@@ -1,6 +1,8 @@
 /** Last saves of the settings, as the audit log records them (who, when, what). */
 import { useTranslation } from 'react-i18next'
 import { formatDate } from '../../lib/utils'
+import { RecordList, RecordRow } from '../../components/atelier'
+import { SettingsHistory as History } from '../../components/atelier/SettingsView'
 
 // The audit log names a save in English: the known names and fixed details in the reader's
 // language, as the mockup writes them (« SMTP modifié »); any other text is shown as recorded
@@ -34,28 +36,13 @@ export default function SettingsHistory({ entries }) {
   }
   const detail = (text) => (DETAILS[text] ? t(DETAILS[text]) : text)
   return (
-    <section className="sf-history" aria-labelledby="sf-history-title">
-      <header className="sf-heading">
-        <div>
-          <h2 id="sf-history-title">{t('settings.historyTitle')}</h2>
-          <p>{t('settings.historyIntent')}</p>
-        </div>
-      </header>
-      {entries.length ? (
-        <ul className="sf-history-list">
-          {entries.map((entry) => (
-            <li key={entry.id}>
-              <span className="sf-history-main">
-                <strong>{title(entry)}</strong>
-                {entry.details && <span className="sf-history-detail">{detail(entry.details)}</span>}
-              </span>
-              <span className="sf-history-meta">{entry.username} · {formatDate(entry.timestamp, { time: true })}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="sf-history-empty">{t('settings.historyEmpty')}</p>
-      )}
-    </section>
+    <History title={t('settings.historyTitle')} text={t('settings.historyIntent')}>
+      <RecordList empty={t('settings.historyEmpty')}>
+        {entries.map((entry) => (
+          <RecordRow key={entry.id} title={title(entry)} meta={entry.details && detail(entry.details)}
+            badge={<span className="rl-meta">{entry.username} · {formatDate(entry.timestamp, { time: true })}</span>} />
+        ))}
+      </RecordList>
+    </History>
   )
 }

@@ -85,3 +85,22 @@
 .atl .command-line{display:flex;align-items:center;gap:8px;margin:8px 0 12px}
 .atl .command-line code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;padding:8px 10px;background:var(--raised);border-radius:4px;font-size:12px}
 .atl .public-key{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;padding:10px;background:var(--raised);border-radius:4px}
+/*
+ * Settings: what the product's sections hold beyond the mockup's fields. A group's sentence under
+ * its legend, its blocks stacked when they are not fields, a row of actions, a notice among the
+ * fields, a segmented choice at its own width, the padlock of a field reserved to administrators,
+ * and the title a link lands on, focused without the keyboard outline.
+ */
+.atl .settings-group>.group-hint{margin:-5px 0 12px}
+.atl .group-hint{font-size:12px;line-height:1.6;color:var(--muted)}
+.atl .settings-group>legend .badge{font-weight:400}
+.atl .settings-stack{display:grid;gap:16px;min-width:0}
+.atl .settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.atl .settings-grid>.settings-actions,.atl .settings-grid>.notice{grid-column:1/-1}
+.atl .settings-grid>.notice,.atl .settings-stack>.notice,.atl .settings-body>.notice{margin:0}
+.atl .notice-actions{margin-top:8px}
+.atl .pre-line{white-space:pre-line}
+.atl .field>.segmented{align-self:flex-start;flex-wrap:wrap}
+.atl .lock-mark{display:inline-flex;margin-left:5px;vertical-align:-2px;color:var(--muted)}
+.atl .lock-mark .icon{width:12px;height:12px}
+.atl .settings-section .panel-heading h2[data-quiet-focus]:focus-visible{outline:none}

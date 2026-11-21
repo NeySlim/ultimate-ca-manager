@@ -10,19 +10,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key, opts) => (opts?.count !== undefined ? `${key}:${opts.count}` : key) }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
-// A native select exposes the options and the helper text that the real one hides in a portal.
-vi.mock('../../../components', async (orig) => ({
-  ...(await orig()),
-  Select: ({ label, options = [], value, helperText }) => (
-    <div data-testid={`field-${label}`}>
-      <select aria-label={label} value={value ?? ''} onChange={() => {}}>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {helperText && <p>{helperText}</p>}
-    </div>
-  ),
-}))
-
 import SecuritySection from '../SecuritySection'
 
 const CAS = [
@@ -39,8 +26,9 @@ function renderPicker(trustedCaId) {
     setShowDisableEncryptionModal={vi.fn()} anomalies={[]} anomaliesLoading={false} loadAnomalies={vi.fn()}
     mtlsSettings={{ enabled: true, trusted_ca_id: trustedCaId }} setMtlsSettings={vi.fn()}
     mtlsLoading={false} mtlsSaving={false} handleMtlsSave={vi.fn()} cas={CAS} />)
-  const field = screen.getByTestId('field-settings.mtls.trustedCA')
-  return { field, labels: within(field).getAllByRole('option').map((o) => o.textContent) }
+  // The mockup's native select; its empty first entry is the placeholder, not a CA
+  const field = screen.getByLabelText('settings.mtls.trustedCA').closest('.field')
+  return { field, labels: within(field).getAllByRole('option').filter((o) => o.value).map((o) => o.textContent) }
 }
 
 describe('SecuritySection mTLS trusted CA picker (#426)', () => {

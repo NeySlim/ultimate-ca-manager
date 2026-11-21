@@ -5,7 +5,7 @@
  * ToggleSwitch, Modal and FormModal keep the props of the product components they replace, so a
  * form moves to the mockup's markup by its import; `full` and `short` place a field in its grid.
  */
-import { forwardRef, useId, useRef } from 'react'
+import { forwardRef, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
 import { Btn } from './Btn'
@@ -50,6 +50,51 @@ export const Input = forwardRef(function Input({ label, error, helperText, hint,
     </Field>
   )
 })
+
+/**
+ * A whole number as the mockup types one (settingsField `numeric`): a text input in numeric mode,
+ * a short field by default; onChange receives the event, the page checks the bounds at the save.
+ */
+export const NumberInput = forwardRef(function NumberInput({ short = true, ...rest }, ref) {
+  return <Input ref={ref} inputMode="numeric" short={short} {...rest} />
+})
+
+/** A secret: masked, never offered by the browser's autofill; a stored one shows as a masked placeholder. */
+export const SecretInput = forwardRef(function SecretInput(props, ref) {
+  return <Input ref={ref} type="password" autoComplete="new-password" {...props} />
+})
+
+const splitList = (text) => text.split(',').map((v) => v.trim()).filter(Boolean)
+
+/**
+ * A list typed as the mockup's recipients field (scheduleDialog `sch-to`): entries separated by
+ * commas. onChange receives the entries `validate` accepts; one it refuses is named under the
+ * field once the field is left, and is not kept.
+ */
+export function ListInput({ value = [], onChange, validate, invalidMessage, id, ...rest }) {
+  const auto = useId()
+  const fid = id ?? auto
+  const joined = value.join(', ')
+  const [text, setText] = useState(joined)
+  const [bad, setBad] = useState([])
+  // A value set from outside (a reset, a load) replaces what is typed
+  const last = useRef(joined)
+  useEffect(() => {
+    if (joined !== last.current && splitList(text).join(', ') !== joined) setText(joined)
+    last.current = joined
+  }, [joined]) // eslint-disable-line react-hooks/exhaustive-deps
+  const change = (e) => {
+    setText(e.target.value)
+    const all = splitList(e.target.value)
+    const ok = validate ? all.filter(validate) : all
+    if (ok.join(', ') !== joined) { last.current = ok.join(', '); onChange?.(ok) }
+    if (bad.length) setBad(validate ? all.filter((v) => !validate(v)) : [])
+  }
+  const leave = () => setBad(validate ? splitList(text).filter((v) => !validate(v)) : [])
+  return (
+    <Input id={fid} value={text} onChange={change} onBlur={leave} error={bad.length ? invalidMessage?.(bad) : undefined} {...rest} />
+  )
+}
 
 /**
  * A native select; onChange receives the value, as the product's Select did. A placeholder is an
@@ -101,6 +146,26 @@ export function ToggleSwitch({ checked = false, onChange, disabled = false, size
     <div className={join('field full', className)}>
       <label className="checkbox-line">{box}{label}</label>
       <small id={`hint-${fid}`}>{description}</small>
+    </div>
+  )
+}
+
+/**
+ * A choice among a few values: the mockup's `.segmented` group of pressed buttons, named by the
+ * field's label. `pressed(value)` says which are on; several may be (a set of days).
+ */
+export function SegmentedField({ id, label, hint, options, pressed, onPick, full = true, short, disabled }) {
+  const auto = useId()
+  const fid = id ?? auto
+  return (
+    <div className={placeOf({ full, short })}>
+      <span id={`label-${fid}`}>{label}</span>
+      <div className="segmented" role="group" aria-labelledby={`label-${fid}`} aria-describedby={hint ? `hint-${fid}` : undefined}>
+        {options.map((o) => (
+          <button key={String(o.value)} type="button" aria-pressed={pressed(o.value)} disabled={disabled || undefined} onClick={() => onPick(o.value)}>{o.label}</button>
+        ))}
+      </div>
+      {hint && <small id={`hint-${fid}`}>{hint}</small>}
     </div>
   )
 }

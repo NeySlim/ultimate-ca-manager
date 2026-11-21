@@ -3848,6 +3848,8 @@
     "alertRecipients": "Одержувачі сповіщень",
     "tagsInputHelp": "Введіть адресу та натисніть Enter для додавання",
     "alertRecipientsPlaceholder": "admin@example.com",
+    "alertRecipientsHint": "One or more addresses separated by commas.",
+    "alertRecipientsInvalid": "Invalid address: {{list}}. For example pki@example.com, separated by commas.",
     "smtpRequiredForAlerts": "Налаштуйте та протестуйте SMTP-сервер вище, перш ніж вмикати сповіщення електронною поштою.",
     "includeRevoked": "Включати відкликані сертифікати",
     "excludeAcme": "Пропускати сертифікати, видані через ACME",

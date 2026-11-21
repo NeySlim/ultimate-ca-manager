@@ -34,7 +34,7 @@ describe('SettingsPage: Backup section permission', () => {
     render(<MemoryRouter initialEntries={['/settings']}><SettingsPage /></MemoryRouter>)
     await screen.findByRole('navigation', { name: 'settings.tocLabel' })
     expect(within(toc()).queryByRole('link', { name: /settings\.tabs\.backup/ })).toBeNull()
-    expect(document.getElementById('sf-sec-backup')).toBeNull()
+    expect(document.getElementById('set-sec-backup')).toBeNull()
     expect(screen.queryByText('backup-body')).toBeNull()
   })
 
@@ -43,6 +43,6 @@ describe('SettingsPage: Backup section permission', () => {
     render(<MemoryRouter initialEntries={['/settings']}><SettingsPage /></MemoryRouter>)
     await screen.findByRole('navigation', { name: 'settings.tocLabel' })
     expect(within(toc()).getByRole('link', { name: /settings\.tabs\.backup/ })).toBeInTheDocument()
-    expect(document.getElementById('sf-sec-backup')).toBeInTheDocument()
+    expect(document.getElementById('set-sec-backup')).toBeInTheDocument()
   })
 })

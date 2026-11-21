@@ -27,13 +27,6 @@ vi.mock('../../../components', () => ({
   DetailContent: ({ children }) => <div>{children}</div>,
 }))
 
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label, description, checked, disabled, onChange }) => (
-    <button type="button" role="switch" aria-label={label} aria-description={description}
-      aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)} />
-  ),
-}))
-
 import SecuritySection from '../SecuritySection'
 
 const OPERATOR = ['read:settings', 'write:settings']
@@ -55,25 +48,26 @@ function renderSecurity(perms, settings = {}, updateSetting = vi.fn()) {
   return updateSetting
 }
 
-const toggle = (key) => screen.getByRole('switch', { name: key })
+// The mockup's checkbox line: its state, its hint as the accessible description
+const toggle = (key) => screen.getByRole('checkbox', { name: key })
 
 describe('CRL housekeeping switches', () => {
   it('are off when the settings do not carry the keys', () => {
     renderSecurity(ADMIN)
-    expect(toggle(DELETE).getAttribute('aria-checked')).toBe('false')
-    expect(toggle(PURGE).getAttribute('aria-checked')).toBe('false')
+    expect(toggle(DELETE).checked).toBe(false)
+    expect(toggle(PURGE).checked).toBe(false)
   })
 
   it('follow each key independently', () => {
     renderSecurity(ADMIN, { crl_auto_delete_expired_revoked: true, crl_auto_purge_stale_serials: false })
-    expect(toggle(DELETE).getAttribute('aria-checked')).toBe('true')
-    expect(toggle(PURGE).getAttribute('aria-checked')).toBe('false')
+    expect(toggle(DELETE).checked).toBe(true)
+    expect(toggle(PURGE).checked).toBe(false)
   })
 
   it('carry their description keys', () => {
     renderSecurity(ADMIN)
-    expect(toggle(DELETE).getAttribute('aria-description')).toBe('settings.crlAutoDeleteExpiredRevokedDesc')
-    expect(toggle(PURGE).getAttribute('aria-description')).toBe('settings.crlAutoPurgeStaleSerialsDesc')
+    expect(toggle(DELETE)).toHaveAccessibleDescription('settings.crlAutoDeleteExpiredRevokedDesc')
+    expect(toggle(PURGE)).toHaveAccessibleDescription('settings.crlAutoPurgeStaleSerialsDesc')
   })
 
   it('send the new boolean under the setting key for an administrator', () => {
@@ -88,15 +82,15 @@ describe('CRL housekeeping switches', () => {
     const updateSetting = renderSecurity(OPERATOR, { crl_auto_delete_expired_revoked: true })
     expect(toggle(DELETE).disabled).toBe(true)
     expect(toggle(PURGE).disabled).toBe(true)
-    expect(toggle(DELETE).getAttribute('aria-checked')).toBe('true')
+    expect(toggle(DELETE).checked).toBe(true)
     fireEvent.click(toggle(DELETE))
     expect(updateSetting).not.toHaveBeenCalled()
   })
 
-  it('sit after the OCSP responder settings, in the same card', () => {
+  it('sit after the OCSP responder settings, in the same group', () => {
     renderSecurity(ADMIN)
-    const card = toggle(DELETE).closest('section')
-    const ocsp = screen.getByRole('switch', { name: 'settings.ocspResponderAutoRenew' })
+    const card = toggle(DELETE).closest('fieldset')
+    const ocsp = toggle('settings.ocspResponderAutoRenew')
     expect(card.contains(ocsp)).toBe(true)
     const order = [ocsp, toggle(DELETE), toggle(PURGE)]
     for (let i = 1; i < order.length; i++) {

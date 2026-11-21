@@ -57,14 +57,16 @@ const granting = (perms) => (p) => perms.includes(p)
 
 // The field a label belongs to, its control and whether it shows a padlock
 function field(labelKey) {
-  const box = screen.getByText(labelKey).closest('[data-field]')
+  // A product field (mocked) or a field of the mockup (`.field`)
+  const box = screen.getByText(labelKey).closest('[data-field], .field')
   return {
     control: box.querySelector('input, select, textarea'),
     locked: box.querySelector('[data-testid="admin-lock"]') !== null,
   }
 }
 
-const toggle = (labelKey) => screen.getByRole('switch', { name: labelKey })
+// A product switch (mocked) or the mockup's checkbox line
+const toggle = (labelKey) => screen.queryByRole('switch', { name: labelKey }) || screen.getByRole('checkbox', { name: labelKey })
 const saveButtons = () => screen.queryAllByText('common.saveChanges')
 
 describe('GeneralSection', () => {

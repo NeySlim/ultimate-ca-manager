@@ -1,4 +1,4 @@
-/** A bounded field of General carries its bounds and shows the error the save found on it. */
+/** A bounded field of General is typed as the mockup's numbers and shows the error the save found on it. */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
@@ -17,16 +17,15 @@ vi.mock('../../../services', () => ({
 import GeneralSection from '../GeneralSection'
 
 describe('GeneralSection bounded fields', () => {
-  it('gives the inactivity field its bounds and marks it out of range', () => {
+  it('types the inactivity field as a number and marks it out of range', () => {
     render(
       <GeneralSection settings={{ session_timeout: 99999 * 60 }} updateSetting={vi.fn()} canWrite={() => true}
         hasPermission={() => true} fieldErrors={{ session_timeout: 'Durée hors plage : un entier de 5 à 1440 minutes.' }} />,
     )
-    const field = screen.getByRole('spinbutton', { name: /settings\.sessionTimeout/ })
-    expect(field).toHaveAttribute('min', '5')
-    expect(field).toHaveAttribute('max', '1440')
+    const field = screen.getByRole('textbox', { name: /settings\.sessionTimeout/ })
+    expect(field).toHaveAttribute('inputmode', 'numeric')
     expect(field).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByText('Durée hors plage : un entier de 5 à 1440 minutes.')).toBeInTheDocument()
-    expect(screen.getByRole('spinbutton', { name: /settings\.maxLoginAttempts/ })).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByRole('textbox', { name: /settings\.maxLoginAttempts/ })).not.toHaveAttribute('aria-invalid')
   })
 })

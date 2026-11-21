@@ -15,12 +15,21 @@ export const heightMin = () => Math.min(210, heightMax())
 
 export const focusMainTitle = () => requestAnimationFrame(() => document.getElementById('main-title')?.focus())
 
-/** Scrolls to a settings section and gives its title the focus without moving the page again. */
-export function jumpTo(id) {
+/**
+ * Scrolls to a settings section and gives its title the focus without moving the page again.
+ * `quiet` (a link landing, no key pressed) keeps the focus without its keyboard outline until the title loses it.
+ */
+export function jumpTo(id, { quiet = false } = {}) {
   const sec = document.getElementById(`set-sec-${id}`)
   if (!sec) return
   sec.scrollIntoView?.({ block: 'start' })
-  document.getElementById(`set-title-${id}`)?.focus({ preventScroll: true })
+  const title = document.getElementById(`set-title-${id}`)
+  if (!title) return
+  if (quiet) {
+    title.setAttribute('data-quiet-focus', '')
+    title.addEventListener('blur', () => title.removeAttribute('data-quiet-focus'), { once: true })
+  }
+  title.focus({ preventScroll: true })
 }
 
 /** Where the focus goes after a queue operation: the action of the row now at the same place, else the history toggle. */

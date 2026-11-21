@@ -3748,6 +3748,8 @@
     "alertRecipients": "アラート受信者",
     "tagsInputHelp": "アドレスを入力してEnterで追加",
     "alertRecipientsPlaceholder": "admin@example.com",
+    "alertRecipientsHint": "One or more addresses separated by commas.",
+    "alertRecipientsInvalid": "Invalid address: {{list}}. For example pki@example.com, separated by commas.",
     "smtpRequiredForAlerts": "メールアラートを有効にする前に、上記のSMTPサーバーを設定してテストしてください。",
     "includeRevoked": "失効済み証明書を含める",
     "excludeAcme": "ACME で発行された証明書を除外",

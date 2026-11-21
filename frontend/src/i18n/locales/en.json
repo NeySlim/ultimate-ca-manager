@@ -3749,6 +3749,8 @@
     "alertRecipients": "Alert Recipients",
     "tagsInputHelp": "Type an address and press Enter to add",
     "alertRecipientsPlaceholder": "admin@example.com",
+    "alertRecipientsHint": "One or more addresses separated by commas.",
+    "alertRecipientsInvalid": "Invalid address: {{list}}. For example pki@example.com, separated by commas.",
     "smtpRequiredForAlerts": "Configure and test an SMTP server above before enabling email alerts.",
     "includeRevoked": "Include revoked certificates",
     "excludeAcme": "Skip certificates issued over ACME",
