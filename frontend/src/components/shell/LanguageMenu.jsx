@@ -1,15 +1,17 @@
 /**
- * Language choice of the pages shown before sign-in, beside the theme menu and in the grammar
- * of the mockup's themeMenu(): `.pop-wrap`, a quiet icon button, `ul.pop-menu.theme-menu` of
- * radio items, the current one checked, arrows on the button. The choice is kept in this browser.
+ * Language menu of the bar and of the sign-in pages, beside the theme menu and in the grammar of
+ * the mockup's themeMenu(): `.pop-wrap`, a quiet icon button, `ul.pop-menu.theme-menu` of radio
+ * items, the current one checked, arrows on the button. A choice takes the account preferences'
+ * path (chooseLanguage): this browser, and the account once signed in.
  */
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from '../atelier/Icon'
 import { languages } from '../../i18n'
-import { useDisclosure, moveFocus } from '../shell/useDisclosure'
+import { chooseLanguage } from '../../lib/chooseLanguage'
+import { useDisclosure, moveFocus } from './useDisclosure'
 
-export function AuthLanguageMenu() {
+export function LanguageMenu() {
   const { t, i18n } = useTranslation()
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
   const panelRef = useRef(null)
@@ -46,8 +48,7 @@ export function AuthLanguageMenu() {
   }
 
   const pick = (code) => {
-    i18n.changeLanguage(code)
-    try { localStorage.setItem('i18nextLng', code) } catch { /* storage is optional */ }
+    chooseLanguage(i18n, code)
     close(true)
   }
 
@@ -58,6 +59,7 @@ export function AuthLanguageMenu() {
         ref={buttonRef}
         className="icon-btn quiet"
         id="language-button"
+        data-action="language-menu"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="language-menu"

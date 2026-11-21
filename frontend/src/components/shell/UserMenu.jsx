@@ -1,13 +1,17 @@
 /**
  * Account menu, the mockup's userMenu(): identity (name, role and login), the sign-in method with
- * the inactivity lock, then My account and Sign out. The language is chosen in the account
- * preferences and on the sign-in page; Settings is reached from the Modules menu and the palette.
+ * the inactivity lock, then My account and Sign out. Deviation asked by the maintainer: Settings
+ * between them, for who may see the Settings module. The language is chosen from the bar's globe
+ * menu (from this menu on a phone), the account preferences and the sign-in pages.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../atelier/Icon'
 import { useAuth } from '../../contexts/AuthContext'
+import { languages } from '../../i18n'
+import { chooseLanguage } from '../../lib/chooseLanguage'
+import { glyphOf, isVisible, menuLabelKey, moduleById } from '../../navigation/registry'
 import { authService } from '../../services/auth.service'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
@@ -31,8 +35,8 @@ const readTimeout = () => {
   return timeoutRead
 }
 
-export function UserMenu() {
-  const { t } = useTranslation()
+export function UserMenu({ can }) {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { user, logout, authMethod } = useAuth()
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
@@ -42,6 +46,9 @@ export function UserMenu() {
   const name = user?.full_name || username
   const role = user?.role ? t(roleKey(user.role), { defaultValue: user.role }) : ''
   const items = () => [...(panelRef.current?.querySelectorAll('a, button') || [])]
+  // Without a `can` nothing proves the right: no Settings entry
+  const settings = moduleById('settings')
+  const showSettings = !!can && isVisible(settings, can)
 
   useEffect(() => {
     if (!open) return undefined
@@ -54,7 +61,8 @@ export function UserMenu() {
   const onKeyDown = (e) => {
     rootProps.onKeyDown(e)
     if (e.defaultPrevented) return
-    if (open && panelRef.current?.contains(e.target)) moveFocus(e, items())
+    // The language list keeps its own arrows
+    if (open && panelRef.current?.contains(e.target) && e.target.tagName !== 'SELECT') moveFocus(e, items())
   }
 
   const handleLogout = async () => {
@@ -94,9 +102,21 @@ export function UserMenu() {
             </span>
           ) : null}
         </div>
+        {/* On a phone the bar has no room for the language menu: it moves here (adjust.css) */}
+        <div className="pop-item user-lang">
+          <Icon name="globe" /><label className="pop-label" htmlFor="user-language">{t('settings.language')}</label>
+          <select id="user-language" value={i18n.language?.split('-')[0] || 'en'} onChange={(e) => { chooseLanguage(i18n, e.target.value); close(true) }}>
+            {languages.map(l => <option key={l.code} value={l.code} lang={l.code}>{l.name}</option>)}
+          </select>
+        </div>
         <button type="button" className="pop-item" id="user-account" data-action="my-account" onClick={() => { close(); navigate('/account') }}>
           <Icon name="users" />{t('common.account')}
         </button>
+        {showSettings && (
+          <button type="button" className="pop-item" id="user-settings" data-action="settings" onClick={() => { close(); navigate(settings.path) }}>
+            <Icon name={glyphOf(settings)} />{t(menuLabelKey(settings))}
+          </button>
+        )}
         <button type="button" className="pop-item" id="user-logout" data-action="logout" onClick={handleLogout}>
           <Icon name="logout" />{t('shell.signOut')}
         </button>

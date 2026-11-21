@@ -87,10 +87,10 @@ describe('TopBar', () => {
     expect(within(nav).getAllByRole('link').map(a => a.getAttribute('data-module'))).not.toContain('audit')
   })
 
-  it('tabs through the bar in reading order: brand, pages, pins, Modules, search, theme, bell, help, account', async () => {
+  it('tabs through the bar in reading order: brand, pages, pins, Modules, search, language, theme, bell, help, account', async () => {
     const { user } = setup({ pins: ['users'] })
     const seen = []
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 14; i++) {
       await user.tab()
       const el = document.activeElement
       seen.push(el.getAttribute('data-module') || el.getAttribute('aria-label') || el.textContent.trim())
@@ -98,7 +98,7 @@ describe('TopBar', () => {
     // The phone picker is display:none on desktop (CSS, not applied in jsdom)
     expect(seen.filter(l => l !== 'shell.navigate')).toEqual([
       'UCM', 'dashboard', 'certificates', 'cas', 'audit', 'users',
-      'shell.modules', 'shell.search', 'shell.theme.label', 'shell.bell.label', 'common.help',
+      'shell.modules', 'shell.search', 'settings.language', 'shell.theme.label', 'shell.bell.label', 'common.help',
       'shell.accountLabel|probe',
     ])
   })
