@@ -246,7 +246,7 @@ function PolicyDialog({ editing, cas, groups, keyTypeOptions, saving, onSave, on
 export default function PoliciesPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
 
   // FIPS mode puts a read-only system policy ahead of these, without EdDSA keys
   const platform = useKeyPlatform()
@@ -462,7 +462,7 @@ export default function PoliciesPage() {
           { status: true },
         ]}
         error={loadError && (
-          <LoadError id="policies" title={t('policies.loadFailed')} onRetry={() => { setLoading(true); loadData() }}
+          <LoadError id="policies" title={t('policies.loadFailed')} onRetry={() => { setLoading(true); loadData() }} journal={hasPermission('read:audit') && '/audit'}
             cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/policies', message: loadError.message }} />} />
         )}
         empty={narrowed && policies.length ? (

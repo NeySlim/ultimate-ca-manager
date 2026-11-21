@@ -5,7 +5,8 @@
  * confirmation, the empty and error states.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render as rtl, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -22,7 +23,7 @@ vi.mock('../../hooks', async () => {
   const persisted = await vi.importActual('../../hooks/usePersistedState')
   return {
     usePersistedState: persisted.usePersistedState,
-    usePermission: () => ({ canRead: () => true, canWrite: () => perms.write, canDelete: () => perms.del }),
+    usePermission: () => ({ canRead: () => true, canWrite: () => perms.write, canDelete: () => perms.del, hasPermission: () => true }),
   }
 })
 vi.mock('../../lib/policyAlgorithms', () => ({ useKeyPlatform: () => ({ fips: false, fipsKeys: null }) }))
@@ -34,6 +35,8 @@ vi.mock('../../services', () => ({
 }))
 
 import PoliciesPage from '../PoliciesPage'
+
+const render = (ui) => rtl(<MemoryRouter>{ui}</MemoryRouter>)
 
 const P = [
   { id: 1, name: 'Serveurs TLS', priority: 50, is_active: true, operations: ['issuance', 'renewal'], ca_name: 'Services CA G2', requires_approval: true, min_approvers: 2, approval_group_name: 'pki', rules: { max_validity_days: 397, allowed_key_types: ['RSA-3072'] } },
@@ -126,6 +129,7 @@ describe('PoliciesPage on the mockup module list', () => {
     render(<PoliciesPage />)
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('policies.loadFailed')
+    expect(within(alert).getByRole('link', { name: /work.viewLog/ })).toHaveAttribute('href', '/audit')
     fireEvent.click(within(alert).getByRole('button', { name: 'table.retry' }))
     expect(await screen.findByRole('button', { name: 'Clients' })).toBeInTheDocument()
   })

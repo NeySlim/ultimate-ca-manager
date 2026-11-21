@@ -212,7 +212,7 @@ export default function DiscoveryPage() {
   const resetFilters = () => { setQuery(''); setScanView(''); setFoundView(''); setRunView(''); setProfileFilter(''); setPage(1) }
   const noMatch = <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={resetFilters} />
   const error = loadError && (
-    <LoadError id="discovery" title={t('discovery.errors.loadFailed')} onRetry={() => { setLoading(true); loadAll() }}
+    <LoadError id="discovery" title={t('discovery.errors.loadFailed')} onRetry={() => { setLoading(true); loadAll() }} journal={hasPermission('read:audit') && '/audit'}
       cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/discovery', message: loadError.message }} />} />
   )
   const progressNote = scanning && (

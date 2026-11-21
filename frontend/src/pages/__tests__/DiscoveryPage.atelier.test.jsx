@@ -162,6 +162,7 @@ describe('DiscoveryPage analyses (the mockup module list)', () => {
     renderAt()
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('discovery.errors.loadFailed')
+    expect(within(alert).getByRole('link', { name: /work.viewLog/ })).toHaveAttribute('href', '/audit')
     fireEvent.click(within(alert).getByRole('button', { name: 'table.retry' }))
     expect(await screen.findByRole('button', { name: 'Réseau A' })).toBeInTheDocument()
   })

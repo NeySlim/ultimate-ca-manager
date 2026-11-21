@@ -25,7 +25,7 @@ vi.mock('../../hooks', async () => {
   return {
     useCRUDPage: crud.useCRUDPage,
     usePersistedState: (_key, initial) => useState(initial),
-    usePermission: () => ({ canRead: () => true, canWrite: () => true, canDelete: () => true }),
+    usePermission: () => ({ canRead: () => true, canWrite: () => true, canDelete: () => true, hasPermission: () => true }),
   }
 })
 
