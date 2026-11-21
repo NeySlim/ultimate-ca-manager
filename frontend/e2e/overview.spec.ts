@@ -124,7 +124,10 @@ test('a head preset shows its cards and reads as pressed', async ({ page, api })
     await page.goto('/')
     const manager = page.locator('#head-preset-manager')
     await expect(manager).toHaveAttribute('aria-pressed', 'false')
+    // The preset is saved: wait for it, or the save lands after the restore below
+    const put = page.waitForResponse(r => r.url().endsWith('/account/preferences') && r.request().method() === 'PUT' && r.ok())
     await manager.click()
+    await put
     await expect.poll(() => shownOrder(page)).toEqual(['compliance', 'horizon', 'hierarchy', 'activity'])
     await expect(manager).toHaveAttribute('aria-pressed', 'true')
   })
