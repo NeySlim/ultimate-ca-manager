@@ -157,7 +157,8 @@ export function Textarea({ label, error, helperText, hint, full = true, short, c
 
 /**
  * Pasted PEM or a file (the CSR field of the mockup's issueDialog()): the monospace textarea, its
- * hint, then « Choisir un fichier… » as a `.text-link` over a hidden file input. A binary file
+ * hint, then « Choisir un fichier… » as a `.text-link` over a hidden file input (a file dropped on
+ * the textarea is read the same way). A binary file
  * replaces the textarea by its size, with the link that removes it. onChange receives the text.
  */
 export function PemField({ id, label, value = '', onChange, accept, hint, rows = 6, placeholder, full = true, fileLabel, onFile }) {
@@ -165,14 +166,15 @@ export function PemField({ id, label, value = '', onChange, accept, hint, rows =
   const auto = useId()
   const fid = id ?? auto
   const binary = value.startsWith('BASE64:')
-  const pick = async (e) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
+  const read = async (file) => {
     if (!file) return
     const content = await fileContent(file)
     onChange?.(content)
     onFile?.(file, content)
   }
+  const pick = (e) => { const file = e.target.files?.[0]; e.target.value = ''; read(file) }
+  // A file dropped on the field is read as one picked (the product's former drop zone)
+  const drop = (e) => { const file = e.dataTransfer?.files?.[0]; if (file) { e.preventDefault(); read(file) } }
   return (
     <div className={join('field', full && 'full')}>
       <label htmlFor={binary ? `${fid}-file` : fid}>{label}</label>
@@ -180,7 +182,8 @@ export function PemField({ id, label, value = '', onChange, accept, hint, rows =
         <p className="group-hint" id={fid} role="status">{t('tools.binaryFileLoadedSize', { bytes: Math.round((value.length - 7) * 0.75) })}</p>
       ) : (
         <textarea id={fid} className="mono" rows={rows} spellCheck={false} value={value} placeholder={placeholder}
-          aria-describedby={hint ? `hint-${fid}` : undefined} onChange={(e) => onChange?.(e.target.value)} />
+          aria-describedby={hint ? `hint-${fid}` : undefined} onChange={(e) => onChange?.(e.target.value)}
+          onDragOver={(e) => { if (e.dataTransfer?.types?.includes?.('Files')) e.preventDefault() }} onDrop={drop} />
       )}
       {hint && <small id={`hint-${fid}`}>{hint}</small>}
       <span className="row-actions">

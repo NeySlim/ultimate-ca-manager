@@ -67,6 +67,14 @@ describe('a PEM field that reads a file', () => {
     expect(onFile).toHaveBeenCalledWith(pem, expect.any(String))
   })
 
+  it('reads a file dropped on the textarea as one picked', async () => {
+    const onChange = vi.fn()
+    render(<PemField id="pem" label="PEM" value="" onChange={onChange} />)
+    const pem = file('-----BEGIN CERTIFICATE REQUEST-----\n', 'a.csr')
+    await act(async () => { fireEvent.drop(screen.getByLabelText('PEM'), { dataTransfer: { files: [pem], types: ['Files'] } }) })
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('-----BEGIN CERTIFICATE REQUEST-----\n'))
+  })
+
   it('sends a binary file as BASE64:, shows its size instead of the text and removes it on demand', async () => {
     const onChange = vi.fn()
     const { rerender } = render(<PemField id="pem" label="PEM" value="" onChange={onChange} />)
