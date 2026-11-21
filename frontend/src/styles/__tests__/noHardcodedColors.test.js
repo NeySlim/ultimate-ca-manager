@@ -28,7 +28,7 @@ const NAMED_JS = new RegExp(`\\b(?:fill|stroke|stop-color|flood-color|background
 // rules copied from the Atelier mockup, which atelierLiteral.test.js holds to the mockup's own values.
 export const EXCEPTIONS = [
   { file: 'styles/tokens.css', all: true, reason: 'the token definitions themselves' },
-  { file: 'styles/atelier/activity.css', all: true, reason: 'literal copy of the mockup\'s style.css (atelierLiteral.test.js)' },
+  { file: 'styles/atelier/maquette.css', all: true, reason: 'literal copy of the mockup\'s style.css (atelierLiteral.test.js)' },
   { file: 'components/ProviderIcons.jsx', all: true, reason: 'third-party brand colours' },
   {
     file: 'contexts/ThemeContext.jsx',

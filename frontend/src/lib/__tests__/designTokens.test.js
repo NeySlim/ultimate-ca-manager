@@ -55,6 +55,9 @@ function declaredVariables(files) {
   }
   // Tailwind's own gradient and ring internals
   found.add('tw-gradient-to').add('tw-gradient-from').add('tw-gradient-stops')
+  // Set in a style attribute by the Atelier mockup's markup, which the copy of its stylesheet
+  // (styles/atelier/maquette.css) reads; a zone drawing that markup sets it the same way
+  found.add('weeks')
   return found
 }
 
