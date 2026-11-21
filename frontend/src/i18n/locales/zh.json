@@ -2003,7 +2003,14 @@
     "pageRange_other": "{{start}}–{{end}} / 共 {{count}} 个组",
     "caption": "组。激活名称以打开其详情。",
     "search": "名称、描述…",
-    "manageMembers": "管理成员"
+    "manageMembers": "管理成员",
+    "resource": "Resource",
+    "actions": {
+      "read": "Read",
+      "write": "Write",
+      "delete": "Delete"
+    },
+    "grant": "{{action}}: {{resource}}"
   },
   "acme": {
     "title": "ACME协议",

@@ -2087,7 +2087,14 @@
     "pageRange_many": "{{start}}–{{end}} of {{count}} groups",
     "caption": "Groups. Activate a name to open its detail.",
     "search": "Name, description…",
-    "manageMembers": "Manage members"
+    "manageMembers": "Manage members",
+    "resource": "Resource",
+    "actions": {
+      "read": "Read",
+      "write": "Write",
+      "delete": "Delete"
+    },
+    "grant": "{{action}}: {{resource}}"
   },
   "acme": {
     "title": "Протокол ACME",

@@ -2087,7 +2087,14 @@
     "pageRange_many": "{{start}}–{{end}} из {{count}} групп",
     "caption": "Группы. Выберите имя, чтобы открыть подробности.",
     "search": "Имя, описание…",
-    "manageMembers": "Управление участниками"
+    "manageMembers": "Управление участниками",
+    "resource": "Ресурс",
+    "actions": {
+      "read": "Чтение",
+      "write": "Запись",
+      "delete": "Удаление"
+    },
+    "grant": "{{resource}}: {{action}}"
   },
   "acme": {
     "title": "Протокол ACME",

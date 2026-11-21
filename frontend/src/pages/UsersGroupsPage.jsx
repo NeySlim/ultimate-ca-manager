@@ -25,6 +25,7 @@ import UserApiKeys from '../components/UserApiKeys'
 import { useNotification, useAuth } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { downloadBlob } from '../lib/utils'
+import { groupPermissions } from '../lib/rbacPermissions'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { deletedUserWarning, localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import UserSecuritySection from './users/UserSecuritySection'
@@ -1065,6 +1066,8 @@ function UserForm({ user, isSelf = false, onSubmit, onCancel }) {
 
 // ============= GROUP FORM =============
 
+const GROUP_ACTION_KEYS = { read: 'groups.actions.read', write: 'groups.actions.write', delete: 'groups.actions.delete' }
+
 function GroupForm({ group, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
@@ -1106,12 +1109,10 @@ function GroupForm({ group, onSubmit, onCancel }) {
     }))
   }
 
-  // Group grantable permissions by their resource (the part after ':')
-  const groupedPerms = availablePerms.reduce((acc, perm) => {
-    const resource = perm.split(':')[1] || perm
-    ;(acc[resource] = acc[resource] || []).push(perm)
-    return acc
-  }, {})
+  // One row per resource, named as the RBAC page names it; read, write, delete, then any other action the server grants
+  const resources = groupPermissions(availablePerms)
+  const actions = [...new Set(['read', 'write', 'delete', ...availablePerms.map((p) => String(p).split(':')[0])])]
+  const actionLabel = (a) => (GROUP_ACTION_KEYS[a] ? t(GROUP_ACTION_KEYS[a]) : a)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -1130,25 +1131,44 @@ function GroupForm({ group, onSubmit, onCancel }) {
           required placeholder={t('groups.namePlaceholder')} data-autofocus />
         <FieldInput label={t('common.description')} value={formData.description} onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
           placeholder={t('groups.descriptionPlaceholder')} />
-        {/* One fieldset per resource, its grantable actions as check lines */}
         <div className="field full">
-          <span>{t('groups.permissions')}</span>
+          <span id="group-perms-label">{t('groups.permissions')}</span>
           <small>{t('groups.permissionsHelp')}</small>
-          {Object.keys(groupedPerms).length === 0 ? (
+          {resources.length === 0 ? (
             <small>{t('common.loading')}</small>
-          ) : Object.entries(groupedPerms).map(([resource, perms]) => (
-            <fieldset key={resource} className="field full">
-              <legend>{resource}</legend>
-              <div className="choice-grid">
-                {perms.map(perm => (
-                  <label key={perm} className="checkbox-line">
-                    <input type="checkbox" checked={formData.permissions.includes(perm)} onChange={() => togglePermission(perm)} />
-                    <span className="mono">{perm}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ))}
+          ) : (
+            <div className="compare-scroll">
+              <table className="compare-table group-perms" aria-labelledby="group-perms-label">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('groups.resource')}</th>
+                    {actions.map((a) => <th key={a} scope="col">{actionLabel(a)}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {resources.map((r) => {
+                    const name = r.labelKey ? t(r.labelKey) : r.label
+                    return (
+                      <tr key={r.key}>
+                        <th scope="row">{name}</th>
+                        {actions.map((a) => {
+                          const perm = `${a}:${r.key}`
+                          return (
+                            <td key={a}>
+                              {r.permissions.includes(perm) && (
+                                <input type="checkbox" checked={formData.permissions.includes(perm)} onChange={() => togglePermission(perm)}
+                                  aria-label={t('groups.grant', { action: actionLabel(a), resource: name })} />
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       <div className="modal-actions">

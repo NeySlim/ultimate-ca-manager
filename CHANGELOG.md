@@ -211,6 +211,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **The group dialog grants permissions in a named grid.** Resources carry their names and the actions sit in Read, Write and Delete columns, instead of raw `action:resource` identifiers.
 - **The search palette names each page as the menu does,** with its menu group as the hint (Overview · Navigation, Templates · PKI), so typing a menu name finds its page in every language.
 - **On a phone, the refresh button of ACME and CRL / OCSP stays beside the search field** instead of sitting alone on a second line.
 - **Lists fit beside the inspector docked at the right.** Between 1200 and 1500 px a list scrolled sideways and hid its chevrons; its secondary columns now fold one by one, by priority, until the table fits.

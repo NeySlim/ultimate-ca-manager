@@ -223,3 +223,7 @@
 /* A notice holding a command line lets it scroll inside the notice instead of widening the page */
 .atl .notice:has(>span>.command-line),.atl .notice>span:has(>.command-line){min-width:0}
 @media(max-width:800px){.atl .ext-row.role-row{grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:none}.atl .ext-row.role-row>select{grid-column:1/-1}.atl .ext-row.role-row>.icon-btn{grid-column:2;grid-row:1}.atl .ext-row.row-head{display:none}.atl .eku-list.two-columns{grid-template-columns:1fr}}
+/* Users, group dialog: the permission grid (absent from the mockup) in its compare table, a box per action column. */
+.atl .compare-table.group-perms{min-width:0}
+.atl .group-perms th:not(:first-child),.atl .group-perms td:not(:first-child){width:84px;text-align:center}
+.atl .group-perms td{padding:8px}

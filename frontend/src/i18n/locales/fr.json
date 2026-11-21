@@ -2901,7 +2901,14 @@
     "pageRange_other": "{{start}}–{{end}} sur {{count}} groupes",
     "caption": "Groupes. Activez un nom pour ouvrir son détail.",
     "search": "Nom, description…",
-    "manageMembers": "Gérer les membres"
+    "manageMembers": "Gérer les membres",
+    "resource": "Ressource",
+    "actions": {
+      "read": "Lire",
+      "write": "Écrire",
+      "delete": "Supprimer"
+    },
+    "grant": "{{action}} : {{resource}}"
   },
   "help": {
     "englishOnlyNotice": "L’aide est disponible en anglais, en français, en russe et en chinois.",

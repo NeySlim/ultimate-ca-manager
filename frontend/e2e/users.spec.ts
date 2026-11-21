@@ -48,11 +48,15 @@ test('a group created on screen is stored', async ({ page, api }) => {
   await page.getByRole('main').getByRole('button', { name: 'Create Group' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Name', { exact: false }).first().fill(name)
+  // The permissions are a grid of named resources and Read, Write, Delete columns
+  await dialog.getByRole('checkbox', { name: 'Write: Certificates', exact: true }).check()
   await dialog.getByRole('button', { name: /^Create/ }).click()
   await expect(dialog).toBeHidden()
 
   await expect(page.getByRole('main').getByRole('cell', { name }).first()).toBeVisible()
-  expect(JSON.stringify(await api.get('/groups'))).toContain(name)
+  const groups = await api.get('/groups')
+  expect(JSON.stringify(groups)).toContain(name)
+  expect(JSON.stringify(groups.find((g) => g.name === name)?.permissions)).toContain('write:certificates')
 })
 
 test('a custom role created on screen is stored', async ({ page, api }) => {
