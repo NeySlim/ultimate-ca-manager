@@ -165,8 +165,8 @@ Les valeurs mal formées sont rejetées avec une erreur indiquant les formats ac
 
 UCM génère un script shell POSIX qui configure automatiquement votre serveur :
 
-1. Ouvrez le panneau de détail de l’AC
-2. Cliquez sur **Télécharger le script de configuration**
+1. Ouvrez l’AC, puis son onglet **Installation rapide**
+2. Cliquez sur **Télécharger .sh (Linux/macOS)**
 3. Transférez le script sur votre serveur
 4. Exécutez-le :
 

@@ -3614,8 +3614,8 @@ Malformed values are rejected with an error naming the accepted formats.
 
 UCM generates a POSIX shell script that automatically configures your server:
 
-1. Open the CA detail panel
-2. Click **Download Setup Script**
+1. Open the CA, then its **Quick Install** tab
+2. Click **Download .sh (Linux/macOS)**
 3. Transfer the script to your server
 4. Run it:
 
