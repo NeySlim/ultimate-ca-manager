@@ -16,7 +16,8 @@ export default {
       {
         title: 'Recherche et raccourcis',
         items: [
-          { label: 'Recherche', text: 'Appuyez sur Ctrl K (Cmd K sur macOS) ou sélectionnez le champ de recherche pour aller à une page ou trouver un certificat. Flèche bas passe du champ aux résultats, Flèche haut ramène du premier résultat au champ, et Entrée dans le champ ouvre le premier résultat' },
+          { label: 'Recherche', text: 'Appuyez sur Ctrl K (Cmd K sur macOS) ou sélectionnez le champ de recherche pour aller à une page ou trouver un certificat. Flèche bas passe du champ aux résultats, Flèche haut ramène du premier résultat au champ, et Entrée dans le champ ouvre le premier résultat. Un certificat, une autorité, un modèle, un utilisateur ou une CSR trouvé s’ouvre dans le détail de sa page' },
+          { label: 'Adresse', text: 'L’objet ouvert dans le panneau de détail d’une page et sa section font partie de l’adresse : un rechargement ou un lien partagé les rouvre, et Précédent du navigateur referme le panneau' },
           { label: 'Aide', text: 'Appuyez sur ? hors d’un champ de texte pour ouvrir l’aide de la page courante' },
           { label: 'Largeur téléphone', text: 'La barre supérieure affiche une seule liste de pages au lieu des liens et du menu' },
         ]
