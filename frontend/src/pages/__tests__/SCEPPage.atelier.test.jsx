@@ -127,6 +127,25 @@ describe('the SCEP profiles', () => {
     expect(screen.queryByRole('dialog', { name: 'scep.newChallengeTitle' })).toBeNull()
   })
 
+  it('rotates nothing when the dialog is cancelled, and deletes through the shared confirmation', async () => {
+    const browserConfirm = vi.fn(() => true)
+    vi.stubGlobal('confirm', browserConfirm)
+    at('/scep-config')
+    fireEvent.click(await screen.findByRole('button', { name: 'Équipements réseau' }))
+    fireEvent.click(within(await dock()).getByRole('button', { name: 'scep.rotate' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'scep.rotateTitle' })).getByRole('button', { name: 'common.cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'scep.rotateTitle' })).toBeNull())
+    expect(scep.regenerateProfileChallenge).not.toHaveBeenCalled()
+    notify.showConfirm.mockResolvedValueOnce(false)
+    fireEvent.click(within(await dock()).getByRole('button', { name: 'common.delete' }))
+    await waitFor(() => expect(notify.showConfirm).toHaveBeenCalled())
+    expect(scep.deleteProfile).not.toHaveBeenCalled()
+    fireEvent.click(within(await dock()).getByRole('button', { name: 'common.delete' }))
+    await waitFor(() => expect(scep.deleteProfile).toHaveBeenCalledWith(1))
+    expect(browserConfirm).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
   it('offers no rotation for an Intune profile and no action without write:scep', async () => {
     at('/scep-config')
     fireEvent.click(await screen.findByRole('button', { name: 'Postes nomades' }))

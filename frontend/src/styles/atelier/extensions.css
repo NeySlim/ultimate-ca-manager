@@ -38,6 +38,8 @@
 /* ACME server profiles: one row of six controls (name, description, validity, digest, template, remove); one column on a phone. */
 .atl .profile-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 90px 110px minmax(0,1.2fr) 36px;gap:8px;align-items:center}
 .atl .profile-row .icon-btn{width:36px;min-height:36px}
-@media(max-width:800px){.atl .profile-row{grid-template-columns:minmax(0,1fr) 40px}.atl .profile-row>:not(.icon-btn,.sr-only){grid-column:1}}
+@media(max-width:800px){.atl .profile-row{grid-template-columns:minmax(0,1fr) 40px}.atl .profile-row>:not(.icon-btn):not(.sr-only){grid-column:1}}
+/* On a phone the switch and its action go under the title, which keeps the full width as in the mockup. */
+@media(max-width:800px){.atl .page-head:has(.view-switch){flex-wrap:wrap}.atl .page-head:has(.view-switch)>div:first-child,.atl .page-head:has(.view-switch)>.actions{flex-basis:100%}.atl .page-head .actions .view-switch{flex:1;max-width:none;min-height:40px}}
 /* The dock slot of a page whose views draw their own dock: no box, the dock inside lays out as the mockup's #inspector. */
 .atl .dock-slot{display:contents}
