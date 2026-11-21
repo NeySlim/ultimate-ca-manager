@@ -104,3 +104,27 @@
 .atl #toast.failure.tone-good .toast-msg .icon{color:var(--good)}
 .atl #toast.failure.tone-accent{border-left-color:var(--accent)}
 .atl #toast.failure.tone-accent .toast-msg .icon{color:var(--accent)}
+/*
+ * Sign-in pages (components/auth/AuthFrame.jsx). The zone fills the window and scrolls itself
+ * (the product's body never scrolls; the mockup's does under 800 px).
+ */
+.atl.atl-auth{height:100%;overflow:auto}
+/* Two tools at the top right (language, then theme): side by side, spaced as the bar's tools. */
+.atl .auth-tools{display:flex;align-items:center;gap:8px}
+.atl .lang-flag{width:17px;flex-shrink:0;text-align:center}
+/* The product's mark in the box of the mockup's 30 × 34 image. */
+.atl .auth-brand>svg{display:block;width:30px;height:34px}
+/* A notice in the card (maintenance, SSO test) takes the card's gap, not the page's margin under it. */
+.atl .auth-card>.notice{margin:0}
+/* Strength of a new password: five bars and the level in words, never the colour alone. */
+.atl .auth-meter{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+.atl .auth-meter-bars{display:flex;gap:4px}
+.atl .auth-meter-bars i{flex:1;height:4px;border-radius:999px;background:var(--line)}
+.atl .auth-meter.is-weak .is-on{background:var(--bad)}
+.atl .auth-meter.is-fair .is-on,.atl .auth-meter.is-good .is-on{background:var(--warn-fill)}
+.atl .auth-meter.is-strong .is-on{background:var(--good)}
+/* Forced 2FA enrolment: the authenticator's QR code on white, the backup codes on two columns. */
+.atl .auth-qr{display:flex;justify-content:center;padding:12px;background:var(--paper);border-radius:6px}
+.atl .auth-qr img{display:block;width:176px;height:176px}
+.atl .backup-codes{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin:0;padding:10px 12px;list-style:none;background:var(--raised);border-radius:6px}
+@media(max-width:800px){.atl .auth-tools{gap:4px}.atl .auth-tools .shell-icon-btn{width:40px;height:40px;min-width:40px;min-height:40px}.atl .auth-tools .shell-pop{position:absolute;top:calc(100% + 8px);right:0;left:auto;width:220px;max-width:calc(100vw - 24px)}}

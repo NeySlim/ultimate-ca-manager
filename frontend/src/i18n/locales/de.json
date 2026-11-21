@@ -662,7 +662,8 @@
       "canRetry": "You can try again.",
       "lockedAnnounce": "Session expired: the screen is locked, the current page is kept.",
       "signedIn": "Signed in: {{name}}, {{role}}.",
-      "signedInNoRole": "Signed in: {{name}}."
+      "signedInNoRole": "Signed in: {{name}}.",
+      "signedOut": "You are signed out. Your display preferences are kept."
     }
   },
   "dashboard": {
@@ -4335,6 +4336,7 @@
     "disableTwoFactor": "Zwei-Faktor-Authentifizierung deaktivieren",
     "enableTwoFactor": "Zwei-Faktor-Authentifizierung aktivieren",
     "scanQRCode": "1. Scannen Sie diesen QR-Code mit Ihrer Authenticator-App:",
+    "qrCodeAlt": "QR code of the authenticator secret",
     "enterDigitCode": "2. Geben Sie den 6-stelligen Code ein:",
     "backupCodes": "Backup-Codes - Diese speichern!",
     "verifyAndEnable": "Verifizieren & Aktivieren",

@@ -666,7 +666,8 @@
       "canRetry": "You can try again.",
       "lockedAnnounce": "Session expired: the screen is locked, the current page is kept.",
       "signedIn": "Signed in: {{name}}, {{role}}.",
-      "signedInNoRole": "Signed in: {{name}}."
+      "signedInNoRole": "Signed in: {{name}}.",
+      "signedOut": "You are signed out. Your display preferences are kept."
     }
   },
   "dashboard": {
@@ -4445,6 +4446,7 @@
     "disableTwoFactor": "Вимкнути двофакторну автентифікацію",
     "enableTwoFactor": "Увімкнути двофакторну автентифікацію",
     "scanQRCode": "1. Відскануйте цей QR-код програмою автентифікації:",
+    "qrCodeAlt": "QR code of the authenticator secret",
     "enterDigitCode": "2. Введіть 6-значний код:",
     "backupCodes": "Резервні коди - збережіть їх!",
     "verifyAndEnable": "Перевірити та увімкнути",

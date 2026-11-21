@@ -38,6 +38,7 @@ vi.mock('../../services/auth-methods.service', () => ({
 }))
 
 import LoginPage from '../LoginPage'
+import { findAlert } from '../../test/filledAlert'
 
 const renderLogin = (entry = '/login') => render(
   <MemoryRouter initialEntries={[entry]}>
@@ -103,7 +104,7 @@ describe('LoginPage, as designed', () => {
     s.loginPassword.mockRejectedValue(refusal(401, 'Invalid credentials'))
     renderLogin()
     await submit()
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.refused')
+    expect(await findAlert()).toHaveTextContent('auth.page.refused')
     const pass = screen.getByLabelText('auth.page.password')
     expect(pass).toHaveValue('')
     await waitFor(() => expect(document.activeElement).toBe(pass))
@@ -114,7 +115,7 @@ describe('LoginPage, as designed', () => {
     s.loginPassword.mockRejectedValue(refusal(401, 'Invalid credentials'))
     renderLogin()
     await submit()
-    const alert = await screen.findByRole('alert')
+    const alert = await findAlert()
     expect(alert).toHaveTextContent('auth.page.refused')
     expect(alert).not.toHaveTextContent('Invalid credentials')
   })
@@ -123,7 +124,7 @@ describe('LoginPage, as designed', () => {
     s.loginPassword.mockRejectedValue(refusal(429, 'Too many requests', { retryAfter: 3 }))
     renderLogin()
     await submit()
-    const alert = await screen.findByRole('alert')
+    const alert = await findAlert()
     expect(alert).toHaveTextContent('auth.page.tooManyWait|3')
     expect(screen.getByText('auth.page.retryIn|3')).toBeInTheDocument()
     const button = screen.getByRole('button', { name: 'auth.page.submit' })
@@ -138,7 +139,7 @@ describe('LoginPage, as designed', () => {
     s.loginPassword.mockRejectedValue(refusal(429, 'Too many requests', { retryAfter: 1 }))
     renderLogin()
     await submit()
-    expect((await screen.findByRole('alert')).querySelector('svg')).not.toBeNull()
+    expect((await findAlert()).querySelector('svg')).not.toBeNull()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('auth.page.canRetry'), { timeout: 3000 })
     expect(screen.getByRole('alert').querySelector('svg')).toBeNull()
   }, 6000)
@@ -164,7 +165,7 @@ describe('LoginPage, as designed', () => {
     s.loginPassword.mockRejectedValue(refusal(429, 'Too many requests'))
     renderLogin()
     await submit()
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.tooManyNoDelay')
+    expect(await findAlert()).toHaveTextContent('auth.page.tooManyNoDelay')
     expect(screen.queryByText(/auth\.page\.retryIn/)).toBeNull()
     expect(screen.getByRole('button', { name: 'auth.page.submit' })).not.toBeDisabled()
   })
@@ -179,7 +180,7 @@ describe('LoginPage, as designed', () => {
     // A browser drops the focus of the field disabled while the code is checked; jsdom does not
     screen.getByRole('button', { name: 'auth.verify' }).focus()
     fireEvent.click(screen.getByRole('button', { name: 'auth.verify' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.invalidTotpCode')
+    expect(await findAlert()).toHaveTextContent('auth.invalidTotpCode')
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('auth.totpCode')))
     expect(screen.getByLabelText('auth.totpCode')).toHaveValue('')
   })

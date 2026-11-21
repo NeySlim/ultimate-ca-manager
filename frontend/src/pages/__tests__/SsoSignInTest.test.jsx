@@ -286,10 +286,10 @@ describe('Sign-in test landing page', () => {
   it('asks the user to close the window when the browser keeps it open', async () => {
     vi.spyOn(window, 'close').mockImplementation(() => {})
     render(<MemoryRouter initialEntries={['/sso-test-complete?result=done']}><SsoTestCompletePage /></MemoryRouter>)
-    expect(screen.queryByText('sso.signInTestCompleteClose')).toBeNull()
+    expect(screen.queryByText(/sso\.signInTestCompleteClose/)).toBeNull()
     await act(async () => { await vi.advanceTimersByTimeAsync(CLOSE_DELAY_MS + 500) })
     expect(window.close).toHaveBeenCalled()
-    expect(screen.getByText('sso.signInTestCompleteClose')).toBeTruthy()
+    expect(screen.getByText(/sso\.signInTestCompleteClose/)).toBeTruthy()
   })
 })
 

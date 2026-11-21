@@ -10,14 +10,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { Key, Fingerprint, Eye, EyeSlash, Warning, Database } from '@phosphor-icons/react'
 import { useAuth, useNotification } from '../contexts'
 import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
-import { ChevronIcon, LockIcon, SsoIcon } from '../components/auth/icons'
+import { describedBy } from '../components/auth/describedBy'
+import { Icon } from '../components/atelier/Icon'
 import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { safeNext } from '../navigation/safeNext'
-import { readLock, clearLock, takeJustLocked } from '../lib/sessionLock'
+import { readLock, clearLock, takeJustLocked, takeSignedOut } from '../lib/sessionLock'
 import { roleLabel, roleInSentence } from '../lib/roleLabel'
 import { focusPageTitle } from '../lib/focusPageTitle'
 import {
@@ -96,6 +96,8 @@ export default function LoginPage() {
   // A polite announcement of the page itself (the lock that just happened)
   const [announce, setAnnounce] = useState('')
   const arrivedLocked = useRef(Boolean(locked) && takeJustLocked())
+  // A sign-out that just happened: said once, the title focused
+  const arrivedSignedOut = useRef(!locked && takeSignedOut())
   const [globalMethods, setGlobalMethods] = useState(null)
   const [preferKey, setPreferKey] = useState(false)
   // The user has started on the form: a late provider load no longer switches it
@@ -312,6 +314,9 @@ export default function LoginPage() {
       if (arrivedLocked.current) {
         titleRef.current?.focus()
         setAnnounce(t('auth.page.lockedAnnounce'))
+      } else if (arrivedSignedOut.current) {
+        titleRef.current?.focus()
+        showSuccess(t('auth.page.signedOut'))
       }
       return
     }
@@ -681,21 +686,22 @@ export default function LoginPage() {
   // An SSO account has no password here: its lock screen offers the provider only
   const ssoOnly = Boolean(locked) && lockedVia === 'sso' && redirectProviders.length > 0
 
-  const alt = (key, Icon, label, detail, onClick) => (
-    <button key={key} type="button" className="auth-btn auth-alt" onClick={onClick} disabled={loading}>
-      <Icon size={17} aria-hidden="true" />
+  // The mockup's `.btn.auth-alt`: icon, then the door and its detail on two lines
+  const alt = (key, icon, label, detail, onClick) => (
+    <button key={key} type="button" className="btn auth-alt" id={`login-${key}`} onClick={onClick} disabled={loading}>
+      <Icon name={icon} />
       <span>{label}<small>{detail}</small></span>
     </button>
   )
-  const keyButton = alt('key', Fingerprint, t('auth.page.keyButton'),
+  const keyButton = alt('key', 'chip', t('auth.page.keyButton'),
     loading && statusMessage === t('auth.touchSecurityKey') ? statusMessage : t('auth.page.keyDetail'), () => attemptWebAuthn())
-  const mtlsButton = alt('mtls', Key, t('auth.page.mtlsButton'), t('auth.page.mtlsDetail', { username: globalMethods?.mtls_user || '' }), handleMTLSLogin)
-  const ssoButtons = redirectProviders.map(p => alt(`sso-${p.id}`, SsoIcon,
+  const mtlsButton = alt('mtls', 'key', t('auth.page.mtlsButton'), t('auth.page.mtlsDetail', { username: globalMethods?.mtls_user || '' }), handleMTLSLogin)
+  const ssoButtons = redirectProviders.map(p => alt(`sso-${p.id}`, 'users',
     locked ? t('auth.page.resumeSso') : t('auth.page.ssoButton'),
-    <><span>{providerName(p)}</span> · {PROTOCOLS[p.provider_type] || p.provider_type}</>,
+    `${providerName(p)} · ${PROTOCOLS[p.provider_type] || p.provider_type}`,
     () => handleSSOLogin(p)))
-  const ldapButtons = ldapProviders.map(p => alt(`ldap-${p.id}`, Database, t('auth.page.ldapButton'),
-    <><span>{providerName(p)}</span> · LDAP</>, () => handleSSOLogin(p)))
+  const ldapButtons = ldapProviders.map(p => alt(`ldap-${p.id}`, 'server', t('auth.page.ldapButton'),
+    `${providerName(p)} · LDAP`, () => handleSSOLogin(p)))
 
   let alternatives
   if (locked) {
@@ -710,30 +716,33 @@ export default function LoginPage() {
       : [...ssoButtons, ...ldapButtons, ...(mtlsReady ? [mtlsButton] : []), ...(keyOffered ? [keyButton] : [])]
   }
 
-  const errorBlock = (rateLimit || formError) && (
-    <div className="auth-error" role="alert">
+  // The mockup's #login-error: always there (a live region), empty and hidden until an attempt is refused
+  const errorText = !rateLimit ? formError
+    : rateLimit.wait == null ? t('auth.page.tooManyNoDelay')
+      : rateLimit.left ? t('auth.page.tooManyWait', { count: rateLimit.wait }) : t('auth.page.canRetry')
+  const errorBlock = (
+    <div className="form-error" id="login-error" role="alert">
       {/* The end of a countdown is the sentence alone, as in the design */}
-      {!(rateLimit?.wait != null && !rateLimit.left) && <Warning size={14} aria-hidden="true" />}
-      <span>
-        {!rateLimit ? formError
-          : rateLimit.wait == null ? t('auth.page.tooManyNoDelay')
-            : rateLimit.left ? t('auth.page.tooManyWait', { count: rateLimit.wait }) : t('auth.page.canRetry')}
-      </span>
+      {errorText ? <>{!(rateLimit?.wait != null && !rateLimit.left) && <Icon name="warning" />}<span>{errorText}</span></> : null}
     </div>
   )
-  const waitLine = waiting && <p className="auth-wait">{t('auth.page.retryIn', { seconds: rateLimit.left })}</p>
+  const waitLine = waiting && <p className="auth-wait" id="login-wait">{t('auth.page.retryIn', { seconds: rateLimit.left })}</p>
 
+  // A maintenance in the mockup's warning notice; its retry a text link inside, as the draft note's
   const maintenanceBlock = maintenance && (
-    <div className="auth-notice" role="status">
-      <span>{maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}</span>
-      {maintenance.seconds != null && <span>{t('auth.maintenanceRetryIn', { seconds: maintenance.seconds })}</span>}
-      <button type="button" className="auth-btn" onClick={retryNow} disabled={loading}>{t('auth.retryNow')}</button>
+    <div className="notice warn" role="status">
+      <Icon name="clock" />
+      <span>
+        {maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}
+        {maintenance.seconds != null && <> {t('auth.maintenanceRetryIn', { seconds: maintenance.seconds })}</>}
+        {' '}<button type="button" className="text-link" onClick={retryNow} disabled={loading}>{t('auth.retryNow')}</button>
+      </span>
     </div>
   )
 
   const passwordField = (
     <AuthField id="login-pass" label={t('auth.page.password')} error={fieldErrors.password}>
-      <div className="auth-password">
+      <div className="password-wrap">
         <input
           ref={passwordRef}
           id="login-pass"
@@ -744,17 +753,18 @@ export default function LoginPage() {
           onChange={(e) => { touched.current = true; setPassword(e.target.value); if (fieldErrors.password) setFieldErrors(f => ({ ...f, password: undefined })) }}
           disabled={loading}
           aria-invalid={fieldErrors.password ? 'true' : undefined}
-          aria-describedby={fieldErrors.password ? 'login-pass-error' : undefined}
+          aria-describedby={describedBy('login-pass', fieldErrors.password)}
         />
         {/* One label, the state in aria-pressed, as in the design */}
         <button
           type="button"
-          className="auth-icon-btn"
+          className="icon-btn quiet"
+          id="login-reveal"
           aria-pressed={reveal}
           aria-label={t('auth.page.showPassword')}
           onClick={() => setReveal(r => !r)}
         >
-          {reveal ? <EyeSlash size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+          <Icon name={reveal ? 'hide' : 'eye'} />
         </button>
       </div>
     </AuthField>
@@ -774,29 +784,29 @@ export default function LoginPage() {
         onChange={(e) => { if (locked) return; touched.current = true; setUsername(e.target.value); if (fieldErrors.username) setFieldErrors(f => ({ ...f, username: undefined })) }}
         disabled={loading && !locked}
         aria-invalid={fieldErrors.username ? 'true' : undefined}
-        aria-describedby={fieldErrors.username ? 'login-user-error' : undefined}
+        aria-describedby={describedBy('login-user', fieldErrors.username)}
       />
     </AuthField>
   )
 
-  const signInForm = (onSubmit, submitLabel, SubmitIcon) => (
-    <form className="auth-form" onSubmit={onSubmit} noValidate aria-busy={loading || undefined}>
+  const signInForm = (onSubmit, submitLabel, submitIcon) => (
+    <form className="auth-form" id="login-form" onSubmit={onSubmit} noValidate aria-busy={loading || undefined}>
       {usernameField}
       {passwordField}
       {errorBlock}
       {waitLine}
-      <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading || waiting}>
-        <SubmitIcon size={17} aria-hidden="true" />{submitLabel}
+      <button type="submit" className="btn primary auth-submit" id="login-submit" disabled={loading || waiting}>
+        <Icon name={submitIcon} />{submitLabel}
       </button>
     </form>
   )
 
   const lockedCard = locked && (
     <p className="auth-user">
-      <span className="auth-avatar" aria-hidden="true">{initialsOf(locked.name || locked.username)}</span>
+      <span className="avatar" aria-hidden="true">{initialsOf(locked.name || locked.username)}</span>
       <span>
         <strong>{locked.name || locked.username}</strong>
-        <span>{locked.role ? `${roleLabel(t, locked.role)} · ` : ''}<span className="auth-mono">{locked.username}</span></span>
+        <span>{locked.role ? `${roleLabel(t, locked.role)} · ` : ''}<span className="mono">{locked.username}</span></span>
       </span>
     </p>
   )
@@ -809,12 +819,13 @@ export default function LoginPage() {
     body = <p className="auth-wait" role="status">{t('auth.signingIn')}</p>
   } else if (step === '2fa') {
     lead = twoFactorMethods.includes('totp') ? t('auth.twoFactorDescription') : t('auth.twoFactorKeyDescription')
+    const keyAsAlt = twoFactorMethods.includes('totp')
     body = (
       <>
         {lockedCard}
         {maintenanceBlock}
         {twoFactorMethods.includes('totp') && (
-          <form className="auth-form" onSubmit={handle2FAVerify} noValidate aria-busy={loading || undefined}>
+          <form className="auth-form" id="login-form" onSubmit={handle2FAVerify} noValidate aria-busy={loading || undefined}>
             <AuthField id="login-code" label={t('auth.totpCode')} error={fieldErrors.code}>
               <input
                 ref={codeRef}
@@ -829,43 +840,43 @@ export default function LoginPage() {
                 onChange={(e) => { setTotpCode(e.target.value.replace(/\D/g, '')); if (fieldErrors.code) setFieldErrors({}) }}
                 disabled={loading}
                 aria-invalid={fieldErrors.code ? 'true' : undefined}
-                aria-describedby={fieldErrors.code ? 'login-code-error' : undefined}
+                aria-describedby={describedBy('login-code', fieldErrors.code)}
               />
             </AuthField>
             {errorBlock}
             {waitLine}
-            <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading || waiting}>
-              <ChevronIcon size={17} aria-hidden="true" />{t('auth.verify')}
+            <button type="submit" className="btn primary auth-submit" id="login-submit" disabled={loading || waiting}>
+              <Icon name="right" />{t('auth.verify')}
             </button>
           </form>
         )}
         {!twoFactorMethods.includes('totp') && errorBlock}
         {twoFactorMethods.includes('webauthn') && keySupported && (
           <>
-            {twoFactorMethods.includes('totp') && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
-            <button type="button" className={`auth-btn ${twoFactorMethods.includes('totp') ? 'auth-alt' : 'is-primary auth-submit'}`}
+            {keyAsAlt && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
+            <button type="button" className={keyAsAlt ? 'btn auth-alt' : 'btn primary auth-submit'} id="login-key2fa"
               onClick={handle2FAWebAuthn} disabled={loading}>
-              <Fingerprint size={17} aria-hidden="true" />
+              <Icon name="chip" />
               <span>{t('auth.twoFactorUseSecurityKey')}</span>
             </button>
           </>
         )}
-        <button type="button" className="auth-link" onClick={handleBackFrom2fa} disabled={loading}>{t('common.back')}</button>
+        <button type="button" className="text-link auth-switch" onClick={handleBackFrom2fa} disabled={loading}>{t('common.back')}</button>
       </>
     )
   } else if (step === 'ldap' && selectedLdapProvider) {
     body = (
       <>
         <p className="auth-user">
-          <span className="auth-avatar" aria-hidden="true"><Database size={14} /></span>
+          <span className="avatar" aria-hidden="true"><Icon name="server" /></span>
           <span>
             <strong>{providerName(selectedLdapProvider)}</strong>
             <span>{t('auth.signingInWith')} LDAP</span>
           </span>
         </p>
         {maintenanceBlock}
-        {signInForm(handleLDAPLogin, t('auth.page.submit'), ChevronIcon)}
-        <button type="button" className="auth-link" onClick={handleBack} disabled={loading}>{t('common.back')}</button>
+        {signInForm(handleLDAPLogin, t('auth.page.submit'), 'right')}
+        <button type="button" className="text-link auth-switch" onClick={handleBack} disabled={loading}>{t('common.back')}</button>
       </>
     )
   } else {
@@ -873,16 +884,12 @@ export default function LoginPage() {
       <>
         {lockedCard}
         {maintenanceBlock}
-        {ssoOnly ? errorBlock : signInForm(handlePasswordLogin, locked ? t('auth.page.unlock') : t('auth.page.submit'), locked ? LockIcon : ChevronIcon)}
+        {ssoOnly ? errorBlock : signInForm(handlePasswordLogin, locked ? t('auth.page.unlock') : t('auth.page.submit'), locked ? 'lock' : 'right')}
         {alternatives.length > 0 && !ssoOnly && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
         {alternatives}
-        {(locked || (emailConfigured && !locked)) && (
-          <div className="auth-links">
-            {locked
-              ? <button type="button" className="auth-link" onClick={handleSwitchAccount}>{t('auth.page.switchAccount')}</button>
-              : <Link to="/forgot-password" className="auth-link">{t('auth.forgotPassword')}</Link>}
-          </div>
-        )}
+        {locked
+          ? <button type="button" className="text-link auth-switch" onClick={handleSwitchAccount}>{t('auth.page.switchAccount')}</button>
+          : emailConfigured && <Link to="/forgot-password" className="text-link auth-switch">{t('auth.forgotPassword')}</Link>}
       </>
     )
   }

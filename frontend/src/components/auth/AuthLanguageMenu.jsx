@@ -1,7 +1,7 @@
 /**
- * Language choice of the pages shown before sign-in, beside the theme menu and in its grammar
- * (220 px panel, menu items with a radio state, the current one checked, arrows on the button):
- * the choice is kept in this browser and applies at once.
+ * Language choice of the pages shown before sign-in, beside the theme menu and in the grammar
+ * of the mockup's themeMenu(): `.pop-wrap`, a quiet icon button, `ul.pop-menu.theme-menu` of
+ * radio items, the current one checked, arrows on the button. The choice is kept in this browser.
  */
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -52,7 +52,7 @@ export function AuthLanguageMenu() {
   }
 
   return (
-    <div className="pop-wrap lang-wrap" {...rootProps} onKeyDown={onKeyDown}>
+    <div className="pop-wrap language-wrap" {...rootProps} onKeyDown={onKeyDown}>
       <button
         type="button"
         ref={buttonRef}
@@ -60,21 +60,20 @@ export function AuthLanguageMenu() {
         id="language-button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls="auth-language-menu"
+        aria-controls="language-menu"
         aria-label={t('settings.language')}
         title={t('settings.language')}
         onClick={() => setOpen(!open)}
       >
         <Icon name="globe" />
       </button>
-      {/* The theme menu's gabarit (the mockup has no language menu): radio items, the current one checked */}
-      <ul id="auth-language-menu" ref={panelRef} className="pop-menu theme-menu" role="menu"
+      <ul id="language-menu" ref={panelRef} className="pop-menu theme-menu" role="menu"
         aria-label={t('settings.language')} hidden={!open}>
         {languages.map(l => (
           <li key={l.code} role="none">
             <button type="button" role="menuitemradio" tabIndex={-1} aria-checked={current === l.code}
               lang={l.code} onClick={() => pick(l.code)}>
-              <span className="auth-lang-flag" aria-hidden="true">{l.flag}</span>
+              <span className="lang-flag" aria-hidden="true">{l.flag}</span>
               <span className="pop-label">{l.name}</span>
               <span className="pop-check"><Icon name="check" /></span>
             </button>

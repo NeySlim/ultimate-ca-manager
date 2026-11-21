@@ -75,7 +75,7 @@ describe('LoginPage SSO return path', () => {
   it('starts the SSO login with the page asked for', async () => {
     stubLocation('/login')
     renderAt('/login?next=%2Fcertificates%3Fstatus%3Dexpiring')
-    fireEvent.click(await screen.findByText('Company SSO'))
+    fireEvent.click(await screen.findByText(/^Company SSO · /))
     expect(window.location.href).toBe('/api/v2/sso/login/oauth2?next=%2Fcertificates%3Fstatus%3Dexpiring')
   })
 
@@ -83,14 +83,14 @@ describe('LoginPage SSO return path', () => {
     'starts the SSO login without %s', async (next) => {
       stubLocation('/login')
       renderAt(`/login?next=${encodeURIComponent(next)}`)
-      fireEvent.click(await screen.findByText('Company SSO'))
+      fireEvent.click(await screen.findByText(/^Company SSO · /))
       expect(window.location.href).toBe('/api/v2/sso/login/oauth2')
     })
 
   it('starts the SSO login without a page when none was asked for', async () => {
     stubLocation('/login')
     renderAt('/login')
-    fireEvent.click(await screen.findByText('Company SSO'))
+    fireEvent.click(await screen.findByText(/^Company SSO · /))
     expect(window.location.href).toBe('/api/v2/sso/login/oauth2')
   })
 

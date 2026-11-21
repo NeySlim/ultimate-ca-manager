@@ -30,6 +30,7 @@ vi.mock('../../services/auth-methods.service', () => ({
 }))
 
 import LoginPage from '../LoginPage'
+import { findAlert } from '../../test/filledAlert'
 
 function Where() {
   const l = useLocation()
@@ -96,7 +97,7 @@ describe('LoginPage form', () => {
     fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
     fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'bad' } })
     fireEvent.click(screen.getByRole('button', { name: 'auth.page.submit' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid username or password')
+    expect(await findAlert()).toHaveTextContent('Invalid username or password')
     expect(screen.getByLabelText('auth.page.password')).toHaveValue('')
   })
 
@@ -111,8 +112,8 @@ describe('LoginPage form', () => {
     renderLogin()
     expect(await screen.findByText('auth.page.or')).toBeInTheDocument()
     expect(screen.getAllByText('auth.page.ssoButton')).toHaveLength(2)
-    expect(screen.getByText('Company SSO').closest('small')).toHaveTextContent('Company SSO · OAuth 2.0')
-    expect(screen.getByText('Partner').closest('small')).toHaveTextContent('Partner · SAML 2.0')
+    expect(screen.getByText('Company SSO · OAuth 2.0').tagName).toBe('SMALL')
+    expect(screen.getByText('Partner · SAML 2.0').tagName).toBe('SMALL')
     expect(screen.getByText('auth.page.ldapButton')).toBeInTheDocument()
     expect(screen.getByText('auth.page.mtlsDetail|alice')).toBeInTheDocument()
     expect(screen.getByText('auth.page.keyButton')).toBeInTheDocument()

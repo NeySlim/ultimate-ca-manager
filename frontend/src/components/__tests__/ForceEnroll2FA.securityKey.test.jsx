@@ -2,7 +2,8 @@
  * Forced 2FA enrolment: a security key can be registered instead of TOTP.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 const mocks = vi.hoisted(() => ({
   enable2FA: vi.fn(),
@@ -18,6 +19,11 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
+vi.mock('../../i18n', () => ({ languages: [{ code: 'en', name: 'English', flag: 'EN' }] }))
+vi.mock('../../contexts/ThemeContext', () => ({
+  useTheme: () => ({ themeFamily: 'atelier', setThemeFamily: vi.fn(), mode: 'dark', setMode: vi.fn(), resolvedMode: 'dark', themes: [] }),
+}))
+
 vi.mock('../../contexts', () => ({
   useAuth: () => ({ logout: vi.fn() }),
   useNotification: () => ({ showError: mocks.showError, showSuccess: mocks.showSuccess }),
@@ -28,6 +34,9 @@ vi.mock('../../services', () => ({
 }))
 
 import { ForceEnroll2FA } from '../ForceEnroll2FA'
+
+// The gate is the sign-in card, in the router and theme the application gives it
+const render = (ui) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>)
 
 describe('ForceEnroll2FA: security key', () => {
   beforeEach(() => {
@@ -85,4 +94,19 @@ describe('ForceEnroll2FA: security key', () => {
     await waitFor(() => expect(onComplete).toHaveBeenCalled())
     expect(mocks.showSuccess).toHaveBeenCalledWith(`account.twoFaEnabled${note}`)
   })
+
+  it('shows the QR code named in words, then the backup codes listed in the card', async () => {
+    mocks.confirm2FA.mockResolvedValue({ data: { backup_codes: ['AAAA-1111', 'BBBB-2222'] } })
+    render(<ForceEnroll2FA onComplete={vi.fn()} />)
+    expect(await screen.findByRole('img', { name: 'account.qrCodeAlt' })).toHaveAttribute('src', 'data:image/png;base64,AA==')
+    const verify = screen.getByRole('button', { name: 'account.verifyAndEnable' })
+    expect(verify).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('account.enterDigitCode'), { target: { value: '12a3456' } })
+    expect(screen.getByLabelText('account.enterDigitCode')).toHaveValue('123456')
+    fireEvent.click(verify)
+    const codes = await screen.findByRole('list')
+    expect([...codes.querySelectorAll('li')].map(li => li.textContent)).toEqual(['AAAA-1111', 'BBBB-2222'])
+    expect(codes.closest('section')).toHaveClass('auth-card')
+  })
 })
+
