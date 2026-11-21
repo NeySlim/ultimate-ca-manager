@@ -2,7 +2,7 @@ name: Tests & Quality Checks
 
 on:
   push:
-    branches: [main, master, develop, dev, test, sextant, 'v*', '*-dev', 'feature/**']
+    branches: [main, master, develop, dev, test, 'v*', '*-dev', 'feature/**']
     # Prose-only commits do not need the suite (no required checks on any
     # branch), except the two files tests read.
     paths:
@@ -32,8 +32,8 @@ permissions:
 # branch, where a push carries the FIPS build and a manual run the sequential job:
 # one group per commit and event there, so a newer commit never cancels a run
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant') && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'sextant' }}
+  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'dev') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'dev' }}
 
 jobs:
   lint:
@@ -155,7 +155,7 @@ jobs:
     # On the 3.0 integration branch one run at a time: the running one finishes, the
     # newest manual run waits and replaces any older waiting one; elsewhere one group per commit
     concurrency:
-      group: tests-sequential-${{ github.event_name }}-${{ github.ref_name == 'sextant' && github.ref || github.sha }}
+      group: tests-sequential-${{ github.event_name }}-${{ github.ref_name == 'dev' && github.ref || github.sha }}
       cancel-in-progress: false
 
     steps:
@@ -198,7 +198,7 @@ jobs:
       # The same suite in random order on the nightly run and on manual runs of the 3.0
       # integration branch: a report, not a gate. The job summary gives the seed that replays the order.
       - name: Run tests in random order (report only)
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'dev')) && steps.deterministic.outcome != 'skipped' }}
         continue-on-error: true
         timeout-minutes: 45
         env:
@@ -646,7 +646,7 @@ jobs:
   test-e2e:
     name: End-to-end (browser)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/sextant')
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
     timeout-minutes: 30
     permissions:
       contents: read
@@ -771,7 +771,7 @@ jobs:
     name: Docker Build Test (FIPS)
     runs-on: ubuntu-24.04
     needs: [test-frontend]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/sextant' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/main')
     timeout-minutes: 60
 
     steps:
