@@ -8254,7 +8254,8 @@
           "doneWith": "{{protocol}} активний.",
           "action": "Вибрати протокол"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "Немає мережі.",

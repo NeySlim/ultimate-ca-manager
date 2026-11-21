@@ -10,9 +10,13 @@ import { useSetup } from '../shell/useSetup'
 import { guardProps } from '../shell/health'
 
 export function SetupWizard({ admin = false, share }) {
+  return <SetupWizardView setup={useSetup({ admin, share })} />
+}
+
+/** The assistant drawn from a useSetup() state the page also reads (its empty state's action). */
+export function SetupWizardView({ setup }) {
   const { t } = useTranslation()
-  const setup = useSetup({ admin, share })
-  if (!setup.visible) return null
+  if (!setup?.visible) return null
   const { later, fold, steps, n, complete, next, nextIndex, nextTitle, doneText, savePref, guard, resumeRef, stepRef } = setup
   const count = n < 3
     ? <><strong>{t('shell.setup.count', { count: n })}</strong>{t('shell.setup.left', { count: 3 - n })}</>

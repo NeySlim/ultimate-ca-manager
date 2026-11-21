@@ -53,7 +53,6 @@ vi.mock('../../../services', () => ({
 }))
 vi.mock('../../../services/account.service', () => ({ accountService: { updatePreferences: vi.fn() } }))
 vi.mock('../../../components/deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
-vi.mock('../../../components/shell/SetupCard', () => ({ SetupCard: () => null }))
 
 import { InspectorProvider, useInspector } from '../../../contexts/InspectorContext'
 import { InspectorCloseOnNavigate } from '../../../components/inspector/InspectorCloseOnNavigate'

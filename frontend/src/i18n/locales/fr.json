@@ -7908,7 +7908,8 @@
           "doneWith": "{{protocol}} actif.",
           "action": "Choisir un protocole"
         }
-      }
+      },
+      "open": "Ouvrir l’assistant de configuration"
     },
     "offline": {
       "title": "Hors ligne.",

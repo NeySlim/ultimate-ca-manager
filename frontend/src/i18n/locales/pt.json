@@ -7908,7 +7908,8 @@
           "doneWith": "{{protocol}} ativo.",
           "action": "Escolher um protocolo"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "Sem ligação.",

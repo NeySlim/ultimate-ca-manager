@@ -27,6 +27,7 @@ import { IssueCertificateDialog } from './certificates/IssueCertificateDialog'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { buildForest, filterCAs, viewCounts, chainNeedsAttention, nameOfCA, layoutRoots } from './cas/caTree'
+import { useSetup, setupPending, openSetupAction } from '../components/shell/useSetup'
 
 const VIEW_MODES = ['tree', 'list']
 // 'org' and 'columns' are views the tree replaced: a stored choice of them opens the tree
@@ -39,6 +40,17 @@ const storedViewMode = () => {
 // Cross-certificate issuers are read per authority: only the first holders are asked
 const CROSS_LINK_HOLDERS = 12
 const REQUEST = 'GET /api/v2/cas'
+
+/** No authority yet: while the first-run steps remain, the way to the assistant, else Create a CA (the mockup's emptyAction). */
+function CAsEmpty({ onCreate }) {
+  const { t } = useTranslation()
+  const { hasPermission } = usePermission()
+  // Mounted only on an empty page: the first-run state is read then, not on every visit
+  const setup = useSetup({ admin: hasPermission('*') })
+  const action = setupPending(setup) ? openSetupAction(t)
+    : onCreate ? { label: t('common.createCA'), icon: 'plus', primary: true, onClick: onCreate } : undefined
+  return <EmptyBlock id="cas" icon="shield" title={t('cas.empty.title')} text={t('cas.empty.text')} action={action} />
+}
 
 export default function CAsPage() {
   const { t } = useTranslation()
@@ -279,8 +291,7 @@ export default function CAsPage() {
     body = (
       <div className="scroll-view" id="view-scroll">
         <div className="panel">
-          <EmptyBlock id="cas" icon="shield" title={t('cas.empty.title')} text={t('cas.empty.text')}
-            action={canWriteCAs ? { label: t('common.createCA'), icon: 'plus', primary: true, onClick: () => setCreateOpen(true) } : undefined} />
+          <CAsEmpty onCreate={canWriteCAs ? () => setCreateOpen(true) : undefined} />
         </div>
       </div>
     )

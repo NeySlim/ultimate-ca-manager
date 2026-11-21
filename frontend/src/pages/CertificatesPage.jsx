@@ -18,7 +18,8 @@ import { usePermission, useRecentHistory, useWebSocket, usePersistedState } from
 import { extractCN, certificateNames, downloadBlob, warnSkippedExport, exportToCSV, exportToJSON } from '../lib/utils'
 import { CERT_STATUSES, OVERVIEW_FILTER_KEYS, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { fetchPages } from '../lib/fetchAllPages'
-import { SetupCard } from '../components/shell/SetupCard'
+import { useSetup, setupPending, openSetupAction } from '../components/shell/useSetup'
+import { SetupWizardView } from '../components/overview/SetupWizard'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { soleImported } from '../lib/importResult'
@@ -74,6 +75,8 @@ export default function CertificatesPage() {
   const canExportKey = canExportPrivateKey('certificate', { hasPermission, canWrite })
   const { muteToasts } = useWebSocket()
   const number = useMemo(() => new Intl.NumberFormat(i18n.language || undefined), [i18n.language])
+  // The first-run assistant, read once: drawn above the list and followed by the empty state's action
+  const setup = useSetup({ admin: hasPermission('*') })
 
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
@@ -502,7 +505,7 @@ export default function CertificatesPage() {
     return (
       <Zone testId="certificates-zone" after={after}>
         {head}
-        <div className="atl-out"><SetupCard admin={hasPermission('*')} /></div>
+        <SetupWizardView setup={setup} />
         <LoadError id="certificates" title={t('certificates.loadFailed')} onRetry={() => loadData()}
           journal={hasPermission('read:audit') ? '/audit' : undefined}
           cause={<LoadCause error={loadError} fallback={t('messages.errors.loadFailed.certificates')} />} />
@@ -515,7 +518,7 @@ export default function CertificatesPage() {
   return (
     <Zone testId="certificates-zone" dock={<CertificateInspector />} after={after}>
       {head}
-      <div className="atl-out"><SetupCard admin={hasPermission('*')} /></div>
+      <SetupWizardView setup={setup} />
       <StateFilters views={views} active={activeView} onChange={(id) => setStatus(id ? [id] : [])} label={t('certificates.viewsLabel')} busy={!counted}
         aside={narrowed
           ? <TextLink icon="close" iconFirst data-action="clear-filters" onClick={resetFilters}> {t('certificates.clearSearchAndFilters')}</TextLink>
@@ -570,7 +573,8 @@ export default function CertificatesPage() {
         empty={!narrowed && !linkView && !activeStatus.length && !certStats.total ? (
           <EmptyBlock id="certificates" icon="cert" title={t('certificates.emptyTitle')}
             text={t(cas.length || !hasPermission('read:cas') ? 'certificates.emptyHintReady' : 'certificates.emptyHintNoCa')}
-            action={canWrite('certificates') ? { label: t('certificates.issueCertificate'), icon: 'plus', primary: true, onClick: () => setDialog('issue') } : undefined} />
+            action={setupPending(setup) ? openSetupAction(t)
+              : canWrite('certificates') ? { label: t('certificates.issueCertificate'), icon: 'plus', primary: true, onClick: () => setDialog('issue') } : undefined} />
         ) : (
           <NoMatch title={t('certificates.noMatchTitle')} text={t('certificates.noMatchHint')} resetLabel={t('certificates.resetFilters')} onReset={resetFilters} />
         )}

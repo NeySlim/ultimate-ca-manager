@@ -21,7 +21,7 @@ const stable = vi.hoisted(() => ({
     showConfirm: () => Promise.resolve(false), showPrompt: () => Promise.resolve(null),
   },
 }))
-const state = vi.hoisted(() => ({ mobile: false, write: true, opened: [], activeKey: null, openEntity: null }))
+const state = vi.hoisted(() => ({ mobile: false, write: true, opened: [], activeKey: null, openEntity: null, setup: { visible: false } }))
 const svc = vi.hoisted(() => ({ getAll: vi.fn(), getStats: vi.fn(), bulkExport: vi.fn(), cas: vi.fn() }))
 
 vi.mock('react-i18next', () => ({
@@ -61,7 +61,8 @@ vi.mock('../../services', () => ({
 // The import and issue dialogs are their own subjects: a stand-in says when they open
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: ({ isOpen }) => (isOpen ? <div data-testid="import-open" /> : null) }))
 vi.mock('../certificates/IssueCertificateDialog', () => ({ IssueCertificateDialog: ({ open }) => (open ? <div data-testid="issue-open" /> : null) }))
-vi.mock('../../components/shell/SetupCard', () => ({ SetupCard: () => null }))
+// The first-run state is useSetup's own subject: here it is given, drawn by the real assistant
+vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual()), useSetup: () => state.setup }))
 vi.mock('../certificates/dialogs/ExportDialog', () => ({ ExportDialog: ({ open, entityName }) => (open ? <div data-testid="export-open">{entityName}</div> : null) }))
 
 import CertificatesPage from '../CertificatesPage'
@@ -96,12 +97,18 @@ const tab = (id) => tabs().find((b) => b.dataset.status === id)
 const row = (cn) => screen.getByRole('row', { name: new RegExp(cn.replace(/\./g, '\\.')) })
 const headers = () => [...zone().querySelectorAll('thead th')].map((th) => th.textContent).filter((x) => x && x !== 'common.actions')
 const settle = () => new Promise((r) => setTimeout(r, 400))
+// useSetup's answer for an empty instance whose first step is to do
+const pendingSetup = (over = {}) => {
+  const steps = [{ id: 'root', done: false, to: '/cas?action=create' }, { id: 'issuing', done: false, to: '/cas?action=create' }, { id: 'protocol', done: false, to: '/acme?tab=config' }]
+  return { visible: true, later: false, fold: vi.fn(), steps, n: 0, complete: false, next: steps[0], nextIndex: 0, nextTitle: 'root',
+    doneText: () => '', savePref: vi.fn(), guard: { suspended: false }, resumeRef: { current: null }, stepRef: { current: null }, ...over }
+}
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   window.localStorage.clear()
-  Object.assign(state, { mobile: false, write: true, opened: [], activeKey: null, openEntity: vi.fn() })
+  Object.assign(state, { mobile: false, write: true, opened: [], activeKey: null, openEntity: vi.fn(), setup: { visible: false } })
   svc.getAll.mockReset()
   svc.bulkExport.mockReset()
   svc.getStats.mockReset()
@@ -528,6 +535,53 @@ describe('CertificatesPage: overview links and saved filters', () => {
 })
 
 describe('CertificatesPage: states (emptyBlock, loadError, skeletonRows)', () => {
+  it('draws the mockup setup assistant above the state tabs, in the zone, no older card', async () => {
+    state.setup = pendingSetup()
+    await mount()
+    const wizard = zone().querySelector('section#setup-wizard')
+    expect(wizard).toHaveClass('panel', 'setup-wizard')
+    expect(wizard.closest('.atl-out')).toBeNull()
+    const tabsGroup = screen.getByRole('group', { name: 'certificates.viewsLabel' })
+    expect(wizard.compareDocumentPosition(tabsGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.getElementById('shell-setup')).toBeNull()
+    expect(zone().querySelector('[class*="shell-setup"]')).toBeNull()
+  })
+
+  it('keeps the assistant above a failed read, as the mockup tableView()', async () => {
+    state.setup = pendingSetup()
+    svc.getAll.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }))
+    render(<MemoryRouter initialEntries={['/certificates']}><CertificatesPage /><Where /></MemoryRouter>)
+    await waitFor(() => expect(document.getElementById('load-error-certificates')).not.toBeNull())
+    const wizard = zone().querySelector('section#setup-wizard.setup-wizard')
+    expect(wizard).not.toBeNull()
+    expect(wizard.closest('.atl-out')).toBeNull()
+  })
+
+  it('leads the empty list to the setup assistant while steps remain, as the mockup emptyAction(setup)', async () => {
+    state.setup = pendingSetup()
+    svc.getStats.mockResolvedValue({ data: { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 } })
+    svc.cas.mockResolvedValue({ data: [] })
+    await mount('/certificates', [], 0)
+    await waitFor(() => expect(zone().querySelector('#empty-certificates')).not.toBeNull())
+    const block = zone().querySelector('#empty-certificates')
+    const go = within(block).getByRole('link', { name: 'shell.setup.open' })
+    expect(go).toHaveAttribute('href', '/')
+    expect(go).toHaveClass('btn', 'primary')
+    // A way to a page, not a write: the write guard leaves it
+    expect(go).toHaveAttribute('data-write', 'false')
+    expect(within(block).queryByRole('button', { name: 'certificates.issueCertificate' })).toBeNull()
+  })
+
+  it('offers Émettre un certificat once the setup is complete', async () => {
+    state.setup = pendingSetup({ complete: true, n: 3 })
+    svc.getStats.mockResolvedValue({ data: { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 } })
+    await mount('/certificates', [], 0)
+    await waitFor(() => expect(zone().querySelector('#empty-certificates')).not.toBeNull())
+    const block = zone().querySelector('#empty-certificates')
+    expect(within(block).queryByRole('link', { name: 'shell.setup.open' })).toBeNull()
+    expect(within(block).getByRole('button', { name: 'certificates.issueCertificate' })).toBeInTheDocument()
+  })
+
   it('says the first issuance waits for an issuing CA, with Émettre un certificat when one exists', async () => {
     svc.getStats.mockResolvedValue({ data: { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 } })
     await mount('/certificates', [], 0)
