@@ -810,7 +810,7 @@ export default function UsersGroupsPage() {
               {attachable.length === 0 && linkProviders.length > 0 ? (
                 <p className="field full muted small">{t('users.sso.noProviderLeft')}</p>
               ) : (
-                <FieldSelect id="sso-attach-provider" full label={t('users.sso.provider')} value={linkProviderId} onChange={(val) => setLinkProviderId(val)}
+                <FieldSelect id="sso-attach-provider" data-autofocus full label={t('users.sso.provider')} value={linkProviderId} onChange={(val) => setLinkProviderId(val)}
                   placeholder={t('users.sso.selectProvider')}
                   options={attachable.map(p => ({ value: String(p.id), label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})` }))} />
               )}
@@ -837,7 +837,7 @@ export default function UsersGroupsPage() {
           <form onSubmit={(e) => { e.preventDefault(); handleSubmitTenant() }} noValidate>
             {tenantEdit.row.external_id && <p>{t('users.sso.confirmReset', { name: tenantEdit.user.username, provider: rowName(tenantEdit.row) })}</p>}
             <div className="form-fields">
-              <FieldSelect id="sso-tenant" full label={t('users.sso.expectedTenant')} value={tenantEdit.tenant} onChange={(val) => setTenantEdit({ ...tenantEdit, tenant: val })}
+              <FieldSelect id="sso-tenant" data-autofocus full label={t('users.sso.expectedTenant')} value={tenantEdit.tenant} onChange={(val) => setTenantEdit({ ...tenantEdit, tenant: val })}
                 placeholder={t('users.sso.selectTenant')} hint={t('users.sso.expectedTenantHelp')} options={tenantOptions(tenantEdit.row.provider_tenants || [])} />
             </div>
             <div className="modal-actions">

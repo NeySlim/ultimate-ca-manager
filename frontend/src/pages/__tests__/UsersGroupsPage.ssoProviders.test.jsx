@@ -159,6 +159,7 @@ describe('UsersGroupsPage single sign-on providers of an account', () => {
     expect(dialog.tagName).toBe('DIALOG')
     expect(dialog.closest('.atl')).not.toBeNull()
     expect(dialog.querySelector('.form-fields #sso-attach-provider')).not.toBeNull()
+    await waitFor(() => expect(dialog.querySelector('#sso-attach-provider')).toHaveFocus())
     expect(screen.getByRole('checkbox', { name: 'users.sso.removePassword' }).closest('label')).toHaveClass('checkbox-line')
     const actions = dialog.querySelector('.modal-actions')
     expect([...actions.querySelectorAll('button')].map((b) => b.className)).toEqual(['btn', 'btn primary'])

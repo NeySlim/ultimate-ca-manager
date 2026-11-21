@@ -34,6 +34,9 @@ describe('MtlsCertificateDialog', () => {
     expect(within(way).getAllByRole('button').map((b) => [b.textContent, b.getAttribute('aria-pressed')]))
       .toEqual([['account.mtlsGenerate', 'true'], ['account.mtlsImport', 'false'], ['account.mtlsAssign', 'false']])
     expect(screen.getByTestId('ca')).toBeInTheDocument()
+    // the narrow dialog of the mockup, its first field focused as the mockup's dialogs do
+    expect(screen.getByRole('dialog')).toHaveClass('narrow')
+    expect(screen.getByLabelText('account.mtlsCertName')).toHaveFocus()
     fireEvent.change(screen.getByLabelText('account.mtlsValidityDays'), { target: { value: '90' } })
     const dialog = screen.getByRole('dialog')
     const actions = dialog.querySelector('form .modal-actions')
@@ -46,6 +49,7 @@ describe('MtlsCertificateDialog', () => {
     expect(screen.queryByRole('button', { name: 'account.mtlsGenerate' })).toBeNull()
     expect(screen.getByRole('button', { name: 'account.mtlsImport' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('account.mtlsPemData').tagName).toBe('TEXTAREA')
+    expect(screen.getByLabelText('account.mtlsCertName')).toHaveFocus()
   })
 
   it('imports pasted PEM, its action held until there is some', async () => {

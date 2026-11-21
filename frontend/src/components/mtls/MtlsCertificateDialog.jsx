@@ -28,7 +28,7 @@ export function MtlsCertificateDialog({
   const submit = (fn) => (e) => { e.preventDefault(); if (!busy) fn() }
 
   return (
-    <AtelierDialog title={title} onClose={onClose} testId="mtls-dialog">
+    <AtelierDialog title={title} size="narrow" onClose={onClose} testId="mtls-dialog">
       {result || (
         <>
           <div className="form-fields">
@@ -37,7 +37,7 @@ export function MtlsCertificateDialog({
           {mode === 'generate' && (
             <form onSubmit={submit(onGenerate)} noValidate>
               <div className="form-fields">
-                <Input id="mtls-name" full label={t('account.mtlsCertName')} value={generateForm.name} placeholder={namePlaceholder}
+                <Input id="mtls-name" data-autofocus full label={t('account.mtlsCertName')} value={generateForm.name} placeholder={namePlaceholder}
                   onChange={(e) => setGenerateForm((prev) => ({ ...prev, name: e.target.value }))} />
                 {caPicker}
                 <NumberInput id="mtls-validity" label={t('account.mtlsValidityDays')} value={String(generateForm.validity_days ?? '')}
@@ -52,7 +52,7 @@ export function MtlsCertificateDialog({
           {mode === 'import' && (
             <form onSubmit={submit(onImport)} noValidate>
               <div className="form-fields">
-                <Input id="mtls-import-name" full label={t('account.mtlsCertName')} value={importForm.name} placeholder={t('account.mtlsImportNamePlaceholder')}
+                <Input id="mtls-import-name" data-autofocus full label={t('account.mtlsCertName')} value={importForm.name} placeholder={t('account.mtlsImportNamePlaceholder')}
                   onChange={(e) => setImportForm((prev) => ({ ...prev, name: e.target.value }))} />
                 <PemField id="mtls-pem" label={t('account.mtlsPemData')} value={importForm.pem} accept=".pem,.crt,.cer" rows={6}
                   placeholder="-----BEGIN CERTIFICATE-----" fileLabel={t('account.mtlsOrUploadFile')}

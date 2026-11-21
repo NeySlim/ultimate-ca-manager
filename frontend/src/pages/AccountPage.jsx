@@ -625,7 +625,7 @@ export default function AccountPage() {
           ))}
         </RecordList>
         <div className="settings-actions">
-          <Btn write icon="plus" onClick={() => setShowWebAuthnModal(true)}>{t('account.addKey')}</Btn>
+          <Btn write icon="plus" id="account-add-key" onClick={() => setShowWebAuthnModal(true)}>{t('account.addKey')}</Btn>
         </div>
       </SettingsGroup>
       <SettingsGroup legend={<>{t('account.clientCertificates')}{' '}<Pill tone="warn" icon="sparkles" label={t('common.experimental')} /></>}
@@ -646,7 +646,7 @@ export default function AccountPage() {
           })}
         </RecordList>
         <div className="settings-actions">
-          <Btn write icon="plus" onClick={() => setShowMTLSModal(true)}>{t('account.addCertificate')}</Btn>
+          <Btn write icon="plus" id="account-add-mtls" onClick={() => setShowMTLSModal(true)}>{t('account.addCertificate')}</Btn>
         </div>
       </SettingsGroup>
     </>
