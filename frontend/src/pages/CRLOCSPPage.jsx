@@ -9,8 +9,9 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
-  Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch, useClientList,
+  Section, Props, RecordList, RecordRow, LoadError, LoadCause, NoMatch, useClientList,
 } from '../components/atelier'
+import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { CRLDeploySection } from '../components/CRLDeploySection'
 import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
@@ -625,7 +626,7 @@ export default function CRLOCSPPage() {
         empty={rows.length && (query.trim() || active) ? (
           <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setQuery(''); setState('') }} />
         ) : (
-          <EmptyBlock id="crl" icon="crl" title={t('crlOcsp.emptyTitle')} text={t('crlOcsp.emptyText')}
+          <SetupEmptyBlock id="crl" icon="crl" title={t('crlOcsp.emptyTitle')} text={t('crlOcsp.emptyText')}
             action={canWrite('cas') ? { label: t('crlOcsp.createCa'), icon: 'plus', to: '/cas' } : undefined} />
         )}
         footer={{ range: t('crlOcsp.range', list.counts(rows.length)) }} />

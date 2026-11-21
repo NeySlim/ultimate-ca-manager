@@ -9,8 +9,9 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
   Zone, Icon, Btn, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
-  LoadError, LoadCause, EmptyBlock,
+  LoadError, LoadCause,
 } from '../components/atelier'
+import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { Input, Select, FormModal } from '../components/atelier/Form'
 import { tsaService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -160,7 +161,9 @@ export default function TSAPage() {
     const ca = cas.find((c) => c.refid === refid)
     return ca?.name || ca?.descr || ca?.subject || config.ca_name || '—'
   }
-  const service = useMemo(() => (loading || loadError ? [] : [{
+  // No CA and off: nothing configured, the list is the mockup's empty block
+  const unset = !config.enabled && !config.ca_refid
+  const service = useMemo(() => (loading || loadError || unset ? [] : [{
     id: 'tsa', name: t('tsa.serviceName'), ca: caName(config.ca_refid), policy: config.policy_oid || DEFAULT_POLICY_OID,
     state: config.enabled ? 'active' : 'disabled',
   }]), [config, cas, loading, loadError, t]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -280,7 +283,8 @@ openssl ts -reply -in response.tsr -text`}</pre>
         <LoadError id="tsa" journal={auditPath} title={t('messages.errors.loadFailed.tsa')} onRetry={() => { setLoading(true); loadData() }}
           cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/tsa/config', message: loadError.message }} />} />
       )}
-      empty={<EmptyBlock id="tsa" icon="stamp" title={t('tsa.serviceName')} />}
+      empty={<SetupEmptyBlock id="tsa" icon="stamp" title={t('tsa.emptyTitle')} text={t('tsa.emptyText')}
+        action={canEdit ? { label: t('tsa.configure'), icon: 'settings', onClick: () => setView('config') } : undefined} />}
       footer={{ range: t('tsa.range', { shown: service.length, count: service.length }) }} />
   )
 

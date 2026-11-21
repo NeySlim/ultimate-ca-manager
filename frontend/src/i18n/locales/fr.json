@@ -6471,7 +6471,9 @@
     "passwordKept": "Un mot de passe est enregistré : laissez vide pour le garder.",
     "views": {
       "list": "Points d’enrôlement"
-    }
+    },
+    "emptyTitle": "Aucun point EST configuré",
+    "emptyText": "EST enrôle les équipements par HTTPS avec un certificat client ; il demande une AC émettrice."
   },
   "discovery": {
     "adHocScan": "Scan ponctuel",
@@ -7114,7 +7116,9 @@
     "views": {
       "list": "Services",
       "config": "Configuration"
-    }
+    },
+    "emptyTitle": "Aucun service d’horodatage",
+    "emptyText": "Un service d’horodatage s’appuie sur une AC émettrice et une politique d’horodatage."
   },
   "sshCas": {
     "title": "Autorités de certification SSH",

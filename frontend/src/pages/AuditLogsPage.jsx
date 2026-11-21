@@ -9,8 +9,9 @@ import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Icon, Btn, IconBtn, PageHead, Toolbar, SearchField, FilterSelect, ToolsDivider, AppliedFilters,
-  DataTable, TableFooter, LoadError, LoadCause, EmptyBlock, NoMatch,
+  DataTable, TableFooter, LoadError, LoadCause, NoMatch,
 } from '../components/atelier'
+import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { useNotification, useInspector } from '../contexts'
 import { integrityMessage } from '../lib/auditIntegrity'
 import { usePermission, usePersistedState, useJob } from '../hooks'
@@ -281,7 +282,7 @@ export default function AuditLogsPage() {
   const shown = firstRead ? [] : logs
 
   const emptyBlock = journalEmpty ? (
-    <EmptyBlock id="activity" icon="activity" title={t('audit.emptyTitle')} text={t('audit.emptyText')}
+    <SetupEmptyBlock id="activity" icon="activity" title={t('audit.emptyTitle')} text={t('audit.emptyText')}
       action={canWrite('certificates') ? { label: t('audit.emptyAction'), icon: 'plus', to: '/certificates?action=create', primary: true } : undefined} />
   ) : (
     <NoMatch icon={false} title={t('audit.noMatchTitle')} text={t('audit.noMatchText')} resetLabel={t('audit.resetFilters')} onReset={narrowed ? clearFilters : undefined} />

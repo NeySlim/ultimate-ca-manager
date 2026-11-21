@@ -47,6 +47,9 @@ const cas = vi.hoisted(() => ({ getAll: vi.fn(), update: vi.fn() }))
 vi.mock('../../services', () => ({ casService: cas, crlService: svc }))
 
 import { renderAtUrl } from '../../test/dockUrl'
+// The first-run state is useSetup's own subject: here it is given
+const setup = vi.hoisted(() => ({ state: { visible: false } }))
+vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual()), useSetup: () => setup.state }))
 import CRLOCSPPage from '../CRLOCSPPage'
 import { crlState } from '../protocols/protocolStates'
 
@@ -55,6 +58,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   localStorage.clear()
+  setup.state = { visible: false }
   perms.crl = true
   perms.cas = true
   cas.getAll.mockResolvedValue({ data: CAS })
@@ -226,6 +230,17 @@ describe('the CRL / OCSP states', () => {
     page()
     expect(await screen.findByText('crlOcsp.emptyTitle')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'crlOcsp.createCa' })).toHaveAttribute('href', '/cas')
+  })
+
+  it('leads the empty list to the setup assistant while its steps remain', async () => {
+    cas.getAll.mockResolvedValue({ data: [] })
+    svc.getAll.mockResolvedValue({ data: [] })
+    setup.state = { visible: true, complete: false }
+    page()
+    expect(await screen.findByText('crlOcsp.emptyTitle')).toBeInTheDocument()
+    const block = document.getElementById('empty-crl')
+    expect(within(block).getByRole('link', { name: 'shell.setup.open' })).toHaveAttribute('href', '/')
+    expect(within(block).queryByRole('link', { name: 'crlOcsp.createCa' })).toBeNull()
   })
 })
 

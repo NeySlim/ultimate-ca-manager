@@ -10,8 +10,9 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
   Zone, Btn, IconBtn, Icon, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
-  LoadError, LoadCause, EmptyBlock,
+  LoadError, LoadCause,
 } from '../components/atelier'
+import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { estService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
@@ -134,7 +135,9 @@ export default function ESTPage() {
   const basic = Boolean(config.username && config.password_set)
   const auth = t(basic ? 'est.auth.certOrPassword' : 'est.auth.cert')
   const state = config.enabled ? 'active' : 'disabled'
-  const endpoints = useMemo(() => (loading || loadError ? [] : [
+  // No CA, no label and off: nothing configured, the list is the mockup's empty block
+  const unset = !config.enabled && !config.ca_id && !Object.keys(config.labels || {}).length
+  const endpoints = useMemo(() => (loading || loadError || unset ? [] : [
     { id: '', name: t('est.defaultEndpoint'), path: '/.well-known/est', ca: caLabel(caOf(config.ca_id)) || config.ca_name || '—' },
     ...Object.entries(config.labels || {}).map(([label, refid]) => ({
       id: label, name: label, path: `/.well-known/est/${label}`, ca: caLabel(caByRefid(refid)) || config.label_names?.[label] || '—',
@@ -258,7 +261,8 @@ export default function ESTPage() {
         <LoadError id="est" journal={auditPath} title={t('messages.errors.loadFailed.est')} onRetry={() => { setLoading(true); loadData() }}
           cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/est/config', message: loadError.message }} />} />
       )}
-      empty={<EmptyBlock id="est" icon="plug" title={t('est.defaultEndpoint')} />}
+      empty={<SetupEmptyBlock id="est" icon="plug" title={t('est.emptyTitle')} text={t('est.emptyText')}
+        action={canEdit ? { label: t('tsa.configure'), icon: 'settings', onClick: () => setView('config') } : undefined} />}
       footer={{ range: t('est.range', { shown: endpoints.length, count: endpoints.length }) }} />
   )
 

@@ -6471,7 +6471,9 @@
     "passwordKept": "A password is saved: leave empty to keep it.",
     "views": {
       "list": "Endpoints"
-    }
+    },
+    "emptyTitle": "No EST endpoint configured",
+    "emptyText": "EST enrols devices over HTTPS with a client certificate; it needs an issuing CA."
   },
   "discovery": {
     "adHocScan": "Scansione ad-hoc",
@@ -7114,7 +7116,9 @@
     "views": {
       "list": "Services",
       "config": "Configuration"
-    }
+    },
+    "emptyTitle": "No time-stamping service",
+    "emptyText": "A time-stamping service relies on an issuing CA and a time-stamping policy."
   },
   "sshCas": {
     "title": "Autorità di certificazione SSH",

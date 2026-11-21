@@ -14,6 +14,7 @@ import {
   Zone, Btn, Pill, PageHead, Toolbar, SearchField, IconBtn, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
   LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, Icon,
 } from '../components/atelier'
+import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { scepService, casService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
@@ -560,7 +561,7 @@ crypto ca enroll UCM-CA`}</pre>
       empty={profiles.length ? (
         <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setProfileState('')} />
       ) : (
-        <EmptyBlock id="scep" icon="globe" title={t('scep.noProfiles')} text={t('scep.emptyProfilesText')}
+        <SetupEmptyBlock id="scep" icon="globe" title={t('scep.noProfiles')} text={t('scep.emptyProfilesText')}
           action={canEdit ? { label: t('scep.newProfile'), icon: 'plus', onClick: () => setProfileForm({ profile: null }), primary: true } : undefined} />
       )}
       footer={{ range: t('scep.range', { shown: shownProfiles.length, count: profiles.length }) }} />
