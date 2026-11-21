@@ -113,7 +113,7 @@
 .atl .atl-out{font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .atl .atl-out .lv-btn,.atl .atl-out .ui-select-trigger,.atl .atl-out button.border{border-style:solid;border-width:1px}
 .atl .atl-out .lv-btn{font-size:12px;font-weight:500}
-.atl .atl-out :is(button,input).text-xs{line-height:1rem}
+.atl .atl-out button.text-xs,.atl .atl-out input.text-xs{line-height:1rem}
 .atl .atl-out .sf-inline-icon{color:var(--muted)}
 .atl .atl-out .sf-inline-icon:hover{color:var(--text)}
 .atl .atl-out .sf-link{color:var(--accent)}
