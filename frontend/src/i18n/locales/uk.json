@@ -1789,7 +1789,36 @@
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
-    "keyCurveNistP521": "NIST P-521 (ECDSA)"
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "states": {
+      "pending": "Pending",
+      "signed": "Signed"
+    },
+    "module": {
+      "name": "CSR-{{id}}",
+      "unit_one": "{{count, number}} request",
+      "unit_other": "{{count, number}} requests",
+      "unit_few": "{{count, number}} requests",
+      "unit_many": "{{count, number}} requests",
+      "range_one": "{{start}}–{{end}} of {{count, number}} request",
+      "range_other": "{{start}}–{{end}} of {{count, number}} requests",
+      "range_few": "{{start}}–{{end}} of {{count, number}} requests",
+      "range_many": "{{start}}–{{end}} of {{count, number}} requests",
+      "caption": "Certificate signing requests. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "subject": "Subject",
+      "requester": "Requester",
+      "key": "Key",
+      "submitted": "Submitted",
+      "pendingSummary": "Waiting to be signed.",
+      "signedSummary": "Signed by {{ca}} on {{date}}.",
+      "noSans": "No alternative name.",
+      "moreActions": "Other actions for {{name}}",
+      "actionsTitle": "Request actions",
+      "details": "Details",
+      "emptyTitle": "No signing request",
+      "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
+    }
   },
   "templates": {
     "template": "Шаблон",
@@ -1950,7 +1979,42 @@
     "activate": "Активувати",
     "activated": "Шаблон активовано",
     "deactivated": "Шаблон деактивовано",
-    "deactivateTooltip": "Деактивований шаблон не пропонується у формі «Видати сертифікат» і для автореєстрації Windows. Системні шаблони можна деактивувати, але не редагувати: скопіюйте шаблон, щоб змінити його."
+    "deactivateTooltip": "Деактивований шаблон не пропонується у формі «Видати сертифікат» і для автореєстрації Windows. Системні шаблони можна деактивувати, але не редагувати: скопіюйте шаблон, щоб змінити його.",
+    "module": {
+      "states": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "validity": "{{count, number}} d",
+      "defaultKey": "Default key",
+      "uses": "Uses",
+      "markers": "Marks",
+      "noDescription": "No description.",
+      "preview": "Detailed preview",
+      "moreActions": "Other actions for {{name}}",
+      "actionsTitle": "Template actions",
+      "sections": {
+        "subject": "Subject",
+        "extensions": "Extensions",
+        "rules": "Subject rules"
+      },
+      "sanTypes": "SAN types",
+      "none": "None",
+      "unit_one": "{{count, number}} template",
+      "unit_other": "{{count, number}} templates",
+      "unit_few": "{{count, number}} templates",
+      "unit_many": "{{count, number}} templates",
+      "range_one": "{{shown}} of {{count, number}} template",
+      "range_other": "{{shown}} of {{count, number}} templates",
+      "range_few": "{{shown}} of {{count, number}} templates",
+      "range_many": "{{shown}} of {{count, number}} templates",
+      "caption": "Templates. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "usesCount_one": "{{count, number}} certificate",
+      "usesCount_other": "{{count, number}} certificates",
+      "usesCount_few": "{{count, number}} certificates",
+      "usesCount_many": "{{count, number}} certificates"
+    }
   },
   "users": {
     "securityKeys": {
@@ -3128,7 +3192,37 @@
     "allStatuses": "Всі статуси",
     "expiringSoon": "Скоро закінчується",
     "trustStoreExpiring": "Trust Store закінчується",
-    "trustStoreExpiringDesc": "{{count}} довірений(і) сертифікат(и) закінчується(ються) протягом {{days}} днів"
+    "trustStoreExpiringDesc": "{{count}} довірений(і) сертифікат(и) закінчується(ються) протягом {{days}} днів",
+    "module": {
+      "states": {
+        "valid": "Valid",
+        "expiring": "Expiring soon",
+        "expired": "Expired"
+      },
+      "subject": "Subject",
+      "usage": "Usage",
+      "expires": "Expiry",
+      "sections": {
+        "details": "Details"
+      },
+      "noNotes": "No notes.",
+      "unit_one": "{{count, number}} anchor",
+      "unit_other": "{{count, number}} anchors",
+      "unit_few": "{{count, number}} anchors",
+      "unit_many": "{{count, number}} anchors",
+      "range_one": "{{shown}} of {{count, number}} anchor",
+      "range_other": "{{shown}} of {{count, number}} anchors",
+      "range_few": "{{shown}} of {{count, number}} anchors",
+      "range_many": "{{shown}} of {{count, number}} anchors",
+      "selected_one": "{{count, number}} anchor selected",
+      "selected_other": "{{count, number}} anchors selected",
+      "selected_few": "{{count, number}} anchors selected",
+      "selected_many": "{{count, number}} anchors selected",
+      "caption": "Trust Store. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "filterByType": "Filter by type",
+      "emptyTitle": "No external trust anchor"
+    }
   },
   "importExport": {
     "subtitle": "Передача сертифікатів та CA",
@@ -6696,7 +6790,33 @@
     "deleteDescription": "Ви впевнені, що хочете видалити {{name}} назавжди?",
     "deleteSuccess": "Сертифікат успішно видалено",
     "deleteFailed": "Не вдалося видалити сертифікат",
-    "exportError": "Не вдалося експортувати сертифікат"
+    "exportError": "Не вдалося експортувати сертифікат",
+    "module": {
+      "description": "Description",
+      "expires": "Expiry",
+      "usage": "Validity and use",
+      "inspect": "Inspect the certificate",
+      "moreActions": "Other actions for {{name}}",
+      "actionsTitle": "Certificate actions",
+      "exportList": "Export the list",
+      "exportScope_one": "{{count, number}} certificate, with the search and filter in use (10,000 at most).",
+      "exportScope_other": "{{count, number}} certificates, with the search and filter in use (10,000 at most).",
+      "exportScope_few": "{{count, number}} certificates, with the search and filter in use (10,000 at most).",
+      "exportScope_many": "{{count, number}} certificates, with the search and filter in use (10,000 at most).",
+      "format_csv": "One row per certificate",
+      "format_json": "Structured data",
+      "unit_one": "{{count, number}} certificate",
+      "unit_other": "{{count, number}} certificates",
+      "unit_few": "{{count, number}} certificates",
+      "unit_many": "{{count, number}} certificates",
+      "range_one": "{{start}}–{{end}} of {{count, number}} certificate",
+      "range_other": "{{start}}–{{end}} of {{count, number}} certificates",
+      "range_few": "{{start}}–{{end}} of {{count, number}} certificates",
+      "range_many": "{{start}}–{{end}} of {{count, number}} certificates",
+      "caption": "User certificates. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "orphan": "No certificate"
+    }
   },
   "est": {
     "title": "Протокол EST",
@@ -8788,6 +8908,8 @@
     "openItem": "Open item",
     "detailOf": "Detail: {{name}}",
     "sectionsOf": "Sections: {{name}}",
-    "settingsSections": "Settings sections"
+    "settingsSections": "Settings sections",
+    "pageActions": "Other actions of {{name}}",
+    "pageActionsTitle": "Page actions"
   }
 }

@@ -8,11 +8,13 @@
  * asked, while the Account page (which goes through ExportModal) sent
  * include_key: false for that same certificate and format.
  *
- * Both surfaces now render ExportModal, so the request is decided by what the
- * operator ticked rather than by which page they happened to start from.
+ * Both surfaces now render an export dialog with the same props (ExportModal on the Account
+ * page, the Certificates zone's ExportDialog in the dock of this page), so the request is
+ * decided by what the operator ticked rather than by which page they happened to start from.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 
 const serviceMocks = vi.hoisted(() => ({
   getAll: vi.fn(),
@@ -86,9 +88,9 @@ const ROW = {
 }
 
 async function openRowExport() {
-  render(<UserCertificatesPage />)
-  await screen.findByTitle('common.export')
-  fireEvent.click(screen.getByTitle('common.export'))
+  render(<MemoryRouter><UserCertificatesPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: ROW.name }))
+  fireEvent.click(await screen.findByRole('button', { name: 'common.export' }))
   await screen.findByText('PEM')
 }
 
@@ -104,7 +106,7 @@ describe('user certificate export sends what was actually asked for', () => {
 
   it('does not ship the private key with a plain PEM export', async () => {
     await openRowExport()
-    fireEvent.click(screen.getByText('Download'))
+    fireEvent.click(screen.getByText('export.download'))
 
     await waitFor(() => expect(serviceMocks.export).toHaveBeenCalledTimes(1))
     const [id, format, options] = serviceMocks.export.mock.calls[0]
@@ -124,8 +126,8 @@ describe('user certificate export sends what was actually asked for', () => {
 
   it('ships the key only when the operator ticks it', async () => {
     await openRowExport()
-    fireEvent.click(screen.getByText('Include private key'))
-    fireEvent.click(screen.getByText('Download'))
+    fireEvent.click(screen.getByText('export.includeKey'))
+    fireEvent.click(screen.getByText('export.download'))
 
     await waitFor(() => expect(serviceMocks.export).toHaveBeenCalledTimes(1))
     expect(serviceMocks.export.mock.calls[0][2].includeKey).toBe(true)

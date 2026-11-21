@@ -1789,7 +1789,36 @@
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
-    "keyCurveNistP521": "NIST P-521 (ECDSA)"
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "states": {
+      "pending": "Ожидает",
+      "signed": "Подписан"
+    },
+    "module": {
+      "name": "CSR-{{id}}",
+      "unit_one": "{{count, number}} запрос",
+      "unit_other": "{{count, number}} запроса",
+      "unit_few": "{{count, number}} запроса",
+      "unit_many": "{{count, number}} запросов",
+      "range_one": "{{start}}–{{end}} из {{count, number}} запроса",
+      "range_other": "{{start}}–{{end}} из {{count, number}} запросов",
+      "range_few": "{{start}}–{{end}} из {{count, number}} запросов",
+      "range_many": "{{start}}–{{end}} из {{count, number}} запросов",
+      "caption": "Запросы на подпись. Выберите имя, чтобы открыть подробности.",
+      "filterByState": "Фильтр по состоянию",
+      "subject": "Субъект",
+      "requester": "Заявитель",
+      "key": "Ключ",
+      "submitted": "Подан",
+      "pendingSummary": "Ожидает подписи.",
+      "signedSummary": "Подписан {{ca}} {{date}}.",
+      "noSans": "Нет альтернативных имён.",
+      "moreActions": "Другие действия для {{name}}",
+      "actionsTitle": "Действия с запросом",
+      "details": "Подробности",
+      "emptyTitle": "Нет запросов на подпись",
+      "emptyText": "CSR, поданные командами или протоколами, поступают сюда на проверку. CSR также можно вставить в форму выпуска."
+    }
   },
   "templates": {
     "template": "Шаблон",
@@ -1950,7 +1979,42 @@
     "activate": "Активировать",
     "activated": "Шаблон активирован",
     "deactivated": "Шаблон деактивирован",
-    "deactivateTooltip": "Деактивированный шаблон не предлагается в форме выпуска сертификата и при автоматической регистрации Windows. Системные шаблоны можно деактивировать, но не изменять: скопируйте шаблон, чтобы изменить его."
+    "deactivateTooltip": "Деактивированный шаблон не предлагается в форме выпуска сертификата и при автоматической регистрации Windows. Системные шаблоны можно деактивировать, но не изменять: скопируйте шаблон, чтобы изменить его.",
+    "module": {
+      "states": {
+        "active": "Активен",
+        "inactive": "Неактивен"
+      },
+      "validity": "{{count, number}} дн.",
+      "defaultKey": "Ключ по умолчанию",
+      "uses": "Использование",
+      "markers": "Отметки",
+      "noDescription": "Нет описания.",
+      "preview": "Подробный просмотр",
+      "moreActions": "Другие действия для {{name}}",
+      "actionsTitle": "Действия с шаблоном",
+      "sections": {
+        "subject": "Субъект",
+        "extensions": "Расширения",
+        "rules": "Правила субъекта"
+      },
+      "sanTypes": "Типы SAN",
+      "none": "Нет",
+      "unit_one": "{{count, number}} шаблон",
+      "unit_other": "{{count, number}} шаблона",
+      "unit_few": "{{count, number}} шаблона",
+      "unit_many": "{{count, number}} шаблонов",
+      "range_one": "{{shown}} из {{count, number}} шаблона",
+      "range_other": "{{shown}} из {{count, number}} шаблонов",
+      "range_few": "{{shown}} из {{count, number}} шаблонов",
+      "range_many": "{{shown}} из {{count, number}} шаблонов",
+      "caption": "Шаблоны. Выберите имя, чтобы открыть подробности.",
+      "filterByState": "Фильтр по состоянию",
+      "usesCount_one": "{{count, number}} сертификат",
+      "usesCount_other": "{{count, number}} сертификата",
+      "usesCount_few": "{{count, number}} сертификата",
+      "usesCount_many": "{{count, number}} сертификатов"
+    }
   },
   "users": {
     "securityKeys": {
@@ -3128,7 +3192,37 @@
     "allStatuses": "Все статусы",
     "expiringSoon": "Скоро истекают",
     "trustStoreExpiring": "Истекают сертификаты в хранилище доверия",
-    "trustStoreExpiringDesc": "Доверенных сертификатов, срок которых истекает в течение {{days}} дн.: {{count}}"
+    "trustStoreExpiringDesc": "Доверенных сертификатов, срок которых истекает в течение {{days}} дн.: {{count}}",
+    "module": {
+      "states": {
+        "valid": "Действителен",
+        "expiring": "Скоро истекает",
+        "expired": "Истёк"
+      },
+      "subject": "Субъект",
+      "usage": "Назначение",
+      "expires": "Срок действия",
+      "sections": {
+        "details": "Подробности"
+      },
+      "noNotes": "Нет заметок.",
+      "unit_one": "{{count, number}} якорь",
+      "unit_other": "{{count, number}} якоря",
+      "unit_few": "{{count, number}} якоря",
+      "unit_many": "{{count, number}} якорей",
+      "range_one": "{{shown}} из {{count, number}} якоря",
+      "range_other": "{{shown}} из {{count, number}} якорей",
+      "range_few": "{{shown}} из {{count, number}} якорей",
+      "range_many": "{{shown}} из {{count, number}} якорей",
+      "selected_one": "Выбран {{count, number}} якорь",
+      "selected_other": "Выбрано якорей: {{count, number}}",
+      "selected_few": "Выбрано якорей: {{count, number}}",
+      "selected_many": "Выбрано якорей: {{count, number}}",
+      "caption": "Trust Store. Выберите имя, чтобы открыть подробности.",
+      "filterByState": "Фильтр по состоянию",
+      "filterByType": "Фильтр по типу",
+      "emptyTitle": "Нет внешних якорей доверия"
+    }
   },
   "importExport": {
     "subtitle": "Перенос сертификатов и ЦС",
@@ -6699,7 +6793,33 @@
     "deleteDescription": "Вы уверены, что хотите безвозвратно удалить {{name}}? Это действие нельзя отменить.",
     "deleteSuccess": "Сертификат удалён",
     "deleteFailed": "Не удалось удалить сертификат",
-    "exportError": "Не удалось экспортировать сертификат"
+    "exportError": "Не удалось экспортировать сертификат",
+    "module": {
+      "description": "Описание",
+      "expires": "Срок действия",
+      "usage": "Срок и использование",
+      "inspect": "Открыть сертификат",
+      "moreActions": "Другие действия для {{name}}",
+      "actionsTitle": "Действия с сертификатом",
+      "exportList": "Экспорт списка",
+      "exportScope_one": "{{count, number}} сертификат с текущими поиском и фильтром (не более 10 000).",
+      "exportScope_other": "{{count, number}} сертификата с текущими поиском и фильтром (не более 10 000).",
+      "exportScope_few": "{{count, number}} сертификата с текущими поиском и фильтром (не более 10 000).",
+      "exportScope_many": "{{count, number}} сертификатов с текущими поиском и фильтром (не более 10 000).",
+      "format_csv": "Одна строка на сертификат",
+      "format_json": "Структурированные данные",
+      "unit_one": "{{count, number}} сертификат",
+      "unit_other": "{{count, number}} сертификата",
+      "unit_few": "{{count, number}} сертификата",
+      "unit_many": "{{count, number}} сертификатов",
+      "range_one": "{{start}}–{{end}} из {{count, number}} сертификата",
+      "range_other": "{{start}}–{{end}} из {{count, number}} сертификатов",
+      "range_few": "{{start}}–{{end}} из {{count, number}} сертификатов",
+      "range_many": "{{start}}–{{end}} из {{count, number}} сертификатов",
+      "caption": "Сертификаты пользователей. Выберите имя, чтобы открыть подробности.",
+      "filterByState": "Фильтр по состоянию",
+      "orphan": "Без сертификата"
+    }
   },
   "est": {
     "title": "Протокол EST",
@@ -8791,6 +8911,8 @@
     "openItem": "Открытый элемент",
     "detailOf": "Сведения: {{name}}",
     "sectionsOf": "Разделы: {{name}}",
-    "settingsSections": "Разделы параметров"
+    "settingsSections": "Разделы параметров",
+    "pageActions": "Другие действия страницы {{name}}",
+    "pageActionsTitle": "Действия страницы"
   }
 }

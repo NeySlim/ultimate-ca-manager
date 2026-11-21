@@ -27,7 +27,8 @@ export default {
     ],
     tips: [
       'Utilisez « Synchroniser depuis le système » pour remplir rapidement le magasin de confiance avec les AC du système d’exploitation',
-      'Filtrez par usage pour vous concentrer sur des catégories de certificats spécifiques',
+      'Filtrez par type pour vous concentrer sur des catégories de certificats spécifiques ; les puces comptent les ancres Valide, Expire bientôt et Expirée',
+      'La colonne Usage montre la description de l’entrée ; ses notes sont le résumé de son détail',
     ],
   },
   helpGuides: {
@@ -61,7 +62,8 @@ Importez les AC de confiance du magasin de confiance du système d’exploitatio
 
 ## Gérer les entrées
 
-- **Filtrer par usage** : Restreindre la liste par catégorie de certificat
+- **Filtrer par type** : Restreindre la liste par catégorie de certificat ; les puces comptent les ancres Valide, Expire bientôt et Expirée
+- **Usage** : La liste montre la description de chaque ancre comme son usage ; un nom ouvre son détail (Aperçu, Détails, PEM) sous la liste
 - **Rechercher** : Trouver des certificats par nom de sujet
 - **Exporter** : Télécharger des certificats individuels au format PEM
 - **Supprimer** : Retirer un certificat du magasin de confiance

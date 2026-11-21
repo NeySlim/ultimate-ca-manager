@@ -58,12 +58,6 @@ vi.mock('../../services', () => ({
   },
   casService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
 }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children, slideOverContent }) => <div>{children}<div>{slideOverContent}</div></div>,
-  ResponsiveDataTable: ({ data, onRowClick }) => (
-    <div>{data.map(row => <button key={row.id} onClick={() => onRowClick(row)}>open-{row.id}</button>)}</div>
-  ),
-}))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
 import TrustStorePage from '../TrustStorePage'
@@ -71,7 +65,9 @@ import TrustStorePage from '../TrustStorePage'
 const openDetail = async (cert) => {
   store.cert = { id: 3, name: 'Trusted root', subject: 'CN=Trusted root', not_after: '2035-01-01T00:00:00Z', ...cert }
   render(<MemoryRouter><TrustStorePage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText('open-3'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Trusted root' }))
+  // The key is in the dock's Détails tab
+  fireEvent.click(await screen.findByRole('tab', { name: en.trustStore.module.sections.details }))
   await screen.findAllByText(en.common.keyType)
 }
 
@@ -89,17 +85,16 @@ const UNREADABLE = {
 }
 
 describe('TrustStorePage key display', () => {
-  it('names an ML-DSA key with its level', async () => {
+  it('names an ML-DSA key as the Certificates zone does, without a level', async () => {
     await openDetail(MLDSA)
-    // Quick stats and key section
-    expect(screen.getAllByText('ML-DSA-65 (level 3)')).toHaveLength(2)
-    // The bare name is the signature algorithm's only (quick stats and technical details)
+    // The key and the issuer's signature algorithm
     expect(screen.getAllByText('ML-DSA-65')).toHaveLength(2)
+    expect(screen.queryByText(/level/)).toBeNull()
   })
 
   it('names an RSA key with its size and its signature algorithm', async () => {
     await openDetail(RSA)
-    expect(screen.getAllByText('RSA 2048')).toHaveLength(2)
+    expect(screen.getAllByText('RSA 2048')).toHaveLength(1)
     expect(screen.getAllByText('SHA256-RSA').length).toBeGreaterThan(0)
   })
 

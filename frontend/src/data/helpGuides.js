@@ -446,11 +446,13 @@ Certificates here are fully managed by UCM: they are stored in the database with
 
 ## Exporting a Certificate
 
-1. Select a certificate → **Export**
-2. Choose format:
-   - **PEM**: Certificate + private key + CA chain in text format
+1. Click the certificate's name: its detail opens under the list
+2. Click **Export** and choose the format:
+   - **PEM**: Certificate, with the CA chain and the private key when ticked, in text format
    - **PKCS#12**: Binary bundle, password-protected (min 8 characters)
 3. Click **Download**
+
+**Export the list** in the page header saves every certificate the search and the state filter keep, as CSV or JSON.
 
 The exported file can be imported into browsers, operating systems, or API clients for mTLS authentication.
 
@@ -458,7 +460,7 @@ The exported file can be imported into browsers, operating systems, or API clien
 
 ## Revoking a Certificate
 
-1. Select a certificate → **Revoke**
+1. Open the certificate, then its **⋯** menu → **Revoke**
 2. Choose a revocation reason:
    - Key Compromise
    - Affiliation Changed
@@ -471,7 +473,7 @@ The exported file can be imported into browsers, operating systems, or API clien
 
 ## Deleting a Certificate
 
-Delete removes both the certificate and the user-certificate association. Only admins and operators can delete.
+Delete, in the **⋯** menu of the certificate's detail, removes both the certificate and the user-certificate association. Only admins and operators can delete.
 
 > ⚠ Deletion is permanent and cannot be undone.
 
@@ -502,13 +504,15 @@ Delete removes both the certificate and the user-certificate association. Only a
 
 Certificate Signing Requests (CSRs) allow external systems to request certificates without exposing their private keys. The CSR contains the public key and subject information; the private key stays with the requester.
 
-## Tabs
+## States
+
+The chips above the list switch between the two lists, each counted.
 
 ### Pending
 CSRs awaiting review and signing. New CSRs appear here after upload.
 
-### History
-Signed requests, each with the certificate it produced. **Download certificate** and **Download CSR** get either one, and **Sign again** puts the request back in Pending.
+### Signed
+Signed requests, each with the certificate it produced. **Download certificate** and, in the **⋯** menu, **Download CSR** get either one, and **Sign again** puts the request back in Pending.
 
 ## Generating a CSR
 
@@ -539,7 +543,7 @@ Through the API, \`related_to\` names an existing certificate **A** whose privat
 
 ## Reviewing a CSR
 
-Click a CSR to view:
+Click a request's name: its detail opens under the list, with:
 - **Subject**: CN, O, OU, C, etc.
 - **SANs**: DNS names, IP addresses, emails
 - **Key info**: Algorithm, size, public key fingerprint
@@ -581,7 +585,7 @@ If Microsoft CA connections are configured, a **Microsoft CA** tab appears in th
 4. Select the **certificate template** (auto-loaded from the CA)
 5. Click **Sign**
 
-If the template requires manager approval, the request stays Pending in UCM. Open it in **Pending** and click **Check status** to fetch the certificate once the CA has issued it (also needs the permission to sign CSRs), or approve it from the CA Control Panel of the connection.
+If the template requires manager approval, the request stays Pending in UCM. Open it in **Pending** and click **Check status** in its **⋯** menu to fetch the certificate once the CA has issued it (also needs the permission to sign CSRs), or approve it from the CA Control Panel of the connection.
 
 ### Enroll on Behalf Of (EOBO)
 
@@ -614,7 +618,7 @@ A device that keeps its key, such as a smart card, often cannot produce the same
 
 ## Adding a Private Key
 
-Before signing, **Upload Key** attaches the private key to a pending CSR, so the signed certificate can be exported as PKCS#12. A signed request is no longer offered this action.
+Before signing, **Upload Key** (in the **⋯** menu of the request) attaches the private key to a pending CSR, so the signed certificate can be exported as PKCS#12. A signed request is no longer offered this action.
 
 > 💡 This is useful when the requester sends both the CSR and the key securely.
 
@@ -642,7 +646,7 @@ The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME
 ### Custom
 Everything created or imported here. These can be edited and deleted freely.
 
-Switch **Show system** off in the toolbar to hide the built-in templates and work with your own only. The choice is remembered, unless you have no custom templates yet, in which case the built-in ones stay visible.
+Choose **Custom** in the source filter of the toolbar to hide the built-in templates and work with your own only. The choice is remembered; with no custom template yet, the list says so and **Clear all filters** brings the built-in ones back.
 
 Certificate authorities are not made from templates: create them on the **CAs** page.
 
@@ -672,7 +676,7 @@ Templates carry three opt-in flags used by the Windows autoenrollment protocols 
 - **Build subject from Active Directory**: For unattended GPO autoenrollment: derive the certificate's subject and SAN from the requester's AD object (via the AD Connector) instead of requiring the client to supply one. On the Kerberos endpoints a subject named in the request is ignored and computer accounts are refused; machine templates always take the computer's DNS name.
 - **Restrict enrollment to AD group**: Only principals belonging to the configured Active Directory group (nested membership included) may enroll against this template over the Kerberos-authenticated endpoint. Enter a group name or full DN; leave blank to allow any authenticated principal, matching real ADCS's default. Not enforced on the Username/Password endpoint, which has no per-request identity to check.
 
-Templates with these flags show **AD**, **Auto**, and **ACL** badges in the template list.
+Templates with these flags list **AD**, **Auto** and **ACL** under **Marks** in their detail.
 
 ## Pinned Subject Fields
 
@@ -680,7 +684,7 @@ A template can **pin** the organizational subject fields: **C, ST, L, O, OU**: f
 
 - **Common Name and Subject Alternative Name are never affected**: they stay dynamic per requester
 - Leave a field blank to leave it dynamic
-- Templates with pinned fields show a **Pinned** badge, and the pinned values appear in the template detail panel
+- Templates with pinned fields list **Pinned** under **Marks**, and the pinned values appear in the **Enrollment** tab of the template's detail
 
 Use this to guarantee a uniform organizational identity (e.g. a fixed \`O\` and \`C\`) across an autoenrolled fleet, regardless of what each Windows client submits.
 
@@ -713,7 +717,7 @@ The inspector lists such extensions for certificates and CAs under **Other exten
 
 ## Copying Templates
 
-Click **Copy** to create a copy of an existing template. Modify the copy without affecting the original.
+Open a template, then in its **⋯** menu click **Copy** to create a copy of it. Modify the copy without affecting the original.
 
 ## Import & Export
 
@@ -1681,7 +1685,8 @@ Import the trusted CAs of the operating system's trust store (e.g., Mozilla's CA
 
 ## Managing Entries
 
-- **Filter by purpose**: Narrow the list by certificate category
+- **Filter by type**: Narrow the list by certificate category; the chips count Valid, Expiring soon and Expired entries
+- **Usage**: The list shows each entry's description as its usage; a name opens its detail (Overview, Details, PEM) under the list
 - **Search**: Find certificates by subject name
 - **Export**: Download individual certificates in PEM format
 - **Delete**: Remove a certificate from the trust store

@@ -54,7 +54,7 @@ vi.mock('../../services', () => ({
 }))
 
 import { CompactField, DetailField } from '../DetailCard'
-import { CSRPanel } from '../detail/CSRPanel'
+import { PemPanel } from '../../pages/certificates/inspector/PemPanel'
 import { TrustCertPanel } from '../detail/TrustCertPanel'
 import CopyableUrl from '../../pages/settings/CopyableUrl'
 import EmailSection from '../../pages/settings/EmailSection'
@@ -303,17 +303,18 @@ describe('CopyableUrl', () => {
 const PEM = '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----'
 
 describe('PEM copy buttons', () => {
-  it('CSRPanel does not claim the PEM was copied on plain HTTP', async () => {
-    render(<CSRPanel csr={{ id: 1, subject: 'CN=web', pem: PEM }} />)
+  // The PEM tab of a request's dock (CSRs) and of a certificate's
+  it('PemPanel does not claim the PEM was copied on plain HTTP', async () => {
+    render(<PemPanel cert={{ id: 1, subject: 'CN=web', pem: PEM }} />)
     fireEvent.click(screen.getByText('details.copyPem'))
 
     await waitFor(() => expect(document.execCommand).toHaveBeenCalled())
     expect(screen.queryByText('common.copied')).toBeNull()
   })
 
-  it('CSRPanel confirms a copy that worked', async () => {
+  it('PemPanel confirms a copy that worked', async () => {
     const writeText = workingClipboard()
-    render(<CSRPanel csr={{ id: 1, subject: 'CN=web', pem: PEM }} />)
+    render(<PemPanel cert={{ id: 1, subject: 'CN=web', pem: PEM }} />)
     fireEvent.click(screen.getByText('details.copyPem'))
 
     await waitFor(() => expect(screen.getByText('common.copied')).toBeTruthy())
@@ -355,7 +356,7 @@ const MIGRATED = [
   'pages/TSAPage.jsx',
   'pages/SCEPPage.jsx',
   'components/DetailCard.jsx',
-  'components/detail/CSRPanel.jsx',
+  'pages/certificates/inspector/PemPanel.jsx',
   'pages/cas/CASideDetails.jsx',
   'components/detail/CertificatePanel.jsx',
   'components/detail/TrustCertPanel.jsx',
@@ -371,7 +372,7 @@ describe('the copy path is not re-implemented', () => {
     },
   )
 
-  it.each(['components/detail/CSRPanel.jsx', 'pages/cas/CASideDetails.jsx',
+  it.each(['pages/certificates/inspector/PemPanel.jsx', 'pages/cas/CASideDetails.jsx',
     'components/detail/CertificatePanel.jsx', 'components/detail/TrustCertPanel.jsx',
     'components/DetailCard.jsx', 'pages/settings/DeploySection.jsx'])(
     '%s no longer owns an uncleaned copy-reset timer',

@@ -84,6 +84,7 @@ vi.mock('../../components', async (orig) => ({
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
 import CSRsPage from '../CSRsPage'
+import { openRow } from '../../test/atelierRows'
 
 const PQ_ROWS = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ)
 // A CSR as the API lists it: a post-quantum key has its label and no size
@@ -126,9 +127,10 @@ async function submitGenerate() {
 async function openRekey(row) {
   mocks.row = row
   render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText(row.cn))
-  const buttons = await screen.findAllByText('csrs.rekey')
-  fireEvent.click(buttons[buttons.length - 1])
+  await openRow(row.cn)
+  // Re-key sits in the dock's « ⋯ » menu
+  fireEvent.click(await screen.findByRole('button', { name: 'csrs.module.moreActions' }))
+  fireEvent.click(await screen.findByText('csrs.rekey'))
   await screen.findByText('csrs.rekeyAsCSR')
 }
 

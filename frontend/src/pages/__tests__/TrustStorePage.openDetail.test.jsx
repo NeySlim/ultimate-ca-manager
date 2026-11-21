@@ -1,5 +1,5 @@
 /**
- * TrustStorePage: adding one CA (managed or via Smart Import) opens its detail.
+ * TrustStorePage: adding one CA (managed or via Smart Import) opens its detail; the page's dock shows an anchor.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -46,6 +46,7 @@ vi.mock('../../hooks', async () => {
 })
 
 const getAll = vi.fn()
+const getById = vi.fn()
 const add = vi.fn()
 const exportCA = vi.fn()
 vi.mock('../../services', () => ({
@@ -53,6 +54,7 @@ vi.mock('../../services', () => ({
     getAll: vi.fn().mockResolvedValue({ data: [] }),
     getStats: vi.fn().mockResolvedValue({ data: { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 } }),
     add: (...args) => add(...args),
+    getById: (...args) => getById(...args),
   },
   casService: {
     getAll: (...args) => getAll(...args),
@@ -72,11 +74,6 @@ vi.mock('../../components', () => ({
   CompactField: () => null,
   FormSelect: () => null,
 }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ toolbarActions }) => <div>{toolbarActions}</div>,
-}))
-
 // Stub Smart Import: a button that fires onImportComplete with a given result
 let importResult = null
 vi.mock('../../components/SmartImport', () => ({
@@ -101,6 +98,7 @@ describe('TrustStorePage — opens detail after add/import', () => {
       { id: 2, descr: 'CA Two', is_root: true },
     ] })
     exportCA.mockResolvedValue({ data: 'PEM-DATA' })
+    getById.mockReset().mockImplementation((id) => Promise.resolve({ data: { id, name: `Anchor ${id}` } }))
     importResult = null
   })
 
@@ -109,12 +107,12 @@ describe('TrustStorePage — opens detail after add/import', () => {
     renderPage()
     fireEvent.click(await screen.findByText('trustStore.add'))
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    const checkboxes = await screen.findAllByRole('checkbox')
-    // index 0 is "select all"; pick the first CA row only
-    fireEvent.click(checkboxes[1])
+    fireEvent.click((await screen.findByText('CA One')).closest('label').querySelector('input'))
     fireEvent.click(screen.getByText('trustStore.addSelected:1'))
     await waitFor(() => expect(add).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('truststore', 101))
+    // The page's own dock shows the entry
+    await waitFor(() => expect(getById).toHaveBeenCalledWith(101))
+    expect(await screen.findByRole('heading', { name: 'Anchor 101' })).toBeTruthy()
   })
 
   it('adding two managed CAs opens nothing', async () => {
@@ -122,11 +120,11 @@ describe('TrustStorePage — opens detail after add/import', () => {
     renderPage()
     fireEvent.click(await screen.findByText('trustStore.add'))
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    const checkboxes = await screen.findAllByRole('checkbox')
-    fireEvent.click(checkboxes[1])
-    fireEvent.click(checkboxes[2])
+    fireEvent.click((await screen.findByText('CA One')).closest('label').querySelector('input'))
+    fireEvent.click(screen.getByText('CA Two').closest('label').querySelector('input'))
     fireEvent.click(screen.getByText('trustStore.addSelected:2'))
     await waitFor(() => expect(add).toHaveBeenCalledTimes(2))
+    expect(getById).not.toHaveBeenCalled()
     expect(openEntity).not.toHaveBeenCalled()
   })
 
@@ -152,7 +150,11 @@ describe('TrustStorePage — opens detail after add/import', () => {
 const Where = () => <span data-testid="where">{useLocation().pathname}</span>
 
 describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor', () => {
-  beforeEach(() => { mockIsMobile = false; openEntity.mockReset() })
+  beforeEach(() => {
+    mockIsMobile = false
+    openEntity.mockReset()
+    getById.mockReset().mockImplementation((id) => Promise.resolve({ data: { id, name: `Anchor ${id}` } }))
+  })
 
   it('opens the detail of the anchor named in the link, then drops the id from the address', async () => {
     render(
@@ -164,8 +166,11 @@ describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor',
         <Where />
       </MemoryRouter>
     )
-    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('truststore', 7))
-    expect(openEntity).toHaveBeenCalledTimes(1)
+    // The anchor is read by id (the filters may hide it) and shown in the page's dock
+    await waitFor(() => expect(getById).toHaveBeenCalledWith(7))
+    expect(await screen.findByRole('heading', { name: 'Anchor 7' })).toBeTruthy()
+    expect(getById).toHaveBeenCalledTimes(1)
+    expect(openEntity).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/truststore'))
   })
 })

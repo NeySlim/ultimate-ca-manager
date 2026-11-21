@@ -175,7 +175,7 @@ describe('TemplatesPage Email field: not type="email" (built-in copies carry {em
     svc.getAll.mockResolvedValue({ data: [] })
     renderPage()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'templates.new' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'templates.createTemplate' }))
     fireEvent.change(await screen.findByPlaceholderText('templates.namePlaceholder'), {
       target: { value: 'Fresh Template' },
     })
@@ -192,7 +192,7 @@ describe('TemplatesPage Email field: not type="email" (built-in copies carry {em
     svc.getAll.mockResolvedValue({ data: [] })
     renderPage()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'templates.new' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'templates.createTemplate' }))
     fireEvent.change(await screen.findByPlaceholderText('templates.namePlaceholder'), {
       target: { value: 'No Max Template' },
     })
@@ -208,7 +208,7 @@ describe('TemplatesPage Email field: not type="email" (built-in copies carry {em
     svc.getAll.mockResolvedValue({ data: [] })
     renderPage()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'templates.new' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'templates.createTemplate' }))
     fireEvent.change(await screen.findByPlaceholderText('templates.namePlaceholder'), {
       target: { value: 'Enforcing Template' },
     })

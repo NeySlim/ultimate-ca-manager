@@ -2654,7 +2654,32 @@
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
-    "keyCurveNistP521": "NIST P-521 (ECDSA)"
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "states": {
+      "pending": "En attente",
+      "signed": "Signée"
+    },
+    "module": {
+      "name": "CSR-{{id}}",
+      "unit_one": "{{count, number}} demande",
+      "unit_other": "{{count, number}} demandes",
+      "range_one": "{{start}}–{{end}} sur {{count, number}} demande",
+      "range_other": "{{start}}–{{end}} sur {{count, number}} demandes",
+      "caption": "Demandes de signature. Activez un nom pour ouvrir son détail.",
+      "filterByState": "Filtrer par état",
+      "subject": "Sujet",
+      "requester": "Demandeur",
+      "key": "Clé",
+      "submitted": "Déposée",
+      "pendingSummary": "En attente de signature.",
+      "signedSummary": "Signée par {{ca}} le {{date}}.",
+      "noSans": "Aucun nom alternatif.",
+      "moreActions": "Autres actions de {{name}}",
+      "actionsTitle": "Actions de la demande",
+      "details": "Détails",
+      "emptyTitle": "Aucune demande de signature",
+      "emptyText": "Les CSR déposées par les équipes ou par les protocoles arrivent ici pour vérification. Vous pouvez aussi coller une CSR dans le formulaire d’émission."
+    }
   },
   "dashboard": {
     "goodMorning": "Bonjour",
@@ -4861,7 +4886,36 @@
     "activate": "Activer",
     "activated": "Modèle activé",
     "deactivated": "Modèle désactivé",
-    "deactivateTooltip": "Un modèle désactivé n’est proposé ni par le formulaire Émettre un certificat ni à l’auto-inscription Windows. Les modèles système peuvent être désactivés mais pas modifiés : copiez-en un pour le changer."
+    "deactivateTooltip": "Un modèle désactivé n’est proposé ni par le formulaire Émettre un certificat ni à l’auto-inscription Windows. Les modèles système peuvent être désactivés mais pas modifiés : copiez-en un pour le changer.",
+    "module": {
+      "states": {
+        "active": "Actif",
+        "inactive": "Inactif"
+      },
+      "validity": "{{count, number}} j",
+      "defaultKey": "Clé par défaut",
+      "uses": "Utilisations",
+      "markers": "Marques",
+      "noDescription": "Aucune description.",
+      "preview": "Aperçu détaillé",
+      "moreActions": "Autres actions de {{name}}",
+      "actionsTitle": "Actions du modèle",
+      "sections": {
+        "subject": "Sujet",
+        "extensions": "Extensions",
+        "rules": "Règles du sujet"
+      },
+      "sanTypes": "Types de SAN",
+      "none": "Aucune",
+      "unit_one": "{{count, number}} modèle",
+      "unit_other": "{{count, number}} modèles",
+      "range_one": "{{shown}} sur {{count, number}} modèle",
+      "range_other": "{{shown}} sur {{count, number}} modèles",
+      "caption": "Modèles. Activez un nom pour ouvrir son détail.",
+      "filterByState": "Filtrer par état",
+      "usesCount_one": "{{count, number}} certificat",
+      "usesCount_other": "{{count, number}} certificats"
+    }
   },
   "time": {
     "today": "Aujourd’hui",
@@ -5104,7 +5158,31 @@
     "allStatuses": "Tous les statuts",
     "expiringSoon": "Expire bientôt",
     "trustStoreExpiring": "Trust Store - Expirations",
-    "trustStoreExpiringDesc": "{{count}} certificat(s) de confiance expirent dans {{days}} jours"
+    "trustStoreExpiringDesc": "{{count}} certificat(s) de confiance expirent dans {{days}} jours",
+    "module": {
+      "states": {
+        "valid": "Valide",
+        "expiring": "Expire bientôt",
+        "expired": "Expirée"
+      },
+      "subject": "Sujet",
+      "usage": "Usage",
+      "expires": "Expiration",
+      "sections": {
+        "details": "Détails"
+      },
+      "noNotes": "Aucune note.",
+      "unit_one": "{{count, number}} ancre",
+      "unit_other": "{{count, number}} ancres",
+      "range_one": "{{shown}} sur {{count, number}} ancre",
+      "range_other": "{{shown}} sur {{count, number}} ancres",
+      "selected_one": "{{count, number}} ancre sélectionnée",
+      "selected_other": "{{count, number}} ancres sélectionnées",
+      "caption": "Trust Store. Activez un nom pour ouvrir son détail.",
+      "filterByState": "Filtrer par état",
+      "filterByType": "Filtrer par type",
+      "emptyTitle": "Aucune ancre de confiance externe"
+    }
   },
   "users": {
     "securityKeys": {
@@ -6479,7 +6557,27 @@
     "deleteDescription": "Êtes-vous sûr de vouloir supprimer définitivement {{name}} ? Cette action est irréversible.",
     "deleteSuccess": "Certificat supprimé avec succès",
     "deleteFailed": "Échec de la suppression du certificat",
-    "exportError": "Échec de l’export du certificat"
+    "exportError": "Échec de l’export du certificat",
+    "module": {
+      "description": "Description",
+      "expires": "Expiration",
+      "usage": "Validité et usage",
+      "inspect": "Inspecter le certificat",
+      "moreActions": "Autres actions de {{name}}",
+      "actionsTitle": "Actions du certificat",
+      "exportList": "Exporter la liste",
+      "exportScope_one": "{{count, number}} certificat, avec la recherche et le filtre en cours (10 000 au plus).",
+      "exportScope_other": "{{count, number}} certificats, avec la recherche et le filtre en cours (10 000 au plus).",
+      "format_csv": "Une ligne par certificat",
+      "format_json": "Données structurées",
+      "unit_one": "{{count, number}} certificat",
+      "unit_other": "{{count, number}} certificats",
+      "range_one": "{{start}}–{{end}} sur {{count, number}} certificat",
+      "range_other": "{{start}}–{{end}} sur {{count, number}} certificats",
+      "caption": "Certificats utilisateurs. Activez un nom pour ouvrir son détail.",
+      "filterByState": "Filtrer par état",
+      "orphan": "Sans certificat"
+    }
   },
   "est": {
     "title": "Protocole EST",
@@ -8431,6 +8529,8 @@
     "openItem": "Élément ouvert",
     "detailOf": "Détail : {{name}}",
     "sectionsOf": "Sections : {{name}}",
-    "settingsSections": "Sections des paramètres"
+    "settingsSections": "Sections des paramètres",
+    "pageActions": "Autres actions de la page {{name}}",
+    "pageActionsTitle": "Actions de la page"
   }
 }

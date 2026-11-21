@@ -124,6 +124,7 @@ vi.mock('../../components', async (orig) => ({
 }))
 
 import CSRsPage from '../CSRsPage'
+import { openRow } from '../../test/atelierRows'
 
 const PENDING_CSR = { id: 11, common_name: 'pending.example.com', cn: 'pending.example.com', has_private_key: false }
 
@@ -138,7 +139,7 @@ describe('CSRsPage signing CA picker (#426)', () => {
   it('offers only the CA that can sign and counts the others', async () => {
     render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /></MemoryRouter>)
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    fireEvent.click(await screen.findByText('pending.example.com'))
+    await openRow('pending.example.com')
     fireEvent.click(await screen.findByText('csrs.sign'))
     const field = await screen.findByTestId('field-common.certificateAuthority')
     expect(within(field).getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)).toEqual(['Signing CA'])

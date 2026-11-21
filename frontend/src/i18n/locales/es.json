@@ -1729,7 +1729,32 @@
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
-    "keyCurveNistP521": "NIST P-521 (ECDSA)"
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "states": {
+      "pending": "Pending",
+      "signed": "Signed"
+    },
+    "module": {
+      "name": "CSR-{{id}}",
+      "unit_one": "{{count, number}} request",
+      "unit_other": "{{count, number}} requests",
+      "range_one": "{{start}}–{{end}} of {{count, number}} request",
+      "range_other": "{{start}}–{{end}} of {{count, number}} requests",
+      "caption": "Certificate signing requests. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "subject": "Subject",
+      "requester": "Requester",
+      "key": "Key",
+      "submitted": "Submitted",
+      "pendingSummary": "Waiting to be signed.",
+      "signedSummary": "Signed by {{ca}} on {{date}}.",
+      "noSans": "No alternative name.",
+      "moreActions": "Other actions for {{name}}",
+      "actionsTitle": "Request actions",
+      "details": "Details",
+      "emptyTitle": "No signing request",
+      "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
+    }
   },
   "templates": {
     "template": "Plantilla",
@@ -1886,7 +1911,36 @@
     "activate": "Activar",
     "activated": "Plantilla activada",
     "deactivated": "Plantilla desactivada",
-    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: copie una para modificarla."
+    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: copie una para modificarla.",
+    "module": {
+      "states": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "validity": "{{count, number}} d",
+      "defaultKey": "Default key",
+      "uses": "Uses",
+      "markers": "Marks",
+      "noDescription": "No description.",
+      "preview": "Detailed preview",
+      "moreActions": "Other actions for {{name}}",
+      "actionsTitle": "Template actions",
+      "sections": {
+        "subject": "Subject",
+        "extensions": "Extensions",
+        "rules": "Subject rules"
+      },
+      "sanTypes": "SAN types",
+      "none": "None",
+      "unit_one": "{{count, number}} template",
+      "unit_other": "{{count, number}} templates",
+      "range_one": "{{shown}} of {{count, number}} template",
+      "range_other": "{{shown}} of {{count, number}} templates",
+      "caption": "Templates. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "usesCount_one": "{{count, number}} certificate",
+      "usesCount_other": "{{count, number}} certificates"
+    }
   },
   "users": {
     "securityKeys": {
@@ -3036,7 +3090,31 @@
     "allStatuses": "Todos los estados",
     "expiringSoon": "Próximo a vencer",
     "trustStoreExpiring": "Trust Store por vencer",
-    "trustStoreExpiringDesc": "{{count}} certificado(s) de confianza vencerá(n) dentro de {{days}} días"
+    "trustStoreExpiringDesc": "{{count}} certificado(s) de confianza vencerá(n) dentro de {{days}} días",
+    "module": {
+      "states": {
+        "valid": "Valid",
+        "expiring": "Expiring soon",
+        "expired": "Expired"
+      },
+      "subject": "Subject",
+      "usage": "Usage",
+      "expires": "Expiry",
+      "sections": {
+        "details": "Details"
+      },
+      "noNotes": "No notes.",
+      "unit_one": "{{count, number}} anchor",
+      "unit_other": "{{count, number}} anchors",
+      "range_one": "{{shown}} of {{count, number}} anchor",
+      "range_other": "{{shown}} of {{count, number}} anchors",
+      "selected_one": "{{count, number}} anchor selected",
+      "selected_other": "{{count, number}} anchors selected",
+      "caption": "Trust Store. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "filterByType": "Filter by type",
+      "emptyTitle": "No external trust anchor"
+    }
   },
   "importExport": {
     "subtitle": "Transferir certificados y CAs",
@@ -6476,7 +6554,27 @@
     "deleteDescription": "¿Está seguro de eliminar permanentemente {{name}}?",
     "deleteSuccess": "Certificado eliminado exitosamente",
     "deleteFailed": "Error al eliminar certificado",
-    "exportError": "Error al exportar el certificado"
+    "exportError": "Error al exportar el certificado",
+    "module": {
+      "description": "Description",
+      "expires": "Expiry",
+      "usage": "Validity and use",
+      "inspect": "Inspect the certificate",
+      "moreActions": "Other actions for {{name}}",
+      "actionsTitle": "Certificate actions",
+      "exportList": "Export the list",
+      "exportScope_one": "{{count, number}} certificate, with the search and filter in use (10,000 at most).",
+      "exportScope_other": "{{count, number}} certificates, with the search and filter in use (10,000 at most).",
+      "format_csv": "One row per certificate",
+      "format_json": "Structured data",
+      "unit_one": "{{count, number}} certificate",
+      "unit_other": "{{count, number}} certificates",
+      "range_one": "{{start}}–{{end}} of {{count, number}} certificate",
+      "range_other": "{{start}}–{{end}} of {{count, number}} certificates",
+      "caption": "User certificates. Activate a name to open its detail.",
+      "filterByState": "Filter by state",
+      "orphan": "No certificate"
+    }
   },
   "est": {
     "title": "Protocolo EST",
@@ -8428,6 +8526,8 @@
     "openItem": "Open item",
     "detailOf": "Detail: {{name}}",
     "sectionsOf": "Sections: {{name}}",
-    "settingsSections": "Settings sections"
+    "settingsSections": "Settings sections",
+    "pageActions": "Other actions of {{name}}",
+    "pageActionsTitle": "Page actions"
   }
 }

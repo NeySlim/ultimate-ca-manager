@@ -3,7 +3,7 @@ import { test, expect, uid } from './support/fixtures'
 test('a template created on screen is stored with its settings', async ({ page, api }) => {
   const name = uid('tpl')
   await page.goto('/templates')
-  await page.getByRole('main').getByRole('button', { name: 'New', exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Create Template', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Create Template' })
   await dialog.getByLabel('Template Name').fill(name)
   await dialog.getByLabel('Default Validity (days)').fill('200')

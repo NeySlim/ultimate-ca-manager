@@ -136,25 +136,25 @@ Turning the option on is allowed when subjects are already shared. UCM answers w
 Open **Modules** > **PKI** > **Certificate Signing Requests**.
 
 1. Click **Import** and, in the **Upload CSR** dialog, give a PEM file or paste the PEM text; or click **Generate CSR** to make a CSR with its key pair in UCM
-2. Select the request in the **Pending** tab and review its subject, names and key
+2. Click the request's name in the **Pending** list: its detail opens under the list, with its subject, names and key
 3. Click **Sign**, then choose the issuing CA, the template and the validity
 4. Confirm with **Sign CSR**, then download or copy the signed certificate
 
-Signed requests move to **History**, where **Sign again** puts one back in Pending.
+Signed requests move to the **Signed** list, where **Sign again**, in the request's ⋯ menu, puts one back in Pending.
 
 ### Templates
 
 Open **Modules** > **PKI** > **Templates**. A template holds reusable certificate settings: type, subject defaults, key usage, extended key usage, name types, validity, key type and digest.
 
-Click **New** to make one, or select a template and click **Copy** to start from it. The built-in templates (Web Server, Email, Client Auth, Code Signing, among others) are marked System: they cannot be edited or deleted, only copied. A deactivated template is no longer offered by the Issue Certificate form or to Windows autoenrollment.
+Click **Create Template** to make one, or open a template and click **Copy** in its ⋯ menu to start from it. Choose **Custom** in the source filter to list your own templates only. The built-in templates (Web Server, Email, Client Auth, Code Signing, among others) are marked System: they cannot be edited or deleted, only copied. A deactivated template is no longer offered by the Issue Certificate form or to Windows autoenrollment.
 
 ### Trust Store
 
-Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, **Export** downloads one certificate, and **Export Bundle** in the toolbar downloads all of them as one PEM file. An entry that contains a private key is refused: the trust store keeps certificates only. When the bundle or another export leaves out unreadable entries, a warning gives their number.
+Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. The list shows each entry's subject, its description as its usage, its type and its expiry, and a name opens its detail under the list. **Sync** imports the operating system's trusted CAs, **Export** in the detail downloads one certificate, and **Export Bundle** at the top of the page downloads all of them as one PEM file. An entry that contains a private key is refused: the trust store keeps certificates only. When the bundle or another export leaves out unreadable entries, a warning gives their number.
 
 ### User Certificates
 
-Open **Modules** > **PKI** > **User Certificates**. It lists the mutual TLS client certificates enrolled from **My Account**: view, export (PEM or PKCS#12), revoke or delete them. A viewer sees only their own.
+Open **Modules** > **PKI** > **User Certificates**. It lists the mutual TLS client certificates enrolled from **My Account**: a name opens one under the list to export it (PEM or PKCS#12), and its ⋯ menu revokes or deletes it; **Inspect the certificate** opens the certificate itself on the Certificates page, and **Export the list** saves the list as CSV or JSON. A viewer sees only their own.
 
 ### Certificate Tools
 

@@ -62,10 +62,10 @@ vi.mock('../../services', () => ({
   },
 }))
 
-const exported = vi.hoisted(() => ({ csv: vi.fn() }))
+const exported = vi.hoisted(() => ({ blob: vi.fn() }))
 vi.mock('../../lib/utils', async () => {
   const actual = await vi.importActual('../../lib/utils')
-  return { ...actual, exportToCSV: exported.csv }
+  return { ...actual, downloadBlob: exported.blob }
 })
 
 import UserCertificatesPage from '../UserCertificatesPage'
@@ -79,7 +79,7 @@ describe('user certificates: export', () => {
   beforeEach(() => {
     window.localStorage.clear()
     getAll.mockReset()
-    exported.csv.mockReset()
+    exported.blob.mockReset()
     getAll.mockImplementation(async (p) => ({
       data: { items: mk((p.page - 1) * p.per_page + 1, Math.min(p.page * p.per_page, 130)), total: 130 },
     }))
@@ -88,13 +88,18 @@ describe('user certificates: export', () => {
   it('exports every page with the sort of the screen', async () => {
     render(<MemoryRouter><UserCertificatesPage /></MemoryRouter>)
     await screen.findAllByText('c1')
-    fireEvent.click(screen.getByText('userCertificates.columns.name'))
+    fireEvent.click(document.querySelector('[data-sort="name"]'))
     await waitFor(() => expect(getAll.mock.calls.at(-1)[0].sort_by).toBe('name'))
     getAll.mockClear()
-    fireEvent.click(await screen.findByTitle('table.exportData'))
-    fireEvent.click(await screen.findByText('table.exportCSV'))
-    await waitFor(() => expect(exported.csv).toHaveBeenCalled())
-    expect(exported.csv.mock.calls[0][0]).toHaveLength(130)
+    // « Exporter la liste », then CSV (the default) and Télécharger
+    fireEvent.click(screen.getByRole('button', { name: 'userCertificates.module.exportList' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'audit.download' }))
+    await waitFor(() => expect(exported.blob).toHaveBeenCalled())
+    const [blob, name] = exported.blob.mock.calls[0]
+    expect(name).toBe('user-certificates.csv')
+    const text = await new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsText(blob) })
+    const lines = text.trim().split('\r\n')
+    expect(lines).toHaveLength(131)
     expect(getAll.mock.calls.every(([p]) => p.sort_by === 'name' && p.per_page === 100)).toBe(true)
   })
 })

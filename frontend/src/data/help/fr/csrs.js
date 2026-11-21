@@ -19,10 +19,11 @@ export default {
         ]
       },
       {
-        title: 'Onglets',
+        title: 'États',
         items: [
           { label: 'En attente', text: 'CSR en attente d’examen et de signature' },
-          { label: 'Historique', text: 'Demandes signées avec leur certificat : téléchargez l’un ou l’autre, ou signez la demande à nouveau. Les deux onglets paginent, recherchent et trient sur toutes les demandes ; Historique recherche aussi par AC signataire' },
+          { label: 'Signée', text: 'Demandes signées avec leur certificat : téléchargez l’un ou l’autre, ou signez la demande à nouveau. Les deux listes paginent, recherchent et trient sur toutes les demandes ; celle des demandes signées recherche aussi par AC signataire' },
+          { label: 'Détail', text: 'Le nom d’une demande ouvre son détail sous la liste : Aperçu (sujet, demandeur, clé, état), Détails (champs du sujet, noms) et PEM. Signer et Télécharger sont ses boutons ; la clé, Vérifier le statut, Signer à nouveau, Recréer la clé et Supprimer sont dans son menu ⋯' },
         ]
       },
     ],
@@ -44,13 +45,15 @@ export default {
 
 Les demandes de signature de certificat (CSR) permettent aux systèmes externes de demander des certificats sans exposer leurs clés privées. La CSR contient la clé publique et les informations du sujet ; la clé privée reste chez le demandeur.
 
-## Onglets
+## États
+
+Les puces au-dessus de la liste passent d’une liste à l’autre, chacune comptée.
 
 ### En attente
 CSR en attente d’examen et de signature. Les nouvelles CSR apparaissent ici après le téléversement.
 
-### Historique
-Demandes signées, chacune avec le certificat qu’elle a produit. **Télécharger le certificat** et **Télécharger la CSR** récupèrent l’un ou l’autre, et **Signer à nouveau** remet la demande en attente.
+### Signée
+Demandes signées, chacune avec le certificat qu’elle a produit. **Télécharger le certificat** et, dans le menu **⋯**, **Télécharger la CSR** récupèrent l’un ou l’autre, et **Signer à nouveau** remet la demande en attente.
 
 ## Générer une CSR
 
@@ -81,7 +84,7 @@ Via l’API, \`related_to\` désigne un certificat existant **A** dont UCM déti
 
 ## Examiner une CSR
 
-Cliquez sur une CSR pour voir :
+Cliquez sur le nom d’une demande : son détail s’ouvre sous la liste, avec :
 - **Sujet** : CN, O, OU, C, etc.
 - **SAN** : Noms DNS, adresses IP, e-mails
 - **Info clé** : Algorithme, taille, empreinte de la clé publique
@@ -123,7 +126,7 @@ Si des connexions AC Microsoft sont configurées, un onglet **AC Microsoft** app
 4. Sélectionnez le **modèle de certificat** (chargé automatiquement depuis l’AC)
 5. Cliquez sur **Signer**
 
-Si le modèle nécessite l’approbation d’un gestionnaire, la demande reste En attente dans UCM. Ouvrez-la dans **En attente** et cliquez sur **Vérifier le statut** pour récupérer le certificat une fois émis par l’AC (il faut aussi le droit de signer des CSR), ou approuvez-la depuis le panneau de contrôle AC de la connexion.
+Si le modèle nécessite l’approbation d’un gestionnaire, la demande reste En attente dans UCM. Ouvrez-la dans **En attente** et cliquez sur **Vérifier le statut** dans son menu **⋯** pour récupérer le certificat une fois émis par l’AC (il faut aussi le droit de signer des CSR), ou approuvez-la depuis le panneau de contrôle AC de la connexion.
 
 ### Inscription pour le compte d’autrui (EOBO)
 
@@ -156,7 +159,7 @@ Un appareil qui garde sa clé, comme une carte à puce, ne peut souvent pas prod
 
 ## Ajouter une clé privée
 
-Avant la signature, **Téléverser la clé** attache la clé privée à une CSR en attente, pour que le certificat signé puisse être exporté en PKCS#12. Une demande signée ne propose plus cette action.
+Avant la signature, **Téléverser la clé** (dans le menu **⋯** de la demande) attache la clé privée à une CSR en attente, pour que le certificat signé puisse être exporté en PKCS#12. Une demande signée ne propose plus cette action.
 
 > 💡 C’est utile lorsque le demandeur envoie à la fois la CSR et la clé de manière sécurisée.
 

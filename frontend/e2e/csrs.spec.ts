@@ -17,8 +17,10 @@ test('a CSR imported on screen is signed by a CA', async ({ page, api }) => {
   await dialog.getByRole('button', { name: /^Import 1 Object/ }).click()
   await dialog.getByRole('button', { name: 'Done' }).click()
 
-  await page.getByRole('main').getByRole('cell', { name: cn }).click()
-  const panel = page.getByRole('complementary').filter({ has: page.getByRole('heading', { name: cn }) })
+  // The row opens from its name (CSR-<id>); the subject is a cell of that row, the request opens in the dock
+  await page.getByRole('main').getByRole('row').filter({ hasText: cn }).locator('.entity-name').click()
+  const panel = page.locator('#inspector')
+  await expect(panel.getByText(cn).first()).toBeVisible()
   await panel.getByRole('button', { name: 'Sign', exact: true }).click()
   const sign = page.getByRole('dialog', { name: 'Sign CSR' })
   await sign.getByLabel('Certificate Authority').click()

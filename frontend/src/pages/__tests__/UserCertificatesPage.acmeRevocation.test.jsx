@@ -4,6 +4,7 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 
 const serviceMocks = vi.hoisted(() => ({
   getAll: vi.fn(),
@@ -61,6 +62,13 @@ vi.mock('../../services', () => ({
 
 import UserCertificatesPage from '../UserCertificatesPage'
 
+// Revoke and delete sit in the dock's « ⋯ » menu
+const openMenuOf = async (name) => {
+  render(<MemoryRouter><UserCertificatesPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name }))
+  fireEvent.click(await screen.findByRole('button', { name: 'userCertificates.module.moreActions' }))
+}
+
 const ROW = {
   id: 11, name: 'alice@example.test', cert_subject: 'CN=alice@example.test',
   has_private_key: false, valid_to: '2030-01-01T00:00:00Z', status: 'valid',
@@ -80,8 +88,8 @@ describe('A user certificate the ACME CA was not told of', () => {
 
   it('says so on revocation', async () => {
     serviceMocks.revoke.mockResolvedValue({ data: ROW, ...OWED })
-    render(<UserCertificatesPage />)
-    fireEvent.click(await screen.findByTitle('userCertificates.actions.revoke'))
+    await openMenuOf(ROW.name)
+    fireEvent.click(await screen.findByRole('button', { name: 'userCertificates.actions.revoke' }))
     fireEvent.click(await screen.findByText('revocation.confirm'))
     await waitFor(() => expect(stable.notify.showWarning).toHaveBeenCalledWith(OWED.message))
     expect(stable.notify.showSuccess).not.toHaveBeenCalled()
@@ -89,8 +97,8 @@ describe('A user certificate the ACME CA was not told of', () => {
 
   it('says so on deletion', async () => {
     serviceMocks.delete.mockResolvedValue({ ...OWED, message: `${OWED.message} Certificate deleted.` })
-    render(<UserCertificatesPage />)
-    fireEvent.click(await screen.findByTitle('common.delete'))
+    await openMenuOf(ROW.name)
+    fireEvent.click(await screen.findByRole('button', { name: 'common.delete' }))
     await waitFor(() => expect(stable.notify.showWarning).toHaveBeenCalledWith(
       `${OWED.message} Certificate deleted.`))
     expect(stable.notify.showSuccess).not.toHaveBeenCalled()
@@ -98,8 +106,8 @@ describe('A user certificate the ACME CA was not told of', () => {
 
   it('reports a plain success when nothing was left to the CA', async () => {
     serviceMocks.delete.mockResolvedValue(null)
-    render(<UserCertificatesPage />)
-    fireEvent.click(await screen.findByTitle('common.delete'))
+    await openMenuOf(ROW.name)
+    fireEvent.click(await screen.findByRole('button', { name: 'common.delete' }))
     await waitFor(() => expect(stable.notify.showSuccess).toHaveBeenCalledWith('userCertificates.deleteSuccess'))
     expect(stable.notify.showWarning).not.toHaveBeenCalled()
   })
