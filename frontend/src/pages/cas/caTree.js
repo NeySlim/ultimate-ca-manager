@@ -4,6 +4,8 @@
 import { buildTree } from '../../lib/overviewHierarchy'
 import { daysRemaining } from '../../lib/utils'
 import { EXPIRY_WINDOW_DAYS, expiryBucket } from '../../lib/expiry'
+import { holdsNoKey, needsKeyImport } from '../../lib/caSelection'
+import { isPostQuantum } from '../../lib/keyAlgorithms'
 
 export const nameOfCA = (ca) => ca?.name || ca?.descr || ca?.common_name || ''
 
@@ -112,3 +114,57 @@ export const chainNeedsAttention = (data, findings = [], running = false) => run
   || findings.length > 0
   || (data?.stats?.orphan_cas || 0) > 0
   || (data?.stats?.same_key_distinct_certs || 0) > 0
+
+// The mockup's caStates (active, revoked) and the product's own states, in the same grammar
+export const CA_STATES = {
+  active: { tone: 'good', icon: 'check', key: 'cas.state.active' },
+  expiring: { tone: 'warn', icon: 'clock', key: 'cas.state.expiring' },
+  expired: { tone: 'bad', icon: 'warning', key: 'cas.state.expired' },
+  revoked: { tone: 'bad', icon: 'block', key: 'cas.state.revoked' },
+  pending: { tone: 'warn', icon: 'clock', key: 'cas.awaitingCertificate' },
+}
+
+/** The marks an authority carries, as [{ id, icon, label, title, tone, cross }]. */
+export function caMarks(ca, t, { orphan = false } = {}) {
+  const marks = []
+  if (ca.offline) {
+    const mode = ca.offline_mode === 'file_exported' ? t('cas.offlineFileExported') : t('cas.offlinePasswordProtected')
+    marks.push({ id: 'offline', icon: 'lock', label: t('cas.offline'), title: ca.offline_reason || mode })
+  }
+  if (ca.uses_hsm) {
+    const where = [ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ')
+    marks.push({ id: 'hsm', icon: 'chip', label: 'HSM', title: where || t('cas.detail.hsmBacked') })
+  }
+  if (holdsNoKey(ca)) {
+    const expected = needsKeyImport(ca)
+    marks.push({
+      id: 'nokey', icon: 'key', tone: expected ? 'warn' : undefined,
+      label: t(expected ? 'cas.certificateOnly' : 'cas.noPrivateKey'),
+      title: t(expected ? 'cas.certificateOnlyBanner' : 'cas.noPrivateKeyBanner'),
+    })
+  }
+  if (ca.revoked_in_chain && !ca.revoked) {
+    marks.push({ id: 'chain', icon: 'warning', tone: 'bad', label: t('cas.chainRevoked'), title: t('cas.chainRevokedBanner') })
+  }
+  if (ca.cross_certificate_count > 0) {
+    marks.push({ id: 'cross', icon: 'link', cross: true, label: t('crossCerts.badge', { count: ca.cross_certificate_count }) })
+  }
+  if (ca.post_quantum || isPostQuantum(ca.key_type)) {
+    marks.push({ id: 'pq', icon: 'key', label: t('common.postQuantum'), title: t('common.postQuantumHint') })
+  }
+  if (orphan) marks.push({ id: 'orphan', icon: 'link', tone: 'warn', label: t('cas.tree.orphan') })
+  return marks
+}
+
+
+/** Why this authority cannot issue now, or '' (the mockup's `reason`, on the product's real states). */
+export function issueBlockReason(ca, t) {
+  if (!ca) return ''
+  if (ca.pending || ca.status === 'Pending') return t('cas.side.blocked.pending')
+  if (ca.revoked || ca.status === 'Revoked') return t('cas.side.blocked.revoked')
+  if (ca.revoked_in_chain) return t('cas.side.blocked.chainRevoked')
+  if (ca.status === 'Expired' || (ca.valid_to && Date.parse(ca.valid_to) < Date.now())) return t('cas.side.blocked.expired')
+  if (ca.offline) return t('cas.side.blocked.offline')
+  if (!ca.has_private_key && !ca.uses_hsm) return t('cas.side.blocked.noKey')
+  return ''
+}

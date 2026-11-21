@@ -108,7 +108,10 @@ export default function CertificatesPage() {
     for (const [key, value] of urlFilters) (byKey[key] = byKey[key] || []).push(value)
     const chips = Object.entries(byKey).map(([key, value]) => ({
       key, value, label: t(`overview.filter.${key}`),
-      optionLabels: Object.fromEntries(value.map((v) => [v, t(`overview.filterValue.${v}`, { defaultValue: v })])),
+      // An authority reads by its name; the other values by their word
+      optionLabels: Object.fromEntries(value.map((v) => [v, key === 'ca_id'
+        ? (cas.find((c) => String(c.id) === v)?.name || cas.find((c) => String(c.id) === v)?.common_name || `#${v}`)
+        : t(`overview.filterValue.${v}`, { defaultValue: v })])),
     }))
     // The weak-key link of the compliance card reads as one chip, « Conformité : Clé faible, RSA < 3072 »
     if (!byKey.key_algo_prefix || !byKey.key_bits_below) return chips
@@ -119,7 +122,7 @@ export default function CertificatesPage() {
     const rest = chips.filter((c) => c.key !== 'key_algo_prefix' && c.key !== 'key_bits_below')
     rest.splice(at, 0, weak)
     return rest
-  }, [urlFilters, t])
+  }, [urlFilters, cas, t])
   const removeUrlFilter = useCallback((key, value) => {
     setPage(1)
     const search = key === WEAK_KEY

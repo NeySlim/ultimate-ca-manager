@@ -4,12 +4,14 @@
  */
 export const OVERVIEW_FILTER_KEYS = [
   'status', 'live', 'key_algo', 'key_algo_prefix', 'key_bits_below', 'sig_hash', 'server',
-  'lifetime_over_days', 'no_key', 'incomplete_chain', 'renewal',
+  'lifetime_over_days', 'no_key', 'incomplete_chain', 'renewal', 'ca_id',
 ]
-const MULTI = new Set(['status', 'key_algo', 'sig_hash', 'renewal'])
+const MULTI = new Set(['status', 'key_algo', 'sig_hash', 'renewal', 'ca_id'])
 // The statuses the list accepts (CERTIFICATE_STATUS_FILTERS); any other is dropped from the link
 export const CERT_STATUSES = ['valid', 'expiring', 'expired', 'revoked', 'orphan', 'archived']
 const ALLOWED = { status: new Set(CERT_STATUSES) }
+// An authority's « Voir les certificats » names it by id
+const VALID = { ca_id: (v) => /^\d+$/.test(v) }
 
 /** Ordered [key, value] pairs of the known filters in a query string. */
 export function parseOverviewFilters(search) {
@@ -18,7 +20,7 @@ export function parseOverviewFilters(search) {
   for (const key of OVERVIEW_FILTER_KEYS) {
     const values = MULTI.has(key) ? params.getAll(key) : params.getAll(key).slice(0, 1)
     for (const value of values) {
-      if (value !== '' && (!ALLOWED[key] || ALLOWED[key].has(value))) pairs.push([key, value])
+      if (value !== '' && (!ALLOWED[key] || ALLOWED[key].has(value)) && (!VALID[key] || VALID[key](value))) pairs.push([key, value])
     }
   }
   return pairs

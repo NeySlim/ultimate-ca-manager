@@ -1243,14 +1243,17 @@
     "viewMode": "Affichage",
     "treeView": "Vue arbre",
     "state": {
-      "expiring": "Expire bientôt"
+      "expiring": "Expire bientôt",
+      "active": "Active",
+      "expired": "Expirée",
+      "revoked": "Révoquée"
     },
     "range_one": "{{start}}–{{end}} sur {{count, number}} autorité",
     "range_other": "{{start}}–{{end}} sur {{count, number}} autorités",
     "downloadCertificate": "Télécharger le certificat (PEM)",
     "tree": {
       "title": "Hiérarchie de confiance",
-      "hint": "Flèches pour parcourir, Entrée pour ouvrir, droite et gauche pour déplier ou replier.",
+      "hint": "Flèches pour parcourir, Entrée pour sélectionner, droite et gauche pour déplier ou replier.",
       "expandAll": "Tout déplier",
       "collapseAll": "Tout replier",
       "expand": "Déplier {{name}}",
@@ -1264,8 +1267,94 @@
       "orphan": "AC parente inconnue",
       "crossLink": "Signature croisée",
       "showMore_one": "Afficher {{count}} de plus",
-      "showMore_other": "Afficher {{count}} de plus"
-    }
+      "showMore_other": "Afficher {{count}} de plus",
+      "noMatchHint": "Modifiez la recherche ou le filtre.",
+      "reset": "Réinitialiser les filtres",
+      "certCount_one": "<0>{{count}}</0>certificat",
+      "certCount_other": "<0>{{count}}</0>certificats",
+      "subCount_one": "<0>{{count}}</0>sous-autorité",
+      "subCount_other": "<0>{{count}}</0>sous-autorités"
+    },
+    "loadFailed": "Impossible de lire les autorités",
+    "empty": {
+      "title": "Aucune autorité de certification",
+      "text": "Créez une AC racine ou importez une AC existante, puis une AC émettrice sous cette racine."
+    },
+    "help": {
+      "title": "Lire la hiérarchie",
+      "text": "Les AC racines signent les autorités intermédiaires, qui peuvent à leur tour signer des AC émettrices. Un pointillé relie deux autorités qu’un certificat croisé lie : les clients qui ne connaissent que la première racine valident les chaînes de la seconde. Sélectionner une autorité montre à côté de l’arbre sa clé, sa CRL et son répondeur OCSP, ses certificats et les actions qu’elle permet. Une autorité mise hors ligne ne signe plus rien jusqu’à sa restauration."
+    },
+    "searchLabel": "Rechercher une autorité",
+    "listMode": "Liste",
+    "guidance": {
+      "lead": "Une racine signe les autorités intermédiaires.",
+      "offline": "Une autorité mise hors ligne ne signe plus rien jusqu’à sa restauration.",
+      "cross": "Le pointillé relie deux autorités qu’un certificat croisé lie."
+    },
+    "repair": {
+      "counts": "{{cas}} AC, {{certs}} certificats",
+      "running": "Réparation en cours…",
+      "nextRun": "Prochain passage automatique"
+    },
+    "side": {
+      "identity": "Identité",
+      "typeLevel": "Type et niveau",
+      "root": "Racine",
+      "intermediate": "Intermédiaire",
+      "issuer": "Émetteur",
+      "selfSigned": "Auto-signée",
+      "crossIssuedBy": "Certificat croisé émis par {{name}}",
+      "expiry": "Expiration",
+      "pathLenNone": "Sans limite",
+      "subject": "Sujet",
+      "serial": "Numéro de série",
+      "validFrom": "Valide depuis",
+      "key": "Clé",
+      "algorithm": "Algorithme",
+      "storage": "Emplacement",
+      "storageKinds": {
+        "hsm": "HSM",
+        "software": "Logiciel",
+        "offline": "Hors ligne",
+        "none": "Aucune clé"
+      },
+      "signature": "Signature",
+      "issuance": "Émission",
+      "issued": "Certificats émis",
+      "revokedOf": "Dont révoqués",
+      "subAuthorities": "Sous-autorités",
+      "none": "Aucune",
+      "crossIssued": "Certificats croisés émis",
+      "revocation": "Révocation",
+      "crlPublished": "CRL publiée",
+      "crlNext": "Prochaine mise à jour",
+      "crlNumber": "Numéro de CRL",
+      "ocsp": "Répondeur OCSP",
+      "ocspActive": "Actif",
+      "ocspInactive": "Inactif",
+      "cdp": "Point de distribution CRL",
+      "ocspUrl": "URL OCSP",
+      "crlDue": "Prochaine mise à jour annoncée dans moins de 24 h : sans nouvelle publication, les clients rejetteront une CRL périmée.",
+      "viewCertificates": "Voir les certificats",
+      "issueWith": "Émettre avec cette AC",
+      "downloadChain": "Télécharger la chaîne",
+      "chainDownloaded": "Chaîne téléchargée",
+      "moreActions": "Autres actions",
+      "actionsTitle": "Actions de l’autorité",
+      "offlineNote": "Autorité hors ligne : elle ne signe ni certificat ni CRL jusqu’à sa restauration.",
+      "blocked": {
+        "pending": "En attente de son certificat : cette autorité ne peut pas encore émettre.",
+        "revoked": "Autorité révoquée : elle ne peut plus émettre. Ses certificats restent consultables.",
+        "chainRevoked": "Une autorité au-dessus de celle-ci est révoquée : elle ne peut plus émettre.",
+        "expired": "Autorité expirée : elle ne peut plus émettre.",
+        "offline": "Autorité hors ligne : restaurez-la pour émettre.",
+        "noKey": "UCM ne détient pas sa clé privée : cette autorité ne peut pas émettre."
+      },
+      "extensions": "Extensions X.509",
+      "copyValue": "Copier {{name}}",
+      "show": "Afficher {{name}}"
+    },
+    "pageActions": "Actions de la page"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -7839,7 +7928,8 @@
       "no_key": "Pas de clé privée",
       "incomplete_chain": "Chaîne incomplète",
       "renewal": "Renouvellement",
-      "weak_key": "Conformité"
+      "weak_key": "Conformité",
+      "ca_id": "Autorité"
     },
     "filterValue": {
       "true": "oui",

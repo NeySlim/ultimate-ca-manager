@@ -5,6 +5,7 @@
  * local copy when the server is unreachable.
  */
 import { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useInRouterContext, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
 
@@ -45,8 +46,16 @@ function writeLocal(patch) {
   } catch { /* storage unavailable: the server copy still applies */ }
 }
 
+// Holds the router's navigate for the provider, when it sits inside a router
+function NavigateCapture({ into }) {
+  into.current = useNavigate()
+  return null
+}
+
 export function InspectorProvider({ children }) {
   const { isAuthenticated } = useAuth()
+  const inRouter = useInRouterContext()
+  const navigateRef = useRef(null)
   const [opened, setOpened] = useState([])
   const [activeKey, setActiveKey] = useState(null)
   const [geometry, setGeometry] = useState(() => ({ ...DEFAULTS, ...readLocal(), ...cleanGeometry(getPreferences().inspector) }))
@@ -71,6 +80,11 @@ export function InspectorProvider({ children }) {
   // `origin` names the control to refocus on close when it is not the one focused now (the palette)
   const openEntity = useCallback((type, entityId, { data, origin } = {}) => {
     if (entityId == null) return
+    // An authority opens in the Authorities view, beside its hierarchy, as the mockup does
+    if (type === 'ca' && navigateRef.current) {
+      navigateRef.current(`/cas?authority=${encodeURIComponent(entityId)}`)
+      return
+    }
     const key = keyOf(type, entityId)
     const from = origin || document.activeElement
     // Reopening replaces the origin, unless the focus is on body or in the dock (then the old one stays)
@@ -154,7 +168,12 @@ export function InspectorProvider({ children }) {
     closeOnNav, toggleCloseOnNav, collapsed, setCollapsed,
   }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav, collapsed])
 
-  return <InspectorContext.Provider value={value}>{children}</InspectorContext.Provider>
+  return (
+    <InspectorContext.Provider value={value}>
+      {inRouter && <NavigateCapture into={navigateRef} />}
+      {children}
+    </InspectorContext.Provider>
+  )
 }
 
 export function useInspector() {

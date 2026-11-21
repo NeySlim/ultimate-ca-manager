@@ -19,7 +19,6 @@ vi.mock('../../cas/ComplianceProfileField', () => ({ ComplianceProfileField: () 
 vi.mock('../../cas/IssuanceVisibilityField', () => ({ IssuanceVisibilityField: () => null }))
 
 import { CertificatePanel } from '../CertificatePanel'
-import { CAPanel } from '../CAPanel'
 import { TrustCertPanel } from '../TrustCertPanel'
 import { CSRPanel } from '../CSRPanel'
 import { DETAIL_SECTIONS } from '../sections'
@@ -40,13 +39,6 @@ const CERT = {
     subject_alt_names: { entries: [{ type: 'DNS', value: 'web.example.com' }] },
   },
 }
-const CA = {
-  id: 2, common_name: 'Sub CA', subject: 'CN=Sub CA', issuer: 'CN=Root', is_root: false,
-  serial_number: '7', valid_from: '2024-01-01T00:00:00Z', valid_to: FUTURE, key_type: 'RSA 3072',
-  has_private_key: true, pem: PEM, thumbprint_sha256: 'aa', thumbprint_sha1: 'bb',
-  path_length: 0, cdp_enabled: true, cdp_url: 'http://crl', created_at: '2024-01-01T00:00:00Z',
-  extensions: { key_usage: { usages: ['keyCertSign'] } },
-}
 const TRUST = {
   id: 3, name: 'Root', subject: 'CN=Root', issuer: 'CN=Root', serial_number: '1',
   not_before: '2024-01-01T00:00:00Z', not_after: FUTURE, key_type: 'RSA 2048',
@@ -63,17 +55,12 @@ const SIGNED = {
 
 const OVERVIEW_CERT = ['common.subject', 'common.validity', 'common.technicalDetails', 'details.subjectAltNames',
   'certificates.ctScts', 'common.issuer', 'compliance.title', 'common.fingerprints', 'details.revocationDetails', 'details.metadata']
-const OVERVIEW_CA = ['common.subject', 'common.issuer', 'common.validity', 'common.technicalDetails',
-  'cas.rfc5280Constraints', 'details.revocationConfig', 'common.fingerprints', 'details.metadata']
 const OVERVIEW_TRUST = ['common.subject', 'common.issuer', 'common.validity', 'common.technicalDetails',
   'common.fingerprints', 'details.metadata']
 
 const PANELS = [
   { name: 'CertificatePanel', ui: (section) => <CertificatePanel certificate={CERT} section={section} />,
     expected: { overview: OVERVIEW_CERT, chain: ['common.issuer', 'details.chainValidation'],
-      extensions: ['details.extensions'], pem: ['details.pemCertificate'] } },
-  { name: 'CAPanel', ui: (section) => <CAPanel ca={CA} section={section} />,
-    expected: { overview: OVERVIEW_CA, chain: ['common.issuer'],
       extensions: ['details.extensions'], pem: ['details.pemCertificate'] } },
   { name: 'TrustCertPanel', ui: (section) => <TrustCertPanel cert={TRUST} section={section} />,
     expected: { overview: OVERVIEW_TRUST, chain: ['common.issuer'], extensions: [], pem: ['details.pemCertificate'] } },

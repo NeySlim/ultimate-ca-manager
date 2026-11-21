@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CompactField } from '../DetailCard'
+import { SideField, SideAction } from './SideField'
 import { Button } from '../Button'
 import { Modal } from '../Modal'
 import { SelectComponent as Select } from '../Select'
@@ -32,12 +32,12 @@ export function ComplianceProfileField({ ca, canWrite = false, canAttach = false
   const current = COMPLIANCE_PROFILE_NAMES.includes(ca.compliance_profile) ? ca.compliance_profile : ''
 
   return (
-    <CompactField autoIcon="signatureAlgorithm" label={t('cas.complianceProfile')}>
+    <SideField label={t('cas.complianceProfile')}>
       <span>{current ? profileLabel(current, profiles) : t('cas.complianceProfileNone')}</span>
       {canWrite && !ca.revoked && (
         <ProfileActions ca={ca} current={current} profiles={profiles} canAttach={canAttach} onChanged={onChanged} />
       )}
-    </CompactField>
+    </SideField>
   )
 }
 
@@ -69,14 +69,14 @@ function ProfileActions({ ca, current, profiles, canAttach, onChanged }) {
   return (
     <>
       {canAttach && (
-        <Button type="button" size="xs" variant="secondary" className="ml-2" onClick={() => setDialog(true)}>
+        <SideAction onClick={() => setDialog(true)}>
           {t(current ? 'cas.compliance.change' : 'cas.compliance.attach')}
-        </Button>
+        </SideAction>
       )}
       {current && (
-        <Button type="button" size="xs" variant="secondary" className="ml-2" onClick={handleRemove}>
+        <SideAction onClick={handleRemove}>
           {t('cas.compliance.remove')}
-        </Button>
+        </SideAction>
       )}
       {dialog && (
         <AttachProfileDialog

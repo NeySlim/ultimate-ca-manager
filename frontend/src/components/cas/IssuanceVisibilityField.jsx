@@ -4,8 +4,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CompactField } from '../DetailCard'
-import { Button } from '../Button'
+import { SideField, SideAction } from './SideField'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 
@@ -14,10 +13,10 @@ export function IssuanceVisibilityField({ ca, canWrite = false, onChanged }) {
   const hidden = !!ca.issuance_hidden
 
   return (
-    <CompactField autoIcon="issuer" label={t('cas.issuancePickers')}>
+    <SideField label={t('cas.issuancePickers')}>
       <span>{t(hidden ? 'cas.issuanceHiddenState' : 'cas.issuanceListedState')}</span>
       {canWrite && <VisibilitySwitch ca={ca} hidden={hidden} onChanged={onChanged} />}
-    </CompactField>
+    </SideField>
   )
 }
 
@@ -42,8 +41,8 @@ function VisibilitySwitch({ ca, hidden, onChanged }) {
   }
 
   return (
-    <Button type="button" size="xs" variant="secondary" className="ml-2" onClick={handleSwitch} disabled={saving}>
+    <SideAction onClick={handleSwitch} disabled={saving}>
       {t(hidden ? 'cas.showInIssuance' : 'cas.hideFromIssuance')}
-    </Button>
+    </SideAction>
   )
 }

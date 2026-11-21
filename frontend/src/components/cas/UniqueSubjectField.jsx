@@ -4,8 +4,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CompactField } from '../DetailCard'
-import { Button } from '../Button'
+import { SideField, SideAction } from './SideField'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 
@@ -14,13 +13,13 @@ export function UniqueSubjectField({ ca, canWrite = false, onChanged }) {
   const enforced = !!ca.enforce_unique_subject
 
   return (
-    <CompactField autoIcon="subject" label={t('cas.uniqueSubject')}>
+    <SideField label={t('cas.uniqueSubject')}>
       <span title={t('cas.uniqueSubjectHelp')}>
         {t(enforced ? 'cas.uniqueSubjectEnforced' : 'cas.uniqueSubjectNotEnforced')}
       </span>
       {canWrite && <UniqueSubjectSwitch ca={ca} enforced={enforced} onChanged={onChanged} />}
-      <p className="text-xs text-text-tertiary mt-1">{t('cas.uniqueSubjectHelp')}</p>
-    </CompactField>
+      <p className="small muted">{t('cas.uniqueSubjectHelp')}</p>
+    </SideField>
   )
 }
 
@@ -55,8 +54,8 @@ function UniqueSubjectSwitch({ ca, enforced, onChanged }) {
   }
 
   return (
-    <Button type="button" size="xs" variant="secondary" className="ml-2" onClick={handleSwitch} disabled={saving}>
+    <SideAction onClick={handleSwitch} disabled={saving}>
       {t(enforced ? 'cas.stopEnforcingUniqueSubject' : 'cas.enforceUniqueSubject')}
-    </Button>
+    </SideAction>
   )
 }

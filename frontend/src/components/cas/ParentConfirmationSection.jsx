@@ -5,7 +5,8 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LinkSimple, LinkBreak } from '@phosphor-icons/react'
+import { Icon } from '../atelier/Icon'
+import { SideAction } from './SideField'
 import { Modal } from '../Modal'
 import { Button } from '../Button'
 import { casService } from '../../services'
@@ -20,33 +21,26 @@ export function ParentConfirmationSection({ ca, canWrite = false, onChanged }) {
 
   if (!candidate && !confirmed) return null
 
+  // Two notices of the side panel (`p.notice` of the mockup), each with its action as a text link
   return (
     <>
       {candidate && (
-        <div className="rounded-lg px-3 py-2 bg-status-warning-op15 border border-status-warning-op40 text-xs text-text-secondary flex items-start gap-2 flex-wrap"
-             data-testid="parent-candidate">
-          <span className="flex-1 min-w-[12rem]">
+        <p className="notice warn" data-testid="parent-candidate">
+          <Icon name="link" />
+          <span>
             {t('cas.parentCandidateBanner', { name: candidate.name, algorithm: candidate.algorithm })}
+            {canWrite && <SideAction onClick={() => setDialog('link')}>{t('cas.linkToParent')}</SideAction>}
           </span>
-          {canWrite && (
-            <Button type="button" size="xs" variant="secondary" onClick={() => setDialog('link')}>
-              <LinkSimple size={12} /> {t('cas.linkToParent')}
-            </Button>
-          )}
-        </div>
+        </p>
       )}
       {confirmed && (
-        <div className="rounded-lg px-3 py-2 bg-tertiary-40 border border-border text-xs text-text-secondary flex items-start gap-2 flex-wrap"
-             data-testid="parent-confirmed">
-          <span className="flex-1 min-w-[12rem]">
+        <p className="notice" data-testid="parent-confirmed">
+          <Icon name="link" />
+          <span>
             {t('cas.parentConfirmedBanner', { user: ca.parent_confirmed_by || '-', date: formatDate(ca.parent_confirmed_at) })}
+            {canWrite && <SideAction onClick={() => setDialog('withdraw')}>{t('cas.withdrawParentLink')}</SideAction>}
           </span>
-          {canWrite && (
-            <Button type="button" size="xs" variant="secondary" onClick={() => setDialog('withdraw')}>
-              <LinkBreak size={12} /> {t('cas.withdrawParentLink')}
-            </Button>
-          )}
-        </div>
+        </p>
       )}
       {dialog && (
         <ParentDialog ca={ca} candidate={candidate} mode={dialog} onClose={() => setDialog(null)} onChanged={onChanged} />

@@ -2,17 +2,15 @@
  * InspectorObject: loads one opened entity and renders its body in the dock. A
  * certificate gets the Atelier detail (heading, actions, Overview, Chain,
  * Extensions, History, PEM); the other types keep their panel under the same
- * heading. The actions live in hooks/useEntityActions; their modals are returned
+ * heading. An authority never opens here: it opens in the Authorities view. The actions live in hooks/useEntityActions; their modals are returned
  * beside the body.
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CAPanel } from '../detail/CAPanel'
 import { TrustCertPanel } from '../detail/TrustCertPanel'
 import { CertificatePanel } from '../detail/CertificatePanel'
 import { ActionBar } from '../detail/ActionBar'
 import { useInspector } from '../../contexts/InspectorContext'
-import { usePermission } from '../../hooks'
 import { useEntityActions } from '../../hooks/useEntityActions'
 import { entityTitle, entitySubtitle } from '../../lib/entityDetail'
 import { extractData } from '../../lib/utils'
@@ -25,7 +23,6 @@ import { QUEUE_DETAILS } from './queueDetails'
 export function InspectorObject({ entry, onTitle }) {
   const { t } = useTranslation()
   const { closeEntity, openEntity, setEntityData } = useInspector()
-  const { canWrite, hasPermission } = usePermission()
   const { key, type, entityId } = entry
   const config = INSPECTOR_TYPES[type]
   const [data, setData] = useState(entry.data)
@@ -50,7 +47,7 @@ export function InspectorObject({ entry, onTitle }) {
   const title = data ? (config?.title ? config.title(data, t) : entityTitle(type, data, t)) : ''
   useEffect(() => { if (title) onTitle(key, title) }, [title, key]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { actions, modals, handler } = useEntityActions({
+  const { actions, modals } = useEntityActions({
     type, entity: data, entityId, onChanged: setData, onClose: () => closeEntity(key), onOpenEntity: openEntity,
   })
 
@@ -86,10 +83,7 @@ export function InspectorObject({ entry, onTitle }) {
         <div className="ins-legacy-actions"><ActionBar actions={actions} /></div>
         <SectionTabs objectKey={key} sections={config.sections} current={section} onSelect={setSection} />
         <div role="tabpanel" id={`${panelId(key)}-section`} aria-labelledby={`${tabId(key)}-${section}`} className="ins-legacy">
-          {type === 'ca' ? (
-            <CAPanel ca={data} embedded section={section} onImportKey={handler('importKey')} onCaChanged={setData}
-              canWriteCas={canWrite('cas')} canAttachProfile={canWrite('cas') && hasPermission('admin:system')} />
-          ) : type === 'truststore' ? (
+          {type === 'truststore' ? (
             <TrustCertPanel cert={data} embedded section={section} />
           ) : (
             <CertificatePanel certificate={data} embedded section={section} />

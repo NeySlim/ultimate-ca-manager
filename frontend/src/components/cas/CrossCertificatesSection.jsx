@@ -4,10 +4,11 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash, DownloadSimple, Signature, UploadSimple } from '@phosphor-icons/react'
-import { Badge } from '../Badge'
+import { UploadSimple } from '@phosphor-icons/react'
+import { Icon } from '../atelier/Icon'
+import { IconBtn } from '../atelier/Btn'
+import { RecordList, RecordRow } from '../atelier/Detail'
 import { Button } from '../Button'
-import { CompactSection } from '../DetailCard'
 import { Modal } from '../Modal'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
@@ -16,7 +17,7 @@ import { certificateFileToPem, commonNameOf, crossStateOf } from '../../lib/cros
 import { signingCas } from '../../lib/caSelection'
 import { sanitizeDownloadName } from '../../lib/filename'
 
-const STATE_VARIANT = { revoked: 'danger', expired: 'danger', notYetValid: 'warning' }
+const STATE_TONE = { revoked: 'bad', expired: 'bad', notYetValid: 'warn' }
 const FIELD = 'w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary'
 
 function AttachModal({ open, onClose, ca, onDone }) {
@@ -220,60 +221,48 @@ export function CrossCertificatesSection({ ca, canWrite }) {
     }
   }
 
+  // A section of the side panel: the record list of the mockup, one row per cross-certificate
   return (
     <>
-      <CompactSection title={t('crossCerts.title')}>
-        <div className="space-y-2" data-testid="cross-certificates">
-          {rows.length === 0 && <p className="text-2xs text-text-secondary">{t('crossCerts.none')}</p>}
-          {rows.map(row => {
+      <section className="ca-side-section" data-testid="cross-certificates">
+        <h3 className="section-title">{t('crossCerts.title')}</h3>
+        <RecordList empty={t('crossCerts.none')}>
+          {rows.map((row) => {
             const state = crossStateOf(row)
             return (
-              <div key={row.id} className="p-2.5 bg-tertiary-50 border border-border rounded-lg space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                    <span className="text-xs font-medium text-text-primary truncate" title={row.issuer}>
-                      {t('crossCerts.issuedBy', { issuer: commonNameOf(row.issuer) })}
-                    </span>
-                    {row.served && <Badge variant="success" size="sm">{t('crossCerts.served')}</Badge>}
-                    {state && <Badge variant={STATE_VARIANT[state]} size="sm">{t(`crossCerts.state.${state}`)}</Badge>}
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Button type="button" size="xs" variant="secondary" onClick={() => exportRow(row)}
-                            title={t('export.title')} aria-label={t('export.title')}>
-                      <DownloadSimple size={12} />
-                    </Button>
+              <RecordRow key={row.id}
+                title={<span title={row.issuer}>{t('crossCerts.issuedBy', { issuer: commonNameOf(row.issuer) })}</span>}
+                meta={`${formatDate(row.valid_from, { time: false })} - ${formatDate(row.valid_to, { time: false })}`}
+                extra={(row.served || state) && (
+                  <span className="ca-badges">
+                    {row.served && <span className="badge good"><Icon name="check" />{t('crossCerts.served')}</span>}
+                    {state && <span className={`badge ${STATE_TONE[state]}`}><Icon name={state === 'notYetValid' ? 'clock' : 'warning'} />{t(`crossCerts.state.${state}`)}</span>}
+                  </span>
+                )}
+                action={(
+                  <>
+                    <IconBtn icon="download" quiet label={t('export.title')} onClick={() => exportRow(row)} />
                     {canWrite && (
                       <>
-                        <Button type="button" size="xs" variant="secondary" onClick={() => toggleServed(row)}
-                                disabled={!row.served && !!state}>
+                        <button type="button" className="btn" data-write="" onClick={() => toggleServed(row)} disabled={!row.served && !!state}>
                           {row.served ? t('crossCerts.stopServing') : t('crossCerts.serve')}
-                        </Button>
-                        <Button type="button" size="xs" variant="danger" onClick={() => detach(row)}
-                                title={t('crossCerts.detach')} aria-label={t('crossCerts.detach')}>
-                          <Trash size={12} />
-                        </Button>
+                        </button>
+                        <IconBtn icon="close" quiet write label={t('crossCerts.detach')} onClick={() => detach(row)} />
                       </>
                     )}
-                  </div>
-                </div>
-                <p className="text-2xs text-text-tertiary">
-                  {formatDate(row.valid_from)} - {formatDate(row.valid_to)}
-                </p>
-              </div>
+                  </>
+                )}
+              />
             )
           })}
-          {canWrite && (
-            <div className="flex flex-wrap gap-1.5">
-              <Button type="button" size="xs" variant="secondary" onClick={() => setAttachOpen(true)}>
-                <Plus size={12} /> {t('crossCerts.attach')}
-              </Button>
-              <Button type="button" size="xs" variant="secondary" onClick={() => setSignOpen(true)}>
-                <Signature size={12} /> {t('crossCerts.sign')}
-              </Button>
-            </div>
-          )}
-        </div>
-      </CompactSection>
+        </RecordList>
+        {canWrite && (
+          <div className="ca-side-tools">
+            <button type="button" className="btn" data-write="" onClick={() => setAttachOpen(true)}><Icon name="plus" />{t('crossCerts.attach')}</button>
+            <button type="button" className="btn" data-write="" onClick={() => setSignOpen(true)}><Icon name="stamp" />{t('crossCerts.sign')}</button>
+          </div>
+        )}
+      </section>
       {canWrite && <AttachModal open={attachOpen} onClose={() => setAttachOpen(false)} ca={ca} onDone={changed} />}
       {canWrite && <CrossSignModal open={signOpen} onClose={() => setSignOpen(false)} ca={ca} onDone={changed} />}
     </>

@@ -1,30 +1,31 @@
 /**
- * CAs Page — chain repair notification/action bar (sits under stats)
+ * CAs page: the chain repair strip, under the page head when something needs repairing (or on
+ * demand), in the mockup's notice grammar: the share of linked authorities as the setup progress
+ * bar, the counts, the next automatic pass, Run now, and the findings with their explicit repairs.
  */
 import { useState, useEffect } from 'react'
-import { LinkSimple, ArrowClockwise, CircleNotch, Timer, CaretDown, CaretUp } from '@phosphor-icons/react'
-import { cn } from '../../lib/utils'
+import { Icon } from '../../components/atelier'
 
 function FindingRow({ finding, canConvert, canRestore, onConvert, onRestore, caName, t }) {
   const label = finding.kind === 'shadowed_root'
     ? t('crossCerts.findingShadowed', { name: finding.ca_name, root: finding.root_name })
     : t('crossCerts.findingSameKey', { subject: finding.subject })
+  const restores = finding.actions?.includes('restore_primary') && canRestore ? finding.ca_ids || [] : []
+  const converts = finding.actions?.includes('convert_to_cross') && canConvert
   return (
-    <div className="flex items-center gap-2 px-4 py-1 text-xs" data-testid="cross-finding">
-      <span className="flex-1 min-w-0 truncate text-text-secondary" title={finding.subject}>{label}</span>
-      {finding.actions?.includes('convert_to_cross') && canConvert && (
-        <button type="button" onClick={() => onConvert?.(finding)}
-                className="px-2 py-0.5 rounded border border-border hover:bg-tertiary-op80 text-text-primary">
-          {t('crossCerts.convertToCross')}
-        </button>
+    <li data-testid="cross-finding">
+      <div className="rl-main"><strong title={finding.subject}>{label}</strong></div>
+      {(converts || restores.length > 0) && (
+        <div className="rl-action">
+          {converts && <button type="button" className="btn" data-write="" onClick={() => onConvert?.(finding)}>{t('crossCerts.convertToCross')}</button>}
+          {restores.map((id) => (
+            <button type="button" key={id} className="btn" data-write="" onClick={() => onRestore?.(finding, id)}>
+              {t('crossCerts.restorePrimaryOn', { name: caName ? caName(id) : `#${id}` })}
+            </button>
+          ))}
+        </div>
       )}
-      {finding.actions?.includes('restore_primary') && canRestore && (finding.ca_ids || []).map(id => (
-        <button type="button" key={id} onClick={() => onRestore?.(finding, id)}
-                className="px-2 py-0.5 rounded border border-border hover:bg-tertiary-op80 text-text-primary">
-          {t('crossCerts.restorePrimaryOn', { name: caName ? caName(id) : `#${id}` })}
-        </button>
-      ))}
-    </div>
+    </li>
   )
 }
 
@@ -35,98 +36,63 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t, findings
   const [showFindings, setShowFindings] = useState(false)
 
   useEffect(() => {
-    if (!task.next_run) return
+    if (!task.next_run) return undefined
     const update = () => {
       const diff = Math.max(0, Math.floor((new Date(task.next_run).getTime() - Date.now()) / 1000))
-      const m = Math.floor(diff / 60)
-      const s = diff % 60
-      setCountdown(`${m}:${String(s).padStart(2, '0')}`)
+      setCountdown(`${Math.floor(diff / 60)}:${String(diff % 60).padStart(2, '0')}`)
     }
     update()
     const id = setInterval(update, 1000)
     return () => clearInterval(id)
   }, [task.next_run])
 
+  if (!data) return null
   const total = crStats.total_cas || 0
   const orphans = crStats.orphan_cas || 0
   const sameKey = crStats.same_key_distinct_certs || 0
-  const linked = total - orphans
-  const pct = total > 0 ? Math.round((linked / total) * 100) : 100
-
-  if (!data) return null
+  const pct = total > 0 ? Math.round(((total - orphans) / total) * 100) : 100
+  const attention = orphans > 0 || sameKey > 0 || findings.length > 0
 
   return (
-    <div className="border-b border-border-op30 bg-secondary-op30">
-    <div className="flex items-center gap-3 px-4 py-1.5">
-      <div className="flex items-center gap-1.5 text-text-tertiary shrink-0">
-        <LinkSimple size={13} weight="duotone" />
-        <span className="text-xs font-medium">{t('dashboard.chainRepair')}</span>
-      </div>
-
-      <div className="flex items-center gap-2 flex-1 max-w-xs">
-        <div className="flex-1 h-1.5 rounded-full bg-tertiary-op80 overflow-hidden">
-          <div 
-            className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-accent-success' : 'bg-accent-warning'}`}
-            style={{ width: `${pct}%` }}
-          />
+    <section className={attention ? 'notice warn ca-repair' : 'notice ca-repair'} aria-labelledby="ca-repair-title" data-testid="chain-repair">
+      <Icon name="link" />
+      <div className="ca-repair-body">
+        <div className="ca-repair-head">
+          <strong id="ca-repair-title">{t('dashboard.chainRepair')}</strong>
+          <div className="setup-progress">
+            <div className="setup-bar" role="progressbar" aria-labelledby="ca-repair-title" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+              <span style={{ width: `${pct}%` }} />
+            </div>
+            <p className="mono">{pct} %</p>
+          </div>
+          <span>{t('cas.repair.counts', { cas: total, certs: crStats.total_certs || 0 })}</span>
+          {orphans > 0 && <span>{orphans} {t('dashboard.chainRepairOrphans')}</span>}
+          {sameKey > 0 && <span>{sameKey} {t('dashboard.chainRepairSameKey')}</span>}
+          {running ? <span role="status">{t('cas.repair.running')}</span>
+            : countdown ? <span className="mono" title={t('cas.repair.nextRun')}><Icon name="clock" />{countdown}</span> : null}
+          {findings.length > 0 && (
+            <button type="button" className="text-link" aria-expanded={showFindings} onClick={() => setShowFindings((v) => !v)}>
+              {t('crossCerts.findings', { count: findings.length })}<Icon name={showFindings ? 'up' : 'down'} />
+            </button>
+          )}
+          {canRunRepair && (
+            <button type="button" className="btn" data-write="" onClick={onRun} disabled={running}>
+              <Icon name="refresh" />{t('dashboard.chainRepairRun')}
+            </button>
+          )}
         </div>
-        <span className="text-xs font-bold font-mono text-text-secondary w-8 text-right">{pct}%</span>
-      </div>
-
-      <div className="hidden sm:flex items-center gap-3 text-xs text-text-tertiary">
-        <span>{crStats.total_cas || 0} CA{(crStats.total_cas || 0) > 1 ? 's' : ''}</span>
-        <span>{crStats.total_certs || 0} certs</span>
-        {orphans > 0 && <span className="text-accent-warning">{orphans} {t('dashboard.chainRepairOrphans')}</span>}
-        {sameKey > 0 && (
-          <span className="text-accent-warning">
-            {sameKey} {t('dashboard.chainRepairSameKey')}
-          </span>
+        {showFindings && findings.length > 0 && (
+          <>
+            <p className="small">{t('crossCerts.findingsNote')}</p>
+            <ul className="record-list">
+              {findings.map((f, i) => (
+                <FindingRow key={`${f.kind}-${f.ca_id ?? f.ski}-${i}`} finding={f} t={t}
+                  canConvert={canConvert} canRestore={canRestore} onConvert={onConvert} onRestore={onRestore} caName={caName} />
+              ))}
+            </ul>
+          </>
         )}
       </div>
-
-      {findings.length > 0 && (
-        <button type="button" onClick={() => setShowFindings(v => !v)} aria-expanded={showFindings}
-                className="flex items-center gap-1 text-xs text-accent-warning shrink-0">
-          {t('crossCerts.findings', { count: findings.length })}
-          {showFindings ? <CaretUp size={10} /> : <CaretDown size={10} />}
-        </button>
-      )}
-
-      <div className="flex items-center gap-2 shrink-0">
-        {running ? (
-          <span className="text-xs text-accent-primary flex items-center gap-1">
-            <CircleNotch size={10} className="animate-spin" />
-          </span>
-        ) : countdown ? (
-          <span className="text-xs text-text-tertiary font-mono flex items-center gap-1">
-            <Timer size={10} />
-            {countdown}
-          </span>
-        ) : null}
-        {canRunRepair && (
-        <button
-          onClick={onRun}
-          disabled={running}
-          className="p-1 rounded hover:bg-tertiary-op80 text-text-tertiary hover:text-accent-primary transition-all disabled:opacity-50"
-          title={t('dashboard.chainRepairRun')}
-        >
-          {running 
-            ? <CircleNotch size={12} className="animate-spin" />
-            : <ArrowClockwise size={12} />
-          }
-        </button>
-        )}
-      </div>
-    </div>
-    {showFindings && findings.length > 0 && (
-      <div className="pb-1.5 border-t border-border-op30">
-        <p className="px-4 py-1 text-xs text-text-tertiary">{t('crossCerts.findingsNote')}</p>
-        {findings.map((f, i) => (
-          <FindingRow key={`${f.kind}-${f.ca_id ?? f.ski}-${i}`} finding={f} t={t}
-                      canConvert={canConvert} canRestore={canRestore} onConvert={onConvert} onRestore={onRestore} caName={caName} />
-        ))}
-      </div>
-    )}
-    </div>
+    </section>
   )
 }

@@ -1492,14 +1492,17 @@
     "viewMode": "Display",
     "treeView": "Tree view",
     "state": {
-      "expiring": "Expiring soon"
+      "expiring": "Expiring soon",
+      "active": "Active",
+      "expired": "Expired",
+      "revoked": "Revoked"
     },
     "range_one": "{{start}}–{{end}} of {{count, number}} authority",
     "range_other": "{{start}}–{{end}} of {{count, number}} authorities",
     "downloadCertificate": "Download certificate (PEM)",
     "tree": {
       "title": "Trust hierarchy",
-      "hint": "Arrow keys to move, Enter to open, right and left to expand or collapse.",
+      "hint": "Arrow keys to move, Enter to select, right and left to expand or collapse.",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all",
       "expand": "Expand {{name}}",
@@ -1513,8 +1516,94 @@
       "orphan": "No known parent",
       "crossLink": "Cross-signature",
       "showMore_one": "Show {{count}} more",
-      "showMore_other": "Show {{count}} more"
-    }
+      "showMore_other": "Show {{count}} more",
+      "noMatchHint": "Change the search or the filter.",
+      "reset": "Reset filters",
+      "certCount_one": "<0>{{count}}</0>certificate",
+      "certCount_other": "<0>{{count}}</0>certificates",
+      "subCount_one": "<0>{{count}}</0>sub-authority",
+      "subCount_other": "<0>{{count}}</0>sub-authorities"
+    },
+    "loadFailed": "Could not read the authorities",
+    "empty": {
+      "title": "No certificate authority",
+      "text": "Create a root CA or import an existing CA, then an issuing CA under that root."
+    },
+    "help": {
+      "title": "Read the hierarchy",
+      "text": "Root CAs sign the intermediate authorities, which can in turn sign issuing CAs. A dotted line joins two authorities that a cross-certificate links: clients that only know the first root validate the chains of the second. Selecting an authority shows its key, its CRL and its OCSP responder beside the tree, with its certificates and the actions it allows. An authority taken offline signs nothing until it is restored."
+    },
+    "searchLabel": "Search the authorities",
+    "listMode": "List",
+    "guidance": {
+      "lead": "A root signs the intermediate authorities.",
+      "offline": "An authority taken offline signs nothing until it is restored.",
+      "cross": "The dotted line joins two authorities that a cross-certificate links."
+    },
+    "repair": {
+      "counts": "{{cas}} CAs, {{certs}} certificates",
+      "running": "Repair running…",
+      "nextRun": "Next automatic pass"
+    },
+    "side": {
+      "identity": "Identity",
+      "typeLevel": "Type and level",
+      "root": "Root",
+      "intermediate": "Intermediate",
+      "issuer": "Issuer",
+      "selfSigned": "Self-signed",
+      "crossIssuedBy": "Cross-certificate issued by {{name}}",
+      "expiry": "Expiry",
+      "pathLenNone": "Unlimited",
+      "subject": "Subject",
+      "serial": "Serial number",
+      "validFrom": "Valid from",
+      "key": "Key",
+      "algorithm": "Algorithm",
+      "storage": "Location",
+      "storageKinds": {
+        "hsm": "HSM",
+        "software": "Software",
+        "offline": "Offline",
+        "none": "No key"
+      },
+      "signature": "Signature",
+      "issuance": "Issuance",
+      "issued": "Certificates issued",
+      "revokedOf": "Of which revoked",
+      "subAuthorities": "Sub-authorities",
+      "none": "None",
+      "crossIssued": "Cross-certificates issued",
+      "revocation": "Revocation",
+      "crlPublished": "CRL published",
+      "crlNext": "Next update",
+      "crlNumber": "CRL number",
+      "ocsp": "OCSP responder",
+      "ocspActive": "Active",
+      "ocspInactive": "Inactive",
+      "cdp": "CRL distribution point",
+      "ocspUrl": "OCSP URL",
+      "crlDue": "Next update due in less than 24 h: without a new publication, clients will reject an expired CRL.",
+      "viewCertificates": "View certificates",
+      "issueWith": "Issue with this CA",
+      "downloadChain": "Download the chain",
+      "chainDownloaded": "Chain downloaded",
+      "moreActions": "Other actions",
+      "actionsTitle": "Authority actions",
+      "offlineNote": "Offline authority: it signs no certificate or CRL until it is restored.",
+      "blocked": {
+        "pending": "Awaiting its certificate: this authority cannot issue yet.",
+        "revoked": "Revoked authority: it can no longer issue. Its certificates remain viewable.",
+        "chainRevoked": "An authority above this one is revoked: it can no longer issue.",
+        "expired": "Expired authority: it can no longer issue.",
+        "offline": "Offline authority: restore it to issue.",
+        "noKey": "UCM does not hold its private key: this authority cannot issue."
+      },
+      "extensions": "X.509 extensions",
+      "copyValue": "Copy {{name}}",
+      "show": "Show {{name}}"
+    },
+    "pageActions": "Page actions"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -7839,7 +7928,8 @@
       "no_key": "No private key",
       "incomplete_chain": "Incomplete chain",
       "renewal": "Renewal",
-      "weak_key": "Compliance"
+      "weak_key": "Compliance",
+      "ca_id": "Authority"
     },
     "filterValue": {
       "true": "yes",

@@ -22,10 +22,8 @@ vi.mock('../../../contexts/NotificationContext', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn() }),
 }))
 vi.mock('../../../services', () => ({ casService: {} }))
-vi.mock('../../cas/CACrlSection', () => ({ CACrlSection: () => null }))
-vi.mock('../../cas/ChainUsageSection', () => ({ ChainUsageSection: () => null }))
 
-const { CAPanel } = await import('../CAPanel')
+const { CAMarks } = await import('../../../pages/cas/CAState')
 const { TemplatePreviewModal } = await import('../../TemplatePreviewModal')
 const { TrustCertPanel } = await import('../TrustCertPanel')
 const { useCertificateColumns } = await import('../../../pages/certificates/useCertificateColumns')
@@ -40,20 +38,9 @@ const keyCell = (row) => {
 }
 
 describe('key display outside the certificate panel', () => {
-  it('names an ML-DSA CA with its level, a badge, and no RSA signature scheme', () => {
-    const ca = { id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true,
-      valid_to: '2030-01-01T00:00:00Z' }
-    render(<CAPanel ca={ca} />)
-    expect(screen.getAllByText(LEVEL_LABEL).length).toBeGreaterThan(0)
-    expect(screen.queryByText(ML_DSA_65.label)).toBeNull()
-    expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
-    expect(screen.queryByText(en.cas.signatureSchemePkcs1v15)).toBeNull()
-  })
-
-  it('shows the badge in the compact bar of the CA detail window', () => {
-    render(<CAPanel ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
-    expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
-    expect(screen.getAllByText(LEVEL_LABEL).length).toBeGreaterThan(0)
+  it('marks an ML-DSA CA as post-quantum among its chips', () => {
+    render(<div><CAMarks ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} t={t} /></div>)
+    expect(screen.getByTestId('post-quantum-badge')).toHaveTextContent(t('common.postQuantum'))
   })
 
   it('shows the badge in the compact bar of a trusted certificate window', () => {
@@ -63,7 +50,7 @@ describe('key display outside the certificate panel', () => {
 
   it('explains the badge by the key, never by the signature', () => {
     // An RSA CA may sign an ML-DSA leaf: the badge follows the leaf's own key
-    render(<CAPanel ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', post_quantum: true }} />)
+    render(<div><CAMarks ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', post_quantum: true }} t={t} /></div>)
     const hint = screen.getByTestId('post-quantum-badge').getAttribute('title')
     expect(hint).toMatch(/post-quantum key/i)
     expect(hint).not.toMatch(/signed/i)

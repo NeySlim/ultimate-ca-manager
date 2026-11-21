@@ -7,3 +7,30 @@
 .atl th>.col-resize:hover{background:var(--line)}
 /* The mockup's #app wraps the zone's stage so that its rules on #app.dock-right apply; it draws no box. */
 .atl #app.zone-app{display:contents}
+/* Authorities: a root alone on one line, the group of idle roots and the button that draws more of them
+   (the tree of a large installation), in the vocabulary of the mockup's ca-card. */
+.atl .ca-compact,.atl .ca-more{list-style:none}
+.atl .ca-lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.atl .ca-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px 9px;min-width:244px;padding:7px 12px;background:var(--panel);border:1px solid var(--line);border-radius:5px;cursor:pointer}
+.atl .ca-line:hover{background:var(--hover)}
+.atl .ca-line.active{background:var(--selected);border-color:var(--accent)}
+.atl .ca-line>.icon{width:16px;height:16px;color:var(--accent);flex-shrink:0}
+.atl .ca-line strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.atl :is(.ca-line-count,.ca-line-date){font-size:12px;color:var(--muted);white-space:nowrap}
+.atl .ca-node:focus-visible>:is(.ca-line,.ca-bundle-head){outline:2px solid var(--accent);outline-offset:3px}
+.atl .ca-node.ca-bundle{flex-direction:column;gap:10px}
+.atl .ca-bundle-head{display:flex;align-items:center;gap:6px;min-height:26px;font-size:12px;color:var(--muted);cursor:pointer}
+.atl .ca-bundle-head .icon{width:14px;height:14px}
+/* The side panel of an authority: the tools under a section, a folded section whose title opens it. */
+.atl .ca-side-tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.atl .ca-side .notice .text-link{min-height:24px;padding:2px 0}
+.atl .ca-fold .section-title{margin-bottom:0}
+.atl .ca-fold>div:not([hidden]){margin-top:10px}
+.atl .fold-toggle{display:flex;align-items:center;gap:7px;width:100%;min-height:24px;text-align:left;color:inherit;cursor:pointer}
+.atl .fold-toggle .icon{width:14px;height:14px}
+.atl .ca-fold .code-preview{margin:0;max-height:240px;overflow:auto}
+/* The chain repair strip under the page head: a notice holding the counts, the progress bar and the findings. */
+.atl .ca-repair-body{flex:1;min-width:0;display:grid;gap:8px}
+.atl .ca-repair-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
+.atl .ca-repair-head strong{color:var(--text);font-weight:500}
+.atl .ca-repair .setup-progress{margin:0;padding:0}
