@@ -11,9 +11,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import { Warning } from '@phosphor-icons/react'
-import { Modal, Button } from '../components'
-import { Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause } from '../components/atelier'
+import { Modal } from '../components/atelier/Form'
+import { Zone, Icon, Btn, IconBtn, Pill, RecordList, RecordRow, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause } from '../components/atelier'
 import { acmeService, casService, certificatesService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
@@ -1052,25 +1051,14 @@ export default function ACMEPage() {
         {views[activeTab]}
       </Zone>
       {/* Create Account Modal */}
-      <Modal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title={t('acme.createAccountTitle')}
-      >
-        <CreateAccountForm
-          onSubmit={handleCreate}
-          onCancel={() => setShowCreateModal(false)}
-        />
+      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('acme.createAccountTitle')} size="sm" testId="acme-account-dialog">
+        <CreateAccountForm onSubmit={handleCreate} onCancel={() => setShowCreateModal(false)} />
       </Modal>
 
-      {/* Request Certificate Modal — gate on clientSettings being loaded
+      {/* Request Certificate Modal: gate on clientSettings being loaded
           so the form's useState captures the configured default env (#26). */}
-      <Modal
-        open={showRequestModal && clientSettings.environment != null}
-        onClose={() => setShowRequestModal(false)}
-        title={t('acme.requestCertificateTitle')}
-        size="lg"
-      >
+      <Modal open={showRequestModal && clientSettings.environment != null} onClose={() => setShowRequestModal(false)}
+        title={t('acme.requestCertificateTitle')} size="lg" testId="acme-request-dialog">
         <RequestCertificateForm
           onSubmit={handleRequestCertificate}
           onPreflight={handlePreflight}
@@ -1084,64 +1072,39 @@ export default function ACMEPage() {
         />
       </Modal>
 
-      <Modal
-        open={!!preflightResult}
-        onClose={() => setPreflightResult(null)}
-        title={preflightResult?.ok ? t('acme.preflightPassedTitle') : t('acme.preflightFailedTitle')}
-        size="lg"
-      >
+      <Modal open={!!preflightResult} onClose={() => setPreflightResult(null)} size="lg" testId="acme-preflight-dialog"
+        title={preflightResult?.ok ? t('acme.preflightPassedTitle') : t('acme.preflightFailedTitle')} subtitle={t('acme.preflightStagingNote')}>
         {preflightResult && (
-          <div className="p-4 space-y-3">
-            <p className="text-sm text-text-secondary">{t('acme.preflightStagingNote')}</p>
-            <ul className="space-y-2">
+          <>
+            <RecordList>
               {(preflightResult.steps || []).map((step) => (
-                <li
-                  key={step.name}
-                  className={`p-2 rounded border text-sm ${
-                    step.status === 'pass'
-                      ? 'border-status-success-op30 bg-status-success-op10'
-                      : 'border-status-danger-op30 bg-status-danger-op5'
-                  }`}
-                >
-                  <div className="font-medium">{step.label}</div>
-                  {step.detail && <div className="text-text-secondary text-xs mt-1">{step.detail}</div>}
-                  {step.data?.txt_records?.length > 0 && (
-                    <ul className="mt-2 font-mono text-xs space-y-1">
-                      {step.data.txt_records.map((rec) => (
-                        <li key={rec.name}>
-                          <span className="text-text-tertiary">{rec.name}</span>
-                          <br />
-                          {rec.value}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
+                <RecordRow key={step.name} title={step.label} meta={step.detail || undefined}
+                  badge={<Pill tone={step.status === 'pass' ? 'good' : 'bad'} label={step.status === 'pass' ? t('common.states.ok') : t('common.states.failed')} />}
+                  extra={step.data?.txt_records?.length > 0 && step.data.txt_records.map((rec) => (
+                    <span key={rec.name} className="rl-meta mono">{rec.name}<br />{rec.value}</span>
+                  ))} />
               ))}
-            </ul>
+            </RecordList>
             {(preflightResult.txt_records || []).length > 0 && (
-              <div className="pt-2 border-t border-border">
-                <p className="text-sm font-medium mb-2">{t('acme.preflightTxtRecords')}</p>
-                <ul className="font-mono text-xs space-y-2">
+              <section style={{ marginTop: 18 }}>
+                <h3 className="section-title">{t('acme.preflightTxtRecords')}</h3>
+                <RecordList>
                   {preflightResult.txt_records.map((rec) => (
-                    <li key={rec.name} className="p-2 bg-bg-secondary rounded">
-                      <div className="text-text-tertiary">{rec.name}</div>
-                      <div className="break-all">{rec.value}</div>
-                    </li>
+                    <RecordRow key={rec.name} title={<span className="mono">{rec.name}</span>} meta={<span className="mono">{rec.value}</span>} />
                   ))}
-                </ul>
-              </div>
+                </RecordList>
+              </section>
             )}
-          </div>
+            <div className="modal-actions">
+              <button type="button" className="btn primary" data-action="close-modal" data-write="false" onClick={() => setPreflightResult(null)}>{t('common.close')}</button>
+            </div>
+          </>
         )}
       </Modal>
-      
+
       {/* DNS Provider Modal */}
-      <Modal
-        open={showDnsProviderModal}
-        onClose={() => { setShowDnsProviderModal(false); setSelectedDnsProvider(null) }}
-        title={selectedDnsProvider ? t('acme.editDnsProvider') : t('common.addDnsProvider')}
-      >
+      <Modal open={showDnsProviderModal} onClose={() => { setShowDnsProviderModal(false); setSelectedDnsProvider(null) }}
+        title={selectedDnsProvider ? t('acme.editDnsProvider') : t('common.addDnsProvider')} testId="acme-dns-dialog">
         <DnsProviderForm
           provider={selectedDnsProvider}
           providerTypes={dnsProviderTypes}
@@ -1151,11 +1114,8 @@ export default function ACMEPage() {
       </Modal>
 
       {/* Domain Modal */}
-      <Modal
-        open={showDomainModal}
-        onClose={() => { setShowDomainModal(false); setSelectedAcmeDomain(null) }}
-        title={selectedAcmeDomain ? t('acme.editDomain') : t('acme.addDomain')}
-      >
+      <Modal open={showDomainModal} onClose={() => { setShowDomainModal(false); setSelectedAcmeDomain(null) }}
+        title={selectedAcmeDomain ? t('acme.editDomain') : t('acme.addDomain')} testId="acme-domain-dialog">
         <DomainForm
           domain={selectedAcmeDomain}
           dnsProviders={dnsProviders}
@@ -1166,11 +1126,8 @@ export default function ACMEPage() {
       </Modal>
 
       {/* Local Domain Modal */}
-      <Modal
-        open={showLocalDomainModal}
-        onClose={() => { setShowLocalDomainModal(false); setSelectedLocalDomain(null) }}
-        title={selectedLocalDomain ? t('acme.editDomain') : t('acme.addDomain')}
-      >
+      <Modal open={showLocalDomainModal} onClose={() => { setShowLocalDomainModal(false); setSelectedLocalDomain(null) }}
+        title={selectedLocalDomain ? t('acme.editDomain') : t('acme.addDomain')} size="sm" testId="acme-local-domain-dialog">
         <LocalDomainForm
           domain={selectedLocalDomain}
           cas={cas}
@@ -1180,29 +1137,13 @@ export default function ACMEPage() {
       </Modal>
 
       {/* Revoke superseded confirmation */}
-      <Modal
-        open={showRevokeConfirm}
-        onClose={() => setShowRevokeConfirm(false)}
-        title={t('acme.revokeSupersededConfirmTitle')}
-      >
-        <div className="p-4 space-y-4">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30">
-            <Warning size={20} className="text-accent-warning flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-accent-warning">{t('common.warning')}</p>
-              <p className="text-text-secondary mt-1">
-                {t('acme.revokeSupersededConfirmDesc', { count: acmeSettings.superseded_count })}
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setShowRevokeConfirm(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" variant="danger" onClick={handleConfirmRevokeSuperseded}>
-              {t('acme.revokeSupersededConfirmAction', { count: acmeSettings.superseded_count })}
-            </Button>
-          </div>
+      <Modal open={showRevokeConfirm} onClose={() => setShowRevokeConfirm(false)} title={t('acme.revokeSupersededConfirmTitle')} size="sm" testId="acme-revoke-superseded-dialog">
+        <div className="notice warn"><Icon name="warning" /><span><strong>{t('common.warning')}</strong> {t('acme.revokeSupersededConfirmDesc', { count: acmeSettings.superseded_count })}</span></div>
+        <div className="modal-actions">
+          <button type="button" className="btn" data-action="close-modal" data-autofocus="" onClick={() => setShowRevokeConfirm(false)}>{t('common.cancel')}</button>
+          <button type="button" className="btn danger" data-write="" onClick={handleConfirmRevokeSuperseded}>
+            {t('acme.revokeSupersededConfirmAction', { count: acmeSettings.superseded_count })}
+          </button>
         </div>
       </Modal>
     </DockSlotProvider>

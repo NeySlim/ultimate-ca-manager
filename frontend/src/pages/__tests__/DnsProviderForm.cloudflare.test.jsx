@@ -22,7 +22,7 @@ describe('Cloudflare credentials', () => {
     ;({ container } = render(<DnsProviderForm provider={null} providerTypes={TYPES}
                                               onSubmit={onSubmit} onCancel={() => {}} />))
     fireEvent.change(screen.getByPlaceholderText('acme.providerNamePlaceholder'), { target: { value: 'cf' } })
-    fireEvent.click(screen.getByRole('button', { name: /Cloudflare/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /Cloudflare/ }))
   })
   const submit = () => fireEvent.submit(container.querySelector('form'))
 

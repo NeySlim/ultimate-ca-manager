@@ -4,9 +4,9 @@ import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
-import { Button, Input, Modal } from '../../components'
 import { Btn, SettingsView } from '../../components/atelier'
-import { MARKDOWN_ELEMENT_CLASSES } from '../../lib/markdown'
+import { Input, Textarea, Modal } from '../../components/atelier/Form'
+import { MARKDOWN_COMPONENTS } from '../../components/atelier/markdown'
 import ProfilesEditor from './ProfilesEditor'
 import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
 import { Field, Notice } from '../protocols/atelierParts'
@@ -28,7 +28,7 @@ import { Field, Notice } from '../protocols/atelierParts'
 export function TosPreview({ body }) {
   if (!body?.trim()) return null
   return (
-    <div className={MARKDOWN_ELEMENT_CLASSES}>
+    <div className="event-detail">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         urlTransform={(url) => {
@@ -40,12 +40,13 @@ export function TosPreview({ body }) {
           }
         }}
         components={{
+          ...MARKDOWN_COMPONENTS,
           // A link whose URL was rejected by urlTransform arrives with an
           // empty href; render it as plain text instead of an <a href="">
           // self-link that would open a copy of the console in a new tab.
           a: ({ node, href, children, ...props }) =>
             href ? (
-              <a {...props} href={href} target="_blank" rel="noopener noreferrer">
+              <a {...props} className="text-link" href={href} target="_blank" rel="noopener noreferrer">
                 {children}
               </a>
             ) : (
@@ -232,37 +233,25 @@ export default function ConfigTab({ acmeSettings, saved = acmeSettings, savedPro
       <SettingsView sections={sections} values={values} changed={changed} onChange={onChange}
         onSave={canWrite ? onSaveConfig : undefined} onReset={onReset} saving={saving} tocLabel={t('protocols.sectionsOf', { name: t('acme.acmeServer') })} />
       {/* Terms of Service edit modal */}
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={t('acme.termsOfService')} size="md">
-        <div className="p-4 space-y-4">
-          <Input
-            name="tosTitle"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            placeholder={t('acme.termsOfServiceTitlePlaceholder')}
-          />
-          <textarea
-            value={editBody}
-            onChange={(e) => setEditBody(e.target.value)}
-            placeholder={t('acme.termsOfServiceBodyPlaceholder')}
-            rows={10}
-            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary-op50 resize-y"
-          />
-          <p className="text-xs text-text-tertiary">{t('acme.termsOfServiceHelper')}</p>
-          {editPreview && (
-            <div className="rounded-lg border border-border bg-bg-tertiary p-3">
-              <p className="text-xs text-text-tertiary mb-2">{t('acme.termsOfServicePreview')}</p>
-              <div className="text-xs text-text-secondary"><TosPreview body={editBody} /></div>
-            </div>
-          )}
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={handleSaveEdit}>
-              {t('common.save')}
-            </Button>
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={t('acme.termsOfService')} testId="acme-tos-dialog">
+        <form noValidate onSubmit={(e) => { e.preventDefault(); handleSaveEdit() }}>
+          <div className="form-fields">
+            <Input id="acme-tos-title" name="tosTitle" label={t('acme.termsOfServiceTitle')} full value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)} placeholder={t('acme.termsOfServiceTitlePlaceholder')} data-autofocus="" />
+            <Textarea id="acme-tos-body" label={t('acme.termsOfServiceBody')} rows={10} value={editBody} onChange={(e) => setEditBody(e.target.value)}
+              placeholder={t('acme.termsOfServiceBodyPlaceholder')} helperText={t('acme.termsOfServiceHelper')} />
           </div>
-        </div>
+          {editPreview && (
+            <section className="review-summary" style={{ marginTop: 18 }}>
+              <h3 className="section-title">{t('acme.termsOfServicePreview')}</h3>
+              <TosPreview body={editBody} />
+            </section>
+          )}
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={() => setEditOpen(false)}>{t('common.cancel')}</button>
+            <button type="submit" className="btn primary">{t('common.save')}</button>
+          </div>
+        </form>
       </Modal>
     </>
   )

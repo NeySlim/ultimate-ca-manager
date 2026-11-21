@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FloppyDisk } from '@phosphor-icons/react'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { Input, Select, Button } from '../../components'
+import { Icon } from '../../components/atelier'
+import { Input, Select, ToggleSwitch } from '../../components/atelier/Form'
 import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
 
 export default function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
@@ -26,8 +25,12 @@ export default function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
       <Input
+        id="acme-domain-name"
+        full
+        data-autofocus=""
         label={t('acme.domainName')}
         value={formData.domain}
         onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value.toLowerCase() }))}
@@ -38,6 +41,8 @@ export default function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
       />
 
       <Select
+        id="acme-domain-ca"
+        full
         label={t('acme.issuingCA')}
         value={formData.issuing_ca_id}
         onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val }))}
@@ -56,19 +61,13 @@ export default function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
         description={t('acme.autoApproveDesc')}
       />
       {formData.auto_approve && (
-        <div className="p-3 rounded-md border border-status-warning-op40 bg-status-warning-op10 text-sm text-status-warning">
-          ⚠ {t('acme.autoApproveWarning')}
-        </div>
+        <p className="notice warn"><Icon name="warning" /><span>{t('acme.autoApproveWarning')}</span></p>
       )}
 
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          <FloppyDisk size={14} />
-          {domain ? t('common.update') : t('common.create')}
-        </Button>
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <button type="submit" className="btn primary"><Icon name="check" />{domain ? t('common.update') : t('common.create')}</button>
       </div>
     </form>
   )

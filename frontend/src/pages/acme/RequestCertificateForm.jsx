@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Warning, CloudArrowUp, MagnifyingGlass } from '@phosphor-icons/react'
-import { Input, Select, Button } from '../../components'
+import { Icon } from '../../components/atelier'
+import { Input, Select, Textarea, ToggleSwitch } from '../../components/atelier/Form'
 import { useNotification } from '../../contexts'
 import { acmeService } from '../../services'
 import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
@@ -142,173 +142,96 @@ export default function RequestCertificateForm({
     : formData.environment === 'production'
 
   return (
-    <form className="p-4 space-y-4">
+    <form onSubmit={handleSubmit} noValidate>
       {isProductionContext && (
-        <div className="p-3 bg-status-warning-op10 border border-status-warning-op30 rounded-lg flex items-start gap-2">
-          <Warning size={18} className="text-status-warning shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-status-warning">{t('acme.productionWarningTitle')}</p>
-            <p className="text-xs text-text-secondary mt-1">{t('acme.productionWarningDesc')}</p>
-          </div>
-        </div>
+        <div className="notice warn"><Icon name="warning" /><span><strong>{t('acme.productionWarningTitle')}</strong> {t('acme.productionWarningDesc')}</span></div>
       )}
-
-      <div>
-        <label className="block text-sm font-medium text-text-primary mb-1">
-          {t('acme.domains')} <span className="text-status-danger">*</span>
-        </label>
-        <textarea
-          className="w-full h-24 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm resize-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary"
-          value={formData.domains}
+      <div className="form-fields">
+        <Textarea id="acme-request-domains" label={<>{t('acme.domains')} *</>} rows={4} value={formData.domains} required data-autofocus=""
           onChange={(e) => setFormData(prev => ({ ...prev, domains: e.target.value }))}
-          placeholder="example.com&#10;*.example.com&#10;sub.example.com"
-          required
-        />
-        <p className="text-xs text-text-tertiary mt-1">{t('acme.domainsHelper')}</p>
-      </div>
-
-      <Input
-        label={t('acme.contactEmail')}
-        type="email"
-        value={formData.email}
-        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-        required
-        helperText={t('acme.contactEmailHelper')}
-      />
-
-      <Select
-        label={t('acme.challengeType')}
-        value={formData.challenge_type}
-        onChange={(val) => setFormData(prev => ({ ...prev, challenge_type: val }))}
-        options={[
-          { value: 'dns-01', label: 'DNS-01 - ' + t('acme.dns01Desc') },
-          { value: 'http-01', label: 'HTTP-01 - ' + t('acme.http01Desc') },
-          { value: 'tls-alpn-01', label: 'TLS-ALPN-01 - ' + t('acme.tlsAlpn01Desc') }
-        ]}
-        helperText={t('acme.challengeTypeHelper')}
-      />
-
-      {formData.challenge_type === 'dns-01' && (
-        <Select
-          label={t('acme.provider')}
-          value={formData.dns_provider_id?.toString() || ''}
-          onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: val ? parseInt(val) : null }))}
-          placeholder={t('acme.selectDnsProvider')}
+          placeholder={'example.com\n*.example.com\nsub.example.com'} helperText={t('acme.domainsHelper')} />
+        <Input id="acme-request-email" label={t('acme.contactEmail')} type="email" full value={formData.email}
+          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} required helperText={t('acme.contactEmailHelper')} />
+        <Select id="acme-request-challenge" label={t('acme.challengeType')} full value={formData.challenge_type}
+          onChange={(val) => setFormData(prev => ({ ...prev, challenge_type: val }))}
           options={[
-            { value: '', label: t('acme.manualDns') },
-            ...dnsProviders.map(p => ({
-              value: p.id.toString(),
-              label: p.name + (p.is_default ? ' (' + t('common.default') + ')' : '')
-            }))
+            { value: 'dns-01', label: 'DNS-01 - ' + t('acme.dns01Desc') },
+            { value: 'http-01', label: 'HTTP-01 - ' + t('acme.http01Desc') },
+            { value: 'tls-alpn-01', label: 'TLS-ALPN-01 - ' + t('acme.tlsAlpn01Desc') }
           ]}
-          helperText={t('acme.dnsProviderHelper')}
-        />
-      )}
-
-      {hasCaAccounts && (
-        <Select
-          label={t('acme.certificateAuthority')}
-          value={formData.acme_account_id != null ? String(formData.acme_account_id) : ''}
-          onChange={(val) => setFormData(prev => ({ ...prev, acme_account_id: val ? parseInt(val) : null }))}
+          helperText={t('acme.challengeTypeHelper')} />
+        {formData.challenge_type === 'dns-01' && (
+          <Select id="acme-request-dns" label={t('acme.provider')} full value={formData.dns_provider_id?.toString() || ''}
+            onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: val ? parseInt(val) : null }))}
+            placeholder={t('acme.selectDnsProvider')}
+            options={[
+              { value: '', label: t('acme.manualDns') },
+              ...dnsProviders.map(p => ({ value: p.id.toString(), label: p.name + (p.is_default ? ' (' + t('common.default') + ')' : '') }))
+            ]}
+            helperText={t('acme.dnsProviderHelper')} />
+        )}
+        {hasCaAccounts && (
+          <Select id="acme-request-ca" label={t('acme.certificateAuthority')} full value={formData.acme_account_id != null ? String(formData.acme_account_id) : ''}
+            onChange={(val) => setFormData(prev => ({ ...prev, acme_account_id: val ? parseInt(val) : null }))}
+            options={[
+              ...caAccounts.map(a => ({
+                value: String(a.id),
+                label: a.label
+                  + (a.environment && a.environment !== 'custom' ? ` (${a.environment})` : '')
+                  + (a.is_default ? `: ${t('common.default')}` : '')
+                  + (a.is_registered ? '' : ` · ${t('acme.notRegistered')}`)
+              })),
+              { value: '', label: t('acme.useEnvironmentDefault') }
+            ]}
+            helperText={t('acme.certificateAuthorityHelper')} />
+        )}
+        {showEnvironmentSelect && (
+          <Select id="acme-request-env" label={t('acme.environment')} full value={formData.environment}
+            onChange={(val) => setFormData(prev => ({ ...prev, environment: val }))}
+            options={[
+              { value: 'staging', label: t('acme.staging') + ' - ' + t('acme.stagingDesc') },
+              { value: 'production', label: t('acme.production') + ' - ' + t('acme.productionDesc') }
+            ]} />
+        )}
+        <Select id="acme-request-key-source" label={t('acme.keySource')} value={formData.key_source} full={formData.key_source === 'csr'}
+          onChange={(val) => setFormData(prev => ({ ...prev, key_source: val }))}
           options={[
-            ...caAccounts.map(a => ({
-              value: String(a.id),
-              label: a.label
-                + (a.environment && a.environment !== 'custom' ? ` (${a.environment})` : '')
-                + (a.is_default ? `: ${t('common.default')}` : '')
-                + (a.is_registered ? '' : ` · ${t('acme.notRegistered')}`)
-            })),
-            { value: '', label: t('acme.useEnvironmentDefault') }
+            { value: 'generate', label: t('acme.keySourceGenerate') },
+            { value: 'reuse', label: t('acme.keySourceReuse') },
+            { value: 'csr', label: t('acme.keySourceCsr') },
           ]}
-          helperText={t('acme.certificateAuthorityHelper')}
-        />
-      )}
-
-      {showEnvironmentSelect && (
-        <Select
-          label={t('acme.environment')}
-          value={formData.environment}
-          onChange={(val) => setFormData(prev => ({ ...prev, environment: val }))}
-          options={[
-            { value: 'staging', label: t('acme.staging') + ' - ' + t('acme.stagingDesc') },
-            { value: 'production', label: t('acme.production') + ' - ' + t('acme.productionDesc') }
-          ]}
-        />
-      )}
-
-      <Select
-        label={t('acme.keySource')}
-        value={formData.key_source}
-        onChange={(val) => setFormData(prev => ({ ...prev, key_source: val }))}
-        options={[
-          { value: 'generate', label: t('acme.keySourceGenerate') },
-          { value: 'reuse', label: t('acme.keySourceReuse') },
-          { value: 'csr', label: t('acme.keySourceCsr') },
-        ]}
-        helperText={t('acme.keySourceHelper')}
-      />
-
-      {formData.key_source === 'csr' && (
-        <div>
-          <label className="block text-sm font-medium text-text-primary mb-1">
-            {t('acme.csrPem')} <span className="text-status-danger">*</span>
-          </label>
-          <textarea
-            className="w-full h-32 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-mono resize-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary"
-            value={formData.csr_pem}
+          helperText={t('acme.keySourceHelper')} />
+        {formData.key_source === 'csr' ? (
+          <Textarea id="acme-request-csr" label={<>{t('acme.csrPem')} *</>} mono rows={6} spellCheck={false} value={formData.csr_pem}
             onChange={(e) => setFormData(prev => ({ ...prev, csr_pem: e.target.value }))}
-            placeholder="-----BEGIN CERTIFICATE REQUEST-----"
-          />
-          <p className="text-xs text-text-tertiary mt-1">{t('acme.csrPemHelper')}</p>
-        </div>
-      )}
-
-      {formData.key_source !== 'csr' && (
-        <Select
-          label={t('acme.keyType')}
-          value={formData.key_type || ''}
-          onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
-          options={groupedOptions(keyOptions, t)}
-          helperText={t('acme.keyTypeHelper')}
-        />
-      )}
-      {formData.key_source !== 'csr' && <BrainpoolNotice label={formData.key_type} />}
-
-      <div className="p-3 rounded-lg border border-border bg-secondary-op50 space-y-3">
-        <p className="text-sm font-medium text-text-primary">{t('acme.preflightTitle')}</p>
-        <p className="text-xs text-text-secondary">{t('acme.preflightDesc')}</p>
-        <Select
-          label={t('acme.preflightMode')}
-          value={formData.preflight_mode}
-          onChange={(val) => setFormData(prev => ({ ...prev, preflight_mode: val }))}
-          options={[
-            { value: 'full', label: t('acme.preflightModeFull') },
-            { value: 'validate_only', label: t('acme.preflightModeValidateOnly') },
-          ]}
-        />
-        <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-          <input
-            type="checkbox"
-            checked={formData.verify_dns}
-            onChange={(e) => setFormData(prev => ({ ...prev, verify_dns: e.target.checked }))}
-            className="rounded border-border"
-          />
-          {t('acme.preflightVerifyDns')}
-        </label>
+            placeholder="-----BEGIN CERTIFICATE REQUEST-----" helperText={t('acme.csrPemHelper')} />
+        ) : (
+          <Select id="acme-request-key" label={t('acme.keyType')} value={formData.key_type || ''}
+            onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
+            options={groupedOptions(keyOptions, t)} helperText={t('acme.keyTypeHelper')}
+            after={<BrainpoolNotice atelier label={formData.key_type} />} />
+        )}
+        <fieldset className="field full" aria-describedby="hint-acme-preflight">
+          <legend>{t('acme.preflightTitle')}</legend>
+          <small id="hint-acme-preflight">{t('acme.preflightDesc')}</small>
+          <div className="form-fields">
+            <Select id="acme-request-preflight-mode" label={t('acme.preflightMode')} value={formData.preflight_mode}
+              onChange={(val) => setFormData(prev => ({ ...prev, preflight_mode: val }))}
+              options={[
+                { value: 'full', label: t('acme.preflightModeFull') },
+                { value: 'validate_only', label: t('acme.preflightModeValidateOnly') },
+              ]} />
+            <ToggleSwitch id="acme-request-verify-dns" label={t('acme.preflightVerifyDns')} checked={formData.verify_dns}
+              onChange={(v) => setFormData(prev => ({ ...prev, verify_dns: v }))} />
+          </div>
+        </fieldset>
       </div>
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="button" variant="secondary" onClick={handlePreflight} disabled={preflightLoading}>
-          <MagnifyingGlass size={14} />
-          {preflightLoading ? t('acme.preflightRunning') : t('acme.preflightRun')}
-        </Button>
-        <Button type="button" onClick={handleSubmit}>
-          <CloudArrowUp size={14} />
-          {t('acme.requestCertificate')}
-        </Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <button type="button" className="btn" onClick={handlePreflight} disabled={preflightLoading || undefined}>
+          <Icon name="search" />{preflightLoading ? t('acme.preflightRunning') : t('acme.preflightRun')}
+        </button>
+        <button type="submit" className="btn primary"><Icon name="upload" />{t('acme.requestCertificate')}</button>
       </div>
     </form>
   )

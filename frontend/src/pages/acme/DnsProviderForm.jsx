@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FloppyDisk } from '@phosphor-icons/react'
-import { Input, Select, Button } from '../../components'
+import { Icon } from '../../components/atelier'
+import { Input, Select } from '../../components/atelier/Form'
 import { useNotification } from '../../contexts'
 import ProviderTypeGrid from './ProviderTypeGrid'
 
@@ -74,97 +74,59 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
   }
   
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('common.providerName')}
-        value={formData.name}
-        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-        required
-        placeholder={t('acme.providerNamePlaceholder')}
-      />
-      
-      <ProviderTypeGrid
-        label={t('common.providerType')}
-        providers={providerTypes}
-        value={formData.provider_type}
-        onChange={(val) => setFormData(prev => ({ ...prev, provider_type: val, credentials: {} }))}
-        disabled={!!provider}
-      />
-      
-      {selectedType?.credentials_schema?.length > 0 && (
-        <div className="space-y-3 p-3 bg-tertiary-op50 rounded-lg">
-          <p className="text-sm font-medium text-text-secondary">{t('acme.credentials')}</p>
-          {selectedType.credentials_schema.map(field => {
-            const hasExistingValue = existingCredentialKeys.includes(field.name)
-            const isPasswordType = field.type === 'password'
-            
-            return (
-              <div key={field.name}>
-                {field.type === 'select' ? (
-                  <Select
-                    label={field.label}
-                    value={formData.credentials[field.name] || field.default || ''}
-                    onChange={(val) => updateCredential(field.name, val)}
-                    options={field.options || []}
-                    required={field.required && !hasExistingValue}
-                  />
-                ) : field.type === 'checkbox' ? (
-                  <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={flagValue(field)}
-                      onChange={(e) => updateCredential(field.name, e.target.checked)}
-                      className="w-4 h-4 mt-0.5 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary-op50"
-                    />
-                    <span>
-                      <span className="block text-sm text-text-primary">{field.label}</span>
-                      {field.help && <span className="block text-xs text-text-secondary mt-1">{field.help}</span>}
-                    </span>
-                  </label>
-                ) : (
-                  <Input
-                    label={field.label}
-                    type={isPasswordType ? 'password' : 'text'}
-                    autoComplete={isPasswordType ? 'new-password' : 'off'}
-                    value={formData.credentials[field.name] || ''}
-                    onChange={(e) => updateCredential(field.name, e.target.value)}
-                    required={field.required}
-                    placeholder={field.placeholder}
-                    hasExistingValue={hasExistingValue && !secretMissing(field)}
-                    helperText={field.help}
-                    {...(secretMissing(field) ? { required: true, error: t('common.secretRequiredForTarget') } : {})}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-      
-      {formData.provider_type === 'manual' && (
-        <div className="p-3 bg-status-info-op10 border border-status-info-op30 rounded-lg">
-          <p className="text-sm text-text-secondary">{t('acme.manualDnsInfo')}</p>
-        </div>
-      )}
-      
-      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
-        <input
-          type="checkbox"
-          checked={formData.is_default}
-          onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
-          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary-op50"
-        />
-        <span className="text-sm text-text-primary">{t('acme.setAsDefault')}</span>
-      </label>
-      
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          <FloppyDisk size={14} />
-          {provider ? t('common.update') : t('common.create')}
-        </Button>
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <Input id="acme-dns-name" label={t('common.providerName')} full value={formData.name}
+          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required placeholder={t('acme.providerNamePlaceholder')} data-autofocus="" />
+        <ProviderTypeGrid label={t('common.providerType')} providers={providerTypes} value={formData.provider_type}
+          onChange={(val) => setFormData(prev => ({ ...prev, provider_type: val, credentials: {} }))} disabled={!!provider} />
+        {selectedType?.credentials_schema?.length > 0 && (
+          <fieldset className="field full">
+            <legend>{t('acme.credentials')}</legend>
+            <div className="form-fields">
+              {selectedType.credentials_schema.map(field => {
+                const hasExistingValue = existingCredentialKeys.includes(field.name)
+                const isPasswordType = field.type === 'password'
+                const fid = `acme-dns-cred-${field.name}`
+                if (field.type === 'select') {
+                  return (
+                    <Select key={field.name} id={fid} label={field.label} full value={formData.credentials[field.name] || field.default || ''}
+                      onChange={(val) => updateCredential(field.name, val)} options={field.options || []} required={field.required && !hasExistingValue} />
+                  )
+                }
+                if (field.type === 'checkbox') {
+                  return (
+                    <div key={field.name} className="field full">
+                      <label className="checkbox-line">
+                        <input type="checkbox" id={fid} checked={flagValue(field)} aria-describedby={field.help ? `hint-${fid}` : undefined}
+                          onChange={(e) => updateCredential(field.name, e.target.checked)} />
+                        {field.label}
+                      </label>
+                      {field.help && <small id={`hint-${fid}`}>{field.help}</small>}
+                    </div>
+                  )
+                }
+                return (
+                  <Input key={field.name} id={fid} label={field.label} full type={isPasswordType ? 'password' : 'text'} autoComplete={isPasswordType ? 'new-password' : 'off'}
+                    value={formData.credentials[field.name] || ''} onChange={(e) => updateCredential(field.name, e.target.value)}
+                    required={field.required} placeholder={field.placeholder} hasExistingValue={hasExistingValue && !secretMissing(field)} helperText={field.help}
+                    {...(secretMissing(field) ? { required: true, error: t('common.secretRequiredForTarget') } : {})} />
+                )
+              })}
+            </div>
+          </fieldset>
+        )}
+        {formData.provider_type === 'manual' && (
+          <p className="notice"><Icon name="help" /><span>{t('acme.manualDnsInfo')}</span></p>
+        )}
+        <label className="checkbox-line field full">
+          <input type="checkbox" checked={formData.is_default} onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))} />
+          {t('acme.setAsDefault')}
+        </label>
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <button type="submit" className="btn primary"><Icon name="check" />{provider ? t('common.update') : t('common.create')}</button>
       </div>
     </form>
   )

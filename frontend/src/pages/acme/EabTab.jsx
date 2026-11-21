@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Warning } from '@phosphor-icons/react'
-import { Button, Input, Modal, Textarea } from '../../components'
-import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch } from '../../components/atelier'
+import { Input, Modal, Textarea, ToggleSwitch } from '../../components/atelier/Form'
+import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch } from '../../components/atelier'
 import { SlotDock } from '../protocols/dockSlot'
 import { Copyable } from '../protocols/atelierParts'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
@@ -19,31 +18,14 @@ const parsePatterns = (text) => text.split(/[\n,]/).map(p => p.trim()).filter(Bo
 // The form always sends an explicit list, never null.
 const buildAllowedDomains = (allDomains, text) => (allDomains ? ['*'] : parsePatterns(text))
 
-function AllowedDomainsField({ allDomains, onAllDomainsChange, text, onTextChange }) {
+function AllowedDomainsField({ id, allDomains, onAllDomainsChange, text, onTextChange }) {
   const { t } = useTranslation()
   return (
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={allDomains}
-          onChange={(e) => onAllDomainsChange(e.target.checked)}
-          className="rounded border-border bg-bg-tertiary"
-        />
-        <span className="text-sm text-text-primary">{t('acme.eab.allDomainsLabel')}</span>
-      </label>
-      <Textarea
-        label={t('acme.eab.allowedDomains')}
-        aria-label={t('acme.eab.allowedDomains')}
-        value={text}
-        onChange={(e) => onTextChange(e.target.value)}
-        disabled={allDomains}
-        rows={4}
-        placeholder={'example.com\n*.example.com'}
-        helperText={t('acme.eab.allowedDomainsHelp')}
-        className="font-mono"
-      />
-    </div>
+    <>
+      <ToggleSwitch id={`${id}-all`} label={t('acme.eab.allDomainsLabel')} checked={allDomains} onChange={onAllDomainsChange} />
+      <Textarea id={`${id}-domains`} label={t('acme.eab.allowedDomains')} mono value={text} onChange={(e) => onTextChange(e.target.value)} disabled={allDomains}
+        rows={4} placeholder={'example.com\n*.example.com'} helperText={t('acme.eab.allowedDomainsHelp')} />
+    </>
   )
 }
 
@@ -284,127 +266,78 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       <SlotDock>{dock}</SlotDock>
 
       {editingNotesId !== null && (
-        <Modal open onClose={cancelEditingNotes} title={t('acme.eab.editNotesTitle')}>
-          <div className="p-4 space-y-4">
-            <Textarea label={t('acme.eab.notes')} aria-label={t('acme.eab.notes')} placeholder={t('acme.eab.notesPlaceholder')}
-              value={editingNotesValue} onChange={(e) => setEditingNotesValue(e.target.value)} rows={3} />
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <Button type="button" variant="secondary" onClick={cancelEditingNotes}>{t('common.cancel')}</Button>
-              <Button type="button" onClick={() => saveNotes(editingNotesId)}>{t('common.save')}</Button>
+        <Modal open onClose={cancelEditingNotes} title={t('acme.eab.editNotesTitle')} size="sm" testId="eab-notes-dialog">
+          <form noValidate onSubmit={(e) => { e.preventDefault(); saveNotes(editingNotesId) }}>
+            <div className="form-fields">
+              <Textarea id="eab-notes" label={t('acme.eab.notes')} placeholder={t('acme.eab.notesPlaceholder')} value={editingNotesValue}
+                onChange={(e) => setEditingNotesValue(e.target.value)} rows={3} data-autofocus="" />
             </div>
-          </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={cancelEditingNotes}>{t('common.cancel')}</button>
+              <button type="submit" className="btn primary">{t('common.save')}</button>
+            </div>
+          </form>
         </Modal>
       )}
 
       {/* Create EAB Credential Modal */}
-      <Modal
-        open={isCreateOpen}
-        onClose={() => { setShowLocalCreate(false); onCloseCreateModal() }}
-        title={t('acme.eab.newTitle')}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-tertiary">
-            {t('acme.eab.newDescription')}
-          </p>
-          <Input
-            label={t('acme.eab.label')}
-            placeholder={t('acme.eab.labelPlaceholder')}
-            value={eabLabel}
-            onChange={(e) => setEabLabel(e.target.value)}
-            maxLength={255}
-          />
-          <Input
-            label={t('acme.eab.expiresInDays')}
-            type="number"
-            placeholder={t('acme.eab.expiresPlaceholder')}
-            value={eabExpiresInDays}
-            onChange={(e) => setEabExpiresInDays(e.target.value)}
-            min={1}
-            helperText={t('acme.eab.expiresHelp')}
-          />
-          <AllowedDomainsField
-            allDomains={eabAllDomains}
-            onAllDomainsChange={setEabAllDomains}
-            text={eabDomainsText}
-            onTextChange={setEabDomainsText}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => { setShowLocalCreate(false); onCloseCreateModal() }}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={handleCreateEabCredential}>
-              {t('acme.eab.generate')}
-            </Button>
+      <Modal open={isCreateOpen} onClose={() => { setShowLocalCreate(false); onCloseCreateModal() }} title={t('acme.eab.newTitle')}
+        subtitle={t('acme.eab.newDescription')} testId="eab-create-dialog">
+        <form noValidate onSubmit={(e) => { e.preventDefault(); handleCreateEabCredential() }}>
+          <div className="form-fields">
+            <Input id="eab-label" label={t('acme.eab.label')} placeholder={t('acme.eab.labelPlaceholder')} value={eabLabel}
+              onChange={(e) => setEabLabel(e.target.value)} maxLength={255} data-autofocus="" />
+            <Input id="eab-expires" label={t('acme.eab.expiresInDays')} type="number" placeholder={t('acme.eab.expiresPlaceholder')} value={eabExpiresInDays}
+              onChange={(e) => setEabExpiresInDays(e.target.value)} min={1} helperText={t('acme.eab.expiresHelp')} />
+            <AllowedDomainsField id="eab-create" allDomains={eabAllDomains} onAllDomainsChange={setEabAllDomains} text={eabDomainsText} onTextChange={setEabDomainsText} />
           </div>
-        </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={() => { setShowLocalCreate(false); onCloseCreateModal() }}>{t('common.cancel')}</button>
+            <button type="submit" className="btn primary">{t('acme.eab.generate')}</button>
+          </div>
+        </form>
       </Modal>
 
       {/* Show EAB Secret Once Modal */}
-      <Modal
-        open={!!newEabSecret}
-        onClose={() => setNewEabSecret(null)}
-        title={t('acme.eab.secretTitle')}
-        size="md"
-      >
+      <Modal open={!!newEabSecret} onClose={() => setNewEabSecret(null)} title={t('acme.eab.secretTitle')} testId="eab-secret-dialog">
         {newEabSecret && (
-          <div className="p-4 space-y-4">
-            <div className="rounded-lg border border-status-warning-op40 bg-status-warning-op10 p-3 flex gap-2">
-              <Warning size={20} className="text-status-warning shrink-0 mt-0.5" weight="duotone" />
-              <div className="text-sm">
-                <div className="font-semibold">{t('acme.eab.secretWarningTitle')}</div>
-                <div className="text-text-tertiary mt-1">{t('acme.eab.secretWarning')}</div>
+          <>
+            <div className="notice warn"><Icon name="warning" /><span><strong>{t('acme.eab.secretWarningTitle')}</strong> {t('acme.eab.secretWarning')}</span></div>
+            <div className="form-fields">
+              <div className="field full">
+                <span>{t('acme.eab.kid')}</span>
+                <div className="command-line" style={{ margin: 0 }}>
+                  <code className="mono">{newEabSecret.kid}</code>
+                  <IconBtn icon="copy" label={t('acme.eab.kid')} onClick={() => { copy(newEabSecret.kid); showSuccess(t('acme.eab.kidCopied')) }} />
+                </div>
+              </div>
+              <div className="field full">
+                <span>{t('acme.eab.hmacKey')}</span>
+                <div className="command-line" style={{ margin: 0 }}>
+                  <code className="mono">{newEabSecret.hmac_key}</code>
+                  <IconBtn icon="copy" label={t('acme.eab.hmacKey')} onClick={() => { copy(newEabSecret.hmac_key); showSuccess(t('acme.eab.hmacCopied')) }} />
+                </div>
+                <small>{t('acme.eab.hmacFormat')}</small>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t('acme.eab.kid')}</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 rounded bg-bg-tertiary font-mono text-sm break-all">{newEabSecret.kid}</code>
-                <Button type="button" variant="secondary" size="sm" onClick={() => { copy(newEabSecret.kid); showSuccess(t('acme.eab.kidCopied')) }}>
-                  <Copy size={14} />
-                </Button>
-              </div>
+            <div className="modal-actions">
+              <button type="button" className="btn primary" data-write="false" onClick={() => setNewEabSecret(null)}>{t('acme.eab.secretConfirm')}</button>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t('acme.eab.hmacKey')}</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 rounded bg-bg-tertiary font-mono text-sm break-all">{newEabSecret.hmac_key}</code>
-                <Button type="button" variant="secondary" size="sm" onClick={() => { copy(newEabSecret.hmac_key); showSuccess(t('acme.eab.hmacCopied')) }}>
-                  <Copy size={14} />
-                </Button>
-              </div>
-              <p className="text-xs text-text-tertiary mt-1">{t('acme.eab.hmacFormat')}</p>
-            </div>
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button type="button" onClick={() => setNewEabSecret(null)}>
-                {t('acme.eab.secretConfirm')}
-              </Button>
-            </div>
-          </div>
+          </>
         )}
       </Modal>
 
       {/* Edit allowed domains Modal */}
-      <Modal
-        open={!!editingDomainsCred}
-        onClose={closeEditingDomains}
-        title={t('acme.eab.editDomainsTitle')}
-      >
-        <div className="p-4 space-y-4">
-          <AllowedDomainsField
-            allDomains={editAllDomains}
-            onAllDomainsChange={setEditAllDomains}
-            text={editDomainsText}
-            onTextChange={setEditDomainsText}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={closeEditingDomains}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={saveDomains}>
-              {t('common.save')}
-            </Button>
+      <Modal open={!!editingDomainsCred} onClose={closeEditingDomains} title={t('acme.eab.editDomainsTitle')} size="sm" testId="eab-domains-dialog">
+        <form noValidate onSubmit={(e) => { e.preventDefault(); saveDomains() }}>
+          <div className="form-fields">
+            <AllowedDomainsField id="eab-edit" allDomains={editAllDomains} onAllDomainsChange={setEditAllDomains} text={editDomainsText} onTextChange={setEditDomainsText} />
           </div>
-        </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={closeEditingDomains}>{t('common.cancel')}</button>
+            <button type="submit" className="btn primary">{t('common.save')}</button>
+          </div>
+        </form>
       </Modal>
     </>
   )

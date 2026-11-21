@@ -10,14 +10,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { Rocket } from '@phosphor-icons/react'
-import { Modal } from './Modal'
-import { Button } from './Button'
+import { AtelierDialog } from './atelier/AtelierDialog'
 import { apiClient } from '../services'
 import { useAuth } from '../contexts/AuthContext'
 import { getPreferences, persistPreference } from '../stores/userPreferencesStore'
 import { formatDate } from '../lib/utils'
-import { MARKDOWN_ELEMENT_CLASSES } from '../lib/markdown'
+import { MARKDOWN_COMPONENTS } from './atelier/markdown'
 
 export function UpdatePopup() {
   const { t } = useTranslation()
@@ -51,39 +49,21 @@ export function UpdatePopup() {
     if (info?.version) persistPreference('update_popup_seen_version', info.version)
   }
 
-  if (!info) return null
+  if (!info || !open) return null
 
   return (
-    <Modal
-      open={open}
-      onClose={dismiss}
-      size="lg"
-      title={(
-        <span className="flex items-center gap-2">
-          <Rocket size={18} className="text-accent-primary" />
-          {t('updatePopup.title', { version: info.version })}
-        </span>
-      )}
-    >
-      <div className="space-y-3">
-        {info.installed_at && (
-          <p className="text-sm text-text-tertiary">
-            {t('updatePopup.installedOn', { date: formatDate(info.installed_at) })}
-          </p>
-        )}
-        {info.release_notes ? (
-          <div className={'p-3 bg-tertiary-op50 rounded-lg text-sm text-text-secondary max-h-80 overflow-y-auto prose prose-sm prose-invert max-w-none ' + MARKDOWN_ELEMENT_CLASSES}>
-            <ReactMarkdown>{info.release_notes}</ReactMarkdown>
-          </div>
-        ) : (
-          <p className="text-sm text-text-secondary">{t('updatePopup.noNotes')}</p>
-        )}
-        <div className="flex justify-end pt-2">
-          <Button type="button" variant="primary" onClick={dismiss}>
-            {t('common.close')}
-          </Button>
+    <AtelierDialog title={t('updatePopup.title', { version: info.version })} size="wide" onClose={dismiss} testId="update-popup"
+      subtitle={info.installed_at ? t('updatePopup.installedOn', { date: formatDate(info.installed_at) }) : undefined}>
+      {info.release_notes ? (
+        <div className="event-detail" style={{ maxHeight: '50dvh', overflow: 'auto' }}>
+          <ReactMarkdown components={MARKDOWN_COMPONENTS}>{info.release_notes}</ReactMarkdown>
         </div>
+      ) : (
+        <p className="event-detail">{t('updatePopup.noNotes')}</p>
+      )}
+      <div className="modal-actions">
+        <button type="button" className="btn primary" data-action="close-modal" data-write="false" onClick={dismiss}>{t('common.close')}</button>
       </div>
-    </Modal>
+    </AtelierDialog>
   )
 }

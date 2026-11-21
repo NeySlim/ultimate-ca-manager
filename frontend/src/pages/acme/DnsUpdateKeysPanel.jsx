@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Warning } from '@phosphor-icons/react'
-import { Btn, Icon, Pill, RecordList } from '../../components/atelier'
-import { Button, Input, Select, Modal, Textarea, Tabs } from '../../components'
+import { Btn, Icon, IconBtn, Pill, RecordList } from '../../components/atelier'
+import { Input, Select, Textarea, Modal } from '../../components/atelier/Form'
 import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
@@ -21,15 +20,14 @@ const SNIPPET_TABS = [
   ['poshacme', 'tabPoshAcme'],
 ]
 
+// A value to copy, as the mockup's command line: the value on one line that scrolls, then its copy button
 function CopyField({ label, value, onCopy, testId }) {
   return (
-    <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
-      <div className="flex items-center gap-2">
-        <code data-testid={testId} className="flex-1 px-3 py-2 rounded bg-bg-tertiary font-mono text-sm break-all">{value}</code>
-        <Button type="button" variant="secondary" size="sm" onClick={() => onCopy(value)} title={label}>
-          <Copy size={14} />
-        </Button>
+    <div className="field full">
+      <span>{label}</span>
+      <div className="command-line" style={{ margin: 0 }}>
+        <code data-testid={testId} className="mono">{value}</code>
+        <IconBtn icon="copy" label={label} onClick={() => onCopy(value)} />
       </div>
     </div>
   )
@@ -59,6 +57,7 @@ export default function DnsUpdateKeysPanel({
   const [form, setForm] = useState(EMPTY_FORM)
   const [created, setCreated] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [snippetTab, setSnippetTab] = useState(null)
 
   const accountId = account.id
 
@@ -151,58 +150,33 @@ export default function DnsUpdateKeysPanel({
       port,
       directoryUrl,
     })
+    const snippet = snippets.find((s) => s.id === snippetTab) || snippets.find((s) => s.id === SNIPPET_TABS[0][0])
     return (
-      <div className="space-y-2">
-        <p className="text-sm font-medium">{t('acme.dnsUpdate.snippets')}</p>
-        <p className="text-xs text-text-tertiary">{t('acme.dnsUpdate.snippetsHelp')}</p>
-        <p className="text-xs text-text-tertiary">
-          {portConfigured
-            ? t('acme.dnsUpdate.notePort', { port })
-            : t('acme.dnsUpdate.notePortDisabled')}
-        </p>
-        <Tabs
-          tabs={SNIPPET_TABS.map(([id, labelKey]) => {
-            const snippet = snippets.find((s) => s.id === id)
-            return {
-              id,
-              label: t(`acme.dnsUpdate.${labelKey}`),
-              content: (
-                <div className="space-y-2">
-                  {snippet.noteKeys.map((noteKey) => (
-                    <p
-                      key={noteKey}
-                      data-testid={`dns-update-note-${noteKey}`}
-                      className={snippet.unsupported && noteKey === 'noteCertManagerSha384'
-                        ? 'text-sm status-warning-text'
-                        : 'text-xs text-text-tertiary'}
-                    >
-                      {t(`acme.dnsUpdate.${noteKey}`)}
-                    </p>
-                  ))}
-                  {snippet.code && (
-                    <div className="relative">
-                      <pre
-                        data-testid={`dns-update-snippet-${id}`}
-                        className="p-3 pr-12 rounded bg-bg-tertiary font-mono text-xs overflow-x-auto whitespace-pre"
-                      >{snippet.code}</pre>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={() => copyValue(snippet.code, 'acme.dnsUpdate.codeCopied')}
-                        title={t('common.copy')}
-                      >
-                        <Copy size={14} />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ),
-            }
-          })}
-        />
-      </div>
+      <fieldset className="field full" aria-describedby="hint-dns-update-snippets">
+        <legend>{t('acme.dnsUpdate.snippets')}</legend>
+        <small id="hint-dns-update-snippets">
+          <span>{t('acme.dnsUpdate.snippetsHelp')}</span>{' '}
+          <span>{portConfigured ? t('acme.dnsUpdate.notePort', { port }) : t('acme.dnsUpdate.notePortDisabled')}</span>
+        </small>
+        <div className="segmented" role="group" aria-label={t('acme.dnsUpdate.snippets')}>
+          {SNIPPET_TABS.map(([id, labelKey]) => (
+            <button key={id} type="button" aria-pressed={snippet.id === id} onClick={() => setSnippetTab(id)}>{t(`acme.dnsUpdate.${labelKey}`)}</button>
+          ))}
+        </div>
+        {snippet.noteKeys.map((noteKey) => (
+          snippet.unsupported && noteKey === 'noteCertManagerSha384'
+            ? <p key={noteKey} className="notice warn" data-testid={`dns-update-note-${noteKey}`} style={{ margin: 0 }}><Icon name="warning" /><span>{t(`acme.dnsUpdate.${noteKey}`)}</span></p>
+            : <small key={noteKey} data-testid={`dns-update-note-${noteKey}`}>{t(`acme.dnsUpdate.${noteKey}`)}</small>
+        ))}
+        {snippet.code && (
+          <>
+            <pre data-testid={`dns-update-snippet-${snippet.id}`} className="code-preview" style={{ margin: 0, whiteSpace: 'pre', overflowX: 'auto' }}>{snippet.code}</pre>
+            <div className="actions">
+              <Btn icon="copy" onClick={() => copyValue(snippet.code, 'acme.dnsUpdate.codeCopied')}>{t('common.copy')}</Btn>
+            </div>
+          </>
+        )}
+      </fieldset>
     )
   }
 
@@ -253,90 +227,47 @@ export default function DnsUpdateKeysPanel({
       )}
 
       {/* Create dialog */}
-      <Modal open={showCreate} onClose={closeCreate} title={t('acme.dnsUpdate.newTitle')}>
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-tertiary">{t('acme.dnsUpdate.newDescription')}</p>
-          <Input
-            label={t('acme.dnsUpdate.name')}
-            aria-label={t('acme.dnsUpdate.name')}
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            placeholder={t('acme.dnsUpdate.namePlaceholder')}
-            helperText={t('acme.dnsUpdate.nameHelp')}
-            maxLength={253}
-          />
-          <Select
-            label={t('acme.dnsUpdate.algorithm')}
-            value={form.algorithm}
-            onChange={(val) => setForm((p) => ({ ...p, algorithm: val }))}
-            options={DNS_UPDATE_ALGORITHMS.map((a) => ({ value: a, label: a }))}
-            helperText={t('acme.dnsUpdate.algorithmHelp')}
-          />
-          <Select
-            label={t('acme.dnsUpdate.eabCredential')}
-            value={form.eabCredentialId}
-            onChange={(val) => setForm((p) => ({ ...p, eabCredentialId: val }))}
-            options={[
-              { value: '', label: t('acme.dnsUpdate.eabNone') },
-              ...eabCredentials.map((c) => ({ value: String(c.id), label: eabLabel(c) })),
-            ]}
-            helperText={t('acme.dnsUpdate.eabHelp')}
-          />
-          <Textarea
-            label={t('acme.dnsUpdate.notes')}
-            aria-label={t('acme.dnsUpdate.notes')}
-            value={form.notes}
-            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            placeholder={t('acme.dnsUpdate.notesPlaceholder')}
-            rows={2}
-            maxLength={1000}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={closeCreate}>{t('common.cancel')}</Button>
-            <Button type="button" onClick={handleCreate} disabled={busy}>{t('acme.dnsUpdate.generate')}</Button>
+      <Modal open={showCreate} onClose={closeCreate} title={t('acme.dnsUpdate.newTitle')} subtitle={t('acme.dnsUpdate.newDescription')} testId="dns-update-create-dialog">
+        <form noValidate onSubmit={(e) => { e.preventDefault(); handleCreate() }}>
+          <div className="form-fields">
+            <Input id="dns-update-name" label={t('acme.dnsUpdate.name')} full value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder={t('acme.dnsUpdate.namePlaceholder')} helperText={t('acme.dnsUpdate.nameHelp')} maxLength={253} data-autofocus="" />
+            <Select id="dns-update-algorithm" label={t('acme.dnsUpdate.algorithm')} value={form.algorithm} onChange={(val) => setForm((p) => ({ ...p, algorithm: val }))}
+              options={DNS_UPDATE_ALGORITHMS.map((a) => ({ value: a, label: a }))} helperText={t('acme.dnsUpdate.algorithmHelp')} />
+            <Select id="dns-update-eab" label={t('acme.dnsUpdate.eabCredential')} value={form.eabCredentialId} onChange={(val) => setForm((p) => ({ ...p, eabCredentialId: val }))}
+              options={[
+                { value: '', label: t('acme.dnsUpdate.eabNone') },
+                ...eabCredentials.map((c) => ({ value: String(c.id), label: eabLabel(c) })),
+              ]}
+              helperText={t('acme.dnsUpdate.eabHelp')} />
+            <Textarea id="dns-update-notes" label={t('acme.dnsUpdate.notes')} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+              placeholder={t('acme.dnsUpdate.notesPlaceholder')} rows={2} maxLength={1000} />
           </div>
-        </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={closeCreate}>{t('common.cancel')}</button>
+            <button type="submit" className="btn primary" disabled={busy || undefined}>{t('acme.dnsUpdate.generate')}</button>
+          </div>
+        </form>
       </Modal>
 
       {/* Secret shown once */}
-      <Modal
-        open={!!created}
-        onClose={() => setCreated(null)}
-        title={t('acme.dnsUpdate.secretTitle')}
-        size="lg"
-      >
+      <Modal open={!!created} onClose={() => setCreated(null)} title={t('acme.dnsUpdate.secretTitle')} size="lg" testId="dns-update-secret-dialog">
         {created && (
-          <div className="p-4 space-y-4">
-            <div className="rounded-lg border border-status-warning-op40 bg-status-warning-op10 p-3 flex gap-2">
-              <Warning size={20} className="text-status-warning shrink-0 mt-0.5" weight="duotone" />
-              <div className="text-sm">
-                <div className="font-semibold">{t('acme.dnsUpdate.secretWarningTitle')}</div>
-                <div className="text-text-tertiary mt-1">{t('acme.dnsUpdate.secretWarning')}</div>
-              </div>
+          <>
+            <div className="notice warn"><Icon name="warning" /><span><strong>{t('acme.dnsUpdate.secretWarningTitle')}</strong> {t('acme.dnsUpdate.secretWarning')}</span></div>
+            <div className="form-fields">
+              <CopyField label={t('acme.dnsUpdate.keyName')} value={created.name} testId="dns-update-created-name"
+                onCopy={(v) => copyValue(v, 'acme.dnsUpdate.nameCopied')} />
+              <CopyField label={t('acme.dnsUpdate.algorithm')} value={created.algorithm} testId="dns-update-created-algorithm"
+                onCopy={(v) => copyValue(v, 'acme.dnsUpdate.algorithmCopied')} />
+              <CopyField label={t('acme.dnsUpdate.secret')} value={created.secret} testId="dns-update-created-secret"
+                onCopy={(v) => copyValue(v, 'acme.dnsUpdate.secretCopied')} />
+              {renderSnippets()}
             </div>
-            <CopyField
-              label={t('acme.dnsUpdate.keyName')}
-              value={created.name}
-              testId="dns-update-created-name"
-              onCopy={(v) => copyValue(v, 'acme.dnsUpdate.nameCopied')}
-            />
-            <CopyField
-              label={t('acme.dnsUpdate.algorithm')}
-              value={created.algorithm}
-              testId="dns-update-created-algorithm"
-              onCopy={(v) => copyValue(v, 'acme.dnsUpdate.algorithmCopied')}
-            />
-            <CopyField
-              label={t('acme.dnsUpdate.secret')}
-              value={created.secret}
-              testId="dns-update-created-secret"
-              onCopy={(v) => copyValue(v, 'acme.dnsUpdate.secretCopied')}
-            />
-            {renderSnippets()}
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button type="button" onClick={() => setCreated(null)}>{t('acme.dnsUpdate.secretConfirm')}</Button>
+            <div className="modal-actions">
+              <button type="button" className="btn primary" data-write="false" onClick={() => setCreated(null)}>{t('acme.dnsUpdate.secretConfirm')}</button>
             </div>
-          </div>
+          </>
         )}
       </Modal>
     </section>

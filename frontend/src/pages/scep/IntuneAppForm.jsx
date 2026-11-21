@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TestTube } from '@phosphor-icons/react'
-import { Button, Input, Modal, HelpCard } from '../../components'
+import { Icon } from '../../components/atelier'
+import { Input, SecretInput, Modal } from '../../components/atelier/Form'
 import { scepService } from '../../services'
 import { useNotification } from '../../contexts'
 import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
@@ -73,61 +73,24 @@ export default function IntuneAppForm({ app, onClose, onSaved }) {
   }
 
   return (
-    <Modal open={showModal} onClose={() => setShowModal(false)}
-           title={editing ? t('scep.editIntuneApp', { name: editing.name }) : t('scep.newIntuneApp')}
-           size="md">
-      <form onSubmit={handleSubmit} className="p-4 space-y-3">
-        <HelpCard variant="info" title={t('scep.intuneHelpTitle')}>
-          {t('scep.intuneHelpDesc')}
-        </HelpCard>
-        <Input
-          label={t('common.name')}
-          value={formData.name}
-          onChange={(e) => update('name', e.target.value)}
-          required
-        />
-        <Input
-          label={t('scep.intuneTenantId')}
-          value={formData.tenant_id}
-          onChange={(e) => update('tenant_id', e.target.value)}
-          placeholder="contoso.onmicrosoft.com"
-          required
-        />
-        <Input
-          label={t('scep.intuneClientId')}
-          value={formData.client_id}
-          onChange={(e) => update('client_id', e.target.value)}
-          required
-        />
-        <Input
-          label={t('scep.intuneClientSecret')}
-          type="password"
-          noAutofill
-          value={formData.client_secret}
-          onChange={(e) => update('client_secret', e.target.value)}
-          placeholder={editing?.client_secret_set ? '••••••••' : ''}
-          required={!editing?.client_secret_set}
-          {...secretInputProps(t, secretTarget)}
-        />
-        <div className="flex items-center justify-between gap-2 pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleTest}
-            disabled={!formData.tenant_id || !formData.client_id || testing}
-          >
-            <TestTube size={14} />
-            {testing ? t('common.testing') : t('scep.intuneTestConnection')}
-          </Button>
-          <div className="flex gap-2">
-            <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" loading={saving}>
-              {editing ? t('common.save') : t('common.create')}
-            </Button>
-          </div>
+    <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? t('scep.editIntuneApp', { name: editing.name }) : t('scep.newIntuneApp')}
+      testId="scep-intune-dialog">
+      <form onSubmit={handleSubmit}>
+        <div className="notice"><Icon name="help" /><span><strong>{t('scep.intuneHelpTitle')}</strong> {t('scep.intuneHelpDesc')}</span></div>
+        <div className="form-fields">
+          <Input id="scep-intune-name" label={t('common.name')} full value={formData.name} onChange={(e) => update('name', e.target.value)} required data-autofocus="" />
+          <Input id="scep-intune-tenant" label={t('scep.intuneTenantId')} value={formData.tenant_id} onChange={(e) => update('tenant_id', e.target.value)}
+            placeholder="contoso.onmicrosoft.com" required />
+          <Input id="scep-intune-client" label={t('scep.intuneClientId')} value={formData.client_id} onChange={(e) => update('client_id', e.target.value)} required />
+          <SecretInput id="scep-intune-secret" label={t('scep.intuneClientSecret')} full value={formData.client_secret} onChange={(e) => update('client_secret', e.target.value)}
+            placeholder={editing?.client_secret_set ? '••••••••' : ''} required={!editing?.client_secret_set} {...secretInputProps(t, secretTarget)} />
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" style={{ marginRight: 'auto' }} onClick={handleTest} disabled={!formData.tenant_id || !formData.client_id || testing || undefined}>
+            <Icon name="plug" />{testing ? t('common.testing') : t('scep.intuneTestConnection')}
+          </button>
+          <button type="button" className="btn" data-action="close-modal" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
+          <button type="submit" className="btn primary" disabled={saving || undefined}>{saving ? t('common.saving') : (editing ? t('common.save') : t('common.create'))}</button>
         </div>
       </form>
     </Modal>

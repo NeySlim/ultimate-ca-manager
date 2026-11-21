@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Input, Select, Textarea, Modal } from '../../components'
+import { Input, SecretInput, Select, Textarea, ToggleSwitch, Modal } from '../../components/atelier/Form'
 import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock } from '../../components/atelier'
 import { SlotDock } from '../protocols/dockSlot'
 import { Copyable, YesNo } from '../protocols/atelierParts'
@@ -191,155 +191,57 @@ export default function CaAccountsManager({
           action={canWrite ? { label: t('acme.addCertificateAuthority'), icon: 'plus', onClick: openCreate, primary: true } : undefined} />}
         footer={{ range: t('acme.upstreamRange', { count: accounts.length }) }} />
       <SlotDock>{dock}</SlotDock>
-      <Modal open={showForm} onClose={closeForm} title={editingId ? t('acme.editCertificateAuthority') : t('acme.addCertificateAuthority')} size="lg">
-          <form onSubmit={submit} className="p-4 space-y-3">
-            <Input
-              label={t('acme.caLabel')}
-              value={form.label}
-              onChange={(e) => setForm(p => ({ ...p, label: e.target.value }))}
-              placeholder="ZeroSSL Production"
-              required
-            />
-
-            <Input
-              label={t('acme.directoryUrl')}
-              type="url"
-              value={form.directory_url}
-              onChange={(e) => setForm(p => ({ ...p, directory_url: e.target.value }))}
-              placeholder="https://acme.example.com/directory"
-              disabled={!!editingId}
-              helperText={editingId ? t('acme.directoryUrlImmutable') : t('acme.directoryUrlHelper')}
-            />
-
-            <Input
-              label={t('acme.contactEmail')}
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
-              required
-            />
-
-            <Select
-              label={t('acme.accountKeyType')}
-              value={form.account_key_algorithm}
+      <Modal open={showForm} onClose={closeForm} title={editingId ? t('acme.editCertificateAuthority') : t('acme.addCertificateAuthority')} size="lg" testId="acme-upstream-dialog">
+        <form onSubmit={submit}>
+          <div className="form-fields">
+            <Input id="acme-ca-label" label={t('acme.caLabel')} value={form.label} onChange={(e) => setForm(p => ({ ...p, label: e.target.value }))}
+              placeholder="ZeroSSL Production" required data-autofocus="" />
+            <Input id="acme-ca-email" label={t('acme.contactEmail')} type="email" value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} required />
+            <Input id="acme-ca-directory" label={t('acme.directoryUrl')} type="url" full value={form.directory_url} onChange={(e) => setForm(p => ({ ...p, directory_url: e.target.value }))}
+              placeholder="https://acme.example.com/directory" disabled={!!editingId} helperText={editingId ? t('acme.directoryUrlImmutable') : t('acme.directoryUrlHelper')} />
+            <Select id="acme-ca-key" label={t('acme.accountKeyType')} full value={form.account_key_algorithm}
               onChange={(val) => setForm(p => ({ ...p, account_key_algorithm: val }))}
               options={[
                 { value: 'ES256', label: 'ECDSA P-256 (ES256)' },
                 { value: 'ES384', label: 'ECDSA P-384 (ES384)' },
                 { value: 'RS256', label: 'RSA 2048 (RS256)' },
               ]}
-              disabled={editingId ? true : !!form.account_key_pem.trim()}
-              helperText={editingId ? t('acme.accountKeyFixed') : undefined}
-            />
-
+              disabled={editingId ? true : !!form.account_key_pem.trim()} helperText={editingId ? t('acme.accountKeyFixed') : undefined} />
             {!editingId && (
-              <Textarea
-                label={t('acme.importAccountKey')}
-                value={form.account_key_pem}
+              <Textarea id="acme-ca-key-pem" label={t('acme.importAccountKey')} mono rows={4} spellCheck={false} value={form.account_key_pem}
                 onChange={(e) => setForm(p => ({ ...p, account_key_pem: e.target.value }))}
-                placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-                helperText={t('acme.importAccountKeyHelper')}
-                rows={4}
-                className="font-mono text-xs"
-              />
+                placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----" helperText={t('acme.importAccountKeyHelper')} />
             )}
-
-            <Input
-              label={t('acme.eabKid')}
-              value={form.eab_kid}
-              onChange={(e) => setForm(p => ({ ...p, eab_kid: e.target.value }))}
-              placeholder="key-id-from-ca"
-              helperText={t('acme.eabKidHelper')}
-            />
-
-            <Input
-              label={t('acme.eabHmacKey')}
-              type="password"
-              value={form.eab_hmac_key}
-              onChange={(e) => setForm(p => ({ ...p, eab_hmac_key: e.target.value }))}
-              placeholder={editingId ? t('acme.eabHmacKeyKeepPlaceholder') : t('acme.eabHmacKeyPlaceholder')}
-              helperText={t('acme.eabHmacKeyHelper')}
-            />
-
-            <p className="text-xs font-medium text-text-secondary pt-1">{t('acme.caTimingSettings')}</p>
-
-            <Input
-              label={t('acme.caOrderPollTimeout')}
-              type="number"
-              min={30}
-              max={600}
-              value={form.order_poll_timeout_sec}
-              onChange={(e) => setForm(p => ({ ...p, order_poll_timeout_sec: e.target.value }))}
-              helperText={t('acme.caOrderPollTimeoutHelper')}
-            />
-
-            <Input
-              label={t('acme.caOrderPollInterval')}
-              type="number"
-              min={1}
-              max={30}
-              value={form.order_poll_interval_sec}
-              onChange={(e) => setForm(p => ({ ...p, order_poll_interval_sec: e.target.value }))}
-              helperText={t('acme.caOrderPollIntervalHelper')}
-            />
-
-            <Input
-              label={t('acme.caHttpTimeout')}
-              type="number"
-              min={10}
-              max={120}
-              value={form.http_timeout_sec}
-              onChange={(e) => setForm(p => ({ ...p, http_timeout_sec: e.target.value }))}
-              helperText={t('acme.caHttpTimeoutHelper')}
-            />
-
-            <Input
-              label={t('acme.preferredChain')}
-              value={form.preferred_chain}
-              onChange={(e) => setForm(p => ({ ...p, preferred_chain: e.target.value }))}
-              placeholder="ISRG Root X1"
-              helperText={t('acme.preferredChainHelper')}
-            />
-
-            <label className="flex items-center gap-2 text-sm text-text-secondary">
-              <input
-                type="checkbox"
-                checked={form.proxy_enabled}
-                onChange={(e) => setForm(p => ({ ...p, proxy_enabled: e.target.checked }))}
-              />
-              {t('acme.proxyEnabled')}
-            </label>
-
+            <Input id="acme-ca-eab-kid" label={t('acme.eabKid')} value={form.eab_kid} onChange={(e) => setForm(p => ({ ...p, eab_kid: e.target.value }))}
+              placeholder="key-id-from-ca" helperText={t('acme.eabKidHelper')} />
+            <SecretInput id="acme-ca-eab-hmac" label={t('acme.eabHmacKey')} value={form.eab_hmac_key} onChange={(e) => setForm(p => ({ ...p, eab_hmac_key: e.target.value }))}
+              placeholder={editingId ? t('acme.eabHmacKeyKeepPlaceholder') : t('acme.eabHmacKeyPlaceholder')} helperText={t('acme.eabHmacKeyHelper')} />
+            <fieldset className="field full">
+              <legend>{t('acme.caTimingSettings')}</legend>
+              <div className="form-fields">
+                <Input id="acme-ca-poll-timeout" label={t('acme.caOrderPollTimeout')} type="number" min={30} max={600} value={form.order_poll_timeout_sec}
+                  onChange={(e) => setForm(p => ({ ...p, order_poll_timeout_sec: e.target.value }))} helperText={t('acme.caOrderPollTimeoutHelper')} />
+                <Input id="acme-ca-poll-interval" label={t('acme.caOrderPollInterval')} type="number" min={1} max={30} value={form.order_poll_interval_sec}
+                  onChange={(e) => setForm(p => ({ ...p, order_poll_interval_sec: e.target.value }))} helperText={t('acme.caOrderPollIntervalHelper')} />
+                <Input id="acme-ca-http-timeout" label={t('acme.caHttpTimeout')} type="number" min={10} max={120} value={form.http_timeout_sec}
+                  onChange={(e) => setForm(p => ({ ...p, http_timeout_sec: e.target.value }))} helperText={t('acme.caHttpTimeoutHelper')} />
+                <Input id="acme-ca-chain" label={t('acme.preferredChain')} value={form.preferred_chain} onChange={(e) => setForm(p => ({ ...p, preferred_chain: e.target.value }))}
+                  placeholder="ISRG Root X1" helperText={t('acme.preferredChainHelper')} />
+              </div>
+            </fieldset>
+            <ToggleSwitch id="acme-ca-proxy" label={t('acme.proxyEnabled')} checked={form.proxy_enabled} onChange={(v) => setForm(p => ({ ...p, proxy_enabled: v }))} />
             {form.proxy_enabled && (
-              <Input
-                label={t('acme.proxySlug')}
-                value={form.proxy_slug}
-                onChange={(e) => setForm(p => ({ ...p, proxy_slug: e.target.value.toLowerCase() }))}
-                placeholder="actalis-production"
-                helperText={t('acme.proxySlugHelper')}
-              />
+              <Input id="acme-ca-proxy-slug" label={t('acme.proxySlug')} full value={form.proxy_slug} onChange={(e) => setForm(p => ({ ...p, proxy_slug: e.target.value.toLowerCase() }))}
+                placeholder="actalis-production" helperText={t('acme.proxySlugHelper')} />
             )}
-
-            <label className="flex items-center gap-2 text-sm text-text-secondary">
-              <input
-                type="checkbox"
-                checked={form.is_default}
-                disabled={isEditingDefault}
-                onChange={(e) => setForm(p => ({ ...p, is_default: e.target.checked }))}
-              />
-              {t('acme.useAsDefault')}
-              {isEditingDefault && (
-                <span className="text-xs text-text-tertiary">{t('acme.defaultChooseAnother')}</span>
-              )}
-            </label>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <Button type="button" variant="secondary" onClick={closeForm}>{t('common.cancel')}</Button>
-              <Button type="submit" disabled={busy}>
-                {editingId ? t('common.save') : t('common.add')}
-              </Button>
-            </div>
-          </form>
+            <ToggleSwitch id="acme-ca-default" label={t('acme.useAsDefault')} checked={form.is_default} disabled={isEditingDefault}
+              description={isEditingDefault ? t('acme.defaultChooseAnother') : undefined} onChange={(v) => setForm(p => ({ ...p, is_default: v }))} />
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={closeForm}>{t('common.cancel')}</button>
+            <button type="submit" className="btn primary" disabled={busy || undefined}>{editingId ? t('common.save') : t('common.add')}</button>
+          </div>
+        </form>
       </Modal>
     </>
   )
