@@ -34,6 +34,9 @@ const tsa = vi.hoisted(() => ({ getConfig: vi.fn(), updateConfig: vi.fn(), getSt
 const est = vi.hoisted(() => ({ getConfig: vi.fn(), updateConfig: vi.fn(), getStats: vi.fn() }))
 const cas = vi.hoisted(() => ({ getAll: vi.fn() }))
 vi.mock('../../services', () => ({ tsaService: tsa, estService: est, casService: cas }))
+// The first-run state is useSetup's own subject: here it is given
+const setup = vi.hoisted(() => ({ state: { visible: false } }))
+vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual()), useSetup: () => setup.state }))
 
 import { renderAtUrl } from '../../test/dockUrl'
 import TSAPage from '../TSAPage'
@@ -48,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   perms.list = ['*']
+  setup.state = { visible: false }
   cas.getAll.mockResolvedValue({ data: CAS })
   tsa.getConfig.mockResolvedValue({ data: { enabled: true, ca_refid: 'ca-1', policy_oid: '1.3.6.1.4.1.55555.1', require_dedicated_cert: true, signer_cert_refid: '', signer: { configured: false } } })
   tsa.updateConfig.mockResolvedValue({})
@@ -173,5 +177,61 @@ describe('the EST and TSA docks in the URL', () => {
     r.unmount()
     const again = renderAtUrl(<TSAPage />, '/tsa-config?item=tsa')
     expect(within(await again.dock()).getByRole('heading', { level: 2 })).toHaveTextContent('tsa.serviceName')
+  })
+})
+
+describe('nothing configured yet (the mockup\'s emptyBlock)', () => {
+  const NONE_TSA = { data: { enabled: false, ca_refid: '', policy_oid: '', require_dedicated_cert: true, signer_cert_refid: '', signer: { configured: false } } }
+  const NONE_EST = { data: { enabled: false, ca_id: null, validity_days: 365, username: '', password_set: false, labels: {} } }
+
+  it('TSA: says what a service needs and leads to the assistant while its steps remain', async () => {
+    tsa.getConfig.mockResolvedValue(NONE_TSA)
+    setup.state = { visible: true, complete: false }
+    at('/tsa-config', TSAPage)
+    const block = await waitFor(() => { const b = document.getElementById('empty-tsa'); expect(b).not.toBeNull(); return b })
+    expect(block).toHaveClass('empty', 'empty-hint')
+    expect(within(block).getByRole('heading', { level: 3 })).toHaveTextContent('tsa.emptyTitle')
+    expect(block.querySelector('p')).toHaveTextContent('tsa.emptyText')
+    expect(within(block).getByRole('link', { name: 'shell.setup.open' })).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('button', { name: 'tsa.serviceName' })).toBeNull()
+  })
+
+  it('TSA: the steps done, the empty block opens the configuration', async () => {
+    tsa.getConfig.mockResolvedValue(NONE_TSA)
+    const r = renderAtUrl(<TSAPage />, '/tsa-config')
+    const block = await waitFor(() => { const b = document.getElementById('empty-tsa'); expect(b).not.toBeNull(); return b })
+    fireEvent.click(within(block).getByRole('button', { name: 'tsa.configure' }))
+    expect(r.where()).toBe('/tsa-config?tab=config')
+  })
+
+  it('TSA: a service with its CA set, even off, stays a row', async () => {
+    tsa.getConfig.mockResolvedValue({ data: { ...NONE_TSA.data, ca_refid: 'ca-1' } })
+    at('/tsa-config', TSAPage)
+    expect(await screen.findByRole('button', { name: 'tsa.serviceName' })).toBeTruthy()
+    expect(document.getElementById('empty-tsa')).toBeNull()
+  })
+
+  it('EST: says what an endpoint needs and leads to the assistant while its steps remain', async () => {
+    est.getConfig.mockResolvedValue(NONE_EST)
+    setup.state = { visible: true, complete: false }
+    at('/est-config', ESTPage)
+    const block = await waitFor(() => { const b = document.getElementById('empty-est'); expect(b).not.toBeNull(); return b })
+    expect(within(block).getByRole('heading', { level: 3 })).toHaveTextContent('est.emptyTitle')
+    expect(block.querySelector('p')).toHaveTextContent('est.emptyText')
+    expect(within(block).getByRole('link', { name: 'shell.setup.open' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'est.defaultEndpoint' })).toBeNull()
+  })
+
+  it('EST: the steps done, the empty block opens the configuration; a label alone keeps the rows', async () => {
+    est.getConfig.mockResolvedValue(NONE_EST)
+    const r = renderAtUrl(<ESTPage />, '/est-config')
+    const block = await waitFor(() => { const b = document.getElementById('empty-est'); expect(b).not.toBeNull(); return b })
+    fireEvent.click(within(block).getByRole('button', { name: 'tsa.configure' }))
+    expect(r.where()).toBe('/est-config?tab=config')
+    r.unmount()
+    est.getConfig.mockResolvedValue({ data: { ...NONE_EST.data, labels: { iot: { ca_refid: 'ca-2' } } } })
+    at('/est-config', ESTPage)
+    expect(await screen.findByRole('button', { name: 'iot' })).toBeTruthy()
+    expect(document.getElementById('empty-est')).toBeNull()
   })
 })

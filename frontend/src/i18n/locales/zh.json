@@ -2009,7 +2009,9 @@
     "actions": {
       "read": "Read",
       "write": "Write",
-      "delete": "Delete"
+      "delete": "Delete",
+      "export": "Export",
+      "admin": "Administer"
     },
     "grant": "{{action}}: {{resource}}"
   },
@@ -4607,7 +4609,10 @@
     "range_other": "{{shown}} / 共 {{count}} 个角色",
     "caption": "角色。激活名称以打开其详情。",
     "filterByType": "按类型筛选",
-    "allOf": "全部 {{name}}"
+    "allOf": "全部 {{name}}",
+    "permissionOf": "{{resource}}: {{actions}}",
+    "anyResource": "All resources",
+    "anyAction": "every action"
   },
   "hsm": {
     "pkcs11Unavailable": "此主机上 PKCS#11 依赖项不可用",
@@ -4988,11 +4993,8 @@
     "aboutCAs": "关于证书颁发机构",
     "proTips": "实用技巧",
     "seeAlso": "另请参阅",
-    "minimize": "最小化",
-    "expand": "展开",
     "quickHelp": "快速帮助",
     "guide": "指南",
-    "guideComingSoon": "详细指南即将推出。",
     "tableOfContents": "目录",
     "back": "Back to the console",
     "views": "Help view",
@@ -5240,8 +5242,6 @@
     "allSkipped": "所有对象被跳过或已存在",
     "privateKeysMatched": "个私钥匹配",
     "importMore": "导入更多",
-    "dropFilesHere": "将文件拖放到此处或",
-    "browse": "浏览",
     "allFormats": "所有格式: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "此文件的解密密码",
     "useGlobalPassword": "对所有文件使用相同密码",
@@ -6471,7 +6471,9 @@
     "passwordKept": "已保存密码：留空则保留。",
     "views": {
       "list": "注册端点"
-    }
+    },
+    "emptyTitle": "No EST endpoint configured",
+    "emptyText": "EST enrols devices over HTTPS with a client certificate; it needs an issuing CA."
   },
   "discovery": {
     "adHocScan": "临时扫描",
@@ -7002,7 +7004,6 @@
     "modeManaged": "已有",
     "certificate": "证书",
     "privateKey": "私钥",
-    "dropOrClick": "拖放文件或点击浏览",
     "analyzing": "分析中...",
     "filePassword": "文件密码",
     "enterPassword": "输入密码",
@@ -7115,7 +7116,9 @@
     "views": {
       "list": "服务",
       "config": "配置"
-    }
+    },
+    "emptyTitle": "No time-stamping service",
+    "emptyText": "A time-stamping service relies on an issuing CA and a time-stamping policy."
   },
   "sshCas": {
     "title": "SSH 证书颁发机构",

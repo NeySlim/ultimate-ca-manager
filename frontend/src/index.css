@@ -307,8 +307,9 @@ html, body, #root {
     color: var(--text-primary) !important;
   }
   
-  /* Ensure form inputs have correct background in all cases; a zone copied from the Atelier mockup (.atl) keeps its own, except what it leaves to the product (.atl-out) */
-  input:not(.atl :not(.atl-out *)), textarea:not(.atl :not(.atl-out *)), select:not(.atl :not(.atl-out *)) {
+  /* Ensure form inputs have correct background in all cases; a zone copied from the Atelier mockup (.atl) keeps its own.
+     The doubled class keeps the rule's weight (0,2,1) above the primitives' :hover and :focus rules. */
+  input:not(.atl.atl *), textarea:not(.atl.atl *), select:not(.atl.atl *) {
     background-color: var(--bg-secondary) !important;
     color: var(--text-primary);
     transition: 

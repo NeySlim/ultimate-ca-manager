@@ -137,11 +137,10 @@ describe('the Atelier mockup, copied literally', () => {
     for (const r of added) for (const sel of r.sel.split(',')) expect(sel.trim().startsWith('.atl ') || onScope.has(sel.trim()), sel).toBe(true)
   })
 
-  it('leaves the product\'s own styles to what a zone puts under .atl-out', () => {
+  it('takes every descendant but icons back to the browser, with no panel left to the product', () => {
     const revert = scope.find((r) => /all:\s*revert/.test(r.body))
-    expect(revert.sel).toContain('.atl-out')
-    // the element, its ::before and its ::after
-    expect(revert.sel.split(':not(svg,svg *,.atl-out,.atl-out *)').length - 1).toBe(3)
+    // the element, its ::before and its ::after; an icon keeps its presentation attributes
+    expect(splitSelectors(revert.sel)).toEqual(['', '::before', '::after'].map((pseudo) => `.atl :where(:not(svg,svg *))${pseudo}`))
   })
 
   it('uses no variable that neither tokens.css nor the copy nor the markup sets', () => {

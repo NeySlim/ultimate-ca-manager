@@ -2907,7 +2907,9 @@
     "actions": {
       "read": "Lire",
       "write": "Écrire",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "export": "Exporter",
+      "admin": "Administrer"
     },
     "grant": "{{action}} : {{resource}}"
   },
@@ -2918,11 +2920,8 @@
     "aboutCAs": "À propos des autorités de certification",
     "proTips": "Astuces",
     "seeAlso": "Voir aussi",
-    "minimize": "Réduire",
-    "expand": "Agrandir",
     "quickHelp": "Aide rapide",
     "guide": "Guide",
-    "guideComingSoon": "Guide détaillé à venir.",
     "tableOfContents": "Sommaire",
     "back": "Revenir à la console",
     "views": "Vue de l’aide",
@@ -3081,8 +3080,6 @@
     "allSkipped": "Tous les objets ont été ignorés ou existent déjà",
     "privateKeysMatched": "clé(s) privée(s) associée(s)",
     "importMore": "Importer d’autres",
-    "dropFilesHere": "Déposez les fichiers ici ou",
-    "browse": "parcourir",
     "allFormats": "Tous les formats : PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "Mot de passe de déchiffrement pour ce fichier",
     "useGlobalPassword": "Utiliser le même mot de passe pour tous les fichiers",
@@ -3303,7 +3300,10 @@
     "range_other": "{{shown}} sur {{count}} rôles",
     "caption": "Rôles. Activez un nom pour ouvrir son détail.",
     "filterByType": "Filtrer par type",
-    "allOf": "Tout {{name}}"
+    "allOf": "Tout {{name}}",
+    "permissionOf": "{{resource}} : {{actions}}",
+    "anyResource": "Toutes les ressources",
+    "anyAction": "toutes les actions"
   },
   "scep": {
     "title": "Protocole SCEP",
@@ -6471,7 +6471,9 @@
     "passwordKept": "Un mot de passe est enregistré : laissez vide pour le garder.",
     "views": {
       "list": "Points d’enrôlement"
-    }
+    },
+    "emptyTitle": "Aucun point EST configuré",
+    "emptyText": "EST enrôle les équipements par HTTPS avec un certificat client ; il demande une AC émettrice."
   },
   "discovery": {
     "adHocScan": "Scan ponctuel",
@@ -7002,7 +7004,6 @@
     "modeManaged": "Existant",
     "certificate": "Certificat",
     "privateKey": "Clé privée",
-    "dropOrClick": "Déposez un fichier ou cliquez pour parcourir",
     "analyzing": "Analyse en cours...",
     "filePassword": "Mot de passe du fichier",
     "enterPassword": "Saisissez le mot de passe",
@@ -7115,7 +7116,9 @@
     "views": {
       "list": "Services",
       "config": "Configuration"
-    }
+    },
+    "emptyTitle": "Aucun service d’horodatage",
+    "emptyText": "Un service d’horodatage s’appuie sur une AC émettrice et une politique d’horodatage."
   },
   "sshCas": {
     "title": "Autorités de certification SSH",

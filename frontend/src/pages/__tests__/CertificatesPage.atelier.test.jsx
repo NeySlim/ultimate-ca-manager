@@ -561,7 +561,6 @@ describe('CertificatesPage: states (emptyBlock, loadError, skeletonRows)', () =>
     await mount()
     const wizard = zone().querySelector('section#setup-wizard')
     expect(wizard).toHaveClass('panel', 'setup-wizard')
-    expect(wizard.closest('.atl-out')).toBeNull()
     const tabsGroup = screen.getByRole('group', { name: 'certificates.viewsLabel' })
     expect(wizard.compareDocumentPosition(tabsGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(document.getElementById('shell-setup')).toBeNull()
@@ -575,7 +574,6 @@ describe('CertificatesPage: states (emptyBlock, loadError, skeletonRows)', () =>
     await waitFor(() => expect(document.getElementById('load-error-certificates')).not.toBeNull())
     const wizard = zone().querySelector('section#setup-wizard.setup-wizard')
     expect(wizard).not.toBeNull()
-    expect(wizard.closest('.atl-out')).toBeNull()
   })
 
   it('leads the empty list to the setup assistant while steps remain, as the mockup emptyAction(setup)', async () => {

@@ -1,4 +1,4 @@
-import { test, expect, createCA, issueCert } from './support/fixtures'
+import { test, expect, createCA, issueCert, createUser } from './support/fixtures'
 
 const EPS = 0.5
 type Box = { x: number; y: number; width: number; height: number }
@@ -10,8 +10,11 @@ const box = async (locator): Promise<Box> => {
 const apart = (a: Box, b: Box) =>
   a.x + a.width <= b.x + EPS || b.x + b.width <= a.x + EPS || a.y + a.height <= b.y + EPS || b.y + b.height <= a.y + EPS
 
-test('the status bar keeps the bottom of the window under the open dock', async ({ page, api }) => {
+test('the status bar keeps the bottom of the window under the open dock', async ({ api, signIn }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
+  // The dock's position is written on an account of this test's own: the shared one is read by specs running beside it
+  const user = await createUser(api, 'admin')
+  const { page } = await signIn(user.username, user.password)
   await page.goto('/certificates')
   await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
   await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
@@ -38,14 +41,10 @@ test('the status bar keeps the bottom of the window under the open dock', async 
   }
   await check()
 
-  // The zone's dock goes to the right from 1200 px; the position is a preference of the account: put it back
+  // The zone's dock goes to the right from 1200 px
   await dock.getByRole('button', { name: 'Dock on the right' }).click()
-  try {
-    await expect(dock.getByRole('button', { name: 'Dock at the bottom' })).toBeVisible()
-    await check()
-  } finally {
-    await dock.getByRole('button', { name: 'Dock at the bottom' }).click()
-  }
+  await expect(dock.getByRole('button', { name: 'Dock at the bottom' })).toBeVisible()
+  await check()
 })
 
 test('the expiry count sits on its own link: no other link covered, the link keeps its width', async ({ page, api }) => {

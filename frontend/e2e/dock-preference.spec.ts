@@ -1,4 +1,4 @@
-import { test, expect, createCA, issueCert } from './support/fixtures'
+import { test, expect, createCA, issueCert, createUser } from './support/fixtures'
 
 // The one dock of the interface: one account preference for every page, the right anchoring from
 // 1200 px, on a phone a modal dialog that keeps the focus and gives it back to the row
@@ -19,29 +19,28 @@ async function openFirst(page, path: string) {
 test.describe('desktop', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('the right anchoring chosen on Certificates holds on Templates, and back', async ({ page, api }) => {
+  // The preference is written on an account of this test's own: the shared one is read by specs running beside it
+  test('the right anchoring chosen on Certificates holds on Templates, and back', async ({ api, signIn }) => {
     const cert = await issueCert(api, (await createCA(api)).id)
-    try {
-      await page.goto('/certificates')
-      await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
-      await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
-      await page.locator('#inspector').getByRole('button', { name: 'Dock on the right' }).click()
-      await expect(app(page)).toHaveClass(/dock-right/)
+    const user = await createUser(api, 'admin')
+    const { page, api: own } = await signIn(user.username, user.password)
+    await page.goto('/certificates')
+    await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
+    await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
+    await page.locator('#inspector').getByRole('button', { name: 'Dock on the right' }).click()
+    await expect(app(page)).toHaveClass(/dock-right/)
+    await expect.poll(async () => (await own.get('/account/preferences'))?.inspector?.position).toBe('right')
 
-      const { dock } = await openFirst(page, '/templates')
-      await expect(app(page)).toHaveClass(/dock-right/)
-      await dock.getByRole('button', { name: 'Dock at the bottom' }).click()
-      await expect(app(page)).not.toHaveClass(/dock-right/)
+    const { dock } = await openFirst(page, '/templates')
+    await expect(app(page)).toHaveClass(/dock-right/)
+    await dock.getByRole('button', { name: 'Dock at the bottom' }).click()
+    await expect(app(page)).not.toHaveClass(/dock-right/)
 
-      // The account holds it: after a reload another page opens at the bottom too
-      await page.reload()
-      await openFirst(page, '/users')
-      await expect(app(page)).not.toHaveClass(/dock-right/)
-    } finally {
-      // The account is shared by the other specs: its dock goes back to the bottom
-      const prefs = (await api.get('/account/preferences')) || {}
-      await api.put('/account/preferences', { ...prefs, inspector: { position: 'bottom', height: 278, width: 460 } })
-    }
+    // The account holds it: after a reload another page opens at the bottom too
+    await page.reload()
+    await openFirst(page, '/users')
+    await expect(app(page)).not.toHaveClass(/dock-right/)
+    await expect.poll(async () => (await own.get('/account/preferences'))?.inspector?.position).toBe('bottom')
   })
 
   test('the open certificates stay open across pages by default', async ({ page, api }) => {
@@ -70,7 +69,7 @@ for (const width of [1199, 1200]) {
 
 test.describe('at 1200 px with the dock at the right', () => {
   test.use({ viewport: { width: 1200, height: 900 } })
-  // Beside the right dock the list folds its secondary columns: no horizontal scroll, the chevron in view.
+  // Beside the right dock the list folds its secondary columns and its toolbar: no horizontal scroll, the chevron in view.
   // The page alone reads the dock at the right: the shared account's preference is never written.
   test('the lists fit beside the dock', async ({ page, api }) => {
     await issueCert(api, (await createCA(api)).id)
@@ -99,6 +98,21 @@ test.describe('at 1200 px with the dock at the right', () => {
         return region.scrollWidth - region.clientWidth <= 1 && (!chevron || chevron.getBoundingClientRect().right <= box.right + 1)
       })
       await expect.poll(fits, { message: path }).toBe(true)
+      // Its toolbar folds when short of room: the search shows its whole hint, each filter its whole choice
+      const readable = () => page.evaluate(() => {
+        const bar = document.querySelector('.atl .page-content .toolbar') as HTMLElement
+        const ctx = document.createElement('canvas').getContext('2d')!
+        const fits = (el: HTMLElement, text: string, room: number) => {
+          const cs = getComputedStyle(el)
+          ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+          return ctx.measureText(text).width <= room + 0.5
+        }
+        const input = bar.querySelector('.search input') as HTMLInputElement
+        const selects = [...bar.querySelectorAll('select')] as HTMLSelectElement[]
+        return bar.scrollWidth <= bar.clientWidth + 1 && (!input || fits(input, input.placeholder, input.clientWidth))
+          && selects.every((s) => fits(s, s.options[s.selectedIndex]?.text || '', s.getBoundingClientRect().width - 38))
+      })
+      await expect.poll(readable, { message: `${path} toolbar` }).toBe(true)
     }
   })
 })

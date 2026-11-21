@@ -42,6 +42,10 @@ vi.mock('../../services/jobs.service', async (importOriginal) => {
   return { ...real, default: { get: vi.fn(), list: vi.fn().mockResolvedValue({ data: [] }), cancel: vi.fn() } }
 })
 
+// The first-run state is useSetup's own subject: here it is given
+const setup = vi.hoisted(() => ({ state: { visible: false } }))
+vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual()), useSetup: () => setup.state }))
+
 import auditService from '../../services/audit.service'
 import jobsService from '../../services/jobs.service'
 import AuditLogsPage from '../AuditLogsPage'
@@ -57,6 +61,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   auth.permissions = ['*']
+  setup.state = { visible: false }
   screenSize.isMobile = true
   rows = [entry(), entry({ id: 40, action: 'login_failure', resource_type: 'user', resource_id: '1', resource_name: null, success: false, username: 'bob' })]
   auditService.getLogs.mockImplementation(async (params) => {
@@ -137,6 +142,17 @@ describe('the journal on a phone', () => {
     const { container } = renderPage()
     expect(await screen.findByText('audit.emptyTitle')).toBeInTheDocument()
     expect(container.querySelector('.mobile-list #empty-activity')).toBeInTheDocument()
+    expect(within(container.querySelector('#empty-activity')).getByRole('link', { name: 'audit.emptyAction' })).toHaveAttribute('href', '/certificates?action=create')
+  })
+
+  it('leads an empty journal to the setup assistant while its steps remain', async () => {
+    rows = []
+    setup.state = { visible: true, complete: false }
+    const { container } = renderPage()
+    await screen.findByText('audit.emptyTitle')
+    const block = container.querySelector('#empty-activity')
+    expect(within(block).getByRole('link', { name: 'shell.setup.open' })).toHaveAttribute('href', '/')
+    expect(within(block).queryByRole('link', { name: 'audit.emptyAction' })).toBeNull()
   })
 })
 

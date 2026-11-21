@@ -93,6 +93,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Changed
 
 - **The setup assistant on the certificate list.** The certificate list shows the overview's Initial setup assistant in place of the former card, and while its steps remain the empty certificate list and the empty Authorities page offer *Open the setup assistant*.
+- **Empty modules lead to the setup assistant.** While the first-run steps remain, the empty Activity, SCEP, CRL / OCSP, TSA and EST lists offer *Open the setup assistant*; a TSA or EST service with no CA and off shows what it needs and *Configure* instead of a disabled row.
 - **Several open certificates survive a reload.** The certificates open in the inspector are kept in the address (`open`, beside `item` for the one shown), so a reload or a shared link reopens all of them; a link with `item` alone still opens its certificate.
 - **The deployments of a certificate are a section of the inspector.** Under *More details*, each deployment is a row with its target, paths, state and actions, drawn like the rest of the inspector.
 - **The certificate list keeps no filter outside its address.** The CA, source and template filters are read from the address only: a bare `/certificates` shows the whole list instead of the filters last chosen in that browser.
@@ -220,9 +221,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **Open certificate tabs keep their titles.** After a visit to another page or a Back, the tabs of the certificates still open showed "…" instead of their names; each tab now keeps its certificate's name.
 - **Trust Store: adding from the managed CAs names each CA Root CA or Intermediate CA** in the interface language, read as the CA page reads it, where it showed the untranslated "Root" or "Inter".
 - **The group dialog grants permissions in a named grid.** Resources carry their names and the actions sit in Read, Write and Delete columns, instead of raw `action:resource` identifiers.
+- **Every permission list reads as the group grid.** The Permissions tabs of an account, a group and a role show named resources under Read, Write and Delete, and API keys and ignored role permissions are named the same way, never as raw `action:resource` identifiers.
 - **The search palette names each page as the menu does,** with its menu group as the hint (Overview · Navigation, Templates · PKI), so typing a menu name finds its page in every language.
 - **On a phone, the refresh button of ACME and CRL / OCSP stays beside the search field** instead of sitting alone on a second line.
 - **Lists fit beside the inspector docked at the right.** Between 1200 and 1500 px a list scrolled sideways and hid its chevrons; its secondary columns now fold one by one, by priority, until the table fits.
+- **List toolbars stay readable beside the inspector docked at the right.** Where the search field shrank and the filters were cut ("Tou"), the toolbar now puts the search on its own line and the filters and tools, whole, on the next.
 - **The bars stay on screen while a page loads.** On a slow link, opening a page for the first time replaced the whole window by a loader for a moment; only the page area waits now.
 - Shell: the status bar stays at the bottom of the window, full width, with the inspector docked above it, and the expiry badge of the top bar no longer slips under its own link. The second bottom bar is gone: the count of open objects and the *Close on navigate* switch are in the inspector header, and the switch now applies on every page and on mobile.
 - **A restored audit log verifies.** A replacing restore wrote every archived entry under a new id, which its seal covers, so the restored history no longer verified; the archive now carries the ids, a replacement writes each entry back under its own, and the report counts the entries that cannot verify here (a merge, an older archive, another master key).

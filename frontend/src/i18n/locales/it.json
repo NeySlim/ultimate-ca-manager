@@ -2009,7 +2009,9 @@
     "actions": {
       "read": "Read",
       "write": "Write",
-      "delete": "Delete"
+      "delete": "Delete",
+      "export": "Export",
+      "admin": "Administer"
     },
     "grant": "{{action}}: {{resource}}"
   },
@@ -4607,7 +4609,10 @@
     "range_other": "{{shown}} of {{count}} roles",
     "caption": "Roles. Activate a name to open its detail.",
     "filterByType": "Filter by type",
-    "allOf": "All of {{name}}"
+    "allOf": "All of {{name}}",
+    "permissionOf": "{{resource}}: {{actions}}",
+    "anyResource": "All resources",
+    "anyAction": "every action"
   },
   "hsm": {
     "pkcs11Unavailable": "Dipendenze PKCS#11 non disponibili su questo host",
@@ -4988,11 +4993,8 @@
     "aboutCAs": "Informazioni sulle autorità di certificazione",
     "proTips": "Suggerimenti",
     "seeAlso": "Vedi anche",
-    "minimize": "Riduci",
-    "expand": "Espandi",
     "quickHelp": "Aiuto rapido",
     "guide": "Guida",
-    "guideComingSoon": "Guida dettagliata in arrivo.",
     "tableOfContents": "Contenuto",
     "back": "Back to the console",
     "views": "Help view",
@@ -5240,8 +5242,6 @@
     "allSkipped": "Tutti gli oggetti sono stati saltati o esistono già",
     "privateKeysMatched": "chiave(i) privata(e) corrispondente(i)",
     "importMore": "Importa Altro",
-    "dropFilesHere": "Trascina i file qui o",
-    "browse": "sfoglia",
     "allFormats": "Tutti i formati: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "Password di decrittazione per questo file",
     "useGlobalPassword": "Usa la stessa password per tutti i file",
@@ -6471,7 +6471,9 @@
     "passwordKept": "A password is saved: leave empty to keep it.",
     "views": {
       "list": "Endpoints"
-    }
+    },
+    "emptyTitle": "No EST endpoint configured",
+    "emptyText": "EST enrols devices over HTTPS with a client certificate; it needs an issuing CA."
   },
   "discovery": {
     "adHocScan": "Scansione ad-hoc",
@@ -7002,7 +7004,6 @@
     "modeManaged": "Esistente",
     "certificate": "Certificato",
     "privateKey": "Chiave privata",
-    "dropOrClick": "Trascina un file o clicca per sfogliare",
     "analyzing": "Analisi in corso...",
     "filePassword": "Password del file",
     "enterPassword": "Inserisci la password",
@@ -7115,7 +7116,9 @@
     "views": {
       "list": "Services",
       "config": "Configuration"
-    }
+    },
+    "emptyTitle": "No time-stamping service",
+    "emptyText": "A time-stamping service relies on an issuing CA and a time-stamping policy."
   },
   "sshCas": {
     "title": "Autorità di certificazione SSH",

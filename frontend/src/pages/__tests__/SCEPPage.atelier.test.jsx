@@ -42,6 +42,10 @@ vi.mock('../../services', () => ({
   templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
 }))
 
+// The first-run state is useSetup's own subject: here it is given
+const setup = vi.hoisted(() => ({ state: { visible: false } }))
+vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual()), useSetup: () => setup.state }))
+
 import { renderAtUrl } from '../../test/dockUrl'
 import SCEPPage from '../SCEPPage'
 
@@ -54,6 +58,7 @@ const REQUEST = { id: 9, subject: 'CN=device-9,O=Lab', transaction_id: 'tx-9', s
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  setup.state = { visible: false }
   perms.write = true
   clip.copy.mockResolvedValue(false)
   scep.getConfig.mockResolvedValue({ data: { enabled: true } })
@@ -157,6 +162,22 @@ describe('the SCEP profiles', () => {
     expect(within(d).queryByRole('button', { name: 'scep.disable' })).toBeNull()
     expect(within(d).queryByRole('button', { name: 'scep.rotate' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'scep.newProfile' })).toBeNull()
+  })
+})
+
+describe('no SCEP profile yet', () => {
+  it('offers a new profile, or the setup assistant while its steps remain', async () => {
+    scep.getProfiles.mockResolvedValue({ data: [] })
+    const { unmount } = at('/scep-config')
+    const block = await waitFor(() => { const b = document.getElementById('empty-scep'); expect(b).not.toBeNull(); return b })
+    expect(within(block).getByRole('heading', { level: 3 })).toHaveTextContent('scep.noProfiles')
+    expect(within(block).getByRole('button', { name: 'scep.newProfile' })).toBeTruthy()
+    unmount()
+    setup.state = { visible: true, complete: false }
+    at('/scep-config')
+    const pending = await waitFor(() => { const b = document.getElementById('empty-scep'); expect(b).not.toBeNull(); return b })
+    expect(within(pending).getByRole('link', { name: 'shell.setup.open' })).toHaveAttribute('href', '/')
+    expect(within(pending).queryByRole('button', { name: 'scep.newProfile' })).toBeNull()
   })
 })
 
