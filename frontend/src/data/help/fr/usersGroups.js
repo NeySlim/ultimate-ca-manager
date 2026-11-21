@@ -23,7 +23,7 @@ export default {
         title: 'Groupes',
         items: [
           { label: 'Créer un groupe', text: 'Définir un groupe et assigner des membres' },
-          { label: 'Permissions de groupe', text: 'Un groupe accorde un ensemble de permissions, chaque membre les reçoit en plus de son propre rôle' },
+          { label: 'Permissions de groupe', text: 'Un groupe accorde un ensemble de permissions, cochées dans une grille des ressources par Lire, Écrire et Supprimer ; chaque membre les reçoit en plus de son propre rôle' },
           { label: 'Gestion des membres', text: 'Ajouter ou retirer des utilisateurs des groupes' },
         ]
       },
