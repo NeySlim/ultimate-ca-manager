@@ -123,12 +123,17 @@ test('wide screens give the bars and the page 34 px margins', async ({ page, api
   expect(Math.abs((await box(page.locator('.statusbar .live .dot'))).x - 34)).toBeLessThanOrEqual(EPS)
 })
 
-test('a phone reads the whole page name in the picker, keeps 44 px targets and scrolls the whole document', async ({ page, api }) => {
+test('a phone gives the picker the room beside the brand, keeps 44 px targets and scrolls the whole document', async ({ page, api }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/certificates')
   const picker = page.getByRole('combobox', { name: 'Navigate' })
   const p = await box(picker)
-  expect(p.width).toBeGreaterThanOrEqual(133)
+  // The mockup's 133 px picker covers the brand: here it takes the whole room between the brand and the tools
+  const brand = await box(page.locator('.masthead .brand'))
+  const tools = await box(page.locator('.global-tools'))
+  expect(p.x).toBeGreaterThanOrEqual(brand.x + brand.width)
+  expect(p.x + p.width).toBeLessThanOrEqual(tools.x)
+  expect(p.x - (brand.x + brand.width) + tools.x - (p.x + p.width)).toBeLessThanOrEqual(24 + EPS)
   expect(await picker.evaluate(el => getComputedStyle(el).fontSize)).toBe('12px')
   for (const target of await page.locator('.global-tools > *:visible, .global-tools .pop-wrap > button').all()) {
     if (!(await target.isVisible())) continue
