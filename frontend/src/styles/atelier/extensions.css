@@ -140,3 +140,52 @@
 @media(max-width:800px){.atl .page-head:has(.view-switch){flex-wrap:wrap}.atl .page-head:has(.view-switch)>div:first-child,.atl .page-head:has(.view-switch)>.actions{flex-basis:100%}.atl .page-head .actions .view-switch{flex:1;max-width:none;min-height:40px}}
 /* The dock slot of a page whose views draw their own dock: no box, the dock inside lays out as the mockup's #inspector. */
 .atl .dock-slot{display:contents}
+/*
+ * Settings: what the product's sections hold beyond the mockup's fields. A group's sentence under
+ * its legend, its blocks stacked when they are not fields, a row of actions, a notice among the
+ * fields, a segmented choice at its own width, the padlock of a field reserved to administrators,
+ * and the title a link lands on, focused without the keyboard outline.
+ */
+.atl .settings-group>.group-hint{margin:-5px 0 12px}
+.atl .group-hint{font-size:12px;line-height:1.6;color:var(--muted)}
+.atl .settings-group>legend .badge{font-weight:400}
+.atl .settings-stack{display:grid;gap:16px;min-width:0}
+.atl .settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.atl .settings-grid>.settings-actions,.atl .settings-grid>.notice{grid-column:1/-1}
+.atl .settings-grid>.notice,.atl .settings-stack>.notice,.atl .settings-body>.notice{margin:0}
+.atl .notice-actions{margin-top:8px}
+.atl .pre-line{white-space:pre-line}
+.atl .field>.segmented{align-self:flex-start;flex-wrap:wrap}
+.atl .lock-mark{display:inline-flex;margin-left:5px;vertical-align:-2px;color:var(--muted)}
+.atl .lock-mark .icon{width:12px;height:12px}
+.atl .settings-section .panel-heading h2[data-quiet-focus]:focus-visible{outline:none}
+/*
+ * A section the product still draws (.atl-out, until its zone is converted) keeps its own look: the
+ * mockup's rules on bare elements (button, input, p, table) outrank the product's classes, so the
+ * classes they would hide are given back here, at the values the product draws. Measured node by
+ * node against the page before the zone, to be removed with the last unconverted section.
+ */
+.atl .atl-out{font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.atl .atl-out .lv-btn,.atl .atl-out .ui-select-trigger,.atl .atl-out button.border{border-style:solid;border-width:1px}
+.atl .atl-out .lv-btn{font-size:12px;font-weight:500}
+.atl .atl-out button.text-xs,.atl .atl-out input.text-xs{line-height:1rem}
+.atl .atl-out .sf-inline-icon{color:var(--muted)}
+.atl .atl-out .sf-inline-icon:hover{color:var(--text)}
+.atl .atl-out .sf-link{color:var(--accent)}
+.atl .atl-out .sf-legend{font-weight:500}
+.atl .atl-out .sf-group-desc{margin:4px 0 0}
+.atl .atl-out .sf-under{margin:7px 0 0}
+.atl .atl-out .sf-records-summary{margin:0 0 12px}
+.atl .atl-out .lv-empty p{margin:9px 0 20px}
+.atl .atl-out p.mt-0\.5{margin-top:.125rem}
+.atl .atl-out p.mt-2{margin-top:.5rem}
+.atl .atl-out p.mb-1{margin-bottom:.25rem}
+.atl .atl-out p.mb-3{margin-bottom:.75rem}
+.atl .atl-out input:not(.ui-control){min-height:0}
+.atl .atl-out input.pl-8{padding-left:2rem}
+.atl .atl-out input.pl-9{padding-left:2.25rem}
+.atl .atl-out input.border-none{border-style:none}
+.atl .atl-out table{white-space:normal}
+.atl .atl-out thead{position:static}
+.atl .atl-out .ui-table th:where(:first-child){width:auto;padding:0 14px}
+.atl .atl-out .ui-table td:where(:first-child){width:auto;padding:3px 14px}

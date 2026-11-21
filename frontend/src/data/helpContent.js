@@ -1162,7 +1162,7 @@ export const helpContent = {
     sections: [
       {
         title: 'Page layout',
-        content: 'Every section is on one page, in a frame of its own; the table of contents on the left lists them by group (on a phone, the Go to section list).',
+        content: 'Every section is on one page, in a frame of its own; the table of contents on the left lists them one under the other (on a phone, the Go to section list).',
         items: [
           { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save of the settings when you can read the audit log (a renewal run or an OAuth consent is not a save); once a field changes, the names of the changed fields (their sections when a field has no label), with Undo changes (back to the values loaded) and Save. Save, or Enter in a field, stores every changed section through its usual route' },
           { label: 'Save in error', text: 'A value out of the bounds the page knows (a port out of 1 to 65535, a duration, a number, a required server, an address or a URL badly formed) is marked on its field with what it expects, and nothing is sent until it is corrected. A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },

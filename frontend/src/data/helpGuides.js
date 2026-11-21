@@ -2014,7 +2014,7 @@ Configure SMTP for email notifications (expiry alerts, user invitations):
 - **Encryption**: None, STARTTLS, or SSL/TLS
 - **From Address**: Sender email address
 - **Content Type**: HTML, Plain Text, or Both
-- **Alert Recipients**: Add multiple recipients using the tag input
+- **Alert Recipients**: One or more addresses separated by commas; an invalid address is named under the field and not kept
 
 Click **Test** to send a test email and verify the configuration.
 

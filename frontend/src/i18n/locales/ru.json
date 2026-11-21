@@ -4164,6 +4164,8 @@
     "alertRecipients": "Получатели оповещений",
     "tagsInputHelp": "Введите адрес и нажмите Enter, чтобы добавить",
     "alertRecipientsPlaceholder": "admin@example.com",
+    "alertRecipientsHint": "Один или несколько адресов через запятую.",
+    "alertRecipientsInvalid": "Недопустимый адрес: {{list}}. Например pki@example.com, через запятую.",
     "smtpRequiredForAlerts": "Перед включением почтовых оповещений настройте и проверьте SMTP-сервер выше.",
     "includeRevoked": "Включать отозванные сертификаты",
     "excludeAcme": "Пропускать сертификаты, выпущенные через ACME",

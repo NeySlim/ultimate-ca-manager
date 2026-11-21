@@ -6,7 +6,7 @@ export default {
     sections: [
       {
         title: 'Disposition de la page',
-        content: 'Toutes les sections sont sur une seule page, chacune dans son cadre ; le sommaire à gauche les range par groupes (sur un téléphone, la liste Aller à la section).',
+        content: 'Toutes les sections sont sur une seule page, chacune dans son cadre ; le sommaire à gauche les liste l’une sous l’autre (sur un téléphone, la liste Aller à la section).',
         items: [
           { label: 'Barre d’enregistrement', text: 'En bas de la page : Aucune modification en attente, avec la date et le compte du dernier enregistrement des paramètres quand vous pouvez lire le journal d’audit (un lancement du renouvellement ou un consentement OAuth n’est pas un enregistrement) ; dès qu’un champ change, le nom des champs modifiés (leur section quand un champ n’a pas de libellé), avec Annuler les modifications (retour aux valeurs chargées) et Enregistrer. Enregistrer, ou Entrée dans un champ, envoie chaque section modifiée par sa route habituelle' },
           { label: 'Enregistrement en échec', text: 'Une valeur hors des bornes que la page connaît (port hors de 1 à 65535, durée, nombre, serveur requis, adresse ou URL mal formée) est marquée sur son champ avec ce qui est attendu, et rien ne part tant qu’elle n’est pas corrigée. Une section dont l’enregistrement échoue est marquée À corriger dans le sommaire et nomme l’erreur dans son cadre ; les autres sections sont enregistrées et la saisie reste' },
@@ -249,7 +249,7 @@ Configurez SMTP pour les notifications par e-mail (alertes d’expiration, invit
 - **Chiffrement** : Aucun, STARTTLS ou SSL/TLS
 - **Adresse d’expédition** : Adresse e-mail de l’expéditeur
 - **Type de contenu** : HTML, texte brut ou les deux
-- **Destinataires des alertes** : Ajoutez plusieurs destinataires en utilisant le champ de tags
+- **Destinataires des alertes** : Une ou plusieurs adresses séparées par des virgules ; une adresse invalide est signalée sous le champ et n’est pas gardée
 
 Cliquez sur **Tester** pour envoyer un e-mail de test et vérifier la configuration.
 

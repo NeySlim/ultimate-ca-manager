@@ -4011,6 +4011,8 @@
     "alertRecipients": "Destinatari degli avvisi",
     "tagsInputHelp": "Digita un indirizzo e premi Invio per aggiungere",
     "alertRecipientsPlaceholder": "admin@example.com",
+    "alertRecipientsHint": "One or more addresses separated by commas.",
+    "alertRecipientsInvalid": "Invalid address: {{list}}. For example pki@example.com, separated by commas.",
     "smtpRequiredForAlerts": "Configura e testa un server SMTP sopra prima di attivare gli avvisi email.",
     "includeRevoked": "Includi i certificati revocati",
     "excludeAcme": "Ignora i certificati emessi tramite ACME",

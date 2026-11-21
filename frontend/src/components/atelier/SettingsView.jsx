@@ -1,9 +1,9 @@
 /**
- * The mockup's settingsView(), the configuration form of the module pages: the table of contents
- * (each section marked « Modifié » or « À corriger »), a select to jump to a section on a phone,
- * one frame per section with its groups of fields and an optional test, the sticky save bar, then
- * the history of changes. The page holds the draft: every change comes back through `onChange`,
- * and the marks, the state sentence and the save buttons follow it without a reload.
+ * The mockup's settingsView(), in pieces a page composes: the layout (table of contents beside the
+ * main column), the jump select of a phone, one frame per section, its groups of fields, a test,
+ * the sticky save bar and the history of changes. The layout's column is a `div.settings-form`
+ * when the sections hold forms of their own (a form cannot nest one), a `<form>` otherwise.
+ * SettingsView draws the whole form from data, as the mockup's settingsFields does.
  */
 import { Component } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -80,63 +80,101 @@ class SectionBoundary extends Component {
 }
 
 /**
- * A section: its heading, its groups (a fieldset per legend), its test.
- * test: { label, onTest, result: { ok, text } | null, hint, busy }
+ * The frame of a section (settingsSection()): its heading, the refusal of its last save, then its
+ * body. `aside` sits at the right of the heading (a state of the section); `legacy` keeps a body the
+ * product still draws with its own styles (`.atl-out`) until its zone is converted.
  */
-export function SettingsSection({ section: s, values, errors, onChange }) {
+export function SettingsFrame({ id, label, desc, error, aside, legacy = false, children }) {
   const { t } = useTranslation()
-  const r = s.test?.result
   return (
-    <section className="panel settings-section" id={`set-sec-${s.id}`} aria-labelledby={`set-title-${s.id}`}>
+    <section className="panel settings-section" id={`set-sec-${id}`} aria-labelledby={`set-title-${id}`}>
       <header className="panel-heading">
         <div>
-          <h2 id={`set-title-${s.id}`} tabIndex={-1}>{s.label}</h2>
-          {s.desc && <p>{s.desc}</p>}
-          {s.error && <p className="field-error" role="alert"><Icon name="warning" /><span>{s.error}</span></p>}
+          <h2 id={`set-title-${id}`} tabIndex={-1}>{label}</h2>
+          {desc && <p>{desc}</p>}
+          {error && <p className="field-error" role="alert"><Icon name="warning" /><span>{error}</span></p>}
         </div>
+        {aside}
       </header>
-      <div className="settings-body">
+      <div className={legacy ? 'settings-body atl-out sf-body' : 'settings-body'}>
         <SectionBoundary fallback={<p className="field-error" role="alert"><Icon name="warning" /><span>{t('sectioned.sectionFailed')}</span></p>}>
-          {s.groups.map((g) => (
-            <fieldset key={g.legend} className="settings-group">
-              <legend>{g.legend}</legend>
-              <div className="settings-grid">
-                {g.fields.map((f) => (
-                  <SettingsField key={f.key} field={f} value={values[f.key]} error={errors[f.key]} onChange={onChange} />
-                ))}
-              </div>
-            </fieldset>
-          ))}
-          {s.children}
-          {s.test && (
-            <div className="settings-test">
-              <button type="button" className="btn" id={`test-${s.id}`} data-settings-test={s.id} data-write="" disabled={s.test.busy || undefined} onClick={s.test.onTest}>
-                <Icon name="send" />{s.test.label}
-              </button>
-              {r ? (
-                <p className={`test-result ${r.ok ? 'good' : 'bad'}`} id={`test-result-${s.id}`}><Icon name={r.ok ? 'check' : 'warning'} /><span>{r.text}</span></p>
-              ) : (
-                <p className="test-result muted" id={`test-result-${s.id}`}><Icon name="help" /><span>{s.test.hint}</span></p>
-              )}
-            </div>
-          )}
+          {children}
         </SectionBoundary>
       </div>
     </section>
   )
 }
 
-/** The table of contents: a link per section, marked « À corriger » or « Modifié »; `current` is the shown one. */
-export function SettingsToc({ sections, flags, current, label, onJump }) {
+/**
+ * A group of fields: `fieldset.settings-group`, its legend, the two (four) column grid; `grid={false}`
+ * for blocks stacked one under the other. `hint` says what the group does, under its legend (absent from the mockup).
+ */
+export function SettingsGroup({ legend, hint, grid = true, children, ...rest }) {
+  return (
+    <fieldset className="settings-group" {...rest}>
+      <legend>{legend}</legend>
+      {hint && <p className="group-hint">{hint}</p>}
+      <div className={grid ? 'settings-grid' : 'settings-stack'}>{children}</div>
+    </fieldset>
+  )
+}
+
+/**
+ * A section's test (`.settings-test`): the button, then its result in the tone of the outcome, or
+ * the hint at rest. result: { ok, text } | null. A field the test needs (`children`) precedes it.
+ */
+export function SettingsTest({ id, label, icon = 'send', onTest, busy = false, result, hint, buttonRef, children }) {
+  return (
+    <div className="settings-test">
+      {children}
+      <button type="button" className="btn" id={`test-${id}`} data-settings-test={id} data-write="" ref={buttonRef} disabled={busy || undefined} onClick={onTest}>
+        <Icon name={icon} />{label}
+      </button>
+      {result ? (
+        <p className={`test-result ${result.ok ? 'good' : 'bad'}`} id={`test-result-${id}`} role="status"><Icon name={result.ok ? 'check' : 'warning'} /><span>{result.text}</span></p>
+      ) : (
+        <p className="test-result muted" id={`test-result-${id}`}><Icon name="help" /><span>{hint}</span></p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * A section from data: its groups of fields and its test.
+ * test: { label, onTest, result: { ok, text } | null, hint, busy }
+ */
+export function SettingsSection({ section: s, values, errors, onChange }) {
+  return (
+    <SettingsFrame id={s.id} label={s.label} desc={s.desc} error={s.error}>
+      {s.groups.map((g) => (
+        <SettingsGroup key={g.legend} legend={g.legend}>
+          {g.fields.map((f) => (
+            <SettingsField key={f.key} field={f} value={values[f.key]} error={errors[f.key]} onChange={onChange} />
+          ))}
+        </SettingsGroup>
+      ))}
+      {s.children}
+      {s.test && <SettingsTest id={s.id} label={s.test.label} onTest={s.test.onTest} busy={s.test.busy} result={s.test.result} hint={s.test.hint} />}
+    </SettingsFrame>
+  )
+}
+
+const plainClick = (e) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+
+/**
+ * The table of contents: a link per section, marked « À corriger » or « Modifié »; `current` is the
+ * shown one. `hrefFor` gives a link that opens the section in a new tab (the mockup's anchor otherwise).
+ */
+export function SettingsToc({ sections, flags = {}, current, label, onJump, hrefFor }) {
   const { t } = useTranslation()
   return (
     <nav className="settings-toc" id="settings-toc" aria-label={label}>
       <ul>
         {sections.map((s) => (
           <li key={s.id}>
-            <a href={`#set-sec-${s.id}`} data-jump={s.id} aria-current={current === s.id ? 'true' : undefined}
+            <a href={hrefFor ? hrefFor(s.id) : `#set-sec-${s.id}`} data-jump={s.id} aria-current={current === s.id ? 'true' : undefined}
               onClick={(e) => {
-                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                if (!plainClick(e)) return
                 e.preventDefault()
                 jumpTo(s.id)
                 onJump?.(s.id)
@@ -152,7 +190,87 @@ export function SettingsToc({ sections, flags, current, label, onJump }) {
   )
 }
 
+/** The table of contents of a phone: `.field.settings-jump`, a select that jumps to the section. */
+export function SettingsJump({ sections, current, onJump }) {
+  const { t } = useTranslation()
+  return (
+    <div className="field settings-jump">
+      <label htmlFor="settings-jump">{t('sectioned.jumpLabel')}</label>
+      <select id="settings-jump" value={current || sections[0]?.id || ''} onChange={(e) => { jumpTo(e.target.value); onJump?.(e.target.value) }}>
+        {sections.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+    </div>
+  )
+}
+
 /**
+ * The save bar (settingsState() and its buttons), then the polite announcement. Pending fields
+ * are named by `pending` (labels), else counted (`count`, `sections`); `failed` names the sections
+ * whose save the server refused. `submit` makes Enregistrer the submit of an enclosing form.
+ */
+export function SettingsSaveBar({ dirty, pending = [], count = 0, sections = [], failed = [], lastSaved, saving = false, disabled = false,
+  onReset, onSave, submit = false, stateRef, announce = '' }) {
+  const { t } = useTranslation()
+  const state = failed.length ? (
+    <><Icon name="warning" /><span><strong>{t('sectioned.saveFailedTitle')}</strong>{t('sectioned.saveFailedIn', { sections: failed.join(', ') })}</span></>
+  ) : dirty ? (
+    <><Icon name="warning" /><span><strong>{t('sectioned.pendingTitle')}</strong>{pending.length
+      ? t('sectioned.pendingFields', { fields: pending.join(', ') })
+      : t('sectioned.pendingCount', { count, sections: sections.join(', ') })}</span></>
+  ) : (
+    <><Icon name="check" /><span>{t('sectioned.nothingPending')}{lastSaved && <>{' '}{lastSaved.by
+      ? t('sectioned.lastSavedBy', { date: lastSaved.at, user: lastSaved.by }) : t('sectioned.lastSaved', { date: lastSaved.at })}</>}</span></>
+  )
+  return (
+    <>
+      <div className={dirty ? 'settings-savebar dirty' : 'settings-savebar'} id="settings-savebar">
+        <p className="settings-state" id="settings-state" tabIndex={-1} ref={stateRef}>{state}</p>
+        <button type="button" className="btn" id="settings-reset" data-action="settings-reset" disabled={!dirty || saving} onClick={onReset}>{t('sectioned.undo')}</button>
+        <button type={submit ? 'submit' : 'button'} className="btn primary" id="settings-save" data-write="" disabled={!dirty || saving || disabled}
+          onClick={submit ? undefined : onSave}>
+          <Icon name="check" />{saving ? t('sectioned.saving') : t('common.save')}
+        </button>
+      </div>
+      <p className="sr-only" id="settings-announce" role="status" aria-live="polite">{announce}</p>
+    </>
+  )
+}
+
+/** The history of changes under the form: `section.panel.settings-history`, its records in `.panel-content`. */
+export function SettingsHistory({ title, text, children }) {
+  return (
+    <section className="panel settings-history" aria-labelledby="set-history-title">
+      <header className="panel-heading"><div><h2 id="set-history-title">{title}</h2>{text && <p>{text}</p>}</div></header>
+      <div className="panel-content">{children}</div>
+    </section>
+  )
+}
+
+/**
+ * The layout: `.scroll-view > .settings-layout`, the table of contents, then the main column with
+ * the form (its jump select, sections and save bar as `children`) and the history under it.
+ * onSubmit: a `<form>` (its fields only); without it a `div.settings-form` that hears its keys.
+ */
+export function SettingsLayout({ toc, history, onSubmit, onKeyDown, children }) {
+  return (
+    <div className="scroll-view" id="view-scroll">
+      <div className="settings-layout">
+        {toc}
+        <div className="settings-main">
+          {onSubmit ? (
+            <form className="settings-form" id="settings-form" noValidate onSubmit={(e) => { e.preventDefault(); onSubmit() }}>{children}</form>
+          ) : (
+            <div className="settings-form" id="settings-form" onKeyDown={onKeyDown}>{children}</div>
+          )}
+          {history}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The whole form from data (the mockup's settingsFields).
  * @param {object} p
  * @param {Array} p.sections  { id, label, icon, desc, groups: [{ legend, fields }], test?, error?, children?, extraKeys? }
  * @param {object} p.values  the draft, field by field
@@ -169,50 +287,22 @@ export function SettingsToc({ sections, flags, current, label, onJump }) {
  * @param {string} [p.current]  the section shown (a link that names one); `onJump` hears each jump, to keep it in the address
  */
 export function SettingsView({ sections, values, errors = {}, changed = [], onChange, onSave, onReset, lastSaved, saving = false, failed = [], announce = '', history, stateRef, current, tocLabel, onJump }) {
-  const { t } = useTranslation()
-  const dirty = changed.length > 0
   const labelOf = Object.fromEntries([...sections.flatMap((s) => s.groups.flatMap((g) => g.fields)).map((f) => [f.key, f.label]), ...sections.flatMap((s) => s.extraKeys || [])])
   const flags = Object.fromEntries(sections.map((s) => {
     const keys = keysOf(s)
     return [s.id, keys.some((k) => errors[k]) || s.error ? 'error' : keys.some((k) => changed.includes(k)) ? 'modified' : '']
   }))
-  const state = failed.length ? (
-    <><Icon name="warning" /><span><strong>{t('sectioned.saveFailedTitle')}</strong>{t('sectioned.saveFailedIn', { sections: failed.join(', ') })}</span></>
-  ) : dirty ? (
-    <><Icon name="warning" /><span><strong>{t('sectioned.pendingTitle')}</strong>{t('sectioned.pendingFields', { fields: changed.map((k) => labelOf[k] || k).join(', ') })}</span></>
-  ) : (
-    <><Icon name="check" /><span>{t('sectioned.nothingPending')}{lastSaved && <>{' '}{lastSaved.by
-      ? t('sectioned.lastSavedBy', { date: lastSaved.at, user: lastSaved.by }) : t('sectioned.lastSaved', { date: lastSaved.at })}</>}</span></>
-  )
   return (
-    <div className="scroll-view" id="view-scroll">
-      <div className="settings-layout">
-        <SettingsToc sections={sections} flags={flags} current={current} label={tocLabel} onJump={onJump} />
-        <div className="settings-main">
-          <form className="settings-form" id="settings-form" noValidate onSubmit={(e) => { e.preventDefault(); onSave?.() }}>
-            <div className="field settings-jump">
-              <label htmlFor="settings-jump">{t('sectioned.jumpLabel')}</label>
-              <select id="settings-jump" value={current || sections[0]?.id} onChange={(e) => { jumpTo(e.target.value); onJump?.(e.target.value) }}>
-                {sections.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-            </div>
-            {sections.map((s) => <SettingsSection key={s.id} section={s} values={values} errors={errors} onChange={onChange} />)}
-            <div className={dirty ? 'settings-savebar dirty' : 'settings-savebar'} id="settings-savebar">
-              <p className="settings-state" id="settings-state" tabIndex={-1} ref={stateRef}>{state}</p>
-              <button type="button" className="btn" id="settings-reset" data-action="settings-reset" disabled={!dirty || saving} onClick={onReset}>{t('sectioned.undo')}</button>
-              <button type="submit" className="btn primary" id="settings-save" disabled={!dirty || saving}><Icon name="check" />{saving ? t('sectioned.saving') : t('common.save')}</button>
-            </div>
-            <p className="sr-only" id="settings-announce" role="status" aria-live="polite">{announce}</p>
-          </form>
-          {history && (
-            <section className="panel settings-history" aria-labelledby="set-history-title">
-              <header className="panel-heading"><div><h2 id="set-history-title">{history.title}</h2>{history.text && <p>{history.text}</p>}</div></header>
-              <div className="panel-content">{history.children}</div>
-            </section>
-          )}
-        </div>
-      </div>
-    </div>
+    <SettingsLayout
+      toc={<SettingsToc sections={sections} flags={flags} current={current} label={tocLabel} onJump={onJump} />}
+      history={history && <SettingsHistory title={history.title} text={history.text}>{history.children}</SettingsHistory>}
+      onSubmit={() => onSave?.()}
+    >
+      <SettingsJump sections={sections} current={current} onJump={onJump} />
+      {sections.map((s) => <SettingsSection key={s.id} section={s} values={values} errors={errors} onChange={onChange} />)}
+      <SettingsSaveBar dirty={changed.length > 0} pending={changed.map((k) => labelOf[k] || k)} failed={failed} lastSaved={lastSaved}
+        saving={saving} onReset={onReset} submit stateRef={stateRef} announce={announce} />
+    </SettingsLayout>
   )
 }
 

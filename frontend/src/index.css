@@ -307,8 +307,8 @@ html, body, #root {
     color: var(--text-primary) !important;
   }
   
-  /* Ensure form inputs have correct background in all cases; a zone copied from the Atelier mockup (.atl) keeps its own */
-  input:not(.atl *), textarea:not(.atl *), select:not(.atl *) {
+  /* Ensure form inputs have correct background in all cases; a zone copied from the Atelier mockup (.atl) keeps its own, except what it leaves to the product (.atl-out) */
+  input:not(.atl :not(.atl-out *)), textarea:not(.atl :not(.atl-out *)), select:not(.atl :not(.atl-out *)) {
     background-color: var(--bg-secondary) !important;
     color: var(--text-primary);
     transition: 

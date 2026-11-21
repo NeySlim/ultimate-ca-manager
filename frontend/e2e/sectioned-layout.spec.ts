@@ -41,7 +41,7 @@ for (const { path, toc, first } of PAGES) {
 
 test('the settings save bar stays above the status bar and counts a change', async ({ page, api }) => {
   await page.goto('/settings')
-  const bar = page.getByTestId('sf-savebar')
+  const bar = page.locator('#settings-savebar')
   await expect(bar).toBeVisible()
   const b = await box(bar)
   const status = await box(page.getByRole('contentinfo'))
@@ -57,7 +57,7 @@ test('the settings save bar stays above the status bar and counts a change', asy
 
 test('a link to ?tab= lands the settings page on that frame', async ({ page, api }) => {
   await page.goto('/settings?tab=email')
-  const title = page.locator('#sf-title-email')
+  const title = page.locator('#set-title-email')
   await expect(title).toBeFocused()
   const t = await box(title)
   expect(t.y).toBeGreaterThanOrEqual(0)
@@ -84,9 +84,9 @@ test('a short field takes one column of four, a button the width of its text', a
   await expect(general).toBeVisible()
   const port = await box(general.getByLabel('ACME public port'))
   const base = await box(general.getByLabel('Public URL', { exact: true }))
-  // 1286 px of fields: 4 columns of 309.5 (short) and 2 of 635 (normal), 16 px gaps
+  // 1286 px of fields: 4 columns of 309.5 (short), the public URL on the whole line, 16 px gaps
   expect(Math.abs(port.width - 309.5)).toBeLessThanOrEqual(2)
-  expect(Math.abs(base.width - 635)).toBeLessThanOrEqual(2)
+  expect(Math.abs(base.width - 1286)).toBeLessThanOrEqual(2)
 
   await page.goto('/tools')
   const run = page.getByRole('button', { name: 'Check SSL', exact: true })
@@ -100,7 +100,7 @@ test('a field out of its bounds takes the error border, is named in the bar and 
   const general = page.getByRole('region', { name: 'General', exact: true })
   const field = general.getByLabel('Sign-out after inactivity (minutes)')
   await field.fill('99999')
-  const bar = page.getByTestId('sf-savebar')
+  const bar = page.locator('#settings-savebar')
   // The bar names the changed field, as the mockup does
   await expect(bar).toContainText('Modified, not saved: Sign-out after inactivity (minutes).')
   let sent = false
@@ -128,7 +128,7 @@ test('in Aurore a field in error keeps its red ring once focused, not the focus 
   const general = page.getByRole('region', { name: 'General', exact: true })
   const field = general.getByLabel('Sign-out after inactivity (minutes)')
   await field.fill('99999')
-  const bar = page.getByTestId('sf-savebar')
+  const bar = page.locator('#settings-savebar')
   await bar.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(field).toBeFocused()
   // Asked until it holds: the ring eases in
@@ -156,7 +156,7 @@ test('the scheduler keeps 36 px rows around 32 px run buttons', async ({ page, a
 
 test('groups of a frame stand 20 px apart', async ({ page, api }) => {
   await page.goto('/settings')
-  const groups = page.locator('#sf-sec-general .sf-group')
+  const groups = page.locator('#set-sec-general > .settings-body > .settings-group')
   await expect(groups.first()).toBeVisible()
   const boxes = await groups.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })))
   for (let i = 1; i < boxes.length; i++) expect(Math.abs(boxes[i].top - boxes[i - 1].bottom - 20)).toBeLessThanOrEqual(EPS)
@@ -164,13 +164,13 @@ test('groups of a frame stand 20 px apart', async ({ page, api }) => {
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-  for (const path of ['/settings', '/account', '/tools', '/operations']) {
+  for (const [path, layout] of [['/settings', '.settings-layout'], ['/account', '.sf-layout'], ['/tools', '.sf-layout'], ['/operations', '.sf-layout']]) {
     test(`${path} is no wider than the phone`, async ({ page, api }) => {
       await page.goto(path)
-      await expect(page.locator('.sf-layout')).toBeVisible()
-      const wide = await page.evaluate(() => {
+      await expect(page.locator(layout)).toBeVisible()
+      const wide = await page.evaluate((sel) => {
         const W = window.innerWidth
-        return [...document.querySelectorAll('.sf-layout *')].filter((el) => {
+        return [...document.querySelectorAll(`${sel} *`)].filter((el) => {
           const r = el.getBoundingClientRect()
           if (!r.width || r.right <= W + 1) return false
           // content scrolling in its own box (tables, code) is not an overflow of the page
@@ -179,7 +179,7 @@ test.describe('on a phone', () => {
           }
           return true
         }).length
-      })
+      }, layout)
       expect(wide).toBe(0)
     })
   }

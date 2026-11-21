@@ -18,9 +18,8 @@ import {
   SlidersHorizontal, PaperPlaneTilt, Archive,
 } from '@phosphor-icons/react'
 import {
-  ResponsiveLayout,
-  Button, Input, Select, Badge, Textarea, Card, EmptyState, ConfirmModal,
-  LoadingSpinner, FileUpload, Modal, HelpCard, Logo, ExperimentalBadge,
+  Button, Input, Select, Textarea, Card, EmptyState, ConfirmModal,
+  LoadingSpinner, FileUpload, Modal, HelpCard, Logo,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   CompactSection,
   UpdateChecker, ServiceReconnectOverlay
@@ -80,9 +79,10 @@ import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
 import {
-  FormLayout, SectionToc, SectionJump, FormSection, SaveBar, SavePartsContext,
-  useSavePartsRegistry, changedKeys, useUnloadGuard, sectionDomId, sectionTitleId, focusSectionTitle, keepDraft, readDraft,
+  SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard, keepDraft, readDraft,
 } from '../components/sectioned'
+import { Zone, PageHead, Pill, SkeletonPanel, jumpTo } from '../components/atelier'
+import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsSaveBar } from '../components/atelier/SettingsView'
 import SettingsHistory from './settings/SettingsHistory'
 import { fieldProblems, fieldSection } from './settings/fieldChecks'
 import { changedLabels } from './settings/fieldLabels'
@@ -112,6 +112,15 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'xcepWstep', labelKey: 'settings.tabs.xcepWstep', descKey: 'xcepWstep.subtitle', icon: WindowsLogo, color: 'icon-bg-indigo' },
   { id: 'about', labelKey: 'settings.tabs.about', descKey: 'settings.about.subtitle', icon: Info, color: 'icon-bg-gray' },
 ]
+
+// The mockup's pictogram of each section in the table of contents
+const SECTION_ICONS = {
+  general: 'settings', appearance: 'sun', email: 'send', security: 'lock', sso: 'users', backup: 'archive',
+  audit: 'activity', database: 'server', https: 'cert', updates: 'download', scheduler: 'clock', webhooks: 'bell',
+  ct: 'eye', autoRenewal: 'refresh', deploy: 'upload', microsoftCA: 'plug', adConnector: 'globe', xcepWstep: 'monitor', about: 'help',
+}
+// Sections drawn with the mockup's fields; the others keep the product's own styles (`.atl-out`) until converted
+const CONVERTED_SECTIONS = new Set(['general', 'security', 'email', 'https'])
 
 // Groups of the table of contents, named by what they hold; the frames follow the same
 // order. Four groups keep every entry in view on a 1000 px high window.
@@ -238,10 +247,9 @@ export default function SettingsPage() {
   })
   const [savedExpiryAlerts, setSavedExpiryAlerts] = useState(expiryAlerts)
   
-  // Selected category - read from URL param or default to 'general'
-  const [selectedCategory, setSelectedCategory] = useState(
-    searchParams.get('tab') || 'general'
-  )
+  // The section a link names: ?tab= (the product's links), or ?section= as well
+  const sectionParam = searchParams.get('tab') || searchParams.get('section')
+  const [selectedCategory, setSelectedCategory] = useState(sectionParam || 'general')
 
   // Re-sync when the URL's ?tab= changes from outside this component (e.g.
   // navigate('/settings?tab=adConnector') from another page's "Configure"
@@ -249,20 +257,16 @@ export default function SettingsPage() {
   // Router doesn't remount this component for an in-place query-param
   // change, so without this the tab never visibly switches.
   useEffect(() => {
-    setSelectedCategory(searchParams.get('tab') || 'general')
-  }, [searchParams])
+    setSelectedCategory(sectionParam || 'general')
+  }, [sectionParam])
 
   // Every section is on the page: a jump scrolls to its frame and gives its title the focus
-  const jumpToSection = useCallback((categoryId, options) => {
-    const frame = document.getElementById(sectionDomId(categoryId))
-    if (!frame) return
-    frame.scrollIntoView?.({ block: 'start' })
-    focusSectionTitle(categoryId, options)
-  }, [])
+  const jumpToSection = useCallback((categoryId, options) => jumpTo(categoryId, options), [])
 
   // Update URL when category changes
   const handleCategoryChange = (categoryId) => {
     setSelectedCategory(categoryId)
+    searchParams.delete('section')
     if (categoryId === 'general') {
       searchParams.delete('tab')
     } else {
@@ -273,15 +277,15 @@ export default function SettingsPage() {
   }
 
   // A link to /settings?tab=<id> (overview, palette, other pages) lands on that section's frame
-  const tabParam = searchParams.get('tab')
+  const tabParam = sectionParam
   useEffect(() => {
     if (loading || !tabParam) return undefined
     jumpToSection(tabParam, { quiet: true })
     // Sections above still load and grow: the frame is held in place until the user moves
-    const form = document.querySelector('.sf-form')
+    const form = document.getElementById('settings-form')
     if (!form || typeof ResizeObserver === 'undefined') return undefined
     const observer = new ResizeObserver(() => {
-      document.getElementById(sectionDomId(tabParam))?.scrollIntoView?.({ block: 'start' })
+      document.getElementById(`set-sec-${tabParam}`)?.scrollIntoView?.({ block: 'start' })
     })
     const release = () => observer.disconnect()
     observer.observe(form)
@@ -1964,7 +1968,7 @@ export default function SettingsPage() {
   // A save stopped by a field out of bounds: the first such field takes the focus
   useEffect(() => {
     if (!invalidFocus) return
-    const field = document.querySelector('.sf-form [aria-invalid="true"]')
+    const field = document.querySelector('#settings-form [aria-invalid="true"]')
     field?.scrollIntoView?.({ block: 'center' })
     field?.focus({ preventScroll: true })
   }, [invalidFocus])
@@ -2274,35 +2278,38 @@ export default function SettingsPage() {
     </div>
   )
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full">
-        <LoadingSpinner message={t('settings.loadingSettings')} />
-      </div>
-    )
-  }
-
   // Sections in the order of the table of contents (permission-gated ones hidden from other roles)
   const allowed = SETTINGS_CATEGORIES.filter(cat => !cat.permission || [].concat(cat.permission).some(hasPermission))
   const sections = SETTINGS_GROUPS.flatMap(g => g.ids)
     .map(id => allowed.find(cat => cat.id === id))
     .filter(Boolean)
-    .map(cat => ({ id: cat.id, label: t(cat.labelKey), description: t(cat.descKey), icon: cat.icon }))
-  const groups = SETTINGS_GROUPS.map(g => ({ id: g.id, label: t(g.labelKey), ids: g.ids }))
+    .map(cat => ({ id: cat.id, label: t(cat.labelKey), description: t(cat.descKey), icon: SECTION_ICONS[cat.id] }))
+  const head = (
+    <PageHead title={t('common.settings')} total={t('sectioned.sectionCount', { count: sections.length })} intent={t('shell.moduleDesc.settings')} />
+  )
+
+  if (loading) {
+    return (
+      <Zone testId="settings-page">
+        {head}
+        <div className="scroll-view" id="view-scroll"><SkeletonPanel label={t('settings.loadingSettings')} /></div>
+      </Zone>
+    )
+  }
+
   const flags = {}
   for (const id of pendingSections) flags[id] = 'modified'
   for (const id of Object.keys(sectionErrors)) flags[id] = 'error'
   for (const key of Object.keys(fieldErrors)) flags[fieldSection(key)] = 'error'
   const sectionLabel = (id) => sections.find(s => s.id === id)?.label || id
   const lastSave = settingsLog?.[0]
-  // Badges the section headers carried: certificate type of HTTPS, experimental Microsoft CA
+  // States the section headers carry: certificate type of HTTPS, experimental Microsoft CA
   const sectionAside = {
     https: httpsInfo?.type ? (
-      <Badge variant={httpsInfo.type === 'CA-Signed' ? 'success' : httpsInfo.type === 'Self-Signed' ? 'warning' : 'secondary'}>
-        {HTTPS_TYPES[httpsInfo.type] ? t(HTTPS_TYPES[httpsInfo.type]) : httpsInfo.type}
-      </Badge>
+      <Pill tone={httpsInfo.type === 'CA-Signed' ? 'good' : httpsInfo.type === 'Self-Signed' ? 'warn' : 'muted'}
+        label={HTTPS_TYPES[httpsInfo.type] ? t(HTTPS_TYPES[httpsInfo.type]) : httpsInfo.type} />
     ) : null,
-    microsoftCA: <ExperimentalBadge />,
+    microsoftCA: <Pill tone="warn" icon="sparkles" label={t('common.experimental')} />,
   }
 
   return (
@@ -2310,58 +2317,44 @@ export default function SettingsPage() {
       {reconnecting && (
         <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
       )}
-      <ResponsiveLayout
-        title={t('common.settings')}
-        total={t('sectioned.sectionCount', { count: sections.length })}
-        intent={t('shell.moduleDesc.settings')}
-        helpPageKey="settings"
-      >
+      <Zone testId="settings-page">
+        {head}
         <SavePartsContext.Provider value={parts.api}>
-          <FormLayout
+          <SettingsLayout
             toc={(
-              <SectionToc
-                label={t('settings.tocLabel')}
-                sections={sections}
-                groups={groups}
-                flags={flags}
-                hrefFor={(id) => (id === 'general' ? '/settings' : `/settings?tab=${id}`)}
-                onJump={handleCategoryChange}
-              />
+              <SettingsToc label={t('settings.tocLabel')} sections={sections} flags={flags} current={selectedCategory}
+                hrefFor={(id) => (id === 'general' ? '/settings' : `/settings?tab=${id}`)} onJump={handleCategoryChange} />
             )}
+            history={settingsLog && <SettingsHistory entries={settingsLog} />}
+            onKeyDown={saveOnEnter}
           >
-            <SectionJump label={t('sectioned.jumpLabel')} sections={sections} value={selectedCategory} onJump={handleCategoryChange} />
-            <div className="sf-form" onKeyDown={saveOnEnter}>
-              {sections.map(section => (
-                <FormSection
-                  key={section.id}
-                  id={section.id}
-                  title={section.label}
-                  description={section.description}
-                  aside={sectionAside[section.id]}
-                  error={sectionErrors[section.id]}
-                >
-                  {renderCategoryContent(section.id)}
-                </FormSection>
-              ))}
-              {(canWrite('settings') || pendingCount > 0) && (
-                <SaveBar
-                  ref={saveState}
-                  count={pendingCount}
-                  sectionLabels={pendingSections.map(sectionLabel)}
-                  fieldLabels={changedLabels(pendingFields, t, sectionLabel)}
-                  failed={pendingCount ? Object.keys(sectionErrors).map(sectionLabel) : []}
-                  lastSaved={lastSave ? { at: formatDate(lastSave.timestamp, { time: true }), by: lastSave.username } : null}
-                  saving={savingAll}
-                  onReset={resetAll}
-                  onSave={saveAll}
-                />
-              )}
-              <p className="sr-only-sf" role="status" aria-live="polite">{announce}</p>
-            </div>
-            {settingsLog && <SettingsHistory entries={settingsLog} />}
-          </FormLayout>
+            <SettingsJump sections={sections} current={selectedCategory} onJump={handleCategoryChange} />
+            {sections.map(section => (
+              <SettingsFrame key={section.id} id={section.id} label={section.label} desc={section.description}
+                aside={sectionAside[section.id]} error={sectionErrors[section.id]} legacy={!CONVERTED_SECTIONS.has(section.id)}>
+                {renderCategoryContent(section.id)}
+              </SettingsFrame>
+            ))}
+            {(canWrite('settings') || pendingCount > 0) ? (
+              <SettingsSaveBar
+                stateRef={saveState}
+                dirty={pendingCount > 0}
+                count={pendingCount}
+                sections={pendingSections.map(sectionLabel)}
+                pending={changedLabels(pendingFields, t, sectionLabel)}
+                failed={pendingCount ? Object.keys(sectionErrors).map(sectionLabel) : []}
+                lastSaved={lastSave ? { at: formatDate(lastSave.timestamp, { time: true }), by: lastSave.username } : null}
+                saving={savingAll}
+                onReset={resetAll}
+                onSave={saveAll}
+                announce={announce}
+              />
+            ) : (
+              <p className="sr-only" id="settings-announce" role="status" aria-live="polite">{announce}</p>
+            )}
+          </SettingsLayout>
         </SavePartsContext.Provider>
-      </ResponsiveLayout>
+      </Zone>
 
       {/* Backup Password Modal; then the running backup, then its archive to download */}
       <Modal

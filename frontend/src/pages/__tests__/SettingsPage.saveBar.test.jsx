@@ -59,7 +59,7 @@ const renderPage = (entry = '/settings') => render(
   </MemoryRouter>,
 )
 
-const bar = () => screen.getByTestId('sf-savebar')
+const bar = () => document.getElementById('settings-savebar')
 const saveButton = () => within(bar()).getByRole('button', { name: 'common.save' })
 const undoButton = () => within(bar()).getByRole('button', { name: 'sectioned.undo' })
 const tocLink = (label) => within(screen.getByRole('navigation', { name: 'settings.tocLabel' })).getByRole('link', { name: new RegExp(label) })
@@ -87,7 +87,7 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
   it('lands a link to ?tab= on its frame title without the keyboard outline', async () => {
     Element.prototype.scrollIntoView = vi.fn()
     await loaded('/settings?tab=email')
-    const title = document.getElementById('sf-title-email')
+    const title = document.getElementById('set-title-email')
     await waitFor(() => expect(document.activeElement).toBe(title))
     expect(title).toHaveAttribute('data-quiet-focus')
     delete Element.prototype.scrollIntoView
@@ -96,7 +96,7 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
   it('shows every section in a frame of its own, listed by group', async () => {
     await loaded()
     for (const id of ['general', 'email', 'audit', 'security', 'backup', 'about']) {
-      expect(document.getElementById(`sf-sec-${id}`)).toBeInTheDocument()
+      expect(document.getElementById(`set-sec-${id}`)).toBeInTheDocument()
     }
     expect(screen.getByLabelText('smtp-host')).toBeInTheDocument()
     expect(tocLink('settings.tabs.email')).toHaveAttribute('href', '/settings?tab=email')
@@ -140,9 +140,9 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
     await act(async () => { fireEvent.click(saveButton()) })
     await waitFor(() => expect(settingsService.getAll).toHaveBeenCalled())
     expect(settingsService.updateBulk).toHaveBeenCalledTimes(1)
-    const email = document.getElementById('sf-sec-email')
+    const email = document.getElementById('set-sec-email')
     expect(within(email).getByRole('alert')).toHaveTextContent('SMTP refused')
-    expect(within(document.getElementById('sf-sec-general')).queryByRole('alert')).toBeNull()
+    expect(within(document.getElementById('set-sec-general')).queryByRole('alert')).toBeNull()
     expect(screen.getByLabelText('smtp-host')).toHaveValue('smtp2.example.com')
     expect(tocLink('settings.tabs.email')).toHaveTextContent('sectioned.flagError')
     expect(bar()).toHaveTextContent('sectioned.saveFailedTitle')
@@ -221,9 +221,28 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
     const scrolled = []
     Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
     await loaded('/settings?tab=email')
-    await waitFor(() => expect(scrolled).toContain('sf-sec-email'))
-    expect(document.activeElement).toBe(document.getElementById('sf-title-email'))
+    await waitFor(() => expect(scrolled).toContain('set-sec-email'))
+    expect(document.activeElement).toBe(document.getElementById('set-title-email'))
     delete Element.prototype.scrollIntoView
+  })
+
+  it('lands a link to ?section= as one to ?tab=', async () => {
+    const scrolled = []
+    Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
+    await loaded('/settings?section=audit')
+    await waitFor(() => expect(scrolled).toContain('set-sec-audit'))
+    expect(document.activeElement).toBe(document.getElementById('set-title-audit'))
+    expect(tocLink('settings.tabs.audit')).toHaveAttribute('aria-current', 'true')
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('draws the converted sections with the mockup rules, keeps the others under .atl-out, in no outer form', async () => {
+    await loaded()
+    const body = (id) => document.querySelector(`#set-sec-${id} > .settings-body`)
+    for (const id of ['general', 'security', 'email', 'https']) expect(body(id), id).not.toHaveClass('atl-out')
+    for (const id of ['audit', 'backup', 'about']) expect(body(id), id).toHaveClass('atl-out')
+    expect(document.getElementById('settings-form').tagName).toBe('DIV')
+    expect(document.getElementById('settings-form').closest('.atl')).not.toBeNull()
   })
 
   it('jumps from the table of contents and writes the section in the address', async () => {
@@ -231,7 +250,7 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
     Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
     await loaded()
     fireEvent.click(tocLink('settings.tabs.audit'))
-    expect(scrolled).toContain('sf-sec-audit')
+    expect(scrolled).toContain('set-sec-audit')
     delete Element.prototype.scrollIntoView
   })
 

@@ -2,448 +2,194 @@ import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
-import { Bell, Warning, ArrowsClockwise, CheckCircle, XCircle, Key, Copy, Info, PencilSimple, PaperPlaneTilt, Question } from '@phosphor-icons/react'
-import { Button, Input, Select } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import TagsInput from '../../components/ui/TagsInput'
+import { Btn, Pill, Notice, RecordList, RecordRow } from '../../components/atelier'
+import { Input, NumberInput, SecretInput, Select, ToggleSwitch, SegmentedField, ListInput } from '../../components/atelier/Form'
+import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
 import EmailTemplateWindow from '../../components/EmailTemplateWindow'
-import { WarningCircle } from '@phosphor-icons/react'
 import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
-import { FormGroup } from '../../components/sectioned'
 import { useRefocusAfter } from '../../components/sectioned/useRefocus'
+import { shownNumber, typedNumber } from './numberFields'
 
-export default function EmailSection({ settings, fieldErrors = {}, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
+const OAUTH_CONSOLES = {
+  google: { consoleUrl: 'https://console.cloud.google.com/apis/credentials', consoleLabel: 'Google Cloud Console → APIs & Services → Credentials' },
+  microsoft: { consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade', consoleLabel: 'Azure Portal → App registrations' },
+  microsoft365: { consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade', consoleLabel: 'Azure Portal → App registrations' },
+}
+const ALERT_DAYS = [90, 60, 30, 14, 7, 3, 1]
+const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
+export default function EmailSection({ settings, fieldErrors = {}, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
   const { t } = useTranslation()
   const testButton = useRef(null)
   useRefocusAfter(emailTesting, testButton)
   const secretTargets = smtpSecretTargets(savedEmail, settings)
   const { showSuccess } = useNotification()
   const { copy } = useClipboard()
-  const oauthProviderSetup = {
-    google: {
-      consoleUrl: 'https://console.cloud.google.com/apis/credentials',
-      consoleLabel: 'Google Cloud Console → APIs & Services → Credentials',
-    },
-    microsoft: {
-      consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-      consoleLabel: 'Azure Portal → App registrations',
-    },
-    microsoft365: {
-      consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-      consoleLabel: 'Azure Portal → App registrations',
-    },
-  }
+  const method = settings.smtp_auth_method || 'password'
+  const provider = settings.smtp_oauth_provider || 'google'
+  const oauth = (key) => (e) => { updateSetting(key, e.target.value); setOauthDirty(true) }
+  const defaultRedirect = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v2/settings/email/oauth/callback`
   return (
     <>
-      <FormGroup title={t('settings.smtpConfig')}>
-        <div className="space-y-5">
-          {/* Server: host and sender, the port and the encryption as short fields */}
-          <div className="sf-grid">
-            <Input
-              label={t('settings.smtpHost')}
-              value={settings.smtp_host || ''}
-              onChange={(e) => updateSetting('smtp_host', e.target.value)}
-              placeholder={t('settings.smtpHostPlaceholder')}
-            />
-            <Input
-              className="sf-short"
-              label={t('settings.smtpPort')}
-              type="number"
-              inputMode="numeric"
-              value={settings.smtp_port ?? 587}
-              onChange={(e) => updateSetting('smtp_port', e.target.value === '' ? '' : Number(e.target.value))}
-              error={fieldErrors.smtp_port}
-              helperText={t('settings.smtpSecurityHint')}
-            />
-            <Select
-              className="sf-short"
-              label={t('settings.smtpSecurity')}
-              value={settings.smtp_security || 'starttls'}
-              onChange={(mode) => updateSetting('smtp_security', mode)}
-              options={[['starttls', 'smtpSecurityStarttls'], ['ssl', 'smtpSecuritySsl'], ['none', 'smtpSecurityNone']]
-                .map(([value, labelKey]) => ({ value, label: t(`settings.${labelKey}`) }))}
-            />
-            <Input
-              label={t('settings.fromEmail')}
-              type="email"
-              value={settings.smtp_from_email || ''}
-              onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
-              error={fieldErrors.smtp_from_email}
-              placeholder={t('settings.fromEmailPlaceholder')}
-            />
-            <Select
-              label={t('settings.smtpAuthMethod')}
-              value={settings.smtp_auth_method || 'password'}
-              onChange={(method) => {
-                updateSetting('smtp_auth_method', method)
-                setOauthDirty(prev => prev || method === 'oauth2')
-              }}
-              options={['password', 'oauth2', 'none'].map((value) => ({ value, label: t(`settings.smtpAuthMethod_${value}`) }))}
-            />
-            <Select
-              label={t('settings.emailFormat')}
-              value={settings.smtp_content_type || 'html'}
-              onChange={(fmt) => updateSetting('smtp_content_type', fmt)}
-              options={['html', 'text', 'both'].map((value) => ({ value, label: t(`settings.emailFormat_${value}`) }))}
-            />
-            {/* Where the test of the relay sends its message */}
-            {canWrite('settings') && (
-              <Input
-                label={t('settings.testRecipient')}
-                type="email"
-                value={settings._testRecipient || ''}
-                onChange={(e) => updateSetting('_testRecipient', e.target.value)}
-                placeholder={defaultTestRecipient || 'admin@example.com'}
-              />
+      <SettingsGroup legend={t('settings.smtpConfig')}>
+        <Input id="set-smtp_host" label={t('settings.smtpHost')} value={settings.smtp_host || ''}
+          onChange={(e) => updateSetting('smtp_host', e.target.value)} placeholder={t('settings.smtpHostPlaceholder')} />
+        <NumberInput id="set-smtp_port" label={t('settings.smtpPort')} value={shownNumber(settings.smtp_port ?? 587)}
+          onChange={(e) => updateSetting('smtp_port', typedNumber(e))} error={fieldErrors.smtp_port} hint={t('settings.smtpSecurityHint')} />
+        <Select id="set-smtp_security" short label={t('settings.smtpSecurity')} value={settings.smtp_security || 'starttls'}
+          onChange={(mode) => updateSetting('smtp_security', mode)}
+          options={[['starttls', 'smtpSecurityStarttls'], ['ssl', 'smtpSecuritySsl'], ['none', 'smtpSecurityNone']]
+            .map(([value, labelKey]) => ({ value, label: t(`settings.${labelKey}`) }))} />
+        <Input id="set-smtp_from_email" label={t('settings.fromEmail')} type="email" value={settings.smtp_from_email || ''}
+          onChange={(e) => updateSetting('smtp_from_email', e.target.value)} error={fieldErrors.smtp_from_email}
+          placeholder={t('settings.fromEmailPlaceholder')} />
+        <Select id="set-smtp_auth_method" label={t('settings.smtpAuthMethod')} value={method}
+          onChange={(next) => { updateSetting('smtp_auth_method', next); setOauthDirty((prev) => prev || next === 'oauth2') }}
+          options={['password', 'oauth2', 'none'].map((value) => ({ value, label: t(`settings.smtpAuthMethod_${value}`) }))} />
+        <Select id="set-smtp_content_type" label={t('settings.emailFormat')} value={settings.smtp_content_type || 'html'}
+          onChange={(fmt) => updateSetting('smtp_content_type', fmt)}
+          options={['html', 'text', 'both'].map((value) => ({ value, label: t(`settings.emailFormat_${value}`) }))} />
+        {/* Where the test of the relay sends its message */}
+        {canWrite('settings') && (
+          <Input id="set-test_recipient" label={t('settings.testRecipient')} type="email" value={settings._testRecipient || ''}
+            onChange={(e) => updateSetting('_testRecipient', e.target.value)} placeholder={defaultTestRecipient || 'admin@example.com'} />
+        )}
+
+        {/* Authentication: what the chosen method asks */}
+        {method === 'none' && <Notice>{t('settings.smtpNoAuthHint')}</Notice>}
+        {/* Saving without authentication deletes the stored OAuth2 credentials (api/v2/settings/email) */}
+        {method === 'none' && (settings.has_oauth_client_secret || settings.has_oauth_refresh_token) && (
+          <Notice tone="warn">{t('settings.smtpNoAuthClearsOauth')}</Notice>
+        )}
+        {method === 'password' && (
+          <>
+            <Input id="set-smtp_username" label={t('settings.smtpUsername')} value={settings.smtp_username || ''}
+              onChange={(e) => updateSetting('smtp_username', e.target.value)} />
+            <SecretInput id="set-smtp_password" label={t('settings.smtpPassword')}
+              value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
+              onChange={(e) => updateSetting('smtp_password', e.target.value)} hasExistingValue={settings.smtp_password === '********'}
+              {...secretInputProps(t, secretTargets.password)} />
+          </>
+        )}
+        {method === 'oauth2' && (
+          <>
+            {/* Mailbox / username (XOAUTH2 uses email address as user) */}
+            <Input id="set-smtp_username" label={t('settings.smtpUsername')} value={settings.smtp_username || ''}
+              onChange={(e) => updateSetting('smtp_username', e.target.value)} />
+            {/* Provider: a preset that fills the endpoints */}
+            <SegmentedField id="set-smtp_oauth_provider" label={t('settings.smtpOauthProvider')}
+              options={['google', 'microsoft', 'microsoft365', 'custom'].map((p) => ({ value: p, label: t(`settings.smtpOauthProvider_${p}`) }))}
+              pressed={(p) => provider === p} onPick={applyOAuthProviderPreset} />
+            {OAUTH_CONSOLES[provider] && (
+              <Notice>
+                <strong>{t(`settings.smtpOauthSetup_${provider}_title`)}</strong>{' '}
+                <span className="pre-line">{t(`settings.smtpOauthSetup_${provider}_steps`)}</span>{' '}
+                <a className="text-link" href={OAUTH_CONSOLES[provider].consoleUrl} target="_blank" rel="noopener noreferrer">
+                  {OAUTH_CONSOLES[provider].consoleLabel} ↗
+                </a>
+              </Notice>
             )}
-          </div>
-
-          {/* Authentication: what the chosen method asks */}
-          <div className="space-y-3">
-            {(settings.smtp_auth_method || 'password') === 'none' && (
-              <p className="sf-hint">{t('settings.smtpNoAuthHint')}</p>
+            {provider === 'microsoft365' && (
+              <Input id="set-smtp_oauth_tenant_id" label={t('settings.smtpOauthTenant')} value={settings.smtp_oauth_tenant_id || ''}
+                onChange={oauth('smtp_oauth_tenant_id')} placeholder="common" hint={t('settings.smtpOauthTenantHintM365')} />
             )}
-            {/* Saving without authentication deletes the stored OAuth2 credentials (api/v2/settings/email) */}
-            {(settings.smtp_auth_method || 'password') === 'none' &&
-              (settings.has_oauth_client_secret || settings.has_oauth_refresh_token) && (
-              <p className="ui-notice is-warn">
-                <Warning aria-hidden="true" />
-                <span className="ui-notice-body">{t('settings.smtpNoAuthClearsOauth')}</span>
-              </p>
+            <Input id="set-smtp_oauth_client_id" label={t('settings.smtpOauthClientId')} value={settings.smtp_oauth_client_id || ''}
+              onChange={oauth('smtp_oauth_client_id')} />
+            <SecretInput id="set-smtp_oauth_client_secret" label={t('settings.smtpOauthClientSecret')}
+              value={settings.smtp_oauth_client_secret === '********' ? '' : (settings.smtp_oauth_client_secret || '')}
+              onChange={oauth('smtp_oauth_client_secret')} hasExistingValue={settings.has_oauth_client_secret}
+              {...secretInputProps(t, secretTargets.oauth)} />
+            {provider === 'custom' && (
+              <>
+                <Input id="set-smtp_oauth_authorize_url" label={t('settings.smtpOauthAuthorizeUrl')} value={settings.smtp_oauth_authorize_url || ''}
+                  onChange={oauth('smtp_oauth_authorize_url')} />
+                <Input id="set-smtp_oauth_token_url" label={t('settings.smtpOauthTokenUrl')} value={settings.smtp_oauth_token_url || ''}
+                  onChange={oauth('smtp_oauth_token_url')} />
+                <Input id="set-smtp_oauth_scope" label={t('settings.smtpOauthScope')} value={settings.smtp_oauth_scope || ''}
+                  onChange={oauth('smtp_oauth_scope')} />
+              </>
             )}
-
-            {(settings.smtp_auth_method || 'password') === 'password' && (
-              <div className="sf-fields">
-                  <Input
-                    label={t('settings.smtpUsername')}
-                    value={settings.smtp_username || ''}
-                    onChange={(e) => updateSetting('smtp_username', e.target.value)}
-                  />
-                  <Input
-                    label={t('settings.smtpPassword')}
-                    type="password"
-                    noAutofill
-                    value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
-                    onChange={(e) => updateSetting('smtp_password', e.target.value)}
-                    hasExistingValue={settings.smtp_password === '********'}
-                    {...secretInputProps(t, secretTargets.password)}
-                  />
-              </div>
-            )}
-
-            {(settings.smtp_auth_method || 'password') === 'oauth2' && (
-              <div className="space-y-3">
-                {/* Mailbox / username (XOAUTH2 uses email address as user) */}
-                <div className="sf-fields">
-                  <div className="col-span-full md:col-span-1">
-                    <Input
-                      label={t('settings.smtpUsername')}
-                      value={settings.smtp_username || ''}
-                      onChange={(e) => updateSetting('smtp_username', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Provider: a preset that fills the endpoints */}
-                <div className="ui-field">
-                  <span className="ui-label" id="smtp-oauth-provider">{t('settings.smtpOauthProvider')}</span>
-                  <div className="ui-segmented" role="group" aria-labelledby="smtp-oauth-provider">
-                    {['google', 'microsoft', 'microsoft365', 'custom'].map(provider => (
-                      <button
-                        key={provider}
-                        type="button"
-                        aria-pressed={(settings.smtp_oauth_provider || 'google') === provider}
-                        onClick={() => applyOAuthProviderPreset(provider)}
-                      >
-                        {t(`settings.smtpOauthProvider_${provider}`)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Per-provider setup guide */}
-                {oauthProviderSetup[settings.smtp_oauth_provider || 'google'] && (
-                  <div className="ui-notice">
-                    <Info aria-hidden="true" />
-                    <div className="ui-notice-body space-y-1.5">
-                      <p><strong>
-                        {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_title`)}
-                      </strong></p>
-                      <p className="whitespace-pre-line">
-                        {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_steps`)}
-                      </p>
-                      <a
-                        href={oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-accent-primary hover:underline"
-                      >
-                        {oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleLabel} ↗
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                <div className="sf-fields">
-                  {(settings.smtp_oauth_provider || 'google') === 'microsoft365' && (
-                    <div className="col-span-full md:col-span-1">
-                      <Input
-                        label={t('settings.smtpOauthTenant')}
-                        value={settings.smtp_oauth_tenant_id || ''}
-                        onChange={(e) => { updateSetting('smtp_oauth_tenant_id', e.target.value); setOauthDirty(true) }}
-                        placeholder="common"
-                        helper={t('settings.smtpOauthTenantHintM365')}
-                      />
-                    </div>
-                  )}
-                  <div className="col-span-full md:col-span-1">
-                    <Input
-                      label={t('settings.smtpOauthClientId')}
-                      value={settings.smtp_oauth_client_id || ''}
-                      onChange={(e) => { updateSetting('smtp_oauth_client_id', e.target.value); setOauthDirty(true) }}
-                    />
-                  </div>
-                  <div className="col-span-full md:col-span-1">
-                    <Input
-                      label={t('settings.smtpOauthClientSecret')}
-                      type="password"
-                      noAutofill
-                      value={settings.smtp_oauth_client_secret === '********' ? '' : (settings.smtp_oauth_client_secret || '')}
-                      onChange={(e) => { updateSetting('smtp_oauth_client_secret', e.target.value); setOauthDirty(true) }}
-                      hasExistingValue={settings.has_oauth_client_secret}
-                      {...secretInputProps(t, secretTargets.oauth)}
-                    />
-                  </div>
-                  {(settings.smtp_oauth_provider || 'google') === 'custom' && (
-                    <>
-                      <div className="col-span-full md:col-span-1">
-                        <Input
-                          label={t('settings.smtpOauthAuthorizeUrl')}
-                          value={settings.smtp_oauth_authorize_url || ''}
-                          onChange={(e) => { updateSetting('smtp_oauth_authorize_url', e.target.value); setOauthDirty(true) }}
-                        />
-                      </div>
-                      <div className="col-span-full md:col-span-1">
-                        <Input
-                          label={t('settings.smtpOauthTokenUrl')}
-                          value={settings.smtp_oauth_token_url || ''}
-                          onChange={(e) => { updateSetting('smtp_oauth_token_url', e.target.value); setOauthDirty(true) }}
-                        />
-                      </div>
-                      <div className="col-span-full md:col-span-1">
-                        <Input
-                          label={t('settings.smtpOauthScope')}
-                          value={settings.smtp_oauth_scope || ''}
-                          onChange={(e) => { updateSetting('smtp_oauth_scope', e.target.value); setOauthDirty(true) }}
-                        />
-                      </div>
-                    </>
-                  )}
-                  <div className="col-span-full">
-                    <Input
-                      label={t('settings.smtpOauthRedirectUri')}
-                      value={settings.smtp_oauth_redirect_uri || ''}
-                      onChange={(e) => { updateSetting('smtp_oauth_redirect_uri', e.target.value); setOauthDirty(true) }}
-                      placeholder={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/v2/settings/email/oauth/callback`}
-                      helper={t('settings.smtpOauthRedirectUriHint')}
-                    />
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          if (typeof window === 'undefined') return
-                          const defaultUri = `${window.location.origin}/api/v2/settings/email/oauth/callback`
-                          updateSetting('smtp_oauth_redirect_uri', defaultUri)
-                          setOauthDirty(true)
-                        }}
-                      >
-                        {t('settings.smtpOauthRedirectUriUseDefault')}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={!settings.smtp_oauth_redirect_uri}
-                        onClick={async () => {
-                          const val = settings.smtp_oauth_redirect_uri || ''
-                          if (!val) return
-                          // Plain HTTP has no async clipboard API: only
-                          // say it was copied once it really was.
-                          if (await copy(val)) showSuccess(t('common.copiedToClipboard'))
-                        }}
-                      >
-                        <Copy size={14} className="mr-1.5" />
-                        {t('common.copy')}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Authorization status + actions */}
-                {/* Unverified-app warning notice — only shown before authorization */}
-                {!settings.has_oauth_refresh_token && ['google', 'microsoft', 'microsoft365'].includes(settings.smtp_oauth_provider || 'google') && (
-                  <div className="ui-notice is-warn">
-                    <Warning aria-hidden="true" />
-                    <div className="ui-notice-body">
-                      <p><strong>{t('settings.smtpOauthUnverifiedTitle')}</strong></p>
-                      <p>{t('settings.smtpOauthUnverifiedBody')}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Authorization status + actions */}
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  <span className={`inline-flex items-center gap-1.5 text-xs ${
-                    settings.has_oauth_refresh_token ? 'text-status-success' : 'text-text-secondary'
-                  }`}>
-                    {settings.has_oauth_refresh_token
-                      ? <><CheckCircle size={13} />{t('settings.smtpOauthStatusAuthorized')}</>
-                      : <><XCircle size={13} />{t('settings.smtpOauthStatusNotAuthorized')}</>
-                    }
-                  </span>
-
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleSmtpOAuthAuthorize}
-                    disabled={!settings.smtp_oauth_client_id || saving}
-                    title={oauthDirty ? t('settings.smtpOauthAutoSaveHint') : undefined}
-                  >
-                    <Key size={14} />
-                    {oauthDirty ? t('settings.smtpOauthSaveAndAuthorize') : t('settings.smtpOauthAuthorize')}
-                  </Button>
-
-                  {settings.has_oauth_refresh_token && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="danger-soft"
-                      onClick={handleSmtpOAuthRevoke}
-                    >
-                      <XCircle size={14} />
-                      {t('settings.smtpOauthRevoke')}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-        </div>
-      </FormGroup>
-
-      {/* Email Template */}
-      <FormGroup title={t('settings.emailTemplate')}>
-        <ul className="sf-records">
-          <li>
-            <div className="sf-record-main">
-              <strong>{t('settings.emailTemplate')}</strong>
-              <span className="sf-record-meta">{isMobile ? t('settings.templateDesktopOnly') : t('settings.templateDescription')}</span>
+            <Input id="set-smtp_oauth_redirect_uri" full label={t('settings.smtpOauthRedirectUri')} value={settings.smtp_oauth_redirect_uri || ''}
+              onChange={oauth('smtp_oauth_redirect_uri')} placeholder={defaultRedirect} hint={t('settings.smtpOauthRedirectUriHint')} />
+            <div className="settings-actions">
+              <Btn onClick={() => { updateSetting('smtp_oauth_redirect_uri', defaultRedirect); setOauthDirty(true) }}>
+                {t('settings.smtpOauthRedirectUriUseDefault')}
+              </Btn>
+              <Btn tone="quiet" icon="copy" disabled={!settings.smtp_oauth_redirect_uri}
+                onClick={async () => {
+                  const val = settings.smtp_oauth_redirect_uri || ''
+                  // Plain HTTP has no async clipboard API: only say it was copied once it really was.
+                  if (val && await copy(val)) showSuccess(t('common.copiedToClipboard'))
+                }}>
+                {t('common.copy')}
+              </Btn>
             </div>
-            <div className="sf-record-actions">
-              <Button type="button" variant="secondary" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>
-                <PencilSimple size={16} />
-                {t('settings.editTemplate')}
-              </Button>
+            {/* Unverified-app warning notice, only shown before authorization */}
+            {!settings.has_oauth_refresh_token && ['google', 'microsoft', 'microsoft365'].includes(provider) && (
+              <Notice tone="warn"><strong>{t('settings.smtpOauthUnverifiedTitle')}</strong>{' '}{t('settings.smtpOauthUnverifiedBody')}</Notice>
+            )}
+            {/* Authorization status and actions */}
+            <div className="settings-actions">
+              <Pill tone={settings.has_oauth_refresh_token ? 'good' : 'muted'}
+                label={settings.has_oauth_refresh_token ? t('settings.smtpOauthStatusAuthorized') : t('settings.smtpOauthStatusNotAuthorized')} />
+              <Btn tone="primary" icon="key" onClick={handleSmtpOAuthAuthorize} disabled={!settings.smtp_oauth_client_id || saving}
+                title={oauthDirty ? t('settings.smtpOauthAutoSaveHint') : undefined}>
+                {oauthDirty ? t('settings.smtpOauthSaveAndAuthorize') : t('settings.smtpOauthAuthorize')}
+              </Btn>
+              {settings.has_oauth_refresh_token && (
+                <Btn tone="danger" icon="block" onClick={handleSmtpOAuthRevoke}>{t('settings.smtpOauthRevoke')}</Btn>
+              )}
             </div>
-          </li>
-        </ul>
-      </FormGroup>
+          </>
+        )}
+      </SettingsGroup>
 
+      <SettingsGroup legend={t('settings.emailTemplate')} grid={false}>
+        <RecordList>
+          <RecordRow title={t('settings.emailTemplate')} meta={isMobile ? t('settings.templateDesktopOnly') : t('settings.templateDescription')}
+            action={<Btn icon="file" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>{t('settings.editTemplate')}</Btn>} />
+        </RecordList>
+      </SettingsGroup>
       {showTemplateEditor && (
-        <EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} />
+        <div className="atl-out"><EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} /></div>
       )}
 
-      <FormGroup title={t('settings.expiryAlerts')}>
+      <SettingsGroup legend={t('settings.expiryAlerts')}>
         {!settings.smtp_host ? (
-          <p className="ui-notice is-warn">
-            <Warning aria-hidden="true" />
-            <span className="ui-notice-body">{t('settings.smtpRequiredForAlerts')}</span>
-          </p>
+          <Notice tone="warn">{t('settings.smtpRequiredForAlerts')}</Notice>
         ) : (
-        <div className="space-y-4">
-          <ToggleSwitch
-            checked={expiryAlerts.enabled}
-            onChange={(val) => setExpiryAlerts(prev => ({ ...prev, enabled: val }))}
-            label={t('settings.enableExpiryAlerts')}
-            size="sm"
-          />
-          <div className="ui-field">
-            <span className="ui-label" id="expiry-alert-days">{t('settings.alertDays')}</span>
-            <div className="ui-segmented" role="group" aria-labelledby="expiry-alert-days">
-              {[90, 60, 30, 14, 7, 3, 1].map(d => (
-                <button
-                  key={d}
-                  type="button"
-                  aria-pressed={expiryAlerts.alert_days.includes(d)}
-                  onClick={() => {
-                    setExpiryAlerts(prev => ({
-                      ...prev,
-                      alert_days: prev.alert_days.includes(d)
-                        ? prev.alert_days.filter(x => x !== d)
-                        : [...prev.alert_days, d].sort((a, b) => b - a)
-                    }))
-                  }}
-                >
-                  {t('time.short.days', { count: d })}
-                </button>
-              ))}
-            </div>
-            <p className="ui-help">{t('settings.alertDaysHelp')}</p>
-          </div>
-          <TagsInput
-            label={t('settings.alertRecipients')}
-            value={expiryAlerts.recipients || []}
-            onChange={(tags) => setExpiryAlerts(prev => ({ ...prev, recipients: tags }))}
-            placeholder={t('settings.alertRecipientsPlaceholder')}
-            helperText={t('settings.tagsInputHelp')}
-            validate={(v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)}
-          />
-          <ToggleSwitch
-            checked={expiryAlerts.include_revoked}
-            onChange={(val) => setExpiryAlerts(prev => ({ ...prev, include_revoked: val }))}
-            label={t('settings.includeRevoked')}
-            size="sm"
-          />
-          <ToggleSwitch
-            checked={!!expiryAlerts.exclude_acme}
-            onChange={(val) => setExpiryAlerts(prev => ({ ...prev, exclude_acme: val }))}
-            label={t('settings.excludeAcme')}
-            description={t('settings.excludeAcmeDesc')}
-            size="sm"
-          />
-          {canWrite('settings') && (
-            <div className="sf-actions-row">
-              <Button type="button" variant="secondary" onClick={triggerExpiryCheck}>
-                <Bell size={16} />
-                {t('settings.checkNow')}
-              </Button>
-            </div>
-          )}
-        </div>
+          <>
+            <ToggleSwitch id="set-expiry_enabled" checked={expiryAlerts.enabled}
+              onChange={(val) => setExpiryAlerts((prev) => ({ ...prev, enabled: val }))} label={t('settings.enableExpiryAlerts')} />
+            <SegmentedField id="set-expiry_alert_days" label={t('settings.alertDays')} hint={t('settings.alertDaysHelp')}
+              options={ALERT_DAYS.map((d) => ({ value: d, label: t('time.short.days', { count: d }) }))}
+              pressed={(d) => expiryAlerts.alert_days.includes(d)}
+              onPick={(d) => setExpiryAlerts((prev) => ({
+                ...prev,
+                alert_days: prev.alert_days.includes(d) ? prev.alert_days.filter((x) => x !== d) : [...prev.alert_days, d].sort((a, b) => b - a),
+              }))} />
+            <ListInput id="set-expiry_recipients" full label={t('settings.alertRecipients')} value={expiryAlerts.recipients || []}
+              onChange={(list) => setExpiryAlerts((prev) => ({ ...prev, recipients: list }))} validate={isEmail}
+              invalidMessage={(bad) => t('settings.alertRecipientsInvalid', { list: bad.join(', ') })}
+              placeholder={t('settings.alertRecipientsPlaceholder')} hint={t('settings.alertRecipientsHint')} />
+            <ToggleSwitch id="set-expiry_include_revoked" checked={expiryAlerts.include_revoked}
+              onChange={(val) => setExpiryAlerts((prev) => ({ ...prev, include_revoked: val }))} label={t('settings.includeRevoked')} />
+            <ToggleSwitch id="set-expiry_exclude_acme" checked={!!expiryAlerts.exclude_acme}
+              onChange={(val) => setExpiryAlerts((prev) => ({ ...prev, exclude_acme: val }))} label={t('settings.excludeAcme')}
+              description={t('settings.excludeAcmeDesc')} />
+            {canWrite('settings') && (
+              <div className="settings-actions">
+                <Btn icon="bell" onClick={triggerExpiryCheck}>{t('settings.checkNow')}</Btn>
+              </div>
+            )}
+          </>
         )}
-      </FormGroup>
+      </SettingsGroup>
       {/* Test of the saved relay, last in the frame as in the mockup: the button and its result */}
       {canWrite('settings') && (
-        <div className="sf-test">
-          <Button ref={testButton} type="button" variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
-            {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <PaperPlaneTilt size={16} />}
-            {t('settings.testEmail')}
-          </Button>
-          {emailTestResult ? (
-            <p className={`sf-test-result ${emailTestResult.success ? 'is-good' : 'is-bad'}`} role="status">
-              {emailTestResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
-              <span className="break-all">{emailTestResult.message}</span>
-            </p>
-          ) : (
-            <p className="sf-test-result">
-              <Question aria-hidden="true" />
-              <span>{t('settings.testEmailSavedHint')}</span>
-            </p>
-          )}
-        </div>
+        <SettingsTest id="email" label={t('settings.testEmail')} onTest={handleTestEmail} busy={emailTesting} buttonRef={testButton}
+          result={emailTestResult ? { ok: emailTestResult.success, text: emailTestResult.message } : null}
+          hint={t('settings.testEmailSavedHint')} />
       )}
     </>
   )

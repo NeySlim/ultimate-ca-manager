@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {  FloppyDisk, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Input, Select, Badge } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { Btn, Pill, Notice } from '../../components/atelier'
+import { Input, NumberInput, Select, ToggleSwitch } from '../../components/atelier/Form'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { useNotification } from '../../contexts'
 import { certificatesService, settingsService } from '../../services'
 import { certificateLabel } from '../../lib/utils'
@@ -10,8 +10,19 @@ import { fetchAllPages } from '../../lib/fetchAllPages'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
 import AdminLockLabel from './AdminLockLabel'
-import { fieldBounds } from './fieldChecks'
-import { FormGroup } from '../../components/sectioned'
+import { shownNumber, typedNumber } from './numberFields'
+
+const TIMEZONES = [
+  ['UTC', 'UTC (GMT+0)'], ['Europe/London', 'Europe/London (GMT+0/+1)'], ['Europe/Paris', 'Europe/Paris (GMT+1/+2)'],
+  ['Europe/Berlin', 'Europe/Berlin (GMT+1/+2)'], ['Europe/Zurich', 'Europe/Zurich (GMT+1/+2)'], ['Europe/Brussels', 'Europe/Brussels (GMT+1/+2)'],
+  ['Europe/Amsterdam', 'Europe/Amsterdam (GMT+1/+2)'], ['Europe/Rome', 'Europe/Rome (GMT+1/+2)'], ['Europe/Madrid', 'Europe/Madrid (GMT+1/+2)'],
+  ['Europe/Helsinki', 'Europe/Helsinki (GMT+2/+3)'], ['Europe/Athens', 'Europe/Athens (GMT+2/+3)'], ['Europe/Moscow', 'Europe/Moscow (GMT+3)'],
+  ['America/New_York', 'America/New York (GMT-5/-4)'], ['America/Chicago', 'America/Chicago (GMT-6/-5)'], ['America/Denver', 'America/Denver (GMT-7/-6)'],
+  ['America/Los_Angeles', 'America/Los Angeles (GMT-8/-7)'], ['America/Toronto', 'America/Toronto (GMT-5/-4)'], ['America/Sao_Paulo', 'America/São Paulo (GMT-3)'],
+  ['Asia/Dubai', 'Asia/Dubai (GMT+4)'], ['Asia/Kolkata', 'Asia/Kolkata (GMT+5:30)'], ['Asia/Shanghai', 'Asia/Shanghai (GMT+8)'],
+  ['Asia/Tokyo', 'Asia/Tokyo (GMT+9)'], ['Asia/Seoul', 'Asia/Seoul (GMT+9)'], ['Asia/Singapore', 'Asia/Singapore (GMT+8)'],
+  ['Australia/Sydney', 'Australia/Sydney (GMT+10/+11)'], ['Pacific/Auckland', 'Pacific/Auckland (GMT+12/+13)'],
+].map(([value, label]) => ({ value, label }))
 
 export default function GeneralSection({ settings, fieldErrors = {}, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
   const { t, i18n } = useTranslation()
@@ -26,7 +37,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
 
   // The API drops these keys without admin:settings; the other fields still save.
   const adminLocked = !(typeof hasPermission === 'function' && hasPermission('admin:settings'))
-  const lockedLabel = (key) => <AdminLockLabel text={t(key)} locked={adminLocked} />
+  const lockedLabel = (key) => <AdminLockLabel text={t(key)} locked={adminLocked} mockup />
   // HTTP_PROTOCOL_PORT in the service environment sets the port: the value shown is the one bound
   const portPinned = settings.env_locked?.http_protocol_port_env === true
   // Certificates with a private key, for the ACME public vhost TLS selector
@@ -80,218 +91,78 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
 
   return (
     <>
-      <FormGroup title={t('settings.subtitle')}>
-        <div className="space-y-4">
-          <Input
-            label={t('settings.systemName')}
-            value={settings.system_name || ''}
-            onChange={(e) => updateSetting('system_name', e.target.value)}
-            helperText={t('settings.systemNameHelper')}
-          />
-          <Input
-            label={lockedLabel('settings.baseUrl')}
-            disabled={adminLocked}
-            value={settings.base_url || ''}
-            error={fieldErrors.base_url}
-            onChange={(e) => updateSetting('base_url', e.target.value)}
-            placeholder={t('settings.baseUrlPlaceholder')}
-            helperText={t('settings.baseUrlHelper')}
-          />
-          <Input
-            label={lockedLabel('settings.protocolBaseUrl')}
-            disabled={adminLocked}
-            value={settings.protocol_base_url || ''}
-            error={fieldErrors.protocol_base_url}
-            onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
-            placeholder="http://admin.ucm.example.com:8080"
-            helperText={t('settings.protocolBaseUrlHelper')}
-          />
-          <Input
-            className="sf-short"
-            label={t('settings.httpProtocolPort')}
-            type="number"
-            min={0}
-            max={65535}
-            disabled={portPinned}
-            value={settings.http_protocol_port ?? 8080}
-            onChange={(e) => {
-              const val = parseInt(e.target.value) || 0
-              updateSetting('http_protocol_port', Math.min(65535, Math.max(0, val)))
-            }}
-            placeholder="8080"
-            helperText={portPinned
-              ? t('settings.httpProtocolPortEnvLocked')
-              : t('settings.httpProtocolPortHelper')}
-          />
-          <Input
-            label={lockedLabel('settings.acmePublicVhost')}
-            disabled={adminLocked}
-            value={settings.acme_public_vhost || ''}
-            onChange={(e) => updateSetting('acme_public_vhost', e.target.value)}
-            placeholder="acme.ucm.example.com"
-            helperText={t('settings.acmePublicVhostHelper')}
-          />
-          <Input
-            className="sf-short"
-            label={lockedLabel('settings.acmePublicPort')}
-            disabled={adminLocked}
-            type="number"
-            min={1}
-            max={65535}
-            inputMode="numeric"
-            value={settings.acme_public_port ?? 443}
-            onChange={(e) => updateSetting('acme_public_port', e.target.value === '' ? '' : Number(e.target.value))}
-            error={fieldErrors.acme_public_port}
-            helperText={t('settings.acmePublicPortHelper')}
-          />
-          <Select
-            label={lockedLabel('settings.acmePublicTlsCertId')}
-            disabled={adminLocked}
-            value={settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''}
-            onChange={(val) => updateSetting('acme_public_tls_cert_id', val || '')}
-            options={[
-              { value: '', label: t('common.none') },
-              ...tlsCertOptions,
-            ]}
-            helperText={t('settings.acmePublicTlsCertIdHelper')}
-          />
-          {canWrite('settings') && adminLocked && (
-            <p className="text-xs text-text-tertiary">{t('settings.adminFieldsLocked')}</p>
+      <SettingsGroup legend={t('settings.subtitle')}>
+        <Input id="set-system_name" label={t('settings.systemName')} value={settings.system_name || ''}
+          onChange={(e) => updateSetting('system_name', e.target.value)} hint={t('settings.systemNameHelper')} />
+        <Input id="set-base_url" full label={lockedLabel('settings.baseUrl')} disabled={adminLocked} value={settings.base_url || ''}
+          error={fieldErrors.base_url} onChange={(e) => updateSetting('base_url', e.target.value)}
+          placeholder={t('settings.baseUrlPlaceholder')} hint={t('settings.baseUrlHelper')} />
+        <Input id="set-protocol_base_url" full label={lockedLabel('settings.protocolBaseUrl')} disabled={adminLocked}
+          value={settings.protocol_base_url || ''} error={fieldErrors.protocol_base_url}
+          onChange={(e) => updateSetting('protocol_base_url', e.target.value)} placeholder="http://admin.ucm.example.com:8080"
+          hint={t('settings.protocolBaseUrlHelper')} />
+        <NumberInput id="set-http_protocol_port" label={t('settings.httpProtocolPort')} disabled={portPinned}
+          value={shownNumber(settings.http_protocol_port ?? 8080)} placeholder="8080"
+          onChange={(e) => updateSetting('http_protocol_port', Math.min(65535, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+          hint={portPinned ? t('settings.httpProtocolPortEnvLocked') : t('settings.httpProtocolPortHelper')} />
+        <Input id="set-acme_public_vhost" label={lockedLabel('settings.acmePublicVhost')} disabled={adminLocked}
+          value={settings.acme_public_vhost || ''} onChange={(e) => updateSetting('acme_public_vhost', e.target.value)}
+          placeholder="acme.ucm.example.com" hint={t('settings.acmePublicVhostHelper')} />
+        <NumberInput id="set-acme_public_port" label={lockedLabel('settings.acmePublicPort')} disabled={adminLocked}
+          value={shownNumber(settings.acme_public_port ?? 443)} error={fieldErrors.acme_public_port}
+          onChange={(e) => updateSetting('acme_public_port', typedNumber(e))} hint={t('settings.acmePublicPortHelper')} />
+        <Select id="set-acme_public_tls_cert_id" label={lockedLabel('settings.acmePublicTlsCertId')} disabled={adminLocked}
+          value={settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''}
+          onChange={(val) => updateSetting('acme_public_tls_cert_id', val || '')}
+          options={[{ value: '', label: t('common.none') }, ...tlsCertOptions]} hint={t('settings.acmePublicTlsCertIdHelper')} />
+        {canWrite('settings') && adminLocked && <Notice>{t('settings.adminFieldsLocked')}</Notice>}
+      </SettingsGroup>
+      <PublicEndpointsPanel settings={settings} updateSetting={updateSetting} refreshKey={savedVersion} adminLocked={adminLocked} />
+      <SettingsGroup legend={t('settings.sessionTimezone')}>
+        <NumberInput id="set-session_timeout" label={lockedLabel('settings.sessionTimeout')} disabled={adminLocked}
+          value={shownNumber(settings.session_timeout ?? 28800, (s) => Math.round((s || 28800) / 60))}
+          onChange={(e) => updateSetting('session_timeout', typedNumber(e, (m) => m * 60))}
+          hint={t('settings.sessionTimeoutHelper')} error={fieldErrors.session_timeout} />
+        <NumberInput id="set-max_login_attempts" label={lockedLabel('settings.maxLoginAttempts')} disabled={adminLocked}
+          value={shownNumber(settings.max_login_attempts ?? 5, (n) => n || 5)}
+          onChange={(e) => updateSetting('max_login_attempts', typedNumber(e))}
+          hint={t('settings.maxLoginAttemptsHelper')} error={fieldErrors.max_login_attempts} />
+        <NumberInput id="set-lockout_duration" label={lockedLabel('settings.lockoutDuration')} disabled={adminLocked}
+          value={shownNumber(settings.lockout_duration ?? 900, (s) => Math.round((s || 900) / 60))}
+          onChange={(e) => updateSetting('lockout_duration', typedNumber(e, (m) => m * 60))}
+          hint={t('settings.lockoutDurationHelper')} error={fieldErrors.lockout_duration} />
+        <Select id="set-timezone" label={t('settings.timezone')} options={TIMEZONES} value={settings.timezone || 'UTC'}
+          onChange={(val) => updateSetting('timezone', val)} />
+        <Select id="set-date_format" label={t('settings.dateFormat')}
+          options={[
+            { value: 'short', label: `${t('settings.dateFormats.short')}, ${sampleDate('short')}` },
+            { value: 'long', label: `${t('settings.dateFormats.long')}, ${sampleDate('long')}` },
+            { value: 'iso', label: `${t('settings.dateFormats.iso')}, 2026-01-06` },
+            { value: 'eu', label: `${t('settings.dateFormats.eu')}, 06/01/2026` },
+            { value: 'us', label: `${t('settings.dateFormats.us')}, 01/06/2026` },
+          ]}
+          value={settings.date_format || 'short'} onChange={(val) => updateSetting('date_format', val)} />
+        <ToggleSwitch id="set-show_time" checked={settings.show_time !== 'false' && settings.show_time !== false}
+          onChange={(on) => updateSetting('show_time', on)} label={t('settings.showTime')} />
+      </SettingsGroup>
+      <SettingsGroup legend={<>{t('settings.metrics.title')}{' '}
+        <Pill label={settings.metrics_enabled ? t('common.enabled') : t('common.disabled')} tone={settings.metrics_enabled ? 'good' : 'muted'} /></>}
+      hint={t('settings.metrics.subtitle')}>
+        <Input id="set-metrics_token" label={t('settings.metrics.token')} value={metricsToken}
+          onChange={(e) => setMetricsToken(e.target.value)} hint={t('settings.metrics.tokenHelper')}
+          placeholder={settings.metrics_enabled ? t('settings.metrics.tokenRotatePlaceholder') : t('settings.metrics.tokenPlaceholder')} />
+        <div className="settings-actions">
+          <Btn icon="refresh" write onClick={generateToken} disabled={!canWrite('settings')}>{t('settings.metrics.generate')}</Btn>
+          {canWrite('settings') && (
+            <Btn tone="primary" icon="check" onClick={saveMetricsToken} disabled={metricsBusy || !metricsToken}>
+              {settings.metrics_enabled ? t('settings.metrics.rotate') : t('settings.metrics.enable')}
+            </Btn>
+          )}
+          {canWrite('settings') && settings.metrics_enabled && (
+            <Btn tone="danger" onClick={disableMetrics} disabled={metricsBusy}>{t('settings.metrics.disable')}</Btn>
           )}
         </div>
-      </FormGroup>
-      <PublicEndpointsPanel
-        settings={settings}
-        updateSetting={updateSetting}
-        refreshKey={savedVersion}
-        adminLocked={adminLocked}
-      />
-      <FormGroup title={t('settings.sessionTimezone')}>
-        <div className="space-y-4">
-          <Input
-            className="sf-short"
-            label={lockedLabel('settings.sessionTimeout')}
-            disabled={adminLocked}
-            type="number"
-            value={Math.round((settings.session_timeout || 28800) / 60)}
-            onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value) * 60)}
-            helperText={t('settings.sessionTimeoutHelper')}
-            {...fieldBounds('session_timeout')}
-            error={fieldErrors['session_timeout']}
-          />
-          <Input
-            className="sf-short"
-            label={lockedLabel('settings.maxLoginAttempts')}
-            disabled={adminLocked}
-            type="number"
-            value={settings.max_login_attempts || 5}
-            onChange={(e) => updateSetting('max_login_attempts', parseInt(e.target.value))}
-            helperText={t('settings.maxLoginAttemptsHelper')}
-            {...fieldBounds('max_login_attempts')}
-            error={fieldErrors['max_login_attempts']}
-          />
-          <Input
-            className="sf-short"
-            label={lockedLabel('settings.lockoutDuration')}
-            disabled={adminLocked}
-            type="number"
-            value={Math.round((settings.lockout_duration || 900) / 60)}
-            onChange={(e) => updateSetting('lockout_duration', parseInt(e.target.value) * 60)}
-            helperText={t('settings.lockoutDurationHelper')}
-            {...fieldBounds('lockout_duration')}
-            error={fieldErrors['lockout_duration']}
-          />
-          <Select
-            label={t('settings.timezone')}
-            options={[
-              { value: 'UTC', label: 'UTC (GMT+0)' },
-              { value: 'Europe/London', label: 'Europe/London (GMT+0/+1)' },
-              { value: 'Europe/Paris', label: 'Europe/Paris (GMT+1/+2)' },
-              { value: 'Europe/Berlin', label: 'Europe/Berlin (GMT+1/+2)' },
-              { value: 'Europe/Zurich', label: 'Europe/Zurich (GMT+1/+2)' },
-              { value: 'Europe/Brussels', label: 'Europe/Brussels (GMT+1/+2)' },
-              { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam (GMT+1/+2)' },
-              { value: 'Europe/Rome', label: 'Europe/Rome (GMT+1/+2)' },
-              { value: 'Europe/Madrid', label: 'Europe/Madrid (GMT+1/+2)' },
-              { value: 'Europe/Helsinki', label: 'Europe/Helsinki (GMT+2/+3)' },
-              { value: 'Europe/Athens', label: 'Europe/Athens (GMT+2/+3)' },
-              { value: 'Europe/Moscow', label: 'Europe/Moscow (GMT+3)' },
-              { value: 'America/New_York', label: 'America/New York (GMT-5/-4)' },
-              { value: 'America/Chicago', label: 'America/Chicago (GMT-6/-5)' },
-              { value: 'America/Denver', label: 'America/Denver (GMT-7/-6)' },
-              { value: 'America/Los_Angeles', label: 'America/Los Angeles (GMT-8/-7)' },
-              { value: 'America/Toronto', label: 'America/Toronto (GMT-5/-4)' },
-              { value: 'America/Sao_Paulo', label: 'America/São Paulo (GMT-3)' },
-              { value: 'Asia/Dubai', label: 'Asia/Dubai (GMT+4)' },
-              { value: 'Asia/Kolkata', label: 'Asia/Kolkata (GMT+5:30)' },
-              { value: 'Asia/Shanghai', label: 'Asia/Shanghai (GMT+8)' },
-              { value: 'Asia/Tokyo', label: 'Asia/Tokyo (GMT+9)' },
-              { value: 'Asia/Seoul', label: 'Asia/Seoul (GMT+9)' },
-              { value: 'Asia/Singapore', label: 'Asia/Singapore (GMT+8)' },
-              { value: 'Australia/Sydney', label: 'Australia/Sydney (GMT+10/+11)' },
-              { value: 'Pacific/Auckland', label: 'Pacific/Auckland (GMT+12/+13)' },
-            ]}
-            value={settings.timezone || 'UTC'}
-            onChange={(val) => updateSetting('timezone', val)}
-          />
-          <Select
-            label={t('settings.dateFormat')}
-            options={[
-              { value: 'short', label: `${t('settings.dateFormats.short')}, ${sampleDate('short')}` },
-              { value: 'long', label: `${t('settings.dateFormats.long')}, ${sampleDate('long')}` },
-              { value: 'iso', label: `${t('settings.dateFormats.iso')}, 2026-01-06` },
-              { value: 'eu', label: `${t('settings.dateFormats.eu')}, 06/01/2026` },
-              { value: 'us', label: `${t('settings.dateFormats.us')}, 01/06/2026` },
-            ]}
-            value={settings.date_format || 'short'}
-            onChange={(val) => updateSetting('date_format', val)}
-          />
-          <ToggleSwitch
-            checked={settings.show_time !== 'false' && settings.show_time !== false}
-            onChange={(on) => updateSetting('show_time', on)}
-            label={t('settings.showTime')}
-          />
-        </div>
-      </FormGroup>
-      <FormGroup
-        title={t('settings.metrics.title')}
-        description={t('settings.metrics.subtitle')}
-        badge={(
-          <Badge variant={settings.metrics_enabled ? 'success' : 'secondary'} size="sm">
-            {settings.metrics_enabled ? t('common.enabled') : t('common.disabled')}
-          </Badge>
-        )}
-      >
-        <div className="sf-stack">
-          <div className="sf-grid">
-            <Input
-              label={t('settings.metrics.token')}
-              type="text"
-              value={metricsToken}
-              onChange={(e) => setMetricsToken(e.target.value)}
-              placeholder={settings.metrics_enabled ? t('settings.metrics.tokenRotatePlaceholder') : t('settings.metrics.tokenPlaceholder')}
-              helperText={t('settings.metrics.tokenHelper')}
-            />
-          </div>
-          <div className="sf-actions-row">
-            <Button type="button" variant="secondary" onClick={generateToken} disabled={!canWrite('settings')} data-write>
-              <ArrowsClockwise size={16} />
-              {t('settings.metrics.generate')}
-            </Button>
-            {canWrite('settings') && (
-              <Button type="button" onClick={saveMetricsToken} disabled={metricsBusy || !metricsToken}>
-                <FloppyDisk size={16} />
-                {settings.metrics_enabled ? t('settings.metrics.rotate') : t('settings.metrics.enable')}
-              </Button>
-            )}
-            {canWrite('settings') && settings.metrics_enabled && (
-              <Button type="button" variant="danger" onClick={disableMetrics} disabled={metricsBusy}>
-                {t('settings.metrics.disable')}
-              </Button>
-            )}
-          </div>
-        </div>
-      </FormGroup>
+      </SettingsGroup>
       <ServiceStatusWidget />
     </>
   )
