@@ -40,17 +40,17 @@ describe('CommandPalette, the mockup palette', () => {
 
   it('lists the pages the menu had and the palette lacked (N04)', () => {
     render(<CommandPalette open onOpenChange={vi.fn()} />)
-    for (const key of ['commands.nav.trustStore', 'commands.nav.userCertificates', 'commands.nav.tsa',
-      'commands.nav.crlOcsp', 'commands.nav.keyRecovery', 'commands.nav.discovery', 'commands.nav.logs']) {
+    for (const key of ['shell.moduleLabel.truststore', 'userCertificates.title', 'common.tsa',
+      'shell.moduleLabel.crlOcsp', 'common.keyRecovery', 'shell.moduleLabel.discovery', 'common.systemLogs']) {
       expect(names(), key).toContain(key)
     }
   })
 
   it('lists only what the account may open: no admin page, no action it may not run', () => {
     render(<CommandPalette open onOpenChange={vi.fn()} can={can(['read:certificates', 'read:truststore'])} />)
-    expect(names()).toContain('commands.nav.trustStore')
-    expect(names()).toContain('commands.nav.discovery')
-    for (const key of ['commands.nav.logs', 'commands.nav.users', 'commands.nav.keyRecovery', 'commands.nav.tsa',
+    expect(names()).toContain('shell.moduleLabel.truststore')
+    expect(names()).toContain('shell.moduleLabel.discovery')
+    for (const key of ['common.systemLogs', 'common.users', 'common.keyRecovery', 'common.tsa',
       'commands.actions.newCertificate', 'commands.actions.newCA', 'commands.actions.uploadCSR']) {
       expect(names(), key).not.toContain(key)
     }

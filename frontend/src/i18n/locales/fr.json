@@ -6994,39 +6994,6 @@
     "noCertsWithKey": "Aucun certificat avec clé privée trouvé"
   },
   "commands": {
-    "nav": {
-      "dashboard": "Aller au Tableau de bord",
-      "certificates": "Aller aux Certificats",
-      "cas": "Aller aux AC",
-      "csrs": "Aller aux CSR",
-      "templates": "Aller aux Modèles",
-      "users": "Aller aux Utilisateurs",
-      "acme": "Aller à ACME",
-      "scep": "Aller à SCEP",
-      "est": "Aller à EST",
-      "operations": "Aller aux Opérations",
-      "tools": "Aller aux Outils de certificats",
-      "audit": "Aller aux Journaux d’audit",
-      "settings": "Aller aux Paramètres",
-      "account": "Aller au Compte",
-      "groups": "Aller aux Groupes",
-      "rbac": "Aller à RBAC",
-      "sso": "Aller à SSO",
-      "hsm": "Aller à HSM",
-      "policies": "Aller aux Politiques",
-      "approvals": "Aller aux Approbations",
-      "reports": "Aller aux Rapports",
-      "discovery": "Aller à Découverte",
-      "msca": "Aller à l’AC Microsoft",
-      "sshCas": "AC SSH",
-      "sshCertificates": "Certificats SSH",
-      "trustStore": "Aller au magasin de confiance",
-      "userCertificates": "Aller aux certificats utilisateur",
-      "tsa": "Aller à TSA",
-      "keyRecovery": "Aller à la récupération de clés",
-      "logs": "Aller aux journaux système",
-      "crlOcsp": "Aller à CRL/OCSP"
-    },
     "actions": {
       "newCertificate": "Émettre un nouveau certificat",
       "newCA": "Créer une nouvelle AC",
@@ -7034,9 +7001,7 @@
     },
     "categories": {
       "navigation": "Navigation",
-      "actions": "Actions",
-      "proFeatures": "Fonctionnalités Pro",
-      "governance": "Gouvernance"
+      "actions": "Actions"
     }
   },
   "passwordStrength": {

@@ -8,6 +8,7 @@
  * barKey: label of a page of the main bar (MAIN_IDS).
  * descKey: one line under the module in the Modules menu; menuKey: its menu and pin label when shorter.
  * paths: extra routes of the module (detail routes, aliases).
+ * palette: listed by the command palette under its bar or menu name (id, icon, pro may differ from the module's).
  */
 // Module icons follow the mockup's (data.js): refresh, globe, plug, stamp, balance, approve, radar, users, chip, sliders, template, anchor
 import {
@@ -24,79 +25,78 @@ export const GROUPS = [
   { id: 'admin', labelKey: 'common.navAdmin' },
 ]
 
+// The palette's hint of the bar's pages and of those outside any menu (the mockup's « Navigation »)
 const NAV = 'commands.categories.navigation'
-const PRO = 'commands.categories.proFeatures'
-const GOV = 'commands.categories.governance'
 
 // Menu order within each group is the order of this list
 const RAW_MODULES = [
   { id: 'dashboard', path: '/', paths: ['/dashboard'], labelKey: 'common.dashboard', barKey: 'shell.bar.dashboard', shortKey: 'common.dashboardShort', icon: House, group: null, guard: 'auth',
-    palette: { rank: 1, labelKey: 'commands.nav.dashboard', category: NAV } },
+    palette: {} },
   { id: 'certificates', path: '/certificates', paths: ['/certificates/:id'], labelKey: 'common.certificates', barKey: 'shell.bar.certificates', shortKey: 'common.certificatesShort', icon: Certificate, group: 'pki', guard: 'auth', pinnable: true,
-    palette: { rank: 2, labelKey: 'commands.nav.certificates', category: NAV } },
+    palette: {} },
   { id: 'cas', path: '/cas', paths: ['/cas/:id'], labelKey: 'common.cas', barKey: 'shell.bar.cas', shortKey: 'common.casShort', icon: ShieldCheck, group: 'pki', guard: 'auth', pinnable: true,
-    palette: { rank: 3, labelKey: 'commands.nav.cas', category: NAV } },
+    palette: {} },
   { id: 'csrs', path: '/csrs', labelKey: 'common.csrs', descKey: 'shell.moduleDesc.csrs', shortKey: 'common.csrsShort', icon: FileText, group: 'pki', guard: 'auth', pinnable: true,
-    palette: { rank: 4, labelKey: 'commands.nav.csrs', category: NAV } },
+    palette: {} },
   { id: 'templates', path: '/templates', labelKey: 'common.templates', descKey: 'shell.moduleDesc.templates', shortKey: 'common.templatesShort', icon: Layout, group: 'pki', guard: 'auth', pinnable: true,
-    palette: { rank: 5, labelKey: 'commands.nav.templates', category: NAV } },
+    palette: {} },
   { id: 'ssh-cas', path: '/ssh/cas', labelKey: 'common.sshCas', descKey: 'shell.moduleDesc.sshCas', icon: Key, group: 'admin', guard: { permission: 'read:ssh_cas' }, pinnable: true,
-    palette: { rank: 29, labelKey: 'commands.nav.sshCas', icon: Terminal, category: NAV } },
+    palette: { icon: Terminal } },
   { id: 'ssh-certificates', path: '/ssh/certificates', labelKey: 'common.sshCertificates', descKey: 'shell.moduleDesc.sshCertificates', icon: Certificate, group: 'admin', guard: { permission: 'read:ssh' }, pinnable: true,
-    palette: { rank: 30, labelKey: 'commands.nav.sshCertificates', icon: Terminal, category: NAV } },
+    palette: { icon: Terminal } },
   { id: 'acme', path: '/acme', labelKey: 'common.acme', descKey: 'shell.moduleDesc.acme', shortKey: 'common.acmeShort', icon: ArrowClockwise, group: 'protocols', guard: { permission: 'read:acme' }, pinnable: true,
-    palette: { rank: 9, labelKey: 'commands.nav.acme', category: NAV } },
+    palette: {} },
   { id: 'scep', path: '/scep-config', labelKey: 'common.scep', descKey: 'shell.moduleDesc.scep', shortKey: 'common.scepShort', icon: Globe, group: 'protocols', guard: { permission: 'read:scep' }, pinnable: true,
-    palette: { rank: 10, labelKey: 'commands.nav.scep', category: NAV } },
+    palette: {} },
   { id: 'est', path: '/est-config', labelKey: 'common.est', descKey: 'shell.moduleDesc.est', shortKey: 'common.estShort', icon: Plug, group: 'protocols', guard: { permission: 'read:est' }, pinnable: true,
-    palette: { rank: 11, labelKey: 'commands.nav.est', category: NAV } },
+    palette: {} },
   { id: 'tsa', path: '/tsa-config', labelKey: 'common.tsa', descKey: 'shell.moduleDesc.tsa', icon: Stamp, group: 'protocols', guard: { permission: 'read:settings' }, pinnable: true,
-    palette: { rank: 12, labelKey: 'commands.nav.tsa', category: NAV } },
+    palette: {} },
   { id: 'crl-ocsp', path: '/crl-ocsp', labelKey: 'common.crlOcsp', descKey: 'shell.moduleDesc.crlOcsp', menuKey: 'shell.moduleLabel.crlOcsp', shortKey: 'common.crlOcspShort', icon: FileX, group: 'protocols', guard: { permission: 'read:crl' }, pinnable: true,
-    palette: { rank: 13, labelKey: 'commands.nav.crlOcsp', category: NAV } },
+    palette: {} },
   { id: 'truststore', path: '/truststore', paths: ['/truststore/:id'], labelKey: 'common.trustStore', descKey: 'shell.moduleDesc.truststore', menuKey: 'shell.moduleLabel.truststore', shortKey: 'common.trustStoreShort', icon: Anchor, group: 'pki', guard: { permission: 'read:truststore' }, pinnable: true,
-    palette: { rank: 6, labelKey: 'commands.nav.trustStore', category: NAV } },
+    palette: {} },
   { id: 'operations', path: '/operations', labelKey: 'common.operations', descKey: 'shell.moduleDesc.operations', shortKey: 'common.operationsShort', icon: Lightning, group: 'admin', guard: 'admin', pinnable: true,
-    palette: { id: 'import', rank: 14, labelKey: 'commands.nav.operations', category: NAV } },
+    palette: { id: 'import' } },
   { id: 'tools', path: '/tools', labelKey: 'common.tools', descKey: 'shell.moduleDesc.tools', shortKey: 'common.toolsShort', icon: Wrench, group: 'pki', guard: 'auth', pinnable: true,
-    palette: { rank: 15, labelKey: 'commands.nav.tools', category: NAV } },
+    palette: {} },
   { id: 'policies', path: '/policies', labelKey: 'common.policies', descKey: 'shell.moduleDesc.policies', shortKey: 'common.policiesShort', icon: Scales, group: 'governance', guard: { permission: 'read:policies' }, pinnable: true,
-    palette: { rank: 24, labelKey: 'commands.nav.policies', category: GOV } },
+    palette: {} },
   { id: 'approvals', path: '/approvals', labelKey: 'common.approvals', descKey: 'shell.moduleDesc.approvals', shortKey: 'common.approvalsShort', icon: CheckCircle, group: 'governance', guard: { permission: 'read:approvals' }, pinnable: true,
-    palette: { rank: 25, labelKey: 'commands.nav.approvals', category: GOV } },
+    palette: {} },
   { id: 'keyRecovery', path: '/key-recovery', labelKey: 'common.keyRecovery', descKey: 'shell.moduleDesc.keyRecovery', icon: Vault, group: 'governance', guard: { permission: 'read:key_recovery' }, pinnable: true,
-    palette: { rank: 26, labelKey: 'commands.nav.keyRecovery', category: GOV } },
+    palette: {} },
   { id: 'reports', path: '/reports', labelKey: 'common.reports', descKey: 'shell.moduleDesc.reports', shortKey: 'common.reportsShort', icon: ChartBar, group: 'governance', guard: { permission: 'read:audit' }, pinnable: true,
-    palette: { rank: 27, labelKey: 'commands.nav.reports', category: GOV } },
+    palette: {} },
   { id: 'discovery', path: '/discovery', labelKey: 'common.discovery', descKey: 'shell.moduleDesc.discovery', menuKey: 'shell.moduleLabel.discovery', icon: Target, group: 'governance', guard: { permission: 'read:certificates' }, pinnable: true,
-    palette: { rank: 28, labelKey: 'commands.nav.discovery', category: GOV } },
+    palette: {} },
   { id: 'users', path: '/users', labelKey: 'common.users', descKey: 'shell.moduleDesc.users', shortKey: 'common.usersShort', icon: Users, group: 'admin', guard: 'admin', pinnable: true,
-    palette: { rank: 8, labelKey: 'commands.nav.users', category: NAV } },
+    palette: {} },
   { id: 'rbac', path: '/rbac', labelKey: 'common.rbac', descKey: 'shell.moduleDesc.rbac', shortKey: 'common.rbacShort', icon: Shield, group: 'admin', guard: 'admin', pinnable: true,
-    palette: { rank: 21, labelKey: 'commands.nav.rbac', category: PRO, pro: true } },
+    palette: { pro: true } },
   { id: 'hsm', path: '/hsm', labelKey: 'common.hsm', descKey: 'shell.moduleDesc.hsm', menuKey: 'shell.moduleLabel.hsm', shortKey: 'common.hsmShort', icon: Cpu, group: 'admin', guard: { permission: 'read:hsm' }, pinnable: true,
-    palette: { rank: 23, labelKey: 'commands.nav.hsm', category: PRO, pro: true } },
+    palette: { pro: true } },
   { id: 'audit', path: '/audit', labelKey: 'common.audit', barKey: 'shell.bar.activity', descKey: 'shell.moduleDesc.audit', shortKey: 'common.auditShort', icon: ClockCounterClockwise, group: 'admin', guard: { permission: 'read:audit' }, pinnable: true,
-    palette: { rank: 16, labelKey: 'commands.nav.audit', category: NAV } },
+    palette: {} },
   { id: 'logs', path: '/logs', labelKey: 'common.systemLogs', descKey: 'shell.moduleDesc.logs', icon: Stack, group: 'admin', guard: 'admin', pinnable: true,
-    palette: { rank: 17, labelKey: 'commands.nav.logs', category: NAV } },
+    palette: {} },
   { id: 'user-certificates', path: '/user-certificates', labelKey: 'userCertificates.title', descKey: 'shell.moduleDesc.userCertificates', icon: Certificate, group: 'pki', guard: { permission: 'read:user_certificates' }, pinnable: true,
-    palette: { rank: 7, labelKey: 'commands.nav.userCertificates', category: NAV } },
+    palette: {} },
   { id: 'settings', path: '/settings', labelKey: 'common.settings', descKey: 'shell.moduleDesc.settings', shortKey: 'common.settingsShort', icon: SlidersHorizontal, group: 'admin', guard: 'admin', pinnable: true,
-    palette: { rank: 18, labelKey: 'commands.nav.settings', category: NAV } },
+    palette: {} },
   { id: 'account', path: '/account', labelKey: 'common.account', icon: UserCircle, group: null, guard: 'auth',
-    palette: { rank: 19, labelKey: 'commands.nav.account', category: NAV } },
+    palette: {} },
 ]
 
 export const MODULES = RAW_MODULES.map(m => ({ paths: [], keywords: [], pinnable: false, ...m }))
 
-// Legacy URLs still answered; `palette` lists the ones the command palette offers
+// Legacy URLs still answered; `palette` lists the ones the command palette offers, under `labelKey`
 export const REDIRECTS = [
   { from: '/import', to: '/operations' },
   { from: '/groups', to: '/users?tab=groups',
-    palette: { id: 'groups', path: '/users?tab=groups', rank: 20, labelKey: 'commands.nav.groups', icon: UsersThree, category: NAV } },
+    palette: { id: 'groups', path: '/users?tab=groups', labelKey: 'common.groups', icon: UsersThree } },
   { from: '/sso', to: '/settings?tab=sso',
-    palette: { id: 'sso', path: '/sso', rank: 22, labelKey: 'commands.nav.sso', icon: Key, category: PRO, pro: true } },
+    palette: { id: 'sso', path: '/sso', labelKey: 'settings.tabs.sso', icon: Key, pro: true } },
   { from: '/security', to: '/settings?tab=security' },
 ]
 
@@ -178,27 +178,37 @@ export function moduleForPath(pathname) {
     .sort((a, b) => b.path.length - a.path.length)[0] || null
 }
 
-/** Command palette entries, in display order; with `can`, only what the account may open (as isVisible). */
+const groupLabelKey = (id) => GROUPS.find(g => g.id === id)?.labelKey || NAV
+
+/**
+ * Command palette entries, in display order; with `can`, only what the account may open (as isVisible).
+ * As the mockup's commandResults() (M:1305): the bar's pages, then the Modules menu's in its order, each
+ * under its name there with its menu group as the hint; then the pages outside the menus, then the actions.
+ */
 export function paletteCommands(can) {
-  const entries = []
-  for (const m of MODULES) {
+  const entry = (m, labelKey, categoryKey) => {
     const p = m.palette
-    if (!p || !isVisible(m, can)) continue
     const icon = p.icon || m.icon
-    entries.push({ rank: p.rank, id: p.id || m.id, labelKey: p.labelKey, icon, path: m.path, categoryKey: p.category, ...(p.pro && { pro: true }) })
+    return { id: p.id || m.id, labelKey, icon, path: m.path, categoryKey, ...(p.pro && { pro: true }) }
   }
+  const shown = (m) => m?.palette && isVisible(m, can)
+  const entries = [
+    ...MAIN_IDS.map(moduleById).filter(shown).map(m => entry(m, m.barKey, NAV)),
+    ...menuGroupsFor(can).flatMap(g => g.modules.filter(shown).map(m => entry(m, menuLabelKey(m), g.labelKey))),
+    ...MODULES.filter(m => !m.group && !MAIN_IDS.includes(m.id) && shown(m)).map(m => entry(m, m.labelKey, NAV)),
+  ]
   for (const r of REDIRECTS) {
     const p = r.palette
-    // An alias is guarded as the page it leads to
-    if (!p || !isVisible(moduleForPath(r.to.split('?')[0]), can)) continue
-    const icon = p.icon
-    entries.push({ rank: p.rank, id: p.id, labelKey: p.labelKey, icon, path: p.path, categoryKey: p.category, ...(p.pro && { pro: true }) })
+    const target = moduleForPath(r.to.split('?')[0])
+    // An alias is guarded as the page it leads to, and hinted by its group
+    if (!p || !isVisible(target, can)) continue
+    const { icon } = p
+    entries.push({ id: p.id, labelKey: p.labelKey, icon, path: p.path, categoryKey: groupLabelKey(target.group), ...(p.pro && { pro: true }) })
   }
-  entries.sort((a, b) => a.rank - b.rank)
   const actions = PALETTE_ACTIONS.filter(a => isVisible(moduleById(a.moduleId), can) && isVisible(a, can)).map(a => {
     const m = moduleById(a.moduleId)
     const icon = m.icon
     return { id: a.id, labelKey: a.labelKey, icon, path: `${m.path}?${a.query}`, action: a.action, categoryKey: ACTION_CATEGORY }
   })
-  return [...entries.map(({ rank: _rank, ...e }) => e), ...actions]
+  return [...entries, ...actions]
 }

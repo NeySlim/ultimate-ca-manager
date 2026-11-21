@@ -7278,39 +7278,6 @@
     "noCertsWithKey": "Сертифікатів з приватним ключем не знайдено"
   },
   "commands": {
-    "nav": {
-      "dashboard": "Перейти до Панелі",
-      "certificates": "Перейти до Сертифікатів",
-      "cas": "Перейти до ЦС",
-      "csrs": "Перейти до CSR",
-      "templates": "Перейти до Шаблонів",
-      "users": "Перейти до Користувачів",
-      "acme": "Перейти до ACME",
-      "scep": "Перейти до SCEP",
-      "est": "Перейти до EST",
-      "operations": "Перейти до Операцій",
-      "tools": "Перейти до Інструментів сертифікатів",
-      "audit": "Перейти до Журналу аудиту",
-      "settings": "Перейти до Налаштувань",
-      "account": "Перейти до Облікового запису",
-      "groups": "Перейти до Груп",
-      "rbac": "Перейти до RBAC",
-      "sso": "Перейти до SSO",
-      "hsm": "Перейти до HSM",
-      "policies": "Перейти до Політик",
-      "approvals": "Перейти до Затверджень",
-      "reports": "Перейти до Звітів",
-      "discovery": "Перейти до Виявлення",
-      "msca": "Перейти до MS CA",
-      "sshCas": "SSH ЦС",
-      "sshCertificates": "SSH-сертифікати",
-      "trustStore": "Go to Trust Store",
-      "userCertificates": "Go to User Certificates",
-      "tsa": "Go to TSA",
-      "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs",
-      "crlOcsp": "Перейти до CRL/OCSP"
-    },
     "actions": {
       "newCertificate": "Видати новий сертифікат",
       "newCA": "Створити новий ЦС",
@@ -7318,9 +7285,7 @@
     },
     "categories": {
       "navigation": "Навігація",
-      "actions": "Дії",
-      "proFeatures": "Pro функції",
-      "governance": "Управління"
+      "actions": "Дії"
     }
   },
   "passwordStrength": {

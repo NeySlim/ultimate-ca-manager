@@ -217,9 +217,8 @@ describe('module icons', () => {
 
 describe('labels (c)', () => {
   const keys = [
-    ...MODULES.flatMap(m => [m.labelKey, m.shortKey, m.palette?.labelKey, m.barKey, m.descKey, m.menuKey]),
+    ...MODULES.flatMap(m => [m.labelKey, m.shortKey, m.barKey, m.descKey, m.menuKey]),
     ...GROUPS.map(g => g.labelKey),
-    ...REDIRECTS.map(r => r.palette?.labelKey),
     ...paletteCommands().flatMap(c => [c.labelKey, c.categoryKey]),
   ].filter(Boolean)
 
@@ -317,18 +316,36 @@ describe('moduleForPath', () => {
 })
 
 describe('palette', () => {
-  it('offers every page of the menu, then the actions (M:1305)', () => {
+  it('offers the pages of the bar, then those of the Modules menu in its order, then the actions (M:1305)', () => {
     expect(paletteCommands().map(c => `${c.id} ${c.path}`)).toEqual([
-      'dashboard /', 'certificates /certificates', 'cas /cas', 'csrs /csrs', 'templates /templates',
-      'truststore /truststore', 'user-certificates /user-certificates',
-      'users /users', 'acme /acme', 'scep /scep-config', 'est /est-config', 'tsa /tsa-config', 'crl-ocsp /crl-ocsp',
-      'import /operations', 'tools /tools', 'audit /audit', 'logs /logs', 'settings /settings', 'account /account',
-      'groups /users?tab=groups', 'rbac /rbac', 'sso /sso', 'hsm /hsm', 'policies /policies', 'approvals /approvals',
-      'keyRecovery /key-recovery', 'reports /reports', 'discovery /discovery',
-      'ssh-cas /ssh/cas', 'ssh-certificates /ssh/certificates',
+      'dashboard /', 'certificates /certificates', 'cas /cas', 'audit /audit',
+      'csrs /csrs', 'templates /templates', 'truststore /truststore', 'tools /tools', 'user-certificates /user-certificates',
+      'acme /acme', 'scep /scep-config', 'est /est-config', 'tsa /tsa-config', 'crl-ocsp /crl-ocsp',
+      'policies /policies', 'approvals /approvals', 'keyRecovery /key-recovery', 'reports /reports', 'discovery /discovery',
+      'ssh-cas /ssh/cas', 'ssh-certificates /ssh/certificates', 'import /operations', 'users /users', 'rbac /rbac', 'hsm /hsm',
+      'logs /logs', 'settings /settings',
+      'account /account', 'groups /users?tab=groups', 'sso /sso',
       'new-cert /certificates?action=create', 'new-ca /cas?action=create', 'upload-csr /csrs?action=upload',
     ])
-    expect(paletteCommands().filter(c => c.pro).map(c => c.id)).toEqual(['rbac', 'sso', 'hsm'])
+    expect(paletteCommands().filter(c => c.pro).map(c => c.id)).toEqual(['rbac', 'hsm', 'sso'])
+  })
+
+  it('names each page as the bar or the Modules menu does, its menu group as the hint (M:1305)', () => {
+    const byId = Object.fromEntries(paletteCommands().map(c => [c.id, c]))
+    for (const id of MAIN_IDS) {
+      expect(byId[id].labelKey, id).toBe(moduleById(id).barKey)
+      expect(byId[id].categoryKey, id).toBe('commands.categories.navigation')
+    }
+    for (const g of menuGroupsFor()) {
+      for (const m of g.modules) {
+        const c = paletteCommands().find(e => e.path === m.path)
+        expect(c.labelKey, m.id).toBe(menuLabelKey(m))
+        expect(c.categoryKey, m.id).toBe(g.labelKey)
+      }
+    }
+    expect([byId.account.labelKey, byId.account.categoryKey]).toEqual(['common.account', 'commands.categories.navigation'])
+    expect([byId.groups.labelKey, byId.groups.categoryKey]).toEqual(['common.groups', 'common.navAdmin'])
+    expect([byId.sso.labelKey, byId.sso.categoryKey]).toEqual(['settings.tabs.sso', 'common.navAdmin'])
   })
 
   it('every page of the Modules menu and of the bar is in the palette', () => {
@@ -340,7 +357,7 @@ describe('palette', () => {
     const ids = (can) => paletteCommands(can).map(c => c.id)
     const viewer = makeCan(['read:certificates', 'read:cas', 'read:csrs', 'read:templates', 'read:truststore'])
     expect(ids(viewer)).toEqual([
-      'dashboard', 'certificates', 'cas', 'csrs', 'templates', 'truststore', 'tools', 'account', 'discovery',
+      'dashboard', 'certificates', 'cas', 'csrs', 'templates', 'truststore', 'tools', 'discovery', 'account',
     ])
     expect(ids(makeCan(['read:certificates', 'write:certificates', 'read:acme']))).toEqual(
       expect.arrayContaining(['acme', 'discovery', 'new-cert']))

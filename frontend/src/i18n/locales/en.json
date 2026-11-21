@@ -6994,39 +6994,6 @@
     "noCertsWithKey": "No certificates with private key found"
   },
   "commands": {
-    "nav": {
-      "dashboard": "Go to Dashboard",
-      "certificates": "Go to Certificates",
-      "cas": "Go to CAs",
-      "csrs": "Go to CSRs",
-      "templates": "Go to Templates",
-      "users": "Go to Users",
-      "acme": "Go to ACME",
-      "scep": "Go to SCEP",
-      "est": "Go to EST",
-      "operations": "Go to Operations",
-      "tools": "Go to Certificate Tools",
-      "audit": "Go to Audit Logs",
-      "settings": "Go to Settings",
-      "account": "Go to Account",
-      "groups": "Go to Groups",
-      "rbac": "Go to RBAC",
-      "sso": "Go to SSO",
-      "hsm": "Go to HSM",
-      "policies": "Go to Policies",
-      "approvals": "Go to Approvals",
-      "reports": "Go to Reports",
-      "discovery": "Go to Discovery",
-      "msca": "Go to MS CA",
-      "sshCas": "SSH CAs",
-      "sshCertificates": "SSH Certificates",
-      "trustStore": "Go to Trust Store",
-      "userCertificates": "Go to User Certificates",
-      "tsa": "Go to TSA",
-      "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs",
-      "crlOcsp": "Go to CRL/OCSP"
-    },
     "actions": {
       "newCertificate": "Issue New Certificate",
       "newCA": "Create New CA",
@@ -7034,9 +7001,7 @@
     },
     "categories": {
       "navigation": "Navigation",
-      "actions": "Actions",
-      "proFeatures": "Pro Features",
-      "governance": "Governance"
+      "actions": "Actions"
     }
   },
   "passwordStrength": {
