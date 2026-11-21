@@ -5123,7 +5123,14 @@
     "disableEllipsis": "Désactiver…",
     "disableTitle": "Désactiver ce compte ?",
     "disableText": "{{login}} ne pourra plus se connecter.",
-    "disableConfirm": "Désactiver le compte"
+    "disableConfirm": "Désactiver le compte",
+    "roleDesc": {
+      "admin": "Toutes les opérations, y compris les paramètres et les comptes.",
+      "operator": "Émettre, renouveler et révoquer ; ni comptes ni contrôle d’accès.",
+      "auditor": "Lecture seule de toutes les données d’exploitation, journal compris.",
+      "viewer": "Lecture seule des certificats, des AC et des modèles."
+    },
+    "customRoleOf": "Rôle personnalisé : {{name}}"
   },
   "validation": {
     "required": "Ce champ est requis",

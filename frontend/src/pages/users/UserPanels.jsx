@@ -34,7 +34,7 @@ export function UserProfile({ user: u, self, canWrite, sso }) {
       </Section>
       <Section title={t('users.access')}>
         <Props items={[
-          [t('common.role'), u.custom_role_name ? <>{role}<br /><span className="muted">{t('rbac.customRole')} : {u.custom_role_name}</span></> : role],
+          [t('common.role'), <>{role}<br /><span className="muted">{u.custom_role_name ? t('users.customRoleOf', { name: u.custom_role_name }) : t(`users.roleDesc.${ROLE_KEYS[u.role] ? u.role : 'viewer'}`)}</span></>],
           [t('users.twoFactor'), <YesNo key="mfa" value={u.two_factor_enabled} />],
           [t('users.lastSeen'), u.last_login ? dateTimeOf(u.last_login, locale) : t('common.never')],
         ]} />

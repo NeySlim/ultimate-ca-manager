@@ -1973,7 +1973,14 @@
     "disableEllipsis": "Disable…",
     "disableTitle": "Disable this account?",
     "disableText": "{{login}} will no longer be able to sign in.",
-    "disableConfirm": "Disable the account"
+    "disableConfirm": "Disable the account",
+    "roleDesc": {
+      "admin": "Every operation, settings and accounts included.",
+      "operator": "Issue, renew and revoke; neither accounts nor access control.",
+      "auditor": "Read-only access to all operational data, the journal included.",
+      "viewer": "Read-only access to certificates, CAs and templates."
+    },
+    "customRoleOf": "Custom role: {{name}}"
   },
   "groups": {
     "group": "Група",

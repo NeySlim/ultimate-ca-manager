@@ -1913,7 +1913,14 @@
     "disableEllipsis": "停用…",
     "disableTitle": "停用此账户？",
     "disableText": "{{login}} 将无法再登录。",
-    "disableConfirm": "停用账户"
+    "disableConfirm": "停用账户",
+    "roleDesc": {
+      "admin": "所有操作，包括设置和账户。",
+      "operator": "签发、续期和吊销；不含账户和访问控制。",
+      "auditor": "只读访问所有运营数据，包括日志。",
+      "viewer": "只读访问证书、CA 和模板。"
+    },
+    "customRoleOf": "自定义角色：{{name}}"
   },
   "groups": {
     "group": "组",

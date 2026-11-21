@@ -135,6 +135,7 @@ describe('the account dock', () => {
       expect(within(dock).getByRole('button', { name })).toBeTruthy()
     }
     expect(within(dock).queryByText('users.selfNotice')).toBeNull()
+    expect(within(dock).getByText('users.roleDesc.operator')).toBeTruthy()
   })
 
   it('keeps your own account from being disabled or deleted, and says so', async () => {

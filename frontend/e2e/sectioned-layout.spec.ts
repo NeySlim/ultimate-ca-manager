@@ -183,4 +183,13 @@ test.describe('on a phone', () => {
       expect(wide).toBe(0)
     })
   }
+
+  test('each scheduler task is a card with its run button on the screen', async ({ page, api }) => {
+    await page.goto('/settings?tab=scheduler')
+    const run = page.locator('.sf-task-table .sf-task-run button')
+    await expect(run.first()).toBeVisible()
+    const off = await run.evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().right > window.innerWidth).length)
+    expect(off).toBe(0)
+    await expect(page.locator('.sf-task-table thead')).toBeHidden()
+  })
 })
