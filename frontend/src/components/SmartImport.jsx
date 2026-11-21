@@ -171,6 +171,7 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
   const [step, setStep] = useState('input')
   const [files, setFiles] = useState([]) // { name, type, data (base64 or text), size, password }
   const [pemContent, setPemContent] = useState('')
+  const [dragOver, setDragOver] = useState(false)
   const [password, setPassword] = useState('')
   const [useGlobalPassword, setUseGlobalPassword] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -246,6 +247,7 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
   
   // Files dropped on the file field are read as files picked
   const handleDrop = useCallback((e) => {
+    setDragOver(false)
     if (!e.dataTransfer?.files?.length) return
     e.preventDefault()
     readFiles(e.dataTransfer.files)
@@ -398,9 +400,12 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
   const renderInputStep = () => (
     <>
       <div className="form-fields">
-        <div className="field full" onDragOver={(e) => { if (e.dataTransfer?.types?.includes?.('Files')) e.preventDefault() }} onDrop={handleDrop}>
+        <div className={`field full${dragOver ? ' dragover' : ''}`} onDrop={handleDrop}
+          onDragOver={(e) => { if (e.dataTransfer?.types?.includes?.('Files')) { e.preventDefault(); setDragOver(true) } }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false) }}>
           <span>{t('import.files')}</span>
-          <span className="row-actions">
+          <span className="drop-zone">
+            {t('import.dropFileHere')}
             <label className="text-link">
               <input type="file" multiple accept={ALL_FORMATS} className="sr-only" onChange={handleFileSelect} />
               {t('common.chooseFile')}

@@ -5449,6 +5449,7 @@
     "privateKeysMatched": "приватних ключів співпало",
     "importMore": "Імпорт More",
     "allFormats": "Усі формати: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "dropFileHere": "Drop a file here or",
     "filePassword": "Пароль розшифрування для цього файлу",
     "useGlobalPassword": "Використовувати однаковий пароль для всіх файлів",
     "typeCaCertificate": "Сертифікат CA",

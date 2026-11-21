@@ -5449,6 +5449,7 @@
     "privateKeysMatched": "закрытых ключей сопоставлено",
     "importMore": "Импортировать ещё",
     "allFormats": "Все форматы: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "dropFileHere": "Перетащите файл сюда или",
     "filePassword": "Пароль расшифровки для этого файла",
     "useGlobalPassword": "Использовать один пароль для всех файлов",
     "typeCaCertificate": "Сертификат ЦС",

@@ -5243,6 +5243,7 @@
     "privateKeysMatched": "个私钥匹配",
     "importMore": "导入更多",
     "allFormats": "所有格式: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "dropFileHere": "Drop a file here or",
     "filePassword": "此文件的解密密码",
     "useGlobalPassword": "对所有文件使用相同密码",
     "typeCaCertificate": "CA证书",
