@@ -55,6 +55,12 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
         showWarning(t('acme.missingCredentials', { fields: missing.join(', ') }))
         return
       }
+      // Cloudflare: a token, or the legacy key with its email (the server refuses anything else)
+      const c = formData.credentials
+      if (formData.provider_type === 'cloudflare' && !c.api_token && !(c.api_key && c.email)) {
+        showWarning(t('acme.credentialsEitherOr'))
+        return
+      }
     }
     
     onSubmit(formData)
@@ -136,7 +142,7 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
       )}
       
       {formData.provider_type === 'manual' && (
-        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+        <div className="p-3 bg-status-info-op10 border border-status-info-op30 rounded-lg">
           <p className="text-sm text-text-secondary">{t('acme.manualDnsInfo')}</p>
         </div>
       )}

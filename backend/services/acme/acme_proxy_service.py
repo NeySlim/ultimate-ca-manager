@@ -3,21 +3,23 @@ ACME Proxy Service
 Acts as a gateway between internal ACME clients and upstream ACME providers (Let's Encrypt)
 """
 import base64
+import contextlib
 import copy
+import hashlib
 import json
 import logging
 import secrets
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple, Union
 from urllib.parse import urlsplit
 
 import requests
 
 from flask import current_app
-from sqlalchemy import and_, or_, inspect as sa_inspect
-from sqlalchemy.exc import NoInspectionAvailable
+from sqlalchemy import and_, or_, inspect as sa_inspect, text as sa_text
+from sqlalchemy.exc import NoInspectionAvailable, SQLAlchemyError
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock as _txt_record_lock
@@ -57,8 +59,8 @@ _CERT_FALLBACK_SCAN_LIMIT = 25
 # the upstream CA may still be reading it. The order lists it, flagged, until deleted; a
 # deletion a restart lost runs at the order's next read or housekeeping pass one delay later.
 _SUBMITTED_RECORD_LINGER = 120
-# The dns-01 threads of one order run in the worker that started them: one lock per
-# order id (striped) orders their writes to the row, a row lock covers PostgreSQL too.
+# SQLite only (one node): the dns-01 threads of one order run in the worker that started
+# them, one lock per order id (striped) orders their writes; PostgreSQL locks the row.
 _ORDER_ROW_LOCKS = tuple(threading.RLock() for _ in range(64))
 # Upstream authz reads for one challenge request the local cache cannot place:
 # each costs a request on the shared upstream account.
@@ -210,8 +212,73 @@ class _TtlCache:
 _directory_cache = _TtlCache(ttl_seconds=3600, max_entries=64)
 # Upstream finalize URL, keyed by upstream order URL.
 _finalize_url_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=4096)
-# (order id, identifier, authz URL) keyed by _challenge_cache_key().
-_challenge_order_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=8192)
+
+
+class _ChallengeOrderLinks:
+    """(order id, identifier, authz URL) keyed by _challenge_cache_key(), stored in the
+    database: the worker or node that answers the challenge POST need not be the one
+    that served the authorization. Best effort: a failed write leaves the upstream read."""
+
+    TTL = timedelta(hours=24)
+
+    @staticmethod
+    def _digest(key):
+        import hashlib
+        return hashlib.sha256(key.encode('utf-8')).hexdigest()
+
+    def get(self, key):
+        from models import AcmeProxyChallengeLink
+        if not key:
+            return None
+        row = AcmeProxyChallengeLink.query.filter_by(key_sha256=self._digest(key)).first()
+        if row is None or row.created_at < utc_now() - self.TTL:
+            return None
+        return row.order_id, row.identifier, row.authz_url
+
+    def put(self, key, value) -> None:
+        from models import AcmeProxyChallengeLink
+        if not key or value is None:
+            return
+        order_id, identifier, authz_url = value
+        digest = self._digest(key)
+        try:
+            with db.session.begin_nested():
+                AcmeProxyChallengeLink.query.filter(
+                    (AcmeProxyChallengeLink.key_sha256 == digest)
+                    | (AcmeProxyChallengeLink.created_at < utc_now() - self.TTL)
+                ).delete(synchronize_session=False)
+                db.session.add(AcmeProxyChallengeLink(
+                    key_sha256=digest, order_id=order_id, identifier=identifier,
+                    authz_url=authz_url, created_at=utc_now()))
+        except SQLAlchemyError as exc:
+            # A concurrent writer recorded the same link: only the savepoint is undone
+            logger.debug("[ACME Proxy] challenge link not recorded: %s", type(exc).__name__)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            raise
+
+    def pop(self, key) -> None:
+        from models import AcmeProxyChallengeLink
+        if not key:
+            return
+        AcmeProxyChallengeLink.query.filter_by(key_sha256=self._digest(key)).delete(
+            synchronize_session=False)
+
+    def clear(self) -> None:
+        from flask import has_app_context
+        from models import AcmeProxyChallengeLink
+        if not has_app_context():  # nothing is held in the process itself
+            return
+        try:
+            AcmeProxyChallengeLink.query.delete(synchronize_session=False)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+_challenge_order_cache = _ChallengeOrderLinks()
 # Upstream RenewalInfo and its retry instant, keyed by (directory URL, certID): kept for
 # the upstream Retry-After, within these bounds (RFC 9773 §4.3).
 _RENEWAL_INFO_CACHE_MIN, _RENEWAL_INFO_CACHE_MAX = 60, 3600
@@ -233,7 +300,10 @@ def _update_order_row(order, change):
     thread's commit would overwrite it."""
     try:
         db.session.commit()  # no transaction held while waiting for the lock
-        with _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)]:
+        # PostgreSQL: the row lock orders every worker and node; SQLite ignores FOR UPDATE
+        lock = (contextlib.nullcontext() if db.engine.dialect.name == 'postgresql'
+                else _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)])
+        with lock:
             db.session.refresh(order, with_for_update=True)
             result = change(order)
             db.session.commit()
@@ -501,6 +571,15 @@ class AcmeProxyService:
         )
         return False
 
+    @staticmethod
+    def _announce_stored(cert_id: int) -> None:
+        """certificate.issued for a certificate the proxy just stored, after its order's commit."""
+        from models import Certificate
+        row = db.session.get(Certificate, cert_id)
+        if row is not None:
+            from services.webhook_service import emit_cert_issued
+            emit_cert_issued(row.to_dict(), ca_refid=row.caref, actor='acme_proxy')
+
     def _prune_replaced_certificates(self, order, new_certificate_id: int) -> int:
         """Delete proxy-imported certificates superseded by this renewal (#240).
 
@@ -532,19 +611,14 @@ class AcmeProxyService:
             if cert.revoked or cert.source != 'acme_client':
                 # Revoked: keep for CRL/history. Non-proxy origin: never touch.
                 continue
-            # Detach every order still pointing at this certificate (FK safety)
-            for ref in AcmeClientOrder.query.filter_by(certificate_id=cert.id).all():
-                ref.certificate_id = None
+            # The deletion detaches the orders in its own transaction: a failure keeps the link
             try:
-                db.session.flush()
+                deleted = CertificateService.delete_certificate(cert.id, username='acme_proxy')
             except Exception as e:
                 db.session.rollback()
-                logger.error(
-                    f"[ACME Proxy] Prune: failed to detach orders from "
-                    f"certificate {cert.id}: {e}"
-                )
+                logger.error(f"[ACME Proxy] Prune: certificate {cert.id} not deleted: {e}")
                 continue
-            if CertificateService.delete_certificate(cert.id, username='acme_proxy'):
+            if deleted:
                 pruned += 1
             else:
                 logger.error(
@@ -1195,7 +1269,8 @@ class AcmeProxyService:
             return
         raise PermissionError(f"{resource} belongs to another account")
 
-    def _orders_by_authz_url(self, authz_url: str):
+    @classmethod
+    def _orders_by_authz_url(cls, authz_url: str):
         """Every proxy order that recorded this exact upstream authz URL.
 
         The proxy signs upstream with one shared account, so Let's Encrypt
@@ -1213,7 +1288,7 @@ class AcmeProxyService:
                             authz_url, autoescape=True))
                 .order_by(AcmeClientOrder.id.asc())
                 .all())
-        return [row for row in rows if authz_url in self._recorded_authz_urls(row)]
+        return [row for row in rows if authz_url in cls._recorded_authz_urls(row)]
 
     @staticmethod
     def _recorded_authz_urls(order):
@@ -1437,7 +1512,7 @@ class AcmeProxyService:
 
                         # Mark as initiated to avoid redundant threads
                         try:
-                            if self._mark_initiated(order, chall_url):
+                            if self._mark_initiated(order, chall_url, authz_url):
                                 thread.start()
                                 logger.info(f"[ACME Proxy] Triggered auto-DNS for {domain} via authz fetch")
                         except Exception as e:
@@ -1650,7 +1725,7 @@ class AcmeProxyService:
         # sharing this upstream challenge (#307) does not launch a second one.
         # Mirror get_authz: only start the thread once the flag is committed.
         try:
-            if self._mark_initiated(order, chall_url):
+            if self._mark_initiated(order, chall_url, authz_url):
                 thread.start()
         except Exception as exc:
             logger.error(f"Failed to start dns-01 automation: {exc}")
@@ -1740,7 +1815,9 @@ class AcmeProxyService:
         if cached:
             order_id, domain, authz_url = cached
             order = db.session.get(AcmeClientOrder, order_id)
-            if order is not None and order.is_proxy_order:
+            # A deleted order's id can be reused (SQLite): the link holds only on its authorization
+            if (order is not None and order.is_proxy_order
+                    and authz_url in self._recorded_authz_urls(order)):
                 return order, domain, authz_url
             _challenge_order_cache.pop(cache_key)
 
@@ -1815,7 +1892,7 @@ class AcmeProxyService:
         """Publish the dns-01 TXT record, wait for it, then submit upstream."""
         import hashlib
         from api.v2.acme_domains import find_provider_for_domain
-        from services.acme.dns_providers import create_provider
+        from services.acme.dns_providers import create_provider, saved_credentials
         from models import AcmeClientOrder
 
         # Calculate TXT value
@@ -1830,7 +1907,7 @@ class AcmeProxyService:
             return
 
         provider_model = provider_info['provider']
-        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+        credentials = saved_credentials(provider_model)
         provider = create_provider(provider_model.provider_type, credentials)
 
         # Hand the provider the name being validated and let it
@@ -1950,19 +2027,41 @@ class AcmeProxyService:
             order, chall_url, domain, None if resp is None else UpstreamProblem.from_response(resp),
             linger=records if taken is None and not refused else ())
 
-    @staticmethod
-    def _mark_initiated(order, chall_url):
-        """Flag a challenge's automation as started; False when it already was."""
-        def _flag(row):
-            challenges_data = row.challenges_dict
-            if (challenges_data.get(chall_url) or {}).get('status') in ('initiated', 'submitted'):
-                return False
-            challenges_data[chall_url] = {'status': 'initiated',
-                                          'started_at': datetime.now().isoformat()}
-            row.set_challenges_dict(challenges_data)
-            return True
-
-        return _update_order_row(order, _flag)
+    @classmethod
+    def _mark_initiated(cls, order, chall_url, authz_url=None):
+        """Flag a challenge's automation as started; False when it already was, on this
+        order or on a sibling order sharing the upstream challenge (#307)."""
+        from models import AcmeClientOrder
+        table = AcmeClientOrder.__table__
+        try:
+            db.session.commit()  # no transaction held while waiting for the lock
+            pg = db.engine.dialect.name == 'postgresql'
+            lock = (contextlib.nullcontext() if pg
+                    else _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)])
+            with lock:
+                # Held to the commit, before any read: PostgreSQL locks the challenge
+                # for every node, SQLite takes its database write lock
+                if pg:
+                    key = int.from_bytes(hashlib.sha256(chall_url.encode()).digest()[:8],
+                                         'big', signed=True)
+                    db.session.execute(sa_text('SELECT pg_advisory_xact_lock(:k)'), {'k': key})
+                else:
+                    db.session.execute(table.update().where(table.c.id == order.id)
+                                       .values(id=table.c.id))
+                db.session.refresh(order, with_for_update=True)
+                siblings = [o for o in cls._orders_by_authz_url(authz_url) if o.id != order.id]
+                if cls._challenge_automation_started(chall_url, [order] + siblings):
+                    db.session.commit()
+                    return False
+                challenges_data = order.challenges_dict
+                challenges_data[chall_url] = {'status': 'initiated',
+                                              'started_at': datetime.now().isoformat()}
+                order.set_challenges_dict(challenges_data)
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        return True
 
     @staticmethod
     def _mark_submitted(order, chall_url, records):
@@ -2247,7 +2346,7 @@ class AcmeProxyService:
     def _bg_cleanup_dns_records(self, app, records, order_id=None, delay=0):
         """Background task: delete DNS-01 TXT records after cert issuance (#218), after ``delay`` seconds."""
         from models import DnsProvider
-        from services.acme.dns_providers import create_provider
+        from services.acme.dns_providers import create_provider, saved_credentials
 
         if delay:
             time.sleep(delay)
@@ -2258,7 +2357,7 @@ class AcmeProxyService:
                         provider_model = db.session.get(DnsProvider, record['provider_id'])
                         if not provider_model:
                             continue
-                        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+                        credentials = saved_credentials(provider_model)
                         provider = create_provider(provider_model.provider_type, credentials)
                         logger.info(f"[ACME Proxy] Cleaning up DNS record: {record['record_name']} in zone {record['domain']}")
                         self._delete_dns_record(provider, record['domain'], record['record_name'],
@@ -2342,12 +2441,13 @@ class AcmeProxyService:
 
     def _build_eab(self, kid, hmac_key_b64, account_url):
         """Build External Account Binding JWS (RFC 8555 §7.3.4)"""
-        import hashlib
         import hmac as hmac_mod
 
         # Decode HMAC key (base64url-encoded)
         hmac_key_padded = hmac_key_b64 + '=' * (4 - len(hmac_key_b64) % 4)
         hmac_key = base64.urlsafe_b64decode(hmac_key_padded)
+        import fips_mode
+        fips_mode.refuse_short_hmac_key(hmac_key, 'EAB HMAC key of the upstream account')
 
         # Protected header for EAB
         protected = {
@@ -2365,7 +2465,7 @@ class AcmeProxyService:
 
         # HMAC-SHA256 signature
         signing_input = f"{protected_b64}.{payload_b64}".encode()
-        sig = hmac_mod.new(hmac_key, signing_input, hashlib.sha256).digest()
+        sig = hmac_mod.digest(hmac_key, signing_input, 'sha256')
         sig_b64 = base64.urlsafe_b64encode(sig).rstrip(b'=').decode()
 
         return {
@@ -2546,6 +2646,7 @@ class AcmeProxyService:
             response_body = cert_pem
 
             stored_cert = None
+            newly_stored = False
             # Store the certificate in the database
             try:
                 # The response usually contains full chain, extract first cert
@@ -2570,14 +2671,21 @@ class AcmeProxyService:
                         descr,
                     )
 
-                    stored_cert = CertificateService.import_certificate(
-                        descr=descr,
-                        cert_pem=first_cert,
-                        chain_pem=chain,
-                        source='acme_client',
-                        username='acme_proxy'
-                    )
-                    logger.info(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")
+                    # A second download of the order's certificate is the same row, not a new one
+                    from services.import_service import stored_certificate_serial
+                    held = db.session.get(Certificate, order.certificate_id) if order.certificate_id else None
+                    if held is not None and stored_certificate_serial(held) == cert_obj.serial_number:
+                        stored_cert = held
+                    else:
+                        stored_cert = CertificateService.import_certificate(
+                            descr=descr,
+                            cert_pem=first_cert,
+                            chain_pem=chain,
+                            source='acme_client',
+                            username='acme_proxy'
+                        )
+                        newly_stored = True
+                        logger.info(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")
             except Exception as e:
                 # Log but don't fail - cert was obtained
                 logger.error(f"[ACME Proxy] Error storing certificate: {e}")
@@ -2606,6 +2714,8 @@ class AcmeProxyService:
                     logger.error(f"Failed to update order status: {e}")
                 else:
                     _dns_rows_hook('close_for_order', order.id)
+                    if newly_stored:
+                        self._announce_stored(stored_cert.id)
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Failed during certificate cleanup: {e}")

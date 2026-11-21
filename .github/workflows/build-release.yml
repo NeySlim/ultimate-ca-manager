@@ -7,9 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g., 2.48)'
+        description: 'Version (e.g., 3.0-rc1)'
         required: true
         type: string
+      # A rehearsal runs the whole chain on any ref and publishes nothing: its output stays in
+      # the run's artifacts. Only a run from a tag, not a rehearsal, publishes.
+      dry_run:
+        description: 'Rehearsal: build everything, publish nothing'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -22,20 +29,50 @@ jobs:
   # ============================================================
   # Validate Release Tag
   # ============================================================
+  # Runs on every run, so that no later job waits on a skipped one; its tag checks run on a tag
   validate-tag:
     name: Validate Release Tag
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
+      # A run publishes only from a tag and for the version of that tag; any other run is a rehearsal
+      - name: Check the run mode
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = true ]; then
+            echo "Rehearsal of $INPUT_VERSION on $GITHUB_REF: nothing is published"
+            exit 0
+          fi
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::Only a tag publishes: dispatch on the tag, or as a rehearsal (dry_run)."
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$INPUT_VERSION" != "${GITHUB_REF#refs/tags/v}" ]; then
+            echo "::error::Version $INPUT_VERSION is not the version of $GITHUB_REF."
+            exit 1
+          fi
+          echo "Release run of $GITHUB_REF"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           fetch-depth: 0
 
       - name: Validate the tag grammar
+        if: startsWith(github.ref, 'refs/tags/')
         run: python3 scripts/ci/release_version.py validate "${GITHUB_REF#refs/tags/v}"
 
+      # A tag run builds the tag's version: the tagged commit must say the same in VERSION.
+      # A rehearsal builds its input version whatever VERSION says, so it is exempt.
+      - name: Check VERSION matches the tag
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        run: python3 scripts/ci/release_version.py matches "${GITHUB_REF#refs/tags/v}" VERSION
+
       - name: Ensure tag points to the correct release branch
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
 
@@ -54,21 +91,12 @@ jobs:
           EXPECTED_SHA="$(remote_head "$EXPECTED_BRANCH")"
           [ -n "$EXPECTED_SHA" ] || { echo "Branch $EXPECTED_BRANCH not found on origin."; exit 1; }
 
-          # A maintenance release (X.Y.Z, RC or stable) may also sit at the tip of its v<major>.x branch
-          MAINT_BRANCH="v${VERSION%%.*}.x"
-          MAINT_SHA=""
-          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            MAINT_SHA="$(remote_head "$MAINT_BRANCH")"
-          fi
-
           echo "Version: $VERSION"
           echo "Tag SHA: $TAG_SHA"
           echo "Expected origin/$EXPECTED_BRANCH SHA: $EXPECTED_SHA"
-          [ -z "$MAINT_SHA" ] || echo "Or origin/$MAINT_BRANCH SHA: $MAINT_SHA"
 
-          if [ "$TAG_SHA" != "$EXPECTED_SHA" ] && [ "$TAG_SHA" != "$MAINT_SHA" ]; then
-            echo "Stable tags must point to origin/main and RC tags to origin/test;"
-            echo "a maintenance release (X.Y.Z) may also point to its v<major>.x branch."
+          if [ "$TAG_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Stable tags must point to origin/main; RC tags must point to origin/test."
             echo "Refusing to build release from an unexpected commit."
             exit 1
           fi
@@ -80,7 +108,6 @@ jobs:
     name: Build DEB Package
     runs-on: ubuntu-latest
     needs: [validate-tag]
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.validate-tag.result == 'success')
     
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -103,7 +130,7 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/v}
           fi
           python3 scripts/ci/release_version.py validate "$VERSION"
-          # Convert to DEB version (2.254.1-rc1 -> 2.254.1~rc1)
+          # Convert to DEB version (3.0-rc1 -> 3.0~rc1)
           DEB_VERSION=$(python3 scripts/ci/release_version.py deb "$VERSION")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "deb_version=$DEB_VERSION" >> $GITHUB_OUTPUT
@@ -119,7 +146,7 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Normalize semver for npm: 2.254-rc1 -> 2.254.0-rc1
+          # Normalize semver for npm: 3.0-rc1 -> 3.0.0-rc1
           STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION
@@ -131,6 +158,9 @@ jobs:
           cd frontend
           npm ci
           npm run build
+
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
       
       - name: Install build dependencies
         run: |
@@ -163,6 +193,23 @@ jobs:
             # GitHub renames "~" to "." in asset names: write the published name so update clients match the line
             echo "$(sha256sum "$f" | cut -c1-64)  ${f//\~/.}" > "$f.sha256"
           done
+
+      # From the built file, extracted without running its scripts; a failure stops the release
+      - name: SBOM of the DEB
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          scripts/ci/sbom-venv.sh "$RUNNER_TEMP/sbom-venv"
+          for f in ucm_*.deb; do
+            root="$RUNNER_TEMP/deb-root/$f"
+            mkdir -p "$root"
+            dpkg-deb -x "$f" "$root"
+            dpkg-deb -f "$f" Pre-Depends Depends Recommends Suggests > "$RUNNER_TEMP/deb-depends"
+            "$RUNNER_TEMP/sbom-venv/bin/python" scripts/ci/sbom.py package --format deb --file "$f" --root "$root" \
+              --depends "$RUNNER_TEMP/deb-depends" --frontend "$RUNNER_TEMP/frontend-build.json" \
+              --version "$VERSION" --commit "$GITHUB_SHA" -o "${f//\~/.}.cdx.json"
+          done
       
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -171,6 +218,9 @@ jobs:
           path: |
             ucm_*.deb
             ucm_*.deb.sha256
+            ucm_*.deb.cdx.json
+            ucm_*.deb.cdx.json.sha256
+          if-no-files-found: error
 
   # ============================================================
   # Build RPM Package
@@ -193,6 +243,11 @@ jobs:
             image: almalinux:9
             artifact: rpm-el9-package
             asset_prefix: ucm-el9-
+          # EL10 ships python3 3.12: the package depends on the system python3
+          - label: EL10
+            image: almalinux:10
+            artifact: rpm-el10-package
+            asset_prefix: ucm-el10-
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -217,6 +272,9 @@ jobs:
           cd frontend
           npm ci
           npm run build
+
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
 
       - name: Build RPM in ${{ matrix.label }} container
         run: |
@@ -257,6 +315,8 @@ jobs:
               sed -i "s/^Version:.*/Version:        ${RPM_VERSION}/" ~/rpmbuild/SPECS/ucm.spec
               sed -i "s/^Source0:.*/Source0:        ucm-${TAR_VERSION}.tar.gz/" ~/rpmbuild/SPECS/ucm.spec
               sed -i "s/%setup -q/%setup -q -n ucm-${TAR_VERSION}/" ~/rpmbuild/SPECS/ucm.spec
+              # The %pre version guard, kept in one file shared with the DEB preinst
+              sh /workspace/packaging/scripts/embed-pivot-guard.sh ~/rpmbuild/SPECS/ucm.spec
               
               # Build
               rpmbuild -bb ~/rpmbuild/SPECS/ucm.spec
@@ -270,6 +330,35 @@ jobs:
               done
             '
 
+      # The RPM tools of its own distribution extract the payload and read the dependencies
+      - name: SBOM of the RPM
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          scripts/ci/sbom-venv.sh "$RUNNER_TEMP/sbom-venv"
+          mkdir -p "$RUNNER_TEMP/rpm-root"
+          docker run --rm -v /tmp/rpm-output:/output:ro -v "$RUNNER_TEMP/rpm-root:/rpm-root" "$IMAGE" bash -c '
+            set -euo pipefail
+            dnf install -y -q cpio
+            for f in /output/*.rpm; do
+              d=/rpm-root/$(basename "$f")
+              mkdir -p "$d/tree"
+              (cd "$d/tree" && rpm2cpio "$f" | cpio -idm --quiet --no-absolute-filenames)
+              { rpm -qp --requires "$f" | sed "s/^/Requires: /"
+                rpm -qp --recommends "$f" | sed "s/^/Recommends: /"
+                rpm -qp --suggests "$f" | sed "s/^/Suggests: /"; } > "$d/depends"
+            done
+            chmod -R a+rX /rpm-root'
+          for f in /tmp/rpm-output/*.rpm; do
+            name=$(basename "$f")
+            d="$RUNNER_TEMP/rpm-root/$name"
+            "$RUNNER_TEMP/sbom-venv/bin/python" scripts/ci/sbom.py package --format rpm --file "$f" --root "$d/tree" \
+              --depends "$d/depends" --frontend "$RUNNER_TEMP/frontend-build.json" \
+              --version "$VERSION" --commit "$GITHUB_SHA" -o "/tmp/rpm-output/${name//\~/.}.cdx.json"
+          done
+
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -277,6 +366,9 @@ jobs:
           path: |
             /tmp/rpm-output/*.rpm
             /tmp/rpm-output/*.rpm.sha256
+            /tmp/rpm-output/*.rpm.cdx.json
+            /tmp/rpm-output/*.rpm.cdx.json.sha256
+          if-no-files-found: error
 
   # ============================================================
   # Build Docker Image (one native runner per arch, then a manifest)
@@ -320,23 +412,35 @@ jobs:
           npm ci
           npm run build
 
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
+
       - name: Set image name
         id: image
         run: |
           echo "name=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      # A rehearsal pushes to a registry of its own, gone with the job, and reads its image back there
+      - name: Start the rehearsal registry
+        if: inputs.dry_run
+        run: docker run -d --name rehearsal-registry -p 5000:5000 registry:3@sha256:82f6ff4a7f982960c8aa51617fea3aabc485df6e55cce80d22deb1de36f1bc3c
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver-opts: ${{ inputs.dry_run && 'network=host' || '' }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -354,6 +458,7 @@ jobs:
       # The tags are set by the manifest job, once both architectures exist
       - name: Push by digest
         id: push
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -365,11 +470,55 @@ jobs:
           build-args: |
             VERSION=${{ needs.build-deb.outputs.version }}
 
-      - name: Export digest
+      - name: Push by digest to the rehearsal registry
+        id: rehearse
+        if: inputs.dry_run
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=localhost:5000/${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=std-${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ needs.build-deb.outputs.version }}
+
+      - name: Digest of the build
+        id: built
+        env:
+          DIGEST: ${{ steps.push.outputs.digest || steps.rehearse.outputs.digest }}
+          REPOSITORY: ${{ inputs.dry_run && format('localhost:5000/{0}', steps.image.outputs.name) || format('{0}/{1}', env.REGISTRY, steps.image.outputs.name) }}
         run: |
-          mkdir -p "${{ runner.temp }}/digests"
-          digest="${{ steps.push.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::not an image digest: $DIGEST"; exit 1; }
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "repository=$REPOSITORY" >> "$GITHUB_OUTPUT"
+
+      # The pushed platform image, by its digest; no digest leaves this job without its SBOM
+      - name: SBOM of the pushed image
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          DIGEST: ${{ steps.built.outputs.digest }}
+          REPOSITORY: ${{ steps.built.outputs.repository }}
+          ARCH: ${{ matrix.arch }}
+          FRONTEND: ${{ runner.temp }}/frontend-build.json
+        run: scripts/ci/sbom-image.sh standard
+
+      - name: Upload the image SBOM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: std-sbom-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/sbom/*.cdx.json
+            ${{ runner.temp }}/sbom/*.cdx.json.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.built.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -377,33 +526,75 @@ jobs:
           name: std-digest-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
+          retention-days: 7
+
+      # The smoke of a rehearsal boots this image: no registry it can reach holds it
+      - name: Save the image for the rehearsal smoke
+        if: inputs.dry_run && matrix.arch == 'amd64'
+        env:
+          REF: ${{ steps.built.outputs.repository }}@${{ steps.built.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull --quiet "$REF"
+          docker tag "$REF" ucm-rehearsal:standard
+          docker save ucm-rehearsal:standard | gzip -1 > "$RUNNER_TEMP/image.tar.gz"
+
+      - name: Upload the image for the rehearsal smoke
+        if: inputs.dry_run && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: std-image-amd64
+          path: ${{ runner.temp }}/image.tar.gz
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 1
 
-  # Tags the two per-arch digests as <version> and latest
+  # Tags the two per-arch digests as <version> and, by their rules, latest and the line; tag runs only,
+  # after a green smoke of the standard and FIPS amd64 digests (arm64 is not smoked)
   docker-manifest:
     name: Publish Docker Image
     runs-on: ubuntu-latest
-    needs: [build-deb, build-docker]
+    needs: [build-deb, build-docker, release-smoke]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # `latest` goes to the highest stable tag only (scripts/ci/release_version.py)
+      # `latest` goes to the highest published stable tag only (scripts/ci/release_version.py)
       - name: Decide latest
         id: latest
         env:
           VERSION: ${{ needs.build-deb.outputs.version }}
+          REHEARSAL: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
-          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
+          # A rehearsal decides as the tag run of its version would
+          if [[ "$GITHUB_REF" != refs/tags/* && "$REHEARSAL" != true ]]; then
             echo "latest=false" >> "$GITHUB_OUTPUT"
-            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
+            echo "latest for $VERSION: false (not a tag run)"
             exit 0
           fi
-          LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
+          TAGS=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2)
+          LATEST=$(python3 scripts/ci/release_version.py latest "$VERSION" <<< "$TAGS")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
+
+      # The line tag (`3`, `2`) goes to the highest published stable of its major, by the same guard
+      - name: Decide the line tag
+        id: line
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          REHEARSAL: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/tags/* && "$REHEARSAL" != true ]]; then
+            echo "line=" >> "$GITHUB_OUTPUT"
+            echo "line tag for $VERSION: none (not a tag run)"
+            exit 0
+          fi
+          TAGS=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2)
+          LINE=$(python3 scripts/ci/release_version.py line "$VERSION" <<< "$TAGS")
+          echo "line=$LINE" >> "$GITHUB_OUTPUT"
+          echo "line tag for $VERSION: ${LINE:-none}"
 
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -418,6 +609,22 @@ jobs:
           find . -type f -printf '%f\n'
           test "$(find . -type f | wc -l)" -eq 2
 
+      - name: Download the SBOMs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/sboms
+          pattern: std-sbom-*
+          merge-multiple: true
+
+      # Each SBOM was checked against the schema where it was made; here, that both are present
+      # and each names one of the digests about to be tagged
+      - name: Require the SBOM of each architecture
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: >-
+          python3 scripts/ci/sbom.py images --variant standard --version "$VERSION" --no-schema
+          --digests "${{ runner.temp }}/digests" --sboms "${{ runner.temp }}/sboms"
+
       - name: Set image name
         id: image
         run: |
@@ -427,14 +634,16 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -451,8 +660,14 @@ jobs:
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}
             type=raw,value=latest,enable=${{ steps.latest.outputs.latest == 'true' }}
+            type=raw,value=${{ steps.line.outputs.line }},enable=${{ steps.line.outputs.line != '' }}
+
+      - name: Show the tags a release would create
+        if: inputs.dry_run
+        run: jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"
 
       - name: Create manifest lists
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
         working-directory: ${{ runner.temp }}/digests
         run: |
           set -euo pipefail
@@ -466,7 +681,9 @@ jobs:
             docker buildx imagetools inspect "${tags[0]}"
           done
 
+      # The page describes the latest image: a candidate or an older line leaves it as it is
       - name: Update Docker Hub description
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run && steps.latest.outputs.latest == 'true'
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -478,13 +695,11 @@ jobs:
   # ============================================================
   # Build Docker Image, FIPS variant (one native runner per arch)
   # ============================================================
-  # continue-on-error on both FIPS jobs: a failed variant neither blocks the
-  # release job nor fails the run that Release Smoke Tests waits on.
+  # Blocking: a release is not published without its FIPS variant.
   build-docker-fips:
     name: Build Docker Image (FIPS, ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     needs: build-deb
-    continue-on-error: true
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -520,13 +735,23 @@ jobs:
           npm ci
           npm run build
 
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
+
       - name: Set image name
         id: image
         run: |
           echo "name=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      # A rehearsal pushes to a registry of its own, gone with the job, and reads its image back there
+      - name: Start the rehearsal registry
+        if: inputs.dry_run
+        run: docker run -d --name rehearsal-registry -p 5000:5000 registry:3@sha256:82f6ff4a7f982960c8aa51617fea3aabc485df6e55cce80d22deb1de36f1bc3c
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver-opts: ${{ inputs.dry_run && 'network=host' || '' }}
 
       - name: Extract metadata
         id: meta
@@ -561,14 +786,16 @@ jobs:
         run: scripts/ci/check-fips-image.sh ucm:fips-check
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -576,6 +803,7 @@ jobs:
       # Same inputs as the checked build, so every layer comes from its cache
       - name: Push by digest
         id: push
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -587,11 +815,56 @@ jobs:
             VERSION=${{ needs.build-deb.outputs.version }}
             UCM_FIPS_BUILD=1
 
-      - name: Export digest
+      - name: Push by digest to the rehearsal registry
+        id: rehearse
+        if: inputs.dry_run
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=localhost:5000/${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=fips-${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ needs.build-deb.outputs.version }}
+            UCM_FIPS_BUILD=1
+
+      - name: Digest of the build
+        id: built
+        env:
+          DIGEST: ${{ steps.push.outputs.digest || steps.rehearse.outputs.digest }}
+          REPOSITORY: ${{ inputs.dry_run && format('localhost:5000/{0}', steps.image.outputs.name) || format('{0}/{1}', env.REGISTRY, steps.image.outputs.name) }}
         run: |
-          mkdir -p "${{ runner.temp }}/digests"
-          digest="${{ steps.push.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::not an image digest: $DIGEST"; exit 1; }
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "repository=$REPOSITORY" >> "$GITHUB_OUTPUT"
+
+      # The pushed platform image, by its digest; no digest leaves this job without its SBOM
+      - name: SBOM of the pushed image
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          DIGEST: ${{ steps.built.outputs.digest }}
+          REPOSITORY: ${{ steps.built.outputs.repository }}
+          ARCH: ${{ matrix.arch }}
+          FRONTEND: ${{ runner.temp }}/frontend-build.json
+        run: scripts/ci/sbom-image.sh fips
+
+      - name: Upload the image SBOM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fips-sbom-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/sbom/*.cdx.json
+            ${{ runner.temp }}/sbom/*.cdx.json.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.built.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -599,36 +872,77 @@ jobs:
           name: fips-digest-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
+          retention-days: 7
+
+      # The smoke of a rehearsal boots this image: no registry it can reach holds it
+      - name: Save the image for the rehearsal smoke
+        if: inputs.dry_run && matrix.arch == 'amd64'
+        env:
+          REF: ${{ steps.built.outputs.repository }}@${{ steps.built.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull --quiet "$REF"
+          docker tag "$REF" ucm-rehearsal:fips
+          docker save ucm-rehearsal:fips | gzip -1 > "$RUNNER_TEMP/image.tar.gz"
+
+      - name: Upload the image for the rehearsal smoke
+        if: inputs.dry_run && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fips-image-amd64
+          path: ${{ runner.temp }}/image.tar.gz
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 1
 
-  # Tags the two per-arch digests as <version>-fips and latest-fips
+  # Tags the two per-arch digests as <version>-fips and, by their rules, latest-fips and <line>-fips; tag runs
+  # only, after a green smoke of the standard and FIPS amd64 digests (arm64 is not smoked)
   docker-fips-manifest:
     name: Publish Docker Image (FIPS)
     runs-on: ubuntu-latest
-    needs: [build-deb, build-docker-fips]
-    continue-on-error: true
+    needs: [build-deb, build-docker-fips, release-smoke]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: scripts/ci
 
-      # `latest` goes to the highest stable tag only (scripts/ci/release_version.py)
+      # `latest` goes to the highest published stable tag only (scripts/ci/release_version.py)
       - name: Decide latest
         id: latest
         env:
           VERSION: ${{ needs.build-deb.outputs.version }}
+          REHEARSAL: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
-          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
+          # A rehearsal decides as the tag run of its version would
+          if [[ "$GITHUB_REF" != refs/tags/* && "$REHEARSAL" != true ]]; then
             echo "latest=false" >> "$GITHUB_OUTPUT"
-            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
+            echo "latest for $VERSION: false (not a tag run)"
             exit 0
           fi
-          LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
+          TAGS=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2)
+          LATEST=$(python3 scripts/ci/release_version.py latest "$VERSION" <<< "$TAGS")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
+
+      # The line tag (`3`, `2`) goes to the highest published stable of its major, by the same guard
+      - name: Decide the line tag
+        id: line
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          REHEARSAL: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/tags/* && "$REHEARSAL" != true ]]; then
+            echo "line=" >> "$GITHUB_OUTPUT"
+            echo "line tag for $VERSION: none (not a tag run)"
+            exit 0
+          fi
+          TAGS=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2)
+          LINE=$(python3 scripts/ci/release_version.py line "$VERSION" <<< "$TAGS")
+          echo "line=$LINE" >> "$GITHUB_OUTPUT"
+          echo "line tag for $VERSION: ${LINE:-none}"
 
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -637,12 +951,28 @@ jobs:
           pattern: fips-digest-*
           merge-multiple: true
 
-      # A job with continue-on-error counts as passed: never tag a single arch
+      # Never tag a single arch, even if a matrix leg uploaded nothing
       - name: Require both architectures
         working-directory: ${{ runner.temp }}/digests
         run: |
           find . -type f -printf '%f\n'
           test "$(find . -type f | wc -l)" -eq 2
+
+      - name: Download the SBOMs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/sboms
+          pattern: fips-sbom-*
+          merge-multiple: true
+
+      # Each SBOM was checked against the schema where it was made; here, that both are present
+      # and each names one of the digests about to be tagged
+      - name: Require the SBOM of each architecture
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: >-
+          python3 scripts/ci/sbom.py images --variant fips --version "$VERSION" --no-schema
+          --digests "${{ runner.temp }}/digests" --sboms "${{ runner.temp }}/sboms"
 
       - name: Set image name
         id: image
@@ -653,14 +983,16 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -678,8 +1010,14 @@ jobs:
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}-fips
             type=raw,value=latest-fips,enable=${{ steps.latest.outputs.latest == 'true' }}
+            type=raw,value=${{ steps.line.outputs.line }}-fips,enable=${{ steps.line.outputs.line != '' }}
+
+      - name: Show the tags a release would create
+        if: inputs.dry_run
+        run: jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"
 
       - name: Create manifest lists
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
         working-directory: ${{ runner.temp }}/digests
         run: |
           set -euo pipefail
@@ -699,14 +1037,38 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-deb, build-rpm, docker-manifest]
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-deb, build-rpm, release-smoke, docker-manifest, docker-fips-manifest]
     
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      
+
+      # `latest` goes to the highest published stable tag only (scripts/ci/release_version.py)
+      - name: Decide latest
+        id: latest
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          REHEARSAL: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # A rehearsal decides as the tag run of its version would
+          if [[ "$GITHUB_REF" != refs/tags/* && "$REHEARSAL" != true ]]; then
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "latest for $VERSION: false (not a tag run)"
+            exit 0
+          fi
+          TAGS=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2)
+          LATEST=$(python3 scripts/ci/release_version.py latest "$VERSION" <<< "$TAGS")
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "latest for $VERSION: $LATEST"
+
+      - name: Decide prerelease
+        id: kind
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: echo "prerelease=$(python3 scripts/ci/release_version.py prerelease "$VERSION")" >> "$GITHUB_OUTPUT"
+
       - name: Download DEB artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -725,6 +1087,12 @@ jobs:
           name: rpm-el9-package
           path: ./artifacts
 
+      - name: Download EL10 RPM artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rpm-el10-package
+          path: ./artifacts
+
       - name: Check the RPM taken by older updaters
         # Updaters before 2.241 install the first .rpm asset by name: it must be the Fedora one
         run: |
@@ -736,35 +1104,19 @@ jobs:
       
       - name: Generate release notes
         id: notes
+        env:
+          REHEARSAL: ${{ inputs.dry_run }}
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           IMAGE="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
           REPO="${{ github.repository }}"
           
-          # Extract changelog section for this version
+          # Its own section; a RC without one takes [Unreleased]. A missing stable section stops the
+          # release, and only warns in a rehearsal, which runs before the bump commit.
+          NOTES_MODE=()
+          if [ "$REHEARSAL" = true ]; then NOTES_MODE=(--rehearsal); fi
           CHANGES_FILE=$(mktemp)
-          PREVIOUS_FILE=$(mktemp)
-          if [ -f CHANGELOG.md ]; then
-            # Extract content between ## [VERSION] and the next ## [
-            python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md > "$CHANGES_FILE" || true
-
-            # Extract the 2 previous versioned sections (skip Unreleased and current)
-            # Output is the raw markdown blocks (heading + body) so users see version + date.
-            awk -v current="${VERSION}" '
-              /^## \[Unreleased\]/ { capture=0; next }
-              /^## \[/ {
-                line = $0
-                sub(/^## \[/, "", line)
-                sub(/\].*$/, "", line)
-                ver = line
-                if (ver == current) { capture=0; next }
-                if (count >= 2) { capture=0; exit }
-                count++
-                capture=1
-              }
-              capture { print }
-            ' CHANGELOG.md > "$PREVIOUS_FILE" || true
-          fi
+          python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md "${NOTES_MODE[@]}" > "$CHANGES_FILE"
           
           # Build release notes
           {
@@ -776,18 +1128,10 @@ jobs:
               echo "---"
               echo ""
             fi
-            if [ -s "$PREVIOUS_FILE" ]; then
-              echo "<details>"
-              echo "<summary><strong>📜 Recent release history (last 2 versions)</strong></summary>"
-              echo ""
-              cat "$PREVIOUS_FILE"
-              echo ""
-              echo "Full history: [CHANGELOG.md](https://github.com/REPO/blob/main/CHANGELOG.md)"
-              echo "</details>"
-              echo ""
-              echo "---"
-              echo ""
-            fi
+            echo "Earlier releases: [CHANGELOG.md](https://github.com/REPO/blob/v${VERSION}/CHANGELOG.md)"
+            echo ""
+            echo "---"
+            echo ""
             cat << 'INSTALL_EOF'
           ## Installation
           
@@ -823,9 +1167,15 @@ jobs:
           wget https://github.com/REPO/releases/download/vVERSION/ucm-el9-RPM_VERSION-1.el9.noarch.rpm
           sudo dnf install ./ucm-el9-RPM_VERSION-1.el9.noarch.rpm
           ```
+
+          ### RHEL, AlmaLinux, Rocky Linux 10
+          ```bash
+          wget https://github.com/REPO/releases/download/vVERSION/ucm-el10-RPM_VERSION-1.el10.noarch.rpm
+          sudo dnf install ./ucm-el10-RPM_VERSION-1.el10.noarch.rpm
+          ```
           
-          ### FIPS mode (preview)
-          FIPS mode is a preview: feedback is welcome on [#399](https://github.com/REPO/issues/399). Full guide: [FIPS Mode](https://github.com/REPO/wiki/FIPS-Mode).
+          ### FIPS mode
+          The `-fips` image runs on the OpenSSL FIPS Provider 3.5.9 (CMVP certificate #5586), which approves ML-DSA, Ed25519 and Ed448; the packages run on the FIPS module of RHEL 9 (#5573) or Ubuntu 24.04 (#5115), which do not. Full guide: [FIPS Mode](https://github.com/REPO/wiki/FIPS-Mode).
           
           Docker, any Linux host (amd64, arm64):
           ```bash
@@ -834,7 +1184,7 @@ jobs:
             --name ucm neyslim/ultimate-ca-manager:VERSION-fips
           ```
           
-          Ubuntu 24.04 with Ubuntu Pro (`sudo pro enable fips-updates`, then reboot):
+          Ubuntu 24.04 with Ubuntu Pro (`sudo pro enable fips`, then reboot). The binary certified under #5115 is the one of Ubuntu Pro's `fips` stream; `fips-updates` carries later, patched versions that are not the certified binary:
           ```bash
           sudo apt-get install -y gcc pkg-config python3-dev python3-venv libpq-dev libxml2-dev libxslt1-dev \
               zlib1g-dev libssl-dev libxmlsec1-dev libxmlsec1t64-openssl rustc-1.91 cargo-1.91
@@ -859,15 +1209,14 @@ jobs:
           sudo UCM_PORT=8443 UCM_FIREWALL=no dpkg -i ucm_DEB_VERSION_all.deb
           ```
           
-          ## Default Credentials
+          ## First Access
           - **Username:** `admin`
-          - **Password:** `changeme123`
-          
-          **Change the password immediately after first login!**
+          - **Password:** none by default. Set `INITIAL_ADMIN_PASSWORD_FILE` (or `INITIAL_ADMIN_PASSWORD`) before the first start, or read the generated one with `sudo cat /opt/ucm/data/initial-admin-password` (Docker: `docker exec <container> cat /opt/ucm/data/initial-admin-password`); a generated password must be changed at first login.
           
           ## Documentation
-          - [Installation Guide](docs/installation/README.md)
-          - [API Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki/API)
+          - [Installation Guide](https://github.com/REPO/blob/vVERSION/docs/installation/README.md)
+          - [Upgrade notes](https://github.com/REPO/blob/vVERSION/UPGRADE.md)
+          - [API Documentation](https://github.com/REPO/wiki/API)
           
           INSTALL_EOF
           } > notes.md
@@ -884,10 +1233,67 @@ jobs:
           sed -i "s|REPO|$REPO|g" notes.md
           sed -i "s|VERSION|$VERSION|g" notes.md
           
-          rm -f "$CHANGES_FILE" "$PREVIOUS_FILE"
+          rm -f "$CHANGES_FILE"
           cat notes.md
       
+      - name: Publish the full-stop marks of the migrations
+        # A rolling update reads it and refuses a release whose pending migrations need every node stopped
+        run: python3 backend/migration_marks.py backend/migrations > artifacts/full-stop-migrations.json
+
+      - name: Download the image SBOMs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ./artifacts
+          pattern: '*-sbom-*'
+          merge-multiple: true
+
+      - name: Download the image digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: '*-digest-*'
+
+      # One SBOM per package file and per image platform, each on its subject, schema-valid and
+      # indexed; anything missing, extra or mismatched stops the release here
+      - name: Check the SBOMs
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          scripts/ci/sbom-venv.sh "$RUNNER_TEMP/sbom-venv"
+          py="$RUNNER_TEMP/sbom-venv/bin/python"
+          "$py" scripts/ci/sbom.py index --dir artifacts --digests "$RUNNER_TEMP/digests" --version "$VERSION"
+          "$py" scripts/ci/sbom.py validate --dir artifacts --digests "$RUNNER_TEMP/digests" --version "$VERSION"
+
+      # What the release step would publish, kept in the run's artifacts
+      - name: Record the rehearsed release
+        if: inputs.dry_run
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          LATEST: ${{ steps.latest.outputs.latest }}
+          PRERELEASE: ${{ steps.kind.outputs.prerelease }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rehearsal"
+          printf 'tag=v%s\nprerelease=%s\nmake_latest=%s\n' "$VERSION" "$PRERELEASE" "$LATEST" > "$RUNNER_TEMP/rehearsal/release.txt"
+          cp notes.md artifacts/full-stop-migrations.json artifacts/sbom-index.json "$RUNNER_TEMP/rehearsal/"
+          cat "$RUNNER_TEMP/rehearsal/release.txt"
+          # The assets, all already in the run's artifacts
+          ls -l artifacts
+
+      - name: Upload the rehearsed release
+        if: inputs.dry_run
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-rehearsal
+          path: |
+            ${{ runner.temp }}/rehearsal/release.txt
+            ${{ runner.temp }}/rehearsal/notes.md
+            ${{ runner.temp }}/rehearsal/*.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Delete existing release assets
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           for asset in $(gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null || true); do
@@ -897,30 +1303,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # `latest` goes to the highest stable tag only (scripts/ci/release_version.py)
-      - name: Decide latest
-        id: latest
-        env:
-          VERSION: ${{ needs.build-deb.outputs.version }}
-        run: |
-          set -euo pipefail
-          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
-          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
-            echo "latest=false" >> "$GITHUB_OUTPUT"
-            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
-            exit 0
-          fi
-          LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
-          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
-          echo "latest for $VERSION: $LATEST"
-
       - name: Create release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           body_path: notes.md
           draft: false
           make_latest: ${{ steps.latest.outputs.latest }}
-          prerelease: ${{ contains(github.ref, 'rc') || contains(github.ref, 'beta') || contains(github.ref, 'alpha') || contains(github.ref, 'dev') }}
+          prerelease: ${{ steps.kind.outputs.prerelease }}
           files: |
             artifacts/*
         env:
@@ -929,8 +1319,161 @@ jobs:
       # Workaround: if the tag was re-pointed (e.g. retag after fix), softprops/action-gh-release
       # does NOT overwrite the body of an existing release. Force-update it explicitly.
       - name: Force-update release body
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           gh release edit "$TAG" --notes-file notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================
+  # Helm chart, versioned with the release (scripts/ci/release_version.py chart)
+  # ============================================================
+  build-chart:
+    name: Build Helm Chart
+    runs-on: ubuntu-latest
+    needs: build-deb
+    outputs:
+      version: ${{ steps.chart.outputs.version }}
+      prerelease: ${{ steps.chart.outputs.prerelease }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Its appVersion is the image tag of this release, the default image of the chart
+      - name: Lint and package the chart
+        id: chart
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          helm version
+          CHART_VERSION=$(python3 scripts/ci/release_version.py chart "$VERSION")
+          PRERELEASE=$(python3 scripts/ci/release_version.py prerelease "$VERSION")
+          helm lint charts/ucm --strict --set secrets.secretKey=lint
+          mkdir -p chart-out
+          helm package charts/ucm --version "$CHART_VERSION" --app-version "$VERSION" -d chart-out
+          f="ucm-$CHART_VERSION.tgz"
+          helm show chart "chart-out/$f" > chart-out/shown.yaml
+          grep -Fqx "version: $CHART_VERSION" chart-out/shown.yaml
+          grep -Fqx -e "appVersion: $VERSION" -e "appVersion: \"$VERSION\"" chart-out/shown.yaml
+          rm chart-out/shown.yaml
+          (cd chart-out && sha256sum "$f" > "$f.sha256")
+          echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the chart
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: helm-chart
+          path: |
+            chart-out/ucm-*.tgz
+            chart-out/ucm-*.tgz.sha256
+          if-no-files-found: error
+
+  # Stable releases only, once the images it deploys and the release exist
+  publish-chart:
+    name: Publish Helm Chart
+    runs-on: ubuntu-latest
+    needs: [build-chart, release]
+    if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run && needs.build-chart.outputs.prerelease == 'false'
+
+    steps:
+      - name: Download the chart
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: helm-chart
+          path: chart-out
+
+      - name: Push the chart to the OCI registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHART_VERSION: ${{ needs.build-chart.outputs.version }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          f="ucm-$CHART_VERSION.tgz"
+          (cd chart-out && sha256sum -c "$f.sha256")
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          echo "$GH_TOKEN" | helm registry login "$REGISTRY" -u "$GITHUB_ACTOR" --password-stdin
+          helm push "chart-out/$f" "oci://$REGISTRY/$owner/charts"
+
+  # ============================================================
+  # Release smoke, before anything is public: the untagged images by digest and the packages
+  # of this run. Definition and scripts from this tag (a workflow_run trigger would take them
+  # from the default branch)
+  # ============================================================
+  # The smoke runs on amd64 runners: it pulls the amd64 digest of each variant
+  smoke-targets:
+    name: Collect Smoke Targets
+    runs-on: ubuntu-latest
+    needs: [build-docker, build-docker-fips]
+    outputs:
+      image-digest: ${{ steps.digests.outputs.std }}
+      fips-image-digest: ${{ steps.digests.outputs.fips }}
+
+    steps:
+      - name: Download the standard digest
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: std-digest-amd64
+          path: ${{ runner.temp }}/std
+
+      - name: Download the FIPS digest
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: fips-digest-amd64
+          path: ${{ runner.temp }}/fips
+
+      - name: Read the digests
+        id: digests
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          for kind in std fips; do
+            mapfile -t found < <(find "$kind" -type f -printf '%f\n')
+            test "${#found[@]}" -eq 1
+            [[ "${found[0]}" =~ ^[0-9a-f]{64}$ ]]
+            echo "$kind=sha256:${found[0]}" >> "$GITHUB_OUTPUT"
+          done
+
+  release-smoke:
+    name: Release Smoke Tests
+    needs: [build-deb, build-rpm, smoke-targets]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-smoke.yml
+    with:
+      version: ${{ needs.build-deb.outputs.version }}
+      from-run: true
+      # A rehearsal has no tag to check out and no image in a registry: its commit, its saved images
+      rehearsal: ${{ inputs.dry_run == true }}
+      ref: ${{ inputs.dry_run && github.sha || '' }}
+      image-digest: ${{ needs.smoke-targets.outputs.image-digest }}
+      fips-image-digest: ${{ needs.smoke-targets.outputs.fips-image-digest }}
+
+  # Reports what a red smoke leaves behind; deletes nothing
+  smoke-failed:
+    name: Nothing Published (smoke failed)
+    runs-on: ubuntu-latest
+    needs: [build-deb, release-smoke]
+    if: always() && startsWith(github.ref, 'refs/tags/') && !inputs.dry_run && needs.release-smoke.result == 'failure'
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: '*-digest-*'
+
+      - name: Say what is left
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          IMAGE="${{ env.REGISTRY }}/$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          echo "::error::The release smoke of v$VERSION failed: no image tag, no Docker Hub page update, no GitHub release and no chart were made."
+          echo "Left behind, untagged (this workflow deletes nothing), on $IMAGE and neyslim/ultimate-ca-manager:"
+          find . -type f | sort | sed 's|^\./\([^/]*\)/|  \1 sha256:|'
+          echo "Remove them from each registry if they are not wanted. The git tag v$VERSION stays: delete or move it before tagging again."

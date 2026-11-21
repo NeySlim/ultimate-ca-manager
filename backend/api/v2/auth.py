@@ -291,8 +291,13 @@ def reset_password():
     user.password_reset_token = None
     user.password_reset_expires = None
     user.force_password_change = False
-    user.failed_logins = 0
-    user.locked_until = None
+    try:
+        # The new password restarts its count: in the database, whatever this copy holds
+        user.clear_failed_logins()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to reset password for user {user.id}: {e}", exc_info=True)
+        return error_response('Failed to reset password', 500)
     ok, _err = safe_commit(logger, "Failed to reset password")
     if not ok:
         return _err

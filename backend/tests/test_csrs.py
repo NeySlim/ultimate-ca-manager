@@ -15,6 +15,7 @@ import pytest
 import os
 import sys
 import json
+from tests.conftest import assert_refused, assert_success
 import tempfile
 import base64
 
@@ -69,6 +70,8 @@ def app():
     app = create_app('testing')
     app.config['TESTING'] = True
     app.config['WTF_CSRF_ENABLED'] = False
+    from tests.header_guard import guard_latin1_headers
+    guard_latin1_headers(app)  # this app serves exports: refuse what the real server refuses
 
     from tests.conftest import clear_admin_password_flag
     clear_admin_password_flag(app)
@@ -219,6 +222,52 @@ class TestCreateCSR:
         data = _json(r)
         assert 'data' in data
 
+    @staticmethod
+    def _stored_subject(auth_client, created):
+        from cryptography import x509
+        csr_id = _json(created)['data']['id']
+        pem = _json(auth_client.get(f'/api/v2/csrs/{csr_id}'))['data']['csr_pem']
+        csr = x509.load_pem_x509_csr(pem.encode())
+        return [(a.oid.dotted_string, a.value) for a in csr.subject]
+
+    def test_create_csr_writes_every_subject_field(self, auth_client):
+        r = _create_csr(auth_client, cn='full-subject.example.com',
+                        department='Ops', state='Ile-de-France',
+                        locality='Paris', email='ops@example.com')
+        assert r.status_code in (200, 201), r.data
+        assert self._stored_subject(auth_client, r) == [
+            ('2.5.4.6', 'US'), ('2.5.4.8', 'Ile-de-France'),
+            ('2.5.4.7', 'Paris'), ('2.5.4.10', 'Test Org'),
+            ('2.5.4.11', 'Ops'), ('2.5.4.3', 'full-subject.example.com'),
+            ('1.2.840.113549.1.9.1', 'ops@example.com'),
+        ]
+        shown = _json(auth_client.get(f"/api/v2/csrs/{_json(r)['data']['id']}"))['data']
+        assert shown['state'] == 'Ile-de-France' and shown['locality'] == 'Paris'
+        assert shown['email'] == 'ops@example.com'
+
+    def test_create_csr_without_state_locality_email_keeps_subject(self, auth_client):
+        r = _create_csr(auth_client, cn='plain-subject.example.com')
+        assert self._stored_subject(auth_client, r) == [
+            ('2.5.4.6', 'US'), ('2.5.4.10', 'Test Org'),
+            ('2.5.4.3', 'plain-subject.example.com'),
+        ]
+
+    @pytest.mark.parametrize('field', ['state', 'locality', 'email'])
+    def test_create_csr_refuses_invalid_subject_field(self, auth_client, field):
+        r = _create_csr(auth_client, cn='bad-field.example.com', **{field: 'a;b'})
+        assert r.status_code == 400
+
+    # RFC 2985 5.2.1: emailAddress is an IA5String, so an address that is not ASCII is refused
+    @pytest.mark.parametrize('email', [123, ['ops@example.com'], 'opé@example.com', 'not-an-address'])
+    def test_create_csr_refuses_an_email_that_is_not_an_address(self, auth_client, email):
+        r = _create_csr(auth_client, cn='bad-email.example.com', email=email)
+        assert r.status_code == 400, r.data
+
+    def test_create_csr_trims_the_email(self, auth_client):
+        r = _create_csr(auth_client, cn='trim-email.example.com', email='  ops@example.com ')
+        assert r.status_code in (200, 201), r.data
+        assert self._stored_subject(auth_client, r)[-1] == ('1.2.840.113549.1.9.1', 'ops@example.com')
+
     def test_create_csr_missing_cn(self, auth_client):
         r = auth_client.post('/api/v2/csrs',
                              data=json.dumps({'organization': 'Test'}),
@@ -235,7 +284,7 @@ class TestCreateCSR:
         r = auth_client.post('/api/v2/csrs',
                              data='not json',
                              content_type='text/plain')
-        assert r.status_code in (400, 415, 500)
+        assert_refused(r, 415, 'Unsupported Media Type')
 
     def test_create_csr_with_sans(self, auth_client):
         r = _create_csr(auth_client, cn='san-test.example.com',
@@ -430,7 +479,7 @@ class TestUploadCSR:
         r = auth_client.post('/api/v2/csrs/upload',
                              data=json.dumps({'pem': 'not-a-valid-pem'}),
                              content_type='application/json')
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid CSR PEM', prefix=True)
 
 
 # ============================================================
@@ -455,7 +504,7 @@ class TestImportCSR:
         r = auth_client.post('/api/v2/csrs/import',
                              data={'pem_content': 'garbage-data'},
                              content_type='multipart/form-data')
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid CSR PEM', prefix=True)
 
 
 # ============================================================
@@ -749,8 +798,11 @@ class TestCSRLifecycle:
         r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign',
                              data=json.dumps({'ca_id': ca_id}),
                              content_type='application/json')
-        # Uploaded CSRs may lack private key for signing; accept 200 or 500
-        assert r.status_code in (200, 400, 500)
+        # Signing needs the CA's key, not the requester's
+        signed = assert_success(r)
+        assert signed['caref'] == ca_for_signing['refid']
+        r = auth_client.get('/api/v2/csrs')
+        assert csr_id not in [c['id'] for c in _json(r)['data']]
 
 
 # ============================================================
@@ -823,14 +875,32 @@ class TestExportCSRKey:
         from cryptography.hazmat.primitives import serialization
         csr_id = _json(_create_csr(auth_client, cn='key-export-pw.example.com'))['data']['id']
         r = auth_client.post(f'/api/v2/csrs/{csr_id}/export',
-                             data=json.dumps({'format': 'key', 'password': 'S3cret!'}),
+                             data=json.dumps({'format': 'key', 'password': 'S3cret!Pw'}),
                              content_type='application/json')
         assert r.status_code == 200, r.data
         assert b'ENCRYPTED PRIVATE KEY' in r.data
-        key = serialization.load_pem_private_key(r.data, password=b'S3cret!')
+        key = serialization.load_pem_private_key(r.data, password=b'S3cret!Pw')
         assert key.public_key().public_bytes(
             serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
         ) == self._csr_public_key_der(auth_client, csr_id)
+
+    @pytest.mark.parametrize('password', ['short', 'x' * 257, 12345678])
+    def test_key_export_applies_the_export_password_rule(self, auth_client, password):
+        csr_id = _json(_create_csr(auth_client, cn='key-export-rule.example.com'))['data']['id']
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/export',
+                             data=json.dumps({'format': 'key', 'password': password}),
+                             content_type='application/json')
+        assert r.status_code == 400, r.data
+        assert b'PRIVATE KEY' not in r.data
+
+    def test_csr_export_ignores_a_password(self, auth_client):
+        # A CSR holds no secret: the password is accepted and has nothing to protect
+        csr_id = _json(_create_csr(auth_client, cn='csr-pw-ignored.example.com'))['data']['id']
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/export',
+                             data=json.dumps({'format': 'csr', 'password': 'whatever-long'}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        assert b'CERTIFICATE REQUEST' in r.data
 
     def test_key_export_rejects_password_in_query_string(self, auth_client):
         csr_id = _json(_create_csr(auth_client, cn='key-export-qs.example.com'))['data']['id']

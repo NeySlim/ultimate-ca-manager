@@ -14,9 +14,11 @@ export const EventType = {
   // Certificate events
   CERTIFICATE_ISSUED: 'certificate.issued',
   CERTIFICATE_REVOKED: 'certificate.revoked',
+  CERTIFICATE_UNHELD: 'certificate.unheld',
   CERTIFICATE_EXPIRING: 'certificate.expiring',
   CERTIFICATE_RENEWED: 'certificate.renewed',
   CERTIFICATE_DELETED: 'certificate.deleted',
+  CERTIFICATE_BINDING_LEFT_BEHIND: 'certificate.binding_left_behind',
   
   // CA events
   CA_CREATED: 'ca.created',
@@ -75,9 +77,11 @@ const WebSocketContext = createContext(null);
 const DATA_CHANGED_TYPE = {
   'certificate.issued': 'certificate',
   'certificate.revoked': 'certificate',
+  'certificate.unheld': 'certificate',
   'certificate.renewed': 'certificate',
   'certificate.deleted': 'certificate',
   'certificate.expiring': 'certificate',
+  'certificate.binding_left_behind': 'certificate',
   'ca.created': 'ca',
   'ca.updated': 'ca',
   'ca.deleted': 'ca',
@@ -132,8 +136,8 @@ function announceEverythingChanged() {
  *
  * `t` is the i18next translator, passed in by the provider so this stays a
  * plain function. Events that already have a `notifications.*` key (present in
- * all nine locales) go through it; the rest keep their English sentence rather
- * than inventing keys that would have to be translated nine times.
+ * all ten locales) go through it; the rest keep their English sentence rather
+ * than inventing keys that would have to be translated ten times.
  */
 export function getEventNotification(payload, t) {
   const { type, data } = payload;
@@ -160,6 +164,9 @@ export function getEventNotification(payload, t) {
       return { method: 'showSuccess', msg: `Certificate renewed: ${data.cn}` };
     case EventType.CERTIFICATE_DELETED:
       return { method: 'showInfo', msg: `Certificate deleted: ${data.cn}` };
+    case EventType.CERTIFICATE_BINDING_LEFT_BEHIND:
+      return { method: 'showWarning', msg: t('notifications.bindingLeftBehind', {
+        name: data.binding?.type === 'https' ? 'HTTPS' : (data.binding?.target_name || '') }) };
     case EventType.CA_CREATED:
       return { method: 'showSuccess', msg: t('notifications.caCreated', { name: data.name }) };
     case EventType.CA_REVOKED:
@@ -221,7 +228,7 @@ export function WebSocketProvider({ children }) {
     
     const socket = io(window.location.origin, {
       path: '/socket.io',
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],  // engine.io-client only falls back with tryAllTransports
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: 5,

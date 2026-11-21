@@ -4,13 +4,17 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket, ShieldCheck, ArrowCircleUp } from '@phosphor-icons/react'
+import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket, ArrowCircleUp } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, ServiceReconnectOverlay } from '../components'
 import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { useServiceReconnect, UPDATE_MAX_WAIT_MS } from '../hooks'
 import { formatRelativeTime } from '../lib/utils'
 import { MARKDOWN_ELEMENT_CLASSES } from '../lib/markdown'
+import { UpdateCampaignStatus } from './UpdateCampaignStatus'
+
+// A rolling update moves one node every minute at most: the screen follows it at this pace
+const CAMPAIGN_POLL_MS = 10000
 
 export function UpdateChecker() {
   const { t } = useTranslation()
@@ -21,6 +25,8 @@ export function UpdateChecker() {
   const [error, setError] = useState(null)
   const [includePrereleases, setIncludePrereleases] = useState(false)
   const [includeChannel, setIncludeChannel] = useState('stable')
+  const [campaign, setCampaign] = useState(null)
+  const [resuming, setResuming] = useState(false)
   const { showSuccess, showError, showConfirm } = useNotification()
   const { reconnecting, status, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
 
@@ -34,6 +40,7 @@ export function UpdateChecker() {
       const response = await apiClient.get(`/system/updates/check?${params}`)
       const data = response?.data || response || {}
       setUpdateInfo(data)
+      setCampaign(data.update_campaign || null)
       if (showNotification) {
         if (data.update_available) {
           showSuccess(t('settings.updateAvailable', { version: data.latest_version }))
@@ -56,17 +63,25 @@ export function UpdateChecker() {
     if (!updateInfo?.update_available) return
     
     const confirmed = await showConfirm(
-      t('settings.installUpdateConfirm', { version: updateInfo.latest_version }),
+      t(updateInfo.ha_mode ? 'settings.installUpdateConfirmHa' : 'settings.installUpdateConfirm',
+        { version: updateInfo.latest_version }),
       { title: t('settings.installUpdate'), confirmText: t('settings.installUpdate'), variant: 'primary' }
     )
     if (!confirmed) return
 
     setInstalling(true)
     try {
-      await apiClient.post('/system/updates/install', {
+      const response = await apiClient.post('/system/updates/install', {
         include_prereleases: includeChannel !== 'stable',
         include_dev: includeChannel === 'dev'
       })
+      if (updateInfo.ha_mode) {
+        // HA: the nodes update one at a time, this page follows the campaign instead of a restart
+        setCampaign((response?.data || response || {}).campaign || null)
+        showSuccess(t('settings.updateCampaign.started', { version: updateInfo.latest_version }))
+        setInstalling(false)
+        return
+      }
       showSuccess(t('settings.updateInitiated', { version: updateInfo.latest_version, defaultValue: `Update to v${updateInfo.latest_version} initiated...` }))
       
       // Show reconnect overlay — countdown then poll until service is back
@@ -85,14 +100,21 @@ export function UpdateChecker() {
     const target = updateInfo?.major_upgrade
     if (!target) return
     const confirmed = await showConfirm(
-      t('settings.majorUpgradeConfirm', { current: updateInfo.current_version, version: target.version }),
+      t(updateInfo.ha_mode ? 'settings.majorUpgradeConfirmHa' : 'settings.majorUpgradeConfirm',
+        { current: updateInfo.current_version, version: target.version }),
       { title: t('settings.majorUpgradeTitle', { version: target.version }), confirmText: t('settings.majorUpgradeInstall'), variant: 'primary' }
     )
     if (!confirmed) return
 
     setInstalling(true)
     try {
-      await apiClient.post('/system/updates/install', { major_upgrade: true, version: target.version })
+      const response = await apiClient.post('/system/updates/install', { major_upgrade: true, version: target.version })
+      if (updateInfo.ha_mode) {
+        setCampaign((response?.data || response || {}).campaign || null)
+        showSuccess(t('settings.updateCampaign.started', { version: target.version }))
+        setInstalling(false)
+        return
+      }
       showSuccess(t('settings.majorUpgradeInitiated', { version: target.version }))
       waitForRestart({ expectedVersion: target.version, maxWaitMs: UPDATE_MAX_WAIT_MS })
     } catch (err) {
@@ -102,6 +124,33 @@ export function UpdateChecker() {
   }
 
   const majorUpgrade = updateInfo?.major_upgrade || null
+
+  const resumeCampaign = async () => {
+    setResuming(true)
+    try {
+      const response = await apiClient.post('/system/updates/campaign/resume', {})
+      setCampaign((response?.data || response || {}).campaign || null)
+      showSuccess(t('settings.updateCampaign.resumed'))
+    } catch (err) {
+      showError(err.message || t('settings.updateCampaign.resumeFailed'))
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  const campaignRunning = campaign?.status === 'running'
+  useEffect(() => {
+    if (!campaignRunning) return undefined
+    const timer = setInterval(async () => {
+      try {
+        const response = await apiClient.get('/system/updates/campaign')
+        setCampaign((response?.data || response || {}).campaign || null)
+      } catch {
+        // the node answering may be the one restarting: the next poll reaches another
+      }
+    }, CAMPAIGN_POLL_MS)
+    return () => clearInterval(timer)
+  }, [campaignRunning])
 
   const firstRender = React.useRef(true)
   useEffect(() => {
@@ -170,6 +219,12 @@ export function UpdateChecker() {
               </div>
             )}
             
+            {updateInfo?.ha_mode && updateInfo?.can_auto_update && (
+              <div className="text-xs text-text-tertiary mt-1">
+                {t('settings.updateCampaign.haNote')}
+              </div>
+            )}
+
             {updateInfo?.update_available && !updateInfo?.can_auto_update && (
               <div className="text-xs text-text-tertiary mt-1">
                 💡 docker pull {updateInfo.download_url || `ghcr.io/neyslim/ultimate-ca-manager:${updateInfo.latest_version}`}
@@ -193,7 +248,7 @@ export function UpdateChecker() {
         </div>
         
         <div className="flex items-center gap-2">
-          {updateInfo?.update_available && updateInfo?.can_auto_update && (
+          {updateInfo?.update_available && updateInfo?.can_auto_update && !campaignRunning && (
             <Button
               variant="primary"
               size="sm"
@@ -228,31 +283,14 @@ export function UpdateChecker() {
         </div>
       </div>
       
-      {/* Security maintenance notice: comes from the check's data */}
-      {updateInfo?.security_maintenance && (
-        <div className="mt-4 flex items-start gap-2 p-2.5 bg-accent-warning-op10 rounded-lg text-xs text-text-secondary">
-          <ShieldCheck size={16} className="shrink-0 mt-0.5 text-accent-warning" />
-          <div>
-            <div className="font-medium text-text-primary">{t('settings.securityMaintenanceTitle')}</div>
-            <div>{t('settings.securityMaintenanceNotice')}</div>
-            {majorUpgrade && (
-              <div className="mt-1">{t('settings.securityMaintenanceUpgrade', { version: majorUpgrade.version })}</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Later major version: recommended, never installed automatically */}
+      {/* Later major version: never installed automatically */}
       {majorUpgrade && (
         <div className="mt-4 p-3 rounded-lg border border-border bg-accent-primary-op5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <ArrowCircleUp size={22} weight="duotone" className="shrink-0 text-accent-primary" />
               <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium text-text-primary">{t('settings.majorUpgradeTitle', { version: majorUpgrade.version })}</h4>
-                  <Badge variant="success" size="sm">{t('settings.majorUpgradeRecommended')}</Badge>
-                </div>
+                <h4 className="font-medium text-text-primary">{t('settings.majorUpgradeTitle', { version: majorUpgrade.version })}</h4>
                 <p className="text-sm text-text-secondary mt-1">{t('settings.majorUpgradeDesc')}</p>
                 {majorUpgrade.html_url && (
                   <a
@@ -271,7 +309,7 @@ export function UpdateChecker() {
                 )}
               </div>
             </div>
-            {updateInfo?.can_auto_update && (
+            {updateInfo?.can_auto_update && !campaignRunning && (
               <Button
                 variant="secondary"
                 size="sm"
@@ -286,6 +324,8 @@ export function UpdateChecker() {
           </div>
         </div>
       )}
+
+      <UpdateCampaignStatus campaign={campaign} onResume={resumeCampaign} resuming={resuming} />
 
       {/* Release notes - current version */}
       {updateInfo?.current_release_notes && (

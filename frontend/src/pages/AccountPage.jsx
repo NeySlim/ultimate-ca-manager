@@ -23,13 +23,14 @@ import { formatDate , downloadBlob} from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
+import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
 
 export default function AccountPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
   const { isMobile } = useMobile()
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { copy } = useClipboard()
   const { hasPermission } = usePermission()
 
@@ -194,6 +195,10 @@ export default function AccountPage() {
     }
   }
 
+  // A second factor changed: say so of the other sessions unless the server closed none
+  const factorChanged = (key, response) => showSuccess(response?.meta?.other_sessions_closed === 0
+    ? t(key) : `${t(key)} ${t('account.otherSessionsClosed')}`)
+
   // 2FA handlers
   const handleToggle2FA = async () => {
     try {
@@ -204,8 +209,8 @@ export default function AccountPage() {
           confirmText: t('common.disable2FA')
         })
         if (!code) return
-        await accountService.disable2FA(code)
-        showSuccess(t('messages.success.other.twoFactorDisabled'))
+        const disabled = await accountService.disable2FA(code)
+        factorChanged('messages.success.other.twoFactorDisabled', disabled)
         await loadAccount()
       } else {
         const response = await accountService.enable2FA()
@@ -227,11 +232,9 @@ export default function AccountPage() {
           confirmText: t('account.turnOffKey2fa')
         })
         if (!password) return
-        await accountService.setWebAuthnSecondFactor(false, password)
-        showSuccess(t('account.key2faDisabled'))
+        factorChanged('account.key2faDisabled', await accountService.setWebAuthnSecondFactor(false, password))
       } else {
-        await accountService.setWebAuthnSecondFactor(true)
-        showSuccess(t('account.key2faEnabled'))
+        factorChanged('account.key2faEnabled', await accountService.setWebAuthnSecondFactor(true))
       }
       await loadAccount()
     } catch (error) {
@@ -241,10 +244,16 @@ export default function AccountPage() {
 
   const handleConfirm2FA = async () => {
     try {
-      await accountService.confirm2FA(confirmCode)
-      showSuccess(t('messages.success.other.twoFactorEnabled'))
-      setShow2FAModal(false)
-      setQrData(null)
+      const confirmed = await accountService.confirm2FA(confirmCode)
+      factorChanged('messages.success.other.twoFactorEnabled', confirmed)
+      // The recovery codes are returned once: the dialog shows them until acknowledged
+      const codes = (confirmed?.data || confirmed)?.backup_codes
+      if (codes?.length) {
+        setQrData(prev => ({ ...prev, backup_codes: codes, confirmed: true }))
+      } else {
+        setShow2FAModal(false)
+        setQrData(null)
+      }
       setConfirmCode('')
       await loadAccount()
     } catch (error) {
@@ -261,9 +270,8 @@ export default function AccountPage() {
     
     setWebauthnRegistering(true)
     try {
-      await accountService.registerWebAuthnKey(webauthnName)
-      
-      showSuccess(t('account.keyRegistered'))
+      const registered = await accountService.registerWebAuthnKey(webauthnName)
+      factorChanged('account.keyRegistered', registered)
       setShowWebAuthnModal(false)
       setWebauthnName('')
       await loadWebAuthnCredentials()
@@ -287,8 +295,8 @@ export default function AccountPage() {
     if (!confirmed) return
     
     try {
-      await accountService.deleteWebAuthnCredential(credentialId)
-      showSuccess(t('account.keyDeleted'))
+      const deleted = await accountService.deleteWebAuthnCredential(credentialId)
+      factorChanged('account.keyDeleted', deleted)
       await loadWebAuthnCredentials()
     } catch (error) {
       showError(error.message || t('account.deleteKeyFailed'))
@@ -370,8 +378,10 @@ export default function AccountPage() {
     if (!confirmed) return
     
     try {
-      await accountService.deleteMTLSCertificate(certId)
-      showSuccess(t('account.certificateDeleted'))
+      // Its certificate is revoked first: the ACME CA that issued it may not have been told
+      const localOnly = localOnlyRevocationWarning(await accountService.deleteMTLSCertificate(certId), t)
+      if (localOnly) showWarning(localOnly)
+      else showSuccess(t('account.certificateDeleted'))
       await loadMTLSCertificates()
     } catch (error) {
       showError(error.message || t('account.deleteCertFailed'))
@@ -1045,11 +1055,12 @@ export default function AccountPage() {
       >
         {qrData && (
           <div className="p-4 space-y-4">
+            {!qrData.confirmed && <>
             <div>
               <p className="text-sm text-text-secondary mb-3">
                 {t('account.scanQRCode')}
               </p>
-              <div className="flex justify-center p-4 bg-white rounded-lg">
+              <div className="flex justify-center p-4 bg-paper rounded-lg">
                 <img src={qrData.qr_code} alt="2FA QR Code" className="w-48 h-48" />
               </div>
             </div>
@@ -1067,6 +1078,7 @@ export default function AccountPage() {
                 className="text-center text-2xl tracking-widest font-mono"
               />
             </div>
+            </>}
             
             {qrData.backup_codes && (
               <div className="p-3 bg-status-warning-op10 border border-status-warning-op30 rounded-lg">
@@ -1074,6 +1086,7 @@ export default function AccountPage() {
                   <Warning size={16} />
                   {t('account.backupCodes')}
                 </p>
+                <p className="text-xs text-text-secondary mt-1">{t('account.backupCodesHint')}</p>
                 <div className="mt-2 grid grid-cols-2 gap-1 font-mono text-xs">
                   {qrData.backup_codes.map((code, i) => (
                     <span key={i} className="text-text-secondary">{code}</span>
@@ -1083,12 +1096,18 @@ export default function AccountPage() {
             )}
             
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
-              <Button type="button" variant="secondary" onClick={() => setShow2FAModal(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="button" onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
-                {t('account.verifyAndEnable')}
-              </Button>
+              {qrData.confirmed ? (
+                <Button type="button" onClick={() => { setShow2FAModal(false); setQrData(null) }}>
+                  {t('account.backupCodesSaved')}
+                </Button>
+              ) : <>
+                <Button type="button" variant="secondary" onClick={() => setShow2FAModal(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="button" onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
+                  {t('account.verifyAndEnable')}
+                </Button>
+              </>}
             </div>
           </div>
         )}

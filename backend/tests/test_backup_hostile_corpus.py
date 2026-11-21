@@ -37,6 +37,8 @@ from models import db
 from services.backup import container, manifest
 from services.backup.restore import RestorePlan, RestoreValidationError
 
+from tests.backup_v3 import as_v3, v3_header
+from tests.test_restore_sso_one_per_type import target  # noqa: F401  (SQLite and PostgreSQL)
 from tests.fresh_app import fresh_app_fixtures
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
@@ -77,8 +79,8 @@ def _only(*names):
 
 
 def _header_of(blob):
-    metadata_len = struct.unpack('>H', blob[8:10])[0]
-    return blob[:10 + metadata_len]
+    """A v3 header for `blob`: forged payloads are sealed as one v3 ciphertext."""
+    return v3_header(blob)
 
 
 def _key_of(header):
@@ -150,13 +152,15 @@ def _census():
     from models import CA, Certificate, SystemConfig, User
     from models.deploy import DeployTarget
     from models.group import Group
+    from services.file_regen_service import GENERATION_KEY
 
     return {
         'users': User.query.count(),
         'cas': CA.query.count(),
         'certificates': Certificate.query.count(),
         'groups': Group.query.count(),
-        'settings': SystemConfig.query.count(),
+        # The files generation a restore advances is this installation's bookkeeping
+        'settings': SystemConfig.query.filter(SystemConfig.key != GENERATION_KEY).count(),
         'deploy_targets': DeployTarget.query.count(),
     }
 
@@ -199,6 +203,13 @@ def archive(app):
     """A real archive of one section of this instance."""
     with app.app_context():
         return _service().create_backup(PASSWORD, include=_only(SECTION))
+
+
+@pytest.fixture
+def v3_archive(app, archive):
+    """The same archive as v3, still read: one ciphertext, one tag."""
+    with app.app_context():
+        return as_v3(archive, PASSWORD)
 
 
 @pytest.fixture(autouse=True)
@@ -265,7 +276,7 @@ class TestATruncatedArchiveIsNotAWrongPassword:
         ('one byte from the end', lambda blob, header: blob[:-1]),
     ])
     def test_a_truncation_only_the_tag_can_see_names_both_causes(
-            self, app, archive, auth_client, where, cut):
+            self, app, v3_archive, auth_client, where, cut):
         """Past the header, the two are the same event to AES-GCM.
 
         The tag fails identically for a wrong key and for bytes that were cut,
@@ -273,7 +284,7 @@ class TestATruncatedArchiveIsNotAWrongPassword:
         the answer must therefore never do is pick one: it names both, so the
         administrator checks the file as well as the password.
         """
-        blob = cut(archive, _header_of(archive))
+        blob = cut(v3_archive, _header_of(v3_archive))
         with app.app_context():
             before = _census()
 
@@ -301,6 +312,103 @@ class TestATruncatedArchiveIsNotAWrongPassword:
             after = _census()
         _assert_refused_cleanly(response, before, after)
         assert response.status_code == 400, response.data
+
+
+def _v4_frames(blob):
+    """The header of a v4 archive, then its framed chunks."""
+    stream = io.BytesIO(blob)
+    _metadata, header = container.read_header(stream)
+    frames = []
+    while True:
+        length = stream.read(4)
+        if not length:
+            return header, frames
+        frames.append(length + stream.read(struct.unpack('>I', length)[0]))
+
+
+class TestAV4ArchiveCutOrRearranged:
+    """A v4 archive is chunks, each bound to its position and to the header.
+
+    Whatever is cut, swapped or rewritten past the first chunk, the refusal
+    says what happened to the file, never that the password is wrong, and
+    nothing is written.
+    """
+
+    @pytest.mark.parametrize('where, cut', [
+        ('in the middle of a chunk', lambda header, frames: header + b''.join(frames)[:-7]),
+        ('after a whole chunk, the end record gone',
+         lambda header, frames: header + b''.join(frames[:-1])),
+        ('inside a chunk length', lambda header, frames: header + frames[0] + frames[1][:2]),
+    ])
+    def test_a_truncation_is_named(self, app, archive, auth_client, where, cut):
+        header, frames = _v4_frames(archive)
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, cut(header, frames))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response).lower()
+        assert 'truncated' in message, (where, message)
+        assert 'password' not in message, (where, message)
+
+    @pytest.mark.parametrize('where, rearrange', [
+        ('two chunks swapped', lambda frames: [frames[0], frames[2], frames[1]] + frames[3:]),
+        ('a chunk left out', lambda frames: frames[:1] + frames[2:]),
+        ('a chunk repeated', lambda frames: frames[:2] + frames[1:]),
+    ])
+    def test_a_rearranged_archive_is_named(self, app, archive, auth_client, where, rearrange):
+        header, frames = _v4_frames(archive)
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, header + b''.join(rearrange(frames)))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response).lower()
+        assert 'does not authenticate' in message, (where, message)
+        assert 'password' not in message, (where, message)
+
+    def test_an_edited_header_is_refused_before_anything_is_read(self, app, archive, auth_client):
+        header, frames = _v4_frames(archive)
+        metadata = json.loads(header[10:].decode())
+        metadata['backup_type'] = 'databases'[:len(metadata['backup_type'])]
+        metadata['sections'] = list(reversed(metadata['sections']))
+        edited = container.build_header(format_version=4, flags=header[5], kdf_id=header[6],
+                                        metadata=metadata)
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, edited + b''.join(frames))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+
+    def test_a_chunk_announcing_more_than_its_header_allows(self, app, archive, auth_client):
+        header, frames = _v4_frames(archive)
+        oversized = struct.pack('>I', 2 ** 32 - 1) + frames[1][4:]
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, header + frames[0] + oversized)
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        assert 'header allows' in _message(response)
+
+    def test_a_future_container_version_is_refused(self, app, archive, auth_client):
+        blob = bytearray(archive)
+        blob[4] = 5
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, bytes(blob))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        assert 'Unsupported backup format version: 5' in _message(response)
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +439,18 @@ def _date_as_text(data):
     data[SECTION] = [dict(TARGET, created_at='yesterday')]
 
 
+# Never copied into a refusal: an archived value can be a secret
+MARKER = 'hostile-corpus-value-marker'
+
+
+def _list_as_text(data):
+    data[SECTION] = [dict(TARGET, host=['deploy.example.test', MARKER])]
+
+
+def _object_as_text(data):
+    data[SECTION] = [dict(TARGET, host={'name': MARKER})]
+
+
 def _count_as_text(data):
     data['metadata']['sections'][SECTION] = 'three'
 
@@ -343,7 +463,39 @@ SHAPES = {
     'a list where the settings object belongs': (_configuration_as_list,
                                                  'configuration'),
     'text where a date belongs': (_date_as_text, SECTION),
+    'a list where text belongs': (_list_as_text, f'{SECTION}.host'),
+    'an object where text belongs': (_object_as_text, f'{SECTION}.host'),
 }
+CONTAINERS = {'list': _list_as_text, 'object': _object_as_text}
+
+# Columns the users, SSO and API key restorers query by before the generic write
+READ_BEFORE_THE_COLUMNS = {
+    'users.username': ('users', {'username': 'hc-user', 'email': 'hc@corpus.test',
+                                 'role': 'viewer', 'active': True, 'password_hash': 'x'}),
+    'sso_providers.name': ('sso_providers', {'name': 'hc-sso', 'provider_type': 'oauth2',
+                                             'oauth2_issuer': 'https://idp.corpus.test'}),
+    'api_keys.key_hash': ('api_keys', {'key_hash': 'a' * 64, 'name': 'hc-key',
+                                       'user_id': None, 'user_id_ref': None}),
+}
+
+
+# Fields the dedicated certificate, CA and SSH CA restorers read themselves: text or absent
+HANDLED_FIELDS = sorted(
+    f'{name}.{field}' for name, section in manifest.SECTIONS.items()
+    for field in section.handled.values())
+HANDLED_ROWS = {
+    'certificates': {'refid': 'hc-cert', 'descr': 'hc-cert'},
+    'certificate_authorities': {'refid': 'hc-ca', 'descr': 'hc-ca'},
+    'ssh_cas': {'refid': 'hc-ssh-ca', 'descr': 'hc-ssh-ca'},
+}
+NOT_TEXT = {'list': [MARKER], 'object': {'v': MARKER}, 'integer': 987654321, 'boolean': True}
+# The encrypted key is an object of hex text: text, or an object of anything else, is not one
+NOT_A_KEY = {**NOT_TEXT, 'text': MARKER,
+             'object': {'salt': MARKER, 'nonce': '00', 'ciphertext': '00'},
+             'object of numbers': {'salt': 1, 'nonce': 2, 'ciphertext': 987654321}}
+UNREADABLE = sorted(
+    (field, shape) for field in HANDLED_FIELDS
+    for shape in (NOT_A_KEY if field.endswith('.private_key_pem_encrypted') else NOT_TEXT))
 
 
 @contextmanager
@@ -402,6 +554,132 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
             after = _census()
         _assert_refused_cleanly(response, before, after)
         assert response.status_code == 400, (label, response.data)
+
+    @pytest.mark.parametrize('shape', sorted(CONTAINERS))
+    def test_a_list_or_an_object_in_a_text_column_is_named_not_copied(
+            self, app, auth_client, shape):
+        with app.app_context():
+            blob = _forged([SECTION], mutate=CONTAINERS[shape])
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert f'{SECTION}.host' in message and MARKER not in message, message
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('shape', sorted(CONTAINERS))
+    def test_a_list_or_an_object_in_a_text_column_writes_nothing_on_either_engine(
+            self, target, shape, mode):
+        from models.deploy import DeployTarget
+        blob = _forged([SECTION], mutate=CONTAINERS[shape])
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service().restore_backup(blob, PASSWORD, mode=mode)
+        db.session.rollback()
+        assert f'{SECTION}.host' in str(refusal.value) and MARKER not in str(refusal.value)
+        assert _census() == before
+        assert DeployTarget.query.filter_by(name=TARGET['name']).count() == 0
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('column', sorted(READ_BEFORE_THE_COLUMNS))
+    @pytest.mark.parametrize('shape', ['list', 'object'])
+    def test_a_container_in_a_column_a_dedicated_restorer_reads_writes_nothing(
+            self, target, column, shape, mode):
+        from models import User
+        from models.api_key import APIKey
+        from models.sso import SSOProvider
+        section, row = READ_BEFORE_THE_COLUMNS[column]
+        value = [MARKER] if shape == 'list' else {'v': MARKER}
+        payload = {section: [dict(row, **{column.split('.')[1]: value})]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        assert column in str(refusal.value) and MARKER not in str(refusal.value)
+        assert _census() == before
+        assert SSOProvider.query.count() == 0 and APIKey.query.count() == 0
+        assert User.query.count() == before['users']
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('shape', ['list', 'object'])
+    def test_a_container_in_a_secret_property_writes_nothing(self, target, shape, mode):
+        # auth_token is a property over _auth_token: no column carries its archived name
+        from services.webhook_service import WebhookEndpoint
+        value = ['tok', MARKER] if shape == 'list' else {'v': MARKER}
+        payload = {'webhook_endpoints': [{'name': 'hc-hook', 'url': 'https://hook.corpus.test/x',
+                                          'auth_token': value}]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        message = str(refusal.value)
+        assert 'webhook_endpoints.auth_token' in message and MARKER not in message
+        assert _census() == before
+        assert WebhookEndpoint.query.filter_by(name='hc-hook').count() == 0
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('field,shape', UNREADABLE)
+    def test_a_value_its_restorer_cannot_read_in_a_handled_field_writes_nothing(
+            self, target, field, shape, mode):
+        from models import CA, Certificate
+        from models.ssh import SSHCertificateAuthority
+        section, name = field.split('.')
+        value = (NOT_A_KEY if name == 'private_key_pem_encrypted' else NOT_TEXT)[shape]
+        payload = {section: [dict(HANDLED_ROWS[section], **{name: value})]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        message = str(refusal.value)
+        assert field in message and MARKER not in message and '987654321' not in message, message
+        assert _census() == before
+        assert SSHCertificateAuthority.query.filter_by(refid='hc-ssh-ca').count() == 0
+        assert CA.query.filter_by(refid='hc-ca').count() == 0
+        assert Certificate.query.filter_by(refid='hc-cert').count() == 0
+
+    @pytest.mark.parametrize('shape', ['integer', 'list'])
+    def test_a_value_that_is_not_text_in_a_pem_answers_400(self, app, auth_client, shape):
+        from models import Certificate
+
+        def mutate(data):
+            data['certificates'] = [dict(HANDLED_ROWS['certificates'],
+                                         certificate_pem=NOT_TEXT[shape])]
+        with app.app_context():
+            blob = _forged([SECTION], mutate=mutate)
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+            assert Certificate.query.filter_by(refid='hc-cert').count() == 0
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert 'certificates.certificate_pem' in message, message
+        assert MARKER not in message and '987654321' not in message, message
+
+    def test_a_list_as_a_username_answers_400_naming_the_column(self, app, auth_client):
+        def mutate(data):
+            data['users'] = [dict(READ_BEFORE_THE_COLUMNS['users.username'][1],
+                                  username=[MARKER])]
+        with app.app_context():
+            blob = _forged([SECTION], mutate=mutate)
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert 'users.username' in message and MARKER not in message, message
 
     def test_a_count_that_is_not_a_number_is_refused_by_name(
             self, app, auth_client):

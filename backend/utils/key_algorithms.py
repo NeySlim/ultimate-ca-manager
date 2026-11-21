@@ -63,7 +63,7 @@ def generate_rsa(bits: int):
     if not fips_mode.enabled():
         return rsa.generate_private_key(public_exponent=65537, key_size=bits)
     bits = int(bits)
-    if bits < 2048:
+    if not fips_rsa_bits_approved(bits):
         fips_mode.refuse(f'RSA-{bits} keys')
     key = _genpkey(['-algorithm', 'RSA', '-pkeyopt', f'rsa_keygen_bits:{bits}'])
     if not (isinstance(key, rsa.RSAPrivateKey) and key.key_size == bits
@@ -85,11 +85,22 @@ def generate_ec(curve: ec.EllipticCurve):
     return key
 
 
-def _non_fips_generator(name: str, private_class: type) -> Callable[[], object]:
-    """Generator of a key the FIPS module does not approve: refused in FIPS mode."""
+# ML-DSA keys as their seed alone (RFC 9881): OpenSSL writes seed and expanded key by default,
+# which pyca cannot read
+_MLDSA_SEED_ONLY = ['-provparam', 'ml-dsa.output_formats=seed-only']
+
+
+def _module_generator(name: str, private_class: type, genpkey_args: list[str]) -> Callable[[], object]:
+    """Generator of a key some FIPS modules approve: by the module through ``openssl genpkey``
+    in FIPS mode when it approves *name*, refused there otherwise, pyca outside FIPS mode."""
     def generate():
-        fips_mode.refuse(f'{name} keys')
-        return private_class.generate()
+        if not fips_mode.enabled():
+            return private_class.generate()
+        fips_mode.refuse_unless_approved(name.upper(), f'{name} keys')
+        key = _genpkey(genpkey_args)
+        if not isinstance(key, private_class):
+            raise KeyGenerationError(f'openssl genpkey returned a key that is not {name}')
+        return key
     return generate
 
 
@@ -106,13 +117,19 @@ class KeyAlgorithm:
     display: str
     legacy_key_algo: str            # spelling written to certificates.key_algo
     trust_store_id: str | None      # TrustStore KEY_TYPES id ('2048', 'prime256v1', 'ml-dsa-65'), None when it has none
-    fips_approved: bool
+    fips_static: bool               # approved by every FIPS module (RSA 2048+, NIST curves)
     key_size: int | None = None     # RSA modulus or EC field size, in bits
     curve_names: tuple[str, ...] = ()   # pyca / OpenSSL curve names, EC only
     aliases: tuple[str, ...] = ()       # extra spellings accepted by normalize_label
     security_level: int | None = None   # NIST post-quantum security category, None for classical keys
     oid: str | None = None              # OID of a post-quantum key and of its signatures (one names both)
     ca_only_key_type: str | None = None  # KEY_TYPES id of a key generated for CAs only (EdDSA: no leaf one)
+    fips_by_module: bool = False    # approved only when the loaded module says so (EdDSA, ML-DSA)
+
+    @property
+    def fips_approved(self) -> bool:
+        """Whether FIPS mode allows this algorithm: fixed, or asked of the loaded module."""
+        return self.fips_static or (self.fips_by_module and fips_mode.module_approves(self.label))
 
     @property
     def ca_key_type(self) -> str | None:
@@ -133,6 +150,17 @@ class KeyAlgorithm:
         return True
 
 
+# FIPS 186-5 §5.1 (even, 2048+) and IG C.F (no upper limit); OpenSSL caps the modulus at 16384
+FIPS_RSA_MIN_BITS = 2048
+FIPS_RSA_MAX_BITS = 16384
+
+
+def fips_rsa_bits_approved(bits) -> bool:
+    """The one FIPS rule for an RSA modulus: even, 2048 to 16384 bits."""
+    return (isinstance(bits, int) and not isinstance(bits, bool) and bits % 2 == 0
+            and FIPS_RSA_MIN_BITS <= bits <= FIPS_RSA_MAX_BITS)
+
+
 def _rsa(bits: int) -> KeyAlgorithm:
     return KeyAlgorithm(
         label=f'RSA-{bits}', family='RSA', param=str(bits),
@@ -140,7 +168,7 @@ def _rsa(bits: int) -> KeyAlgorithm:
         generator=lambda: generate_rsa(bits),
         needs_digest=True, default_digest='sha256',
         display=f'RSA {bits}', legacy_key_algo=f'RSA {bits}', trust_store_id=str(bits),
-        fips_approved=bits >= 2048, key_size=bits,
+        fips_static=fips_rsa_bits_approved(bits), key_size=bits,
     )
 
 
@@ -152,7 +180,7 @@ def _ec(bits: int, curve: type, names: tuple[str, ...], trust_store_id: str) -> 
         # A hash of the curve's strength (CA/Browser Forum BR 7.1.3.2.2)
         needs_digest=True, default_digest={256: 'sha256', 384: 'sha384', 521: 'sha512'}[bits],
         display=f'EC P-{bits}', legacy_key_algo=f'EC {curve.name}', trust_store_id=trust_store_id,
-        fips_approved=True, key_size=bits, curve_names=names,
+        fips_static=True, key_size=bits, curve_names=names,
         aliases=(f'P-{bits}', f'NIST P-{bits}', f'ECDSA-P{bits}'),
     )
 
@@ -166,7 +194,7 @@ def _brainpool(bits: int, curve: type) -> KeyAlgorithm:
         generator=lambda: generate_ec(curve()),
         needs_digest=True, default_digest={256: 'sha256', 384: 'sha384', 512: 'sha512'}[bits],
         display=f'EC Brainpool P{bits}r1', legacy_key_algo=f'EC {name}', trust_store_id=name,
-        fips_approved=False, key_size=bits, curve_names=(name.lower(),),
+        fips_static=False, key_size=bits, curve_names=(name.lower(),),
         aliases=(name, f'EC-{name}', f'BP-{bits}'),
     )
 
@@ -175,23 +203,23 @@ def _edwards(name: str, private_class: type, public_class: type, bits: int) -> K
     return KeyAlgorithm(
         label=name.upper(), family=name.upper(), param=None,
         private_class=private_class, public_class=public_class,
-        generator=_non_fips_generator(name, private_class),
+        generator=_module_generator(name, private_class, ['-algorithm', name.upper()]),
         needs_digest=False, default_digest=None,
         display=name, legacy_key_algo=name, trust_store_id=None,
-        fips_approved=False, key_size=bits, ca_only_key_type=name.lower(),
+        fips_static=False, fips_by_module=True, key_size=bits, ca_only_key_type=name.lower(),
     )
 
 
 def _mldsa(param: str, level: int, oid_arc: int, private_class: type, public_class: type) -> KeyAlgorithm:
-    """FIPS 204 key: signs without a separate digest, outside the FIPS module UCM ships."""
+    """FIPS 204 key: signs without a separate digest (pure ML-DSA, the only mode the 3.5 module offers)."""
     label = f'ML-DSA-{param}'
     return KeyAlgorithm(
         label=label, family='ML-DSA', param=param,
         private_class=private_class, public_class=public_class,
-        generator=_non_fips_generator(label, private_class),
+        generator=_module_generator(label, private_class, ['-algorithm', label, *_MLDSA_SEED_ONLY]),
         needs_digest=False, default_digest=None,
         display=label, legacy_key_algo=label, trust_store_id=label.lower(),
-        fips_approved=False, key_size=None,
+        fips_static=False, fips_by_module=True, key_size=None,
         security_level=level, oid=f'2.16.840.1.101.3.4.3.{oid_arc}',
     )
 
@@ -219,7 +247,7 @@ _ML_DSA: tuple[KeyAlgorithm, ...] = (
 
 def mldsa_supported() -> bool:
     """Whether pyca was built against a libcrypto with ML-DSA (OpenSSL 3.5+, AWS-LC, BoringSSL);
-    a FIPS provider loaded at run time may still lack it."""
+    in FIPS mode the loaded module decides on top of it (KeyAlgorithm.fips_approved)."""
     return bool(_openssl_backend.mldsa_supported())
 
 
@@ -454,13 +482,55 @@ def fips_approved(label) -> bool:
     return bool(alg and alg.fips_approved)
 
 
+_RSA_SPELLING = re.compile(r'\s*RSA[\s:_-]*(\d+)\s*', re.IGNORECASE)
+
+
+def rsa_bits_of_label(text) -> int | None:
+    """Modulus size an RSA spelling names ('RSA 8192', 'RSA-2048', 'rsa:4096'), else None."""
+    match = _RSA_SPELLING.fullmatch(str(text)) if isinstance(text, str) else None
+    return int(match.group(1)) if match else None
+
+
 def fips_approved_for_key(key) -> bool:
-    """Whether a public or private *key* is FIPS approved; any RSA modulus of 2048+ bits counts."""
+    """Whether a public or private *key* is FIPS approved; RSA by ``fips_rsa_bits_approved``."""
+    if isinstance(key, (rsa.RSAPublicKey, rsa.RSAPrivateKey)):
+        return fips_rsa_bits_approved(key.key_size)
     for alg in _REGISTRY.algorithms:
         if alg.matches_key(key):
             return alg.fips_approved
-    return isinstance(key, (rsa.RSAPublicKey, rsa.RSAPrivateKey)) and key.key_size >= 2048
+    return False
+
+
+def fips_approved_key_label(label) -> bool:
+    """Whether FIPS mode approves the key *label* names: any RSA size the rule admits,
+    otherwise the registry's verdict."""
+    bits = rsa_bits_of_label(label)
+    return fips_rsa_bits_approved(bits) if bits is not None else fips_approved(label)
 
 
 def fips_approved_labels() -> tuple[str, ...]:
     return tuple(a.label for a in _REGISTRY.algorithms if a.fips_approved)
+
+
+def _mldsa_label_of(item) -> str | None:
+    """ML-DSA label of a label, key, certificate or CSR (read by its OID, unloaded), else None."""
+    oid = getattr(item, 'public_key_algorithm_oid', None)
+    if oid is not None:
+        info = post_quantum_info(oid)
+        return info.label if info is not None and info.family == 'ML-DSA' else None
+    family = _family_of(item)
+    if family != 'ML-DSA':
+        return None
+    return item if isinstance(item, str) and get(item) else (
+        label_for_private_key(item) or label_for_public_key(item))
+
+
+def refuse_unapproved_mldsa(items, context: str) -> None:
+    """In FIPS mode, FipsRestricted '<label> key of <context>' for the first ML-DSA key among
+    *items* (labels, keys, certificates) the loaded module does not approve, as EdDSA ones are."""
+    if not fips_mode.enabled():
+        return
+    for item in items:
+        label = _mldsa_label_of(item) if item is not None else None
+        if label:
+            fips_mode.refuse_unless_approved(label, f'{label} key of {context}')

@@ -5,25 +5,47 @@ System HTTPS Operations
 from . import bp
 from flask import request, current_app, Response
 from auth.unified import require_auth
+from utils.ha import ha_enabled
+from services.https_binding import restart_to_serve
 from utils.response import success_response, error_response
 from models import Certificate, db, SystemConfig
 from services.audit_service import AuditService
 from pathlib import Path
 import os
-import shutil
-import base64
 from datetime import datetime, timedelta, timezone
 import logging
 from utils.datetime_utils import to_naive_utc, utc_now, utc_isoformat
-from utils.key_codec import load_pem_bytes
-from config.settings import is_docker
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from utils import key_algorithms
+from utils.issuance_defaults import BASELINE_ISSUE_KEY
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
+
+
+def _actor():
+    from flask import g
+    user = getattr(g, 'current_user', None)
+    return getattr(user, 'username', None)
+
+
+def _https_attention():
+    """The renewed certificate the HTTPS binding could not follow (no key in UCM), or None."""
+    from services.binding_attention import REASON_SUCCESSOR_WITHOUT_KEY, https_left_behind_for
+    refid = https_left_behind_for()
+    if not refid:
+        return None
+    successor = Certificate.query.filter_by(refid=refid).first()
+    return {
+        'reason': REASON_SUCCESSOR_WITHOUT_KEY,
+        'successor_id': successor.id if successor else None,
+        'successor_refid': refid,
+        'successor_descr': successor.descr if successor else None,
+        'successor_has_key': bool(successor and successor.has_private_key),
+        'successor_archived': bool(successor and successor.archived),
+    }
 
 
 @bp.route('/api/v2/system/https/cert-info', methods=['GET'])
@@ -82,6 +104,7 @@ def get_https_cert_info():
                     'descr': row.descr if row else None,
                     'common_name': row.common_name if row else None,
                     'exists': bool(row and row.crt and row.prv),
+                    'needs_attention': _https_attention(),
                 }
         except Exception as e:
             logger.warning(f"Could not resolve HTTPS binding: {e}")
@@ -130,6 +153,42 @@ def unbind_https_cert():
     return success_response(message='HTTPS certificate binding cleared')
 
 
+def _ha_unrecorded_message(refid):
+    """The 500 of an HA apply whose binding was not stored: the other nodes serve what the
+    binding names, which may already be *refid*."""
+    try:
+        from services.https_binding import get_bound_refid
+        db.session.rollback()
+        if get_bound_refid() == refid:
+            return ("Certificate applied on this node: the binding could not be stored, but it "
+                    "already names this certificate, which the other nodes serve")
+    except Exception:
+        db.session.rollback()
+    return "Certificate applied on this node only: the binding could not be stored"
+
+
+def _unrecorded_message(refid=None):
+    """The 500 of a pair written to disk whose binding was not stored (outside HA).
+
+    The next start rewrites the files only when the database names a pair (materialize_https);
+    a binding that already names *refid*, the certificate just written, rewrites that one.
+    """
+    base = "Certificate written but not recorded: the service was not restarted"
+    try:
+        from services import shared_files
+        from services.https_binding import get_bound_refid
+        db.session.rollback()
+        bound = get_bound_refid()
+        if refid and bound == refid:
+            return f"{base}, and its next start serves this certificate"
+        named = bool(bound) or any(shared_files.read_file(name) is not None for name in (
+            shared_files.HTTPS_RESTORED, shared_files.HTTPS_GENERATED))
+    except Exception:
+        db.session.rollback()
+        return base
+    return f"{base}, and its next start serves {'the previous' if named else 'this'} certificate"
+
+
 @bp.route('/api/v2/system/https/regenerate', methods=['POST'])
 @require_auth(['admin:system'])
 def regenerate_https_cert():
@@ -140,7 +199,7 @@ def regenerate_https_cert():
 
     try:
         # Generate private key
-        private_key = key_algorithms.generate('RSA-2048')
+        private_key = key_algorithms.generate(BASELINE_ISSUE_KEY)
 
         # Build certificate
         subject = issuer = x509.Name([
@@ -168,41 +227,41 @@ def regenerate_https_cert():
             .sign(private_key, hashes.SHA256())
         )
 
-        # Get cert paths dynamically - same logic as gunicorn.conf.py
-        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
-        cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
-        key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
-
-        # Backup existing
-        backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
-        if cert_path.exists():
-            shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
-        if key_path.exists():
-            shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
-
-        # Write new cert and key
-        cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-        key_path.write_bytes(private_key_to_pem(private_key))
-        os.chmod(key_path, 0o600)
-
-        # Set ownership to the ucm service user (POSIX only; skipped elsewhere / if absent)
-        try:
-            import pwd  # POSIX-only; import lazily so this module loads on non-POSIX too
-            ucm_user = pwd.getpwnam('ucm')
-            os.chown(cert_path, ucm_user.pw_uid, ucm_user.pw_gid)
-            os.chown(key_path, ucm_user.pw_uid, ucm_user.pw_gid)
-        except (KeyError, ImportError):
-            pass
+        cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode('ascii')
+        key_pem = private_key_to_pem(private_key).decode('ascii')
+        from boot_config import write_https_pair
+        from services.https_binding import _paths, set_bound_refid
+        from services import shared_files
+        cert_path, key_path = _paths()
+        write_https_pair(cert_path, key_path, cert_pem, key_pem,
+                         backup_suffix=utc_now().strftime('%Y%m%d_%H%M%S'))
 
         current_app.logger.info(f"Regenerated HTTPS certificate for {common_name}")
 
-        # A regenerated self-signed certificate replaces any bound managed
-        # certificate: drop the binding so renewals stop re-materializing (#303)
+        # A regenerated self-signed certificate replaces any bound managed one (#303).
+        # HA: the pair is kept for the other nodes, which write it as they restart.
         try:
-            from services.https_binding import set_bound_refid
+            if ha_enabled():
+                import json
+                shared_files.store_file(shared_files.HTTPS_GENERATED,
+                                 json.dumps({'crt': cert_pem, 'key': key_pem}).encode('utf-8'),
+                                 actor=_actor())
+            else:
+                shared_files.drop_file(shared_files.HTTPS_GENERATED)
+            shared_files.drop_file(shared_files.HTTPS_RESTORED)
             set_bound_refid('')
         except Exception as e:
-            current_app.logger.warning(f"Could not clear HTTPS binding: {e}")
+            db.session.rollback()
+            current_app.logger.error(f"Could not store the regenerated HTTPS certificate: {e}")
+            # Not restarted: the next start writes the pair the database still names, if any
+            message = ("Certificate regenerated on this node only: it could not be stored "
+                       "for the other nodes") if ha_enabled() else _unrecorded_message()
+            AuditService.log_action(
+                action='https_regenerate', resource_type='system',
+                resource_name='HTTPS Certificate',
+                details=f'Regenerated self-signed HTTPS certificate for {common_name}: {message}',
+                success=False)
+            return error_response(message, 500)
 
         AuditService.log_action(
             action='https_regenerate',
@@ -212,16 +271,13 @@ def regenerate_https_cert():
             success=True
         )
 
-        # Restart service (skip in Docker - user must restart container)
-        if is_docker():
+        started, msg = restart_to_serve()
+        if started is None:
             return success_response(
                 message="Certificate regenerated. Restart the container to apply.",
                 data={'requires_container_restart': True}
             )
-
-        from utils.service_manager import restart_service as do_restart
-        success, msg = do_restart()
-        if not success:
+        if not started:
             return success_response(
                 message="Certificate regenerated but service restart failed. Please restart manually.",
                 data={'restart_failed': True, 'error': msg}
@@ -259,78 +315,35 @@ def apply_https_cert():
         return error_response("Certificate has expired - cannot use for HTTPS", 400)
 
     try:
-        # Get cert paths dynamically - same logic as gunicorn.conf.py
-        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
-        cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
-        key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
-
-        # Backup existing certs
-        backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
-        if cert_path.exists():
-            shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
-        if key_path.exists():
-            shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
-
-        # Decode cert/key - they may be base64 encoded or raw PEM
-        cert_data = cert.crt
-
-        # The private key goes through the codec, not through base64 alone:
-        # with a key-encryption key the column holds base64 of `ENC:` plus a
-        # token, so decoding it yields the ciphertext, and that is what used
-        # to be written into the file gunicorn reads as the key. The renewal
-        # path (`services/https_binding.materialize_https_cert`) has always
-        # done it this way; this is the same work, written once more here.
-        if cert.prv.lstrip().startswith('-----BEGIN'):
-            # A column holding the PEM itself, from before the key was stored
-            # base64-encoded. `load_pem_bytes` would hand its body to the
-            # base64 decoder and produce bytes that are not a key, without
-            # raising, so the tolerance the previous version had is kept.
-            key_data = cert.prv
-        else:
-            try:
-                key_data = load_pem_bytes(
-                    cert.prv, context=f"certificate {cert.id}").decode('utf-8')
-            except Exception as exc:
-                logger.error(f"HTTPS apply: private key unreadable: {exc}")
-                return error_response(
-                    "The private key of this certificate could not be read. "
-                    "The certificate and key in use were not replaced; the "
-                    "copies taken before the attempt are on disk beside them",
-                    400)
-
-        if not cert_data.startswith('-----BEGIN'):
-            try:
-                cert_data = base64.b64decode(cert_data).decode('utf-8')
-            except Exception:
-                pass  # Already decoded or different format
-
-        # Write new certificate with full chain (leaf + intermediates + root)
-        from services.https_binding import with_ca_chain
-        full_cert = with_ca_chain(cert, cert_data)
-
-        cert_path.write_text(full_cert)
-
-        # Write private key with restricted permissions
-        key_path.write_text(key_data)
-        os.chmod(key_path, 0o600)
-
-        # Set ownership to ucm user (POSIX only; skipped on non-POSIX or if user absent)
+        from services.https_binding import https_key_pem, materialize_https_cert, set_bound_refid
         try:
-            import pwd  # POSIX-only; import lazily so this module loads on non-POSIX too
-            ucm_user = pwd.getpwnam('ucm')
-            os.chown(cert_path, ucm_user.pw_uid, ucm_user.pw_gid)
-            os.chown(key_path, ucm_user.pw_uid, ucm_user.pw_gid)
-        except (KeyError, ImportError):
-            pass  # ucm user doesn't exist (or non-POSIX), skip chown
+            https_key_pem(cert)
+        except ValueError as exc:
+            logger.error(f"HTTPS apply: private key unreadable: {exc}")
+            return error_response(
+                "The private key of this certificate could not be read. "
+                "The certificate and key in use were not replaced", 400)
 
+        # Leaf, chain and key, written whole or not at all (also how every node writes it at start)
+        full_cert = materialize_https_cert(cert)
         current_app.logger.info(f"Applied certificate {cert.refid} as HTTPS cert")
 
-        # Remember the binding so a renewal re-materializes the files (#303)
+        # Remember the binding so a renewal re-materializes the files (#303), and so the
+        # other nodes (HA) write the same files when they restart
+        # Read before binding: a failed binding rolls back and expires the instance
+        refid, label = cert.refid, cert.descr or cert.refid
         try:
-            from services.https_binding import set_bound_refid
-            set_bound_refid(cert.refid)
+            set_bound_refid(refid, chain=full_cert)
         except Exception as e:
             current_app.logger.warning(f"Could not persist HTTPS binding: {e}")
+            # Not restarted: the next start writes the certificate the database still names, if any
+            message = _ha_unrecorded_message(refid) if ha_enabled() else _unrecorded_message(refid)
+            AuditService.log_action(
+                action='https_apply', resource_type='system', resource_id=str(cert_id),
+                resource_name=label,
+                details=f'Applied certificate {refid} as HTTPS certificate: {message}',
+                success=False)
+            return error_response(message, 500)
 
         AuditService.log_action(
             action='https_apply',
@@ -341,16 +354,13 @@ def apply_https_cert():
             success=True
         )
 
-        # Restart service (skip in Docker - user must restart container)
-        if is_docker():
+        started, msg = restart_to_serve()
+        if started is None:
             return success_response(
                 message="Certificate applied. Restart the container to apply.",
                 data={'requires_container_restart': True}
             )
-
-        from utils.service_manager import restart_service as do_restart
-        success, msg = do_restart()
-        if not success:
+        if not started:
             return success_response(
                 message="Certificate applied but service restart failed. Please restart manually.",
                 data={'restart_failed': True, 'error': msg}

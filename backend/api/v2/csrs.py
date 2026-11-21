@@ -12,13 +12,17 @@ import uuid
 from flask import Blueprint, request, jsonify, g, Response
 from sqlalchemy import func, or_
 from auth.unified import has_permission, require_auth
+from services.cert.unique_subject import OVERRIDE_FIELD, SubjectTaken, override_requested, taken_response
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
+from utils.export_password import validate_export_password
+from utils.export_options import FORMAT, PASSWORD, read_export_options
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
+from utils.san_parse import is_valid_san_email
 from utils.request_names import RequestRejected
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from models import db, Certificate, CA
 from services.cert_service import CertificateService
 from services.cert.mixins.csr import RelatedSignerError
@@ -27,6 +31,8 @@ from services.policy_service import PolicyViolation
 from utils.csr_extensions import csr_extensions
 from utils.custom_extensions import TemplateConfigError
 from fips_mode import FipsRestricted
+from utils import key_algorithms
+from utils.csr_diagnostics import weak_csr_hash_error
 from utils.key_type import unsignable_csr_key
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
                              san_buckets_from_general_names)
@@ -251,7 +257,7 @@ def _malformed_request_refusal(cert, cert_type, template_id=None):
 
 
 def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None,
-                      extra_san=None, custom_extensions=None):
+                      extra_san=None, custom_extensions=None, override=False):
     """Queue the signing for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
     from services.approval_gate import queue_if_approval_required
@@ -270,6 +276,8 @@ def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus
             'custom_extensions': custom_extensions or [],
             # The duration was already capped by policy: the approver is told
             'validity_notice': validity_notice or None,
+            # The requester's override of a taken unique subject, shown to the approver
+            OVERRIDE_FIELD: override,
         },
         comment=data.get('approval_comment'),
     )
@@ -373,6 +381,19 @@ def create_csr():
             dn['O'] = data['organization']
         if country:
             dn['C'] = country
+        for key, field in (('state', 'ST'), ('locality', 'L')):
+            if data.get(key):
+                dn[field] = data[key]
+        # emailAddress is an IA5String (RFC 2985 5.2.1): an ASCII address or nothing
+        email = data.get('email')
+        if email not in (None, ''):
+            if not isinstance(email, str):
+                return error_response('email must be a string', 400)
+            email = email.strip()
+            if email and not is_valid_san_email(email):
+                return error_response(f'Invalid email address: {email}', 400)
+            if email:
+                dn['email'] = email
         
         # Validate DN fields
         for field, value in dn.items():
@@ -380,10 +401,12 @@ def create_csr():
             if not is_valid:
                 return error_response(error, 400)
             
-        # Parse key type (Frontend: "RSA 2048", "EC P-256", etc.)
+        # Parse key type (Frontend: "RSA <bits>", "EC P-256", etc.)
         from utils.key_type import parse_csr_key_type
+        from utils.issuance_defaults import default_issue_key_type
         try:
-            key_type = parse_csr_key_type(data.get('key_type', 'RSA 2048'))
+            key_type = parse_csr_key_type(
+                data.get('key_type') or key_algorithms.get(default_issue_key_type()).display)
         except FipsRestricted:
             raise
         except ValueError as exc:
@@ -434,7 +457,7 @@ def create_csr():
         
         cert_dict = cert.to_dict()
         from services.webhook_service import emit_csr_submitted
-        emit_csr_submitted(cert_dict)
+        emit_csr_submitted(cert_dict, actor=g.current_user.username)
 
         return created_response(
             data=cert_dict,
@@ -485,7 +508,7 @@ def upload_csr():
             return error_response(unsignable, 400)
         # RFC 2986 §2.2: verify CSR signature
         if not csr.is_signature_valid:
-            return error_response('CSR has invalid signature', 400)
+            return error_response(weak_csr_hash_error(csr) or 'CSR has invalid signature', 400)
         
         # Extract subject info
         subject = csr.subject
@@ -541,7 +564,7 @@ def upload_csr():
             san_email=json.dumps(san_email) if san_email else None,
             san_uri=json.dumps(san_uri) if san_uri else None,
             source='upload',
-            created_by=getattr(g, 'username', 'system')
+            created_by=g.current_user.username
         )
         
         db.session.add(new_cert)
@@ -560,6 +583,8 @@ def upload_csr():
 
         # Return CSR-friendly format
         result = new_cert.to_dict()
+        from services.webhook_service import emit_csr_submitted
+        emit_csr_submitted(dict(result), actor=g.current_user.username)
         result['status'] = 'Pending'
         result['cn'] = cn
         result['department'] = ou
@@ -614,7 +639,7 @@ def import_csr():
             return error_response(unsignable, 400)
         # RFC 2986 §2.2: verify CSR signature
         if not csr.is_signature_valid:
-            return error_response('CSR has invalid signature', 400)
+            return error_response(weak_csr_hash_error(csr) or 'CSR has invalid signature', 400)
         
         # Extract subject info
         subject = csr.subject
@@ -665,7 +690,7 @@ def import_csr():
             san_ip=json.dumps(san_ip) if san_ip else None,
             san_email=json.dumps(san_email) if san_email else None,
             san_uri=json.dumps(san_uri) if san_uri else None,
-            created_by='import',
+            created_by=g.current_user.username,
             created_at=utc_now()
         )
         
@@ -684,8 +709,12 @@ def import_csr():
             success=True
         )
 
+        cert_dict = cert.to_dict()
+        from services.webhook_service import emit_csr_submitted
+        emit_csr_submitted(cert_dict, actor=g.current_user.username)
+
         return created_response(
-            data=cert.to_dict(),
+            data=cert_dict,
             message=f'CSR "{cert.descr}" imported successfully'
         )
 
@@ -751,7 +780,12 @@ def resubmit_csr(csr_id):
         details=f'Request of certificate {signed.id} pending again as request {row.id}',
         success=True,
     )
+    from services.webhook_service import emit_csr_submitted
+    emit_csr_submitted(row.to_dict(), actor=g.current_user.username)
     return created_response(data=row.to_dict(), message='Request pending again')
+
+
+EXPORT_OPTIONS = {'format': FORMAT, 'password': PASSWORD}
 
 
 @bp.route('/api/v2/csrs/<int:csr_id>/export', methods=['GET', 'POST'])
@@ -772,23 +806,25 @@ def export_csr(csr_id):
     if not cert or not cert.csr:
         return error_response('CSR not found', 404)
 
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json(silent=True) or {}
-        export_format = str(data.get('format') or 'csr').lower()
-        password = data.get('password') or None
-    else:
-        export_format = (request.args.get('format') or 'csr').lower()
-        password = None
-        if request.args.get('password'):
-            return error_response('Password must be sent via POST body (JSON), not query string', 400)
-    if export_format not in ('csr', 'key'):
-        return error_response('format must be csr or key', 400)
+    # A GET may fetch the key in clear, with no password anywhere in the request
+    opts, refused = read_export_options(EXPORT_OPTIONS, ('csr', 'key'), 'CSR')
+    if refused:
+        return refused
+    export_format = opts.get('format', 'csr')
+    password = opts.get('password') or None
+    # A HEAD would decrypt and audit a key it never sends
+    if export_format == 'key' and request.method not in ('GET', 'POST'):
+        return error_response('A key export is a GET or a POST', 400)
 
     if export_format == 'key':
         if not has_permission('read:private_keys', getattr(g, 'permissions', []) or []):
             return error_response(
                 'Private key export requires the read:private_keys permission', 403
             )
+        # An empty password means an unencrypted key; any other must follow the shared rule
+        pw_err = validate_export_password(password, allow_empty=True)
+        if pw_err:
+            return error_response(pw_err, 400)
         if not cert.prv:
             return error_response('CSR has no private key', 400)
         try:
@@ -815,7 +851,7 @@ def export_csr(csr_id):
         return Response(
             key_pem,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(cert.descr or cert.refid)}.key"'}
+            headers={'Content-Disposition': content_disposition(cert.descr or cert.refid, '.key', fallback=cert.refid)}
         )
     
     try:
@@ -823,7 +859,7 @@ def export_csr(csr_id):
         return Response(
             csr_pem,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(cert.descr or cert.refid)}.csr"'}
+            headers={'Content-Disposition': content_disposition(cert.descr or cert.refid, '.csr', fallback=cert.refid)}
         )
     except Exception as e:
         logger.error(f"CSR export failed: {e}")
@@ -1001,6 +1037,8 @@ def sign_csr(csr_id):
         extra_ekus: EKU names or OIDs added to the type's own
         san_dns, san_ip, san_email, san_uri: names added to the request's own
         custom_extensions: [{oid, critical, value (hex)}] added verbatim (#437)
+        override_unique_subject: true attests that the certificate is for the same entity as the one
+            that already carries the subject under a CA enforcing a unique subject (audited)
     """
     
     cert = db.session.get(Certificate, csr_id)
@@ -1014,6 +1052,7 @@ def sign_csr(csr_id):
         return error_response('CSR already signed', 400)
     
     data = request.get_json(silent=True) or {}
+    override = override_requested(data)
     ca_id = data.get('ca_id')
     validity_days = coerce_validity_days(data.get('validity_days', 365))
     if validity_days is None:
@@ -1116,7 +1155,8 @@ def sign_csr(csr_id):
     try:
         policy, approval = _approval_for_csr(
             g.current_user, ca, cert, data, validity_days, backend_cert_type, extra_ekus,
-            validity_notice=validity_notice, extra_san=extra_san, custom_extensions=custom_extensions)
+            validity_notice=validity_notice, extra_san=extra_san, custom_extensions=custom_extensions,
+            override=override)
     except Exception as e:
         logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the request was not signed', 500)
@@ -1163,6 +1203,8 @@ def sign_csr(csr_id):
             policy_template_id=data.get('template_id'),
             notices=sign_notices,
             custom_extensions=custom_extensions,
+            override_unique_subject=override,
+            source='csr',
         )
         
         # Determine if result is a CA or Certificate
@@ -1190,7 +1232,10 @@ def sign_csr(csr_id):
         )
     except FipsRestricted:
         raise
+    except SubjectTaken as e:
+        return taken_response(e)
     except PolicyViolation as e:
+        logger.warning(f"CSR {csr_id} not signed, refused: {e}")
         return error_response(f'Policy violation: {e}', 400)
     except (TemplateConfigError, RequestRejected) as e:
         return error_response(str(e), 400)
@@ -1306,7 +1351,10 @@ def bulk_sign_csrs():
             results['success'].append(csr_id)
             signed_notices += [f'CSR {csr_id}: {n}' for n in item_notices if n]
         except PolicyViolation as e:
+            logger.warning(f"Bulk sign: CSR {csr_id} not signed, refused: {e}")
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
+        except SubjectTaken as e:
+            results['failed'].append({'id': csr_id, 'error': e.audited})
         except (FipsRestricted, TemplateConfigError, RequestRejected) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:

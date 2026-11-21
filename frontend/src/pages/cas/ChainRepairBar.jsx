@@ -10,7 +10,7 @@ function FindingRow({ finding, canConvert, canRestore, onConvert, onRestore, caN
     ? t('crossCerts.findingShadowed', { name: finding.ca_name, root: finding.root_name })
     : t('crossCerts.findingSameKey', { subject: finding.subject })
   return (
-    <div className="flex items-center gap-2 px-4 py-1 text-[11px]" data-testid="cross-finding">
+    <div className="flex items-center gap-2 px-4 py-1 text-xs" data-testid="cross-finding">
       <span className="flex-1 min-w-0 truncate text-text-secondary" title={finding.subject}>{label}</span>
       {finding.actions?.includes('convert_to_cross') && canConvert && (
         <button type="button" onClick={() => onConvert?.(finding)}
@@ -60,7 +60,7 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t, findings
     <div className="flex items-center gap-3 px-4 py-1.5">
       <div className="flex items-center gap-1.5 text-text-tertiary shrink-0">
         <LinkSimple size={13} weight="duotone" />
-        <span className="text-[11px] font-medium">{t('dashboard.chainRepair')}</span>
+        <span className="text-xs font-medium">{t('dashboard.chainRepair')}</span>
       </div>
 
       <div className="flex items-center gap-2 flex-1 max-w-xs">
@@ -70,10 +70,10 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t, findings
             style={{ width: `${pct}%` }}
           />
         </div>
-        <span className="text-[10px] font-bold font-mono text-text-secondary w-8 text-right">{pct}%</span>
+        <span className="text-xs font-bold font-mono text-text-secondary w-8 text-right">{pct}%</span>
       </div>
 
-      <div className="hidden sm:flex items-center gap-3 text-[10px] text-text-tertiary">
+      <div className="hidden sm:flex items-center gap-3 text-xs text-text-tertiary">
         <span>{crStats.total_cas || 0} CA{(crStats.total_cas || 0) > 1 ? 's' : ''}</span>
         <span>{crStats.total_certs || 0} certs</span>
         {orphans > 0 && <span className="text-accent-warning">{orphans} {t('dashboard.chainRepairOrphans')}</span>}
@@ -86,7 +86,7 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t, findings
 
       {findings.length > 0 && (
         <button type="button" onClick={() => setShowFindings(v => !v)} aria-expanded={showFindings}
-                className="flex items-center gap-1 text-[10px] text-accent-warning shrink-0">
+                className="flex items-center gap-1 text-xs text-accent-warning shrink-0">
           {t('crossCerts.findings', { count: findings.length })}
           {showFindings ? <CaretUp size={10} /> : <CaretDown size={10} />}
         </button>
@@ -94,11 +94,11 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t, findings
 
       <div className="flex items-center gap-2 shrink-0">
         {running ? (
-          <span className="text-[10px] text-accent-primary flex items-center gap-1">
+          <span className="text-xs text-accent-primary flex items-center gap-1">
             <CircleNotch size={10} className="animate-spin" />
           </span>
         ) : countdown ? (
-          <span className="text-[10px] text-text-tertiary font-mono flex items-center gap-1">
+          <span className="text-xs text-text-tertiary font-mono flex items-center gap-1">
             <Timer size={10} />
             {countdown}
           </span>
@@ -120,7 +120,7 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t, findings
     </div>
     {showFindings && findings.length > 0 && (
       <div className="pb-1.5 border-t border-border-op30">
-        <p className="px-4 py-1 text-[10px] text-text-tertiary">{t('crossCerts.findingsNote')}</p>
+        <p className="px-4 py-1 text-xs text-text-tertiary">{t('crossCerts.findingsNote')}</p>
         {findings.map((f, i) => (
           <FindingRow key={`${f.kind}-${f.ca_id ?? f.ski}-${i}`} finding={f} t={t}
                       canConvert={canConvert} canRestore={canRestore} onConvert={onConvert} onRestore={onRestore} caName={caName} />

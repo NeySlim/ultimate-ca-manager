@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Certificats',
     subtitle: 'Émettre, gérer et surveiller les certificats',
-    overview: 'Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certificats depuis vos CA, importez des certificats existants, suivez les dates d\'expiration et gérez les renouvellements et révocations.',
+    overview: 'Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certificats depuis vos AC, importez des certificats existants, suivez les dates d\'expiration et gérez les renouvellements et révocations.',
     sections: [
       {
         title: "Linting de conformité",
@@ -21,24 +21,25 @@ export default {
           { term: 'Expirant', description: 'Expirera dans les 30 jours' },
           { term: 'Expiré', description: 'Après la date « Not After »' },
           { term: 'Révoqué', description: 'Explicitement révoqué (publié dans la CRL)' },
-          { term: 'Orphelin', description: 'La CA émettrice n\'existe plus dans le système' },
+          { term: 'Orphelin', description: 'L\'AC émettrice n\'existe plus dans le système' },
           { term: 'Archivé', description: 'Remplacé par un renouvellement ou un ré-enrôlement qui a conservé l\'ancien enregistrement pour l\'historique (SCEP, EST, WSTEP, ACME, répondeur OCSP) ; listé avec le filtre de statut « Archivé »' },
         ]
       },
       {
         title: 'Actions',
         items: [
-          { label: 'Émettre', text: 'Créer un nouveau certificat signé par une de vos CA' },
+          { label: 'Émettre', text: 'Créer un nouveau certificat signé par une de vos AC' },
           { label: 'Importer', text: 'Importer un certificat existant (PEM, DER ou PKCS#12)' },
-          { label: 'Renouveler', text: 'En place depuis la v2.214 : mêmes id/refid, nouveaux numéro de série et période de validité, le numéro de série remplacé reste dans la CRL jusqu\'à l\'ancienne expiration. Un certificat révoqué ne peut pas être renouvelé. Demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques et l\'expiration de la CA la plafonnent toujours' },
+          { label: 'Renouveler', text: 'En place depuis la v2.214 : mêmes id/refid, nouveaux numéro de série et période de validité, le numéro de série remplacé reste dans la CRL jusqu\'à l\'ancienne expiration. Un certificat révoqué ne peut pas être renouvelé. Demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques et l\'expiration de l\'AC la plafonnent toujours' },
           { label: 'Renommer', text: 'Définir un nom d\'affichage indépendant du CN (par défaut le CN, ou le premier nom DNS des SAN pour les certificats sans CN)' },
           { label: 'Révoquer', text: 'Marquer comme révoqué avec un motif, apparaîtra dans la CRL' },
           { label: 'Lever la suspension', text: 'Annuler la suspension d\'un certificat révoqué avec le motif « Suspension de certificat », restaure le statut valide' },
           { label: 'Révoquer un certificat suspendu', text: 'Un certificat suspendu peut aussi être révoqué définitivement avec un autre motif, sans repasser par valide. La CRL et l\'OCSP donnent alors le nouveau motif, et la date d\'invalidité est le début de la suspension sauf si une est fournie' },
+          { label: 'Révocation auprès de l\'AC ACME', text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
           { label: 'Exporter', text: 'Télécharger au format PEM, DER, PKCS#12 ou JKS' },
           { label: 'Mode compatibilité PKCS#12 (v2.222)', text: 'Les dialogues d\'export proposent un profil 3DES/SHA-1 pour les importeurs qui refusent l\'archive AES-256 par défaut comme un mot de passe incorrect : Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java ancien. Désactivé par défaut, il protège moins bien le fichier' },
           { label: 'Comparer', text: 'Comparaison côte à côte de deux certificats' },
-          { label: "Autres extensions (v2.251)", text: "Les détails des certificats et des CA listent sous Autres extensions celles pour lesquelles UCM n'a pas de section, avec leur OID, leur nom s'il est connu, leur criticité et leur valeur brute. Le formulaire d'émission peut ajouter des extensions personnalisées à celles du template" },
+          { label: "Autres extensions (v2.251)", text: "Les détails des certificats et des AC listent sous Autres extensions celles pour lesquelles UCM n'a pas de section, avec leur OID, leur nom s'il est connu, leur criticité et leur valeur brute. Le formulaire d'émission peut ajouter des extensions personnalisées à celles du template" },
           { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour keyCompromise reste connue après la suppression de son certificat, quelle que soit l'AC qui l'a émis, Let's Encrypt compris : le client ACME la refuse à la requête, au renouvellement et à la finalisation, et EST refuse une CSR qui la porte. Les autres chemins d'émission ne consultent pas cette liste" },
           { label: "Certificats du client ACME (v2.251)", text: "Un certificat obtenu par le client ACME est lui aussi renouvelé en place, avec son id et son refid conservés. Les copies que d'anciens renouvellements ont importées comme nouvelles lignes restent dans l'inventaire jusqu'à leur archivage ou suppression" },
         ]
@@ -47,7 +48,7 @@ export default {
         title: 'EKU supplémentaires personnalisés (RFC 5280 §4.2.1.12)',
         content: 'Le formulaire d\'émission et la modale de signature de CSR exposent un sélecteur multi-valeurs « EKU supplémentaires » qui ajoute des OID Extended Key Usage en plus des EKU par défaut du type de certificat :',
         items: [
-          { label: 'Catalogue', text: '26 EKU connus (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.)' },
+          { label: 'Catalogue', text: '26 EKU connus dans une liste déroulante (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.)' },
           { label: 'OID libre', text: 'Tout OID pointé bien formé respectant ^[0-2](?:\\.(?:0|[1-9]\\d*)){1,15}$' },
           { label: 'Limite', text: 'Jusqu\'à 16 OID au total par certificat' },
           { label: 'Fusion (jamais remplacement)', text: 'Les EKU par défaut du type (par ex. serverAuth) restent verrouillés, les extras s\'ajoutent par-dessus' },
@@ -58,11 +59,11 @@ export default {
         title: 'Paires de certificats hybrides (RFC 9763)',
         content: 'Un certificat classique (A) et un certificat ML-DSA (B) pour le même sujet, liés : B porte l\'extension relatedCertificate qui désigne A par son empreinte. Les clients qui connaissent ML-DSA vérifient les deux ; les autres continuent d\'utiliser A.',
         items: [
-          { label: 'Émission', text: 'Cochez « Émettre une paire hybride » dans le formulaire d\'émission et choisissez la clé classique et le niveau ML-DSA ; les deux viennent de la même CA, avec le même sujet, les mêmes noms et la même validité, et B n\'affirme aucun key usage ni EKU absent de A. Proposé seulement quand les politiques de la CA autorisent les deux, jamais en mode FIPS. Sous les profils ANSSI, BSI et EU ACM, ML-DSA-65 et ML-DSA-87 ne sont proposés que dans la paire. Une politique qui exige une approbation refuse la paire pour l\'instant' },
+          { label: 'Émission', text: 'Cochez « Émettre une paire hybride » dans le formulaire d\'émission et choisissez la clé classique et le niveau ML-DSA ; les deux viennent de la même AC, avec le même sujet, les mêmes noms et la même validité, et B n\'affirme aucun key usage ni EKU absent de A. Proposé seulement quand les politiques de l\'AC autorisent les deux, jamais en mode FIPS. Sous les profils ANSSI, BSI et EU ACM, ML-DSA-65 et ML-DSA-87 ne sont proposés que dans la paire. Une politique qui exige une approbation refuse la paire pour l\'instant' },
           { label: 'Lien par requête', text: 'Une CSR portant une relatedCertRequest signée par la clé de A (Signer une CSR, ACME, EST, WSTEP) émet un B lié à A. A doit être détenu ici, valide, non révoqué et être un certificat d\'entité finale ; un B plus récent désignant le même A reprend la paire' },
           { label: 'Lié', text: 'Chaque membre porte un badge Lié dans la liste et dans ses détails, avec un lien qui ouvre l\'autre membre' },
           { label: 'Révocation', text: 'Révoquer un membre, seul ou en masse, révoque aussi l\'autre, sauf si vous décochez « Révoquer aussi le certificat lié », par ex. pour garder A quand seule la clé ML-DSA est compromise ; sous une politique qui exige une approbation, les deux partent ensemble. Un avertissement nomme l\'autre membre quand il n\'a pas pu être révoqué. La révocation ACME ne révoque que le certificat présenté' },
-          { label: 'Renouvellement', text: 'Renouveler l\'un des membres renouvelle les deux, manuellement, en masse ou automatiquement, et le nouveau B désigne le nouveau A. Un membre renouvelé seul, l\'autre étant révoqué, quitte la paire' },
+          { label: 'Renouvellement', text: 'Renouveler l\'un des membres renouvelle les deux, manuellement, en masse ou automatiquement, et le nouveau B désigne le nouveau A. Un membre renouvelé seul ne désigne que le certificat que désignait l\'original ; une fois celui-ci renouvelé entre-temps, révoqué, archivé ou expiré, il quitte la paire et le renouvellement dit pourquoi. Un membre illisible fait refuser le renouvellement' },
           { label: 'Export', text: 'Le format Lot hybride télécharge un ZIP des deux certificats, et des deux clés quand vous incluez la clé et pouvez exporter les clés' },
         ]
       },
@@ -70,7 +71,7 @@ export default {
         title: 'Fichiers certificats sur disque (v2.140)',
         items: [
           { label: 'Auto-matérialisés', text: 'Les fichiers .crt / .key sont écrits sous data/certs/ pour chaque chemin de création (UI, signature CSR, ACME, SCEP, import)' },
-          { label: 'CA aussi', text: 'Les fichiers .crt / .key des CA sont écrits sous data/cas/ via le même mécanisme' },
+          { label: 'AC aussi', text: 'Les fichiers .crt / .key des AC sont écrits sous data/cas/ via le même mécanisme' },
           { label: 'Filet de sécurité', text: 'Un scan de régénération au démarrage reconstruit tout fichier manquant depuis la base' },
           { label: 'Non bloquant', text: 'Les erreurs d\'écriture sont loguées mais n\'interrompent jamais la transaction DB' },
         ]
@@ -79,26 +80,28 @@ export default {
         title: 'Déploiement (v2.215)',
         content: "Poussez ce certificat vers des hôtes distants en SSH/SFTP ou vers une API HTTP, réservé aux admins, les cibles se gèrent dans Paramètres › Déploiement.",
         items: [
-          { label: 'Attacher une cible', text: "Depuis le panneau de détails du certificat : choisissez une cible de déploiement et définissez des chemins de destination absolus pour le certificat, la clé privée et/ou la chaîne complète (au moins un). La chaîne complète omet la CA racine sauf si Inclure l'AC racine est coché" },
+          { label: 'Attacher une cible', text: "Depuis le panneau de détails du certificat : choisissez une cible de déploiement et définissez des chemins de destination absolus pour le certificat, la clé privée et/ou la chaîne complète (au moins un). La chaîne complète omet l'AC racine sauf si Inclure l'AC racine est coché" },
           { label: 'API HTTP (v2.252)', text: "Une cible HTTP n'a pas de chemins : à l'émission, au renouvellement et avec Déployer maintenant, UCM envoie une requête construite à partir du modèle de corps de la cible (certificat, chaîne, sujet, numéro de série, et la clé privée seulement si la cible l'autorise)" },
           { label: 'Même hôte', text: "Pour déployer sur l’hôte UCM lui-même, utilisez une cible SFTP sur 127.0.0.1 avec un compte SSH dédié ; le service isolé ne peut pas écrire hors de son répertoire de données" },
           { label: 'Automatique', text: "À l'émission et au renouvellement, les fichiers liés sont transférés à nouveau et la commande de rechargement de ce déploiement de certificat s'exécute ; les livraisons sont mises en file avec réessais" },
           { label: 'Fichiers', text: "Écrits de façon atomique aux chemins exacts configurés (le répertoire parent doit exister) : clé 0600, certificat/chaîne 0644" },
           { label: 'Déployer maintenant', text: "Envoi manuel depuis le panneau de détails, avec le statut de livraison et la dernière erreur affichés par cible" },
+          { label: 'Renouvellement sans la clé', text: "Un renouvellement EST, SCEP ou WSTEP déplace les déploiements vers le nouveau certificat, sauf celui qui envoie la clé privée quand UCM ne détient pas la nouvelle clé : il affiche Ne suit pas le renouvellement, apparaît dans la cloche et la vue d'ensemble, et propose Rattacher au certificat renouvelé dès qu'UCM détient la clé ou que le déploiement cesse de l'envoyer. Importer la clé le déplace de lui-même" },
         ]
       },
 
     ],
     tips: [
       'Ajoutez une étoile ⭐ aux certificats importants pour les ajouter à vos favoris',
-      'Utilisez les filtres pour trouver rapidement les certificats par statut, CA ou texte de recherche : votre sélection est conservée au rechargement',
+      'Utilisez les filtres pour trouver rapidement les certificats par statut, AC ou texte de recherche : votre sélection est conservée au rechargement',
       'Le renouvellement conserve le même enregistrement (id, refid, date de création). Renouveler depuis la page génère une nouvelle clé ; le renouvellement automatique conserve la clé. Un certificat dont UCM ne détient pas la clé (enrôlement SCEP, EST, WSTEP ou ACME, import sans la clé) est refusé (409) : renouvelez-le par son protocole ou signez une nouvelle demande',
       'Besoin d\'un EKU non-standard (Microsoft RDP, smartcard logon, document signing) ? Ajoutez-le via « EKU supplémentaires » plutôt que d\'éditer les modèles',
-      'Quand une politique ou l\'expiration de la CA émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
+      'Quand une politique ou l\'expiration de l\'AC émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
       'Une signature RSA-PSS s\'affiche avec son hachage et la longueur du sel, p. ex. RSASSA-PSS SHA-256 (salt 32)',
+      'Dans une vue liée (ouverte depuis la vue d\'ensemble), le bouton Effacer tous les filtres affiché quand rien ne correspond vide les statuts du lien et la recherche et garde les autres filtres du lien ; retirer une puce retire ce filtre, le bouton d\'effacement de la rangée de puces quitte la vue liée, et vos filtres enregistrés ne sont pas touchés',
     ],
     warnings: [
-      'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée',
+      'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée (unhold) ou rendue permanente avec un autre motif',
       'Un certificat valide non révoqué ne peut pas être supprimé seul : Supprimer explique pourquoi et propose « Révoquer, puis supprimer », pour que la révocation atteigne la CRL/OCSP ; les révocations survivent à la suppression',
       'UCM signe uniquement en SHA-256, SHA-384 ou SHA-512 : SHA-224 et les noms de hachage inconnus sont refusés au lieu d\'être remplacés par SHA-256',
     ],
@@ -116,19 +119,19 @@ Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certifi
 - **Expirant** : Expirera dans les 30 jours
 - **Expiré** : Après la date « Not After »
 - **Révoqué** : Explicitement révoqué, publié dans la CRL
-- **Orphelin** : La CA émettrice n'existe plus dans UCM
+- **Orphelin** : L'AC émettrice n'existe plus dans UCM
 - **Archivé** : Remplacé par un renouvellement ou un ré-enrôlement qui a conservé l'ancien enregistrement pour l'historique (SCEP, EST, WSTEP, ACME, répondeur OCSP)
 
 ## Émettre un certificat
 
 1. Cliquez sur **Émettre un certificat**
-2. Sélectionnez la **CA de signature** (doit posséder une clé privée)
+2. Sélectionnez la **AC de signature** (doit posséder une clé privée)
 3. Remplissez le sujet (CN obligatoire, autres champs optionnels)
-4. Ajoutez des noms alternatifs du sujet (SAN) : noms DNS, IP, e-mails
+4. Ajoutez des noms alternatifs du sujet (SAN) : noms DNS, IP, e-mails. Un nom DNS suit la RFC 5280 : étiquettes séparées par des points, un joker seulement comme première étiquette, ni espace ni point final ; un nom internationalisé est émis sous sa forme A-label. Un CN serveur ou combiné contenant un tiret bas (\`my_host.example.com\`) est refusé quand il serait le nom DNS du certificat, c'est-à-dire sans SAN fourni et avec un modèle qui autorise les noms DNS. Une adresse e-mail du sujet va aussi dans le SAN, quel que soit le type
 5. Choisissez le type et la taille de la clé
 6. Définissez la période de validité
 7. Appliquez optionnellement un **modèle** pour préremplir les paramètres
-8. Cliquez sur **Émettre**
+8. Cliquez sur **Émettre un certificat**
 
 ### Utiliser les modèles
 Les modèles préremplissent l'utilisation de la clé, l'utilisation étendue de la clé, les valeurs par défaut du sujet et la validité. Sélectionnez un modèle avant de remplir le formulaire pour gagner du temps.
@@ -151,17 +154,20 @@ Depuis la v2.214, le renouvellement met à jour le certificat **en place** :
 - Le **numéro de série remplacé reste publié dans la CRL** (motif \`superseded\`) et répond \`revoked\` via OCSP jusqu'à l'expiration originale de l'ancien certificat
 - \`renewed_at\` / \`renewed_times\` tracent l'historique des renouvellements
 - Un certificat révoqué ne peut pas être renouvelé (409) : émettez-en un nouveau à la place
-- **Renouveler** demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques d'émission et l'expiration de la CA la plafonnent toujours
+- **Renouveler** demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques d'émission et l'expiration de l'AC la plafonnent toujours
+- **Renouvellement par EST, SCEP ou WSTEP** enregistre un nouveau certificat : ses déploiements et la liaison HTTPS se déplacent vers lui. Un déploiement qui envoie la clé privée, ainsi que la liaison HTTPS, restent sur le certificat précédent quand UCM ne détient pas la nouvelle clé : le déploiement affiche **Ne suit pas le renouvellement**, la cloche et la vue d'ensemble le listent, et l'événement \`certificate.binding_left_behind\` est envoyé. **Rattacher au certificat renouvelé** dès qu'UCM détient sa clé ou que le déploiement cesse d'envoyer la clé ; importer la clé du certificat renouvelé les déplace de lui-même
 
 **Suppression** : un certificat valide non révoqué ne peut pas être supprimé seul : **Supprimer** explique pourquoi et propose **Révoquer, puis supprimer**, pour que les parties utilisatrices voient le changement. Les révocations sont persistées indépendamment de l'enregistrement du certificat et survivent à la suppression.
 
 ## Révoquer un certificat
 
 1. Sélectionnez le certificat → **Révoquer**
-2. Choisissez un motif de révocation (Compromission de clé, Compromission de CA, Changement d'affiliation, Remplacement, Cessation d'activité, Suspension de certificat, etc.)
+2. Choisissez un motif de révocation (Compromission de clé, Compromission d'AC, Changement d'affiliation, Remplacement, Cessation d'activité, Suspension de certificat, etc.)
 3. Confirmez la révocation
 
 Les certificats révoqués sont publiés dans la CRL lors de la prochaine régénération.
+
+Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que l'AC confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
 
 > ⚠ La révocation est généralement permanente : sauf pour la **Suspension de certificat** qui peut être levée.
 
@@ -169,7 +175,7 @@ Les certificats révoqués sont publiés dans la CRL lors de la prochaine régé
 
 Si un certificat a été révoqué avec le motif **Suspension de certificat**, il peut être restauré au statut valide :
 
-1. Ouvrez les détails du certificat révoqué
+1. Ouvrez le certificat révoqué dans l'inspecteur
 2. Le bouton **Lever la suspension** apparaît dans la barre d'actions (uniquement pour les révocations de type Suspension de certificat)
 3. Cliquez sur **Lever la suspension** pour restaurer le certificat
 4. Le certificat retrouve le statut valide, la CRL est régénérée et le cache OCSP est mis à jour
@@ -184,18 +190,19 @@ Un certificat suspendu peut être révoqué avec un autre motif (par exemple Com
 
 Formats d'exportation :
 - **PEM** : Certificat seul
-- **PEM + Chaîne** : Certificat avec ses CA émettrices (**Inclure la chaîne CA**) ; la CA racine n'est ajoutée que si **Inclure l'AC racine** est coché
+- **PEM + Chaîne** : Certificat avec ses AC émettrices (**Inclure la chaîne AC**) ; l'AC racine n'est ajoutée que si **Inclure l'AC racine** est coché
 - **DER** : Format binaire
 - **PKCS#12** : Certificat + clé + chaîne, protégé par mot de passe
+> ⚠ L'export de la **clé privée** (PKCS#12/PFX, JKS ou fichier de clé) exige la permission **read:private_keys**, réservée aux admins. Les rôles qui ne la détiennent pas, y compris le rôle Opérateur intégré, doivent récupérer les clés archivées par le flux **Récupération de clés**, soumis à approbation.
 
 ## Paires de certificats hybrides (RFC 9763)
 
 Une paire hybride lie un certificat classique (**A**, RSA ou EC) et un certificat post-quantique (**B**, ML-DSA) pour le même sujet. B porte l'extension non critique **relatedCertificate**, qui désigne A par son empreinte, afin qu'une partie utilisatrice puisse exiger les deux.
 
-- **Émission** : cochez **Émettre une paire hybride** dans le formulaire d'émission (ou envoyez \`hybrid\` dans \`POST /api/v2/certificates\`) pour émettre les deux depuis la même CA, avec le même sujet, les mêmes noms et la même validité. B copie les extensions de A avec son propre identifiant de clé et son propre key usage, et n'affirme aucun key usage ni EKU absent de A. Sous les profils de conformité ANSSI, BSI et EU ACM, ML-DSA-65 et ML-DSA-87 ne sont acceptés que comme B : jamais seuls, et ML-DSA-44 pas du tout
-- **Lien par requête** : une CSR portant une **relatedCertRequest** signée par la clé de A émet un B lié à A, via Signer une CSR, ACME, EST ou WSTEP. A doit être détenu par UCM, valide, non révoqué, être un certificat d'entité finale émis par une CA de cette instance dont la chaîne est valide à cet instant, et la requête ne doit pas avoir plus de 7 jours. Un certificat plus récent qui désigne le même A reprend la paire, et le précédent la quitte. Un certificat fourni en ligne à l'emplacement indiqué par la requête doit être A ; les autres emplacements ne sont pas récupérés
+- **Émission** : cochez **Émettre une paire hybride** dans le formulaire d'émission (ou envoyez \`hybrid\` dans \`POST /api/v2/certificates\`) pour émettre les deux depuis la même AC, avec le même sujet, les mêmes noms et la même validité. B copie les extensions de A avec son propre identifiant de clé et son propre key usage, et n'affirme aucun key usage ni EKU absent de A. Sous les profils de conformité ANSSI, BSI et EU ACM, ML-DSA-65 et ML-DSA-87 ne sont acceptés que comme B : jamais seuls, et ML-DSA-44 pas du tout
+- **Lien par requête** : une CSR portant une **relatedCertRequest** signée par la clé de A émet un B lié à A, via Signer une CSR, ACME, EST ou WSTEP. A doit être détenu par UCM, valide, non révoqué, être un certificat d'entité finale émis par une AC de cette instance dont la chaîne est valide à cet instant, et la requête ne doit pas avoir plus de 7 jours. Un certificat plus récent qui désigne le même A reprend la paire, et le précédent la quitte. Un certificat fourni en ligne à l'emplacement indiqué par la requête doit être A ; les autres emplacements ne sont pas récupérés
 - **Révoquer** l'un des membres, seul ou en masse, révoque l'autre, sauf si **Révoquer aussi le certificat lié** est décoché. Sous une politique qui exige une approbation, la paire part ensemble, et deux politiques d'approbation différentes sur les deux membres laissent la révocation à un administrateur. Si l'autre membre ne peut pas être révoqué, la réponse l'indique (\`related_not_revoked\`) et il faut le révoquer séparément. ACME revokeCert ne révoque que le certificat présenté (RFC 8555)
-- **Renouveler** l'un des membres, à la main, en masse ou automatiquement, renouvelle les deux, et le nouveau B désigne le nouveau A. Un membre renouvelé seul, l'autre étant révoqué, quitte la paire, tout comme l'autre membre quand l'un est supprimé
+- **Renouveler** l'un des membres, à la main, en masse ou automatiquement, renouvelle les deux, et le nouveau B désigne le nouveau A : UCM détient les deux clés et renouvelle la paire d'un seul tenant. Un membre renouvelé seul ne désigne que le certificat que désignait l'original : une fois celui-ci renouvelé entre-temps, révoqué, archivé ou expiré, le membre renouvelé ne porte plus l'extension relatedCertificate et quitte la paire, et le renouvellement dit pourquoi (un avertissement après un renouvellement depuis cette page, le journal d'audit dans tous les cas). L'autre membre quitte aussi la paire quand l'un est supprimé. Le renouvellement est refusé, sans rien changer, quand l'autre membre ou l'extension relatedCertificate ne se lit pas
 - **Exporter** : le format **hybrid-bundle** est un ZIP des deux certificats, et des deux clés privées quand la clé est incluse ; il est refusé quand aucun des deux certificats ne désigne plus l'autre
 
 > ⚠ Une politique qui exige une approbation refuse pour l'instant d'émettre une paire hybride : émettez-la sous une politique sans approbation.
@@ -211,7 +218,7 @@ Sélectionnez deux certificats et cliquez sur **Comparer** pour voir une compara
 ## Filtrage et recherche
 
 - **Filtre par statut** : Valide, Expirant, Expiré, Révoqué, Orphelin, Archivé
-- **Filtre par CA** : Afficher les certificats d'une CA spécifique
+- **Filtre par AC** : Afficher les certificats d'une AC spécifique
 - **Filtre par source** : Filtrer selon la manière dont le certificat est entré dans UCM (émis, importé, ACME, SCEP, etc.)
 - **Filtre par modèle** : Trouver les certificats **modifiés depuis le modèle** : émis depuis un modèle mais avec le type de clé ou la validité explicitement remplacés au moment de la demande. Les champs divergents sont listés sur le détail du certificat ; l'enregistrement est figé à l'émission
 - **Recherche textuelle** : Recherche par sujet, émetteur, nom d'affichage ou numéro de série (les SAN ne sont pas recherchés)

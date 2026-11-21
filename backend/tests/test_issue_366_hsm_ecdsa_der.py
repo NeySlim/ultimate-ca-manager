@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 )
 from cryptography.x509.oid import NameOID
 
+from tests.optional_backends import needs
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 
 CURVES = {
@@ -39,27 +40,36 @@ class TestEcdsaToDer:
         curve, size, digest = CURVES[algorithm]
         key = ec.generate_private_key(curve)
         der = key.sign(b'tbs', ec.ECDSA(digest))
-        converted = ecdsa_to_der(_raw(der, size), coordinate_bytes(algorithm))
+        converted = ecdsa_to_der(_raw(der, size), coordinate_bytes(algorithm), 'raw')
         assert converted == der
         key.public_key().verify(converted, b'tbs', ec.ECDSA(digest))
 
     def test_der_passes_through_unchanged(self):
         key = ec.generate_private_key(ec.SECP384R1())
         der = key.sign(b'tbs', ec.ECDSA(hashes.SHA384()))
-        assert ecdsa_to_der(der, 48) == der
+        assert ecdsa_to_der(der, 48, 'der') == der
 
     def test_der_of_exactly_two_coordinates_is_kept(self):
-        # r and s short enough that the DER is 96 bytes: the codec round trip
-        # recognises it, the length alone would not.
+        # The provider's contract, not the length or content, identifies this as DER.
         r = int.from_bytes(b'\x01' + b'\x00' * 44, 'big')
         s = int.from_bytes(b'\x01' + b'\x00' * 44, 'big')
         der = encode_dss_signature(r, s)
         assert len(der) == 96
-        assert ecdsa_to_der(der, 48) == der
+        assert ecdsa_to_der(der, 48, 'der') == der
 
-    def test_unknown_key_or_other_length_is_left_alone(self):
-        assert ecdsa_to_der(b'\x00' * 96, None) == b'\x00' * 96
-        assert ecdsa_to_der(b'\x00' * 95, 48) == b'\x00' * 95
+    def test_unknown_key_is_left_alone_but_wrong_raw_length_is_refused(self):
+        assert ecdsa_to_der(b'\x00' * 96, None, 'raw') == b'\x00' * 96
+        with pytest.raises(ValueError, match='length'):
+            ecdsa_to_der(b'\x00' * 95, 48, 'raw')
+
+    @pytest.mark.parametrize('signature', [b'signature', b'', b'\x30\x06\x02\x01\x01\x02\x01\x01\x00'])
+    def test_malformed_der_is_refused_without_parser_text(self, signature):
+        with pytest.raises(ValueError, match=r'^Invalid DER HSM ECDSA signature$'):
+            ecdsa_to_der(signature, 48, 'der')
+
+    def test_signature_format_has_no_default(self):
+        with pytest.raises(TypeError):
+            ecdsa_to_der(b'\x00' * 96, 48)
 
     def test_coordinate_bytes_from_algorithm_or_public_key(self):
         assert coordinate_bytes('EC-P521') == 66
@@ -80,6 +90,7 @@ class _FakeProvider:
 
     def __init__(self, key, digest, raw: bool, bound: bool = False):
         self.key, self.digest, self.raw, self.bound = key, digest, raw, bound
+        self.ECDSA_SIGNATURE_FORMAT = 'raw' if raw else 'der'
 
     def hash_for_key(self, key_identifier, key_algorithm, requested='sha256'):
         return self.digest.name if self.bound else requested
@@ -182,9 +193,8 @@ def test_external_ca_on_an_hsm_key_gets_the_curve_digest_by_default(app, auth_cl
             auth_client.delete(f"/api/v2/cas/{ca['id']}")
 
 
-@pytest.mark.skipif(
-    not (__import__('shutil').which('softhsm2-util') and __import__('os').path.exists('/usr/lib/softhsm/libsofthsm2.so')),
-    reason='SoftHSM not installed')
+@needs('softhsm', __import__('shutil').which('softhsm2-util')
+       and __import__('os').path.exists('/usr/lib/softhsm/libsofthsm2.so'), reason='SoftHSM not installed')
 def test_pkcs11_provider_falls_back_to_raw_ecdsa_on_softhsm(tmp_path, monkeypatch):
     """SoftHSM has no ECDSA_SHA* mechanism: the provider hashes and signs raw, same signature."""
     import os
@@ -209,7 +219,7 @@ def test_pkcs11_provider_falls_back_to_raw_ecdsa_on_softhsm(tmp_path, monkeypatc
             public_key = serialization.load_pem_public_key(provider.get_public_key(info.key_identifier).encode())
             signature = provider.sign(info.key_identifier, b'tbs', 'EC-P384', hash_algorithm='sha384')
             assert len(signature) == 96
-            public_key.verify(ecdsa_to_der(signature, 48), b'tbs', ec.ECDSA(hashes.SHA384()))
+            public_key.verify(ecdsa_to_der(signature, 48, 'raw'), b'tbs', ec.ECDSA(hashes.SHA384()))
     finally:
         _release_pkcs11_lib(pkcs11, lib_path)
 
@@ -307,6 +317,6 @@ def test_deleting_a_key_forgets_its_cached_digest(app):
     from services.hsm import HsmService
     with _hsm_ec_key(app, 'EC-P384', raw=True, bound=True) as (key_id, _public_key, _digest):
         assert HsmService.signing_hash(key_id, 'EC-P384', 'sha256') == 'sha384'
-        assert (key_id, 'sha256') in HsmService._signing_hash_cache
+        assert any(k[0] == key_id for k in HsmService._signing_hash_cache)
         HsmService.delete_key(key_id)
-        assert (key_id, 'sha256') not in HsmService._signing_hash_cache
+        assert not any(k[0] == key_id for k in HsmService._signing_hash_cache)

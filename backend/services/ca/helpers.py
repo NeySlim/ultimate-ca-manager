@@ -45,7 +45,7 @@ def save_ca_key_file(ca, key_pem: bytes) -> None:
 
     from security.encryption import key_encryption
 
-    if not key_encryption.is_enabled:
+    if not key_encryption.is_encrypting:
         raise OSError(f"Failed to save CA private key file: {key_path}")
 
 

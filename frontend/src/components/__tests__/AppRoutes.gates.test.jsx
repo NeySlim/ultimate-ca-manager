@@ -4,7 +4,7 @@
  * left so a logout from the prompt does not land back on it.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
 const auth = vi.hoisted(() => ({ value: {} }))
@@ -15,7 +15,7 @@ vi.mock('../../contexts', () => ({
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 vi.mock('../../hooks/useWebSocket', () => ({ WebSocketProvider: ({ children }) => children }))
 vi.mock('../../components', async () => {
@@ -28,16 +28,17 @@ vi.mock('../../components', async () => {
     ForcePasswordChange: () => <div>password-prompt</div>,
     ForceEnroll2FA: () => <div>enrol-prompt</div>,
     SafeModeOverlay: () => null,
-    DetailWindowLayer: () => null,
+    InspectorDock: () => null,
   }
 })
 vi.mock('../../pages/LoginPage', () => ({ default: () => <div>login-page</div> }))
-vi.mock('../../pages/DashboardPage', () => ({ default: () => <div>dashboard-page</div> }))
+vi.mock('../../pages/OverviewPage', () => ({ default: () => <div>dashboard-page</div> }))
 
 import { AppRoutes } from '../../App'
 
 function Where() {
-  return <div data-testid="where">{useLocation().pathname}</div>
+  const l = useLocation()
+  return <div data-testid="where">{l.pathname + l.search}</div>
 }
 
 function renderAt(path, state) {
@@ -61,8 +62,27 @@ describe('AppRoutes under the forced gates', () => {
     expect(screen.queryByText('login-page')).toBeNull()
   })
 
+  it('sends a signed-out visitor to login carrying the page asked for', async () => {
+    renderAt('/acme?tab=orders', { isAuthenticated: false })
+    await screen.findByText('login-page')
+    expect(screen.getByTestId('where').textContent).toBe('/login?next=%2Facme%3Ftab%3Dorders')
+  })
+
   it('mounts the pages once nothing is pending', async () => {
     renderAt('/dashboard', {})
     expect(await screen.findByText('dashboard-page')).toBeTruthy()
+  })
+})
+
+describe('AppRoutes: the sign-in page once signed in', () => {
+  it('goes to the page its next names', async () => {
+    // A page this test mocks: a lazy one keeps the old location until it loads
+    renderAt('/login?next=%2Fdashboard%3Ftab%3Dqueue')
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/dashboard?tab=queue'))
+  })
+
+  it('goes to the landing page for a next it refuses', async () => {
+    renderAt('/login?next=%2F%2Fevil.example')
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/'))
   })
 })

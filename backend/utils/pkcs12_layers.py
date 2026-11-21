@@ -381,7 +381,7 @@ def _mac(pfx: asn1_pkcs12.Pfx):
         salt, rounds = mac_data['mac_salt'].native, _iterations(mac_data['iterations'])
         size = hashlib.new(digest).digest_size
         key = lambda secret: pkcs12_kdf(_bmp(secret), salt, rounds, 3, size, digest)  # noqa: E731
-    return lambda secret: hmac.compare_digest(hmac.new(key(secret), content, digest).digest(), expected)
+    return lambda secret: hmac.compare_digest(hmac.digest(key(secret), content, digest), expected)
 
 
 def _iterations(value) -> int:

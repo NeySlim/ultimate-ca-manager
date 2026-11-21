@@ -1,5 +1,5 @@
 """
-Database Admin — publish DATABASE_URL into /etc/ucm/ucm.env.
+Database Admin — publish DATABASE_URL into ucm.env (UCM_CONFIG_DIR, default /etc/ucm).
 
 ``ucm.env`` is shared installation state: besides DATABASE_URL it carries the
 key-encryption key, the listen address, the HTTPS port and whatever else the
@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
+from config.paths import DEFAULT_CONFIG_DIR
 from config.settings import is_docker
 from services.backup.storage import _fsync_directory
 
@@ -46,7 +47,8 @@ _DEFAULT_MODE = 0o640
 _TEMP_PREFIX = ".ucm.env."
 _TEMP_SUFFIX = ".tmp"
 
-_DOCKER_REFUSAL = "Cannot modify ucm.env in Docker. Set DATABASE_URL env var instead."
+_DOCKER_REFUSAL = ("Cannot modify ucm.env in a container (Docker, Kubernetes). "
+                   "Set the DATABASE_URL environment variable instead.")
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,19 @@ class EnvBackup:
 def _env_path() -> Path:
     """Resolve the env path at call time so tests can redirect it."""
     return Path(UCM_ENV_PATH)
+
+
+def env_file_path() -> Path:
+    """Env file to rewrite: a redirected UCM_ENV_PATH or UCM_CONFIG_DIR wins, then Docker, then /etc."""
+    configured = Path(UCM_ENV_PATH)
+    if configured != DEFAULT_CONFIG_DIR / 'ucm.env':
+        return configured
+    if os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true'):
+        for candidate in ('/opt/ucm/.env', '/app/.env', '/app/backend/.env'):
+            if Path(candidate).exists():
+                return Path(candidate)
+        return Path('/opt/ucm/.env')
+    return configured
 
 
 def _read_env_text(path: Path) -> str:
@@ -329,9 +344,9 @@ def persist_database_url_with_backup(
 
 def persist_database_url(database_url: Optional[str]) -> Tuple[bool, str]:
     """
-    Write DATABASE_URL to /etc/ucm/ucm.env (set/update/remove).
+    Write DATABASE_URL to ucm.env under UCM_CONFIG_DIR (set/update/remove).
     Pass None or empty string to remove (= use SQLite default).
-    Refuses in Docker (caller must check first).
+    Refuses in a container (caller must check first).
 
     Every other variable, comment and line order in the file is preserved.
     Use :func:`persist_database_url_with_backup` when the change may need to

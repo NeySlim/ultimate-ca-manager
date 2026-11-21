@@ -1,10 +1,16 @@
 """CRL deployment bindings, bundle construction and event-driven queueing."""
 import json
 
+import pytest
+
 from tests.conftest import assert_error, assert_success
+from tests.deploy_leftovers import delete_leftovers
 
 BASE = '/api/v2/deploy'
 _seq = [0]
+
+# Deliveries left behind keep binding ids that later files reuse
+_cleanup = pytest.fixture(autouse=True)(delete_leftovers)
 
 
 def _post(client, url, payload):

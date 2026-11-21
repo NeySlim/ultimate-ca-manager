@@ -131,9 +131,17 @@ services:
 
 Then configure the provider in the UCM web UI with the vendor library path.
 
+### USB smart card (PIV, pcscd)
+
+The image ships `opensc` (its PKCS#11 module is `opensc-pkcs11.so`) and `libpcsclite1`, the client library of the PC/SC daemon. It does not ship `pcscd` or a container for it: the reader, the daemon that owns it and the sharing of its socket with the UCM container are the operator's to provide. `libpcsclite1` looks for the daemon's socket at `/run/pcscd/pcscd.comm` (or at the path in `PCSCLITE_CSOCK_NAME`), and the container runs as the user `ucm` (uid 1000), which must be allowed to open it.
+
+The provider is then created on the HSM page: type `PKCS#11`, `module_path` the image's `opensc-pkcs11.so` (`docker exec ucm sh -c 'ls /usr/lib/*/opensc-pkcs11.so'`), the slot or token label, and the card PIN. The PIN is stored in the provider's configuration, encrypted in the database. **Sync keys** registers the card's keys as HSM keys; a key a CA holds is never removed by a later sync.
+
+In HA mode, a CA cannot be created on a key of a local smart card reader provider, OpenSC (`opensc-pkcs11.so`) or YubiKey PIV (`libykcs11.so`): the reader is attached to one host.
+
 ## Cloud HSM
 
-Configure cloud HSM providers via the UCM web UI (Settings → HSM):
+Configure cloud HSM providers via the UCM web UI (**Modules** > **Administration** > **HSM Management**):
 
 - **AWS CloudHSM**: uses PKCS#11 with the CloudHSM client library
 - **Azure Key Vault**: requires `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`

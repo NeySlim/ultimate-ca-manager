@@ -14,6 +14,9 @@ from cryptography.x509.oid import NameOID
 
 from models import Certificate, db
 from tests.conftest import get_json
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _crt(key, cn='key-algo.test'):
@@ -56,33 +59,6 @@ def test_compliance_sort_ranks_stronger_keys_higher(app, auth_client, create_cer
     assert r.status_code == 200, r.data
     ids = [c['id'] for c in get_json(r)['data'] if c['id'] in (weak['id'], strong['id'])]
     assert ids == [strong['id'], weak['id']]
-
-
-def _migration():
-    spec = importlib.util.spec_from_file_location(
-        'm095', 'migrations/095_certificate_key_algo_backfill.py')
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_migration_recomputes_every_readable_certificate():
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE TABLE certificates (id INTEGER PRIMARY KEY, crt TEXT, key_algo VARCHAR(50))')
-    rows = [
-        (1, _crt(rsa.generate_private_key(public_exponent=65537, key_size=2048)), None),
-        (2, _crt(ec.generate_private_key(ec.SECP384R1())), ''),
-        (3, _crt(ed25519.Ed25519PrivateKey.generate()), 'EdDSA'),
-        (4, _crt(rsa.generate_private_key(public_exponent=65537, key_size=2048)), 'RSA'),
-        (7, _crt(ec.generate_private_key(ec.SECP256R1())), 'ECDSA'),
-        (5, None, None),
-        (6, 'not a certificate', 'kept as is'),
-    ]
-    conn.executemany('INSERT INTO certificates VALUES (?, ?, ?)', rows)
-    _migration().upgrade(conn)
-    assert dict(conn.execute('SELECT id, key_algo FROM certificates').fetchall()) == {
-        1: 'RSA 2048', 2: 'EC secp384r1', 3: 'Ed25519', 4: 'RSA 2048', 5: None,
-        6: 'kept as is', 7: 'EC secp256r1'}
 
 
 def test_dsa_and_curves_outside_the_registry():

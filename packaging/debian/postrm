@@ -4,6 +4,28 @@
 
 set -e
 
+UCM_HOME=/opt/ucm
+UCM_CONFIG=/etc/ucm
+
+# Removes directory $1, except the archives of an earlier installation kept beside its
+# files (.ucm-archive-*): they hold its keys, and only their owner removes them. Every
+# directory a purge removes goes through it: the archiver may leave one in any of them.
+purge_keeping_archives() {
+    [ -d "$1" ] || return 0
+    if [ -z "$(find "$1" -name '.ucm-archive-*' -print -quit 2>/dev/null)" ]; then
+        rm -rf "$1"
+        return 0
+    fi
+    find "$1" -name '.ucm-archive-*' -prune -o ! -type d -exec rm -f {} +
+    # Deepest first; a directory that holds an archive stays, with nothing else in it
+    find "$1" -name '.ucm-archive-*' -prune -o -type d -print | sort -r | while IFS= read -r d; do
+        rmdir -- "$d" 2>/dev/null || true
+    done
+    chown root:root "$1" && chmod 700 "$1"
+    echo "Kept: what an earlier UCM installation left, archived under $1:"
+    find "$1" -name '.ucm-archive-*' -prune -print | sed 's/^/  /'
+}
+
 case "$1" in
     remove)
         # Stop service
@@ -11,15 +33,18 @@ case "$1" in
         systemctl disable ucm.service >/dev/null 2>&1 || true
         
         echo "UCM service stopped and disabled"
-        echo "Data preserved in /var/lib/ucm"
-        echo "To remove data: rm -rf /var/lib/ucm"
+        echo "Data preserved in $UCM_HOME/data, configuration in $UCM_CONFIG"
+        echo "apt purge ucm also removes the configuration, /var/lib/ucm and /var/log/ucm, and"
+        echo "keeps the .ucm-archive-* directories an earlier installation left; $UCM_HOME/data stays."
         ;;
         
     purge)
         # Remove data directories
-        rm -rf /var/lib/ucm
-        rm -rf /etc/ucm
-        rm -rf /var/log/ucm
+        purge_keeping_archives /var/lib/ucm
+        purge_keeping_archives "$UCM_CONFIG"
+        purge_keeping_archives /var/log/ucm
+        # Not a package file: the mark of an unfinished archiving would outlive the purge
+        rm -f "$UCM_HOME/.leftover-archive-pending"
         
         # Remove user and group
         if getent passwd ucm >/dev/null 2>&1; then

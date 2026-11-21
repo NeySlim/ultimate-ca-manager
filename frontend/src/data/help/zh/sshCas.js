@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'SSH证书颁发机构',
     subtitle: '管理用于用户和主机认证的SSH CA',
-    overview: '按照OpenSSH标准创建和管理SSH证书颁发机构。SSH CA消除了分发单独公钥的需要,, 服务器和用户信任CA，由CA签发证书来授予访问权限。',
+    overview: '按照OpenSSH标准创建和管理SSH证书颁发机构。SSH CA消除了分发单独公钥的需要，服务器和用户信任CA，由CA签发证书来授予访问权限。',
     sections: [
       {
         title: 'CA类型',
@@ -20,11 +20,22 @@ export default {
         ]
       },
       {
+        title: 'HSM 支持的 SSH CA',
+        items: [
+          { label: '密钥存储', text: '创建时选择本地或 HSM，然后选择提供商和一个未使用的签名密钥。CA 的密钥类型取自该密钥，私钥永远不会离开 HSM' },
+          { label: '算法', text: 'RSA 和 ECDSA P-256、P-384 或 P-521 密钥。不提供 Ed25519 密钥：UCM 的 HSM 签名不覆盖 EdDSA，因此 Ed25519 SSH CA 使用软件密钥。也不提供 Brainpool 和 ML-DSA 密钥：UCM 可在 HSM 上用它们为 X.509 CA 签名，但 OpenSSH 证书没有对应的密钥类型' },
+          { label: '一个密钥一个机构', text: '一个密钥只能用于一个认证机构，X.509 或 SSH。已被持有的密钥不会提供，指定它的请求会被拒绝 (409) 并给出持有它的 CA 的名称。只要 CA 存在，密钥及其提供商就无法删除' },
+          { label: '权限', text: 'write:ssh_cas 和 read:hsm。没有 read:hsm 时 HSM 选项被禁用，拒绝 (403) 会指出缺少的权限' },
+          { label: 'FIPS 与 HA', text: '在 FIPS 模式下，FIPS 模式拒绝的密钥不会提供。在 HA 模式下，位于 SoftHSM 或本地智能卡读卡器上的密钥会被拒绝 (409)，因为它只存在于一个节点' },
+          { label: '令牌不可达', text: '创建 CA 时如果无法连接提供商 (503)，则不会创建任何内容：请在 HSM 管理中检查提供商后重试' },
+        ]
+      },
+      {
         title: '服务器配置',
         items: [
           { label: 'Linux/macOS配置脚本', text: '下载一个POSIX shell脚本（.sh），自动配置sshd以信任此CA。快速安装：curl -sSL <url> | sudo bash' },
           { label: 'Windows配置脚本', text: '下载一个PowerShell脚本（.ps1），配置Windows OpenSSH Server（将CA公钥写入%ProgramData%\\ssh、收紧ACL、在sshd_config中添加TrustedUserCAKeys / HostCertificate、用sshd -T验证、重启sshd）。快速安装：iwr <url> | iex' },
-          { label: '诊断信息块', text: '当Add-WindowsCapability失败时（WSUS / 已加入域），脚本会打印一个带标签的信息块，说明策略状态和三种补救路径,, 脚本本身绝不修改WSUS / WU策略' },
+          { label: '诊断信息块', text: '当Add-WindowsCapability失败时（WSUS / 已加入域），脚本会打印一个带标签的信息块，说明策略状态和三种补救路径，脚本本身绝不修改WSUS / WU策略' },
           { label: '试运行', text: '两个脚本都支持-DryRun / --dry-run参数，可在不应用更改的情况下预览' },
           { label: '手动配置', text: '复制CA公钥，在sshd_config中添加TrustedUserCAKeys（User CA）或HostCertificate（Host CA）。' },
         ]
@@ -39,7 +50,7 @@ export default {
       {
         title: 'TTL格式',
         items: [
-          { label: '带后缀的时长', text: '默认TTL和最大TTL接受24h、7d、365d,, 可用后缀为s、m、h、d、w、y' },
+          { label: '带后缀的时长', text: '默认TTL和最大TTL接受24h、7d、365d，可用后缀为s、m、h、d、w、y' },
           { label: '纯数字', text: '纯数字按秒解释（例如3600 = 1小时）' },
           { label: '验证', text: '格式错误的值会被拒绝，错误信息中会列出可接受的格式' },
         ]
@@ -55,16 +66,16 @@ export default {
       {
         title: 'Key ID',
         items: [
-          { label: '由 CA 设置', text: 'sshd 会将 Key ID 记录为持有者的身份。默认情况下，CA 将每个证书命名为 principals@CA 名称，设置了其他 Key ID 的请求会被拒绝。' },
+          { label: '由 CA 设置', text: 'sshd 会将 Key ID 记录为持有者的身份。默认情况下，CA 将每个证书命名为 principals@CA name，设置了其他 Key ID 的请求会被拒绝。' },
           { label: '允许请求者设置 Key ID', text: '勾选后，请求者可自行选择 Key ID，例如工单号或员工编号。' },
           { label: '升级', text: '自 2.249 起，现有 CA 的此选项同样默认关闭。' },
         ]
       },
     ],
     tips: [
-      '用户证书和主机证书使用单独的CA:, 切勿混用。',
+      '用户证书和主机证书使用单独的CA：切勿混用。',
       '由于速度和安全性，Ed25519是新部署的推荐选择。',
-      '下载配置脚本可轻松配置服务器:, 它会自动处理备份和验证。',
+      '下载配置脚本可轻松配置服务器：它会自动处理备份和验证。',
     ],
     warnings: [
       '只要仍有其签发的证书，CA 就无法删除：请先删除这些证书，并更新服务器信任设置。',
@@ -78,7 +89,7 @@ export default {
 
 SSH证书颁发机构（CA）是SSH证书认证的基础。无需将单独的公钥分发到每台服务器，只需创建一个CA并配置服务器信任它。CA签发的任何证书都会被自动接受。
 
-UCM支持OpenSSH证书格式（RFC 4253 + OpenSSH扩展），OpenSSH 5.4+原生支持:, 服务器和客户端无需安装额外软件。
+UCM支持OpenSSH证书格式（RFC 4253 + OpenSSH扩展），OpenSSH 5.4+原生支持：服务器和客户端无需安装额外软件。
 
 ## CA类型
 
@@ -92,7 +103,7 @@ TrustedUserCAKeys /etc/ssh/user_ca.pub
 \`\`\`
 
 ### Host CA
-Host CA签发用于**将服务器认证到客户端**的证书。当客户端信任Host CA时，可以验证所连接服务器的合法性:, 消除"Trust On First Use"（TOFU）警告。
+Host CA签发用于**将服务器认证到客户端**的证书。当客户端信任Host CA时，可以验证所连接服务器的合法性：消除"Trust On First Use"（TOFU）警告。
 
 **客户端配置：**
 \`\`\`
@@ -113,6 +124,20 @@ Host CA签发用于**将服务器认证到客户端**的证书。当客户端信
 6. 列出允许的 principal，或勾选**允许任意主体**
 7. 点击**创建**
 
+### 使用 HSM 密钥
+
+SSH CA 可以把私钥保存在 HSM 提供商上。
+
+1. 在**创建 SSH CA** 中，将**密钥存储**设为 **HSM**
+2. 选择 **HSM 提供商**，再选择**现有 HSM 密钥**：只列出未使用的 RSA 和 ECDSA P-256/P-384/P-521 签名密钥
+3. 点击**创建**。CA 的密钥类型取自该密钥，私钥永远不会离开令牌
+
+须知：
+- HSM 上的 SSH CA 使用 RSA 或 ECDSA P-256、P-384 或 P-521 密钥。不提供 Ed25519 密钥：UCM 的 HSM 签名不覆盖 EdDSA，因此 Ed25519 SSH CA 使用软件密钥。也不提供 Brainpool 和 ML-DSA 密钥：UCM 可在 HSM 上用它们为 X.509 CA 签名，但 OpenSSH 证书没有对应的密钥类型。
+- 一个 HSM 密钥只能用于一个认证机构，X.509 或 SSH。已被某个 CA 持有的密钥会被拒绝并给出该 CA 的名称，只要 CA 存在，密钥及其提供商就无法删除。
+- 需要 \`write:ssh_cas\` 和 \`read:hsm\`。没有 \`read:hsm\` 时 **HSM** 选项被禁用。
+- 在 FIPS 模式下，FIPS 模式拒绝的密钥不会提供。在 HA 模式下，位于 SoftHSM 或本地智能卡读卡器上的密钥会被拒绝，因为它只存在于一个节点。
+- 创建 CA 时如果无法连接提供商，则不会创建任何内容。
 ### 允许的 Principal
 
 **允许的 Principal**字段限制 CA 可为哪些名称签发，格式为以逗号分隔的模式（\`deploy\`、\`team-*\`、\`web??.example.com\`）。请求中的每个 principal 都必须匹配其中之一。
@@ -121,7 +146,7 @@ Host CA签发用于**将服务器认证到客户端**的证书。当客户端信
 
 ### Key ID
 
-sshd 会将证书的 Key ID 记录为持有者的身份。CA 将其设置为 \`principals@CA 名称\`，并拒绝设置了其他 Key ID 的请求，除非勾选了**允许请求者设置 Key ID**。此选项对所有 CA 默认关闭，自 2.249 起现有 CA 也是如此。
+sshd 会将证书的 Key ID 记录为持有者的身份。CA 将其设置为 \`principals@CA name\`，并拒绝设置了其他 Key ID 的请求，除非勾选了**允许请求者设置 Key ID**。此选项对所有 CA 默认关闭，自 2.249 起现有 CA 也是如此。
 
 ### TTL格式
 

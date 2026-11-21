@@ -8,13 +8,15 @@ import logging
 
 from flask import Blueprint, request, g, session
 from auth.unified import require_auth
-from auth.twofa_enforcement import ENROLL_SESSION_KEY, lock_for_factor_change, lock_user
+from auth.twofa_enforcement import (
+    ENROLL_SESSION_KEY, last_factor_refusal, lock_for_factor_change,
+)
 from models import db
 from models.webauthn import WebAuthnCredential
 from services.webauthn_service import WebAuthnService
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
-from utils.db_transaction import safe_commit
+from auth.session_start import closed_sessions_note, end_sessions_on_commit, sessions_closed_by
 
 logger = logging.getLogger(__name__)
 
@@ -53,22 +55,28 @@ def delete_credential(credential_id):
     """Delete a WebAuthn credential"""
     user = g.current_user
     if _strips_last_factor(user, credential_id):
-        return error_response(_LAST_FACTOR_MESSAGE, 403)
+        return last_factor_refusal(_LAST_FACTOR_MESSAGE)
+    # A factor change closes the account's other sessions, as a password change
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     success, message = WebAuthnService.delete_credential(credential_id, user.id)
-    
     if not success:
+        db.session.rollback()
         return error_response(message, 404)
-    
+    closed = sessions_closed_by(owner)
+
     AuditService.log_action(
         action='webauthn_delete',
         resource_type='webauthn',
         resource_id=str(credential_id),
         resource_name=f'WebAuthn credential {credential_id}',
-        details=f'Deleted WebAuthn credential {credential_id}',
+        details=f'Deleted WebAuthn credential {credential_id} ({closed_sessions_note(closed)})',
         success=True
     )
-    
-    return success_response(message=message)
+
+    return success_response(message=message, meta={'other_sessions_closed': closed})
 
 
 @bp.route('/credentials/<int:credential_id>/toggle', methods=['POST'])
@@ -79,23 +87,34 @@ def toggle_credential(credential_id):
     data = request.get_json() or {}
     enabled = data.get('enabled', True)
     if not enabled and _strips_last_factor(user, credential_id):
-        return error_response(_LAST_FACTOR_MESSAGE, 403)
-    
+        return last_factor_refusal(_LAST_FACTOR_MESSAGE)
+    # A key left as it was changes no factor: no session closes
+    current = db.session.get(WebAuthnCredential, credential_id)
+    if current and current.user_id == user.id and current.enabled == bool(enabled):
+        db.session.rollback()
+        return success_response(message=f'Credential already {"enabled" if enabled else "disabled"}',
+                                meta={'other_sessions_closed': 0})
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     success, message = WebAuthnService.toggle_credential(credential_id, user.id, enabled)
-    
     if not success:
+        db.session.rollback()
         return error_response(message, 404)
-    
+    closed = sessions_closed_by(owner)
+
     AuditService.log_action(
         action='webauthn_toggle',
         resource_type='webauthn',
         resource_id=str(credential_id),
         resource_name=f'WebAuthn credential {credential_id}',
-        details=f'{"Enabled" if enabled else "Disabled"} WebAuthn credential {credential_id}',
+        details=(f'{"Enabled" if enabled else "Disabled"} WebAuthn credential {credential_id} '
+                 f'({closed_sessions_note(closed)})'),
         success=True
     )
-    
-    return success_response(message=message)
+
+    return success_response(message=message, meta={'other_sessions_closed': closed})
 
 
 @bp.route('/register/options', methods=['POST'])
@@ -119,30 +138,34 @@ def verify_registration():
     credential_data = data.get('credential', {})
     credential_name = data.get('name', 'Security Key')
     hostname = request.host
-    
-    success, message, credential = WebAuthnService.verify_registration(
-        user.id, credential_data, hostname, credential_name
-    )
-    
-    if not success:
-        return error_response(message, 400)
 
-    # A registered key satisfies a forced-enrolment session (#141): lift the gate,
-    # and keep the key as this user's second factor if enforcement is lifted later.
-    if session.pop(ENROLL_SESSION_KEY, None) is not None:
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
+    # A key registered under forced enrolment (#141) stays the user's second factor if
+    # enforcement is lifted later: the flag rides the key's own commit, the gate goes after it.
+    enrolling = session.get(ENROLL_SESSION_KEY) is not None
+    success, message, credential = WebAuthnService.verify_registration(
+        user.id, credential_data, hostname, credential_name,
+        second_factor_of=owner if enrolling else None
+    )
+    if not success:
+        db.session.rollback()
+        return error_response(message, 400)
+    if enrolling:
+        session.pop(ENROLL_SESSION_KEY, None)
         session.modified = True
-        owner = lock_user(user.id)
-        owner.webauthn_2fa = True
-        if not safe_commit(logger, "Failed to keep the enrolled key as second factor")[0]:
-            return error_response('Failed to complete 2FA enrolment', 500)
-    
+    closed = sessions_closed_by(owner)
+
     AuditService.log_action(
         action='webauthn_register',
         resource_type='webauthn',
         resource_id=str(credential.id) if credential else None,
         resource_name=credential_name,
-        details=f'Registered WebAuthn credential: {credential_name}',
+        details=f'Registered WebAuthn credential: {credential_name} ({closed_sessions_note(closed)})',
         success=True
     )
-    
-    return success_response(data=credential.to_dict() if credential else None, message=message)
+
+    return success_response(data=credential.to_dict() if credential else None, message=message,
+                            meta={'other_sessions_closed': closed})

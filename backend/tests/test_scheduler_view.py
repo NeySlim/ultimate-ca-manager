@@ -43,3 +43,30 @@ class TestSchedulerRunEndpoint:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+class TestPerNodeTasks:
+    def test_the_update_result_and_the_files_run_on_every_node(self, auth_client):
+        r = auth_client.get('/api/v2/system/scheduler')
+        tasks = {t['name']: t for t in json.loads(r.data)['data']['tasks']}
+        assert 'backup_retention' in tasks and 'update_result' in tasks, sorted(tasks)
+        per_node = {name for name, t in tasks.items() if t['per_node']}
+        # Retention runs on the leader, over the archives every node shares
+        assert per_node == {'update_result', 'files_reconcile'}
+        assert tasks['files_reconcile']['label'] == 'Certificate and key files'
+        assert tasks['update_result']['label'] == 'Update result'
+
+    def test_the_update_check_leaves_the_result_to_its_node_task(self, app, monkeypatch, tmp_path):
+        import services.updates as updates
+        consumed = []
+        monkeypatch.setattr(updates, 'consume_update_result', lambda: consumed.append(1))
+        monkeypatch.setattr(updates, '_cfg_get', lambda key, default=None: default)
+        monkeypatch.setattr(updates, 'get_update_settings',
+                            lambda: {'auto_install': False, 'hour': 3, 'channel': 'stable'})
+        monkeypatch.setattr(updates, 'check_for_updates', lambda channel: {'error': 'offline'})
+        monkeypatch.setattr(updates, '_cfg_set', lambda *a: True)
+        with app.app_context():
+            updates.scheduled_update_check()
+            assert consumed == []
+            updates.scheduled_update_result()
+        assert consumed == [1]

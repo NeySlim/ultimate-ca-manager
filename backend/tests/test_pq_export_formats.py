@@ -173,15 +173,17 @@ def test_trust_store_service_refuses_ml_dsa_pkcs12():
 ])
 @pytest.mark.parametrize('target', ['certificates/{cert}', 'cas/{ca}'])
 def test_other_formats_still_export(fmt, check, target, auth_client, material):
+    # DER carries no key: a certificate export and a CA export both refuse include_key with it
     r = _post(auth_client, f'/api/v2/{target.format(**material)}/export',
-              {'format': fmt, 'include_key': True})
+              {'format': fmt, 'include_key': fmt != 'der'})
     assert r.status_code == 200, r.data[:300]
     assert check(r.data)
 
 
 def test_converter_pem_and_der_still_work(auth_client, app, material):
     r = _converter('pem')(auth_client, app, material)
-    assert r.status_code == 200 and 'BEGIN PRIVATE KEY' in r.get_json()['data']['data']
+    # The converter's output password encrypts the PEM key
+    assert r.status_code == 200 and 'BEGIN ENCRYPTED PRIVATE KEY' in r.get_json()['data']['data']
 
 
 def test_export_formats_for_follows_the_key():

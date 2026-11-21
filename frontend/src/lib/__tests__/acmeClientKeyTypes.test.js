@@ -28,6 +28,8 @@ describe('ACME client key types agree with the server', () => {
   it('hides what FIPS mode or a build without ML-DSA refuses', () => {
     const offered = (opts) => listAlgorithms({ labels: ACME_CLIENT_LABELS, ...opts }).map(a => a.label)
     expect(offered({ fips: true })).toEqual(rows.filter(r => r.fips).map(r => r.label))
+    const approved = rows.filter(r => r.fips !== false).map(r => r.label)
+    expect(offered({ fips: true, fipsKeys: approved })).toEqual(approved)
     expect(offered({ mldsa: false })).toEqual(rows.filter(r => !r.ml_dsa).map(r => r.label))
   })
 })

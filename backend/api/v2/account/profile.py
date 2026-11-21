@@ -3,6 +3,7 @@ import logging
 
 from flask import request, g
 from models import db, User
+from models.user import local_email_holder, local_email_taken
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
@@ -20,15 +21,61 @@ logger = logging.getLogger(__name__)
 # across browsers and devices instead of being limited to localStorage.
 # ---------------------------------------------------------------------------
 
-# Whitelist of allowed preference keys + value validators.
-# Anything not listed here is silently dropped to avoid storing arbitrary blobs.
+# Registry ids as the shell pins them: the server does not know the frontend
+# registry, only the id format and the cap of three.
+_PIN_ID = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,39}$')
+MAX_PINS = 3
+
+
+def _valid_pins(v):
+    return (isinstance(v, list) and len(v) <= MAX_PINS
+            and all(isinstance(i, str) and _PIN_ID.fullmatch(i) for i in v)
+            and len(set(v)) == len(v))
+
+
+def _valid_inspector(v):
+    if not isinstance(v, dict) or set(v) - {'position', 'height', 'width'}:
+        return False
+    if 'position' in v and v['position'] not in ('bottom', 'right'):
+        return False
+    for key, lo, hi in (('height', 160, 4000), ('width', 280, 4000)):
+        if key in v and not (type(v[key]) is int and lo <= v[key] <= hi):
+            return False
+    return True
+
+
+def _valid_dashboard(value):
+    """Overview layout: card ids in display order, hidden card ids, and two flags."""
+    ids = lambda v: isinstance(v, list) and len(v) <= 20 and all(  # noqa: E731
+        isinstance(i, str) and 1 <= len(i) <= 30 for i in v)
+    return (isinstance(value, dict) and set(value) <= {'order', 'hidden', 'queueShowAll'}
+            and ids(value.get('order', [])) and ids(value.get('hidden', []))
+            and isinstance(value.get('queueShowAll', False), bool))
+
+
+# The bell's read marks: item keys such as ``approval_pending:12``, newest last.
+_READ_KEY = re.compile(r'^[A-Za-z0-9_.:-]{1,120}$')
+MAX_READ_MARKS = 200
+
+
+def _valid_notifications_read(v):
+    return (isinstance(v, list) and len(v) <= MAX_READ_MARKS
+            and all(isinstance(i, str) and _READ_KEY.fullmatch(i) for i in v)
+            and len(set(v)) == len(v))
+
+
+# Whitelist of allowed preference keys + value validators. Anything not listed here is
+# silently dropped to avoid storing arbitrary blobs (a bad pin list is refused instead).
 _PREF_VALIDATORS = {
     'language': lambda v: isinstance(v, str) and 1 <= len(v) <= 10,
     'theme_family': lambda v: isinstance(v, str) and 1 <= len(v) <= 30,
     'theme_mode': lambda v: v in ('light', 'dark', 'system'),
     'density': lambda v: v in ('compact', 'comfortable', 'spacious'),
     'sidebar_collapsed': lambda v: isinstance(v, bool),
+    'dashboard': _valid_dashboard,
     'force_desktop': lambda v: isinstance(v, bool),
+    'pins': _valid_pins,
+    'notifications_read': _valid_notifications_read,
     # `date_format`, `show_time` and `timezone` are deliberately absent. They
     # are instance-wide SystemConfig rows, served at the top level of the
     # same `/auth/verify` body that carries this blob, and that top-level
@@ -41,6 +88,8 @@ _PREF_VALIDATORS = {
     'update_popup_seen_version': lambda v: isinstance(v, str) and 1 <= len(v) <= 32,
     # Last version for which the admin dismissed the Ko-fi support card
     'kofi_seen_version': lambda v: isinstance(v, str) and 1 <= len(v) <= 32,
+    # Inspector dock: anchor side and size; a malformed value is refused (400)
+    'inspector': lambda v: _valid_inspector(v),
 }
 
 
@@ -114,6 +163,9 @@ def update_profile():
         email = data['email']
         if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
             return error_response('Invalid email format', 400)
+        # E-mail is unique among local accounts (#136); ix_users_email_local refuses a race
+        if email and user.is_local and local_email_holder(email, other_than=user.id) is not None:
+            return error_response('Email already in use', 409)
         user.email = email
 
     if 'full_name' in data:
@@ -122,7 +174,9 @@ def update_profile():
     if 'timezone' in data:
         user.timezone = data.get('timezone', 'UTC')
 
-    ok, _err = safe_commit(logger, "Failed to update profile")
+    uid, email = user.id, data.get('email')
+    ok, _err = safe_commit(logger, "Failed to update profile",
+                           on_conflict=lambda: local_email_taken(email, other_than=uid))
     if not ok:
         return _err
 
@@ -165,9 +219,20 @@ def update_preferences():
     if not user:
         return error_response('User not found', 404)
 
+    # A bad pin list is refused with 400, not silently dropped like other bad values.
+    if isinstance(payload, dict) and 'pins' in payload and not _valid_pins(payload['pins']):
+        return error_response('pins must be a list of at most 3 distinct module ids', 400)
+
+    if (isinstance(payload, dict) and 'notifications_read' in payload
+            and not _valid_notifications_read(payload['notifications_read'])):
+        return error_response(
+            f'notifications_read must be a list of at most {MAX_READ_MARKS} distinct item keys', 400)
+
     # PUT replaces; PATCH would merge — frontend currently uses PUT after
     # merging client-side, which keeps the contract simple.
     cleaned = _sanitize_preferences(payload)
+    if isinstance(payload, dict) and 'inspector' in payload and 'inspector' not in cleaned:
+        return error_response('Invalid inspector preference', 400)
     try:
         user.set_preferences(cleaned)
         db.session.commit()

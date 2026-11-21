@@ -21,12 +21,12 @@ import { cn } from '../lib/utils'
 export function Button({ children, type = 'button', variant = 'primary', size = 'sm', loading = false, loadingText, className, ...props }) {
   const { t } = useTranslation()
   const variants = {
-    primary: 'btn-gradient text-white',
+    primary: 'btn-gradient',
     secondary: 'btn-soft text-text-primary',
-    danger: 'btn-gradient danger text-white',
+    danger: 'btn-gradient danger',
     'danger-soft': 'btn-danger-soft',
     'warning-soft': 'btn-warning-soft',
-    success: 'btn-gradient success text-white',
+    success: 'btn-gradient success',
     ghost: 'hover:bg-tertiary-op80 text-text-primary hover:text-text-primary transition-colors',
     outline: 'border border-border bg-transparent text-text-primary hover:bg-tertiary-op60 hover:border-border-strong transition-all',
   }

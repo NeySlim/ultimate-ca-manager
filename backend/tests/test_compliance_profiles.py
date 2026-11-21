@@ -97,7 +97,6 @@ def test_edwards_keys_follow_the_arbitrage():
     assert labels['eu-acm']['require_hsm_ca_key'] is True
 
 
-
 @pytest.mark.parametrize('profile, brainpool_notice, nist_notice', [
     ('anssi', True, False), ('bsi', False, True), ('eu-acm', False, False)])
 def test_brainpool_is_accepted_and_advised_as_each_text_says(profile, brainpool_notice, nist_notice):
@@ -166,9 +165,11 @@ def test_a_rsa_2048_leaf_is_refused_under_bsi_and_passes_without(app, auth_clien
     ca = create_ca(cn='Profile leaf CA', signatureScheme='pss')
     assert _leaf(auth_client, ca['id'], 'before.profile.example.test').status_code == 201
     assert _patch(auth_client, ca['id'], complianceProfile='bsi').status_code == 200
-    r = _leaf(auth_client, ca['id'], 'under.bsi.example.test')
+    r = _leaf(auth_client, ca['id'], 'under.bsi.example.test', key_type='rsa', key_size=2048)
     assert r.status_code == 400, r.get_json()
     assert 'RSA-2048' in r.get_json()['message'] and 'bsi' in r.get_json()['message']
+    # A request that names no key gets the default the profile allows (#397)
+    assert _leaf(auth_client, ca['id'], 'default.bsi.example.test').status_code == 201
     # The same request with a key the profile allows is issued
     ec = _leaf(auth_client, ca['id'], 'rsa3072.bsi.example.test', key_type='rsa', key_size=3072)
     assert ec.status_code == 201, ec.get_json()
@@ -262,41 +263,6 @@ def test_backups_keep_the_profile(app, auth_client, create_ca):
 
 
 # ---- migration ---------------------------------------------------------------
-
-def test_sqlite_migration_leaves_existing_cas_without_a_profile():
-    m = importlib.import_module('migrations.107_ca_compliance_profile')
-    conn = sqlite3.connect(':memory:')
-    conn.execute(f"CREATE TABLE {CA.__tablename__} (id INTEGER PRIMARY KEY, descr TEXT)")
-    conn.execute(f"INSERT INTO {CA.__tablename__} VALUES (1, 'old')")
-    m.upgrade(conn)
-    m.upgrade(conn)
-    assert conn.execute(f"SELECT compliance_profile FROM {CA.__tablename__}").fetchone()[0] is None
-    m.upgrade(sqlite3.connect(':memory:'))  # no table: a no-op
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_migration_leaves_existing_cas_without_a_profile():
-    m = importlib.import_module('migrations.107_ca_compliance_profile')
-    schema = f"migtest_107_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.execute(text(f"CREATE SCHEMA {schema}"))
-        conn.execute(text(f"SET search_path TO {schema}"))
-        table = CA.__tablename__
-        conn.execute(text(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY, descr TEXT)"))
-        conn.execute(text(f"INSERT INTO {table} VALUES (1, 'old')"))
-        m.upgrade(conn)
-        m.upgrade(conn)
-        assert conn.execute(text(f"SELECT compliance_profile FROM {table}")).scalar() is None
-    finally:
-        conn.rollback()
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.commit()
-        conn.close()
-        engine.dispose()
 
 
 @pytest.mark.parametrize('profile', compliance_profiles.PROFILE_NAMES)

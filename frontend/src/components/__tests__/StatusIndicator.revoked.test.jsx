@@ -5,7 +5,7 @@
  * `revoked` used the same grey as inactive / disabled / offline, so the dot of
  * a revoked certificate was indistinguishable from a disabled row, while every
  * badge map in the app (useCertificateColumns, UserCertificatesPage,
- * FloatingDetailWindow) paints revoked as danger.
+ * InspectorObject) paints revoked as danger.
  */
 import { describe, it, expect } from 'vitest'
 import { render, cleanup } from '@testing-library/react'

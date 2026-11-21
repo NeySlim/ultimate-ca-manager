@@ -43,13 +43,17 @@ export const acmeService = {
     return apiClient.get(`/acme/accounts/${accountId}/orders`)
   },
 
+  async getLocalOrder(id) {
+    return apiClient.get(`/acme/orders/${id}`)
+  },
+
   async getChallenges(accountId) {
     return apiClient.get(`/acme/accounts/${accountId}/challenges`)
   },
 
   // History
-  async getHistory() {
-    return apiClient.get('/acme/history')
+  async getHistory(params = {}) {
+    return apiClient.get(`/acme/history${buildQueryString(params)}`)
   },
 
   // =========================================================================

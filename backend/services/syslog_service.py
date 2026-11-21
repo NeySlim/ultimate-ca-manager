@@ -33,6 +33,8 @@ SEVERITY_MAP = {
 
 # How long the resolved HOSTNAME is cached before re-reading system_name
 _HOSTNAME_CACHE_TTL = 300
+# Another process (the scheduler, another node) may have saved the settings: re-read this often
+REFRESH_SECONDS = 5.0
 
 
 def _sd_escape(value) -> str:
@@ -61,6 +63,8 @@ class SyslogForwarder:
 
     # The categories an operator can deselect; a resource type in none of them is always sent
     ALL_CATEGORIES = ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system']
+    SETTING_KEYS = ('syslog_enabled', 'syslog_host', 'syslog_port', 'syslog_protocol', 'syslog_tls',
+                    'syslog_tls_verify', 'syslog_framing', 'syslog_categories')
     _PREFIXES = (('acme_', 'acme'), ('scep_', 'scep'))
     _ALIASES = {'sso': 'user', 'user_certificate': 'certificate',
                 'ssh_certificate': 'certificate', 'ssh_ca': 'ca'}
@@ -112,6 +116,8 @@ class SyslogForwarder:
         self._socket_pid = None
         self._hostname = ''
         self._hostname_resolved_at = 0.0
+        self._stored = None  # the rows last applied: a refresh applies only a change to them
+        self._checked_at = float('-inf')
         self._initialized = True
 
     def _resolve_hostname(self) -> str:
@@ -336,32 +342,71 @@ class SyslogForwarder:
             self._close()
             return {'success': False, 'error': str(e)}
 
-    def load_from_db(self):
-        """Load syslog config from database."""
-        if not self._initialized:
-            self._initialize()
+    def _read_stored(self) -> dict:
+        """The stored settings, read without flushing what the caller has pending.
+
+        Not from an after_commit hook: the session refuses SQL there.
+        """
+        from models import db, SystemConfig
+        with db.session.no_autoflush:
+            rows = db.session.query(SystemConfig.key, SystemConfig.value) \
+                .filter(SystemConfig.key.in_(self.SETTING_KEYS)).all()
+        return {key: value for key, value in rows}
+
+    def _apply_stored(self, stored):
+        categories_raw = stored.get('syslog_categories', '')
+        categories = [c.strip() for c in categories_raw.split(',') if c.strip()] if categories_raw else list(self.ALL_CATEGORIES)
         try:
-            from models import SystemConfig
-            def _get(key, default=None):
-                c = SystemConfig.query.filter_by(key=key).first()
-                return c.value if c else default
-
-            categories_raw = _get('syslog_categories', '')
-            categories = [c.strip() for c in categories_raw.split(',') if c.strip()] if categories_raw else list(self.ALL_CATEGORIES)
-
             self.configure(
-                enabled=_get('syslog_enabled', 'false').lower() == 'true',
-                host=_get('syslog_host', ''),
-                port=int(_get('syslog_port', '514')),
-                protocol=_get('syslog_protocol', 'udp'),
-                tls=_get('syslog_tls', 'false').lower() == 'true',
-                tls_verify=_get('syslog_tls_verify', 'true').lower() == 'true',
-                framing=_get('syslog_framing'),
+                enabled=stored.get('syslog_enabled', 'false').lower() == 'true',
+                host=stored.get('syslog_host', ''),
+                port=int(stored.get('syslog_port', '514')),
+                protocol=stored.get('syslog_protocol', 'udp'),
+                tls=stored.get('syslog_tls', 'false').lower() == 'true',
+                tls_verify=stored.get('syslog_tls_verify', 'true').lower() == 'true',
+                framing=stored.get('syslog_framing'),
                 categories=categories,
             )
         except Exception as e:
+            logger.warning(f"Stored syslog settings not applied, forwarding disabled: {e}")
+            checked_at = self._checked_at
+            self._close()
+            self._initialize()
+            self._checked_at = checked_at
+        self._stored = stored
+
+    def load_from_db(self):
+        """Apply the stored settings unless they are the ones this process last applied."""
+        if not self._initialized:
+            self._initialize()
+        try:
+            stored = self._read_stored()
+        except Exception as e:
             logger.debug(f"Syslog config load skipped: {e}")
             self._initialize()
+            self._checked_at = time.monotonic()  # retried by reload_if_changed(), not on every line
+            return
+        self._checked_at = time.monotonic()
+        if stored != self._stored:
+            self._apply_stored(stored)
+
+    def postpone_reload(self):
+        """The next REFRESH_SECONDS keep the current target (an entry meant for it is on its way)."""
+        self._checked_at = time.monotonic()
+
+    def reload_if_changed(self):
+        """Apply a change another process saved; the rows are read at most every REFRESH_SECONDS."""
+        now = time.monotonic()
+        if now - getattr(self, '_checked_at', float('-inf')) < REFRESH_SECONDS:
+            return
+        self._checked_at = now
+        try:
+            stored = self._read_stored()
+        except Exception as e:
+            logger.debug(f"Syslog settings not re-read, the current target stays: {e}")
+            return
+        if stored != getattr(self, '_stored', None):
+            self._apply_stored(stored)
 
     @property
     def is_enabled(self):

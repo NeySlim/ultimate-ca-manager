@@ -14,12 +14,14 @@ import pytest
 from utils.validity import (MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS,
                             coerce_validity_days, validity_days_in_range)
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 # Modules that cap certificate validity. None of them may spell the number.
 VALIDITY_MODULES = [
     'api/v2/certificates/cert_create.py',
     'api/v2/csrs.py',
     'api/v2/est.py',
-    'api/v2/wstep.py',
+    'api/v2/windows_profiles.py',
     'api/v2/templates.py',
     'api/v2/policies.py',
     'api/v2/mtls.py',

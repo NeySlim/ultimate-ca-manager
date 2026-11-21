@@ -5,6 +5,7 @@ import ipaddress
 import threading
 from datetime import datetime
 from typing import Optional, Tuple
+from utils.datetime_utils import to_naive_utc
 
 # Private/reserved IP ranges — block SSRF via scan targets
 # Note: RFC1918 private ranges (10/8, 172.16/12, 192.168/16) are intentionally
@@ -81,12 +82,12 @@ def _parse_target(raw: str) -> Tuple[str, Optional[int]]:
 
 
 def _parse_iso(val) -> Optional[datetime]:
-    """Parse ISO datetime string."""
+    """Parse an ISO datetime into naive UTC, the form every DateTime column stores."""
     if val is None:
         return None
     if isinstance(val, datetime):
-        return val
+        return to_naive_utc(val)
     try:
-        return datetime.fromisoformat(val.replace('Z', '+00:00'))
+        return to_naive_utc(datetime.fromisoformat(val.replace('Z', '+00:00')))
     except (ValueError, AttributeError):
         return None

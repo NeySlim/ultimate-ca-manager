@@ -25,6 +25,12 @@ const ssoService = {
   testMapping: (id, username) =>
     apiClient.post(`/sso/providers/${id}/test-mapping`, { username }),
 
+  startSignInTest: (id) =>
+    apiClient.post(`/sso/providers/${id}/test-sign-in`),
+
+  getSignInTest: (testId) =>
+    apiClient.get(`/sso/sign-in-tests/${encodeURIComponent(testId)}`),
+
   fetchIdpMetadata: (metadataUrl, sslOptions = {}) =>
     apiClient.post('/sso/saml/metadata/fetch', { metadata_url: metadataUrl, ...sslOptions }),
 

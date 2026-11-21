@@ -1,7 +1,7 @@
 /**
  * Select Component - Radix Select wrapper with optional searchable mode
  */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useId } from 'react'
 import * as Select from '@radix-ui/react-select'
 import { CaretDown, Check, MagnifyingGlass, X } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
@@ -32,6 +32,8 @@ export function SelectComponent({
   // ignore any value that isn't a current option and would silently blank the
   // field. This relies on `options` being the post-swap list at the time Radix
   // fires (it is: the reset runs after that commit) (#318).
+  // The label names the trigger (assistive technologies, getByLabelText)
+  const fieldId = useId()
   const handleValueChange = onChange
     ? (v) => {
         const next = fromInternal(v)
@@ -58,13 +60,14 @@ export function SelectComponent({
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
-        <label className="block text-sm font-medium text-text-primary">
+        <label htmlFor={fieldId} className="block text-sm font-medium text-text-primary">
           {label}
         </label>
       )}
 
       <Select.Root value={value == null ? value : toInternal(value)} onValueChange={handleValueChange} disabled={disabled}>
         <Select.Trigger
+          id={fieldId}
           className={cn(
             "w-full flex items-center justify-between px-2.5 py-1.5 bg-tertiary-op80 border rounded-md text-sm",
             "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary focus:bg-bg-tertiary",
@@ -83,7 +86,7 @@ export function SelectComponent({
 
         <Select.Portal>
           <Select.Content
-            className="bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl shadow-black/30 overflow-hidden z-50 animate-scaleIn"
+            className="bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl overflow-hidden z-50 animate-scaleIn"
             position="popper"
             sideOffset={4}
           >
@@ -117,6 +120,7 @@ export function SelectComponent({
 
 /** Searchable combobox variant — custom dropdown with filter input */
 function SearchableSelect({ label, options, value, onChange, placeholder, error, disabled, helperText, className }) {
+  const fieldId = useId()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [highlightIdx, setHighlightIdx] = useState(0)
@@ -191,11 +195,12 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
   return (
     <div className={cn("space-y-1.5", className)} ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-text-primary">{label}</label>
+        <label htmlFor={fieldId} className="block text-sm font-medium text-text-primary">{label}</label>
       )}
 
       {/* Trigger / display */}
       <button
+        id={fieldId}
         type="button"
         disabled={disabled}
         onClick={() => { if (!disabled) { setOpen(prev => !prev); setTimeout(() => inputRef.current?.focus(), 0) } }}
@@ -216,7 +221,7 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
       {/* Dropdown */}
       {open && (
         <div className="relative z-50">
-          <div className="absolute top-0 left-0 w-full bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl shadow-black/30 overflow-hidden animate-scaleIn">
+          <div className="absolute top-0 left-0 w-full bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl overflow-hidden animate-scaleIn">
             {/* Search input */}
             <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border-op30">
               <MagnifyingGlass size={14} className="text-text-tertiary shrink-0" />

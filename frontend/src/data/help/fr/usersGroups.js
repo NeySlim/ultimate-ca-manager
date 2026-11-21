@@ -10,9 +10,10 @@ export default {
           { label: 'Créer un utilisateur', text: 'Ajouter un nouvel utilisateur avec nom d\'utilisateur, e-mail et mot de passe initial' },
           { label: 'Rôles', text: 'Attribuer des rôles système ou personnalisés pour contrôler les permissions' },
           { label: 'Statut', text: 'Activer ou désactiver les comptes utilisateurs' },
-          { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d\'un utilisateur (action administrateur)' },
+          { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d\'un utilisateur (action administrateur). Les sessions ouvertes de l\'utilisateur sont fermées, comme par une réinitialisation de la 2FA' },
+          { label: 'Supprimer un utilisateur', text: "Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (cessationOfOperation), puis les supprime. Un certificat que l'AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, est nommé dans l'avertissement et le journal d'audit, et doit être révoqué sous Certificats. Un échec après certaines révocations conserve l'utilisateur et nomme les certificats déjà révoqués. Retirer un utilisateur ou l'un de ses certificats mTLS avertit quand l'AC ACME qui a émis un certificat n'a pas été informée de sa révocation" },
           { label: 'Clés API', text: 'Dans le détail d\'un utilisateur, liste ses clés API et révoque une clé compromise ou inutilisée : elle cesse de fonctionner immédiatement, et une clé révoquée ou expirée peut ensuite être supprimée. Les propriétaires créent leurs clés depuis leur page Compte' },
-          { label: 'Source', text: 'Indique l\'origine de chaque utilisateur : Local (géré dans UCM) ou LDAP / OAuth2 / SAML (provisionné par un fournisseur SSO). Le badge affiche le nom du fournisseur d\'origine.' },
+          { label: 'Source', text: 'Indique ce qui ouvre chaque compte : Local (son mot de passe UCM), ou chaque fournisseur qui lui est rattaché, par type et par nom (par exemple OAuth2 · Okta, SAML · AD FS). Un compte peut être rattaché à plusieurs fournisseurs.' },
         ]
       },
       {
@@ -56,10 +57,13 @@ Gérez les comptes utilisateurs, les groupes et les attributions de rôles. Les 
 Basculez le statut d'un utilisateur sans supprimer son compte.
 
 ### Réinitialisation du mot de passe
-Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. L'utilisateur n'est pas invité à le changer à la prochaine connexion : donnez-lui le nouveau mot de passe et demandez-lui de le changer sous Mon compte. **Mot de passe oublié** sur la page de connexion n'envoie aucun lien à un compte lié à un fournisseur SSO et sans mot de passe local : seul son fournisseur l'ouvre.
+Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. L'utilisateur n'est pas invité à le changer à la prochaine connexion : donnez-lui le nouveau mot de passe et demandez-lui de le changer sous Mon compte.
 
 ### Clés de sécurité
 Dans la fiche d'un utilisateur, les administrateurs voient ses clés de sécurité et peuvent en désactiver ou en retirer une, typiquement une clé perdue, qui sinon permet toujours de se connecter sans mot de passe. Retirer le dernier second facteur d'un compte qui en exige un demande une seconde confirmation ; l'utilisateur enrôle alors à nouveau un facteur à la prochaine connexion.
+
+### Supprimer un utilisateur
+Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (motif cessationOfOperation), puis les supprime. Un certificat que l'AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, l'avertissement et le journal d'audit le nomment, et vous le révoquez sous Certificats. Si la suppression échoue après certaines révocations, le message nomme les certificats déjà révoqués : ils restent révoqués.
 
 ### Clés API
 Chaque utilisateur peut avoir plusieurs clés API pour l'accès programmatique. Les clés API héritent des permissions du rôle de l'utilisateur. Voir la page Compte pour gérer vos propres clés.
@@ -87,9 +91,9 @@ Les permissions effectives d'un utilisateur sont l'**union** de :
 
 ### Rôles système
 - **Admin** : Accès complet à toutes les fonctionnalités
-- **Opérateur** : Peut gérer les certificats, CA, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC
+- **Opérateur** : Peut gérer les certificats, AC, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC
 - **Auditeur** : Accès en lecture seule à toutes les données opérationnelles pour la conformité et l'audit
-- **Lecteur** : Accès en lecture seule aux certificats, CA et modèles
+- **Lecteur** : Accès en lecture seule aux certificats, AC et modèles
 
 ### Rôles personnalisés
 Créez des rôles avec des permissions granulaires sur la page **RBAC**.
@@ -98,13 +102,13 @@ Créez des rôles avec des permissions granulaires sur la page **RBAC**.
 
 ## Source d'authentification
 
-La colonne **Source** indique d'où provient chaque utilisateur :
+La colonne **Source** indique ce qui ouvre chaque compte :
 - **Local** : créé et géré dans UCM (mot de passe local)
-- **LDAP / OAuth2 / SAML** : provisionné automatiquement lors d'une connexion SSO ; le nom du fournisseur d'origine apparaît sur le badge (ex. \`LDAP · Corporate AD\`).
+- **LDAP / OAuth2 / SAML** : une entrée par fournisseur rattaché au compte, par type et par nom (ex. \`LDAP · Corporate AD\`) ; un compte peut en avoir plusieurs.
 
 Depuis la v2.133, les rôles modifiés manuellement dans UCM sur des utilisateurs SSO sont **conservés** entre deux connexions, sauf si **« Synchroniser le rôle à chaque connexion »** est activé sur le fournisseur (voir page **Paramètres → SSO**).
 
-**Lier au SSO** rattache un compte à un fournisseur ; sur un compte déjà lié, **Changer de fournisseur ou réinitialiser l'identité SSO** le déplace vers un autre fournisseur ou efface son identité SSO, après confirmation. La prochaine connexion via ce fournisseur avec le nom d'utilisateur ou l'e-mail du compte lie la nouvelle identité ; le mot de passe du compte, s'il en a un, est conservé sauf si la case qui le supprime est cochée, après quoi aucune connexion par mot de passe n'ouvre le compte, et un compte qui n'en a pas n'est pas invité à en définir un. **Délier du SSO** reconvertit le compte en compte local.
+Le panneau du compte liste ses **fournisseurs d'authentification unique**, chacun lié, en attente de sa première connexion, ou laissé par un fournisseur supprimé. **Rattacher un fournisseur** en ajoute un : les fournisseurs déjà rattachés continuent d'ouvrir le compte, et la prochaine connexion via le nouveau avec le nom d'utilisateur ou l'e-mail du compte lie son identité. **Réinitialiser l'identité** efface l'identité d'un fournisseur dont l'IdP l'a changée, et **Détacher** retire un fournisseur, chacun après confirmation ; rattacher, réinitialiser et détacher ferment toutes les sessions du compte. Pour déplacer un compte vers un autre fournisseur, rattachez le nouveau, puis détachez l'ancien. Le mot de passe du compte, s'il en a un, est conservé, sauf si la case qui le retire est cochée, après quoi aucune connexion par mot de passe n'ouvre le compte ; un mot de passe n'est demandé à un compte qui n'en a pas que lorsque son dernier fournisseur est détaché, et il redevient alors un compte local.
 `
   }
 }

@@ -5,7 +5,10 @@ import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
+import LegacyGroupsNotice from './LegacyGroupsNotice'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import TestConnectionButton from './TestConnectionButton'
+import SignInTestPanel from './SignInTestPanel'
 import { formatDate } from '../../../lib/utils'
 
 export const NAMEID_UNSPECIFIED = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
@@ -14,6 +17,15 @@ const NAME_ID_FORMATS = [
   { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent', labelKey: 'sso.nameIdPersistent' },
   { value: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress', labelKey: 'sso.nameIdEmail' },
   { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient', labelKey: 'sso.nameIdTransient' },
+]
+
+// Common SAML attribute Names that carry groups, by origin. None is read by default:
+// a click adds a visible "→ groups" row the operator saves (or removes) himself.
+const SAML_GROUP_SHORTCUTS = [
+  { name: 'Role', originKey: 'sso.samlGroupShortcutKeycloakRoles' },
+  { name: 'member', originKey: 'sso.samlGroupShortcutKeycloakGroups' },
+  { name: 'memberOf', originKey: 'sso.samlGroupShortcutMemberOf' },
+  { name: 'urn:oid:1.3.6.1.4.1.5923.1.5.1.1', originKey: 'sso.samlGroupShortcutIsMemberOf' },
 ]
 
 export default function SsoSamlFields({
@@ -34,6 +46,7 @@ export default function SsoSamlFields({
   samlAcsUrl,
   samlSloUrl,
   handleTestConnection,
+  dirty,
 }) {
   const { t } = useTranslation()
 
@@ -115,7 +128,7 @@ export default function SsoSamlFields({
             helperText={t('sso.nameIdFormatHelp')}
           />
           <ToggleSwitch checked={formData.saml_verify_ssl} onChange={(val) => handleChange('saml_verify_ssl', val)} label={t('sso.verifySsl')} size="sm" />
-          {!formData.saml_verify_ssl && <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>}
+          {!formData.saml_verify_ssl && <p className="text-xs text-status-warning">{t('sso.sslWarning')}</p>}
           {formData.saml_verify_ssl && (
             <Textarea
               label={t('sso.caBundleLabel')}
@@ -128,11 +141,9 @@ export default function SsoSamlFields({
             />
           )}
           {provider?.id && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleTestConnection} disabled={testingConnection} className="gap-1.5">
-              {testingConnection ? <LoadingSpinner size="xs" /> : <Shield size={14} />}
-              {t('sso.testConnection')}
-            </Button>
+            <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} icon={Shield} />
           )}
+          <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
         </div>
       </CompactSection>
 
@@ -161,6 +172,26 @@ export default function SsoSamlFields({
               keyPlaceholder="e.g., preferred_username"
               valuePlaceholder="e.g., username"
             />
+            <LegacyGroupsNotice mapping={formData.attribute_mapping} />
+            <div className="mt-2">
+              <p className="text-xs text-text-tertiary mb-1">{t('sso.samlGroupShortcuts')}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {SAML_GROUP_SHORTCUTS.map(({ name, originKey }) => (
+                  <Button
+                    key={name}
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={Object.prototype.hasOwnProperty.call(formData.attribute_mapping || {}, name)}
+                    onClick={() => handleChange('attribute_mapping', { ...(formData.attribute_mapping || {}), [name]: 'groups' })}
+                    className="gap-1"
+                  >
+                    <span className="font-mono">{name}</span>
+                    <span className="text-text-tertiary">{t(originKey)}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="pt-2 border-t border-border">
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>

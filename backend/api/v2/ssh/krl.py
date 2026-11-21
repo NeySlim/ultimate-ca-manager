@@ -2,16 +2,15 @@
 SSH CA KRL (Key Revocation List) endpoint.
 """
 
-import re
-
 from flask import Response
 
 from auth.unified import require_auth
 from utils.response import error_response
+from utils.sanitize import content_disposition
 from services.ssh_krl_service import SSHKRLService
 from models.ssh import SSHCertificateAuthority
 
-from .helpers import bp, logger
+from .helpers import bp, logger, ssh_download_stem
 from models import db
 
 
@@ -28,7 +27,7 @@ def get_ssh_ca_krl(ca_id):
             krl_data,
             mimetype='application/octet-stream',
             headers={
-                'Content-Disposition': f'attachment; filename="ssh_ca_{re.sub(r"[^a-zA-Z0-9_.-]", "_", ca_name)}_krl"'
+                'Content-Disposition': content_disposition(ssh_download_stem(ca_name), '_krl', fallback=ca.refid if ca else None, prefix='ssh_ca_')
             }
         )
     except ValueError as e:

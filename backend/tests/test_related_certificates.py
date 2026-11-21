@@ -19,9 +19,11 @@ from services.policy_service import PolicyViolation
 from services.trust_store import TrustStoreService
 from utils import key_algorithms, related_cert
 from utils.datetime_utils import utc_now
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates', 'drop_new_users')
 
 PQ_LABEL = next(label for label in key_algorithms.labels('ML-DSA') if label.endswith('65'))
 
@@ -350,6 +352,52 @@ def test_a_never_returns_to_a_b_that_is_no_longer_current(app, auth_client, cert
         assert (row.related_certificate_id, row.hybrid_role) == (None, None)
 
 
+def _names_a(row_id):
+    db.session.expire_all()
+    cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(Certificate, row_id).crt))
+    try:
+        cert.extensions.get_extension_for_oid(related_cert.RELATED_CERT_EXTENSION_OID)
+    except x509.ExtensionNotFound:
+        return False
+    return True
+
+
+def test_b_renewed_alone_names_no_a_that_was_archived(app, auth_client, cert_a):
+    """RFC 9763 makes the extension optional: a replaced A is not hashed into the renewed B."""
+    row_id = cert_a[0]
+    b = _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        assert _names_a(b)
+        db.session.get(Certificate, row_id).archived = True
+        db.session.commit()
+    r = auth_client.post(f'/api/v2/certificates/{b}/renew', json={})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert not _names_a(b)
+        assert db.session.get(Certificate, b).related_certificate_id is None
+
+
+@pytest.mark.parametrize('how', ['single', 'bulk'])
+def test_revoking_b_leaves_a_superseded_a_alone(app, auth_client, cert_a, how):
+    """An archived member is a replaced certificate: a pair revocation does not follow it."""
+    row_id = cert_a[0]
+    b = _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        db.session.get(Certificate, row_id).archived = True
+        db.session.commit()
+    if how == 'bulk':
+        r = auth_client.post('/api/v2/certificates/bulk/revoke', json={'ids': [b], 'reason': 'superseded'})
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['failed'] == [], r.data
+    else:
+        r = auth_client.post(f'/api/v2/certificates/{b}/revoke', json={'reason': 'superseded'})
+        assert r.status_code == 200, r.data
+        assert 'related_revoked' not in json.loads(r.data)['data'], r.data
+    with app.app_context():
+        assert db.session.get(Certificate, b).revoked
+        assert not db.session.get(Certificate, row_id).revoked
+
+
 def test_revoking_a_alone_moves_no_link(app, auth_client, cert_a):
     row_id = cert_a[0]
     b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
@@ -597,7 +645,14 @@ def test_a_failed_signature_does_not_use_the_request(app, cert_a, monkeypatch):
         assert len(_bindings(request, cert)) == 1
 
 
-def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch):
+def _a_refusal_is_not_an_error(caplog, text):
+    """An expected refusal: no ERROR and no trace; the route that answers it reports it."""
+    lines = [(r.levelname, r.exc_info) for r in caplog.records
+             if r.levelno >= 30 and text in r.getMessage()]
+    assert lines == [], caplog.text
+
+
+def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch, caplog):
     """Both requests passed the check before either committed: the second insert loses."""
     from models.related_cert_request import RelatedCertRequestUse
     from services.cert import related_pair
@@ -620,8 +675,10 @@ def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch):
         monkeypatch.setattr(related_pair, 'check_request_key', lambda *a: None)
         monkeypatch.setattr(related_pair, '_bound_key', unseen_once)
         before = Certificate.query.count()
-        with pytest.raises(RelatedCertificateRefused, match='already used with another key'):
+        with caplog.at_level('INFO'), \
+                pytest.raises(RelatedCertificateRefused, match='already used with another key'):
             _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
+        _a_refusal_is_not_an_error(caplog, 'already used with another key')
         assert len(calls) == 2
         assert Certificate.query.count() == before
         assert db.session.get(Certificate, row_id).related_certificate_id == link
@@ -701,6 +758,27 @@ def test_a_form_pair_renews_a_alone_once_a_device_enrols_a_newer_b(app, auth_cli
         assert _links(a_id, form_id, b2_id) == [(None, None)] * 3
 
 
+@pytest.mark.parametrize('archived', ['related', 'certificate'])
+def test_an_archived_partner_is_not_renewed_with_the_live_member(app, auth_client, create_ca, archived):
+    ca = create_ca(cn=f'Archived partner CA {archived}')
+    r = auth_client.post('/api/v2/certificates', json={
+        'cn': f'archived-{archived}.example.com', 'ca_id': ca['id'], 'validity_days': 90,
+        'hybrid': {'classical': next(l for l in key_algorithms.labels('EC') if l.endswith('P256')),
+                   'pq': PQ_LABEL}})
+    assert r.status_code == 201, r.data
+    a_id, b_id = (json.loads(r.data)['data'][k]['id'] for k in ('certificate', 'related'))
+    gone, live = (b_id, a_id) if archived == 'related' else (a_id, b_id)
+    with app.app_context():
+        row = db.session.get(Certificate, gone)
+        row.archived, gone_serial = True, row.serial_number
+        db.session.commit()
+    _renew(auth_client, live, 'single')
+    with app.app_context():
+        row = db.session.get(Certificate, gone)
+        assert (db.session.get(Certificate, live).renewed_times, row.renewed_times or 0,
+                row.serial_number) == (1, 0, gone_serial)
+
+
 @pytest.mark.parametrize('path', ['est', 'sign_route'])
 def test_b_is_stored_and_linked_when_a_changes_after_signing(app, auth_client, cert_a, monkeypatch, path):
     """A is found before signing: a lookup after it could lose a signed certificate."""
@@ -726,6 +804,50 @@ def test_b_is_stored_and_linked_when_a_changes_after_signing(app, auth_client, c
         monkeypatch.undo()
         with app.app_context():
             db.session.get(Certificate, row_id).serial_number = str(cert.serial_number)
+            db.session.commit()
+
+
+@pytest.mark.parametrize('path', ['est', 'sign_route'])
+def test_no_link_is_written_onto_an_a_renewed_after_signing(app, auth_client, cert_a, monkeypatch,
+                                                             caplog, path):
+    """B's extension hashes the A it was signed against: an A renewed in place meanwhile
+    holds another certificate, so the linked issuance is refused rather than linked wrong."""
+    row_id, cert, key = cert_a
+    real_sign = TrustStoreService.sign_csr
+    other_key = ec.generate_private_key(ec.SECP256R1())
+    other = _self_signed(other_key, hashes.SHA256(), serial=cert.serial_number + 1)
+    csr_id = _generate_b(app, row_id) if path == 'sign_route' else None
+
+    def sign_then_renew_a(*args, **kwargs):
+        pem = real_sign(*args, **kwargs)
+        a_row = db.session.get(Certificate, row_id)
+        a_row.crt = base64.b64encode(other.public_bytes(serialization.Encoding.PEM)).decode()
+        a_row.serial_number = str(other.serial_number)
+        return pem
+
+    monkeypatch.setattr(TrustStoreService, 'sign_csr', staticmethod(sign_then_renew_a))
+    try:
+        if path == 'est':
+            with app.app_context(), caplog.at_level('INFO'):
+                with pytest.raises(RelatedCertificateRefused, match='not held by this instance'):
+                    _est_sign(_signing_ca(row_id)[0], x509.load_pem_x509_csr(_csr_b(cert, key)))
+            _a_refusal_is_not_an_error(caplog, 'not held by this instance')
+        else:
+            with app.app_context():
+                ca_id = _signing_ca(row_id)[0].id
+            r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id, 'validity_days': 30})
+            assert r.status_code == 400, r.data
+            assert 'not held by this instance' in json.loads(r.data)['message']
+        with app.app_context():
+            a_row = db.session.get(Certificate, row_id)
+            assert (a_row.serial_number, a_row.related_certificate_id) == (str(cert.serial_number), None)
+            assert Certificate.query.filter_by(related_certificate_id=row_id).count() == 0
+    finally:
+        monkeypatch.undo()
+        with app.app_context():
+            a_row = db.session.get(Certificate, row_id)
+            a_row.crt = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode()
+            a_row.serial_number, a_row.related_certificate_id = str(cert.serial_number), None
             db.session.commit()
 
 
@@ -958,3 +1080,80 @@ def test_the_csr_route_refuses_a_bad_related_to(auth_client, related_to, message
     r = auth_client.post('/api/v2/csrs', json={'cn': 'bad-related.example.com', 'key_type': 'EC P-256',
                                                'related_to': related_to})
     assert r.status_code == 400 and message in r.data, r.data
+
+
+# ---- a unique subject (RFC 5280 §4.1.2.6) and the pair -------------------------
+
+@pytest.fixture
+def unique_subject_on(app, cert_a):
+    with app.app_context():
+        ca = _signing_ca(cert_a[0])[0]
+        ca.enforce_unique_subject = True
+        db.session.commit()
+    yield
+    with app.app_context():
+        ca = _signing_ca(cert_a[0])[0]
+        ca.enforce_unique_subject = False
+        db.session.commit()
+
+
+def test_est_issues_b_although_a_carries_its_subject(app, cert_a, unique_subject_on):
+    """The verified relatedCertRequest proves A's key: B is A's entity, not another one."""
+    from services.ca_service import CAService
+    row_id, cert, key = cert_a
+    with app.app_context():
+        ca = _signing_ca(row_id)[0]
+        csr = x509.load_pem_x509_csr(_csr_b(cert, key))
+        CAService.sign_csr_from_crypto(ca, csr, validity_days=30, source='est')
+        b_row = Certificate.query.filter_by(related_certificate_id=row_id).order_by(
+            Certificate.id.desc()).first()
+        assert b_row is not None and b_row.related_certificate_id == row_id
+        assert b_row.subject_holder == f'cert:{db.session.get(Certificate, row_id).refid}'
+
+
+def test_csr_signing_issues_b_although_a_carries_its_subject(app, auth_client, cert_a, unique_subject_on):
+    """Without an override: the pair is one entity, the 409 is not for it."""
+    row_id = cert_a[0]
+    b_id = _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        assert db.session.get(Certificate, b_id).subject_holder == \
+            f'cert:{db.session.get(Certificate, row_id).refid}'
+
+
+def test_an_override_on_a_shared_subject_keeps_b_with_its_a(app, auth_client, cert_a, create_cert):
+    """Two entities carry A's subject: the override names neither, B stays the entity of the A it
+    designates (RFC 9763) and the subject stays shared."""
+    row_id = cert_a[0]
+    with app.app_context():
+        a = db.session.get(Certificate, row_id)
+        ca_id, a_refid, cn = _signing_ca(row_id)[0].id, a.refid, a.common_name
+    other = create_cert(cn=cn, ca_id=ca_id)  # another entity, before the option
+    with app.app_context():
+        db.session.get(CA, ca_id).enforce_unique_subject = True
+        db.session.commit()
+    try:
+        csr_id = _generate_b(app, row_id)
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id, 'validity_days': 30})
+        assert r.status_code == 409 and r.get_json()['details']['serial_number'] == other['serial_number']
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={
+            'ca_id': ca_id, 'validity_days': 30, 'override_unique_subject': True})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(Certificate, r.get_json()['data']['id']).subject_holder == f'cert:{a_refid}'
+    finally:
+        with app.app_context():
+            db.session.get(CA, ca_id).enforce_unique_subject = False
+            db.session.commit()
+
+
+def test_b_signed_for_an_acme_account_keeps_the_account_as_its_holder(app, cert_a, unique_subject_on):
+    """The path's identity wins over A's lineage (``successor_holder``): B is the account's."""
+    from services.cert_service import CertificateService
+    row_id = cert_a[0]
+    csr_id = _generate_b(app, row_id)
+    with app.app_context():
+        signed = CertificateService.sign_csr(
+            cert_id=csr_id, caref=_signing_ca(row_id)[0].refid, validity_days=30, cert_type='server_cert',
+            username='acme', subject_holder='acme:b-account', source='acme')
+        b = db.session.get(Certificate, signed.id)
+        assert (b.related_certificate_id, b.subject_holder) == (row_id, 'acme:b-account')

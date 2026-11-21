@@ -120,6 +120,8 @@ def update_syslog_config():
         set_config('syslog_tls_verify', str(tls_verify).lower())
         set_config('syslog_framing', framing)
         set_config('syslog_categories', ','.join(categories))
+        from services.cluster_commands import RELOAD_SYSLOG, emit
+        emit(RELOAD_SYSLOG)  # same transaction: the other nodes reload only a committed config
         ok, err = safe_commit(logger, "Failed to update syslog config")
         if not ok:
             return err
@@ -127,6 +129,7 @@ def update_syslog_config():
         # Logged as settings (never filtered) and before reconfiguring, so the
         # collector that is being narrowed or turned off still hears of it
         old = syslog_forwarder.config
+        syslog_forwarder.postpone_reload()
         entry = AuditService.log_action(
             action='syslog_config_updated',
             resource_type='settings',
@@ -138,11 +141,7 @@ def update_syslog_config():
                      f"categories {','.join(old['categories'])})"),
         )
 
-        syslog_forwarder.configure(
-            enabled=enabled, host=host, port=port,
-            protocol=protocol, tls=tls, tls_verify=tls_verify,
-            framing=framing, categories=categories
-        )
+        syslog_forwarder.load_from_db()
         # A collector that was not the one being told also receives its own setup
         new = syslog_forwarder.config
         if entry is not None and enabled and any(

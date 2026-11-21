@@ -7,11 +7,16 @@ import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission as _has_perm
 from services.settings_registry import as_boolean_word
-from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
+from utils.secret_target import (MASKS, SECRET_TARGET_MESSAGE, changed_targets, keeps_saved_secret,
+                                 retarget_error)
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
+from services.msca.connection import saved_credential_retargets, tested_values
+from services.msca.client_keytab import KerberosBusy, managed_keytab_error
+from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
+                                    SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
@@ -41,6 +46,24 @@ def _check_size(name: str, value, limit: int):
         return None
     if isinstance(value, str) and len(value.encode('utf-8')) > limit:
         return error_response(f"{name} exceeds maximum size ({limit} bytes)", 413)
+    return None
+
+
+# Fields read as text: null or another JSON type is a 400 naming the field, not a 500.
+# A method's own fields are read only under that method, as v2 ignored the others
+_TEXT_FIELDS = ('name', 'server', 'ca_name', 'ca_bundle', 'default_template')
+_METHOD_TEXT_FIELDS = {'basic': ('username',), 'certificate': ('client_cert_pem', 'client_key_pem'),
+                       'kerberos': ('kerberos_principal', 'kerberos_keytab_path')}
+
+
+def _method_fields(method):
+    return _METHOD_TEXT_FIELDS.get(method, ()) if isinstance(method, str) else ()
+
+
+def _text_field_error(data, method):
+    for field in _TEXT_FIELDS + _method_fields(method):
+        if field in data and not isinstance(data[field], str):
+            return error_response(f"{field} must be a string", 400)
     return None
 
 
@@ -125,9 +148,106 @@ _WINRM_OVERRIDE_FIELDS = ('winrm_enabled', 'winrm_host', 'winrm_port', 'winrm_us
                           'winrm_password', 'ca_config')
 
 
-def _winrm_target(cfg):
-    return ((cfg.winrm_host or cfg.server or '').strip().lower(), cfg.winrm_port,
-            bool(cfg.winrm_use_ssl), bool(cfg.winrm_verify_ssl), cfg.winrm_transport or 'kerberos')
+# Kerberos credentials a channel test may override: the keytab and the principal it signs in as
+_WINRM_KERBEROS_FIELDS = ('kerberos_principal', 'kerberos_keytab_path')
+
+KERBEROS_ADMIN_MESSAGE = ('A Kerberos connection signs in as an identity of this server: creating one, '
+                          'moving it, changing its keytab or principal, or testing it against another '
+                          'target requires the admin:system permission')
+
+# Retry-After of a sign-in that waited its bound for another connection's Kerberos acquisition
+KERBEROS_RETRY_SECONDS = 5
+
+# What create and update read of a connection to know where it signs in with Kerberos, and the defaults
+_SIGN_IN_DEFAULTS = dict(server='', use_ssl=True, verify_ssl=True, ca_bundle=None, auth_method='certificate',
+                         username=None, kerberos_principal=None, kerberos_keytab_path=None,
+                         winrm_enabled=False, winrm_host=None, winrm_port=5986, winrm_use_ssl=True,
+                         winrm_verify_ssl=True, winrm_transport='kerberos', winrm_username=None)
+
+
+def kerberos_busy_response(error):
+    """503 with Retry-After: the sign-in waited its bound for another one and nothing reached the CA."""
+    response, code = error_response(str(error), 503)
+    response.headers['Retry-After'] = str(KERBEROS_RETRY_SECONDS)
+    return response, code
+
+
+def _text(value):
+    return value.strip() if isinstance(value, str) else (value or '')
+
+
+def _sign_in_config(msca):
+    from types import SimpleNamespace
+    return SimpleNamespace(**{k: getattr(msca, k) if msca is not None else v
+                              for k, v in _SIGN_IN_DEFAULTS.items()})
+
+
+def _kerberos_sign_ins(cfg, channel=True):
+    """Each Kerberos sign-in ``cfg`` makes, by channel: where it goes and as whom
+    (keytab, principal, or without them the tickets the process holds)."""
+    uses = {}
+    if cfg.auth_method == 'kerberos':
+        uses['certsrv'] = {'server': str(cfg.server or '').strip().lower(), 'use_ssl': cfg.use_ssl,
+                           'verify_ssl': cfg.verify_ssl, 'ca_bundle': cfg.ca_bundle,
+                           'kerberos_principal': cfg.kerberos_principal,
+                           'kerberos_keytab_path': cfg.kerberos_keytab_path}
+    if channel and cfg.winrm_enabled and (cfg.winrm_transport or 'kerberos').lower() == 'kerberos':
+        uses['winrm'] = {**_winrm_channel(cfg), 'kerberos_keytab_path': cfg.kerberos_keytab_path}
+    return uses
+
+
+def _kerberos_forbidden(before, after):
+    """403 unless admin:system when ``after`` makes a Kerberos sign-in ``before`` did not make identically:
+    any Kerberos configuration is an identity of the system, with or without keytab."""
+    if all(ch in before and not changed_targets(before[ch], use) for ch, use in after.items()):
+        return None
+    if _has_perm('admin:system', getattr(g, 'permissions', None) or []):
+        return None
+    return error_response(KERBEROS_ADMIN_MESSAGE, 403)
+
+
+def _kerberos_save_forbidden(msca, data):
+    """The rule on the connection as this create (``msca`` None) or update would leave it."""
+    cfg = _sign_in_config(msca)
+    method = data.get('auth_method', cfg.auth_method)
+    if method != cfg.auth_method:  # the update clears the old method's credentials
+        cfg.username = cfg.kerberos_principal = cfg.kerberos_keytab_path = None
+    cfg.auth_method = method
+    for field in ('server', 'use_ssl', 'verify_ssl', 'ca_bundle'):
+        if field in data:
+            setattr(cfg, field, data[field])
+    for field in _method_fields(method):
+        if field in data:
+            setattr(cfg, field, _text(data[field]) or None)
+    err = _apply_winrm_fields(cfg, {k: data[k] for k in _WINRM_TARGET_FIELDS + ('winrm_enabled',) if k in data})
+    if err:
+        return err
+    before = _kerberos_sign_ins(_sign_in_config(msca)) if msca is not None else {}
+    return _kerberos_forbidden(before, _kerberos_sign_ins(cfg))
+
+
+def _kerberos_test_forbidden(msca, data):
+    """The rule on the certsrv sign-in a test runs: the saved one, or the inline form's (``msca`` None)."""
+    from types import SimpleNamespace
+    if msca is None:
+        tested = {**_SIGN_IN_DEFAULTS, 'auth_method': 'basic',
+                  **{k: v for k, v in data.items() if k in _SIGN_IN_DEFAULTS}}
+        return _kerberos_forbidden({}, _kerberos_sign_ins(SimpleNamespace(**tested), channel=False))
+    return _kerberos_forbidden(_kerberos_sign_ins(_sign_in_config(msca), channel=False),
+                               _kerberos_sign_ins(SimpleNamespace(**tested_values(msca, data)), channel=False))
+
+
+def _winrm_channel(cfg):
+    """Where and as whom the channel signs in, as _build_session derives it."""
+    use_ssl = bool(cfg.winrm_use_ssl)
+    transport = (cfg.winrm_transport or 'kerberos').lower()
+    account = cfg.winrm_username or (cfg.username if cfg.auth_method == 'basic' else None)
+    if transport == 'kerberos':
+        account = account or cfg.kerberos_principal
+    return {'winrm_host': (cfg.winrm_host or cfg.server or '').strip().lower(),
+            'winrm_port': cfg.winrm_port or (5986 if use_ssl else 5985),
+            'winrm_use_ssl': use_ssl, 'winrm_verify_ssl': bool(cfg.winrm_verify_ssl),
+            'winrm_transport': transport, 'winrm_username': (account or '').strip() or None}
 
 
 def _transient_winrm_config(msca, overrides):
@@ -157,18 +277,31 @@ def _transient_winrm_config(msca, overrides):
         ca_config=msca.ca_config,
     )
 
-    data = {k: v for k, v in (overrides or {}).items() if k in _WINRM_OVERRIDE_FIELDS}
+    if not isinstance(overrides, dict):
+        return None, error_response("Request body must be a JSON object", 400)
+    data = {k: v for k, v in overrides.items() if k in _WINRM_OVERRIDE_FIELDS + _WINRM_KERBEROS_FIELDS}
     # Empty or masked password means "use the saved one".
     if not data.get('winrm_password') or str(data['winrm_password']).strip() in MASKS:
         data.pop('winrm_password', None)
-    saved_target = _winrm_target(cfg)
+    for field in _WINRM_KERBEROS_FIELDS:
+        if field in data and data[field] is not None and not isinstance(data[field], str):
+            return None, error_response(f"{field} must be a string", 400)
+    err = _check_size('kerberos_keytab_path', data.get('kerberos_keytab_path'), MAX_KEYTAB_PATH_LEN) \
+        or _keytab_error(data)
+    if err:
+        return None, err
+    saved_channel = _winrm_channel(cfg)
     err = _apply_winrm_fields(cfg, data)
     if err:
         return None, err
-    # A saved password only goes to the saved target, trusted the saved way
-    if 'winrm_password' not in data and _winrm_target(cfg) != saved_target:
-        return None, error_response(
-            "Enter the WinRM password to test a host, port or transport other than the saved one", 400)
+    for field in _WINRM_KERBEROS_FIELDS:
+        if field in data:
+            setattr(cfg, field, (data[field] or '').strip() or None)
+    # The saved NTLM password does not follow a moved channel; Kerberos is the route's admin:system
+    changed = sorted(k for k, v in _winrm_channel(cfg).items() if saved_channel[k] != v)
+    if changed and cfg.winrm_transport != 'kerberos' and 'winrm_password' not in data:
+        return None, error_response(SECRET_TARGET_MESSAGE, 400,
+                                    details={'code': 'secret_required_for_target', 'fields': changed})
 
     # Mirror MicrosoftCA.winrm_effective_* on the transient object.
     cfg.winrm_effective_host = cfg.winrm_host or cfg.server
@@ -229,6 +362,11 @@ def create_connection():
     data = request.get_json()
     if not data:
         return error_response("Request body required", 400)
+    if not isinstance(data, dict):
+        return error_response("Request body must be a JSON object", 400)
+    err = _text_field_error(data, data.get('auth_method', 'certificate'))
+    if err:
+        return err
 
     name = data.get('name', '').strip()
     server = data.get('server', '').strip()
@@ -244,6 +382,9 @@ def create_connection():
         return error_response(f"Server too long (max {MAX_SERVER_LEN})", 400)
     if auth_method not in ('certificate', 'kerberos', 'basic'):
         return error_response("Invalid auth method", 400)
+    err = _kerberos_save_forbidden(None, data) or _keytab_error(data)
+    if err:
+        return err
 
     # Cap PEM/keytab inputs early so we don't ingest megabytes into the DB.
     for field, limit in (
@@ -331,6 +472,13 @@ def get_connection(msca_id):
     return success_response(data=msca.to_dict())
 
 
+def _keytab_error(data):
+    """400 when the body names a file UCM manages as the client keytab."""
+    value = data.get('kerberos_keytab_path') if isinstance(data, dict) else None
+    reason = managed_keytab_error(value) if isinstance(value, str) else None
+    return error_response(reason, 400) if reason else None
+
+
 _WINRM_TARGET_FIELDS = ('winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
                         'winrm_transport', 'winrm_username')
 
@@ -346,24 +494,30 @@ def _winrm_target_fields(msca):
 
 
 def _msca_retarget_error(msca, data):
-    """Saved passwords stay with their saved host. A TLS client key is never sent."""
+    """Saved passwords and client keys stay with their saved target; Kerberos is a permission instead.
+    Stored tokens are read: a password this node cannot open is kept all the same."""
     current = _winrm_target_fields(msca)
     winrm_err = retarget_error(current, data, keeps_saved_secret(
-        data, 'winrm_password', msca.winrm_password, blank_clears=True))
+        data, 'winrm_password', msca._winrm_password, blank_clears=True))
     if winrm_err:
         return winrm_err
+    # The saved password or client key stays with the saved certsrv target, whatever the channel
+    fields = saved_credential_retargets(msca, data)
+    if fields:
+        return error_response(SECRET_TARGET_MESSAGE, 400,
+                              details={'code': 'secret_required_for_target', 'fields': fields})
     if msca.auth_method != 'basic' or data.get('auth_method', 'basic') != 'basic':
         return None
-    if not keeps_saved_secret(data, 'password', msca.password, blank_clears=True):
+    if not keeps_saved_secret(data, 'password', msca._password, blank_clears=True):
         return None
     # Clearing the WinRM password hands its channel to the connection password
     cleared = 'winrm_password' in data and not str(data['winrm_password'] or '').strip()
-    if cleared and msca.winrm_password and basic_password_reaches(
+    if cleared and msca._winrm_password and basic_password_reaches(
             data.get('winrm_host', msca.winrm_host), data.get('server', msca.server)):
         return retarget_error({'winrm_password': 'saved'}, {'winrm_password': 'cleared'}, True)
     current = {k: getattr(msca, k) for k in ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username')}
     winrm_typed = str(data.get('winrm_password') or '').strip() not in ('', *MASKS)
-    if not msca.winrm_password and not winrm_typed:
+    if not msca._winrm_password and not winrm_typed:
         # The basic password doubles as the WinRM one
         current.update(_winrm_target_fields(msca))
     return retarget_error(current, data, True)
@@ -380,9 +534,15 @@ def update_connection(msca_id):
     data = request.get_json()
     if not data:
         return error_response("Request body required", 400)
+    if not isinstance(data, dict):
+        return error_response("Request body must be a JSON object", 400)
+    err = _text_field_error(data, data.get('auth_method', msca.auth_method))
+    if err:
+        return err
     # A transport refused outright is the answer, before any question of secrets
-    err = (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
-        or _msca_retarget_error(msca, data)
+    err = _kerberos_save_forbidden(msca, data) \
+        or (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
+        or _keytab_error(data) or _msca_retarget_error(msca, data)
     if err:
         return err
 
@@ -534,17 +694,70 @@ def test_connection_inline():
     data = request.get_json()
     if not data or not data.get('server'):
         return error_response("Server hostname is required", 400)
-    result = MicrosoftCAService.test_connection_inline(data)
+    # An unsaved connection has no saved sign-in: any Kerberos test needs admin:system
+    err = _kerberos_test_forbidden(None, data) or _keytab_error(data)
+    if err:
+        return err
+    try:
+        result = MicrosoftCAService.test_connection_inline(data)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
     return error_response(result.get('error', 'Connection test failed'), 400)
 
 
+_TEST_STRING_FIELDS = ('server', 'ca_name', 'username', 'password', 'client_cert_pem',
+                       'client_key_pem', 'kerberos_principal', 'kerberos_keytab_path', 'ca_bundle')
+
+
+def _test_overrides(msca, data):
+    """(form values, error): the body of a test, held to the rules of a save."""
+    if not isinstance(data, dict):
+        return None, error_response("Request body must be a JSON object", 400)
+    for field in _TEST_STRING_FIELDS:
+        if field in data and not isinstance(data[field], str):
+            return None, error_response(f"{field} must be a string", 400)
+    for field in ('use_ssl', 'verify_ssl'):
+        if field in data and not isinstance(data[field], bool):
+            return None, error_response(f"{field} must be a boolean", 400)
+    if 'server' in data and not data['server'].strip():
+        return None, error_response("Server hostname is required", 400)
+    if data.get('auth_method', msca.auth_method) not in ('certificate', 'kerberos', 'basic'):
+        return None, error_response("Invalid auth method", 400)
+    err = _kerberos_test_forbidden(msca, data) or _keytab_error(data)
+    if err:
+        return None, err
+    for field, limit in (('client_cert_pem', MAX_PEM_FIELD_BYTES), ('client_key_pem', MAX_PEM_FIELD_BYTES),
+                         ('ca_bundle', MAX_PEM_FIELD_BYTES), ('kerberos_keytab_path', MAX_KEYTAB_PATH_LEN),
+                         ('server', MAX_SERVER_LEN)):
+        err = _check_size(field, data.get(field), limit)
+        if err:
+            return None, err
+    # A saved password or client key never follows a changed target (as on save), a new method included
+    err = _msca_retarget_error(msca, data)
+    if err:
+        return None, err
+    return {**data, **({'server': data['server'].strip()} if 'server' in data else {})}, None
+
+
 @bp.route('/<int:msca_id>/test', methods=['POST'])
 @require_auth(['write:settings'])
 def test_connection(msca_id):
-    """Test connectivity to Microsoft CA"""
-    result = MicrosoftCAService.test_connection(msca_id)
+    """Test connectivity to Microsoft CA; a JSON body tests the form's values instead, saving nothing"""
+    data = request.get_json(silent=True)
+    overrides = None
+    if data:
+        msca = db.session.get(MicrosoftCA, msca_id)
+        if not msca:
+            return error_response("Connection not found", 404)
+        overrides, err = _test_overrides(msca, data)
+        if err:
+            return err
+    try:
+        result = MicrosoftCAService.test_connection(msca_id, overrides)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
     return error_response(result.get('error', 'Connection test failed'), 400)
@@ -663,11 +876,13 @@ def inventory_sync(msca_id):
     try:
         summary = MicrosoftCAService.inventory_sync(msca_id, username=_actor(), full=full)
         _audit('msca.inventory_sync', msca,
-               f"imported={summary['imported']} skipped={summary['skipped']} "
+               f"imported={summary['imported']} completed={summary['completed']} "
+               f"denied={summary['denied']} skipped={summary['skipped']} "
                f"failed={summary['failed']} full={full}")
         return success_response(
             data=summary,
-            message=f"Inventory sync complete: {summary['imported']} certificate(s) imported"
+            message=(f"Inventory sync complete: {summary['imported']} certificate(s) imported, "
+                    f"{summary['completed']} pending request(s) completed")
         )
     except MSCAAdminChannelError as e:
         _audit('msca.inventory_sync', msca, f"error={e}", success=False)
@@ -804,6 +1019,8 @@ def list_templates(msca_id):
     try:
         templates = MicrosoftCAService.list_templates(msca_id)
         return success_response(data=templates)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
     except Exception as e:
         logger.error(f"Failed to list templates: {e}")
         return error_response("Failed to retrieve templates", 500)
@@ -878,7 +1095,8 @@ def sign_csr(msca_id, csr_id):
         if _unsignable:
             return error_response(_unsignable, 400)
         if not _csr_obj.is_signature_valid:
-            return error_response("CSR signature is invalid", 400)
+            from utils.csr_diagnostics import weak_csr_hash_error
+            return error_response(weak_csr_hash_error(_csr_obj) or "CSR signature is invalid", 400)
     except ValueError as e:
         return error_response(f"Invalid CSR: {e}", 400)
     except Exception as e:
@@ -909,6 +1127,14 @@ def sign_csr(msca_id, csr_id):
             # (don't pretend the whole call succeeded).
             try:
                 _import_signed_cert(csr, result.get('cert_pem'), msca, template, result['request_id'])
+            except MSCASignedElsewhere:
+                # Signed by a local CA or an import meanwhile: closed as complete_request does
+                db.session.rollback()
+                supersede([result['request_id']], states=('issued',))
+                _audit('msca.sign', msca,
+                       f"template={template} csr_id={csr_id} eobo={bool(enrollee_name or enrollee_upn)} "
+                       f"status=superseded", success=False)
+                return error_response(SIGNED_MEANWHILE_MESSAGE, 409)
             except Exception as imp_err:
                 logger.error(
                     f"MS CA issued cert but UCM import failed (msca={msca.name}, "
@@ -943,6 +1169,9 @@ def sign_csr(msca_id, csr_id):
 
         return success_response(data=result)
 
+    except KerberosBusy as e:
+        _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
+        return kerberos_busy_response(e)
     except ValueError as e:
         logger.error(f"Validation error signing CSR via MS CA: {e}", exc_info=True)
         _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
@@ -954,34 +1183,21 @@ def sign_csr(msca_id, csr_id):
 
 
 @bp.route('/<int:msca_id>/requests/<int:request_id>', methods=['GET'])
-@require_auth(['read:certificates'])
+@require_auth(['write:certificates'])
 def check_request_status(msca_id, request_id):
-    """Check status of a pending signing request"""
+    """Check a pending signing request; an issued certificate is imported (as signing does)."""
+    from services.msca.requests import MSCAImportError
     try:
         result = MicrosoftCAService.check_request(msca_id, request_id)
-
-        # If just issued, import the cert
-        if result.get('status') == 'issued' and result.get('cert_pem'):
-            req = db.session.get(MSCARequest, request_id)
-            if req and req.csr_id and not req.cert_id:
-                from models import Certificate
-                csr = db.session.get(Certificate, req.csr_id)
-                msca = db.session.get(MicrosoftCA, msca_id)
-                if csr and msca:
-                    try:
-                        _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
-                        result = req.to_dict()
-                    except Exception as imp_err:
-                        logger.error(
-                            f"MS CA request {request_id} issued but UCM import failed: {imp_err}",
-                            exc_info=True,
-                        )
-                        return error_response(
-                            "Certificate was issued by MS CA but failed to import into UCM.",
-                            500,
-                        )
-
+        if result.get('status') == SUPERSEDED:
+            return success_response(data=result, message=SUPERSEDED_MESSAGE)
         return success_response(data=result)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
+    except MSCAImportError as e:
+        logger.error(f"MS CA request {request_id} issued but UCM import failed: {e}")
+        return error_response(
+            "Certificate was issued by MS CA but failed to import into UCM.", 500)
     except ValueError as e:
         logger.error(f"Request not found or invalid: {e}")
         return error_response("Request not found", 404)
@@ -1001,14 +1217,17 @@ def list_pending_requests():
 
 # --- Helper ---
 
-def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
+def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id, announce=True):
     """Import a signed certificate from MS CA into UCM's certificate store.
 
     Raises on failure. Callers MUST handle the exception so that an MS-CA-issued
     certificate that we couldn't persist is surfaced to the operator instead of
     being silently swallowed (orphan: MS CA has it, UCM doesn't).
+    With *announce*, the commit is followed by certificate.issued, or
+    certificate.renewed when the row held another certificate.
     """
     from models import Certificate
+    from services.import_service import stored_certificate_serial
     import base64
     import uuid
     import json
@@ -1069,9 +1288,6 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         cert_pem_bytes = cert_obj.public_bytes(encoding=Encoding.PEM)
         cert_pem_b64 = base64.b64encode(cert_pem_bytes).decode('utf-8')
 
-        # Serial in upper-case hex (matches services/ca/ca_signing.py).
-        serial_hex = format(cert_obj.serial_number, 'X')
-
         # Validity dates: cert_obj exposes tz-aware UTC datetimes; UCM stores
         # naive UTC everywhere, so strip tzinfo here.
         valid_from = cert_obj.not_valid_before_utc.replace(tzinfo=None)
@@ -1081,14 +1297,19 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         # This avoids creating a duplicate Certificate row (one CSR + one cert).
         # The CSR's id is reused so existing references (links, audit) stay valid.
         # aki/ski come from the crt listener, in the form CA lookups match
+        old_serial = stored_certificate_serial(csr) if csr is not None else None
         if csr is not None:
+            # Atomic with the write: a certificate another source stored on this row stays
+            if Certificate.query.filter(Certificate.id == csr.id, msca_may_write_clause()).update(
+                    {Certificate.crt: cert_pem_b64}, synchronize_session=False) != 1:
+                raise MSCASignedElsewhere(f"CSR id={csr.id} already holds a certificate from another source")
             csr.crt = cert_pem_b64
             csr.descr = csr.descr or f"MSCA: {cn} ({template})"
             csr.cert_type = csr.cert_type or 'server'
             csr.subject = cert_obj.subject.rfc4514_string()
             csr.subject_cn = cn
             csr.issuer = cert_obj.issuer.rfc4514_string()
-            csr.serial_number = serial_hex
+            csr.serial_number = cert_obj.serial_number
             csr.valid_from = valid_from
             csr.valid_to = valid_to
             # Refresh SANs from issued cert (MS CA may have added/changed entries)
@@ -1114,7 +1335,7 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
                 subject=cert_obj.subject.rfc4514_string(),
                 subject_cn=cn,
                 issuer=cert_obj.issuer.rfc4514_string(),
-                serial_number=serial_hex,
+                serial_number=cert_obj.serial_number,
                 valid_from=valid_from,
                 valid_to=valid_to,
                 san_dns=json.dumps(san_dns) if san_dns else None,
@@ -1146,7 +1367,14 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
             actor = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
             resolve_moot_requests('csr', 'csr_id', csr.id, outcome='approved', username=actor,
                                   certificate_id=cert.id, reason='Signed by the Microsoft CA')
+        if announce:
+            from services.webhook_service import emit_cert_stored
+            actor = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
+            emit_cert_stored(cert.to_dict(), old_serial, cert_obj.serial_number,
+                             ca_refid=cert.caref, actor=actor)
 
+    except MSCASignedElsewhere:
+        raise
     except Exception as e:
         logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)
         raise

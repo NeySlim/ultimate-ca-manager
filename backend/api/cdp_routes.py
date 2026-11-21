@@ -90,7 +90,13 @@ def get_crl(ca_ref):
         if nu_naive <= now_naive:
             needs_regen = True
 
-    if not crl_meta or not crl_meta.crl_der or needs_regen:
+    from services.cluster_maintenance import blocks_writes
+    if (not crl_meta or not crl_meta.crl_der or needs_regen) and blocks_writes():
+        # HA maintenance: the CRL stored before it, never one signed now
+        if not crl_meta or not crl_meta.crl_der:
+            return Response('CRL unavailable during cluster maintenance, retry shortly',
+                            status=503, headers={'Retry-After': '30'})
+    elif not crl_meta or not crl_meta.crl_der or needs_regen:
         # No CRL in DB or it's expired — try to generate one if CA can sign.
         # An offline CA's CRL is signed elsewhere and uploaded: regenerating
         # here is refused downstream, so do not take the lock for it.

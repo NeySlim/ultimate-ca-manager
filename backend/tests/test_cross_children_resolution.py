@@ -10,6 +10,8 @@ from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import build_cross_pki, key_pem, make_cert, new_key, pem
 from utils.key_codec import store_pem_bytes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def pki():

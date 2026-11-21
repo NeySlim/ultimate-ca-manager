@@ -21,7 +21,7 @@ vi.mock('react-i18next', () => ({
 // 1 and 2 form a pair, 3 stands alone, 4 names 1 one way, 5 names the revoked 6,
 // 7 names 8, which is not listed and is read on demand
 const mocks = vi.hoisted(() => ({
-  bulkRevoke: vi.fn(), bulkRenew: vi.fn(), showWarning: vi.fn(), showInfo: vi.fn(), getById: vi.fn(),
+  bulkRevoke: vi.fn(), bulkRenew: vi.fn(), bulkDeleteUsers: vi.fn(), showWarning: vi.fn(), showInfo: vi.fn(), getById: vi.fn(),
   selection: [1],
   certs: [
     { id: 1, cn: 'pair.example.com', related_certificate_id: 2 },
@@ -31,6 +31,8 @@ const mocks = vi.hoisted(() => ({
     { id: 5, cn: 'old.example.com', related_certificate_id: 6 },
     { id: 6, cn: 'old.example.com', related_certificate_id: 5, revoked: true },
     { id: 7, cn: 'far.example.com', related_certificate_id: 8 },
+    { id: 9, cn: 'old2.example.com', related_certificate_id: 10 },
+    { id: 10, cn: 'old2.example.com', related_certificate_id: 9, archived: true },
   ],
 }))
 
@@ -43,8 +45,8 @@ vi.mock('../../contexts', () => ({
     isMobile: false, isTablet: false, isDesktop: true, isTouch: false,
     isLargeScreen: true, screenWidth: 1440, sidebarOpen: true, setSidebarOpen: vi.fn(),
   }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -67,7 +69,7 @@ vi.mock('../../services', () => ({
   },
   csrsService: { getAll: vi.fn().mockResolvedValue({ data: [], meta: { total: 0 } }), bulkSign: vi.fn() },
   templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
-  usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
+  usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }), bulkDelete: (...args) => mocks.bulkDeleteUsers(...args) },
 }))
 
 vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }))
@@ -165,6 +167,7 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
   it.each([
     ['names it one way', 4],
     ['is already revoked', 5],
+    ['was superseded', 9],
   ])('asks nothing when the other certificate %s', async (_case, id) => {
     mocks.selection = [id]
     mocks.bulkRevoke.mockResolvedValue({ data: { success: [id], failed: [] } })
@@ -183,6 +186,55 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
     expect(mocks.getById).toHaveBeenCalledWith(8)
     confirm(dialog)
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.bulkRelatedRevoked:1'))
+  })
+
+  it('warns once for the certificates whose issuing CA was not told', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: {
+      success: [3, 9, 10], failed: [], acme_local_only: [3, 9], msca_local_only: [10, 3] } })
+    const dialog = await openBulk('common.revoke')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      'revocation.bulkRevokedLocallyOnly:3:#3, #9, #10'))
+  })
+
+  it('warns of nothing for ACME certificates put on hold: ACME has no hold', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: { success: [3, 9], failed: [], acme_local_only: [3, 9] } })
+    const dialog = await openBulk('common.revoke')
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'certificateHold' } })
+    confirm(dialog)
+    await waitFor(() => expect(mocks.bulkRevoke).toHaveBeenCalledWith([3], 'certificateHold', expect.anything()))
+    expect(mocks.showWarning).not.toHaveBeenCalledWith(expect.stringMatching(/LocallyOnly/))
+  })
+
+  it('still warns of a Microsoft CA not told of a hold', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: {
+      success: [3, 10], failed: [], acme_local_only: [3], msca_local_only: [10] } })
+    const dialog = await openBulk('common.revoke')
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'certificateHold' } })
+    confirm(dialog)
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      'revocation.bulkRevokedLocallyOnly:1:#10'))
+  })
+
+  it('warns of nothing when every issuing CA was told', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: { success: [3], failed: [] } })
+    const dialog = await openBulk('common.revoke')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.bulkRevoke).toHaveBeenCalled())
+    expect(mocks.showWarning).not.toHaveBeenCalledWith(expect.stringMatching(/LocallyOnly/))
+  })
+
+  it('warns of the users\' certificates whose ACME CA was not told when they are deleted', async () => {
+    localStorage.setItem('ucm-ops-resource-type', 'users')
+    mocks.bulkDeleteUsers.mockResolvedValue({ data: { success: [1], failed: [], acme_local_only: [3, 9] } })
+    const dialog = await openBulk('common.delete')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'common.delete' }))
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      'revocation.bulkRevokedLocallyOnly:2:#3, #9'))
   })
 
   it('reports the other members renewed outside the selection', async () => {
@@ -208,5 +260,26 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
     const [ids, options] = mocks.bulkRenew.mock.calls[0]
     expect(ids).toEqual([1, 2])
     expect(options.relatedOf(2)).toBe(1)
+  })
+
+  it('shows the notices the server gave for each renewed certificate', async () => {
+    mocks.selection = [3]
+    mocks.bulkRenew.mockResolvedValue({ data: {
+      success: [3], failed: [],
+      notices: [{ id: 3, notices: ['Certificate 3 was renewed without its RelatedCertificate extension', 'Validity cut'] }] } })
+    const dialog = await openBulk('common.renew')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      '#3: Certificate 3 was renewed without its RelatedCertificate extension'))
+    expect(mocks.showWarning).toHaveBeenCalledWith('#3: Validity cut')
+  })
+
+  it('shows no notice when the server gave none', async () => {
+    mocks.selection = [3]
+    mocks.bulkRenew.mockResolvedValue({ data: { success: [3], failed: [] } })
+    const dialog = await openBulk('common.renew')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.bulkRenew).toHaveBeenCalled())
+    expect(mocks.showWarning).not.toHaveBeenCalled()
   })
 })

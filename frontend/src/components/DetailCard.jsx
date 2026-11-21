@@ -3,7 +3,7 @@
  * Modern card header with clean minimal sections
  * Theme-aware soft color palette
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import { 
@@ -151,7 +151,7 @@ export function DetailHeader({
               "flex items-center justify-center shrink-0",
               isMobile ? "w-11 h-11" : "w-14 h-14"
             )}>
-              <Icon size={isMobile ? 22 : 28} className="text-white" weight="duotone" />
+              <Icon size={isMobile ? 22 : 28} className="text-on-accent" weight="duotone" />
             </div>
           )}
           <div className="min-w-0">
@@ -461,9 +461,23 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
  */
 export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true, icon: Icon, iconClass, onToggle }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
-  
+  const rootRef = useRef(null)
+  const openRef = useRef(isOpen)
+  openRef.current = isOpen
+
+  // A form refusing to submit fires `invalid` on each invalid field: a closed section holding one opens
+  useEffect(() => {
+    const root = rootRef.current
+    if (!collapsible || !root) return undefined
+    const reveal = () => {
+      if (!openRef.current) { setIsOpen(true); onToggle?.(true) }
+    }
+    root.addEventListener('invalid', reveal, true)
+    return () => root.removeEventListener('invalid', reveal, true)
+  }, [collapsible, onToggle])
+
   return (
-    <div className={cn(
+    <div ref={rootRef} className={cn(
       "border border-border rounded-lg overflow-hidden",
       "shadow-sm hover:shadow transition-shadow duration-200",
       className
@@ -479,6 +493,7 @@ export function CompactSection({ title, children, className, collapsible = false
           !collapsible && "cursor-default"
         )}
         disabled={!collapsible}
+        aria-expanded={collapsible ? isOpen : undefined}
       >
         {/* Subtle accent line on left - uses theme accent */}
         <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-accent-25" />

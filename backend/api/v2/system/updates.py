@@ -5,9 +5,9 @@ System Updates Operations
 from . import bp
 from flask import request, g
 from auth.unified import require_auth
+from utils.ha import ha_enabled
 from utils.response import success_response, error_response
 from services.audit_service import AuditService
-import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,18 @@ def _actor():
     return 'admin'
 
 
+def _with_update_state(data):
+    """can_auto_update plus, in HA, the rolling update campaign the screen shows."""
+    from services.updates import is_container_install
+    data['can_auto_update'] = not is_container_install()
+    data['ha_mode'] = ha_enabled()
+    data['update_campaign'] = None
+    if data['ha_mode']:
+        from services.update_campaign import public_view, read_campaign
+        data['update_campaign'] = public_view(read_campaign()[1])
+    return data
+
+
 @bp.route('/api/v2/system/updates/check', methods=['GET'])
 @require_auth(['admin:system'])
 def check_updates():
@@ -37,8 +49,8 @@ def check_updates():
         include_prereleases = request.args.get('include_prereleases', 'false').lower() == 'true'
         include_dev = request.args.get('include_dev', 'false').lower() == 'true'
         force = request.args.get('force', 'false').lower() == 'true'
-        result = check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev, force=force)
-        result['can_auto_update'] = os.getenv('UCM_DOCKER') != '1'
+        result = _with_update_state(
+            check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev, force=force))
 
         return success_response(data=result)
     except Exception as e:
@@ -49,11 +61,18 @@ def check_updates():
 @bp.route('/api/v2/system/updates/install', methods=['POST'])
 @require_auth(['admin:system'])
 def install_update():
-    """Download and install an update"""
-    if os.getenv('UCM_DOCKER') == '1':
+    """Download and install an update; in HA, start a rolling update of every node"""
+    from services.updates import CONTAINER_HA_REFUSAL, is_container_install
+    in_ha = ha_enabled()
+    if is_container_install():
+        if in_ha:
+            return error_response(CONTAINER_HA_REFUSAL, 400)
+        # The FIPS image is published under <version>-fips
+        import fips_mode
+        tag = '<version>-fips' if fips_mode.requested() else '<version>'
         return error_response(
-            "Auto-update is not available in Docker. Pull the image tag of the "
-            "new version instead: ghcr.io/neyslim/ultimate-ca-manager:<version>", 400
+            "Auto-update is not available in a container (Docker, Kubernetes). Pull the image tag of the new "
+            f"version instead: ghcr.io/neyslim/ultimate-ca-manager:{tag}", 400
         )
 
     try:
@@ -72,6 +91,9 @@ def install_update():
         major_upgrade = body.get('major_upgrade') is True
         update_info = check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev)
 
+        if update_info.get('error'):
+            return error_response(update_info['error'], 502)
+
         if major_upgrade:
             target = update_info.get('major_upgrade')
             if not target:
@@ -87,6 +109,7 @@ def install_update():
                 'download_url': target.get('download_url'),
                 'package_name': target.get('package_name'),
                 'checksum_url': target.get('checksum_url'),
+                'assets': target.get('assets') or [],
             }
         else:
             if not update_info.get('update_available'):
@@ -94,6 +117,9 @@ def install_update():
             if major_of(update_info['latest_version']) != major_of(get_current_version()):
                 return error_response(
                     "Another major version is only installed with major_upgrade=true", 400)
+
+        if in_ha:
+            return _start_rolling_update(update_info)
 
         if not update_info.get('download_url'):
             return error_response("No download URL available for this platform", 400)
@@ -162,15 +188,48 @@ def install_update():
         return error_response("Update failed", 500)
 
 
+def _start_rolling_update(update_info):
+    """HA: no local download here, each node fetches and verifies the package of its family on its turn."""
+    from services import update_campaign
+    started, message, campaign = update_campaign.start_campaign(
+        update_info['latest_version'], update_info.get('assets') or [], _actor())
+    if not started:
+        return error_response(message, 409)
+    update_campaign.campaign_tick()
+    return success_response(data={'campaign': update_campaign.public_view(update_campaign.read_campaign()[1])},
+                            message=message)
+
+
+@bp.route('/api/v2/system/updates/campaign', methods=['GET'])
+@require_auth(['admin:system'])
+def get_update_campaign():
+    """HA rolling update state: target, nodes done, node in progress, failure and its reason"""
+    from services.update_campaign import public_view, read_campaign
+    return success_response(data={'ha': ha_enabled(), 'campaign': public_view(read_campaign()[1])})
+
+
+@bp.route('/api/v2/system/updates/campaign/resume', methods=['POST'])
+@require_auth(['admin:system'])
+def resume_update_campaign():
+    """Resume a stopped rolling update once the failed node was fixed"""
+    if not ha_enabled():
+        return error_response("Rolling updates exist only in HA mode", 400)
+    from services import update_campaign
+    resumed, message, campaign = update_campaign.resume_campaign(_actor())
+    if not resumed:
+        return error_response(message, 409)
+    update_campaign.campaign_tick()
+    return success_response(data={'campaign': update_campaign.public_view(update_campaign.read_campaign()[1])},
+                            message=message)
+
+
 @bp.route('/api/v2/system/updates/settings', methods=['GET'])
 @require_auth(['admin:system'])
 def get_update_settings():
     """Get update automation settings (#301)"""
     from services.updates import get_update_settings as read_settings
 
-    data = read_settings()
-    data['can_auto_update'] = os.getenv('UCM_DOCKER') != '1'
-    return success_response(data=data)
+    return success_response(data=_with_update_state(read_settings()))
 
 
 @bp.route('/api/v2/system/updates/settings', methods=['PATCH'])
@@ -195,9 +254,10 @@ def update_update_settings():
         return error_response("auto_install must be a boolean", 400)
     if 'popup_enabled' in data and not isinstance(data['popup_enabled'], bool):
         return error_response("popup_enabled must be a boolean", 400)
-    if data.get('auto_install') and os.getenv('UCM_DOCKER') == '1':
+    from services.updates import is_container_install
+    if data.get('auto_install') and is_container_install():
         return error_response(
-            "Auto-update is not available in Docker. Pull the new image instead.", 400
+            "Auto-update is not available in a container (Docker, Kubernetes). Pull the new image instead.", 400
         )
 
     # All fields in one transaction: a commit failure must yield an error,
@@ -229,9 +289,7 @@ def update_update_settings():
         details=f"Update automation settings changed: {sorted(data.keys())}",
         success=True,
     )
-    result = read_settings()
-    result['can_auto_update'] = os.getenv('UCM_DOCKER') != '1'
-    return success_response(data=result, message='Update settings saved')
+    return success_response(data=_with_update_state(read_settings()), message='Update settings saved')
 
 
 @bp.route('/api/v2/system/updates/whatsnew', methods=['GET'])

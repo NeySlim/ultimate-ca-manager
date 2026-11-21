@@ -35,8 +35,8 @@ def app():
     
     from app import create_app
     app = create_app('testing')
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
+    from tests.conftest import configure_test_app
+    configure_test_app(app)
     
     from tests.conftest import clear_admin_password_flag
     clear_admin_password_flag(app)
@@ -106,13 +106,19 @@ class TestAuthEndpoints:
         body = json.loads(r.data)
         assert body.get('data', body).get('authenticated') is False
 
-    def test_forgot_password_accepts_email(self, client):
-        """POST /auth/forgot-password always returns success (no enumeration)"""
+    def test_forgot_password_accepts_email(self, app, client):
+        """Without a usable SMTP server the reset is unavailable, for any address."""
+        from models import db
+        from models.email_notification import SMTPConfig
+        with app.app_context():
+            for row in SMTPConfig.query.all():
+                row.enabled = False
+            db.session.commit()
         r = client.post('/api/v2/auth/forgot-password',
             data=json.dumps({'email': 'nonexistent@test.com'}),
             content_type='application/json')
-        # Returns 200 (email sent or pretended), 400 (bad format), or 503 (no SMTP)
-        assert r.status_code in (200, 400, 500, 503)
+        assert r.status_code == 503, r.data
+        assert json.loads(r.data)['message'] == 'Password reset unavailable - email not configured'
 
     def test_reset_password_invalid_token(self, client):
         """POST /auth/reset-password with bad token → 400/401"""
@@ -189,28 +195,32 @@ class TestInputValidation:
         r = auth_client.post('/api/v2/certificates',
             data=json.dumps({'ca_id': 999}),
             content_type='application/json')
-        assert r.status_code in (400, 404, 500)
-        if r.status_code == 400:
-            data = json.loads(r.data)
-            assert 'cn' in str(data).lower() or 'common' in str(data).lower()
+        assert r.status_code == 400, r.data
+        assert json.loads(r.data)['message'] == 'Common Name (cn) is required'
 
     def test_create_cert_missing_ca_returns_error(self, auth_client):
         """POST /certificates without ca_id → error"""
         r = auth_client.post('/api/v2/certificates',
             data=json.dumps({'cn': 'test.com'}),
             content_type='application/json')
-        assert r.status_code in (400, 404, 500)
+        assert r.status_code == 400, r.data
+        assert json.loads(r.data)['message'] == 'CA ID is required'
 
     def test_create_cert_validity_days_must_be_int(self, auth_client):
         """POST /certificates with string validity_days → error"""
+        from tests.conftest import ca_factory
+        ca_id = ca_factory(auth_client)(cn='Validity Type CA')['id']
         r = auth_client.post('/api/v2/certificates',
             data=json.dumps({
-                'cn': 'test.com',
-                'ca_id': 999,
+                'cn': 'validity-type.test',
+                'ca_id': ca_id,
                 'validity_days': 'not-a-number'
             }),
             content_type='application/json')
-        assert r.status_code in (400, 404, 500)
+        assert r.status_code == 400, r.data
+        assert json.loads(r.data)['message'].startswith('validity_days must be an integer')
+        listed = auth_client.get('/api/v2/certificates?search=validity-type.test')
+        assert json.loads(listed.data)['data'] == []
 
     def test_create_user_requires_username(self, auth_client):
         """POST /users without username → 400"""

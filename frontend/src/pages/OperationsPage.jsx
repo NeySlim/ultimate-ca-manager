@@ -22,8 +22,9 @@ import {
 import { REVOCATION_REASONS } from '../components/RevokeCertificateModal'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
+import { formatDate, extractCN, cn, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
+import { bulkLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useOpenEntity } from '../hooks/useOpenEntity'
@@ -481,6 +482,9 @@ export default function OperationsPage() {
       })
       const imported = (result.imported?.cas || 0) + (result.imported?.certificates || 0)
       showSuccess(t('importExport.opnsense.importSuccess', { count: imported, skipped: result.skipped || 0 }))
+      for (const p of result.unverifiable_parents || []) {
+        showWarning(t('import.unverifiableParent', { ca: p.ca_name, parent: p.candidate?.name, algorithm: p.algorithm }))
+      }
       setTestResult(null)
       setTestItems([])
       loadCAs()
@@ -503,6 +507,7 @@ export default function OperationsPage() {
       const ext = { pem: 'pem', pkcs7: 'p7b', p7b: 'p7b' }[format] || format
       downloadBlob(blob, `${filename}.${ext}`)
       showSuccess(t('importExport.export.certificatesExported'))
+      warnSkippedExport(blob, t, showWarning)
     } catch (error) {
       showError(error.message || t('importExport.export.exportFailed'))
     }
@@ -511,13 +516,13 @@ export default function OperationsPage() {
   // ===== BULK ACTION HANDLERS =====
   const relatedOf = (id) => seenItemsRef.current.get(id)?.related_certificate_id
   // The other member the server revokes or renews with id: it names id back and is not
-  // revoked. null when there is none, undefined when it could not be read.
+  // revoked or superseded. null when there is none, undefined when it could not be read.
   const livePartner = (id) => {
     const other = relatedOf(id)
     if (other == null) return null
     const item = seenItemsRef.current.get(other)
     if (!item) return undefined
-    return item.related_certificate_id === id && !item.revoked ? other : null
+    return item.related_certificate_id === id && !item.revoked && !item.archived ? other : null
   }
   const pairAction = bulkResourceType === 'certificates' && (bulkAction === 'revoke' || bulkAction === 'renew')
   const selectionHasPairs = bulkResourceType === 'certificates'
@@ -586,8 +591,6 @@ export default function OperationsPage() {
         action: bulkAction, count: successCount,
         defaultValue: `${bulkAction}: ${successCount} succeeded${failedCount ? `, ${failedCount} failed` : ''}`
       }))
-      // Users deleted whose mTLS certificates could not be revoked stay valid
-      if (data?.unrevoked?.length > 0 && result?.message) showWarning(result.message)
       if (failedCount > 0) {
         showError(t('operations.bulkPartialFail', {
           count: failedCount,
@@ -599,6 +602,13 @@ export default function OperationsPage() {
       const pairedOutside = new Set((data?.success || [])
         .map(id => partnerBefore.get(id))
         .filter(other => other != null && !selectedIds.has(other) && !notRevoked.includes(other)))
+      // Deleting users revokes their certificates too: the same CA-not-told warning
+      const revokes = bulkAction === 'revoke' || (bulkAction === 'delete' && bulkResourceType === 'users')
+      const localOnly = revokes
+        ? bulkLocalOnlyRevocationWarning(data, t, bulkAction === 'revoke' ? bulkRevokeReason : undefined) : null
+      if (localOnly) showWarning(localOnly)
+      // Users deleted whose mTLS certificates could not be revoked: those stay valid
+      if (bulkAction === 'delete' && data?.unrevoked?.length > 0 && result?.message) showWarning(result.message)
       if (notRevoked.length > 0) {
         showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.map(id => `#${id}`).join(', ') }))
       }
@@ -607,6 +617,10 @@ export default function OperationsPage() {
       }
       if (pairedOutside.size > 0 && bulkAction === 'renew') {
         showInfo(t('certificates.hybrid.bulkRelatedRenewed', { count: pairedOutside.size }))
+      }
+      // What the server decided on other terms than asked, per renewed certificate
+      for (const entry of data?.notices || []) {
+        for (const notice of entry?.notices || []) showWarning(`#${entry.id}: ${notice}`)
       }
       const pendingCount = data?.pending_approval?.length || 0
       if (pendingCount > 0) {
@@ -697,7 +711,8 @@ export default function OperationsPage() {
               if (blob) {
                 downloadBlob(blob, `${bulkResourceType}_export.pem`)
               }
-              showSuccess(t('operations.bulkSuccess', { action: 'export', count: ids.length, defaultValue: `Exported ${ids.length} items` }))
+              showSuccess(t('operations.bulkSuccess', { action: 'export', count: blob?.exportedCount ?? ids.length, defaultValue: `Exported ${blob?.exportedCount ?? ids.length} items` }))
+              warnSkippedExport(blob, t, showWarning)
             } catch (e) { showError(e.message || 'Export failed') }
           }}>
             <DownloadSimple size={14} /> {t('export.title', 'Export')} PEM
@@ -755,7 +770,7 @@ export default function OperationsPage() {
             <span className="text-sm text-text-secondary">{t('importExport.opnsense.ignoreCert')}</span>
           </label>
           {!opnsenseVerifySsl && (
-            <p className="text-xs text-amber-500">{t('importExport.opnsense.sslWarning')}</p>
+            <p className="text-xs text-status-warning">{t('importExport.opnsense.sslWarning')}</p>
           )}
 
           {testResult && (
@@ -790,7 +805,7 @@ export default function OperationsPage() {
                         {testItems.map(item => (
                           <label key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors">
                             <input type="checkbox" checked={item.selected} onChange={() => toggleItemSelection(item.id)} className="w-4 h-4 rounded border-border text-accent-primary shrink-0" />
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
                               {item.type}
                             </span>
                             <span className="text-sm truncate">{item.name || t('common.unnamed')}</span>
@@ -836,7 +851,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-blue flex items-center justify-center">
-              <FileText size={20} weight="fill" className="text-white" />
+              <FileText size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
@@ -851,7 +866,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center">
-              <Package size={20} weight="fill" className="text-white" />
+              <Package size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>
@@ -871,7 +886,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-emerald flex items-center justify-center">
-              <FileText size={20} weight="fill" className="text-white" />
+              <FileText size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
@@ -886,7 +901,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-orange flex items-center justify-center">
-              <Package size={20} weight="fill" className="text-white" />
+              <Package size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>
@@ -914,7 +929,7 @@ export default function OperationsPage() {
             <Certificate size={12} weight="duotone" />
           </div>
           <span className="text-sm font-medium truncate flex-1">{name}</span>
-          <span className={cn("text-[10px] font-medium uppercase", statusColors[status] || 'text-text-tertiary')}>{status}</span>
+          <span className={cn("text-xs font-medium uppercase", statusColors[status] || 'text-text-tertiary')}>{status}</span>
         </div>
       )
     }
@@ -945,7 +960,7 @@ export default function OperationsPage() {
             <PencilSimple size={12} weight="duotone" />
           </div>
           <span className="text-sm font-medium truncate flex-1">{item.name || '—'}</span>
-          <span className="text-[10px] text-text-tertiary">{item.key_type}</span>
+          <span className="text-xs text-text-tertiary">{item.key_type}</span>
         </div>
       )
     }
@@ -953,11 +968,11 @@ export default function OperationsPage() {
       const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', auditor: 'icon-bg-orange', viewer: 'icon-bg-teal' }
       return (
         <div className="flex items-center gap-2">
-          <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0", avatarColors[item.role] || 'icon-bg-teal')}>
+          <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0", avatarColors[item.role] || 'icon-bg-teal')}>
             {item.username?.charAt(0)?.toUpperCase() || '?'}
           </div>
           <span className="text-sm font-medium truncate flex-1">{item.username || '—'}</span>
-          <span className="text-[10px] text-text-tertiary">{item.role}</span>
+          <span className="text-xs text-text-tertiary">{item.role}</span>
         </div>
       )
     }
@@ -1018,7 +1033,7 @@ export default function OperationsPage() {
                     {t(`common.${key}Short`, key)}
                     {count !== undefined && (
                       <span className={cn(
-                        "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
+                        "text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
                         isActive ? "bg-accent-primary-op15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
                       )}>
                         {count}
@@ -1074,7 +1089,7 @@ export default function OperationsPage() {
                   onClick={() => setBulkViewMode('table')}
                   className={cn(
                     "p-1.5 rounded-md transition-all",
-                    bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                    bulkViewMode === 'table' ? "bg-accent-primary text-on-accent shadow-sm" : "text-text-secondary hover:text-text-primary"
                   )}
                   title={t('operations.tableView', 'Table View')}
                 >
@@ -1084,7 +1099,7 @@ export default function OperationsPage() {
                   onClick={() => setBulkViewMode('basket')}
                   className={cn(
                     "p-1.5 rounded-md transition-all",
-                    bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                    bulkViewMode === 'basket' ? "bg-accent-primary text-on-accent shadow-sm" : "text-text-secondary hover:text-text-primary"
                   )}
                   title={t('operations.basketView', 'Basket View')}
                 >

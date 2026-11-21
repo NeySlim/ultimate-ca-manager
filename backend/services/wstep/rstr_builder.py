@@ -102,3 +102,27 @@ def build_issue_response(cert, relates_to=None, request_id=None, cmc_response_de
         etree.SubElement(rstr, '{%s}RequestID' % WSTEP_NS).text = str(request_id)
 
     return build_envelope(collection, action=ACTION_RSTRC, relates_to=relates_to)
+
+
+DISPOSITION_PENDING = 'Pending'
+
+
+def build_pending_response(request_id, relates_to=None, cmc_response_der=None):
+    """The RSTR of a request held for approval (MS-WSTEP 3.1.4.2.1.1): its
+    disposition, the CMC response marking it pending and the RequestID the
+    client sends back with QueryTokenStatus; no RequestedSecurityToken."""
+    collection = etree.Element('{%s}RequestSecurityTokenResponseCollection' % WST_NS)
+    rstr = etree.SubElement(collection, '{%s}RequestSecurityTokenResponse' % WST_NS)
+    etree.SubElement(rstr, '{%s}TokenType' % WST_NS).text = TOKEN_TYPE_X509V3
+    disposition = etree.SubElement(rstr, '{%s}DispositionMessage' % WSTEP_NS)
+    disposition.set('{http://www.w3.org/XML/1998/namespace}lang', 'en-US')
+    disposition.text = DISPOSITION_PENDING
+    if cmc_response_der is not None:
+        cmc_bst = etree.SubElement(
+            rstr, '{%s}BinarySecurityToken' % WSSE_NS,
+            ValueType=VALUE_TYPE_PKCS7,
+            EncodingType='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#base64binary',
+        )
+        cmc_bst.text = base64.b64encode(cmc_response_der).decode('ascii')
+    etree.SubElement(rstr, '{%s}RequestID' % WSTEP_NS).text = str(request_id)
+    return build_envelope(collection, action=ACTION_RSTRC, relates_to=relates_to)

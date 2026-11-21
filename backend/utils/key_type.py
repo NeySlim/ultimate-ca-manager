@@ -139,11 +139,24 @@ def parse_issue_key_type(
 
 
 def issue_key_size(key_type, key_size, default):
-    """*key_size*, else *default*; None for a label that names its own parameter ('ML-DSA-65')."""
+    """*key_size*, else *default* (called when callable); None for a label that names its own
+    parameter ('ML-DSA-65')."""
     if key_size not in (None, ''):
         return key_size
     alg = key_algorithms.get(str(key_type or '').strip())
-    return None if alg is not None and alg.family not in ('RSA', 'EC') else default
+    if alg is not None and alg.family not in ('RSA', 'EC'):
+        return None
+    return default() if callable(default) else default
+
+
+def names_its_key(key_type, key_size, curve=None) -> bool:
+    """True when a request names its key: a size, a curve for an EC family, or a label
+    that carries its own parameter ('ML-DSA-65'); bare 'rsa' or 'ec' does not."""
+    if not key_type:
+        return False
+    if key_size not in (None, '') or (curve and _request_family(key_type) == 'EC'):
+        return True
+    return issue_key_size(key_type, None, True) is None
 
 
 def fill_key_params_from_template(key_type, key_size, template_key_type):
@@ -237,7 +250,7 @@ def validate_enrollment_public_key(public_key) -> str | None:
     """Return an error string if *public_key* is too weak to certify, else None.
 
     Accepts a cryptography public-key object (from a parsed CSR). Ed25519 /
-    Ed448 and, outside FIPS mode, ML-DSA are accepted. Unknown key types are rejected — an
+    Ed448 and ML-DSA are accepted (in FIPS mode, ML-DSA when the loaded module approves it). Unknown key types are rejected — an
     enrollment endpoint should not sign a key it cannot assess.
     """
     family = key_algorithms.family_for_public_key(public_key)
@@ -263,11 +276,32 @@ def validate_enrollment_public_key(public_key) -> str | None:
         return None
 
     if family == 'ML-DSA':
-        if fips_mode.enabled():
+        if fips_mode.enabled() and not key_algorithms.fips_approved_for_key(public_key):
             return f'{key_algorithms.label_for_public_key(public_key)} keys are not available in FIPS mode'
         return None
 
     return f'Unsupported public key type: {type(public_key).__name__}'
+
+
+def weak_ca_key_refusal(key) -> str | None:
+    """Refusal for a CA arriving with a private key that is RSA below the enrollment floor, else None.
+
+    *key* is a cryptography key object or an unencrypted PEM. Only the RSA floor is applied: other
+    key types are not judged here, and a CA imported without a key never reaches this rule. A PEM that
+    cannot be loaded is refused: callers decrypt before asking.
+    """
+    if key is None:
+        return None
+    if isinstance(key, (bytes, str)):
+        from cryptography.hazmat.primitives import serialization
+        try:
+            key = serialization.load_pem_private_key(key.encode() if isinstance(key, str) else key, None)
+        except Exception:
+            return 'The private key could not be read (encrypted or malformed); it cannot be admitted for a CA'
+    public = key.public_key() if hasattr(key, 'public_key') else key
+    if key_algorithms.family_for_public_key(public) != 'RSA' or public.key_size >= MIN_RSA_BITS:
+        return None
+    return validate_enrollment_public_key(public)
 
 
 def unsignable_csr_key(csr) -> str | None:

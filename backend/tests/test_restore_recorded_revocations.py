@@ -16,15 +16,10 @@ EARLY = datetime(2026, 1, 2, 3, 4, 5)
 OLD, RECENT = '2.253', '2.254'
 
 
-def _serial(row):
-    import base64
-    from cryptography import x509
-    return x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number
-
-
 def _record(row, reason, *, linked=True):
     from models import RevokedSerial
-    record = RevokedSerial(caref=row.caref, serial_number=str(_serial(row)),
+    from utils.serial_format import canonical_serial
+    record = RevokedSerial(caref=row.caref, serial_number=canonical_serial(row.serial_number),
                            revoked_at=EARLY, revoke_reason=reason, valid_to=row.valid_to,
                            certificate_id=row.id if linked else None)
     db.session.add(record)
@@ -45,12 +40,11 @@ def _version(blob, version):
 def _state(refid):
     """(row revoked, row reason, reasons of the records of its serial under its CA)."""
     from models import Certificate, RevokedSerial
-    from utils.serial_format import unambiguous_serial_spellings
+    from utils.serial_format import canonical_serial
     db.session.expire_all()
     row = Certificate.query.filter_by(refid=refid).one()
-    reasons = sorted(r.revoke_reason for r in RevokedSerial.query.filter(
-        RevokedSerial.caref == row.caref,
-        RevokedSerial.serial_number.in_(unambiguous_serial_spellings(_serial(row)))))
+    reasons = sorted(r.revoke_reason for r in RevokedSerial.query.filter_by(
+        caref=row.caref, serial_number=canonical_serial(row.serial_number)))
     return bool(row.revoked), row.revoke_reason, reasons
 
 
@@ -77,10 +71,9 @@ class TestTheRowsARestoreWritesTakeTheirRecords:
         results = _restore(blob, mode='merge')
 
         assert _state('restore-align') == (True, reason, [reason])
-        # A final revocation here is kept by the merge itself; a hold is written back from its record
-        marked = 0 if reason == 'keyCompromise' else 1
-        assert results['revoked_from_records'] == marked
-        assert len(_audited('restore-align')) == marked
+        # A revocation here, final or hold, is kept by the merge itself: nothing to mark again
+        assert results['revoked_from_records'] == 0
+        assert _audited('restore-align') == []
         assert _state('restore-not-written') == (False, None, [reason])
 
 
@@ -115,14 +108,6 @@ class TestAnOlderArchiveLeavesItsLiftedHoldsOut:
     def test_a_final_record_linked_to_an_unrevoked_row_is_kept(self, target):
         self._one('lifted-final', record_reason='keyCompromise')
         assert _state('lifted-final') == (True, 'keyCompromise', ['keyCompromise'])
-
-    def test_a_leftover_in_a_hex_spelling_is_not_restored(self, target):
-        """An unambiguous spelling of the row's serial names it, as in migration 136."""
-        def in_hex(record):
-            record.serial_number = format(int(record.serial_number), 'X')
-        results = self._one('lifted-hex', record=in_hex)
-        assert _state('lifted-hex') == (False, None, [])
-        assert results['lifted_holds_skipped'] == 1
 
     def test_a_hold_of_another_serial_linked_to_the_row_is_kept(self, target):
         """The record of a serial renewed away in place stays linked to the row."""

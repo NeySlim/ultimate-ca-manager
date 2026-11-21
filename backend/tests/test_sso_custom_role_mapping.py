@@ -1,4 +1,5 @@
 """Custom roles in the SSO role mapping (migration 109, resolution, sync, guards)."""
+from tests.sso_identity_support import delete_users_of
 import importlib
 import json
 import os
@@ -63,7 +64,8 @@ def provider(app):
 
     yield _make
     with app.app_context():
-        User.query.filter(User.sso_provider_id.in_(made)).delete(synchronize_session=False)
+        for pid in made:
+            delete_users_of(pid)
         SSOProvider.query.filter(SSOProvider.id.in_(made)).delete(synchronize_session=False)
         db.session.commit()
 
@@ -96,40 +98,6 @@ def _post(client, **body):
 
 
 # ---- migration -----------------------------------------------------------------
-
-def test_sqlite_migration_adds_the_column_and_leaves_users_manual():
-    m = importlib.import_module('migrations.109_user_custom_role_source')
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)')
-    conn.execute("INSERT INTO users VALUES (1, 'old')")
-    m.upgrade(conn)
-    m.upgrade(conn)
-    assert conn.execute('SELECT custom_role_source FROM users').fetchone()[0] is None
-    m.upgrade(sqlite3.connect(':memory:'))  # no table: a no-op
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_migration_adds_the_column_and_leaves_users_manual():
-    m = importlib.import_module('migrations.109_user_custom_role_source')
-    schema = f"migtest_109_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        conn.execute(text(f'CREATE SCHEMA {schema}'))
-        conn.execute(text(f'SET search_path TO {schema}'))
-        conn.execute(text('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)'))
-        conn.execute(text("INSERT INTO users VALUES (1, 'old')"))
-        m.upgrade(conn)
-        m.upgrade(conn)
-        assert conn.execute(text('SELECT custom_role_source FROM users')).scalar() is None
-    finally:
-        conn.rollback()
-        conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        conn.commit()
-        conn.close()
-        engine.dispose()
 
 
 # ---- resolution ----------------------------------------------------------------
@@ -287,12 +255,17 @@ class TestValidationOnSave:
 
     def test_a_system_role_is_not_a_custom_role(self, app, auth_client):
         with app.app_context():
-            system = CustomRole.query.filter_by(is_system=True).first()
-            if system is None:
-                pytest.skip('no system role seeded')
-            name = system.name
-        r = _post(auth_client, role_mapping={'g': {'custom_role': name}})
-        assert r.status_code == 400
+            system = CustomRole(name=f'sys-{_uid()}', permissions=['read:certificates'], is_system=True)
+            db.session.add(system)
+            db.session.commit()
+            name, role_id = system.name, system.id
+        try:
+            r = _post(auth_client, role_mapping={'g': {'custom_role': name}})
+            assert r.status_code == 400, r.data
+        finally:
+            with app.app_context():
+                CustomRole.query.filter_by(id=role_id).delete()
+                db.session.commit()
 
     def test_good_mappings_are_stored_as_sent(self, auth_client, role):
         name = role()

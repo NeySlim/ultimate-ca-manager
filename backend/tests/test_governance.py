@@ -10,6 +10,7 @@ import pytest
 import os
 import sys
 import json
+from tests.conftest import assert_refused
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,8 +31,8 @@ def app():
 
     from app import create_app
     app = create_app('testing')
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
+    from tests.conftest import configure_test_app
+    configure_test_app(app)
 
     from tests.conftest import clear_admin_password_flag
     clear_admin_password_flag(app)
@@ -160,13 +161,13 @@ class TestApprovalsAPI:
         r = auth_client.post('/api/v2/approvals/99999/approve',
             data=json.dumps({'comment': 'test'}),
             content_type='application/json')
-        assert r.status_code in (404, 400, 500)
+        assert_refused(r, 404, 'Approval request not found')
 
     def test_reject_nonexistent(self, auth_client):
         r = auth_client.post('/api/v2/approvals/99999/reject',
             data=json.dumps({'comment': 'test reason'}),
             content_type='application/json')
-        assert r.status_code in (404, 400, 500)
+        assert_refused(r, 404, 'Approval request not found')
 
 
 # ============================================================

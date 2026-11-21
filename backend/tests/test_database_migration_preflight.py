@@ -16,7 +16,6 @@ The bugs these pin down all shipped as "successful" migrations:
 Every one of those is now a refusal, and every refusal names what blocks it.
 """
 import contextlib
-import importlib.util
 import os
 import sqlite3
 import tempfile
@@ -128,21 +127,14 @@ def _add_legacy_columns(engine, columns_by_table=None):
     ])
 
 
-def _baseline_schema():
-    """``{table: {column}}`` of the consolidated baseline schema.
+FIXTURES = Path(__file__).resolve().parent / 'fixtures'
 
-    Loaded from `migrations/000_baseline_v252.py` and executed into an
-    in-memory database rather than parsed: it is the schema every installation
-    upgraded from v2.52 carries, and it is where the legacy columns come from.
-    """
-    path = Path(__file__).resolve().parent.parent / 'migrations' / '000_baseline_v252.py'
-    spec = importlib.util.spec_from_file_location('ucm_baseline_v252', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
 
+def _schema_of(sql):
+    """``{table: {column}}`` of a schema script, executed into an in-memory database."""
     conn = sqlite3.connect(':memory:')
     try:
-        conn.executescript(module.SCHEMA_SQL)
+        conn.executescript(sql)
         tables = [
             row[0] for row in
             conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -153,6 +145,20 @@ def _baseline_schema():
         }
     finally:
         conn.close()
+
+
+def _baseline_schema():
+    """The 2.52 baseline every installation upgraded from it still carries, where the legacy
+    columns come from (fixture taken from the 2.254 tag by scripts/schema_fixture.py)."""
+    return _schema_of((FIXTURES / 'schema_v252_baseline_sqlite.sql').read_text())
+
+
+def _carried_schema():
+    """What a 2.254 database may hold: the baseline's columns and those 2.254 creates."""
+    carried = _baseline_schema()
+    for table, columns in _schema_of((FIXTURES / 'schema_v2254_sqlite.sql').read_text()).items():
+        carried.setdefault(table, set()).update(columns)
+    return carried
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +222,7 @@ def test_row_in_the_internal_migrations_ledger_is_refused(app, sqlite_target):
         _execute(
             engine,
             _MIGRATIONS_DDL,
-            "INSERT INTO _migrations (name) VALUES ('000_baseline_v252')",
+            "INSERT INTO _migrations (name) VALUES ('300_upgrade_from_2_254')",
         )
 
         with pytest.raises(PreflightError) as excinfo:
@@ -563,8 +569,8 @@ def test_dropped_columns_counts_the_values_it_leaves_behind(
         _add_legacy_columns(source, {'group_members': {'created_at': ''}})
         _execute(source, 'INSERT INTO "groups" (id, name) VALUES (1, \'g\')')
         _execute(source,
-                 'INSERT INTO "users" (id, username, email, password_hash, role, '
-                 'auth_source) VALUES (1, \'u\', \'u@x.test\', \'x\', \'viewer\', \'local\')')
+                 'INSERT INTO "users" (id, username, email, password_hash, role) '
+                 'VALUES (1, \'u\', \'u@x.test\', \'x\', \'viewer\')')
         _execute(source,
                  'INSERT INTO "group_members" (group_id, user_id, created_at) '
                  'VALUES (1, 1, \'2020-01-01\')')
@@ -618,11 +624,10 @@ def test_legacy_columns_match_the_baseline_schema(app):
     a column is removed from a model without a line in LEGACY_COLUMNS, the
     migration would drop it silently — this fails first.
     """
-    baseline = _baseline_schema()
     schema = expected_schema()
 
     unapproved = {}
-    for table, columns in baseline.items():
+    for table, columns in _carried_schema().items():
         if table not in schema:
             continue
         extra = columns - schema[table] - set(LEGACY_COLUMNS.get(table, {}))
@@ -630,14 +635,15 @@ def test_legacy_columns_match_the_baseline_schema(app):
             unapproved[table] = sorted(extra)
 
     assert unapproved == {}, (
-        "columns carried by the baseline schema, dropped from the models, and "
+        "columns a 2.254 database may carry, dropped from the models, and "
         f"not approved in LEGACY_COLUMNS: {unapproved}"
     )
 
-    # And the reverse: an approval for a column no schema ever had is a typo.
+    # And the reverse: an approval for a column neither the baseline nor 2.254 had is a typo.
+    carried = _carried_schema()
     for table, columns in LEGACY_COLUMNS.items():
         for column in columns:
-            assert column in baseline.get(table, set()), f"{table}.{column}"
+            assert column in carried.get(table, set()), f"{table}.{column}"
 
 
 def test_no_unapproved_extra_column_in_the_test_database(app):
@@ -674,3 +680,18 @@ def test_copy_plan_leaves_both_databases_untouched(app, sqlite_source, sqlite_ta
 
         assert _table_names(source) == before_source
         assert _table_names(target) == before_target
+
+
+def test_copy_plan_ignores_the_session_store_table(app, sqlite_source, sqlite_target):
+    """Live sessions are never copied, and their table never blocks a switch."""
+    with app.app_context(), _engine(sqlite_source) as source, _engine(sqlite_target) as target:
+        _create_ucm_schema(app, source)
+        _execute(source, "CREATE TABLE flask_sessions (id INTEGER PRIMARY KEY, "
+                         "session_id VARCHAR(255), data BLOB, expiry DATETIME)",
+                 "INSERT INTO flask_sessions (session_id) VALUES ('live')")
+        _create_ucm_schema(app, target)
+
+        plan = build_copy_plan(source, target)
+
+    assert 'flask_sessions' not in [entry.name for entry in plan]
+    assert 'flask_sessions' in IGNORED_TABLES

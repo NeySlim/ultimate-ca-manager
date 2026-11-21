@@ -62,7 +62,7 @@ def test_in_place_renewal_copies_the_sid_extension_without_a_directory_check(
     if connector:
         _configure_ad_connector(app)
     asked = []
-    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: asked.append(sid) or ad_lookup.NO_ACCOUNT)
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: asked.append(sid) or ad_lookup.NO_ACCOUNT)
     with app.app_context():
         renew_certificate_in_place(db.session.get(Certificate, row_id), username='admin')
         db.session.commit()

@@ -153,6 +153,24 @@ def _load(row):
     return key, x509.load_pem_x509_certificate(base64.b64decode(row.crt))
 
 
+class DelegateRenewedMeanwhile(RuntimeError):
+    """The delegate being replaced was renewed in place since it was read: this replacement
+    loses, and the request is answered 409 (a retry replaces the renewed row)."""
+
+
+def _archive(previous, serial) -> bool:
+    """Archive the replaced delegate only if it still holds *serial*, re-checked after any
+    lock wait (still valid until it expires, as a renewed responder)."""
+    from sqlalchemy import update
+    from sqlalchemy.orm.attributes import set_committed_value
+    done = db.session.execute(
+        update(Certificate).where(Certificate.id == previous.id, Certificate.serial_number == serial)
+        .values(archived=True).execution_options(synchronize_session=False)).rowcount == 1
+    if done:
+        set_committed_value(previous, 'archived', True)
+    return done
+
+
 def key_generator(ca, ca_cert):
     """(private key, certificate) of the CA's key generator, issued or re-issued as needed.
 
@@ -171,6 +189,7 @@ def key_generator(ca, ca_cert):
     previous = db.session.get(Certificate, previous_id) if previous_id is not None else None
     if previous is not None and (previous.source != SOURCE or previous.serial_number != link.serial_number):
         previous = None  # a reused id: not ours to archive
+    previous_serial = previous.serial_number if previous is not None else None
     try:
         with db.session.begin_nested():
             row = _certificate_row(ca, cert, key, not_after)
@@ -184,9 +203,13 @@ def key_generator(ca, ca_cert):
                 link.certificate_id, link.issuer_fingerprint = row.id, fingerprint
                 link.serial_number = row.serial_number
                 link.created_at = utc_now()
-            if previous is not None and previous.caref == ca.refid and not previous.revoked:
-                previous.archived = True  # still valid until it expires, as a renewed responder
+            if previous is not None and previous.caref == ca.refid and not previous.revoked \
+                    and not _archive(previous, previous_serial):
+                raise DelegateRenewedMeanwhile(previous_id)
             db.session.flush()  # a concurrent pointer fails here, before the audit entry is staged
+            # The delegate is an issuance of the CA; a lost race rolls the count back with it
+            from utils.ca_serial_counter import next_ca_serial
+            next_ca_serial(ca)
             stage_audit_entry(
                 action='est_key_generator.issued' if link is None else 'est_key_generator.reissued',
                 resource_type='ca', resource_id=ca.id, resource_name=ca.descr,
@@ -194,12 +217,19 @@ def key_generator(ca, ca_cert):
                          f'issued, valid to {not_after}'
                          + (f', replacing certificate {previous_id}' if previous_id else '')))
         db.session.commit()
-    except IntegrityError:  # the savepoint is rolled back, the caller's transaction kept
+    except DelegateRenewedMeanwhile:  # the savepoint goes, the caller's transaction stays
+        logger.info('EST key generator certificate %s of CA %s was renewed meanwhile; '
+                    'it is not replaced', previous_id, ca.id)
+        raise
+    except IntegrityError:  # the savepoint goes, the caller's transaction stays
         winner = EstSignerCert.query.filter_by(ca_id=ca.id).first()
         logger.info('EST key generator of CA %s made by a concurrent request', ca.id)
         usable = _usable(winner, ca, fingerprint, ca_cert)
         if usable is None:
             raise RuntimeError('the concurrent EST key generator is not usable')
         return usable
+    from services.webhook_service import emit_cert_issued, emit_cert_renewed
+    announce = emit_cert_renewed if previous_id is not None else emit_cert_issued
+    announce(row.to_dict(), ca_refid=ca.refid, actor='system:est-key-generator')
     logger.info('EST key generator of CA %s issued, valid until %s', ca.id, not_after)
     return key, cert

@@ -25,8 +25,8 @@ vi.mock('../../contexts', () => ({
   }),
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: ['light', 'dark'] }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(),
+  useInspector: () => ({
+    openEntity: vi.fn(),
     closeWindow: vi.fn(),
     windows: [],
     prefs: { sameWindow: true, closeOnNav: true },
@@ -36,7 +36,7 @@ vi.mock('../../contexts', () => ({
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 // usePermission reads `permissions` from AuthContext; write:settings guards
@@ -77,6 +77,8 @@ const CA_SIGNS = {
   enabled: true, ca_refid: 'ca-tsa-probe', policy_oid: '1.2.3.4.1',
   require_dedicated_cert: false, signer_cert_refid: '', signer: { configured: false },
 }
+// A fresh install: strict by default, a CA chosen, no dedicated signer yet
+const STRICT_NO_SIGNER = { ...CA_SIGNS, require_dedicated_cert: true }
 const DEDICATED = {
   enabled: true, ca_refid: 'ca-tsa-probe', policy_oid: '1.3.6.1.4.1.55555.1',
   require_dedicated_cert: false, signer_cert_refid: 'cert-tsa-signer',
@@ -101,6 +103,20 @@ describe('TSAPage warnings and stats', () => {
     await openSettingsTab()
     expect(screen.getByText('tsa.caSignerWarning')).toBeInTheDocument()
     expect(screen.getByText('tsa.policyPlaceholderWarning')).toBeInTheDocument()
+  })
+
+  it('says what is missing when the strict mode is on without a dedicated signer', async () => {
+    config.current = STRICT_NO_SIGNER
+    await openSettingsTab()
+    expect(screen.getByText('tsa.strictNoSigner')).toBeInTheDocument()
+    expect(screen.queryByText('tsa.caSignerWarning')).not.toBeInTheDocument()
+  })
+
+  it('does not claim the CA signs once a dedicated signer is saved', async () => {
+    config.current = { ...DEDICATED, require_dedicated_cert: true }
+    await openSettingsTab()
+    expect(screen.queryByText('tsa.strictNoSigner')).not.toBeInTheDocument()
+    expect(screen.queryByText('tsa.caSignerWarning')).not.toBeInTheDocument()
   })
 
   it('drops both warnings with a dedicated signer and an own policy OID', async () => {

@@ -14,6 +14,16 @@ beforeAll(() => {
   }
 })
 
+// The notifications every page sees: one set of spies, so a test can read what it was told
+export const notificationSpies = {
+  showSuccess: vi.fn(),
+  showError: vi.fn(),
+  showWarning: vi.fn(),
+  showInfo: vi.fn(),
+  notifications: [],
+  removeNotification: vi.fn(),
+}
+
 // ── Mock all services (prevent real API calls) ─────────────────────
 const mockApiClientInstance = {
   get: vi.fn().mockResolvedValue({ data: [] }),
@@ -30,6 +40,7 @@ const mockApiClientInstance = {
 vi.mock('../../services/apiClient', () => ({
   apiClient: mockApiClientInstance,
   buildQueryString: vi.fn().mockReturnValue(''),
+  holdSignOut: vi.fn(),
   createCRUDService: (_endpoint) => ({
     getAll: vi.fn().mockResolvedValue({ data: [] }),
     getById: vi.fn().mockResolvedValue({ data: {} }),
@@ -52,32 +63,6 @@ vi.mock('react-i18next', () => ({
   }),
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
-}))
-
-// Mock react-grid-layout (DashboardPage uses it)
-vi.mock('react-grid-layout', () => ({
-  Responsive: ({ children }) => <div data-testid="grid-layout">{children}</div>,
-  WidthProvider: (Component) => Component,
-  verticalCompactor: vi.fn(),
-}))
-vi.mock('react-grid-layout/css/styles.css', () => ({}))
-vi.mock('react-resizable/css/styles.css', () => ({}))
-
-// Mock recharts
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }) => <div>{children}</div>,
-  AreaChart: ({ children }) => <div>{children}</div>,
-  Area: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  CartesianGrid: () => null,
-  Tooltip: () => null,
-  PieChart: ({ children }) => <div>{children}</div>,
-  Pie: () => null,
-  Cell: () => null,
-  Legend: () => null,
-  BarChart: ({ children }) => <div>{children}</div>,
-  Bar: () => null,
 }))
 
 // Mock WebSocket hook
@@ -259,14 +244,7 @@ vi.mock('../../contexts', () => ({
     checkAuth: vi.fn(),
     checkSession: vi.fn(),
   }),
-  useNotification: () => ({
-    showSuccess: vi.fn(),
-    showError: vi.fn(),
-    showWarning: vi.fn(),
-    showInfo: vi.fn(),
-    notifications: [],
-    removeNotification: vi.fn(),
-  }),
+  useNotification: () => notificationSpies,
   useTheme: () => ({
     theme: 'dark',
     setTheme: vi.fn(),
@@ -289,14 +267,14 @@ vi.mock('../../contexts', () => ({
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  useWindowManager: () => ({
-    openWindow: vi.fn(),
+  useInspector: () => ({
+    openEntity: vi.fn(),
     closeWindow: vi.fn(),
     windows: [],
     prefs: { sameWindow: true, closeOnNav: true },
     updatePrefs: vi.fn(),
   }),
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 vi.mock('../../contexts/ThemeContext', () => ({
@@ -326,14 +304,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 }))
 
 vi.mock('../../contexts/NotificationContext', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(),
-    showError: vi.fn(),
-    showWarning: vi.fn(),
-    showInfo: vi.fn(),
-    notifications: [],
-    removeNotification: vi.fn(),
-  }),
+  useNotification: () => notificationSpies,
   NotificationProvider: ({ children }) => children,
 }))
 
@@ -351,15 +322,15 @@ vi.mock('../../contexts/MobileContext', () => ({
   MobileProvider: ({ children }) => children,
 }))
 
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    openWindow: vi.fn(),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({
+    openEntity: vi.fn(),
     closeWindow: vi.fn(),
     windows: [],
     prefs: { sameWindow: true, closeOnNav: true },
     updatePrefs: vi.fn(),
   }),
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 // ── Shared test wrapper ────────────────────────────────────────────

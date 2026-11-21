@@ -10,11 +10,18 @@ fips_module_mac() {
 # fipsinstall runs the self-tests on this platform (security policy 11.1); the module-mac it
 # computes must equal the one recorded when the image was built, or the module was modified
 install_fips_module() {
-    local module=$1 run_dir=$2 reference=$3 expected actual out
+    local module=$1 run_dir=$2 reference=$3 expected actual out checked
     # the provider loads fips.so from OPENSSL_MODULES when set: only the checked directory, as an
-    # absolute path (a relative one names another directory in the process that loads the module)
+    # absolute path (a relative one names another directory in the process that loads the module);
+    # a directory that cannot be resolved is refused, not taken as equal
+    checked=$(realpath -m -- "$(dirname -- "$module")" 2>/dev/null)
+    if [ -n "${OPENSSL_MODULES+set}" ] && [ -z "$checked" ]; then
+        echo -e "${RED:-}❌ The directory of the checked FIPS module ($(dirname -- "$module")) cannot be resolved, so OPENSSL_MODULES ($OPENSSL_MODULES) cannot be compared to it${NC:-}"
+        echo "   Remove OPENSSL_MODULES: UCM does not start FIPS mode on a module it has not checked."
+        return 1
+    fi
     if [ -n "${OPENSSL_MODULES+set}" ] && { [ "${OPENSSL_MODULES#/}" = "$OPENSSL_MODULES" ] \
-        || [ "$(realpath -m -- "$OPENSSL_MODULES")" != "$(realpath -m -- "$(dirname -- "$module")")" ]; }; then
+        || [ "$(realpath -m -- "$OPENSSL_MODULES" 2>/dev/null)" != "$checked" ]; }; then
         echo -e "${RED:-}❌ OPENSSL_MODULES ($OPENSSL_MODULES) is not the absolute path of the directory of the checked FIPS module ($(dirname -- "$module"))${NC:-}"
         echo "   Remove OPENSSL_MODULES: UCM does not start FIPS mode on a module it has not checked."
         return 1
@@ -44,4 +51,7 @@ install_fips_module() {
         return 1
     fi
     mv -f -- "$out" "$run_dir/fipsmodule.cnf"
+    # pinned: ucm.env, read by the app after this check, cannot move it (no dotenv override)
+    export OPENSSL_MODULES
+    OPENSSL_MODULES=$(dirname -- "$module")
 }

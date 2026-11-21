@@ -83,9 +83,28 @@ def test_a_file_written_before_the_install_gets_secrets_and_defaults(tmp_path):
     assert values['DATABASE_PATH'] == ['/opt/ucm/data/ucm.db']
     assert values['DATA_DIR'] == ['/opt/ucm/data']
     assert values['HTTPS_PORT'] == ['8443'] and values['HTTP_PROTOCOL_PORT'] == ['8080']
-    assert values['INITIAL_ADMIN_PASSWORD'] == ['changeme123']
+    # No default password: the first start generates one into the data directory
+    assert 'INITIAL_ADMIN_PASSWORD' not in values
     assert values['UCM_FIPS_BUILD'] == ['1']
     assert stat.S_IMODE(envfile.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize('line', ['INITIAL_ADMIN_PASSWORD=changeme123', 'export INITIAL_ADMIN_PASSWORD="changeme123"'])
+def test_the_password_older_packages_wrote_is_dropped(tmp_path, line):
+    """An existing account is untouched; a later database reset generates instead."""
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text(f'SECRET_KEY=keep-me\n{line}\nLOG_LEVEL=INFO\n')
+    envfile.chmod(0o600)
+    assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
+    assert envfile.read_text() == 'SECRET_KEY=keep-me\nLOG_LEVEL=INFO\n'
+    assert stat.S_IMODE(envfile.stat().st_mode) == 0o600
+
+
+def test_a_password_the_operator_chose_stays_in_the_file(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('SECRET_KEY=keep-me\nINITIAL_ADMIN_PASSWORD=changeme1234\n')
+    assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
+    assert _values(envfile)['INITIAL_ADMIN_PASSWORD'] == ['changeme1234']
 
 
 def test_a_file_without_final_newline_keeps_its_last_line(tmp_path):
@@ -443,14 +462,15 @@ def test_the_standard_install_is_unchanged(tmp_path):
 
 # ------------------------------------------------------- running service
 
-def _systemd(tmp_path, bin_dir, record, state='active', hold_stop=None):
+def _systemd(tmp_path, bin_dir, record, state='active', hold_stop=None, gap=''):
     """A booted systemd whose systemctl logs each call, with the venv's content at that moment.
 
-    With hold_stop, `stop` stops ucm, creates that file and waits to be killed."""
+    With hold_stop, `stop` stops ucm, writes its pid to that file and execs a sleep waiting to be
+    killed: one process, since a shell outlives a SIGINT that misses its child of the moment."""
     (tmp_path / 'run-systemd').mkdir()
     (tmp_path / 'ucm-state').write_text(state)
     venv = tmp_path / 'opt' / 'venv'
-    hold = f'touch {hold_stop}; while :; do {shutil.which("sleep")} 0.05; done' if hold_stop else ':'
+    hold = f'echo $$ > {hold_stop}; {gap}exec {shutil.which("sleep")} 600' if hold_stop else ':'
     _stub(bin_dir / 'systemctl', f"""echo "SYSTEMCTL $* [$({shutil.which('ls')} {venv} 2>/dev/null | tr '\\n' ' ')]" >> {record}
 state=$(cat {tmp_path}/ucm-state)
 case "$1" in
@@ -459,6 +479,26 @@ case "$1" in
   start|restart) echo active > {tmp_path}/ucm-state ;;
 esac""")
     return {'PATH': str(bin_dir), 'UCM_SETUP_SYSTEMD_RUN': str(tmp_path / 'run-systemd')}
+
+
+def test_a_held_stop_dies_of_a_sigint_its_shell_alone_receives(tmp_path):
+    """The held stop execs its sleep in the shell's own pid: once the sleep runs, a SIGINT ends it,
+    with no child left for the shell to wait for."""
+    bin_dir = tmp_path / 'bin'
+    held = tmp_path / 'held'
+    _systemd(tmp_path, bin_dir, tmp_path / 'record', hold_stop=held)
+    proc = subprocess.Popen([str(bin_dir / 'systemctl'), 'stop', 'ucm'], start_new_session=True,
+                            preexec_fn=_default_signals)
+    try:
+        _wait_for_held_stop(held, proc)
+        os.kill(proc.pid, signal.SIGINT)
+        assert proc.wait(timeout=5) == -signal.SIGINT
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
 
 
 def _calls(record):
@@ -602,6 +642,17 @@ def _held_gunicorn(started, exit_code=None):
 def test_an_interruption_after_the_stop_restarts_the_service_on_the_previous_venv(tmp_path, sig, point):
     """Cut once ucm is stopped: before the switch (systemctl stop still running), or after it,
     while the new venv is being checked."""
+    _cut_after_the_stop(tmp_path, sig, point)
+
+
+def test_a_sigint_between_the_witness_and_the_held_stop_still_lands(tmp_path):
+    """The window a slow machine opens: the fake's shell, waiting for a child that exits normally,
+    outlives the SIGINT and then execs the sleep, which never gets it."""
+    _cut_after_the_stop(tmp_path, signal.SIGINT, 'stopped',
+                        gap=f"{shutil.which('sh')} -c 'trap \"\" INT; {shutil.which('sleep')} 1'; ")
+
+
+def _cut_after_the_stop(tmp_path, sig, point, gap=''):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
     held = tmp_path / 'held'
     python, record = _fake_python(tmp_path, _held_gunicorn(held) if point == 'switched' else 'exit 0')
@@ -609,9 +660,9 @@ def test_an_interruption_after_the_stop_restarts_the_service_on_the_previous_ven
     envfile.write_text('SECRET_KEY=a\n')
     shutil.rmtree(home / 'venv')
     _venv_dir(home / 'venv')
-    extra = _systemd(tmp_path, bin_dir, record, hold_stop=held if point == 'stopped' else None)
+    extra = _systemd(tmp_path, bin_dir, record, hold_stop=held if point == 'stopped' else None, gap=gap)
     proc = _spawn(tmp_path, home, python, envfile, extra)
-    _wait_for(held, proc)
+    (_wait_for_held_stop if point == 'stopped' else _wait_for)(held, proc)
     os.killpg(proc.pid, sig)
     _out, err = _reap(proc)
     assert proc.returncode != 0, err
@@ -752,12 +803,47 @@ def _wait_for(path, proc):
     assert path.exists(), proc.communicate(timeout=5)
 
 
+def _wait_for_held_stop(witness, proc, timeout=15):
+    """Until the held `systemctl stop` runs the sleep: before its exec, a SIGINT can reach its shell
+    while that waits for a child exiting normally, and the shell then goes on to the sleep."""
+    deadline = time.monotonic() + timeout
+    while proc.poll() is None and time.monotonic() < deadline:
+        try:
+            if pathlib.Path(f'/proc/{int(witness.read_text())}/comm').read_text().strip() == 'sleep':
+                return
+        except (OSError, ValueError):  # not written yet, or written halfway
+            pass
+        time.sleep(0.05)
+    if proc.poll() is None:  # the script and its held stop would otherwise outlive the test
+        os.killpg(proc.pid, signal.SIGKILL)
+    try:
+        said = proc.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        said = '(pipes still held open)'
+    pytest.fail(f'the held stop never reached its sleep: {said}')
+
+
+def test_a_stop_that_never_holds_fails_the_wait_and_leaves_no_process(tmp_path):
+    proc = subprocess.Popen([shutil.which('sleep'), '600'], start_new_session=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True)
+    try:
+        with pytest.raises(pytest.fail.Exception, match='never reached its sleep'):
+            _wait_for_held_stop(tmp_path / 'held', proc, timeout=0.3)
+        assert proc.poll() is not None
+    finally:
+        # A failing assertion must not leave the sleep behind either
+        if proc.poll() is None:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait(timeout=5)
+        proc.communicate(timeout=5)
+
+
 def _systemctl_lines(record):
     return [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')]
 
 
 RESTARTED = ['SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]',
-             'SYSTEMCTL start ucm [bin good ]']
+             'SYSTEMCTL reset-failed ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
 
 
 @pytest.mark.parametrize('trigger', ['pip fails', 'SIGHUP', 'SIGHUP after the switch', 'new venv fails'])
@@ -1082,7 +1168,7 @@ def test_an_inactive_provider_is_reported(tmp_path):
 
 @pytest.mark.parametrize('os_release, command', [
     (ALMA, 'sudo fips-mode-setup --enable'),
-    (UBUNTU, 'sudo pro enable fips-updates'),
+    (UBUNTU, 'sudo pro enable fips '),
 ])
 def test_a_host_outside_fips_mode_is_told_how_to_enable_it(tmp_path, os_release, command):
     envfile = tmp_path / 'ucm.env'
@@ -1090,6 +1176,7 @@ def test_a_host_outside_fips_mode_is_told_how_to_enable_it(tmp_path, os_release,
     result = _finish(tmp_path, envfile, 0, os_release)
     assert result.returncode == 0
     assert 'not in FIPS mode' in result.stdout and command in result.stdout
+    assert 'fips-updates' not in result.stdout
     assert 'UCM_FIPS=' not in envfile.read_text().replace('UCM_FIPS_BUILD=', '')
 
 
@@ -1114,7 +1201,8 @@ def test_a_generated_secret_never_appears_in_a_command_line(tmp_path):
 # ----------------------------------------------------------------- banner
 
 def _banner(tmp_path, pkg, softhsm=False,
-            hostname='[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test'):
+            hostname='[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test',
+            env_text='HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=s3cret\n'):
     bin_dir = tmp_path / 'bin'
     _stub(bin_dir / 'hostname', hostname)
     status = 'install ok installed' if softhsm is True else softhsm
@@ -1122,7 +1210,7 @@ def _banner(tmp_path, pkg, softhsm=False,
     _stub(bin_dir / 'dpkg', 'exit 1')
     _stub(bin_dir / 'rpm', '[ "$*" = "-q softhsm" ]' if softhsm else 'exit 1')
     envfile = tmp_path / 'ucm.env'
-    envfile.write_text('HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=s3cret\n')
+    envfile.write_text(env_text)
     path = f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"
     return envfile, _run(['banner', str(envfile), pkg], _env(tmp_path, extra={'PATH': path}))
 
@@ -1132,8 +1220,25 @@ def test_the_banner_brackets_ipv6_addresses(tmp_path):
     assert result.returncode == 0, result.stderr
     urls = [line.split()[-1] for line in result.stdout.splitlines() if 'https://' in line]
     assert urls == ['https://ucm.example.test:9443', 'https://192.0.2.10:9443', 'https://[2001:db8::10]:9443']
-    assert ' Admin:    admin / s3cret' in result.stdout
+    assert f' Password: the one you provided (INITIAL_ADMIN_PASSWORD in {envfile})' in result.stdout
+    assert 's3cret' not in result.stdout
     assert f' Config:   {envfile}' in result.stdout
+
+
+@pytest.mark.parametrize('env_text, path', [
+    ('HTTPS_PORT=9443\nDATA_DIR=/srv/ucm\n', '/srv/ucm/initial-admin-password'),
+    ('HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=\n', '/opt/ucm/data/initial-admin-password'),
+])
+def test_the_banner_says_where_the_generated_password_will_be(tmp_path, env_text, path):
+    _, result = _banner(tmp_path, 'deb', env_text=env_text)
+    assert result.returncode == 0, result.stderr
+    assert f'sudo cat {path}' in result.stdout
+    assert 'changeme123' not in result.stdout
+
+
+def test_the_banner_names_a_password_file(tmp_path):
+    _, result = _banner(tmp_path, 'rpm', env_text='INITIAL_ADMIN_PASSWORD_FILE=/root/admin.pw\n')
+    assert ' Password: the one you provided (INITIAL_ADMIN_PASSWORD_FILE=/root/admin.pw)' in result.stdout
 
 
 @pytest.mark.parametrize('pkg, softhsm, line', [
@@ -1159,7 +1264,7 @@ def test_the_banner_names_the_hsm_package_of_the_distribution(tmp_path, pkg, sof
 def test_a_failed_host_lookup_does_not_cut_the_banner_short(tmp_path):
     _, result = _banner(tmp_path, 'rpm', hostname='exit 127')
     assert result.returncode == 0, result.stderr
-    assert ' Admin:    admin / s3cret' in result.stdout
+    assert ' Admin:    admin' in result.stdout
     assert result.stdout.rstrip().endswith('============================================')
 
 
@@ -1179,3 +1284,71 @@ def test_a_failed_write_leaves_no_copy_of_the_secret(tmp_path):
     result = _run(['env', str(envfile), '/d'], _env(tmp_path, extra={'PATH': str(bin_dir)}))
     assert result.returncode != 0
     assert [p.name for p in conf.iterdir()] == ['ucm.env'] and envfile.read_text() == 'SECRET_KEY=\n'
+
+
+def _sourced_banner(tmp_path, env_text):
+    """cmd_banner and the helpers it calls, sourced alone: the script itself never runs."""
+    import re as _re
+    body = SCRIPT.read_text(encoding='utf-8')
+    def function(name):
+        one_line = _re.search(rf'^{name}\(\) \{{ .*\}}$', body, _re.M)
+        return (one_line or _re.search(rf'^{name}\(\) \{{\n.*?^\}}$', body, _re.M | _re.S)).group(0)
+    funcs = '\n'.join(function(name) for name in ('env_value', 'env_has', 'cmd_banner'))
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    for tool, script in (('hostname', 'echo ucm.example.test'), ('dpkg-query', 'exit 1'), ('rpm', 'exit 1')):
+        (bin_dir / tool).write_text(f'#!/bin/sh\n{script}\n')
+        (bin_dir / tool).chmod(0o755)
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text(env_text)
+    return subprocess.run([BASH, '-c', funcs + f'\ncmd_banner {envfile} deb'],
+                          env={'PATH': f'{bin_dir}:/usr/bin:/bin'}, capture_output=True, text=True)
+
+
+def test_the_banner_says_both_sources_refuse_the_start(tmp_path):
+    result = _sourced_banner(tmp_path, 'INITIAL_ADMIN_PASSWORD=Op-Chosen-1!\n'
+                                       'INITIAL_ADMIN_PASSWORD_FILE=/root/admin.pw\n')
+    assert result.returncode == 0, result.stderr
+    assert 'both set' in result.stdout and 'refused' in result.stdout
+    assert 'the one you provided' not in result.stdout and 'Op-Chosen-1!' not in result.stdout
+
+
+def test_the_banner_names_the_configured_administrator(tmp_path):
+    result = _sourced_banner(tmp_path, 'INITIAL_ADMIN_USERNAME=operator\n')
+    assert result.returncode == 0, result.stderr
+    assert ' Admin:    operator' in result.stdout
+
+
+# ----------------------------------------------------------------- without hostname
+
+def _path_without_hostname(tmp_path):
+    """Every command of the host but hostname, as on a Fedora 43 image without it."""
+    bin_dir = tmp_path / 'nohostname'
+    bin_dir.mkdir()
+    for d in ('/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'):
+        if not os.path.isdir(d):
+            continue
+        for name in os.listdir(d):
+            target = bin_dir / name
+            if name != 'hostname' and not target.exists() and not target.is_symlink():
+                os.symlink(os.path.join(d, name), target)
+    return str(bin_dir)
+
+
+def test_without_hostname_the_banner_and_the_name_come_from_uname(tmp_path):
+    path = _path_without_hostname(tmp_path)
+    name = os.uname().nodename
+    result = _run(['host-name'], _env(tmp_path, extra={'PATH': path}))
+    assert (result.returncode, result.stdout, result.stderr) == (0, f'{name}\n', '')
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('HTTPS_PORT=9443\n')
+    result = _run(['banner', str(envfile), 'rpm'], _env(tmp_path, extra={'PATH': path}))
+    assert result.returncode == 0 and 'command not found' not in result.stderr, result.stderr
+    assert f' Access:   https://{name}:9443' in result.stdout, result.stdout
+
+
+def test_with_hostname_its_fully_qualified_name_comes_first(tmp_path):
+    bin_dir = tmp_path / 'bin'
+    _stub(bin_dir / 'hostname', '[ "$1" = -f ] && echo ucm.example.test || echo ucm')
+    result = _run(['host-name'], _env(tmp_path, extra={'PATH': f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"}))
+    assert result.stdout == 'ucm.example.test\n'

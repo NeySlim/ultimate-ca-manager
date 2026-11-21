@@ -11,7 +11,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 import fips_mode
 from fips_mode import FipsRestricted
@@ -21,10 +21,13 @@ from auth.unified import require_auth, has_permission
 from models import CA, AuthCertificate, Certificate, User, db
 from utils.key_codec import load_pem_bytes
 from services.audit_service import AuditService
+from services.key_export_audit import encrypt_key_pem
 from services.cert_service import CertificateService
 from services.approval_gate import PairApprovalConflict, approval_payload, queue_revocation
-from services.cert.related_pair import mutual_partner
+from services.cert.related_pair import revocation_partner
 from services.mtls_enrollment import remove_enrolment
+from services.acme.upstream_revocation import (
+    propagate_acme_revocation, revocation_answer, with_related_answer)
 from utils.pagination import parse_request_pagination
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.export_password import validate_export_password
@@ -33,14 +36,31 @@ from utils.cert_status import (USER_CERTIFICATE_STATUS_FILTERS,
                                unknown_status_message)
 from utils.response import error_response, no_content_response, success_response
 from utils.db_transaction import safe_commit
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition, sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import BOOL, FORMAT, PASSWORD, TEXT, read_export_options
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('user_certificates', __name__, url_prefix='/api/v2/user-certificates')
+
+
+# Formats that carry no key or no chain default those options off, so a plain
+# DER or P7B request is not refused for an option nobody ticked.
+def _key_by_default(export_format):
+    return export_format not in ('der', 'pkcs7', 'p7b')
+
+
+def _chain_by_default(export_format):
+    return export_format not in ('der', 'key')
+
+
+_EXPORT_FORMATS = ('pem', 'der', 'pkcs7', 'p7b', 'key', 'pkcs12', 'p12', 'pfx', 'jks')
+EXPORT_OPTIONS = {
+    'format': FORMAT, 'include_key': BOOL, 'include_chain': BOOL, 'include_root': BOOL,
+    'password': PASSWORD, 'legacy': BOOL, 'chain_variant': TEXT,
+}
 
 
 def _is_admin_or_operator(user):
@@ -67,6 +87,19 @@ def _get_certificate_for_auth_cert(auth_cert):
     return certificate_row_for(auth_cert)
 
 
+def _cert_status(certificate, now):
+    """The status a listing row shows and the status filter matches."""
+    if certificate is None:
+        return 'orphan'
+    if certificate.revoked:
+        return 'revoked'
+    if certificate.valid_to and certificate.valid_to <= now:
+        return 'expired'
+    if certificate.valid_to and certificate.valid_to <= now + timedelta(days=30):
+        return 'expiring'
+    return 'valid'
+
+
 def _build_cert_response(auth_cert, certificate, owner_user=None):
     """Build a combined response dict from auth_cert + certificate."""
     result = auth_cert.to_dict()
@@ -85,13 +118,8 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['has_private_key'] = bool(certificate.prv)
         result['caref'] = certificate.caref
         # Extract CN from subject for CertificateDetails compatibility
-        subj = certificate.subject or ''
-        cn = ''
-        for part in subj.split(','):
-            part = part.strip()
-            if part.upper().startswith('CN='):
-                cn = part[3:]
-                break
+        from utils.dn_parse import stored_dn_common_name
+        cn = stored_dn_common_name(certificate.subject)
         result['common_name'] = cn or auth_cert.name or certificate.descr or ''
         result['cn'] = result['common_name']
         # Key info (parse from cert if available)
@@ -100,14 +128,7 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['signature_algorithm'] = getattr(certificate, 'signature_algorithm', None)
         # Compute status + days_remaining
         now = utc_now()
-        if certificate.revoked:
-            result['status'] = 'revoked'
-        elif certificate.valid_to and certificate.valid_to <= now:
-            result['status'] = 'expired'
-        elif certificate.valid_to and certificate.valid_to <= now + timedelta(days=30):
-            result['status'] = 'expiring'
-        else:
-            result['status'] = 'valid'
+        result['status'] = _cert_status(certificate, now)
         if certificate.valid_to:
             result['days_remaining'] = compute_days_remaining(
                 certificate.valid_to, now)
@@ -159,9 +180,9 @@ def list_user_certificates():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                AuthCertificate.name.ilike(search_pattern),
-                AuthCertificate.cert_subject.ilike(search_pattern),
-                AuthCertificate.cert_serial.ilike(search_pattern),
+                AuthCertificate.name.ilike(search_pattern, escape='\\'),
+                AuthCertificate.cert_subject.ilike(search_pattern, escape='\\'),
+                AuthCertificate.cert_serial.ilike(search_pattern, escape='\\'),
             )
         )
 
@@ -173,56 +194,43 @@ def list_user_certificates():
         'last_used_at': AuthCertificate.last_used_at,
     }
     sort_col = sort_col_map.get(sort_by, AuthCertificate.created_at)
-    # Tie-break on the primary key: `name` is not unique and `last_used_at` is
-    # NULL for every certificate never used, so without it the page boundary
-    # falls wherever the plan puts it — and the two backends do not even order
-    # NULLs the same way.
+    # Absent values last in both directions, whichever engine; the primary key
+    # breaks ties so the page boundary does not depend on the plan.
     if sort_order == 'asc':
-        query = query.order_by(sort_col.asc(), AuthCertificate.id.asc())
+        query = query.order_by(sort_col.asc().nulls_last(), AuthCertificate.id.asc())
     else:
-        query = query.order_by(sort_col.desc(), AuthCertificate.id.desc())
+        query = query.order_by(sort_col.desc().nulls_last(), AuthCertificate.id.desc())
 
-    # Execute with pagination
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    auth_certs = pagination.items
+    if status_filters:
+        # The status is computed from the bound certificate, so the filter
+        # runs before the page is cut: total and pages are those of the match.
+        now = utc_now()
+        matched = []
+        for ac in query.all():
+            cert = _get_certificate_for_auth_cert(ac)
+            if _cert_status(cert, now) in status_filters:
+                matched.append((ac, cert))
+        total = len(matched)
+        pages = (total + per_page - 1) // per_page
+        window = matched[(page - 1) * per_page:page * per_page]
+    else:
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        total, pages = pagination.total, pagination.pages
+        window = [(ac, _get_certificate_for_auth_cert(ac)) for ac in pagination.items]
 
-    # Build response with joined data
     results = []
     user_cache = {}
-    for ac in auth_certs:
-        cert = _get_certificate_for_auth_cert(ac)
-
-        # Status filter (post-query since status is computed)
-        if status_filters and cert:
-            now = utc_now()
-            matches = False
-            for sf in status_filters:
-                if sf == 'revoked' and cert.revoked:
-                    matches = True
-                elif sf == 'expired' and cert.valid_to and cert.valid_to <= now and not cert.revoked:
-                    matches = True
-                elif sf == 'valid' and cert.valid_to and cert.valid_to > now and not cert.revoked:
-                    matches = True
-                elif sf == 'expiring':
-                    threshold = now + timedelta(days=30)
-                    if cert.valid_to and now < cert.valid_to <= threshold and not cert.revoked:
-                        matches = True
-            if not matches:
-                continue
-
-        # Cache user lookup
+    for ac, cert in window:
         if ac.user_id not in user_cache:
             user_cache[ac.user_id] = db.session.get(User, ac.user_id)
-        owner = user_cache[ac.user_id]
-
-        results.append(_build_cert_response(ac, cert, owner))
+        results.append(_build_cert_response(ac, cert, user_cache[ac.user_id]))
 
     return success_response(data={
         'items': results,
-        'total': pagination.total,
+        'total': total,
         'page': page,
         'per_page': per_page,
-        'pages': pagination.pages,
+        'pages': pages,
     })
 
 
@@ -286,7 +294,7 @@ def get_user_certificate(cert_id):
 @bp.route('/<int:cert_id>/export', methods=['GET', 'POST'])
 @require_auth(['read:user_certificates'])
 def export_user_certificate(cert_id):
-    """Export user certificate (PEM or PKCS12). Auditors cannot export."""
+    """Export a user certificate as PEM, DER, P7B, the key alone, PKCS#12 or JKS. Auditors cannot export."""
     user = g.current_user
 
     if _is_auditor(user):
@@ -303,51 +311,34 @@ def export_user_certificate(cert_id):
     if not cert:
         return error_response('Certificate data not found', 404)
 
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json()
-        export_format = data.get('format', 'pem').lower()
-        password = data.get('password', '')
-        try:
-            include_key = json_boolean(data, 'include_key', True)
-            include_chain = json_boolean(data, 'include_chain', True)
-            include_root = json_boolean(data, 'include_root', False)
-            legacy_value = json_boolean(data, 'legacy', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        legacy = legacy_flag(legacy_value)  # 3DES/SHA-1 profile (#331)
-    else:
-        export_format = request.args.get('format', 'pem').lower()
-        password = request.args.get('password', '')
-        legacy = False
-        try:
-            include_key = query_boolean(request.args, 'include_key', True)
-            include_chain = query_boolean(request.args, 'include_chain', True)
-            include_root = query_boolean(request.args, 'include_root', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        # SECURITY: never accept passwords via query string (proxy access logs).
-        if password or export_format in ('pkcs12', 'p12', 'pfx', 'jks'):
-            if password:
-                logger.warning(
-                    "Rejected user-certificate export with password in query string "
-                    "(cert_id=%s): client must POST with JSON body",
-                    cert_id,
-                )
-            return error_response(
-                'Password must be sent via POST body (JSON), not query string',
-                400,
-            )
+    opts, refused = read_export_options(EXPORT_OPTIONS, _EXPORT_FORMATS, 'user-certificate')
+    if refused:
+        return refused
+    export_format = opts.get('format', 'pem')
+    password = opts.get('password', '')
+    by_query = request.method != 'POST'
+    # A GET reads no password, so it serves no key: the certificate alone, or 400
+    include_key = opts.get('include_key', False if by_query else _key_by_default(export_format))
+    include_chain = opts.get('include_chain', _chain_by_default(export_format))
+    include_root = opts.get('include_root', False)
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
+    if by_query and (include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key')):
+        return error_response(
+            'Password and private key exports must use POST with a JSON body, '
+            'not the query string', 400)
 
-    from api.v2.certificates.export import requested_chain_variant
-    variant, variant_err = requested_chain_variant(
-        data if request.method == 'POST' and request.is_json else request.args, cert)
+    from api.v2.certificates.export import inapplicable_option, requested_chain_variant
+    option_err = inapplicable_option(export_format, include_key, include_chain)
+    if option_err:
+        return error_response(option_err, 400)
+    variant, variant_err = requested_chain_variant(opts, cert)
     if variant_err:
         return variant_err
 
     # Somebody else's key needs `read:private_keys`, as on the certificate
     # route, or the approval-gated Key Recovery flow is bypassable (#232).
     # Your own key stays: that is what the account page is for.
-    wants_key = include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks')
+    wants_key = include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key')
     if wants_key and auth_cert.user_id != user.id:
         if not has_permission('read:private_keys', g.permissions):
             return error_response(
@@ -357,7 +348,48 @@ def export_user_certificate(cert_id):
 
     try:
         cert_pem = base64.b64decode(cert.crt)
-        filename_base = sanitize_filename(auth_cert.name or cert.descr or cert.refid)
+        # The raw name goes to content_disposition(), which falls back to the refid.
+        raw_name = auth_cert.name or cert.descr or cert.refid
+        filename_base = sanitize_filename(raw_name)
+
+        if export_format == 'key':
+            pw_err = validate_export_password(password, allow_empty=True)
+            if pw_err:
+                return error_response(pw_err, 400)
+            from api.v2.certificates.export import key_only_response
+            answer = key_only_response(cert, password, 'user_certificate', filename_base, raw_name)
+            if answer.status_code == 200:
+                AuditService.log_action(
+                    action='user_certificate_exported',
+                    resource_type='user_certificate',
+                    resource_id=cert_id,
+                    resource_name=filename_base,
+                    details=f'Exported private key only for user cert: {filename_base}',
+                    success=True
+                )
+            return answer
+
+        if export_format in ('der', 'pkcs7', 'p7b'):
+            from api.v2.certificates.export import (
+                _build_ca_chain, _split_pem_certs, der_response, p7b_response)
+            if export_format == 'der':
+                answer = der_response(cert_pem, raw_name, cert.refid)
+            else:
+                leaf = _split_pem_certs(cert_pem)
+                pems = [leaf[0].public_bytes(serialization.Encoding.PEM) if leaf else cert_pem]
+                if include_chain:
+                    pems += [c.public_bytes(serialization.Encoding.PEM) for c in _build_ca_chain(
+                        cert, cert_pem, include_root=include_root, variant=variant)]
+                answer = p7b_response(pems, raw_name, cert.refid)
+            AuditService.log_action(
+                action='user_certificate_exported',
+                resource_type='user_certificate',
+                resource_id=cert_id,
+                resource_name=filename_base,
+                details=f'Exported {export_format.upper()} for user cert: {filename_base}',
+                success=True
+            )
+            return answer
 
         if export_format in ('pkcs12', 'p12', 'pfx'):
             pw_err = validate_export_password(password)
@@ -397,7 +429,7 @@ def export_user_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{filename_base}.p12"'}
+                headers={'Content-Disposition': content_disposition(raw_name, '.p12', fallback=cert.refid)}
             )
 
         elif export_format == 'jks':
@@ -456,7 +488,7 @@ def export_user_certificate(cert_id):
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
-                headers={'Content-Disposition': f'attachment; filename="{filename_base}.jks"'}
+                headers={'Content-Disposition': content_disposition(raw_name, '.jks', fallback=cert.refid)}
             )
 
         # PEM export (default)
@@ -466,14 +498,18 @@ def export_user_certificate(cert_id):
             stored_certs[0].public_bytes(serialization.Encoding.PEM)
             if stored_certs else cert_pem
         )
-        filename = f"{filename_base}.crt"
+        suffix = '.crt'
 
         if include_key and cert.prv:
-            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
+            pw_err = validate_export_password(password, allow_empty=True)
+            if pw_err:
+                return error_response(pw_err, 400)
+            key_pem = encrypt_key_pem(
+                load_pem_bytes(cert.prv, context=f"certificate {cert.id}"), password)
             if not result.endswith(b'\n'):
                 result += b'\n'
             result += key_pem
-            filename = f"{filename_base}.pem"
+            suffix = '.pem'
 
         if include_chain:
             for ca_cert in _build_ca_chain(cert, cert_pem, include_root=include_root, variant=variant):
@@ -486,7 +522,7 @@ def export_user_certificate(cert_id):
             resource_type='user_certificate',
             resource_id=cert_id,
             resource_name=filename_base,
-            details=(f'Exported PEM with private key (unencrypted) for user cert: {filename_base}'
+            details=(f'Exported PEM with private key ({"password-protected" if password else "unencrypted"}) for user cert: {filename_base}'
                      if include_key and cert.prv else f'Exported PEM for user cert: {filename_base}'),
             success=True
         )
@@ -494,7 +530,7 @@ def export_user_certificate(cert_id):
         return Response(
             result,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+            headers={'Content-Disposition': content_disposition(raw_name, suffix, fallback=cert.refid)}
         )
 
     except FipsRestricted:
@@ -528,7 +564,7 @@ def revoke_user_certificate(cert_id):
     if not revocable(cert, reason):
         return error_response('Certificate already revoked', 400)
 
-    partner = mutual_partner(cert)
+    partner = revocation_partner(cert)
     try:
         policy, approval = queue_revocation(user, cert, reason=reason,
                                             comment=data.get('approval_comment'),
@@ -545,10 +581,12 @@ def revoke_user_certificate(cert_id):
                                 message='Certificate revocation submitted for approval')
 
     try:
+        related_acme = []
         cert = CertificateService.revoke_certificate(
             cert_id=cert.id,
             reason=reason,
-            username=user.username
+            username=user.username,
+            related_acme=related_acme,
         )
 
         # Disable auth certificate
@@ -564,11 +602,12 @@ def revoke_user_certificate(cert_id):
             success=True
         )
 
+        # After the commit: a failed lookup rolls back, which must not re-enable the enrolment
+        acme_outcome, acme_detail = propagate_acme_revocation(cert, reason)
         owner = db.session.get(User, auth_cert.user_id)
         return success_response(
             data=_build_cert_response(auth_cert, cert, owner),
-            message='Certificate revoked successfully'
-        )
+            **with_related_answer(revocation_answer(acme_outcome, acme_detail), related_acme))
     except ValueError as e:
         logger.error(f'User certificate revocation validation error: {e}')
         return error_response('Invalid revocation request', 400)
@@ -593,9 +632,9 @@ def delete_user_certificate(cert_id):
 
     # Refused while a policy requires approval to revoke its certificate,
     # whoever holds it (administrators bypass)
-    removed, failure = remove_enrolment(auth_cert, username=user.username, actor=user)
+    removed, answer = remove_enrolment(auth_cert, username=user.username, actor=user)
     if not removed:
-        return failure
+        return answer
 
     AuditService.log_action(
         action='user_certificate_deleted',
@@ -606,4 +645,4 @@ def delete_user_certificate(cert_id):
         success=True
     )
 
-    return no_content_response()
+    return success_response(**answer) if answer else no_content_response()

@@ -178,19 +178,19 @@ export default function EmailTemplateWindow({ onClose }) {
             <div className="flex items-center gap-1 bg-bg-tertiary rounded-md p-0.5">
               <button type="button" onClick={() => setTab('html')}
                 className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                  tab === 'html' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
+                  tab === 'html' ? 'bg-accent-primary text-on-accent shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
                 <Code size={14} /> HTML
               </button>
               <button type="button" onClick={() => setTab('text')}
                 className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                  tab === 'text' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
+                  tab === 'text' ? 'bg-accent-primary text-on-accent shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
                 <TextT size={14} /> {t('settings.templatePlainText')}
               </button>
             </div>
             {/* Variables */}
             <div className="flex items-start gap-1.5 min-w-0">
               <Info size={12} className="shrink-0 mt-0.5 text-accent-primary" />
-              <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-[11px] text-text-tertiary">
+              <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-text-tertiary">
                 {vars.map(v => (
                   <span key={v.var}>
                     <code className="text-accent-primary font-mono">{v.var}</code>
@@ -223,7 +223,7 @@ export default function EmailTemplateWindow({ onClose }) {
           ) : (
             <>
               <div className="w-1/2 flex flex-col border-r border-border min-h-0">
-                <div className="px-3 py-1.5 bg-bg-tertiary border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
+                <div className="px-3 py-1.5 bg-bg-tertiary border-b border-border text-xs font-medium text-text-tertiary uppercase tracking-wider">
                   {tab === 'html' ? 'HTML Source' : t('settings.templatePlainText')}
                 </div>
                 <textarea
@@ -234,7 +234,7 @@ export default function EmailTemplateWindow({ onClose }) {
                 />
               </div>
               <div className="w-1/2 flex flex-col min-h-0">
-                <div className="px-3 py-1.5 bg-bg-tertiary border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
+                <div className="px-3 py-1.5 bg-bg-tertiary border-b border-border text-xs font-medium text-text-tertiary uppercase tracking-wider">
                   {t('settings.templatePreview')}
                 </div>
                 {tab === 'html' ? (

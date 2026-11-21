@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 import fips_mode
 from fips_mode import FipsRestricted
 
@@ -28,13 +29,14 @@ from models.truststore import TrustedCertificate
 from utils.response import success_response, error_response
 from utils.export_password import (export_password_policy,
                                    validate_export_password)
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from utils.key_codec import load_pem_bytes
 from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
 )
-from utils.export_options import json_boolean, query_boolean
-from services.key_export_audit import audit_key_export
+from utils.export_options import (
+    BOOL, FORMAT, PASSWORD, TEXT, json_boolean, query_boolean, read_export_options)
+from services.key_export_audit import audit_key_export, encrypt_key_pem
 from services.cert.related_pair import row_certificate
 from utils import related_cert
 from . import bp
@@ -82,17 +84,13 @@ def _hybrid_bundle(certificate, include_key, password):
                             if stored else base64.b64decode(row.crt))
             if include_key:
                 key_pem = load_pem_bytes(row.prv, context=f"certificate {row.id}")
-                if password:
-                    key_pem = serialization.load_pem_private_key(key_pem, password=None).private_bytes(
-                        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                        serialization.BestAvailableEncryption(password.encode()))
+                key_pem = encrypt_key_pem(key_pem, password)
                 bundle.writestr(f'{name}.key', key_pem)
     if include_key:
         for row in members:
             audit_key_export('certificate', row.id, row.descr or row.refid, 'hybrid-bundle', password)
-    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_hybrid.zip"
     return Response(buffer.getvalue(), mimetype='application/zip',
-                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+                    headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '_hybrid.zip', fallback=certificate.refid)})
 
 
 def _normalized_key_identifier(value):
@@ -109,13 +107,15 @@ def _resolve_issuer_cert(cert):
     (by issuer DN). Returns the issuer x509.Certificate or None. Used to fill in
     a missing chain when it is neither stored inline nor reachable via `caref`.
     """
+    from utils.cert_issuer import self_signed_first
     issuer_dn = cert.issuer.rfc4514_string()
     aki = authority_key_identifier_hex(cert)
     candidates = []
     seen = set()
 
     def add_managed(rows):
-        for row in rows:
+        # The root before a cross or link certificate of its key, on any engine
+        for row in self_signed_first(sorted(rows, key=lambda r: r.id)):
             identity = ('ca', row.id)
             if row.crt and identity not in seen:
                 seen.add(identity)
@@ -239,6 +239,47 @@ def _named_cas(ca_certs):
     return named
 
 
+def key_only_response(certificate, password, audit_type, audit_name, download_name):
+    """The private key alone, PKCS#8 encrypted when a password is given; audited."""
+    if not certificate.prv:
+        return error_response('Certificate has no private key', 400)
+    key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
+    key_pem = encrypt_key_pem(key_pem, password)
+    audit_key_export(audit_type, certificate.id, audit_name, 'key', password)
+    return Response(
+        key_pem,
+        mimetype='application/x-pem-file',
+        headers={'Content-Disposition': content_disposition(download_name, '.key', fallback=certificate.refid)}
+    )
+
+
+def der_response(cert_pem, download_name, fallback):
+    cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+    return Response(
+        cert.public_bytes(serialization.Encoding.DER),
+        mimetype='application/x-x509-ca-cert',
+        headers={'Content-Disposition': content_disposition(download_name, '.der', fallback=fallback)}
+    )
+
+
+def p7b_response(pems, download_name, fallback):
+    return Response(
+        p7b_from_pems(pems),
+        mimetype='application/x-pkcs7-certificates',
+        headers={'Content-Disposition': content_disposition(download_name, '.p7b', fallback=fallback)}
+    )
+
+
+def inapplicable_option(export_format, include_key, include_chain):
+    """Message for a ticked option the format cannot carry (DER holds one
+    certificate, P7B no key); None when the combination is possible."""
+    if include_key and export_format in ('der', 'pkcs7', 'p7b'):
+        return f'include_key cannot be used with the {export_format} format: it holds no private key'
+    if include_chain and export_format == 'der':
+        return 'include_chain cannot be used with the der format: it holds a single certificate'
+    return None
+
+
 @bp.route('/api/v2/certificates/export', methods=['GET', 'POST'])
 @require_auth(['read:certificates'])
 def export_all_certificates():
@@ -269,28 +310,17 @@ def export_all_certificates():
         return error_response('No certificates to export', 404)
 
     try:
-        if export_format == 'pem':
-            # Concatenate all PEM certificates
-            pem_data = b''
-            for cert in certificates:
-                if cert.crt:
-                    pem_data += base64.b64decode(cert.crt)
-                    if not pem_data.endswith(b'\n'):
-                        pem_data += b'\n'
-
-            return Response(
-                pem_data,
-                mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="certificates.pem"'}
-            )
-
-        elif export_format == 'pkcs7' or export_format == 'p7b':
-            p7b_output = p7b_from_pems(base64.b64decode(cert.crt) for cert in certificates if cert.crt)
-            return Response(
-                p7b_output,
-                mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'}
-            )
+        if export_format in ('pem', 'pkcs7', 'p7b'):
+            pems, skipped = readable_pems(((c.id, c.crt) for c in certificates))
+            if not pems:
+                return nothing_readable(skipped)
+            headers = skipped_headers(skipped)
+            if export_format == 'pem':
+                headers['Content-Disposition'] = 'attachment; filename="certificates.pem"'
+                return Response(b''.join(pem if pem.endswith(b'\n') else pem + b'\n' for pem in pems),
+                                mimetype='application/x-pem-file', headers=headers)
+            headers['Content-Disposition'] = 'attachment; filename="certificates.p7b"'
+            return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
 
         else:
             return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
@@ -298,6 +328,14 @@ def export_all_certificates():
     except Exception as e:
         logger.error(f"Bulk export failed: {e}")
         return error_response('Export failed', 500)
+
+
+EXPORT_FORMATS = ('pem', 'der', 'pkcs7', 'p7b', 'key', 'pkcs12', 'pfx', 'jks', 'hybrid-bundle')
+KEY_FORMATS = ('pkcs12', 'pfx', 'jks', 'key')
+EXPORT_OPTIONS = {
+    'format': FORMAT, 'include_key': BOOL, 'include_chain': BOOL, 'include_root': BOOL,
+    'password': PASSWORD, 'legacy': BOOL, 'chain_variant': TEXT,
+}
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/export', methods=['GET', 'POST'])
@@ -321,48 +359,30 @@ def export_certificate(cert_id):
     if not certificate.crt:
         return error_response('Certificate data not available', 400)
 
-    # Support both GET (query params) and POST (body) for security
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json()
-        export_format = data.get('format', 'pem').lower()
-        try:
-            include_key = json_boolean(data, 'include_key', False)
-            include_chain = json_boolean(data, 'include_chain', False)
-            include_root = json_boolean(data, 'include_root', False)
-            legacy_value = json_boolean(data, 'legacy', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        password = data.get('password')
-        # PKCS#12 compatibility profile (3DES/SHA-1) for importers that
-        # reject the AES-256/SHA-256 default (#331)
-        legacy = legacy_flag(legacy_value)
-        variant, variant_err = requested_chain_variant(data, certificate)
-    else:
-        export_format = request.args.get('format', 'pem').lower()
-        try:
-            include_key = query_boolean(request.args, 'include_key', False)
-            include_chain = query_boolean(request.args, 'include_chain', False)
-            include_root = query_boolean(request.args, 'include_root', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        password = request.args.get('password')
-        legacy = False
-        variant, variant_err = requested_chain_variant(request.args, certificate)
-        # SECURITY: never accept passwords via query string
-        if password or export_format in ('pkcs12', 'pfx', 'jks'):
-            if password:
-                logger.warning(
-                    "Rejected certificate export with password in query string "
-                    "(cert_id=%s): client must POST with JSON body",
-                    cert_id,
-                )
-            return error_response(
-                'Password must be sent via POST body (JSON), not query string',
-                400,
-            )
+    opts, refused = read_export_options(EXPORT_OPTIONS, EXPORT_FORMATS, 'certificate')
+    if refused:
+        return refused
+    export_format = opts.get('format', 'pem')
+    include_key = opts.get('include_key', False)
+    include_chain = opts.get('include_chain', False)
+    include_root = opts.get('include_root', False)
+    password = opts.get('password')
+    # PKCS#12 compatibility profile (3DES/SHA-1) for importers that
+    # reject the AES-256/SHA-256 default (#331)
+    legacy = opts.get('legacy', False)
+    variant, variant_err = requested_chain_variant(opts, certificate)
+    # A GET reads no password, so it serves no key
+    if request.method != 'POST' and (include_key or export_format in KEY_FORMATS):
+        return error_response(
+            'Password and private key exports must use POST with a JSON body, '
+            'not the query string', 400)
 
     if variant_err:
         return variant_err
+
+    option_err = inapplicable_option(export_format, include_key, include_chain)
+    if option_err:
+        return error_response(option_err, 400)
 
     # One rule for the password that encrypts the bundle (utils/export_password).
     # This route used to check presence only, so a one-character password
@@ -399,38 +419,24 @@ def export_certificate(cert_id):
 
         # Private key only export
         if export_format == 'key':
-            if not certificate.prv:
-                return error_response('Certificate has no private key', 400)
-            key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
-            if password:
-                private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-                key_pem = private_key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
-                )
-            audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
-                             export_format, password)
-            return Response(
-                key_pem,
-                mimetype='application/x-pem-file',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.key"'}
-            )
+            return key_only_response(certificate, password, 'certificate', certificate.descr or certificate.refid,
+                                     certificate.descr or certificate.refid)
 
         if export_format == 'pem':
             # A stored certificate may already contain an inline full chain.
             # Start with the leaf only so include_chain/include_root are honored.
             result = leaf_pem
             content_type = 'application/x-pem-file'
-            filename = f"{sanitize_filename(certificate.descr or certificate.refid)}.crt"
+            suffix = '.crt'
 
             # Include private key if requested
             if include_key and certificate.prv:
-                key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
+                key_pem = encrypt_key_pem(
+                    load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}"), password)
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
-                filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_with_key.pem"
+                suffix = '_with_key.pem'
 
             # Include CA chain if requested
             if include_chain:
@@ -441,9 +447,9 @@ def export_certificate(cert_id):
                         result += b'\n'
                     result += ca_cert.public_bytes(serialization.Encoding.PEM)
                 if include_key:
-                    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_full_chain.pem"
+                    suffix = '_full_chain.pem'
                 else:
-                    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_chain.pem"
+                    suffix = '_chain.pem'
 
             if include_key and certificate.prv:
                 audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
@@ -451,18 +457,11 @@ def export_certificate(cert_id):
             return Response(
                 result,
                 mimetype=content_type,
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, suffix, fallback=certificate.refid)}
             )
 
         elif export_format == 'der':
-            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            der_bytes = cert.public_bytes(serialization.Encoding.DER)
-
-            return Response(
-                der_bytes,
-                mimetype='application/x-x509-ca-cert',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.der"'}
-            )
+            return der_response(cert_pem, certificate.descr or certificate.refid, certificate.refid)
 
         elif export_format == 'pkcs12':
             if not password:
@@ -494,7 +493,7 @@ def export_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p12"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.p12', fallback=certificate.refid)}
             )
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
@@ -502,11 +501,7 @@ def export_certificate(cert_id):
             if include_chain:
                 pems += [ca_cert.public_bytes(serialization.Encoding.PEM) for ca_cert in _build_ca_chain(
                     certificate, cert_pem, include_root=include_root, variant=variant)]
-            return Response(
-                p7b_from_pems(pems),
-                mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p7b"'}
-            )
+            return p7b_response(pems, certificate.descr or certificate.refid, certificate.refid)
 
         elif export_format == 'pfx':
             # PFX is same as PKCS12
@@ -539,7 +534,7 @@ def export_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.pfx"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.pfx', fallback=certificate.refid)}
             )
 
         elif export_format == 'jks':
@@ -588,7 +583,7 @@ def export_certificate(cert_id):
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.jks"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.jks', fallback=certificate.refid)}
             )
 
         else:

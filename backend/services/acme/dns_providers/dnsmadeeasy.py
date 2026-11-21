@@ -2,11 +2,12 @@
 DNS Made Easy Provider
 https://api-docs.dnsmadeeasy.com/
 """
-import requests, hashlib, hmac, time
+import requests, hmac, time
 from typing import Tuple, Dict, Any, Optional
 import logging
 from datetime import datetime, timezone
 
+import fips_mode
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -20,12 +21,17 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
     
     BASE_URL = "https://api.dnsmadeeasy.com/V2.0"
     
+    HMAC_SECRET_NAME = 'DNS Made Easy secret key'
+
+    @classmethod
+    def hmac_key(cls, credentials) -> bytes:
+        return str(credentials.get('secret_key') or '').encode()
+
     def _get_headers(self):
         now = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
-        hmac_hash = hmac.new(
-            self.credentials['secret_key'].encode(),
-            now.encode(), hashlib.sha1
-        ).hexdigest()
+        secret = self.hmac_key(self.credentials)
+        fips_mode.refuse_short_hmac_key(secret, self.HMAC_SECRET_NAME)
+        hmac_hash = hmac.digest(secret, now.encode(), 'sha1').hex()
         return {
             'x-dnsme-apiKey': self.credentials['api_key'],
             'x-dnsme-requestDate': now,

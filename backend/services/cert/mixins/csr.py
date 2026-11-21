@@ -10,6 +10,11 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
+from services.cert.unique_subject import (SubjectTaken, audit_override, refuse_taken_subject,
+                                          successor_holder)
+from utils.ca_serial_counter import (
+    log_commit_failure, next_ca_serial, retry_on_serial_collision,
+    rollback_unless_serial_collision)
 from services.file_regen_service import mirror_private_key
 from services.trust_store import TrustStoreService
 from utils.dn_parse import subject_common_name
@@ -53,6 +58,20 @@ from security.encryption import decrypt_private_key, encrypt_private_key
 from utils.key_codec import load_pem_bytes
 
 
+def _supersede_msca_requests(csr_id, username, commit):
+    """Close the Microsoft CA requests a certificate from another source made moot.
+    With ``commit`` the action is already stored: a failure is logged, never raised."""
+    from services.msca.requests import supersede_for_csr
+    if not commit:
+        return supersede_for_csr(csr_id, username=username, commit=False)
+    try:
+        return supersede_for_csr(csr_id, username=username, commit=True)
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to close the Microsoft CA requests of CSR %s", csr_id)
+        return 0
+
+
 class RelatedSignerError(ValueError):
     """The certificate A named by ``related_to`` cannot sign a relatedCertRequest."""
 
@@ -78,8 +97,8 @@ class CSRMixin:
     def generate_csr(
         descr: str,
         dn: Dict[str, str],
-        key_type: str = '2048',
-        digest: str = 'sha256',
+        key_type: Optional[str] = None,
+        digest: Optional[str] = None,
         san_dns: Optional[List[str]] = None,
         san_ip: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,
@@ -113,10 +132,11 @@ class CSRMixin:
         related_row, related_certificate, related_key = (
             _related_signer(related_to) if related_to is not None else (None, None, None))
 
-        # Generate CSR
+        # Generate CSR; the default key is the one the global policies allow
+        from utils.issuance_defaults import default_issue_key_id
         csr_pem, key_pem = TrustStoreService.generate_csr(
             subject=subject,
-            key_type=key_type,
+            key_type=key_type or default_issue_key_id(),
             digest=digest,
             san_dns=san_dns,
             san_ip=san_ip,
@@ -187,6 +207,7 @@ class CSRMixin:
         return certificate
 
     @staticmethod
+    @retry_on_serial_collision
     def sign_csr(
         cert_id: int,
         caref: str,
@@ -204,6 +225,10 @@ class CSRMixin:
         custom_extensions: list = None,
         not_before=None,
         not_after=None,
+        subject_holder: str = None,
+        override_unique_subject: bool = False,
+        source: str = 'csr',
+        subject_dns: list = None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -229,6 +254,11 @@ class CSRMixin:
                 over the template's for the same OID; the template's apply to leaves only
             not_before, not_after: dates the requester asked for (naive UTC), issued
                 exactly or refused (ACME notBefore/notAfter)
+            subject_holder: who the subject is certified to (ACME: 'acme:<account>')
+            override_unique_subject: an operator issues although the CA's unique subject
+                is taken (audited); never set by a protocol
+            source: the issuance path its refusal audit names
+            subject_dns: DNS names the subject requests (ACME CN), counted by the policies
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -285,14 +315,16 @@ class CSRMixin:
             if unsignable:
                 raise RequestRejected(f"CSR public key rejected: {unsignable}")
             if not csr_obj.is_signature_valid:
-                raise RequestRejected("CSR signature is invalid (proof-of-possession failed)")
+                from utils.csr_diagnostics import weak_csr_hash_error
+                raise RequestRejected(weak_csr_hash_error(csr_obj)
+                                      or "CSR signature is invalid (proof-of-possession failed)")
         except ValueError:
             raise
         except Exception as e:
             raise ValueError(f"Failed to verify CSR signature: {e}")
 
-        # RFC 9763: A is found before signing, so linking after it cannot fail
-        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
+        # RFC 9763: A is found before signing; linking refuses only an A renewed since
+        from services.cert.related_pair import link_issued, named_by, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr_obj.public_bytes(serialization.Encoding.DER))
 
         # Sign CSR
@@ -355,10 +387,15 @@ class CSRMixin:
                 'ca_id': ca.id,
                 'template_id': policy_template_id if policy_template_id is not None else template_id,
                 'digest_explicit': digest_explicit,
+                'subject_dns': list(subject_dns or ()),
             },
             notices=notices,
             not_before=not_before,
             not_after=not_after,
+            # Without the lock, before the CT logs see a pre-certificate; checked again under it
+            before_publication=None if override_unique_subject else (lambda leaf: refuse_taken_subject(
+                ca, leaf, own=[certificate], renews=[named_by(leaf, related_a)],
+                holder=subject_holder, source=source, requester=username, locked=False)),
         )
 
         # Parse signed certificate
@@ -415,6 +452,8 @@ class CSRMixin:
         certificate.serial_number = str(cert.serial_number)
         certificate.valid_from = cert.not_valid_before
         certificate.valid_to = cert.not_valid_after
+        if subject_holder:
+            certificate.subject_holder = subject_holder
 
         # Keep the template link and record the divergences from its
         # defaults (#258), as the issue form and approval paths do. The key
@@ -432,8 +471,15 @@ class CSRMixin:
                 digest=digest if cert.signature_hash_algorithm is not None else None,
             )
 
-        # RFC 9763: the A the request named and the certificate now names
-        link_issued(certificate, cert, related_a)
+        # RFC 9763: the A the request named and the certificate now names, refused if renewed since
+        try:
+            a_row = link_issued(certificate, cert, related_a)
+        except Exception:
+            db.session.rollback()
+            raise
+        # A verified relatedCertRequest proves A's key: B is A's entity (RFC 9763 pair)
+        if a_row is not None:
+            certificate.subject_holder = successor_holder(subject_holder, [a_row])
 
         # Store SANs
         if san_dns_list:
@@ -442,9 +488,6 @@ class CSRMixin:
             certificate.san_ip = json.dumps(san_ip_list)
         if san_email_list:
             certificate.san_email = json.dumps(san_email_list)
-
-        # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
 
         # If signing as intermediate CA, create a CA record
         new_ca = None
@@ -493,11 +536,24 @@ class CSRMixin:
         try:
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr_obj.public_bytes(serialization.Encoding.DER), related_a)
+            # Every row written (A's link included) is locked before the CA row, last
+            db.session.flush()
+            next_ca_serial(ca)
+            overridden = None
+            if new_ca is None:  # a CA certificate is out of the subject rule's scope
+                overridden = refuse_taken_subject(
+                    ca, cert, own=[certificate], renews=[a_row], holder=subject_holder,
+                    override=override_unique_subject, source=source,
+                    requester=username)
             db.session.commit()
-        except Exception as _commit_err:
-            db.session.rollback()
-            logger.error(f"Commit failed in services/cert/mixins/csr.py:303: {_commit_err}", exc_info=True)
+        except SubjectTaken:
             raise
+        except Exception as _commit_err:
+            rollback_unless_serial_collision(_commit_err)
+            log_commit_failure(logger, "Storing the signed CSR failed", _commit_err)
+            raise
+        if overridden is not None:
+            audit_override(ca, certificate, overridden, username)
 
         # A request queued for approval and then signed directly is closed
         # as approved by the signer (no other approver could do more)
@@ -505,6 +561,7 @@ class CSRMixin:
         resolve_moot_requests('csr', 'csr_id', cert_id, outcome='approved', username=username,
                               certificate_id=None if new_ca else certificate.id,
                               reason='Signed directly')
+        _supersede_msca_requests(cert_id, username, commit=True)
         # Audit log with centralized service
         from services.audit_service import AuditService
         if new_ca:
@@ -518,6 +575,8 @@ class CSRMixin:
                 mirror_private_key(
                     ca_key_path(new_ca), key_data, context=f"CA {new_ca.id}"
                 )
+            from services.webhook_service import emit_ca_created
+            emit_ca_created(new_ca.to_dict(), actor=username)
             return new_ca
         else:
             AuditService.log_certificate('csr_signed', certificate, f'Signed CSR: {certificate.descr}')
@@ -644,6 +703,7 @@ class CSRMixin:
         from services.approval_gate import resolve_moot_requests
         resolve_moot_requests('csr', 'csr_id', certificate.id, outcome='approved', username=username,
                               certificate_id=certificate.id, reason='Certificate imported', commit=commit)
+        _supersede_msca_requests(certificate.id, username, commit=commit)
 
         with open(cert_cert_path(certificate), 'wb') as f:
             f.write(cert_pem)
@@ -662,4 +722,7 @@ class CSRMixin:
                 f'(private key {"kept" if certificate.prv else "absent"})',
                 username=username,
             )
+            # The Smart Import (commit=False) fires it after its own commit
+            from services.webhook_service import emit_cert_imported
+            emit_cert_imported(certificate.to_dict(), ca_refid=certificate.caref, actor=username)
         return certificate

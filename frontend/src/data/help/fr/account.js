@@ -9,24 +9,24 @@ export default {
         items: [
           { label: 'Nom complet', text: 'Votre nom d\'affichage affiché dans toute l\'application' },
           { label: 'E-mail', text: 'Utilisé pour les notifications et la récupération de compte' },
-          { label: 'Infos du compte', text: 'Date de création, dernière connexion, nombre total de connexions' },
+          { label: 'Informations du compte', text: 'Date de création, dernière connexion, nombre total de connexions' },
         ]
       },
       {
         title: 'Sécurité',
         items: [
-          { label: 'Mot de passe', text: 'Changer votre mot de passe actuel' },
-          { label: '2FA (TOTP)', text: 'Activer les mots de passe à usage unique basés sur le temps via une application d\'authentification. La réactiver alors qu\'elle est déjà active est refusé : désactivez-la d\'abord' },
+          { label: 'Mot de passe', text: 'Changer votre mot de passe actuel. Vos autres sessions sont fermées ; celle-ci reste ouverte' },
+          { label: '2FA (TOTP)', text: 'Activer les mots de passe à usage unique basés sur le temps via une application d\'authentification. La réactiver alors qu\'elle est déjà active est refusé : désactivez-la d\'abord. Chaque code ne fonctionne qu\'une fois : après en avoir utilisé un, attendez le suivant pour confirmer une autre action' },
           { label: 'Clés de sécurité', text: 'Enregistrer des clés WebAuthn/FIDO2 (YubiKey, empreinte digitale, etc.)' },
           { label: 'mTLS', text: 'Gérer les certificats client pour l\'authentification TLS mutuel' },
-          { label: "Changement de mot de passe imposé (v2.245)", text: "Un compte à qui l'on a demandé un nouveau mot de passe, comme l'admin du premier démarrage avec changeme123 par défaut, ne peut rien faire d'autre tant qu'il ne l'a pas changé, API et WebSocket compris ; l'invite propose Se déconnecter au lieu de Ignorer. Un mot de passe défini par INITIAL_ADMIN_PASSWORD n'a pas à être changé" },
+          { label: "Changement de mot de passe imposé (v2.245)", text: "Un compte à qui l'on a demandé un nouveau mot de passe, comme le premier administrateur dont UCM a généré le mot de passe au premier démarrage, ne peut rien faire d'autre tant qu'il ne l'a pas changé, API et WebSocket compris ; l'invite ne peut pas être ignorée et son seul autre bouton est Déconnexion. Ce changement supprime le fichier qui contenait le mot de passe généré. Un mot de passe fourni par INITIAL_ADMIN_PASSWORD ou INITIAL_ADMIN_PASSWORD_FILE n'a pas à être changé, sauf si INITIAL_ADMIN_PASSWORD_FORCE_CHANGE est défini (le chart Helm le définit pour le mot de passe qu'il génère)" },
         ]
       },
       {
         title: 'Clés API',
         items: [
           { label: 'Créer une clé', text: 'Générer une nouvelle clé API, expirant éventuellement après un nombre de jours' },
-          { label: 'Permissions', text: 'Une clé porte le périmètre choisi à sa création, jamais plus que vos propres permissions. Une clé ne peut créer ou régénérer qu\'une clé dont elle détient elle-même les permissions' },
+          { label: 'Permissions', text: 'Une clé porte le périmètre choisi à sa création, jamais plus que vos propres permissions. Une clé ne peut créer ou régénérer qu\'une clé dont elle détient elle-même les permissions, expirant au plus tard comme elle. Régénérer, ce que seule l\'API propose, conserve la durée de vie de la clé ; une clé révoquée ou expirée ne peut pas être régénérée' },
           { label: 'Révoquer', text: 'Invalider immédiatement une clé API' },
           { label: 'Utilisateurs désactivés', text: 'Les clés API appartenant à un utilisateur désactivé sont rejetées même si la clé elle-même est encore valide' },
           { label: 'Session interactive uniquement', text: 'Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d\'administration des utilisateurs : connectez-vous de façon interactive' },
@@ -38,7 +38,7 @@ export default {
         items: [
           { label: 'Stocké', text: 'Dans users.preferences (JSON). Nouveaux endpoints GET/PUT /api/v2/account/preferences' },
           { label: 'Auto-appliqué', text: '/api/v2/auth/verify retourne vos préférences, appliquées au chargement de chaque page' },
-          { label: 'Nouveau navigateur', text: 'Connexion depuis un nouvel appareil ou après nettoyage du site → vos langue et thème choisis sont restaurés' },
+          { label: 'Nouveau navigateur', text: 'Connexion depuis un nouvel appareil ou après nettoyage du site → vos langue et thème choisis sont restaurés, sans repli sur la langue du navigateur' },
         ]
       },
 
@@ -46,9 +46,9 @@ export default {
     tips: [
       'Activez au moins un second facteur (TOTP ou clé de sécurité) pour les comptes admin',
       'Les clés API peuvent expirer après un nombre de jours défini pour les intégrations de courte durée',
-      'Scannez le code QR avec n\'importe quelle application TOTP : Google Authenticator, Authy, 1Password, etc.',
       'Les clés API peuvent aussi être créées sans expiration pour l\'automatisation à long terme',
-      'Les sélections de filtres sur les principales pages liste (Certificats, CA, Modèles, Audit, Politiques, Magasin de confiance et autres) sont persistées au rechargement ; CSR, Approbations, Récupération de clés, Découverte et Journaux système démarrent sans filtre',
+      'Scannez le code QR avec n\'importe quelle application TOTP : Google Authenticator, Authy, 1Password, etc.',
+      'Les sélections de filtres sur les principales pages liste (Certificats, AC, Modèles, Audit, Politiques, Magasin de confiance et autres) sont persistées au rechargement ; CSR, Approbations, Récupération de clés, Découverte et Journaux système démarrent sans filtre',
     ],
   },
   helpGuides: {
@@ -62,14 +62,14 @@ Gérez votre profil personnel, vos paramètres de sécurité et vos clés API.
 
 - **Nom complet** : Votre nom d'affichage affiché dans UCM
 - **E-mail** : Utilisé pour les notifications et la récupération de mot de passe
-- **Infos du compte** : Date de création, horodatage de la dernière connexion, nombre total de connexions
+- **Informations du compte** : Date de création, horodatage de la dernière connexion, nombre total de connexions
 
 ## Sécurité
 
 ### Changement de mot de passe
-Changez votre mot de passe actuel. Doit respecter la politique de mot de passe du système (longueur minimale, exigences de complexité).
+Changez votre mot de passe actuel. Doit respecter la politique de mot de passe du système (longueur minimale, exigences de complexité). Vos autres sessions sont fermées ; celle depuis laquelle vous l'avez changé reste ouverte. Une réinitialisation du mot de passe ou de la 2FA par un administrateur ferme toutes les sessions de l'utilisateur.
 
-Lorsque UCM demande un nouveau mot de passe à la connexion (le compte \`admin\` du premier démarrage, par exemple), ce changement passe avant tout le reste : tant qu'il n'est pas fait, le serveur refuse toutes les autres requêtes de cette session, API comprise.
+Lorsque UCM demande un nouveau mot de passe à la connexion (le compte \`admin\` du premier démarrage quand UCM a généré son mot de passe, par exemple), ce changement passe avant tout le reste : tant qu'il n'est pas fait, le serveur refuse toutes les autres requêtes de cette session, API comprise.
 
 ### Authentification à deux facteurs (TOTP)
 Ajoutez un mot de passe à usage unique basé sur le temps à l'aide de n'importe quelle application d'authentification :
@@ -82,6 +82,7 @@ Ajoutez un mot de passe à usage unique basé sur le temps à l'aide de n'import
 > ⚠ Si vous perdez l'accès à votre application d'authentification et aux codes de secours, un administrateur devra désactiver votre 2FA.
 
 Pour migrer la 2FA vers une nouvelle application d'authentification, désactivez-la d'abord : la réactiver alors qu'elle est déjà active est refusé.
+Chaque code n'est accepté qu'une fois (RFC 6238) : un code utilisé pour se connecter ne peut pas confirmer une autre action ni une seconde connexion, attendez donc le suivant.
 
 ### Clés de sécurité (WebAuthn/FIDO2)
 Enregistrez des clés de sécurité matérielles ou des authentificateurs biométriques :
@@ -118,13 +119,13 @@ Gérez les certificats client pour l'authentification TLS mutuel :
 Incluez la clé dans l'en-tête \`X-API-Key\` :
 
 \`\`\`
-X-API-Key: <votre-cle-api>
+X-API-Key: <your-api-key>
 \`\`\`
 
-Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <votre-cle-api>\`.
+Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les CA, les CA SSH et les CRL, mais ne peut ni créer ni modifier une CA. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions.
+Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les AC, les AC SSH et les CRL, mais ne peut ni créer ni modifier une AC. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions, et cette clé expire au plus tard avec celle qui la demande. Régénérer une clé, ce que seule l'API propose (\`POST /api/v2/account/apikeys/<id>/regenerate\`), conserve ses permissions et sa durée ; une clé révoquée ou expirée ne peut pas être régénérée.
 
 Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d'administration des utilisateurs : celles-ci exigent une session interactive.
 

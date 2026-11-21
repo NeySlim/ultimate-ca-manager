@@ -17,6 +17,10 @@ from tests.test_wstep_issue import ISSUE_URL, _basic_auth, _build_rst, wstep_con
 from tests.test_wstep_protocol_conformance import _fault, _fault_code
 from tests.test_wstep_requested_template import TWINS, _oid_of
 from tests.test_wstep_subject_source import _issue, subject_ca  # noqa: F401
+from tests.windows_profile_support import default_profile, windows_profiles_restored  # noqa: F401
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 TEMPLATE_EXT_OID = '1.3.6.1.4.1.311.21.7'
 
@@ -33,8 +37,10 @@ def _x(el, path):
 
 def _announced(app, ca_id):
     """{template name: {'oid', 'revision', 'extensions': [(oid, critical, der)]}} from GetPolicies."""
+    # Same profile as _issue and _oid_of: its policy root drives every announced OID
     with app.app_context():
-        root = etree.fromstring(build_get_policies_response(db.session.get(CA, ca_id), []))
+        root = etree.fromstring(build_get_policies_response(
+            db.session.get(CA, ca_id), [], profile=default_profile()))
     oids = {int(_x(o, 'x:oIDReferenceID').text): (_x(o, 'x:value').text, int(_x(o, 'x:group').text))
             for o in root.iter(f'{{{XCEP_NS}}}oID')}
     policies = {}

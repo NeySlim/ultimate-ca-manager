@@ -45,6 +45,20 @@ class _FakeResponse:
             yield self.content[i:i + chunk_size]
 
 
+class TestFetchFullStopMarks:
+    def test_reads_the_marks(self, monkeypatch):
+        monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _FakeResponse(
+            text='{"full_stop": {"399_x": "why"}}'))
+        assert updates.fetch_full_stop_marks('http://x/full-stop-migrations.json') == {'399_x': 'why'}
+
+    @pytest.mark.parametrize('body', ['[]', '{}', '{"full_stop": ["399_x"]}',
+                                      '{"full_stop": {"399_x": 1}}', 'not json'])
+    def test_refuses_anything_else(self, monkeypatch, body):
+        monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _FakeResponse(text=body))
+        with pytest.raises(ValueError):
+            updates.fetch_full_stop_marks('http://x/full-stop-migrations.json')
+
+
 class TestFetchExpectedSha256:
     def test_parses_sha256sum_output(self, monkeypatch):
         digest = 'a' * 64
@@ -98,9 +112,9 @@ class TestCheckForUpdatesChecksumUrl:
             ],
         }])
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         monkeypatch.setattr(updates.os.path, 'exists',
                             lambda p: p == '/usr/bin/dpkg')
-        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         result = updates.check_for_updates()
         assert result['update_available'] is True
         assert result['package_name'] == 'ucm_99.0_all.deb'
@@ -124,10 +138,9 @@ class TestChannelFilter:
         import time as _time
         monkeypatch.setitem(updates._releases_cache, 'data', releases)
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         monkeypatch.setattr(updates.os.path, 'exists',
                             lambda p: p == '/usr/bin/dpkg')
-        # updates stay within the installed major version
-        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
 
     def test_stable_channel_ignores_all_prereleases(self, monkeypatch):
         self._seed(monkeypatch, [
@@ -327,27 +340,50 @@ class TestUpdateResultConsumption:
 
 
 class TestNotifyMarker:
-    def test_marker_failure_is_visible(self, app, clean_update_config, monkeypatch):
-        """R-05: a failed dedup-marker persist must not be silent."""
+    RESULT = {'current_version': '2.0', 'latest_version': '99.0',
+              'html_url': 'http://x', 'prerelease': False}
+
+    def test_marker_failure_is_visible(self, app, clean_update_config, monkeypatch, caplog):
+        """R-05: a marker that cannot be reserved emits nothing and says so; the next check retries."""
         import services.webhook_service as wh
         events = []
         monkeypatch.setattr(wh, 'emit_update_available',
                             lambda update: events.append(update))
-        monkeypatch.setattr(updates, '_cfg_set', lambda k, v: False)
-        with app.app_context():
-            ok = updates._notify_update_available({
-                'current_version': '2.0', 'latest_version': '99.0',
-                'html_url': 'http://x', 'prerelease': False,
-            })
+
+        def fail(*a, **k):
+            raise RuntimeError('database down')
+        monkeypatch.setattr(updates, 'config_compare_and_set', fail)
+        with caplog.at_level('WARNING', logger='ucm.updates'), app.app_context():
+            ok = updates._notify_update_available(dict(self.RESULT))
         assert ok is False
-        assert len(events) == 1  # emitted, but the failure is reported
+        assert events == []
+        assert any('Update 99.0 not notified' in r.getMessage() for r in caplog.records)
+
+    def test_two_executors_reading_the_same_marker_notify_once(self, app, clean_update_config, monkeypatch):
+        """Two nodes during a leader change both read the old marker: one reserves it, one emits."""
+        import services.webhook_service as wh
+        events = []
+        monkeypatch.setattr(wh, 'emit_update_available',
+                            lambda update: events.append(update))
+        real_get = updates._cfg_get
+        monkeypatch.setattr(updates, '_cfg_get', lambda key, default=None: (
+            None if key == updates._NOTIFIED_VERSION_KEY else real_get(key, default)))
+        with app.app_context():
+            assert updates._notify_update_available(dict(self.RESULT)) is True
+            assert updates._notify_update_available(dict(self.RESULT)) is True
+            assert real_get(updates._NOTIFIED_VERSION_KEY) == '99.0'
+        assert len(events) == 1
 
 
 class TestScheduledTask:
+    @pytest.fixture(autouse=True)
+    def _installed_major(self, monkeypatch):
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
+
     def _base_result(self, **over):
         result = {
             'update_available': True, 'current_version': '2.0',
-            'latest_version': '2.999', 'download_url': 'http://x/p.deb',
+            'latest_version': '99.0', 'download_url': 'http://x/p.deb',
             'package_name': 'p.deb', 'checksum_url': 'http://x/p.deb.sha256',
             'html_url': 'http://x/rel', 'prerelease': False,
         }
@@ -366,7 +402,7 @@ class TestScheduledTask:
             updates._cfg_set(updates._LAST_CHECK_TS_KEY, '0')  # force re-check
             updates.scheduled_update_check()
         assert len(events) == 1
-        assert events[0]['latest_version'] == '2.999'
+        assert events[0]['latest_version'] == '99.0'
 
     def test_no_install_when_opt_out(self, app, clean_update_config, monkeypatch):
         installed = []
@@ -430,7 +466,7 @@ class TestScheduledTask:
         # trigger + manifest both written
         assert (tmp_path / '.update_pending').read_text() == '/tmp/p.deb'
         manifest = json.loads((tmp_path / '.update_manifest.json').read_text())
-        assert manifest['to_version'] == '2.999'
+        assert manifest['to_version'] == '99.0'
         assert manifest['op_id']
 
     def test_trigger_failure_emits_no_installed_event(
@@ -682,17 +718,27 @@ def test_updaters_before_2_241_still_take_the_fedora_rpm(tag):
     assert first['name'].endswith('.fc43.noarch.rpm'), first['name']
 
 
+def test_the_release_downloads_every_rpm_artifact_it_builds():
+    yaml = pytest.importorskip('yaml')
+    jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
+    built = {b['artifact'] for b in jobs['build-rpm']['strategy']['matrix']['include']}
+    # Downloads by pattern (image SBOMs and digests) name no artifact
+    fetched = {s['with']['name'] for s in jobs['release']['steps']
+               if str(s.get('uses', '')).startswith('actions/download-artifact') and 'name' in s['with']}
+    assert built <= fetched, built - fetched
+
+
 class TestRpmAssetPerDistribution:
-    """A release carries a Fedora RPM and an EL9 one (python3.12): each host takes its own."""
+    """A release carries a Fedora RPM, an EL9 one (python3.12) and an EL10 one: each host takes its own."""
 
     def _check(self, monkeypatch, el, assets):
         import time as _time
         monkeypatch.setitem(updates._releases_cache, 'data', [{
             'tag_name': 'v99.0', 'draft': False, 'prerelease': False, 'body': '', 'assets': assets}])
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         monkeypatch.setattr(updates.os.path, 'exists', lambda p: p == '/usr/bin/rpm')
         monkeypatch.setattr(updates, '_el_release', lambda: el)
-        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         return updates.check_for_updates()
 
     @pytest.mark.parametrize('order', [1, -1])
@@ -701,9 +747,20 @@ class TestRpmAssetPerDistribution:
         assert result['package_name'] == 'ucm-el9-99.0-1.el9.noarch.rpm'
         assert result['checksum_url'] == 'http://x/ucm-el9-99.0-1.el9.noarch.rpm.sha256'
 
-    @pytest.mark.parametrize('el', [None, '10'])
-    def test_other_hosts_never_take_the_el9_build(self, monkeypatch, el):
+    @pytest.mark.parametrize('el', [None, '8'])
+    def test_other_hosts_never_take_an_el_build(self, monkeypatch, el):
         result = self._check(monkeypatch, el, _release_assets('99.0'))
+        assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
+
+    @pytest.mark.parametrize('order', [1, -1])
+    def test_el10_host_takes_the_el10_build(self, monkeypatch, order):
+        result = self._check(monkeypatch, '10', _release_assets('99.0')[::order])
+        assert result['package_name'] == 'ucm-el10-99.0-1.el10.noarch.rpm'
+        assert result['checksum_url'] == 'http://x/ucm-el10-99.0-1.el10.noarch.rpm.sha256'
+
+    def test_el10_host_falls_back_on_a_release_without_el10_build(self, monkeypatch):
+        assets = [a for a in _release_assets('99.0') if '.el10.' not in a['name']]
+        result = self._check(monkeypatch, '10', assets)
         assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
 
     def test_el9_host_falls_back_on_a_release_without_el9_build(self, monkeypatch):

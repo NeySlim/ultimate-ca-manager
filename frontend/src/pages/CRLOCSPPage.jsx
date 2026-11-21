@@ -23,6 +23,7 @@ import { CRLDeploySection } from '../components/CRLDeploySection'
 import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
+import { useLinkedId } from '../hooks/useLinkedId'
 import { formatDate, cn , downloadBlob} from '../lib/utils'
 import { findAlgorithm } from '../lib/keyAlgorithms'
 export default function CRLOCSPPage() {
@@ -119,6 +120,17 @@ export default function CRLOCSPPage() {
       setOcspResponder(res.data?.responder || null)
     }).catch(() => setOcspResponder(null))
   }
+
+  // /crl-ocsp?ca=N selects that CA once the list is in
+  const linkedCa = useLinkedId('ca')
+  const openedCa = useRef(null)
+  useEffect(() => {
+    if (!linkedCa || loading || openedCa.current === linkedCa) return
+    openedCa.current = linkedCa
+    const ca = cas.find((c) => String(c.id) === linkedCa)
+    if (ca) handleSelectCA(ca)
+    else showInfo(t('overview.link.gone', { id: linkedCa }))
+  }, [linkedCa, loading, cas]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAssignResponder = async (certId) => {
     try {
@@ -573,7 +585,7 @@ export default function CRLOCSPPage() {
             {nextUpdate && (
               <span className={cn(
                 'text-2xs',
-                isExpired ? 'text-red-500 font-medium' : 'text-text-tertiary'
+                isExpired ? 'text-status-danger font-medium' : 'text-text-tertiary'
               )}>
                 → {formatDate(nextUpdate, 'short')}
               </span>
@@ -837,7 +849,7 @@ export default function CRLOCSPPage() {
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('cdp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
+                      <Button type="button" size="sm" variant="ghost" className="text-status-danger hover:text-status-danger" onClick={() => handleRemoveUrl('cdp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}
@@ -888,7 +900,7 @@ export default function CRLOCSPPage() {
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('ocsp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
+                      <Button type="button" size="sm" variant="ghost" className="text-status-danger hover:text-status-danger" onClick={() => handleRemoveUrl('ocsp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}
@@ -939,7 +951,7 @@ export default function CRLOCSPPage() {
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('aia', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
+                      <Button type="button" size="sm" variant="ghost" className="text-status-danger hover:text-status-danger" onClick={() => handleRemoveUrl('aia', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}

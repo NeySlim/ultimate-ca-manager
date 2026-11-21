@@ -4,6 +4,7 @@ Core restore methods mixin for BackupService
 import json
 import hashlib
 import base64
+import io
 import logging
 from datetime import datetime
 from types import SimpleNamespace
@@ -16,24 +17,35 @@ from compliance_profiles import is_valid as is_valid_profile
 from utils.port_zero import strip_port_zero_from_stored
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
-from config.settings import Config
-from utils.serial_format import serial_named_by, unambiguous_serial_spellings
-from services.file_regen_service import insert_file_writes_suspended
+from services.file_regen_service import (
+    advance_generation, insert_file_writes_suspended, keep_named_paths, record_removal_candidates,
+    removals_listed, unwritable_dirs,
+)
 
-from . import installation
-from .errors import BackupSchemaError
+from . import container, installation
+from .errors import BackupSchemaError, RestoreFilesUnwritable
+from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
-from .restore.files import StagedFiles
+from .restore.transaction import checkpoint, expect_rows, tick, ticking
+from .restore import audit_ids
 from .manifest import SECTIONS
-from .restore.apply import apply_columns, apply_section, relink_references
+from .section_store import SectionStore, section_kind, section_length
+from .restore.apply import (apply_columns, apply_section, escape_nul_in_archive,
+                            refuse_containers_in_columns,
+                            relink_references)
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
+from .restore.sso_providers import (name_blank_providers, refuse_archived_shared_types,
+                                    settle_provider_types)
 from .restore.repairs import replay_repairs
 from .restore.conflict import conflict_from_integrity_error, is_value_too_long
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
+from utils import ssh_serials as SSHSerials
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
+from .restore.tsa_signer import upgrade_archived_tsa_signer
+from .restore.windows_profiles import link_restored_connectors, upgrade_archived_windows_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -44,31 +56,15 @@ def _revocation_key(holder):
     return reason_rank(holder.revoke_reason), holder.revoked_at or datetime.max
 
 
-def _kept_final(service, here):
-    """In a merge, the final revocation a certificate or CA row holds here, which the
-    archive's hold or validity never replaces; None otherwise."""
-    from utils.revocation_reasons import HOLD_REASONS
+def _kept_revocation(service, here):
+    """In a merge, the revocation a certificate or CA row holds here, final or suspension, which
+    only a graver archive replaces (lifting a hold is an act of its own); None otherwise.
+    A lift in progress (removeFromCRL) is no revocation to keep."""
     if (not getattr(service, '_merging', False) or here is None or not here.revoked
-            or here.revoke_reason in HOLD_REASONS + ('removeFromCRL',)):
+            or here.revoke_reason == 'removeFromCRL'):
         return None
     return SimpleNamespace(revoked=True, revoked_at=here.revoked_at,
                            revoke_reason=here.revoke_reason, invalidity_at=here.invalidity_at)
-
-
-def _readable_record_serial(archived: Any) -> str:
-    """A record's serial in a spelling the revocation readers accept: kept when it already is one
-    (decimal, bare hex with a letter), else decimal when it reads as hex without doubt (``0x``,
-    colons, leading zeros before a letter); an all-digit string is kept."""
-    text = str(archived).strip()
-    bare = text.replace(':', '')
-    hexa = bare[2:] if bare.lower().startswith('0x') else bare
-    if not (hexa != bare or ':' in text or any(c in 'abcdefABCDEF' for c in hexa)):
-        return text
-    try:
-        value = int(hexa, 16)
-    except ValueError:
-        return text
-    return text if text in unambiguous_serial_spellings(value) else str(value)
 
 
 def _archived_datetime(where: str, column: str, value: Any):
@@ -99,32 +95,6 @@ def _archived_datetime(where: str, column: str, value: Any):
         ) from exc
 
 
-def _row_file_paths() -> set:
-    """The certificate, CSR and key files the authority and certificate rows name."""
-    from types import SimpleNamespace
-    from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_csr_path, cert_key_path
-
-    paths = set()
-    with db.session.no_autoflush:
-        for refid, subject, descr in db.session.query(CA.refid, CA.subject, CA.descr):
-            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
-            paths.update((ca_cert_path(row), ca_key_path(row)))
-        for refid, subject, descr in db.session.query(
-                Certificate.refid, Certificate.subject, Certificate.descr):
-            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
-            paths.update((cert_cert_path(row), cert_csr_path(row), cert_key_path(row)))
-    return paths
-
-
-def _stage_key_mirror(staged, path, key_pem: bytes) -> None:
-    """A plaintext key mirror, only while database encryption is off (as mirror_private_key)."""
-    from security.encryption import key_encryption
-    if key_encryption.is_enabled:
-        staged.stage_removal(path)
-    else:
-        staged.stage(path, key_pem, mode=0o600)
-
-
 def _archived_timestamps(row, where: str, data: Dict[str, Any]) -> None:
     """`created_at` and `updated_at` as the archive has them, for a hand-written restorer."""
     for column in ('created_at', 'updated_at'):
@@ -143,6 +113,7 @@ GENERIC_SECTIONS = (
     'compromised_keys',
     'role_permissions',
     'group_members',
+    'user_sso_identities',
     'webauthn_credentials',
     'ad_connector',
     'webhook_endpoints',
@@ -152,6 +123,8 @@ GENERIC_SECTIONS = (
     'crl_deploy_bindings',
     'intune_apps',
     'scep_profiles',
+    'windows_enrollment_profiles',
+    'windows_profile_templates',
     'ca_template_pins',
     'acme_client_accounts',
     # After its proxy account, EAB credential and creator (users and
@@ -169,6 +142,18 @@ GENERIC_SECTIONS = (
     'scep_requests',
 )
 
+# Certificates written are flushed and their PEMs let go by this many: the plan holds every
+# row it placed until the commit, and a reader of a PEM loads it again from the transaction
+PEM_RELEASE_ROWS = 1000
+_PEM_COLUMNS = ('crt', 'csr', 'prv')
+
+
+def _release_pems(certificates) -> None:
+    db.session.flush()
+    for cert in certificates:
+        db.session.expire(cert, _PEM_COLUMNS)
+
+
 RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
     'users', 'certificate_authorities', 'certificates', 'revoked_serials',
     'crl_number_counters', 'acme_accounts', 'acme_eab_credentials', 'configuration', 'groups',
@@ -183,6 +168,13 @@ RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
 }
 
 
+def _carries(backup_data, name: str) -> bool:
+    """Whether a section holds anything, asked of a v4 store without loading it."""
+    if isinstance(backup_data, SectionStore):
+        return backup_data.length(name) > 0
+    return bool(backup_data.get(name))
+
+
 class RestoreCoreMixin:
     def _check_payload_schema(self, backup_data: Dict[str, Any]) -> None:
         """Refuse a payload this version cannot restore.
@@ -194,6 +186,12 @@ class RestoreCoreMixin:
         metadata = backup_data.get('metadata')
         if metadata is None:
             return
+        self._check_schema_version(metadata)
+        self._check_section_counts(backup_data, metadata.get('sections'))
+        self._check_section_digests(backup_data, metadata.get('section_digests'))
+
+    def _check_schema_version(self, metadata: Any) -> None:
+        """Refuse the metadata of an archive written for a later reader than this one."""
         if not isinstance(metadata, dict):
             raise BackupSchemaError("Invalid backup format: metadata is not an object")
 
@@ -220,9 +218,6 @@ class RestoreCoreMixin:
                     "been changed."
                 )
 
-        self._check_section_counts(backup_data, metadata.get('sections'))
-        self._check_section_digests(backup_data, metadata.get('section_digests'))
-
     @staticmethod
     def _check_section_digests(backup_data: Dict[str, Any], digests: Any) -> None:
         """Compare each section against the digest the archive recorded.
@@ -230,8 +225,8 @@ class RestoreCoreMixin:
         The payload checksum says the archive is damaged; this says which
         section, which is what decides whether a restore is worth attempting.
         """
-        if digests is None:
-            return
+        if digests is None or isinstance(backup_data, SectionStore):
+            return  # a v4 archive's digests were compared as its chunks were read
         if not isinstance(digests, dict):
             raise BackupSchemaError(
                 "Invalid backup format: section digests are not an object")
@@ -268,20 +263,19 @@ class RestoreCoreMixin:
             if name not in backup_data:
                 raise BackupSchemaError(
                     f"Incomplete backup: section '{name}' is announced but missing")
-            value = backup_data[name]
-            if not isinstance(value, (list, dict)):
+            if section_kind(backup_data, name) not in ('list', 'mapping'):
                 raise BackupSchemaError(
                     f"Invalid backup format: section '{name}' is neither a list nor "
                     "an object")
-            if len(value) != expected:
+            held = section_length(backup_data, name)
+            if held != expected:
                 raise BackupSchemaError(
-                    f"Incomplete backup: section '{name}' holds {len(value)} entries, "
+                    f"Incomplete backup: section '{name}' holds {held} entries, "
                     f"{expected} were written"
                 )
 
     def restore_backup(self, backup_bytes: bytes, password: str, *, mode: str = 'replace') -> Dict[str, Any]:
-        """
-        Restore from encrypted backup. Auto-detects format v1 (legacy) or v2.
+        """Restore from an encrypted archive held in memory, any format v1 to v4.
 
         Args:
             backup_bytes: Encrypted backup file content
@@ -290,6 +284,9 @@ class RestoreCoreMixin:
         Returns:
             Dict with restore results
         """
+        if container.format_version_of(backup_bytes) == container.FORMAT_VERSION_V4:
+            return self._restore_v4(io.BytesIO(backup_bytes), password, mode)
+
         # Detect format from magic bytes
         if len(backup_bytes) >= 4 and backup_bytes[:4] == self.MAGIC:
             master_key, backup_data = self._decrypt_framed(backup_bytes, password)
@@ -311,12 +308,63 @@ class RestoreCoreMixin:
                     "Backup checksum mismatch: the archive is corrupted. "
                     "Nothing has been changed.")
 
+        return self._restore_payload(backup_data, master_key, mode)
+
+    def restore_backup_from_path(self, path, password: str, *,
+                                 mode: str = 'replace') -> Dict[str, Any]:
+        """Restore the archive at `path`: a v4 is streamed, an older one read whole."""
+        with open(path, 'rb') as stream:
+            return self.restore_backup_from_stream(stream, password, mode=mode)
+
+    def restore_backup_from_stream(self, stream, password: str, *,
+                                   mode: str = 'replace') -> Dict[str, Any]:
+        """Restore from a seekable binary stream positioned at the archive's start.
+
+        v1 to v3 are bounded by BACKUP_MAX_UPLOAD_MB before they are read into
+        memory; a v4 never is, its chunks are bounded one by one.
+        """
+        start = stream.tell()
+        head = stream.read(container.HEADER_PREFIX_SIZE)
+        stream.seek(start)
+        if container.format_version_of(head) == container.FORMAT_VERSION_V4:
+            return self._restore_v4(stream, password, mode)
+        size = stream.seek(0, io.SEEK_END) - start
+        stream.seek(start)
+        container.refuse_oversized_size(size)
+        return self.restore_backup(stream.read(), password, mode=mode)
+
+    def _restore_v4(self, stream, password: str, mode: str) -> Dict[str, Any]:
+        """Sections land on disk as their chunks are read; the restore loads them on demand."""
+        with SectionStore() as store:
+            master_key = self._read_v4(stream, password, store)
+            return self._restore_payload(store, master_key, mode)
+
+    def _restore_payload(self, backup_data, master_key: bytes, mode: str) -> Dict[str, Any]:
+        """Everything after decryption: a payload dict, or a v4 `SectionStore`."""
+        # Nothing reaches the disk before the commit; after it, a file that cannot be written
+        # is only retried, so a directory this process cannot write refuses the restore here
+        refused = unwritable_dirs()
+        if refused:
+            raise RestoreFilesUnwritable(
+                "The restore was refused: this server cannot write to "
+                f"{', '.join(refused)}. Nothing has been changed.")
         # Everything the payload claims about itself is checked here, before
         # the first write: a schema this version cannot read, or a section
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
+        # Shapes first: it compares no text, and the rewrite reads identities as values
+        refuse_containers_in_columns(backup_data)
+        # PostgreSQL stores no NUL; SQLite keeps what it stored, identities included. Before
+        # every other check, plan and rename: they compare the rewritten text alone
+        nul_warnings = (escape_nul_in_archive(backup_data, set(SECTIONS) | RESTORED_SECTIONS)
+                        if db.session.get_bind().dialect.name == 'postgresql' else [])
+        self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
+        windows_warnings: List[str] = []
+        # Before the profiles: their section is what marks a 3.0 archive
+        upgrade_archived_tsa_signer(backup_data)
+        upgrade_archived_windows_profiles(backup_data, windows_warnings)
         if mode not in ('replace', 'merge'):
             raise BackupSchemaError(
                 f"Unknown restore mode {mode!r}: use 'replace' (the archive "
@@ -326,24 +374,29 @@ class RestoreCoreMixin:
         # Before the plan, which finds these rows again by name.
         ambiguous_references: List[str] = []
         displaced: Dict[str, set] = {}
-        renamed = rename_clashing_rows(backup_data, ambiguous_references,
-                                       replacing=frozenset(pruned), displaced=displaced)
-
-        # An archive of metadata alone restores nothing. Announcing it as a
-        # success made the caller revoke every session and ask for a restart
-        # over a file that changed not one row.
+        # An archive of metadata alone restores nothing (no session revoked, no restart).
+        # Counted before any row is left out: a provider a merge leaves out was carried.
         carried = sorted(
             name for name in SECTIONS
-            if backup_data.get(name)
+            if _carries(backup_data, name)
         )
+        # One SSO provider per type at the end, whatever the mode (restore/sso_providers.py)
+        refuse_archived_shared_types(backup_data)
+        sso_warnings: List[str] = []
+        name_blank_providers(backup_data, sso_warnings)
+        settle_provider_types(backup_data, 'sso_providers' in pruned, sso_warnings, displaced)
+        renamed_here: Dict[str, dict] = {}
+        renamed = rename_clashing_rows(backup_data, ambiguous_references,
+                                       replacing=frozenset(pruned), displaced=displaced,
+                                       renamed_here=renamed_here)
 
         # Named before anything is written, so the answer can say what this
         # version will not put back even though the archive carries it.
         not_restored = sorted(
-            name for name, value in backup_data.items()
+            name for name in backup_data.keys()
             if name not in ('metadata', 'checksum')
             and name not in RESTORED_SECTIONS
-            and value
+            and _carries(backup_data, name)
         )
         if not_restored:
             logger.warning(
@@ -397,45 +450,64 @@ class RestoreCoreMixin:
         # each reference resolves to on this installation.
         # Orders this installation moved on with: kept in a merge, named in a replacement
         order_warnings = keep_newer_orders(backup_data, mode)
+        # The progress counts the rows written from here on
+        expect_rows(sum(section_length(backup_data, name) for name in backup_data.keys()
+                        if name in RESTORED_SECTIONS and section_kind(backup_data, name) == 'list'))
+        checkpoint('plan')
         plan = RestorePlan.build(backup_data, pruned=pruned)
-        plan.warnings.extend(order_warnings)
+        plan.warnings.extend(nul_warnings + order_warnings + windows_warnings + sso_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
+        from .restore_extended import refuse_archived_shared_keys
+        refuse_archived_shared_keys(backup_data, plan)
 
-        # Files are staged during the transaction and published just before the
-        # commit; a commit that fails puts them back (`unpublish()`).
+        # No file is written here: the rows commit with a new files generation and the
+        # list of paths they no longer name; each node's reconciliation then follows them.
         results['mode'] = mode
-        # A merge never lowers a final revocation made here, of a certificate or a CA (_kept_final)
+        # A merge never lowers a revocation made here, of a certificate or a CA (_kept_revocation)
         self._merging = mode == 'merge'
-        self._kept_finals = []
+        self._kept_revocations = []
+        # SSH certificates revoked with their serial's revoked holder: audited after the commit
+        self._ssh_aligned = {}
 
-        staged = StagedFiles()
-        # What the rows had on disk before: a file no row names afterwards goes with the commit
-        files_before = _row_file_paths()
         aligned = []
         try:
-            with single_transaction(), insert_file_writes_suspended():
+            with single_transaction(results), insert_file_writes_suspended():
+                # Every file the rows have now; what they still name afterwards is struck out
+                generation = advance_generation() if carried else None
+                if generation is not None:
+                    record_removal_candidates(generation)
+                from services.hsm import key_binding
+                # A key two authorities held before the restore is not the restore's doing
+                shared_before = set(key_binding.shared_keys())
+                token_shared_before = set(key_binding.shared_token_keys())
+                # Before a replacement removes certificates issued here: their serials stay given out
+                SSHSerials.raise_counters(SSHSerials.session_run)
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
-                    replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced)
+                    replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced,
+                                                   renamed_here=renamed_here)
                     prune_doomed_settings(replacement, plan, deferred_keys(
                         backup_data.get('configuration') if isinstance(
                             backup_data.get('configuration'), dict) else {}))
                     replacement = remove_before_writes(replacement)
                     plan.refresh()
 
-                self._apply_all(backup_data, results, master_key, plan, staged)
+                self._apply_all(backup_data, results, master_key, plan)
 
                 # Sections are applied in an order that cannot satisfy every
                 # reference at once, so they are resolved again now that every
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
+                checkpoint('relink')
                 results['relinked'] = relink_references(backup_data, plan)
+                link_restored_connectors(backup_data)
                 results['repairs'] = replay_repairs(backup_data, plan)
+                db.session.flush()
                 # The rows written take the revocation their CA records, as the hourly pass does
-                aligned = self._align_restored_revocations(plan) + self._align_kept_finals()
+                aligned = self._align_restored_revocations(plan) + self._align_kept_revocations()
                 results['revoked_from_records'] = len(aligned)
                 if plan.written.get('acme_client_orders'):
                     results['acme_client_orders_repaired'] = results['repairs'].get(
@@ -446,6 +518,33 @@ class RestoreCoreMixin:
 
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
+                # On the final rows: an authority a replacement removes after the writes holds nothing
+                db.session.flush()
+                self._ssh_aligned.update(SSHSerials.settle_marks(SSHSerials.session_run))
+                results['ssh_revoked_with_serial'] = len(self._ssh_aligned)
+                aligned.extend(SSHSerials.revocation_entries(SSHSerials.session_run, self._ssh_aligned))
+                SSHSerials.raise_counters(SSHSerials.session_run)
+                self._settle_local_emails(backup_data)
+                for key_id, held in key_binding.shared_keys().items():
+                    if key_id not in shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM key '{key_binding.label_of(key_id)}' would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
+                # Two key rows naming one token key are one key (refuse_same_token_key)
+                for (first, second), held in key_binding.shared_token_keys().items():
+                    if (first, second) not in token_shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM keys '{key_binding.label_of(first)}' and "
+                            f"'{key_binding.label_of(second)}' are one token key and would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
+                # Lockouts are keyed by user id and name, which either mode may hand to
+                # another account; the sessions they guard are revoked after any restore
+                from models.second_factor_failure import SecondFactorFailure
+                db.session.execute(db.delete(SecondFactorFailure))
+                # Before the warnings are reported: a keytab it cannot serve is one of them
+                keytab_published = self._publish_restored_keytab(backup_data, plan)
                 results['left_out'] = list(plan.left_out)
                 # What applying the rows had to warn about reaches the log and the result
                 for warning in dict.fromkeys(plan.warnings[built_with:]):
@@ -453,34 +552,33 @@ class RestoreCoreMixin:
                 results['warnings'] = list(dict.fromkeys(plan.warnings))
                 results['dropped_secrets'] = list(plan.dropped_fields)
 
-                for path in sorted(files_before - _row_file_paths()):
-                    staged.stage_removal(path)
-                # Published inside the transaction, so a file that cannot be
-                # placed rolls the database back with it. The window that
-                # remains is the commit itself, and it is compensated below.
-                staged.publish()
+                if generation is not None:
+                    keep_named_paths()
+                    results['files'] = {'generation': generation,
+                                        'removals': removals_listed(generation)}
         except (IntegrityError, DataError) as exc:
-            staged.unpublish()
-            staged.discard()
             if isinstance(exc, DataError) and not is_value_too_long(exc):
                 raise
             conflict = conflict_from_integrity_error(exc)
             logger.warning("Restore refused by the database: %s", conflict)
             raise conflict from exc
-        except Exception:
-            # The commit is the last thing the block does: if it is what
-            # failed, the files are already in place and describe a restore
-            # that did not happen.
-            staged.unpublish()
-            staged.discard()
-            raise
-        finally:
-            staged.discard()
+
+        if keytab_published:
+            self._write_keytab_here()
 
         if aligned:
             from services.audit_service import AuditService
             for entry in aligned:
                 AuditService.log_action(username='system', **entry)
+
+        if results.get('truststore_private_keys_removed'):
+            from services.audit_service import AuditService
+            from utils.trust_pem import REMOVED_ACTION, removal_warning
+            for entry in results['truststore_private_keys_removed']:
+                AuditService.log_action(
+                    action=REMOVED_ACTION, resource_type='truststore', resource_id=entry['id'],
+                    resource_name=entry['name'], username='system', success=True,
+                    details=removal_warning(entry['id'], entry['name'], entry['fingerprint_sha256']))
 
         from utils import admin_allowlist
         admin_allowlist.invalidate_cache()
@@ -502,6 +600,30 @@ class RestoreCoreMixin:
         return results
 
     @staticmethod
+    def _publish_restored_keytab(backup_data, plan) -> bool:
+        """The profiles' section restored: the keytab file every node writes is rebuilt from
+        them (A7) and the other nodes reload it, in the restore's transaction."""
+        if section_kind(backup_data, 'windows_enrollment_profiles') != 'list':
+            return False
+        from services import cluster_commands, windows_profiles
+        db.session.flush()
+        try:
+            windows_profiles.publish_keytab(actor='restore')
+        except ValueError as exc:
+            plan.warnings.append(f"windows_enrollment_profiles: the keytab is not served: {exc}")
+            return False
+        cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+        return True
+
+    @staticmethod
+    def _write_keytab_here() -> None:
+        from services.kerberos import negotiate_auth
+        try:
+            negotiate_auth.write_stored_keytab()
+        except (OSError, ValueError) as exc:
+            logger.error("Restore: the Kerberos keytab file was not written on this node: %s", exc)
+
+    @staticmethod
     def _align_restored_revocations(plan) -> List[Dict[str, Any]]:
         """Mark the certificate rows the restore wrote from their CA's records (the hourly
         pass's function, limited to them); returns their audit entries, logged after the commit."""
@@ -512,19 +634,39 @@ class RestoreCoreMixin:
             return []
         return [_marked_entry(row, record) for row, record in apply_persisted_revocations(ids)]
 
-    def _align_kept_finals(self) -> List[Dict[str, Any]]:
-        """A final revocation a merge kept here takes its serial's gravest record when that one
-        is graver (``persisted_revocation``): the CRL and OCSP answer a final row with itself."""
+    def _align_kept_revocations(self) -> List[Dict[str, Any]]:
+        """A revocation a merge kept here takes its serial's gravest record when that one is
+        graver (``persisted_revocation``): a final row answers the CRL and OCSP with itself."""
         from services.cert.issued_lookup import row_persisted_revocation
         from services.ski_aki_backfill import _marked_entry
         entries = []
-        for row in self.__dict__.get('_kept_finals', ()):
+        for row in self.__dict__.get('_kept_revocations', ()):
             record = row_persisted_revocation(row)
             if record is not None and _revocation_key(record) < _revocation_key(row):
                 row.revoked_at, row.revoke_reason = record.revoked_at, record.revoke_reason
                 row.invalidity_at = record.invalidity_at or row.invalidity_at
                 entries.append(_marked_entry(row, record))
         return entries
+
+    @staticmethod
+    def _check_serial_duplicates(backup_data: Dict[str, Any]) -> None:
+        """Refused before any write only when the target carries the unique
+        (caref, serial_number) index; a target whose unique serial index is pending accepts them."""
+        from sqlalchemy import inspect
+        from utils.serial_duplicates import CLEANUP, INDEX, describe, duplicates_in_rows
+        if not any(ix.get('name') == INDEX for ix in inspect(db.engine).get_indexes('certificates')):
+            return
+        if section_kind(backup_data, 'certificates') != 'list':
+            return
+        # A v4 store is read row by row: the section is never loaded for this check
+        rows = (backup_data.iter_rows('certificates') if isinstance(backup_data, SectionStore)
+                else backup_data['certificates'])
+        duplicates = duplicates_in_rows(r for r in ticking(rows) if isinstance(r, dict))
+        if duplicates:
+            raise BackupSchemaError(
+                f"The archive holds {len(duplicates)} serial number(s) shared by certificates "
+                f"of the same CA (certificate refids): {describe(duplicates)}. Nothing has been "
+                f"changed. {CLEANUP} Then take a new backup.")
 
     @staticmethod
     def _archived_key_mismatches(backup_data: Dict[str, Any]) -> List[str]:
@@ -536,7 +678,8 @@ class RestoreCoreMixin:
         """
         metadata = backup_data.get('metadata') or {}
         recorded = metadata.get('key_mismatches')
-        if isinstance(recorded, list) and recorded:
+        # A v4 archive always records the list, so an empty one is an answer
+        if isinstance(recorded, list) and (recorded or isinstance(backup_data, SectionStore)):
             return [str(item) for item in recorded]
 
         found = []
@@ -562,11 +705,11 @@ class RestoreCoreMixin:
         """
         excluded = set(
             (backup_data.get('metadata') or {}).get('excluded_sections') or [])
-        sections = {name for name, value in backup_data.items()
-                    if name in SECTIONS and isinstance(value, list)
+        sections = {name for name in backup_data.keys()
+                    if name in SECTIONS and section_kind(backup_data, name) == 'list'
                     and name not in excluded}
 
-        if 'users' in sections and not backup_data.get('users'):
+        if 'users' in sections and not section_length(backup_data, 'users'):
             raise BackupSchemaError(
                 "Refusing to restore: this archive carries no users, and a "
                 "replacing restore would remove every account on this server. "
@@ -575,9 +718,10 @@ class RestoreCoreMixin:
 
         return sections
 
-    def _apply_all(self, backup_data, results, master_key, plan, staged):
+    def _apply_all(self, backup_data, results, master_key, plan):
         """Every write of a restore, inside the one transaction."""
         # Core restores
+        checkpoint('core')
         self._restore_users(backup_data, results, plan)
         self._restore_cas(backup_data, results, master_key, plan)
         self._restore_certificates(backup_data, results, master_key, plan)
@@ -591,10 +735,8 @@ class RestoreCoreMixin:
         # in a later section cannot leave these entities applied on their own.
         db.session.flush()
 
-        # Regenerate CA/cert files on disk
-        self._regenerate_files(staged)
-
         # RBAC restores
+        checkpoint('rbac')
         self._restore_groups(backup_data, results, plan)
         self._restore_custom_roles(backup_data, results, plan)
         self._restore_templates(backup_data, results)
@@ -604,25 +746,30 @@ class RestoreCoreMixin:
         db.session.flush()
         from services.acme import profiles as acme_profiles
         results['acme_profile_bindings'] = acme_profiles.remap_template_bindings()
-        self._restore_truststore(backup_data, results)
+        self._restore_truststore(backup_data, results, plan)
 
         # Auth restores
+        checkpoint('auth')
         self._restore_sso_providers(backup_data, results)
+        self._restore_legacy_sso_identities(results, plan)
         self._restore_hsm_providers(backup_data, results, plan)
         self._restore_api_keys(backup_data, results, plan)
         self._restore_auth_certificates(backup_data, results, plan)
 
         # Notification restores
+        checkpoint('notifications')
         self._restore_smtp_config(backup_data, results)
         self._restore_notification_config(backup_data, results)
 
         # Policy restores
+        checkpoint('policies')
         self._restore_policies(backup_data, results, plan)
         self._restore_dns_providers(backup_data, results)
         self._restore_acme_domains(backup_data, results, plan)
         self._restore_acme_local_domains(backup_data, results, plan)
 
         # Extended restores
+        checkpoint('extended')
         self._restore_ssh_cas(backup_data, results, master_key, plan)
         self._restore_ssh_certificates(backup_data, results, plan)
         self._restore_microsoft_cas(backup_data, results)
@@ -631,16 +778,26 @@ class RestoreCoreMixin:
         self._restore_approval_requests(backup_data, results, plan)
         self._restore_acme_client_orders(backup_data, results, plan)
         self._restore_key_recovery_requests(backup_data, results, plan)
-        self._restore_https_files(backup_data, results, staged)
+        self._restore_https_files(backup_data, results, plan)
 
         # Sections the manifest carries and the hand-written restorers never
         # learned about: applied from the manifest, with every column and with
         # references resolved through the plan.
+        checkpoint('generic')
         for name in GENERIC_SECTIONS:
             rows = backup_data.get(name)
             if not rows:
                 continue
+            if name == 'user_sso_identities':
+                rows = self._identities_free_here(rows, plan)
             results[name] = apply_section(name, rows, plan)
+        audit_ids.settle(plan)
+
+        # Rows of another installation can name user ids this one has not handed out yet
+        from services.backup import user_id_counter
+        if any(_carries(backup_data, name) for name in user_id_counter.SECTIONS):
+            db.session.flush()
+            user_id_counter.advance_users_counter()
 
     def _restore_users(self, backup_data: Dict, results: Dict, plan) -> None:
         """Restore users from backup data.
@@ -660,6 +817,9 @@ class RestoreCoreMixin:
         """
         from models import User
 
+        # An archive older than user_sso_identities carries the provider on the account row
+        legacy = not _carries(backup_data, 'user_sso_identities')
+        self._legacy_sso_identities = []
         for user_data in backup_data.get('users', []):
             existing = User.query.filter_by(
                 username=user_data['username']).first()
@@ -677,6 +837,10 @@ class RestoreCoreMixin:
 
             if not carried_hash:
                 existing.password_hash = previous_hash
+            # Out of the local e-mail index until its identity rows are back (_settle_local_emails)
+            existing.has_sso_identity = True
+            if legacy and 'auth_source' in user_data:
+                self._legacy_sso_identities.append((existing, user_data))
             results['users'] += 1
 
         db.session.flush()
@@ -684,11 +848,165 @@ class RestoreCoreMixin:
         if nested:
             results['webauthn_credentials'] = nested
 
+    def _settle_local_emails(self, backup_data: Dict) -> None:
+        """On the final rows: the refusal of two local accounts on one e-mail, then the flag of
+        every account set from its identity rows, which the local e-mail index checks."""
+        from models.user import sync_sso_flags_in_session
+        self._refuse_shared_local_emails(backup_data)
+        sync_sso_flags_in_session(db.session)
+        db.session.flush()
+
     @staticmethod
-    def _apply_ca_revocation(ca, ca_data: Dict, here_final=None) -> None:
+    def _refuse_shared_local_emails(backup_data: Dict) -> None:
+        """E-mail is unique among local accounts (#136): a restored local account may not share
+        one with another local account here. Said before ix_users_email_local refuses it."""
+        from sqlalchemy import and_, exists
+        from sqlalchemy.orm import aliased
+        from models import User, UserSSOIdentity
+        from .restore.conflict import RestoreConflictError
+
+        mine, other = aliased(User), aliased(User)
+
+        def local(account):
+            # Local in SQL: the cached sso_identities predate the identity rows just restored
+            return ~exists().where(UserSSOIdentity.user_id == account.id)
+
+        names = [row['username'] for row in backup_data.get('users') or []]
+        for start in range(0, len(names), 500):
+            shared = (db.session.query(mine.username, other.username, mine.email)
+                      .join(other, and_(other.email == mine.email, other.id != mine.id))
+                      .filter(mine.username.in_(names[start:start + 500]), mine.email.isnot(None),
+                              mine.email != '', local(mine), local(other))
+                      .order_by(mine.id, other.id).first())
+            if shared is not None:
+                raise RestoreConflictError(
+                    f"Refusing to restore: the local accounts {shared[0]!r} and "
+                    f"{shared[1]!r} would share the e-mail {shared[2]!r}. "
+                    "Nothing has been changed.")
+
+    @staticmethod
+    def _identity_holder(user_id, provider_id, external_id):
+        """The other account here a provider's stable identity opens, if any."""
+        from models import User, UserSSOIdentity
+        if provider_id is None or not external_id:
+            return None
+        return (User.query.join(UserSSOIdentity, UserSSOIdentity.user_id == User.id)
+                .filter(UserSSOIdentity.provider_id == provider_id,
+                        UserSSOIdentity.external_id == external_id, User.id != user_id).first())
+
+    @staticmethod
+    def _skipped_identity(plan, account, provider_id, holder) -> str:
+        from models.sso import SSOProvider
+        provider = db.session.get(SSOProvider, provider_id)
+        warning = (f"user_sso_identities: the identity of account {account!r} at provider "
+                   f"{(provider.name if provider else provider_id)!r} opens the account "
+                   f"{holder.username!r} here, and an identity opens one account only: it is kept "
+                   f"as an orphan of an unknown IdP, which no sign-in takes back; attach a provider "
+                   f"to the account to let it sign in")
+        plan.warnings.append(warning)
+        logger.warning("Restore: %s", warning)
+        return warning
+
+    def _identities_free_here(self, rows, plan):
+        """The archive's identity rows, those whose identity opens another account here made
+        orphans of an unknown IdP: an account without a row nor a password is claimable by name."""
+        from models import User
+        db.session.flush()
+        plan.refresh(['users', 'sso_providers'])
+        kept = []
+        for row in rows:
+            user_id = plan.resolve('user_sso_identities', row, 'user_id')
+            provider_id = plan.resolve('user_sso_identities', row, 'provider_id')
+            row = self._expected_tenant_here(plan, row, user_id)
+            holder = self._identity_holder(user_id, provider_id, row.get('external_id'))
+            if holder is None:
+                kept.append(row)
+                continue
+            account = db.session.get(User, user_id) if user_id is not None else None
+            self._skipped_identity(plan, account.username if account else None, provider_id, holder)
+            kept.append({**row, 'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
+                         'orphan_of': None})
+        return kept
+
+    @staticmethod
+    def _expected_tenant_here(plan, row, user_id):
+        """``row`` with its expected tenant as a sign-in reads it, a lower-case GUID; any other
+        value binds no sign-in and is dropped with a warning."""
+        from models import User
+        from services.oidc_id_token import is_tenant_id
+        value = row.get('expected_tenant')
+        if value is None:
+            return row
+        tenant = value.strip().lower() if isinstance(value, str) else None
+        if is_tenant_id(tenant):
+            return {**row, 'expected_tenant': tenant}
+        account = db.session.get(User, user_id) if user_id is not None else None
+        warning = (f"user_sso_identities: the expected tenant of account "
+                   f"{(account.username if account else None)!r} is not a tenant id (GUID) and "
+                   f"was dropped: an attachment not bound yet without one is bound by no sign-in")
+        plan.warnings.append(warning)
+        logger.warning("Restore: %s", warning)
+        return {**row, 'expected_tenant': None}
+
+    def _restore_legacy_sso_identities(self, results: Dict, plan) -> None:
+        """The identity rows of an archive's account rows that carry their provider (2.254, or
+        3.0 before user_sso_identities), once the providers are back: the same rows an upgrade
+        gives them. A provider this installation does not hold leaves an orphan of an unknown IdP."""
+        from models import UserSSOIdentity
+        from models.sso import SSOProvider
+        from utils.sso_identity_upgrade import identity_rows
+
+        pending = getattr(self, '_legacy_sso_identities', [])
+        if not pending:
+            return
+        db.session.flush()
+        # The archive's reference to a provider, as identity_rows reads it: its number and its
+        # name, placed here by name; None only when the row names no provider at all
+        here = {}
+        accounts = []
+        merging = getattr(self, '_merging', False)
+        for user, row in pending:
+            # A merge keeps the account's own rows; a replace rebuilds them from the archive
+            held = UserSSOIdentity.query.filter_by(user_id=user.id)
+            if merging and held.first() is not None:
+                continue
+            if not merging:
+                held.delete(synchronize_session=False)
+                # The loaded collection still lists the rows the statement deleted
+                db.session.expire(user, ['sso_identities'])
+            name = (row.get('sso_provider_id_ref') or {}).get('name')
+            stored = None
+            if row.get('sso_provider_id') is not None or name:
+                stored = (row.get('sso_provider_id'), name)
+                if stored not in here:
+                    found = SSOProvider.query.filter_by(name=name).first() if name else None
+                    here[stored] = found.id if found else None
+            accounts.append((user.id, row.get('auth_source'), stored,
+                             row.get('sso_external_id'), row.get('sso_orphan_of'),
+                             user.password_hash, user.force_password_change))
+        made = []
+        names = {user.id: user.username for user, _row in pending}
+        for user_id, provider_id, orphan_of, external_id in identity_rows(sorted(accounts), here):
+            holder = self._identity_holder(user_id, provider_id, external_id)
+            if holder is not None:
+                # Kept as an orphan of an unknown IdP, as the upgrade keeps a shared identity
+                self._skipped_identity(plan, names.get(user_id), provider_id, holder)
+                provider_id, orphan_of = None, None
+            made.append((user_id, provider_id, orphan_of, external_id))
+        for user_id, provider_id, orphan_of, external_id in made:
+            identity = UserSSOIdentity(user_id=user_id, provider_id=provider_id, orphan_of=orphan_of)
+            identity.bind(external_id)
+            db.session.add(identity)
+        db.session.flush()
+        self._legacy_sso_identities = []
+        if made:
+            results['user_sso_identities'] = results.get('user_sso_identities', 0) + len(made)
+
+    @staticmethod
+    def _apply_ca_revocation(ca, ca_data: Dict, here_revocation=None) -> None:
         """Carry the CA's revocation state back (#343): a restore that drops
         it brings a revoked CA back as active and able to sign again. A merge
-        keeps ``here_final`` (``_kept_final``) over a lighter or no revocation."""
+        keeps ``here_revocation`` (``_kept_revocation``) over a lighter or no revocation."""
         where = f"certificate authority {ca_data.get('refid') or ca_data.get('descr')}"
 
         def _dt_or_none(column, val):
@@ -703,8 +1021,8 @@ class RestoreCoreMixin:
         ca.revoked_at = _dt_or_none('revoked_at', ca_data.get('revoked_at'))
         ca.revoke_reason = ca_data.get('revoke_reason')
         ca.invalidity_at = _dt_or_none('invalidity_at', ca_data.get('invalidity_at'))
-        if here_final is not None and (not ca.revoked or _revocation_key(ca) > _revocation_key(here_final)):
-            for field, value in vars(here_final).items():
+        if here_revocation is not None and (not ca.revoked or _revocation_key(ca) > _revocation_key(here_revocation)):
+            for field, value in vars(here_revocation).items():
                 setattr(ca, field, value)
 
     @staticmethod
@@ -756,6 +1074,7 @@ class RestoreCoreMixin:
         is not reached when a later section refuses the archive.
         """
         from models.revoked_serial import RevokedSerial
+        from utils.serial_format import canonical_serial
         from .restore.plan import RestorePlan
         from .restore_extended import reindex_reference_targets
 
@@ -776,10 +1095,12 @@ class RestoreCoreMixin:
         known = {ca.refid for ca in CA.query.with_entities(CA.refid).all()}
         known.update(c.get('refid') for c in backup_data.get('certificate_authorities', []) if c.get('refid'))
         for position, rs_data in enumerate(backup_data.get('revoked_serials', [])):
+            tick(1)
             if position in lifted:
                 continue
             caref = rs_data.get('caref')
-            serial = rs_data.get('serial_number')
+            # An older archive holds any spelling: matched and written in the stored one
+            serial = canonical_serial(rs_data.get('serial_number'))
             if not caref or not serial:
                 # Both columns are NOT NULL on the model, so no export writes
                 # such a row: it used to be dropped without a word, which for
@@ -798,19 +1119,12 @@ class RestoreCoreMixin:
                 logger.warning(f"Revoked serial {serial} skipped: CA {caref} is unknown")
                 results['revoked_serials_skipped'] += 1
                 continue
-            archived_serial = serial
-            where = f"revoked serial {archived_serial} of CA {caref}"
-            serial = _readable_record_serial(serial)
-            # One serial, one identity: every spelling of it here, ranked under its decimal form
-            value = serial_named_by(serial)
-            spellings = {str(archived_serial), serial} | (
-                unambiguous_serial_spellings(value) if value is not None else set())
-            here = RevokedSerial.query.filter(
-                RevokedSerial.caref == caref,
-                RevokedSerial.serial_number.in_(spellings),
+            # A refusal names the serial as the archive spells it
+            where = f"revoked serial {rs_data.get('serial_number')} of CA {caref}"
+            here = RevokedSerial.query.filter_by(
+                caref=caref, serial_number=serial
             ).order_by(RevokedSerial.id).all()
-            taken = plan.rank('revoked_serials', (caref, str(value) if value is not None else serial),
-                              rs_data, [r.id for r in here])
+            taken = plan.rank('revoked_serials', (caref, str(serial)), rs_data, [r.id for r in here])
             existing = next((r for r in here if r.id == taken), None)
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()
@@ -821,7 +1135,6 @@ class RestoreCoreMixin:
             certificate_id = plan.resolve('revoked_serials', rs_data,
                                           'certificate_id')
             if existing:
-                existing.serial_number = serial
                 archived = SimpleNamespace(revoke_reason=rs_data.get('revoke_reason'),
                                            revoked_at=revoked_at or existing.revoked_at,
                                            invalidity_at=invalidity_at)
@@ -855,6 +1168,7 @@ class RestoreCoreMixin:
         """Each issuer's CRL number, never lowered: the higher of here and the archive."""
         from models.crl import CRLNumberCounter
         for position, row in enumerate(backup_data.get('crl_number_counters') or []):
+            tick(1)   # every row announced by expect_rows is counted, written or left out
             issuer_key, number = row.get('issuer_key'), row.get('last_number')
             if (not isinstance(issuer_key, str) or not isinstance(number, int)
                     or isinstance(number, bool)):
@@ -883,6 +1197,8 @@ class RestoreCoreMixin:
         # build one, so references still land on the row the archive names
         # rather than on whatever holds that number here.
         plan = plan if plan is not None else RestorePlan.build(backup_data)
+        from .restore_extended import _refuse_a_taken_key
+        taken = {}
 
         for ca_data in backup_data.get('certificate_authorities', []):
             ca = CA.query.filter_by(refid=ca_data['refid']).first()
@@ -890,17 +1206,15 @@ class RestoreCoreMixin:
             # Decrypt private key if encrypted
             prv_pem = None
             if ca_data.get('private_key_pem_encrypted'):
-                prv_pem = self._decrypt_private_key(
-                    ca_data['private_key_pem_encrypted'],
-                    master_key
-                )
+                prv_pem = self._decrypt_archived_key(
+                    ca_data['private_key_pem_encrypted'], master_key, f"CA {ca_data['refid']}")
             prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
             if prv_b64:
                 from security.encryption import encrypt_private_key
                 prv_b64 = encrypt_private_key(prv_b64)
 
             # Read before apply_columns writes the archive's revocation columns
-            here_final = _kept_final(self, ca)
+            here_revocation = _kept_revocation(self, ca)
             if ca is None:
                 # descr and crt are NOT NULL; both are overwritten below
                 ca = CA(refid=ca_data['refid'], descr=ca_data.get('descr'), crt='')
@@ -924,7 +1238,8 @@ class RestoreCoreMixin:
             ca.serial_number = ca_data.get('serial_number') or ca.serial_number
             ca.ski = ca_data.get('ski') or ca.ski
             self._apply_ca_fields(ca, ca_data)
-            self._apply_ca_revocation(ca, ca_data, here_final)
+            self._apply_ca_revocation(ca, ca_data, here_revocation)
+            _refuse_a_taken_key(ca, taken)
             results['cas'] += 1
 
     def _restore_certificates(self, backup_data: Dict, results: Dict, master_key: bytes,
@@ -939,17 +1254,16 @@ class RestoreCoreMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
 
         written = []
-        kept_finals = self.__dict__.setdefault('_kept_finals', [])
+        kept_revocations = self.__dict__.setdefault('_kept_revocations', [])
         for cert_data in backup_data.get('certificates', []):
             cert = Certificate.query.filter_by(refid=cert_data['refid']).first()
 
             # Decrypt private key if encrypted
             prv_pem = None
             if cert_data.get('private_key_pem_encrypted'):
-                prv_pem = self._decrypt_private_key(
-                    cert_data['private_key_pem_encrypted'],
-                    master_key
-                )
+                prv_pem = self._decrypt_archived_key(
+                    cert_data['private_key_pem_encrypted'], master_key,
+                    f"certificate {cert_data['refid']}")
 
             prv_b64 = None
             if prv_pem:
@@ -985,7 +1299,7 @@ class RestoreCoreMixin:
             if prv_b64:
                 cert.prv = prv_b64
             where = f"certificate {cert_data.get('refid')}"
-            here_final = _kept_final(self, here_state)
+            here_revocation = _kept_revocation(self, here_state)
             cert.revoked = bool(cert_data.get('revoked', False))
             cert.revoked_at = _archived_datetime(where, 'revoked_at',
                                                  cert_data.get('revoked_at'))
@@ -993,19 +1307,23 @@ class RestoreCoreMixin:
             if 'invalidity_at' in cert_data:
                 cert.invalidity_at = _archived_datetime(
                     where, 'invalidity_at', cert_data.get('invalidity_at'))
-            if here_final is not None and (not cert.revoked or _revocation_key(cert) > _revocation_key(here_final)):
-                for field, value in vars(here_final).items():
+            if here_revocation is not None and (not cert.revoked or _revocation_key(cert) > _revocation_key(here_revocation)):
+                for field, value in vars(here_revocation).items():
                     setattr(cert, field, value)
-                kept_finals.append(cert)
+                kept_revocations.append(cert)
             cert.archived = bool(cert_data.get('archived', False))
             written.append(cert)
             results['certificates'] += 1
+            if len(written) % PEM_RELEASE_ROWS == 0:
+                _release_pems(written[-PEM_RELEASE_ROWS:])
         db.session.flush()
+        _release_pems(written[-(len(written) % PEM_RELEASE_ROWS or PEM_RELEASE_ROWS):])
         plan.written.setdefault('certificates', set()).update(cert.id for cert in written)
 
     def _restore_acme_accounts(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME accounts from backup data (RFC 8555)"""
         for acme_data in backup_data.get('acme_accounts', []):
+            tick(1)   # every row announced by expect_rows is counted, written or left out
             account_id = acme_data.get('account_id')
             jwk_thumbprint = acme_data.get('jwk_thumbprint')
             if not account_id or not jwk_thumbprint or not acme_data.get('jwk'):
@@ -1047,6 +1365,7 @@ class RestoreCoreMixin:
 
         results.setdefault('acme_eab_credentials', 0)
         for eab in backup_data.get('acme_eab_credentials', []):
+            tick(1)   # every row announced by expect_rows is counted, written or left out
             kid = eab.get('kid')
             if not kid or not eab.get('hmac_key_b64'):
                 continue
@@ -1105,7 +1424,7 @@ class RestoreCoreMixin:
         # Settings naming a row by number wait for that row: see restore/setting_refs.py
         deferred = deferred_keys(configuration if isinstance(configuration, dict) else {})
         for key, value in config_data.items():
-            if key in installation.LOCAL_SETTINGS or key in deferred:
+            if installation.is_local_setting(key) or key in deferred:
                 continue    # this database's own, never the source's
             if key == admin_allowlist.CONFIG_KEY and admin_allowlist.restored_value_locks_out(value):
                 if admin_allowlist.disabled_by_env():
@@ -1131,92 +1450,3 @@ class RestoreCoreMixin:
         results['encrypted_settings'] = restore_encrypted_settings(
             configuration if isinstance(configuration, dict) else {},
             (configuration or {}).get('encrypted_settings') or [], skip=deferred)
-
-    def _regenerate_files(self, staged) -> None:
-        """Write the files that materialise the restored rows on disk.
-
-        Every failure here used to be `pass`: a restore that could not write
-        a single file still reported success. Two kinds are distinguished,
-        because they do not mean the same thing.
-
-        A write that fails — no space left, a read-only directory — stops the
-        restore. It runs inside the transaction, so the rows go back with it
-        and the instance stays as it was, which is the only outcome that
-        matches what the caller is told.
-
-        The certificate, CSR and key files are staged rather than written in
-        place, published with the rest just before the commit and put back by
-        `unpublish()` if the commit fails: written directly, a restore that failed afterwards left
-        every certificate file holding the archive's content while the rows
-        had gone back to what they were. With database encryption on, a key
-        mirror is staged as a removal.
-
-        Material that cannot be decoded is a warning naming the row, and the
-        restore goes on. This walks every authority and certificate in the
-        database, not only the ones the archive carried: a row whose stored
-        key predates this installation's KEY_ENCRYPTION_KEY was already
-        unreadable before the restore, so nothing is lost by not mirroring
-        it, and refusing would make an instance holding one such row
-        impossible to restore at all. What the archive itself brought cannot
-        land here: it was just encoded by this process, a few lines above.
-        """
-        from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_key_path, cert_csr_path
-        from utils.key_codec import load_pem_bytes
-
-        for ca in CA.query.all():
-            if ca.crt:
-                try:
-                    cert_pem = base64.b64decode(ca.crt)
-                except (ValueError, TypeError) as exc:
-                    logger.warning(
-                        "Restore: the stored certificate of CA %s could not be "
-                        "decoded (%s); its file was not written", ca.id, exc)
-                else:
-                    Config.CA_DIR.mkdir(parents=True, exist_ok=True)
-                    staged.stage(ca_cert_path(ca), cert_pem, mode=0o644)
-            if ca.prv:
-                try:
-                    prv_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
-                except ValueError as exc:
-                    logger.warning(
-                        "Restore: the stored key of CA %s could not be read "
-                        "(%s); it was not mirrored on disk", ca.id, exc)
-                else:
-                    _stage_key_mirror(staged, ca_key_path(ca), prv_pem)
-
-        for cert in Certificate.query.all():
-            if cert.crt:
-                try:
-                    cert_pem_bytes = base64.b64decode(cert.crt)
-                except (ValueError, TypeError) as exc:
-                    logger.warning(
-                        "Restore: the stored certificate %s could not be "
-                        "decoded (%s); its file was not written", cert.id, exc)
-                else:
-                    Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
-                    staged.stage(cert_cert_path(cert), cert_pem_bytes,
-                                 mode=0o644)
-            if cert.csr:
-                try:
-                    csr_data = cert.csr
-                    if csr_data.startswith('-----BEGIN'):
-                        csr_bytes = csr_data.encode('utf-8')
-                    else:
-                        csr_bytes = base64.b64decode(csr_data)
-                except (ValueError, TypeError, AttributeError) as exc:
-                    logger.warning(
-                        "Restore: the stored CSR of certificate %s could not "
-                        "be decoded (%s); its file was not written",
-                        cert.id, exc)
-                else:
-                    staged.stage(cert_csr_path(cert), csr_bytes, mode=0o644)
-            if cert.prv:
-                try:
-                    prv_pem_bytes = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
-                except ValueError as exc:
-                    logger.warning(
-                        "Restore: the stored key of certificate %s could not "
-                        "be read (%s); it was not mirrored on disk",
-                        cert.id, exc)
-                else:
-                    _stage_key_mirror(staged, cert_key_path(cert), prv_pem_bytes)

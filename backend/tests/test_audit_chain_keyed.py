@@ -602,53 +602,21 @@ def test_no_master_key_no_derived_key(app):
     assert key_encryption.derive_key(b'ucm audit chain v2') is None
 
 
-def _migration():
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'migrations', '098_audit_chain_keyed.py')
-    spec = importlib.util.spec_from_file_location('m098', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_migration_adds_the_columns_and_is_idempotent():
-    migration = _migration()
-    assert migration.pg_compatible is True
-    conn = sqlite3.connect(':memory:')
-    migration.upgrade(conn)     # no table yet
-    conn.execute('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, entry_hash VARCHAR(64))')
-    conn.execute("INSERT INTO audit_logs VALUES (1, 'x')")
-    for _ in range(2):
-        migration.upgrade(conn)
-    cols = {row[1] for row in conn.execute('PRAGMA table_info(audit_logs)')}
-    assert {'hash_version', 'hash_key_id', 'chain_start'} <= cols
-    assert conn.execute('SELECT hash_version FROM audit_logs').fetchone() == (None,)
-
-
 @pytest.mark.postgres
 @pytest.mark.skipif(not os.getenv('UCM_TEST_PG_URL'), reason='UCM_TEST_PG_URL not set')
 def test_the_seal_survives_a_postgresql_round_trip():
-    """Migration, then an entry sealed in memory and read back from PostgreSQL."""
+    """An entry sealed in memory, stored in the model's table and read back from PostgreSQL."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 
     schema = f"m098_{os.getenv('PYTEST_XDIST_WORKER', 'main')}_{uuid.uuid4().hex[:6]}"
     engine = create_engine(os.environ['UCM_TEST_PG_URL'])
-    migration = _migration()
     key = os.urandom(32)
     try:
         with engine.begin() as conn:
             conn.execute(text(f'CREATE SCHEMA {schema}'))
             conn.execute(text(f'SET search_path TO {schema}'))
-            migration.upgrade(conn)     # no table yet
-            conn.execute(text('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, '
-                              'timestamp TIMESTAMP, username VARCHAR(80), '
-                              'action VARCHAR(100) NOT NULL, resource_type VARCHAR(50), '
-                              'resource_id VARCHAR(100), resource_name VARCHAR(255), '
-                              'details TEXT, ip_address VARCHAR(45), user_agent VARCHAR(255), '
-                              'success BOOLEAN, prev_hash VARCHAR(64), entry_hash VARCHAR(64))'))
-            migration.upgrade(conn)
-            migration.upgrade(conn)
+            AuditLog.__table__.create(conn)
         with engine.begin() as conn:
             conn.execute(text(f'SET search_path TO {schema}'))
             entry = AuditLog(id=7, timestamp=utc_now(), username='pg', action='pg_seal',

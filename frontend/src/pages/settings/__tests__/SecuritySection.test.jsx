@@ -124,9 +124,102 @@ describe('SecuritySection disabling encryption', () => {
     expect(screen.getByText('settings.disableEncryption')).toBeInTheDocument()
   })
 
-  it('is not offered when the key comes from the environment', () => {
+  it('is offered when the key comes from the environment: it stays configured, unused', () => {
     renderSection({ ...status, key_source: 'env' })
-    expect(screen.queryByText('settings.disableEncryption')).not.toBeInTheDocument()
+    expect(screen.getByText('settings.disableEncryption')).toBeInTheDocument()
+  })
+
+  it('shows a disable left half-way and offers to run it again, not to rotate', () => {
+    const setShow = vi.fn()
+    renderSection({ ...status, key_source: 'env', disabling: true },
+      { setShowDisableEncryptionModal: setShow, handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.encryptionDisabling')).toBeInTheDocument()
+    expect(screen.getByText('settings.encryptionDisablingHint')).toBeInTheDocument()
+    expect(screen.queryByText('common.enabled')).not.toBeInTheDocument()
+    expect(screen.queryByText('settings.rotateDataKey')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('settings.runDisableAgain'))
+    expect(setShow).toHaveBeenCalledWith(true)
+  })
+  it('names the end of a disable grace period and holds enabling until then', () => {
+    renderSection({ ...status, enabled: false, key_source: 'env',
+      enable_available_after: '2026-11-12T10:00:00Z' })
+    expect(screen.getByText('common.disabled')).toBeInTheDocument()
+    expect(screen.getByText('settings.enableAvailableAfter')).toBeInTheDocument()
+    expect(screen.getByText('settings.enableEncryption').closest('button')).toBeDisabled()
+  })
+  it('lists the keys a disable kept and says master.key goes with the last one', () => {
+    renderSection({ ...status, enabled: false, key_source: 'file',
+      retained_keys: [{ version: 3, retire_after: '2026-11-19T10:00:00Z' }],
+      key_file_kept_for_retained_keys: true })
+    expect(screen.getByText('settings.retainedDataKey')).toBeInTheDocument()
+    expect(screen.getByText('settings.keyFileRemovedWithRetainedKeys')).toBeInTheDocument()
+    expect(screen.getByText('settings.enableEncryption').closest('button')).not.toBeDisabled()
+  })
+  it('says a disable grace waits for every node while its end is not known', () => {
+    renderSection({ ...status, enabled: false, key_source: 'env',
+      enable_available_after: null, enable_waits_for_nodes: true })
+    expect(screen.getByText('settings.enableAvailableAfterNodesReload')).toBeInTheDocument()
+    expect(screen.queryByText('settings.enableAvailableAfter')).not.toBeInTheDocument()
+    expect(screen.getByText('settings.enableEncryption').closest('button')).toBeDisabled()
+  })
+})
+
+describe('SecuritySection data key rotation', () => {
+  const status = {
+    enabled: true,
+    key_source: 'env',
+    kek_fingerprint: '0123456789abcdef',
+    dek_version: 2,
+    rotation_in_progress: false,
+    total_keys: 1,
+    encrypted_count: 1,
+    unencrypted_count: 0,
+    key_files_on_disk: 0,
+  }
+
+  it('shows the fingerprint and version and offers the rotation', () => {
+    const handleRotateDataKey = vi.fn()
+    renderSection(status, { handleRotateDataKey })
+    expect(screen.getByText('0123456789abcdef')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('settings.rotateDataKey'))
+    expect(handleRotateDataKey).toHaveBeenCalledOnce()
+  })
+
+  it('offers to finish a rotation in progress', () => {
+    renderSection({ ...status, rotation_in_progress: true }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.dekRotationInProgress')).toBeInTheDocument()
+    expect(screen.getByText('settings.resumeDataKeyRotation')).toBeInTheDocument()
+  })
+
+  it('names the end of the grace period and holds the next rotation until then', () => {
+    renderSection({ ...status, rotation_available: false,
+      rotation_available_after: '2026-11-12T10:00:00Z' }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.rotationAvailableAfter')).toBeInTheDocument()
+    expect(screen.queryByText('settings.rotationAvailable')).not.toBeInTheDocument()
+    expect(screen.getByText('settings.rotateDataKey').closest('button')).toBeDisabled()
+  })
+
+  it('says the next rotation waits for every node while the end is not known', () => {
+    renderSection({ ...status, rotation_available: false, rotation_available_after: null,
+      rotation_waits_for_nodes: true }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.rotationAvailableAfterNodesReload')).toBeInTheDocument()
+    expect(screen.getByText('settings.rotateDataKey').closest('button')).toBeDisabled()
+  })
+
+  it('says rotation is possible while old keys are kept, and lists them', () => {
+    renderSection({ ...status, rotation_available: true, retained_keys: [
+      { version: 1, retire_after: '2026-11-19T10:00:00Z' },
+      { version: 2, retire_after: '2026-11-20T10:00:00Z' },
+    ] }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.rotationAvailable')).toBeInTheDocument()
+    expect(screen.getByText('settings.retainedDataKeys')).toBeInTheDocument()
+    expect(screen.getAllByText('settings.retainedDataKey')).toHaveLength(2)
+    expect(screen.getByText('settings.rotateDataKey').closest('button')).not.toBeDisabled()
+  })
+
+  it('is not offered while encryption is off', () => {
+    renderSection({ ...status, enabled: false }, { handleRotateDataKey: vi.fn() })
+    expect(screen.queryByText('settings.rotateDataKey')).not.toBeInTheDocument()
   })
 })
 
@@ -211,5 +304,69 @@ describe('SecuritySection admin access allowlist', () => {
     expect(screen.getByText('settings.adminAllowlistDisabled')).toBeInTheDocument()
     expect(screen.getByText('settings.adminAllowlistDisabledNote')).toBeInTheDocument()
     expect(screen.queryByText('settings.adminAllowlistActive')).not.toBeInTheDocument()
+  })
+})
+
+describe('SecuritySection session key', () => {
+  it('says the stored key rotates without a restart and names the grace end', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'database', rotation: 'database', previous_accepted_until: '2026-11-13T10:00:00Z' } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyFromDatabase')).toBeTruthy()
+    expect(screen.getByText('settings.sessionKeyRotateStoredDesc')).toBeTruthy()
+    expect(screen.getByText('settings.sessionKeyPreviousUntil')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateFileDesc')).toBeNull()
+    // The next rotation waits for the end of the grace
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).not.toHaveBeenCalled()
+  })
+
+  it('says the file rotation restarts the service without encryption', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'environment', rotation: 'environment_file', previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyFromEnvironment')).toBeTruthy()
+    expect(screen.getByText('settings.sessionKeyRotateFileDesc')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateStoredDesc')).toBeNull()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).toHaveBeenCalled()
+  })
+
+  it('disables the file rotation in HA and says why', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'environment', rotation: 'environment_file', ha: true, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyRotateHaRefused')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateFileDesc')).toBeNull()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).not.toHaveBeenCalled()
+  })
+
+  it('blocks the rotation while a disable is unfinished and says why', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'database', rotation: 'blocked', ha: false, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyRotateBlocked')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateFileDesc')).toBeNull()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).not.toHaveBeenCalled()
+  })
+
+  it('keeps the stored rotation available in HA', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'database', rotation: 'database', ha: true, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).toHaveBeenCalled()
   })
 })

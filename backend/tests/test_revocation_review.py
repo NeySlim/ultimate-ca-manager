@@ -11,6 +11,7 @@ from cryptography.x509.oid import NameOID
 
 from models import db, CA
 from models.revoked_serial import RevokedSerial
+from tests.windows_profile_support import put_default_profile
 
 from tests.fresh_app import fresh_app_fixtures
 
@@ -88,11 +89,14 @@ class TestChainRevocationExposed:
         if r.status_code == 405:
             r = auth_client.patch('/api/v2/tsa/config', data=json.dumps({'ca_id': grand['id']}), content_type='application/json')
         assert r.status_code == 400, r.data
-        for path in ('/api/v2/est/config', '/api/v2/xcep/config'):
-            r = auth_client.put(path, data=json.dumps({'ca_id': grand['id']}), content_type='application/json')
-            if r.status_code == 405:
-                r = auth_client.patch(path, data=json.dumps({'ca_id': grand['id']}), content_type='application/json')
-            assert r.status_code == 400, (path, r.data)
+        r = auth_client.put('/api/v2/est/config', data=json.dumps({'ca_id': grand['id']}), content_type='application/json')
+        if r.status_code == 405:
+            r = auth_client.patch('/api/v2/est/config', data=json.dumps({'ca_id': grand['id']}), content_type='application/json')
+        assert r.status_code == 400, r.data
+        with app.app_context():
+            grand_refid = db.session.get(CA, grand['id']).refid
+        r = put_default_profile(auth_client, policy_ca_refid=grand_refid)
+        assert r.status_code == 400, r.data
 
 
 class TestParentCrlFromTheRow:
@@ -181,9 +185,9 @@ class TestReviewOfTheReviewFixes:
             r = auth_client.put('/api/v2/tsa/config', data=json.dumps({'ca_refid': sub_refid}), content_type='application/json')
         assert r.status_code == 400 and 'revoked' in json.loads(r.data)['message']
         # WSTEP refuses a revoked CA too
-        r = auth_client.patch('/api/v2/wstep/config', data=json.dumps({'ca_id': sub['id']}), content_type='application/json')
-        if r.status_code == 405:
-            r = auth_client.put('/api/v2/wstep/config', data=json.dumps({'ca_id': sub['id']}), content_type='application/json')
+        with app.app_context():
+            sub_ca_refid = db.session.get(CA, sub['id']).refid
+        r = put_default_profile(auth_client, issuing_ca_refid=sub_ca_refid)
         assert r.status_code == 400, r.data
 
     def test_chain_message_differs_from_own_revocation(self, app, auth_client, create_ca):
@@ -236,11 +240,12 @@ class TestSecondPass:
         assert _revoke(auth_client, sub['id']).status_code == 200
         with app.app_context():
             refid = db.session.get(CA, sub['id']).refid
-        for path in ('/api/v2/est/config', '/api/v2/xcep/config'):
-            r = auth_client.put(path, data=json.dumps({'ca_refid': refid}), content_type='application/json')
-            if r.status_code == 405:
-                r = auth_client.patch(path, data=json.dumps({'ca_refid': refid}), content_type='application/json')
-            assert r.status_code == 400 and 'revoked' in json.loads(r.data)['message'], (path, r.data)
+        r = auth_client.put('/api/v2/est/config', data=json.dumps({'ca_refid': refid}), content_type='application/json')
+        if r.status_code == 405:
+            r = auth_client.patch('/api/v2/est/config', data=json.dumps({'ca_refid': refid}), content_type='application/json')
+        assert r.status_code == 400 and 'revoked' in json.loads(r.data)['message'], r.data
+        r = put_default_profile(auth_client, policy_ca_refid=refid)
+        assert r.status_code == 400 and 'revoked' in json.loads(r.data)['message'], r.data
 
     def test_caches_do_not_outlive_a_request_inside_an_outer_app_context(self, app, auth_client, create_ca):
         root = create_ca(cn='Outer Ctx Root')

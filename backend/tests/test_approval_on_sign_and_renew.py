@@ -11,6 +11,8 @@ import pytest
 from models import CA, Certificate, db
 from models.policy import ApprovalRequest, CertificatePolicy
 
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
+
 
 def _json(client, method, url, payload=None):
     return getattr(client, method)(url, data=json.dumps(payload or {}), content_type='application/json')
@@ -362,6 +364,29 @@ class TestMootRequestsAreResolved:
             with app.app_context():
                 ap = db.session.get(ApprovalRequest, approval_id)
                 assert ap.status == 'approved' and ap.certificate_id == cert_id
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    @pytest.mark.parametrize('refusal', ['renewed', 'related'])
+    def test_an_expected_refusal_is_a_warning_without_a_trace(self, app, auth_client, create_ca,
+                                                              create_user, monkeypatch, caplog, refusal):
+        from services.cert import renewal
+        from services.cert.related_pair import RelatedCertificateRefused
+        ca, pid, cert_id, approval_id = self._queue_renew(app, create_ca, create_user, f'warn-{refusal}')
+        error = (renewal._renewed_meanwhile('manual')
+                 if refusal == 'renewed' else RelatedCertificateRefused('The related certificate is revoked'))
+
+        def refused(*_a, **_k):
+            raise error
+        monkeypatch.setattr(renewal, 'renew_certificate_in_place', refused)
+        try:
+            with caplog.at_level('INFO', logger='api.v2.policies'):
+                r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200 and str(error) in r.get_json()['data']['issue_error'], r.get_json()
+            mine = [rec for rec in caplog.records if rec.name == 'api.v2.policies' and rec.levelname != 'INFO']
+            assert [(rec.levelname, rec.exc_info) for rec in mine] == [('WARNING', None)]
+            assert str(error) in mine[0].getMessage()
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, cert_id)
@@ -862,9 +887,9 @@ class TestSecondReviewFollowUps:
                     stats = AutoRenewalService.run_auto_renewal()
                 finally:
                     AutoRenewalService.set_renewal_config(previous)
-                assert stats['renewed'] == 0 and stats['failed'] == 1, stats
-                assert 'another request' in stats['errors'][0]['error']
-                assert 'reload' not in stats['errors'][0]['error']  # nobody to retry in a batch
+                # Overtaken: skipped, the next pass reads the row anew
+                assert (stats['renewed'], stats['failed'], stats['skipped']) == (0, 0, 1), stats
+                assert stats['errors'] == []
                 assert db.session.get(Certificate, cert_id).serial_number == 'deadbeef'
         finally:
             _drop_rows(app, cert_id)

@@ -16,11 +16,13 @@ from cryptography.hazmat.backends import default_backend
 import compliance_profiles
 from fips_mode import FipsRestricted
 from models import CA, db
-from models.hsm import HsmKey
+from utils.ca_serial_counter import next_ca_serial
+from models.hsm import HsmKey, HsmProvider
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
 from services.import_service import CrossCertificateImport, refused_as_cross_certificate
-from utils.cert_issuer import find_ca_by_ski, is_self_signed
+from utils.cert_issuer import authority_key_identifier_hex, cas_by_ski, is_self_signed, self_signed_first
+from utils.key_type import weak_ca_key_refusal
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.serial_format import serial_to_int
 from .helpers import save_ca_files, save_ca_key_file
@@ -44,6 +46,10 @@ def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm,
     if hsm_key_id:
         hsm_key = db.session.get(HsmKey, hsm_key_id)
         label = hsm_key.algorithm if hsm_key else None
+        if hsm_key is not None:
+            # Bound only if it signs: the signing rule and its message, ahead of the policies
+            from services.hsm import HsmService
+            HsmService.refuse_signing_in_fips_mode(hsm_key)
     else:
         label = hsm_key_algorithm or key_type
     policies = PolicyEvaluationService.applicable_policies(
@@ -119,6 +125,54 @@ def _refuse_on_violations(violations):
         raise PolicyViolation('Policy violation: ' + '; '.join(violations))
 
 
+def _default_ca_digest(caref, key_type, hsm_key_id=None, hsm_key_algorithm=None):
+    """Hash of a CA certificate nobody chose: for an intermediate, the stronger of the parent
+    key's and the new key's (the parent's alone when only it takes one), else the new key's.
+    The new key's algorithm is the HSM key's when there is one, else *key_type*."""
+    from utils import key_algorithms
+    from utils.ca_profile import resolve_digest
+    from utils.issuance_defaults import digest_for_key, stronger_digest
+    if hsm_key_id:
+        hsm_key = db.session.get(HsmKey, hsm_key_id)
+        hsm_key_algorithm = hsm_key.algorithm if hsm_key else None
+    alg = key_algorithms.get(hsm_key_algorithm) if hsm_key_algorithm else None
+    own = resolve_digest(None, alg.trust_store_id if alg is not None and alg.trust_store_id else key_type)[0]
+    parent = CA.query.filter_by(refid=caref).first() if caref else None
+    if parent is not None and parent.crt:
+        from services.ca.helpers import get_ca_cert_pem
+        parent_digest = digest_for_key(x509.load_pem_x509_certificate(get_ca_cert_pem(parent)).public_key())
+        return stronger_digest(parent_digest, own) if parent_digest else None
+    return own
+
+
+def _stored_certificate(record):
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(record.crt)) if record.crt else None
+    except Exception:
+        return None
+
+
+def _bears_name(record, name):
+    """Whether the certificate *record* holds has *name* as its subject."""
+    from utils.dn_match import same_name
+    stored = _stored_certificate(record)
+    return stored is not None and same_name(stored.subject, name)
+
+
+def _orphaned_by_subject_change(ca, cert):
+    """The warning's tail when CAs linked under *ca* name its former subject as their issuer: the
+    chain repair drops them once *cert* holds another (RFC 5280 6.1.3 (a)(4)), revoked ones and
+    those confirmed by hand excepted."""
+    from utils.dn_match import same_name
+    for child in CA.query.filter(CA.caref == ca.refid, CA.id != ca.id).all():
+        if child.parent_confirmed_at is not None or child.is_revoked:
+            continue
+        stored = _stored_certificate(child)
+        if stored is not None and not same_name(stored.issuer, cert.subject):
+            return ': the CAs issued under the former subject lose this CA as their parent at the next chain repair'
+    return ''
+
+
 class CACreationMixin:
     """CA creation and import operations"""
 
@@ -136,7 +190,7 @@ class CACreationMixin:
         Returns (private_key, key_pem_bytes_or_None, hsm_key_or_None).
         key_pem is None for HSM-backed keys (no on-disk PEM).
         """
-        from services.hsm import HsmService
+        from services.hsm import HsmService, key_binding
         from services.hsm.hsm_private_key import load_hsm_private_key
 
         if hsm_key_id and (hsm_provider_id or hsm_key_label or hsm_key_algorithm):
@@ -156,30 +210,21 @@ class CACreationMixin:
             return private_key, key_pem, None
 
         if hsm_key_id:
-            # Lock the HSM key row to serialise concurrent CA creations
-            # binding the same key. The DB also enforces uq_ca_hsm_key_id
-            # (migration 032) as a defense-in-depth safety net.
-            try:
-                hsm_key = (
-                    HsmKey.query.filter_by(id=hsm_key_id)
-                    .with_for_update()
-                    .one_or_none()
-                )
-            except Exception:
-                # SQLite has no row-level locks; fall back to plain lookup.
-                hsm_key = db.session.get(HsmKey, hsm_key_id)
+            # The key row stays locked to the CA's commit: concurrent X.509 and SSH bindings serialise
+            hsm_key = key_binding.lock_key(hsm_key_id)
             if not hsm_key:
                 raise ValueError(f"HSM key {hsm_key_id} not found")
-            if CA.query.filter_by(hsm_key_id=hsm_key.id).first():
-                raise ValueError(
-                    f"HSM key {hsm_key.label} is already bound to another CA"
-                )
+            # A new CA never binds a token only one node reaches in HA, nor a key an X.509 or SSH CA holds
+            key_binding.refuse_node_local_in_ha(hsm_key.provider)
+            key_binding.refuse_bound_key(hsm_key)
+            HsmService.refuse_signing_in_fips_mode(hsm_key)
         else:
             if not (hsm_provider_id and hsm_key_label and hsm_key_algorithm):
                 raise ValueError(
                     "hsm_provider_id, hsm_key_label and hsm_key_algorithm "
                     "are all required to generate a new HSM key"
                 )
+            key_binding.refuse_node_local_in_ha(db.session.get(HsmProvider, hsm_provider_id))
             hsm_key = HsmService.generate_key(
                 provider_id=hsm_provider_id,
                 label=hsm_key_label,
@@ -188,7 +233,10 @@ class CACreationMixin:
             )
 
         with _discarding_new_hsm_key(hsm_provider_id, hsm_key):
-            return load_hsm_private_key(hsm_key.id), None, hsm_key
+            wrapper = load_hsm_private_key(hsm_key.id)
+            if hsm_key_id:
+                key_binding.refuse_same_token_key(hsm_key, wrapper.public_key())
+            return wrapper, None, hsm_key
 
     @staticmethod
     def _encode_private_key(key_pem: Optional[bytes]) -> Optional[str]:
@@ -228,9 +276,9 @@ class CACreationMixin:
     def create_internal_ca(
         descr: str,
         dn: Dict[str, str],
-        key_type: str = '2048',
+        key_type: Optional[str] = None,
         validity_days: int = 825,
-        digest: str = 'sha256',
+        digest: Optional[str] = None,
         caref: Optional[str] = None,
         ocsp_uri: Optional[str] = None,
         username: str = 'system',
@@ -279,6 +327,13 @@ class CACreationMixin:
         from services.hsm.ca_key_loader import bind_signature_scheme, get_ca_signing_key
         from services.policy_service import (
             PolicyEvaluationService, key_label_for_public_key)
+        from utils.issuance_defaults import default_issue_key_id
+
+        parent = CA.query.filter_by(refid=caref).first() if caref else None
+        key_type = key_type or default_issue_key_id(parent.id if parent else None, compliance_profile)
+        if digest is None:  # nobody chose: the signer key's own, yielding to the policies
+            digest, digest_explicit = _default_ca_digest(
+                caref, key_type, hsm_key_id, hsm_key_algorithm), False
 
         # Issuance policies, checked before a key is generated (an HSM key is
         # created on the device), then again on the real key and signer below
@@ -379,7 +434,7 @@ class CACreationMixin:
                 private_key = bind_signature_scheme(private_key, signature_scheme)
             subject = TrustStoreService.build_subject(dn)
             if caref:
-                parent_ca.serial = (parent_ca.serial or 0) + 1
+                next_ca_serial(parent_ca)
 
             # A root's new HSM key may sign with a provider-bound hash
             _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
@@ -547,6 +602,11 @@ class CACreationMixin:
         except x509.ExtensionNotFound:
             pass
 
+        if key_pem:
+            weak = weak_ca_key_refusal(key_pem)
+            if weak:
+                raise ValueError(weak)
+
         # Encrypt imported private key at rest, mirroring create_internal_ca
         # (otherwise imported CA keys sit base64-only in the DB).
         prv_encoded = CACreationMixin._encode_private_key(
@@ -597,7 +657,7 @@ class CACreationMixin:
     def create_external_ca(
         descr: str,
         dn: Dict[str, str],
-        key_type: str = '2048',
+        key_type: Optional[str] = None,
         digest: Optional[str] = None,
         username: str = 'system',
         path_length: Optional[int] = None,
@@ -619,6 +679,8 @@ class CACreationMixin:
         *digest* signs the CSR; None picks the key's own (none for ML-DSA).
         """
         from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+        from utils.issuance_defaults import default_issue_key_id
+        key_type = key_type or default_issue_key_id(None, compliance_profile)
         policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm,
                                            compliance_profile)
         rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}
@@ -755,7 +817,8 @@ class CACreationMixin:
         # 4. The signer is authoritative on the subject
         cert_subject = cert.subject.rfc4514_string()
         if ca.subject and cert_subject != ca.subject:
-            warnings.append("Certificate subject differs from the CSR subject")
+            warnings.append("Certificate subject differs from the CSR subject"
+                            + _orphaned_by_subject_change(ca, cert))
 
         # 5. SKI (uppercase — CA convention) and effective pathLen from the cert
         new_ski = None
@@ -776,33 +839,31 @@ class CACreationMixin:
         # 6. Chain to the issuing CA when it is known to UCM (AKI→SKI, then
         #    issuer DN). Absence is non-blocking — the offline root may be
         #    imported later, and chain-repair re-links orphans.
-        caref = None
-        parent = None
-        try:
-            aki_ext = cert.extensions.get_extension_for_oid(
-                ExtensionOID.AUTHORITY_KEY_IDENTIFIER
-            )
-            if aki_ext.value.key_identifier:
-                aki_hex = aki_ext.value.key_identifier.hex(':').upper()
-                parent = find_ca_by_ski(aki_hex, exclude_id=ca.id)
-        except x509.ExtensionNotFound:
-            pass
-        if parent is None:
-            parent = CA.query.filter(
+        # The parent follows the rule of every certificate change (parent_confirmation.settle_parent);
+        # the candidates, records of the issuer name (RFC 5280 6.1.3 (a)(4)), only word the warnings
+        candidates = []
+        aki_hex = authority_key_identifier_hex(cert)
+        if aki_hex:
+            candidates = [c for c in cas_by_ski(aki_hex, exclude_id=ca.id) if _bears_name(c, cert.issuer)]
+        if not candidates:
+            candidates = self_signed_first(CA.query.filter(
                 CA.subject == cert.issuer.rfc4514_string(), CA.id != ca.id
-            ).first()
-        if parent is not None and parent.crt:
-            try:
-                parent_cert = x509.load_pem_x509_certificate(
-                    base64.b64decode(parent.crt), default_backend()
-                )
-                cert.verify_directly_issued_by(parent_cert)
-                caref = parent.refid
-            except Exception:
-                warnings.append(
-                    "A CA matching the issuer was found but signature verification failed"
-                )
-        elif parent is None:
+            ).order_by(CA.id).all())
+        from services.ca import parent_confirmation
+        kept_confirmed = parent_confirmation.settle_parent(ca, cert)
+        caref = None if kept_confirmed else ca.caref
+        proposed = None if caref or kept_confirmed else parent_confirmation.proposal_for(cert, ca.id)
+        if proposed is not None:
+            # Unverifiable is not invalid: the operator may confirm this parent by hand
+            warnings.append(
+                f'Issuing CA "{proposed.parent.descr}" is not linked, {proposed.reason}: '
+                'confirm it as the parent to complete the chain'
+            )
+        elif caref is None and not kept_confirmed and any(parent.crt for parent in candidates):
+            warnings.append(
+                "A CA matching the issuer was found but signature verification failed"
+            )
+        elif not candidates and not kept_confirmed:
             warnings.append(
                 "Issuing CA not found in UCM: import the external root "
                 "(certificate only) to complete the chain"
@@ -827,8 +888,6 @@ class CACreationMixin:
         ca.valid_from = cert.not_valid_before_utc
         ca.valid_to = cert.not_valid_after_utc
         ca.path_length = new_path_length
-        if caref:
-            ca.caref = caref
         ca.csr = None  # the outstanding CSR is fulfilled
 
         try:
@@ -848,7 +907,8 @@ class CACreationMixin:
                     ca.set_cdp_urls([f"{base_url}/cdp/{ca.url_ref}.crl"])
                     db.session.commit()
             except Exception:
-                pass
+                # The certificate is installed: a CDP that could not be set is not left for the audit to commit
+                db.session.rollback()
 
         AuditService.log_ca(
             'ca_certificate_installed', ca,
@@ -857,6 +917,7 @@ class CACreationMixin:
             + (f", superseded serial: {superseded['serial']}" if superseded else '')
             + ')'
         )
+        parent_confirmation.audit_dropped(ca)
 
         save_ca_files(ca, cert_pem, None)
 

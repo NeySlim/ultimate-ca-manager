@@ -20,8 +20,9 @@ export default {
           { label: 'Formulaire d\'émission', text: 'Une demande de certificat correspondant à une politique qui exige une approbation' },
           { label: 'Signature de CSR et signature en masse', text: 'La signature d\'une requête stockée, seule ou depuis Opérations, est mise en file de la même façon ; l\'approbation effectue la signature' },
           { label: 'Renouvellement', text: 'Le renouvellement d\'un certificat, seul ou en masse, est également mis en file ; un renouvellement impossible à honorer (révoqué, clé non détenue par le serveur) est refusé immédiatement' },
-          { label: 'Révocation', text: 'La révocation d\'un certificat (seul, en masse, depuis les certificats utilisateur) ou d\'une CA intermédiaire sous une politique de révocation est mise en file ; l\'approbation révoque avec le motif demandé' },
+          { label: 'Révocation', text: 'La révocation d\'un certificat (seul, en masse, depuis les certificats utilisateur) ou d\'une AC intermédiaire sous une politique de révocation est mise en file ; l\'approbation révoque avec le motif demandé' },
           { label: 'Planificateur', text: 'Sous une politique de renouvellement, le planificateur met le renouvellement en file ; l\'approbation re-signe la clé détenue par le serveur, comme l\'aurait fait le planificateur' },
+          { label: 'Protocoles d\'enrôlement', text: "Une finalisation ACME, un enrôlement, un réenrôlement ou une génération de clé côté serveur EST, une demande SCEP (même sur un profil à approbation automatique) ou un enrôlement ou renouvellement WSTEP soumis à une politique d'approbation est retenu : le client est informé que la demande est en attente et l'interroge à intervalles réguliers ; l'approbation émet le certificat par ce protocole, un rejet ou une expiration est signalé au client comme un refus" },
           { label: 'Administrateurs', text: 'Contournent la file sur tous les chemins, comme sur le formulaire d\'émission' },
         ]
       },
@@ -31,7 +32,7 @@ export default {
           { label: 'Signée ou renouvelée directement', text: 'Une demande en file dont la cible a entre-temps été signée ou renouvelée par un administrateur est clôturée comme approuvée par cette action et liée au certificat' },
           { label: 'Supprimée ou révoquée', text: 'Une demande dont la cible a été supprimée ou révoquée est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu\'à la levée de la suspension' },
           { label: 'Déjà satisfaite', text: 'Approuver une demande déjà satisfaite la clôture sur le certificat existant ; approuver l\'une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous' },
-          { label: 'Cible disparue', text: 'Approuver une demande dont la requête stockée, le certificat ou la CA n\'existe plus la clôture comme rejetée' },
+          { label: 'Cible disparue', text: 'Approuver une demande dont la requête stockée, le certificat ou l\'AC n\'existe plus la clôture comme rejetée' },
           { label: 'Révoquée ou renouvelée entre-temps', text: 'Une révocation en file dont le certificat a été révoqué directement est clôturée comme approuvée ; si le certificat a été renouvelé depuis, elle est clôturée comme rejetée à l\'approbation' },
           { label: 'Échéance', text: 'Une demande attend sept jours ; passé ce délai, elle est clôturée comme expirée, jamais comptée comme en attente, et le planificateur de renouvellement reprend pour son certificat' },
         ]
@@ -72,7 +73,7 @@ Son demandeur a effectué l'action directement, ou approuvé une autre demande p
 Au-delà du formulaire d'émission, une politique qui exige une approbation met aussi en file :
 - **Signature de CSR** et **signature en masse** depuis Opérations : l'approbation effectue la signature
 - **Renouvellement** et **renouvellement en masse** : l'approbation effectue le renouvellement ; un renouvellement impossible à honorer (certificat révoqué, clé non détenue par le serveur) est refusé immédiatement au lieu d'être mis en file
-- **Révocation** (d'un certificat, en masse, d'un certificat utilisateur, d'une CA intermédiaire) sous une politique de révocation : l'approbation révoque avec le motif et la date d'invalidité demandés, après une nouvelle vérification (un certificat renouvelé depuis la demande n'est pas révoqué)
+- **Révocation** (d'un certificat, en masse, d'un certificat utilisateur, d'une AC intermédiaire) sous une politique de révocation : l'approbation révoque avec le motif et la date d'invalidité demandés, après une nouvelle vérification (un certificat renouvelé depuis la demande n'est pas révoqué)
 - Le **planificateur de renouvellement**, sous une politique de renouvellement : il met le renouvellement en file une fois, et l'approbation l'effectue comme l'aurait fait le planificateur
 
 Les administrateurs contournent la file sur tous les chemins.
@@ -82,8 +83,8 @@ Les administrateurs contournent la file sur tous les chemins.
 - Une demande en file dont la cible a entre-temps été **signée ou renouvelée directement** par un administrateur est clôturée comme approuvée par cette action et liée au certificat
 - Une demande dont la cible a été **supprimée ou révoquée** est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu'à la levée de la suspension
 - Approuver une demande **déjà satisfaite** la clôture sur le certificat existant ; approuver l'une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous
-- Approuver une demande dont la requête stockée, le certificat ou la CA **n'existe plus** la clôture comme rejetée
-- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l'a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; pendant une suspension du certificat, elle attend la levée de la suspension
+- Approuver une demande dont la requête stockée, le certificat ou l'AC **n'existe plus** la clôture comme rejetée
+- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l'a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; approuvée pendant une suspension du certificat, elle rend la suspension définitive avec son motif
 
 Une clôture comme rejetée notifie les webhooks comme le fait un rejet ; une clôture comme approuvée n'envoie aucun webhook.
 

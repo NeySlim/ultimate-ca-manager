@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.primitives import serialization
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.issuance_defaults import DEFAULT_ACME_ACCOUNT_KEY_TYPE
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from services.acme.acme_client_service import CERT_KEY_TYPES
@@ -109,7 +110,7 @@ def create_acme_account():
         return error_response('Request body required', 400)
 
     email = data.get('email', '').strip()
-    key_type = data.get('key_type', 'RSA-2048')
+    key_type = data.get('key_type', DEFAULT_ACME_ACCOUNT_KEY_TYPE)
     agree_tos = data.get('agree_tos', False)
 
     if not email:
@@ -124,9 +125,12 @@ def create_acme_account():
     if key_type not in account_types:
         return error_response(f'Key type must be one of: {", ".join(account_types)}', 400)
 
-    # Check for existing account with same email
+    # Same address = one whole element of the stored JSON contact list, in any case,
+    # on both engines; `_` and `%` in it are literal, not wildcards
+    element = json.dumps(f'mailto:{email}').lower()
+    literal = element.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
     existing = AcmeAccount.query.filter(
-        AcmeAccount.contact.like(f'%{email}%')
+        db.func.lower(AcmeAccount.contact).like(f'%{literal}%', escape='\\')
     ).first()
     if existing:
         return error_response(f'An account with email {email} already exists', 409)

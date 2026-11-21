@@ -53,8 +53,14 @@ TRANSIT_TO_ALGORITHM = {
     'ed25519': 'Ed25519',
     'chacha20-poly1305': 'ChaCha20',
 }
-# Transit key types outside the FIPS module, left out of the inventory there
+# Transit key types left out of the inventory in FIPS mode: OpenBao signs them, not the
+# loaded module, so EdDSA and ML-DSA stay out whatever that module approves
 FIPS_UNAPPROVED_TRANSIT = frozenset({'ed25519', 'chacha20-poly1305', 'mldsa-44', 'mldsa-65', 'mldsa-87'})
+
+
+def fips_hides_transit(transit_type) -> bool:
+    """Whether FIPS mode leaves a Transit key of *transit_type* out of the inventory."""
+    return transit_type in FIPS_UNAPPROVED_TRANSIT and fips_mode.enabled()
 # Transit keys that sign the input itself (pure ML-DSA, empty context): no hash_algorithm
 PURE_SIGNING_TRANSIT = frozenset({'mldsa-44', 'mldsa-65', 'mldsa-87'})
 _SYMMETRIC_TRANSIT = frozenset({'aes128-gcm96', 'aes256-gcm96', 'chacha20-poly1305'})
@@ -266,7 +272,7 @@ class OpenBaoProvider(BaseHsmProvider):
                 detail = self._api('GET', f'keys/{name}')
                 data = detail.get('data', {})
                 transit_type = data.get('type', 'unknown')
-                if transit_type in FIPS_UNAPPROVED_TRANSIT and fips_mode.enabled():
+                if fips_hides_transit(transit_type):
                     continue
                 algorithm = TRANSIT_TO_ALGORITHM.get(transit_type, transit_type)
                 is_symmetric = transit_type in _SYMMETRIC_TRANSIT

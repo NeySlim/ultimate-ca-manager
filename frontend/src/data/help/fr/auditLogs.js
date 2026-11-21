@@ -18,8 +18,8 @@ export default {
         title: 'Actions',
         items: [
           { label: 'Exporter', text: 'Télécharger les journaux au format JSON ou CSV' },
-          { label: 'Nettoyage', text: 'Purger les anciens journaux avec une rétention configurable (jours)' },
-          { label: 'Vérifier l\'intégrité', text: 'Vérifier l\'intégrité de la chaîne de journaux pour détecter les altérations' },
+          { label: 'Nettoyer les anciens journaux', text: 'Purger les anciens journaux avec une rétention configurable (jours)' },
+          { label: 'Vérifier l\'intégrité', text: 'Vérifier l\'intégrité de la chaîne de journaux pour détecter les altérations ; sur un gros journal, elle tourne en tâche de fond, avec son avancement et un bouton d\'annulation' },
         ]
       },
     ],
@@ -45,7 +45,7 @@ Chaque entrée de journal enregistre :
 - **Horodatage** : Quand l'action a eu lieu
 - **Utilisateur** : Qui a effectué l'action
 - **Action** : Ce qui a été fait (créer, mettre à jour, supprimer, connexion, etc.)
-- **Ressource** : Ce qui a été affecté (certificat, CA, utilisateur, etc.)
+- **Ressource** : Ce qui a été affecté (certificat, AC, utilisateur, etc.)
 - **Statut** : Succès ou échec
 - **Adresse IP** : IP source de la requête
 - **User Agent** : Identifiant de l'application cliente
@@ -75,14 +75,14 @@ Exportez les journaux filtrés en :
 - **JSON** : Lisible par machine, inclut tous les champs
 - **CSV** : Compatible avec les tableurs, inclut les champs clés
 
-Les exportations n'appliquent que la plage de dates, jusqu'à 10 000 entrées : les autres filtres ne sont pas appliqués.
+Les exportations suivent les filtres de la page (recherche, utilisateur, action, statut et plage de dates) et contiennent au plus 10 000 entrées.
 
 ## Nettoyage
 
 Purgez les anciens journaux selon la période de rétention :
-1. Cliquez sur **Nettoyage**
+1. Cliquez sur **Nettoyer les anciens journaux**
 2. Définissez la période de rétention en jours
-3. Confirmez le nettoyage
+3. Cliquez sur **Supprimer les anciens journaux**
 
 > ⚠ Le nettoyage des journaux est irréversible. Exportez les journaux importants avant la purge.
 
@@ -90,9 +90,13 @@ Purgez les anciens journaux selon la période de rétention :
 
 Cliquez sur **Vérifier l'intégrité** pour contrôler la chaîne de journaux d'audit. UCM utilise le chaînage de hachages pour détecter une entrée modifiée ou supprimée à l'intérieur de la chaîne ; la suppression des dernières entrées ne laisse aucune trace dans la chaîne elle-même, c'est pourquoi le transfert syslog en garde une copie ailleurs.
 
+Sur un gros journal, la vérification tourne en tâche de fond : le bouton indique combien d'entrées sont déjà contrôlées, **Annuler la vérification** l'arrête, et quitter ou recharger la page ne l'arrête pas (la page la reprend). Une seule vérification tourne à la fois.
+
 ## Transfert Syslog
 
 Configurez le transfert syslog distant dans **Paramètres → Audit** pour envoyer les événements de journal à un serveur SIEM ou syslog externe en temps réel.
+
+Tout événement d'audit est transmis par défaut. Décocher une catégorie (Certificats, AC, CSR, Utilisateurs, ACME, SCEP, Système) n'arrête que ses événements : ACME couvre tous les événements ACME, Utilisateurs couvre les connexions et déconnexions, SSO compris. Laisser toutes les cases décochées transmet tous les événements. Les modifications de compte (création, rôle, mot de passe, MFA, activation), les modifications du transfert syslog lui-même, les purges d'audit, les clés d'API, les rôles, les paramètres et les politiques sont toujours transmis. Sous Système, les téléchargements de clé maître, les changements de chiffrement, les restaurations, les réinitialisations et bascules de base de données, les paramètres de mise à jour, les suppressions de sauvegardes et les téléchargements de lots de journaux sont aussi toujours transmis. Une modification syslog est envoyée avec la configuration précédente : le collecteur dont le périmètre est réduit ou qui est désactivé la reçoit, et un collecteur nouvellement configuré la reçoit aussi.
 `
   }
 }

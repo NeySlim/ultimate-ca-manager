@@ -1,5 +1,4 @@
 export { default as LoginPage } from './LoginPage'
-export { default as DashboardPage } from './DashboardPage'
 export { default as CertificatesPage } from './CertificatesPage'
 export { default as CAsPage } from './CAsPage'
 export { default as CSRsPage } from './CSRsPage'

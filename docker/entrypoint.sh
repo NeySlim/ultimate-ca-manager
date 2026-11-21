@@ -53,6 +53,8 @@ validate_fqdn() {
 
 # DNS UPDATE (RFC 2136) listener port check
 . "$(dirname "${BASH_SOURCE[0]}")/dns-update-port.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/ha-secret.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/ha-database.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/fips-module.sh"
 
 # =============================================================================
@@ -113,12 +115,14 @@ activate = 1
 [algorithm_sect]
 default_properties = fips=yes
 
-# Every TLS context of the process: X25519 and X448 are not allowed by the module's policy
+# Every TLS context of the process: X25519 and X448 alone are not allowed by the module's
+# policy; the three ML-KEM hybrids it approves are, and "?" skips them on a module without
+# ML-KEM (3.1.2). Cheapest first: X25519MLKEM768 is what clients send by default
 [ssl_sect]
 system_default = system_default_sect
 
 [system_default_sect]
-Groups = P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
+Groups = ?X25519MLKEM768:?SecP256r1MLKEM768:?SecP384r1MLKEM1024:P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
 EOF
     export OPENSSL_CONF="$FIPS_RUN_DIR/openssl-fips.cnf"
     # libpq: no GSSAPI encryption (Kerberos library, outside the module) for any process
@@ -163,18 +167,25 @@ fi
 : "${UCM_LOG_LEVEL:="INFO"}"
 
 # Security
+check_ha_secret || exit 1
 : "${UCM_SECRET_KEY:=$(generate_secret)}"
 
 # Database
-: "${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}"
+: "${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}"  # unused and not exported in HA mode
 # Copy of the SQLite database taken by this script before each start
 : "${UCM_BACKUP_ENABLED:=true}"
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
+# Before the first write to the volumes: a refused database is never copied
+ucm_refuse_unstartable_database || exit $?
+# Then, on every backend: a 2.254 database moves to this major only with UCM_ACCEPT_MAJOR_UPGRADE
+ucm_refuse_unaccepted_major_upgrade || exit $?
 
 # Initial Admin User (the unprefixed names, as set by older Helm charts, still count)
 : "${UCM_INITIAL_ADMIN_USERNAME:="${INITIAL_ADMIN_USERNAME:-admin}"}"
 : "${UCM_INITIAL_ADMIN_EMAIL:="${INITIAL_ADMIN_EMAIL:-admin@${UCM_FQDN}}"}"
-: "${UCM_INITIAL_ADMIN_PASSWORD:="${INITIAL_ADMIN_PASSWORD:-changeme123}"}"
+# No default password: unset, the first start generates one into /opt/ucm/data
+: "${UCM_INITIAL_ADMIN_PASSWORD:="${INITIAL_ADMIN_PASSWORD:-}"}"
+: "${UCM_INITIAL_ADMIN_PASSWORD_FILE:="${INITIAL_ADMIN_PASSWORD_FILE:-}"}"
 
 # Application
 : "${UCM_APP_VERSION:="${UCM_VERSION}"}"
@@ -217,38 +228,9 @@ echo -e "${BLUE}📁 Setting up directories...${NC}"
 # Unified data path: /opt/ucm/data (same as DEB/RPM)
 DATA_PATH="/opt/ucm/data"
 
-# Migration: if old path has data, migrate everything to new path
-OLD_DATA_PATH="/opt/ucm/backend/data"
-OLD_APP_PATH="/app/backend/data"
-for old_path in "$OLD_DATA_PATH" "$OLD_APP_PATH"; do
-if [ -d "$old_path" ] && [ "$(ls -A $old_path 2>/dev/null)" ]; then
-    echo -e "${YELLOW}   Checking for data migration from $old_path...${NC}"
-    # Copy everything that doesn't already exist in new path
-    for item in "$old_path"/*; do
-        [ -e "$item" ] || continue
-        basename_item=$(basename "$item")
-        # Rename 'cas' → 'ca' (old Docker naming mismatch)
-        target_name="$basename_item"
-        if [ "$basename_item" = "cas" ]; then
-            target_name="ca"
-        fi
-        if [ ! -e "$DATA_PATH/$target_name" ]; then
-            echo -e "${YELLOW}   Migrating $basename_item → $target_name...${NC}"
-            cp -a "$item" "$DATA_PATH/$target_name" 2>/dev/null || true
-        elif [ -d "$item" ] && [ -d "$DATA_PATH/$target_name" ]; then
-            for subitem in "$item"/*; do
-                [ -e "$subitem" ] || continue
-                sub_basename=$(basename "$subitem")
-                if [ ! -e "$DATA_PATH/$target_name/$sub_basename" ]; then
-                    echo -e "${YELLOW}   Migrating $target_name/$sub_basename...${NC}"
-                    cp -a "$subitem" "$DATA_PATH/$target_name/" 2>/dev/null || true
-                fi
-            done
-        fi
-    done
-    echo -e "${GREEN}✅ Data migration complete${NC}"
-fi
-done
+# A path from before 2.70 that still holds data: what the data lacks is copied in (its
+# database was asked about by ucm_refuse_unstartable_database, before any write)
+ucm_carry_old_data_paths
 
 # Create necessary directories (must match backend/config/settings.py)
 mkdir -p "$DATA_PATH"/{ca,certs,private,crl,scep,backups,sessions,logs,temp} 2>/dev/null || true
@@ -318,12 +300,11 @@ LOG_LEVEL=${UCM_LOG_LEVEL}
 SECRET_KEY=${UCM_SECRET_KEY}
 
 # Database
-DATABASE_PATH=${UCM_DATABASE_PATH}
+$(ucm_env_database_line)
 
-# Initial Admin User (used on first run)
+# Initial Admin User (used on first run; its password is never written here)
 INITIAL_ADMIN_USERNAME=${UCM_INITIAL_ADMIN_USERNAME}
 INITIAL_ADMIN_EMAIL=${UCM_INITIAL_ADMIN_EMAIL}
-INITIAL_ADMIN_PASSWORD=${UCM_INITIAL_ADMIN_PASSWORD}
 
 # Application Version
 APP_VERSION=${UCM_APP_VERSION}
@@ -420,28 +401,7 @@ fi
 
 echo -e "${BLUE}💾 Checking database...${NC}"
 
-if [ ! -f "$UCM_DATABASE_PATH" ]; then
-    echo -e "${YELLOW}   First run detected - database will be auto-created${NC}"
-    echo -e "${CYAN}   Default credentials:${NC}"
-    echo "   • Username: admin"
-    echo "   • Password: changeme123"
-    echo -e "   ${RED}⚠️  CHANGE THIS PASSWORD IMMEDIATELY!${NC}"
-else
-    echo -e "${GREEN}✅ Database exists${NC}"
-    
-    # Database backup if enabled
-    if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
-        BACKUP_DIR="/opt/ucm/data/backups"
-        BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
-        
-        # Create backup
-        cp "$UCM_DATABASE_PATH" "$BACKUP_FILE"
-        echo -e "${GREEN}✅ Database backup created${NC}"
-        
-        # Clean old backups
-        find "$BACKUP_DIR" -name "ucm-backup-*.db" -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
-    fi
-fi
+ucm_sqlite_check_and_backup
 
 # =============================================================================
 # DISPLAY CONFIGURATION SUMMARY
@@ -458,7 +418,7 @@ echo "   • HTTPS Port:  ${UCM_HTTPS_PORT}"
 echo "   • HTTP Port:   ${UCM_HTTP_PORT}"
 echo ""
 echo -e "${GREEN}💾 Storage:${NC}"
-echo "   • Database:    ${UCM_DATABASE_PATH}"
+echo "   • Database:    $(ucm_database_label)"
 echo "   • Data Dir:    /opt/ucm/data"
 echo "   • Backup:      ${UCM_BACKUP_ENABLED}"
 echo ""
@@ -483,10 +443,11 @@ export HTTP_PORT="${UCM_HTTP_PORT}"
 export DEBUG="${UCM_DEBUG}"
 export LOG_LEVEL="${UCM_LOG_LEVEL}"
 export SECRET_KEY="${UCM_SECRET_KEY}"
-export DATABASE_PATH="${UCM_DATABASE_PATH}"
+ucm_export_database_path
 export INITIAL_ADMIN_USERNAME="${UCM_INITIAL_ADMIN_USERNAME}"
 export INITIAL_ADMIN_EMAIL="${UCM_INITIAL_ADMIN_EMAIL}"
 export INITIAL_ADMIN_PASSWORD="${UCM_INITIAL_ADMIN_PASSWORD}"
+export INITIAL_ADMIN_PASSWORD_FILE="${UCM_INITIAL_ADMIN_PASSWORD_FILE}"
 
 # =============================================================================
 # HSM / SoftHSM AUTO-INIT
@@ -494,7 +455,7 @@ export INITIAL_ADMIN_PASSWORD="${UCM_INITIAL_ADMIN_PASSWORD}"
 if command -v softhsm2-util >/dev/null 2>&1; then
     if softhsm2-util --show-slots 2>/dev/null | grep -qE '^ *Label: +UCM-Default *$'; then
         echo -e "${GREEN}🔐 SoftHSM tokens found${NC}"
-    elif [ "${HSM_AUTO_INIT:-true}" = "true" ]; then
+    elif ucm_softhsm_auto_init; then
         echo -e "${CYAN}🔐 Initializing SoftHSM default token...${NC}"
         HSM_PIN="${HSM_PIN:-$(openssl rand -hex 8)}"
         HSM_SO_PIN="${HSM_SO_PIN:-$(openssl rand -hex 8)}"
@@ -507,6 +468,8 @@ if command -v softhsm2-util >/dev/null 2>&1; then
         else
             echo -e "${YELLOW}   ⚠️  SoftHSM token init failed${NC}"
         fi
+    elif ucm_ha_active; then
+        echo -e "${YELLOW}🔐 SoftHSM default token not created in HA mode (a token stays on one node)${NC}"
     else
         echo -e "${YELLOW}🔐 No SoftHSM token 'UCM-Default' and HSM_AUTO_INIT is off${NC}"
     fi

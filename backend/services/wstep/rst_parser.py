@@ -17,10 +17,12 @@ from asn1crypto import core as asn1_core
 from asn1crypto import csr as asn1_csr
 from defusedxml.lxml import fromstring as safe_fromstring
 
-from .soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
+from .soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSTEP_NS
 
 TOKEN_TYPE_X509V3 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3'
 REQUEST_TYPE_ISSUE = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
+# MS-WSTEP 3.1.4.1.3.6: the status of a request answered pending
+REQUEST_TYPE_QUERY_TOKEN_STATUS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment/QueryTokenStatus'
 VALUE_TYPE_PKCS10 = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10'
 # MS-WCCE 2.2.2.6 allows a PKCS#10, CMS or CMC request under either ValueType
 # (the MS-WSTEP 4.1.1.1 example sends a bare PKCS#10 as "#PKCS7"): the DER decides.
@@ -125,6 +127,8 @@ class ParsedRST:
     # verifies this proves possession of the inner CSR's own private key.
     # None when not PKCS#7/CMC-wrapped (nothing to verify).
     outer_signed_data: object | None
+    # wstep:RequestID of a QueryTokenStatus request (no CSR is sent then)
+    request_id: str | None = None
 
 
 def _text(element):
@@ -218,6 +222,19 @@ def _parse_rst_body(root, message_id):
 
     token_type = _text(rst_el.find(f'{{{WST_NS}}}TokenType'))
     request_type = _text(rst_el.find(f'{{{WST_NS}}}RequestType'))
+
+    if request_type == REQUEST_TYPE_QUERY_TOKEN_STATUS:
+        # MS-WSTEP 3.1.4.2.1.2: a RequestID and no CSR; absent or empty is a fault
+        request_id = _text(rst_el.find(f'{{{WSTEP_NS}}}RequestID'))
+        request_id = (request_id or '').strip().rstrip('\x00')
+        if not request_id:
+            raise RSTParseError('QueryTokenStatus requires a wstep:RequestID')
+        return ParsedRST(
+            csr_der=None, cmc_body_part_id=None, token_type=token_type,
+            request_type=request_type, message_id=message_id,
+            security_header=security_header, csr_element=None,
+            was_pkcs7_wrapped=False, outer_signed_data=None, request_id=request_id,
+        )
 
     bst_el = rst_el.find(f'{{{WSSE_NS}}}BinarySecurityToken')
     if bst_el is None or not (bst_el.text or '').strip():

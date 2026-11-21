@@ -16,6 +16,7 @@ from flask import Blueprint, request, Response
 
 from api.v2.ssh.validation import validate_setup_hostname
 from models.ssh import SSHCertificateAuthority
+from utils.sanitize import content_disposition
 from services.ssh_ca_service import SSHCAService
 
 logger = logging.getLogger(__name__)
@@ -71,16 +72,16 @@ def get_public_setup_script(refid):
 
         if platform == 'windows':
             mimetype = 'text/x-powershell'
-            filename = f'ssh_ca_setup_{safe_name}.ps1'
+            ext = '.ps1'
         else:
             mimetype = 'text/x-shellscript'
-            filename = f'ssh_ca_setup_{safe_name}.sh'
+            ext = '.sh'
 
         return Response(
             script,
             mimetype=mimetype,
             headers={
-                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Disposition': content_disposition(safe_name, ext, fallback=ca.refid, prefix='ssh_ca_setup_'),
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
             }
         )
@@ -108,7 +109,7 @@ def get_public_key(refid):
             pub_key + '\n',
             mimetype='text/plain',
             headers={
-                'Content-Disposition': f'inline; filename="{ca.descr.replace(" ", "_")}_ca.pub"',
+                'Content-Disposition': content_disposition(ca.descr.replace(' ', '_'), '_ca.pub', fallback=ca.refid, disposition='inline'),
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
             }
         )

@@ -142,6 +142,7 @@ cp "$PROJECT_ROOT/packaging/rpm/ucm.spec" "$SPEC_FILE"
 # Update version in spec file
 sed -i "s/^Version:.*/Version:        $VERSION/" "$SPEC_FILE"
 sed -i "s/^Release:.*/Release:        $RELEASE%{?dist}/" "$SPEC_FILE"
+sh "$PROJECT_ROOT/packaging/scripts/embed-pivot-guard.sh" "$SPEC_FILE"
 echo -e "${GREEN}✅ Spec file ready${NC}"
 
 # Build RPM

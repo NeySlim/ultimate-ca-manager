@@ -127,6 +127,18 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause('Rows the archive does not carry lost their link to a removed row: '
                            + _listing([f'{name} ({count})' for name, count in sorted(unlinked.items())]))
 
+    invalidated = (results or {}).get('invalidated') or {}
+    if invalidated.get('crls_not_regenerated'):
+        message += _clause('The CRLs were not regenerated after the restore: '
+                           'the ones served may list the revocations of the replaced instance')
+    unsigned = invalidated.get('crls_failed') or []
+    if unsigned:
+        message += _clause('No new CRL could be signed after the restore for: ' + _listing(unsigned))
+    delta_unsigned = invalidated.get('crls_delta_failed') or []
+    if delta_unsigned:
+        message += _clause('The CRL was signed but its delta CRL was not, after the restore, for: '
+                           + _listing(delta_unsigned))
+
     warnings = (results or {}).get('warnings') or []
     if warnings:
         message += _clause('The archive also warned: ' + _listing(warnings))
@@ -150,3 +162,51 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
     if not message:
         return message
     return message if message.endswith(('.', '?', '!')) else message + '.'
+
+
+def restore_todo_lines(results: Dict[str, Any]) -> list:
+    """What a restore left to the operator, one line per element (the screen's "to do" list).
+
+    The same facts as `with_restore_warnings`, unabridged: the sentence is
+    for a toast, this is for a report that stays open.
+    """
+    results = results or {}
+    lines = []
+    lines += [f'Section not restored by this version: {name}'
+              for name in results.get('sections_not_restored') or []]
+    lines += [f"Private key is not its certificate's and cannot sign: {name}"
+              for name in results.get('key_mismatches') or []]
+    lines += [f'Deploy binding of {name} was pinned to a cross-certificate absent here and now '
+              'deploys the automatic chain: choose its chain again in the certificate\'s deployments'
+              for name in results.get('chain_variant_fallbacks') or []]
+    lines += [f"Restored under another name: {_RENAMED_KIND.get(e['section'], e['section'])} "
+              f"{e['from']} as {e['to']}" for e in results.get('renamed') or []]
+    for key, label in (('cleared_dependents', 'Deleted with a removed row'),
+                       ('closed_dependents', 'Open requests cancelled on a removed row'),
+                       ('unlinked_dependents', 'Lost their link to a removed row')):
+        lines += [f'{label}: {name} ({count})'
+                  for name, count in sorted((results.get(key) or {}).items())]
+    invalidated = results.get('invalidated') or {}
+    if invalidated.get('crls_not_regenerated'):
+        lines.append('The CRLs were not regenerated: the ones served may list the '
+                     'revocations of the replaced instance')
+    lines += [f'No new CRL could be signed for: {name}'
+              for name in invalidated.get('crls_failed') or []]
+    lines += [f'The CRL was signed but its delta CRL was not, for: {name}'
+              for name in invalidated.get('crls_delta_failed') or []]
+    lines += [f'Archive warning: {w}' for w in results.get('warnings') or []]
+    lines += [f'Left out of an older archive: {row}' for row in results.get('left_out') or []]
+    lines += [f"Secret encrypted under another installation's key, enter it again: {name}"
+              for name in results.get('dropped_secrets') or []]
+    if results.get('admin_allowlist_cleared'):
+        lines.append('The admin access allowlist from the archive would have locked out '
+                     'this session and was cleared; set it again in Settings > Security')
+    return lines
+
+
+def safe_restore_audit_details(filename: str, results: Dict[str, Any]) -> str:
+    """`restore_audit_details`, or a fixed line when it cannot be built: a committed restore is always audited."""
+    try:
+        return restore_audit_details(filename, results)
+    except Exception:
+        return 'Restored from backup'

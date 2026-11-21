@@ -227,7 +227,7 @@ export default function ConfigTab({ acmeSettings, savedProfiles = {}, cas, templ
             description={t('acme.caaEnforceDesc')}
           />
           {acmeSettings.caa_enforce && (
-            <p className="text-xs text-amber-500">{t('acme.caaEnforceWarning')}</p>
+            <p className="text-xs text-status-warning">{t('acme.caaEnforceWarning')}</p>
           )}
         </div>
       </CompactSection>
@@ -243,7 +243,7 @@ export default function ConfigTab({ acmeSettings, savedProfiles = {}, cas, templ
           />
           {acmeSettings.dns_persist_enabled && (
             <>
-              <p className="text-xs text-amber-500">{t('acme.dnsPersistWarning')}</p>
+              <p className="text-xs text-status-warning">{t('acme.dnsPersistWarning')}</p>
               <p className="text-xs text-text-tertiary">
                 {t('acme.dnsPersistIssuerNote', { domains: (acmeSettings.dns_persist_issuer_domains || []).join(', ') || '—' })}
               </p>

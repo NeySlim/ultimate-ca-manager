@@ -14,6 +14,7 @@ import { useNotification } from '../../contexts'
 import { extractData, formatDate, downloadBlob } from '../../lib/utils'
 import { certificateFileToPem, commonNameOf, crossStateOf } from '../../lib/crossCertificates'
 import { signingCas } from '../../lib/caSelection'
+import { sanitizeDownloadName } from '../../lib/filename'
 
 const STATE_VARIANT = { revoked: 'danger', expired: 'danger', notYetValid: 'warning' }
 const FIELD = 'w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary'
@@ -199,7 +200,7 @@ export function CrossCertificatesSection({ ca, canWrite }) {
   const exportRow = async (row) => {
     try {
       const blob = await casService.exportCrossCertificate(ca.id, row.id, 'pem')
-      downloadBlob(blob, `${(ca.name || ca.common_name || 'ca').replace(/[^a-zA-Z0-9._-]+/g, '_')}-cross-${row.id}.pem`)
+      downloadBlob(blob, sanitizeDownloadName(ca.name || ca.common_name || 'ca', `-cross-${row.id}.pem`))
     } catch (err) {
       showError(err?.message || t('cas.exportFailed'))
     }

@@ -16,6 +16,8 @@ from api.v2.acme_local_domains import find_local_domain_ca
 from api.v2.acme_domains import find_provider_for_domain
 from services.acme import domain_match
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture(scope='module')
 def _mapping_ids(app, create_ca):

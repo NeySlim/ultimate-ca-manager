@@ -12,13 +12,14 @@ import { buildQueryString } from '../../services/apiClient'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { formatDate } from '../../lib/utils'
+import { stateLabel } from '../../lib/stateLabel'
 
 const STATUS_VARIANT = {
   valid: 'success', ready: 'info', pending: 'warning',
   processing: 'warning', invalid: 'danger',
 }
 
-export default function LocalOrdersTab() {
+export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canDelete } = usePermission()
@@ -98,7 +99,7 @@ export default function LocalOrdersTab() {
     { key: 'account', header: t('acme.account'), priority: 3,
       render: (v) => <span className="text-xs text-text-tertiary truncate">{v}</span> },
     { key: 'status', header: t('common.status'), priority: 1,
-      render: (v) => <Badge variant={STATUS_VARIANT[(v || '').toLowerCase()] || 'default'}>{v}</Badge> },
+      render: (v) => <Badge variant={STATUS_VARIANT[(v || '').toLowerCase()] || 'default'}>{stateLabel(t, v)}</Badge> },
     { key: 'method', header: t('acme.challengeType'), priority: 4 },
     { key: 'expires', header: t('common.expires'), priority: 2,
       render: (v) => v ? formatDate(v) : '-' },
@@ -128,7 +129,7 @@ export default function LocalOrdersTab() {
             value={status}
             onChange={(v) => { setPage(1); setStatus(v) }}
             allLabel={t('common.allStatuses')}
-            options={['pending', 'ready', 'processing', 'valid', 'invalid'].map(sv => ({ value: sv, label: sv }))}
+            options={['pending', 'ready', 'processing', 'valid', 'invalid'].map(sv => ({ value: sv, label: stateLabel(t, sv) }))}
           />
           <span className="text-xs text-text-tertiary">{t('acme.localOrdersCount', { count: meta.total })}</span>
         </div>
@@ -144,6 +145,21 @@ export default function LocalOrdersTab() {
           )}
         </div>
       </div>
+
+      {linkedOrder && (
+        <div aria-current="true" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-accent-primary p-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-text-primary truncate">{linkedOrder.domain}</div>
+            <div className="text-xs text-text-tertiary">
+              {linkedOrder.account} · {linkedOrder.method} · {linkedOrder.created_at ? formatDate(linkedOrder.created_at) : '-'}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={STATUS_VARIANT[(linkedOrder.status || '').toLowerCase()] || 'default'}>{stateLabel(t, linkedOrder.status)}</Badge>
+            {onCloseLinked && <Button type="button" size="sm" variant="ghost" onClick={onCloseLinked}>{t('common.close')}</Button>}
+          </div>
+        </div>
+      )}
 
       {items.length === 0 && !loading ? (
         <EmptyState icon={Globe} title={t('acme.noLocalOrders')} description={t('acme.noLocalOrdersDesc')} />

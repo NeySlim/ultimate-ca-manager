@@ -36,7 +36,14 @@ def sqlite_target():
 
 @pytest.fixture
 def populated_app(app):
-    """App with the auto-created admin user — enough for migration tests."""
+    """App with the auto-created admin user — enough for migration tests. Other files on the
+    same worker delete ACME client orders in bulk, which SQLite never cascades to their proxy
+    challenge links; the migration refuses such orphans, so they are removed first."""
+    from models import db
+    with app.app_context():
+        db.session.execute(text('DELETE FROM acme_proxy_challenge_links WHERE order_id NOT IN '
+                                '(SELECT id FROM acme_client_orders)'))
+        db.session.commit()
     return app
 
 
@@ -79,6 +86,30 @@ def test_bootstrap_copies_users_to_empty_target(populated_app, sqlite_target):
     with eng.connect() as c:
         row = c.execute(text("SELECT COUNT(*) FROM users WHERE username = 'admin'")).fetchone()
         assert row[0] == 1
+    eng.dispose()
+
+
+def test_bootstrap_carries_the_providers_that_open_an_account(populated_app, sqlite_target):
+    """An SSO account lands with its identity rows: without them it would be a local account
+    its provider no longer opens, and the copy's check of has_sso_identity refuses that."""
+    from models import db, User, UserSSOIdentity
+    with populated_app.app_context():
+        user = User(username='boot-sso', email='boot-sso@x.test', role='viewer', password_hash='h')
+        user.sso_identities.append(UserSSOIdentity(orphan_of='oauth2:https://boot.example',
+                                                   external_id='sub-boot'))
+        db.session.add(user)
+        db.session.commit()
+        try:
+            ok, msg, _stats = svc.bootstrap_auth_to_target(sqlite_target)
+        finally:
+            db.session.delete(db.session.get(User, user.id))
+            db.session.commit()
+    assert ok, msg
+    eng = create_engine(sqlite_target)
+    with eng.connect() as c:
+        assert c.execute(text(
+            "SELECT u.has_sso_identity, i.external_id FROM users u JOIN user_sso_identities i "
+            "ON i.user_id = u.id WHERE u.username = 'boot-sso'")).fetchall() == [(1, 'sub-boot')]
     eng.dispose()
 
 
@@ -322,6 +353,51 @@ class TestBootstrapPlanOnAnUpgradedInstallation:
         assert order.index('pro_custom_roles') < order.index('users')
         assert order.index('pro_sso_providers') < order.index('users')
         assert order.index('users') < order.index('group_members')
+
+    @pytest.mark.parametrize('failure', ['foreign_keys', 'cycle', 'table_names'])
+    def test_the_parents_come_first_when_the_target_cannot_be_sorted(
+            self, populated_app, sqlite_target, tmp_path, monkeypatch, failure):
+        """The order of the copy holds when the target's foreign keys do not read, form a
+        cycle, or its tables cannot be listed a second time."""
+        from sqlalchemy.engine.reflection import Inspector
+        from models import db
+        from services.database_admin.migration import BOOTSTRAP_AUTH_TABLES, _bootstrap_plan
+
+        source, target = self._schemas(
+            populated_app, f"sqlite:///{tmp_path / f'src-{failure}.db'}", sqlite_target)
+        real_fks, real_names = Inspector.get_foreign_keys, Inspector.get_table_names
+
+        def foreign_keys(self, table, *a, **k):
+            if self.bind.url == target.url:
+                if failure == 'foreign_keys':
+                    raise RuntimeError('cannot read foreign keys')
+                if failure == 'cycle' and table == 'users':
+                    return real_fks(self, table, *a, **k) + [{'referred_table': 'api_keys'}]
+            return real_fks(self, table, *a, **k)
+        calls = []
+
+        def table_names(self, *a, **k):
+            if self.bind.url == target.url and failure == 'table_names':
+                calls.append(1)
+                if len(calls) > 1:
+                    raise RuntimeError('cannot list tables')
+            return real_names(self, *a, **k)
+        monkeypatch.setattr(Inspector, 'get_foreign_keys', foreign_keys)
+        monkeypatch.setattr(Inspector, 'get_table_names', table_names)
+        try:
+            order = [entry.name for entry in _bootstrap_plan(source, target)]
+        finally:
+            source.dispose()
+            target.dispose()
+
+        assert sorted(order) == sorted(BOOTSTRAP_AUTH_TABLES)
+        wanted = set(BOOTSTRAP_AUTH_TABLES)
+        with populated_app.app_context():
+            edges = [(fk.column.table.name, table.name) for table in db.metadata.sorted_tables
+                     if table.name in wanted for fk in table.foreign_keys
+                     if fk.column.table.name in wanted and fk.column.table.name != table.name]
+        assert edges
+        assert [(p, c) for p, c in edges if order.index(p) > order.index(c)] == []
 
 
 # ---------------------------------------------------------------------------

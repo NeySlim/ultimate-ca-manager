@@ -7,11 +7,16 @@ from flask import request, g
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_reverify import check_session_password
 from auth.session_start import keep_own_session
+from auth.twofa_enforcement import lock_user
 from utils.response import success_response, error_response, created_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
+from sqlalchemy.exc import IntegrityError
+
 from models import db, User
+from models.user import local_email_holder, local_email_taken
 from services.audit_service import AuditService
 from services.deletion_blockers import parse_bulk_ids
 
@@ -43,35 +48,101 @@ def _pending_approvals_count(user_id):
         return 0
 
 
-def _withdraw_enrolments(user_id, actor):
-    """Remove each mTLS enrolment of the user as its own route does (revoke, then
-    delete). Each removal commits on its own; returns the certificates left valid,
-    which never block the deletion: [{'id', 'serial_number', 'name'}]."""
-    from models import AuthCertificate, Certificate
-    from services.mtls_enrollment import certificate_row_for, remove_enrolment
-    unrevoked = []
-    enrolment_ids = [row.id for row in AuthCertificate.query.filter_by(user_id=user_id)
-                     .order_by(AuthCertificate.id)]
-    for enrolment_id in enrolment_ids:
-        enrolment = db.session.get(AuthCertificate, enrolment_id)
-        if enrolment is None:
-            continue
-        certificate = certificate_row_for(enrolment)
-        certificate_id = certificate.id if certificate is not None else None
-        removed, _failure = remove_enrolment(enrolment, username=actor.username, actor=actor)
-        if removed or certificate_id is None:
-            continue
-        kept = db.session.get(Certificate, certificate_id)
-        if kept is not None and not kept.revoked:
-            unrevoked.append({'id': kept.id, 'serial_number': kept.serial_number,
-                              'name': kept.descr or kept.subject_cn or f'Certificate #{kept.id}'})
-        if kept is not None and kept.revoked:
-            logger.warning(f"User {user_id}: revoked mTLS certificate #{kept.id} not deleted")
-    return unrevoked
+def _numbers(certificate_ids):
+    return ', '.join(f'#{cid}' for cid in certificate_ids)
+
+
+def _revoked_note(revoked, kept=()):
+    """What a failure after the revocations must add: they are not undone, and the rows of
+    the revoked certificates are already deleted, but for the ``kept`` ones."""
+    deleted = [cid for cid in revoked if cid not in kept]
+    parts = []
+    if revoked:
+        parts.append(f'Already revoked for this deletion: certificate(s) {_numbers(revoked)}')
+    if deleted:
+        parts.append(f'the row(s) of {_numbers(deleted)} are already deleted')
+    if kept:
+        parts.append(f'certificate(s) {_numbers(kept)} could not be deleted '
+                     'and are still listed under Certificates')
+    return '. ' + '; '.join(parts) if parts else ''
+
+
+def _acme_untold(upstream):
+    """``(meta, note)`` for the certificates of ``upstream`` (``(id, outcome, detail)``)
+    whose ACME CA did not confirm the revocation, or ``(None, '')``."""
+    from services.acme.upstream_revocation import NOT_ACME, OWED, REVOKED, local_only_message
+    untold = [(cid, outcome, detail) for cid, outcome, detail in upstream
+              if outcome not in (REVOKED, NOT_ACME)]
+    if not untold:
+        return None, ''
+    meta = {'acme_local_only': [cid for cid, _o, _d in untold]}
+    owed = [cid for cid, outcome, _d in untold if outcome == OWED]
+    if owed:
+        meta['acme_upstream_pending'] = owed
+    note = ''.join(f' Certificate #{cid}: {local_only_message(outcome, detail)}'
+                   for cid, outcome, detail in untold)
+    return meta, note
+
+
+def _unrevoked_entry(certificate_id):
+    from models import Certificate
+    row = db.session.get(Certificate, certificate_id)
+    return {'id': certificate_id, 'serial_number': row.serial_number if row else None,
+            'name': (row.descr or row.subject_cn if row else None) or f'Certificate #{certificate_id}'}
 
 
 def _unrevoked_text(unrevoked):
     return ', '.join(f"#{c['id']} (serial {c['serial_number']})" for c in unrevoked)
+
+
+def _withdraw_enrolled_certificates(user_id, actor, upstream=None):
+    """Revoke each certificate the user enrolled for mTLS, then delete it with its
+    enrolments, as removing the enrolment does. Returns ``(revoked, unrevoked, kept,
+    None)`` or ``(None, None, None, refusal)``; ``upstream`` collects the ACME outcomes.
+
+    A policy refusal is found before anything is revoked and blocks the deletion; a
+    certificate the CA cannot revoke never does: it stays, with its enrolment, in
+    ``unrevoked``. Withdrawn enrolments are committed before the user is touched.
+    """
+    from models import AuthCertificate
+    from services.mtls_enrollment import removal_check, revoke_checked
+    enrolments = AuthCertificate.query.filter_by(user_id=user_id).order_by(AuthCertificate.id).all()
+    planned, bound, seen = [], [], set()
+    for enrolment in enrolments:
+        certificate_id, needs_revoking, refusal = removal_check(enrolment, actor)
+        if refusal is not None:
+            return None, None, None, refusal
+        bound.append((enrolment.id, certificate_id))
+        # Two enrolments of one certificate: revoked and deleted once
+        if certificate_id is not None:
+            if certificate_id in seen:
+                continue
+            seen.add(certificate_id)
+        planned.append((enrolment, certificate_id, needs_revoking))
+    withdrawn, revoked, unrevoked = [], [], []
+    for enrolment, certificate_id, needs_revoking in planned:
+        if needs_revoking:
+            refusal = revoke_checked(enrolment, certificate_id, actor.username, upstream)
+            if refusal is not None:
+                unrevoked.append(_unrevoked_entry(certificate_id))
+                continue
+            revoked.append(certificate_id)
+        if certificate_id:
+            withdrawn.append(certificate_id)
+    left_valid = {c['id'] for c in unrevoked}
+    for enrolment_id, certificate_id in bound:
+        if certificate_id is None or certificate_id not in left_valid:
+            AuthCertificate.query.filter_by(id=enrolment_id).delete()
+    if not safe_commit(logger, f'Withdraw the mTLS enrolments of user {user_id}')[0]:
+        return revoked, unrevoked, withdrawn, None
+    return revoked, unrevoked, _delete_withdrawn_certificates(withdrawn, actor.username), None
+
+
+def _delete_withdrawn_certificates(certificate_ids, username):
+    """Delete the withdrawn certificate rows; ids left behind."""
+    from services.cert_service import CertificateService
+    return [cid for cid in certificate_ids
+            if not CertificateService.delete_certificate(cid, username=username)]
 
 
 def _purge_user_dependencies(user_id):
@@ -98,6 +169,13 @@ def _purge_user_dependencies(user_id):
         AuthCertificate.query.filter_by(user_id=user_id).delete()
     except Exception as e:
         logger.debug(f"AuthCertificate cleanup skipped for user {user_id}: {e}")
+
+    # Provider attachments (SQLite applies no ON DELETE CASCADE)
+    from models import UserSSOIdentity
+    UserSSOIdentity.query.filter_by(user_id=user_id).delete()
+    # Sign-in tests keep an emptied row for a day: none outlives its owner, whose id may be reused
+    from models.sso import SSOSignInTest
+    SSOSignInTest.query.filter_by(user_id=user_id).delete()
 
     # SSO sessions
     try:
@@ -177,9 +255,9 @@ def list_users():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                User.username.ilike(search_pattern),
-                User.email.ilike(search_pattern),
-                User.full_name.ilike(search_pattern)
+                User.username.ilike(search_pattern, escape='\\'),
+                User.email.ilike(search_pattern, escape='\\'),
+                User.full_name.ilike(search_pattern, escape='\\')
             )
         )
 
@@ -230,7 +308,7 @@ def create_user():
         return error_response('Username already exists', 409)
 
     # Email is unique only among local accounts (an SSO account may share it).
-    if User.query.filter_by(email=data['email'], auth_source='local').first():
+    if local_email_holder(data['email']) is not None:
         return error_response('Email already exists', 409)
 
     # Validate role — only admins can assign non-viewer roles
@@ -266,7 +344,9 @@ def create_user():
     user.set_password(data['password'])
 
     db.session.add(user)
-    ok, err = safe_commit(logger, "Failed to create user")
+    email = data['email']
+    ok, err = safe_commit(logger, "Failed to create user", on_conflict=lambda: local_email_taken(
+        email, message='Email already exists'))
     if not ok:
         return err
 
@@ -332,17 +412,28 @@ def update_user(user_id):
 
     data = request.get_json()
 
+    # SECURITY: Self-password change requires current-password proof (defends against
+    # stolen-cookie / XSS account takeover); checked before any field changes, as its
+    # attempt counter commits.
+    if 'password' in data and data['password'] and g.current_user.id == user_id:
+        is_valid, error_msg = validate_password_strength(data['password'])
+        if not is_valid:
+            return error_response(error_msg, 400)
+        current = data.get('current_password') or data.get('old_password')
+        if not current:
+            return error_response('Current password is required', 400)
+        refused = check_session_password(
+            user, current, error_response('Current password is required', 400))
+        if refused:
+            return refused
+
     # Update fields
     if 'email' in data:
         # Email is unique only among local accounts. Only block when this change
         # would put two local accounts on the same email (an SSO account may
         # share an email with a local one).
-        if (user.auth_source or 'local') == 'local':
-            existing = User.query.filter(
-                User.email == data['email'], User.id != user_id,
-                User.auth_source == 'local').first()
-            if existing:
-                return error_response('Email already in use', 409)
+        if user.is_local and local_email_holder(data['email'], other_than=user_id) is not None:
+            return error_response('Email already in use', 409)
         user.email = data['email']
 
     if 'full_name' in data:
@@ -406,12 +497,6 @@ def update_user(user_id):
         is_valid, error_msg = validate_password_strength(data['password'])
         if not is_valid:
             return error_response(error_msg, 400)
-        # SECURITY: Self-password change requires current-password proof
-        # (defends against stolen-cookie / XSS account takeover)
-        if g.current_user.id == user_id:
-            current = data.get('current_password') or data.get('old_password')
-            if not current or not user.check_password(current):
-                return error_response('Current password is required', 400)
         user.set_password(data['password'])
         password_changed = True
 
@@ -433,6 +518,11 @@ def update_user(user_id):
         )
     except Exception as e:
         db.session.rollback()
+        # The local e-mail index refused a change a concurrent request beat this one to
+        if isinstance(e, IntegrityError) and 'email' in data:
+            taken = local_email_taken(data['email'], other_than=user_id)
+            if taken is not None:
+                return taken
         logger.error(f"Failed to update user: {e}", exc_info=True)
         return error_response('Failed to update user', 500)
 
@@ -471,16 +561,30 @@ def delete_user(user_id):
         )
 
     username = user.username
-    unrevoked = _withdraw_enrolments(user_id, g.current_user)
+    upstream = []
+    revoked, unrevoked, kept, refusal = _withdraw_enrolled_certificates(
+        user_id, g.current_user, upstream)
+    if refusal is not None:
+        # Found before any revocation: nothing was withdrawn
+        message, status = refusal
+        return error_response(f'User not deleted: {message}', status)
+    # Revocations already made stand: a failure past them still says what the CA was not told
+    acme_meta, acme_note = _acme_untold(upstream)
     try:
-        user = db.session.get(User, user_id)
+        # The account row first, as a factor change takes it: the two never lock in reverse
+        user = lock_user(user_id)
+        if user is None:
+            db.session.rollback()
+            return error_response('User not found', 404)
         sessions_deleted = _purge_user_dependencies(user_id)
         db.session.delete(user)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
-        return error_response('Failed to delete user', 500)
+        return error_response(f'Failed to delete user{_revoked_note(revoked, kept)}.{acme_note}'
+                              if acme_note else 'Failed to delete user' + _revoked_note(revoked, kept),
+                              500, meta=acme_meta)
 
     if sessions_deleted > 0:
         logger.info(f"Invalidated {sessions_deleted} sessions for deleted user {username}")
@@ -503,14 +607,21 @@ def delete_user(user_id):
     except Exception:
         pass
 
+    extra = {'meta': acme_meta} if acme_meta else {}
     if unrevoked:
+        extra['data'] = {'unrevoked_certificates': unrevoked}
+    if not (kept or unrevoked):
         return success_response(
-            data={'unrevoked_certificates': unrevoked},
-            message=(f'User {username} deleted; its mTLS certificate(s) {_unrevoked_text(unrevoked)} '
-                     'could not be revoked and remain valid: revoke them under Certificates'))
-    return success_response(
-        message=f'User {username} deleted successfully'
-    )
+            message=f'User {username} deleted successfully.{acme_note}' if acme_note
+            else f'User {username} deleted successfully', **extra)
+    message = f'User {username} deleted'
+    if unrevoked:
+        message += (f'; its mTLS certificate(s) {_unrevoked_text(unrevoked)} could not be revoked '
+                    'and remain valid: revoke them under Certificates')
+    if kept:
+        message += (f'; its revoked mTLS certificate(s) {_numbers(kept)} '
+                    'could not be deleted and are still listed under Certificates')
+    return success_response(message=f'{message}.{acme_note}', **extra)
 
 
 # ============================================================
@@ -520,7 +631,7 @@ def delete_user(user_id):
 @bp.route('/api/v2/users/bulk/delete', methods=['POST'])
 @require_auth(['delete:users'])
 def bulk_delete_users():
-    """Bulk deactivate users (soft delete)"""
+    """Delete users, each with the mTLS certificates it enrolled (a real deletion, not a deactivation)."""
     if g.current_user.role != 'admin':
         return error_response('Insufficient permissions', 403)
 
@@ -546,7 +657,15 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'User has pending approval requests'})
             continue
 
-        unrevoked = _withdraw_enrolments(user_id, g.current_user)
+        upstream = []
+        revoked, unrevoked, kept, refusal = _withdraw_enrolled_certificates(
+            user_id, g.current_user, upstream)
+        acme_meta, _note = _acme_untold(upstream)
+        for key, certificate_ids_of_key in (acme_meta or {}).items():
+            results.setdefault(key, []).extend(certificate_ids_of_key)
+        if refusal is not None:
+            results['failed'].append({'id': user_id, 'error': refusal[0]})
+            continue
         try:
             user = db.session.get(User, user_id)
             sessions_deleted = _purge_user_dependencies(user_id)
@@ -554,13 +673,15 @@ def bulk_delete_users():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
-            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked, kept)})
             continue
         ok, _err = safe_commit(logger, f"Delete user {user_id}")
         if not ok:
-            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked, kept)})
             continue
         total_sessions_invalidated += sessions_deleted
+        if kept:
+            logger.warning(f"User {user_id} deleted, revoked certificate(s) {_numbers(kept)} not deleted")
         results['success'].append(user_id)
         # Named only once the user is gone: a failed deletion reports nothing as deleted
         if unrevoked:

@@ -133,7 +133,7 @@ function ChainCard({ chain, index }) {
       </div>
       
       {chain.trust_anchor && (
-        <div className="text-[10px] text-text-tertiary mb-1.5">
+        <div className="text-xs text-text-tertiary mb-1.5">
           {t('import.trustAnchor')}: {chain.trust_anchor}
         </div>
       )}
@@ -204,6 +204,7 @@ export function ImportResultStep({ importResult, onReset, onDone }) {
                        (importResult?.cas_imported || 0)
   const errors = importResult?.errors || []
   const warnings = importResult?.warnings || []
+  const unverifiableParents = importResult?.unverifiable_parents || []
   const cross = crossSummary(importResult)
   const importedIds = importResult?.imported_ids || {}
   
@@ -252,6 +253,17 @@ export function ImportResultStep({ importResult, onReset, onDone }) {
       {cross.skipped > 0 && (
         <div className="text-sm pl-4 text-status-warning" data-testid="cross-skipped">
           {t('import.crossSkipped', { count: cross.skipped })}
+        </div>
+      )}
+
+      {unverifiableParents.length > 0 && (
+        <div className="space-y-1" data-testid="unverifiable-parents">
+          <h4 className="text-sm font-medium text-status-warning">{t('import.unverifiableParentsTitle')}:</h4>
+          {unverifiableParents.map((p) => (
+            <div key={p.ca_id} className="text-sm pl-4">
+              ⚠ {t('import.unverifiableParent', { ca: p.ca_name, parent: p.candidate?.name, algorithm: p.algorithm })}
+            </div>
+          ))}
         </div>
       )}
 

@@ -2,19 +2,28 @@
 Ultimate Certificate Manager - Configuration Management
 Handles all application settings with web UI configuration support
 """
+import logging
 import os
+import socket
 import subprocess
 from pathlib import Path
 from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
-from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
+from config.paths import env_file as _config_env_file
+from utils.db_url import is_postgres_url, postgres_engine_options, sqlalchemy_url
+
+
+def load_env_files():
+    """ucm.env, then a local .env; a variable already in the environment wins, so the
+    OPENSSL_MODULES the -fips entrypoint pinned after its module check stays."""
+    load_dotenv(_config_env_file())  # System config (DEB/RPM), moved by UCM_CONFIG_DIR
+    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
+
 
 # Load environment variables FIRST (before using them)
-# Try multiple locations for .env files
-load_dotenv("/etc/ucm/ucm.env")  # System config (DEB/RPM)
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
+load_env_files()
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -31,9 +40,40 @@ except PermissionError:
     pass  # Directory should already exist from package install
 
 
+SESSION_TABLE = 'flask_sessions'
+
+
+def session_store(redis, database_type):
+    """Redis wins, then the shared database on PostgreSQL, else files."""
+    if redis:
+        return 'redis'
+    return 'sqlalchemy' if database_type == 'postgresql' else 'filesystem'
+
+
 def redis_url() -> Optional[str]:
     """REDIS_URL, or UCM_REDIS_URL, the name the Redis guide and compose overlay used."""
     return os.getenv("REDIS_URL") or os.getenv("UCM_REDIS_URL") or None
+
+
+# The blanks a shell [:space:] trims, so the image scripts read a flag as the application does
+FLAG_BLANKS = " \t\n\v\f\r"
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    """Boolean environment variable: 1/true/yes/on (any case) are true."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip(FLAG_BLANKS):
+        return default
+    return raw.strip(FLAG_BLANKS).lower() in ("1", "true", "yes", "on")
+
+
+def rate_limit_enabled() -> bool:
+    """RATE_LIMIT_ENABLED, the one reading both limiters (route limits, tiered limiter) follow."""
+    return env_bool("RATE_LIMIT_ENABLED", True)
+
+
+CONTAINER_RESTART_REFUSAL = ("Service restart is not available in a container (Docker, Kubernetes). "
+                             "Restart the container or pod instead.")
 
 
 def is_docker():
@@ -45,11 +85,16 @@ def restart_ucm_service():
     """
     Restart UCM service via signal file.
     ucm-watcher.path detects the file and ucm-watcher.service runs systemctl restart.
-    Not available in Docker — container must be restarted externally.
+    Not available in a container (Docker, Kubernetes), restarted externally, except in HA
+    mode, where a rolling restart of every node is queued instead.
     Returns: (success: bool, message: str)
     """
+    if Config.HA_MODE:
+        # Every node restarts in turn, through its own signal file or process exit
+        from services.cluster_commands import request_restart
+        return request_restart()
     if is_docker():
-        return False, "Service restart not available in Docker. Restart the container instead."
+        return False, CONTAINER_RESTART_REFUSAL
     try:
         restart_signal = DATA_DIR / '.restart_requested'
         restart_signal.write_text('restart')
@@ -106,6 +151,18 @@ def backup_max_upload_mb() -> int:
         return 512
 
 
+def backup_max_archive_mb() -> int:
+    """`BACKUP_MAX_ARCHIVE_MB`: the largest v4 archive a restore accepts; 0 (default) for no limit."""
+    raw = os.getenv("BACKUP_MAX_ARCHIVE_MB", "0")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        import logging
+        logging.getLogger(__name__).warning(
+            "BACKUP_MAX_ARCHIVE_MB=%r is not a whole number of MB: no limit", raw)
+        return 0
+
+
 class Config:
     """Base configuration - values can be overridden by database settings"""
     
@@ -159,7 +216,13 @@ class Config:
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
     # The restore routes alone accept an archive up to this size, in MiB
     BACKUP_MAX_UPLOAD_MB = backup_max_upload_mb()
+    # v4 archives are streamed and not bound by the above; 0 accepts any size
+    BACKUP_MAX_ARCHIVE_MB = backup_max_archive_mb()
     
+    # HA: multi-node mode refuses host-local operations (see utils/ha.py)
+    HA_MODE = env_bool("UCM_HA")
+    NODE_ID = os.getenv("UCM_NODE_ID") or socket.gethostname()
+
     # Database
     # Supports SQLite (default) or PostgreSQL for high availability
     # DATABASE_URL takes precedence (PostgreSQL), else fallback to SQLite
@@ -189,9 +252,13 @@ class Config:
     # SQLAlchemy would otherwise quote bound values in its errors, private keys included.
     # PostgreSQL's DETAIL stays for a duplicate or missing key; a refused row or input is dropped (utils/db_errors)
     SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
-    # UCM_PG_PREPARE_THRESHOLD, for a transaction-mode pooler without prepared statements
-    if _db_url and postgres_connect_args(_db_url):
-        SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = postgres_connect_args(_db_url)
+    # Pre-ping, keepalives and connect timeout, plus UCM_PG_PREPARE_THRESHOLD (utils/db_url)
+    if _db_url:
+        SQLALCHEMY_ENGINE_OPTIONS.update(postgres_engine_options(_db_url))
+    if SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+        # A SQLite connection plans with the statistics it loaded when it opened: reopened hourly,
+        # as often as the sqlite_statistics task refreshes them
+        SQLALCHEMY_ENGINE_OPTIONS["pool_recycle"] = 3600
     
     
     @classmethod
@@ -200,13 +267,13 @@ class Config:
         if cls.SECRET_KEY == "INSTALL_TIME_PLACEHOLDER" or not cls.SECRET_KEY:
             raise ValueError(
                 "SECRET_KEY must be set in environment. "
-                "Check /etc/ucm/ucm.env or load environment variables."
+                f"Check {_config_env_file()} or load environment variables."
             )
     
     # Session settings
     
     # Session Configuration - Flask server-side sessions
-    # Supports filesystem (default) or Redis (HA mode)
+    # Redis first, else the database on PostgreSQL, else the filesystem
     _redis_url = redis_url()
     
     if _redis_url:
@@ -214,6 +281,11 @@ class Config:
         SESSION_TYPE = 'redis'
         SESSION_REDIS = _redis_url  # Will be converted to Redis connection in app.py
         SESSION_KEY_PREFIX = os.getenv("SESSION_KEY_PREFIX", "ucm:session:")
+    elif session_store(None, DATABASE_TYPE) == 'sqlalchemy':
+        # PostgreSQL without Redis: sessions live in the shared database (app.py binds `db`)
+        SESSION_TYPE = 'sqlalchemy'
+        SESSION_SQLALCHEMY_TABLE = SESSION_TABLE
+        SESSION_CLEANUP_N_REQUESTS = 500
     else:
         # Filesystem sessions for standalone deployment
         SESSION_TYPE = 'filesystem'
@@ -227,11 +299,12 @@ class Config:
     
     # Initial Admin User (only used on first run)
     INITIAL_ADMIN_USERNAME = os.getenv("INITIAL_ADMIN_USERNAME", "admin")
-    INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD", "changeme123")
+    # No default: unset, auth.initial_admin generates one into the data directory
+    INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD") or None
+    INITIAL_ADMIN_PASSWORD_FILE = os.getenv("INITIAL_ADMIN_PASSWORD_FILE") or None
+    # Set by the Helm chart for the value it generated: changed at first login like ours
+    INITIAL_ADMIN_PASSWORD_FORCE_CHANGE = os.getenv("INITIAL_ADMIN_PASSWORD_FORCE_CHANGE") or None
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL", "admin@localhost")
-    
-    # Rate Limiting
-    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
     
     # Logging. LOG_FILE is the fallback application log path (utils.app_log):
     # the data directory is writable on every deployment, unlike /var/log/ucm.
@@ -306,6 +379,10 @@ class TestingConfig(Config):
     SQLALCHEMY_ENGINE_OPTIONS = {"hide_parameters": True}
     # The suite starts unencrypted; the tests of the first-start key turn it on
     AUTO_MASTER_KEY = False
+    # The suite keeps file sessions unless a test forces the database store
+    if Config.SESSION_TYPE == 'sqlalchemy':
+        SESSION_TYPE = 'filesystem'
+        SESSION_FILE_DIR = Config.DATA_DIR / 'sessions'
 
 
 # Configuration dictionary

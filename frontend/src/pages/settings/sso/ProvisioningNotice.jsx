@@ -10,7 +10,12 @@ export function hasRoleRules(roleMapping) {
 export default function ProvisioningNotice({ formData }) {
   const { t } = useTranslation()
   if (hasRoleRules(formData.role_mapping)) {
-    return <p className="text-xs text-text-tertiary">{t('sso.provisioningRulesNotice')}</p>
+    return (
+      <div className="text-xs text-text-tertiary space-y-1">
+        <p>{t('sso.provisioningRulesNotice')}</p>
+        <p>{t('sso.provisioningRefusalAudited')}</p>
+      </div>
+    )
   }
   const role = formData.default_role
   return (

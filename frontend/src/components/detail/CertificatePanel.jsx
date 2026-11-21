@@ -1,0 +1,592 @@
+/**
+ * CertificatePanel: pure presentation of one certificate. No service call, no
+ * modal, no action button; actions live in hooks/useEntityActions. The rule
+ * covers direct imports: self-loading field components (see README.md) are
+ * known exceptions until the inspector lot.
+ * `section` limits the output to one named part (see ./sections.js).
+ */
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { formatDate as formatDateUtil, formatSerialNumberHex } from '../../lib/utils'
+import { daysSinceExpiry, hasExpiry } from '../../lib/expiry'
+import { 
+  Certificate, 
+  Key, 
+  Lock, 
+  Clock, 
+  Calendar, 
+  X, 
+  Copy,
+  CheckCircle,
+  ShieldCheck,
+  Globe,
+  Envelope,
+  Buildings,
+  MapPin,
+  Hash,
+  Fingerprint,
+  LinkSimple,
+  Stack,
+} from '@phosphor-icons/react'
+import { Badge } from '../Badge'
+import { Button } from '../Button'
+import { CompactSection, CompactGrid, CompactField } from '../DetailCard'
+import { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
+import { CertDeploySection } from '../deploy/CertDeploySection'
+import { cn } from '../../lib/utils'
+import { useClipboard } from '../../hooks/useClipboard'
+import { signatureShortName } from '../../lib/signatureName'
+import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
+import { PostQuantumBadge } from '../PostQuantumBadge'
+import { showSection } from './sections'
+
+// Maps a template_override field name to the i18n key of its label (#258).
+const OVERRIDE_FIELD_LABEL_KEYS = {
+  key_type: 'common.keyType',
+  validity_days: 'common.validityPeriod',
+  digest: 'common.digest',
+}
+
+// Format date helper — delegates to shared util
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  return formatDateUtil(dateStr)
+}
+
+const CERT_TYPE_LABELS = {
+  server_cert: 'certificates.sourceTypes.server',
+  client_cert: 'certificates.sourceTypes.client',
+  code_signing: 'certificates.sourceTypes.codeSigning',
+  email_cert: 'certificates.sourceTypes.emailSmime',
+  ca_cert: 'certificates.sourceTypes.ca',
+  intermediate_ca: 'certificates.sourceTypes.intermediateCA',
+  root_ca: 'certificates.sourceTypes.rootCA',
+  self_signed: 'certificates.sourceTypes.selfSigned',
+  timestamping: 'certificates.sourceTypes.timestamping',
+}
+
+function formatCertType(type, t) {
+  if (!type) return null
+  const key = CERT_TYPE_LABELS[type]
+  return key ? t(key) : type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// Expiry indicator - uses t from parent
+function ExpiryIndicator({ daysRemaining, validTo, t }) {
+  let color = 'text-status-success'
+  let bgColor = 'bg-status-success-op10'
+  let label = `${daysRemaining}d`
+
+  // `days_remaining` is signed and may be null when the row carries no
+  // expiry date. `null <= 0` is true in JavaScript, so without this the
+  // panel called a certificate that never expires expired.
+  if (!hasExpiry(daysRemaining)) {
+    return null
+  }
+  if (daysRemaining <= 0) {
+    color = 'text-status-danger'
+    bgColor = 'bg-status-danger-op10'
+    label = daysRemaining < 0
+      ? t('details.expiredDaysAgo', { count: daysSinceExpiry(daysRemaining) })
+      : t('common.expired')
+  } else if (daysRemaining <= 7) {
+    color = 'text-status-danger'
+    bgColor = 'bg-status-danger-op10'
+    label = t('details.daysLeft', { count: daysRemaining })
+  } else if (daysRemaining <= 30) {
+    color = 'text-status-warning'
+    bgColor = 'bg-status-warning-op10'
+    label = t('details.daysLeft', { count: daysRemaining })
+  } else {
+    label = t('details.daysLeft', { count: daysRemaining })
+  }
+  
+  return (
+    <div className={cn("flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg", bgColor)}>
+      <Clock size={14} className={cn("sm:w-4 sm:h-4", color)} />
+      <div>
+        <div className={cn("text-xs sm:text-sm font-medium", color)}>{label}</div>
+        <div className="text-2xs sm:text-xs text-text-tertiary">{t('common.expires')}: {formatDate(validTo, 'short')}</div>
+      </div>
+    </div>
+  )
+}
+
+export function CertificatePanel({
+  certificate,
+  // Opens the other member of a hybrid pair; without it the link navigates
+  onOpenRelated,
+  onAddToTrustStore,
+  section = 'all',
+  compact = false,
+  showPem = true,
+  embedded = false,
+}) {
+
+  const { t } = useTranslation()
+  const { copy: copyPem, isCopied } = useClipboard()
+  const pemCopied = isCopied('pem')
+  const [showFullPem, setShowFullPem] = useState(false)
+
+  if (!certificate) return null
+  
+  const cert = certificate
+  const serialHex = formatSerialNumberHex(cert.serial_number)
+  const keyName = keyAlgorithmLabel(cert.key_algorithm || cert.key_type, t, cert.security_level)
+  const status = cert.revoked ? 'revoked' : (cert.status || 'valid')
+  // Hybrid pair (RFC 9763): the other member's id and this one's role
+  const relatedId = cert.related_certificate_id ?? null
+  const HYBRID_ROLE_KEYS = { classical: 'certificates.hybrid.roleClassical', pq: 'certificates.hybrid.rolePq' }
+  const hybridRoleKey = HYBRID_ROLE_KEYS[cert.hybrid_role]
+  const otherRoleKey = HYBRID_ROLE_KEYS[{ classical: 'pq', pq: 'classical' }[cert.hybrid_role]]
+  const linkedBadge = relatedId != null && (
+    <Badge variant="info" size="sm" icon={LinkSimple} data-testid="hybrid-linked-badge"
+      title={hybridRoleKey ? t(hybridRoleKey) : t('certificates.hybrid.relatedCertificate')}>
+      {t('certificates.hybrid.linked')}
+    </Badge>
+  )
+  
+  // Status badge config
+  const statusConfig = {
+    valid: { variant: 'success', label: t('common.valid') },
+    expiring: { variant: 'warning', label: t('common.detailsExpiring') },
+    expired: { variant: 'danger', label: t('common.expired') },
+    revoked: { variant: 'danger', label: t('common.revoked') }
+  }
+  
+  // Source badge config
+  const sourceConfig = {
+    acme: { variant: 'info', label: 'ACME' },
+    scep: { variant: 'warning', label: 'SCEP' },
+    msca: { variant: 'info', label: 'AD CS' },
+    import: { variant: 'default', label: t('common.imported') },
+    csr: { variant: 'default', label: t('details.fromCSR') },
+    manual: { variant: 'default', label: t('common.manual') }
+  }
+  
+  const statusBadge = statusConfig[status] || statusConfig.valid
+  const on = (...names) => showSection(section, ...names)
+  const sourceBadge = sourceConfig[cert.source] || null
+  
+  return (
+    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2", embedded && "space-y-3 p-3")}>
+      {on('overview') && (<>
+      {!embedded && <>
+      {/* Header */}
+      <div className="flex items-start gap-2 sm:gap-3">
+        <div className={cn(
+          "p-2 sm:p-2.5 rounded-lg shrink-0",
+          cert.revoked ? "bg-status-danger-op10" : "bg-accent-primary-op10"
+        )}>
+          <Certificate size={20} className={cn("sm:w-6 sm:h-6", cert.revoked ? "text-status-danger" : "text-accent-primary")} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate">
+              {cert.cn || cert.common_name || cert.descr || t('common.certificate')}
+            </h3>
+            <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
+            {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
+            {!cert.has_private_key && <Badge variant="warning" size="sm">{t('details.noKey')}</Badge>}
+            <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_algorithm || cert.key_type} />
+            {linkedBadge}
+            {cert.template_name && (
+              <Badge
+                variant={cert.template_overrides?.length ? 'warning' : 'info'}
+                size="sm"
+                title={cert.template_overrides?.length
+                  ? t('certificates.templateOverridesHint', {
+                      name: cert.template_name,
+                      fields: cert.template_overrides
+                        .map(f => OVERRIDE_FIELD_LABEL_KEYS[f] ? t(OVERRIDE_FIELD_LABEL_KEYS[f]) : f)
+                        .join(', ')
+                    })
+                  : t('certificates.issuedFromTemplate', { name: cert.template_name })}
+              >
+                {cert.template_name}
+              </Badge>
+            )}
+          </div>
+          <p className="text-2xs sm:text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
+        </div>
+      </div>
+      
+      {/* Expiry indicator */}
+      {!cert.revoked && hasExpiry(cert.days_remaining) && (
+        <ExpiryIndicator daysRemaining={cert.days_remaining} validTo={cert.valid_to} t={t} />
+      )}
+      
+      {/* Quick stats */}
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+        <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
+          <Key size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{keyName || '—'}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
+        </div>
+        <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
+          <Lock size={14} className={cn("mx-auto mb-0.5 sm:mb-1 sm:w-4 sm:h-4", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? t('common.hasKey') : t('details.noKey')}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">
+            {cert.has_private_key ? (cert.private_key_location || '—') : '—'}
+          </div>
+        </div>
+        <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
+          <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
+          <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{signatureShortName(cert.signature_algorithm)}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
+        </div>
+      </div>
+      </>}
+      </>)}
+      {on('overview') && (<>
+      {/* Embedded: compact status bar */}
+      {embedded && (
+        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-tertiary-op30">
+          <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
+          {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
+          <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_algorithm || cert.key_type} />
+          {linkedBadge}
+          {hasExpiry(cert.days_remaining) && !cert.revoked && (
+            <span className={cn(
+              "text-2xs font-medium",
+              cert.days_remaining <= 0 ? "text-status-danger" :
+              cert.days_remaining <= 30 ? "text-status-warning" : "text-text-tertiary"
+            )}>
+              {cert.days_remaining <= 0 ? t('common.expired') : t('details.daysShort', { count: cert.days_remaining })}
+            </span>
+          )}
+          <span className="text-2xs text-text-tertiary">•</span>
+          <span className="text-2xs text-text-secondary">{keyName || '—'}{cert.key_size ? ` ${cert.key_size}` : ''}</span>
+          <span className="text-2xs text-text-tertiary">•</span>
+          <span className={cn("text-2xs", cert.has_private_key ? "text-status-success" : "text-text-tertiary")}>
+            {cert.has_private_key ? '🔑' : '—'} {t('common.privateKey')}
+          </span>
+        </div>
+      )}
+      
+      </>)}
+      {on('overview') && (<>
+      {/* Subject Information */}
+      <CompactSection title={t('common.subject')} icon={Globe} iconClass="icon-bg-blue">
+        <CompactGrid>
+          <CompactField icon={Globe} label={t('common.commonName')} value={cert.cn || cert.common_name} />
+          <CompactField autoIcon="country" label={t('common.country')} value={cert.country} />
+          <CompactField autoIcon="state" label={t('common.state')} value={cert.state} />
+          <CompactField icon={MapPin} label={t('common.locality')} value={cert.locality} />
+          <CompactField icon={Buildings} label={t('common.organization')} value={cert.organization} />
+          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={cert.organizational_unit} />
+          <CompactField icon={Envelope} label={t('common.email')} value={cert.email} colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
+      
+      </>)}
+      {on('overview') && (<>
+      {/* Validity Period */}
+      <CompactSection title={t('common.validity')} icon={Calendar} iconClass="icon-bg-green">
+        <CompactGrid>
+          <CompactField icon={Calendar} label={t('common.validFrom')} value={formatDate(cert.valid_from)} />
+          <CompactField icon={Calendar} label={t('common.validUntil')} value={formatDate(cert.valid_to)} />
+        </CompactGrid>
+      </CompactSection>
+      
+      </>)}
+      {on('overview') && (<>
+      {/* Technical Details */}
+      <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
+        <CompactGrid>
+          <CompactField icon={Hash} label={t('common.serial')} value={cert.serial_number} mono copyable />
+          {serialHex && (
+            <CompactField icon={Hash} label={t('common.serialHex')} value={serialHex} mono copyable />
+          )}
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={keyAlgorithmLabel(cert.key_type, t, cert.security_level) || keyName} />
+          <CompactField
+            autoIcon="issuerSignatureAlgorithm"
+            label={t('common.issuerSignatureAlgorithm')}
+            hint={t('common.issuerSignatureAlgorithmHint')}
+            value={cert.signature_algorithm}
+          />
+          <CompactField autoIcon="certType" label={t('details.certType')} value={formatCertType(cert.cert_type, t)} />
+          {relatedId != null && (
+            <CompactField icon={LinkSimple} label={t('certificates.hybrid.relatedCertificate')}>
+              <a
+                href={`/certificates/${relatedId}`}
+                aria-label={t('certificates.hybrid.openRelated', { id: relatedId })}
+                onClick={onOpenRelated ? (e) => { e.preventDefault(); onOpenRelated(relatedId) } : undefined}
+                className="text-accent-primary hover:underline"
+              >
+                #{relatedId}{otherRoleKey ? ` (${t(otherRoleKey)})` : ''}
+              </a>
+            </CompactField>
+          )}
+          {cert.template_name && (
+            <CompactField
+              icon={Stack}
+              label={t('certificates.template')}
+              value={cert.template_overrides?.length
+                ? `${cert.template_name}: ${t('certificates.modifiedFromTemplate')}: ${cert.template_overrides.map(f => OVERRIDE_FIELD_LABEL_KEYS[f] ? t(OVERRIDE_FIELD_LABEL_KEYS[f]) : f).join(', ')}`
+                : cert.template_name}
+            />
+          )}
+          {cert.windows_profile_id != null && (
+            <CompactField
+              icon={Stack}
+              label={t('certificates.windowsProfile')}
+              value={cert.windows_profile_name || `#${cert.windows_profile_id}`}
+            />
+          )}
+        </CompactGrid>
+      </CompactSection>
+      
+      </>)}
+      {on('overview') && (<>
+      {/* SANs — shared component */}
+      <SubjectAltNames extensions={cert.extensions} sanCombined={cert.san_combined} />
+      
+      </>)}
+      {on('extensions') && (<>
+      {/* X.509 Extensions — shared component */}
+      <CertificateExtensions extensions={cert.extensions} />
+      </>)}
+      {on('overview') && (<>
+      {/* CT SCTs */}
+      <CompactSection title={t('certificates.ctScts')} icon={ShieldCheck} iconClass="icon-bg-cyan" collapsible defaultOpen={false}>
+        {cert.ct_scts && cert.ct_scts.length > 0 ? (
+          <div className="space-y-2">
+            <Badge variant="teal" size="sm">{t('certificates.ctSctsCount', { count: cert.ct_scts.length })}</Badge>
+            {cert.ct_scts.map((sct, i) => (
+              <div key={i} className="text-2xs font-mono text-text-secondary">
+                {sct.log_url || 'unknown'}{sct.timestamp ? `: ${sct.timestamp}` : ''}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-text-tertiary">{t('certificates.ctNoScts')}</div>
+        )}
+      </CompactSection>
+      
+      </>)}
+      {on('overview', 'chain') && (<>
+      {/* Issuer */}
+      <CompactSection title={t('common.issuer')} icon={ShieldCheck} iconClass="icon-bg-orange">
+        <CompactGrid cols={1}>
+          <CompactField autoIcon="issuer" label={t('common.issuer')} value={cert.issuer} mono />
+          <CompactField autoIcon="ca" label={t('common.ca')} value={cert.issuer_name} />
+          <CompactField autoIcon="caReference" label={t('details.caReference')} value={cert.caref} mono copyable />
+        </CompactGrid>
+      </CompactSection>
+      </>)}
+      {on('chain') && (<>
+      {/* Chain Validation */}
+      {cert.chain_status && (
+        <CompactSection 
+          title={t('details.chainValidation')} 
+          icon={LinkSimple} 
+          iconClass={cert.chain_status.status === 'complete' ? 'icon-bg-emerald' : cert.chain_status.status === 'incomplete' ? 'icon-bg-orange' : 'icon-bg-teal'}
+        >
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {cert.chain_status.status === 'complete' ? (
+                <Badge variant="success" size="sm" dot>{t('details.chainComplete')}</Badge>
+              ) : cert.chain_status.status === 'incomplete' ? (
+                <Badge variant="warning" size="sm" dot>{t('details.chainIncomplete')}</Badge>
+              ) : (
+                <Badge variant="secondary" size="sm" dot>{t('details.chainPartial')}</Badge>
+              )}
+              {cert.chain_status.trust_source === 'trust_store' && (
+                <Badge variant="teal" size="sm">✓ Trust Store</Badge>
+              )}
+              {cert.chain_status.trust_source === 'managed_ca' && (
+                <Badge variant="primary" size="sm">✓ {t('details.managedCA')}</Badge>
+              )}
+            </div>
+            {cert.chain_status.trust_anchor && (
+              <CompactField autoIcon="ca" label={t('details.trustAnchor')} value={cert.chain_status.trust_anchor} />
+            )}
+            {cert.chain_status.chain?.length > 0 && (
+              <div className="flex items-center gap-1 text-xs flex-wrap mt-1">
+                <span className="px-2 py-0.5 rounded icon-bg-blue text-xs">{cert.common_name || 'Leaf'}</span>
+                {cert.chain_status.chain.map((link, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    <span className="text-text-tertiary">→</span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-xs",
+                      link.type === 'trust_store' ? 'icon-bg-amber' : 'icon-bg-emerald'
+                    )}>{link.name}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            {cert.chain_status.status === 'incomplete' && (
+              <div className="mt-2 p-2 rounded-lg bg-accent-warning-op5 border border-accent-warning-op20">
+                <p className="text-xs text-text-secondary">
+                  {t('details.chainIncompleteHint')}
+                </p>
+                {onAddToTrustStore && cert.caref && (
+                  <Button
+                    size="xs"
+                    variant="secondary"
+                    className="mt-1.5"
+                    onClick={() => onAddToTrustStore(cert.caref)}
+                  >
+                    <ShieldCheck size={12} className="mr-1" />
+                    {t('details.addIssuerToTrustStore')}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </CompactSection>
+      )}
+      
+      </>)}
+      {on('overview') && (<>
+      {/* Compliance Score */}
+      {cert.compliance && (
+        <CompactSection title={t('compliance.title')} icon={ShieldCheck} iconClass={
+          cert.compliance.grade === 'A+' || cert.compliance.grade === 'A' ? 'icon-bg-emerald' :
+          cert.compliance.grade === 'B' ? 'icon-bg-blue' :
+          cert.compliance.grade === 'C' ? 'icon-bg-orange' :
+          'icon-bg-red'
+        }>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-bold text-text-primary">{cert.compliance.grade}</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-text-secondary">{cert.compliance.score}/100</span>
+                </div>
+                <div className="h-2 bg-tertiary-op50 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      cert.compliance.score >= 85 ? "bg-status-success" :
+                      cert.compliance.score >= 70 ? "bg-status-info" :
+                      cert.compliance.score >= 55 ? "bg-status-warning" :
+                      "bg-status-danger"
+                    )}
+                    style={{ width: `${cert.compliance.score}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+            {cert.compliance.breakdown && (
+              <div className="grid gap-1.5">
+                {Object.entries(cert.compliance.breakdown).map(([key, item]) => {
+                  if (!item || typeof item.score === 'undefined') return null
+                  return (
+                    <div key={key} className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary">{t(`compliance.criteria.${key}`)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "font-mono font-medium",
+                          item.score >= (item.max || 1) * 0.8 ? "text-status-success" :
+                          item.score >= (item.max || 1) * 0.5 ? "text-status-warning" :
+                          "text-status-danger"
+                        )}>
+                          {item.score}/{item.max}
+                        </span>
+                        <span className="text-text-tertiary text-2xs w-20 text-right truncate">{t(`compliance.reasons.${item.reason}`, item.reason)}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </CompactSection>
+      )}
+      
+      </>)}
+      {on('overview') && (<>
+      {/* Deployment — push to remote hosts over SSH (#299, admin-only) */}
+      <CertDeploySection certificate={cert} />
+      </>)}
+      {on('overview') && (<>
+      {/* Thumbprints */}
+      <CompactSection title={t('common.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
+        <CompactGrid cols={1}>
+          <CompactField autoIcon="sha1" label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
+          <CompactField autoIcon="sha256" label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
+        </CompactGrid>
+      </CompactSection>
+      
+      </>)}
+      {on('pem') && (<>
+      {/* PEM */}
+      {showPem && cert.pem && (
+        <CompactSection title={t('details.pemCertificate')} icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
+          <div className="relative">
+            <pre className={cn(
+              "text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto border border-border-op30",
+              !showFullPem && "max-h-24 overflow-hidden"
+            )}>
+              {cert.pem}
+            </pre>
+            {!showFullPem && cert.pem.length > 500 && (
+              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-bg-primary to-transparent pointer-events-none" />
+            )}
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button 
+              type="button"
+              size="sm" 
+              variant="ghost" 
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowFullPem(!showFullPem)
+              }}
+            >
+              {showFullPem ? t('details.showLess') : t('details.showFull')}
+            </Button>
+            <Button 
+              type="button"
+              size="sm" 
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                copyPem(cert.pem, 'pem')
+              }}
+            >
+              {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
+              {pemCopied ? t('common.copied') : t('details.copyPem')}
+            </Button>
+          </div>
+        </CompactSection>
+      )}
+      
+      </>)}
+      {on('overview') && (<>
+      {/* Revocation info */}
+      {cert.revoked && (
+        <CompactSection title={t('details.revocationDetails')}>
+          <div className="bg-status-danger-op10 border border-status-danger-op20 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-status-danger mb-2">
+              <X size={16} />
+              <span className="font-medium">{t('details.certificateRevoked')}</span>
+            </div>
+            <CompactGrid>
+              <CompactField autoIcon="revokedAt" label={t('details.revokedAt')} value={formatDate(cert.revoked_at)} />
+              <CompactField autoIcon="reason" label={t('details.reason')} value={cert.revoke_reason ? t(`revocation.reasons.${cert.revoke_reason}`, cert.revoke_reason) : t('details.unspecified')} />
+            </CompactGrid>
+          </div>
+        </CompactSection>
+      )}
+      
+      </>)}
+      {on('overview') && (<>
+      {/* Metadata */}
+      <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
+        <CompactGrid>
+          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(cert.created_at)} />
+          <CompactField autoIcon="createdBy" label={t('details.createdBy')} value={cert.created_by} />
+          <CompactField autoIcon="source" label={t('common.source')} value={cert.source} />
+          <CompactField autoIcon="importedFrom" label={t('details.importedFrom')} value={cert.imported_from} />
+          <CompactField autoIcon="referenceId" label={t('details.referenceId')} value={cert.refid} mono copyable colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
+      </>)}
+    </div>
+  )
+}
+
+export default CertificatePanel

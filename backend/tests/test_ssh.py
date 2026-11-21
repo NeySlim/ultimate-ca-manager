@@ -25,7 +25,8 @@ import pytest
 import json
 import os
 import sys
-from tests.conftest import get_json, assert_success, assert_error
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -598,7 +599,7 @@ class TestSignSSHCertificate:
             'principals': ['testuser'],
         }
         r = post_json(auth_client, '/api/v2/ssh/certificates', payload)
-        assert r.status_code in (400, 404, 500)
+        assert_refused(r, 400, 'SSH CA not found: 999999')
 
     def test_sign_certificate_invalid_public_key(self, auth_client):
         ca = _create_ssh_ca(auth_client, descr='Bad Key CA')
@@ -609,7 +610,7 @@ class TestSignSSHCertificate:
             'principals': ['testuser'],
         }
         r = post_json(auth_client, '/api/v2/ssh/certificates', payload)
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid SSH public key format')
 
     def test_sign_increments_serial(self, auth_client):
         """Each certificate from the same CA should have an incrementing serial."""

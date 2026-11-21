@@ -67,7 +67,7 @@ describe('IssueCertificateForm ML-DSA', () => {
 
   it('offers ml-dsa with its levels and sends key_type=ml-dsa key_size=65 by default', async () => {
     expect(PQ_ROWS).toHaveLength(3)
-    const onSubmit = renderForm({ allowed_key_types: null, allowed_digests: null })
+    const onSubmit = renderForm({ allowed_key_types: null, allowed_digests: null, default_key_type: 'RSA-2048' })
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
     expect(optionValues('common.keyType')).toContain('ml-dsa')
     fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ml-dsa' } })
@@ -78,7 +78,7 @@ describe('IssueCertificateForm ML-DSA', () => {
 
   it('keeps an ML-DSA template as ML-DSA, never ECDSA', async () => {
     mocks.templates = [{ id: 9, name: 'PQ server', template_type: 'web_server', key_type: 'ML-DSA-87', dn_template: {} }]
-    const onSubmit = renderForm({ allowed_key_types: null, allowed_digests: null })
+    const onSubmit = renderForm({ allowed_key_types: null, allowed_digests: null, default_key_type: 'RSA-2048' })
     await waitFor(() => expect(optionValues('certificates.templateOptional')).toContain('9'))
     fireEvent.change(screen.getByLabelText('certificates.templateOptional'), { target: { value: '9' } })
     await waitFor(() => expect(screen.getByLabelText('common.keyType').value).toBe('ml-dsa'))

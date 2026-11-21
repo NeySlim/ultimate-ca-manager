@@ -10,7 +10,7 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) })
 vi.mock('../../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError, showWarning: vi.fn() }),
 }))
-vi.mock('../../../services', () => ({ adConnectorService: { test: vi.fn() } }))
+vi.mock('../../../services', () => ({ adConnectorsService: { test: vi.fn() } }))
 vi.mock('../../../components', () => ({
   Button: ({ children, ...props }) => <button {...props}>{children}</button>,
   Input: ({ label, helperText: _h, hasExistingValue: _e, error, ...props }) => (

@@ -31,7 +31,6 @@ from utils import (
     reload_service, # Reload configuration (currently = restart)
     is_service_running, # Check if service is running
     get_service_status, # Get detailed status info
-    schedule_restart, # Schedule restart with delay
     cancel_scheduled_restart # Cancel scheduled restart
 )
 ```
@@ -96,20 +95,6 @@ Get detailed service status information.
 status = get_service_status()
 print(f"Service PID: {status['pid']}")
 print(f"Memory: {status['memory']}")
-```
-
-### schedule_restart(delay_seconds=1)
-
-Schedule a service restart after a delay.
-
-**Args:**
-- `delay_seconds` (int): Seconds to wait before restarting
-
-**Returns:** `Tuple[bool, str]` - (success, message)
-
-**Example:**
-```python
-success, msg = schedule_restart(delay_seconds=5)
 ```
 
 ### cancel_scheduled_restart()

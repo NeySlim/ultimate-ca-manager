@@ -1,56 +1,19 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { lazy, Suspense } from 'react'
-import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, WindowManagerProvider, useAuth } from './contexts'
+import { Suspense } from 'react'
+import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, InspectorProvider, useAuth } from './contexts'
 import { WebSocketProvider } from './hooks/useWebSocket'
-import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, DetailWindowLayer } from './components'
+import { MODULES, REDIRECTS } from './navigation/registry'
+import { loginUrl, safeNext } from './navigation/safeNext'
+import { pages, lazyWithRetry } from './navigation/pages'
+import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, InspectorDock } from './components'
 
-// Auto-reload on chunk load failure (stale cache after update)
-function lazyWithRetry(importFn) {
-  return lazy(() => importFn().catch(() => {
-    // Chunk failed to load (likely 404 after update) — reload once
-    const key = 'chunk_reload'
-    if (!sessionStorage.getItem(key)) {
-      sessionStorage.setItem(key, '1')
-      window.location.reload()
-    }
-    sessionStorage.removeItem(key)
-    return importFn()
-  }))
-}
-
-// Lazy load pages for code splitting
+// Lazy load pages for code splitting (module pages are bound in navigation/pages.js)
 const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
-const DashboardPage = lazyWithRetry(() => import('./pages/DashboardPage'))
-const CertificatesPage = lazyWithRetry(() => import('./pages/CertificatesPage'))
-const UserCertificatesPage = lazyWithRetry(() => import('./pages/UserCertificatesPage'))
-const CAsPage = lazyWithRetry(() => import('./pages/CAsPage'))
-const CSRsPage = lazyWithRetry(() => import('./pages/CSRsPage'))
-const TemplatesPage = lazyWithRetry(() => import('./pages/TemplatesPage'))
-const UsersGroupsPage = lazyWithRetry(() => import('./pages/UsersGroupsPage'))
-const ACMEPage = lazyWithRetry(() => import('./pages/ACMEPage'))
-const SCEPPage = lazyWithRetry(() => import('./pages/SCEPPage'))
-const ESTPage = lazyWithRetry(() => import('./pages/ESTPage'))
-const TSAPage = lazyWithRetry(() => import('./pages/TSAPage'))
-const SettingsPage = lazyWithRetry(() => import('./pages/SettingsPage'))
-const OperationsPage = lazyWithRetry(() => import('./pages/OperationsPage'))
-const CertificateToolsPage = lazyWithRetry(() => import('./pages/CertificateToolsPage'))
-const AccountPage = lazyWithRetry(() => import('./pages/AccountPage'))
-const AuditLogsPage = lazyWithRetry(() => import('./pages/AuditLogsPage'))
-const SystemLogsPage = lazyWithRetry(() => import('./pages/SystemLogsPage'))
-const CRLOCSPPage = lazyWithRetry(() => import('./pages/CRLOCSPPage'))
-const TrustStorePage = lazyWithRetry(() => import('./pages/TrustStorePage'))
-const RBACPage = lazyWithRetry(() => import('./pages/RBACPage'))
-const HSMPage = lazyWithRetry(() => import('./pages/HSMPage'))
 const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
-const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'))
-const ApprovalsPage = lazyWithRetry(() => import('./pages/ApprovalsPage'))
-const KeyRecoveryPage = lazyWithRetry(() => import('./pages/KeyRecoveryPage'))
-const ReportsPage = lazyWithRetry(() => import('./pages/ReportsPage'))
-const DiscoveryPage = lazyWithRetry(() => import('./pages/DiscoveryPage'))
-const SSHCAsPage = lazyWithRetry(() => import('./pages/SSHCAsPage'))
-const SSHCertificatesPage = lazyWithRetry(() => import('./pages/SSHCertificatesPage'))
+const SsoTestCompletePage = lazyWithRetry(() => import('./pages/SsoTestCompletePage'))
+const SsoTestLaunchPage = lazyWithRetry(() => import('./pages/SsoTestLaunchPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -61,35 +24,71 @@ function PageLoader() {
   )
 }
 
+// Signed in on the sign-in page: the page its ?next= names (checked), else the landing page
+function SignedIn() {
+  const { search } = useLocation()
+  return <Navigate to={safeNext(new URLSearchParams(search).get('next')) || '/'} replace />
+}
+
 function ProtectedRoute({ children }) {
+  const { pathname, search } = useLocation()
+  const toLogin = loginUrl(pathname, search)
   const { isAuthenticated, loading } = useAuth()
   
   if (loading) {
     return <PageLoader />
   }
   
-  return isAuthenticated ? children : <Navigate to="/login" replace />
+  return isAuthenticated ? children : <Navigate to={toLogin} replace />
 }
 
 function AdminRoute({ children }) {
+  const { pathname, search } = useLocation()
+  const toLogin = loginUrl(pathname, search)
   const { isAuthenticated, loading, permissions } = useAuth()
   
   if (loading) return <PageLoader />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to={toLogin} replace />
   if (!permissions?.includes('*')) return <Navigate to="/" replace />
   
   return children
 }
 
 function PermissionRoute({ children, permission }) {
+  const { pathname, search } = useLocation()
+  const toLogin = loginUrl(pathname, search)
   const { isAuthenticated, loading, permissions } = useAuth()
   
   if (loading) return <PageLoader />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to={toLogin} replace />
   if (permissions?.includes('*')) return children
   if (permission && !permissions?.includes(permission)) return <Navigate to="/" replace />
   
   return children
+}
+
+export function guarded(guard, element) {
+  if (guard === 'admin') return <AdminRoute>{element}</AdminRoute>
+  if (guard && guard.permission) return <PermissionRoute permission={guard.permission}>{element}</PermissionRoute>
+  if (guard === 'auth') return <ProtectedRoute>{element}</ProtectedRoute>
+  // A mistyped guard must not open the route to every signed-in user
+  throw new Error(`navigation: unknown guard ${JSON.stringify(guard)}`)
+}
+
+// Routes of every registry module and legacy redirect, under the app shell
+export function moduleRoutes() {
+  const routes = []
+  for (const m of MODULES) {
+    const Page = pages[m.id]
+    if (!Page) throw new Error(`navigation: no page bound to module '${m.id}'`)
+    for (const path of [m.path, ...m.paths]) {
+      routes.push(<Route key={path} path={path} element={guarded(m.guard, <Page />)} />)
+    }
+  }
+  for (const r of REDIRECTS) {
+    routes.push(<Route key={r.from} path={r.from} element={<Navigate to={r.to} replace />} />)
+  }
+  return routes
 }
 
 export function AppRoutes() {
@@ -121,7 +120,7 @@ export function AppRoutes() {
           path="/login" 
           element={
             loading ? <PageLoader /> :
-            isAuthenticated ? <Navigate to="/" replace /> : 
+            isAuthenticated ? <SignedIn /> :
             <LoginPage />
           } 
         />
@@ -130,50 +129,14 @@ export function AppRoutes() {
           element={<LoginPage />} 
         />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        {/* An SSO sign-in test's landing: no application shell, whoever signed in at the IdP */}
+        <Route path="/sso-test-complete" element={<SsoTestCompletePage />} />
+        <Route path="/sso-test-launch" element={<SsoTestLaunchPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         <Route element={<AppShell />}>
-          <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
-          <Route path="/certificates/:id" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
-          <Route path="/user-certificates" element={<PermissionRoute permission="read:user_certificates"><UserCertificatesPage /></PermissionRoute>} />
-          <Route path="/cas" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
-          <Route path="/cas/:id" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
-          <Route path="/csrs" element={<ProtectedRoute><CSRsPage /></ProtectedRoute>} />
-          <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
-          <Route path="/users" element={<AdminRoute><UsersGroupsPage /></AdminRoute>} />
-          <Route path="/acme" element={<PermissionRoute permission="read:acme"><ACMEPage /></PermissionRoute>} />
-          <Route path="/scep-config" element={<PermissionRoute permission="read:scep"><SCEPPage /></PermissionRoute>} />
-          <Route path="/est-config" element={<PermissionRoute permission="read:est"><ESTPage /></PermissionRoute>} />
-          <Route path="/tsa-config" element={<PermissionRoute permission="read:settings"><TSAPage /></PermissionRoute>} />
-          <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
-          <Route path="/audit" element={<PermissionRoute permission="read:audit"><AuditLogsPage /></PermissionRoute>} />
-          <Route path="/logs" element={<AdminRoute><SystemLogsPage /></AdminRoute>} />
-          <Route path="/operations" element={<AdminRoute><OperationsPage /></AdminRoute>} />
-          <Route path="/import" element={<Navigate to="/operations" replace />} />
-          <Route path="/tools" element={<ProtectedRoute><CertificateToolsPage /></ProtectedRoute>} />
-          <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-          <Route path="/crl-ocsp" element={<PermissionRoute permission="read:crl"><CRLOCSPPage /></PermissionRoute>} />
-          <Route path="/truststore" element={<PermissionRoute permission="read:truststore"><TrustStorePage /></PermissionRoute>} />
-          <Route path="/truststore/:id" element={<PermissionRoute permission="read:truststore"><TrustStorePage /></PermissionRoute>} />
-          
-          {/* Security & Administration */}
-          <Route path="/groups" element={<Navigate to="/users?tab=groups" replace />} />
-          <Route path="/rbac" element={<AdminRoute><RBACPage /></AdminRoute>} />
-          <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
-          <Route path="/hsm" element={<PermissionRoute permission="read:hsm"><HSMPage /></PermissionRoute>} />
-          <Route path="/security" element={<Navigate to="/settings?tab=security" replace />} />
-          {/* Governance */}
-          <Route path="/policies" element={<PermissionRoute permission="read:policies"><PoliciesPage /></PermissionRoute>} />
-          <Route path="/approvals" element={<PermissionRoute permission="read:approvals"><ApprovalsPage /></PermissionRoute>} />
-          <Route path="/key-recovery" element={<PermissionRoute permission="read:key_recovery"><KeyRecoveryPage /></PermissionRoute>} />
-          <Route path="/reports" element={<PermissionRoute permission="read:audit"><ReportsPage /></PermissionRoute>} />
-          <Route path="/discovery" element={<PermissionRoute permission="read:certificates"><DiscoveryPage /></PermissionRoute>} />
-          {/* SSH */}
-          <Route path="/ssh/cas" element={<PermissionRoute permission="read:ssh_cas"><SSHCAsPage /></PermissionRoute>} />
-          <Route path="/ssh/certificates" element={<PermissionRoute permission="read:ssh"><SSHCertificatesPage /></PermissionRoute>} />
-          {/* Component showcase — accessible by URL only, not in sidebar */}
+          {moduleRoutes()}
+          {/* Component showcase: accessible by URL only, not a module */}
           <Route path="/dev/components" element={<ProtectedRoute><DevShowcasePage /></ProtectedRoute>} />
         </Route>
         
@@ -192,11 +155,11 @@ export default function App() {
             <NotificationProvider>
             <WebSocketProvider>
               <MobileProvider>
-                <WindowManagerProvider>
+                <InspectorProvider>
                   <SafeModeOverlay />
                   <AppRoutes />
-                  <DetailWindowLayer />
-                </WindowManagerProvider>
+                  <InspectorDock />
+                </InspectorProvider>
               </MobileProvider>
             </WebSocketProvider>
             </NotificationProvider>

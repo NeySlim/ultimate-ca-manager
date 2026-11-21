@@ -48,6 +48,10 @@ def _is_lan_ip(ip: str) -> bool:
     return addr.is_private or addr.is_loopback or addr.is_link_local
 
 
+# HA: the rate limit settings changed through the API, stored for every node
+STORED_KEY = 'rate_limit_overrides'
+
+
 class RateLimitConfig:
     """Rate limit configuration per endpoint pattern
     
@@ -175,7 +179,8 @@ class RateLimitConfig:
     @classmethod
     def is_enabled(cls) -> bool:
         if cls._enabled is None:
-            cls._enabled = _get_env_bool('RATE_LIMIT_ENABLED', True)
+            from config.settings import rate_limit_enabled
+            cls._enabled = rate_limit_enabled()
         return cls._enabled
     
     @classmethod
@@ -264,6 +269,89 @@ class RateLimitConfig:
             'whitelist': list(cls._whitelist)
         }
     
+    @staticmethod
+    def validate_update(data: Any) -> Optional[str]:
+        """Error naming the first field of a settings request that cannot be stored, else None."""
+        if not isinstance(data, dict):
+            return 'request body must be an object'
+        if 'enabled' in data and not isinstance(data['enabled'], bool):
+            return 'enabled must be a boolean'
+        limits = data.get('custom_limits')
+        if limits is not None:
+            if not isinstance(limits, dict):
+                return 'custom_limits must be an object keyed by path'
+            for path, limit in limits.items():
+                if not isinstance(limit, dict):
+                    return f'custom_limits[{path}] must be an object with rpm and burst'
+                for name, required in (('rpm', True), ('burst', False)):
+                    value = limit.get(name)
+                    if value is None and not required:
+                        continue
+                    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                        return f'custom_limits[{path}].{name} must be an integer of at least 1'
+        for name in ('whitelist_add', 'whitelist_remove'):
+            values = data.get(name)
+            if values is None:
+                continue
+            if not isinstance(values, list):
+                return f'{name} must be a list of IP addresses'
+            for value in values:
+                try:
+                    if not isinstance(value, str):
+                        raise ValueError(value)  # ip_address() would read an int as an address
+                    ipaddress.ip_address(value)
+                except ValueError:
+                    return f'{name} holds an invalid IP address: {str(value)[:64]}'
+        return None
+
+    @staticmethod
+    def merge_stored(stored: Optional[Dict[str, Any]], data: Dict[str, Any]) -> Dict[str, Any]:
+        """The settings stored in the database (HA) after a settings API request ``data``.
+
+        Only what the API changed is kept: each node adds it to its own environment.
+        """
+        out = {'custom_limits': dict((stored or {}).get('custom_limits') or {}),
+               'whitelist_add': set((stored or {}).get('whitelist_add') or []),
+               'whitelist_remove': set((stored or {}).get('whitelist_remove') or [])}
+        if 'enabled' in (stored or {}):
+            out['enabled'] = bool(stored['enabled'])
+        if 'enabled' in data:
+            out['enabled'] = bool(data['enabled'])
+        for path, limit in (data.get('custom_limits') or {}).items():
+            rpm = int(limit['rpm'])
+            out['custom_limits'][path] = {'rpm': rpm, 'burst': int(limit.get('burst', max(1, rpm // 3)))}
+        for ip in data.get('whitelist_add') or []:
+            ip = str(ipaddress.ip_address(ip))
+            out['whitelist_add'].add(ip)
+            out['whitelist_remove'].discard(ip)
+        for ip in data.get('whitelist_remove') or []:
+            ip = str(ipaddress.ip_address(ip))
+            out['whitelist_remove'].add(ip)
+            out['whitelist_add'].discard(ip)
+        out['whitelist_add'] = sorted(out['whitelist_add'])
+        out['whitelist_remove'] = sorted(out['whitelist_remove'])
+        return out
+
+    @classmethod
+    def compose(cls, stored: Optional[Dict[str, Any]]):
+        """This node's environment, then the settings stored in the database (HA)."""
+        stored = stored or {}
+        cls._limits_loaded, cls._enabled, cls._whitelist = False, None, set()
+        cls._load_limits()
+        if 'enabled' in stored:
+            cls._enabled = bool(stored['enabled'])
+        cls._custom_limits = {k: {'rpm': int(v['rpm']), 'burst': int(v['burst'])}
+                              for k, v in (stored.get('custom_limits') or {}).items()}
+        cls._whitelist |= set(stored.get('whitelist_add') or [])
+        cls._whitelist -= set(stored.get('whitelist_remove') or [])
+
+    @staticmethod
+    def read_stored() -> Optional[Dict[str, Any]]:
+        import json
+        from models import SystemConfig
+        row = SystemConfig.query.filter_by(key=STORED_KEY).first()
+        return json.loads(row.value) if row and row.value else None
+
     @classmethod
     def reload(cls):
         """Reload configuration from environment"""
@@ -537,3 +625,20 @@ def rate_limit(rpm: int = None, burst: int = None):
             return f(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def start_rate_limiting(app):
+    """Start-up: register the limiter, then read again the settings the API stored."""
+    from config.settings import rate_limit_enabled
+    try:
+        if rate_limit_enabled():
+            init_rate_limiter(app)
+        else:
+            app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
+    except Exception as e:
+        app.logger.warning(f"Rate limiter not loaded: {e}")
+    try:  # the settings stored by the API, by this node before a restart or by another node
+        with app.app_context():
+            RateLimitConfig.compose(RateLimitConfig.read_stored())
+    except Exception as e:
+        app.logger.error(f"Stored rate limit settings not loaded: {e}")

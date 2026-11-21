@@ -6,7 +6,9 @@ This page describes the security features of Ultimate Certificate Manager. To re
 
 ### 1. Private Key Encryption
 
-All private keys (CA and certificate) are encrypted at rest using **Fernet** encryption (AES-128-CBC with HMAC-SHA256).
+With private-key encryption enabled, private keys (CA and certificate) are encrypted at rest using **Fernet** encryption (AES-128-CBC with HMAC-SHA256).
+
+In a container, a new installation creates its master key only when `/etc/ucm` is a persistent volume of its own (a named volume or a host directory). On an anonymous volume, memory or an emptyDir, UCM creates no key, logs the reason and leaves private keys unencrypted until you mount the directory or supply the key through `KEY_ENCRYPTION_KEY`. Encryption disabled from the UI also stays disabled at the next start.
 
 #### Configuration
 
@@ -95,6 +97,14 @@ POST /api/v2/users/password-strength
 
 ---
 
+#### Initial Administrator Password
+
+There is no default password. The first administrator's password is provided (`INITIAL_ADMIN_PASSWORD_FILE`, or `INITIAL_ADMIN_PASSWORD`) or generated into `DATA_DIR/initial-admin-password` (0600, never logged, changed at first login, file removed by that change); see the [Administration Guide](ADMIN_GUIDE.md#initial-administrator-password).
+
+- Prefer `INITIAL_ADMIN_PASSWORD_FILE` with a Docker, Compose or Kubernetes secret. The plain variable is visible to anyone who can run `docker inspect` on the container or read the process environment.
+- Remove the value from the environment or secret after the first start: it is never read again once the administrator exists.
+- A provided password is not forced to change, unless `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` is set (the Helm chart sets it for the one it generates); change it after the first login if others handled it.
+
 ### 4. Rate Limiting
 
 Protection against brute force and DoS attacks.
@@ -115,7 +125,7 @@ Protection against brute force and DoS attacks.
 | `/ocsp`, `/cdp/` | 500 | 100 |
 | Default | 600 | 100 |
 
-The four base rates can be changed with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`. Requests from RFC 1918, loopback and link-local addresses are not rate limited.
+The four base rates can be changed with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`. Two limiters apply, as described under [Rate limits](HA.md#rate-limits) in the HA guide: a flask-limiter default of 200 requests per minute and 2000 per hour per client address on routes without their own limit, and the UCM limiter whose tiers the table lists. Counts are kept per node. Unless `RATE_LIMIT_TRUST_LAN` is set to false, neither limiter counts requests from RFC 1918, loopback and link-local addresses.
 
 #### Response Headers
 ```
@@ -187,7 +197,10 @@ database can recompute, and the check reports the log as not protected. A retent
 removes the oldest entries only and records, sealed, where the log now starts.
 
 `GET /api/v2/audit/verify` (Audit Logs > Verify Integrity) reports `intact`, `broken` at
-entry N, or `unprotected`. Once the key has sealed an entry, an entry written after it
+entry N, or `unprotected`. It runs as a background job in the scheduler process, page by page,
+so the web worker stays available and other writes go on meanwhile; past 25 seconds the route
+answers `202` and the job is followed at `/api/v2/system/jobs/<id>` (see API_REFERENCE.md,
+Background Jobs). A purge during the check makes it start again, so it never reads as a break. Once the key has sealed an entry, an entry written after it
 without the key is a break.
 
 Changing the master key re-anchors the chain. UCM keeps the ids of the keys it has sealed
@@ -247,11 +260,10 @@ Requires SMTP configuration in Settings > Email.
 
 Two guards, because the two jobs have different answers.
 
-**Network scan endpoints** (discovery, SSL checker) use `validate_url_not_private`:
+**Network scan endpoints** (Discovery and the SSL Checker) connect to hosts you name, and UCM is installed on premises, where scanning the internal network is the point. They therefore do not block private networks:
 
-- Private/loopback IP ranges blocked by default (127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
-- DNS rebinding protection: resolved IPs are validated against the blocklist
-- Configurable allowlist for internal network scanning use cases
+- Discovery accepts RFC 1918 targets and IPv4 loopback. It rejects link-local, multicast and reserved addresses, for a literal IP address and for the address a hostname resolves to (the first one returned). It runs at most three scans at a time.
+- The SSL Checker accepts private and loopback targets. It rejects link-local and multicast addresses, and refuses a hostname when any address it resolves to is one of them or it does not resolve. The `SSRF_ALLOWED_DOMAINS` environment variable (comma-separated hostnames, exact match) lets a named host skip these checks.
 
 **User-supplied outbound URLs** (webhooks, SSO, ACME, imports) use `validate_url_not_cloud_metadata`, which blocks cloud metadata and loopback while deliberately allowing the LAN. UCM is deployed on premises: an RFC1918 webhook or an internal SSO endpoint is the primary use case, not an attack.
 
@@ -262,9 +274,11 @@ Two guards, because the two jobs have different answers.
 
 WebAuthn authentication includes rate limiting:
 
-- Failed attempts tracked per user
-- A TOTP or recovery code checked in an open session (disabling 2FA, regenerating recovery codes) counts against the same per-account budget as the second step of a login
-- Account lockout after repeated failures
+- Attempts counted per username in the database, as are second-factor attempts per pending login: the count and the lockout apply on every node and survive a restart
+- A code checked in an open session (disabling 2FA, regenerating recovery codes) counts against the same per-account budget as the login's second step
+- A password checked in an open session counts on a per-account counter of its own, with the same threshold and duration, and never locks the login
+- Account lockout after repeated failures; at the password and LDAP login each attempt is counted before its password is checked (at LDAP on the local account the directory entry opens, not the name typed), so attempts sent together on any node check at most `max_login_attempts` passwords
+- The lockout is the password's and the LDAP bind's: a client certificate or a passkey is not refused by it, and its success neither resets the password's count nor lifts its lock
 - Separate rate limit from password login
 
 ### 9. SSO Audit Logging (v2.52+)
@@ -398,7 +412,7 @@ FLASK_ENV=production
 ## Security Monitoring
 
 ### Audit Dashboard
-Access security metrics at Settings > Audit Logs:
+Access security metrics at **Modules** > **Administration** > **Audit Logs**:
 - Failed login attempts
 - Rate limited requests
 - Permission denied events

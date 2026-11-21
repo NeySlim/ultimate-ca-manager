@@ -10,12 +10,13 @@ import re
 import logging
 from datetime import datetime, timezone
 
-from auth.unified import require_auth, has_permission
+from auth.unified import hsm_binding_refusal, require_auth, has_permission
 from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
 from services.hsm.base_provider import HsmKeyExistsError
+from services.hsm.key_binding import HsmKeyBound
 from utils.process_lock import LockBusyError
 from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
@@ -23,6 +24,7 @@ from utils.validity import coerce_validity_days
 from utils.db_transaction import safe_commit
 import fips_mode
 from fips_mode import FipsRestricted
+from utils.ha import HaRestricted
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from services.smart_import.parser import PasswordNotTried, inspected_key
@@ -44,6 +46,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import dsa
 from utils import key_algorithms, notices as notices_mod
+from utils.issuance_defaults import default_issue_key_id, digest_for_key, stronger_digest
 from websocket.emitters import on_ca_created, on_ca_updated, on_ca_deleted
 
 logger = logging.getLogger(__name__)
@@ -101,21 +104,26 @@ def _blank(value):
     return value is None or (isinstance(value, str) and not value.strip())
 
 
-def _resolve_local_key_type(data):
+def _resolve_local_key_type(data, compliance_profile=None):
     """(TrustStore key type, error) for a locally generated CA key.
 
     keyType is accepted as an alias of keyAlgo; a value that names no usable
-    key is an error, only a request without any key field gets RSA-2048.
+    key is an error, only a request without any key field gets the default key.
     """
     algo, alias, size = data.get('keyAlgo'), data.get('keyType'), data.get('keySize')
     if _blank(algo) and _blank(alias):
         if _blank(size):
-            return '2048', None
+            parent_id = data.get('parentCAId') if data.get('type') == 'intermediate' else None
+            try:
+                parent_id = int(parent_id) if parent_id else None
+            except (TypeError, ValueError):
+                parent_id = None
+            return default_issue_key_id(parent_id, compliance_profile), None
         return None, f'keySize requires keyAlgo ({_CA_KEY_NAMES})'
     names = [v for v in (algo, alias) if not _blank(v)]
     if not all(isinstance(v, str) for v in names):
         return None, f'keyAlgo must be a string ({_CA_KEY_NAMES})'
-    # A full label ('RSA-4096', 'EC-P384', '2048', 'Ed25519') names size and curve at once
+    # A full label ('RSA-4096', 'EC-P384', 'Ed25519') names size and curve at once
     labels = {key_algorithms.get(v) for v in names}
     if len(labels) == 1 and None not in labels:
         alg = labels.pop()
@@ -342,19 +350,19 @@ def list_cas():
         # pagination controls) doesn't silently truncate the list. See issue #89.
         paginated_cas = filtered_cas
 
-    # Add certificate count for each CA
+    # Grouped queries for the whole page: the cost does not grow with the CA count
+    from services.ca import list_prefetch
+    prefetched = list_prefetch.build(paginated_cas)
+    by_issuer = None
     result = []
     for ca in paginated_cas:
-        ca_dict = ca.to_dict()
+        ca_dict = ca.to_dict(prefetched=prefetched)
         # Count certificates by refid first, then by issuer CN
-        cert_count = Certificate.query.filter_by(caref=ca.refid).count()
+        cert_count = ca_dict['certs']
         if cert_count == 0 and ca_dict.get('common_name'):
-            cn = ca_dict.get('common_name')
-            cert_count = Certificate.query.filter(
-                Certificate.issuer.ilike(f'CN={cn},%') |
-                Certificate.issuer.ilike(f'%,CN={cn},%') |
-                Certificate.issuer.ilike(f'%,CN={cn}')
-            ).count()
+            if by_issuer is None:
+                by_issuer = list_prefetch.issuer_counts()
+            cert_count = list_prefetch.count_by_issuer_cn(by_issuer, ca_dict['common_name'])
         ca_dict['certs'] = cert_count
         result.append(ca_dict)
 
@@ -397,8 +405,17 @@ def create_ca():
         if not is_valid:
             return error_response(error, 400)
 
+        # Absent means the instance default; an explicit null or '' means no profile
+        if 'complianceProfile' in data or 'compliance_profile' in data:
+            compliance_profile, profile_err = compliance_profiles.normalize(
+                data.get('complianceProfile', data.get('compliance_profile')))
+            if profile_err:
+                return error_response(profile_err, 400)
+        else:
+            compliance_profile = compliance_profiles.default_profile()
+
         # Registry sizes and curves only: no huge RSA keys, no unknown curves
-        key_type, key_err = _resolve_local_key_type(data)
+        key_type, key_err = _resolve_local_key_type(data, compliance_profile)
         if key_err:
             return error_response(key_err, 400)
 
@@ -407,6 +424,10 @@ def create_ca():
         hsm_key_id = data.get('hsm_key_id') or data.get('hsmKeyId')
         hsm_key_label = data.get('hsm_key_label') or data.get('hsmKeyLabel')
         hsm_key_algorithm = data.get('hsm_key_algorithm') or data.get('hsmKeyAlgorithm')
+        if hsm_key_id or hsm_provider_id or hsm_key_label or hsm_key_algorithm:
+            refusal = hsm_binding_refusal('an X.509 CA')
+            if refusal:
+                return refusal
 
         # Mutually exclusive: local vs existing-HSM-key vs new-HSM-key
         modes = []
@@ -430,6 +451,10 @@ def create_ca():
         local_alg = None if modes else key_algorithms.get(key_type)
         if local_alg is not None and not local_alg.fips_approved:
             fips_mode.refuse(f'{local_alg.display} keys')
+
+        # An intermediate without a parent would be created as a self-signed root
+        if data.get('type') == 'intermediate' and not data.get('parentCAId'):
+            return error_response('parentCAId is required for an intermediate CA', 400)
 
         # Resolve parent CA for intermediate CAs
         caref = None
@@ -595,6 +620,10 @@ def create_ca():
         if digest_err:
             return error_response(digest_err, 400)
         digest_explicit = digest is not None and str(raw_digest or 'auto').strip().lower() != 'auto'
+        # 'auto' never signs an intermediate below the parent key's own hash
+        if (caref and data.get('type') != 'external' and digest is not None
+                and not digest_explicit and key_algorithms.needs_digest(parent_cert.public_key())):
+            digest = stronger_digest(digest, digest_for_key(parent_cert.public_key()))
         notices = []
         if digest is None and str(raw_digest or 'auto').strip().lower() != 'auto':
             notices.append(notices_mod.digest_ignored(
@@ -613,15 +642,6 @@ def create_ca():
             refusal = pss_refusal(str(digest_key_type).isdigit(), hsm_type)
             if refusal:
                 return error_response(refusal, 400)
-
-        # Absent means the instance default; an explicit null or '' means no profile
-        if 'complianceProfile' in data or 'compliance_profile' in data:
-            compliance_profile, profile_err = compliance_profiles.normalize(
-                data.get('complianceProfile', data.get('compliance_profile')))
-            if profile_err:
-                return error_response(profile_err, 400)
-        else:
-            compliance_profile = compliance_profiles.default_profile()
 
         raw_ku = data.get('keyUsage')
         if raw_ku is None and data.get('key_usage') is not None:
@@ -713,8 +733,10 @@ def create_ca():
             message='CA created successfully',
             meta=notices_mod.meta_with_notices(notices),
         )
-    except FipsRestricted:
+    except (FipsRestricted, HaRestricted):
         raise
+    except HsmKeyBound as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         # Validation errors (HSM key conflicts, missing fields, etc.) -- surface to user
         logger.info(f"CA creation validation error: {e}")
@@ -740,12 +762,10 @@ def get_ca(ca_id):
     # Add certificate count
     cert_count = Certificate.query.filter_by(caref=ca.refid).count()
     if cert_count == 0 and ca_data.get('common_name'):
-        cn = ca_data.get('common_name')
-        cert_count = Certificate.query.filter(
-            Certificate.issuer.ilike(f'CN={cn},%') |
-            Certificate.issuer.ilike(f'%,CN={cn},%') |
-            Certificate.issuer.ilike(f'%,CN={cn}')
-        ).count()
+        # The listing's match: the CN escaped as stored, on both backends
+        from services.ca import list_prefetch
+        cert_count = list_prefetch.count_by_issuer_cn(
+            list_prefetch.issuer_counts(), ca_data['common_name'])
     ca_data['certs'] = cert_count
 
     # Get CRL status
@@ -855,6 +875,12 @@ def update_ca(ca_id):
         new_hidden = data.get('issuanceHidden', data.get('issuance_hidden'))
         if not isinstance(new_hidden, bool):
             return error_response('issuanceHidden must be true or false', 400)
+
+    new_unique = None
+    if 'enforceUniqueSubject' in data or 'enforce_unique_subject' in data:
+        new_unique = data.get('enforceUniqueSubject', data.get('enforce_unique_subject'))
+        if not isinstance(new_unique, bool):
+            return error_response('enforceUniqueSubject must be true or false', 400)
 
     # Track which fields actually changed for the audit log
     changed = []
@@ -987,6 +1013,10 @@ def update_ca(ca_id):
     if new_hidden is not None and new_hidden != bool(ca.issuance_hidden):
         ca.issuance_hidden = new_hidden
         changed.append('hidden from issuance pickers' if new_hidden else 'listed in issuance pickers')
+    unique_turned_on = new_unique is True and not ca.enforce_unique_subject
+    if new_unique is not None and new_unique != bool(ca.enforce_unique_subject):
+        ca.enforce_unique_subject = new_unique
+        changed.append('unique subject enforced' if new_unique else 'unique subject no longer enforced')
     for forbidden in ('offline', 'offline_reason', 'offline_mode'):
         if forbidden in data:
             logger.warning(
@@ -1016,6 +1046,12 @@ def update_ca(ca_id):
         ca_dict = ca.to_dict()
         from services.webhook_service import emit_ca_updated
         emit_ca_updated(ca_dict, actor=username, changes={k: v for k, v in data.items()})
+        if unique_turned_on:
+            # Checked at issuance only: subjects already shared stay, their holders are refused
+            from services.cert.unique_subject import shared_subjects
+            shared = shared_subjects(ca)
+            ca_dict['shared_subjects'] = len(shared)
+            ca_dict['shared_subject_examples'] = shared[:20]
 
         return success_response(data=ca_dict, message='CA updated successfully')
     except Exception as e:
@@ -1271,13 +1307,14 @@ def take_ca_offline(ca_id):
         )
 
         if mode == 'file_exported':
-            from utils.sanitize import sanitize_filename
-            fname = f"{sanitize_filename(ca.descr or ca.refid or f'ca-{ca_id}')}-offline.key"
+            from utils.sanitize import content_disposition
+            disposition = content_disposition(ca.descr or ca.refid or f'ca-{ca_id}', '-offline.key',
+                                              fallback=ca.refid or f'ca-{ca_id}')
             return Response(
                 encrypted_pem,
                 mimetype='application/x-pem-file',
                 headers={
-                    'Content-Disposition': f'attachment; filename="{fname}"',
+                    'Content-Disposition': disposition,
                     'X-UCM-Offline-Mode': 'file_exported',
                 }
             )

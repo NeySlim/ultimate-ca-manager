@@ -3,17 +3,20 @@ from flask import g, request
 from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db, User
-from models.sso import SSOProvider, SSOSession
+from models import db, UserSSOIdentity
+from models.sso import SAMLMessageId, SSOProvider, SSOSession, SSOSignInTest
 from services.audit_service import AuditService
 import json
 from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_list, validate_role_mapping
 from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _test_saml_connection
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
-from services.oidc_id_token import clear_oidc_cache
+from services.oidc_id_token import clear_oidc_cache, has_tenants, normalize_tenants, provider_tenants, OIDCValidationError
+from utils.dn_parse import parse_dn
 from . import saml_sp
 
+
+NESTED_NOT_BOOLEAN = 'ldap_nested_groups must be true or false'
 
 # SSO provider URL fields that the backend will dereference (metadata fetch,
 # token exchange, userinfo). Cloud metadata endpoints and loopback are blocked
@@ -35,6 +38,10 @@ def _validate_sso_outbound_urls(data):
         value = data.get(field)
         if not value:
             continue
+        # The Entra preset leaves {tenant} for the administrator to fill in
+        if isinstance(value, str) and '{tenant}' in value:
+            return error_response(
+                f"{field}: replace {{tenant}} with the directory (tenant) ID", 400)
         try:
             validate_url_not_cloud_metadata(value)
         except ValueError as e:
@@ -84,6 +91,19 @@ def _sp_signing_error(provider):
     return None
 
 
+def _group_base_dn(value):
+    """Stored LDAP group search base: None when empty, ValueError when not a DN."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if not isinstance(value, str):
+        raise ValueError('ldap_group_base_dn must be a distinguished name')
+    try:
+        parse_dn(value)
+    except ValueError:
+        raise ValueError('ldap_group_base_dn is not a valid distinguished name') from None
+    return value.strip()
+
+
 def _default_role(value):
     """Stored default role: a base role, or None (unmapped users refused). ValueError otherwise."""
     if value in (None, ''):
@@ -94,27 +114,74 @@ def _default_role(value):
     return value
 
 
+def _tenants(value):
+    """Stored accepted tenants: a JSON array of GUIDs, None for none. ValueError otherwise."""
+    tenants = normalize_tenants(value)
+    return json.dumps(tenants) if tenants else None
+
+
+def _tenants_error(provider):
+    """Why the accepted tenants of ``provider`` cannot be used as configured, else None."""
+    if provider.provider_type != 'oauth2' or not has_tenants(provider):
+        return None
+    if provider.id_token_verify is False:
+        return 'Accepted tenants require ID token verification'
+    if not (provider.oauth2_issuer or '').strip():
+        return 'Accepted tenants need the OIDC issuer of a multi-tenant authority (organizations or common)'
+    return None
+
+
+def _role_tenants_error(provider):
+    """Why ``oauth2_role_tenants`` is not a subset of the accepted tenants, else None."""
+    honoured = json.loads(provider.oauth2_role_tenants) if provider.oauth2_role_tenants else []
+    if not honoured:
+        return None
+    try:
+        accepted = provider_tenants(provider)
+    except OIDCValidationError:
+        accepted = ()
+    outside = [t for t in honoured if t not in accepted]
+    if outside:
+        return (f'Role tenant {outside[0]} is not an accepted tenant: the roles of a tenant are '
+                'honoured only among the accepted tenants')
+    return None
+
+
+def _blank_name(name) -> bool:
+    """A provider is named by non-blank text: what a restore of its own backup expects."""
+    return not isinstance(name, str) or not name.strip()
+
+
+def _taken(data):
+    """The answer to a creation whose name or type a provider already holds, else None."""
+    if SSOProvider.query.filter_by(name=data['name']).first():
+        return error_response("Provider name already exists", 400)
+    if SSOProvider.query.filter_by(provider_type=data['provider_type']).first():
+        return error_response(f"A {data['provider_type'].upper()} provider already exists. "
+                              "Only one provider per type is allowed.", 400)
+    return None
+
+
 @bp.route('/api/v2/sso/providers', methods=['POST'])
 @require_auth(['write:sso'])
 def create_provider():
     """Create new SSO provider"""
     data = request.get_json()
 
-    if not data.get('name'):
+    if _blank_name(data.get('name')):
         return error_response("Provider name is required", 400)
     if not data.get('provider_type'):
         return error_response("Provider type is required", 400)
-    if data['provider_type'] not in ['saml', 'oauth2', 'ldap']:
+    if data['provider_type'] not in SSOProvider.TYPES:
         return error_response("Invalid provider type. Must be: saml, oauth2, ldap", 400)
 
     # Check name uniqueness
     if SSOProvider.query.filter_by(name=data['name']).first():
         return error_response("Provider name already exists", 400)
 
-    # Enforce 1 provider per type
-    existing = SSOProvider.query.filter_by(provider_type=data['provider_type']).first()
-    if existing:
-        return error_response(f"A {data['provider_type'].upper()} provider already exists. Only one provider per type is allowed.", 400)
+    # Enforce 1 provider per type (uq_pro_sso_providers_provider_type holds it against a race)
+    if SSOProvider.query.filter_by(provider_type=data['provider_type']).first():
+        return _taken(data)
 
     # SSRF guard on URLs the backend will dereference
     err = _validate_sso_outbound_urls(data)
@@ -173,6 +240,12 @@ def create_provider():
         provider.oauth2_jwks_uri = data.get('oauth2_jwks_uri')
         # Verification is fail-closed unless an administrator explicitly opts out.
         provider.id_token_verify = data.get('id_token_verify', True) is not False
+        try:
+            provider.oauth2_tenants = _tenants(data.get('oauth2_tenants'))
+            provider.oauth2_role_tenants = _tenants(data.get('oauth2_role_tenants'))
+        except ValueError as e:
+            db.session.rollback()
+            return error_response(str(e), 400)
         provider.oauth2_verify_ssl = data.get('oauth2_verify_ssl', True)
         ca = data.get('oauth2_ca_bundle')
         provider.oauth2_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
@@ -192,6 +265,16 @@ def create_provider():
         provider.ldap_user_filter = data.get('ldap_user_filter', '(uid={username})')
         provider.ldap_group_filter = data.get('ldap_group_filter')
         provider.ldap_group_member_attr = data.get('ldap_group_member_attr', 'member')
+        nested = data.get('ldap_nested_groups', False)
+        if not isinstance(nested, bool):
+            db.session.rollback()
+            return error_response(NESTED_NOT_BOOLEAN, 400)
+        provider.ldap_nested_groups = nested
+        try:
+            provider.ldap_group_base_dn = _group_base_dn(data.get('ldap_group_base_dn'))
+        except ValueError as e:
+            db.session.rollback()
+            return error_response(str(e), 400)
         provider.ldap_username_attr = data.get('ldap_username_attr', 'uid')
         provider.ldap_email_attr = data.get('ldap_email_attr', 'mail')
         provider.ldap_fullname_attr = data.get('ldap_fullname_attr', 'cn')
@@ -213,13 +296,14 @@ def create_provider():
             return error_response(role_error, 400)
         provider.role_mapping = json.dumps(val)
 
-    signing_error = _sp_signing_error(provider)
+    signing_error = (_sp_signing_error(provider) or _tenants_error(provider)
+                     or (_role_tenants_error(provider) if provider.provider_type == 'oauth2' else None))
     if signing_error:
         db.session.rollback()
         return error_response(signing_error, 400)
 
     db.session.add(provider)
-    ok, _err = safe_commit(logger, "Failed to create SSO provider")
+    ok, _err = safe_commit(logger, "Failed to create SSO provider", on_conflict=lambda: _taken(data))
     if not ok:
         return _err
     clear_oidc_cache()
@@ -262,8 +346,9 @@ def _sso_retarget_error(provider, data):
     # to_dict sends ca_bundle back as a boolean, which the update ignores
     requested = {k: v for k, v in data.items()
                  if not (k.endswith('_ca_bundle') and not isinstance(v, str))}
+    # The stored token: a secret this node cannot open is kept all the same
     return retarget_error(current, requested,
-                          keeps_saved_secret(data, secret_key, getattr(provider, secret_key)))
+                          keeps_saved_secret(data, secret_key, getattr(provider, '_' + secret_key)))
 
 
 @bp.route('/api/v2/sso/providers/<int:provider_id>', methods=['PUT'])
@@ -275,7 +360,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         provider = db.get_or_404(SSOProvider, provider_id)
     elif provider_type_name:
         # Find provider by type (for backward compatibility / simple configs)
-        provider = SSOProvider.query.filter_by(provider_type=provider_type_name).first()
+        provider = SSOProvider.query.filter_by(provider_type=provider_type_name).order_by(SSOProvider.id).first()
         if not provider:
             return error_response(f"No provider found with type: {provider_type_name}", 404)
         provider_id = provider.id
@@ -296,6 +381,8 @@ def update_provider(provider_id=None, provider_type_name=None):
 
     # Update common fields
     if 'name' in data:
+        if _blank_name(data['name']):
+            return error_response("Provider name is required", 400)
         # Check uniqueness
         existing = SSOProvider.query.filter_by(name=data['name']).first()
         if existing and existing.id != provider_id:
@@ -359,6 +446,18 @@ def update_provider(provider_id=None, provider_type_name=None):
             provider.oauth2_scopes = json.dumps(data['oauth2_scopes'])
         if 'id_token_verify' in data:
             provider.id_token_verify = data['id_token_verify'] is not False
+        try:
+            if 'oauth2_tenants' in data:
+                provider.oauth2_tenants = _tenants(data['oauth2_tenants'])
+            if 'oauth2_role_tenants' in data:
+                provider.oauth2_role_tenants = _tenants(data['oauth2_role_tenants'])
+        except ValueError as e:
+            db.session.rollback()
+            return error_response(str(e), 400)
+        tenants_error = _tenants_error(provider) or _role_tenants_error(provider)
+        if tenants_error:
+            db.session.rollback()
+            return error_response(tenants_error, 400)
 
     elif provider.provider_type == 'ldap':
         for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
@@ -369,6 +468,17 @@ def update_provider(provider_id=None, provider_type_name=None):
                 setattr(provider, field, data[field])
         if 'ldap_start_tls' in data:
             provider.ldap_start_tls = bool(data['ldap_start_tls'])
+        if 'ldap_nested_groups' in data:
+            if not isinstance(data['ldap_nested_groups'], bool):
+                db.session.rollback()
+                return error_response(NESTED_NOT_BOOLEAN, 400)
+            provider.ldap_nested_groups = data['ldap_nested_groups']
+        if 'ldap_group_base_dn' in data:
+            try:
+                provider.ldap_group_base_dn = _group_base_dn(data['ldap_group_base_dn'])
+            except ValueError as e:
+                db.session.rollback()
+                return error_response(str(e), 400)
         # ldap_required_groups: normalize list/CSV string → JSON string (empty = clear)
         if 'ldap_required_groups' in data:
             required = _parse_group_list(data['ldap_required_groups'])
@@ -424,12 +534,15 @@ def delete_provider(provider_id):
     provider_name = provider.name
     provider_type = provider.provider_type
 
-    # Delete associated sessions first
+    # Delete associated sessions first, and its sign-in tests: a later provider may take its id
     SSOSession.query.filter_by(provider_id=provider_id).delete()
-    # Unlink its users on both backends (SQLite does not apply ON DELETE SET NULL),
-    # keeping its IdP so that only a provider recreated for that IdP takes them back.
-    User.query.filter_by(sso_provider_id=provider_id).update(
-        {User.sso_provider_id: None, User.sso_orphan_of: provider.idp_key()},
+    SSOSignInTest.query.filter_by(provider_id=provider_id).delete()
+    # Its pending AuthnRequests: a provider that takes its id never answers them (replay rows stay)
+    SAMLMessageId.query.filter_by(provider_id=provider_id, kind=SAMLMessageId.KIND_REQUEST).delete()
+    # Its attachments become orphans on both backends (SQLite does not apply ON DELETE
+    # SET NULL), keeping its IdP so that only a provider recreated for it takes them back.
+    UserSSOIdentity.query.filter_by(provider_id=provider_id).update(
+        {UserSSOIdentity.provider_id: None, UserSSOIdentity.orphan_of: provider.idp_key()},
         synchronize_session=False)
 
     db.session.delete(provider)

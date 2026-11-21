@@ -26,7 +26,8 @@ from utils.ca_signing_window import IssuerWindowError, check_issuer_window
 from utils.cert_issuer import is_self_signed
 from utils.datetime_utils import utc_now
 from utils.leaf_key_usage import key_usage_for_key
-from utils.serial_format import serial_variants
+from utils.serial_format import canonical_serial
+from utils.revocation_reasons import HOLD_REASONS
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def find_requested(req):
     if serial < 0:
         raise RelatedCertificateRefused('The related certificate serial is negative')
     matches = {}
-    rows = Certificate.query.filter(Certificate.serial_number.in_(serial_variants(serial)),
+    rows = Certificate.query.filter(Certificate.serial_number == canonical_serial(serial),
                                     Certificate.crt.isnot(None)).order_by(Certificate.id).all()
     for row in rows:
         try:
@@ -311,6 +312,27 @@ def mutual_partner(row):
     return partner
 
 
+def revocation_partner(row):
+    """The mutual partner a revocation follows: a superseded (archived) one is left alone."""
+    partner = mutual_partner(row)
+    return None if partner is not None and partner.archived else partner
+
+
+def unhold_partner(row):
+    """The partner an unhold of *row* lifts with it: the revocation partner, when it is on hold,
+    by its row or by its CA's record alone (row not aligned yet), as OCSP and the CRL say it."""
+    from services.cert.issued_lookup import effective_revocation
+    partner = revocation_partner(row)
+    if partner is None:
+        return None
+    from services.cert.issued_lookup import interrupted_lift
+    if partner.revoked and partner.revoke_reason == 'removeFromCRL':
+        # Only an unhold stopped between its commits; one revoked so (ACME, an old row) stays
+        return partner if interrupted_lift(partner) else None
+    holder = partner if partner.revoked else effective_revocation(partner)
+    return partner if holder is not None and holder.revoke_reason in HOLD_REASONS else None
+
+
 def anchor_first(row, partner):
     """``(A, B)``: B is the one whose certificate names the other, else the one carrying the link."""
     cert, other = row_certificate(row), row_certificate(partner)
@@ -339,6 +361,27 @@ def _names_its_link(row, cert):
     return other is not None and related_cert.references(cert, other)
 
 
+def _still_holding(a_row, cert_a):
+    """*a_row* locked and re-read, refused unless it still holds *cert_a*: B's extension
+    hashes that certificate (RFC 9763), so an A renewed meanwhile is not B's A."""
+    from sqlalchemy.exc import InvalidRequestError
+    try:
+        fresh = db.session.get(Certificate, a_row.id, populate_existing=True, with_for_update=True)
+    except InvalidRequestError:  # deleted since it was found
+        fresh = None
+    if fresh is None or not fresh.crt or row_certificate(fresh) != cert_a:
+        raise RelatedCertificateRefused(
+            'The related certificate named by the request is not held by this instance')
+    return fresh
+
+
+def named_by(cert_b, requested):
+    """A's row when *cert_b* names it, as :func:`link_issued` requires (read without its lock)."""
+    if requested is None or related_cert.read_related_certificate(cert_b) is None:
+        return None
+    return requested[0] if related_cert.references(cert_b, requested[1]) else None
+
+
 def link_issued(b_row, cert_b, requested):
     """Record on *b_row* the A (*requested*, from ``requested_by_csr``) its
     certificate names, and on A the way back: the newest B takes A from the
@@ -348,6 +391,7 @@ def link_issued(b_row, cert_b, requested):
     a_row, cert_a = requested
     if not related_cert.references(cert_b, cert_a):
         return None
+    a_row = _still_holding(a_row, cert_a)
     b_row.related_certificate_id = a_row.id
     b_row.hybrid_role = role_for_public_key(cert_b.public_key())
     if not _names_its_link(a_row, cert_a):
@@ -379,9 +423,23 @@ def hand_over_link(revoked_row):
         return None
     for b_row in _live_rows_linked_to(a_row.id, revoked_row.id):
         if related_cert.references(row_certificate(b_row), cert_a):
+            if not _still_linked(a_row, revoked_row.id, cert_a):
+                return None
             a_row.related_certificate_id = b_row.id
             return b_row
     return None
+
+
+def _still_linked(a_row, b_id, cert_a):
+    """*a_row* locked and re-read: True while it still holds *cert_a*, unrevoked and linked to
+    *b_id*. A renewal of A writes its links under this lock, so none is written back over it."""
+    from sqlalchemy.exc import InvalidRequestError
+    try:
+        fresh = db.session.get(Certificate, a_row.id, populate_existing=True, with_for_update=True)
+    except InvalidRequestError:  # deleted since it was read
+        return False
+    return (fresh is not None and not fresh.revoked and fresh.related_certificate_id == b_id
+            and bool(fresh.crt) and row_certificate(fresh) == cert_a)
 
 
 def _readable(row):
@@ -406,10 +464,33 @@ def _relink_or_leave(row, gone_id):
 
 
 def unlink_rows_naming(row_id):
-    """Rows linked to *row_id*, whose certificate is gone or replaced, relink or leave their pair."""
-    for other in Certificate.query.filter(Certificate.related_certificate_id == row_id,
-                                          Certificate.id != row_id).all():
-        _relink_or_leave(other, row_id)
+    """Rows linked to *row_id*, whose certificate is gone or replaced, relink or leave their pair.
+    Each is locked and re-read first, the A of *row_id* before it and its Bs after, as a
+    pair renewal locks them: one a newer B took meanwhile (link_issued, under that lock)
+    keeps its new link. A B renewed alone locks itself before its A: against a deletion of
+    that A, PostgreSQL may abort one of the two, and nothing is left half written."""
+    linked = Certificate.query.filter(Certificate.related_certificate_id == row_id,
+                                      Certificate.id != row_id).order_by(Certificate.id).all()
+    if not linked:
+        return
+    gone = _readable(db.session.get(Certificate, row_id))
+    bs = [r for r in linked if _is_b_of(r, gone)]
+    for r in [r for r in linked if r not in bs]:  # the A of *row_id* (or a row renewed since)
+        _relink_if_linked(r, row_id)
+    db.session.get(Certificate, row_id, with_for_update=True)
+    for r in bs:
+        _relink_if_linked(r, row_id)
+
+
+def _is_b_of(row, cert):
+    mine = _readable(row)
+    return cert is not None and mine is not None and related_cert.references(mine, cert)
+
+
+def _relink_if_linked(row, gone_id):
+    fresh = db.session.get(Certificate, row.id, populate_existing=True, with_for_update=True)
+    if fresh is not None and fresh.related_certificate_id == gone_id:
+        _relink_or_leave(fresh, gone_id)
 
 
 def leave_pair(row):

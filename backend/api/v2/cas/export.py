@@ -9,22 +9,24 @@ import logging
 
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from utils.datetime_utils import utc_isoformat
 from models import CA, Certificate, db
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 import fips_mode
 from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
 
 from utils.export_password import validate_export_password
-from services.key_export_audit import audit_key_export
+from utils.export_options import BOOL, FORMAT, PASSWORD, TEXT, read_export_options
+from services.key_export_audit import audit_key_export, encrypt_key_pem
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +60,15 @@ def _bulk_pems(cas, option):
     """The CA certificates of a bulk export, each followed by the cross-certificates *option* adds.
 
     ``primary`` (default) adds none, ``auto`` the served ones, ``all`` every attached one, ``cross:<id>`` that one.
+    Returns ``(pems, skipped)``: an unreadable certificate is skipped and named (a cross-certificate as ``cross:<id>``).
     Raises ChainVariantError for any other value."""
     from services.ca import cross_certs
     from utils.ca_chain import ChainVariantError, parse_variant
     value = option or 'primary'
     wanted = parse_variant(value) if value != 'all' else 'all'
-    pems, found = [], False
+    entries, found = [], False
     for ca in cas:
-        pems.append(base64.b64decode(ca.crt))
+        entries.append((ca.id, ca.crt))
         if wanted == 'primary':
             continue
         if wanted == 'auto':
@@ -75,10 +78,10 @@ def _bulk_pems(cas, option):
         else:
             rows = [r for r in ca.cross_certificates if r.id == wanted[1]]
             found = found or bool(rows)
-        pems.extend(base64.b64decode(r.crt) for r in rows)
+        entries.extend((f'cross:{r.id}', r.crt) for r in rows)
     if isinstance(wanted, tuple) and not found:
         raise ChainVariantError(f'Cross-certificate {value} does not exist')
-    return pems
+    return readable_pems(entries, 'CA')
 
 
 # The bounds, and the reason for the ceiling, now live in
@@ -110,12 +113,17 @@ def export_all_cas():
     cas = CA.query.filter(CA.crt.isnot(None), CA.crt != '').all()
     if not cas:
         return error_response('No CAs to export', 404)
+    if export_format not in ('pem', 'pkcs7', 'p7b'):
+        return error_response('Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
 
     from utils.ca_chain import ChainVariantError
     try:
-        pems = _bulk_pems(cas, variant_option)
+        pems, skipped = _bulk_pems(cas, variant_option)
     except ChainVariantError as exc:
         return error_response(str(exc), 400)
+    if not pems:
+        return nothing_readable(skipped, 'CA')
+    headers = skipped_headers(skipped, 'CAs')
 
     try:
         if export_format == 'pem':
@@ -128,22 +136,25 @@ def export_all_cas():
             return Response(
                 pem_data,
                 mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="ca-certificates.pem"'}
+                headers={**headers, 'Content-Disposition': 'attachment; filename="ca-certificates.pem"'}
             )
 
-        elif export_format == 'pkcs7' or export_format == 'p7b':
-            return Response(
-                p7b_from_pems(pems),
-                mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'}
-            )
-
-        else:
-            return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
+        return Response(
+            p7b_from_pems(pems),
+            mimetype='application/x-pkcs7-certificates',
+            headers={**headers, 'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'}
+        )
 
     except Exception as e:
         logger.error(f"Export failed: {e}")
         return error_response('Export failed', 500)
+
+
+EXPORT_FORMATS = ('pem', 'der', 'pkcs7', 'p7b', 'key', 'pkcs12', 'pfx', 'jks')
+EXPORT_OPTIONS = {
+    'format': FORMAT, 'include_key': BOOL, 'include_chain': BOOL,
+    'password': PASSWORD, 'legacy': BOOL, 'chain_variant': TEXT,
+}
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/export', methods=['GET', 'POST'])
@@ -166,28 +177,20 @@ def export_ca(ca_id):
     if not ca.crt:
         return error_response('CA certificate data not available', 400)
 
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json()
-        export_format = data.get('format', 'pem').lower()
-        include_key = bool(data.get('include_key', False))
-        include_chain = bool(data.get('include_chain', False))
-        password = data.get('password')
-        legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
-        variant, variant_err = _requested_variant(data, ca)
-    else:
-        export_format = request.args.get('format', 'pem').lower()
-        include_key = request.args.get('include_key', 'false').lower() == 'true'
-        include_chain = request.args.get('include_chain', 'false').lower() == 'true'
-        password = request.args.get('password')
-        legacy = False
-        variant, variant_err = _requested_variant(request.args, ca)
-        # Passwords and key-bearing formats must not travel in the URL
-        if password or include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
-            if password:
-                logger.warning("Rejected CA %s export with password in query string", ca_id)
-            return error_response(
-                'Password and private key exports must use POST with a JSON body, '
-                'not the query string', 400)
+    opts, refused = read_export_options(EXPORT_OPTIONS, EXPORT_FORMATS, 'CA')
+    if refused:
+        return refused
+    export_format = opts.get('format', 'pem')
+    include_key = opts.get('include_key', False)
+    include_chain = opts.get('include_chain', False)
+    password = opts.get('password')
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
+    variant, variant_err = _requested_variant(opts, ca)
+    # A GET reads no password, so it serves no key
+    if request.method != 'POST' and (include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key')):
+        return error_response(
+            'Password and private key exports must use POST with a JSON body, '
+            'not the query string', 400)
 
     if variant_err:
         return variant_err
@@ -202,13 +205,17 @@ def export_ca(ca_id):
         if ca.uses_hsm:
             return error_response('Cannot export HSM-backed key', 409)
 
+    if include_key and export_format not in ('pem', 'pkcs12', 'p12', 'pfx', 'jks', 'key'):
+        return error_response(
+            f'include_key is not supported with format {export_format}: it carries no private key', 400)
+
     # Cap export password length (PKCS12/PFX/JKS or PEM-encrypted key)
     pw_err = _validate_export_password(password)
     if pw_err:
         return error_response(pw_err, 400)
 
     try:
-        explicit = (data if request.method == 'POST' and request.is_json else request.args).get('chain_variant') not in (None, '', 'auto')
+        explicit = opts.get('chain_variant') not in (None, '', 'auto')
         cert_pem, parent_pems = _export_chain(ca, include_chain, variant, explicit)
 
         # Private key only export
@@ -216,32 +223,27 @@ def export_ca(ca_id):
             if not ca.prv:
                 return error_response('CA has no private key', 400)
             key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
-            if password:
-                private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-                key_pem = private_key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
-                )
+            key_pem = encrypt_key_pem(key_pem, password)
             _audit_key_export(ca, export_format, password)
             return Response(
                 key_pem,
                 mimetype='application/x-pem-file',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.key"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.key', fallback=ca.refid)}
             )
 
         if export_format == 'pem':
             result = cert_pem
             content_type = 'application/x-pem-file'
-            filename = f"{sanitize_filename(ca.descr or ca.refid)}.crt"
+            suffix = '.crt'
 
             # Include private key if requested
             if include_key and ca.prv:
-                key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
+                key_pem = encrypt_key_pem(
+                    load_pem_bytes(ca.prv, context=f"CA {ca.id}"), password)
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
-                filename = f"{sanitize_filename(ca.descr or ca.refid)}_with_key.pem"
+                suffix = '_with_key.pem'
 
             # Include parent CA chain if requested
             if include_chain:
@@ -250,16 +252,16 @@ def export_ca(ca_id):
                         result += b'\n'
                     result += parent_cert
                 if include_key:
-                    filename = f"{sanitize_filename(ca.descr or ca.refid)}_full_chain.pem"
+                    suffix = '_full_chain.pem'
                 else:
-                    filename = f"{sanitize_filename(ca.descr or ca.refid)}_chain.pem"
+                    suffix = '_chain.pem'
 
             if include_key and ca.prv:
                 _audit_key_export(ca, export_format, password)
             return Response(
                 result,
                 mimetype=content_type,
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, suffix, fallback=ca.refid)}
             )
 
         elif export_format == 'der':
@@ -270,7 +272,7 @@ def export_ca(ca_id):
             return Response(
                 der_bytes,
                 mimetype='application/x-x509-ca-cert',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.der"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.der', fallback=ca.refid)}
             )
 
         elif export_format == 'pkcs12':
@@ -300,7 +302,7 @@ def export_ca(ca_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.p12"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.p12', fallback=ca.refid)}
             )
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
@@ -308,7 +310,7 @@ def export_ca(ca_id):
             return Response(
                 p7b_from_pems([cert_pem, *parent_pems]),
                 mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.p7b"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.p7b', fallback=ca.refid)}
             )
 
         elif export_format == 'pfx':
@@ -339,7 +341,7 @@ def export_ca(ca_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.pfx"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.pfx', fallback=ca.refid)}
             )
 
         elif export_format == 'jks':
@@ -385,7 +387,7 @@ def export_ca(ca_id):
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.jks"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.jks', fallback=ca.refid)}
             )
 
         else:

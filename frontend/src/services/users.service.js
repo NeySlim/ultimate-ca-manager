@@ -26,8 +26,11 @@ export const usersService = {
 
   // The route reads new_password and refuses 400 without it; it does not
   // generate one, and it returns a message only (no password in the answer).
-  async resetPassword(id, newPassword) {
-    return apiClient.post(`/users/${id}/reset-password`, { new_password: newPassword })
+  async resetPassword(id, newPassword, currentPassword) {
+    const body = { new_password: newPassword }
+    // Required by the server when the account is the caller's own
+    if (currentPassword) body.current_password = currentPassword
+    return apiClient.post(`/users/${id}/reset-password`, body)
   },
 
   async reset2FA(id) {
@@ -63,12 +66,20 @@ export const usersService = {
     return apiClient.post(`/users/${id}/toggle-active`)
   },
 
-  async linkSso(id, { provider_id, sso_username, remove_password } = {}) {
-    return apiClient.post(`/users/${id}/link-sso`, { provider_id, sso_username, remove_password })
+  // One row per provider that opens the account (sso_identities)
+  // expected_tenant: a provider with accepted tenants adopts the attachment from that tenant only
+  async attachSso(id, { provider_id, remove_password, expected_tenant } = {}) {
+    const body = { provider_id, remove_password }
+    if (expected_tenant) body.expected_tenant = expected_tenant
+    return apiClient.post(`/users/${id}/sso-identities`, body)
   },
 
-  async unlinkSso(id) {
-    return apiClient.post(`/users/${id}/unlink-sso`)
+  async resetSsoIdentity(id, identityId, body) {
+    return apiClient.post(`/users/${id}/sso-identities/${identityId}/reset`, body)
+  },
+
+  async detachSso(id, identityId) {
+    return apiClient.delete(`/users/${id}/sso-identities/${identityId}`)
   },
 
   // Bulk operations

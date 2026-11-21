@@ -8,8 +8,12 @@ from models import db
 from models.acme_models import AcmeOrder
 from utils.datetime_utils import utc_now
 from utils.csr_extensions import csr_extensions
+from utils import caa_checker
 
 logger = logging.getLogger(__name__)
+
+# What a client reads of a failure on the server; the cause stays in the logs and the audit
+SERVER_FAILURE_DETAIL = 'Certificate signing failed on the server; retry later'
 
 
 def _is_ip_text(value: str) -> bool:
@@ -18,6 +22,10 @@ def _is_ip_text(value: str) -> bool:
         return True
     except ValueError:
         return False
+
+
+class IssuingCAUnusable(Exception):
+    """An issuing CA was chosen (domain or default) but cannot sign: the order is refused."""
 
 
 class IssuanceMixin:
@@ -55,7 +63,8 @@ class IssuanceMixin:
         self,
         order_id: str,
         csr_pem: str,
-        ca_refid: str = None
+        ca_refid: str = None,
+        approval=None,
     ) -> Tuple[bool, Optional[str]]:
         """Finalize order and issue certificate
         
@@ -63,84 +72,42 @@ class IssuanceMixin:
             order_id: Order identifier
             csr_pem: PEM-encoded Certificate Signing Request
             ca_refid: CA to sign with (optional, resolved from domain config → global default → first available)
+            approval: the approved request this issuance carries out (the
+                approval gate is then passed)
             
         Returns:
-            Tuple of (success, error_message)
+            Tuple of (success, error_message); success with
+            ``self._pending_approval`` set when a policy holds the order for
+            approval (it stays ``processing``).
         """
+        self._pending_approval = None
+        # badCSR unless a step below names another type
+        self._last_finalize_error_type = None
         order = self.get_order(order_id)
-        
+
         if not order:
             return False, "Order not found"
-        
+
         if order.status != "ready":
             return False, f"Order status is {order.status}, must be 'ready'"
-        
+
         # Parse CSR
         try:
             from cryptography import x509
             from cryptography.hazmat.backends import default_backend
-            
+
             csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
         except Exception as e:
             return False, f"Invalid CSR: {str(e)}"
-        
-        # Validate CSR matches order identifiers (RFC 4343: DNS names case-insensitive, RFC 8738: IP identifiers)
-        csr_domains = self._extract_domains_from_csr(csr)
-        csr_ips = self._extract_ips_from_csr(csr)
-        order_identifiers = json.loads(order.identifiers)
-        order_domains = [id['value'] for id in order_identifiers if id.get('type') == 'dns']
-        order_ips = [id['value'] for id in order_identifiers if id.get('type') == 'ip']
 
-        # Validate DNS identifiers
-        csr_domains_norm = {d.lower().rstrip('.') for d in csr_domains}
-        order_domains_norm = {d.lower().rstrip('.') for d in order_domains}
-        if csr_domains_norm != order_domains_norm:
-            return False, f"CSR domains {sorted(csr_domains_norm)} don't match order domains {sorted(order_domains_norm)}"
-        
-        # Validate IP identifiers (RFC 8738)
-        csr_ips_norm = {ip for ip in csr_ips}
-        order_ips_norm = {ip for ip in order_ips}
-        if csr_ips_norm != order_ips_norm:
-            return False, f"CSR IPs {sorted(csr_ips_norm)} don't match order IPs {sorted(order_ips_norm)}"
+        refusal = self.csr_refusal(order, csr)
+        if refusal:
+            return False, refusal
+        refusal = self.order_refusal(order)
+        if refusal:
+            return self._refuse_order(order, 'rejectedIdentifier', refusal, approval)
 
-        # Reject any SAN entry that is not one of the validated identifiers.
-        # The per-type extractors above only look at DNSName/IPAddress, so an
-        # rfc822Name, otherName/UPN, URI or dirName would otherwise sail past
-        # validation and be copied verbatim into the signed certificate by
-        # sign_csr — letting a client that only proved control of a DNS name
-        # obtain a cert asserting an email address or a Windows UPN it never
-        # proved. ACME only ever proves DNS/IP control, so anything else is
-        # unauthorized by construction.
-        san_ok, san_err = self._validate_csr_san_types(
-            csr, order_domains_norm, order_ips_norm
-        )
-        if not san_ok:
-            return False, san_err
-
-        # The SAN check above does not cover the subject, but two subject
-        # attributes still reach the issued certificate: sign_csr SYNTHESIZES a
-        # SAN from the CN/emailAddress when the CSR carries no SAN extension, and
-        # the whole subject is copied verbatim onto the leaf while finalize only
-        # ever validated the FIRST CN. Require every CN to be a validated order
-        # identifier and forbid any emailAddress RDN.
-        subject_ok, subject_err = self._validate_csr_subject(
-            csr, order_domains_norm, order_ips_norm
-        )
-        if not subject_ok:
-            return False, subject_err
-
-        # The profile's template may restrict the SAN types (DNS, IP)
-        from services.acme import profiles as acme_profiles
-        from models.certificate_template import CertificateTemplate
-        from services.template_service import allowed_san_types, san_type_refusal
-        tpl_id = acme_profiles.issuance_params(getattr(order, 'profile', None)).get('template_id')
-        template = db.session.get(CertificateTemplate, tpl_id) if tpl_id else None
-        if template is not None:
-            refusal = san_type_refusal(
-                allowed_san_types(template),
-                ['dns'] * bool(order_domains_norm) + ['ip'] * bool(order_ips_norm), template.name)
-            if refusal:
-                return False, refusal
+        order_domains = [i['value'] for i in json.loads(order.identifiers) if i.get('type') == 'dns']
 
         # CAA record check (RFC 6844 + RFC 8555 §8.1) - only for DNS identifiers
         if order_domains:
@@ -148,7 +115,7 @@ class IssuanceMixin:
             try:
                 from utils.caa_checker import check_caa_for_domains
                 from models import SystemConfig
-                
+
                 from services.acme.caa_identities import caa_identities
                 caa_identifiers = caa_identities()
 
@@ -172,12 +139,13 @@ class IssuanceMixin:
                 )
                 if not caa_allowed:
                     logger.warning(f"CAA check failed for order {order_id}: {caa_reason}")
-                    return False, f"CAA check failed: {caa_reason}"
+                    return self._caa_refusal(f"CAA check failed: {caa_reason}")
                 logger.debug(f"CAA check passed for {order_domains}: {caa_reason}")
             except ImportError:
                 if caa_enforce:
                     logger.error("CAA check unavailable: dns.resolver import failed")
-                    return False, "CAA check failed (DNS error): resolver unavailable"
+                    return self._caa_refusal(
+                        f"CAA check failed ({caa_checker.DNS_ERROR_MARKER}): resolver unavailable")
                 logger.error(
                     "CAA check unavailable (dns.resolver import failed); "
                     "proceeding without CAA check (soft-fail)"
@@ -185,15 +153,31 @@ class IssuanceMixin:
             except Exception as e:
                 if caa_enforce:
                     logger.warning(f"CAA check error: {e}")
-                    return False, "CAA check failed (DNS error): lookup error"
+                    return self._caa_refusal(
+                        f"CAA check failed ({caa_checker.DNS_ERROR_MARKER}): lookup error")
                 logger.warning(f"CAA check error (non-blocking): {e}")
-        
-        # Resolve CA: domain-specific → global default → first available
+
+        # Resolve CA: domain-specific → global default; first available only when nothing was chosen
         # IP-only orders have no domains: skips the per-domain mappings and
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
-            ca_refid = self._resolve_ca_for_domains(order_domains)
-        
+            # A chosen CA that is gone or keyless refuses the order: never another CA instead
+            try:
+                ca_refid = self._resolve_ca_for_domains(order_domains)
+            except IssuingCAUnusable as e:
+                logger.error("ACME order %s refused: %s", order_id, e)
+                self._last_finalize_error_type = 'serverInternal'
+                return False, str(e)
+
+        if approval is None:
+            held, gate_error = self._approval_gate(order, csr, csr_pem, ca_refid)
+            if gate_error:
+                self._last_finalize_error_type = 'serverInternal'
+                return False, gate_error
+            if held is not None:
+                self._pending_approval = held
+                return True, None
+
         # Sign certificate with UCM CA
         self._last_signing_exception = None
         success, cert_id, error = self._sign_certificate_with_ca(
@@ -201,32 +185,28 @@ class IssuanceMixin:
             csr_pem=csr_pem,
             ca_refid=ca_refid
         )
-        
+
         if not success:
-            if not self._is_request_failure(getattr(self, '_last_signing_exception', None)):
+            exc = getattr(self, '_last_signing_exception', None)
+            if not self._is_request_failure(exc):
                 # Nothing wrong with the request (CA offline or outside its
-                # window, signing key unavailable...): the order goes back to
-                # `ready` (restore_processing_order) so the client may retry,
-                # and the error is reported as serverInternal, not badCSR
+                # window, signing key unavailable...): the caller invalidates
+                # the order (RFC 8555 §7.1.6) and answers serverInternal
                 self._last_finalize_error_type = 'serverInternal'
                 return False, error
             from services.acme.requested_validity import RequestedValidityError
-            self._last_finalize_error_type = (
-                'malformed' if isinstance(self._last_signing_exception, RequestedValidityError)
-                else 'badCSR')
-            order.status = "invalid"
-            order.error = json.dumps({
-                "type": f"urn:ietf:params:acme:error:{self._last_finalize_error_type}",
-                "detail": error
-            })
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"DB commit failed: {e}")
-                raise
+            from services.policy_service import DnsNameCountRefused, RequestedValidityRefused
+            if isinstance(exc, (RequestedValidityError, RequestedValidityRefused)):
+                # The order's own dates: no other CSR can be issued on it
+                return self._refuse_order(order, 'malformed', error, approval)
+            if isinstance(exc, DnsNameCountRefused) and self._order_dns_count_refused(order, exc.policies):
+                # The order's own distinct names exceed the limit: every CSR carries each
+                # in its CN or SAN, counted alike (RFC 8555 §7.4, §6.7 rejectedIdentifier);
+                # a repeated SAN is badCSR
+                return self._refuse_order(order, 'rejectedIdentifier', error, approval)
+            self._last_finalize_error_type = 'badCSR'
             return False, error
-        
+
         # Update order status
         order.status = "valid"
         order.csr = csr_pem
@@ -238,7 +218,7 @@ class IssuanceMixin:
             db.session.rollback()
             logger.error(f"DB commit failed: {e}")
             raise
-        
+
         # Auto-supersede: revoke previous certs for same domains if enabled
         self._auto_supersede(order, cert_id)
 
@@ -247,7 +227,153 @@ class IssuanceMixin:
         # every ACME issuance twice)
 
         return True, None
-    
+
+    @staticmethod
+    def _order_dns_count_refused(order, policies) -> bool:
+        """Whether *policies* refuse the count of the order's distinct DNS names."""
+        from services.policy_service import PolicyEvaluationService
+        names = {i['value'].lower().rstrip('.') for i in json.loads(order.identifiers)
+                 if i.get('type') == 'dns'}
+        return bool(PolicyEvaluationService.dns_name_count_violations(policies, len(names)))
+
+    def _caa_refusal(self, error):
+        """A CAA denial refuses the order (caa); a lookup failure is the server's (serverInternal)."""
+        self._last_finalize_error_type = (
+            'serverInternal' if caa_checker.is_transient_caa_failure(error) else 'caa')
+        return False, error
+
+    def _refuse_order(self, order, error_type, detail, approval):
+        """A refusal of the order itself: invalid with *error_type* (RFC 8555
+        §7.1.6), unless an approval's caller closes the request first."""
+        self._last_finalize_error_type = error_type
+        if approval is None:
+            order.status = "invalid"
+            order.error = json.dumps({
+                "type": f"urn:ietf:params:acme:error:{error_type}",
+                "detail": detail,
+            })
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"DB commit failed: {e}")
+                raise
+        return False, detail
+
+    def order_refusal(self, order) -> Optional[str]:
+        """Why no CSR can be issued on *order*: its profile's template refuses
+        the types of its identifiers. None when it may be."""
+        identifiers = json.loads(order.identifiers)
+        from services.acme import profiles as acme_profiles
+        from models.certificate_template import CertificateTemplate
+        from services.template_service import allowed_san_types, san_type_refusal
+        tpl_id = acme_profiles.issuance_params(getattr(order, 'profile', None)).get('template_id')
+        template = db.session.get(CertificateTemplate, tpl_id) if tpl_id else None
+        if template is None:
+            return None
+        types = {i.get('type') for i in identifiers}
+        return san_type_refusal(
+            allowed_san_types(template), ['dns'] * ('dns' in types) + ['ip'] * ('ip' in types),
+            template.name)
+
+    def csr_refusal(self, order, csr) -> Optional[str]:
+        """Why *csr* cannot be issued on *order*, judged without signing
+        (RFC 8555 §7.4 badCSR); None when it may be."""
+        # Validate CSR matches order identifiers (RFC 4343: DNS names case-insensitive, RFC 8738: IP identifiers)
+        csr_domains = self._extract_domains_from_csr(csr)
+        csr_ips = self._extract_ips_from_csr(csr)
+        order_identifiers = json.loads(order.identifiers)
+        order_domains = [id['value'] for id in order_identifiers if id.get('type') == 'dns']
+        order_ips = [id['value'] for id in order_identifiers if id.get('type') == 'ip']
+
+        # Validate DNS identifiers
+        csr_domains_norm = {d.lower().rstrip('.') for d in csr_domains}
+        order_domains_norm = {d.lower().rstrip('.') for d in order_domains}
+        if csr_domains_norm != order_domains_norm:
+            return f"CSR domains {sorted(csr_domains_norm)} don't match order domains {sorted(order_domains_norm)}"
+
+        # Validate IP identifiers (RFC 8738)
+        csr_ips_norm = {ip for ip in csr_ips}
+        order_ips_norm = {ip for ip in order_ips}
+        if csr_ips_norm != order_ips_norm:
+            return f"CSR IPs {sorted(csr_ips_norm)} don't match order IPs {sorted(order_ips_norm)}"
+
+        # Reject any SAN entry that is not one of the validated identifiers.
+        # The per-type extractors above only look at DNSName/IPAddress, so an
+        # rfc822Name, otherName/UPN, URI or dirName would otherwise sail past
+        # validation and be copied verbatim into the signed certificate by
+        # sign_csr — letting a client that only proved control of a DNS name
+        # obtain a cert asserting an email address or a Windows UPN it never
+        # proved. ACME only ever proves DNS/IP control, so anything else is
+        # unauthorized by construction.
+        san_ok, san_err = self._validate_csr_san_types(
+            csr, order_domains_norm, order_ips_norm
+        )
+        if not san_ok:
+            return san_err
+
+        # The SAN check above does not cover the subject, but two subject
+        # attributes still reach the issued certificate: sign_csr SYNTHESIZES a
+        # SAN from the CN/emailAddress when the CSR carries no SAN extension, and
+        # the whole subject is copied verbatim onto the leaf while finalize only
+        # ever validated the FIRST CN. Require every CN to be a validated order
+        # identifier and forbid any emailAddress RDN.
+        subject_ok, subject_err = self._validate_csr_subject(
+            csr, order_domains_norm, order_ips_norm
+        )
+        if not subject_ok:
+            return subject_err
+        return None
+
+    def _approval_gate(self, order, csr, csr_pem, ca_refid):
+        """``(approval, None)`` when a policy holds the order for approval
+        (its CSR kept on it, the order left ``processing``), ``(None, None)``
+        to issue now, ``(None, error)`` when the policies cannot be read."""
+        from services import protocol_approval
+        ca = self._select_signing_ca(ca_refid, warn=False)
+        if ca is None:
+            return None, None  # the signer reports the missing CA
+        from services.acme import profiles as acme_profiles
+        template_id = acme_profiles.issuance_params(getattr(order, 'profile', None)).get('template_id')
+        cn, dns = protocol_approval.csr_names(csr)
+        try:
+            approval = protocol_approval.gate_protocol_issuance(
+                'acme', ca=ca, template_id=template_id, cn=cn, san_list=dns, csr_pem=csr_pem,
+                identity=f'account {order.account_id}', protocol_ref=order.order_id,
+                extra={'order_id': order.order_id, 'account_id': order.account_id,
+                       'base_url': self.base_url,
+                       'identifiers': json.loads(order.identifiers)})
+        except protocol_approval.ApprovalGateUnavailable as e:
+            return None, str(e)
+        if approval is None:
+            return None, None
+        db.session.refresh(order)
+        order.csr = csr_pem
+        db.session.commit()
+        logger.info("ACME order %s held for approval #%s", order.order_id, approval.id)
+        return approval, None
+
+    def _select_signing_ca(self, ca_refid, warn=True):
+        """The CA *ca_refid* names, else the first CA able to sign."""
+        from models import CA
+        if ca_refid:
+            return CA.query.filter_by(refid=ca_refid).first()
+        # No issuing CA configured: the fallback must be a CA able to
+        # sign (a key that is not an empty sentinel, not offline), chosen
+        # deterministically rather than in database order
+        candidates = CA.query.filter(
+            ((CA.prv.isnot(None) & (CA.prv != '')) | CA.hsm_key_id.isnot(None)),
+            CA.crt.isnot(None), CA.crt != '',
+            CA.offline.is_(False),
+        ).order_by(CA.id.asc()).all()
+        ca = next((c for c in candidates if not c.revoked_in_chain), None)
+        if ca is not None and warn:
+            logger.warning(
+                "ACME: no issuing CA configured, falling back to CA %s (%s)",
+                ca.id, ca.descr,
+            )
+        return ca
+
     def _auto_supersede(self, new_order, new_cert_id: int):
         """Revoke previous certificates for the same domains if revoke_on_renewal is enabled."""
         try:
@@ -456,55 +582,70 @@ class IssuanceMixin:
     
     def _resolve_ca_for_domains(self, domains: list) -> Optional[str]:
         """Resolve which CA should sign for the given domains.
-        
-        Resolution order:
+
+        Resolution order, the first choice found decides:
         1. Local ACME domain mapping (acme_local_domains table)
         2. DNS domain-specific CA (acme_domains.issuing_ca_id)
         3. Global default from acme.issuing_ca_id config
-        4. None (will fall back to first available CA in _sign_certificate_with_ca)
+        4. None: nothing chosen, _select_signing_ca takes the first CA able to sign
+
+        Raises IssuingCAUnusable when the chosen CA is gone or has no private key.
         """
         from api.v2.acme_local_domains import find_local_domain_ca
         from api.v2.acme_domains import find_provider_for_domain
         from models import SystemConfig, CA
-        
+        from services.deletion_blockers import _int_or_none
+
         # Check local ACME domain mapping first
         for domain in domains:
             ca_id = find_local_domain_ca(domain)
             if ca_id:
-                ca = db.session.get(CA, ca_id)
-                if ca and ca.has_private_key:
-                    return ca.refid
-        
+                return self._chosen_ca_refid(db.session.get(CA, ca_id), f'for the ACME domain {domain}',
+                                             'the ACME local domain settings')
+
         # Check DNS domain-specific CA
         for domain in domains:
             result = find_provider_for_domain(domain)
             if result and result.get('issuing_ca_id'):
-                ca = db.session.get(CA, result['issuing_ca_id'])
-                if ca and ca.has_private_key:
-                    return ca.refid
-        
-        # Fall back to global default
-        ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
-        if ca_id_cfg and ca_id_cfg.value:
-            ca = CA.query.filter_by(refid=ca_id_cfg.value).first()
-            if not ca:
-                try:
-                    ca = db.session.get(CA, int(ca_id_cfg.value))
-                except (ValueError, TypeError):
-                    pass
-            if ca and ca.has_private_key:
-                return ca.refid
-        
+                return self._chosen_ca_refid(db.session.get(CA, result['issuing_ca_id']),
+                                             f'for the ACME domain {domain}', 'the ACME domain settings')
+
+        # Global default, read as the deletion blocker reads it (refid, else what int() takes)
+        cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+        value = (cfg.value or '').strip() if cfg else ''
+        if value:
+            ca = CA.query.filter_by(refid=value).first()
+            number = _int_or_none(value)
+            if ca is None and number is not None:
+                ca = db.session.get(CA, number)
+            return self._chosen_ca_refid(ca, 'in the ACME settings', 'the ACME settings')
+
         return None
-    
+
+    @staticmethod
+    def _chosen_ca_refid(ca, chosen, where) -> str:
+        """The refid of a chosen CA that can sign; IssuingCAUnusable otherwise."""
+        if ca is None:
+            raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} no longer exists: '
+                                    f'choose another one in {where}')
+        if not ca.has_private_key:
+            # Taken offline with its key exported: the remedy is the CA itself
+            if ca.offline:
+                raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} is offline: bring it '
+                                        f'back online, or choose a CA able to sign in {where}')
+            raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} has no private key: '
+                                    f'choose a CA able to sign in {where}')
+        return ca.refid
+
     @staticmethod
     def _is_request_failure(exc) -> bool:
         """Whether a signing failure is the request's fault (badCSR, order
-        invalid) rather than the server's (order retryable)."""
+        ready) rather than the server's (serverInternal, order invalid)."""
         if exc is None:
             return True
         from services.policy_service import PolicyViolation
-        if isinstance(exc, PolicyViolation):
+        from services.cert.unique_subject import SubjectTaken
+        if isinstance(exc, (PolicyViolation, SubjectTaken)):  # SubjectTaken: RFC 8555 §7.4 badCSR
             return True
         from utils.ca_signing_window import IssuerWindowError
         try:
@@ -545,23 +686,7 @@ class IssuanceMixin:
         import base64
         
         # Get CA (use first available if not specified)
-        if ca_refid:
-            ca = CA.query.filter_by(refid=ca_refid).first()
-        else:
-            # No issuing CA configured: the fallback must be a CA able to
-            # sign (a key that is not an empty sentinel, not offline), chosen
-            # deterministically rather than in database order
-            candidates = CA.query.filter(
-                ((CA.prv.isnot(None) & (CA.prv != '')) | CA.hsm_key_id.isnot(None)),
-                CA.crt.isnot(None), CA.crt != '',
-                CA.offline.is_(False),
-            ).order_by(CA.id.asc()).all()
-            ca = next((c for c in candidates if not c.revoked_in_chain), None)
-            if ca is not None:
-                logger.warning(
-                    "ACME: no issuing CA configured, falling back to CA %s (%s)",
-                    ca.id, ca.descr,
-                )
+        ca = self._select_signing_ca(ca_refid)
         
         if not ca:
             self._last_signing_exception = RuntimeError("No CA available for signing")
@@ -597,12 +722,16 @@ class IssuanceMixin:
 
         # Extract CN from CSR for better description
         descr = f"ACME Certificate - Order {order.order_id}"
+        subject_dns = []
         try:
             from cryptography.hazmat.backends import default_backend
             from cryptography import x509
             csr_bytes = csr_pem.encode() if isinstance(csr_pem, str) else csr_pem
             csr = x509.load_pem_x509_csr(csr_bytes, default_backend())
-            
+            # Every CN is an order identifier (_validate_csr_subject): its DNS names are requested
+            subject_dns = [a.value for a in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+                           if not _is_ip_text(a.value)]
+
             # Try to get CN from subject
             cn = None
             for attr in csr.subject:
@@ -662,6 +791,8 @@ class IssuanceMixin:
                 template_id=params.get('template_id'),
                 not_before=not_before,
                 not_after=not_after,
+                subject_holder=f'acme:{order.account_id}', source='acme',
+                subject_dns=subject_dns,
             )
             
             return True, signed_cert.id, None

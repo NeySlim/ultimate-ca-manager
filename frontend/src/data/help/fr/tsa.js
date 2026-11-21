@@ -7,19 +7,19 @@ export default {
       {
         title: 'Onglets',
         items: [
-          { label: 'Paramètres', text: 'Activer TSA, sélectionner la CA de signature et configurer l\'OID de politique TSA' },
+          { label: 'Paramètres', text: 'Activer TSA, sélectionner l\'AC de signature et configurer l\'OID de politique TSA' },
           { label: "Point d'accès TSA", text: 'URL du point de terminaison TSA, exemples d\'utilisation avec OpenSSL et statistiques de requêtes' },
         ]
       },
       {
         title: 'Configuration',
         items: [
-          { label: 'CA de signature', text: 'La CA dont le propre certificat signe les jetons d\'horodatage quand aucun certificat de signature dédié n\'est défini. Une CA hors de sa période de validité ne signe pas : /tsa répond 503. Les vérificateurs stricts (openssl ts -verify, jarsigner) refusent les jetons signés par un certificat de CA, et la page avertit tant que la CA signe' },
+          { label: 'AC de signature', text: 'L\'AC qui émet le certificat de signature dédié. Son propre certificat ne signe les jetons d\'horodatage que si aucun signataire dédié n\'est défini et que Exiger un certificat dédié est désactivé. Une AC hors de sa période de validité ne signe pas : /tsa répond 503. Les vérificateurs stricts (openssl ts -verify, jarsigner) refusent les jetons signés par un certificat d\'AC, et la page avertit tant que l\'AC signe' },
           { label: 'OID de politique', text: 'Identifiant d\'objet pour la politique TSA, inclus dans chaque réponse d\'horodatage. La valeur par défaut 1.2.3.4.1 est l\'OID d\'exemple d\'OpenSSL, un substitut dont la page avertit : utilisez un OID de l\'arc de votre organisation' },
           { label: 'Activer/Désactiver', text: 'Basculer le point de terminaison TSA sans perdre la configuration' },
-          { label: 'Exiger un certificat dédié', text: 'Opt-in : refuser de signer les horodatages avec le certificat de la CA lui-même, exige un certificat de signature d\'entité finale dédié avec une EKU timeStamping critique (RFC 3161)' },
-                  { label: 'Certificat de signature (v2.217)', text: 'Signez les jetons avec un certificat final dédié choisi parmi les certificats émis (EKU timeStamping, clé RSA, ECDSA ou ML-DSA détenue par UCM ; les certificats Ed25519 et Ed448 ne sont pas proposés, ni ML-DSA en mode FIPS). Les renouvellements sont suivis automatiquement ; un signeur expiré ou révoqué fait échouer les requêtes en 503, sans jamais retomber sur le certificat de la CA' },
-                  { label: 'Générer un certificat de signature (v2.218)', text: 'Émission en un clic d\'un signeur RFC 3161 taillé pour cet usage : CA:FALSE, KeyUsage digitalSignature uniquement et une EKU timeStamping exclusive et critique, la forme qu\'exigent les vérificateurs stricts (openssl ts -verify). Émis depuis la CA TSA configurée et sélectionné automatiquement quand aucun signeur utilisable n\'est défini. Le certificat a la source "manual" : ajoutez "manual" aux sources du renouvellement automatique ou renouvelez-le vous-même avant son expiration' },
+          { label: 'Exiger un certificat dédié', text: 'Activé par défaut : refuser de signer les horodatages avec le certificat de l\'AC lui-même, /tsa répond donc 503 tant qu\'aucun certificat de signature d\'entité finale dédié avec une EKU timeStamping critique (RFC 3161) n\'est défini. Le désactiver n\'est pas conforme à la RFC 3161 ; une installation montée depuis la 2.x dont la TSA signait avec son AC le garde désactivé, et la vue d\'ensemble affiche un avertissement' },
+                  { label: 'Certificat de signature (v2.217)', text: 'Signez les jetons avec un certificat final dédié choisi parmi les certificats émis (EKU timeStamping, clé RSA, ECDSA ou ML-DSA détenue par UCM ; les certificats Ed25519 et Ed448 ne sont pas proposés, ni ML-DSA en mode FIPS quand le module FIPS ne l\'approuve pas). Les renouvellements sont suivis automatiquement ; un signeur expiré ou révoqué fait échouer les requêtes en 503, sans jamais retomber sur le certificat de l\'AC' },
+                  { label: 'Générer un certificat de signature (v2.218)', text: 'Émission en un clic d\'un signeur RFC 3161 taillé pour cet usage : CA:FALSE, KeyUsage digitalSignature uniquement et une EKU timeStamping exclusive et critique, la forme qu\'exigent les vérificateurs stricts (openssl ts -verify). Émis depuis l\'AC TSA configurée et sélectionné automatiquement quand aucun signeur utilisable n\'est défini. Le certificat a la source "manual" : ajoutez "manual" aux sources du renouvellement automatique ou renouvelez-le vous-même avant son expiration' },
         ]
       },
       {
@@ -27,7 +27,7 @@ export default {
         items: [
           { label: 'Créer une requête', text: 'openssl ts -query -data file.txt -sha256 -cert -out request.tsq (-cert demande le certificat du signeur dans la réponse, dont openssl ts -verify a besoin)' },
           { label: 'Envoyer au TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://votre-serveur/tsa -o response.tsr' },
-          { label: 'Vérifier', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (signeur dédié RSA ou ECDSA ; un jeton signé par le certificat de la CA échoue avec « unsuitable certificate purpose »). Un jeton ML-DSA échoue à openssl ts -verify : vérifiez sa signature avec openssl cms -verify (OpenSSL 3.5 ou ultérieur), puis comparez l\'empreinte du message avec le condensat du fichier' },
+          { label: 'Vérifier', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (signeur dédié RSA ou ECDSA ; un jeton signé par le certificat de l\'AC échoue avec « unsuitable certificate purpose »). Un jeton ML-DSA échoue à openssl ts -verify : vérifiez sa signature avec openssl cms -verify (OpenSSL 3.5 ou ultérieur), puis comparez l\'empreinte du message avec le condensat du fichier' },
         ]
       },
     ],
@@ -40,8 +40,8 @@ export default {
       'Aucune authentification n\'est requise : le point de terminaison TSA est accessible publiquement comme CRL/OCSP',
     ],
     warnings: [
-      'Une CA de signature valide doit être configurée avant d\'activer TSA',
-      'openssl ts -verify et jarsigner refusent les jetons signés par le certificat de la CA : la RFC 3161 exige un signeur dédié avec une EKU timeStamping critique et exclusive. Générez-en un dans l\'onglet Paramètres',
+      'Un certificat de signature dédié doit être défini avant que /tsa signe : générez-en un dans l\'onglet Paramètres',
+      'openssl ts -verify et jarsigner refusent les jetons signés par le certificat de l\'AC : la RFC 3161 exige un signeur dédié avec une EKU timeStamping critique et exclusive. Générez-en un dans l\'onglet Paramètres',
       'Le point de terminaison TSA est un point de terminaison de protocole public : ne mettez pas de données sensibles dans les requêtes d\'horodatage',
     ],
   },
@@ -56,7 +56,7 @@ L'autorité d'horodatage (TSA) implémente le **RFC 3161** pour fournir des horo
 
 1. **Le client crée une requête d'horodatage** : hache un fichier avec SHA-256/SHA-512 et crée un \`TimeStampReq\` (encodé ASN.1 DER)
 2. **Le client envoie la requête au TSA** : HTTP POST vers le point de terminaison \`/tsa\` avec \`Content-Type: application/timestamp-query\`
-3. **UCM signe l'horodatage** : la CA configurée signe le hash + l'heure actuelle dans un \`TimeStampResp\`
+3. **UCM signe l'horodatage** : le certificat de signature dédié signe le hash + l'heure actuelle dans un \`TimeStampResp\`. Le certificat de l'AC configurée ne signe que si **Exiger un certificat TSA dédié** est désactivé
 4. **Le client reçoit et stocke la réponse** : le fichier \`.tsr\` peut ensuite prouver que le document existait à ce moment
 
 ## Configuration
@@ -64,23 +64,24 @@ L'autorité d'horodatage (TSA) implémente le **RFC 3161** pour fournir des horo
 ### Onglet Paramètres
 
 1. **Activer TSA** : Basculer le serveur TSA on ou off
-2. **CA de signature** : Sélectionner quelle autorité de certification signe les jetons d'horodatage
-3. **OID de politique** : Identifiant d'objet pour la politique TSA (par ex. \`1.2.3.4.1\`), inclus dans chaque réponse d'horodatage
+2. **AC de signature** : Sélectionner quelle autorité de certification signe les jetons d'horodatage
+3. **OID de politique** : Identifiant d'objet pour la politique TSA, inclus dans chaque réponse d'horodatage
+4. **Exiger un certificat TSA dédié** : Activé par défaut : refuse de signer des horodatages avec le certificat de l'AC lui-même, \`/tsa\` répond donc 503 tant qu'aucun certificat de signature final dédié avec un **EKU timeStamping critique** (RFC 3161) n'est défini. **Générer un certificat de signature** en émet un depuis l'AC de signature et le sélectionne. Désactiver l'option laisse signer le certificat de l'AC, ce qui n'est pas conforme à la RFC 3161 ; une installation montée depuis la 2.x dont la TSA signait avec son AC la garde désactivée, et la vue d'ensemble affiche un avertissement
 
-### Choisir une CA de signature
+### Choisir une AC de signature
 
-La clé privée de la CA de signature est utilisée pour signer chaque jeton d'horodatage. Bonnes pratiques :
+La clé privée de l'AC de signature est utilisée pour signer chaque jeton d'horodatage. Bonnes pratiques :
 
-- Utilisez une **sous-CA dédiée** pour l'horodatage plutôt que votre CA racine
-- La RFC 3161 §2.3 exige un signeur dont la seule EKU, critique, est **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), qu'un certificat de CA ne peut pas porter sans perdre ses autres usages. Les jetons signés par le certificat de la CA sont refusés par les vérificateurs stricts : \`openssl ts -verify\` échoue avec « unsuitable certificate purpose » et jarsigner avec « Certificate is not valid for timestamping ». L'onglet Paramètres avertit tant que le certificat de la CA signe : **générez-y un certificat de signature dédié** pour ces clients
-- Assurez-vous que le certificat de la CA a une **validité suffisante** : les horodatages doivent rester vérifiables pendant des années. Une CA hors de sa période de validité ne signe pas : \`/tsa\` répond 503 et le tableau de bord affiche le TSA hors ligne
-- Activez **Exiger un certificat dédié** pour l'imposer au moment de la signature plutôt que de s'en remettre à la convention
+- Utilisez une **sous-AC dédiée** pour l'horodatage plutôt que votre AC racine
+- La RFC 3161 §2.3 exige un signeur dont la seule EKU, critique, est **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), qu'un certificat d'AC ne peut pas porter sans perdre ses autres usages. Les jetons signés par le certificat de l'AC sont refusés par les vérificateurs stricts : \`openssl ts -verify\` échoue avec « unsuitable certificate purpose » et jarsigner avec « Certificate is not valid for timestamping ». L'onglet Paramètres avertit tant que le certificat de l'AC signe : **générez-y un certificat de signature dédié** pour ces clients
+- Assurez-vous que le certificat de l'AC a une **validité suffisante** : les horodatages doivent rester vérifiables pendant des années. Une AC hors de sa période de validité ne signe pas : \`/tsa\` répond 503
+- Laissez **Exiger un certificat TSA dédié** activé pour l'imposer au moment de la signature
 
 ### OID de politique
 
 L'OID de politique identifie la politique TSA sous laquelle les horodatages sont émis. Il est intégré dans chaque \`TimeStampResp\`.
 
-- Par défaut : \`1.2.3.4.1\` (espace réservé)
+- Par défaut : \`1.2.3.4.1\` (espace réservé : l'OID d'exemple d'OpenSSL, attribué à personne ; l'onglet Paramètres avertit tant qu'il est utilisé)
 - En production, enregistrez un OID sous l'arc de votre organisation ou utilisez-en un de votre CP/CPS
 
 ## Onglet Point d'accès TSA
@@ -89,15 +90,15 @@ L'onglet Point d'accès TSA affiche :
 
 - **URL du point de terminaison TSA** : URL prête à copier-coller pour la configuration client
 - **Exemples d'utilisation** : Commandes OpenSSL pour créer des requêtes, les envoyer et vérifier les réponses
-- **Statistiques** : Total des requêtes d'horodatage traitées (réussies et échouées)
+- **Statistiques** : Total des requêtes d'horodatage traitées (réussies et échouées) ; chaque requête rejetée est auditée sous \`tsa.timestamp_rejected\` avec son code d'échec
 
 ## Exemples d'utilisation
 
 ### Créer une requête d'horodatage
 
 \`\`\`bash
-# Hacher un fichier et créer une requête d'horodatage
-openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq
+# Hacher un fichier et créer une requête d'horodatage (-cert : y inclure le certificat du signataire)
+openssl ts -query -data file.txt -sha256 -cert -out request.tsq
 \`\`\`
 
 ### Envoyer la requête au TSA
@@ -106,7 +107,7 @@ openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq
 # Envoyer la requête et recevoir une réponse d'horodatage
 curl -s -H "Content-Type: application/timestamp-query" \\
   --data-binary @request.tsq \\
-  https://votre-serveur:8443/tsa -o response.tsr
+  https://your-server:8443/tsa -o response.tsr
 \`\`\`
 
 ### Vérifier un horodatage
@@ -121,16 +122,16 @@ openssl ts -verify -data file.txt -in response.tsr \\
 
 ### Signature de code avec horodatages
 
-Lors de la signature de code, ajoutez l'URL TSA pour garantir que les signatures restent valides après l'expiration du certificat :
+Lors de la signature de code, ajoutez l'URL TSA pour garantir que les signatures restent valides après l'expiration du certificat. Configurez d'abord un certificat de signature dédié : jarsigner refuse un jeton signé par le certificat de l'AC (« Certificate is not valid for timestamping »).
 
 \`\`\`bash
 # Signer avec horodatage (osslsigncode)
 osslsigncode sign -certs cert.pem -key key.pem \\
-  -ts https://votre-serveur:8443/tsa \\
+  -ts https://your-server:8443/tsa \\
   -in app.exe -out app-signed.exe
 
 # Signer avec horodatage (signtool.exe sous Windows)
-signtool sign /fd SHA256 /tr https://votre-serveur:8443/tsa \\
+signtool sign /fd SHA256 /tr https://your-server:8443/tsa \\
   /td SHA256 /f cert.pfx app.exe
 \`\`\`
 
@@ -143,7 +144,7 @@ openssl ts -query -data document.pdf -sha256 -cert \\
 
 curl -s -H "Content-Type: application/timestamp-query" \\
   --data-binary @document.tsq \\
-  https://votre-serveur:8443/tsa -o document.tsr
+  https://your-server:8443/tsa -o document.tsr
 \`\`\`
 
 ## Détails du protocole
@@ -165,7 +166,7 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 ## Considérations de sécurité
 
 - Le point de terminaison TSA est **public** : aucune authentification n'est requise (comme CRL/OCSP)
-- Chaque réponse d'horodatage est **signée** par le signeur dédié ou la clé de la CA : les clients vérifient la signature pour garantir l'authenticité
+- Chaque réponse d'horodatage est **signée** par le signeur dédié ou la clé de l'AC : les clients vérifient la signature pour garantir l'authenticité
 - Utilisez **SHA-256 ou plus fort** pour les algorithmes de hachage lors de la création de requêtes (SHA-1 est refusé)
 - Le TSA ne **voit pas** le document original : seul le hash est transmis
 - Envisagez la **limitation de débit** si le point de terminaison TSA est exposé à Internet

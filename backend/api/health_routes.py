@@ -9,10 +9,61 @@ from config.settings import redis_url as config_redis_url
 import os
 
 import fips_mode
+from shared_check import SharedCheck
 
 health_bp = Blueprint('health', __name__)
 
 _started_at = time.time()
+
+
+def _ha_fields(read_registry=True):
+    from config.settings import Config
+    leader = None
+    try:
+        from services.scheduler_service import is_leader
+        if read_registry or not Config.HA_MODE:
+            leader = is_leader()
+    except Exception:
+        pass
+    return {'ha': bool(Config.HA_MODE), 'node_id': Config.NODE_ID, 'leader': leader}
+
+
+def _cluster():
+    """HA only: who leads, how many nodes registered, how many stopped heartbeating."""
+    try:
+        from services.scheduler_leader import cluster_summary
+        from services.scheduler_service import get_scheduler
+        return cluster_summary(get_scheduler().wake_interval)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Cluster registry not readable: {e}")
+        return None
+
+
+def _maintenance(refresh=True):
+    """HA: the cluster maintenance this process refuses writes for, or None."""
+    from services import cluster_maintenance
+    view = cluster_maintenance.current(refresh=refresh)
+    return view.public() if view is not None else None
+
+
+def _check_cluster():
+    """HA only: 503 until this node has ever registered (a row left by an earlier run counts),
+    and while another live process holds this node's identifier."""
+    from config.settings import Config
+    try:
+        from services.scheduler_leader import node_held_elsewhere, node_registered
+        from services.scheduler_service import get_scheduler
+        if node_held_elsewhere(Config.NODE_ID, get_scheduler().wake_interval):
+            return {'status': 'error', 'message': f'Node identifier {Config.NODE_ID} is used by another '
+                    'live process: give each node a distinct UCM_NODE_ID'}
+        if node_registered(Config.NODE_ID):
+            return {'status': 'ok'}
+        return {'status': 'error', 'message': 'Node not registered yet (no scheduler heartbeat)'}
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Cluster registry check failed: {e}")
+        return {'status': 'error', 'message': 'Cluster registry not readable'}
 
 
 @health_bp.route('/api/v2/health')
@@ -42,11 +93,18 @@ def health():
         'started_at': _started_at,
         'websocket': ws_ready,
         'fips_active': fips_mode.enabled(),
+        **_ha_fields(),
     }
+    from config.settings import Config
+    if Config.HA_MODE:
+        result['cluster'] = _cluster()
+        result['maintenance'] = _maintenance()
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True
         result['safe_mode_reason'] = current_app.config.get('SAFE_MODE_REASON',
                                                             'encryption_key_missing')
+    if current_app.config.get('SERIAL_INDEX_PENDING'):
+        result['serial_unique_index_pending'] = current_app.config['SERIAL_INDEX_PENDING']
     return jsonify(result)
 
 
@@ -57,23 +115,46 @@ def readiness():
     """
     Readiness check - verifies the app can serve traffic.
     Checks database connectivity and required services.
-    Returns 200 if ready, 503 if not.
+    Returns 200 if ready, 503 if a check fails. In safe mode the status is
+    'safe_mode' and the code is 503 under UCM_HA or on a failed check, else 200.
     """
+    from config.settings import Config
     checks = {
         'database': _check_database(),
         'filesystem': _check_filesystem(),
     }
-    
+    # Every other read would wait on the same silent server: none once SELECT 1 failed
+    database_ok = checks['database']['status'] == 'ok'
+
     # Optional: check Redis if configured
     redis_url = config_redis_url()
     if redis_url:
         checks['redis'] = _check_redis(redis_url)
-    
+    if Config.HA_MODE:
+        checks['cluster'] = _check_cluster() if database_ok else {
+            'status': 'error', 'message': 'Cluster registry not read: the database does not answer'}
+
     all_ok = all(c.get('status') in ('ok', 'skipped') for c in checks.values())
-    
+    maintenance = _maintenance(refresh=database_ok) if Config.HA_MODE else None
+    if maintenance is not None:
+        # Out of the load balancer's rotation until the maintenance ends for this process
+        return jsonify({'status': 'maintenance', 'maintenance': maintenance, 'checks': checks,
+                        **_ha_fields(database_ok)}), 503
+
+    if current_app.config.get('SAFE_MODE'):
+        # Single node stays in the Service so the safe-mode UI remains reachable,
+        # but never with a broken dependency.
+        return jsonify({
+            'status': 'safe_mode',
+            'reason': current_app.config.get('SAFE_MODE_REASON', 'encryption_key_missing'),
+            'checks': checks,
+            **_ha_fields(database_ok),
+        }), (200 if all_ok and not Config.HA_MODE else 503)
+
     return jsonify({
         'status': 'ready' if all_ok else 'not_ready',
-        'checks': checks
+        'checks': checks,
+        **_ha_fields(database_ok),
     }), 200 if all_ok else 503
 
 
@@ -119,15 +200,36 @@ def metrics():
     return Response(body, status=200, mimetype='text/plain; version=0.0.4; charset=utf-8')
 
 
+# /health/ready waits at most this long for SELECT 1: a server that stops answering without
+# refusing leaves the probe at 503 instead of hanging it (docs/HA.md)
+READY_DATABASE_TIMEOUT_SECONDS = 5.0
+_database_check = SharedCheck('ucm-ready-database')
+
+
+def _select_1(app):
+    with app.app_context():
+        with db.engine.connect() as conn:
+            conn.execute(db.text('SELECT 1'))
+
+
+def wait_for_pending_check(timeout):
+    """Tests: let a database check still running end."""
+    _database_check.wait(timeout)
+
+
 def _check_database():
-    """Check database connectivity"""
-    try:
-        # Execute simple query to verify connection
-        db.session.execute(db.text('SELECT 1'))
+    """SELECT 1 on a pooled connection, one at a time per worker: a probe that arrives while it
+    runs shares its result, and gives up READY_DATABASE_TIMEOUT_SECONDS after it started."""
+    app = current_app._get_current_object()
+    result, error = _database_check(lambda: _select_1(app), READY_DATABASE_TIMEOUT_SECONDS)
+    if result == 'ok':
         return {'status': 'ok'}
-    except Exception as e:
-        current_app.logger.error(f"Database health check failed: {e}")
-        return {'status': 'error', 'message': 'Database connection failed'}
+    if result == 'timeout':
+        current_app.logger.error(
+            f"Database health check failed: no answer within {READY_DATABASE_TIMEOUT_SECONDS:g}s")
+    else:
+        current_app.logger.error(f"Database health check failed: {error}")
+    return {'status': 'error', 'message': 'Database connection failed'}
 
 
 def _check_filesystem():

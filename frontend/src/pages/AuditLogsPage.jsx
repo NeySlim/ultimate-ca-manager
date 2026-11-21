@@ -2,7 +2,7 @@
  * Audit Logs Page - Migrated to ResponsiveLayout
  * View and filter audit logs with real-time updates
  */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   ClockCounterClockwise, 
@@ -46,7 +46,8 @@ import {
 } from '../components';
 import { useNotification } from '../contexts';
 import { integrityMessage } from '../lib/auditIntegrity';
-import { usePermission, usePersistedState } from '../hooks';
+import { usePermission, usePersistedState, useJob } from '../hooks';
+import { acceptedJob } from '../services/jobs.service';
 import auditService from '../services/audit.service';
 import { formatRelativeTime, formatDate, downloadBlob } from '../lib/utils';
 import { reportSilentFailure } from '../lib/silentFailure'
@@ -127,6 +128,7 @@ export default function AuditLogsPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [showDateFilters, setShowDateFilters] = useState(false);
   const [verifyingIntegrity, setVerifyingIntegrity] = useState(false);
+  const { job: verifyJob, running: verifyRunning, follow: followJob, resume: resumeJob, cancel: cancelJob } = useJob();
 
   // Load initial data
   useEffect(() => {
@@ -181,6 +183,10 @@ export default function AuditLogsPage() {
     try {
       const res = await auditService.exportLogs({
         format,
+        search: search || undefined,
+        username: filterUsername || undefined,
+        action: filterAction.length > 0 ? filterAction : undefined,
+        success: filterSuccess !== '' ? filterSuccess : undefined,
         date_from: filterDateFrom || undefined,
         date_to: filterDateTo || undefined,
         limit: 10000
@@ -212,20 +218,77 @@ export default function AuditLogsPage() {
     }
   };
 
+  const showIntegrity = useCallback((data) => {
+    const { level, key, params } = integrityMessage(data);
+    const show = { error: showError, warning: showWarning, success: showSuccess }[level];
+    show(t(key, params));
+  }, [showError, showWarning, showSuccess, t]);
+
+  // A verification that outlasts the request runs as a job: its end is shown once it comes
+  const showVerificationEnd = useCallback((job) => {
+    if (job.state === 'succeeded' && job.result?.data) {
+      showIntegrity(job.result.data);
+    } else if (job.state === 'cancelled') {
+      showWarning(t('audit.verifyCancelled'));
+    } else if (job.reason === 'executor_lost' || job.reason === 'not_taken') {
+      showError(t('audit.verifyLost'));
+    } else {
+      showError(t('audit.integrityError'));
+    }
+  }, [showIntegrity, showWarning, showError, t]);
+
+  const followVerification = useCallback(async (job) => {
+    setVerifyingIntegrity(true);
+    try {
+      showVerificationEnd(await followJob(job));
+    } catch {
+      showError(t('audit.integrityError'));
+    } finally {
+      setVerifyingIntegrity(false);
+    }
+  }, [followJob, showVerificationEnd, showError, t]);
+
+  // After a reload: a verification still running is followed again, once per mount
+  const verificationEnd = useRef(showVerificationEnd);
+  verificationEnd.current = showVerificationEnd;
+  useEffect(() => {
+    let gone = false;
+    resumeJob('audit_verify').then((job) => {
+      if (!gone && job) verificationEnd.current(job);
+    }).catch(() => {});
+    return () => { gone = true; };
+  }, [resumeJob]);
+
   const handleVerifyIntegrity = async () => {
     setVerifyingIntegrity(true);
     try {
       const response = await auditService.verifyIntegrity();
-      const data = response.data || response;
-      const { level, key, params } = integrityMessage(data);
-      const show = { error: showError, warning: showWarning, success: showSuccess }[level];
-      show(t(key, params));
-    } catch (error) {
+      const job = acceptedJob(response);
+      if (job) {
+        await followVerification(job);
+        return;
+      }
+      showIntegrity(response.data || response);
+    } catch {
       showError(t('audit.integrityError'));
     } finally {
       setVerifyingIntegrity(false);
     }
   };
+
+  const handleCancelVerification = async () => {
+    try {
+      await cancelJob();
+    } catch {
+      showError(t('audit.verifyCancelFailed'));
+    }
+  };
+
+  const verifyProgress = verifyRunning && verifyJob?.progress?.total
+    ? t('audit.verifyProgress', {
+      done: verifyJob.progress.done || 0, total: verifyJob.progress.total,
+    })
+    : null;
 
   const clearFilters = useCallback(() => {
     setSearch('');
@@ -689,10 +752,15 @@ export default function AuditLogsPage() {
         <span className="hidden md:inline">{t('audit.cleanupLogs')}</span>
       </Button>
       )}
-      <Button type="button" variant="secondary" size="sm" onClick={handleVerifyIntegrity} loading={verifyingIntegrity} className="hidden md:inline-flex">
+      <Button type="button" variant="secondary" size="sm" onClick={handleVerifyIntegrity} loading={verifyingIntegrity || verifyRunning} loadingText={verifyProgress || undefined} className="hidden md:inline-flex">
         <ShieldCheck size={14} />
-        <span>{t('audit.verifyIntegrity')}</span>
+        <span>{verifyProgress || t('audit.verifyIntegrity')}</span>
       </Button>
+      {verifyRunning && (
+      <Button type="button" variant="secondary" size="sm" onClick={handleCancelVerification} className="hidden md:inline-flex" data-testid="audit-verify-cancel">
+        <span>{t('audit.verifyCancel')}</span>
+      </Button>
+      )}
       {/* Mobile: More filters */}
       <Button 
         variant="secondary" 

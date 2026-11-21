@@ -9,6 +9,7 @@ import es from './locales/es.json'
 import it from './locales/it.json'
 import pt from './locales/pt.json'
 import uk from './locales/uk.json'
+import ru from './locales/ru.json'
 import zh from './locales/zh.json'
 import ja from './locales/ja.json'
 
@@ -20,9 +21,17 @@ export const languages = [
   { code: 'it', name: 'Italiano', flag: '🇮🇹' },
   { code: 'pt', name: 'Português', flag: '🇵🇹' },
   { code: 'uk', name: 'Українська', flag: '🇺🇦' },
+  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
   { code: 'zh', name: '中文', flag: '🇨🇳' },
   { code: 'ja', name: '日本語', flag: '🇯🇵' },
 ]
+
+// The page's lang attribute names the language shown (screen readers, spelling, hyphenation):
+// an unsupported request (ko, nl-NL) resolves to the fallback, which is what the page reads
+i18n.on('languageChanged', (lng) => {
+  const shown = i18n.resolvedLanguage || lng
+  if (typeof document !== 'undefined' && shown) document.documentElement.lang = shown
+})
 
 i18n
   .use(LanguageDetector)
@@ -36,6 +45,7 @@ i18n
       it: { translation: it },
       pt: { translation: pt },
       uk: { translation: uk },
+      ru: { translation: ru },
       zh: { translation: zh },
       ja: { translation: ja },
     },

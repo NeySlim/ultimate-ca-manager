@@ -2,7 +2,8 @@
 Certificate Model - Certificates and CSRs
 """
 import json
-from sqlalchemy import event
+from sqlalchemy import event, text
+from sqlalchemy.orm import validates
 
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -11,6 +12,16 @@ from utils.datetime_utils import utc_now, utc_isoformat
 class Certificate(db.Model):
     """Certificate model"""
     __tablename__ = "certificates"
+    # RFC 5280 §4.1.2.2: one serial per issuing CA (upgrade step 142 on an upgraded 2.254 database)
+    __table_args__ = (
+        db.Index('uix_certificates_ca_serial', 'caref', 'serial_number', unique=True,
+                 sqlite_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"),
+                 postgresql_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''")),
+        # Finds the certificates of a CA carrying a subject (migration 157)
+        db.Index('ix_certificates_caref_subject_key', 'caref', 'subject_key'),
+        # The work queue looks up a later certificate of the same CN in the same CA (migration 139)
+        db.Index('ix_certificates_caref_subject_cn', 'caref', 'subject_cn'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
@@ -24,13 +35,18 @@ class Certificate(db.Model):
     cert_type = db.Column(db.String(50))  # client_cert, server_cert, combined_cert, ca_cert
     subject = db.Column(db.Text)
     subject_cn = db.Column(db.String(255))  # Extracted CN for sorting
+    # utils.dn_match.name_key of the certificate's subject, written with crt
+    subject_key = db.Column(db.String(64))
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100), index=True)
     aki = db.Column(db.String(200))  # Authority Key Identifier (hex, colon-separated)
     ski = db.Column(db.String(200))  # Subject Key Identifier (hex, colon-separated)
     valid_from = db.Column(db.DateTime)
-    valid_to = db.Column(db.DateTime)
+    valid_to = db.Column(db.DateTime, index=True)
     key_algo = db.Column(db.String(50))  # RSA 2048, EC P-256, etc. (for sorting)
+    # Written with key_algo whenever crt is set: the dashboard counts them without parsing PEM
+    key_bits = db.Column(db.Integer)  # RSA/DSA modulus or EC field size; NULL when the key has none
+    sig_hash = db.Column(db.String(20))  # 'sha256', 'sha1'; NULL when the scheme has no separate hash
     
     # Subject Alternative Names (SAN)
     san_dns = db.Column(db.Text)  # JSON array of DNS names
@@ -58,7 +74,7 @@ class Certificate(db.Model):
     
     # Metadata
     imported_from = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, default=utc_now)
+    created_at = db.Column(db.DateTime, default=utc_now, index=True)
     created_by = db.Column(db.String(80))
     
     # Last in-place renewal (naive UTC) and how many there were
@@ -73,6 +89,8 @@ class Certificate(db.Model):
     
     # Template reference (optional - null if created without template)
     template_id = db.Column(db.Integer, db.ForeignKey("certificate_templates.id"), nullable=True)
+    # Windows enrollment profile that issued it; no foreign key, like SCEPRequest.profile_id
+    windows_profile_id = db.Column(db.Integer, nullable=True, index=True)
 
     # Frozen at issuance (issue #258): JSON array of the fields where the
     # effective value diverged from the linked template's declared default
@@ -89,10 +107,29 @@ class Certificate(db.Model):
     # RFC 9763: on B, the A its id-pe-relatedCert names; on A, B once the pair is mutual
     related_certificate_id = db.Column(db.Integer, nullable=True, index=True)
     hybrid_role = db.Column(db.String(16), nullable=True)  # 'classical' or 'pq'
+    # Who the subject was certified to (services.cert.unique_subject): 'acme:<account>',
+    # 'sid:<SID>', 'user:<id>', or 'cert:<refid>' of the certificate this one renews
+    subject_holder = db.Column(db.String(100), nullable=True)
     
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
     template = db.relationship("CertificateTemplate", foreign_keys=[template_id])
+
+    DUPLICATE_SERIAL = "already stored under this CA"
+
+    @validates('serial_number')
+    def _canonical_serial_number(self, key, value):
+        # One stored spelling per serial (utils/serial_format.py), or the unique index misses twins
+        from utils.serial_format import canonical_stored_serial
+        return canonical_stored_serial(value, self.crt)
+
+    @classmethod
+    def stored_under(cls, caref, serial_number):
+        """The row uix_certificates_ca_serial would collide with, or None."""
+        from utils.serial_format import canonical_serial
+        if not caref or not serial_number:
+            return None
+        return cls.query.filter_by(caref=caref, serial_number=canonical_serial(serial_number)).first()
     
     @property
     def template_overrides_list(self) -> list:
@@ -193,8 +230,9 @@ class Certificate(db.Model):
 
     @property
     def common_name(self) -> str:
-        """Extract Common Name from subject, or fallback to first SAN DNS"""
-        cn = self._extract_dn_field('CN')
+        """The first CN of the stored subject (escapes honoured), else the first SAN DNS"""
+        from utils.dn_parse import stored_dn_common_name
+        cn = stored_dn_common_name(self.subject)
         if cn:
             return cn
         # Fallback: use first SAN DNS if available
@@ -225,7 +263,8 @@ class Certificate(db.Model):
         """Extract issuer Common Name"""
         if not self.issuer:
             return ""
-        cn = self._extract_dn_field('CN', self.issuer)
+        from utils.dn_parse import stored_dn_common_name
+        cn = stored_dn_common_name(self.issuer)
         return cn if cn else self.issuer
     
     @property
@@ -268,20 +307,17 @@ class Certificate(db.Model):
             dn_string = self.subject
         if not dn_string:
             return ""
-        prefixes = [f'{field}=']
+        from utils.dn_parse import stored_dn_attribute
+        names = [field]
         alias = self._DN_FIELD_ALIASES.get(field)
         if alias:
-            prefixes.append(f'{alias}=')
+            names.append(alias)
         for short, long in self._DN_FIELD_ALIASES.items():
             if field == long:
-                prefixes.append(f'{short}=')
+                names.append(short)
                 break
-        for part in dn_string.split(','):
-            part = part.strip()
-            for prefix in prefixes:
-                if part.startswith(prefix):
-                    return part[len(prefix):]
-        return ""
+        # Escapes honoured; of several values, the first in the stored string
+        return stored_dn_attribute(dn_string, names) or ""
     
     @property
     def key_algorithm(self) -> str:
@@ -380,8 +416,17 @@ class Certificate(db.Model):
             return ""
         return self.valid_to.strftime("%Y-%m-%d %H:%M:%S UTC")
     
-    def to_dict(self, include_private=False):
-        """Convert to dictionary"""
+    def _windows_profile_name(self, names):
+        if self.windows_profile_id is None:
+            return None
+        if names is not None:
+            return names.get(self.windows_profile_id)
+        from models.windows_profile import WindowsEnrollmentProfile
+        profile = db.session.get(WindowsEnrollmentProfile, self.windows_profile_id)
+        return profile.name if profile else None
+
+    def to_dict(self, include_private=False, windows_profile_names=None):
+        """Convert to dictionary; a list passes ``windows_profile_names`` (id to name) read once"""
         from datetime import datetime, timedelta
         
         # Calculate status
@@ -467,6 +512,9 @@ class Certificate(db.Model):
             "template_id": self.template_id,
             "template_name": self.template.name if self.template_id and self.template else None,
             "template_overrides": self.template_overrides_list,
+            # Windows enrollment profile that issued it; the name is null once the profile is gone
+            "windows_profile_id": self.windows_profile_id,
+            "windows_profile_name": self._windows_profile_name(windows_profile_names),
             # Related certificate pair (RFC 9763)
             "related_certificate_id": self.related_certificate_id,
             "hybrid_role": self.hybrid_role,
@@ -500,10 +548,28 @@ def key_algo_for_certificate(cert):
     return key_algo_for_public_key(cert.public_key())
 
 
+def key_bits_for_certificate(cert):
+    """Modulus or field size of the certificate's key; None when the key has no size."""
+    from utils.foreign_algorithms import describe_public_key
+    foreign = describe_public_key(cert)
+    if foreign:
+        return foreign['key_size'] or None
+    return getattr(cert.public_key(), 'key_size', None)
+
+
+def sig_hash_for_certificate(cert):
+    """Lowercase name of the hash the issuer signed with ('sha256'), None when the scheme has none."""
+    try:
+        algorithm = cert.signature_hash_algorithm
+    except Exception:
+        return None
+    return algorithm.name.lower()[:20] if algorithm is not None else None
+
+
 @event.listens_for(Certificate.crt, 'set')
 def _key_fields_follow_crt(target, value, oldvalue, initiator):
-    # Every issuance path sets crt; key_algo (sorting, compliance) and the
-    # AKI/SKI columns (ACME ARI, chain lookups) follow it
+    # Every issuance path sets crt; key_algo, key_bits, sig_hash (sorting, compliance),
+    # subject_key (subject uniqueness) and the AKI/SKI columns (ACME ARI, chain lookups) follow it
     if not value:
         return
     import base64
@@ -513,10 +579,21 @@ def _key_fields_follow_crt(target, value, oldvalue, initiator):
         cert = x509.load_pem_x509_certificate(base64.b64decode(value))
     except Exception:
         return
+    from utils.serial_format import serial_readings
+    if target.serial_number and cert.serial_number in serial_readings(target.serial_number):
+        target.serial_number = str(cert.serial_number)  # set before crt: the certificate settles it
     try:
         target.key_algo = key_algo_for_certificate(cert) or target.key_algo
+        target.key_bits = key_bits_for_certificate(cert)
     except Exception:
         pass
+    target.sig_hash = sig_hash_for_certificate(cert)
+    try:
+        # Inside the guard: a certificate is stored even when its subject cannot be keyed
+        from utils.dn_match import name_key
+        target.subject_key = name_key(cert.subject)
+    except Exception:
+        target.subject_key = None
     try:
         target.aki = authority_key_identifier_hex(cert)
         target.ski = cert.extensions.get_extension_for_class(

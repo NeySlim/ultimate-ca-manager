@@ -17,8 +17,8 @@ export default {
         title: '规则',
         items: [
           { label: '最大有效期', text: '证书最大生命周期（天数）' },
-          { label: '允许的密钥类型', text: '限制可使用的密钥算法和大小，包括 ML-DSA-44、ML-DSA-65 和 ML-DSA-87；FIPS 模式会移除 ML-DSA' },
-          { label: '允许的签名方案', text: 'PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA 或 SLH-DSA，与签发 CA 的密钥进行匹配。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名' },
+          { label: '允许的密钥类型', text: '限制可使用的密钥算法和大小，包括 ML-DSA-44、ML-DSA-65 和 ML-DSA-87；当 FIPS 模块不批准 ML-DSA 时，FIPS 模式会移除 ML-DSA' },
+          { label: '签名方案（仅限 API）', text: 'allowed_signature_schemes 规则，策略表单中没有该字段：PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA 或 SLH-DSA，与签发 CA 的密钥进行匹配。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名' },
           { label: 'SAN 限制', text: '限制 DNS 名称的数量（其他 SAN 类型不计入）；每个策略一个 DNS 模式（*.company.com，或 company.com 以同时包含该域名本身），将策略限定到匹配的名称' },
           { label: '允许的签名摘要', text: 'SHA-256、SHA-384 或 SHA-512；未选择任何项则允许全部。无人指定摘要时，若默认值被允许则使用默认值，否则使用允许的最弱摘要。签发表单仅提供允许的密钥类型，创建 CA 仅提供允许的密钥类型和摘要' },
         ]
@@ -77,15 +77,15 @@ export default {
 - **EC-P256**: 现代、快速，推荐
 - **EC-P384**: 更高安全性的椭圆曲线
 - **EC-P521**: 最高安全性（很少需要）
-- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: 后量子（FIPS 204），NIST 级别 2、3 和 5；在 FIPS 模式下移除
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: 后量子（FIPS 204），NIST 级别 2、3 和 5；当 FIPS 模块不批准它们时，在 FIPS 模式下移除
 
-**允许的签名方案**限制签发 CA 的签名方式（PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA、SLH-DSA）。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名。
+\`allowed_signature_schemes\` 规则仅能通过 API 设置（策略表单不显示该字段），它限制签发 CA 的签名方式（PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA、SLH-DSA）。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名。
 
 **允许的签名摘要**以同样的方式限制签名摘要（SHA-256、SHA-384、SHA-512）；未选择任何项则允许全部。无人指定摘要时，若默认值被允许则使用默认值，否则使用允许的最弱摘要。签发表单仅提供允许的密钥类型，创建 CA 仅提供允许的密钥类型和摘要。
 
 ### SAN 限制
-- **最大 DNS 名称数**: 限制 SAN 中 DNS 名称的数量；IP、电子邮件和 URI 条目不计入
-- **DNS 模式**: 限制到特定域名模式（例如 \`*.company.com\`）
+- **最大 SAN 数量**: 限制 SAN 中 DNS 名称的数量；IP、电子邮件和 URI 条目不计入。通过 ACME 时，仅出现在 CN 中的 DNS 名称同样计入（RFC 8555 §7.4）
+- **DNS 模式**: 将策略限定于其 CN 或 DNS SAN 匹配的请求，逐个标签比较且忽略大小写：\`*.company.com\` 涵盖 company.com 之下的名称，\`company.com\` 同样涵盖 company.com。其他名称不会被拒绝：策略不适用于它们
 
 ## 审批工作流
 
@@ -101,8 +101,8 @@ export default {
 ## 优先级系统
 
 策略按优先级顺序评估。数字越小优先级越高：
-- **1–10**: 关键安全策略（代码签名、通配符）
-- **10–20**: 标准合规（公共 TLS、内部 PKI）
+- **1-10**: 关键安全策略（代码签名、通配符）
+- **10-20**: 标准合规（公共 TLS、内部 PKI）
 - **20+**: 宽松默认值
 
 当多个策略匹配一个证书请求时，最高优先级（最小数字）的策略决定审批；所有匹配策略的规则一并适用（最小的最大有效期、允许密钥类型的交集，等等）。

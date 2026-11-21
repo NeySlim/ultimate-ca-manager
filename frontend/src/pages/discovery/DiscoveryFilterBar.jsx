@@ -30,7 +30,7 @@ export default function DiscoveryFilterBar({ statusFilter, setStatusFilter, prof
             className={cn(
               'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all',
               (f.id === null && statusFilter.length === 0) || (f.id !== null && statusFilter.includes(f.id))
-                ? 'bg-accent-primary text-white shadow-sm'
+                ? 'bg-accent-primary text-on-accent shadow-sm'
                 : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
             )}
           >

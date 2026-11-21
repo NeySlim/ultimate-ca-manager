@@ -105,8 +105,8 @@ describe('account password change honours its own confirmation field', () => {
       useNotification: () => notifications,
       useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
       useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: ['light', 'dark'] }),
-      useWindowManager: () => ({
-        openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+      useInspector: () => ({
+        openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
         prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
       }),
     }))

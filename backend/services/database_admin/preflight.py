@@ -62,7 +62,10 @@ class PreflightError(Exception):
 #       own schema (``migrations/``, tracked in ``_migrations``), so the stamp
 #       describes a history the target does not share; copying it would tell a
 #       future Alembic run that migrations it never applied are already done.
-IGNORED_TABLES = frozenset({"alembic_version"})
+#   flask_sessions — the SQL session store: live sessions of the old database,
+#       meaningless on the new one and never copied; a non-empty table on the
+#       target still fails check_target_is_empty.
+IGNORED_TABLES = frozenset({"alembic_version", "flask_sessions"})
 
 # Tables that live outside ``db.metadata`` and ARE copied.
 #
@@ -72,16 +75,22 @@ IGNORED_TABLES = frozenset({"alembic_version"})
 #       migration against a schema that already has them.
 INTERNAL_TABLES = frozenset({"_migrations"})
 
+# Present on a target from the start of a copy until its verification passed, one row per kind:
+# a switch copies its accounts again beside 'switch' and refuses them beside 'migration'.
+# Never copied, and skipped by the emptiness count: a migration may restart over it.
+TRANSFER_MARKER = "_transfer_unverified"
+
+
 # {table: {column: reason}} — columns an installation still carries and the
 # models no longer declare, so ``create_all`` does not create them on the
 # target and their values cannot go anywhere.
 #
 # They are the only columns allowed to be left behind, and the same rule as
 # ``services/backup/manifest.py`` applies: a column is copied unless someone
-# wrote down why it is not. They all come from the consolidated baseline
-# (``migrations/000_baseline_v252.py``), and
-# ``tests/test_database_migration_preflight.py`` compares this list to it: a
-# column dropped from a model without a line here fails the suite.
+# wrote down why it is not. They all come from the 2.52 baseline schema, which a
+# 2.254 database upgraded from it still carries, and
+# ``tests/test_database_migration_preflight.py`` compares this list to it (frozen
+# as a fixture): a column dropped from a model without a line here fails the suite.
 #
 # The reason says what became of the value, and that is NOT always "another
 # column carries it". Three of these were replaced by a column that was added
@@ -129,6 +138,13 @@ LEGACY_COLUMNS: Dict[str, Dict[str, str]] = {
                        "migration 030 added the approvals JSON empty",
         "review_comment": "the review trail of the replaced approval model; legacy "
                           "migration 030 added the approvals JSON empty",
+    },
+    "users": {
+        "auth_source": "upgrade step 167 replaced it by the rows of user_sso_identities: "
+                       "an account is local when it has none",
+        "sso_provider_id": "copied to user_sso_identities.provider_id by upgrade step 167",
+        "sso_external_id": "copied to user_sso_identities.external_id by upgrade step 167",
+        "sso_orphan_of": "copied to user_sso_identities.orphan_of by upgrade step 167",
     },
 }
 
@@ -341,7 +357,7 @@ def check_target_is_empty(target_engine) -> Dict[str, int]:
     inspector = _inspector(target_engine, "target")
     tables = _table_names(inspector, "target")
 
-    known = set(expected) | INTERNAL_TABLES | IGNORED_TABLES
+    known = set(expected) | INTERNAL_TABLES | IGNORED_TABLES | {TRANSFER_MARKER}
     foreign = sorted(t for t in tables if t not in known)
     if foreign:
         raise PreflightError(
@@ -373,6 +389,10 @@ def check_target_is_empty(target_engine) -> Dict[str, int]:
     conn = _connect(target_engine, "target")
     try:
         for table in sorted(tables):
+            # The marker is what a failed attempt leaves behind; the retry
+            # sets it again, and any rows copied beside it count in their table.
+            if table == TRANSFER_MARKER:
+                continue
             try:
                 count = _table_row_count(conn, table)
             except PreflightError:

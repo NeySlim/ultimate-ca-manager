@@ -1,7 +1,4 @@
-/**
- * A later major version is an explicit, recommended upgrade shown from the
- * check's data, and the security-maintenance notice comes from the same data.
- */
+/** A later major version is an explicit, confirmed upgrade shown apart from the update. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 
@@ -35,13 +32,13 @@ vi.mock('../index.js', () => ({
 import { UpdateChecker } from '../UpdateChecker'
 
 const UPGRADE = {
-  version: '7.3', html_url: 'https://example.invalid/releases/v7.3', release_notes: '',
-  download_url: 'http://x/ucm_7.3_all.deb',
+  version: '4.3', html_url: 'https://example.invalid/releases/v4.3', release_notes: '',
+  download_url: 'http://x/ucm_4.3_all.deb',
 }
 const check = (over = {}) => ({
   data: {
-    update_available: false, can_auto_update: true, current_version: '2.254.1',
-    latest_version: '2.254.1', security_maintenance: true, major_upgrade: UPGRADE, ...over,
+    update_available: false, can_auto_update: true, current_version: '3.1',
+    latest_version: '3.1', major_upgrade: UPGRADE, ...over,
   },
 })
 const flush = () => act(async () => {})
@@ -55,21 +52,20 @@ describe('upgrade to a later major version', () => {
     mocks.waitForRestart.mockReset()
   })
 
-  it('shows the recommended section with the version of the data and installs on confirmation', async () => {
+  it('shows the section with the version of the data and installs on confirmation', async () => {
     mocks.get.mockResolvedValue(check())
     render(<UpdateChecker />)
     await flush()
-    expect(screen.getByText(title('7.3'))).toBeInTheDocument()
-    expect(screen.getByText('settings.majorUpgradeRecommended')).toBeInTheDocument()
+    expect(screen.getByText(title('4.3'))).toBeInTheDocument()
     expect(screen.getByText('settings.majorUpgradeDesc')).toBeInTheDocument()
     expect(screen.getByText('settings.majorUpgradeNotes').closest('a'))
-      .toHaveAttribute('href', 'https://example.invalid/releases/v7.3')
+      .toHaveAttribute('href', 'https://example.invalid/releases/v4.3')
 
     fireEvent.click(screen.getByText('settings.majorUpgradeInstall'))
     await flush()
     expect(mocks.showConfirm).toHaveBeenCalledTimes(1)
-    expect(mocks.post).toHaveBeenCalledWith('/system/updates/install', { major_upgrade: true, version: '7.3' })
-    expect(mocks.waitForRestart).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: '7.3' }))
+    expect(mocks.post).toHaveBeenCalledWith('/system/updates/install', { major_upgrade: true, version: '4.3' })
+    expect(mocks.waitForRestart).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: '4.3' }))
   })
 
   it('installs nothing when the confirmation is declined', async () => {
@@ -88,10 +84,10 @@ describe('upgrade to a later major version', () => {
     await flush()
     expect(screen.queryByText(/settings\.majorUpgrade/)).toBeNull()
 
-    mocks.get.mockResolvedValueOnce(check({ major_upgrade: { ...UPGRADE, version: '8.0' } }))
+    mocks.get.mockResolvedValueOnce(check({ major_upgrade: { ...UPGRADE, version: '5.0' } }))
     fireEvent.click(screen.getByText('settings.checkNow'))
     await flush()
-    expect(screen.getByText(title('8.0'))).toBeInTheDocument()
+    expect(screen.getByText(title('5.0'))).toBeInTheDocument()
 
     mocks.get.mockResolvedValueOnce(check({ major_upgrade: null }))
     fireEvent.click(screen.getByText('settings.checkNow'))
@@ -104,50 +100,74 @@ describe('upgrade to a later major version', () => {
     mocks.get.mockResolvedValue(check({ can_auto_update: false, major_upgrade: { ...UPGRADE, download_url: null } }))
     render(<UpdateChecker />)
     await flush()
-    expect(screen.getByText(title('7.3'))).toBeInTheDocument()
+    expect(screen.getByText(title('4.3'))).toBeInTheDocument()
     expect(screen.getByText(
-      `settings.majorUpgradeDocker:${JSON.stringify({ image: 'ghcr.io/neyslim/ultimate-ca-manager:7.3' })}`,
+      `settings.majorUpgradeDocker:${JSON.stringify({ image: 'ghcr.io/neyslim/ultimate-ca-manager:4.3' })}`,
     )).toBeInTheDocument()
     expect(screen.queryByText('settings.majorUpgradeInstall')).toBeNull()
   })
 
-  it('under Docker shows the image the server names, the FIPS variant included', async () => {
-    const image = 'ghcr.io/neyslim/ultimate-ca-manager:7.3-fips'
+  it('under Docker shows the image the server names', async () => {
+    const image = 'ghcr.io/neyslim/ultimate-ca-manager:4.3-fips'
     mocks.get.mockResolvedValue(check({
       can_auto_update: false,
-      major_upgrade: { version: '7.3', html_url: 'https://example.invalid/r', download_url: image },
+      major_upgrade: { version: '4.3', html_url: 'https://example.invalid/r', download_url: image },
     }))
     render(<UpdateChecker />)
     await flush()
     expect(screen.getByText(`settings.majorUpgradeDocker:${JSON.stringify({ image })}`)).toBeInTheDocument()
   })
+
+  it('asks the confirmation that fits the mode: a restart, or a rolling update in HA', async () => {
+    const values = JSON.stringify({ current: '3.1', version: '4.3' })
+    mocks.get.mockResolvedValueOnce(check())
+    const first = render(<UpdateChecker />)
+    await flush()
+    fireEvent.click(screen.getByText('settings.majorUpgradeInstall'))
+    await flush()
+    expect(mocks.showConfirm.mock.calls[0][0]).toBe(`settings.majorUpgradeConfirm:${values}`)
+    first.unmount()
+
+    mocks.get.mockResolvedValueOnce(check({ ha_mode: true }))
+    render(<UpdateChecker />)
+    await flush()
+    fireEvent.click(screen.getByText('settings.majorUpgradeInstall'))
+    await flush()
+    expect(mocks.showConfirm.mock.calls[1][0]).toBe(`settings.majorUpgradeConfirmHa:${values}`)
+  })
+
+  it('in HA starts a campaign instead of waiting for a restart', async () => {
+    const campaign = { id: 'c1', status: 'stopped', target: '4.3', order: [], done: [], current: null, failed: null, skipped: [] }
+    mocks.get.mockResolvedValue(check({ ha_mode: true }))
+    mocks.post.mockResolvedValue({ data: { campaign } })
+    render(<UpdateChecker />)
+    await flush()
+    fireEvent.click(screen.getByText('settings.majorUpgradeInstall'))
+    await flush()
+    expect(mocks.post).toHaveBeenCalledWith('/system/updates/install', { major_upgrade: true, version: '4.3' })
+    expect(mocks.waitForRestart).not.toHaveBeenCalled()
+  })
 })
 
-describe('security maintenance notice', () => {
-  beforeEach(() => { mocks.get.mockReset() })
-
-  it('is shown without a later major, with no upgrade sentence', async () => {
-    mocks.get.mockResolvedValue(check({ major_upgrade: null }))
+describe('docker hint of an ordinary update', () => {
+  it('names the tag of the new version, never latest', async () => {
+    mocks.get.mockResolvedValue(check({
+      update_available: true, can_auto_update: false, latest_version: '3.2', major_upgrade: null,
+      download_url: null,
+    }))
     render(<UpdateChecker />)
     await flush()
-    expect(screen.getByText('settings.securityMaintenanceTitle')).toBeInTheDocument()
-    expect(screen.getByText('settings.securityMaintenanceNotice')).toBeInTheDocument()
-    expect(screen.queryByText(/settings\.securityMaintenanceUpgrade/)).toBeNull()
+    expect(screen.getByText(/docker pull ghcr\.io\/neyslim\/ultimate-ca-manager:3\.2/)).toBeInTheDocument()
+    expect(screen.queryByText(/:latest/)).toBeNull()
   })
 
-  it('recommends the later major the data names', async () => {
-    mocks.get.mockResolvedValue(check())
+  it('shows the image the server names when it names one', async () => {
+    mocks.get.mockResolvedValue(check({
+      update_available: true, can_auto_update: false, latest_version: '3.2', major_upgrade: null,
+      download_url: 'ghcr.io/neyslim/ultimate-ca-manager:3.2-fips',
+    }))
     render(<UpdateChecker />)
     await flush()
-    expect(screen.getByText(
-      `settings.securityMaintenanceUpgrade:${JSON.stringify({ version: '7.3' })}`,
-    )).toBeInTheDocument()
-  })
-
-  it('follows the data, not a constant', async () => {
-    mocks.get.mockResolvedValue(check({ security_maintenance: false, major_upgrade: null }))
-    render(<UpdateChecker />)
-    await flush()
-    expect(screen.queryByText('settings.securityMaintenanceNotice')).toBeNull()
+    expect(screen.getByText(/docker pull ghcr\.io\/neyslim\/ultimate-ca-manager:3\.2-fips/)).toBeInTheDocument()
   })
 })

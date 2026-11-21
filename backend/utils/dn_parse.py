@@ -116,10 +116,16 @@ def _split_unescaped(text: str, separators: str) -> list[str]:
     return parts
 
 
+def stored_dn_common_name(dn) -> str | None:
+    """The first CN of a DN kept as text (for a stored `rfc4514_string()`, the most
+    specific one), or None. Reads what `get_dn_attribute` reads, and also what RFC 4514
+    allows and ldap3 refuses: a numeric OID type, an unescaped '=', an empty value."""
+    return stored_dn_attribute(dn, ('cn', '2.5.4.3'))
+
+
 def stored_dn_attribute(dn, types) -> str | None:
-    """The first value, in the string, of an attribute named in `types` (any case), or None.
-    Reads what `get_dn_attribute` reads, and also what RFC 4514 allows and ldap3 refuses:
-    a numeric OID type, an unescaped '=', an empty value."""
+    """The first value, in the string, of an attribute named in `types` (any case),
+    read as `stored_dn_common_name` reads a CN; None when there is none."""
     if not dn:
         return None
     wanted = {t.casefold() for t in types}
@@ -171,3 +177,14 @@ def subject_common_name(subject) -> str | None:
     """
     attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     return attrs[0].value if attrs else None
+
+
+def most_specific_common_name(subject) -> str | None:
+    """The LAST commonName of an x509 subject (the leaf of a directory path), or None.
+
+    Directory subjects (EST, WSTEP, import) take this one; paths where an operator
+    chooses or a CN is verified (ACME, CSR signing, SCEP, completion of an external
+    certificate) take `subject_common_name`.
+    """
+    attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    return attrs[-1].value if attrs else None

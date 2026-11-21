@@ -11,6 +11,7 @@ import pytest
 
 from models import db
 from services.backup import manifest
+from services.notification.scheduler import EXPIRY_LEASE_KEY, EXPIRY_WEBHOOKS_MARK_KEY
 
 
 def _model_of(section):
@@ -45,7 +46,7 @@ class TestEveryTableIsDecidedAbout:
 
     def test_excluded_tables_still_exist(self, registered_tables):
         stale = sorted(set(manifest.EXCLUDED_TABLES) - registered_tables
-                       - {'schema_migrations', 'alembic_version'})
+                       - {'schema_migrations', 'alembic_version', 'flask_sessions'})
         assert not stale, f"the manifest excludes tables that are gone: {stale}"
 
 
@@ -275,3 +276,55 @@ def test_an_acme_order_carries_its_pending_key_and_link_not_its_lease(app):
             db.session.delete(child)
             db.session.delete(parent)
             db.session.commit()
+
+
+class TestClusterStateStaysLocal:
+    def test_scheduler_state_is_neither_exported_nor_restored(self, app, monkeypatch):
+        """Another cluster's scheduler state must not come back with a restore."""
+        from types import SimpleNamespace
+        from models import SystemConfig
+        from services.backup import BackupService, export_core
+        from services.scheduler_service import STATE_KEY
+
+        with app.app_context():
+            SystemConfig.query.filter_by(key=STATE_KEY).delete()
+            db.session.commit()
+            row = SystemConfig(key=STATE_KEY, value='{"pid": 1, "tasks": {}}', encrypted=False)
+            monkeypatch.setattr(export_core, 'SystemConfig', SimpleNamespace(
+                query=SimpleNamespace(all=lambda: [row])))
+            exported = BackupService()._export_configuration(True)
+            monkeypatch.undo()
+            assert STATE_KEY not in exported['settings']
+
+            configuration = {'settings': {STATE_KEY: '{"pid": 1, "tasks": {}}'}}
+            BackupService()._restore_settings({'configuration': configuration}, {'settings': 0})
+            db.session.commit()
+            assert SystemConfig.query.filter_by(key=STATE_KEY).first() is None
+
+    @pytest.mark.parametrize('key', ['backup.last_run', 'backup.concluded_run',
+                                     EXPIRY_WEBHOOKS_MARK_KEY, EXPIRY_LEASE_KEY,
+                                     'crl_schedule_lease_7'])
+    def test_the_backup_schedule_state_is_neither_exported_nor_restored(self, app, key):
+        """An archive carries its own reservation, not yet concluded: restored, the
+        schedule would report a run in progress that does not exist."""
+        from models import SystemConfig
+        from services.backup import BackupService
+
+        with app.app_context():
+            saved = SystemConfig.query.filter_by(key=key).first()
+            saved = saved.value if saved else None
+            try:
+                SystemConfig.query.filter_by(key=key).delete()
+                db.session.add(SystemConfig(key=key, value='2026-01-01T00:00:00Z'))
+                db.session.commit()
+                assert key not in BackupService()._export_configuration(True)['settings']
+
+                configuration = {'settings': {key: '2030-01-01T00:00:00Z'}}
+                BackupService()._restore_settings({'configuration': configuration}, {'settings': 0})
+                db.session.commit()
+                assert SystemConfig.query.filter_by(key=key).one().value == '2026-01-01T00:00:00Z'
+            finally:
+                SystemConfig.query.filter_by(key=key).delete()
+                if saved is not None:
+                    db.session.add(SystemConfig(key=key, value=saved))
+                db.session.commit()

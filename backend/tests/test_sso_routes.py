@@ -11,6 +11,25 @@ import pytest
 import json
 from tests.conftest import get_json
 
+@pytest.fixture(scope='module', autouse=True)
+def _own_saml_provider(app):
+    """One provider per type is allowed: a SAML row another file of the worker left would
+    fail the CRUD tests, so the module starts without one and leaves none."""
+    from models import SSOProvider, db
+    from models.sso import SSOSession
+
+    def clear():
+        with app.app_context():
+            saml = [p.id for p in SSOProvider.query.filter_by(provider_type='saml')]
+            SSOSession.query.filter(SSOSession.provider_id.in_(saml)).delete(synchronize_session=False)
+            SSOProvider.query.filter_by(provider_type='saml').delete()
+            db.session.commit()
+
+    clear()
+    yield
+    clear()
+
+
 def _post(client, url, data=None):
     return client.post(
         url,
@@ -199,6 +218,35 @@ class TestSSOProviderValidation:
         })
         assert r.status_code == 400
 
+    @pytest.mark.parametrize('name', ['', '   ', None, 5, ['x']])
+    def test_create_refuses_a_name_that_is_not_blank_free_text(self, app, auth_client, name):
+        from models import SSOProvider
+        r = _post(auth_client, '/api/v2/sso/providers', {
+            'name': name, 'provider_type': 'ldap', 'enabled': False,
+            'ldap_server': 'ldap.example.com', 'ldap_base_dn': 'dc=example,dc=com',
+        })
+        with app.app_context():
+            created = SSOProvider.query.filter_by(ldap_server='ldap.example.com').count()
+            SSOProvider.query.filter_by(ldap_server='ldap.example.com').delete()
+            SSOProvider.query.session.commit()
+        assert r.status_code == 400, r.data
+        assert 'Provider name' in get_json(r)['message'], r.data
+        assert created == 0
+
+    @pytest.mark.parametrize('name', ['', '   ', None, 5, ['x']])
+    def test_update_refuses_a_name_that_is_not_blank_free_text(self, app, auth_client, name):
+        listed = get_json(auth_client.get('/api/v2/sso/providers')).get('data', [])
+        saml = next(p for p in listed if p['name'] == 'Test SAML')
+        from models import SSOProvider, db
+        r = _put(auth_client, f'/api/v2/sso/providers/{saml["id"]}', {'name': name})
+        again = get_json(auth_client.get(f'/api/v2/sso/providers/{saml["id"]}'))['data']
+        with app.app_context():
+            db.session.get(SSOProvider, saml['id']).name = 'Test SAML'
+            db.session.commit()
+        assert r.status_code == 400, r.data
+        assert 'Provider name' in get_json(r)['message'], r.data
+        assert again['name'] == 'Test SAML'
+
     def test_create_missing_type(self, auth_client):
         r = _post(auth_client, '/api/v2/sso/providers', {
             'name': 'Missing Type',
@@ -220,12 +268,28 @@ class TestSSOProviderValidation:
         assert r.status_code == 400
 
     def test_create_duplicate_type(self, auth_client):
-        """Only one provider per type allowed."""
-        r = _post(auth_client, '/api/v2/sso/providers', {
-            'name': 'Another SAML',
-            'provider_type': 'saml',
-        })
-        assert r.status_code == 400
+        """Only one provider per type allowed: the one it needs is its own, removed afterwards."""
+        listed = get_json(auth_client.get('/api/v2/sso/providers')).get('data', [])
+        own = None
+        if not any(p['provider_type'] == 'saml' for p in listed):
+            r = _post(auth_client, '/api/v2/sso/providers', {
+                'name': 'Duplicate type first', 'provider_type': 'saml', 'enabled': False,
+                'saml_entity_id': 'dup', 'saml_sso_url': 'https://idp.example.com/sso',
+                'saml_certificate': 'dup',
+            })
+            assert r.status_code in (200, 201), r.data
+            own = get_json(r)['data']['id']
+        try:
+            r = _post(auth_client, '/api/v2/sso/providers', {
+                'name': 'Another SAML', 'provider_type': 'saml', 'enabled': False,
+                'saml_entity_id': 'dup2', 'saml_sso_url': 'https://idp.example.com/sso',
+                'saml_certificate': 'dup2',
+            })
+            assert r.status_code == 400, r.data
+            assert 'Only one provider per type' in get_json(r)['message'], r.data
+        finally:
+            if own is not None:
+                assert auth_client.delete(f'/api/v2/sso/providers/{own}').status_code == 200
 
 
 # ============================================================
@@ -308,6 +372,79 @@ class TestSAMLMetadata:
         assert r.status_code == 200
         assert len(calls) == 1
         assert calls[0][0] == 'https://93.184.216.34/metadata'
+
+    @pytest.fixture
+    def saml_row(self, app):
+        """A saved SAML provider with TLS verification on and no saved CA bundle."""
+        from models import SSOProvider, db
+        with app.app_context():
+            SSOProvider.query.filter_by(provider_type='saml').delete()
+            row = SSOProvider(name='rep24b-saml', provider_type='saml', saml_verify_ssl=True)
+            db.session.add(row)
+            db.session.commit()
+            pid = row.id
+        yield pid
+        with app.app_context():
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
+
+    def _verify_sent(self, auth_client, monkeypatch, body):
+        seen = []
+
+        class _Resp:
+            text = '<x/>'
+
+            def raise_for_status(self):
+                return None
+
+        def fake_get(url, **kwargs):
+            v = kwargs['verify']
+            if isinstance(v, str):
+                with open(v) as fh:
+                    v = ('bundle', fh.read())
+            seen.append(v)
+            return _Resp()
+
+        monkeypatch.setattr('api.v2.sso.sessions.safe_request_get', fake_get)
+        monkeypatch.setattr('api.v2.sso.sessions._parse_saml_metadata', lambda _t: {})
+        r = _post(auth_client, '/api/v2/sso/saml/metadata/fetch',
+                  {'metadata_url': 'https://93.184.216.34/metadata', **body})
+        assert r.status_code == 200, r.data
+        return seen[0]
+
+    def test_typed_skip_verify_beats_the_saved_setting(self, auth_client, monkeypatch, saml_row):
+        assert self._verify_sent(auth_client, monkeypatch,
+                                 {'provider_id': saml_row, 'verify_ssl': False}) is False
+
+    def test_typed_ca_bundle_beats_the_saved_setting(self, auth_client, monkeypatch, saml_row):
+        got = self._verify_sent(auth_client, monkeypatch,
+                                {'provider_id': saml_row, 'verify_ssl': True, 'ca_bundle': 'PEM-TEXT'})
+        assert got == ('bundle', 'PEM-TEXT')
+
+    def test_saved_setting_applies_when_nothing_is_typed(self, auth_client, monkeypatch, saml_row, app):
+        from models import SSOProvider, db
+        assert self._verify_sent(auth_client, monkeypatch, {'provider_id': saml_row}) is True
+        with app.app_context():
+            SSOProvider.query.filter_by(id=saml_row).update({'saml_verify_ssl': False})
+            db.session.commit()
+        assert self._verify_sent(auth_client, monkeypatch, {'provider_id': saml_row}) is False
+
+    def test_unknown_provider_id_uses_the_typed_values(self, auth_client, monkeypatch):
+        assert self._verify_sent(auth_client, monkeypatch,
+                                 {'provider_id': 987654, 'verify_ssl': False}) is False
+
+    def test_ssl_error_message_names_the_setting_without_telling_to_tick_a_box(self, auth_client, monkeypatch):
+        import requests
+
+        def bad(url, **kwargs):
+            raise requests.exceptions.SSLError('bad cert')
+
+        monkeypatch.setattr('api.v2.sso.sessions.safe_request_get', bad)
+        r = _post(auth_client, '/api/v2/sso/saml/metadata/fetch',
+                  {'metadata_url': 'https://93.184.216.34/metadata'})
+        assert r.status_code == 400
+        assert "Enable 'Skip SSL Verification'" not in get_json(r)['message']
+        assert 'turn SSL verification off' in get_json(r)['message']
 
     def test_saml_certificates_list(self, auth_client):
         r = auth_client.get('/api/v2/sso/saml/certificates')

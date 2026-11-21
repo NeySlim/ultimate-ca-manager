@@ -298,13 +298,14 @@ def pending_target_ids(request_type: str, key: str) -> dict:
     return targets
 
 
-def expire_stale_requests(commit: bool = True) -> int:
+def expire_stale_requests(commit: bool = True, notify: bool = False) -> int:
     """Close the pending requests past their deadline as ``expired``. The
     approve and reject routes did so one request at a time when it was
     acted on; the pending list, the counters and the hourly task do it for
     all of them, so they neither accumulate nor pass for pending. Nothing
     is written when there is nothing to expire (the list is a read); a
-    request an approver is acting on at that moment is left to them."""
+    request an approver is acting on at that moment is left to them.
+    Only the scheduled task passes *notify*: a read never calls Intune."""
     from sqlalchemy import and_, or_
     from utils.datetime_utils import utc_now
     now = utc_now().replace(tzinfo=None)
@@ -327,12 +328,21 @@ def expire_stale_requests(commit: bool = True) -> int:
             return 0
     if count:
         logger.info("Expired %s stale approval request(s)", count)
+        if commit:
+            # The protocols follow once the expiry is durable (ACME order invalid, SCEP request rejected)
+            from services.protocol_approval import REQUEST_TYPE_PROTOCOLS, propagate_closed
+            propagate_closed(ApprovalRequest.query.filter(
+                ApprovalRequest.id.in_(stale_ids), ApprovalRequest.status == 'expired',
+                ApprovalRequest.request_type.in_(tuple(REQUEST_TYPE_PROTOCOLS))).all(), notify=notify)
     return count
 
 
 def scheduled_expiry():
-    """Scheduler entry point."""
-    return expire_stale_requests()
+    """Scheduler entry point: expires, then sends the notices reads left owed."""
+    from services.protocol_approval import send_pending_notices
+    count = expire_stale_requests(notify=True)
+    send_pending_notices()
+    return count
 
 
 def request_snapshots(resolved: list) -> list:

@@ -13,7 +13,7 @@ This module verifies the *cryptographic* signature only — it proves the
 sender possesses the private key matching the embedded certificate. It
 does **not** decide whether that certificate should be trusted (chains to
 a UCM-issued cert, not expired, not revoked); the caller
-(``wstep_service.renew``) is responsible for that. Unlike EST's mTLS
+(``wstep_service.renew``, after the route finds its profile) is responsible for that. Unlike EST's mTLS
 renewal, where TLS already validated the presented cert's trust chain
 before the app layer ever saw it, nothing here has validated trust yet —
 signature verification alone only proves possession of a private key,
@@ -26,7 +26,7 @@ its own independent, position-based search of the document, which is not
 guaranteed to land on the same element this module verified. Callers
 must use ``SignedContent.covers()`` (returned alongside the cert) to
 confirm the specific element they intend to trust was actually inside
-the verified signature before relying on it -- see ``wstep_service.renew``.
+the verified signature before relying on it -- see ``wstep_service.signed_request_certificate``.
 """
 import base64
 from dataclasses import dataclass, field

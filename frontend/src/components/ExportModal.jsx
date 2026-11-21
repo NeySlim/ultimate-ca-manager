@@ -114,9 +114,12 @@ export function ExportModal({
   const isJks = format === 'jks'
   const isKeyOnly = format === 'key'
   const isBundle = format === 'hybrid-bundle'
+  // DER holds one certificate; P7B holds certificates only (the server refuses the rest)
+  const carriesChain = !isBundle && format !== 'der'
+  const carriesKey = format !== 'der' && format !== 'pkcs7'
   const keyOffered = hasPrivateKey && canExportKey
     && (!isBundle || relatedHasKey === true || relatedHasKey === RELATED_KEY_UNKNOWN)
-  const effectiveIncludeKey = (isPkcs12 || isJks || isKeyOnly) ? true : includeKey && keyOffered
+  const effectiveIncludeKey = (isPkcs12 || isJks || isKeyOnly) ? true : includeKey && keyOffered && carriesKey
   const needsPassword = isPkcs12 || isJks
   const showPasswordField = isPkcs12 || isJks
 
@@ -146,12 +149,12 @@ export function ExportModal({
     setExporting(true)
     try {
       await onExport(format, {
-        includeChain: includeChain && !isBundle,
-        includeRoot: includeRoot && !isBundle,
+        includeChain: includeChain && carriesChain,
+        includeRoot: includeRoot && carriesChain,
         includeKey: effectiveIncludeKey,
         password: (isPkcs12 || isJks) ? password : undefined,
         legacy: isPkcs12 ? legacy : undefined,
-        chainVariant: includeChain && chainVariant !== 'auto' ? chainVariant : undefined,
+        chainVariant: includeChain && carriesChain && chainVariant !== 'auto' ? chainVariant : undefined,
       })
       onClose()
     } catch {
@@ -222,14 +225,14 @@ export function ExportModal({
         </div>
 
         {/* Options — hidden for key-only export */}
-        {!isKeyOnly && (
+        {!isKeyOnly && format !== 'der' && (
         <div className="space-y-2">
           <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
             {t('export.options', 'Options')}
           </label>
 
           {/* Include chain; the hybrid bundle holds the pair only */}
-          {!isBundle && (<>
+          {carriesChain && (<>
           <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
             <input
               type="checkbox"
@@ -278,7 +281,7 @@ export function ExportModal({
           </>)}
 
           {/* Include private key — only if key exists AND user has permission */}
-          {keyOffered && !isPkcs12 && !isJks && (
+          {keyOffered && carriesKey && !isPkcs12 && !isJks && (
             <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
               <input
                 type="checkbox"

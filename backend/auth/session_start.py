@@ -61,26 +61,59 @@ def session_is_current(user) -> bool:
     with the same id. A session opened before the proof existed gets it on its first
     request, only if it was opened for this username after this account was created."""
     from auth.session_epoch import holds_current_epoch
-    if session.get('session_version', 0) != (user.session_version or 0) \
-            or not holds_current_epoch(session):
+    if (session.get('session_version', 0) != (user.session_version or 0)
+            or not holds_account(session, user) or not holds_current_epoch(session)):
         return False
-    proof = session.get(ACCOUNT_KEY)
-    if proof is None:
-        if session.get('username') != user.username or not _opened_after_creation(user):
-            return False
+    if session.get(ACCOUNT_KEY) is None:
         session[ACCOUNT_KEY] = account_proof(user)
-        return True
+    return True
+
+
+def holds_account(data, user) -> bool:
+    """Whether session ``data`` was opened for this account, not for an earlier one of its id:
+    by its proof, else by this username and a login not before the account's creation."""
+    proof = data.get(ACCOUNT_KEY)
+    if proof is None:
+        return data.get('username') == user.username and _opened_after_creation(data, user)
     return proof == account_proof(user)
 
 
-def _opened_after_creation(user) -> bool:
+def _opened_after_creation(data, user) -> bool:
     """Whether the session's login time (naive UTC) is not before the account's creation."""
     from datetime import datetime
     from utils.datetime_utils import to_naive_utc
     try:
-        opened = to_naive_utc(datetime.fromisoformat(session.get('login_time') or ''))
+        opened = to_naive_utc(datetime.fromisoformat(data.get('login_time') or ''))
     except (TypeError, ValueError):
         return False
     created = to_naive_utc(user.created_at)
     # Every account created since the column exists has a time: NULL is never a recreated one
     return created is None or opened >= created
+
+
+def sessions_closed_by(user):
+    """After ``user.end_sessions()`` is committed: the caller's own session stays, and
+    the count of the account's other sessions that ended (None: store not listed)."""
+    keep_own_session(user)
+    replaced, _new = getattr(user, '_sessions_bump', (None, None))
+    if replaced is None:
+        return 0
+    from utils.session_census import count_sessions
+    return count_sessions(user, replaced)
+
+
+def closed_sessions_note(count):
+    """Audit wording of sessions_closed_by()."""
+    if count is None:
+        return 'other sessions closed'
+    return f"{count} other session{'' if count == 1 else 's'} closed"
+
+
+def end_sessions_on_commit(user_id):
+    """The account row, locked, its sessions ended in the transaction the factor change
+    commits: change and closure stand or fall together. None: no such account."""
+    from auth.twofa_enforcement import lock_user
+    owner = lock_user(user_id)
+    if owner is not None:
+        owner.end_sessions()
+    return owner

@@ -4,7 +4,6 @@ Handles creation of encrypted, portable backup archives
 """
 import os
 import json
-import gzip
 import struct
 import uuid
 import hashlib
@@ -12,7 +11,7 @@ import base64
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Callable, Dict, Any, Iterator, List, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -36,8 +35,9 @@ from utils.randomness import csp_bytes
 logger = logging.getLogger(__name__)
 
 from . import container
+from .container import ContainerError
 from .errors import BackupExportError
-from .export_generic import IdentityIndex, export_section, identity_of, load_model
+from .export_generic import IdentityIndex, export_section, identity_of, iter_section, load_model
 from .manifest import SECTIONS
 from .export_core import ExportCoreMixin
 from .export_extended import ExportExtendedMixin
@@ -83,21 +83,26 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                    RestoreNotificationsMixin, RestorePoliciesMixin, RestoreExtendedMixin):
     """Service for creating encrypted system backups
 
-    Format v3 container layout (written today):
+    Format v4 container layout (written today):
         [0:4]      magic = b'UCMB'
-        [4]        format_version = 0x03
-        [5]        flags (bit 0 = gzip-compressed plaintext)
+        [4]        format_version = 0x04
+        [5]        flags (bit 0 = gzip-compressed chunks)
         [6]        kdf_id (1=PBKDF2-SHA256, 2=Argon2id)
         [7]        reserved = 0x00
         [8:10]     metadata_len (big-endian uint16)
         [10:10+N]  metadata JSON (cleartext header: ucm_version, created_at,
-                   backup_type, kdf params, salt_b64, nonce_b64)
-        [10+N:]    AES-256-GCM ciphertext (plaintext = gzipped JSON if flag set)
+                   backup_type, kdf params, salt_b64, nonce_base_b64,
+                   chunk_max, sections)
+        then       chunks: len (big-endian uint32) || AES-256-GCM ciphertext
 
-    The whole header, bytes 0 to 10+N, is the GCM additional data: editing any
-    of it (the announced version, the backup type, the KDF profile, the salt)
-    breaks the tag. Format v2 is identical but authenticates only the magic,
-    so its header could be rewritten at will; it is still read, never written.
+    Chunk i is sealed with nonce = nonce_base || i (uint32) and additional
+    data = header || i || last flag. It holds one part of one section
+    `{"section", "part", "rows"}`; the last chunk is the end record carrying
+    each section's SHA-256, part and row counts. See container.py.
+
+    Format v3 is a single GCM ciphertext after the same header, the whole
+    header as additional data; v2 authenticates only the magic. Both are
+    still read, never written.
 
     Format v1 (legacy): raw 32-byte salt + 12-byte nonce + GCM ciphertext.
     restore_backup() auto-detects the format from the magic bytes.
@@ -113,6 +118,8 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
     MAGIC = container.MAGIC
     FORMAT_VERSION_V2 = container.FORMAT_VERSION_V2
     FORMAT_VERSION_V3 = container.FORMAT_VERSION_V3
+    FORMAT_VERSION_V4 = container.FORMAT_VERSION_V4
+    CHUNK_MAX = container.CHUNK_MAX_DEFAULT
     FLAG_GZIP = container.FLAG_GZIP
     KDF_PBKDF2 = container.KDF_PBKDF2
     KDF_ARGON2ID = container.KDF_ARGON2ID
@@ -135,7 +142,6 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
     def __init__(self):
         self.app_version = Config.APP_VERSION
         self.last_payload_size = 0    # decompressed bytes of the last archive created
-        self.last_payload_containers = 0
         self.last_export_warnings = []  # what the last export left out, to say in its result
     def create_backup(
         self,
@@ -144,17 +150,30 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         include: Optional[Dict[str, bool]] = None,
         kdf: Optional[str] = None
     ) -> bytes:
+        """The whole archive in memory: `iter_backup` joined, for callers that need bytes."""
+        return b''.join(self.iter_backup(password, backup_type, include, kdf))
+
+    def iter_backup(
+        self,
+        password: str,
+        backup_type: str = "full",
+        include: Optional[Dict[str, bool]] = None,
+        kdf: Optional[str] = None,
+        progress: Optional[Callable[..., None]] = None,
+    ) -> Iterator[bytes]:
         """
-        Create encrypted backup archive
+        Yield an encrypted v4 archive: the header, then one chunk at a time
 
         Args:
             password: Encryption password (min 12 chars)
             backup_type: "full", "database", or "certificates"
             include: Dict of what to include (cas, certificates, users, etc.)
             kdf: "pbkdf2" or "argon2id"; None picks Argon2id when it can
+            progress: called as progress(done, total) before each section and the end,
+                and as progress() between two rows; what it raises stops the export
 
-        Returns:
-            Encrypted backup as bytes
+        Sections are read a page at a time and written as they come: no step
+        holds a section, only a page of rows and the chunk being filled.
         """
         # Validate password
         self._validate_password(password)
@@ -193,36 +212,36 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
 
         index = IdentityIndex()
         self.last_export_warnings = []
-        custom_exporters = {
-            'configuration': self._export_configuration,
-            'certificate_authorities': self._export_cas,
-            'certificates': self._export_certificates,
-            'revoked_serials': self._export_revoked_serials,
-            'ssh_cas': self._export_ssh_cas,
+        self.last_payload_size = 0
+        # The dedicated part of one row, laid over the manifest's columns of it
+        row_exporters = {
+            'certificate_authorities': self._ca_row,
+            'certificates': self._certificate_row,
+            'revoked_serials': self._revoked_serial_row,
+            'ssh_cas': self._ssh_ca_row,
         }
 
-        backup_data = {'metadata': self._get_metadata(backup_type)}
-        for name, section in SECTIONS.items():
-            wanted = include.get(name, not section.optional)
-            if not wanted:
-                backup_data[name] = {} if name == 'configuration' else []
-                continue
+        def guarded(name, read):
+            """A section's rows as they are read: a failure on any of them aborts the backup."""
+            try:
+                yield from read()
+            except BackupExportError:
+                raise
+            except Exception as exc:
+                logger.error("Backup export of section '%s' failed: %s", name, exc,
+                             exc_info=True)
+                raise BackupExportError(
+                    f"Section '{name}' could not be exported"
+                ) from exc
 
-            if name in custom_exporters:
-                rows = _section(name, custom_exporters[name], True)
-                if section.custom and name != 'configuration':
-                    rows = _section(
-                        name, self._merge_with_manifest, name, rows, index)
-            else:
-                rows = _section(name, export_section, name, index, self.last_export_warnings)
-            backup_data[name] = rows
-
-        # Files, not a table: the HTTPS certificate and key the server serves
-        backup_data['https_server'] = _section('https_server', self._export_https_files)
-
-        # Two sections are also carried nested, where the current restore
-        # still reads them. The flat sections are the ones to build on.
-        _section('nesting', self._nest_legacy_sections, backup_data)
+        def export(name):
+            section = SECTIONS[name]
+            if not include.get(name, not section.optional):
+                return {} if name == 'configuration' else []
+            if name == 'configuration':
+                return _section(name, self._export_configuration, True)
+            return guarded(name, lambda: iter_section(name, index, self.last_export_warnings,
+                                                      extra=row_exporters.get(name)))
 
         # Choose KDF: Argon2id if available, else strong PBKDF2. The profile
         # written here is the one the reader whitelists, taken from the same
@@ -235,6 +254,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         kdf_id = self.KDF_ARGON2ID if use_argon2 else self.KDF_PBKDF2
         profile = container.KDF_PROFILES[kdf_id]
         kdf_params = {'type': profile['type'], **profile['emitted']}
+        # A salt per archive: no two archives share a key, whatever their nonces
         salt = csp_bytes(profile['salt_size'])
 
         if kdf_id == self.KDF_ARGON2ID:
@@ -248,143 +268,96 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         else:
             master_key = self._derive_pbkdf2(password, salt, kdf_params['iterations'])
 
-        # Encrypt private keys individually (uses same master_key + PBKDF2 per-key salt for legacy compat)
-        backup_data = self._encrypt_private_keys(backup_data, master_key)
-
-        # The logical schema of what was just collected, written once the
-        # payload is final: counts and digests have to describe the bytes the
-        # archive carries, not an earlier state of them.
-        backup_data['metadata'].update(self._schema_metadata(backup_data, include))
-
-        # Calculate checksum of plaintext
-        json_str = json.dumps(backup_data, indent=2, sort_keys=True)
-        checksum = hashlib.sha256(json_str.encode()).hexdigest()
-        backup_data['checksum'] = {
-            'algorithm': 'SHA256',
-            'value': checksum
-        }
-
-        # Serialize final payload
-        final_json = json.dumps(backup_data, indent=2, sort_keys=True).encode()
-        self.last_payload_size = len(final_json)
-        self.last_payload_containers = container.count_containers(backup_data)
-
-        # Compress (gzip level 6 — good ratio, fast)
-        flags = self.FLAG_GZIP
-        plaintext = gzip.compress(final_json, compresslevel=6)
-
-        # Build the header first: it is the additional data the tag covers, so
-        # every byte an attacker could edit is authenticated with the payload.
-        nonce = csp_bytes(self.NONCE_SIZE)
+        # The header is every chunk's additional data: editing any byte of it
+        # (the version, the backup type, the KDF profile, the section list)
+        # breaks every tag.
+        names = ['metadata', *SECTIONS, 'https_server']
+        nonce_base = csp_bytes(container.NONCE_BASE_SIZE)
         header = container.build_header(
-            format_version=self.FORMAT_VERSION_V3,
-            flags=flags,
+            format_version=self.FORMAT_VERSION_V4,
+            flags=self.FLAG_GZIP,
             kdf_id=kdf_id,
             metadata={
-                'format_version': self.FORMAT_VERSION_V3,
+                'format_version': self.FORMAT_VERSION_V4,
                 'ucm_version': self.app_version,
                 'created_at': utc_now().isoformat() + 'Z',
                 'backup_type': backup_type,
                 'kdf': kdf_params,
                 'salt_b64': base64.b64encode(salt).decode(),
-                'nonce_b64': base64.b64encode(nonce).decode(),
+                'nonce_base_b64': base64.b64encode(nonce_base).decode(),
+                'chunk_max': self.CHUNK_MAX,
+                'sections': names,
             },
         )
+        writer = container.ChunkWriter(master_key, header, nonce_base, names,
+                                       chunk_max=self.CHUNK_MAX)
 
-        # Encrypt with AES-256-GCM, the full header as additional data
-        ciphertext = AESGCM(master_key).encrypt(nonce, plaintext, header)
+        def write(name, value):
+            try:
+                yield from writer.section(name, value)
+            except ContainerError as exc:
+                raise BackupExportError(str(exc)) from exc
 
-        return header + ciphertext
+        def step(done):
+            if progress is not None:
+                progress(done, len(names))
 
-    @staticmethod
-    def _nest_legacy_sections(backup_data):
-        """Mirror group members and WebAuthn credentials inside their owner.
+        def ticking(rows):
+            # Outside guarded(): a stop asked between two rows is not an export failure
+            for row in rows:
+                yield row
+                progress()
 
-        They are exported as sections of their own, by stable identity; this
-        keeps the nested copies the current restore path reads, so the two
-        halves of the change can land one after the other.
-        """
-        # Only mirror what was actually exported: excluding the flat section
-        # must not empty the nested copy the current restore reads from.
-        if backup_data.get('group_members'):
-            members_by_group = {}
-        else:
-            members_by_group = None
+        yield header
 
-        for row in backup_data.get('group_members', []):
-            members_by_group.setdefault(row.get('group_id'), []).append(
-                {'user_id': row.get('user_id'), 'role': row.get('role')})
-        if members_by_group is not None:
-            for group in backup_data.get('groups', []):
-                group['members'] = members_by_group.get(group.get('id'), [])
-
-        creds_by_user = {} if backup_data.get('webauthn_credentials') else None
-        for row in backup_data.get('webauthn_credentials', []):
-            creds_by_user.setdefault(row.get('user_id'), []).append({
-                'credential_id': row.get('credential_id'),
-                'public_key': row.get('public_key'),
-                'sign_count': row.get('sign_count'),
-                'name': row.get('name'),
-                'aaguid': row.get('aaguid'),
-            })
-        if creds_by_user is not None:
-            for user in backup_data.get('users', []):
-                user['webauthn_credentials'] = creds_by_user.get(user.get('id'), [])
-
-    def _merge_with_manifest(self, section_name, rows, index):
-        """Complete a hand-written section with every column of its model.
-
-        The dedicated exporters carry what is not a column (a PEM, a decrypted
-        key, a list of URLs). Everything else comes from the manifest, so a
-        column added to the model reaches the archive without anyone having to
-        remember this function exists.
-        """
-        from .manifest import SECTIONS as _SECTIONS
-        section = _SECTIONS[section_name]
-        generic = export_section(section_name, index)
-        by_identity = {
-            tuple(str(row.get(name)) for name in section.identity): row
-            for row in generic
-        }
-        merged = []
-        for row in rows:
-            key = tuple(str(row.get(name)) for name in section.identity)
-            base = by_identity.get(key, {})
-            merged.append({**base, **row})
-        return merged
-
-    def _schema_metadata(self, backup_data: Dict[str, Any],
-                         include: Dict[str, bool]) -> Dict[str, Any]:
-        """Describe the payload: schema, source dialect, sections and counts.
-
-        `database_type` used to say sqlite whatever the server ran on, and
-        nothing said how many rows a section was supposed to hold, so a
-        section truncated in transit restored as a smaller instance without a
-        word. Counts are checked by the reader before the first write.
-        """
-        sections = {}
-        excluded = []
-        for name, value in backup_data.items():
-            if name == 'metadata':
-                continue
-            if isinstance(value, list):
-                sections[name] = len(value)
-            elif isinstance(value, dict):
-                sections[name] = len(value)
-        for name, wanted in sorted(include.items()):
-            if not wanted:
-                excluded.append(name)
-
-        return {
+        step(0)
+        metadata = self._get_metadata(backup_type)
+        metadata.update({
             'schema_version': self.SCHEMA_VERSION,
             'min_reader_schema_version': self.MIN_READER_SCHEMA_VERSION,
             'permissions_revision': PERMISSIONS_REVISION,
             'database_dialect': self._database_dialect(),
-            'sections': sections,
-            'section_digests': self._section_digests(backup_data),
-            'excluded_sections': excluded,
-            'key_mismatches': self._key_mismatches(backup_data),
-        }
+            'excluded_sections': sorted(name for name, wanted in include.items() if not wanted),
+        })
+        yield from write('metadata', metadata)
+
+        # Group members and WebAuthn keys are not nested in their owner any
+        # more: a reader of v4 applies their flat sections, always present.
+        key_mismatches: List[str] = []
+
+        def sealed_keys(name, rows):
+            # One row at a time: its key encrypted, a mismatch noted for the end record
+            for row in rows:
+                self._encrypt_section_keys((row,), master_key)
+                key_mismatches.extend(self._key_mismatches({name: (row,)}))
+                yield row
+
+        for done, name in enumerate(SECTIONS, start=1):
+            step(done)
+            rows = export(name)
+            if name in self._PRIVATE_KEY_SECTIONS:
+                rows = sealed_keys(name, rows)
+            if progress is not None and not isinstance(rows, dict):
+                rows = ticking(rows)
+            yield from write(name, rows)
+            del rows
+
+        # Files, not a table: the HTTPS certificate and key the server serves
+        step(len(names) - 1)
+        yield from write('https_server', _section('https_server', self._export_https_files))
+
+        step(len(names))
+        yield writer.finish({'key_mismatches': key_mismatches})
+        self.last_payload_size = writer.payload_bytes
+
+    # Sections whose rows carry a private key, encrypted one by one under the master key
+    _PRIVATE_KEY_SECTIONS = ('certificate_authorities', 'certificates', 'ssh_cas')
+
+    def _encrypt_section_keys(self, rows, master_key: bytes) -> None:
+        for row in rows:
+            if isinstance(row, dict) and '_private_key_plaintext' in row:
+                row['private_key_pem_encrypted'] = self._encrypt_private_key(
+                    row.pop('_private_key_plaintext'), master_key)
 
     @staticmethod
     def _key_mismatches(backup_data: Dict[str, Any]) -> List[str]:

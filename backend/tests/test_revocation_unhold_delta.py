@@ -112,7 +112,7 @@ class TestARefusedLiftRepublishesTheCrl:
 
         def broken(*args, **kwargs):
             raise RuntimeError('lift failed')
-        monkeypatch.setattr(cert_lifecycle, '_lift_hold', broken)
+        monkeypatch.setattr(cert_lifecycle, '_lift_holds', broken)
         r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
         assert r.status_code == 500, r.data
         assert _row(app, row_id) == (True, 'certificateHold', EARLY)

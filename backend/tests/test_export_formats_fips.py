@@ -15,6 +15,8 @@ import fips_mode
 from fips_mode import FipsRestricted
 from models import db
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 PASSWORD = 'fips-export-pw-123'
 LEGACY_REFUSAL = 'PKCS#12 legacy encryption (3DES/SHA-1) not available in FIPS mode'
 JKS_REFUSAL = 'JKS export not available in FIPS mode'
@@ -54,6 +56,16 @@ def material(app, create_ca, create_cert):
         if stale:
             db.session.delete(stale)
             db.session.commit()
+
+
+@pytest.fixture(autouse=True)
+def _dual_control_back_to_its_default(app):
+    """No test leaves the setting behind: the next file reads the default (on)."""
+    yield
+    from models import SystemConfig, db
+    with app.app_context():
+        SystemConfig.query.filter_by(key='key_recovery_dual_control').delete()
+        db.session.commit()
 
 
 def _post(client, url, body):

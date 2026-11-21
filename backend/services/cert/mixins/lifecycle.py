@@ -12,6 +12,10 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, CertificateTemplate, Certificate, SystemConfig
+from services.cert.unique_subject import SubjectTaken, refuse_taken_subject
+from utils.ca_serial_counter import (
+    log_commit_failure, next_ca_serial, retry_on_serial_collision,
+    rollback_unless_serial_collision)
 from models.compromised_key import remember_if_compromised
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS
 from utils.key_type import issue_key_type_from_template
@@ -21,37 +25,21 @@ from services.trust_store import TrustStoreService
 from utils.ct_client import embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now, to_naive_utc
-from utils.issuance_defaults import template_digest
+from utils.issuance_defaults import default_issue_key_id, template_digest
 from utils.spki_digest import certificate_key_sha256
-from utils.revocation_reasons import revocable
+from utils.serial_format import canonical_serial
+from utils.revocation_reasons import HOLD_REASONS, revocable
 from services.cert.issued_lookup import effective_revocation, record_reason_replaceable
 
 logger = logging.getLogger(__name__)
 
 from security.encryption import decrypt_private_key, encrypt_private_key
 
-_HOLD_REASONS = ('certificateHold', 'certificate_hold')
 _REVOCATION_FIELDS = ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')
 
 
 class _AlreadyRevoked(ValueError):
     """The refusal met under the lock: answered to the caller, not an error to log."""
-
-
-def _lock_own_record(certificate):
-    """Lock by id every record of ``certificate``'s serial under its CA, in the row's own spelling
-    and each unambiguous one (``record_serial_clause``); return the one in the row's spelling."""
-    from sqlalchemy import or_
-    from models import RevokedSerial
-    from services.cert.issued_lookup import record_serial_clause
-    from services.cert.serial_resolution import resolve_record_serial
-    serial = resolve_record_serial(certificate)
-    spelled = RevokedSerial.serial_number == certificate.serial_number
-    if serial is not None:
-        spelled = or_(spelled, record_serial_clause(serial))
-    records = RevokedSerial.query.filter(RevokedSerial.caref == certificate.caref, spelled) \
-        .order_by(RevokedSerial.id).with_for_update().all()
-    return next((r for r in records if r.serial_number == certificate.serial_number), None)
 
 
 def _request_user_id(username):
@@ -89,9 +77,22 @@ REVOKED_THEN_DELETED = ('Certificate {id} was revoked, then deleted: automatic r
                         'Turn it back on to obtain a new certificate for these names.')
 
 
+def _propagate_to_acme_ca(partner, reason):
+    """The related member obtained over ACME is revoked at its CA too; ``(outcome, detail)``
+    of :func:`propagate_acme_revocation`, logged when the CA was not told."""
+    from services.acme.upstream_revocation import (
+        HOLD, NOT_ACME, REVOKED, local_only_message, propagate_acme_revocation)
+    outcome, detail = propagate_acme_revocation(partner, reason)
+    # A hold is never sent: nothing to warn about
+    if outcome not in (NOT_ACME, REVOKED, HOLD):
+        logger.warning("Related certificate %s: %s", partner.id, local_only_message(outcome, detail))
+    return outcome, detail
+
+
 class LifecycleMixin:
 
     @staticmethod
+    @retry_on_serial_collision
     def create_certificate(
         descr: str,
         caref: str,
@@ -109,6 +110,7 @@ class LifecycleMixin:
         template_id: Optional[int] = None,
         username: str = 'system',
         ocsp_must_staple: bool = False,
+        subject_holder: Optional[str] = None,
     ) -> Certificate:
         """
         Create a certificate signed by a CA
@@ -130,6 +132,7 @@ class LifecycleMixin:
             template_id: Certificate template ID (optional)
             username: User creating certificate
             ocsp_must_staple: Enable OCSP Must-Staple extension
+            subject_holder: who the subject is certified to (mTLS: 'user:<id>')
 
         Returns:
             Certificate model instance
@@ -160,13 +163,15 @@ class LifecycleMixin:
                     raise PolicyViolation(san_refusal)
 
         if key_type is None:
-            key_type = '2048'
+            ca_row = CA.query.filter_by(refid=caref).first()
+            key_type = default_issue_key_id(ca_row.id if ca_row else None, template_id=template.id if template else None)
         if validity_days is None:
             validity_days = DEFAULT_CERTIFICATE_VALIDITY_DAYS
         # A digest asked for is checked; the template's (floored at the CA key's) and the default yield
         digest_explicit = digest is not None
         if digest is None:
-            digest = (template.digest if template is not None else None) or 'sha256'
+            # Only the divergence check reads it: signing takes the template's, floored at the CA key's
+            digest = template.digest if template is not None else None
 
         # Record divergences from the template on the final effective values
         # (#258) — inherited-as-default values compare equal and are not
@@ -292,6 +297,9 @@ class LifecycleMixin:
         # internal template: when enabled it is replaced by a CA-signed
         # pre-certificate for CT submission, then by the final SCT-bearing
         # certificate before anything is persisted or returned.
+        # Refused before the CT logs see a pre-certificate, and again under the CA row lock
+        refuse_taken_subject(ca, cert, holder=subject_holder, source='mtls', requester=username,
+                             locked=False)
         from utils.ct_client import apply_ct_policy
         signed_cert, embedded_scts = apply_ct_policy(cert, ca_cert, ca_private_key)
         if signed_cert is not cert:
@@ -299,7 +307,7 @@ class LifecycleMixin:
             cert_pem = cert.public_bytes(serialization.Encoding.PEM)
 
         # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
+        next_ca_serial(ca)
 
         # Encrypt private key if encryption is enabled and key is stored
         prv_encoded = None
@@ -335,15 +343,21 @@ class LifecycleMixin:
             # Other fields
             revoked=False,
             imported_from='generated',
-            created_by=username
+            created_by=username,
+            subject_holder=subject_holder,
         )
 
         db.session.add(certificate)
         try:
+            # The CA row was locked by next_ca_serial above; the pre-certificate is never stored
+            refuse_taken_subject(ca, cert, own=[certificate], holder=subject_holder,
+                                 source='mtls', requester=username)
             db.session.commit()
+        except SubjectTaken:
+            raise
         except Exception as _commit_err:
-            db.session.rollback()
-            logger.error(f"Certificate creation not committed: {_commit_err}", exc_info=True)
+            rollback_unless_serial_collision(_commit_err)
+            log_commit_failure(logger, "Certificate creation not committed", _commit_err)
             raise
 
         # Audit log
@@ -398,6 +412,7 @@ class LifecycleMixin:
         username: str = 'system',
         invalidity_at=None,
         revoke_related: bool = True,
+        related_acme: Optional[list] = None,
     ) -> Certificate:
         """
         Revoke a certificate, and the other member of its related pair unless
@@ -408,6 +423,8 @@ class LifecycleMixin:
             reason: Revocation reason
             username: User revoking
             invalidity_at: Optional RFC 5280 §5.3.2 invalidityDate (datetime)
+            related_acme: When given, receives ``(partner_id, outcome, detail)`` of the
+                related member's propagation to its ACME CA
 
         Returns:
             Updated certificate
@@ -422,13 +439,16 @@ class LifecycleMixin:
             raise ValueError("Certificate already revoked")
 
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
-        is_hold = reason in _HOLD_REASONS
+        is_hold = reason in HOLD_REASONS
         now = utc_now()
         rejected_renewals = []
         try:
             # The record is locked before the row is written, the order unholds and the hourly
-            # pass follow (PostgreSQL), so none of them deadlocks
-            record = _lock_own_record(certificate) if ca is not None else None
+            # pass follow (PostgreSQL), so none of them deadlocks. A row the upgrade step 144 left
+            # pending keeps its spelling; records never do
+            record = RevokedSerial.query.filter_by(
+                caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)
+            ).with_for_update().first() if ca is not None else None
             # The row as it stands under its own lock: an unhold or a revocation committed
             # while this one waited is seen, and only changed columns are sent
             db.session.refresh(certificate, with_for_update=True)
@@ -530,17 +550,22 @@ class LifecycleMixin:
         notify_rejected(rejected_snapshots, reason='Certificate revoked', actor=username)
 
         if revoke_related:
-            from services.cert.related_pair import mutual_partner
-            partner = mutual_partner(db.session.get(Certificate, cert_id))
+            from services.cert.related_pair import revocation_partner
+            partner = revocation_partner(db.session.get(Certificate, cert_id))
             if partner is not None and revocable(partner, reason):
                 partner_id = partner.id
                 try:
-                    LifecycleMixin.revoke_certificate(partner_id, reason=reason, username=username,
-                                                      invalidity_at=invalidity_at, revoke_related=False)
+                    partner = LifecycleMixin.revoke_certificate(
+                        partner_id, reason=reason, username=username,
+                        invalidity_at=invalidity_at, revoke_related=False)
                 except Exception:
                     # The member asked for stays revoked; the other one is said, not hidden
                     logger.error("Certificate %s revoked, its related certificate %s was not",
                                  cert_id, partner_id, exc_info=True)
+                else:
+                    outcome, detail = _propagate_to_acme_ca(partner, reason)
+                    if related_acme is not None:
+                        related_acme.append((partner_id, outcome, detail))
         else:
             from services.cert.related_pair import hand_over_link
             try:
@@ -599,6 +624,8 @@ class LifecycleMixin:
             from models.est_signer_cert import EstSignerCert
             EstSignerCert.query.filter_by(certificate_id=cert_id).delete(synchronize_session='fetch')
 
+            from services.binding_attention import forget_successor
+            forget_successor(certificate)
             binding_ids = [row.id for row in DeployBinding.query.filter_by(certificate_id=cert_id)]
             if binding_ids:
                 DeployDelivery.query.filter(
@@ -620,7 +647,7 @@ class LifecycleMixin:
             if digest:  # a record older than the column learns the key before the row goes
                 # Only the row's own serial: an earlier one, renewed in place, had another key
                 RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id,
-                                           RevokedSerial.serial_number == certificate.serial_number,
+                                           RevokedSerial.serial_number == canonical_serial(certificate.serial_number),
                                            RevokedSerial.public_key_sha256.is_(None)).update(
                     {RevokedSerial.public_key_sha256: digest}, synchronize_session='fetch')
             RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id).update(

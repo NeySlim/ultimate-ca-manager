@@ -7,9 +7,12 @@ The source of truth is the General-settings keys the UI actually writes:
 ``auto_backup_enabled``, ``backup_frequency`` (daily/weekly/monthly),
 ``backup_retention_days``, ``backup_password`` and ``backup_kdf``. There is
 no time-of-day in the UI, so cadence is driven by a stored ``backup.last_run``
-timestamp.
+timestamp. A run reserves its slot by moving ``backup.last_run`` and concludes it
+by copying that value to ``backup.concluded_run`` once its archive is written; the
+schedule reports ``in_progress`` while a reservation is not concluded within its lease.
 """
 import base64
+import fnmatch
 import glob
 import json
 import logging
@@ -20,9 +23,10 @@ from datetime import datetime, timezone
 import fips_mode
 from models import db, SystemConfig
 from config.settings import Config
+from utils.config_cas import config_compare_and_set, config_release
 from utils.datetime_utils import utc_now, utc_isoformat
 
-from . import storage
+from . import shared_store, storage
 from .backup_service import BackupService
 from .locking import BackupBusyError, backup_operation_lock
 from .errors import ScheduledBackupError
@@ -32,8 +36,14 @@ logger = logging.getLogger(__name__)
 
 _BACKUP_GLOB = 'ucm_backup_*.ucmbkp'
 _LAST_RUN_KEY = 'backup.last_run'
+# The reservation (a last_run value) whose archive was written: a reservation that
+# differs from it is in flight, or abandoned once the lease is over.
+_CONCLUDED_KEY = 'backup.concluded_run'
 _VALID_FREQUENCIES = ('daily', 'weekly', 'monthly')
 _PERIOD_SECONDS = {'daily': 86400, 'weekly': 604800, 'monthly': 2592000}
+# A claimed run not concluded is in flight for this long, then abandoned (killed,
+# OOM, os._exit on shutdown): the slot becomes due again.
+_CLAIM_LEASE_SECONDS = 2 * 3600
 
 # Archives with no validation record are kept in this number, newest first:
 # nothing can be proven about them either way, so prudence decides.
@@ -56,12 +66,19 @@ _LAST_REASON_KEY = 'backup.last_reason'
 _LAST_OUTCOME_AT_KEY = 'backup.last_outcome_at'
 
 
+def _cluster_now() -> datetime:
+    """Reservations are written and compared on the cluster clock: of two nodes, one ahead
+    by more than the lease would otherwise take the other's run for abandoned."""
+    from services.scheduler_leader import cluster_utc_now
+    return cluster_utc_now()
+
+
 def _get(key, default=None):
     cfg = SystemConfig.query.filter_by(key=key).first()
     return cfg.value if cfg and cfg.value is not None else default
 
 
-def get_schedule() -> dict:
+def get_schedule(with_archives: bool = True) -> dict:
     """Return the effective backup schedule, and what the last run did.
 
     `last_run` says when the task last decided something; it said nothing
@@ -73,6 +90,9 @@ def get_schedule() -> dict:
     hours since the last run, not a time of day, and the runs drift with
     restarts. Saying so is more useful than implying a calendar the scheduler
     does not keep.
+
+    The archive figures come from one listing, so they agree with each other;
+    the scheduler tick passes `with_archives=False` and lists nothing.
     """
     freq = _get('backup_frequency', 'daily')
     if freq not in _VALID_FREQUENCIES:
@@ -82,32 +102,72 @@ def get_schedule() -> dict:
     except (ValueError, TypeError):
         retention = 30
 
-    newest, age = _newest_validated_archive()
-    return {
+    last_run = _get(_LAST_RUN_KEY)
+    sched = {
         'enabled': _get('auto_backup_enabled', 'false') == 'true',
         'frequency': freq,
         'cadence': 'rolling_interval',
         'retention_days': retention,
         'min_keep': _min_keep(),
         'max_total_mb': _max_total_bytes() // (1024 * 1024),
-        'last_run': _get(_LAST_RUN_KEY),
+        'last_run': last_run,
+        # last_run is then this run's reservation, the outcome still the previous run's
+        'in_progress': _in_flight(last_run, _get(_CONCLUDED_KEY), _cluster_now()),
         'last_outcome': _get(_LAST_OUTCOME_KEY),
         'last_outcome_reason': _get(_LAST_REASON_KEY),
         'last_outcome_at': _get(_LAST_OUTCOME_AT_KEY),
-        'last_archive': os.path.basename(newest) if newest else None,
-        'last_archive_age_seconds': age,
         'password_set': bool(_get('backup_password')),
         'kdf': _get('backup_kdf') or 'auto',
     }
+    if with_archives:
+        snapshot = _archive_snapshot()
+        newest, age = snapshot['newest']
+        sched.update({
+            'stored_bytes': snapshot['bytes'],
+            'stored_count': snapshot['count'],
+            'uncounted_count': snapshot['uncounted'],
+            'over_ceiling': _over_ceiling(snapshot['bytes']),
+            'last_archive': os.path.basename(newest) if newest else None,
+            'last_archive_age_seconds': age,
+        })
+    return sched
 
 
-def _newest_validated_archive():
-    """The most recent archive whose bytes still match what was recorded."""
-    paths = _existing_archives()
-    newest = storage.newest_validated(paths) if paths else None
-    if newest is None:
-        return None, None
-    return newest, max(0, int(time.time() - _mtime_of(newest)))
+def _archive_snapshot() -> dict:
+    """What the stored archives take, their newest restore point and the archive files
+    retention ignores, all from one listing (the database's in HA, else the disk's)."""
+    if shared_store.enabled():
+        # Each stored archive was read back before its commit: the newest is proven
+        stored = shared_store.list_archives()
+        newest = ((stored[0]['filename'], shared_store.age_seconds(stored[0]['created_at']))
+                  if stored else (None, None))
+        return {'bytes': sum(int(a['size']) for a in stored), 'count': len(stored),
+                'uncounted': 0, 'newest': newest}
+    counted, uncounted = _scan_directory()
+    validated = storage.newest_validated(counted) if counted else None
+    newest = ((validated, max(0, int(time.time() - _mtime_of(validated))))
+              if validated else (None, None))
+    return {'bytes': sum(_size_of(path) for path in counted), 'count': len(counted),
+            'uncounted': uncounted, 'newest': newest}
+
+
+def _scan_directory() -> tuple:
+    """(archives retention and the ceiling count, number of other archive files)."""
+    counted, uncounted = [], 0
+    try:
+        for path in glob.glob(os.path.join(str(Config.BACKUP_DIR), '*')):
+            name = os.path.basename(path)
+            if fnmatch.fnmatchcase(name, _BACKUP_GLOB):
+                try:
+                    os.stat(path)
+                except OSError:
+                    continue
+                counted.append(path)
+            elif storage.is_archive_name(name) and os.path.isfile(path):
+                uncounted += 1
+    except Exception as e:
+        logger.error(f"Failed to list backups: {e}")
+    return counted, uncounted
 
 
 def _record_outcome(outcome: str, reason: str = None) -> None:
@@ -137,8 +197,8 @@ def _record_outcome(outcome: str, reason: str = None) -> None:
             db.session.rollback()
         except Exception:
             logger.warning("Could not roll back after a failed outcome record")
-        # The outcome is a report, not the work: losing it must not turn a
-        # successful backup into a failed one.
+        # The outcome is a report, not the work: the schedule follows the conclusion
+        # marker, so losing it neither fails a backup nor brings a second one.
         logger.warning("Could not record the outcome of the scheduled backup")
 
 
@@ -168,7 +228,11 @@ def _get_backup_password() -> str:
 
 
 def list_backups() -> list[dict]:
-    """List backup files on disk, newest first."""
+    """List the archives, newest first: on disk, or in HA the database's with their node."""
+    if shared_store.enabled():
+        return [{'filename': a['filename'], 'size': a['size'], 'node': a['node'],
+                 'sha256': a['sha256'], 'created_at': utc_isoformat(a['created_at'])}
+                for a in shared_store.list_archives()]
     backups = []
     try:
         for path in glob.glob(os.path.join(str(Config.BACKUP_DIR), _BACKUP_GLOB)):
@@ -187,6 +251,75 @@ def list_backups() -> list[dict]:
     return backups
 
 
+def stored_usage() -> tuple:
+    """(bytes, count) the stored archives take: the database's in HA, else the disk's."""
+    snapshot = _archive_snapshot()
+    return snapshot['bytes'], snapshot['count']
+
+
+def _over_ceiling(total: int) -> bool:
+    ceiling = _max_total_bytes()
+    return ceiling > 0 and total > ceiling
+
+
+def ceiling_warning():
+    """A sentence when the archives are above the size ceiling, else None."""
+    ceiling = _max_total_bytes()
+    if ceiling <= 0:
+        return None
+    total, _ = stored_usage()
+    if total <= ceiling:
+        return None
+    return (f"The archives take {total // (1024 * 1024)} MiB, above the "
+            f"{ceiling // (1024 * 1024)} MiB ceiling: {protected_archives_sentence()}")
+
+
+def protected_archives_sentence() -> str:
+    """What retention never removes, by age or for the ceiling, in the store in use."""
+    if shared_store.enabled():
+        # Every stored archive was proven at its commit: only the count protects
+        return f"retention never removes the {_min_keep()} newest archives."
+    return ("retention never removes the newest archive that matches its validation record, "
+            f"up to {_UNRECORDED_KEPT} archives with no validation record, nor the "
+            f"{_min_keep()} newest archives not found altered.")
+
+
+def safe_ceiling_warning():
+    """ceiling_warning(), or None (logged) when it cannot be computed: a report on an
+    operation already done never turns it into a failure."""
+    try:
+        return ceiling_warning()
+    except Exception:
+        logger.exception("The backup size ceiling could not be checked")
+        return None
+
+
+def _audit_ceiling_removals(names) -> None:
+    """One audit entry per archive removed to stay under the size ceiling."""
+    from services.audit_service import AuditService
+    for name in names:
+        AuditService.log_action(
+            action='backup_delete', resource_type='system', resource_name=name,
+            details=f'Removed by retention to stay under the size ceiling: {name}',
+            success=True)
+
+
+def _apply_shared_retention(retention_days: int, wait: float = 0) -> int:
+    """HA: the rule below over the database's archives, under a lock of the whole cluster.
+
+    Busy with no wait is a pass skipped; with a wait it raises BackupBusyError.
+    """
+    try:
+        return shared_store.apply_retention(
+            retention_days, min_keep=_min_keep(), max_total_bytes=_max_total_bytes(), wait=wait,
+            on_ceiling_removed=_audit_ceiling_removals)
+    except BackupBusyError as busy:
+        if wait:
+            raise
+        logger.info("Backup retention skipped: %s", busy)
+        return 0
+
+
 def _apply_retention(retention_days: int) -> int:
     """Delete backup files older than retention_days. Returns count removed.
 
@@ -198,6 +331,8 @@ def _apply_retention(retention_days: int) -> int:
     existed, or by another path — are kept in the two most recent, since
     nothing proves they are usable and nothing proves they are not.
     """
+    if shared_store.enabled():
+        return _apply_shared_retention(retention_days)
     if not retention_days or retention_days < 1:
         return 0
     # Wall-clock seconds, not utc_now().timestamp(): utc_now() is naive UTC,
@@ -248,8 +383,8 @@ def _protected_archives(paths: list) -> set:
     # The minimum count protects against losing a restore point, so it does
     # not extend to an archive proven to be something other than what was
     # written: keeping it would push out one that can still be restored.
-    provable = [path for path in _newest_first(paths)
-                if path not in set(storage.tampered(paths))]
+    tampered = set(storage.tampered(paths))  # hashes every archive: once per pass
+    provable = [path for path in _newest_first(paths) if path not in tampered]
     keep.update(provable[:_min_keep()])
     return keep
 
@@ -272,6 +407,7 @@ def _enforce_size_ceiling(keep: set) -> int:
         return 0
 
     removed = 0
+    gone = []
     for path in _oldest_first(paths):
         if total <= ceiling:
             break
@@ -284,12 +420,14 @@ def _enforce_size_ceiling(keep: set) -> int:
             continue
         total -= size
         removed += 1
+        gone.append(os.path.basename(path))
+    _audit_ceiling_removals(gone)
 
     if total > ceiling:
         logger.warning(
             "Backup retention: the archives still take %d MiB, above the %d MiB "
-            "ceiling, because what remains is the last restore point",
-            total // (1024 * 1024), ceiling // (1024 * 1024))
+            "ceiling: %s", total // (1024 * 1024), ceiling // (1024 * 1024),
+            protected_archives_sentence())
     elif removed:
         logger.info("Backup retention removed %d archive(s) to stay under the "
                     "configured size ceiling", removed)
@@ -357,6 +495,10 @@ def run_backup_retention(wait: float = 0) -> int:
     except (ValueError, TypeError):
         retention = 30
 
+    if shared_store.enabled():
+        # An archive in the database is invisible until committed whole: the store lock alone
+        # serialises deleters, and the node's disk lock would only add its own wait
+        return _apply_shared_retention(retention, wait)
     try:
         # Retention deletes; a backup being written at the same moment is not
         # yet recorded, and would look like an archive nothing vouches for.
@@ -371,52 +513,95 @@ def run_backup_retention(wait: float = 0) -> int:
         return 0
 
 
-# Last archive this process published, whether or not its timestamp could be
-# stored. `backup.last_run` is the source of truth across restarts; this guard
-# only covers the case where writing that row fails, which used to leave the
-# task due again 60 seconds later, once per minute, until the disk filled. It
-# is set after publication, never before, so a failed attempt is retried.
-_LAST_ATTEMPT: dict = {'at': None}
-
-
-def _record_last_run(ts: datetime) -> None:
-    """Persist the run timestamp, or raise.
-
-    The scheduler asks every 60 seconds whether a backup is due, and the
-    answer is read from this row: a silent rollback left the task due again on
-    the next tick, writing one archive per minute until the disk filled.
-    """
-    cfg = SystemConfig.query.filter_by(key=_LAST_RUN_KEY).first()
-    if cfg:
-        cfg.value = utc_isoformat(ts)
-    else:
-        db.session.add(SystemConfig(key=_LAST_RUN_KEY, value=utc_isoformat(ts)))
+def _claim_run(previous, now: datetime):
+    """Move ``backup.last_run`` from what the due check read to this run, before any
+    archive is written: of two nodes finding the run due, one writes. The claimed
+    value, or None when another node moved it first."""
+    claimed = utc_isoformat(now)
     try:
+        moved = config_compare_and_set(_LAST_RUN_KEY, previous, claimed)
+    except Exception as exc:
+        db.session.rollback()
+        raise ScheduledBackupError(f'The backup schedule could not be reserved: {exc}') from exc
+    return claimed if moved else None
+
+
+def _start_marking_conclusions(previous) -> None:
+    """Create the conclusion marker before the first reservation that can need it, so
+    a run killed with none recorded is retried; an existing marker is left alone."""
+    try:
+        # Read first: the compare-and-set's INSERT would hit the unique key, an ERROR in the PG log
+        if db.session.query(SystemConfig.value).filter_by(key=_CONCLUDED_KEY).scalar() is not None:
+            return
+        config_compare_and_set(_CONCLUDED_KEY, None, previous or '')
+    except Exception as exc:
+        db.session.rollback()
+        raise ScheduledBackupError(f'The backup schedule could not be reserved: {exc}') from exc
+
+
+def _conclude_run(claimed: str) -> None:
+    """Mark the reservation *claimed* as done once its archive exists; raises, since a
+    lost marker would bring a second archive once the lease is over."""
+    try:
+        row = SystemConfig.query.filter_by(key=_CONCLUDED_KEY).first()
+        if row:
+            row.value = claimed
+        else:
+            db.session.add(SystemConfig(key=_CONCLUDED_KEY, value=claimed))
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
         raise ScheduledBackupError(
-            f'Backup created, but its schedule timestamp could not be saved: {exc}'
-        ) from exc
+            f'The archive was written but its run could not be marked concluded: {exc}') from exc
+
+
+def _release_run(previous, claimed: str) -> None:
+    """Give a run that wrote no archive back to the next tick, unless moved since."""
+    # The claim is committed; a failed export may have left the transaction aborted
+    db.session.rollback()
+    try:
+        config_release(_LAST_RUN_KEY, claimed, previous)
+    except Exception:
+        db.session.rollback()
+        logger.warning("Could not release the backup schedule; retried once the lease is over")
+
+
+def _parse(value):
+    try:
+        return _naive_utc(datetime.fromisoformat(value.replace('Z', '+00:00')))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _unconcluded_for(last_run, concluded, now: datetime):
+    """Seconds since the reservation *last_run* was taken, or None when it is concluded.
+    No marker at all: last_run predates it (upgraded install) and counts as concluded."""
+    prev = _parse(last_run) if last_run else None
+    if prev is None or concluded is None or concluded == last_run:
+        return None
+    return (_naive_utc(now) - prev).total_seconds()
+
+
+def _in_flight(last_run, concluded, now: datetime) -> bool:
+    elapsed = _unconcluded_for(last_run, concluded, now)
+    return elapsed is not None and elapsed < _CLAIM_LEASE_SECONDS
 
 
 def _is_due(sched: dict, now: datetime) -> bool:
     period = _PERIOD_SECONDS.get(sched.get('frequency', 'daily'), 86400)
-    attempted = _LAST_ATTEMPT.get('at')
-    if attempted is not None:
-        elapsed = (_naive_utc(now) - _naive_utc(attempted)).total_seconds()
-        if elapsed < period - 300:
-            return False
-
     last_run = sched.get('last_run')
     if not last_run:
         return True  # never run → run now
-    try:
-        prev = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
-    except (ValueError, AttributeError):
+    prev = _parse(last_run)
+    if prev is None:
         return True
+    elapsed = (_naive_utc(now) - prev).total_seconds()
+    # An upgraded install has no marker yet: its last run counts as concluded
+    unconcluded = _unconcluded_for(last_run, sched.get('concluded_run'), now)
+    if unconcluded is not None and unconcluded >= _CLAIM_LEASE_SECONDS:
+        return True  # claimed, never concluded, lease expired
     # small slack so a ~daily timer doesn't drift a day each run
-    return (_naive_utc(now) - _naive_utc(prev)).total_seconds() >= period - 300
+    return elapsed >= period - 300
 
 
 def _naive_utc(value: datetime) -> datetime:
@@ -434,12 +619,13 @@ def run_scheduled_backup() -> dict:
     "completed successfully", with a green view, a growing run count and no
     archive anywhere.
     """
-    sched = get_schedule()
+    sched = get_schedule(with_archives=False)
     if not sched.get('enabled'):
         _record_outcome('skipped', 'disabled')
         return {'status': 'skipped', 'reason': 'disabled'}
 
-    now = utc_now()
+    now = _cluster_now()
+    sched['concluded_run'] = _get(_CONCLUDED_KEY)
     if not _is_due(sched, now):
         return {'status': 'skipped', 'reason': 'not_due'}
 
@@ -475,34 +661,34 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
             # A setting carried over from a standard instance must not stop every run.
             logger.warning("Scheduled backup KDF is Argon2id, refused in FIPS mode: using PBKDF2")
             kdf = None
+        _start_marking_conclusions(sched.get('last_run'))
+        claimed = _claim_run(sched.get('last_run'), now)
+        if claimed is None:
+            logger.info("Scheduled backup already taken by another node")
+            return {'status': 'skipped', 'reason': 'claimed by another node'}
         service = BackupService()
-        # The same export and naming as every other archive, under the lock already held
-        backup_bytes, _path, filename = storage.export_archive(service, password, kdf=kdf)
+        try:
+            # The same export and naming as every other archive, under the lock already held
+            size, _path, filename = storage.export_archive(service, password, kdf=kdf)
+        except Exception:
+            # No archive: the next tick retries. Past this point the claim stays,
+            # so nothing after the write can bring a second archive a minute later.
+            _release_run(sched.get('last_run'), claimed)
+            raise
+        _conclude_run(claimed)
 
-        # Only now: the archive exists, it reads back as written, and it is
-        # recorded. An export or write that failed before this point leaves
-        # the run due again on the next tick, which is what should happen;
-        # past it, a timestamp that cannot be stored must not produce a second
-        # archive a minute later.
-        _LAST_ATTEMPT['at'] = now
-
-        logger.info(f"Scheduled backup created: {filename} ({len(backup_bytes)} bytes)")
-        warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size,
-                                                service.last_payload_containers)
-        if warning:
-            logger.warning("Scheduled backup %s: %s", filename, warning)
+        logger.info(f"Scheduled backup created: {filename} ({size} bytes)")
         for left_out in service.last_export_warnings:
             logger.warning("Scheduled backup %s: %s", filename, left_out)
         _audit_scheduled_backup(filename, f'Scheduled backup: {filename}',
                                 success=True)
 
         removed = _apply_retention(sched.get('retention_days', 30))
-        _record_last_run(now)
         _record_outcome('ok', filename)
         return {
             'status': 'ok',
             'filename': filename,
-            'size': len(backup_bytes),
+            'size': size,
             'retention_removed': removed,
         }
     except Exception as e:

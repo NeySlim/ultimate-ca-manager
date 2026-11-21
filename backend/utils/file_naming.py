@@ -29,6 +29,7 @@ def slugify_cn(cn: str) -> str:
 
 def _get_cn(subject: str) -> str:
     """Extract CN from an X.509 subject string like 'CN=example,O=Org'."""
+    # Kept as is (escapes not honoured): these names are on disk, a change would rename files
     if not subject:
         return ''
     for part in subject.split(','):

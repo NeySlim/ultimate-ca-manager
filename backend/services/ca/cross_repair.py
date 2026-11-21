@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 NOTE = ('A self-signed root that was overwritten or deleted is not recovered here: '
         'restore it from a backup, or give its certificate to restore-primary.')
-_SETTINGS = ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid', 'xcep_ca_refid',
-             'mtls_trusted_ca_id', 'scep_ca_id')
+_SETTINGS = ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id')
 _ALIAS_PREFIX = 'ca_url_alias_'
 _CROSS_PREFIX = 'ca_url_cross_'
 
@@ -101,15 +100,26 @@ def _record(ca_id) -> CA:
 
 
 def _move_settings(record, root, cross=None):
-    """Point the CA settings, the OCSP responder choice and the public URLs of *record* at *root*."""
-    from models import SystemConfig
+    """Point the CA settings, the Windows profiles, the OCSP responder choice and the public URLs
+    of *record* at *root*."""
+    from models import SystemConfig, WindowsEnrollmentProfile
+    from services.deletion_blockers import setting_names_ca
+    from services.windows_profiles import renewal_ca_refids
+    for profile in WindowsEnrollmentProfile.query.all():
+        for column in ('issuing_ca_refid', 'policy_ca_refid'):
+            if getattr(profile, column) == record.refid:
+                setattr(profile, column, root.refid)
+        former = renewal_ca_refids(profile)
+        if record.refid in former:
+            moved = list(dict.fromkeys(root.refid if r == record.refid else r for r in former))
+            profile.renewal_ca_refids = json.dumps([r for r in moved if r != profile.issuing_ca_refid])
     for key in _SETTINGS:
         cfg = SystemConfig.query.filter_by(key=key).first()
         if cfg is None:
             continue
-        if cfg.value == record.refid:
+        if (cfg.value or '').strip() == record.refid:
             cfg.value = root.refid
-        elif cfg.value == str(record.id):
+        elif setting_names_ca(cfg.value, record):
             cfg.value = str(root.id)
     labels_cfg = SystemConfig.query.filter_by(key='est_labels').first()
     try:
@@ -252,11 +262,15 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     if row is None:
         row, warnings = cross_certs.attach_certificate(root, cert, username, commit=False)
     if not root.prv and not root.hsm_key_id:
-        root.prv, root.hsm_key_id = record.prv, record.hsm_key_id
+        # One CA per HSM key (uq_ca_hsm_key_id): the record lets the key go before the root takes it
+        key_id, record.hsm_key_id = record.hsm_key_id, None
+        db.session.flush()
+        root.prv, root.hsm_key_id = record.prv, key_id
     _move_ca_dependents(db, record, root)
     from models import SystemConfig
     scep_cfg = SystemConfig.query.filter_by(key='scep_ca_id').first()
-    was_scep_ca = bool(scep_cfg and scep_cfg.value in (str(record.id), record.refid))
+    from services.deletion_blockers import setting_names_ca
+    was_scep_ca = bool(scep_cfg and setting_names_ca(scep_cfg.value, record))
     _move_settings(record, root, row)
     _move_scep_challenge(record, root, was_scep_ca)
     _move_publication(record, root)
@@ -326,5 +340,7 @@ def restore_primary(ca_id: int, certificate, username: str = 'system'):
     from services.audit_service import AuditService
     AuditService.log_ca('ca_cross_repair_restored', record,
                         f'Self-signed certificate restored on CA {record.descr}', username=username)
+    from services.ca import parent_confirmation
+    parent_confirmation.audit_dropped(record, username=username)
     cross_certs.announce(record, 'attached', row, username, {'restored_primary': True})
     return record, row, warnings

@@ -47,7 +47,12 @@ class BootDatabase:
 
     def rows(self, sql, params=()):
         cursor = self._connection.cursor()
-        cursor.execute(sql.replace('?', self._placeholder), params)
+        try:
+            cursor.execute(sql.replace('?', self._placeholder), params)
+        except Exception:
+            # A failed statement aborts a PostgreSQL transaction: the next read starts clean
+            self._connection.rollback()
+            raise
         return cursor.fetchall()
 
     def one(self, sql, params=()):
@@ -88,11 +93,21 @@ def open_boot_database(data_path: str):
     return BootDatabase(sqlite3.connect(path), '?')
 
 
-def _settings(database, keys):
+# What mtls_client_ca answers when there are no settings to read: nothing was decided
+MTLS_UNDECIDED = object()
+
+
+def _settings(database, keys, missing=None):
+    """The stored values of *keys*; *missing* (default: none) when the table does not exist."""
     placeholders = ', '.join('?' for _ in keys)
-    rows = database.rows(
-        f"SELECT key, value FROM system_config WHERE key IN ({placeholders})",
-        tuple(keys))
+    try:
+        rows = database.rows(
+            f"SELECT key, value FROM system_config WHERE key IN ({placeholders})",
+            tuple(keys))
+    except Exception as e:
+        if _missing_table(e):
+            return {} if missing is None else missing
+        raise
     return {key: value for key, value in rows}
 
 
@@ -148,13 +163,16 @@ def anchor_client_verification(ctx):
 
 
 def mtls_client_ca(data_path: str):
-    """``(ca_pem, ca_name, required)`` when mTLS is on, else None."""
+    """``(ca_pem, ca_name, required)`` when mTLS is on, None when it is off, and
+    ``MTLS_UNDECIDED`` when there is no database file or no settings table to read."""
     database = open_boot_database(data_path)
     if database is None:
-        return None
+        return MTLS_UNDECIDED
     with database:
         config = _settings(database, (
-            'mtls_enabled', 'mtls_required', 'mtls_trusted_ca_id'))
+            'mtls_enabled', 'mtls_required', 'mtls_trusted_ca_id'), missing=MTLS_UNDECIDED)
+        if config is MTLS_UNDECIDED:
+            return MTLS_UNDECIDED
         if config.get('mtls_enabled') != 'true':
             return None
         ca_refid = config.get('mtls_trusted_ca_id')
@@ -164,3 +182,326 @@ def mtls_client_ca(data_path: str):
         if pem is None:
             return None
         return pem, name, config.get('mtls_required') == 'true'
+
+
+def _chain_refids(database, refid):
+    """*refid* and its ancestors by ``caref``, with whether one of them is revoked (a loop: revoked)."""
+    seen, revoked = [], False
+    while refid:
+        if refid in seen or len(seen) > 64:
+            return seen, True
+        row = database.one("SELECT caref, revoked FROM certificate_authorities WHERE refid = ?", (refid,))
+        if row is None:
+            break
+        seen.append(refid)
+        revoked = revoked or bool(row[1])
+        refid = row[0]
+    return seen, revoked
+
+
+def mtls_former_cas(data_path: str):
+    """``[(refid, pem, name)]`` of the former CAs the listener trusts beside the mTLS anchor so that
+    their certificates renew over TLS: listed by a Windows enrollment profile, held here, not revoked
+    up their chain, not already under the anchor. Empty while mTLS is off or on any read failure;
+    ``services.windows_profiles.listener_former_refids`` applies the same rule in the application."""
+    import json
+    database = open_boot_database(data_path)
+    if database is None:
+        return []
+    with database:
+        try:
+            config = _settings(database, ('mtls_enabled', 'mtls_trusted_ca_id'), missing={})
+            anchor = config.get('mtls_trusted_ca_id')
+            if config.get('mtls_enabled') != 'true' or not anchor:
+                return []
+            refids = set()
+            for (value,) in database.rows("SELECT renewal_ca_refids FROM windows_enrollment_profiles"):
+                try:
+                    listed = json.loads(value or '[]')
+                except ValueError:
+                    continue
+                if isinstance(listed, list):
+                    refids.update(r for r in listed if isinstance(r, str))
+            found = []
+            for refid in sorted(refids):
+                chain, revoked = _chain_refids(database, refid)
+                if not chain or revoked or anchor in chain:
+                    continue
+                pem, name = client_ca_anchor(database, refid)
+                if pem is not None:
+                    found.append((refid, pem, name))
+            return found
+        except Exception as e:
+            print(f"mTLS: former CAs of the Windows profiles not read ({type(e).__name__}: {e})",
+                  file=sys.stderr)
+            return []
+
+
+# The bound HTTPS certificate (services/https_binding.py) and the chain last written with it
+HTTPS_BOUND_KEY = 'https_bound_certificate_refid'
+HTTPS_CHAIN_KEY = 'https_bound_certificate_chain'
+# services/shared_files.HTTPS_GENERATED: the self-signed pair regenerated in HA
+HTTPS_GENERATED_FILE = 'https.generated'
+# services/shared_files.HTTPS_RESTORED: the pair of the last restored archive
+HTTPS_RESTORED_FILE = 'https.restored'
+RESTORED_LABEL = "restored HTTPS certificate"
+# What this node's master did with the restored pair, read by the scheduler process
+HTTPS_RESTORED_ATTEMPT = '.ucm-https-restored'
+
+
+class HttpsMaterialError(Exception):
+    """The database names an HTTPS certificate this node cannot write; the message is for operators."""
+
+
+def _missing_table(e):
+    """Whether *e* says the table does not exist: a first start, or a table an upgrade adds later."""
+    import sqlite3
+    if isinstance(e, sqlite3.OperationalError):
+        return str(e).startswith('no such table')
+    return getattr(e, 'sqlstate', None) == '42P01'  # psycopg UndefinedTable
+
+
+def _certificate_text(stored):
+    """Certificates are stored base64-wrapped; tolerate raw PEM too."""
+    if stored.lstrip().startswith('-----BEGIN'):
+        return stored
+    try:
+        return base64.b64decode(stored).decode('utf-8')
+    except Exception:
+        return stored
+
+
+def _first_certificate(pem):
+    """The first PEM certificate of ``pem`` without its whitespace, or None."""
+    start = pem.find(PEM_HEADER)
+    end = pem.find(PEM_FOOTER, start)
+    if start < 0 or end < 0:
+        return None
+    return ''.join(pem[start:end + len(PEM_FOOTER)].split())
+
+
+def _load_deks(database):
+    """The DEK rows, so a value a rotation rewrote opens. Before migration 153: the KEK alone."""
+    from security.encryption import key_encryption
+    if not key_encryption.kek_loaded:
+        return
+    try:
+        rows = database.rows(
+            "SELECT version, state, kek_id, wrapped FROM encryption_keys ORDER BY version")
+    except Exception as e:
+        if _missing_table(e):
+            return
+        raise
+    key_encryption.load_rows([tuple(row) for row in rows])
+    if key_encryption.dek_error:
+        raise HttpsMaterialError("the configured master key (master.key or KEY_ENCRYPTION_KEY) "
+                                 "does not open this database's data-encryption keys")
+
+
+def _stored_bytes(stored, context):
+    """A column under the master key (``utils.key_codec`` format) as raw bytes."""
+    from security.encryption import key_encryption
+    from utils.key_codec import load_pem_bytes
+    if key_encryption.is_encrypted(stored) and not key_encryption.is_enabled:
+        raise HttpsMaterialError(
+            f"{context}: its private key is encrypted under the master key, which this node "
+            "does not have (master.key or KEY_ENCRYPTION_KEY)")
+    try:
+        return load_pem_bytes(stored, context=context)
+    except ValueError as e:
+        raise HttpsMaterialError(str(e)) from None
+
+
+def _key_text(stored, context):
+    if stored.lstrip().startswith('-----BEGIN'):
+        return stored  # a column from before keys were stored base64-encoded
+    return _stored_bytes(stored, context).decode('utf-8')
+
+
+def https_material(database):
+    """``(cert_pem, key_pem, label, chain_known)`` the database says this node serves, or None.
+
+    The bound certificate first, then a restored pair, then a regenerated one. The bound
+    certificate comes with the chain last written for it when that chain starts with it
+    (``chain_known``), else alone. Raises HttpsMaterialError when unreadable.
+    """
+    config = _settings(database, (HTTPS_BOUND_KEY, HTTPS_CHAIN_KEY))
+    refid = (config.get(HTTPS_BOUND_KEY) or '').strip()
+    if refid:
+        label = f"bound certificate {refid}"
+        row = database.one("SELECT crt, prv FROM certificates WHERE refid = ?", (refid,))
+        if not row or not row[0] or not row[1]:
+            raise HttpsMaterialError(f"{label}: no certificate or private key in the database")
+        leaf = _certificate_text(row[0])
+        if _first_certificate(leaf) is None:
+            raise HttpsMaterialError(f"{label}: the stored certificate is not PEM")
+        _load_deks(database)
+        key = _key_text(row[1], label)
+        chain = config.get(HTTPS_CHAIN_KEY) or ''
+        if chain and _first_certificate(chain) == _first_certificate(leaf):
+            return chain, key, label, True
+        return leaf, key, label, False
+    import json
+    for name, label in ((HTTPS_RESTORED_FILE, RESTORED_LABEL),
+                        (HTTPS_GENERATED_FILE, "regenerated self-signed certificate")):
+        try:
+            row = database.one("SELECT content FROM shared_files WHERE name = ?", (name,))
+        except Exception as e:
+            if _missing_table(e):
+                return None
+            raise
+        if row and row[0]:
+            _load_deks(database)
+            pair = json.loads(_stored_bytes(row[0], label))
+            return pair['crt'], pair['key'], label, True
+    return None
+
+
+def _same_file(path, text):
+    try:
+        with open(path, encoding='utf-8') as handle:
+            return handle.read() == text
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def _leaf_in_file(path):
+    try:
+        with open(path, encoding='utf-8') as handle:
+            return _first_certificate(handle.read())
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _prepare(path, text, mode):
+    """A complete temporary file beside ``path``, owned like the files it replaces."""
+    import tempfile
+    fd, tmp_path = tempfile.mkstemp(prefix='.ucm-https-', suffix='.tmp',
+                                    dir=os.path.dirname(path) or '.')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write(text)
+        os.chmod(tmp_path, mode)
+        try:
+            import pwd
+            ucm_user = pwd.getpwnam('ucm')
+            os.chown(tmp_path, ucm_user.pw_uid, ucm_user.pw_gid)
+        except (KeyError, ImportError, PermissionError):
+            pass
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
+    return tmp_path
+
+
+def _keep_aside(path):
+    """A copy of ``path`` beside it with its mode and owner, or None when it does not exist."""
+    import shutil
+    import tempfile
+    if not os.path.exists(path):
+        return None
+    fd, aside = tempfile.mkstemp(prefix='.ucm-https-', suffix='.old', dir=os.path.dirname(path) or '.')
+    os.close(fd)
+    try:
+        shutil.copy2(path, aside)
+        st = os.stat(path)
+        try:
+            os.chown(aside, st.st_uid, st.st_gid)
+        except PermissionError:
+            pass  # not root: only root can give a file away, the copy stays ours
+    except BaseException:
+        os.unlink(aside)
+        raise
+    return aside
+
+
+def write_https_pair(cert_path, key_path, cert_pem, key_pem, backup_suffix=None):
+    """Both files hold exactly these texts afterwards; False when they already did.
+
+    Each is replaced by the rename of a complete temporary file, prepared both before
+    either rename. The key is 0600; the certificate keeps the mode of the one it replaces.
+    Raises on failure, leaving both files as they were.
+    """
+    cert_path, key_path = str(cert_path), str(key_path)
+    if _same_file(cert_path, cert_pem) and _same_file(key_path, key_pem):
+        return False
+    if backup_suffix:
+        import shutil
+        for path in (cert_path, key_path):
+            if os.path.exists(path):
+                shutil.copy(path, f"{path}.backup-{backup_suffix}")
+    try:
+        cert_mode = os.stat(cert_path).st_mode & 0o777
+    except OSError:
+        mask = os.umask(0o022)
+        os.umask(mask)
+        cert_mode = 0o666 & ~mask
+    prepared = []
+    try:
+        prepared.append(_prepare(cert_path, cert_pem, cert_mode))
+        prepared.append(_prepare(key_path, key_pem, 0o600))
+        old_key = _keep_aside(key_path)
+        if old_key:
+            prepared.append(old_key)
+        os.replace(prepared[1], key_path)
+        try:
+            os.replace(prepared[0], cert_path)
+        except BaseException:
+            # The new key never stays beside the old certificate
+            if old_key:
+                os.replace(old_key, key_path)
+            else:
+                os.unlink(key_path)
+            raise
+    finally:
+        for tmp_path in prepared:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    return True
+
+
+def materialize_https(data_path, cert_path, key_path):
+    """Gunicorn master, before the TLS socket: write the HTTPS pair the database names.
+
+    Returns what happened, for the log; None when the database names none (the files are
+    left to the existing startup). Raises HttpsMaterialError and leaves the files untouched
+    when the named pair cannot be read.
+    """
+    database = open_boot_database(data_path)
+    if database is None:
+        return None
+    with database:
+        found = https_material(database)
+    if found is None:
+        return None
+    cert_pem, key_pem, label, chain_known = found
+    if not chain_known and _leaf_in_file(cert_path) == _first_certificate(cert_pem) \
+            and _same_file(key_path, key_pem):
+        return f"{label} already in place"  # the chain on disk was written by the application
+    from datetime import datetime, timezone
+    suffix = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+    try:
+        written = write_https_pair(cert_path, key_path, cert_pem, key_pem, backup_suffix=suffix)
+    except Exception as e:
+        if label == RESTORED_LABEL:
+            _record_restored_attempt(data_path, cert_pem, key_pem, f"{type(e).__name__}: {e}")
+        raise
+    if label == RESTORED_LABEL:
+        _record_restored_attempt(data_path, cert_pem, key_pem, None)
+    return f"{label} {'written from the database' if written else 'already in place'}"
+
+
+def restored_pair_digest(cert_pem, key_pem):
+    import hashlib
+    return hashlib.sha256(cert_pem.encode('utf-8') + b'\0' + key_pem.encode('utf-8')).hexdigest()
+
+
+def _record_restored_attempt(data_path, cert_pem, key_pem, error):
+    """One line for the scheduler process: outside HA it then drops the stored pair."""
+    import json
+    try:
+        with open(os.path.join(data_path, HTTPS_RESTORED_ATTEMPT), 'w', encoding='utf-8') as out:
+            json.dump({'digest': restored_pair_digest(cert_pem, key_pem), 'error': error}, out)
+    except OSError as e:
+        print(f"HTTPS: the restored certificate attempt could not be recorded: {e}",
+              file=sys.stderr)

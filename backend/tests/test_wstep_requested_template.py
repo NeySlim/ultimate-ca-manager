@@ -15,6 +15,10 @@ from models.certificate_template import CertificateTemplate
 from services.xcep.policy_builder import _policy_oid_for_template
 from tests.test_wstep_subject_source import CLIENT_AUTH, SERVER_AUTH, _issue, subject_ca  # noqa: F401
 from tests.test_wstep_renew_tls import _eku_csr, _renew, _template_oid
+from tests.windows_profile_support import default_profile, template_oid
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 TWINS = {
     'User': ('usr_cert', ['clientAuth'], False, 'RSA-2048'),
@@ -22,6 +26,15 @@ TWINS = {
     'Web': ('web_server', ['serverAuth'], False, 'RSA-2048'),
 }
 CERTTYPE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2')
+
+
+@pytest.fixture(autouse=True)
+def served_by_the_default_profile(app):
+    """A ``wstep`` certificate recording no profile renews through the default one: made when
+    missing, so that no test here leans on an earlier one for it."""
+    with app.app_context():
+        default_profile(create=True)
+        db.session.commit()
 
 
 def _named_csr(oid=None, name=None, ekus=(CLIENT_AUTH,), name_type=asn1_core.BMPString):
@@ -40,6 +53,14 @@ def _named_csr(oid=None, name=None, ekus=(CLIENT_AUTH,), name_type=asn1_core.BMP
 
 
 def _oid_of(app, ca_id, name):
+    """The OID XCEP announces for template *name* in the default profile's policy."""
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        return template_oid(ca, CertificateTemplate.query.filter_by(name=name).one())
+
+
+def _derived_oid_of(app, ca_id, name):
+    """The OID 2.x derived from the CA, which a request no longer names at issuance."""
     with app.app_context():
         ca = db.session.get(CA, ca_id)
         return _policy_oid_for_template(ca, CertificateTemplate.query.filter_by(name=name).one())
@@ -122,18 +143,17 @@ def test_an_unreadable_template_name_is_refused(app, subject_ca):
 @pytest.fixture
 def split_xcep(app, subject_ca, create_ca):
     """A WSTEP CA offering TWINS while XCEP is set to another CA: (WSTEP CA id, XCEP OID of VPNUser)."""
-    from models import SystemConfig
+    from tests.windows_profile_support import restore, set_config, snapshot
     ca_id = subject_ca('Named split WSTEP CA', TWINS)
     xcep_ca = create_ca(cn='Named split XCEP CA')
     with app.app_context():
         template = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
-        oid = _policy_oid_for_template(db.session.get(CA, xcep_ca['id']), template)
-        db.session.add(SystemConfig(key='xcep_ca_refid', value=xcep_ca['refid']))
-        db.session.commit()
+        saved = snapshot(('xcep_ca_refid',))
+        set_config('xcep_ca_refid', xcep_ca['refid'])
+        oid = template_oid(db.session.get(CA, xcep_ca['id']), template)
     yield ca_id, oid
     with app.app_context():
-        SystemConfig.query.filter_by(key='xcep_ca_refid').delete()
-        db.session.commit()
+        restore(saved)
 
 
 def test_an_oid_announced_by_a_separate_xcep_ca_is_issued(app, split_xcep):
@@ -142,7 +162,9 @@ def test_an_oid_announced_by_a_separate_xcep_ca_is_issued(app, split_xcep):
     ca_id, oid = split_xcep
     cert, err = _issue(app, ca_id, _named_csr(oid=oid))
     assert err is None, err
-    assert _template_oid(cert).dotted_string == oid != _oid_of(app, ca_id, 'Named split WSTEP CA VPNUser')
+    # The profile's, derived from neither CA
+    assert _template_oid(cert).dotted_string == oid
+    assert oid not in {_derived_oid_of(app, i, 'Named split WSTEP CA VPNUser') for i in (ca_id, ca_id_of_xcep(app))}
 
 
 @pytest.mark.parametrize('path', ['tls', 'xml'])
@@ -162,22 +184,21 @@ def test_a_certificate_naming_the_xcep_oid_renews_under_it(app, split_xcep, path
 
 
 def test_only_an_oid_of_the_template_is_stamped(app, split_xcep):
+    """The OID XCEP announces for that template in the profile's policy, whichever CA issues."""
     from services.wstep.wstep_service import _template_oid_for
     ca_id, oid = split_xcep
     with app.app_context():
         ca = db.session.get(CA, ca_id)
         vpn = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
         user = CertificateTemplate.query.filter_by(name='Named split WSTEP CA User').one()
-        assert _template_oid_for(ca, vpn, oid) == oid
-        xcep_ca = db.session.get(CA, ca_id_of_xcep(oid))
-        # A request naming another template's OID, or none, gets the OID XCEP announced
-        assert _template_oid_for(ca, user, oid) == _policy_oid_for_template(xcep_ca, user)
-        assert _template_oid_for(ca, user, None) == _policy_oid_for_template(xcep_ca, user)
+        assert _template_oid_for(ca, vpn, profile=default_profile()) == oid
+        assert _template_oid_for(ca, user, profile=default_profile()) == default_profile().template_oid(user.id) != oid
 
 
-def ca_id_of_xcep(oid):
-    from models import SystemConfig
-    return CA.query.filter_by(refid=SystemConfig.query.filter_by(key='xcep_ca_refid').one().value).one().id
+def ca_id_of_xcep(app):
+    from tests.windows_profile_support import get_config
+    with app.app_context():
+        return CA.query.filter_by(refid=get_config('xcep_ca_refid')).one().id
 
 
 @pytest.mark.parametrize('how', ['name', 'eku'])
@@ -190,19 +211,15 @@ def test_a_request_not_naming_the_oid_carries_the_one_xcep_announced(app, split_
     cert, err = _issue(app, ca_id, csr)
     assert err is None, err
     template = 'VPNUser' if how == 'name' else 'Web'
-    with app.app_context():
-        xcep_ca = db.session.get(CA, ca_id_of_xcep(_oid))
-        wanted = _policy_oid_for_template(
-            xcep_ca, CertificateTemplate.query.filter_by(name=f'Named split WSTEP CA {template}').one())
-    assert _template_oid(cert).dotted_string == wanted != _oid_of(app, ca_id, f'Named split WSTEP CA {template}')
+    wanted = _oid_of(app, ca_id, f'Named split WSTEP CA {template}')
+    assert _template_oid(cert).dotted_string == wanted != _derived_oid_of(app, ca_id, f'Named split WSTEP CA {template}')
 
 
 @pytest.mark.parametrize('path', ['tls', 'xml'])
 @pytest.mark.parametrize('change', ['cleared', 'moved'])
 def test_a_certificate_renews_after_the_xcep_ca_changes(app, split_xcep, create_ca, change, path):
-    """The renewed certificate was issued by this CA: its template OID, stamped under the XCEP
-    CA of the time, still names its template once that setting is cleared or moved."""
-    from models import SystemConfig
+    """The template OID belongs to the profile: once its policy CA is cleared or moved, the
+    renewal names the same template and the certificate keeps the same OID."""
     ca_id, oid = split_xcep
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     csr = (x509.CertificateSigningRequestBuilder()
@@ -214,15 +231,11 @@ def test_a_certificate_renews_after_the_xcep_ca_changes(app, split_xcep, create_
     assert err is None, err
     other = create_ca(cn=f'Named split other XCEP CA {change} {path}') if change == 'moved' else None
     with app.app_context():
-        row = SystemConfig.query.filter_by(key='xcep_ca_refid').one()
-        row.value = other['refid'] if other else ''
-        db.session.commit()
+        from tests.windows_profile_support import set_config
+        set_config('xcep_ca_refid', other['refid'] if other else '')
     cert, err = _renew(app, ca_id, path, old_cert, key, _eku_csr(old_cert, key, CLIENT_AUTH))
     assert err is None, err
-    with app.app_context():
-        vpn = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
-        now = _policy_oid_for_template(db.session.get(CA, other['id'] if other else ca_id), vpn)
-    assert _template_oid(cert).dotted_string == now != oid
+    assert _template_oid(cert).dotted_string == oid == _oid_of(app, ca_id, 'Named split WSTEP CA VPNUser')
 
 
 def _foreign_oid_cert(app, ca_id, template_name, key, refid='another-ucm-instance-ca'):

@@ -274,7 +274,11 @@ export default function DiscoveryPage() {
 
   const handleExport = async (format = 'csv') => {
     try {
-      const blob = await discoveryService.export(format)
+      // The filters on screen: the file holds what the table holds
+      const params = { search: discoveredSearch || undefined }
+      if (statusFilter.length > 0) params.status = statusFilter
+      if (profileFilter) params.profile_id = profileFilter
+      const blob = await discoveryService.export(format, params)
       downloadBlob(blob, `discovered_certificates.${format}`)
       showSuccess(t('discovery.exportSuccess'))
     } catch (error) {
@@ -550,7 +554,7 @@ export default function DiscoveryPage() {
         <div className="flex items-center gap-2">
           <div className={cn(
             "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-            row.status === 'completed' ? 'icon-bg-emerald' : row.status === 'running' ? 'icon-bg-blue' : 'icon-bg-rose'
+            row.status === 'completed' ? 'icon-bg-emerald' : row.status === 'running' ? 'icon-bg-blue' : 'icon-bg-red'
           )}>
             <ClockCounterClockwise size={14} weight="duotone" />
           </div>

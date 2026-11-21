@@ -3,7 +3,7 @@
  * Supports password fields with show/hide toggle and strength indicator
  * Supports credential fields with "already set" indicator
  */
-import { forwardRef, useEffect, useMemo, useState } from 'react'
+import { forwardRef, useEffect, useId, useMemo, useState } from 'react'
 import { Eye, EyeSlash, CheckCircle } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useTranslation } from 'react-i18next'
@@ -35,6 +35,9 @@ export const Input = forwardRef(function Input({
   ...props 
 }, ref) {
   const { t } = useTranslation()
+  // The label names the field (assistive technologies, getByLabelText)
+  const autoId = useId()
+  const fieldId = props.id ?? autoId
   const [showPassword, setShowPassword] = useState(false)
   const [internalValue, setInternalValue] = useState('')
   
@@ -89,12 +92,12 @@ export const Input = forwardRef(function Input({
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
-        <label className="block text-xs font-medium text-text-secondary leading-[20px]">
+        <label htmlFor={fieldId} className="block text-xs font-medium text-text-secondary leading-[20px]">
           <span className="flex items-center gap-1 h-[20px]">
             {typeof label === 'string' ? label : label}
             {required && !hasExistingValue && <span className="status-danger-text">*</span>}
             {hasExistingValue && (
-              <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
+              <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
                 <CheckCircle size={10} weight="fill" />
                 {t('common.set')}
               </span>
@@ -137,6 +140,7 @@ export const Input = forwardRef(function Input({
           required={required && !hasExistingValue}
           autoComplete={noAutofill ? 'off' : undefined}
           {...props}
+          id={fieldId}
         />
         
         {/* Password toggle -- hidden when there's nothing typed to reveal.

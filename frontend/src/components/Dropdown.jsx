@@ -13,7 +13,7 @@ const sizes = {
 
 const variants = {
   default: 'bg-bg-tertiary hover:bg-bg-hover text-text-primary border border-border',
-  primary: 'btn-gradient text-white border-0',
+  primary: 'btn-gradient text-on-accent border-0',
   secondary: 'bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border',
 }
 

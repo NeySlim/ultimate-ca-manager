@@ -4,6 +4,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 import types
 
@@ -194,6 +195,33 @@ def test_the_scheduler_process_stops_when_its_master_dies(tmp_path):
                 pass
 
 
+def test_a_scheduler_process_whose_master_died_before_it_ran_stops(tmp_path):
+    """The master spawns through the supervisor and dies at once: the orphan, adopted
+    before it read its parent, still stops once its loop runs."""
+    env, data = _scheduler_env(tmp_path)
+    pidfile = tmp_path / 'scheduler.pid'
+    script = tmp_path / 'master.py'
+    script.write_text(
+        'import os, sys\n'
+        f'sys.path.insert(0, {BACKEND!r})\n'
+        'from scheduler_supervisor import SchedulerSupervisor\n'
+        'proc = SchedulerSupervisor()._spawn()\n'
+        f'open({str(pidfile)!r}, "w").write(str(proc.pid))\n'
+        'os._exit(0)\n')
+    master = subprocess.run([sys.executable, str(script)], cwd=BACKEND, env=env, timeout=30,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    child = int(pidfile.read_text())
+    try:
+        assert master.returncode == 0
+        assert _wait(lambda: not _alive(child), timeout=60)
+        assert 'The gunicorn master is gone' in (tmp_path / 'ucm.log').read_text()
+    finally:
+        try:
+            os.kill(child, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def test_the_scheduler_process_prepares_then_runs_then_hands_over(monkeypatch):
     import app as app_module
     import scheduler_main
@@ -204,15 +232,10 @@ def test_the_scheduler_process_prepares_then_runs_then_hands_over(monkeypatch):
     monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '')  # main() sets it: undone after
     monkeypatch.setattr(scheduler_main.signal, 'signal', lambda sig, h: handlers.__setitem__(sig, h))
 
-    class Thread:
+    class Scheduler:
         def join(self, timeout):
             calls.append(('join', timeout))
-
-        def is_alive(self):
-            return False
-
-    class Scheduler:
-        _thread = Thread()
+            return True
 
         def rearm_grace(self):
             calls.append('rearm')
@@ -230,9 +253,27 @@ def test_the_scheduler_process_prepares_then_runs_then_hands_over(monkeypatch):
     monkeypatch.setattr(app_module, 'create_app', create_app)
     monkeypatch.setattr(app_module, 'run_startup_housekeeping', lambda a: calls.append(('housekeeping', a)))
     monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
+    monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: calls.append(('relay', a)))
+    monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: calls.append('relay stop'))
+
+    class Runner:
+        def __init__(self, app, scheduler):
+            calls.append(('jobs', app))
+
+        def start(self):
+            return self
+
+        def stop(self):
+            calls.append('jobs stop')
+
+        def join(self, timeout):
+            calls.append('jobs join')
+            return True
+    monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
     assert scheduler_main.main() == 0
-    assert calls == [('create_app', '1'), ('housekeeping', 'the-app'), 'rearm', ('start', 'the-app'),
-                     'relinquish', ('join', 7.0)]
+    assert calls == [('create_app', '1'), ('relay', 'the-app'), ('housekeeping', 'the-app'), 'rearm',
+                     ('start', 'the-app'), ('jobs', 'the-app'), 'jobs stop', 'relinquish',
+                     ('join', 7.0), 'jobs join', 'relay stop']
 
 
 def test_under_gunicorn_the_master_skips_the_startup_housekeeping(monkeypatch):
@@ -259,7 +300,8 @@ def test_the_scheduler_process_never_exits_with_a_code_that_halts_gunicorn(outco
     assert scheduler_main.exit_code(outcome) == expected
 
 
-def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
+@pytest.mark.parametrize('task_ends, job_ends', [(False, True), (True, False)])
+def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch, caplog, task_ends, job_ends):
     import app as app_module
     import scheduler_main
     from services import scheduler_service
@@ -277,7 +319,8 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
     monkeypatch.setattr(scheduler_main.os, '_exit', fake_exit)
 
     class Scheduler:
-        _thread = types.SimpleNamespace(join=lambda timeout: None, is_alive=lambda: True)
+        def join(self, timeout):
+            return task_ends
 
         def rearm_grace(self):
             pass
@@ -290,6 +333,166 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
     monkeypatch.setattr(app_module, 'create_app', lambda: 'the-app')
     monkeypatch.setattr(app_module, 'run_startup_housekeeping', lambda a: None)
     monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
-    with pytest.raises(Exit):
+    monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: None)
+    monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: exits.append('relay stop'))
+
+    class Runner:
+        def __init__(self, app, scheduler):
+            pass
+
+        def start(self):
+            return self
+
+        def stop(self):
+            pass
+
+        def join(self, timeout):
+            return job_ends
+    monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
+    with caplog.at_level('WARNING', logger='ucm.scheduler_main'), pytest.raises(Exit):
         scheduler_main.main()
-    assert exits == [0]
+    assert exits == ['relay stop', 0]
+    assert 'A scheduled task or a background job outlasted 30.0s' in caplog.text
+
+
+def test_the_master_stopping_stops_the_process_then_releases_the_node(supervisor):
+    """SIGTERM to the master: the scheduler process stops beside the workers' drain, and the
+    node's row is released at once, not after graceful_timeout of open connections."""
+    s = supervisor()
+    calls = []
+    server = types.SimpleNamespace(log=s.log, LISTENERS=['listener'],
+                                   cfg=types.SimpleNamespace(graceful_timeout=1))
+    s.start(server, on_stopped=lambda: calls.append(s._proc.poll()))
+    assert _wait(lambda: s.pid is not None)
+    pid = s.pid
+    server.LISTENERS = []  # Arbiter.stop() empties them, then drains the workers
+    assert _wait(lambda: not _alive(pid), timeout=3)
+    assert _wait(lambda: calls, timeout=3)
+    assert calls[0] is not None  # after the process exited: its last heartbeat is written
+    s.stop()
+    assert len(calls) == 1
+
+
+def test_stop_releases_the_node_once(supervisor):
+    s = supervisor()
+    calls = []
+    s.start(on_stopped=lambda: calls.append(1))
+    assert _wait(lambda: s.pid is not None)
+    s.stop()
+    s.stop()
+    assert calls == [1]
+
+
+class _UnseenExit:
+    """The process as gevent's Popen sees it in the master once the arbiter's waitpid(-1)
+    reaped it first: its child watcher never fires, poll() stays None, wait() times out."""
+
+    def __init__(self, proc):
+        self._proc, self.pid, self.returncode = proc, proc.pid, None
+
+    def poll(self):
+        return None
+
+    def wait(self, timeout=None):
+        time.sleep(timeout or 0)
+        raise subprocess.TimeoutExpired('scheduler', timeout)
+
+    def send_signal(self, signum):
+        os.kill(self.pid, signum)
+
+    def kill(self):
+        self.send_signal(signal.SIGKILL)
+
+
+def test_a_process_another_reaper_collected_counts_as_stopped(supervisor):
+    s = supervisor(graceful=3.0)
+    calls = []
+    s._owner_pid, s._on_stopped = os.getpid(), lambda: calls.append(1)
+    real = s._spawn()
+    s._proc = _UnseenExit(real)
+    # The arbiter's reap_workers collects the exit, so the Popen object never sees it
+    reaper = threading.Thread(target=os.waitpid, args=(real.pid, 0), daemon=True)
+    reaper.start()
+    started = time.monotonic()
+    s.stop()
+    assert time.monotonic() - started < 1.5, 'waited for an exit nobody would report'
+    assert calls == [1]
+    reaper.join(5)
+    real.returncode = 0
+
+
+def test_on_exit_waits_for_the_stop_the_watcher_is_recording(supervisor):
+    s = supervisor()
+    entered, release, calls = threading.Event(), threading.Event(), []
+
+    def slow():
+        entered.set()
+        release.wait(5)
+        calls.append('recorded')
+    s._owner_pid, s._on_stopped = os.getpid(), slow
+    watcher = threading.Thread(target=s._say_stopped)
+    watcher.start()
+    assert entered.wait(5)
+    threading.Timer(0.3, release.set).start()
+    s.stop()  # on_exit: returns only once the row is recorded, or the exit would cut it off
+    assert calls == ['recorded']
+    watcher.join(5)
+
+
+@pytest.mark.parametrize('named, dies', [(False, True), (True, True), (False, False)])
+def test_a_master_that_dies_while_the_scheduler_process_starts_is_noticed(monkeypatch, caplog, named,
+                                                                         dies):
+    """The parent is read before the application loads, or named by the master: an orphan stops,
+    and a process started by hand follows the parent it has."""
+    import app as app_module
+    import scheduler_main
+    from services import scheduler_service
+
+    handlers, started, asked = {}, [], []
+    monkeypatch.setenv('UCM_SCHEDULER_GRACEFUL_TIMEOUT', '1')
+    monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '')
+    monkeypatch.setattr(scheduler_main.signal, 'signal', lambda sig, h: handlers.__setitem__(sig, h))
+
+    def getppid():
+        asked.append(1)
+        if len(asked) > 5:  # a process that never notices is stopped, and the test fails below
+            handlers[signal.SIGTERM]()
+        # Not named: the master dies once the loop runs. Named: it was gone before main() ran
+        return 1 if dies and (started or named) else 4242
+    monkeypatch.setattr(scheduler_main.os, 'getppid', getppid)
+    if named:
+        monkeypatch.setenv(scheduler_main.MASTER_ENV, '4242')
+    else:
+        monkeypatch.delenv(scheduler_main.MASTER_ENV, raising=False)
+
+    class Scheduler:
+        join = staticmethod(lambda timeout: True)
+        rearm_grace = relinquish = staticmethod(lambda: None)
+        start = staticmethod(lambda app: started.append(app))
+
+    class Runner:
+        def __init__(self, app, scheduler):
+            pass
+        start = lambda self: self  # noqa: E731
+        stop = lambda self: None  # noqa: E731
+        join = lambda self, timeout: True  # noqa: E731
+
+    monkeypatch.setattr(app_module, 'create_app', lambda: 'the-app')
+    monkeypatch.setattr(app_module, 'run_startup_housekeeping', lambda a: None)
+    monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
+    monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: None)
+    monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: None)
+    monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
+    with caplog.at_level('WARNING', logger='ucm.scheduler_main'):
+        assert scheduler_main.main() == 0
+    assert ('The gunicorn master is gone' in caplog.text) is dies
+
+
+def test_the_supervisor_names_itself_to_the_scheduler_process(monkeypatch):
+    import scheduler_main
+    import scheduler_supervisor
+
+    seen = {}
+    monkeypatch.setattr(scheduler_supervisor.subprocess, 'Popen', lambda cmd, cwd, env: seen.update(env) or None)
+    scheduler_supervisor.SchedulerSupervisor()._spawn()
+    assert seen[scheduler_main.MASTER_ENV] == str(os.getpid())

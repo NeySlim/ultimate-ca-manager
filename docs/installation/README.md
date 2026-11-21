@@ -58,7 +58,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443 or https://your-server-fqdn:8443  
-**Default credentials:** admin / changeme123
+**First login:** `admin`, password read with `docker exec ucm cat /opt/ucm/data/initial-admin-password` (see [First access](#first-access))
 
 ---
 
@@ -88,10 +88,11 @@ sudo systemctl status ucm
 
 **Native installation for Fedora, Red Hat Enterprise Linux, Rocky Linux, AlmaLinux, and derivatives.**
 
-Each release has two RPMs: `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, and `ucm-el9-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9, which runs on the `python3.12` package of the distribution (its `python3` is 3.9).
+Each release has three RPMs: `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, `ucm-el9-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9, which runs on the `python3.12` package of the distribution (its `python3` is 3.9), and `ucm-el10-VERSION-1.el10.noarch.rpm` for the same distributions at 10, which runs on the system `python3` (3.12). FIPS builds of the packages are supported on EL9 and Ubuntu 24.04 only.
 
 ```bash
-# Download latest package (replace VERSION with actual version, e.g. 2.241)
+# Download latest package (replace VERSION with the actual version, e.g. 2.241,
+# and el9 with el10 on RHEL, Rocky Linux or AlmaLinux 10)
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-el9-VERSION-1.el9.noarch.rpm
 
 # Install
@@ -104,6 +105,14 @@ sudo systemctl status ucm
 ```
 
 **Access:** https://localhost:8443 or https://your-server-fqdn:8443
+
+---
+
+### Upgrading a DEB or RPM installation
+
+The 3.0 packages install over UCM 2.254 or later only. Over an older version, the pre-installation script refuses before writing anything and leaves that version installed and running: install 2.254, start it once, then install 3.0. See the [Upgrade Guide](../../UPGRADE.md#upgrading-to-v30).
+
+Where an older UCM was removed but left its data (an RPM removal, a DEB removed or purged), the 3.0 package installs as new. If 3.0 cannot start on the SQLite database left there, the package moves that installation's files, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (root only, with a `README.txt` that gives the way back through 2.254; a file that cannot be renamed out of its filesystem goes into a root-only `.ucm-archive-<UTC date and time>/` directory beside it, which that README lists), then starts a new, empty UCM. Data that 3.0 starts on is kept. The Docker image never archives: it refuses an older volume at startup.
 
 ---
 
@@ -137,9 +146,30 @@ The packages install pre-built Python wheels, and the `cryptography` and `psycop
 
    The package completes `/etc/ucm/ucm.env` with its secrets and defaults. `sudo UCM_FIPS_BUILD=1 dnf install ...` works too and records the option in `ucm.env` (a variable exported before `sudo` does not reach the package). The first build takes about five minutes (log: `/var/log/ucm/fips-build.log`). Later installs rebuild a package only when its version changed, and otherwise reuse pip's wheel cache. When a tool is missing or the build fails, the installation stops with the command to run, and an upgrade keeps the previous environment. The built-in updater checks the build tools before installing: when one is missing it refuses the update and leaves the installation untouched, and a failed build is reported as a failed update.
 
-3. When the host is in FIPS mode (`/proc/sys/crypto/fips_enabled` is 1), the package adds `UCM_FIPS=1` to `ucm.env` (an explicit `UCM_FIPS=0` is kept), checks that the FIPS provider is active, and prints the readiness report of `python -m scripts.fips_preflight`. Otherwise UCM runs in standard mode on the system OpenSSL: enable FIPS mode with `sudo fips-mode-setup --enable` (RHEL) or `sudo pro enable fips-updates` (Ubuntu Pro), reboot, and reinstall the package.
+3. When the host is in FIPS mode (`/proc/sys/crypto/fips_enabled` is 1), the package adds `UCM_FIPS=1` to `ucm.env` (an explicit `UCM_FIPS=0` is kept), checks that the FIPS provider is active, and prints the readiness report of `python -m scripts.fips_preflight`. Otherwise UCM runs in standard mode on the system OpenSSL: enable FIPS mode with `sudo fips-mode-setup --enable` (RHEL) or `sudo pro enable fips` (Ubuntu Pro: the certified binaries; `fips-updates` installs patched versions, see below), reboot, and reinstall the package.
 
 TLS follows the host's configuration: with the FIPS crypto policy of RHEL 9 and the FIPS module of Ubuntu 24.04, X25519 and X448 are not offered, and UCM refuses to start in FIPS mode when its TLS contexts still accept them.
+
+#### What FIPS mode allows on each installation
+
+In FIPS mode UCM asks the loaded module whether it approves ML-DSA, Ed25519 and Ed448, and allows them only when it does; RSA keys of an even length from 2048 to 16384 bits and ECDSA on P-256, P-384 and P-521 are allowed everywhere, at issuance, for HSM signatures and in the readiness check, though EST, SCEP and WSTEP enrolment caps RSA at 8192 bits in every mode. FIPS 186-5 approves every such RSA length, but the module validations test only 2048, 3072 and 4096 bits (the security policy of #5586 lists the others as approved and untested).
+
+| Installation | FIPS module (CMVP certificate) | ML-DSA-44/65/87 | Ed25519, Ed448 |
+|---|---|---|---|
+| Docker image `-fips` | OpenSSL FIPS Provider 3.5.9 (#5586) | allowed | allowed |
+| DEB, Ubuntu 24.04 Pro | Ubuntu 24.04 OpenSSL Cryptographic Module (#5115) | refused | refused |
+| RPM, RHEL 9 | Red Hat Enterprise Linux 9 OpenSSL FIPS Provider (#5573) | refused | refused |
+
+- The binary certified under #5115 is the one of Ubuntu Pro's `fips` stream; `fips-updates` carries later, patched versions that are not the certified binary.
+- The image is built on Debian 13, and also for arm64: neither is among the tested configurations of certificate #5586.
+- Still refused with the image: Ed25519 SSH keys of deployment targets and Ed25519 host keys (paramiko signs and verifies them with libsodium, outside the module), HSM and OpenBao keys other than RSA of an even length from 2048 to 16384 bits and ECDSA P-256, P-384 and P-521, ML-DSA and EdDSA among them (the provider signs, not the module), and SLH-DSA, which the module approves but the Python cryptography library does not provide.
+- The readiness check of the `-fips` image, run before the switch without `UCM_FIPS`, judges these keys by the image's module, asked when the image was built. Run it with that image, not the standard one: without a FIPS module the check lists EdDSA and ML-DSA keys as refused, and its report says so (`module_known: false`).
+- At each start in FIPS mode the `-fips` image runs the module's self-tests and compares the module's HMAC-SHA2-256 integrity value to the one recorded when the image was built; when they differ, or the record is missing or malformed, it refuses to start, and the published image has to be pulled again. It also refuses to start when `OPENSSL_MODULES` is set to anything but the absolute path of the checked module's directory, and keeps that directory for the whole process, whatever `ucm.env` sets.
+- SCEP in FIPS mode takes only RSA-OAEP key transport and AES content encryption: a request whose content key is wrapped with RSA PKCS#1 v1.5, encrypted with 3DES or signed with SHA-1 is refused (`badAlg`), so a client without RSA-OAEP, such as sscep, does not enroll.
+- In FIPS mode UCM runs the blocker checks of the readiness check at each start (about one database query per check, none that reads every certificate) and writes each blocker to the log as an error line with its remedy; `GET /api/v2/system/service/status` carries those of the start under `crypto.blockers`, with their time in `crypto.blockers_checked_at`, until the next start; the readiness check run on demand gives a fresh report. UCM starts anyway, since a native package sets `UCM_FIPS=1` by itself when the host switches, and refuses each affected operation when it is used. In HA mode every node logs its own.
+- With the image, TLS 1.2 without Extended Master Secret is refused in both directions, and TLS also offers the hybrid groups X25519MLKEM768, SecP256r1MLKEM768 and SecP384r1MLKEM1024; X25519 and X448 alone stay refused.
+- An HMAC key under 14 bytes (112 bits) is refused in FIPS mode with the FIPS reason: a webhook secret or TSIG key when saved, and a webhook secret, a Constellix, DNS Made Easy, INWX or Tencent Cloud secret, an external EAB key of an ACME account or the `SECRET_KEY` when used, even if saved before the switch. A short `SECRET_KEY` makes every sign-in fail and is a blocker of the readiness check; the other secrets are listed as warnings when the check can read them (one that does not decrypt is not listed).
+- HMAC that UCM computes itself (webhook signatures, CSRF tokens, ACME External Account Binding, DNS provider API signatures) uses the one-shot call, which the image's module runs in its own HMAC service, key check included. Known limits: TSIG (dnspython), TOTP codes (pyotp) and Fernet tokens (the Python cryptography library) compute HMAC in OpenSSL around the module's digests, where the module checks no key length; for TSIG keys only UCM's own 14-byte check, at save, applies.
 
 A standard package installed on a host in FIPS mode prints a reminder to set `UCM_FIPS_BUILD=1`. To return to the standard build, remove the line from `ucm.env` and reinstall.
 
@@ -168,7 +198,7 @@ pip install -r backend/requirements.txt
 python wsgi.py
 ```
 
-Building the Docker image from a clone needs the same frontend build first: the `Dockerfile` copies `frontend/dist/` as is.
+Building the Docker image from a clone needs the same frontend build first: the `Dockerfile` copies `frontend/dist/` as is. It also needs BuildKit, for the standard image as for the FIPS one: the `Dockerfile` uses `RUN --mount` steps that the legacy builder refuses ("the --mount option requires BuildKit"). Docker uses BuildKit when its buildx plugin is installed: check with `docker buildx version`, and install the `docker-buildx-plugin` package (Docker's repositories) or `docker-buildx` (Debian, Ubuntu) when the command is missing.
 
 ```bash
 (cd frontend && npm ci && npm run build)
@@ -179,15 +209,78 @@ docker build -t ucm:local .
 
 ---
 
-## First Login
+## First Access
 
-After installation, access UCM at **https://localhost:8443** (or **https://your-server-fqdn:8443** for remote access)
+UCM has no default password. The first administrator (`admin`, or `INITIAL_ADMIN_USERNAME`) gets its password from one of two sources, read only at the first start:
 
-**Default Credentials:**
-- **Username:** admin
-- **Password:** `changeme123`
+- **Provided:** `INITIAL_ADMIN_PASSWORD_FILE` names a file holding it (a Docker, Compose or Kubernetes secret), or `INITIAL_ADMIN_PASSWORD` holds it. Setting both refuses the start; an unreadable or empty file refuses it too, it never falls back to a generated one. A provided password is yours: no change is forced. The password policy is not applied to it: a weak one is accepted, and the log says it does not meet the policy. The Helm chart's generated value is the exception: the chart sets `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE=1`, so the log says the deployment drew it (it is in the release's Secret), no policy warning is given, and it must be changed at first login.
+- **Generated:** with neither set, the first start writes a random password to `initial-admin-password` in the data directory (`/opt/ucm/data` for every package and the image), mode 0600, owned by the service user. It never appears in a log, the container output or the installation message: they give the path and the command to read it. The first login must change it, and that change removes the file.
 
-The first login must set a new password: until then the server refuses every other request of that session, API included.
+Once the administrator exists, neither variable is read again: remove the value from your environment or secret after the first start. The [Administration Guide](../ADMIN_GUIDE.md#initial-administrator-password) has the full model, the HA case and what to do if the file was lost.
+
+### DEB (Debian, Ubuntu) and RPM (Fedora, RHEL, Rocky, Alma)
+
+The package starts UCM at installation. Generated password:
+
+```bash
+sudo cat /opt/ucm/data/initial-admin-password
+```
+
+To provide it, write `/etc/ucm/ucm.env` before installing the package: the package keeps a file it finds, completes it, and gives `/etc/ucm` to the `ucm` user before starting UCM.
+
+```bash
+sudo install -d -m 750 /etc/ucm
+sudo sh -c 'umask 077; printf "%s\n" "Your-Chosen-Password" > /etc/ucm/admin-password'
+echo 'INITIAL_ADMIN_PASSWORD_FILE=/etc/ucm/admin-password' | sudo tee /etc/ucm/ucm.env
+sudo apt install ./ucm_VERSION_all.deb      # or: sudo dnf install ./ucm-...rpm
+```
+
+`INITIAL_ADMIN_PASSWORD=...` in `/etc/ucm/ucm.env` works the same way. The installation message says which source it found, or gives the command above for a generated password; it never shows the value. Delete the file and the line after the first login.
+
+### Docker
+
+Generated password:
+
+```bash
+docker exec ucm cat /opt/ucm/data/initial-admin-password
+```
+
+To provide it, prefer a file: `-v /path/to/admin-password:/run/secrets/ucm_admin_password:ro -e INITIAL_ADMIN_PASSWORD_FILE=/run/secrets/ucm_admin_password`. The plain variable `-e INITIAL_ADMIN_PASSWORD=...` works too, but `docker inspect` shows it to anyone who can reach the Docker daemon. The file must be readable by the container user (`ucm`, UID set by the image).
+
+### Docker Compose with a secret
+
+```yaml
+services:
+  ucm:
+    image: neyslim/ultimate-ca-manager:latest
+    environment:
+      - INITIAL_ADMIN_PASSWORD_FILE=/run/secrets/ucm_admin_password
+    secrets:
+      - ucm_admin_password
+secrets:
+  ucm_admin_password:
+    file: ./ucm_admin_password.txt
+```
+
+Without the secret, read the generated password with `docker compose exec ucm cat /opt/ucm/data/initial-admin-password`. The `docker-compose*.yml` files of the repository carry this example, commented.
+
+### Helm (Kubernetes)
+
+The chart provides the password: `initialAdminPassword` when set, otherwise one it generates into its Secret and keeps across upgrades (that one must be changed at first login). To use your own Secret, set `INITIAL_ADMIN_PASSWORD` or `INITIAL_ADMIN_PASSWORD_FILE` in `extraEnv`: the chart then passes none. Read the generated one with:
+
+```bash
+kubectl -n ucm get secret ucm-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' | base64 -d; echo
+```
+
+(`<fullname>-secrets` for another release name.) The value the chart generated must be changed at the first login, as a generated password (the chart sets `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE=1`); a value you set in `initialAdminPassword` is yours and no change is forced. No file is written in the pod. `helm template` and GitOps tools cannot look the Secret up and render a new value each time: set `initialAdminPassword` there.
+
+### HA (several nodes on one PostgreSQL)
+
+The administrator is created once, in the database, by the first node to start (creation runs under the startup lock). With nothing provided, only that node writes the file. Each node's log says where it is: `generated password in <path>` on that node, `its generated password file is on node <id>` on the others. A password change made through any node removes the file on every node: at once on the node that holds it when the change is made there, through a cluster command otherwise, and at the next start for a node that was down. Providing the password through a secret shared by the nodes avoids the question.
+
+### At the first login
+
+With a generated password, UCM asks for a new one right after login. Until it is set, the server refuses every other request of that session, API and WebSocket included. The new password follows the password policy (Settings > Security). Once it is saved, `initial-admin-password` is deleted. The file is never removed after a delay.
 
 ---
 
@@ -195,7 +288,7 @@ The first login must set a new password: until then the server refuses every oth
 
 ### Docker
 - **Data:** `/opt/ucm/data` (inside container, mount as volume)
-- **Volume:** `ucm-data` (Docker volume)
+- **Volumes:** `ucm-data` for the data and `ucm-config` for `/etc/ucm`, where `master.key` lives (both Docker volumes)
 - **Config:** Environment variables
 
 ### DEB/RPM Packages
@@ -203,6 +296,7 @@ The first login must set a new password: until then the server refuses every oth
 - **Config:** `/etc/ucm/ucm.env`
 - **Logs:** `/var/log/ucm/`
 - **Service:** `/etc/systemd/system/ucm.service`
+- **Archive of a removed older installation:** `/opt/ucm-archive/` (only after one was archived; see above)
 
 ### Source Installation
 - **Data:** `./backend/data` (relative to repository root)
@@ -215,11 +309,11 @@ The first login must set a new password: until then the server refuses every oth
 
 After installation:
 
-1. **Change default password** — Settings → Users & Groups
-2. **Configure HTTPS certificate** — Upload a trusted certificate or use the auto-generated one
-3. **Create your first CA** — Dashboard → Create Certificate Authority
-4. **Configure email notifications** (optional) — Settings → SMTP
-5. **Enable ACME/SCEP** (optional) — ACME / SCEP pages
+1. **Log in and set your password**: see [First Access](#first-access); there is no default password
+2. **Configure HTTPS certificate**: upload a trusted certificate or use the auto-generated one
+3. **Create your first CA**: Modules → PKI → Certificate Authorities
+4. **Configure email notifications** (optional): Settings → Email
+5. **Enable ACME/SCEP** (optional): ACME and SCEP pages
 
 ---
 
@@ -227,7 +321,7 @@ After installation:
 
 - [Docker Deployment Guide](docker.md)
 - [Upgrade Guide](../../UPGRADE.md)
-- [Redis (future high-availability mode)](../REDIS.md)
+- [Redis (optional, holds the sessions and events of a high-availability cluster instead of PostgreSQL)](../REDIS.md)
 
 ---
 

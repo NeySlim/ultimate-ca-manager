@@ -11,6 +11,8 @@ import pytest
 
 from models import db, SystemConfig
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 URL = '/api/v2/settings/general'
 
 # One value per reserved key, each different from the defaults. Values that
@@ -41,6 +43,7 @@ RESERVED_VALUES = {
     'auto_backup_enabled': True,
     'backup_frequency': 'weekly',
     'backup_retention_days': 1,
+    'backup_max_total_mb': 5,
     'backup_password': 'Reserved-Backup-Pass-123!',
     'backup_kdf': 'pbkdf2',
     'clear_backup_password': True,
@@ -119,7 +122,17 @@ def api_key(auth_client):
 def test_the_reserved_set_is_the_contract():
     from api.v2.settings.general import _ADMIN_ONLY_SETTINGS
     assert set(_ADMIN_ONLY_SETTINGS) == set(RESERVED_VALUES)
-    assert len(RESERVED_VALUES) == 34
+    assert len(RESERVED_VALUES) == 35
+
+
+def test_the_interface_list_is_the_server_set():
+    import re
+    from pathlib import Path
+    from api.v2.settings.general import _ADMIN_ONLY_SETTINGS
+    src = Path(__file__).resolve().parents[2] / 'frontend/src/pages/settings/adminOnlySettings.js'
+    text = src.read_text()
+    body = text.split('ADMIN_ONLY_SETTINGS = [', 1)[1].split(']', 1)[0]
+    assert set(re.findall(r"'([a-z0-9_]+)'", body)) == set(_ADMIN_ONLY_SETTINGS)
 
 
 @pytest.mark.parametrize('key', sorted(RESERVED_VALUES))
@@ -273,3 +286,17 @@ def test_an_operator_still_reads_the_reserved_values(app, operator_client, confi
     assert data['session_timeout'] == 4321
     assert data['backup_password'] == ''
     assert data['metrics_token'] == ''
+
+
+def test_a_partial_save_names_the_refused_keys(operator_client, config_snapshot):
+    r = _patch(operator_client, {'system_name': 'x', 'session_timeout': 999,
+                                 'backup_retention_days': 1})
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['ignored_keys'] == [
+        'backup_retention_days', 'session_timeout']
+
+
+def test_a_full_save_names_no_refused_key(auth_client, config_snapshot):
+    r = _patch(auth_client, {'system_name': 'x', 'session_timeout': 999})
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['ignored_keys'] == []

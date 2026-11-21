@@ -9,7 +9,7 @@ from models import db
 from utils.response import error_response
 
 
-def safe_commit(logger_instance, error_msg="Database operation failed"):
+def safe_commit(logger_instance, error_msg="Database operation failed", on_conflict=None):
     """
     Attempt db.session.commit(); roll back and return an error response on failure.
 
@@ -24,12 +24,21 @@ def safe_commit(logger_instance, error_msg="Database operation failed"):
             return err
         AuditService.log_action(...)
         return success_response(data=cert.to_dict())
+
+    ``on_conflict``: called after the rollback of an IntegrityError; the response it returns,
+    if any, answers instead of the 500 (a constraint a concurrent request won first).
     """
+    from sqlalchemy.exc import IntegrityError
     try:
         db.session.commit()
         return True, None
     except Exception as e:
         db.session.rollback()
+        if on_conflict is not None and isinstance(e, IntegrityError):
+            answer = on_conflict()
+            if answer is not None:
+                logger_instance.warning(f"{error_msg}: {e.orig}")
+                return False, answer
         logger_instance.error(f"{error_msg}: {e}", exc_info=True)
         return False, error_response(error_msg, 500)
 

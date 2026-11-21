@@ -3,6 +3,8 @@
 The directory is ldap3's MOCK_SYNC strategy behind the real ``_ldap_authenticate_user``,
 the real ``/api/v2/sso/ldap/login`` door and the real mapping test route.
 """
+from models import UserSSOIdentity
+from tests.sso_identity_support import step_aside
 import json
 import logging
 import uuid
@@ -108,9 +110,7 @@ def _provider(**kw):
 def env(app, monkeypatch):
     created_p, created_u = [], []
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='ldap').all()]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('ldap')
         db.session.commit()
 
     class E:
@@ -146,15 +146,11 @@ def env(app, monkeypatch):
         _cleanup(created_u)
         for pid in created_p:
             SSOSession.query.filter_by(provider_id=pid).delete()
-            User.query.filter_by(sso_provider_id=pid).update({User.sso_provider_id: None})
+            UserSSOIdentity.query.filter_by(provider_id=pid).update({UserSSOIdentity.provider_id: None})
             p = db.session.get(SSOProvider, pid)
             if p:
                 db.session.delete(p)
-        for opid, enabled in others:
-            p = db.session.get(SSOProvider, opid)
-            if p:
-                p.enabled = enabled
-        db.session.commit()
+        others.back()
 
 
 def _openldap(monkeypatch, user, groups_ou='ou=groups,dc=example,dc=com', group_cn='pki-admins',
@@ -293,6 +289,21 @@ def test_a_parent_and_a_base_dn_both_refused_are_unreadable(env, monkeypatch, au
     assert tool['refusal'] == 'groups_unreadable' and tool['resolved_role'] is None
 
 
+def test_an_explicit_group_base_is_the_only_base_searched(env, monkeypatch):
+    user = env.user()
+    d, _ = _openldap(monkeypatch, user)
+    pid = _member_provider(env, ldap_base_dn='ou=people,dc=example,dc=com',
+                           ldap_group_base_dn='ou=groups,dc=example,dc=com')
+    assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'admin'
+    assert _group_bases(d) == ['ou=groups,dc=example,dc=com']
+    d.searches.clear()
+    d.denied.add('ou=groups,dc=example,dc=com')  # no fallback past an explicit base
+    code, body = env.login(pid, user)
+    assert (code, body.get('message')) == (403, UNREADABLE)
+    assert _group_bases(d) == ['ou=groups,dc=example,dc=com']
+
+
 @pytest.mark.parametrize('base_dn,bases', [
     ('ou=people,dc=example,dc=com', ['dc=example,dc=com']),
     ('dc=example,dc=com', ['dc=com', 'dc=example,dc=com']),
@@ -305,6 +316,30 @@ def test_without_a_published_naming_context_the_parent_comes_first(
     assert env.login(pid, user)[0] == 200
     assert env.role(user) == 'admin'
     assert _group_bases(d) == bases
+
+
+def test_the_group_base_is_saved_as_a_dn_or_empty(app, auth_client):
+    name = f'grp-base-{uuid.uuid4().hex[:6]}'
+    ldap = {'name': name, 'provider_type': 'ldap', 'ldap_server': 'ldap.example.com',
+            'ldap_base_dn': 'dc=example,dc=com'}
+    r = auth_client.post('/api/v2/sso/providers', json={**ldap, 'ldap_group_base_dn': 'groups'})
+    assert r.status_code == 400 and 'ldap_group_base_dn' in r.get_json()['message']
+    r = auth_client.post('/api/v2/sso/providers',
+                         json={**ldap, 'ldap_group_base_dn': ' ou=groups,dc=example,dc=com '})
+    assert r.status_code in (200, 201), r.data
+    pid = r.get_json()['data']['id']
+    try:
+        assert r.get_json()['data']['ldap_group_base_dn'] == 'ou=groups,dc=example,dc=com'
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}', json={'ldap_group_base_dn': 'ou=,x'})
+        assert r.status_code == 400, r.data
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}', json={'ldap_group_base_dn': '  '})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(SSOProvider, pid).ldap_group_base_dn is None
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
 
 
 # ── 2. No group filter ───────────────────────────────────────────────────────
@@ -387,7 +422,7 @@ def test_a_memberof_value_that_is_no_dn_is_skipped_and_the_others_kept(
 
 
 def test_a_memberof_group_whose_name_holds_an_equals_sign_is_read(env, monkeypatch):
-    """RFC 4514 section 3 lets '=' stand unescaped in a value; member mode reads such a cn too."""
+    """RFC 4514 §3 lets '=' stand unescaped in a value; member mode reads such a cn as well."""
     user = env.user()
     _ad(monkeypatch, user, ['CN=a=b,OU=Groups,DC=example,DC=com'])
     pid = _ad_provider(env, role_mapping=json.dumps({'a=b': 'operator'}))
@@ -407,8 +442,11 @@ def test_ldap_rule_and_group_compare_ignoring_case_and_edge_spaces(env, monkeypa
     assert env.role(user) == 'operator'
     other = env.user()
     _ad(monkeypatch, other, ['CN=VPN,OU=Groups,DC=example,DC=com'])
-    pid2 = _ad_provider(env, role_mapping=json.dumps({' pki-admins ': 'operator'}))
-    assert env.login(pid2, other)[0] == 403
+    # The same provider without required groups: one LDAP provider at a time
+    with env.app.app_context():
+        db.session.get(SSOProvider, pid).ldap_required_groups = None
+        db.session.commit()
+    assert env.login(pid, other)[0] == 403
 
 
 @pytest.mark.parametrize('rule,group', [('PKI  Admins', 'PKI Admins'), ('pki admins', 'PKI \t Admins'),
@@ -441,70 +479,55 @@ def test_oidc_and_saml_groups_stay_exact(provider_type):
     assert _resolve_mapped_roles(p, {'groups': ['pki-admins']})[0] == 'admin'
 
 
-@pytest.fixture
-def alone(app):
-    """The API allows one provider per type: the others are held aside during the test."""
-    held, made = [], []
-
-    def _alone(provider_type):
-        with app.app_context():
-            for p in SSOProvider.query.filter_by(provider_type=provider_type).all():
-                held.append((p.id, p.provider_type))
-                p.provider_type = 'held-by-test'
-            db.session.commit()
-        return made
-    yield _alone
-    with app.app_context():
-        SSOProvider.query.filter(SSOProvider.id.in_(made)).delete(synchronize_session=False)
-        for pid, provider_type in held:
-            db.session.get(SSOProvider, pid).provider_type = provider_type
-        db.session.commit()
-
-
-def _ldap_body(**kw):
-    body = {'name': f'grp-save-{uuid.uuid4().hex[:6]}', 'provider_type': 'ldap',
-            'ldap_server': 'ldap.example.com', 'ldap_base_dn': 'dc=example,dc=com'}
-    body.update(kw)
-    return body
-
-
-def test_a_rule_key_is_saved_without_edge_spaces(app, auth_client, alone):
-    made = alone('ldap')
-    r = auth_client.post('/api/v2/sso/providers', json=_ldap_body(role_mapping={'  pki-admins ': 'admin'}))
+def test_a_rule_key_is_saved_without_edge_spaces(app, auth_client):
+    name = f'grp-save-{uuid.uuid4().hex[:6]}'
+    r = auth_client.post('/api/v2/sso/providers', json={
+        'name': name, 'provider_type': 'ldap', 'role_mapping': {'  pki-admins ': 'admin'},
+        'ldap_server': 'ldap.example.com', 'ldap_base_dn': 'dc=example,dc=com'})
     assert r.status_code in (200, 201), r.data
     pid = r.get_json()['data']['id']
-    made.append(pid)
-    with app.app_context():
-        assert json.loads(db.session.get(SSOProvider, pid).role_mapping) == {'pki-admins': 'admin'}
-    r = auth_client.put(f'/api/v2/sso/providers/{pid}',
-                        json={'role_mapping': {'ops ': 'operator', ' ops': 'viewer'}})
-    assert r.status_code == 400, r.data
-    r = auth_client.put(f'/api/v2/sso/providers/{pid}', json={'role_mapping': {' ops\t': 'operator'}})
-    assert r.status_code == 200, r.data
-    with app.app_context():
-        assert json.loads(db.session.get(SSOProvider, pid).role_mapping) == {'ops': 'operator'}
+    try:
+        with app.app_context():
+            assert json.loads(db.session.get(SSOProvider, pid).role_mapping) == {'pki-admins': 'admin'}
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}',
+                            json={'role_mapping': {'ops ': 'operator', ' ops': 'viewer'}})
+        assert r.status_code == 400, r.data
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}',
+                            json={'role_mapping': {' ops\t': 'operator'}})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert json.loads(db.session.get(SSOProvider, pid).role_mapping) == {'ops': 'operator'}
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
 
 
 @pytest.mark.parametrize('provider_type,accepted', [('ldap', False), ('oauth2', True)])
 def test_two_rule_keys_ldap_compares_equal_are_refused_for_ldap(
-        app, auth_client, alone, provider_type, accepted):
-    made = alone(provider_type)
+        app, auth_client, provider_type, accepted):
     twins = {'PKI-Admins': 'viewer', 'pki-admins': 'admin'}
     body = {'name': f'grp-twin-{uuid.uuid4().hex[:6]}', 'provider_type': provider_type,
             'role_mapping': {'ops': 'viewer'}}
     if provider_type == 'ldap':
-        body = _ldap_body(**body)
+        body.update(ldap_server='ldap.example.com', ldap_base_dn='dc=example,dc=com')
     r = auth_client.post('/api/v2/sso/providers', json={**body, 'role_mapping': twins})
     assert (r.status_code in (200, 201)) is accepted, r.data
-    if not accepted:
+    if accepted:
+        pid = r.get_json()['data']['id']
+    else:
         assert 'two entries' in r.get_json()['message']
         r = auth_client.post('/api/v2/sso/providers', json=body)
         assert r.status_code in (200, 201), r.data
-    pid = r.get_json()['data']['id']
-    made.append(pid)
-    r = auth_client.put(f'/api/v2/sso/providers/{pid}',
-                        json={'role_mapping': {'PKI-Admins ': 'viewer', 'pki-ADMINS': 'admin'}})
-    assert (r.status_code == 200) is accepted, r.data
+        pid = r.get_json()['data']['id']
+    try:
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}',
+                            json={'role_mapping': {'PKI-Admins ': 'viewer', 'pki-ADMINS': 'admin'}})
+        assert (r.status_code == 200) is accepted, r.data
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
 
 
 def test_twin_rule_keys_already_saved_give_the_highest_role(env, monkeypatch):
@@ -553,6 +576,20 @@ def test_a_failed_group_read_the_admission_does_not_need_lets_the_user_in(env, m
     pid = env.provider(ldap_group_filter='(objectClass=groupOfNames)', ldap_group_member_attr='member')
     d.fail_on = '(member='
     assert env.login(pid, user)[0] == 200
+
+
+@pytest.mark.parametrize('uac,disabled', [(514, True), (512, False), (66050, True)])
+def test_user_account_control_is_read_from_the_ldap3_attribute(env, monkeypatch, uac, disabled):
+    """ACCOUNTDISABLE (0x2) of the value ldap3 returns, not of the Attribute object."""
+    user = env.user()
+    _ad(monkeypatch, user, ['CN=PKI-Admins,OU=Groups,DC=example,DC=com'], uac=uac)
+    pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'admin'}))
+    code, body = env.login(pid, user)
+    if disabled:
+        assert (code, body.get('message')) == (
+            403, 'This account has been disabled in Active Directory / LDAP')
+    else:
+        assert code == 200, body
 
 
 # ── 6. The mapping test reads and decides as the login does ──────────────────
@@ -620,17 +657,75 @@ def test_the_mapping_test_lists_the_groups_the_login_reads(env, monkeypatch, aut
     assert err is None and info['groups'] == ['pki-admins']
 
 
-# ── 7. Active Directory userAccountControl ───────────────────────────────────
+# ── SSO-04: a refusal for want of a role says what was read and where ──
 
-@pytest.mark.parametrize('uac,disabled', [(514, True), (512, False), (66050, True)])
-def test_user_account_control_is_read_from_the_ldap3_attribute(env, monkeypatch, uac, disabled):
-    """ACCOUNTDISABLE (0x2) of the value ldap3 returns, not of the Attribute object."""
+REMEDY = 'add a role mapping rule for one of these values, or set a default role'
+
+
+def _refusal_details(app, username):
+    with app.app_context():
+        return AuditLog.query.filter_by(action='login_failure', resource_name=username).one().details
+
+
+def test_refusal_names_the_groups_and_the_search_base(env, monkeypatch, caplog):
     user = env.user()
-    _ad(monkeypatch, user, ['CN=PKI-Admins,OU=Groups,DC=example,DC=com'], uac=uac)
+    _openldap(monkeypatch, user)
+    pid = _member_provider(env, role_mapping=json.dumps({'other-group': 'admin'}))
+    with caplog.at_level(logging.WARNING):
+        code, body = env.login(pid, user)
+    assert code == 403
+    # The person signing in is told no more than before.
+    assert body['message'] == 'Access denied: no role mapping rule of this provider matches your account'
+    details = _refusal_details(env.app, user)
+    assert ("groups read from the group search under 'dc=example,dc=com': 'pki-admins'"
+            in details)
+    assert details.endswith(REMEDY)
+    assert details in caplog.text
+
+
+def test_refusal_names_memberof_as_the_source(env, monkeypatch):
+    user = env.user()
+    _ad(monkeypatch, user, ['CN=VPN,OU=Groups,DC=example,DC=com'])
     pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'admin'}))
-    code, body = env.login(pid, user)
-    if disabled:
-        assert (code, body.get('message')) == (
-            403, 'This account has been disabled in Active Directory / LDAP')
-    else:
-        assert code == 200, body
+    assert env.login(pid, user)[0] == 403
+    assert ("groups read from the memberOf attribute of the user entry: 'VPN'"
+            in _refusal_details(env.app, user))
+
+
+def test_refusal_puts_no_other_directory_value_in_the_log_nor_the_audit(
+        env, monkeypatch, caplog):
+    user = env.user()
+    d = Directory(monkeypatch, 'openldap', ['dc=example,dc=com'])
+    udn = f'uid={user},ou=people,dc=example,dc=com'
+    d.add(udn, {'objectClass': ['inetOrgPerson'], 'uid': user, 'cn': 'SENTINEL-CN',
+                'sn': 'SENTINEL-SN', 'mail': 'SENTINEL-MAIL@example.com', 'userPassword': PW,
+                'telephoneNumber': 'SENTINEL-PHONE', 'entryUUID': str(uuid.uuid4())})
+    d.add('cn=vpn,ou=groups,dc=example,dc=com',
+          {'objectClass': ['groupOfNames'], 'cn': 'vpn', 'member': [udn]})
+    pid = _member_provider(env)
+    with caplog.at_level(logging.DEBUG):
+        assert env.login(pid, user)[0] == 403
+    details = _refusal_details(env.app, user)
+    assert "'vpn'" in details
+    assert 'SENTINEL' not in details
+    assert 'SENTINEL' not in caplog.text
+
+
+def test_the_mapping_test_gives_the_same_diagnosis_as_the_login(env, monkeypatch, auth_client):
+    user = env.user()
+    _ad(monkeypatch, user, [f'CN=G{i:02d},OU=Groups,DC=example,DC=com' for i in range(25)])
+    pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'admin'}))
+    tool = _tool(auth_client, pid, user)
+    assert tool['refusal'] == 'unmapped'
+    assert tool['group_source'] == 'the memberOf attribute of the user entry'
+    assert len(tool['groups']) == 25
+    assert env.login(pid, user)[0] == 403
+    assert _refusal_details(env.app, user).endswith(tool['diagnosis'])
+    assert '(+5 more)' in tool['diagnosis']
+
+
+def test_the_mapping_test_gives_no_diagnosis_when_access_is_allowed(env, monkeypatch, auth_client):
+    user = env.user()
+    _openldap(monkeypatch, user)
+    tool = _tool(auth_client, _member_provider(env), user)
+    assert tool['access_allowed'] is True and tool['diagnosis'] is None

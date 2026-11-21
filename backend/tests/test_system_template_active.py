@@ -7,6 +7,8 @@ import pytest
 from models import AuditLog, db
 from models.certificate_template import CertificateTemplate
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _put(auth_client, template_id, body):
     return auth_client.put(f'/api/v2/templates/{template_id}', data=json.dumps(body),
@@ -77,11 +79,11 @@ def test_deactivating_the_only_pinned_template_does_not_widen_a_ca(app, auth_cli
     with app.app_context():
         db.session.add(CATemplatePin(ca_id=ca['id'], template_id=tpl['id']))
         db.session.commit()
-        assert [t.id for t in wstep_service._ca_templates(db.session.get(CA, ca['id']))] == [tpl['id']]
+        assert [t.id for t in wstep_service._ca_templates(db.session.get(CA, ca['id']), profile=None)] == [tpl['id']]
     assert _put(auth_client, tpl['id'], {'is_active': False}).status_code == 200
     try:
         with app.app_context():
-            assert wstep_service._ca_templates(db.session.get(CA, ca['id'])) == []
+            assert wstep_service._ca_templates(db.session.get(CA, ca['id']), profile=None) == []
     finally:
         with app.app_context():
             CATemplatePin.query.filter_by(ca_id=ca['id']).delete()

@@ -1,7 +1,7 @@
 /**
  * UserCertificatesPage - Manage user/client certificates (mTLS)
  * 
- * Follows CertificatesPage patterns: stats bar, floating windows, rowActions, server-side pagination.
+ * Follows CertificatesPage patterns: stats bar, inspectors, rowActions, server-side pagination.
  * RBAC: viewers see own, operators/admins manage all, auditors read-only
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -17,18 +17,19 @@ import { userCertificatesService } from '../services'
 import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
 import { ExportModal } from '../components/ExportModal'
 import { useNotification, useMobile } from '../contexts'
-import { useWindowManager } from '../contexts/WindowManagerContext'
+import { useInspector } from '../contexts/InspectorContext'
 import { usePermission, usePersistedState } from '../hooks'
 import { formatDate, extractCN, isOnHold } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { isExportFormatAllowed } from '../lib/keyAlgorithms'
+import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 
 export default function UserCertificatesPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
-  const { openWindow } = useWindowManager()
+  const { openEntity } = useInspector()
   const { canWrite, canDelete, hasPermission } = usePermission()
 
   // Data
@@ -47,6 +48,8 @@ export default function UserCertificatesPage() {
   // Filters
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-usercerts-status', [])
   const [searchValue, setSearchValue] = useState('')
+  // The server sorts the whole list; null keeps its default (newest first)
+  const [sort, setSort] = useState(null)
 
   // Export — ExportModal owns the format, password and PKCS#12 profile (#331);
   // exportFormat only says which tile it opens on.
@@ -60,6 +63,10 @@ export default function UserCertificatesPage() {
       const params = { page, per_page: perPage }
       if (filterStatus.length > 0) params.status = filterStatus
       if (searchValue) params.search = searchValue
+      if (sort) {
+        params.sort_by = sort.by
+        params.sort_order = sort.order
+      }
 
       const [certRes, statsRes] = await Promise.all([
         userCertificatesService.getAll(params),
@@ -74,11 +81,32 @@ export default function UserCertificatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, perPage, JSON.stringify(filterStatus), searchValue, showError, t])
+  }, [page, perPage, JSON.stringify(filterStatus), searchValue, sort, showError, t])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Listen for data change events (from floating windows)
+  const SERVER_SORT_KEYS = { name: 'name', valid_to: 'valid_until' }
+  const handleSortChange = useCallback((next) => {
+    const by = next && SERVER_SORT_KEYS[next.key]
+    setSort(by ? { by, order: next.direction } : null)
+    setPage(1)
+  }, [])
+
+  // Every page of the list as filtered and sorted on screen, for the table's export
+  const exportLoader = useCallback(async (paging) => {
+    const params = { ...paging }
+    if (filterStatus.length > 0) params.status = filterStatus
+    if (searchValue) params.search = searchValue
+    if (sort) {
+      params.sort_by = sort.by
+      params.sort_order = sort.order
+    }
+    const res = await userCertificatesService.getAll(params)
+    return { data: res.data?.items || [], meta: { total: res.data?.total || 0 } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filterStatus), searchValue, sort])
+
+  // Listen for data change events (from inspectors)
   useEffect(() => {
     const handler = (e) => {
       if (e.detail?.type === 'user_certificate') loadData()
@@ -111,12 +139,12 @@ export default function UserCertificatesPage() {
     }
   }, [])
 
-  // Row click → open floating window (desktop) or slide-over (mobile)
+  // Row click → open inspector (desktop) or slide-over (mobile)
   const handleSelectCert = useCallback(async (row) => {
     if (!row) { setSelectedCert(null); return }
 
     if (!isMobile) {
-      openWindow('user_certificate', row.id)
+      openEntity('user_certificate', row.id)
       return
     }
 
@@ -127,7 +155,7 @@ export default function UserCertificatesPage() {
     } catch {
       setSelectedCert(row)
     }
-  }, [isMobile, openWindow])
+  }, [isMobile, openEntity])
 
   // Status badge helper
   const getStatusBadge = useCallback((row) => {
@@ -173,8 +201,11 @@ export default function UserCertificatesPage() {
     setRevoking(true)
     try {
       const res = await userCertificatesService.revoke(revokingCert.id, reason)
+      const localOnly = localOnlyRevocationWarning(res, t)
       if (res?.data?.approval_required) {
         showWarning(t('certificates.revocationApprovalRequired', { policy: res.data.policy_name }))
+      } else if (localOnly) {
+        showWarning(localOnly)
       } else {
         showSuccess(t('userCertificates.revokeSuccess'))
       }
@@ -198,14 +229,16 @@ export default function UserCertificatesPage() {
     )
     if (!confirmed) return
     try {
-      await userCertificatesService.delete(id)
-      showSuccess(t('userCertificates.deleteSuccess'))
+      // Its certificate is revoked first: the issuing CA may not have been told
+      const localOnly = localOnlyRevocationWarning(await userCertificatesService.delete(id), t)
+      if (localOnly) showWarning(localOnly)
+      else showSuccess(t('userCertificates.deleteSuccess'))
       setSelectedCert(null)
       loadData()
     } catch (error) {
       showError(error.message || t('userCertificates.deleteFailed'))
     }
-  }, [certificates, showConfirm, showSuccess, showError, loadData, t])
+  }, [certificates, showConfirm, showSuccess, showWarning, showError, loadData, t])
 
   // Table columns — follows ResponsiveDataTable pattern: { key, header, priority, sortable, render(val, row) }
   const columns = useMemo(() => [
@@ -239,6 +272,7 @@ export default function UserCertificatesPage() {
       key: 'owner',
       header: t('userCertificates.columns.owner'),
       priority: 3,
+      sortable: false,
       hideOnMobile: true,
       render: (_val, row) => (
         <div className="flex items-center gap-1.5">
@@ -251,6 +285,7 @@ export default function UserCertificatesPage() {
       key: 'status',
       header: t('common.status'),
       priority: 2,
+      sortable: false,
       hideOnMobile: true,
       render: (_val, row) => getStatusBadge(row),
     },
@@ -393,7 +428,10 @@ export default function UserCertificatesPage() {
             { value: 'revoked', label: t('common.revoked') },
           ],
         }]}
+        sortable
+        onSortChange={handleSortChange}
         exportEnabled
+        exportLoader={exportLoader}
         exportFilename="user-certificates"
         pagination={{
           page,

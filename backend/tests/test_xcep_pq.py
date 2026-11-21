@@ -6,16 +6,19 @@ import pytest
 from lxml import etree
 
 from models import CA, CATemplatePin, CertificateTemplate, db
-from models.system_config import SystemConfig
+from tests.windows_profile_support import restore, snapshot
 from tests.fixtures.templates import delete_templates
 from services.xcep import policy_builder
 from tests.test_xcep_policy import (
     XCEP_NS, XCEP_PASSWORD, XCEP_URL, XCEP_USER, _basic_auth, _set_config,
 )
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 XSI_NIL = '{http://www.w3.org/2001/XMLSchema-instance}nil'
 MLDSA_LABELS = key_algorithms.labels('ML-DSA')
@@ -51,8 +54,7 @@ def xcep_pq_policies(app, client, create_ca):
     """GetPolicies of an RSA CA pinned to one template per ML-DSA label plus an RSA one."""
     ca_data = create_ca(cn='XCEP RSA CA for ML-DSA')
     with app.app_context():
-        previous = {k: getattr(SystemConfig.query.filter_by(key=k).first(), 'value', None)
-                    for k in XCEP_KEYS}
+        previous = snapshot(XCEP_KEYS)
         ca = db.session.get(CA, ca_data['id'])
         for key, value in zip(XCEP_KEYS, ('true', ca.refid, XCEP_USER, XCEP_PASSWORD)):
             _set_config(key, value)
@@ -66,12 +68,7 @@ def xcep_pq_policies(app, client, create_ca):
         with app.app_context():
             delete_templates(ids)
             db.session.commit()
-            for k, v in previous.items():
-                if v is None:
-                    SystemConfig.query.filter_by(key=k).delete()
-                    db.session.commit()
-                else:
-                    _set_config(k, v)
+            restore(previous)
 
 
 def _private_key_attributes(root, name):

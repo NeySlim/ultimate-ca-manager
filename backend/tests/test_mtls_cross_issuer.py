@@ -10,6 +10,8 @@ from models.auth_certificate import AuthCertificate
 from models.revoked_serial import RevokedSerial
 from tests.test_backfill_cross_dupes import _cert, _row
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def twin_records(app):
@@ -67,12 +69,13 @@ def test_an_enrolment_without_certificate_keeps_both_readings_of_an_all_digit_se
     decimal one, so an all-digit text is read both ways and either record closes it."""
     import secrets
     from services.mtls_auth_service import MTLSAuthService
+    from utils.serial_format import canonical_serial
     text = '1' + ''.join(secrets.choice('0123456789') for _ in range(13))
     serial = int(text, 16)  # written by the parser as format(serial, 'X'): all digits
     db.session.add_all([
         AuthCertificate(user_id=1, cert_serial=text, cert_subject='CN=hex-digits',
                         cert_issuer=twin_records['name_b'], cert_fingerprint='', name='hex-digits', enabled=True),
-        RevokedSerial(caref=twin_records['root'], serial_number=str(serial),
+        RevokedSerial(caref=twin_records['root'], serial_number=canonical_serial(serial),
                       valid_to=datetime.utcnow() + timedelta(days=30)),
     ])
     db.session.commit()
@@ -82,14 +85,15 @@ def test_an_enrolment_without_certificate_keeps_both_readings_of_an_all_digit_se
         assert user is None and err == 'Certificate has been revoked'
     finally:
         AuthCertificate.query.filter_by(cert_serial=text).delete()
-        RevokedSerial.query.filter_by(serial_number=str(serial)).delete()
+        RevokedSerial.query.filter_by(serial_number=canonical_serial(serial)).delete()
         db.session.commit()
 
 
 
 def test_an_enrolment_without_certificate_is_not_closed_by_another_serials_record(app, twin_records):
     """Each reading of the enrolment's text matches its own unambiguous spellings: the record of
-    another serial whose decimal is one reading's all-digit hex closes nothing."""
+    another serial whose decimal is one reading's all-digit hex closes nothing. Non-regression:
+    passes before and after the change, the record column being canonical decimal here."""
     from services.mtls_auth_service import MTLSAuthService
     from tests.test_revocation_record_rule import _homonyms
     d, h = _homonyms()  # format(h, 'x') == str(d)

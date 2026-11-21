@@ -10,6 +10,7 @@ from utils.response import success_response, error_response
 from utils.pagination import paginate, parse_request_pagination
 from services.ca_service import CAService
 from models import Certificate, CA
+from models.windows_profile import profile_names_of
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/certificates', methods=['GET'])
@@ -27,8 +28,9 @@ def list_ca_certificates(ca_id):
 
     result = paginate(query, page, per_page)
 
-    # Convert items to dict
+    # Profile names read once for the page, not once per Windows certificate
+    names = profile_names_of(result['items'])
     return success_response(
-        data=[cert.to_dict() for cert in result['items']],
+        data=[cert.to_dict(windows_profile_names=names) for cert in result['items']],
         meta=result['meta']
     )

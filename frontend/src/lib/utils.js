@@ -2,6 +2,7 @@ import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { getAppTimezone } from '../stores/timezoneStore'
 import { getDateFormat, getShowTime } from '../stores/dateFormatStore'
+import { sanitizeDownloadName } from './filename'
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs))
@@ -139,7 +140,7 @@ export function exportToCSV(data, columns, filename = 'export') {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`
+  link.download = sanitizeDownloadName(`${filename}-${new Date().toISOString().split('T')[0]}.csv`)
   link.click()
   URL.revokeObjectURL(link.href)
 }
@@ -157,10 +158,20 @@ export function exportToJSON(data, filename = 'export') {
   const blob = new Blob([json], { type: 'application/json' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.download = `${filename}-${new Date().toISOString().split('T')[0]}.json`
+  link.download = sanitizeDownloadName(`${filename}-${new Date().toISOString().split('T')[0]}.json`)
   link.click()
   URL.revokeObjectURL(link.href)
 }
+/**
+ * Warn that an export left unreadable rows out of its file; the client sets blob.skippedCount
+ * from the X-Skipped-*-Count header. Returns the count.
+ */
+export function warnSkippedExport(blob, t, showWarning) {
+  const count = blob?.skippedCount || 0
+  if (count) showWarning(t('export.skippedUnreadable', { count }))
+  return count
+}
+
 /**
  * Trigger a browser file download from a Blob
  * @param {Blob} blob - The blob to download
@@ -170,7 +181,7 @@ export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = filename
+  a.download = sanitizeDownloadName(filename)
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

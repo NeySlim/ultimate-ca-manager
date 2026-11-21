@@ -8,20 +8,20 @@ export default {
         title: 'Rôles système',
         definitions: [
           { term: 'Admin', description: 'Accès complet à toutes les fonctionnalités et paramètres' },
-          { term: 'Opérateur', description: 'Peut gérer les certificats, CA, CSR, ACME, SSH et les paramètres qu\'un admin ne réserve pas ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC' },
+          { term: 'Opérateur', description: 'Peut gérer les certificats, AC, CSR, ACME, SSH et les paramètres qu\'un admin ne réserve pas ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC' },
           { term: 'Auditeur', description: 'Accès en lecture seule à toutes les données opérationnelles pour la conformité et l\'audit' },
-          { term: 'Lecteur', description: 'Accès de base en lecture seule aux certificats, CA et modèles' },
+          { term: 'Lecteur', description: 'Accès de base en lecture seule aux certificats, AC et modèles' },
         ]
       },
       {
         title: 'Rôles personnalisés',
         items: [
           { label: 'Créer un rôle', text: 'Définir un nouveau rôle avec un nom et une description' },
-          { label: 'Matrice de permissions', text: 'Cocher/décocher les permissions par catégorie (CA, Certificats, Clés privées, etc.)' },
+          { label: 'Matrice de permissions', text: 'Cocher/décocher les permissions par catégorie (AC, Certificats, Clés privées, etc.)' },
           { label: 'Couverture', text: 'Une barre et un décompte n/N des permissions accordées au rôle' },
-          { label: 'Permissions des rôles système', text: 'Un rôle système affiche les permissions que UCM lui applique ; Admin affiche toutes les permissions de la matrice' },
           { label: 'Nombre d\'utilisateurs', text: 'Voir combien d\'utilisateurs sont assignés à chaque rôle' },
-          { label: "Permissions des CA SSH (v2.248)", text: "read:ssh_cas, write:ssh_cas et delete:ssh_cas régissent les CA SSH : write:ssh ne les crée ni ne les modifie plus. Les rôles, groupes et clés d'API qui détenaient une permission SSH ont reçu la permission correspondante à la mise à jour" },
+          { label: 'Permissions des rôles système', text: 'Un rôle système affiche les permissions que UCM lui applique ; Admin affiche toutes les permissions de la matrice' },
+          { label: "Permissions des AC SSH (v2.248)", text: "read:ssh_cas, write:ssh_cas et delete:ssh_cas régissent les AC SSH : write:ssh ne les crée ni ne les modifie plus. Les rôles, groupes et clés d'API qui détenaient une permission SSH ont reçu la permission correspondante à la mise à jour" },
         ]
       },
     ],
@@ -40,12 +40,12 @@ RBAC fournit une gestion granulaire des permissions. Définissez des rôles pers
 
 ## Rôles système
 
-Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés :
+Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés. La page RBAC affiche chacun avec les permissions qu'UCM lui applique :
 
 - **Admin** : Accès complet à tout
-- **Opérateur** : Gérer les certificats, CA, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule. Pas d'accès aux utilisateurs ni au RBAC
-- **Auditeur** : Accès en lecture seule à toutes les données opérationnelles (certificats, CA, ACME, SCEP, HSM, journaux d'audit, politiques, groupes) mais pas aux paramètres ou à la gestion des utilisateurs
-- **Lecteur** : Accès de base en lecture seule aux certificats, CA, CSR, modèles et magasin de confiance
+- **Opérateur** : Gérer les certificats, AC, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule. Pas d'accès aux utilisateurs ni au RBAC
+- **Auditeur** : Accès en lecture seule à toutes les données opérationnelles (certificats, AC, ACME, SCEP, HSM, journaux d'audit, politiques, groupes) mais pas aux paramètres ou à la gestion des utilisateurs
+- **Lecteur** : Accès de base en lecture seule aux certificats, AC, CSR, modèles et magasin de confiance
 
 ## Rôles personnalisés
 
@@ -57,9 +57,9 @@ Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés :
 
 ### Matrice de permissions
 Les permissions sont organisées par catégorie :
-- **CA** : Créer, lire, mettre à jour, supprimer, importer, exporter (certificat seul : voir Clés privées)
+- **AC** : Créer, lire, mettre à jour, supprimer, importer, exporter (certificat seul : voir Clés privées)
 - **Certificats** : Émettre, lire, révoquer, renouveler, supprimer, exporter (certificat seul : voir Clés privées)
-- **Clés privées** : Export direct de la clé privée d'un certificat ou d'une CA (\`read:private_keys\`). Aucun rôle intégré hormis Admin ne la détient ; un rôle personnalisé peut l'accorder. Les rôles sans cette permission passent par la récupération de clés
+- **Clés privées** : Export direct de la clé privée d'un certificat ou d'une AC (\`read:private_keys\`). Aucun rôle intégré hormis Admin ne la détient ; un rôle personnalisé peut l'accorder. Les rôles sans cette permission passent par la récupération de clés
 - **CSR** : Créer, lire, signer, supprimer
 - **Modèles** : Créer, lire, mettre à jour, supprimer
 - **Utilisateurs** : Lire (la gestion des comptes est réservée aux administrateurs)
@@ -70,7 +70,7 @@ Les permissions sont organisées par catégorie :
 - **SCEP** : Configurer, approuver les requêtes
 - **Magasin de confiance** : Gérer les certificats de confiance
 - **HSM** : Consulter, supprimer (ajouter ou modifier un fournisseur est réservé aux administrateurs)
-- **SSH** : Gérer les CA et certificats SSH
+- **SSH** : Gérer les AC et certificats SSH
 - **Politiques** : Consulter les politiques de certificat
 - **Approbations** : Consulter et décider des demandes d'approbation
 - **Récupération de clés** : Demander des récupérations et consulter les demandes (l'approbation est réservée aux administrateurs)

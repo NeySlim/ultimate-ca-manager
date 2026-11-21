@@ -16,6 +16,8 @@ from tests.fixtures.cross_pki import make_cert, new_key, pem
 from tests.test_serial_encoding_crl_ocsp import _make_ca
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def world(app, auth_client):
@@ -117,6 +119,22 @@ def test_expiry_pass_announces_a_cross_certificate_close_to_its_end(app, world, 
         before = len(mine())
         expiry_alert_service._emit_expiry_webhooks()
         assert len(mine()) == before
+
+
+def test_expiry_pass_announces_a_cross_certificate_expired_since_the_given_instant(app, world, monkeypatch):
+    from services import expiry_alert_service
+    seen = []
+    monkeypatch.setattr('services.webhook_service.emit_cert_expired',
+                        lambda cert, ca_refid=None: seen.append(cert.get('cross_certificate_id')))
+    with app.app_context():
+        row = db.session.get(CACrossCertificate, world['xid'])
+        now = utc_now()
+        row.valid_to = now - timedelta(hours=30)
+        db.session.commit()
+        expiry_alert_service._emit_expiry_webhooks(now=now)
+        assert row.id not in seen
+        expiry_alert_service._emit_expiry_webhooks(now=now, expired_after=now - timedelta(hours=31))
+        assert seen.count(row.id) == 1
 
 
 def test_ocsp_revokes_from_the_issuers_record_when_the_row_lost_its_flag(app, world):

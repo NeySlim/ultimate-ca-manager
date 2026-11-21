@@ -5,6 +5,7 @@ CRL & OCSP Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from fips_mode import FipsRestricted
+from utils.encryption import SecretUnreadable
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.protocol_url import get_protocol_base_url
@@ -12,6 +13,7 @@ from utils.trusted_proxy import client_ip
 from models import db, CA, AuditLog
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
+from services.crl import CRLSigningKeyMismatch
 from services.audit_service import AuditService
 from datetime import timedelta
 import logging
@@ -152,6 +154,12 @@ def regenerate_crl(ca_id):
         )
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except CRLSigningKeyMismatch as e:
+        return error_response(str(e), 409)
+    except SecretUnreadable as e:
+        # The message names the secret, never its value: the operator knows what to restore
+        logger.error(f'Failed to regenerate CRL: {e}')
+        return error_response(str(e), 500)
     except Exception as e:
         logger.error(f'Failed to regenerate CRL: {e}')
         return error_response("Failed to regenerate CRL", 500)
@@ -246,6 +254,8 @@ def regenerate_delta_crl(ca_id):
             data['caref'] = ca.refid
         
         return success_response(data=data, message='Delta CRL generated successfully')
+    except CRLSigningKeyMismatch as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         logger.warning(f'Delta CRL generation rejected for CA {ca_id}: {e}')
         msg = str(e)

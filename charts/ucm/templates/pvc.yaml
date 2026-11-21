@@ -1,11 +1,24 @@
 {{- if .Values.persistence.enabled }}
-{{- if not .Values.persistence.data.existingClaim }}
+{{- $dataPvc := include "ucm.dataPvcName" . }}
+{{- $renderData := not .Values.persistence.data.existingClaim }}
+{{- /* The lookup sits under an if, never in an and/or argument: before Go 1.18 (Helm 3.10)
+       and/or evaluate every argument, so the claim would be read outside HA too */}}
+{{- if and $renderData .Values.ha.enabled }}
+{{- $renderData = (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $dataPvc) }}
+{{- end }}
+{{- if $renderData }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "ucm.dataPvcName" . }}
+  name: {{ $dataPvc }}
   labels:
     {{- include "ucm.labels" . | nindent 4 }}
+  {{- if .Values.ha.enabled }}
+  annotations:
+    # HA leaves the claim of a former single-node release unmounted (SQLite database,
+    # SoftHSM tokens, uploads, backups): still rendered, and kept, so the switch deletes nothing.
+    "helm.sh/resource-policy": keep
+  {{- end }}
 spec:
   accessModes:
     - {{ .Values.persistence.data.accessMode }}
@@ -16,6 +29,7 @@ spec:
   storageClassName: {{ .Values.persistence.storageClass | quote }}
   {{- end }}
 {{- end }}
+{{- if not .Values.ha.enabled }}
 ---
 {{- if not .Values.persistence.etc.existingClaim }}
 apiVersion: v1
@@ -37,5 +51,6 @@ spec:
   {{- if .Values.persistence.storageClass }}
   storageClassName: {{ .Values.persistence.storageClass | quote }}
   {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}

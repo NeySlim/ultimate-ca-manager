@@ -28,7 +28,7 @@ const HTTP_ERROR_MESSAGES = {
   405: 'This operation is not supported.',
   408: 'The request timed out. Please try again.',
   409: 'Conflict: this resource already exists or is in use.',
-  413: 'The file is too large. Maximum upload size is 50 MB.',
+  413: 'The server or a proxy in front of it refused a request of this size.',
   415: 'Unsupported file type.',
   422: 'The data provided is invalid. Please check and try again.',
   429: 'Too many requests. Please wait a moment and try again.',
@@ -64,14 +64,67 @@ function buildErrorMessage(status, data, fallback = 'Request failed') {
 // a client certificate, and calls sent while it loads would carry no cookie.
 let loginRedirectPending = false
 
+// A restore revokes every session, the page's own too: while held, a 401 leaves the
+// report on screen and the sign-in follows its reload
+let signOutHeld = false
+
+export function holdSignOut(held = true) {
+  signOutHeld = held
+}
+
 export function resetLoginRedirect() {
   loginRedirectPending = false
+  signOutHeld = false
+}
+
+// The 401 of the server's authentication gate: refused before the route ran, so safe to send again
+export const AUTHENTICATION_REQUIRED_PROBLEM = 'urn:ucm:problem:authentication-required'
+
+// One check of the session for a burst of 401s: /auth/verify with the cookie held now, which a
+// renewed identifier (TOTP, password, other sessions closed) replaced. False when it cannot tell.
+let sessionCheck = null
+
+function sessionStillOpen(client) {
+  if (!sessionCheck) {
+    sessionCheck = (async () => {
+      try {
+        const response = await fetch(`${client.baseURL}/auth/verify`, { method: 'GET', credentials: 'include' })
+        const body = response.ok ? await response.json() : null
+        if (body?.data?.authenticated !== true) return false
+        client.setCsrfToken(body.data.csrf_token)
+        return true
+      } catch {
+        return false
+      }
+    })().finally(() => { sessionCheck = null })
+  }
+  return sessionCheck
 }
 
 // A page restored from the back-forward cache keeps its module state: it sends again
 if (typeof window !== 'undefined') {
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) resetLoginRedirect()
+  })
+}
+
+// POST through XMLHttpRequest, answering like the part of a fetch Response the client reads.
+function xhrUpload(url, config, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    xhr.withCredentials = config.credentials === 'include'
+    for (const [name, value] of Object.entries(config.headers || {})) xhr.setRequestHeader(name, value)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded, event.total)
+    }
+    xhr.onload = () => resolve({
+      ok: xhr.status >= 200 && xhr.status < 300,
+      status: xhr.status,
+      json: async () => JSON.parse(xhr.responseText),
+    })
+    xhr.onerror = () => reject(new TypeError('Network error'))
+    xhr.send(config.body)
   })
 }
 
@@ -103,7 +156,8 @@ class APIClient {
     sessionStorage.removeItem(CSRF_TOKEN_KEY)
   }
 
-  async request(endpoint, options = {}) {
+  // `replayed`: this call already follows a 401 and a session check, its own 401 signs out
+  async request(endpoint, options = {}, replayed = false) {
     if (import.meta.env.DEV && options.params) {
       console.warn(`⚠️ apiClient does not support 'params'. Use buildQueryString() to append query params to the URL. Called on: ${endpoint}`)
     }
@@ -155,6 +209,10 @@ class APIClient {
         data = await response.json()
       } else if (options.responseType === 'blob') {
         data = await response.blob()
+        const skipped = skippedCount(response.headers)
+        if (skipped) data.skippedCount = skipped
+        const exported = response.headers.get('x-exported-count')
+        if (exported !== null && Number.isInteger(Number(exported))) data.exportedCount = Number(exported)
       } else {
         data = await response.text()
       }
@@ -172,11 +230,21 @@ class APIClient {
         // Redirect to login on 401 (unless already on login page OR this is the login/verify request)
         const isLoginPage = window.location.pathname.includes('/login')
         const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/verify')
-        
+        if (response.status === 401 && signOutHeld) throw error
+
+        // A 401 signs out only once the session is gone; the gate's refusal is sent again, once
+        if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending
+            && !replayed && await sessionStillOpen(this)) {
+          if (data?.type === AUTHENTICATION_REQUIRED_PROBLEM) return this.request(endpoint, options, true)
+          throw error
+        }
         if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
           loginRedirectPending = true
-          window.location.href = '/login'
+          // The page asked for comes back after sign-in; LoginPage validates it (safeNext).
+          const { pathname = '/', search = '' } = window.location
+          const back = pathname === '/' || pathname === '/dashboard' ? '' : `?next=${encodeURIComponent(pathname + search)}`
+          window.location.href = `/login${back}`
         }
         
         throw error
@@ -214,6 +282,8 @@ class APIClient {
     return this.request(endpoint, { ...options, method: 'PATCH', body })
   }
 
+  // upload() and download() have neither the session check nor the single replay of the
+  // gate's 401 that request() has: their 401 is thrown and never signs out.
   /**
    * Upload FormData (multipart/form-data)
    * @param {string} endpoint - API endpoint
@@ -230,20 +300,30 @@ class APIClient {
       headers['X-CSRF-Token'] = csrfToken
     }
     
+    const { onProgress, ...fetchOptions } = options
     const config = {
       method: 'POST',
       body: formData,
       credentials: 'include',
       headers,
       // Don't set Content-Type - browser will set it with boundary for FormData
-      ...options,
+      ...fetchOptions,
     }
 
     if (import.meta.env.DEV) console.log(`📡 API UPLOAD ${url}`)
 
     try {
-      const response = await fetch(url, config)
-      const data = await response.json()
+      // fetch reports no upload progress: a caller that wants it gets XHR, the same body.
+      const response = onProgress
+        ? await xhrUpload(url, config, onProgress)
+        : await fetch(url, config)
+      // A refusal from a proxy is an HTML page: its status still says what happened.
+      let data = null
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        if (response.ok) throw parseError
+      }
 
       if (!response.ok) {
         const msg = buildErrorMessage(response.status, data, 'Upload failed')
@@ -289,6 +369,13 @@ class APIClient {
 }
 
 export const apiClient = new APIClient()
+
+/** The rows a bulk export left out as unreadable (X-Skipped-*-Count), 0 when none. */
+export function skippedCount(headers) {
+  const raw = headers?.get?.('x-skipped-certificates-count') || headers?.get?.('x-skipped-cas-count')
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
 
 /**
  * Build a URL query string from an object of params.

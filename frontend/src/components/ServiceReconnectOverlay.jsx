@@ -94,7 +94,7 @@ export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel, 
           <div className="flex justify-center gap-3 mt-4">
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-accent-primary text-white rounded-lg text-sm hover:bg-accent-primary-op90"
+              className="px-4 py-2 bg-accent-primary text-on-accent rounded-lg text-sm hover:bg-accent-primary-op90"
             >
               {t('reconnect.refresh', 'Refresh Page')}
             </button>

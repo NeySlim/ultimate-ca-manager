@@ -22,6 +22,8 @@ from tests.test_acme_security_paths import (
     acme_account,  # noqa: F401  (fixture)
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 DOMAIN = 'deact-native.example.com'
 
 

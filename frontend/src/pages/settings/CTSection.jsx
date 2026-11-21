@@ -77,7 +77,7 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctSavi
                   onChange={(val) => setCtSettings(prev => ({ ...prev, required: val }))}
                 />
                 {ctSettings.required && (
-                  <p className="text-xs text-amber-500">{t('settings.ctRequiredWarning')}</p>
+                  <p className="text-xs text-status-warning">{t('settings.ctRequiredWarning')}</p>
                 )}
               </>
             )}

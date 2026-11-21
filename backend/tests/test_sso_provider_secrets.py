@@ -7,6 +7,8 @@ import pytest
 from models import db
 from models.sso import SSOProvider
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 OAUTH_SECRET = 'oauth-secret-Zq81'
 LDAP_PASSWORD = 'ldap-bind-pw-Xk42'
 

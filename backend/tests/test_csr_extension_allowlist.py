@@ -36,6 +36,8 @@ from tests.test_est_rfc7030 import (  # reuse the EST harness
     EST_BASE, _basic_auth, _post_csr, est_config,  # noqa: F401
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 ATTACKER_CDP = 'http://attacker.example/stale.crl'
 ATTACKER_OCSP = 'http://attacker.example/ocsp'
 ATTACKER_SID = 'S-1-5-21-1-2-3-500'
@@ -290,7 +292,7 @@ class TestProtocolPathsReachTheAllowList:
         with app.app_context():
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, error = wstep_service.issue(
-                ca, csr.public_bytes(serialization.Encoding.DER), 30
+                ca, csr.public_bytes(serialization.Encoding.DER), 30, profile=None
             )
         assert error is None, error
         leaf = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())

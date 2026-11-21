@@ -1,30 +1,23 @@
 """
-Active Directory Connector settings routes
-/api/v2/ad-connector/* -- single stored LDAP connection UCM uses to query
-Active Directory directly, kept deliberately separate from SSO's own LDAP
-provider config (see models/ad_connector.py's module docstring for why).
+Active Directory connector field validation and tests, shared by the collection
+(api/v2/ad_connectors.py); kept apart from SSO's own LDAP provider config (see
+models/ad_connector.py's module docstring for why).
 """
 import logging
 import re
 
-from flask import Blueprint, request
-
-from auth.unified import require_auth
-from models import db, ADConnectorConfig
+from models import db
 from services.ad_connector import health, lookup
 from services.ad_connector.health import (
     MAX_PROBE_INTERVAL_SECONDS as MAX_PROBE_INTERVAL,
     MIN_PROBE_INTERVAL_SECONDS as MIN_PROBE_INTERVAL,
 )
-from services.audit_service import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.secret_target import keeps_saved_secret, retarget_error
 
 logger = logging.getLogger(__name__)
-
-bp = Blueprint('ad_connector_v2', __name__)
 
 MAX_SERVER_LEN = 500
 MAX_DN_LEN = 500
@@ -71,27 +64,10 @@ def _parse_servers(data):
     return joined, None
 
 
-def _get_or_create():
-    config = ADConnectorConfig.get_singleton()
-    if config is None:
-        config = ADConnectorConfig()
-        db.session.add(config)
-    return config
-
-
-@bp.route('/api/v2/ad-connector', methods=['GET'])
-@require_auth(['read:ad_connector'])
-def get_config():
-    """Get the Active Directory Connector configuration."""
-    config = ADConnectorConfig.get_singleton()
-    if config is None:
-        return success_response(data=ADConnectorConfig().to_dict())
-    return success_response(data=config.to_dict())
-
-
 def _ad_retarget_error(saved, data):
-    """The saved bind password stays with the saved DCs, port and TLS trust."""
-    if saved is None or not keeps_saved_secret(data, 'bind_password', saved.bind_password,
+    """The saved bind password stays with the saved DCs, port and TLS trust. The stored
+    token is read, so a password this node cannot open still counts as kept."""
+    if saved is None or not keeps_saved_secret(data, 'bind_password', saved._bind_password,
                                                blank_clears=True):
         return None
     current = {'port': saved.port or 389, 'use_ssl': bool(saved.use_ssl),
@@ -111,17 +87,18 @@ def _ad_retarget_error(saved, data):
     return retarget_error(current, requested, True)
 
 
-@bp.route('/api/v2/ad-connector', methods=['PUT'])
-@require_auth(['write:ad_connector'])
-def update_config():
-    """Update the Active Directory Connector configuration (upsert)."""
-    data = request.json or {}
+def _ca_bundle(value):
+    """(PEM text or None, None), or (None, a 400) for a value that is not text."""
+    if value is None:
+        return None, None
+    if not isinstance(value, str):
+        return None, error_response('ca_bundle must be PEM text', 400)
+    return value.strip() or None, None
 
-    err = _ad_retarget_error(ADConnectorConfig.get_singleton(), data)
-    if err:
-        return err
-    config = _get_or_create()
 
+def apply_fields(config, data):
+    """Copy the submitted settings onto *config*; an error response, or None. The domain
+    SID read for a base DN or a DC list is dropped when either changes."""
     if 'servers' in data or 'server' in data:
         joined, err = _parse_servers(data)
         if err:
@@ -132,6 +109,7 @@ def update_config():
             # get applied to the new list. Clearing it means the next probe
             # decides, and until then _connect simply has no opinion.
             config.health = None
+            config.domain_sid = None
         config.server = joined or None
     if 'port' in data:
         try:
@@ -156,7 +134,10 @@ def update_config():
     if 'verify_ssl' in data:
         config.verify_ssl = bool(data['verify_ssl'])
     if 'ca_bundle' in data:
-        config.ca_bundle = (data['ca_bundle'] or '').strip() or None
+        bundle, err = _ca_bundle(data['ca_bundle'])
+        if err:
+            return err
+        config.ca_bundle = bundle
     if 'base_dn' in data:
         base_dn = (data['base_dn'] or '').strip()
         if len(base_dn) > MAX_DN_LEN:
@@ -165,6 +146,8 @@ def update_config():
         if base_dn and not lookup.realm_of_base_dn(base_dn):
             return error_response('base_dn must name the domain with DC components, '
                                   'such as DC=corp,DC=example', 400)
+        if (base_dn or None) != config.base_dn:
+            config.domain_sid = None
         config.base_dn = base_dn or None
     if 'bind_dn' in data:
         bind_dn = (data['bind_dn'] or '').strip()
@@ -183,40 +166,29 @@ def update_config():
         db.session.rollback()
         return error_response('bind_dn is required while the connector is enabled', 400)
     if config.enabled and not config.bind_password:
+        # A saved password this node cannot open is named: only typing it again saves
+        unreadable = lookup.unreadable_bind_password(config)
         db.session.rollback()
+        if unreadable:
+            return error_response(unreadable, 400)
         return error_response('bind_password is required while the connector is enabled', 400)
-
-    config.updated_at = utc_now()
-
-    try:
-        ok, err = safe_commit(logger, 'Failed to update AD Connector configuration')
-        if not ok:
-            return err
-    except Exception as e:
-        # bind_password's setter raises if encryption is unavailable --
-        # fail closed, never silently persist plaintext.
-        db.session.rollback()
-        logger.error('Failed to update AD Connector configuration: %s', e)
-        return error_response('Failed to save configuration (encryption unavailable?)', 500)
-
-    AuditService.log_action(
-        action='ad_connector_config_update',
-        resource_type='ad_connector',
-        resource_name='AD Connector Configuration',
-        details='Updated AD Connector configuration',
-        success=True,
-    )
-
-    return success_response(data=config.to_dict(), message='AD Connector configuration saved')
+    return None
 
 
-@bp.route('/api/v2/ad-connector/test', methods=['POST'])
-@require_auth(['write:ad_connector'])
-def test_connection_inline():
-    """Test connectivity using unsaved form data (before save)."""
+def refresh_domain_sid(config):
+    """Read the SID of the domain head the base DN sits under when the row has none; a failed
+    read leaves it empty.
+    Every save route calls it, so renewals routed on the SID see the saved connector."""
+    if config.domain_sid or not config.base_dn:
+        return
+    config.domain_sid = lookup.fetch_domain_sid(config)
+
+
+def run_unsaved_test(data, saved_connector):
+    """Test the submitted values; a blank password is the *saved_connector*'s only when
+    the target is the one it was saved for."""
     from types import SimpleNamespace
 
-    data = request.json or {}
     joined, err = _parse_servers(data)
     if err:
         return err
@@ -236,18 +208,23 @@ def test_connection_inline():
         return error_response(GLOBAL_CATALOG_REFUSAL, 400)
     use_ssl = bool(data.get('use_ssl'))
     verify_ssl = data.get('verify_ssl', True)
-    ca_bundle = data.get('ca_bundle') or None
+    ca_bundle, err = _ca_bundle(data.get('ca_bundle'))
+    if err:
+        return err
 
     bind_password = data.get('bind_password')
     if not bind_password:
         # The saved secret only goes to the saved target, trusted the saved way
-        saved = ADConnectorConfig.get_singleton()
-        if (saved and saved.bind_password
+        saved = saved_connector
+        if (saved and saved._bind_password
                 and set(lookup.split_servers(joined)) <= set(lookup.split_servers(saved.server))
                 and (saved.port or 389, bool(saved.use_ssl), bool(saved.verify_ssl),
                      saved.ca_bundle or None)
                 == (port, use_ssl, bool(verify_ssl), ca_bundle)):
-            bind_password = saved.bind_password
+            try:
+                bind_password = lookup._bind_password(saved)
+            except lookup.ADSecretUnreadable as e:
+                return error_response(str(e), 400)  # named, never taken for a missing one
     if not bind_password:
         # Same rule as the save: an anonymous bind is not a connection this
         # connector is allowed to make, so testing one would report a
@@ -262,6 +239,7 @@ def test_connection_inline():
         ca_bundle=ca_bundle,
         bind_dn=data.get('bind_dn'),
         bind_password=bind_password,
+        base_dn=(data.get('base_dn') or '').strip() or None,
     )
     result = lookup.test_connection(cfg)
     if result.get('success'):
@@ -273,15 +251,14 @@ def test_connection_inline():
                           details={'servers': result.get('servers', [])})
 
 
-@bp.route('/api/v2/ad-connector/test-saved', methods=['POST'])
-@require_auth(['write:ad_connector'])
-def test_connection_saved():
-    """Test connectivity using the saved configuration."""
-    config = ADConnectorConfig.get_singleton()
+def run_saved_test(config):
+    """Test *config*'s saved settings, record the verdict on the row."""
     if config is None or not config.server:
         return error_response('AD Connector is not configured', 400)
 
     result = lookup.test_connection(config)
+    if result.get('success') and result.get('domain_sid'):
+        config.domain_sid = result['domain_sid']
     # The badge reflects the test just run, which is the same per-DC bind the
     # probe performs. Only for an enabled connector (a disabled one serves no
     # lookup), and only when DCs were tried: a refused bind reached none.

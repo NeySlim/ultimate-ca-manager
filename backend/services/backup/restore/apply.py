@@ -15,6 +15,7 @@ archive restorable somewhere else at all.
 import base64
 import json
 import logging
+import unicodedata
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -24,15 +25,20 @@ from sqlalchemy.types import (
     Date,
     DateTime,
     Integer,
+    JSON,
     LargeBinary,
     Numeric,
 )
 
 from models import db
+from utils.nul_text import NUL, escape_nul
 
 from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
+from . import audit_ids
 from .plan import RestorePlan, RestoreValidationError, row_label
+from .transaction import tick
+from .windows_profiles import IDENTITY as _PROFILE_IDENTITY, PROFILES as _PROFILES, restored_identity
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +86,7 @@ def apply_columns(instance, section_name: str, row: Dict[str, Any],
     is the archive's row when `row` is a copy of it: the plan records the
     row written for that one (`RestorePlan.place`).
     """
+    tick(1)
     section = SECTIONS[section_name]
     columns, attribute_of = _mapping_of(type(instance))
     applied = _apply_or_leave_out(section_name, section, instance, row, columns,
@@ -140,18 +147,26 @@ def apply_section(section_name: str, rows: List[Dict[str, Any]],
         db.session.flush()
         plan.refresh(sorted(set(section.references.values())))
 
+    # An audit entry's seal covers its id: a replacement writes each back under its own
+    keep_ids = section_name == audit_ids.SECTION and plan.keep_audit_ids
+    if keep_ids:
+        audit_ids.hold_appends()
     applied = 0
     for row in rows:
-        target_id = plan.existing_id(section_name, row)
+        tick(1)
+        target_id = row['id'] if keep_ids else plan.existing_id(section_name, row)
         instance = db.session.get(model, target_id) if target_id is not None else None
-        if instance is None:
-            instance = model()
+        created = instance is None
+        if created:
+            instance = model(id=row['id']) if keep_ids else model()
             db.session.add(instance)
 
         if _apply_or_leave_out(section_name, section, instance, row, columns,
                                attribute_of, plan):
             plan.place(section_name, row, instance)
             applied += 1
+            if created and section_name == audit_ids.SECTION and not keep_ids:
+                plan.audit_new += 1
 
     db.session.flush()
     return applied
@@ -229,6 +244,8 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
             continue          # the dedicated restorer owns this column
         if name == 'id':
             continue          # the target keeps its own key
+        if section_name == _PROFILES and name in _PROFILE_IDENTITY:
+            continue          # restored_identity decides, below
         column = columns.get(name)
         if column is None and name in section.secrets and isinstance(
                 getattr(type(instance), name, None), property):
@@ -264,6 +281,10 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
                 _coerce(value, column, f"{section_name}.{name}"))
     for column, value in legacy_defaults(section_name, row, plan).items():
         setattr(instance, attribute_of.get(column, column), value)
+    if section_name == _PROFILES:
+        for column, value in restored_identity(instance, row, new=new, replacing=_PROFILES in plan.pruned,
+                                               warnings=plan.warnings).items():
+            setattr(instance, column, value)
 
 
 def _restored_chain_variant(row, value, plan):
@@ -281,9 +302,19 @@ def _restored_chain_variant(row, value, plan):
     if target is None:
         logger.warning("Deploy binding chain_variant %s: its cross-certificate is not on this "
                        "installation, the binding falls back to 'auto'", value)
-        plan.chain_variant_fallbacks.append(str(value))
+        plan.chain_variant_fallbacks.append(_binding_label(row))
         return 'auto'
     return f'cross:{target.id}'
+
+
+def _binding_label(row) -> str:
+    """A deploy binding by the names an operator finds it under here: certificate and target."""
+    from models import Certificate
+    target = (row.get(f'target_id{REFERENCE_SUFFIX}') or {}).get('name') or '?'
+    refid = (row.get(f'certificate_id{REFERENCE_SUFFIX}') or {}).get('refid')
+    with db.session.no_autoflush:
+        cert = Certificate.query.filter_by(refid=refid).first() if refid else None
+    return f"certificate '{cert.descr if cert else refid or '?'}' on target '{target}'"
 
 
 _row_label = row_label
@@ -397,12 +428,268 @@ def _secret_as_stored(section, name: str, value: Any, *, label: str = 'HSM provi
 _INTEGER_LIMIT = 2 ** 63 - 1
 
 
+def _refuse_container(value: Any, column, where: str) -> None:
+    # Only a JSON column holds a list or an object; the value is not echoed (it may be a secret).
+    # column None: a secret property over a private column, which takes text
+    if isinstance(value, (list, dict)) and (column is None or not isinstance(column.type, JSON)):
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds {_a_kind_of(value)} "
+            "where this column takes a single value")
+
+
+# The encrypted private key of an archive: an object of hex text (BackupService._encrypt_private_key).
+# Its salt and nonce have had these lengths in bytes in every release; the ciphertext is never empty.
+_KEY_BLOB = 'private_key_pem_encrypted'
+_KEY_BLOB_PARTS = {'salt': 32, 'nonce': 12, 'ciphertext': None}
+
+
+def _kind_of(value: Any) -> str:
+    return {list: 'list', dict: 'object', bool: 'boolean', str: 'text'}.get(type(value), 'number')
+
+
+def _a_kind_of(value: Any) -> str:
+    kind = _kind_of(value)
+    return f"{'an' if kind[0] in 'aeiou' else 'a'} {kind}"
+
+
+def _is_key_part(value: Any, length) -> bool:
+    try:
+        size = len(bytes.fromhex(value))
+    except (TypeError, ValueError):
+        return False
+    return size == length if length is not None else size > 0
+
+
+def _refuse_unreadable_handled(name: str, value: Any, where: str) -> None:
+    """A field a dedicated restorer reads itself: a PEM is text, the encrypted key an object
+    of hex text; either may be absent. The value is never echoed (it may be a secret)."""
+    if value is None:
+        return
+    if name == _KEY_BLOB:
+        if isinstance(value, dict) and (not value or all(
+                _is_key_part(value.get(part), length) for part, length in _KEY_BLOB_PARTS.items())):
+            return
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds {_a_kind_of(value)} that is not an encrypted key "
+            f"(an object of {', '.join(_KEY_BLOB_PARTS)} in hexadecimal, the salt of 32 bytes, "
+            "the nonce of 12)")
+    if not isinstance(value, str):
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds {_a_kind_of(value)} where this field takes text")
+
+
+def _holds_nul(value: Any) -> bool:
+    """Whether a text in ``value``, at any depth and keys included, holds U+0000."""
+    if isinstance(value, str):
+        return NUL in value
+    if isinstance(value, dict):
+        return any(_holds_nul(k) or _holds_nul(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_holds_nul(item) for item in value)
+    return False
+
+
+def _without_nul(value: Any, clashes: Optional[List[bool]] = None) -> Any:
+    """``value`` through escape_nul; a key rewritten onto another key of its object appends
+    to ``clashes`` (one of the two values is lost)."""
+    if isinstance(value, str):
+        return escape_nul(value)
+    if isinstance(value, dict):
+        rewritten = {}
+        for key, item in value.items():
+            new_key = _without_nul(key)
+            if new_key in rewritten and clashes is not None:
+                clashes.append(True)
+            rewritten[new_key] = _without_nul(item, clashes)
+        return rewritten
+    if isinstance(value, list):
+        return [_without_nul(item, clashes) for item in value]
+    return value
+
+
+def _shown(name: str) -> str:
+    """An archive's field or key name as a report line may hold it: control characters
+    escaped, at most NAME_SHOWN characters."""
+    shown = ''.join(c if unicodedata.category(c) != 'Cc' else f'\\x{ord(c):02x}' for c in name)
+    return shown if len(shown) <= NAME_SHOWN else shown[:NAME_SHOWN] + '...'
+
+
+def _mapping_fields_with_nul(mapping: Dict[str, Any]) -> List[str]:
+    """The keys of ``mapping`` whose key or value holds a NUL; one level down in a mapping
+    value (configuration.settings), so a field is a setting rather than the whole section."""
+    fields = []
+    for key, value in mapping.items():
+        if isinstance(value, dict) and not _holds_nul(key):
+            fields.extend(f"{_shown(key)}.{_shown(escape_nul(inner))}"
+                          for inner, held in value.items() if _holds_nul(inner) or _holds_nul(held))
+        elif _holds_nul(key) or _holds_nul(value):
+            fields.append(_shown(escape_nul(key)))
+    return fields
+
+
+def _merged_identities(section_name: str, rows) -> List[str]:
+    """The identity fields under which two archived rows of the section become one once
+    rewritten: each such field is named, the rows are not."""
+    section = SECTIONS.get(section_name)
+    if section is None or not section.identity:
+        return []
+    seen: Dict[tuple, set] = {}
+    merged = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        before = tuple(row.get(field) for field in section.identity)
+        after = tuple(_without_nul(value) for value in before)
+        try:
+            # Rows already alike before the rewrite are not the NUL's doing
+            if after in seen and before not in seen[after]:
+                merged.append('.'.join(section.identity))
+            seen.setdefault(after, set()).add(before)
+        except TypeError:
+            continue    # a list or an object as identity: refused by refuse_containers_in_columns
+    return sorted(set(merged))
+
+
+def _fields_taken(section_name: str):
+    """Field names a restorer of the section reads: columns, handled and secret fields and
+    references; None when the section has no manifest entry (nothing is said ignored)."""
+    section = SECTIONS.get(section_name)
+    if section is None:
+        return None
+    columns, _attribute_of = _mapping_of(load_model(section))
+    taken = set(columns) | set(section.handled.values()) | set(section.secrets)
+    return taken | {f'{name}{REFERENCE_SUFFIX}' for name in section.references}
+
+
+# What the report says of a field holding a NUL, by who reads the field
+_NUL_TEXT = {
+    'column': "a NUL character, which PostgreSQL cannot store in text, was restored as the two "
+              "characters \\0",
+    # A restorer may read a field of an older archive that no column takes: not said ignored
+    'unknown': "a field no column takes held a NUL character; where the restore reads it, it is "
+               "restored as the two characters \\0",
+    'nobody': "a field no column takes, ignored, holding a NUL character",
+}
+
+
+def _reader_of(name, taken) -> str:
+    """Who reads a row's field: a column, nobody (no code spells a name holding a NUL), or unknown."""
+    if taken is None or name in taken:
+        return 'column'
+    return 'nobody' if _holds_nul(name) else 'unknown'
+
+
+# Fields named one by one in the report; past this many, a count
+NUL_WARNING_FIELDS = 20
+# Characters of an archive's field name a warning shows
+NAME_SHOWN = 64
+
+
+def escape_nul_in_archive(backup_data, sections) -> List[str]:
+    """Every text of ``sections`` (rows and mappings, keys and identities included, at any
+    depth) through escape_nul, before anything compares or follows them: a reference still
+    names the row it named. For a PostgreSQL target only, which stores no NUL.
+
+    One warning per section.field, the value never echoed; one more per identity under which
+    two archived rows become one."""
+    from ..section_store import SectionStore, section_kind
+    fields: List[str] = []
+    merged: List[str] = []
+    for section_name in sorted(sections):
+        kind = section_kind(backup_data, section_name)
+        if kind == 'mapping':
+            mapping = backup_data[section_name]
+            hit = _mapping_fields_with_nul(mapping)
+            if hit:
+                rewritten = {}
+                for key, value in mapping.items():
+                    clashes: List[bool] = []
+                    new_key = escape_nul(key) if isinstance(key, str) else key
+                    if new_key in rewritten:
+                        merged.append(section_name)
+                    rewritten[new_key] = _without_nul(value, clashes)
+                    if clashes:
+                        merged.append(f"{section_name}.{_shown(str(new_key))}")
+                backup_data[section_name] = rewritten
+                fields.extend((f"{section_name}.{name}", 'column') for name in hit)
+            continue
+        if kind != 'list':
+            continue
+        rows = (backup_data.iter_rows(section_name) if isinstance(backup_data, SectionStore)
+                else backup_data[section_name])
+        taken = _fields_taken(section_name)
+        hit = {}
+        for row in rows:
+            if isinstance(row, dict):
+                for name, value in row.items():
+                    if _holds_nul(name) or _holds_nul(value):
+                        hit.setdefault(_shown(escape_nul(name)), _reader_of(name, taken))
+            elif _holds_nul(row):
+                hit.setdefault('(row)', 'column')
+        if hit:
+            # Loaded only when it holds one: written back through the store
+            loaded = backup_data[section_name]
+            merged.extend(f"{section_name}.{field}"
+                          for field in _merged_identities(section_name, loaded))
+            for row in loaded:
+                names = set()
+                for name, value in (row.items() if isinstance(row, dict) else ()):
+                    clashes = []
+                    _without_nul(value, clashes)
+                    if clashes:
+                        merged.append(f"{section_name}.{_shown(escape_nul(name))}")
+                    if escape_nul(name) in names:
+                        merged.append(section_name)
+                    names.add(escape_nul(name))
+            backup_data[section_name] = _without_nul(loaded)
+            fields.extend((f"{section_name}.{name}", reader) for name, reader in hit.items())
+    merged = list(dict.fromkeys(merged))
+    warnings = [f"{field}: {_NUL_TEXT[reader]}" for field, reader in fields[:NUL_WARNING_FIELDS]]
+    if len(fields) > NUL_WARNING_FIELDS:
+        warnings.append(f"{len(fields) - NUL_WARNING_FIELDS} more fields held a NUL character, "
+                        "restored the same way")
+    warnings.extend(
+        f"{field}: two archived rows or keys hold the same value once their NUL characters "
+        "are rewritten as \\0, and are restored as one" for field in merged)
+    return warnings
+
+
+def refuse_containers_in_columns(backup_data) -> None:
+    """RestoreValidationError, before any write, for a value no restorer of the row can take.
+
+    A list or an object in a non JSON column, or in a secret property over a column of
+    another name; a field the dedicated restorers read themselves (`Section.handled`) that is
+    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key."""
+    from ..section_store import SectionStore, section_kind
+    for section_name, section in SECTIONS.items():
+        if section_kind(backup_data, section_name) != 'list':
+            continue
+        columns, _attribute_of = _mapping_of(load_model(section))
+        handled = set(section.handled.values())
+        rows = (backup_data.iter_rows(section_name) if isinstance(backup_data, SectionStore)
+                else backup_data[section_name])
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            for name, value in row.items():
+                column = columns.get(name)
+                if name in handled:
+                    _refuse_unreadable_handled(name, value, f"{section_name}.{name}")
+                elif column is not None and name not in section.handled:
+                    _refuse_container(value, column, f"{section_name}.{name}")
+                elif (column is None and name in section.secrets
+                      and section.stored.get(name) != 'fields'):
+                    # A `fields` secret is an object; none is a property over another column today
+                    _refuse_container(value, None, f"{section_name}.{name}")
+
+
 def _coerce(value: Any, column, where: str) -> Any:
     """Turn an archived value back into what the column holds."""
     if value is None:
         return None
 
     kind = column.type
+    _refuse_container(value, column, where)
     try:
         if isinstance(kind, LargeBinary) and isinstance(value, str):
             return base64.b64decode(value)
@@ -459,6 +746,7 @@ def relink_references(backup_data: Dict[str, Any], plan: RestorePlan) -> Dict[st
 
         changed = 0
         for row in rows:
+            tick()
             if not isinstance(row, dict):
                 continue
             target_id = plan.existing_id(section_name, row)

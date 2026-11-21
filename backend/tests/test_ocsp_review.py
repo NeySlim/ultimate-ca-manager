@@ -19,6 +19,19 @@ from tests.test_ocsp_service import (  # noqa: E402
 )
 from tests.test_ca_service_hsm import _patch_hsm, hsm_provider_and_key  # noqa: E402,F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _stored_leaves_leave_with_the_module(app):
+    """The leaves _store_leaf writes (serials 10 and 16 among them) are gone for the files after this one."""
+    yield
+    from services.cert_service import CertificateService
+    with app.app_context():
+        for row_id in [r.id for r in Certificate.query.filter(Certificate.refid.like('ocsp-review-%'))]:
+            CertificateService.delete_certificate(row_id)
+
 
 def _gen():
     return rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -94,7 +107,7 @@ class TestNextUpdateBoundByResponder:
                                         serial_number=str(resp_cert.serial_number))
             db.session.add(responder_row); db.session.commit()
             _configure_delegated_responder(ca_obj, responder_row, resp_cert, key)
-            serial = int(row.serial_number, 16)
+            serial = int(row.serial_number)
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good'
             resp = ocsp.load_der_ocsp_response(der)
@@ -191,7 +204,7 @@ class TestRenewalDropsResponderCache:
                                  data=json.dumps({'certificate_id': resp_id}), content_type='application/json')
             assert r.status_code == 200, r.data
             ca_obj = _ca_model(ca)
-            serial = int(db.session.get(Certificate, leaf['id']).serial_number, 16)
+            serial = int(db.session.get(Certificate, leaf['id']).serial_number)
             OCSPService().generate_response(ca_obj, serial)
             assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() >= 1
             r = auth_client.post(f"/api/v2/certificates/{resp_id}/renew", data=json.dumps({}), content_type='application/json')

@@ -13,9 +13,11 @@ import pytest
 import json
 import os
 import sys
-from tests.conftest import get_json, assert_success, assert_error
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
 from services.acme.jws_problems import UNKNOWN_ACCOUNT
 from tests.seeded_rows import delete_client_accounts
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -702,9 +704,27 @@ class TestAcmeClientProxy:
             assert data['acme_account_id'] == account_id
             assert 'account_url' in data
 
-    def test_proxy_register_missing_email(self, auth_client):
-        r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {})
-        assert_error(r, 400)
+    def test_proxy_register_missing_email(self, auth_client, app):
+        # The proxy account is the test's own, without an email: any other account of the
+        # session (a default one with a contact) would otherwise be registered upstream.
+        from models import db, AcmeClientAccount, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            acct = AcmeClientAccount(directory_url='https://proxy-noemail-test.example/directory',
+                                     label='Proxy no email', email='')
+            db.session.add(acct)
+            db.session.commit()
+            account_id = acct.id
+        try:
+            r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {'acme_account_id': account_id})
+            assert_error(r, 400)
+        finally:
+            with app.app_context():
+                db.session.rollback()
+                delete_client_accounts(AcmeClientAccount.query.filter_by(id=account_id))
+                db.session.commit()
 
     def test_proxy_register_empty_email(self, auth_client):
         r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {'email': ''})
@@ -924,14 +944,14 @@ class TestAcmeClientRequestValidation:
         r = post_json(auth_client, '/api/v2/acme/client/request',
                       {'domains': ['example.com'],
                        'challenge_type': 'dns-01', 'environment': 'staging'})
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Email is required. Set it in settings or provide in request.')
 
     def test_request_dns_provider_not_found(self, auth_client):
         r = post_json(auth_client, '/api/v2/acme/client/request',
                       {'domains': ['example.com'], 'email': 'a@b.com',
                        'challenge_type': 'dns-01', 'environment': 'staging',
                        'dns_provider_id': 999999})
-        assert r.status_code in (404, 400, 500)
+        assert_refused(r, 404, 'DNS provider not found')
 
 
 # ============================================================
@@ -956,12 +976,56 @@ class TestAcmeClientAccountRegistration:
                       {'email': 'a@b.com', 'environment': 'invalid'})
         assert_error(r, 400)
 
-    def test_register_account_valid_staging(self, auth_client):
-        """Registration will likely fail in test mode (no real LE), but validates input."""
+    @pytest.fixture
+    def directory(self, app, monkeypatch):
+        """The ACME server's answer to a registration, set by the test: no network."""
+        from types import SimpleNamespace
+        from models import SystemConfig, db
+        import api.v2.acme_client.account as account
+        answer = {}
+
+        class _Client:
+            account = SimpleNamespace(label='fake', directory_url='https://acme.test/dir')
+
+            def register_account(self, email):
+                answer['email'] = email
+                return answer['result']
+
+        monkeypatch.setattr(account.AcmeClientService, 'for_issuance',
+                            classmethod(lambda cls, environment=None: _Client()))
+        with app.app_context():
+            row = SystemConfig.query.filter_by(key='acme.client.email').first()
+            before = row.value if row else None
+        yield answer
+        with app.app_context():
+            row = SystemConfig.query.filter_by(key='acme.client.email').first()
+            if row and before is None:
+                db.session.delete(row)
+            elif row:
+                row.value = before
+            db.session.commit()
+
+    def _stored_email(self, app):
+        from models import SystemConfig
+        with app.app_context():
+            row = SystemConfig.query.filter_by(key='acme.client.email').first()
+            return row.value if row else None
+
+    def test_register_account_valid_staging(self, app, auth_client, directory):
+        directory['result'] = (True, 'Account registered', 'https://acme.test/acct/7')
         r = post_json(auth_client, '/api/v2/acme/client/account',
-                      {'email': 'test@example.com', 'environment': 'staging'})
-        # Accept 200 (success) or 400/500 (expected failure in test env)
-        assert r.status_code in (200, 400, 500)
+                      {'email': 'registered@acme.test', 'environment': 'staging'})
+        assert assert_success(r) == {'account_url': 'https://acme.test/acct/7'}
+        assert directory['email'] == 'registered@acme.test'
+        assert self._stored_email(app) == 'registered@acme.test'
+
+    def test_register_account_refused_by_the_server(self, app, auth_client, directory):
+        directory['result'] = (False, 'contact email has forbidden domain', None)
+        before = self._stored_email(app)
+        r = post_json(auth_client, '/api/v2/acme/client/account',
+                      {'email': 'refused@acme.test', 'environment': 'staging'})
+        assert_refused(r, 400, 'contact email has forbidden domain')
+        assert self._stored_email(app) == before
 
 
 # ============================================================

@@ -8,7 +8,7 @@ import uuid
 
 import pytest
 
-from models import AuditLog, User, db
+from models import User, db
 
 PASSWORD = 'Activ1ty-Scope-Pass!'
 
@@ -39,16 +39,18 @@ def account(app):
 
 @pytest.fixture
 def typed_name(app):
-    """A failed login whose typed name is someone's password."""
+    """A failed login whose typed name is someone's password.
+
+    Written through the audit service and left in place: a row removed from the
+    middle of the chain breaks the link of the entry after it.
+    """
+    from services.audit_service import AuditService
+
     typed = f'MyS3cret-{uuid.uuid4().hex[:8]}'
     with app.app_context():
-        db.session.add(AuditLog(username=typed, action='login_failure', resource_type='user',
-                                details=f'Login failed for username: {typed}', success=False))
-        db.session.commit()
-    yield typed
-    with app.app_context():
-        AuditLog.query.filter_by(username=typed).delete()
-        db.session.commit()
+        AuditService.log_action(action='login_failure', resource_type='user', username=typed,
+                                details=f'Login failed for username: {typed}', success=False)
+    return typed
 
 
 def _feed(c):
@@ -68,3 +70,17 @@ def test_without_read_audit_only_own_events(account, typed_name):
 def test_with_read_audit_the_whole_trail(account, typed_name):
     _name, auditor = account('auditor')
     assert typed_name in json.dumps(_feed(auditor))
+
+
+def test_a_database_error_is_an_error_not_an_empty_feed(auth_client, monkeypatch):
+    real = db.session.execute
+
+    def failing(statement, *args, **kwargs):
+        if 'FROM audit_logs' in str(statement):
+            raise RuntimeError('database down')
+        return real(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db.session, 'execute', failing)
+    r = auth_client.get('/api/v2/dashboard/activity')
+    assert r.status_code == 500, r.data
+    assert 'database down' not in r.get_data(as_text=True)

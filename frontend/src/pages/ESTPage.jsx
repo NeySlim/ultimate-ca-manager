@@ -159,8 +159,12 @@ export default function ESTPage() {
       helpPageKey="est"
     >
       {/* Settings Tab */}
+      {/* A form, so the browser refuses to save while a field is invalid (a repeated label) */}
       {activeTab === 'settings' && (
-        <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
+        <form
+          className="p-4 md:p-6 max-w-3xl mx-auto space-y-6"
+          onSubmit={(e) => { e.preventDefault(); handleSaveConfig() }}
+        >
           <Card className="p-4">
             <div className="flex items-start gap-4">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
@@ -265,13 +269,13 @@ export default function ESTPage() {
 
           {hasPermission('write:est') && (
             <div className="flex justify-end">
-              <Button type="button" onClick={handleSaveConfig} disabled={saving}>
+              <Button type="submit" disabled={saving}>
                 {saving ? <LoadingSpinner size="sm" /> : <Gear size={14} />}
                 {saving ? t('common.saving') : t('common.saveConfiguration')}
               </Button>
             </div>
           )}
-        </div>
+        </form>
       )}
 
       {/* Endpoints / Info Tab */}

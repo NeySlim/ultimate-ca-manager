@@ -15,6 +15,8 @@ from cryptography import x509
 from models import SystemConfig, db
 import utils.ct_client as ct_client
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 KEYS = ('ct_enabled', 'ct_auto_submit', 'ct_embed_sct')
 
 

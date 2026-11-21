@@ -17,6 +17,8 @@ from models import CA, AuthCertificate, Certificate, db
 from models.policy import ApprovalRequest, CertificatePolicy
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
+
 
 def _json(client, method, url, payload=None):
     return getattr(client, method)(url, data=json.dumps(payload or {}), content_type='application/json')

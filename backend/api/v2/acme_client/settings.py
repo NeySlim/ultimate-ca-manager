@@ -9,6 +9,7 @@ from flask import request
 from api.v2.acme_client import bp, _set_config, _coerce_bool
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils import issuance_defaults
 from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.acme_public_url import get_acme_public_base, get_acme_proxy_public_base
@@ -142,7 +143,8 @@ def get_settings():
         'directory_url': directory_cfg.value if directory_cfg else None,
         'eab_kid': eab_kid_cfg.value if eab_kid_cfg else None,
         'eab_hmac_key_set': bool(eab_hmac_cfg and eab_hmac_cfg.value),
-        'key_type': key_type_cfg.value if key_type_cfg else 'RSA-2048',
+        'key_type': ((key_type_cfg.value if key_type_cfg else '')
+                     or issuance_defaults.DEFAULT_ACME_CLIENT_CERT_KEY_TYPE),
         'account_key_type': acct_key_type_cfg.value if acct_key_type_cfg else 'ES256',
         'acme_public_base_url': get_acme_public_base(request),
         'acme_proxy_public_base_url': get_acme_proxy_public_base(request),

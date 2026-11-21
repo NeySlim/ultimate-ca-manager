@@ -12,6 +12,7 @@ from services.retention_service import RetentionPolicy, RetentionSettingError
 from api.v2.key_recovery import _dual_control_enabled, _dual_control_env
 import json
 import logging
+import os
 
 from . import bp, get_config, set_config
 from services.backup.settings_contract import (
@@ -19,12 +20,14 @@ from services.backup.settings_contract import (
     validate_backup_kdf,
     validate_backup_password,
     validate_frequency,
+    validate_max_total_mb,
     validate_retention_days,
 )
 from utils.hsts import hsts_env_locked
 from utils import admin_allowlist
 import compliance_profiles
 from utils.public_endpoints import validate_admin_base_url, validate_protocol_base_url
+from api.v2.sso.helpers import MIN_LOGIN_ATTEMPTS, _get_lockout_settings
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
@@ -69,6 +72,7 @@ _ADMIN_ONLY_SETTINGS = frozenset([
     'auto_backup_enabled',
     'backup_frequency',
     'backup_retention_days',
+    'backup_max_total_mb',
     'backup_password',
     'backup_kdf',
     'clear_backup_password',
@@ -90,12 +94,16 @@ _ADMIN_ONLY_SETTINGS = frozenset([
 @require_auth(['read:settings'])
 def get_general_settings():
     """Get general settings from database"""
+    from protocol_http_server import get_http_protocol_port
+    from utils.public_endpoints import env_locked_fields
+    env_locked = env_locked_fields()
     return success_response(data={
         'system_name': get_config('system_name', ''),
         'timezone': get_config('timezone', 'UTC'),
         'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
         'backup_frequency': get_config('backup_frequency', 'daily'),
         'backup_retention_days': int(get_config('backup_retention_days', '30')),
+        'backup_max_total_mb': _int_config('backup_max_total_mb', 0),
         'backup_kdf': get_config('backup_kdf', '') or 'auto',
         'audit_retention_days': RetentionPolicy.get_retention_days(),
         'backup_password': '',  # Never return password
@@ -105,10 +113,13 @@ def get_general_settings():
         'metrics_enabled': bool(get_config('metrics_token', '')),
         'session_timeout': int(get_config('session_timeout', '28800')),
         'session_max_lifetime': int(get_config('session_max_lifetime', '86400')),
-        'max_login_attempts': int(get_config('max_login_attempts', '5')),
+        'max_login_attempts': _get_lockout_settings()[0],
         'lockout_duration': effective('lockout_duration'),
         'protocol_base_url': get_config('protocol_base_url', ''),
-        'http_protocol_port': int(get_config('http_protocol_port', '8080')),
+        # The port really bound: the environment, when it sets one, wins over the stored value
+        'http_protocol_port': (get_http_protocol_port() if env_locked['http_protocol_port_env']
+                               else int(get_config('http_protocol_port', '8080'))),
+        'env_locked': env_locked,
         'base_url': get_config('base_url', ''),
         # ACME public endpoint (local server + proxy directory URLs behind reverse proxy)
         'acme_public_vhost': get_config('acme_public_vhost', ''),
@@ -161,6 +172,9 @@ def update_general_settings():
     data = request.json or {}
     if not isinstance(data, dict):
         return error_response('Request body must be a JSON object', 400)
+    port_restart = False
+    port_pinned_message = None
+    ignored_keys = []
 
     # Reserved keys are dropped before any validation; a body holding nothing
     # else is refused, so a mixed card still saves its other fields.
@@ -173,12 +187,14 @@ def update_general_settings():
         if reserved:
             logger.info('Ignored admin-only settings without admin:settings: %s',
                         ', '.join(reserved))
+            ignored_keys = reserved
             data = {k: v for k, v in data.items() if k not in _ADMIN_ONLY_SETTINGS}
 
     # List of allowed settings
     allowed_keys = [
         'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
-        'backup_retention_days', 'backup_password', 'backup_kdf', 'session_timeout',
+        'backup_retention_days', 'backup_max_total_mb', 'backup_password', 'backup_kdf',
+        'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
         'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time',
         'acme_public_vhost', 'acme_public_port', 'acme_public_tls_cert_id',
@@ -207,6 +223,19 @@ def update_general_settings():
         'audit_retention_days',
         'compliance_profile_default',
     ]
+
+    if 'max_login_attempts' in data:
+        raw = data['max_login_attempts']
+        try:
+            # A boolean or a fractional number is not a count of attempts
+            if isinstance(raw, bool) or (isinstance(raw, float) and not raw.is_integer()):
+                raise ValueError(raw)
+            attempts = int(raw)
+        except (TypeError, ValueError):
+            return error_response('max_login_attempts must be an integer', 400)
+        if attempts < MIN_LOGIN_ATTEMPTS:
+            return error_response(f'max_login_attempts must be at least {MIN_LOGIN_ATTEMPTS}', 400)
+        data['max_login_attempts'] = str(attempts)
 
     if 'ocsp_response_validity_hours' in data:
         try:
@@ -261,12 +290,26 @@ def update_general_settings():
             port = int(data['http_protocol_port'])
         except (ValueError, TypeError):
             return error_response("Invalid port number", 400)
-        if port != 0 and (port < 1024 or port > 65535):
-            return error_response("Port must be 0 (disabled) or between 1024-65535", 400)
-        from config.settings import Config
-        if port == Config.HTTPS_PORT:
-            return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
-        data['http_protocol_port'] = str(port)
+        pinned = os.getenv('HTTP_PROTOCOL_PORT')
+        from protocol_http_server import get_http_protocol_port
+        if pinned is not None and port == get_http_protocol_port():
+            data.pop('http_protocol_port')  # the bound port GET showed: the stored one stays
+        else:
+            if port != 0 and (port < 1024 or port > 65535):
+                return error_response("Port must be 0 (disabled) or between 1024-65535", 400)
+            from config.settings import Config
+            if port == Config.HTTPS_PORT:
+                return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
+            data['http_protocol_port'] = str(port)
+            # Bound when a worker starts: a new value needs a restart, unless the environment pins it
+            stored_port = get_config('http_protocol_port', '') or '8080'
+            changed = data['http_protocol_port'] != stored_port
+            port_restart = changed and pinned is None
+            # The environment wins over the stored port: say so rather than report a save that never binds
+            port_pinned_message = (
+                f'HTTP_PROTOCOL_PORT={pinned} in the service environment sets this port: '
+                'the saved value is not used until it is removed.'
+                if changed and pinned is not None else None)
 
     if 'acme_public_vhost' in data:
         raw_vhost = data.get('acme_public_vhost')
@@ -336,6 +379,17 @@ def update_general_settings():
                 data['backup_retention_days'])
         except BackupSettingError as e:
             return error_response(str(e), 400)
+
+    ceiling_change = None
+    if 'backup_max_total_mb' in data:
+        try:
+            data['backup_max_total_mb'] = validate_max_total_mb(
+                data['backup_max_total_mb'])
+        except BackupSettingError as e:
+            return error_response(str(e), 400)
+        before = _int_config('backup_max_total_mb', 0)
+        if before != data['backup_max_total_mb']:
+            ceiling_change = (before, data['backup_max_total_mb'])
 
     # The screen sends every setting back: an unchanged KDF must not block an
     # unrelated save once FIPS mode refuses it
@@ -451,6 +505,15 @@ def update_general_settings():
                 value = encrypt_if_needed(value)
             set_config(key, value)
 
+    if allowlist_change is not None:
+        from services.cluster_commands import RELOAD_ADMIN_ALLOWLIST, emit
+        emit(RELOAD_ADMIN_ALLOWLIST)  # committed with the list, or not at all
+    from utils.ha import ha_enabled
+    rolling = port_restart and ha_enabled()
+    if rolling:
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)  # HA: queued with the port, or neither is saved
+
     try:
         db.session.commit()
     except Exception as e:
@@ -485,11 +548,27 @@ def update_general_settings():
         resource_type='settings',
         resource_name='General Settings',
         details='Updated general settings'
-        + ('; backup password cleared' if clear_backup_password else ''),
+        + ('; backup password cleared' if clear_backup_password else '')
+        + (f'; backup_max_total_mb {ceiling_change[0]} -> {ceiling_change[1]}'
+           if ceiling_change else ''),
         success=True
     )
 
-    return success_response(message='Settings saved successfully')
+    restart_message = port_pinned_message
+    if rolling:
+        from services.cluster_commands import ROLLING_RESTART_MESSAGE
+        restart_message = ROLLING_RESTART_MESSAGE
+    elif port_restart:
+        from config import settings as config_settings
+        if config_settings.is_docker():
+            restart_message = 'Restart the container to apply the HTTP protocol port.'
+        else:
+            restarted, detail = config_settings.restart_ucm_service()
+            restart_message = ('Service restart initiated to apply the HTTP protocol port.'
+                               if restarted else detail)
+    return success_response(data={'needs_restart': port_restart, 'restart_message': restart_message,
+                                  'ignored_keys': ignored_keys},
+                            message='Settings saved successfully')
 
 
 # --- Certificate Transparency (CT) ---

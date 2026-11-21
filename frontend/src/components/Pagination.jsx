@@ -91,7 +91,7 @@ export function Pagination({
                   className={cn(
                     "min-w-[28px] h-7 rounded text-xs font-medium transition-all",
                     page === pageNum
-                      ? "bg-accent-primary text-white"
+                      ? "bg-accent-primary text-on-accent"
                       : "text-text-secondary bg-tertiary-op50 hover:bg-bg-tertiary hover:text-text-primary"
                   )}
                 >

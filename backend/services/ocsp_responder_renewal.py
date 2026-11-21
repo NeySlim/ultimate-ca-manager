@@ -43,6 +43,19 @@ def _get_config(key, default=None):
     return row.value if row else default
 
 
+def renewed_by_responder_task(model=Certificate):
+    """SQL condition: *model* is bound as a CA's delegated responder and this task
+    renews it (it holds the key and ``ocsp_responder_auto_renew`` is unset or 'true')."""
+    from sqlalchemy import String, and_, cast, or_, select
+    # Uncorrelated, so read once per statement; no NULL in the list keeps NOT IN equal to NOT EXISTS
+    bound = cast(model.id, String).in_(select(SystemConfig.value).where(
+        SystemConfig.key.like(f'{RESPONDER_KEY_PREFIX}%'), SystemConfig.value.isnot(None)))
+    switched_off = select(SystemConfig.id).where(
+        SystemConfig.key == 'ocsp_responder_auto_renew',
+        or_(SystemConfig.value.is_(None), SystemConfig.value != 'true')).exists()
+    return and_(bound, model.prv.isnot(None), model.prv != '', ~switched_off)
+
+
 def _renew_threshold_days(lifetime_days: int) -> int:
     """Days-before-expiry threshold, bounded so short-lived responders don't
     renew immediately after issuance (never earlier than 1/3 of lifetime left).
@@ -153,6 +166,27 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
     return db_cert
 
 
+def _rebind(key, old_cert_id, new_cert_id) -> bool:
+    """Point the responder binding at the new certificate only if it still names the old
+    one: of two runners renewing the same responder, one rebinds and the other rolls back."""
+    return SystemConfig.query.filter(
+        SystemConfig.key == key, SystemConfig.value == str(old_cert_id),
+    ).update({SystemConfig.value: str(new_cert_id)}, synchronize_session=False) == 1
+
+
+def _archive(cert_id, serial) -> bool:
+    """Archive the old responder row only if it still holds the serial this run renewed
+    (a row already archived included): re-checked after any lock wait, so a row renewed
+    in place meanwhile is left as it is."""
+    archived = Certificate.query.filter(
+        Certificate.id == cert_id, Certificate.serial_number == serial,
+    ).update({Certificate.archived: True}, synchronize_session=False) == 1
+    if archived:
+        from sqlalchemy.orm.attributes import set_committed_value
+        set_committed_value(db.session.get(Certificate, cert_id), 'archived', True)
+    return archived
+
+
 def run_ocsp_responder_renewal():
     """Scheduled task: renew delegated OCSP responder certs nearing expiry."""
     if _get_config('ocsp_responder_auto_renew', 'true') != 'true':
@@ -211,9 +245,24 @@ def run_ocsp_responder_renewal():
             continue
 
         try:
+            binding_key = binding.key
             new_row = _renew_responder_cert(ca, cert)
-            binding.value = str(new_row.id)
-            cert.archived = True
+            if not _rebind(binding_key, cert_id, new_row.id):
+                db.session.rollback()
+                logger.info("OCSP responder of CA %s already renewed by another runner", ca_id)
+                stats['skipped'] += 1
+                continue
+            if not _archive(cert_id, cert.serial_number):
+                db.session.rollback()
+                logger.info("OCSP responder %s of CA %s renewed meanwhile; left as it is",
+                            cert_id, ca_id)
+                stats['skipped'] += 1
+                continue
+            # A renewal is an issuance, counted in this commit; the CA row is locked only
+            # after the responder row, the order an in-place renewal of that row takes
+            db.session.flush()
+            from utils.ca_serial_counter import next_ca_serial
+            next_ca_serial(ca)
             from services.audit.staging import stage_audit_entry
             stage_audit_entry(
                 action='ocsp_responder.auto_renewed',
@@ -226,6 +275,8 @@ def run_ocsp_responder_renewal():
                 ),
             )
             db.session.commit()
+            from services.webhook_service import emit_cert_renewed
+            emit_cert_renewed(new_row.to_dict(), ca_refid=ca.refid, actor='system:ocsp-renewal')
             # The CA's cached answers embed the old responder certificate
             try:
                 from services.ocsp_service import OCSPService

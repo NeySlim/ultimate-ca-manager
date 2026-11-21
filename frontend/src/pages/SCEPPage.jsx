@@ -2,7 +2,7 @@
  * SCEP Management Page - Migrated to ResponsiveLayout
  * Simple Certificate Enrollment Protocol configuration and request management
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Robot, Gear, CheckCircle, XCircle, Clock, Copy, ArrowsClockwise, 
@@ -21,6 +21,8 @@ import ScepProfilesTab from './scep/ScepProfilesTab'
 import ScepIntuneAppsTab from './scep/ScepIntuneAppsTab'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
+import { useLinkedId } from '../hooks/useLinkedId'
+import { stateLabel } from '../lib/stateLabel'
 import { formatDate, cn } from '../lib/utils'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { scepPickerCas, unlistedScepPickerCas } from '../lib/caSelection'
@@ -46,6 +48,8 @@ export default function SCEPPage() {
   // Pagination state
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
+  const [totalRequests, setTotalRequests] = useState(0)
+  const [statusFilter, setStatusFilter] = useState([])
   
   // Modal states
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -56,12 +60,56 @@ export default function SCEPPage() {
     loadData()
   }, [])
 
+  // /scep-config?tab=requests&request=N opens that request, even past the latest 50 listed
+  const linkedId = useLinkedId('request')
+  useEffect(() => {
+    if (!linkedId) return
+    let cancelled = false
+    scepService.getRequest(linkedId)
+      .then((res) => {
+        if (cancelled || !res?.data) return
+        setActiveTab('requests')
+        setSelectedRequest(res.data)
+        if (res.data.status !== 'pending') {
+          showInfo(t('overview.link.handled', { id: res.data.id, status: stateLabel(t, res.data.status) }))
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return
+        if (error?.status === 404) showInfo(t('overview.link.gone', { id: linkedId }))
+        else showError(error.message || t('messages.errors.loadFailed.scep'))
+      })
+    return () => { cancelled = true }
+  }, [linkedId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The requests are paged, filtered and searched by the server
+  const requestSeq = useRef(0)
+  const loadRequests = useCallback(async () => {
+    // An answer older than the last request sent is dropped
+    const seq = ++requestSeq.current
+    try {
+      const params = { page, per_page: perPage }
+      if (searchQuery) params.search = searchQuery
+      if (statusFilter.length > 0) params.status = statusFilter
+      const res = await scepService.getRequests(params)
+      if (seq !== requestSeq.current) return
+      setRequests(res.data || [])
+      setTotalRequests(res.meta?.total ?? (res.data || []).length)
+    } catch (error) {
+      if (seq === requestSeq.current) notifyRef.current(error.message)
+    }
+  }, [page, perPage, searchQuery, statusFilter])
+  const notifyRef = useRef(() => {})
+  notifyRef.current = (message) => showError(message || t('messages.errors.loadFailed.scep'))
+  const loadRequestsRef = useRef(loadRequests)
+  loadRequestsRef.current = loadRequests
+  useEffect(() => { loadRequests() }, [loadRequests])
+
   const loadData = async () => {
     setLoading(true)
     try {
-      const [configRes, requestsRes, casRes, statsRes, profilesRes, templatesRes] = await Promise.all([
+      const [configRes, casRes, statsRes, profilesRes, templatesRes] = await Promise.all([
         scepService.getConfig(),
-        scepService.getRequests(),
         casService.getAll(),
         scepService.getStats(),
         scepService.getProfiles().catch(() => ({ data: [] })),
@@ -70,7 +118,6 @@ export default function SCEPPage() {
       setConfig(configRes.data || {})
       setProfiles(profilesRes.data || [])
       setTemplates((templatesRes.data || []).filter(tpl => tpl.template_type !== 'ca'))
-      setRequests(requestsRes.data || [])
       setStats(statsRes.data || { pending: 0, approved: 0, rejected: 0, total: 0 })
       
       // Load challenge passwords for each CA
@@ -86,6 +133,7 @@ export default function SCEPPage() {
         })
       )
       setCas(casWithChallenges)
+      loadRequestsRef.current()
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.scep'))
     } finally {
@@ -159,7 +207,7 @@ export default function SCEPPage() {
       issued: { variant: 'primary', dot: true, pulse: false }
     }
     const { variant, dot, pulse } = config[status] || { variant: 'secondary', dot: false, pulse: false }
-    return <Badge variant={variant} size="sm" dot={dot} pulse={pulse}>{status}</Badge>
+    return <Badge variant={variant} size="sm" dot={dot} pulse={pulse}>{stateLabel(t, status)}</Badge>
   }
 
   // Parse DN to extract CN and other fields
@@ -380,7 +428,7 @@ export default function SCEPPage() {
         <CompactGrid>
           <CompactField autoIcon="transactionId" label={t('scep.transactionId')} value={selectedRequest.transaction_id} mono copyable />
           <CompactField autoIcon="subject" label={t('common.subject')} value={selectedRequest.subject} />
-          <CompactField autoIcon="status" label={t('common.status')} value={selectedRequest.status} />
+          <CompactField autoIcon="status" label={t('common.status')} value={stateLabel(t, selectedRequest.status)} />
           <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedRequest.created_at)} />
         </CompactGrid>
       </CompactSection>
@@ -455,8 +503,21 @@ export default function SCEPPage() {
             keyField="id"
             searchable
             externalSearch={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={(v) => { setSearchQuery(v); setPage(1) }}
             searchPlaceholder={t('scep.searchRequests')}
+            toolbarFilters={[{
+              key: 'status',
+              label: t('common.status'),
+              type: 'multiSelect',
+              value: statusFilter,
+              onChange: (v) => { setStatusFilter(v); setPage(1) },
+              placeholder: t('common.allStatus'),
+              options: [
+                { value: 'pending', label: t('common.pending') },
+                { value: 'approved', label: t('common.approved') },
+                { value: 'rejected', label: t('common.rejected') },
+              ],
+            }]}
             toolbarActions={
               <>
                 <Button type="button" variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
@@ -469,7 +530,13 @@ export default function SCEPPage() {
             }
             selectedId={selectedRequest?.id}
             onRowClick={setSelectedRequest}
-            pagination={true}
+            pagination={{
+              page,
+              total: totalRequests,
+              perPage,
+              onChange: setPage,
+              onPerPageChange: (v) => { setPerPage(v); setPage(1) },
+            }}
             emptyState={{
               icon: Robot,
               title: t('scep.noRequests'),

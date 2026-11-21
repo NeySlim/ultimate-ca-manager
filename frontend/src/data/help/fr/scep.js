@@ -8,8 +8,8 @@ export default {
         title: 'Onglets',
         items: [
           { label: 'Requêtes', text: 'Requêtes d\'inscription SCEP en attente, approuvées et rejetées' },
-          { label: 'Configuration', text: 'Paramètres du serveur SCEP : sélection de CA, approbation automatique' },
-          { label: 'Profils', text: 'Endpoints d\'enrôlement nommés, chacun avec sa propre URL, CA, template et challenge' },
+          { label: 'Configuration', text: 'Paramètres du serveur SCEP : sélection d\'AC, approbation automatique' },
+          { label: 'Profils', text: 'Endpoints d\'enrôlement nommés, chacun avec sa propre URL, AC, template et challenge' },
           { label: 'Inscriptions d\'application Intune', text: 'Inscriptions d\'application Entra (ID de locataire, ID client, secret client) partagées par les profils qui valident les challenges Intune ; un secret vide à l\'édition conserve l\'actuel, Tester la connexion demande un jeton et découvre le service sans consommer de challenge, et une app encore utilisée par un profil ne peut pas être supprimée' },
           { label: 'Défis', text: 'Afficher et régénérer les mots de passe de défi pour l\'inscription des appareils' },
           { label: 'Informations', text: 'URL des points de terminaison SCEP et instructions d\'intégration' },
@@ -18,11 +18,12 @@ export default {
       {
         title: 'Configuration',
         items: [
-          { label: 'CA de signature', text: 'Sélectionner quelle CA signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette CA, elle doit donc détenir une clé RSA logicielle : les CA EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)' },
+          { label: 'AC de signature', text: 'Sélectionner quelle AC signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette AC, elle doit donc détenir une clé RSA logicielle : les AC EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)' },
           { label: 'Approbation automatique', text: 'Approuver automatiquement les requêtes avec des mots de passe de défi valides, ou les renouvellements signés par un certificat émis par le même endpoint' },
           { label: 'Servir en HTTP simple', text: 'Désactivé par défaut. Répond aussi au SCEP sur le port du protocole HTTP (8080 par défaut), à http://votre-serveur:8080/scep/pkiclient.exe et aux URL de profil, pour les clients comme sscep qui ne peuvent pas utiliser HTTPS. RFC 8894 §7.10 : les messages SCEP sont déjà protégés, l\'enveloppe CMS garde le mot de passe de défi privé' },
           { label: 'Mot de passe de défi', text: 'Secret partagé que les appareils utilisent pour authentifier l\'inscription. Un renouvellement (RenewalReq) signé par un certificat émis par le même endpoint (profil ou global) est authentifié par ce certificat : son défi n\'est pas vérifié et changer le secret n\'empêche pas les appareils enrôlés de renouveler (RFC 8894 §2.4). Tout autre certificat a toujours besoin du défi de l\'endpoint' },
-          { label: 'Clés des appareils (v2.248)', text: 'Un appareil signe sa requête avec une clé RSA, ECDSA, Ed25519 ou ML-DSA ; une signature ML-DSA suit la RFC 9882 (condensat SHA-512). Ed448 est refusé, ML-DSA aussi en mode FIPS' },
+          { label: 'Clés des appareils (v2.248)', text: 'Un appareil signe sa requête avec une clé RSA, ECDSA, Ed25519 ou ML-DSA ; une signature ML-DSA suit la RFC 9882 (condensat SHA-512). Ed448 est refusé, ML-DSA aussi en mode FIPS quand le module FIPS ne l\'approuve pas' },
+          { label: 'Noms de la requête', text: 'Une requête dont le sujet ou les noms DNS enfreignent la RFC 5280 (un CN de plus de 64 caractères, un nom DNS avec espace, apostrophe ou tiret bas, comme le nom d\'un appareil iOS) est refusée avec sa raison, une fois son défi vérifié et avant sa mise en file, et Intune est informé du refus ; un renouvellement garde les noms que porte son certificat. Construisez un SAN DNS Intune à partir d\'une valeur sûre pour le DNS' },
         ]
       },
       {
@@ -40,13 +41,13 @@ export default {
       },
     ],
     tips: [
-      'Utilisez des mots de passe de défi uniques par CA pour un meilleur audit de sécurité',
+      'Utilisez des mots de passe de défi uniques par AC pour un meilleur audit de sécurité',
       'L\'approbation automatique est pratique mais examinez les requêtes manuellement dans les environnements haute sécurité',
-      'URL SCEP : https://votre-serveur:8443/scep/pkiclient.exe pour la CA configurée, https://votre-serveur:8443/scep/<profil>/pkiclient.exe pour un profil',
+      'URL SCEP : https://votre-serveur:8443/scep/pkiclient.exe pour l\'AC configurée, https://your-server:8443/scep/<profile>/pkiclient.exe pour un profil',
       'Les profils Intune nécessitent l\'approbation automatique : l\'inscription Intune est un aller-retour synchrone de validation puis émission, sans file d\'approbation côté Intune',
     ],
     warnings: [
-      'Le mot de passe de défi se trouve dans la CSR, qui voyage dans l\'enveloppe CMS chiffrée pour la CA (RFC 8894 §2.4) : le HTTP simple ne l\'expose donc pas ; un client qui l\'envoie comme attribut signé hors de l\'enveloppe l\'expose, en HTTP et à tout ce qui journalise la requête',
+      'Le mot de passe de défi se trouve dans la CSR, qui voyage dans l\'enveloppe CMS chiffrée pour l\'AC (RFC 8894 §2.4) : le HTTP simple ne l\'expose donc pas ; un client qui l\'envoie comme attribut signé hors de l\'enveloppe l\'expose, en HTTP et à tout ce qui journalise la requête',
     ],
   },
   helpGuides: {
@@ -67,21 +68,22 @@ Voir toutes les requêtes d'inscription SCEP :
 ### Configuration
 Configurer le serveur SCEP :
 - **Activer/Désactiver** : Basculer le service SCEP
-- **CA de signature** : Sélectionner quelle CA signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette CA, elle doit donc détenir une clé RSA logicielle : les CA EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)
-- **Approbation automatique** : Approuver automatiquement les requêtes avec des mots de passe de défi valides
+- **AC de signature** : Sélectionner quelle AC signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette AC, elle doit donc détenir une clé RSA logicielle : les AC EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)
+- **Approbation automatique** : Approuver automatiquement les requêtes avec des mots de passe de défi valides, ou les renouvellements signés par un certificat émis par le même endpoint
+- **Servir en HTTP simple** : désactivé par défaut. Répond aussi au SCEP sur le port du protocole HTTP (8080 par défaut) pour les clients qui ne peuvent pas utiliser HTTPS, comme sscep. RFC 8894 §7.10 : les messages SCEP sont déjà protégés, TLS n'est donc pas requis ; l'enveloppe CMS garde le mot de passe de défi privé
 
 ### Profils
 Endpoints d'enrôlement nommés, chacun servi sur sa propre URL :
 
 \`\`\`
-https://votre-serveur:8443/scep/<profil>/pkiclient.exe
+https://your-server:8443/scep/<profile>/pkiclient.exe
 \`\`\`
 
 Chaque profil est lié à :
-- **Sa propre CA** : différentes flottes d'appareils peuvent s'enrôler auprès de CAs différentes
+- **Sa propre AC** : différentes flottes d'appareils peuvent s'enrôler auprès d'AC différentes
 - **Un template de certificat optionnel** : quand un template est lié, ses usages de clé (KU/EKU) et sa validité gouvernent chaque certificat émis via le profil
 - **Usages interdits aux enrôlés** : un template lié à un profil ne peut pas porter la signature OCSP, l'horodatage, « any purpose » ou Smartcard Logon, et un renouvellement SCEP ne les reporte jamais ; Smartcard Logon est autorisé quand le profil se valide face à Intune, qui se porte garant de l'identité
-- **Un mot de passe de défi par profil** : stocké chiffré, avec la même fenêtre d'expiration que le challenge global
+- **Un mot de passe de défi par profil** : stocké chiffré, avec la même fenêtre d'expiration que le challenge global (ou la validation Microsoft Intune, voir ci-dessous)
 - **Une politique d'approbation** : approbation automatique ou revue manuelle par profil
 
 Pointez chaque flotte d'appareils, profil MDM ou tenant vers sa propre URL de profil. L'endpoint \`/scep/pkiclient.exe\` sans segment continue de servir la configuration globale sans changement.
@@ -89,15 +91,17 @@ Pointez chaque flotte d'appareils, profil MDM ou tenant vers sa propre URL de pr
 ### Mots de passe de défi
 L'onglet **Défis** affiche les mots de passe de défi. Les appareils doivent inclure un mot de passe de défi valide dans leur requête d'inscription pour s'authentifier.
 
-- **Voir le mot de passe** : Afficher le défi actuel pour une CA
-- **Régénérer** : Créer un nouveau mot de passe de défi (invalide l'ancien)
+- **Voir le mot de passe** : Afficher le défi actuel pour une AC
+- **Régénérer** : Créer un nouveau mot de passe de défi (invalide l'ancien pour les nouvelles inscriptions)
+
+Un renouvellement (RenewalReq) signé par un certificat émis par le même endpoint (profil ou global) est authentifié par ce certificat : son mot de passe de défi n'est pas vérifié, donc un secret régénéré n'empêche pas les appareils enrôlés de renouveler (RFC 8894 §2.4). Un certificat émis ailleurs, par un autre profil, ACME, EST ou l'interface, a toujours besoin du défi de l'endpoint. Un appareil EC envoie quand même un mot de passe, qui sert de clé au chiffrement de sa réponse.
 
 ### Informations
 Affiche l'URL du point de terminaison SCEP et les instructions d'intégration.
 
 ## Flux d'inscription SCEP
 
-1. L'appareil envoie une requête **GetCACert** pour obtenir le certificat de la CA
+1. L'appareil envoie une requête **GetCACert** pour obtenir le certificat de l'AC
 2. L'appareil génère une paire de clés et crée une CSR
 3. L'appareil enveloppe la CSR avec le **mot de passe de défi** et envoie un **PKCSReq**
 4. UCM valide le mot de passe de défi
@@ -105,21 +109,21 @@ Affiche l'URL du point de terminaison SCEP et les instructions d'intégration.
 6. Si l'approbation automatique est désactivée, un administrateur examine et approuve/rejette
 
 ### Clés des appareils
-L'appareil signe son PKCSReq avec sa propre clé : RSA, ECDSA, Ed25519 ou ML-DSA. Une signature ML-DSA est vérifiée selon la RFC 9882 (condensat SHA-512, identifiant d'algorithme propre à la clé, sans paramètres). Les signatures Ed448 sont refusées, et ML-DSA aussi en mode FIPS. La requête reste chiffrée pour la CA de signature RSA.
+L'appareil signe son PKCSReq avec sa propre clé : RSA, ECDSA, Ed25519 ou ML-DSA. Une signature ML-DSA est vérifiée selon la RFC 9882 (condensat SHA-512, identifiant d'algorithme propre à la clé, sans paramètres). Les signatures Ed448 sont refusées, et ML-DSA aussi en mode FIPS quand le module FIPS n'approuve pas ML-DSA. La requête reste chiffrée pour l'AC de signature RSA.
 
 ## URL SCEP
 
 \`\`\`
-https://votre-serveur:8443/scep/pkiclient.exe            (CA configurée)
-https://votre-serveur:8443/scep/<profil>/pkiclient.exe   (endpoint par profil)
-https://votre-serveur:8443/cgi-bin/pkiclient.exe         (CA configurée, chemin hérité)
-http://votre-serveur:8080/scep/pkiclient.exe             (avec Servir en HTTP simple)
+https://your-server:8443/scep/pkiclient.exe            (AC configurée)
+https://your-server:8443/scep/<profile>/pkiclient.exe   (endpoint par profil)
+https://your-server:8443/cgi-bin/pkiclient.exe         (AC configurée, chemin hérité)
+http://your-server:8080/scep/pkiclient.exe             (avec Servir en HTTP simple)
 \`\`\`
 
-Les appareils ont besoin de l'URL pour s'inscrire ; \`/scep\` seul est l'interface web, pas un endpoint SCEP. Utilisez une URL de profil pour cibler la CA, le template et le mot de passe de défi de ce profil.
+Les appareils ont besoin de l'URL pour s'inscrire ; \`/scep\` seul est l'interface web, pas un endpoint SCEP. Utilisez une URL de profil pour cibler l'AC, le template et le mot de passe de défi de ce profil.
 
-### Bascule de CA (GetNextCACert)
-GetNextCACert sert le successeur de la CA de l'endpoint, signé par la CA actuelle : une autre CA avec le même parent et le même DN de sujet, non révoquée, non hors ligne, détenant une clé RSA logicielle, et expirant plus tard. Une CA qui ne partage que le nom d'affichage n'est jamais servie ; sans successeur, la réponse est 404.
+### Bascule d'AC (GetNextCACert)
+GetNextCACert sert le successeur de l'AC de l'endpoint, signé par l'AC actuelle : une autre AC avec le même parent et le même DN de sujet, non révoquée, non hors ligne, détenant une clé RSA logicielle, et expirant plus tard. Une AC qui ne partage que le nom d'affichage n'est jamais servie ; sans successeur, la réponse est 404.
 
 ## Approuver/Rejeter des requêtes
 
@@ -130,20 +134,20 @@ Pour les requêtes en attente (approbation automatique désactivée) :
 
 Une requête arrivée via un profil est émise avec le template de ce profil (validité, usages de clé), exactement comme le ferait l'approbation automatique.
 
-> Le mot de passe de défi se trouve dans la CSR, qui voyage dans l'enveloppe CMS chiffrée pour la CA (RFC 8894 §2.4) : le HTTP simple ne l'expose donc pas. Un client qui l'envoie comme attribut signé hors de l'enveloppe l'expose : gardez ces clients sur HTTPS.
+> Le mot de passe de défi se trouve dans la CSR, qui voyage dans l'enveloppe CMS chiffrée pour l'AC (RFC 8894 §2.4) : le HTTP simple ne l'expose donc pas. Un client qui l'envoie comme attribut signé hors de l'enveloppe l'expose : gardez ces clients sur HTTPS.
 
 ## Intégration d'appareils
 
 ### Cisco IOS
 \`\`\`
 crypto pki trustpoint UCM
-  enrollment url https://votre-serveur:8443/scep
-  password <mot-de-passe-de-défi>
+  enrollment url https://your-server:8443/scep/pkiclient.exe
+  password <challenge-password>
 \`\`\`
 
 ### JAMF
 Configurez le profil SCEP avec :
-- URL du serveur : \`https://votre-serveur:8443/scep\`
+- URL du serveur : \`https://your-server:8443/scep/pkiclient.exe\`, ou \`/scep/<profile>/pkiclient.exe\` pour un profil
 - Défi : le mot de passe depuis UCM
 
 ### Microsoft Intune

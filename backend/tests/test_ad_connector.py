@@ -1,14 +1,35 @@
 """
 Tests for the ADConnectorConfig model -- encrypted-at-rest bind password
 (same mechanism/pattern as models/msca.py's MicrosoftCA.password), and
-fail-closed behavior when encryption is unavailable -- plus the settings
+fail-closed behavior when encryption is unavailable -- plus the collection
 route's validation of the domain controller list.
 """
 import json
 
 import pytest
 
+from tests.ad_connector_support import connector_row, save_connector, saved_connector_test
 from models import db, ADConnectorConfig
+from tests.windows_profile_support import connectors_kept
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """A 2.x install: no default profile, so the screen shows the lowest-id row."""
+    from models import WindowsEnrollmentProfile
+    with connectors_kept(app):
+        with app.app_context():
+            parked = [p.id for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)]
+            WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.id.in_(parked)).update(
+                {'is_default': False}, synchronize_session=False)
+            db.session.commit()
+        try:
+            yield
+        finally:
+            with app.app_context():
+                WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.id.in_(parked)).update(
+                    {'is_default': True}, synchronize_session=False)
+                db.session.commit()
 
 
 def test_bind_password_encrypted_at_rest(app):
@@ -63,7 +84,7 @@ def test_get_singleton_returns_none_when_unconfigured(app):
     with app.app_context():
         ADConnectorConfig.query.delete()
         db.session.commit()
-        assert ADConnectorConfig.get_singleton() is None
+        assert connector_row() is None
 
 
 class TestServerListValidation:
@@ -75,8 +96,7 @@ class TestServerListValidation:
 
     @staticmethod
     def _put(auth_client, payload):
-        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
-                               content_type='application/json')
+        return save_connector(auth_client, payload)
 
     def test_a_number_in_the_list_is_rejected(self, auth_client):
         assert self._put(auth_client, {'servers': [123]}).status_code == 400
@@ -110,9 +130,9 @@ class TestServerListValidation:
             'bind_dn': 'CN=svc-ucm,DC=corp,DC=local',
             'bind_password': 'svc-password',
         })
-        assert response.status_code == 200, response.data
+        assert response.status_code in (200, 201), response.data
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().servers == \
+            assert connector_row().servers == \
                 ['dc1.corp.local', 'dc2.corp.local']
 
 
@@ -136,10 +156,10 @@ class TestSavedTestDoesNotRecordForADisabledConnector:
                          'message': 'timed out'}],
         })
 
-        response = auth_client.post('/api/v2/ad-connector/test-saved')
+        response = saved_connector_test(auth_client)
         assert response.status_code == 400
         with app.app_context():
-            config = ADConnectorConfig.get_singleton()
+            config = connector_row()
             assert config.health == {}
             # The test itself is still recorded -- only the health verdict
             # (which drives the badge and the skip list) is withheld.
@@ -203,8 +223,7 @@ class TestBindCredentialIsRequired:
 
     @staticmethod
     def _put(auth_client, payload):
-        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
-                               content_type='application/json')
+        return save_connector(auth_client, payload)
 
     def test_first_save_of_an_enabled_connector_without_one_is_refused(self, app, auth_client):
         with app.app_context():
@@ -217,7 +236,7 @@ class TestBindCredentialIsRequired:
         assert response.status_code == 400
         with app.app_context():
             # Refused, not half-applied: the partial mutation is rolled back.
-            assert ADConnectorConfig.get_singleton() is None
+            assert connector_row() is None
 
     def test_setup_can_be_filled_in_before_the_switch_is_turned_on(self, app, auth_client):
         """Nothing binds while it is off, so the form can be completed over
@@ -227,7 +246,7 @@ class TestBindCredentialIsRequired:
             db.session.commit()
         assert self._put(auth_client, {
             'servers': ['dc1.corp.local'], 'base_dn': 'DC=corp,DC=local',
-        }).status_code == 200
+        }).status_code in (200, 201)
         assert self._put(auth_client, {
             'bind_dn': 'CN=svc-ucm,DC=corp,DC=local',
         }).status_code == 200
@@ -247,13 +266,13 @@ class TestBindCredentialIsRequired:
             'servers': ['dc1.corp.local'], 'base_dn': 'DC=corp,DC=local',
             'bind_dn': 'CN=svc-ucm,DC=corp,DC=local',
             'bind_password': 'svc-password',
-        }).status_code == 200
+        }).status_code in (200, 201)
 
         assert self._put(auth_client, {'base_dn': 'DC=corp2,DC=local'}).status_code == 200
         assert self._put(auth_client, {'port': 636}).status_code == 400
         assert self._put(auth_client, {'port': 636, 'bind_password': 'svc-password'}).status_code == 200
         with app.app_context():
-            config = ADConnectorConfig.get_singleton()
+            config = connector_row()
             assert (config.port, config.bind_password) == (636, 'svc-password')
 
     def test_clearing_it_on_an_enabled_connector_is_refused(self, app, auth_client):
@@ -268,7 +287,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'bind_password': ''}).status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().bind_password == 'svc-password'
+            assert connector_row().bind_password == 'svc-password'
 
     def test_first_save_of_an_enabled_connector_without_a_bind_dn_is_refused(self, app, auth_client):
         with app.app_context():
@@ -280,7 +299,7 @@ class TestBindCredentialIsRequired:
         })
         assert response.status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton() is None
+            assert connector_row() is None
 
     def test_clearing_the_bind_dn_on_an_enabled_connector_is_refused(self, app, auth_client):
         with app.app_context():
@@ -294,7 +313,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'bind_dn': ''}).status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().bind_dn == 'CN=svc-ucm,DC=corp,DC=local'
+            assert connector_row().bind_dn == 'CN=svc-ucm,DC=corp,DC=local'
 
     def test_a_legacy_connector_can_still_be_switched_off(self, app, auth_client):
         """The regression this rule caused when it was unconditional. The
@@ -310,7 +329,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'enabled': False}).status_code == 200
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().enabled is False
+            assert connector_row().enabled is False
 
     def test_a_legacy_connector_cannot_be_re_enabled_without_one(self, app, auth_client):
         with app.app_context():
@@ -322,7 +341,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'enabled': True}).status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().enabled is False
+            assert connector_row().enabled is False
 
     def test_the_saved_test_will_not_bind_anonymously(self, app, auth_client):
         """The other half of the same rule: POST /test refused an anonymous
@@ -338,10 +357,10 @@ class TestBindCredentialIsRequired:
             db.session.add(config)
             db.session.commit()
 
-        response = auth_client.post('/api/v2/ad-connector/test-saved')
+        response = saved_connector_test(auth_client)
         assert response.status_code == 400
         with app.app_context():
-            config = ADConnectorConfig.get_singleton()
+            config = connector_row()
             # No DC was reached, so the stored verdict is left alone rather
             # than being overwritten with "nothing was healthy".
             assert config.health['state'] == 'up'
@@ -352,13 +371,13 @@ class TestBindCredentialIsRequired:
             ADConnectorConfig.query.delete()
             db.session.commit()
         response = auth_client.post(
-            '/api/v2/ad-connector/test', content_type='application/json',
+            '/api/v2/ad-connectors/test', content_type='application/json',
             data=json.dumps({'servers': ['dc1.corp.local'],
                              'bind_dn': 'CN=svc-ucm,DC=corp,DC=local'}))
         assert response.status_code == 400
 
         no_dn = auth_client.post(
-            '/api/v2/ad-connector/test', content_type='application/json',
+            '/api/v2/ad-connectors/test', content_type='application/json',
             data=json.dumps({'servers': ['dc1.corp.local'],
                              'bind_password': 'svc-password'}))
         assert no_dn.status_code == 400
@@ -367,8 +386,7 @@ class TestBindCredentialIsRequired:
 class TestBaseDnValidation:
     @staticmethod
     def _put(auth_client, payload):
-        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
-                               content_type='application/json')
+        return save_connector(auth_client, payload)
 
     @pytest.mark.parametrize('base_dn', ['OU=Users,O=Corp', 'not a dn', 'CN=Users'])
     def test_a_base_dn_without_a_domain_component_is_refused(self, app, auth_client, base_dn):
@@ -377,7 +395,7 @@ class TestBaseDnValidation:
         assert 'DC=' in response.get_json()['message']
 
     def test_a_spaced_domain_dn_is_accepted(self, app, auth_client):
-        assert self._put(auth_client, {'base_dn': 'DC=corp, DC=example'}).status_code == 200
+        assert self._put(auth_client, {'base_dn': 'DC=corp, DC=example'}).status_code in (200, 201)
 
 
 class TestGlobalCatalogPortRefused:
@@ -394,8 +412,7 @@ class TestGlobalCatalogPortRefused:
 
     @staticmethod
     def _put(auth_client, payload):
-        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
-                               content_type='application/json')
+        return save_connector(auth_client, payload)
 
     @pytest.mark.parametrize('port', [3268, 3269, '3268'])
     def test_a_global_catalog_port_is_refused(self, app, auth_client, port):
@@ -431,14 +448,12 @@ class TestServersCarryNoPort:
     @pytest.mark.parametrize('server', ['dc1.corp.local:3268', 'ldap://dc1.corp.local',
                                         'ldaps://dc1.corp.local:3269', '[2001:db8::1]:389'])
     def test_a_server_with_a_port_or_scheme_is_refused(self, auth_client, server):
-        response = auth_client.put('/api/v2/ad-connector', content_type='application/json',
-                                   data=json.dumps({'servers': ['dc2.corp.local', server]}))
+        response = save_connector(auth_client, {'servers': ['dc2.corp.local', server]})
         assert response.status_code == 400
         assert response.get_json()['message'] == _HOST_PORT_MESSAGE
 
     def test_a_bare_ipv6_address_is_still_a_host(self, auth_client):
-        response = auth_client.put('/api/v2/ad-connector', content_type='application/json',
-                                   data=json.dumps({'servers': ['2001:db8::1']}))
+        response = save_connector(auth_client, {'servers': ['2001:db8::1']})
         assert response.status_code == 200
 
     @pytest.mark.parametrize('payload, message', [
@@ -452,7 +467,7 @@ class TestServersCarryNoPort:
         monkeypatch.setattr(ad_lookup, 'test_connection',
                             lambda cfg: (_ for _ in ()).throw(AssertionError('must not connect')))
         payload = dict(payload, bind_dn='CN=svc-ucm,DC=corp,DC=local', bind_password='svc-password')
-        response = auth_client.post('/api/v2/ad-connector/test', content_type='application/json',
+        response = auth_client.post('/api/v2/ad-connectors/test', content_type='application/json',
                                     data=json.dumps(payload))
         assert response.status_code == 400
         assert response.get_json()['message'] == message

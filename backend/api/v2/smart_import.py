@@ -12,6 +12,7 @@ from fips_mode import FipsRestricted
 from services.smart_import import SmartImporter
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
+from utils.certificate_readability import UnreadableCertificate
 import logging
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,8 @@ def analyze_import():
 
     Request body: `content` (PEM/PKCS#12/JKS text or base64), an optional
     `password` for encrypted content and optional `file_passwords` (an object
-    or a list of passwords, each tried in turn on every encrypted object).
+    or a list of passwords, each tried in turn on every encrypted object), and
+    `include_pem` (true: each certificate and private key object also carries its `pem`).
 
     Response `data` carries `objects`, `chains`, `matching`, `validation`
     and `summary`.
@@ -83,12 +85,14 @@ def analyze_import():
     
     try:
         importer = SmartImporter()
-        result = importer.analyze(content, password)
+        result = importer.analyze(content, password, include_pem=data.get('include_pem') is True)
         
         return success_response(data=result.to_dict())
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f'Smart import analysis failed: {e}')
         return error_response('Import analysis failed', 500)
@@ -151,6 +155,8 @@ def execute_import():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f'Smart import execution failed: {e}')
         return error_response('Import execution failed', 500)

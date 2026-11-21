@@ -5,7 +5,10 @@ import { Badge, ResponsiveDataTable } from '../../components'
 import { cn, daysRemaining, formatDate } from '../../lib/utils'
 import CertDetailPanel from './CertDetailPanel'
 
-export default function HistoryTab({ history, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert }) {
+// The columns the server can sort by; the others are not sortable here
+const SERVER_SORT_KEYS = ['common_name', 'valid_to', 'created_at', 'source']
+
+export default function HistoryTab({ history, total, page, perPage, onPageChange, onPerPageChange, search, onSearchChange, onSortChange, caOptions, exportLoader, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert }) {
   const { t } = useTranslation()
 
   const handleApplyFilterPreset = useCallback((filters) => {
@@ -16,29 +19,6 @@ export default function HistoryTab({ history, filterStatus, onFilterStatusChange
     if (filters.ca) onFilterCAChange(filters.ca)
     else onFilterCAChange('')
   }, [onFilterStatusChange, onFilterCAChange, onFilterSourceChange])
-
-  const filteredHistory = useMemo(() => {
-    let filtered = history
-    if (filterStatus.length > 0) {
-      filtered = filtered.filter(cert => {
-        if (filterStatus.includes('revoked') && cert.revoked) return true
-        if (filterStatus.includes('valid') && !cert.revoked) return true
-        return false
-      })
-    }
-    if (filterCA) {
-      filtered = filtered.filter(cert => cert.issuer === filterCA)
-    }
-    if (filterSource) {
-      filtered = filtered.filter(cert => cert.source === filterSource)
-    }
-    return filtered
-  }, [history, filterStatus, filterCA, filterSource])
-
-  const historyCAs = useMemo(() => {
-    const cas = [...new Set(history.map(c => c.issuer).filter(Boolean))]
-    return cas.map(ca => ({ value: ca, label: ca }))
-  }, [history])
 
   const historyColumns = useMemo(() => [
     {
@@ -122,7 +102,7 @@ export default function HistoryTab({ history, filterStatus, onFilterStatusChange
       key: 'issuer',
       header: t('common.issuer'),
       priority: 3,
-      sortable: true,
+      sortable: false,
       hideOnMobile: true,
       render: (value) => (
         <span className="text-sm text-text-secondary">{value || t('common.unknown')}</span>
@@ -186,6 +166,7 @@ export default function HistoryTab({ history, filterStatus, onFilterStatusChange
     {
       key: 'source',
       header: t('common.source'),
+      sortable: true,
       priority: 3,
       hideOnMobile: true,
       render: (value, row) => {
@@ -259,22 +240,26 @@ export default function HistoryTab({ history, filterStatus, onFilterStatusChange
         </span>
       )
     }
-  ], [t])
+  ].map((col) => (SERVER_SORT_KEYS.includes(col.key) ? col : { ...col, sortable: false })), [t])
 
   return (
     <ResponsiveDataTable
-      data={filteredHistory}
+      data={history}
       columns={historyColumns}
       columnStorageKey="acme-history-columns"
       searchable
       searchPlaceholder={t('common.searchCertificates')}
-      searchKeys={['common_name', 'serial', 'issuer']}
+      externalSearch={search}
+      onSearchChange={onSearchChange}
       getRowId={(row) => row.id}
       onRowClick={onSelectCert}
       selectedRow={selectedCert}
       sortable
       defaultSort={{ key: 'created_at', direction: 'desc' }}
+      onSortChange={onSortChange}
+      pagination={{ page, total, perPage, onChange: onPageChange, onPerPageChange }}
       exportEnabled
+      exportLoader={exportLoader}
       exportFilename="acme-certificates"
       toolbarFilters={[
         {
@@ -305,7 +290,7 @@ export default function HistoryTab({ history, filterStatus, onFilterStatusChange
           value: filterCA,
           onChange: onFilterCAChange,
           placeholder: t('acme.allCAs'),
-          options: historyCAs
+          options: caOptions
         }
       ]}
       filterPresetsKey="ucm-acme-presets"

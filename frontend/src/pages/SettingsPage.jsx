@@ -2,7 +2,8 @@
  * Settings Page - Horizontal tabs for desktop, scrollable for mobile
  * Uses DetailCard design system
  */
-import { useState, useEffect } from 'react'
+import { withoutAdminOnly } from './settings/adminOnlySettings'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -27,10 +28,12 @@ import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
 import CertificateInput from '../components/CertificateInput'
 import LanguageSelector from '../components/ui/LanguageSelector'
-import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, adConnectorService } from '../services'
+import { settingsService, systemService, casService, ssoService, mtlsService, mscaService } from '../services'
+import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
-import { usePermission } from '../hooks'
+import { usePermission, useJob, isTransientError, jobPercent } from '../hooks'
+import { acceptedJob } from '../services/jobs.service'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
@@ -39,6 +42,7 @@ import EmailTemplateWindow from '../components/EmailTemplateWindow'
 import DatabaseBackendSection from './settings/DatabaseBackendSection'
 import ServiceStatusWidget from './settings/ServiceStatusWidget'
 import AboutSection from './settings/AboutSection'
+import { expiryCheckOutcome } from './settings/expiryCheck'
 import { addCtLogUrl, removeCtLogUrl } from './settings/ctLogUrls'
 import AppearanceSettings from './settings/AppearanceSettings'
 import CopyableUrl from './settings/CopyableUrl'
@@ -49,14 +53,18 @@ import MscaConnectionForm from './settings/MscaConnectionForm'
 import MscaCaControlModal from '../components/MscaCaControlModal'
 import AdConnectorSection from './settings/AdConnectorSection'
 import XcepWstepSection from './settings/XcepWstepSection'
-import AdConnectorForm from './settings/AdConnectorForm'
 import GeneralSection from './settings/GeneralSection'
 import EmailSection from './settings/EmailSection'
 import SecuritySection from './settings/SecuritySection'
 import SsoSection from './settings/SsoSection'
 import BackupSection from './settings/BackupSection'
+import { ceilingNotice } from './settings/backupCeiling'
+import RestoreReport from './settings/RestoreReport'
+import { loginUrl } from '../navigation/safeNext'
+import { useRestoreJob, UNCANCELLABLE_PHASES } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
+import { afterDatabaseReset } from './settings/databaseReset'
 import HttpsSection from './settings/HttpsSection'
 import UpdatesSection from './settings/UpdatesSection'
 import DeploySection from './settings/DeploySection'
@@ -86,7 +94,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'scheduler', labelKey: 'settings.tabs.scheduler', icon: Timer, color: 'icon-bg-blue' },
-  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
+  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-orange' },
   { id: 'ct', labelKey: 'settings.tabs.ct', icon: Eye, color: 'icon-bg-cyan' },
   { id: 'autoRenewal', labelKey: 'settings.tabs.autoRenewal', icon: ClockClockwise, color: 'icon-bg-emerald' },
   // Admin-only (#299) — hidden from non-admin roles below
@@ -94,7 +102,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'microsoftCA', labelKey: 'settings.tabs.microsoftCA', icon: WindowsLogo, color: 'icon-bg-indigo' },
   { id: 'adConnector', labelKey: 'settings.tabs.adConnector', icon: IdentificationBadge, color: 'icon-bg-blue' },
   { id: 'xcepWstep', labelKey: 'settings.tabs.xcepWstep', icon: WindowsLogo, color: 'icon-bg-indigo' },
-  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-sky' },
+  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-gray' },
 ]
 
 // SSO Provider type icons
@@ -154,6 +162,7 @@ export default function SettingsPage() {
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [backups, setBackups] = useState([])
   const [backupMeta, setBackupMeta] = useState({ total: 0, pages: 1, page: 1 })
+  const [backupSchedule, setBackupSchedule] = useState({})
   const [backupQuery, setBackupQuery] = useState({ page: 1, per_page: 20, search: '', sort: 'created_desc' })
   const [selectedBackups, setSelectedBackups] = useState([])
   const [backupBusy, setBackupBusy] = useState(false)
@@ -200,6 +209,60 @@ export default function SettingsPage() {
   const [restorePassword, setRestorePassword] = useState('')
   const [restoreFile, setRestoreFile] = useState(null)
   const [backupLoading, setBackupLoading] = useState(false)
+  // A backup that outlasts the request runs as a job: followed here, its archive offered at the end
+  const { job: backupJob, running: backupRunning, follow: followBackupJob, resume: resumeBackupJob,
+    cancel: cancelBackupJob } = useJob()
+  const [backupReady, setBackupReady] = useState(null)
+  const [restoreProgress, setRestoreProgress] = useState(null)
+  const [restoreReport, setRestoreReport] = useState(null)
+  // Off the page the report can no longer show: the held sign-out goes with it
+  const mounted = useRef(true)
+  const holdingSignOut = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      if (holdingSignOut.current) {
+        holdingSignOut.current = false
+        holdSignOut(false)
+      }
+    }
+  }, [])
+  // A restore that outlasts the request runs as a job; its report survives its own sign-out
+  const releaseSignOut = () => {
+    holdingSignOut.current = false
+    holdSignOut(false)
+  }
+  // A restore's server error stays until closed: a committed restore's asks a restart
+  const showRestoreError = (message, status) => {
+    if (status >= 500) showError(message, 0)
+    else showError(message)
+  }
+  const restoreJob = useRestoreJob({
+    enabled: hasPermission('admin:system'),
+    account: user?.username,
+    onReport: (data) => {
+      setShowRestoreModal(false)
+      setRestoreReport(data)
+    },
+    onFailure: (job) => {
+      releaseSignOut()
+      setShowRestoreModal(false)
+      if (job.state === 'cancelled') showWarning(t('settings.restoreCancelled'))
+      else if (job.reason === 'executor_lost' || job.reason === 'not_taken') showError(t('settings.restoreLost'))
+      else showRestoreError(job.result?.message || t('messages.errors.backup.restoreFailed'), job.result?.code)
+    },
+    // The job can no longer be followed and no commit was seen: its end shows at the next visit
+    onLost: (error) => {
+      releaseSignOut()
+      setShowRestoreModal(false)
+      showError(isTransientError(error) ? t('settings.restoreContactLost')
+        : error?.message || t('messages.errors.backup.restoreFailed'))
+    },
+  })
+  useEffect(() => {
+    if (restoreJob.running || restoreJob.signInNeeded) setShowRestoreModal(true)
+  }, [restoreJob.running, restoreJob.signInNeeded])
   
   // HTTPS import modal
   const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
@@ -231,13 +294,11 @@ export default function SettingsPage() {
   const [mscaCaControl, setMscaCaControl] = useState(null)
 
   // Active Directory Connector state
-  const [adConnectorConfig, setAdConnectorConfig] = useState(null)
-  const [adConnectorLoading, setAdConnectorLoading] = useState(false)
-  const [adConnectorTesting, setAdConnectorTesting] = useState(false)
-  const [showAdConnectorModal, setShowAdConnectorModal] = useState(false)
 
   // Encryption states
   const [encryptionStatus, setEncryptionStatus] = useState(null)
+  const [secretsStatus, setSecretsStatus] = useState(null)
+  const [sessionKeyLoading, setSessionKeyLoading] = useState(false)
   const [showEnableEncryptionModal, setShowEnableEncryptionModal] = useState(false)
   const [showDisableEncryptionModal, setShowDisableEncryptionModal] = useState(false)
   const [encryptionLoading, setEncryptionLoading] = useState(false)
@@ -294,13 +355,13 @@ export default function SettingsPage() {
     // Backup listing is admin:system now — don't fire a request every other
     // role is refused.
     if (hasPermission('admin:system')) loadBackups()
+    else if (hasPermission('read:settings')) loadBackupSchedule()
     loadHttpsInfo()
     loadCAs()
     loadDbStats()
     loadSsoProviders()
     loadWebhooks()
     loadMscaConnections()
-    loadAdConnectorConfig()
     loadEncryptionStatus()
     loadAnomalies()
     loadExpiryAlerts()
@@ -384,10 +445,9 @@ export default function SettingsPage() {
   const triggerExpiryCheck = async () => {
     try {
       const res = await settingsService.checkExpiryAlerts()
-      const data = res.data || res
-      // The check reports per type: {cert_expiring: {notified}, crl_expiring: {notified}}
-      const count = (data.cert_expiring?.notified || 0) + (data.crl_expiring?.notified || 0) + (data.alerts_sent || 0)
-      showSuccess(t('settings.expiryCheckResult', { count }))
+      const outcome = expiryCheckOutcome(res.data || res)
+      if (outcome.skipped) showInfo(t('settings.expiryCheckSkipped'))
+      else showSuccess(t('settings.expiryCheckResult', { count: outcome.count }))
     } catch (e) {
       showError(e.message || t('common.error'))
     }
@@ -400,7 +460,16 @@ export default function SettingsPage() {
     } catch (error) { reportSilentFailure('loadCAs', error) }
   }
 
-  const loadBackups = async (query = backupQuery) => {
+  // The space used and the ceiling warning, as the server counts them
+  const loadBackupSchedule = async () => {
+    try {
+      const res = await settingsService.getBackupSchedule()
+      setBackupSchedule(res?.data || {})
+    } catch (error) { reportSilentFailure('loadBackupSchedule', error) }
+  }
+
+  const loadBackups = async (query = backupQuery, { withSchedule = true } = {}) => {
+    if (withSchedule) loadBackupSchedule()
     try {
       const res = await systemService.listBackups(query)
       const data = res.data || res
@@ -421,7 +490,7 @@ export default function SettingsPage() {
     // Any change other than an explicit page jump resets to page 1.
     if (!('page' in patch)) next.page = 1
     setBackupQuery(next)
-    loadBackups(next)
+    loadBackups(next, { withSchedule: false })
   }
 
   const toggleSelectBackup = (filename) => {
@@ -459,7 +528,11 @@ export default function SettingsPage() {
     setBackupBusy(true)
     try {
       const res = await systemService.runBackupRetention()
-      showSuccess(t('settings.backupRetentionRemoved', { count: (res.data || res).removed ?? 0 }))
+      const outcome = res.data || res
+      showSuccess(t('settings.backupRetentionRemoved', { count: outcome.removed ?? 0 }))
+      const notice = ceilingNotice(outcome, backupSchedule,
+        { afterRetention: true, shared: backupMeta.storage === 'database' }, t)
+      if (notice) showWarning(notice)
       loadBackups()
     } catch (error) {
       showError(error.message || t('common.error'))
@@ -700,6 +773,7 @@ export default function SettingsPage() {
       const res = await mscaService.inventorySync(conn.id)
       showSuccess(t('msca.inventorySyncResult', {
         imported: res.data?.imported ?? 0,
+        completed: res.data?.completed ?? 0,
         skipped: res.data?.skipped ?? 0
       }))
       loadMscaConnections()
@@ -707,63 +781,6 @@ export default function SettingsPage() {
       showError(error.message || t('msca.inventorySyncFailed'))
     } finally {
       setMscaTesting(false)
-    }
-  }
-
-  // Active Directory Connector handlers
-  const loadAdConnectorConfig = async () => {
-    setAdConnectorLoading(true)
-    try {
-      const response = await adConnectorService.get()
-      setAdConnectorConfig(response.data || null)
-    } catch (error) { reportSilentFailure('loadAdConnectorConfig', error) } finally {
-      setAdConnectorLoading(false)
-    }
-  }
-
-  const handleAdConnectorEdit = () => {
-    setShowAdConnectorModal(true)
-  }
-
-  const handleAdConnectorSave = async (formData) => {
-    try {
-      await adConnectorService.save(formData)
-      showSuccess(t('messages.success.update.settings'))
-      setShowAdConnectorModal(false)
-      loadAdConnectorConfig()
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-    }
-  }
-
-  const handleAdConnectorToggle = async () => {
-    if (!adConnectorConfig) return
-    try {
-      await adConnectorService.save({ enabled: !adConnectorConfig.enabled })
-      loadAdConnectorConfig()
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-    }
-  }
-
-  const handleAdConnectorTest = async () => {
-    setAdConnectorTesting(true)
-    try {
-      const response = await adConnectorService.testSaved()
-      const message = response.data?.message || t('adConnector.testSuccess')
-      // A partial pass is not a pass -- the connector works today only
-      // because the reachable DC happens to be up. Same call the dialog's
-      // own Test Connection makes, so it says the same thing.
-      if (response.data?.partial) showWarning(message)
-      else showSuccess(message)
-    } catch (error) {
-      showError(error.message || t('adConnector.testFailed'))
-    } finally {
-      setAdConnectorTesting(false)
-      // test-saved records last_test_at/last_test_result server-side
-      // regardless of outcome -- refresh so the section's status badge
-      // doesn't keep showing whatever the previous test left behind.
-      loadAdConnectorConfig()
     }
   }
 
@@ -846,6 +863,8 @@ export default function SettingsPage() {
       const response = await settingsService.getEncryptionStatus()
       setEncryptionStatus(response.data)
     } catch (error) { reportSilentFailure('loadEncryptionStatus', error) }
+    // Enabling or disabling encryption changes how the session key rotates
+    loadSecretsStatus()
   }
 
   const handleEnableEncryption = async () => {
@@ -948,6 +967,59 @@ export default function SettingsPage() {
       await loadEncryptionStatus()
     } catch (error) {
       showError(error.message || t('common.error'))
+    } finally {
+      setEncryptionLoading(false)
+    }
+  }
+
+  const loadSecretsStatus = async () => {
+    try {
+      const response = await settingsService.getSecretsStatus()
+      setSecretsStatus(response.data)
+    } catch (error) { reportSilentFailure('loadSecretsStatus', error) }
+  }
+
+  const handleRotateSessionKey = async () => {
+    const stored = secretsStatus?.session_secret?.rotation === 'database'
+    const confirmed = await showConfirm(
+      t(stored ? 'settings.rotateSessionKeyConfirmStored' : 'settings.rotateSessionKeyConfirmFile'), {
+        title: t('settings.rotateSessionKey'),
+        confirmText: t('settings.rotateSessionKey'),
+      })
+    if (!confirmed) return
+    setSessionKeyLoading(true)
+    try {
+      const res = await settingsService.rotateSessionKey()
+      const data = res.data || res
+      showSuccess(t(data.mode === 'database' ? 'settings.rotateSessionKeyDoneStored' : 'settings.rotateSessionKeyDoneFile'))
+      await loadSecretsStatus()
+    } catch (error) {
+      showError(error.message || t('common.error'))
+      await loadSecretsStatus()
+    } finally {
+      setSessionKeyLoading(false)
+    }
+  }
+
+  const handleRotateDataKey = async () => {
+    const confirmed = await showConfirm(t('settings.rotateDataKeyConfirm'), {
+      title: t('settings.rotateDataKey'),
+      confirmText: t('settings.rotateDataKey'),
+    })
+    if (!confirmed) return
+    setEncryptionLoading(true)
+    try {
+      const res = await settingsService.rotateDataKey()
+      const data = res.data || res
+      if (data.state === 'done') {
+        showSuccess(t('settings.rotateDataKeyDone', { version: data.version }))
+      } else {
+        showWarning(t('settings.rotateDataKeyPending'))
+      }
+      await loadEncryptionStatus()
+    } catch (error) {
+      showError(error.message || t('common.error'))
+      await loadEncryptionStatus()
     } finally {
       setEncryptionLoading(false)
     }
@@ -1115,6 +1187,8 @@ export default function SettingsPage() {
 
   const handleSave = async (section) => {
     setSaving(true)
+    let restartMessage = null
+    let ignoredKeys = []
     try {
       if (section === 'email') {
         const targets = smtpSecretTargets(savedEmail, settings)
@@ -1145,14 +1219,22 @@ export default function SettingsPage() {
           smtp_oauth_redirect_uri: settings.smtp_oauth_redirect_uri,
         })
       } else {
-        await settingsService.updateBulk(settings)
+        const response = await settingsService.updateBulk(
+          withoutAdminOnly(settings, hasPermission('admin:settings')))
+        restartMessage = response?.data?.restart_message
+        ignoredKeys = response?.data?.ignored_keys || []
       }
       showSuccess(t('messages.success.update.settings'))
+      if (ignoredKeys.length) {
+        showWarning(t('settings.adminKeysIgnored', { keys: ignoredKeys.join(', ') }))
+      }
+      if (restartMessage) showWarning(restartMessage)
       if (section === 'email') setOauthDirty(false)
       if (settings.timezone) setAppTimezone(settings.timezone)
       if (settings.date_format) setDateFormat(settings.date_format)
       if (settings.show_time !== undefined) setShowTime(settings.show_time !== 'false' && settings.show_time !== false)
       await loadSettings()
+      if (section === 'backup') await loadBackupSchedule()
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
     } finally {
@@ -1286,6 +1368,54 @@ export default function SettingsPage() {
     }
   }
 
+  const closeBackupModal = () => {
+    setShowBackupModal(false)
+    setBackupPassword('')
+    setBackupReady(null)
+  }
+
+  const showBackupEnd = useCallback((job) => {
+    if (job.state === 'succeeded' && job.result?.data) {
+      setBackupReady(job.result.data)
+      setShowBackupModal(true)
+      showSuccess(t('messages.success.backup.ready'))
+      const notice = ceilingNotice(job.result.data, backupSchedule, {}, t)
+      if (notice) showWarning(notice)
+      loadBackups()
+    } else if (job.state === 'cancelled') {
+      setShowBackupModal(false)
+      showWarning(t('settings.backupCancelled'))
+    } else if (job.reason === 'executor_lost' || job.reason === 'not_taken') {
+      showError(t('settings.backupLost'))
+    } else {
+      showError(job.result?.message || t('messages.errors.backup.createFailed'))
+    }
+  }, [backupSchedule, showSuccess, showWarning, showError, t]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const followBackup = useCallback(async (job) => {
+    try {
+      showBackupEnd(await followBackupJob(job))
+    } catch {
+      showError(t('messages.errors.backup.createFailed'))
+    }
+  }, [followBackupJob, showBackupEnd, showError, t])
+
+  // After a reload: a backup still running is shown and followed again, once per mount
+  const backupEnd = useRef(showBackupEnd)
+  backupEnd.current = showBackupEnd
+  const canBackup = hasPermission('admin:system')
+  useEffect(() => {
+    if (!canBackup) return undefined
+    let gone = false
+    resumeBackupJob('backup').then((job) => {
+      if (!gone && job) backupEnd.current(job)
+    }).catch(() => {})
+    return () => { gone = true }
+  }, [resumeBackupJob, canBackup])
+  useEffect(() => {
+    if (backupRunning) setShowBackupModal(true)
+  }, [backupRunning])
+
   const handleBackup = async () => {
     const problem = backupPasswordProblem(backupPassword, t)
     if (problem) {
@@ -1296,10 +1426,19 @@ export default function SettingsPage() {
     setBackupLoading(true)
     try {
       const response = await systemService.backup(backupPassword)
+      const job = acceptedJob(response)
+      if (job) {
+        setBackupPassword('')
+        setBackupLoading(false)
+        await followBackup(job)
+        return
+      }
       if (response.data) {
         const blob = await systemService.downloadBackup(response.data.filename)
         downloadBlob(blob, response.data.filename)
         showSuccess(t('messages.success.backup.created'))
+        const notice = ceilingNotice(response.data, backupSchedule, {}, t)
+        if (notice) showWarning(notice)
         setShowBackupModal(false)
         setBackupPassword('')
         loadBackups()
@@ -1310,6 +1449,18 @@ export default function SettingsPage() {
       setBackupLoading(false)
     }
   }
+
+  const handleCancelBackup = async () => {
+    try {
+      await cancelBackupJob()
+    } catch {
+      showError(t('settings.backupCancelFailed'))
+    }
+  }
+
+  const backupProgress = backupRunning && backupJob?.progress?.total
+    ? t('settings.backupProgress', { done: backupJob.progress.done || 0, total: backupJob.progress.total })
+    : t('settings.backupStarting')
 
   const handleDownloadBackup = async (filename) => {
     try {
@@ -1349,19 +1500,50 @@ export default function SettingsPage() {
     }
     
     setBackupLoading(true)
+    // Requests answered after the restore revoked the sessions get 401: the report stays first
+    holdSignOut()
+    holdingSignOut.current = true
     try {
-      const result = await systemService.restore(restoreFile, restorePassword)
-      showSuccess(t('settings.backupRestored', { users: result.data?.users || 0, cas: result.data?.cas || 0, certs: result.data?.certificates || 0 }))
-      setShowRestoreModal(false)
+      setRestoreProgress(0)
+      const result = await systemService.restore(restoreFile, restorePassword, {
+        onProgress: (loaded, total) => setRestoreProgress(Math.floor((loaded / total) * 100)),
+      })
+      // Restored after the page was left: the session is revoked, the reload leads to sign-in
+      if (!mounted.current) {
+        window.location.reload()
+        return
+      }
       setRestorePassword('')
       setRestoreFile(null)
-      setTimeout(() => window.location.reload(), 2000)
+      // Past the bounded wait: the job is followed in the dialog, its report shown at the end
+      setBackupLoading(false)
+      setRestoreProgress(null)
+      if (await restoreJob.start(result)) return
+      setShowRestoreModal(false)
+      setRestoreReport(result.data || {})
     } catch (error) {
-      showError(error.message || t('messages.errors.backup.restoreFailed'))
+      holdingSignOut.current = false
+      holdSignOut(false)
+      showRestoreError(error.message || t('messages.errors.backup.restoreFailed'), error.status)
     } finally {
       setBackupLoading(false)
+      setRestoreProgress(null)
     }
   }
+
+  const handleCancelRestore = async () => {
+    try {
+      await restoreJob.cancel()
+    } catch (error) {
+      showError(error.message || t('settings.restoreCancelFailed'))
+    }
+  }
+
+  // A restore counts its rows: a percentage, the total known once the archive is read
+  const restorePercent = jobPercent(restoreJob.job?.progress)
+  const restoreJobProgress = restorePercent !== null
+    ? t('settings.restoreJobPercent', { percent: restorePercent })
+    : t('settings.restoreJobStarting')
 
   const handleOptimizeDb = async () => {
     try {
@@ -1416,9 +1598,8 @@ export default function SettingsPage() {
     }
 
     try {
-      await systemService.resetDatabase()
-      showSuccess(t('messages.success.database.reset'))
-      setTimeout(() => window.location.reload(), 2000)
+      const res = await systemService.resetDatabase()
+      await afterDatabaseReset(res, { t, showConfirm, showSuccess, reload: () => window.location.reload() })
     } catch (error) {
       showError(error.message || t('messages.errors.database.resetFailed'))
     }
@@ -1545,7 +1726,11 @@ export default function SettingsPage() {
             setShowDisableEncryptionModal={setShowDisableEncryptionModal}
             handleDownloadExistingMasterKey={handleDownloadExistingMasterKey}
             handleEncryptRemainingKeys={handleEncryptRemainingKeys}
+            handleRotateDataKey={handleRotateDataKey}
             encryptionLoading={encryptionLoading}
+            secretsStatus={secretsStatus}
+            handleRotateSessionKey={handleRotateSessionKey}
+            sessionKeyLoading={sessionKeyLoading}
             anomalies={anomalies}
             anomaliesLoading={anomaliesLoading}
             loadAnomalies={loadAnomalies}
@@ -1581,6 +1766,7 @@ export default function SettingsPage() {
             hasPermission={hasPermission}
             backups={backups}
             backupMeta={backupMeta}
+            backupSchedule={backupSchedule}
             backupQuery={backupQuery}
             updateBackupQuery={updateBackupQuery}
             selectedBackups={selectedBackups}
@@ -1590,6 +1776,7 @@ export default function SettingsPage() {
             handleRunRetention={handleRunRetention}
             backupBusy={backupBusy}
             setShowBackupModal={setShowBackupModal}
+            backupRunning={backupRunning}
             setShowRestoreModal={setShowRestoreModal}
             setRestoreFile={setRestoreFile}
             handleDownloadBackup={handleDownloadBackup}
@@ -1709,19 +1896,9 @@ export default function SettingsPage() {
           />
         )
       case 'adConnector':
-        return (
-          <AdConnectorSection
-            adConnectorConfig={adConnectorConfig}
-            adConnectorLoading={adConnectorLoading}
-            adConnectorTesting={adConnectorTesting}
-            handleAdConnectorEdit={handleAdConnectorEdit}
-            handleAdConnectorToggle={handleAdConnectorToggle}
-            handleAdConnectorTest={handleAdConnectorTest}
-            hasPermission={hasPermission}
-          />
-        )
+        return <AdConnectorSection hasPermission={hasPermission} />
       case 'xcepWstep':
-        return <XcepWstepSection />
+        return <XcepWstepSection hasPermission={hasPermission} />
       case 'about':
         return <AboutSection />
 
@@ -1803,19 +1980,46 @@ export default function SettingsPage() {
           { labelKey: 'settings.groups.automation', tabs: ['autoRenewal', 'deploy'], color: 'icon-bg-emerald' },
           { labelKey: 'settings.groups.integrations', tabs: ['microsoftCA', 'adConnector', 'xcepWstep'], color: 'icon-bg-indigo' },
           { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'], color: 'icon-bg-violet' },
-          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-sky' },
+          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-gray' },
         ]}
         helpPageKey="settings"
       >
         {renderCategoryContent()}
       </ResponsiveLayout>
 
-      {/* Backup Password Modal */}
+      {/* Backup Password Modal; then the running backup, then its archive to download */}
       <Modal
         open={showBackupModal}
-        onClose={() => { setShowBackupModal(false); setBackupPassword('') }}
+        onClose={closeBackupModal}
         title={t('settings.encryptedBackup')}
       >
+        {backupRunning ? (
+          <div className="space-y-4" data-testid="backup-job">
+            <p className="text-sm text-text-primary">{backupProgress}</p>
+            <p className="text-sm text-text-secondary">{t('settings.backupRunsInBackground')}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" variant="secondary" onClick={closeBackupModal}>
+                {t('common.close')}
+              </Button>
+              <Button type="button" variant="danger" onClick={handleCancelBackup} disabled={!!backupJob?.cancel_requested}
+                data-testid="backup-job-cancel">
+                {t('settings.backupCancel')}
+              </Button>
+            </div>
+          </div>
+        ) : backupReady ? (
+          <div className="space-y-4" data-testid="backup-ready">
+            <p className="text-sm text-text-primary">{t('settings.backupReady', { filename: backupReady.filename })}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" variant="secondary" onClick={closeBackupModal}>
+                {t('common.close')}
+              </Button>
+              <Button type="button" onClick={() => handleDownloadBackup(backupReady.filename)} data-testid="backup-ready-download">
+                {t('common.download')}
+              </Button>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
             {t('settings.createBackupDesc')}
@@ -1833,7 +2037,7 @@ export default function SettingsPage() {
             showStrength
           />
           <div className="flex gap-3 justify-end pt-4">
-            <Button type="button" variant="secondary" onClick={() => { setShowBackupModal(false); setBackupPassword('') }}>
+            <Button type="button" variant="secondary" onClick={closeBackupModal}>
               {t('common.cancel')}
             </Button>
             <Button 
@@ -1844,14 +2048,52 @@ export default function SettingsPage() {
             </Button>
           </div>
         </div>
+        )}
       </Modal>
 
-      {/* Restore Password Modal */}
+      {/* Restore Password Modal; then the running restore, or the sign-in its end asks for */}
       <Modal
         open={showRestoreModal}
-        onClose={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}
+        onClose={() => {
+          // Closed on "sign in again": every call now answers 401, which must lead to the sign-in
+          if (restoreJob.signInNeeded) releaseSignOut()
+          setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null)
+        }}
         title={t('settings.restoreFromBackup')}
       >
+        {restoreJob.signInNeeded ? (
+          <div className="space-y-4" data-testid="restore-sign-in">
+            <p className="text-sm text-text-primary" role="status">{t('settings.restoreSignInAgain')}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" autoFocus onClick={() => {
+                // Back to this tab after the sign-in: its report is shown there
+                releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
+              }}
+                data-testid="restore-sign-in-button">
+                {t('settings.restoreSignIn')}
+              </Button>
+            </div>
+          </div>
+        ) : restoreJob.running ? (
+          <div className="space-y-4" data-testid="restore-job">
+            <p className="text-sm text-text-primary" role="status" data-testid="restore-job-progress">
+              {restoreJobProgress}
+            </p>
+            <p className="text-sm text-text-secondary">{t('settings.restoreRunsInBackground')}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" variant="secondary" onClick={() => setShowRestoreModal(false)}>
+                {t('common.close')}
+              </Button>
+              {/* From the commit on the server refuses the cancellation (409): none is offered */}
+              {!UNCANCELLABLE_PHASES.includes(restoreJob.job?.phase) && (
+                <Button type="button" variant="danger" onClick={handleCancelRestore}
+                  disabled={!!restoreJob.job?.cancel_requested} data-testid="restore-job-cancel">
+                  {t('settings.restoreCancel')}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div className="p-3 status-warning-bg status-warning-border border rounded-lg">
             <p className="text-sm status-warning-text font-medium">⚠️ {t('common.warning')}</p>
@@ -1882,11 +2124,18 @@ export default function SettingsPage() {
               onClick={handleRestoreBackup} 
               disabled={backupLoading || !restorePassword || restorePassword.length < 12}
             >
-              {backupLoading ? t('settings.restoring') : t('settings.restoreBackup')}
+              {backupLoading
+                ? (restoreProgress !== null && restoreProgress < 100
+                  ? t('settings.restoreUploading', { percent: restoreProgress })
+                  : t('settings.restoring'))
+                : t('settings.restoreBackup')}
             </Button>
           </div>
         </div>
+        )}
       </Modal>
+
+      <RestoreReport data={restoreReport} onClose={() => setRestoreReport(null)} />
 
       {/* SSO Provider Modal */}
       <Modal
@@ -1971,20 +2220,6 @@ export default function SettingsPage() {
         onClose={() => setMscaCaControl(null)}
       />
 
-      {/* Active Directory Connector Modal */}
-      <Modal
-        open={showAdConnectorModal}
-        onClose={() => setShowAdConnectorModal(false)}
-        title={t('adConnector.title')}
-        size="lg"
-      >
-        <AdConnectorForm
-          config={adConnectorConfig}
-          onSave={handleAdConnectorSave}
-          onCancel={() => setShowAdConnectorModal(false)}
-        />
-      </Modal>
-
       {/* Enable Encryption Modal */}
       <Modal
         open={showEnableEncryptionModal}
@@ -1997,9 +2232,9 @@ export default function SettingsPage() {
         maxWidth="lg"
       >
         <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
             <div className="flex items-start gap-2">
-              <WarningCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" weight="fill" />
+              <WarningCircle size={20} className="text-status-warning flex-shrink-0 mt-0.5" weight="fill" />
               <div className="text-sm text-text-primary">
                 <p className="font-semibold mb-1">{t('settings.encryptionWarningTitle')}</p>
                 <p className="text-text-secondary">{t('settings.encryptionWarningDesc')}</p>

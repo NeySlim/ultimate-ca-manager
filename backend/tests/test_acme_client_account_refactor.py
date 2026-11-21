@@ -150,51 +150,6 @@ class TestAccountKeyBinding:
             assert pem1 == pem2
 
 
-class TestMigrationBackfill:
-    def test_migration_backfills_legacy_keys(self, app, clean_acme_state):
-        """Migration 031 should create AcmeClientAccount rows from legacy keys."""
-        with app.app_context():
-            # Seed legacy state
-            for k, v in [
-                ('acme.client.environment', 'production'),
-                ('acme.client.email', 'legacy@example.com'),
-                ('acme.client.staging.account_key', '-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----'),
-                ('acme.client.staging.account_url', 'https://acme-staging-v02.api.letsencrypt.org/acme/acct/123'),
-                ('acme.client.production.account_key', '-----BEGIN PRIVATE KEY-----\nfake2\n-----END PRIVATE KEY-----'),
-                ('acme.client.production.account_url', 'https://acme-v02.api.letsencrypt.org/acme/acct/456'),
-            ]:
-                db.session.add(SystemConfig(key=k, value=v, description=''))
-            db.session.commit()
-
-            # Run migration manually (uses raw sqlite conn)
-            import sqlite3, importlib.util, os
-            db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-            if not os.path.isabs(db_path):
-                # In-memory or relative — skip real-conn test
-                pytest.skip("Migration test requires file-backed SQLite")
-            spec = importlib.util.spec_from_file_location(
-                'mig031',
-                '/root/ucm-src/backend/migrations/031_acme_client_accounts.py'
-            )
-            mig = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mig)
-            conn = sqlite3.connect(db_path)
-            mig.upgrade(conn)
-            conn.close()
-            db.session.expire_all()
-
-            stg = AcmeClientAccount.query.filter_by(
-                directory_url=AcmeClientAccount.LE_STAGING_URL
-            ).first()
-            prod = AcmeClientAccount.query.filter_by(
-                directory_url=AcmeClientAccount.LE_PRODUCTION_URL
-            ).first()
-            assert stg is not None
-            assert prod is not None
-            assert prod.is_default is True  # active env was 'production'
-            assert stg.is_default is False
-            assert stg.email == 'legacy@example.com'
-
 class TestForIssuanceFactory:
     """Issue #147: the configured custom ACME directory + EAB must be honoured
     by the issuance / registration path, which previously only ever passed an

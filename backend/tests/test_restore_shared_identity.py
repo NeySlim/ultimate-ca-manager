@@ -24,9 +24,18 @@ def _identity_without_unique_constraint(name):
     section = manifest.SECTIONS[name]
     table = load_model(section).__table__
     uniques = [{c.name} for c in table.columns if c.unique or c.primary_key]
-    uniques += [{c.name for c in i.columns} for i in table.indexes if i.unique]
+    # A partial index leaves rows out: ssh_certificates holds a marked pair under one identity
+    uniques += [{c.name for c in i.columns} for i in table.indexes if i.unique and not _partial(i)]
     uniques += [{c.name for c in k.columns} for k in table.constraints if isinstance(k, UniqueConstraint)]
     return not any(u <= set(section.identity) for u in uniques)
+
+
+def _partial(index):
+    return any(index.dialect_options[d].get('where') is not None for d in ('sqlite', 'postgresql'))
+
+
+# What a partial unique index over the identity leaves out, given to a row and its twin
+_LEFT_OUT = {'ssh_certificates': {'serial_duplicate': True}}
 
 
 SHARED = sorted(name for name, section in manifest.SECTIONS.items()
@@ -126,6 +135,8 @@ def _twin(name, row_id):
             setattr(row, field, getattr(_any_existing(parent_name), reference.column.name))
         else:
             setattr(row, field, _value_for(column, 9000 + index))
+    for attribute, value in _LEFT_OUT.get(name, {}).items():
+        setattr(row, attribute, value)
     db.session.commit()
     primary = {k.key for k in sa_inspect(model).primary_key}
     values = {c.key: getattr(row, c.key) for c in sa_inspect(model).column_attrs if c.key not in primary}
@@ -153,8 +164,7 @@ def _archived(name, *ids):
 
 @pytest.mark.parametrize('name', SHARED)
 def test_the_oldest_row_is_the_archives_and_the_others_are_told(app, seeded, name):
-    if name not in seeded:
-        pytest.skip(f'{name}: the factory could not build a row here')
+    assert name in seeded, f'{name}: the factory could not build a row here'
     model = load_model(manifest.SECTIONS[name])
     with app.app_context():
         oldest, newer = _twin(name, seeded[name])
@@ -186,8 +196,7 @@ def test_the_oldest_row_is_the_archives_and_the_others_are_told(app, seeded, nam
 
 @pytest.mark.parametrize('name', SHARED)
 def test_an_archive_of_both_rows_puts_each_back_on_its_own(app, seeded, name):
-    if name not in seeded:
-        pytest.skip(f'{name}: the factory could not build a row here')
+    assert name in seeded, f'{name}: the factory could not build a row here'
     model = load_model(manifest.SECTIONS[name])
     with app.app_context():
         oldest, newer = _twin(name, seeded[name])

@@ -10,9 +10,9 @@ HSTS can be disabled entirely (for instances serving self-signed certs during
 setup — see issue #154) either by `hsts_enabled=false` in SystemConfig or by
 `UCM_HSTS_ENABLED=0` in the environment.
 
-All three helpers are DB-tolerant: they never raise if the DB / SystemConfig
-table is unavailable (e.g. during boot before init, under safe mode), they just
-fall back to defaults.
+The builder never raises when the DB / SystemConfig table is unavailable (boot
+before init, safe mode): a setting the environment does not fix and the
+database cannot give means no header at all.
 """
 import os
 
@@ -49,43 +49,34 @@ def hsts_env_locked() -> list[str]:
     return locked
 
 
-def _cfg_value(key: str):
+# A setting the database could not give (locked, unavailable, table missing)
+_UNREADABLE = object()
+
+
+def _cfg_value(key: str, unreadable=None):
     """Read a SystemConfig value, tolerating any DB error / missing table."""
     try:
         from models import SystemConfig
         row = SystemConfig.query.filter_by(key=key).first()
         return row.value if row else None
     except Exception:
-        return None
+        return unreadable
 
 
-def hsts_enabled() -> bool:
-    """Whether HSTS should be emitted at all."""
-    env = _env_override('ucm_hsts_enabled')
+def _setting(key: str):
+    """The env override, else the database value (None when absent,
+    ``_UNREADABLE`` when the database could not answer)."""
+    env = _env_override(f'ucm_{key}')
     if env is not None:
-        return not _is_disabled(env)
-    val = _cfg_value('hsts_enabled')
-    if val is None:
-        return True
-    return not _is_disabled(val)
+        return env
+    return _cfg_value(key, unreadable=_UNREADABLE)
 
 
-def hsts_include_subdomains() -> bool:
-    """Whether the `includeSubDomains` directive is emitted (when HSTS is on)."""
-    env = _env_override('ucm_hsts_include_subdomains')
-    if env is not None:
-        return not _is_disabled(env)
-    val = _cfg_value('hsts_include_subdomains')
-    if val is None:
-        return True
-    return not _is_disabled(val)
+def _enabled(val) -> bool:
+    return True if val is None else not _is_disabled(val)
 
 
-def hsts_max_age() -> int:
-    """HSTS max-age in seconds (clamped to >= 0)."""
-    src = _env_override('ucm_hsts_max_age')
-    if src is None:
-        src = _cfg_value('hsts_max_age')
+def _max_age(src) -> int:
     if src is None:
         return _DEFAULT_MAX_AGE
     try:
@@ -96,10 +87,14 @@ def hsts_max_age() -> int:
 
 
 def build_hsts_header() -> str | None:
-    """Return the HSTS header value, or None when HSTS is disabled."""
-    if not hsts_enabled():
+    """The HSTS header value, or None when HSTS is off or any of its three
+    settings the environment does not fix cannot be read from the database."""
+    # Unread, it may be off: one response without HSTS beats pinning a year by mistake
+    enabled, subdomains, max_age = (
+        _setting(k) for k in ('hsts_enabled', 'hsts_include_subdomains', 'hsts_max_age'))
+    if _UNREADABLE in (enabled, subdomains, max_age) or not _enabled(enabled):
         return None
-    parts = [f'max-age={hsts_max_age()}']
-    if hsts_include_subdomains():
+    parts = [f'max-age={_max_age(max_age)}']
+    if _enabled(subdomains):
         parts.append('includeSubDomains')
     return '; '.join(parts)

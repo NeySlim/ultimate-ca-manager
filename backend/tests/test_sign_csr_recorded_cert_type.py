@@ -17,6 +17,8 @@ from tests.test_est_rfc7030 import _basic_auth, _post_csr, est_config  # noqa: F
 from tests.test_wstep_renew_tls import USER_AND_CODESIGN, _eku_csr, _key, _renew
 from services.wstep import wstep_service
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 templated_ca = renew_tls.templated_ca
 MAIL = {'Mail': (['emailProtection'], None)}
 
@@ -30,7 +32,7 @@ def _wstep(app, ca_id, cn, eku):
     key = _key()
     with app.app_context():
         pem, err = wstep_service.issue(db.session.get(CA, ca_id), _eku_csr(cn, key, eku).public_bytes(
-            serialization.Encoding.DER), 30)
+            serialization.Encoding.DER), 30, profile=None)
     assert err is None, err
     return x509.load_pem_x509_certificate(pem.encode()), key
 

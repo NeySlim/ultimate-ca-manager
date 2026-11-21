@@ -12,13 +12,16 @@ from sqlalchemy import or_
 from models import db, Certificate
 from utils.cert_status import issued_certificates
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 from services.cert_service import CertificateService
 from services.cert.renewal import (
     RenewalError, check_renewable, renew_certificate_in_place, renewal_partner,
 )
 from services.msca.propagation import propagate_revocation, PROPAGATED
+from services.acme.upstream_revocation import (
+    NOT_ACME as ACME_NOT_ACME, REVOKED as ACME_REVOKED, propagate_acme_revocation, related_untold)
 from services.approval_gate import PairApprovalConflict, queue_revocation
-from services.cert.related_pair import mutual_partner
+from services.cert.related_pair import revocation_partner
 from api.v2.certificates.cert_lifecycle import _related_choice_refusal
 from utils.export_options import json_boolean
 from services.audit_service import AuditService
@@ -62,6 +65,8 @@ def bulk_revoke_certificates():
     # single-certificate route carries it there and this one did not, so a
     # bulk revoke left such a certificate valid to every relying party.
     msca_local_only = []
+    # Same for a certificate obtained over ACME: its CA publishes its status
+    acme_local_only = []
     for cert_id in ids:
         try:
             if cert_id in queued_with_pair:
@@ -77,7 +82,7 @@ def bulk_revoke_certificates():
                 else:
                     results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
                 continue
-            partner = mutual_partner(cert)
+            partner = revocation_partner(cert)
             partner_id = partner.id if partner is not None and revocable(partner, reason) else None
             refusal = _related_choice_refusal(cert, partner_id, revoke_related)
             if refusal is not None:
@@ -101,8 +106,11 @@ def bulk_revoke_certificates():
                 if revoke_related and partner_id:
                     queued_with_pair[partner_id] = results['pending_approval'][-1]
                 continue
+            related_acme = []
             cert = CertificateService.revoke_certificate(
-                cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related)
+                cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related,
+                related_acme=related_acme)
+            acme_local_only.extend(pid for pid, _o, _d in related_untold(related_acme))
             if revoke_related and partner_id:
                 left = db.session.get(Certificate, partner_id)
                 if left is None or not revocable(left, reason):
@@ -113,6 +121,9 @@ def bulk_revoke_certificates():
                 outcome, _detail = propagate_revocation(cert, reason)
                 if outcome != PROPAGATED:
                     msca_local_only.append(cert_id)
+            elif cert is not None and propagate_acme_revocation(cert, reason)[0] not in (
+                    ACME_REVOKED, ACME_NOT_ACME):
+                acme_local_only.append(cert_id)
             results['success'].append(cert_id)
         except Exception as e:
             logger.error(f"Bulk revoke failed for cert {cert_id}: {e}")
@@ -122,6 +133,8 @@ def bulk_revoke_certificates():
         # Reported, not counted as a failure: the certificate *is* revoked in
         # UCM. The operator still has to revoke it on the Windows CA.
         results['msca_local_only'] = msca_local_only
+    if acme_local_only:
+        results['acme_local_only'] = acme_local_only
 
     AuditService.log_action(
         action='certificates_bulk_revoked',
@@ -151,8 +164,8 @@ def bulk_renew_certificates():
     results = {'success': [], 'failed': []}
     from api.v2.certificates.cert_renew import _actor, _approval_for_renewal
     username, actor_user_id = _actor()
-    # CAs that renewed at least one certificate: one CRL each, after the loop
-    renewed_ca_ids = []
+    # Renewed certificates: one CRL for each CA they name, after the loop
+    renewed_cert_ids = []
     # Members of a related pair renewed with the other one earlier in the batch
     renewed_with_pair = set()
     # Partners covered by a request queued earlier in the batch: id -> that pending entry
@@ -170,12 +183,14 @@ def bulk_renew_certificates():
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
-            check_renewable(cert)  # RenewalError → reported per item below
+            check_renewable(cert, 'bulk')  # RenewalError → reported per item below
             try:
                 policy, approval = _approval_for_renewal(g.current_user, cert, data)
             except PairApprovalConflict as e:
                 results['failed'].append({'id': cert_id, 'error': str(e)})
                 continue
+            except RenewalError:  # the pair could not be read: reported per item below
+                raise
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
@@ -192,10 +207,11 @@ def bulk_renew_certificates():
                 cert, username=username, actor_user_id=actor_user_id, rekey=True,
                 regenerate_crl=False, trigger='bulk')
             results['success'].append(cert_id)
+            if outcome.get('notices'):
+                results.setdefault('notices', []).append({'id': cert_id, 'notices': outcome['notices']})
             for done in [outcome] + list(outcome.get('related') or []):
                 renewed_with_pair.add(done['cert_id'])
-                if done.get('ca_id') is not None and done['ca_id'] not in renewed_ca_ids:
-                    renewed_ca_ids.append(done['ca_id'])
+                renewed_cert_ids.append(done['cert_id'])
         except RenewalError as refusal:
             db.session.rollback()
             logger.info("Bulk renewal of certificate %s refused: %s", cert_id, refusal.message)
@@ -205,7 +221,7 @@ def bulk_renew_certificates():
             logger.error("Bulk renewal of certificate %s failed: %s", cert_id, e, exc_info=True)
             results['failed'].append({'id': cert_id, 'error': 'Renewal failed'})
 
-    _publish_crls(renewed_ca_ids, username)
+    _publish_crls(renewed_cert_ids, username)
 
     AuditService.log_action(
         action='certificates_bulk_renewed',
@@ -219,19 +235,25 @@ def bulk_renew_certificates():
     return success_response(data=results, message=f'{len(results["success"])} certificates renewed')
 
 
-def _publish_crls(ca_ids, username):
-    """Regenerate once the CRL of each CA whose CDP is enabled; a failure is
-    logged and leaves the bulk answer unchanged."""
-    from models import CA
+def _publish_crls(cert_ids, username):
+    """Regenerate once the CRL of each CA the renewed certificates name now, when its CDP is
+    enabled: the record a certificate was signed under may have been merged since. A failure
+    is logged and leaves the bulk answer unchanged."""
+    from services.cert.renewal import current_issuer
     from services.crl import CRLService
-    for ca_id in ca_ids:
+    seen = set()
+    for cert_id in cert_ids:
+        issuer = current_issuer(cert_id)
+        if issuer is None or issuer[0] in seen:
+            continue
+        seen.add(issuer[0])
+        if not issuer[2]:
+            continue
         try:
-            ca = db.session.get(CA, ca_id)
-            if ca is not None and ca.cdp_enabled:
-                CRLService.generate_crl(ca_id, username=username)
+            CRLService.generate_crl(issuer[0], username=username)
         except Exception as e:
             db.session.rollback()
-            logger.error("CRL of CA %s not regenerated after bulk renewal: %s", ca_id, e, exc_info=True)
+            logger.error("CRL of CA %s not regenerated after bulk renewal: %s", issuer[0], e, exc_info=True)
 
 
 @bp.route('/api/v2/certificates/bulk/delete', methods=['POST'])
@@ -296,21 +318,20 @@ def bulk_export_certificates():
     if not certs:
         return error_response('No certificates found', 404)
 
+    if export_format not in ('pem', 'pkcs7', 'p7b'):
+        return error_response('Supported formats: pem, p7b', 400)
     try:
+        pems, skipped = readable_pems((c.id, c.crt) for c in certs)
+        if not pems:
+            return nothing_readable(skipped)
+        headers = skipped_headers(skipped)
+        headers['X-Exported-Count'] = str(len(pems))
         if export_format == 'pem':
-            pem_data = b''
-            for cert in certs:
-                pem_data += base64.b64decode(cert.crt)
-                if not pem_data.endswith(b'\n'):
-                    pem_data += b'\n'
-            return Response(pem_data, mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="certificates.pem"'})
-        elif export_format in ('pkcs7', 'p7b'):
-            p7b_output = p7b_from_pems(base64.b64decode(cert.crt) for cert in certs)
-            return Response(p7b_output, mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'})
-        else:
-            return error_response('Supported formats: pem, p7b', 400)
+            headers['Content-Disposition'] = 'attachment; filename="certificates.pem"'
+            return Response(b''.join(p if p.endswith(b'\n') else p + b'\n' for p in pems),
+                            mimetype='application/x-pem-file', headers=headers)
+        headers['Content-Disposition'] = 'attachment; filename="certificates.p7b"'
+        return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
     except Exception as e:
         logger.error(f"Bulk export failed: {e}")
         return error_response('Export failed', 500)

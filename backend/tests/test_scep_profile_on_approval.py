@@ -18,6 +18,8 @@ from models.certificate_template import CertificateTemplate
 from models.scep import ScepProfile
 from models.system_config import SystemConfig
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _csr(cn):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -248,7 +250,7 @@ def test_manual_approval_of_a_renewal_archives_the_renewed_certificate(app, auth
 
 
 @pytest.mark.parametrize('twin', ['hex_serial', 'crlf_pem'])
-def test_approving_a_renewal_archives_a_twin_row_too(app, auth_client, create_ca, twin):
+def test_approving_a_renewal_archives_a_twin_row_too(app, auth_client, create_ca, twin, no_serial_index):
     """A certificate stored twice is replaced once, however the twin stores its serial or PEM."""
     from services.cert_service import CertificateService
     ca = create_ca(cn=f'SCEP renewal twin {twin} CA')

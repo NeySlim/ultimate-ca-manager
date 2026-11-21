@@ -12,7 +12,6 @@ import pytest
 
 from models import db, User, Certificate
 from models.auth_certificate import AuthCertificate
-from tests.test_user_certificate_key_export_guard import _enrolment_for
 
 NAME = 'mtls_namesake_probe'
 
@@ -36,36 +35,24 @@ def _own(app, certificate_id, username):
         db.session.commit()
 
 
-def _certificate_of(app, enrolment_id):
-    with app.app_context():
-        from services.mtls_enrollment import certificate_row_for
-        return certificate_row_for(db.session.get(AuthCertificate, enrolment_id)).id
-
-
 @pytest.fixture
-def left_behind(app, auth_client, create_user, create_cert, monkeypatch):
-    """The certificate of a deleted user, still valid, and a namesake logged in."""
-    create_user(username=NAME, role='operator')
-    enrolment_id, old_user_id = _enrolment_for(app, create_cert, NAME, 'namesake-probe')
-    certificate_id = _certificate_of(app, enrolment_id)
+def left_behind(app, auth_client, create_user, create_cert):
+    """The unenrolled certificate of a deleted user, still valid, and a namesake logged in."""
+    old_user_id = create_user(username=NAME, role='operator')['id']
+    certificate_id = create_cert(cn='namesake-probe.example')['id']
     _own(app, certificate_id, NAME)
 
-    from services.cert_service import CertificateService
-
-    def _offline(**_kwargs):
-        raise ValueError('CA is offline and cannot sign')
-    with monkeypatch.context() as patched:
-        patched.setattr(CertificateService, 'revoke_certificate', _offline)
-        answer = auth_client.delete(f'/api/v2/users/{old_user_id}')
+    # Deleting a user revokes its enrolments only: this certificate stays valid
+    answer = auth_client.delete(f'/api/v2/users/{old_user_id}')
     assert answer.status_code == 200, answer.data[:300]
     with app.app_context():
         kept = db.session.get(Certificate, certificate_id)
-        assert kept is not None and not kept.revoked
+        assert kept is not None and not kept.revoked and kept.prv
 
     create_user(username=NAME, role='operator')
     with app.app_context():
         assert User.query.filter_by(username=NAME).count() == 1
-    yield {'certificate_id': certificate_id, 'enrolment_id': enrolment_id,
+    yield {'certificate_id': certificate_id,
            'client': _login(app, NAME)}
     with app.app_context():
         for row in AuthCertificate.query.join(User, AuthCertificate.user_id == User.id).filter(
@@ -118,12 +105,13 @@ class TestANamesakeGetsNothing:
         with app.app_context():
             owner_id = User.query.filter_by(username=NAME).first().id
             ids = [r.id for r in AuthCertificate.query.filter_by(user_id=owner_id)]
-        for enrolment_id in ids + [left_behind['enrolment_id']]:
+        for enrolment_id in ids:
             answer = left_behind['client'].post(
                 f'/api/v2/mtls/certificates/{enrolment_id}/download',
                 data=json.dumps({'format': 'pkcs12', 'password': 'Passw0rd!2026x'}),
                 content_type='application/json')
             assert answer.status_code == 404, answer.data[:300]
+        assert ids == []
 
 
 class TestTheAccountsOwnCertificatesStillWork:

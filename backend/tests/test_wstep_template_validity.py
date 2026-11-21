@@ -10,6 +10,10 @@ from cryptography.x509.oid import ExtendedKeyUsageOID
 from models import CA, db
 from services.wstep import wstep_service
 from tests.test_wstep_template_eku import _make_csr, smartcard_template_config  # noqa: F401
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _days(cert_pem):
@@ -21,7 +25,7 @@ def test_matched_template_sets_the_validity(app, smartcard_template_config):  # 
     csr, _ = _make_csr('validity-user.example.test', ekus=[ExtendedKeyUsageOID.CLIENT_AUTH])
     with app.app_context():
         ca = db.session.get(CA, smartcard_template_config['id'])
-        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
     assert err is None, err
     assert _days(cert_pem) >= 364  # the template's 365, not the global 30
 

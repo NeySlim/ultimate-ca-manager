@@ -32,6 +32,8 @@ from utils.export_password import (EXPORT_PASSWORD_MAX_LENGTH,
                                    EXPORT_PASSWORD_MIN_LENGTH,
                                    validate_export_password)
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 TOO_SHORT = 'x' * (EXPORT_PASSWORD_MIN_LENGTH - 1)
 JUST_RIGHT = 'x' * EXPORT_PASSWORD_MIN_LENGTH
 TOO_LONG = 'x' * (EXPORT_PASSWORD_MAX_LENGTH + 1)
@@ -187,3 +189,25 @@ class TestTheRuleIsPublished:
         assert ok.status_code == 200, ok.data
         assert refused.status_code == 400, (
             'the published minimum is not the one the route applies')
+
+
+ASTRAL_TOO_BIG = '\U0001F600' * EXPORT_PASSWORD_MAX_LENGTH  # 256 characters, 1024 bytes
+LONE_SURROGATE = 'abcdefgh\ud800'
+
+
+class TestTheRuleCountsBytes:
+    def test_the_byte_ceiling_and_the_unencodable_are_refused(self):
+        assert validate_export_password(ASTRAL_TOO_BIG) is not None
+        assert validate_export_password(LONE_SURROGATE) is not None
+        assert validate_export_password('\U0001F600' * 255) is None
+
+    @pytest.mark.parametrize('password', [ASTRAL_TOO_BIG, LONE_SURROGATE], ids=['astral-1024-bytes', 'lone-surrogate'])
+    @pytest.mark.parametrize('fmt', ['key', 'pkcs12'])
+    def test_a_certificate_and_a_ca_answer_400_not_500(
+            self, auth_client, create_cert, create_ca, fmt, password):
+        cert = create_cert(cn=f'exportpw-bytes-{fmt}.example.com')
+        ca = create_ca(cn=f'ExportPW Bytes CA {fmt}')
+        for url in (f'/api/v2/certificates/{cert["id"]}/export', f'/api/v2/cas/{ca["id"]}/export'):
+            r = auth_client.post(url, data=json.dumps({'format': fmt, 'password': password}),
+                                 content_type='application/json')
+            assert r.status_code == 400, (url, r.status_code, r.data[:200])

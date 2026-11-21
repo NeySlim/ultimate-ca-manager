@@ -15,6 +15,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CSRS = '/api/v2/csrs'
@@ -139,7 +141,7 @@ class TestExternalCertificateCompletesCSR:
         assert csr['id'] in {c['id'] for c in _json(r)['data']}
 
         # The key stayed with the certificate: exportable with it
-        r = auth_client.get(f'{CERTS}/{csr["id"]}/export?format=key')
+        r = auth_client.post(f'{CERTS}/{csr["id"]}/export', json={'format': 'key'})
         assert r.status_code == 200
         assert b'PRIVATE KEY' in r.data
         r = auth_client.post(f'{CERTS}/{csr["id"]}/export',

@@ -40,3 +40,10 @@ class BackupSchemaError(ValueError):
     nothing was changed: an archive from a newer UCM, or one whose sections
     are short of the counts it announces.
     """
+
+
+class RestoreFilesUnwritable(RuntimeError):
+    """A managed directory (CA, certificate or key files) this server cannot write.
+
+    Raised before the restore's transaction: nothing has been changed.
+    """

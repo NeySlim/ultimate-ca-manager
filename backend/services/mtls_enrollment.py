@@ -19,7 +19,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import CA, Certificate
-from utils.serial_format import serial_variants
+from utils.serial_format import canonical_serial, serial_variants
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ def certificate_row_for(auth_cert) -> Optional[Certificate]:
             serial = int(raw, base)
         except ValueError:
             continue
-        readings.append((serial, serial_variants(serial)))
+        readings.append((serial, {canonical_serial(serial)}))
     if not readings:
         return None
     # Both readings in one query, then split back so decimal still wins
@@ -482,26 +482,17 @@ def _revocation_held(actor) -> bool:
     return actor is not None and getattr(actor, 'role', None) != 'admin'
 
 
-def remove_enrolment(auth_cert, username: str = 'system', actor=None):
-    """Revoke the certificate an enrolment names, then delete both.
+def removal_check(auth_cert, actor=None):
+    """Whether an enrolment's certificate may be revoked for its removal, without revoking it.
 
-    Returns ``(True, None)`` or ``(False, response)``. Deleting the
-    ``AuthCertificate`` row is what withdraws access to UCM, and that is all
-    these routes used to do: the certificate stayed valid for every other
-    service trusting the same authority, with nothing on the CRL or at the
-    responder to say otherwise. It is revoked first so the withdrawal is
-    published, and the operator keeps a single gesture.
+    Returns ``(certificate_id, needs_revoking, None)``, the id being None when
+    no row of this server backs the enrolment, or ``(None, False, (message, status))``.
     """
-    from models import db
-    from services.cert_service import CertificateService
     from utils.datetime_utils import utc_now
-    from utils.db_transaction import safe_commit
-    from utils.response import error_response
-    from services.cert.issued_lookup import row_revoked
 
+    from services.cert.issued_lookup import row_revoked
     certificate = certificate_row_for(auth_cert)
     certificate_id = certificate.id if certificate else None
-
     needs_revoking = bool(
         certificate is not None
         and certificate.crt
@@ -514,41 +505,126 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
             policy = revocation_policy_for(certificate)
         except Exception as error:
             logger.error('Enrolment %s: policy evaluation failed: %s', auth_cert.id, error)
-            return False, error_response(
-                'Policy evaluation failed; the enrolment was not removed', 500)
+            return None, False, ('Policy evaluation failed; the enrolment was not removed', 500)
         if policy is not None:
-            return False, error_response(
+            return None, False, (
                 f'Revoking this certificate requires approval per policy "{policy.name}": '
                 'request its revocation, then remove the enrolment once it is revoked', 409)
+    return certificate_id, needs_revoking, None
+
+
+# Said when a revocation fails: the certificate would otherwise vanish while still valid
+REVOCATION_FAILED = ('The certificate could not be revoked, so it was not deleted: '
+                     'it would stay valid for anything else trusting its authority. '
+                     'Check that the issuing CA can sign, then try again')
+
+
+def revoke_checked(auth_cert, certificate_id, username: str = 'system', upstream=None):
+    """Revoke a certificate :func:`removal_check` cleared; ``(message, status)`` on failure.
+
+    Obtained over ACME, it is revoked at its CA too: ``(certificate_id, outcome, detail)``
+    of :func:`propagate_acme_revocation` is appended to ``upstream`` when given.
+    """
+    from models import Certificate, db
+    from services.acme.upstream_revocation import propagate_acme_revocation
+    from services.cert_service import CertificateService
+    try:
+        # The enrolled certificate only: its pair partner is not part of the enrolment
+        certificate = CertificateService.revoke_certificate(
+            cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
+            revoke_related=False)
+    except Exception as error:
+        db.session.rollback()
+        # A failure after the commit still left it revoked for removal: the row, read again,
+        # says so; any other revocation (a concurrent hold) is not this one
+        certificate = db.session.get(Certificate, certificate_id, populate_existing=True)
+        if certificate is None or not certificate.revoked \
+                or certificate.revoke_reason != REMOVAL_REASON:
+            logger.error('Enrolment %s: revocation refused: %s', auth_cert.id, error)
+            return REVOCATION_FAILED, 409
+        logger.warning('Enrolment %s: revoked, a step after the commit failed: %s',
+                       auth_cert.id, error)
+    outcome, detail = propagate_acme_revocation(certificate, REMOVAL_REASON)
+    if upstream is not None:
+        upstream.append((certificate_id, outcome, detail))
+    return None
+
+
+def revoke_for_removal(auth_cert, username: str = 'system', actor=None, upstream=None):
+    """Revoke the certificate an enrolment names, ahead of removing it.
+
+    Returns ``(certificate_id, None)``, the id being None when no row of
+    this server backs the enrolment, or ``(None, (message, status))`` when the
+    enrolment must stay: a revocation that fails or needs approval.
+    """
+    certificate_id, needs_revoking, refusal = removal_check(auth_cert, actor)
+    if refusal is not None:
+        return None, refusal
     if needs_revoking:
-        try:
-            # The enrolled certificate only: its pair partner is not part of the enrolment
-            CertificateService.revoke_certificate(
-                cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
-                revoke_related=False)
-        except Exception as error:
-            # An authority that cannot sign right now is not a reason to make
-            # the certificate disappear without a trace; say so instead.
-            logger.error('Enrolment %s: revocation refused: %s',
-                         auth_cert.id, error)
-            db.session.rollback()
-            return False, error_response(
-                'The certificate could not be revoked, so it was not deleted: '
-                'it would stay valid for anything else trusting its authority. '
-                'Check that the issuing CA can sign, then try again', 409)
+        refusal = revoke_checked(auth_cert, certificate_id, username, upstream)
+        if refusal is not None:
+            return None, refusal
+    return certificate_id, None
+
+
+REMOVED_MESSAGE = 'Certificate deleted.'
+
+
+def removal_answer(upstream):
+    """The ``message`` and ``meta`` of a removal whose certificate was obtained over ACME,
+    None when no ACME CA was concerned."""
+    from services.acme.upstream_revocation import NOT_ACME, revocation_answer
+    told = [(outcome, detail) for _cid, outcome, detail in upstream or () if outcome != NOT_ACME]
+    return revocation_answer(*told[0], REMOVED_MESSAGE) if told else None
+
+
+def removal_failure(message, status, upstream):
+    """The error of a removal that failed past the revocation: what the ACME CA was not
+    told is said there too, as the success would have said it."""
+    from services.acme.upstream_revocation import NOT_ACME, local_only_message, revocation_answer
+    from utils.response import error_response
+    told = [(outcome, detail) for _cid, outcome, detail in upstream or () if outcome != NOT_ACME]
+    warning = local_only_message(*told[0]) if told else None
+    if warning is None:
+        return error_response(message, status)
+    meta = revocation_answer(*told[0])['meta']
+    return error_response(f'{message}. {warning}', status, meta=meta)
+
+
+def remove_enrolment(auth_cert, username: str = 'system', actor=None):
+    """Revoke the certificate an enrolment names, then delete both.
+
+    Returns ``(True, answer)``, ``answer`` being :func:`removal_answer` (None
+    unless an ACME CA was concerned), or ``(False, response)``. Deleting the
+    ``AuthCertificate`` row is what withdraws access to UCM, and that is all
+    these routes used to do: the certificate stayed valid for every other
+    service trusting the same authority, with nothing on the CRL or at the
+    responder to say otherwise. It is revoked first so the withdrawal is
+    published, and the operator keeps a single gesture.
+    """
+    from models import db
+    from services.cert_service import CertificateService
+    from utils.db_transaction import safe_commit
+    from utils.response import error_response
+
+    upstream = []
+    certificate_id, refusal = revoke_for_removal(auth_cert, username=username, actor=actor,
+                                                 upstream=upstream)
+    if refusal is not None:
+        return False, error_response(*refusal)
 
     # The enrolment goes first: it is what mTLS authenticates against.
     db.session.delete(auth_cert)
-    committed, failure = safe_commit(
+    committed, _failure = safe_commit(
         logger, 'Failed to delete the certificate enrolment')
     if not committed:
-        return False, failure
+        return False, removal_failure('Failed to delete the certificate enrolment', 500, upstream)
 
     if certificate_id and not CertificateService.delete_certificate(
             certificate_id, username=username):
         # The access is withdrawn either way; saying it all worked would put
         # a success in the ledger for a certificate that is still there.
-        return False, error_response(
+        return False, removal_failure(
             'The enrolment was removed but its certificate could not be '
-            'deleted; it is still listed under Certificates', 500)
-    return True, None
+            'deleted; it is still listed under Certificates', 500, upstream)
+    return True, removal_answer(upstream)

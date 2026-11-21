@@ -15,6 +15,8 @@ from utils.pkcs11_config import (
     pkcs11_config_needs_normalization,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_config_rows')
+
 try:
     import pkcs11 as _pkcs11  # noqa: F401
     _PKCS11_AVAILABLE = True
@@ -187,6 +189,21 @@ class TestAutoRegisterSofthsm:
             assert row.get_config()['user_pin'] == 'third-pin'
             assert row.get_config()['previous_user_pin'] == 'first-pin'
 
+    def test_a_takeover_keeps_a_pin_this_node_cannot_open(self, app):
+        """A PIN saved under another database key stays stored, as the previous PIN."""
+        import json
+        from cryptography.fernet import Fernet
+        token = Fernet(Fernet.generate_key()).encrypt(b'stale-pin').decode()
+        with app.app_context():
+            from models import db
+
+            row = self._seed_row({'token_label': 'UCM-Default', 'user_pin': token})
+            self._run({'HSM_DEFAULT_PIN': 'fresh-pin', 'HSM_TOKEN_CREATED': '1'})
+
+            db.session.refresh(row)
+            assert json.loads(row.config)['previous_user_pin'] == token
+            assert row.get_config()['user_pin'] == 'fresh-pin'
+
     def test_editing_the_provider_keeps_the_previous_pin(self, app):
         """The form sends only its own fields; the kept PIN is not one of them."""
         with app.app_context():
@@ -238,47 +255,3 @@ class TestAutoRegisterSofthsm:
             assert row.status == 'connected'
             assert 'created anew' not in caplog.text
             assert 'carried over' not in caplog.text
-
-
-class TestMigration057:
-    def test_sqlite_rewrites_legacy_config(self, tmp_path):
-        import importlib.util
-        import sqlite3
-        from pathlib import Path
-
-        mig_path = (
-            Path(__file__).resolve().parents[1]
-            / 'migrations'
-            / '057_pkcs11_config_keys.py'
-        )
-        spec = importlib.util.spec_from_file_location('migration_057', mig_path)
-        mig = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mig)
-
-        db_path = tmp_path / 'hsm.db'
-        conn = sqlite3.connect(db_path)
-        conn.execute(
-            "CREATE TABLE hsm_providers (id INTEGER PRIMARY KEY, type TEXT, config TEXT)"
-        )
-        legacy = json.dumps({
-            'library_path': '/old.so',
-            'pin': 'abcd',
-            'token_label': 'tok',
-        })
-        conn.execute(
-            "INSERT INTO hsm_providers (id, type, config) VALUES (1, 'pkcs11', ?)",
-            (legacy,),
-        )
-        conn.commit()
-
-        mig.upgrade(conn)
-
-        row = conn.execute(
-            "SELECT config FROM hsm_providers WHERE id = 1"
-        ).fetchone()
-        cfg = json.loads(row[0])
-        assert cfg['module_path'] == '/old.so'
-        assert cfg['user_pin'] == 'abcd'
-        assert 'library_path' not in cfg
-        assert 'pin' not in cfg
-        conn.close()

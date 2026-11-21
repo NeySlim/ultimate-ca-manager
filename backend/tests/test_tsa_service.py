@@ -7,6 +7,8 @@ import pytest
 
 from asn1crypto import tsp, algos, core
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _status_info(resp_der):
     """Load PKIStatusInfo from granted or token-less rejection responses."""
@@ -324,20 +326,22 @@ class TestTsaCertificateValidation:
         cert, key = _self_signed_tsa(include_eku=True, eku_critical=False)
         assert TSAService(cert, key).tsa_cert is cert
 
-    def test_ca_certificate_without_eku_is_accepted(self):
-        # Pre-2.200 deployments sign with the configured CA's own cert
+    def test_ca_certificate_without_eku_is_accepted(self, monkeypatch):
+        # Pre-2.200 deployments sign with the configured CA's own cert, once the strict mode is off
         from cryptography import x509
         from services.tsa_service import TSAService
+        monkeypatch.setattr(TSAService, '_require_dedicated_tsa_cert', staticmethod(lambda: False))
 
         cert, key = _self_signed_tsa(include_eku=False, basic_constraints_ca=True)
         assert TSAService(cert, key).tsa_cert is cert
 
-    def test_ca_certificate_with_non_timestamping_eku_is_accepted(self):
+    def test_ca_certificate_with_non_timestamping_eku_is_accepted(self, monkeypatch):
         # #309: a constrained sub-CA carries an EKU that does not list
         # timeStamping. It is still the configured CA's own certificate, so
-        # signing with it stays allowed (with a warning).
+        # signing with it stays allowed (with a warning) once the strict mode is off.
         from cryptography.x509.oid import ExtendedKeyUsageOID
         from services.tsa_service import TSAService
+        monkeypatch.setattr(TSAService, '_require_dedicated_tsa_cert', staticmethod(lambda: False))
 
         cert, key = _self_signed_tsa(
             include_eku=True, basic_constraints_ca=True,
@@ -421,6 +425,7 @@ class TestTsaProtocolAudit:
                 ('tsa_enabled', 'true'),
                 ('tsa_ca_refid', ca.refid),
                 ('tsa_policy_oid', policy),
+                ('tsa_require_dedicated_cert', 'false'),
             ):
                 row = SystemConfig.query.filter_by(key=config_key).first()
                 if row is None:
@@ -457,7 +462,8 @@ class TestTsaProtocolAudit:
             with app.app_context():
                 SystemConfig.query.filter(
                     SystemConfig.key.in_([
-                        'tsa_enabled', 'tsa_ca_refid', 'tsa_policy_oid'
+                        'tsa_enabled', 'tsa_ca_refid', 'tsa_policy_oid',
+                        'tsa_require_dedicated_cert',
                     ])
                 ).delete(synchronize_session=False)
                 db.session.commit()
@@ -913,7 +919,8 @@ def _configure_ca_signer(app, create_ca, cert, key, cn):
             serialization.NoEncryption(),
         )).decode()
         for config_key, value in (('tsa_enabled', 'true'), ('tsa_ca_refid', ca.refid),
-                                  ('tsa_signer_cert_refid', '')):
+                                  ('tsa_signer_cert_refid', ''),
+                                  ('tsa_require_dedicated_cert', 'false')):
             row = SystemConfig.query.filter_by(key=config_key).first()
             if row is None:
                 row = SystemConfig(key=config_key)
@@ -924,7 +931,8 @@ def _configure_ca_signer(app, create_ca, cert, key, cn):
     def cleanup():
         with app.app_context():
             SystemConfig.query.filter(SystemConfig.key.in_(
-                ['tsa_enabled', 'tsa_ca_refid', 'tsa_signer_cert_refid'])
+                ['tsa_enabled', 'tsa_ca_refid', 'tsa_signer_cert_refid',
+                 'tsa_require_dedicated_cert'])
             ).delete(synchronize_session=False)
             db.session.commit()
     return cleanup

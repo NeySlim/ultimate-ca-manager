@@ -105,6 +105,22 @@ describe('SSHCertificatesPage: key ID', () => {
     expect((await submit(form)).key_id).toBe('ticket-4321')
   })
 
+  it('saves the generated files under the key ID, any script kept, no separator', async () => {
+    casGetAll.mockResolvedValue({ data: [NAMED_CA] })
+    generate.mockResolvedValue({ data: { id: 9, key_id: 'テスト/用:CA', certificate: 'C', private_key: 'P', public_key: 'K' } })
+    const saved = []
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    URL.revokeObjectURL = vi.fn()
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () { saved.push(this.download) })
+    const form = await openForm()
+    fireEvent.change(principals(), { target: { value: 'alice' } })
+    await submit(form)
+    const buttons = await screen.findAllByText('common.download')
+    buttons.forEach((button) => fireEvent.click(button))
+    click.mockRestore()
+    expect(saved).toEqual(['テスト_用_CA', 'テスト_用_CA-cert.pub', 'テスト_用_CA.pub'])
+  })
+
   it('leaves it to the CA when the requester sets nothing', async () => {
     casGetAll.mockResolvedValue({ data: [OPEN_CA] })
     const form = await openForm()

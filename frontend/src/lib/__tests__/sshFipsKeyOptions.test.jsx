@@ -21,6 +21,11 @@ describe('sshKeyOptions', () => {
     expect(sshKeyOptions(OPTIONS, true).map(o => o.value)).toEqual(['rsa', 'ecdsa-p256'])
     expect(sshKeyOptions(OPTIONS, false)).toEqual(OPTIONS)
   })
+
+  it('keeps Ed25519 in FIPS mode when the server module approves it', () => {
+    expect(sshKeyOptions(OPTIONS, true, ['EC-P256', 'ED25519'])).toEqual(OPTIONS)
+    expect(sshKeyOptions(OPTIONS, true, ['EC-P256', 'ML-DSA-65']).map(o => o.value)).toEqual(['rsa', 'ecdsa-p256'])
+  })
 })
 
 describe('useFipsMode', () => {
@@ -68,5 +73,29 @@ describe('ML-DSA on this build', () => {
     await waitFor(() => expect(getEffective).toHaveBeenCalled())
     await waitFor(() => expect(result.current.allowedKeyTypes ?? null).toBe(null))
     expect(result.current.mldsa).toBe(true)
+  })
+})
+
+describe('What the FIPS module approves', () => {
+  beforeEach(() => { getEffective.mockReset() })
+
+  it.each([
+    ['useKeyPlatform', () => useKeyPlatform()],
+    ['useEffectiveAlgorithms', () => useEffectiveAlgorithms({ caId: 1 })],
+  ])('%s reads fips_key_types', async (_name, hook) => {
+    getEffective.mockResolvedValue({ data: { fips: true, fips_key_types: ['EC-P256', 'ML-DSA-65'] } })
+    const { result } = renderHook(hook)
+    await waitFor(() => expect(result.current.fipsKeys).toEqual(['EC-P256', 'ML-DSA-65']))
+    expect(result.current.fips).toBe(true)
+  })
+
+  it.each([
+    ['useKeyPlatform', () => useKeyPlatform()],
+    ['useEffectiveAlgorithms', () => useEffectiveAlgorithms({ caId: 1 })],
+  ])('%s has no list when the server gives none', async (_name, hook) => {
+    getEffective.mockResolvedValue({ data: { fips: true } })
+    const { result } = renderHook(hook)
+    await waitFor(() => expect(result.current.fips).toBe(true))
+    expect(result.current.fipsKeys).toBeNull()
   })
 })

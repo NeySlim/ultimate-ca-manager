@@ -20,11 +20,16 @@ import { useTheme } from '../contexts/ThemeContext'
 import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { cn } from '../lib/utils'
+import { safeNext } from '../navigation/safeNext'
+import {
+  NO_ANSWER_RETRY_S, NO_ANSWER_TRIES, isMaintenanceRefusal, isNoAnswer, isRestoreMaintenance, maintenanceRetrySeconds,
+} from './loginMaintenance'
 
 const STORAGE_KEY = 'ucm_last_username'
 const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
 const SSO_RETRY_BASE_MS = 2000
 const SSO_RETRY_MAX_MS = 30000
+const NO_EVENT = { preventDefault() {} }
 
 const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
 
@@ -59,6 +64,16 @@ export default function LoginPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  // Where to go after signing in: a known internal page from ?next=, else the dashboard.
+  const requested = safeNext(searchParams.get('next'))
+  const landing = requested || '/dashboard'
+  const [rateLimit, setRateLimit] = useState(null)
+  // { restoring, seconds }: seconds counts down to the next attempt, null when none is planned
+  const [maintenance, setMaintenance] = useState(null)
+  const maintenanceRetry = useRef(null)
+  // The maintenance waited out, kept across its planned attempts: { restoring, lost }
+  const outage = useRef(null)
+  const latestAttempt = useRef({})
   const { login, sessionChecked } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
@@ -234,7 +249,7 @@ export default function LoginPage() {
           const verifyData = data.data || data
           await login(verifyData?.user?.username || 'sso_user', null, verifyData)
           showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || 'User' }))
-          navigate('/dashboard')
+          navigate(landing)
         })
         .catch(() => {
           showError(t('auth.ssoError'))
@@ -281,6 +296,7 @@ export default function LoginPage() {
   // ═══════════════════════════════════════════════════
 
   const attemptWebAuthn = useCallback(async () => {
+    clearMaintenance()
     setAuthMethod('webauthn')
     setStatusMessage(t('auth.touchSecurityKey'))
     setLoading(true)
@@ -290,17 +306,77 @@ export default function LoginPage() {
       saveAuthMethod('webauthn')
       await login(username, null, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
       // Cancelled or failed → fall to password
       setAuthMethod('password')
       setStatusMessage('')
       setLoading(false)
+      // A security key is touched again by the user: no attempt is made for them
+      if (noteRefusal(error, 'webauthn', false)) return
       if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
         showInfo(t('auth.securityKeyCancelled'))
       }
     }
   }, [username, login, navigate, showSuccess, showInfo, t]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The server's 429: shown as it sends it, with the wait only when it gives one (no local timer).
+  const noteRateLimit = (error) => {
+    if (error?.status !== 429) { setRateLimit(null); return false }
+    setRateLimit({ retryAfter: Number.isFinite(error.retryAfter) ? error.retryAfter : null })
+    return true
+  }
+
+  const clearMaintenance = () => {
+    maintenanceRetry.current = null
+    outage.current = null
+    setMaintenance(null)
+  }
+
+  // A 429 or a maintenance's 503 shown as a banner (true); `again` names the attempt repeated, by
+  // itself after the Retry-After when `auto`, or from the banner's button
+  const noteRefusal = (error, again, auto = true) => {
+    if (isMaintenanceRefusal(error)) {
+      setRateLimit(null)
+      maintenanceRetry.current = again
+      outage.current = { restoring: isRestoreMaintenance(error), lost: 0 }
+      setMaintenance({ restoring: isRestoreMaintenance(error), seconds: auto ? maintenanceRetrySeconds(error) : null })
+      return true
+    }
+    // A node that restarts at the end of the maintenance gives no answer: still waited out, a while
+    const kept = outage.current
+    if (kept && auto && isNoAnswer(error) && kept.lost < NO_ANSWER_TRIES) {
+      maintenanceRetry.current = again
+      outage.current = { ...kept, lost: kept.lost + 1 }
+      setMaintenance({ restoring: kept.restoring, seconds: NO_ANSWER_RETRY_S })
+      return true
+    }
+    clearMaintenance()
+    return noteRateLimit(error)
+  }
+
+  // Never a second request while one is in flight; each attempt drops the one planned
+  const retryNow = () => {
+    if (loading) return
+    const again = maintenanceRetry.current
+    const kept = outage.current
+    setMaintenance(m => (m ? { ...m, seconds: null } : m))
+    if (!again) return
+    latestAttempt.current[again]()
+    // The attempt dropped the wait as any attempt does: this one belongs to it
+    outage.current = kept
+  }
+
+  // The countdown of a planned attempt; one attempt at zero, which plans the next if refused again
+  useEffect(() => {
+    if (maintenance?.seconds == null) return undefined
+    if (maintenance.seconds <= 0) {
+      retryNow()
+      return undefined
+    }
+    const timer = setTimeout(() => setMaintenance(m => (m?.seconds != null ? { ...m, seconds: m.seconds - 1 } : m)), 1000)
+    return () => clearTimeout(timer)
+  }, [maintenance, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleContinue = async (e) => {
     e?.preventDefault()
@@ -345,6 +421,7 @@ export default function LoginPage() {
       return
     }
 
+    clearMaintenance()
     setLoading(true)
     setStatusMessage(t('auth.signingIn'))
 
@@ -352,6 +429,7 @@ export default function LoginPage() {
       const userData = await authMethodsService.loginPassword(username, password)
       if (userData.requires_2fa) {
         twoFactorFrom.current = 'password'
+        setRateLimit(null)
         setStep('2fa')
         setTwoFactorMethods(userData.methods || ['totp'])
         setTotpCode('')
@@ -365,14 +443,14 @@ export default function LoginPage() {
       // #141: if 2FA enrolment is enforced, the session is established but
       // restricted; the ForceEnroll2FA overlay takes over after navigation.
       if (userData.requires_2fa_enrollment) {
-        navigate('/dashboard')
+        navigate(landing)
         return
       }
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      showError(error.message || t('auth.invalidCredentials'))
-      setPassword('')
+      if (!noteRefusal(error, 'password')) showError(error.message || t('auth.invalidCredentials'))
+      if (!maintenanceRetry.current) setPassword('')  // kept while a maintenance is waited out
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -386,6 +464,7 @@ export default function LoginPage() {
       return
     }
 
+    clearMaintenance()
     setLoading(true)
     try {
       const userData = await authMethodsService.login2FA(totpCode)
@@ -393,16 +472,17 @@ export default function LoginPage() {
       saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      showError(error.message || t('auth.invalidTotpCode'))
-      setTotpCode('')
+      if (!noteRefusal(error, 'totp')) showError(error.message || t('auth.invalidTotpCode'))
+      if (!maintenanceRetry.current) setTotpCode('')
     } finally {
       setLoading(false)
     }
   }
 
   const handle2FAWebAuthn = async () => {
+    clearMaintenance()
     setLoading(true)
     try {
       const userData = await authMethodsService.login2FAWebAuthn()
@@ -410,9 +490,11 @@ export default function LoginPage() {
       saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
+      if (noteRefusal(error, 'key2fa', false)) {
+        // banner shown
+      } else if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
         showInfo(t('auth.twoFactorKeyCancelled'))
       } else {
         showError(t('auth.twoFactorKeyFailed'))
@@ -422,12 +504,23 @@ export default function LoginPage() {
     }
   }
 
+  // A retry runs the handler of the latest render, so it sends what the fields hold now
+  latestAttempt.current = {
+    password: () => handlePasswordLogin(NO_EVENT),
+    totp: () => handle2FAVerify(NO_EVENT),
+    ldap: () => handleLDAPLogin(NO_EVENT),
+    webauthn: () => attemptWebAuthn(),
+    key2fa: () => handle2FAWebAuthn(),
+  }
+
   const handleSSOLogin = (provider) => {
     if (provider.provider_type === 'ldap') {
       setSelectedLdapProvider(provider)
       setStep('ldap')
     } else {
-      window.location.href = `/api/v2/sso/login/${provider.provider_type}`
+      // The server keeps the page with this login and hands it back on /login/sso-complete.
+      const next = requested ? `?next=${encodeURIComponent(requested)}` : ''
+      window.location.href = `/api/v2/sso/login/${provider.provider_type}${next}`
     }
   }
 
@@ -438,6 +531,7 @@ export default function LoginPage() {
       return
     }
 
+    clearMaintenance()
     setLoading(true)
     setStatusMessage(t('auth.authenticating'))
 
@@ -447,6 +541,7 @@ export default function LoginPage() {
       // The provider enforces 2FA: the enrolled code is asked next.
       if (responseData.requires_2fa) {
         twoFactorFrom.current = 'ldap'
+        setRateLimit(null)
         setStep('2fa')
         setTwoFactorMethods(responseData.methods || ['totp'])
         setTotpCode('')
@@ -457,10 +552,10 @@ export default function LoginPage() {
       saveAuthMethod('ldap', selectedLdapProvider?.id)
       await login(username, null, responseData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      showError(error.message || t('auth.ldapFailed'))
-      setPassword('')
+      if (!noteRefusal(error, 'ldap')) showError(error.message || t('auth.ldapFailed'))
+      if (!maintenanceRetry.current) setPassword('')
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -468,6 +563,7 @@ export default function LoginPage() {
   }
 
   const handleBack = () => {
+    clearMaintenance()
     setStep('username')
     setAuthMethod(null)
     setPassword('')
@@ -521,6 +617,33 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {rateLimit && (
+          <div role="alert" className="rounded-lg border border-status-danger bg-bg-secondary p-3 text-sm text-text-primary">
+            <strong className="block">{t('auth.tooManyAttempts')}</strong>
+            <span className="text-text-secondary">
+              {rateLimit.retryAfter != null
+                ? t('auth.retryAfterSeconds', { seconds: rateLimit.retryAfter })
+                : t('auth.retryLater')}
+            </span>
+          </div>
+        )}
+
+        {maintenance && (
+          <div role="status" className="rounded-lg border border-status-warning bg-bg-secondary p-3 text-sm text-text-primary">
+            <strong className="block">
+              {maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}
+            </strong>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-text-secondary">
+                {maintenance.seconds != null ? t('auth.maintenanceRetryIn', { seconds: maintenance.seconds }) : null}
+              </span>
+              <Button type="button" size="sm" variant="secondary" onClick={retryNow} disabled={loading}>
+                {t('auth.retryNow')}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Step 1: Username */}
         {step === 'username' && (
           <div className="space-y-3 sm:space-y-4">
@@ -561,8 +684,8 @@ export default function LoginPage() {
                   <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent-op10 transition-colors" />
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                      <User size={20} className="text-white sm:hidden" weight="bold" />
-                      <User size={24} className="text-white hidden sm:block" weight="bold" />
+                      <User size={20} className="text-on-accent sm:hidden" weight="bold" />
+                      <User size={24} className="text-on-accent hidden sm:block" weight="bold" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.continueAs')}</p>
@@ -640,8 +763,8 @@ export default function LoginPage() {
               <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg">
-                  <User size={20} className="text-white sm:hidden" weight="bold" />
-                  <User size={24} className="text-white hidden sm:block" weight="bold" />
+                  <User size={20} className="text-on-accent sm:hidden" weight="bold" />
+                  <User size={24} className="text-on-accent hidden sm:block" weight="bold" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.signingInAs')}</p>
@@ -781,18 +904,18 @@ export default function LoginPage() {
         {step === 'auth' && userMethods && (
           <div className="flex justify-center gap-1.5 sm:gap-2 pt-1 sm:pt-2">
             {userMethods.mtls && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
                 <ShieldCheck size={12} weight="fill" />
                 <span>mTLS</span>
               </div>
             )}
             {userMethods.webauthn && authMethodsService.isWebAuthnSupported() && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
                 <Fingerprint size={12} weight="fill" />
                 <span>{t('common.key')}</span>
               </div>
             )}
-            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
               <Key size={12} weight="fill" />
               <span>{t('common.password')}</span>
             </div>
@@ -804,8 +927,8 @@ export default function LoginPage() {
           <div className="space-y-3 sm:space-y-5">
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg">
-                  <Lock size={20} weight="fill" className="text-white" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-status-warning flex items-center justify-center shadow-lg">
+                  <Lock size={20} weight="fill" className="text-on-accent" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-text-primary text-sm sm:text-base">{t('auth.twoFactorTitle')}</h3>
@@ -866,7 +989,7 @@ export default function LoginPage() {
             )}
 
             <button
-              onClick={() => { setStep('auth'); setTotpCode(''); setAuthMethod('password') }}
+              onClick={() => { clearMaintenance(); setStep('auth'); setTotpCode(''); setAuthMethod('password') }}
               className="flex items-center justify-center gap-2 text-sm text-text-secondary hover:text-text-primary cursor-pointer transition-colors py-2 w-full"
             >
               <ArrowLeft size={16} />
@@ -1023,7 +1146,7 @@ export default function LoginPage() {
                           className="w-3 h-3 rounded-full border border-border"
                           style={{ background: theme.accent }}
                         />
-                        {theme.name}
+                        {t(theme.nameKey)}
                       </button>
                     ))}
                     

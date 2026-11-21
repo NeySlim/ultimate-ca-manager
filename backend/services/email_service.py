@@ -22,6 +22,17 @@ def _sanitize_header_value(value) -> str:
     return str(value).replace('\r', ' ').replace('\n', ' ').strip()
 
 
+def _log_instant(log_clock):
+    """The log rows' date: an unreadable caller clock never turns a sent mail into a failure.
+    The clock gets the engine, never the caller's session, so a failed read cannot end it."""
+    if log_clock is not None:
+        try:
+            return log_clock(db.engine)
+        except Exception as exc:
+            logger.warning("Mail log dated on this host's clock: %s", type(exc).__name__)
+    return utc_now()
+
+
 def _smtp_connect(config: SMTPConfig, timeout: int) -> smtplib.SMTP:
     """Open the SMTP session: implicit TLS (port 465 style) wins over STARTTLS."""
     if config.smtp_use_ssl:
@@ -42,6 +53,8 @@ def _smtp_authenticate(server: smtplib.SMTP, config: SMTPConfig) -> None:
     Raises ``smtplib.SMTPAuthenticationError`` (or ``smtplib.SMTPException``)
     on failure — caller catches and reports.
     """
+    if getattr(config, 'smtp_auth', True) is False:
+        return  # "No authentication" is stored as smtp_auth off
     if (config.smtp_auth_method or 'password') == 'oauth2':
         if not config.smtp_user:
             raise smtplib.SMTPAuthenticationError(535, b'OAuth2 requires smtp_user (mailbox)')
@@ -57,8 +70,10 @@ def _smtp_authenticate(server: smtplib.SMTP, config: SMTPConfig) -> None:
             # attempt mints a fresh one.
             smtp_oauth.invalidate_cache(config.id)
             raise smtplib.SMTPAuthenticationError(code, resp)
-    elif config.smtp_user and config.smtp_password:
-        server.login(config.smtp_user, config.smtp_password)
+    elif config.smtp_user and config._smtp_password:
+        # A password this node cannot open fails here: the mail is never sent unauthenticated
+        from utils.encryption import decrypt_required
+        server.login(config.smtp_user, decrypt_required(config._smtp_password, 'SMTP password'))
 
 
 class EmailService:
@@ -135,6 +150,7 @@ class EmailService:
         threshold_days: Optional[int] = None,
         release_session: bool = False,
         attachments: Optional[List[tuple]] = None,
+        log_clock=None,
     ) -> tuple[bool, str]:
         """
         Send email to recipients
@@ -150,6 +166,9 @@ class EmailService:
             release_session: return the session's connection to the pool before
                 the SMTP exchange (callers that own their session only)
             attachments: (filename, bytes, mimetype) tuples
+            log_clock: dates the log rows (default this host's utc_now), called with
+                db.engine, never the session; a caller whose window is read on another
+                clock passes that clock (cluster_utc_now)
 
         Returns:
             (success: bool, message: str)
@@ -239,6 +258,7 @@ class EmailService:
                         pass
 
             # Log success for each recipient
+            logged_at = _log_instant(log_clock)
             for recipient in recipients:
                 log = NotificationLog(
                     type=notification_type,
@@ -249,7 +269,7 @@ class EmailService:
                     resource_type=resource_type,
                     resource_id=resource_id,
                     threshold_days=threshold_days,
-                    sent_at=utc_now()
+                    sent_at=logged_at
                 )
                 db.session.add(log)
 
@@ -268,6 +288,7 @@ class EmailService:
             logger.error(f"Failed to send email: {error_msg}")
             
             # Log failure for each recipient
+            logged_at = _log_instant(log_clock)
             for recipient in recipients:
                 log = NotificationLog(
                     type=notification_type,
@@ -279,7 +300,7 @@ class EmailService:
                     resource_type=resource_type,
                     resource_id=resource_id,
                     threshold_days=threshold_days,
-                    sent_at=utc_now()
+                    sent_at=logged_at
                 )
                 db.session.add(log)
             

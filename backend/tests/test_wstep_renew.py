@@ -14,48 +14,37 @@ from models import CA, Certificate, db
 from models.system_config import SystemConfig
 from services.ca_service import CAService
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSU_NS
+from tests.windows_profile_support import restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 RENEW_URL = '/ADCertificateService_CES_Certificate/service.svc'
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
 def wstep_renew_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Renewal CA')
-    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days')
+    # The renewing CA is the mTLS anchor too: native TLS renewal needs it (A5)
+    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days', 'mtls_enabled', 'mtls_trusted_ca_id')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
         _set_config('wstep_validity_days', '30')
+        _set_config('mtls_enabled', 'true')
+        _set_config('mtls_trusted_ca_id', ca.refid)
 
     yield ca_data
 
     with app.app_context():
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _issue_test_cert(app, ca_data, common_name='wstep-renew.example.test'):
@@ -68,7 +57,7 @@ def _issue_test_cert(app, ca_data, common_name='wstep-renew.example.test'):
     with app.app_context():
         ca = db.session.get(CA, ca_data['id'])
         cert_pem, _serial = CAService.sign_csr_from_crypto(
-            ca=ca, csr=csr, validity_days=30, source='test',
+            ca=ca, csr=csr, validity_days=30, source='wstep',
         )
     cert = x509.load_pem_x509_certificate(cert_pem.encode())
     return cert, key
@@ -361,7 +350,7 @@ def test_renewal_csr_without_san_keeps_the_certificate_names(client, app, wstep_
     with app.app_context():
         ca = db.session.get(CA, wstep_renew_config['id'])
         cert_pem, _serial = CAService.sign_csr_from_crypto(
-            ca=ca, csr=csr, validity_days=30, source='test', override_san=names)
+            ca=ca, csr=csr, validity_days=30, source='wstep', override_san=names)
     cert = x509.load_pem_x509_certificate(cert_pem.encode())
     signed = _build_signed_rst(cert, key, _renewal_csr(subject, key),
                                message_id='urn:uuid:renew-names')

@@ -28,6 +28,10 @@ def get_certificate(cert_id):
     # The revocation a record of its CA makes counts as OCSP and the CRL answer it
     from services.cert.issued_lookup import row_persisted_revocation, show_effective_revocation
     data = show_effective_revocation(cert.to_dict(), cert, row_persisted_revocation(cert))
+    # The certificate an unhold would lift with this one, so the client announces only that
+    from services.cert.related_pair import unhold_partner
+    partner = unhold_partner(cert)
+    data['related_on_hold_id'] = partner.id if partner is not None else None
 
     # Parse X.509 extensions from PEM
     from utils.cert_extensions import parse_certificate_extensions

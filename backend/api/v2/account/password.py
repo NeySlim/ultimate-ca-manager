@@ -7,6 +7,7 @@ from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from auth.unified import require_auth
+from auth.session_reverify import check_session_password
 from auth.session_start import keep_current_session
 from security.password_policy import validate_password
 
@@ -53,12 +54,15 @@ def change_password():
     # Skip current-password verification only when the SERVER says so.
     # 403, not 401: the session is valid, and the UI logs out on any 401.
     if not skip_current_check:
-        if not current_password or not user.check_password(current_password):
-            return error_response('Current password is incorrect', 403)
+        refused = check_session_password(
+            user, current_password, error_response('Current password is incorrect', 403))
+        if refused:
+            return refused
 
     # Update password: set_password() closes every session of the account,
     # then this one is kept under a new identifier.
     user.set_password(new_password)
+    user.clear_failed_logins()  # guesses at the old password count for nothing now
     user.force_password_change = False
     ok, _err = safe_commit(logger, "Failed to update password")
     if not ok:

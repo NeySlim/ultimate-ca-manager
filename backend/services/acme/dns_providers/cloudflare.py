@@ -30,11 +30,17 @@ class CloudflareDnsProvider(BaseDnsProvider):
     PROVIDER_TYPE = "cloudflare"
     PROVIDER_NAME = "Cloudflare"
     PROVIDER_DESCRIPTION = "Cloudflare DNS API"
-    REQUIRED_CREDENTIALS = ["api_token"]  # We'll handle legacy auth separately
+    REQUIRED_CREDENTIALS: List[str] = []  # a token OR key and email: see validate_credentials
     OPTIONAL_CREDENTIALS = ["api_key", "email"]
     
     BASE_URL = "https://api.cloudflare.com/client/v4"
     
+    @classmethod
+    def validate_credentials(cls, credentials: Dict[str, Any]) -> None:
+        if not credentials.get('api_token') and not (
+                credentials.get('api_key') and credentials.get('email')):
+            raise ValueError("Either api_token OR both api_key and email are required")
+
     def __init__(self, credentials: Dict[str, Any]):
         # Custom validation - either api_token OR (api_key + email)
         self.credentials = credentials or {}

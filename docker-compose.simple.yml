@@ -14,6 +14,18 @@ services:
       # SoftHSM tokens live in the data volume since 2.233. This older volume is
       # read once, at the first start of 2.233, to carry its tokens over.
       - ucm-hsm-tokens:/var/lib/softhsm/tokens
+    # environment:
+      # Initial admin password (first start only). Unset: generated, read it with
+      #   docker compose exec ultimate-ca-manager cat /opt/ucm/data/initial-admin-password
+      # To choose it, prefer a secret (uncomment the secrets blocks too):
+      # - UCM_INITIAL_ADMIN_PASSWORD_FILE=/run/secrets/ucm_admin_password
+      # Second choice, visible in docker inspect:
+      # - UCM_INITIAL_ADMIN_PASSWORD=change-me
+    # secrets:
+    #   - ucm_admin_password
+# secrets:
+#   ucm_admin_password:
+#     file: ./ucm_admin_password.txt   # one line, the password; keep it out of version control
 volumes:
   ucm-data:
     name: ucm-data

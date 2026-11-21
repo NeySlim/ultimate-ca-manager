@@ -84,6 +84,13 @@ def template_variables(template: str):
     return found
 
 
+def template_names(target) -> set:
+    """Variable names the URL and body template of HTTP *target* name; ValueError on an
+    unreadable one, which each caller answers in its own way."""
+    return {name for source in (target.url, target.body_template)
+            for name, _ in template_variables(source or '')}
+
+
 def _apply(value: str, flt: str) -> str:
     if flt == 'json':
         return json.dumps(value)

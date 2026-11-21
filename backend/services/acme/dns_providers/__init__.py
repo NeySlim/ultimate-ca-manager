@@ -168,6 +168,17 @@ def create_provider(provider_type: str, credentials: Dict[str, Any]) -> BaseDnsP
     return provider_class(credentials)
 
 
+def saved_credentials(model) -> Dict[str, Any]:
+    """The saved credentials of a DnsProvider row about to be used. A blob this node's key
+    does not open raises SecretUnreadable naming it, never reads back as no credentials."""
+    import json
+    from utils.encryption import decrypt_required
+    if model.provider_type == 'manual':
+        return {}  # it reads no credentials: whatever is stored cannot stop it
+    stored = decrypt_required(model._credentials, f'DNS provider {model.id} credentials')
+    return json.loads(stored) if stored else {}
+
+
 def get_available_providers() -> List[Dict[str, Any]]:
     """
     Get list of all available provider types with their info.

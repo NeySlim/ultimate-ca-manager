@@ -19,6 +19,8 @@ from services import compliance_signer
 from services.policy_service import PolicyEvaluationService, SystemPolicy
 from tests.conftest import get_json
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 JSON = 'application/json'
 HSM = '/api/v2/hsm/providers'
@@ -46,40 +48,6 @@ def _put(auth_client, pid, **body):
 
 
 # ---- migration -----------------------------------------------------------------
-
-def test_sqlite_migration_adds_the_column_and_leaves_providers_undeclared():
-    m = importlib.import_module('migrations.108_hsm_provider_certification')
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE TABLE hsm_providers (id INTEGER PRIMARY KEY, name TEXT)')
-    conn.execute("INSERT INTO hsm_providers VALUES (1, 'old')")
-    m.upgrade(conn)
-    m.upgrade(conn)
-    assert conn.execute('SELECT certification FROM hsm_providers').fetchone()[0] is None
-    m.upgrade(sqlite3.connect(':memory:'))  # no table: a no-op
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_migration_adds_the_column_and_leaves_providers_undeclared():
-    m = importlib.import_module('migrations.108_hsm_provider_certification')
-    schema = f"migtest_108_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        conn.execute(text(f'CREATE SCHEMA {schema}'))
-        conn.execute(text(f'SET search_path TO {schema}'))
-        conn.execute(text('CREATE TABLE hsm_providers (id INTEGER PRIMARY KEY, name TEXT)'))
-        conn.execute(text("INSERT INTO hsm_providers VALUES (1, 'old')"))
-        m.upgrade(conn)
-        m.upgrade(conn)
-        assert conn.execute(text('SELECT certification FROM hsm_providers')).scalar() is None
-    finally:
-        conn.rollback()
-        conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        conn.commit()
-        conn.close()
-        engine.dispose()
 
 
 # ---- API -----------------------------------------------------------------------

@@ -114,11 +114,11 @@ class AuthManager:
         if not linked_user or not getattr(linked_user, 'active', False):
             return None
         
-        # Update last_used timestamp
+        # last_used is telemetry: a lock its write swallows is not the request's
+        from utils.sqlite_wait import lock_not_marked
         api_key.last_used_at = utc_now()
-        if not commit_or_rollback(logger, "Failed to update api_key.last_used_at"):
-            # Don't fail the auth — last_used is non-critical telemetry
-            pass
+        with lock_not_marked():
+            commit_or_rollback(logger, "Failed to update api_key.last_used_at")
         
         # Parse permissions from JSON
         try:
@@ -169,7 +169,8 @@ class AuthManager:
             'auth_method': 'api_key',
             'permissions': permissions,
             'api_key_id': api_key.id,
-            'api_key_name': api_key.name
+            'api_key_name': api_key.name,
+            'api_key_expires_at': api_key.expires_at
         }
     
     def verify_session(self):
@@ -197,43 +198,10 @@ class AuthManager:
             return None
 
         now = utc_now()
-        
-        # Check absolute session lifetime (default 24h)
-        login_time_str = session.get('login_time')
-        if login_time_str:
-            try:
-                login_time = datetime.fromisoformat(login_time_str)
-                max_lifetime = self._get_session_max_lifetime()
-                if (now - login_time).total_seconds() > max_lifetime:
-                    logger.info(
-                        f"Session expired (max lifetime): user={user.username}, "
-                        f"login_time={login_time_str}, max={max_lifetime}s"
-                    )
-                    session.clear()
-                    return None
-            except (ValueError, TypeError) as e:
-                logger.warning(
-                    f"Malformed session login_time={login_time_str!r} for user={user.username}: {e}"
-                )
-        
-        # Check inactivity timeout (default 8h)
-        last_activity_str = session.get('last_activity')
-        if last_activity_str:
-            try:
-                last_activity = datetime.fromisoformat(last_activity_str)
-                inactivity_timeout = self._get_session_timeout()
-                if (now - last_activity).total_seconds() > inactivity_timeout:
-                    logger.info(
-                        f"Session expired (inactivity): user={user.username}, "
-                        f"last_activity={last_activity_str}, timeout={inactivity_timeout}s"
-                    )
-                    session.clear()
-                    return None
-            except (ValueError, TypeError) as e:
-                logger.warning(
-                    f"Malformed session last_activity={last_activity_str!r} for user={user.username}: {e}"
-                )
-        
+        if self.session_ended(session, now, label=user.username):
+            session.clear()
+            return None
+
         # Update last activity timestamp
         session['last_activity'] = now.isoformat()
         
@@ -248,6 +216,32 @@ class AuthManager:
             'session_expires': session.get('expires_at')
         }
     
+    @classmethod
+    def session_ended(cls, data, now, label='', limits=None, log=True):
+        """Whether the session ``data`` is past its maximum lifetime or its inactivity
+        timeout at ``now``; ``limits`` = (max lifetime, inactivity timeout) in seconds."""
+        max_lifetime, inactivity_timeout = limits or cls.session_limits()
+        for key, limit, reason, name in (('login_time', max_lifetime, 'max lifetime', 'max'),
+                                         ('last_activity', inactivity_timeout, 'inactivity',
+                                          'timeout')):
+            value = data.get(key)
+            if not value:
+                continue
+            try:
+                if (now - datetime.fromisoformat(value)).total_seconds() > limit:
+                    if log:
+                        logger.info(f"Session expired ({reason}): user={label}, {key}={value}, "
+                                    f"{name}={limit}s")
+                    return True
+            except (ValueError, TypeError) as e:
+                if log:
+                    logger.warning(f"Malformed session {key}={value!r} for user={label}: {e}")
+        return False
+
+    @classmethod
+    def session_limits(cls):
+        return cls._get_session_max_lifetime(), cls._get_session_timeout()
+
     @staticmethod
     def _get_session_timeout():
         """Get inactivity timeout in seconds from DB config (default 8h = 28800s)"""
@@ -373,8 +367,11 @@ def require_auth(permissions=None, session_only=False):
             auth_result = auth_manager.authenticate_request(request)
             
             if not auth_result:
-                from utils.response import error_response
-                return error_response('Authentication required', 401)
+                from auth import restore_hold
+                restore_hold.forget()
+                from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
+                return error_response('Authentication required', 401,
+                                      problem_type=AUTHENTICATION_REQUIRED_PROBLEM)
             if session_only and auth_result['auth_method'] != 'session':
                 return jsonify({
                     'error': 'Forbidden',
@@ -422,6 +419,9 @@ def require_auth(permissions=None, session_only=False):
             g.permissions = auth_result['permissions']
             g.user_id = auth_result['user_id']
             g.api_key_id = auth_result.get('api_key_id')
+            # Checked against the database during a restore's gate: kept for its held window
+            from auth import restore_hold
+            restore_hold.remember(auth_result)
 
             # Call the actual route function
             return f(*args, **kwargs)
@@ -457,6 +457,15 @@ def has_permission(required, user_permissions):
             return True
     
     return False
+
+
+def hsm_binding_refusal(authority):
+    """403 naming read:hsm when the caller may not put *authority* ('an SSH CA', 'an X.509 CA')
+    on an HSM key: binding a key takes the right to see the HSM inventory too. None otherwise."""
+    if has_permission('read:hsm', getattr(g, 'permissions', None) or []):
+        return None
+    from utils.response import error_response
+    return error_response(f'Creating {authority} on an HSM key requires the read:hsm permission', 403)
 
 
 def verify_request_auth(request_obj=None):

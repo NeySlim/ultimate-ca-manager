@@ -42,6 +42,8 @@ def clear_request_caches():
 class CA(db.Model):
     """Certificate Authority model"""
     __tablename__ = "certificate_authorities"
+    # One HSM key backs one X.509 CA at most (upgrade step 163); NULLs stay distinct
+    __table_args__ = (db.Index('uq_ca_hsm_key_id', 'hsm_key_id', unique=True),)
     
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
@@ -60,6 +62,9 @@ class CA(db.Model):
     csr = db.Column(db.Text)
     serial = db.Column(db.Integer, default=0)
     caref = db.Column(db.String(36))  # Parent CA refid for intermediate
+    # Set only when caref was confirmed by hand over a signature this build cannot check
+    parent_confirmed_by = db.Column(db.String(80))
+    parent_confirmed_at = db.Column(db.DateTime)
     
     # Certificate details (parsed from crt)
     subject = db.Column(db.Text)
@@ -98,6 +103,9 @@ class CA(db.Model):
 
     # Kept out of the manual issuance pickers, offered on request only (#430)
     issuance_hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    # RFC 5280 §4.1.2.6: no subject issued to two entities (services.cert.unique_subject)
+    enforce_unique_subject = db.Column(db.Boolean, nullable=False, default=False,
+                                       server_default=db.false())
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -184,25 +192,23 @@ class CA(db.Model):
         """Extract a field from DN string, supporting both short (CN) and long (commonName) formats"""
         if not dn_string:
             return ""
-        prefixes = [f'{field}=']
+        from utils.dn_parse import stored_dn_attribute
+        names = [field]
         alias = self._DN_FIELD_ALIASES.get(field)
         if alias:
-            prefixes.append(f'{alias}=')
+            names.append(alias)
         for short, long in self._DN_FIELD_ALIASES.items():
             if field == long:
-                prefixes.append(f'{short}=')
+                names.append(short)
                 break
-        for part in dn_string.split(','):
-            part = part.strip()
-            for prefix in prefixes:
-                if part.startswith(prefix):
-                    return part[len(prefix):]
-        return ""
+        # Escapes honoured; of several values, the first in the stored string
+        return stored_dn_attribute(dn_string, names) or ""
 
     @property
     def common_name(self) -> str:
-        """Extract Common Name from subject"""
-        return self._extract_dn_field(self.subject, 'CN')
+        """The first CN of the stored subject, escapes honoured."""
+        from utils.dn_parse import stored_dn_common_name
+        return stored_dn_common_name(self.subject) or ""
     
     @property
     def organization(self) -> str:
@@ -260,7 +266,8 @@ class CA(db.Model):
         import base64
         from cryptography import x509
         from utils.cert_issuer import (
-            authority_key_identifier_hex, cas_by_ski, certificate_signed_by, is_self_signed,
+            UNVERIFIABLE, VERIFIED, authority_key_identifier_hex, cas_by_ski, is_self_signed,
+            self_signed_first, signature_verdict,
         )
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
@@ -283,7 +290,8 @@ class CA(db.Model):
         if aki:
             _add(cas_by_ski(aki))
         if self.issuer:
-            _add(CA.query.filter(CA.subject == self.issuer).all())
+            # The root before a cross or link certificate of its key, on any engine
+            _add(self_signed_first(CA.query.filter(CA.subject == self.issuer).order_by(CA.id).all()))
 
         for candidate in candidates:
             try:
@@ -291,14 +299,30 @@ class CA(db.Model):
             except Exception:
                 continue
             try:
-                signed = certificate_signed_by(cert, issuer_cert)
+                verdict, _ = signature_verdict(cert, issuer_cert)
             except Exception:
-                # Key type this cannot verify: keep the named issuer rather
-                # than dropping the CA out of its chain
-                signed = candidate.subject == self.issuer
+                verdict = UNVERIFIABLE
+            if verdict == UNVERIFIABLE:
+                # Key type this cannot verify: keep the named issuer, or the parent confirmed
+                # by hand, rather than dropping the CA out of its chain
+                signed = candidate.subject == self.issuer or (
+                    candidate.refid == self.caref and self.parent_confirmed_at is not None)
+            else:
+                signed = verdict == VERIFIED
             if signed:
                 return candidate
         return None
+
+    def _parent_candidate(self):
+        if self.caref or not self.crt:
+            return None
+        from services.ca.parent_confirmation import proposal
+        try:
+            found = proposal(self)
+        except Exception:
+            logger.warning("Parent proposal of CA %s could not be computed", self.id, exc_info=True)
+            return None
+        return None if found is None else found.to_dict()
 
     def persisted_revocation(self):
         cache = _request_cache('_ucm_persisted_revocation')
@@ -323,7 +347,7 @@ class CA(db.Model):
         if parent is None:
             return None
         from models.revoked_serial import RevokedSerial
-        from utils.serial_format import serial_to_int, unambiguous_serial_spellings
+        from utils.serial_format import canonical_serial, serial_to_int
         serial = serial_to_int(self.serial_number) if self.serial_number else None
         if serial is None:
             try:
@@ -332,10 +356,9 @@ class CA(db.Model):
                 serial = x509.load_pem_x509_certificate(base64.b64decode(self.crt)).serial_number
             except Exception:
                 return None
-        # Another serial's all-digit hex spelling names that serial, never this one
         return RevokedSerial.query.filter(
             RevokedSerial.caref == parent.refid,
-            RevokedSerial.serial_number.in_(unambiguous_serial_spellings(serial)),
+            RevokedSerial.serial_number == canonical_serial(serial),
         ).first()
 
     @property
@@ -546,8 +569,12 @@ class CA(db.Model):
             return None
         return self.crl_digest or default_digest_for_key(key) or 'sha256'
 
-    def to_dict(self, include_private=False):
-        """Convert to dictionary"""
+    def to_dict(self, include_private=False, prefetched=None):
+        """Convert to dictionary.
+
+        `prefetched` (services.ca.list_prefetch.build) supplies the parent id,
+        certificate and cross-certificate counts of a whole listing at once.
+        """
         # Determine CA type (lowercase for frontend)
         ca_type = "root" if self.is_root else "intermediate"
         key_facts = self.key_facts
@@ -580,15 +607,22 @@ class CA(db.Model):
         
         # Get parent_id (numeric id) from caref (uuid)
         parent_id = None
-        if self.caref:
+        if self.caref and prefetched is not None:
+            parent_id = prefetched['parent_ids'].get(self.caref)
+        elif self.caref:
             parent_ca = CA.query.filter_by(refid=self.caref).first()
             parent_id = parent_ca.id if parent_ca else None
         
         # Aggregates, so the rows are not loaded into the session
         from models.ca_cross_certificate import CACrossCertificate as _Cross
-        cross_total = 0 if self.id is None else db.session.query(db.func.count(_Cross.id)).filter(
-            _Cross.ca_id == self.id).scalar()
-        if cross_total:
+        if prefetched is not None:
+            cross_total = prefetched['cross_totals'].get(self.id, 0)
+        else:
+            cross_total = 0 if self.id is None else db.session.query(db.func.count(_Cross.id)).filter(
+                _Cross.ca_id == self.id).scalar()
+        if prefetched is not None:
+            cross_served = self.id in prefetched['cross_served']
+        elif cross_total:
             from services.ca import cross_certs
             cross_served = cross_certs.served_for(self) is not None
         else:
@@ -603,6 +637,11 @@ class CA(db.Model):
             "serial": self.serial,
             "caref": self.caref,
             "parent_id": parent_id,  # Numeric parent ID for frontend tree
+            # Linked by hand over a signature this build cannot check: who, when
+            "parent_confirmed_by": self.parent_confirmed_by,
+            "parent_confirmed_at": utc_isoformat(self.parent_confirmed_at),
+            # Parent proposed for that confirmation; the list leaves it to the detail
+            "parent_candidate": None if prefetched is not None else self._parent_candidate(),
             "ski": self.ski,
             "subject": self.subject,
             "issuer": self.issuer,
@@ -639,7 +678,8 @@ class CA(db.Model):
             # External-CSR lifecycle (#298)
             "pending": self.is_pending,
             "has_csr": bool(self.csr),
-            "certs": self.certificates.count() if self.certificates else 0,  # Count of issued certificates
+            "certs": (prefetched['cert_counts'].get(self.refid, 0) if prefetched is not None
+                      else self.certificates.count() if self.certificates else 0),  # Count of issued certificates
             "cross_certificate_count": cross_total,
             "cross_certificate_served": bool(cross_served),
             "key_type": key_facts['key_type'],
@@ -653,6 +693,7 @@ class CA(db.Model):
             "signature_scheme": self.signature_scheme or 'pkcs1v15',
             "compliance_profile": self.compliance_profile,
             "issuance_hidden": bool(self.issuance_hidden),
+            "enforce_unique_subject": bool(self.enforce_unique_subject),
             # CRL/CDP configuration
             "cdp_enabled": self.cdp_enabled,
             "cdp_url": self.get_primary_cdp_url(),

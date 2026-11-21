@@ -1,7 +1,7 @@
 # Default values for the UCM Helm chart.
-# UCM is a single-instance application: it ships a background scheduler that is
-# not yet HA-safe and defaults to a local SQLite database. Keep replicaCount at
-# 1 (see the HA note in README.md).
+# UCM defaults to a single instance on a local SQLite database: keep replicaCount
+# at 1. For several nodes set ha.enabled=true (see docs/HA.md): it needs
+# PostgreSQL and replicaCount >= 2.
 
 image:
   repository: neyslim/ultimate-ca-manager
@@ -13,26 +13,54 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-## Single instance only — SQLite + per-pod scheduler are not HA-safe.
+## Single instance unless ha.enabled (then 2 or more): above 1 without ha.enabled the render fails.
 replicaCount: 1
 
-## Fully qualified domain name UCM serves on. Used for the self-signed UI
-## certificate and as the default base URL for issued AIA/CRL/OCSP URLs.
+## High availability (UCM_HA=1): several nodes on one PostgreSQL. The render
+## fails unless database.type=postgresql and replicaCount >= 2. Each pod gets
+## UCM_NODE_ID = pod name; UCM_SECRET_KEY, KEY_ENCRYPTION_KEY and UCM_DB_ENCRYPTION_KEY
+## come from the one shared Secret (generated once, kept across upgrades). There is no etc
+## PVC. The data volume is an emptyDir per pod (backup archives are kept in
+## PostgreSQL), or the persistence.data.existingClaim you name (ReadWriteMany).
+## Sessions are shared through PostgreSQL (or Redis), so no affinity is needed;
+## the ingress must pass the WebSocket upgrade (see docs/HA.md).
+ha:
+  enabled: false
+  podDisruptionBudget:
+    minAvailable: 1
+
+## Optional Redis shared by the nodes (sets REDIS_URL in HA mode).
+redis:
+  url: ""
+
+## Fully qualified domain name UCM serves on. Used as the default base URL for issued
+## AIA/CRL/OCSP URLs, and for the self-signed UI certificate, which is generated at the first
+## start only (kept on the data volume): changing fqdn later does not change it. To replace it,
+## apply a certificate in Settings > HTTPS, or regenerate the
+## self-signed one there.
 fqdn: ucm.local
 
-## Initial admin password (first boot only). Strongly recommended to override.
-## Leave empty to keep the image default (changeme123) — change it after login.
+## Initial admin password (first boot only). Empty: the chart generates one into its
+## Secret and keeps it across upgrades (lookup); read it with
+##   kubectl get secret <fullname>-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' | base64 -d
+## helm template and GitOps tools have no lookup: set it there, or it changes at each render.
+## The generated value must be changed at first login; a value set here is yours, no change forced.
+## Your own Secret instead: add INITIAL_ADMIN_PASSWORD (valueFrom secretKeyRef) or
+## INITIAL_ADMIN_PASSWORD_FILE (with the volume) to extraEnv; the chart then passes no password
+## of its own and forces no change.
 initialAdminPassword: ""
 
 ## App secrets. If left empty the chart generates random values on first install
 ## and PERSISTS them across upgrades (via lookup) so sessions survive restarts.
 secrets:
   secretKey: ""   # UCM_SECRET_KEY (Flask)
+  keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled: there, helm template or GitOps (no cluster lookup) refuse to render until it is set.
+  dbEncryptionKey: ""   # UCM_DB_ENCRYPTION_KEY (Fernet key) for the integration secrets (DNS, LDAP, SMTP, webhooks, SSO...), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled, where every pod must share it; helm template or GitOps refuse to render until it is set, as keyEncryptionKey. Moving an instance to HA: see docs/HA.md.
 
 ## Database backend.
-##  - sqlite (default): file in the data PVC, single instance.
-##  - postgresql: set databaseUrl to an external PostgreSQL 13+ (HA-capable
-##    storage, but the app itself still runs as a single replica).
+##  - sqlite (default): file in the data PVC, one replica.
+##  - postgresql: set databaseUrl to an external PostgreSQL 13+; required for
+##    several replicas (ha.enabled=true).
 database:
   type: sqlite
   # e.g. postgresql://ucm:password@postgres:5432/ucm  (used when type=postgresql)
@@ -83,10 +111,19 @@ proxy:
 fips:
   enabled: false
 
+## Upgrade from 2.x: the image stops on a database 2.254 started last unless
+## UCM_ACCEPT_MAJOR_UPGRADE names its major. A helm upgrade to this chart is
+## that consent: the chart sets the variable to the major of its appVersion.
+## false keeps the image's gate (set the variable yourself in extraEnv).
+majorUpgrade:
+  accept: true
+
 ## Extra environment variables (UCM_* etc.), passed verbatim.
 extraEnv: []
   # - name: UCM_LOG_LEVEL
   #   value: DEBUG
+  # - name: UCM_WORKER_TIMEOUT   # seconds a web request may run, 30 to 3600 (default 120)
+  #   value: "300"
 
 service:
   type: ClusterIP
@@ -138,6 +175,9 @@ ingress:
   className: ""
   annotations: {}
     # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    # Optional cookie affinity (ingress-nginx); sessions are shared, none is required:
+    # nginx.ingress.kubernetes.io/affinity: "cookie"
+    # nginx.ingress.kubernetes.io/session-cookie-name: "ucm-node"
   host: ucm.local
   tls: []
     # - secretName: ucm-tls
@@ -148,6 +188,11 @@ ingress:
     enabled: false
     host: pki.local
 
+## Backups and restores run in the scheduler process of this container, and their memory grows with the number of
+## certificates. Size limits.memory for the larger of the backup and the restore, plus the web worker (0.25 GB) and
+## the master (0.22 GB): 1Gi holds about 25 500 certificates with about 5% to spare (restore 0.55 GB); raise it to
+## about 5Gi for 255 000 (backup 3.85 GB on PostgreSQL, restore 3.7 GB). See docs/ADMIN_GUIDE.md, memory of backups
+## and restores.
 resources:
   requests:
     cpu: 100m
@@ -155,7 +200,7 @@ resources:
   limits:
     memory: 1Gi
 
-## Probes hit https://:8443/health (UCM serves a self-signed cert; the HTTPS
+## Liveness hits /health/live and readiness /health/ready on https://:8443 (UCM serves a self-signed cert; the HTTPS
 ## scheme tells the kubelet to skip verification).
 livenessProbe:
   enabled: true
@@ -163,12 +208,29 @@ livenessProbe:
   periodSeconds: 30
   timeoutSeconds: 10
   failureThreshold: 3
+## Liveness and readiness start once /health/live answers. The first start of a release that
+## upgrades the database answers nothing until the upgrade ends (UPGRADE.md), and in HA a container
+## restarted in its pod waits up to 190 s for its previous heartbeat to expire.
+startupProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 10
+  failureThreshold: 36
 readinessProbe:
   enabled: true
   initialDelaySeconds: 20
   periodSeconds: 15
   timeoutSeconds: 10
   failureThreshold: 3
+
+## Stopping a pod: preStop sleeps preStopSleepSeconds, the time the endpoints and kube-proxy take
+## to stop sending it connections, then UCM receives SIGTERM. The grace covers that sleep and UCM's
+## clean stop (at most 41 s: a running scheduled task gets 30 s, the scheduler process 5 s more
+## before it is killed, then the node writes its stop in cluster_nodes); the render refuses a grace
+## shorter than preStopSleepSeconds + 45. 0 disables the preStop hook.
+lifecycle:
+  preStopSleepSeconds: 10
+terminationGracePeriodSeconds: 60
 
 serviceAccount:
   create: true

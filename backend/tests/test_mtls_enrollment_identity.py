@@ -22,6 +22,8 @@ from tests.test_mtls_p12_identity import (  # noqa: F401  (fixture + helpers)
     _forged_cert_with_serial, _post, _serial_int, victim,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 
 def _login(app, username, password):
     client = app.test_client()
@@ -53,7 +55,8 @@ class TestUserCertificateRoutesShareTheRule:
             db.session.commit()
             legacy_id = legacy.id
         try:
-            r = auth_client.get(f'/api/v2/user-certificates/{legacy_id}/export?format=pem')
+            r = auth_client.post(f'/api/v2/user-certificates/{legacy_id}/export',
+                                 json={'format': 'pem'})
             assert r.status_code == 200, r.data[:200]
             assert b'PRIVATE KEY' in r.data
         finally:

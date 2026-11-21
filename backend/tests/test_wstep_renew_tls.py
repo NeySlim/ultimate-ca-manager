@@ -7,6 +7,7 @@ import contextlib
 import datetime
 import json
 import threading
+import time
 import uuid
 from unittest.mock import patch
 
@@ -18,8 +19,9 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-from sqlalchemy import update
+from sqlalchemy import text, update
 from sqlalchemy.orm.attributes import set_committed_value
+from utils.serial_duplicates import INDEX as SERIAL_INDEX
 
 from models import CA, AuditLog, CATemplatePin, Certificate, db
 from models.certificate_template import CertificateTemplate
@@ -30,7 +32,11 @@ from services.cert_service import CertificateService
 from services.wstep import wstep_service
 from services.wstep.rst_parser import _PKIData, _TaggedRequest, _unwrap_pkcs7_csr, parse_rst
 from tests.pqc_fixtures import fixture_bytes
+from tests.windows_profile_support import default_profile
 from tests.test_wstep_renew import RENEW_URL, _build_signed_rst, wstep_renew_config  # noqa: F401
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 PKIDATA_OID = '1.3.6.1.5.5.7.12.2'
 PKCS7_VALUE_TYPE = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
@@ -48,7 +54,7 @@ def _issue(app, ca_id, cn):
            .sign(key, hashes.SHA256()))
     with app.app_context():
         ca = db.session.get(CA, ca_id)
-        cert_pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test')
+        cert_pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='wstep')
     return x509.load_pem_x509_certificate(cert_pem.encode()), key
 
 
@@ -368,7 +374,8 @@ def test_renewal_is_audited_with_both_serials(client, app, wstep_renew_config):
     assert r.status_code == 200, r.data
     new_serial = _issued_from(r).serial_number
     assert _audit_rows(app, old_cert.serial_number) == [('wstep-client-cert', True, (
-        f'WSTEP renewal from 127.0.0.1: old serial {old_cert.serial_number}, new serial {new_serial}'))]
+        f'WSTEP renewal from 127.0.0.1: old serial {old_cert.serial_number}, new serial {new_serial} '
+        '(profile default)'))]
 
 
 def test_refused_renewal_is_audited(client, app, wstep_renew_config):
@@ -380,7 +387,7 @@ def test_refused_renewal_is_audited(client, app, wstep_renew_config):
     assert _post(client, signed).status_code == 400
     assert _audit_rows(app, old_cert.serial_number) == [('wstep-ws-security', False, (
         'WSTEP renewal refused from 127.0.0.1: Signing certificate has been revoked '
-        f'(old serial {old_cert.serial_number})'))]
+        f'(old serial {old_cert.serial_number}, profile default)'))]
 
 
 def _refusal_count(app):
@@ -423,7 +430,8 @@ def test_lookalike_of_a_revoked_and_deleted_certificate_is_not_audited(client, a
     before = _refusal_count(app)
     r = _post(client, _build_signed_rst(lookalike, key, _renewal_csr(lookalike, key)))
     assert r.status_code == 400
-    assert b'revoked' in r.data, r.data
+    # Stored nowhere, it names no profile and so no CA: refused before any record is read
+    assert b'not recognized' in r.data, r.data
     assert _refusal_count(app) == before
 
 
@@ -479,19 +487,30 @@ def test_supersede_is_a_compare_and_set(app, backend):
 
 @pytest.mark.postgres
 def test_two_claims_never_lock_in_opposite_orders(app):
-    """Listed in opposite orders, two claims still lock by id: one wins, neither deadlocks."""
+    """Listed in opposite orders, two claims still lock by id: one wins, neither deadlocks.
+
+    The first claim takes its first row lock and holds it, transaction open, until the
+    second one is seen by PostgreSQL waiting on a lock; a run where that never happened
+    did not overlap, and fails."""
+    from sqlalchemy.sql.dml import Update
     from services.ca.ca_signing import _claim_superseded
     from services.cert import issued_lookup
     from tests.test_crl_persistent_revocations import _PG_URL, _make_ca, _on_postgresql
     if not _PG_URL:
         pytest.skip('UCM_TEST_PG_URL not set; skipping the PostgreSQL target')
     listed = issued_lookup._rows_holding
-    both_hold_one = threading.Barrier(2, timeout=3)
-    local, results, errors = threading.local(), [], []
+    first_holds, second_pid = threading.Event(), []
+    local, results, errors, met = threading.local(), [], [], []
 
     def rows_in_this_threads_order(*args, **kwargs):
         rows = sorted(listed(*args, **kwargs), key=lambda r: r.id)
         return rows if local.first else rows[::-1]
+
+    def waiting_on_a_lock(pid):
+        with db.engine.connect() as probe:
+            return probe.execute(text(
+                "SELECT wait_event_type FROM pg_stat_activity WHERE pid = :pid"),
+                {'pid': pid}).scalar() == 'Lock'
 
     with _on_postgresql(app):
         with app.app_context():
@@ -502,20 +521,31 @@ def test_two_claims_never_lock_in_opposite_orders(app):
             columns = {c.name: getattr(row, c.name) for c in Certificate.__table__.columns
                        if c.name not in ('id', 'refid')}
             twin = Certificate(refid=str(uuid.uuid4()), **columns)
+            # A twin exists only where migration 142 is pending; this schema is dropped afterwards
+            db.session.execute(text(f'DROP INDEX IF EXISTS {SERIAL_INDEX}'))
             db.session.add(twin)
             db.session.commit()
             row_id = row.id
             real_execute = db.session.execute
 
-        def execute_then_meet(*args, **kwargs):
-            result = real_execute(*args, **kwargs)
-            if not getattr(local, 'met', False):
-                local.met = True
-                try:
-                    both_hold_one.wait()
-                except threading.BrokenBarrierError:
-                    pass  # the other one is waiting for this lock, as it should
-            return result
+        def execute_in_turn(statement, *args, **kwargs):
+            if not isinstance(statement, Update) or getattr(local, 'updated', False):
+                return real_execute(statement, *args, **kwargs)
+            local.updated = True
+            if local.first:
+                result = real_execute(statement, *args, **kwargs)
+                first_holds.set()
+                # Held until the second claim is blocked behind this lock, or never is
+                deadline = time.monotonic() + 15
+                while time.monotonic() < deadline and not met:
+                    if second_pid and waiting_on_a_lock(second_pid[0]):
+                        met.append(True)
+                    else:
+                        time.sleep(0.05)
+                return result
+            assert first_holds.wait(15), 'the first claim never took its lock'
+            second_pid.append(real_execute(text('SELECT pg_backend_pid()')).scalar())
+            return real_execute(statement, *args, **kwargs)
 
         def claim(first):
             local.first = first
@@ -530,13 +560,14 @@ def test_two_claims_never_lock_in_opposite_orders(app):
                     db.session.remove()
 
         with patch.object(issued_lookup, '_rows_holding', rows_in_this_threads_order), \
-                patch.object(db.session, 'execute', execute_then_meet):
+                patch.object(db.session, 'execute', execute_in_turn):
             threads = [threading.Thread(target=claim, args=(first,)) for first in (True, False)]
             for thread in threads:
                 thread.start()
             for thread in threads:
                 thread.join(60)
     assert errors == []
+    assert met, 'the second claim never waited on the lock the first one held'
     assert sorted(results) == [False, True]
 
 
@@ -544,8 +575,14 @@ def test_two_claims_never_lock_in_opposite_orders(app):
 
 @pytest.fixture
 def templated_ca(app, create_ca):
-    """A CA offering the given templates: {name: (EKU names, allowed AD group)}."""
+    """A CA offering the given templates: {name: (EKU names, allowed AD group)}. The default
+    profile its certificates are issued and renewed under exists for the test."""
+    from tests.windows_profile_support import default_profile
     made = []
+    with app.app_context():
+        no_profile = default_profile() is None
+        default_profile(create=True)
+        db.session.commit()
 
     def _make(cn, templates):
         ca_data = create_ca(cn=cn)
@@ -564,6 +601,10 @@ def templated_ca(app, create_ca):
     yield _make
     with app.app_context():
         delete_templates(made)
+        if no_profile:
+            Certificate.query.filter(Certificate.windows_profile_id == default_profile().id).update(
+                {'windows_profile_id': None})
+            db.session.delete(default_profile())
         db.session.commit()
 
 
@@ -584,7 +625,7 @@ def _wstep_issued(app, ca_id, cn):
     csr = _eku_csr(cn, key, ExtendedKeyUsageOID.CLIENT_AUTH)
     with app.app_context():
         cert_pem, err = wstep_service.issue(db.session.get(CA, ca_id),
-                                            csr.public_bytes(serialization.Encoding.DER), 30)
+                                            csr.public_bytes(serialization.Encoding.DER), 30, profile=default_profile())
     assert err is None, err
     return x509.load_pem_x509_certificate(cert_pem.encode()), key
 
@@ -607,11 +648,12 @@ def _renew(app, ca_id, path, old_cert, old_key, csr):
         if path == 'tls':
             csr_der, _part, signed = _unwrap_pkcs7_csr(_cmc_renewal(csr, [(old_key, old_cert)]))
             pem, err = wstep_service.renew_with_client_certificate(
-                ca, old_cert.public_bytes(serialization.Encoding.PEM), csr_der, signed, 30)
+                ca, old_cert, csr_der, signed, 30, profile=default_profile())
         else:
             parsed = parse_rst(_build_signed_rst(old_cert, old_key, csr))
-            pem, err = wstep_service.renew(ca, parsed.csr_der, parsed.security_header,
-                                           parsed.csr_element, 30)
+            signer, err = wstep_service.signed_request_certificate(parsed.security_header, parsed.csr_element)
+            assert err is None, err
+            pem, err = wstep_service.renew(ca, signer, parsed.csr_der, 30, profile=default_profile())
     return (x509.load_pem_x509_certificate(pem.encode()) if pem else None), err
 
 
@@ -662,7 +704,7 @@ def test_renewal_keeps_the_key_family_of_its_template(app, templated_ca):
                  .sign(key_algorithms.generate('ML-DSA-65'), None))
     with app.app_context():
         _template, _extra, _issued, err = wstep_service._renewal_template(
-            db.session.get(CA, ca_id), old_cert, mldsa_csr)
+            db.session.get(CA, ca_id), old_cert, mldsa_csr, profile=None)
     assert err == "Template 'WSTEP renew family CA User' issues RSA-2048 keys, not ML-DSA-65", err
 
 
@@ -711,7 +753,7 @@ def test_legacy_certificate_takes_a_fitting_template(app, templated_ca):
     assert _ekus(cert) == {ExtendedKeyUsageOID.CLIENT_AUTH}
 
 
-def test_restored_duplicate_beside_an_archived_original_still_renews(client, app, wstep_renew_config):
+def test_restored_duplicate_beside_an_archived_original_still_renews(client, app, wstep_renew_config, no_serial_index):
     """The live duplicate answers the status and is the row the renewal claims."""
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-duplicate.example.test')
     with app.app_context():
@@ -746,9 +788,9 @@ def test_legacy_certificate_with_any_eku_renews_at_par(app, templated_ca):
     csr = _eku_csr(renewed, key, ExtendedKeyUsageOID.CLIENT_AUTH)
     with app.app_context():
         ca = db.session.get(CA, ca_id)
-        template, extra, issued, err = wstep_service._renewal_template(ca, renewed, csr)
+        template, extra, issued, err = wstep_service._renewal_template(ca, renewed, csr, profile=None)
         assert (template, err) == (None, None)
-        pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test',
+        pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='wstep',
                                                       extra_ekus=extra, template_ekus=issued)
     assert _ekus(x509.load_pem_x509_certificate(pem.encode())) == {ExtendedKeyUsageOID.CLIENT_AUTH}
 
@@ -769,7 +811,7 @@ def test_legacy_certificate_is_refused_when_the_ca_offers_no_template(app, templ
         for pin in CATemplatePin.query.filter_by(ca_id=ca_id):
             pin.template.is_active = False
         db.session.commit()
-        _template, _extra, _issued, err = wstep_service._renewal_template(db.session.get(CA, ca_id), renewed, csr)
+        _template, _extra, _issued, err = wstep_service._renewal_template(db.session.get(CA, ca_id), renewed, csr, profile=None)
     assert err == 'This CA offers no certificate template'
     assert isinstance(err, wstep_service.ServerError)
 
@@ -798,7 +840,7 @@ def test_template_without_ekus_keeps_the_renewal_within_the_old_ones(app, templa
 
 
 @pytest.mark.parametrize('twin', ['same', 'hex_serial', 'crlf_pem'])
-def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config, twin):
+def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config, twin, no_serial_index):
     """A certificate held twice renews once, however the twin stores its serial or PEM."""
     old_cert, old_key = _issue(app, wstep_renew_config['id'], f"tls-renew-two-live-{twin.replace('_', '-')}.example.test")
     with app.app_context():
@@ -823,7 +865,7 @@ def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_confi
         assert [db.session.get(Certificate, i).archived for i in ids] == [True, True]
 
 
-def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_config, monkeypatch):
+def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_config, monkeypatch, no_serial_index):
     """One of two live rows archived between the read and the update: the claim fails."""
     from services.ca.ca_signing import _claim_superseded
     old_cert, _old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-twin-race.example.test')
@@ -861,10 +903,127 @@ def test_renewal_keeps_the_key_usage_of_its_template(app, templated_ca, ekus):
     csr = _eku_csr('jdoe', key, *oids)
     with app.app_context():
         pem, err = wstep_service.issue(db.session.get(CA, ca_id),
-                                       csr.public_bytes(serialization.Encoding.DER), 30)
+                                       csr.public_bytes(serialization.Encoding.DER), 30, profile=None)
     assert err is None, err
     old_cert = x509.load_pem_x509_certificate(pem.encode())
     cert, err = _renew(app, ca_id, 'tls', old_cert, key, _eku_csr(old_cert, key, *oids))
     assert err is None, err
     assert (cert.extensions.get_extension_for_class(x509.KeyUsage).value
             == old_cert.extensions.get_extension_for_class(x509.KeyUsage).value)
+
+
+def test_renewal_of_a_subject_another_holds_is_a_fault_once_the_option_is_on(client, app, wstep_renew_config):
+    """No pattern names the subject: the refusal names it, as a fault the requester can read."""
+    from tests.test_windows_profile_routing import _audits, _fault, _top_audit
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-taken.example.test')
+    _issue(app, wstep_renew_config['id'], 'tls-renew-taken.example.test')  # another key, no holder
+    with app.app_context():
+        db.session.get(CA, wstep_renew_config['id']).enforce_unique_subject = True
+        db.session.commit()
+    floor = _top_audit(app)
+    try:
+        new_key = _key()
+        body = _rst(_cmc_renewal(_renewal_csr(old_cert, new_key), [(new_key, None), (old_key, old_cert)]))
+        assert _fault(_post(client, body, tls_cert=old_cert)) == (
+            400, 's:Sender',
+            'The subject CN=tls-renew-taken.example.test is already carried by a certificate of another account')
+        # One entry, as for a pattern's refusal: no certificate.subject_taken
+        assert [a[0] for a in _audits(app, floor)] == ['windows_enrollment.refused']
+    finally:
+        with app.app_context():
+            db.session.get(CA, wstep_renew_config['id']).enforce_unique_subject = False
+            db.session.commit()
+
+
+def test_a_templated_renewal_of_a_subject_another_holds_names_no_template(app, templated_ca):
+    """A template matched, no pattern building the subject: the CA's option refuses it, and the
+    refusal names no template (the template did not build that subject)."""
+    ca_id = templated_ca('WSTEP renew taken template CA', USER_AND_CODESIGN)
+    old_cert, old_key = _wstep_issued(app, ca_id, 'template-taken.example.test')
+    _wstep_issued(app, ca_id, 'template-taken.example.test')  # another key, the option still off
+    with app.app_context():
+        db.session.get(CA, ca_id).enforce_unique_subject = True
+        db.session.commit()
+    before = _issued_count(app)
+    cert, err = _renew(app, ca_id, 'tls', old_cert, old_key,
+                       _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH))
+    assert cert is None and isinstance(err, wstep_service.SubjectHeldByAnother), err
+    assert err == ('The subject CN=template-taken.example.test is already carried by a certificate '
+                   'of another account')
+    assert _issued_count(app) == before
+
+
+# An imported twin of the renewed certificate
+
+@contextlib.contextmanager
+def _imported_twin_listed_first(app, ca_id, cert):
+    """The same certificate imported under a twin record of the CA (no profile, source='import'),
+    the Windows row stored again after it so that the twin is read first."""
+    from services.cert.issued_lookup import find_issued_rows
+
+    def copy(model, row, **changes):
+        values = {c.key: getattr(row, c.key) for c in model.__table__.columns if c.key != 'id'}
+        values.update(changes)
+        db.session.add(model(**values))
+        db.session.flush()
+
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        twin_refid = '0000' + uuid.uuid4().hex[:28]
+        copy(CA, ca, refid=twin_refid, descr=f'{ca.descr} twin', url_slug=None, hsm_key_id=None)
+        original = Certificate.query.filter_by(caref=ca.refid, serial_number=str(cert.serial_number)).one()
+        copy(Certificate, original, refid=uuid.uuid4().hex, caref=twin_refid, source='import',
+             windows_profile_id=None)
+        values = {c.key: getattr(original, c.key) for c in Certificate.__table__.columns if c.key != 'id'}
+        db.session.delete(original)
+        db.session.flush()
+        db.session.add(Certificate(**values))
+        db.session.commit()
+        assert [r.source for r in find_issued_rows(ca, cert)] == ['import', 'wstep']
+    try:
+        yield
+    finally:
+        with app.app_context():
+            Certificate.query.filter_by(caref=twin_refid).delete()
+            CA.query.filter_by(refid=twin_refid).delete()
+            db.session.commit()
+
+
+def test_the_rows_holding_a_certificate_come_oldest_first(app, wstep_renew_config):
+    """One order on both engines: SQLite would follow the (caref, serial) index, PostgreSQL the heap."""
+    from services.cert.issued_lookup import find_issued_rows
+    cert, _ = _issue(app, wstep_renew_config['id'], 'tls-renew-order.example.test')
+    twin_refid = '0000' + uuid.uuid4().hex[:28]      # sorts before any refid in the index
+    with app.app_context():
+        ca = db.session.get(CA, wstep_renew_config['id'])
+        values = {c.key: getattr(ca, c.key) for c in CA.__table__.columns if c.key != 'id'}
+        values.update(refid=twin_refid, descr=f'{ca.descr} twin', url_slug=None, hsm_key_id=None)
+        db.session.add(CA(**values))
+        original = Certificate.query.filter_by(caref=ca.refid, serial_number=str(cert.serial_number)).one()
+        values = {c.key: getattr(original, c.key) for c in Certificate.__table__.columns if c.key != 'id'}
+        values.update(refid=uuid.uuid4().hex, caref=twin_refid, source='import', windows_profile_id=None)
+        db.session.add(Certificate(**values))
+        db.session.commit()
+        try:
+            assert [r.source for r in find_issued_rows(ca, cert)] == ['wstep', 'import']
+        finally:
+            Certificate.query.filter_by(caref=twin_refid).delete()
+            CA.query.filter_by(refid=twin_refid).delete()
+            db.session.commit()
+
+
+@pytest.mark.parametrize('path', ['tls', 'ws-security'])
+def test_a_certificate_bound_renewal_is_served_when_an_imported_twin_is_read_first(
+        client, app, wstep_renew_config, path):
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], f'tls-renew-twin-{path}.example.test')
+    with _imported_twin_listed_first(app, wstep_renew_config['id'], old_cert):
+        csr = _renewal_csr(old_cert, old_key)
+        if path == 'tls':
+            r = _post(client, _rst(_cmc_renewal(csr, [(old_key, old_cert)])), tls_cert=old_cert)
+        else:
+            r = _post(client, _build_signed_rst(old_cert, old_key, csr))
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            rows = {row.source: row for row in Certificate.query.filter_by(
+                serial_number=str(old_cert.serial_number))}
+            assert rows['wstep'].archived, 'the Windows row is the one superseded'

@@ -13,12 +13,13 @@ confirmed against a real GSSAPI installation (ucm2.vm.hagland.home) to
 parse successfully and report that exact principal -- not a mock.
 """
 import base64
-import io
 from pathlib import Path
 
 import pytest
 
 from services.kerberos import negotiate_auth
+from tests.optional_backends import needs
+from tests.windows_profile_support import windows_profiles_restored, upload_keytab  # noqa: F401
 
 try:
     import gssapi  # noqa: F401
@@ -26,8 +27,8 @@ try:
 except ImportError:
     HAS_GSSAPI = False
 
-requires_gssapi = pytest.mark.skipif(
-    not HAS_GSSAPI,
+requires_gssapi = needs(
+    'gssapi', HAS_GSSAPI,
     reason='gssapi not installed (optional pyspnego[kerberos] extra); '
            'positive-parse cases need the real GSSAPI keytab loader',
 )
@@ -59,6 +60,8 @@ class TestInspectKeytab:
         assert result == {
             'valid': True,
             'principal': 'HTTP/testhost.example.test@EXAMPLE.TEST',
+            'entries': [{'principal': 'HTTP/testhost.example.test@EXAMPLE.TEST',
+                         'realm': 'EXAMPLE.TEST', 'kvno': 1, 'enctype': 18}],
             'error': None,
         }
 
@@ -70,7 +73,8 @@ class TestInspectKeytab:
 
     def test_missing_keytab_is_invalid(self, tmp_path):
         result = negotiate_auth.inspect_keytab(str(tmp_path / 'does-not-exist.keytab'))
-        assert result == {'valid': False, 'principal': None, 'error': 'No keytab uploaded'}
+        assert result == {'valid': False, 'principal': None, 'entries': [],
+                          'error': 'No keytab uploaded'}
     @requires_gssapi
     def test_default_path_is_keytab_path(self, monkeypatch, valid_keytab_path):
         monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', Path(valid_keytab_path))
@@ -80,7 +84,7 @@ class TestInspectKeytab:
 
 
 class TestKeytabUploadEndpoint:
-    """Exercises api/v2/kerberos.py's upload_kerberos_keytab through the
+    """Exercises the keytab upload of api/v2/windows_profiles.py through the
     real Flask app, since the validate-before-persist ordering (reject a
     malformed keytab without overwriting a working one) is the actual
     behavior being fixed, not just inspect_keytab in isolation."""
@@ -93,8 +97,7 @@ class TestKeytabUploadEndpoint:
         keytab_target.write_bytes(base64.b64decode(_VALID_KEYTAB_B64))
         before = keytab_target.read_bytes()
 
-        data = {'file': (io.BytesIO(b'not a real keytab'), 'bad.keytab')}
-        r = auth_client.post('/api/v2/kerberos/keytab', data=data, content_type='multipart/form-data')
+        r = upload_keytab(auth_client, b'not a real keytab', filename='bad.keytab')
 
         assert r.status_code == 400
         assert keytab_target.read_bytes() == before  # untouched
@@ -105,30 +108,24 @@ class TestKeytabUploadEndpoint:
         monkeypatch.setattr(negotiate_auth, 'get_spn', lambda: 'HTTP/testhost.example.test@EXAMPLE.TEST')
 
         keytab_bytes = base64.b64decode(_VALID_KEYTAB_B64)
-        data = {'file': (io.BytesIO(keytab_bytes), 'good.keytab')}
-        r = auth_client.post('/api/v2/kerberos/keytab', data=data, content_type='multipart/form-data')
+        r = upload_keytab(auth_client, keytab_bytes, filename='good.keytab')
 
         assert r.status_code == 200
         body = r.get_json()
-        assert body['data']['keytab_valid'] is True
-        assert body['data']['keytab_principal'] == 'HTTP/testhost.example.test@EXAMPLE.TEST'
-        assert body['data']['keytab_spn_matches'] is True
+        assert body['data']['keytab_set'] is True
+        assert [e['principal'] for e in body['data']['keytab_entries']] == [
+            'HTTP/testhost.example.test@EXAMPLE.TEST']
         assert keytab_target.read_bytes() == keytab_bytes
-    @requires_gssapi
-    def test_valid_upload_with_mismatched_spn_is_still_accepted(self, auth_client, app, tmp_path, monkeypatch):
-        """A keytab can legitimately carry a different (or additional)
-        principal than the SPN field currently says -- reject the upload
-        outright would be wrong; surface the mismatch instead."""
+    def test_a_keytab_for_another_host_than_the_spn_is_refused(self, auth_client, app, tmp_path, monkeypatch):
+        """The unnamed acceptor takes a ticket for any entry: one for another host is refused."""
         keytab_target = tmp_path / 'persisted3.keytab'
         monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', keytab_target)
         monkeypatch.setattr(negotiate_auth, 'get_spn', lambda: 'HTTP/some-other-host.example.test@EXAMPLE.TEST')
+        monkeypatch.setattr(negotiate_auth, '_gssapi_load', lambda target: ('HTTP/testhost.example.test@EXAMPLE.TEST', None))
 
         keytab_bytes = base64.b64decode(_VALID_KEYTAB_B64)
-        data = {'file': (io.BytesIO(keytab_bytes), 'good.keytab')}
-        r = auth_client.post('/api/v2/kerberos/keytab', data=data, content_type='multipart/form-data')
+        r = upload_keytab(auth_client, keytab_bytes, filename='good.keytab')
 
-        assert r.status_code == 200
-        body = r.get_json()
-        assert body['data']['keytab_valid'] is True
-        assert body['data']['keytab_spn_matches'] is False
-        assert keytab_target.read_bytes() == keytab_bytes
+        assert r.status_code == 400
+        assert 'HTTP/testhost.example.test@EXAMPLE.TEST' in r.get_json()['message']
+        assert not keytab_target.exists()

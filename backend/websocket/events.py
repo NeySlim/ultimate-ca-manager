@@ -37,6 +37,13 @@ socketio = SocketIO()
 # Worker-local socket state; counts and rooms are per worker by design.
 connected_clients: Dict[str, Dict[str, Any]] = {}
 
+# True once init_websocket gave SocketIO a message queue: it carries every process's events
+_queue_in_use = False
+# Without a message queue: events go to the other processes through the database
+# (services.ws_relay); the scheduler process emits nowhere else, an HA web worker also here
+_relay_publisher = None
+_relay_emits_here = False
+
 _QUEUE_SCHEMES = ("redis", "rediss", "unix")
 _KEEPALIVE_OPTIONS = {
     opt: value
@@ -69,14 +76,13 @@ def _message_queue(app) -> Optional[socketio_pkg.RedisManager]:
         return None
     # Bound each emit on an unreachable or silently dead Redis; a read timeout
     # would also hit the idle pub/sub listener, so keepalive detects dead peers.
+    options = {"socket_connect_timeout": 2}
+    if urlparse(url).scheme != "unix":  # TCP options: a Unix socket connection refuses them
+        options.update(socket_keepalive=True, socket_keepalive_options=_KEEPALIVE_OPTIONS)
     return socketio_pkg.RedisManager(
         url,
         channel=_queue_channel(url, app.config.get("SESSION_KEY_PREFIX", "ucm:session:")),
-        redis_options={
-            "socket_connect_timeout": 2,
-            "socket_keepalive": True,
-            "socket_keepalive_options": _KEEPALIVE_OPTIONS,
-        },
+        redis_options=options,
     )
 
 
@@ -174,8 +180,10 @@ def _checked_origins(app) -> list:
 # ================== Initialization ==================
 def init_websocket(app):
     """Initialize WebSocket with Flask app; refuses to start without explicit origins."""
+    global _queue_in_use
     origins = _checked_origins(app)
     message_queue = _message_queue(app)
+    _queue_in_use = message_queue is not None
     socketio.init_app(
         app,
         cors_allowed_origins=origins,
@@ -188,6 +196,17 @@ def init_websocket(app):
         engineio_logger=_flag(_setting(app, 'WEBSOCKET_ENGINEIO_LOGGER', False)))
     logger.info("WebSocket initialized (message queue: %s)", bool(message_queue))
     return socketio
+
+
+def message_queue_in_use() -> bool:
+    return _queue_in_use
+
+
+def relay_through(publisher, emit_here=False):
+    """Route this process's events to ``publisher`` (None: emit them here again only)."""
+    global _relay_publisher, _relay_emits_here
+    _relay_publisher = publisher
+    _relay_emits_here = bool(emit_here) and publisher is not None
 
 
 # ================== Identity and rooms ==================
@@ -442,6 +461,12 @@ def emit_event(event_type, data, room=None, include_self=True):
     type_name = _event_name(event_type)
     _check_payload(data)
     payload = {'type': type_name, 'data': data, 'timestamp': _timestamp()}
+    publisher = _relay_publisher
+    if publisher is not None:
+        publisher.publish(room, payload)  # queues only, never raises
+        if not _relay_emits_here:
+            return
+    # The skipped sid, if any, is a socket of this process: the relayed copies need no option
     options = {'to': room}
     if not include_self and _calling_sid():
         options['skip_sid'] = _calling_sid()

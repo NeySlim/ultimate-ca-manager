@@ -6,6 +6,9 @@ import tempfile
 import os
 import json
 import logging
+from .diagnostics import (
+    MAX_NAMES, NAME_LENGTH, GroupSource, claim_candidates, saml_candidates, shown_list,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +16,10 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Shared lockout helpers (used by auth.py, auth_methods.py, sso/*)
 # ============================================================================
+
+# The settings screen's minimum: under it every login locks at its first failure
+MIN_LOGIN_ATTEMPTS = 3
+
 
 def _get_lockout_settings():
     """Read lockout settings from DB config, fallback to defaults.
@@ -29,7 +36,7 @@ def _get_lockout_settings():
     except Exception:
         max_attempts = 5
         lockout_seconds = 900
-    return max_attempts, lockout_seconds
+    return max(max_attempts, MIN_LOGIN_ATTEMPTS), lockout_seconds
 
 def _get_ssl_verify(provider, protocol):
     """Get SSL verification parameter for requests library.
@@ -122,8 +129,14 @@ def _encrypt_ldap_password(password: str) -> str:
 
 
 def _decrypt_ldap_password(provider) -> str:
-    """Decrypt LDAP bind password from provider config."""
-    password = provider.ldap_bind_password
+    """Decrypt LDAP bind password from provider config. A stored token this node's key
+    does not open raises SecretUnreadable: ldap3 would bind anonymously without it."""
+    from utils.encryption import decrypt_required
+    if hasattr(provider, '_ldap_bind_password'):
+        password = decrypt_required(provider._ldap_bind_password,
+                                    f'SSO provider {provider.id} LDAP bind password')
+    else:
+        password = provider.ldap_bind_password
     if not password:
         return password
     from security.encryption import key_encryption
@@ -179,24 +192,6 @@ def _get_ldap_lockout_settings():
     return _get_lockout_settings()
 
 
-def _check_ldap_lockout(username):
-    """Check if account is locked due to failed LDAP attempts."""
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        return False
-    if user.locked_until:
-        if utc_now() < user.locked_until:
-            return True
-        user.locked_until = None
-        user.failed_logins = 0
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP lockout: {e}")
-    return False
-
-
 def notify_account_locked(username):
     """Send the account_locked security alert; never fails the login."""
     try:
@@ -211,38 +206,62 @@ def notify_account_locked(username):
         logger.warning(f"Failed to send account_locked alert for {username}: {e}")
 
 
-def _record_ldap_failed_attempt(username):
-    """Record a failed LDAP login attempt."""
-    user = User.query.filter_by(username=username).first()
+def announce_account_locked(subject, username, max_attempts):
+    """Log and alert a lock; called by the one attempt that armed it."""
+    logger.warning(f"{subject} locked after {max_attempts} failed attempts")
+    notify_account_locked(username)
+
+
+def _reserve_ldap_attempt(user):
+    """Count one LDAP attempt before the bind, on the local account the entry resolves to.
+
+    Returns (account, rank, armed) as ``User.reserve_login_attempt``: account None when
+    there is none (nothing is counted). Raises, rolled back, when the count fails."""
     if not user:
-        return
+        return None, None, None
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
-    user.failed_logins = (user.failed_logins or 0) + 1
-    locked = user.failed_logins >= max_attempts
-    if locked:
-        user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
-        logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
     try:
+        rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return user, rank, armed
+
+
+def _ldap_attempt_failed(user, armed):
+    """A refused or failed bind: the one attempt that armed the lock reports it."""
+    if user is not None and armed:
+        announce_account_locked(f'LDAP account {user.username}', user.username,
+                                _get_ldap_lockout_settings()[0])
+
+
+def _release_ldap_attempt(user, armed):
+    """The bind proved the password but no session opens: the attempt that armed the lock
+    lifts it and is not counted; any other stays counted (``User.release_login_attempt``)."""
+    if user is None:
+        return
+    try:
+        user.release_login_attempt(armed)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to record LDAP failed attempt for {username}: {e}")
-        return
-    if locked:
-        notify_account_locked(username)
+        logger.error(f"Failed to release LDAP attempt for {user.username}: {e}")
 
 
-def _clear_ldap_failed_attempts(username):
-    """Clear failed attempt counters on successful login."""
-    user = User.query.filter_by(username=username).first()
-    if user and (user.failed_logins or user.locked_until):
-        user.failed_logins = 0
-        user.locked_until = None
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP failed attempts for {username}: {e}")
+def _clear_ldap_failed_attempts(user):
+    """Clear the stored count and lock of the account a successful bind opens; False,
+    rolled back, when that fails: no session opens, as at the password door."""
+    if user is None:
+        return True
+    try:
+        user.clear_failed_logins()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to update login stats for {user.username}: {e}", exc_info=True)
+        return False
+    return True
 
 
 # SAML attributes read for group membership when the provider's attribute
@@ -316,6 +335,39 @@ def oidc_identity(userinfo, attr_mapping):
     return username, email, get('fullname', 'name')
 
 
+# Key of the verified ``tid`` in the external data of a multi-tenant sign-in; UserInfo's is replaced
+OIDC_TENANT_KEY = 'ucm_oidc_tenant'
+_EXTERNAL_ID_LENGTH = 255  # user_sso_identities.external_id
+
+
+def oidc_external_id(provider, external_data):
+    """The account's stable id at ``provider``: :func:`oidc_stable_id`, scoped as
+    ``<tid>/<sub>`` by the verified tenant when the provider accepts several tenants (claims are
+    interpreted within the tenant); None when that tenant or the id is missing."""
+    from services.oidc_id_token import has_tenants, is_tenant_id
+    value = oidc_stable_id(external_data)
+    if not has_tenants(provider):
+        return value
+    tid = (external_data or {}).get(OIDC_TENANT_KEY) if isinstance(external_data, dict) else None
+    if value is None or not is_tenant_id(tid):
+        return None
+    scoped = f'{tid}/{value}'
+    return scoped if len(scoped) <= _EXTERNAL_ID_LENGTH else None
+
+
+def oidc_stable_id(userinfo):
+    """The account's stable id in UserInfo: ``sub``, else (GitHub, not an OIDC provider) the
+    numeric ``id``; never ``login`` nor the e-mail, which can pass to another person."""
+    userinfo = userinfo if isinstance(userinfo, dict) else {}
+    value = userinfo.get('sub')
+    if value is None:
+        value = userinfo.get('id')
+        if isinstance(value, bool) or not isinstance(value, (int, str)):
+            return None
+    value = str(value).strip()
+    return value or None
+
+
 def saml_identity(attrs, name_id, attr_mapping):
     """(username, email, fullname) from SAML attributes through the attribute mapping."""
     attrs = attrs if isinstance(attrs, dict) else {}
@@ -331,19 +383,26 @@ def saml_identity(attrs, name_id, attr_mapping):
 
 
 def _extract_saml_groups(attrs, attr_mapping=None):
-    """Group / role values from a validated SAML assertion, for role mapping.
+    """Group / role values from a validated SAML assertion, for role mapping."""
+    return saml_groups(attrs, attr_mapping)[0]
+
+
+def saml_groups(attrs, attr_mapping=None, friendly_names=None):
+    """``(values, GroupSource)`` of a validated SAML assertion, for role mapping.
 
     ``attrs`` is the ``{name: [values]}`` dict from the SAML library. When the
     attribute mapping assigns attributes to ``groups``, only those are read and
-    the defaults in ``_SAML_GROUP_ATTRIBUTES`` are not. Returns the non-empty
-    values, de-duplicated in assertion order, for the top-level ``groups`` key
-    that ``_resolve_role_from_mapping`` reads.
+    the defaults in ``_SAML_GROUP_ATTRIBUTES`` are not. Attributes are read by Name
+    only, never by FriendlyName (SAML Core 2.0 §2.7.3.1), which ``friendly_names``
+    gives for the refusal diagnosis alone. Values are the non-empty ones,
+    de-duplicated in assertion order, for the top-level ``groups`` key.
     """
     attrs = attrs if isinstance(attrs, dict) else {}
     configured = _saml_group_attribute_names(attr_mapping, attrs)
+    looked_for = configured or _SAML_GROUP_ATTRIBUTES
     groups = {}  # insertion-ordered set
     sources = []
-    for name in configured or _SAML_GROUP_ATTRIBUTES:
+    for name in looked_for:
         values = attrs.get(name)
         if values is None:
             continue
@@ -366,7 +425,11 @@ def _extract_saml_groups(attrs, attr_mapping=None):
             "SAML assertion has no groups: Entra ID sent groups.link because the user "
             "has too many groups. Emit only the groups assigned to the application, "
             "or app roles, so role mapping can match.")
-    return list(groups)
+    names = sources or looked_for
+    label = (f"SAML attribute{'s' if len(names) > 1 else ''} "
+             f"{shown_list(names, MAX_NAMES, NAME_LENGTH)}")
+    candidates = None if groups else saml_candidates(attrs, friendly_names, exclude=looked_for)
+    return list(groups), GroupSource(label, candidates, 'attributes')
 
 
 # Highest privilege first — multi-match resolution picks the greatest (#221).
@@ -482,38 +545,88 @@ def _entra_oidc_groups_overage(id_claims):
     return (isinstance(names, dict) and 'groups' in names) or id_claims.get('hasgroups') is True
 
 
-def oidc_external_groups(userinfo, id_claims, token_unused=None):
-    """Groups and roles of an OIDC login: those of its UserInfo response and of
-    the ID token bound to it (``None`` when none is, ``token_unused`` saying why)."""
+def _claim_lookup(data, name):
+    """The value of claim ``name``: the claim of that exact name, else a dotted path
+    through nested objects (a key may itself hold dots); ``_MISSING`` when neither."""
+    if not isinstance(data, dict):
+        return _MISSING
+    if name in data:
+        return data[name]
+    dots = [i for i, ch in enumerate(name) if ch == '.']
+    for i in reversed(dots):  # the longest key first
+        inner = data.get(name[:i])
+        if isinstance(inner, dict):
+            found = _claim_lookup(inner, name[i + 1:])
+            if found is not _MISSING:
+                return found
+    return _MISSING
+
+
+_MISSING = object()
+
+
+def claim_groups(data, name):
+    """Groups of the claim an attribute mapping row assigns to ``groups``: a string
+    or a list of strings; any other value gives none."""
+    value = _claim_lookup(data, name)
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return list(value)
+    return []
+
+
+def oidc_groups(userinfo, id_claims, token_unused=None, attr_mapping=None):
+    """``(values, GroupSource)`` of an OIDC login: those of its UserInfo response and of
+    the ID token bound to it (``None`` when none is, ``token_unused`` saying why).
+    Claims the attribute mapping assigns to ``groups`` replace ``roles`` and ``groups``."""
     id_claims = id_claims if isinstance(id_claims, dict) else {}
+    userinfo = userinfo if isinstance(userinfo, dict) else {}
+    configured = mapped_attributes(attr_mapping, 'groups', set(userinfo) | set(id_claims))
     sources = [('UserInfo', userinfo)]
     if token_unused is None:
         sources.insert(0, ('ID token', id_claims))
     merged, counts = {}, []
     for label, data in sources:
-        values = _external_groups(data)
+        if configured:
+            values = [v for name in configured for v in claim_groups(data, name)]
+        else:
+            values = _external_groups(data)
         counts.append(f"{label} ({len(values)} value(s))")
         merged.update((v, None) for v in values)
     unused = f"; ID token not used: {token_unused}" if token_unused is not None else ''
-    logger.info(f"OIDC groups read from {', '.join(counts)}{unused}")
+    claims = f" claim {', '.join(configured)}" if configured else ''
+    logger.info(f"OIDC groups read from {', '.join(counts)}{claims}{unused}")
     if _entra_oidc_groups_overage(id_claims):
         logger.warning(
             "OIDC ID token has no groups claim: Entra ID left it out because the user "
             "has too many groups. Emit only the groups assigned to the application, "
             "or app roles, so role mapping can match.")
-    return list(merged)
+    names = configured or ('roles', 'groups')
+    where = ' and '.join(('the ID token' if label == 'ID token' else label) for label, _ in sources)
+    label = (f"{where}, claim{'s' if len(names) > 1 else ''} "
+             f"{shown_list(names, MAX_NAMES, NAME_LENGTH)}")
+    if token_unused is not None:
+        label += f" (ID token not used: {token_unused})"
+    candidates = None if merged else claim_candidates(*(data for _, data in sources), exclude=names)
+    return list(merged), GroupSource(label, candidates, 'claims')
+
+
+def oidc_external_groups(userinfo, id_claims, token_unused=None, attr_mapping=None):
+    """Group values of an OIDC login (see :func:`oidc_groups`)."""
+    return oidc_groups(userinfo, id_claims, token_unused, attr_mapping)[0]
 
 
 def _group_match_key_of(provider_type):
     if provider_type == 'ldap':
-        # str.split() takes the separators RFC 4518 2.2 maps to SPACE (and a few control characters)
+        # str.split() takes every separator RFC 4518 §2.2 maps to SPACE
         return lambda name: ' '.join(str(name).split()).casefold()
     return lambda name: name
 
 
 def group_match_key(provider):
     """How a rule key and a group name compare. LDAP: close to what cn does, caseIgnoreMatch
-    (RFC 4519 2.3; RFC 4517 4.2.11 with RFC 4518 2.6.1): case, edge spaces and the
+    (RFC 4519 §2.3; RFC 4517 §4.2.11 with RFC 4518 §2.6.1): case, edge spaces and the
     length of inner space runs ignored. OIDC and SAML groups are opaque identifiers: exact."""
     return _group_match_key_of(getattr(provider, 'provider_type', None))
 
@@ -523,12 +636,29 @@ def _external_group_keys(provider, external_data):
     return [key(g) for g in _external_groups(external_data)]
 
 
+def roles_honoured(provider, external_data):
+    """Whether the role mapping reads this identity's claims: always for one issuer; for several
+    tenants, only a tenant listed in ``oauth2_role_tenants``, whose administrators assign roles."""
+    from services.oidc_id_token import has_tenants, provider_role_tenants
+    if provider.provider_type != 'oauth2' or not has_tenants(provider):
+        return True
+    tid = external_data.get(OIDC_TENANT_KEY) if isinstance(external_data, dict) else None
+    return isinstance(tid, str) and tid.lower() in provider_role_tenants(provider)
+
+
+def _honoured_rules(provider, external_data):
+    """The provider's rules that apply to this identity: none for a tenant whose roles are not honoured."""
+    return _mapping_rules(provider) if roles_honoured(provider, external_data) else {}
+
+
 def sso_admission(provider, external_data):
     """Whether a login may proceed. With mapping rules, only a user one of them
-    matches; without rules, every user gets the default role, and no default
-    role admits nobody (no implicit role)."""
+    matches, and a tenant whose role claims are not honoured matches none; without
+    rules, every user gets the default role, and no default role admits nobody."""
     rules = _mapping_rules(provider)
     if rules:
+        if not roles_honoured(provider, external_data):
+            return False
         key = group_match_key(provider)
         groups = _external_group_keys(provider, external_data)
         return any(key(rule) in groups for rule in rules)
@@ -543,11 +673,12 @@ def _resolve_mapped_roles(provider, external_data):
     in mapping order, that names one. An invalid base role counts as viewer
     (as before) and an unknown custom role is ignored, both with a warning.
     """
-    role_mapping = _mapping_rules(provider)
+    role_mapping = _honoured_rules(provider, external_data)
     if not role_mapping:
         return None, None
     external_roles = _external_groups(external_data)
-    logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
+    logger.info(f"Role resolution: {len(role_mapping)} rule(s), external groups "
+                f"({len(external_roles)}): {shown_list(external_roles)}")
     key = group_match_key(provider)
     external_keys = _external_group_keys(provider, external_data)
     bases, customs = [], []

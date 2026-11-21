@@ -1,7 +1,7 @@
 /**
  * CAs (Certificate Authorities) Page - Using ResponsiveLayout
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -13,10 +13,9 @@ import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
-import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, useModals, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
-import { extractData, cn, downloadBlob } from '../lib/utils'
+import { extractData, cn } from '../lib/utils'
 import { OrgView } from './cas/OrgView'
 import { ColumnsView } from './cas/ColumnsView'
 import { ListView } from './cas/ListView'
@@ -33,7 +32,6 @@ export default function CAsPage() {
   const { id: urlCAId } = useParams()
   const navigate = useNavigate()
   const { isMobile } = useMobile()
-  const { openWindow } = useWindowManager()
   const openEntity = useOpenEntity()
   const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
@@ -114,7 +112,7 @@ export default function CAsPage() {
     }
   }, [])
 
-  // Reload when floating window actions change data. loadCAs must be in the
+  // Reload when inspector actions change data. loadCAs must be in the
   // dependencies: a listener registered once keeps the loader captured at
   // mount and reloads with the state of that moment (#345).
   useEffect(() => {
@@ -125,7 +123,7 @@ export default function CAsPage() {
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [loadCAs])
 
-  // Handle open pins modal event from floating window
+  // Handle open pins modal event from inspector
   useEffect(() => {
     const handler = (e) => {
       if (e.detail?.caId) {
@@ -160,7 +158,7 @@ export default function CAsPage() {
       const id = parseInt(urlCAId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
-          openWindow('ca', id)
+          openEntity('ca', id)
         } else {
           loadCADetails({ id })
         }
@@ -169,13 +167,14 @@ export default function CAsPage() {
     }
   }, [urlCAId, loading])
 
-  // Expand all nodes that have children by default
+  // Every CA starts expanded, one created after the first load included;
+  // a node the user folded stays folded
+  const seenCAs = useRef(new Set())
   useEffect(() => {
-    if (cas.length > 0 && expandedNodes.size === 0) {
-      const parentIds = cas.filter(c => cas.some(child => child.parent_id === c.id)).map(c => c.id)
-      const rootIds = cas.filter(c => !c.parent_id || c.type === 'root').map(c => c.id)
-      setExpandedNodes(new Set([...rootIds, ...parentIds]))
-    }
+    const fresh = cas.map(c => c.id).filter(id => !seenCAs.current.has(id))
+    if (fresh.length === 0) return
+    fresh.forEach(id => seenCAs.current.add(id))
+    setExpandedNodes(prev => new Set([...prev, ...fresh]))
   }, [cas])
 
   const getParentName = (ca) => {
@@ -188,9 +187,9 @@ export default function CAsPage() {
   }
 
   const loadCADetails = async (ca) => {
-    // Desktop: open floating window
+    // Desktop: open inspector
     if (!isMobile) {
-      openWindow('ca', ca.id)
+      openEntity('ca', ca.id)
       addToHistory({
         id: ca.id,
         name: ca.common_name || ca.descr || `CA ${ca.id}`,
@@ -242,39 +241,9 @@ export default function CAsPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    const confirmed = await showConfirm(t('messages.confirm.delete.ca'), {
-      title: t('cas.deleteCA'),
-      confirmText: t('cas.deleteCAButton'),
-      variant: 'danger'
-    })
-    if (!confirmed) return
-    
-    try {
-      muteToasts()
-      await casService.delete(id)
-      showSuccess(t('messages.success.delete.ca'))
-      loadCAs()
-      setSelectedCA(null)
-    } catch (error) {
-      showError(error.message || t('cas.deleteFailed'))
-    }
-  }
-
-  const handleExport = async (ca, format = 'pem', options = {}) => {
-    try {
-      const blob = await casService.export(ca.id, format, options)
-      const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', jks: 'jks' }[format] || format
-      downloadBlob(blob, `${ca.name || ca.common_name || 'ca'}.${ext}`)
-      showSuccess(t('messages.success.export.ca'))
-    } catch (error) {
-      showError(error.message || t('cas.exportFailed'))
-    }
-  }
-
-  // CA offline / restore are driven by TakeOfflineModal / RestoreModal in
-  // CADetailsPanel — they call casService directly and dispatch
-  // 'ucm:data-changed' which this page already listens to.
+  // CA actions of the slide-over (offline, restore, delete...) come from
+  // useEntityActions and announce themselves with 'ucm:data-changed', which
+  // this page already listens to.
 
   // Check if intermediate CA is orphan
   const isOrphanIntermediate = useCallback((ca) => {
@@ -454,9 +423,9 @@ export default function CAsPage() {
             canWrite={canWrite}
             canDelete={canDelete}
             hasPermission={hasPermission}
-            onExport={(format, options) => handleExport(selectedCA, format, options)}
-            onDelete={() => handleDelete(selectedCA.id)}
             onChanged={(updated) => setSelectedCA(prev => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev))}
+            onClose={() => setSelectedCA(null)}
+            onMutate={muteToasts}
             t={t}
           />
         ) : null}
@@ -495,7 +464,7 @@ export default function CAsPage() {
                         className={cn(
                           'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
                           viewMode === mode
-                            ? 'bg-accent-primary text-white'
+                            ? 'bg-accent-primary text-on-accent'
                             : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
                         )}
                         title={tip}

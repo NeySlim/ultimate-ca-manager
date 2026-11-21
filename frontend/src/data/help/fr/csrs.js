@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Demandes de signature de certificat',
     subtitle: 'Gérer le flux de travail des CSR',
-    overview: 'Téléversez, examinez et signez les demandes de signature de certificat. Les CSR permettent aux systèmes externes de demander des certificats à vos CA sans exposer les clés privées.',
+    overview: 'Téléversez, examinez et signez les demandes de signature de certificat. Les CSR permettent aux systèmes externes de demander des certificats à vos AC sans exposer les clés privées.',
     sections: [
       {
         title: 'Flux de travail',
@@ -10,18 +10,19 @@ export default {
           { label: 'Générer une CSR', text: 'Créer une nouvelle CSR avec paire de clés directement dans UCM : RSA, EC, Brainpool ou ML-DSA-44/65/87' },
           { label: 'Téléverser une CSR', text: 'Accepter des fichiers CSR encodés en PEM ou coller du texte PEM' },
           { label: 'Examiner', text: 'Inspecter le sujet, les SAN, le type de clé et la signature avant de signer' },
-          { label: 'Signer', text: 'Sélectionner une CA, le type de certificat, définir la période de validité et émettre le certificat' },
-          { label: 'Ajouter des noms', text: 'À la signature, ajouter des noms e-mail, DNS, IP ou URI à ceux de la demande, par exemple l\'adresse e-mail d\'un certificat S/MIME demandé depuis une carte à puce. Ils passent les contraintes de noms de la CA, les politiques d\'émission et l\'approbation comme les autres' },
+          { label: 'Signer', text: 'Sélectionner une AC, le type de certificat, définir la période de validité et émettre le certificat' },
+          { label: 'Contrôles de la demande', text: 'Le sujet et les noms de la demande sont soumis aux règles du formulaire d\'émission : CN de 64 caractères au plus, C sur deux lettres, noms DNS en syntaxe RFC 5280 (ni espace, ni tiret bas, ni point final, ni adresse IP, ni dernier label entièrement numérique, ni joker au-delà du premier label). Un CN en syntaxe de nom DNS donne un nom DNS (un seul label pour un certificat de serveur ou d\'appareil, aucun pour S/MIME) ; un autre n\'en donne aucun, avec un avis quand un CN de serveur ressemble à un hôte. Une sous-AC n\'en reçoit aucun, et une emailAddress valide dans le sujet est ajoutée au SAN. Chaque refus indique sa raison' },
+          { label: 'Ajouter des noms', text: 'À la signature, ajouter des noms e-mail, DNS, IP ou URI à ceux de la demande, par exemple l\'adresse e-mail d\'un certificat S/MIME demandé depuis une carte à puce. Ils passent les contraintes de noms de l\'AC, les politiques d\'émission et l\'approbation comme les autres' },
           { label: 'Signer à nouveau', text: 'Dans Historique, remettre une demande signée en attente pour la signer une nouvelle fois avec d\'autres EKU, noms ou une autre validité, sans générer de nouvelle clé' },
           { label: 'Télécharger', text: 'Télécharger la CSR originale au format PEM' },
-          { label: 'Télécharger la clé', text: 'Télécharger la clé privée d\'une CSR générée dans UCM, pour la déployer à côté d\'un certificat émis par une CA externe (nécessite la permission read:private_keys)' },
+          { label: 'Télécharger la clé', text: 'Télécharger la clé privée d\'une CSR générée dans UCM, pour la déployer à côté d\'un certificat émis par une AC externe (nécessite la permission read:private_keys)' },
         ]
       },
       {
         title: 'Onglets',
         items: [
           { label: 'En attente', text: 'CSR en attente d\'examen et de signature' },
-          { label: 'Historique', text: 'Demandes signées avec leur certificat : téléchargez l\'un ou l\'autre, ou signez la demande à nouveau. Les deux onglets paginent, recherchent et trient sur toutes les demandes ; Historique recherche aussi par CA signataire' },
+          { label: 'Historique', text: 'Demandes signées avec leur certificat : téléchargez l\'un ou l\'autre, ou signez la demande à nouveau. Les deux onglets paginent, recherchent et trient sur toutes les demandes ; Historique recherche aussi par AC signataire' },
         ]
       },
     ],
@@ -29,11 +30,11 @@ export default {
       'Les CSR préservent la clé privée du demandeur : elle ne quitte jamais son système',
       'Téléverser la clé attache une clé privée à une CSR en attente, pour que le certificat signé puisse être exporté en PKCS#12',
       'Un certificat importé pour une CSR générée dans UCM complète cette CSR : l\'enregistrement conserve sa clé privée, le certificat s\'exporte donc avec elle',
-      'Utilisez le mode Microsoft CA pour signer les CSR via AD CS lorsque vous êtes connecté à une PKI Windows',
+      'Utilisez le mode AC Microsoft pour signer les CSR via AD CS lorsque vous êtes connecté à une PKI Windows',
       'Un certificat pour une clé ML-DSA ne garde que les bits de signature : keyEncipherment, dataEncipherment et keyAgreement demandés par le template sont retirés, et le résultat l\'indique',
       'Une CSR générée avec related_to (API, exige read:private_keys) désigne un certificat existant A : la signer émet un certificat lié à A (RFC 9763), refusé s\'il affirme un key usage ou un EKU absent de A',
       'À la signature, utilisez « EKU supplémentaires » pour ajouter Microsoft RDP, smartcard logon, IPsec ou tout OID : l\'EKU existante du CSR est reconstruite avec le jeu fusionné',
-      'Quand une politique ou l\'expiration de la CA émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
+      'Quand une politique ou l\'expiration de l\'AC émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
     ],
   },
   helpGuides: {
@@ -88,56 +89,64 @@ Cliquez sur une CSR pour voir :
 
 ## Signer une CSR
 
-### Signature par CA locale
+### Signature par AC locale
 
 1. Sélectionnez une CSR en attente
 2. Cliquez sur **Signer**
-3. Choisissez la **CA de signature** (doit posséder une clé privée)
+3. Choisissez la **AC de signature** (doit posséder une clé privée)
 4. Sélectionnez le **type de certificat** (serveur, client, signature de code, e-mail)
 5. Définissez la **période de validité** en jours
 6. **Ajoutez des noms** (e-mail, DNS, IP, URI) à ceux de la demande si nécessaire
 7. Cliquez sur **Signer**
 
-En mode CA Microsoft, le modèle AD CS est choisi à la place du type de certificat.
+En mode AC Microsoft, le modèle AD CS est choisi à la place du type de certificat.
 
 Le certificat résultant apparaît sur la page des certificats.
 
-> 💡 Une demande générée sur une carte à puce ne porte souvent qu'un CN. Pour un certificat S/MIME, choisissez le type « Email (S/MIME) » et ajoutez l'adresse : elle devient le nom alternatif du sujet du certificat. Les noms ajoutés passent les contraintes de noms de la CA, les politiques d'émission et l'approbation comme les autres, et l'approbateur les voit.
+> 💡 Une demande générée sur une carte à puce ne porte souvent qu'un CN. Pour un certificat S/MIME, choisissez le type « Email (S/MIME) » et ajoutez l'adresse : elle devient le nom alternatif du sujet du certificat. Les noms ajoutés passent les contraintes de noms de l'AC, les politiques d'émission et l'approbation comme les autres, et l'approbateur les voit.
 
-### Signature par Microsoft CA
+Ce qu'une demande peut porter est contrôlé comme sur le formulaire d'émission, et chaque refus indique sa raison :
+- **Sujet** : CN, O et OU de 64 caractères au plus, L et ST de 128, C un code pays à deux lettres en PrintableString (RFC 5280 annexe A)
+- **Noms DNS** : lettres, chiffres et tirets dans des labels séparés par des points (pas de tiret bas), un joker seulement comme premier label entier, pas de point final, un dernier label non entièrement numérique, jamais une adresse IP. Un nom internationalisé saisi dans le formulaire est émis sous sa forme A-label (\`xn--\`)
+- **Noms issus du CN** : une demande sans SAN reçoit un nom DNS de son CN seulement quand le CN est en syntaxe de nom DNS (jamais \`John Doe\`) ; un label unique comme \`intranet\` ne compte que pour un certificat de serveur ou d'appareil, pas pour client, e-mail ou signature de code, et un certificat e-mail (S/MIME) n'en reçoit aucun, même d'un CN à points comme \`john.doe\` ; un CN de serveur qui ressemble à un hôte et n'en donne aucun est signalé dans un avis, et une sous-AC n'en reçoit aucun
+- **E-mail dans le sujet** : une emailAddress valide est aussi ajoutée au SAN comme nom e-mail, pour tout type de certificat
+- **Key Usage** : une demande sans Key Usage reçoit celui de son type, comme sur le formulaire d'émission (client, signature de code et e-mail inclus)
+- Une AC parente avec pathLen 0, ou un nom hors des contraintes de noms de l'AC, est refusé avec cette raison ; le CN à points d'un certificat e-mail n'est contrôlé comme nom DNS que si le certificat porte aussi Server Auth
 
-Si des connexions Microsoft CA sont configurées, un onglet **Microsoft CA** apparaît dans le modal de signature :
+### Signature par AC Microsoft
+
+Si des connexions AC Microsoft sont configurées, un onglet **AC Microsoft** apparaît dans le modal de signature :
 
 1. Sélectionnez une CSR en attente et cliquez sur **Signer**
-2. Passez à l'onglet **Microsoft CA**
-3. Sélectionnez la **connexion MS CA**
-4. Sélectionnez le **modèle de certificat** (chargé automatiquement depuis la CA)
+2. Passez à l'onglet **AC Microsoft**
+3. Sélectionnez la **connexion AC Microsoft**
+4. Sélectionnez le **modèle de certificat** (chargé automatiquement depuis l'AC)
 5. Cliquez sur **Signer**
 
-Si le modèle nécessite l'approbation d'un gestionnaire, UCM suit la demande en attente. La page ne propose pas de vérification du statut : une fois le certificat émis sur la CA Microsoft, importez-le, ou laissez la **synchronisation de l'inventaire** via le canal d'administration WinRM importer les certificats que UCM ne connaît pas encore.
+Si le modèle nécessite l'approbation d'un gestionnaire, la demande reste En attente dans UCM. Ouvrez-la dans **En attente** et cliquez sur **Vérifier le statut** pour récupérer le certificat une fois émis par l'AC (il faut aussi le droit de signer des CSR), ou approuvez-la depuis le panneau de contrôle AC de la connexion.
 
 ### Inscription pour le compte d'autrui (EOBO)
 
-Lors de la signature via Microsoft CA, vous pouvez inscrire pour le compte d'un autre utilisateur :
+Lors de la signature via AC Microsoft, vous pouvez inscrire pour le compte d'un autre utilisateur :
 
-1. Sélectionnez la connexion MS CA et le modèle
+1. Sélectionnez la connexion AC Microsoft et le modèle
 2. Cochez **Inscription pour le compte d'autrui (EOBO)**
 3. Les champs **DN du bénéficiaire** et **UPN du bénéficiaire** se remplissent automatiquement à partir du sujet et du SAN e-mail de la CSR
 4. Ajustez les valeurs si nécessaire et cliquez sur **Signer**
 
 > ⚠️ EOBO nécessite un certificat d'agent d'inscription configuré sur le serveur AD CS, et le modèle doit autoriser l'inscription pour le compte d'autres utilisateurs.
 
-### Signature par CA externe
+### Signature par AC externe
 
-Pour un certificat délivré par une CA publique ou tierce, conservez la clé dans UCM et n'envoyez que la demande :
+Pour un certificat délivré par une AC publique ou tierce, conservez la clé dans UCM et n'envoyez que la demande :
 
-1. **Générer une CSR** dans UCM, puis **Télécharger la CSR** et soumettez-la à la CA externe
+1. **Générer une CSR** dans UCM, puis **Télécharger la CSR** et soumettez-la à l'AC externe
 2. Au retour du certificat, importez-le depuis la page Certificats (**Importer**, fichier ou PEM collé) ou via **Opérations → Import intelligent**
 3. UCM reconnaît le certificat par sa clé publique, complète la CSR en attente et conserve sa clé privée : le certificat s'exporte alors avec la clé (PEM, PKCS#12, JKS) comme n'importe quel autre
 
 La CSR passe de **En attente** à **Historique**. Si le certificat doit être installé ailleurs, **Télécharger la clé privée** sur la CSR en attente fournit la clé (nécessite la permission read:private_keys, comme toute exportation directe de clé).
 
-> 💡 La correspondance se fait sur la paire de clés, elle fonctionne donc même lorsque la CA réécrit le sujet (beaucoup de CA publiques ne conservent que le CN).
+> 💡 La correspondance se fait sur la paire de clés, elle fonctionne donc même lorsque l'AC réécrit le sujet (beaucoup d'AC publiques ne conservent que le CN).
 
 ## Signer une demande à nouveau
 

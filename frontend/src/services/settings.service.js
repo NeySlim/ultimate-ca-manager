@@ -13,6 +13,10 @@ export const settingsService = {
     return apiClient.patch('/settings/general', settings)
   },
 
+  async getBackupSchedule() {
+    return apiClient.get('/settings/backup/schedule')
+  },
+
   async getPublicEndpoints() {
     return apiClient.get('/settings/public-endpoints')
   },
@@ -104,6 +108,21 @@ export const settingsService = {
 
   async disableEncryption() {
     return apiClient.post('/system/security/disable-encryption')
+  },
+
+  // New data key, every stored value re-encrypted under it; 202 while nodes lag (run again)
+  async rotateDataKey() {
+    return apiClient.post('/system/security/rotate-encryption-key')
+  },
+
+  // Where the session key comes from and how its rotation applies (never the key itself)
+  async getSecretsStatus() {
+    return apiClient.get('/system/security/secrets-status')
+  },
+
+  // Encryption on: stored under the data key, no restart; off: environment file and restart
+  async rotateSessionKey() {
+    return apiClient.post('/system/security/rotate-secrets', {})
   },
 
   // Encrypts only the keys still stored in the clear; encrypted ones are skipped

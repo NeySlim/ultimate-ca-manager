@@ -81,6 +81,89 @@ def certificate_signed_by(cert: x509.Certificate, issuer: x509.Certificate) -> b
     return True
 
 
+VERIFIED, INVALID, UNVERIFIABLE = 'verified', 'invalid', 'unverifiable'
+
+
+def signature_verdict(cert: x509.Certificate, issuer: x509.Certificate):
+    """``(VERIFIED | INVALID | UNVERIFIABLE, algorithm)``: whether *issuer*'s key signed *cert*.
+
+    Only UNVERIFIABLE (a key or signature type this cannot check) names the algorithm;
+    it never stands for INVALID, which no confirmation can override."""
+    try:
+        return (VERIFIED if certificate_signed_by(cert, issuer) else INVALID), None
+    except UnsupportedIssuerKey:
+        return UNVERIFIABLE, _unverifiable_algorithm(cert, issuer)
+
+
+def signature_disproved(cert: x509.Certificate, issuer: x509.Certificate) -> bool:
+    """Whether *issuer*'s key provably did not sign *cert*: only an InvalidSignature from a
+    provider that approves the key. A provider error proves nothing, nor does a FIPS module
+    refusing the key (its type, curve or size, known before the call): it rejects any signature."""
+    try:
+        key = issuer.public_key()
+        signing_family, key_family = _signature_family(cert), _key_family(key)
+        if signing_family and key_family and signing_family != key_family:
+            # RFC 5280 4.1.1.2: the signature algorithm is the issuer key's; the types alone disprove it
+            return True
+        if _fips_module_refuses(key):
+            return False
+        verify_certificate_signature(cert, key)
+    except InvalidSignature:
+        return True
+    except Exception:
+        return False
+    return False
+
+
+def _signature_family(cert):
+    """Key family that makes *cert*'s signature algorithm, None when it is not one of those below."""
+    from cryptography.x509.oid import SignatureAlgorithmOID as S
+    oid = cert.signature_algorithm_oid
+    for family, oids in (
+            ('RSA', (S.RSA_WITH_MD5, S.RSA_WITH_SHA1, S.RSA_WITH_SHA224, S.RSA_WITH_SHA256, S.RSA_WITH_SHA384,
+                     S.RSA_WITH_SHA512, S.RSA_WITH_SHA3_224, S.RSA_WITH_SHA3_256, S.RSA_WITH_SHA3_384,
+                     S.RSA_WITH_SHA3_512, S.RSASSA_PSS)),
+            ('EC', (S.ECDSA_WITH_SHA1, S.ECDSA_WITH_SHA224, S.ECDSA_WITH_SHA256, S.ECDSA_WITH_SHA384,
+                    S.ECDSA_WITH_SHA512, S.ECDSA_WITH_SHA3_224, S.ECDSA_WITH_SHA3_256, S.ECDSA_WITH_SHA3_384,
+                    S.ECDSA_WITH_SHA3_512)),
+            ('DSA', (S.DSA_WITH_SHA1, S.DSA_WITH_SHA224, S.DSA_WITH_SHA256, S.DSA_WITH_SHA384, S.DSA_WITH_SHA512)),
+            ('ED25519', (S.ED25519,)), ('ED448', (S.ED448,)), ('ML-DSA', (S.ML_DSA_44, S.ML_DSA_65, S.ML_DSA_87))):
+        if oid in oids:
+            return family
+    return None
+
+
+def _key_family(public_key):
+    for cls, family in ((rsa.RSAPublicKey, 'RSA'), (ec.EllipticCurvePublicKey, 'EC'), (dsa.DSAPublicKey, 'DSA'),
+                        (ed25519.Ed25519PublicKey, 'ED25519'), (ed448.Ed448PublicKey, 'ED448')):
+        if isinstance(public_key, cls):
+            return family
+    return 'ML-DSA' if key_algorithms.family_for_public_key(public_key) == 'ML-DSA' else None
+
+
+def _fips_module_refuses(public_key) -> bool:
+    import fips_mode
+    return fips_mode.enabled() and not key_algorithms.fips_approved_for_key(public_key)
+
+
+def _unverifiable_algorithm(cert, issuer):
+    from utils.foreign_algorithms import describe_public_key
+    from utils.signature_label import signature_algorithm_label
+    foreign = describe_public_key(issuer)
+    if foreign is not None:
+        return foreign['label']
+    key = issuer.public_key()
+    if isinstance(key, (rsa.RSAPublicKey, ec.EllipticCurvePublicKey, dsa.DSAPublicKey,
+                        ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)) \
+            or key_algorithms.family_for_public_key(key) == 'ML-DSA':
+        # A key this checks: the signature algorithm is what cannot be
+        try:
+            return signature_algorithm_label(cert)
+        except Exception:
+            return cert.signature_algorithm_oid.dotted_string
+    return key_algorithms.label_for_public_key(key) or type(key).__name__.removesuffix('PublicKey')
+
+
 def is_self_signed(cert: x509.Certificate) -> bool:
     """Whether the certificate is signed by its own key.
 
@@ -101,7 +184,7 @@ def is_self_signed(cert: x509.Certificate) -> bool:
 def _subject_key_identifier_hex(cert: x509.Certificate):
     try:
         ski = cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
-    except x509.ExtensionNotFound:
+    except Exception:  # absent, or unreadable extensions (RFC 5280 4.2: one instance each)
         return None
     return ski.key_identifier.hex(':').upper()
 
@@ -110,7 +193,7 @@ def authority_key_identifier_hex(cert: x509.Certificate):
     """The AKI keyIdentifier as stored in CA.ski ("AA:BB:..."), or None."""
     try:
         aki = cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value
-    except x509.ExtensionNotFound:
+    except Exception:  # absent, or unreadable extensions (RFC 5280 4.2: one instance each)
         return None
     if not aki.key_identifier:
         return None
@@ -179,17 +262,17 @@ def hsm_key_binding_matches(hsm_key_id, cert: x509.Certificate):
 
 
 def cas_by_ski(ski, exclude_id=None):
-    """Stored CAs with this SKI, the self-signed record first: a cross-certificate shares its root's SKI."""
-    from sqlalchemy import case
+    """Stored CAs with this SKI, the self-signed record first: a cross or self-issued
+    link certificate shares its root's SKI, and subject == issuer does not tell them apart."""
     from models import CA
     query = CA.query.filter(CA.ski == ski)
     if exclude_id is not None:
         query = query.filter(CA.id != exclude_id)
-    return query.order_by(case((CA.subject == CA.issuer, 0), else_=1), CA.id).all()
+    return self_signed_first(query.order_by(CA.id).all())
 
 
 def find_ca_by_ski(ski, exclude_id=None):
-    """The stored CA with this SKI; at equal SKI the self-signed record, not a cross-certificate."""
+    """The stored CA with this SKI; at equal SKI the self-signed record, not a cross or link certificate."""
     found = cas_by_ski(ski, exclude_id)
     return found[0] if found else None
 
@@ -205,11 +288,10 @@ def ca_signature_verdict(ca, cert: x509.Certificate):
     except Exception:
         return None
     try:
-        return certificate_signed_by(cert, ca_cert)
-    except UnsupportedIssuerKey:
-        return None
+        verdict, _ = signature_verdict(cert, ca_cert)
     except Exception:
         return False
+    return None if verdict == UNVERIFIABLE else verdict == VERIFIED
 
 
 def ca_signed(ca, cert: x509.Certificate) -> bool:

@@ -3,7 +3,6 @@ WebSocket event integration helpers.
 Use these functions in services to emit events after actions.
 """
 
-import re
 from typing import Dict, Any, Optional
 import logging
 
@@ -14,8 +13,9 @@ def _extract_cn(subject: str) -> str:
     """Extract clean CN from a full subject string like 'CN=host.example.com,O=Org,...'."""
     if not subject:
         return 'Unknown'
-    m = re.search(r'CN=([^,/]+)', subject)
-    return m.group(1).strip() if m else subject.split(',')[0].strip()
+    from utils.dn_parse import stored_dn_common_name
+    cn = stored_dn_common_name(subject)  # escapes honoured, as the models read it
+    return cn.strip() if cn else subject.split(',')[0].strip()
 
 
 # Server-managed scope rooms; each socket joins those its permissions allow.
@@ -66,6 +66,16 @@ def on_certificate_revoked(cert_id: int, cn: str, reason: str, revoked_by: str):
     }, ROOM_CERTIFICATES)
 
 
+def on_certificate_unheld(cert_id: int, cn: str, unheld_by: str):
+    """Emit event when a certificate hold is lifted."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.CERTIFICATE_UNHELD, {
+        'id': cert_id,
+        'cn': cn,
+        'unheld_by': unheld_by
+    }, ROOM_CERTIFICATES)
+
+
 def on_certificate_renewed(cert_id: int, old_cert_id: int, cn: str):
     """Emit event when a certificate is renewed."""
     from websocket.event_types import EventType
@@ -73,6 +83,16 @@ def on_certificate_renewed(cert_id: int, old_cert_id: int, cn: str):
         'id': cert_id,
         'old_id': old_cert_id,
         'cn': cn
+    }, ROOM_CERTIFICATES)
+
+
+def on_certificate_binding_left_behind(cert_id: int, previous_id, binding: dict):
+    """Emit event when a renewal leaves a binding on the previous certificate."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.CERTIFICATE_BINDING_LEFT_BEHIND, {
+        'id': cert_id,
+        'previous_id': previous_id,
+        'binding': binding,
     }, ROOM_CERTIFICATES)
 
 

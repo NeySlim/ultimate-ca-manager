@@ -22,6 +22,8 @@ from services.policy_service import POLICY_DIGESTS, PolicyEvaluationService, Pol
 from tests.conftest import get_json
 from utils import key_algorithms
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 CONTENT_JSON = 'application/json'
 FIPS_LABELS = sorted(key_algorithms.fips_approved_labels())
 SYSTEM_POLICY = 'FIPS mode'
@@ -356,7 +358,7 @@ class TestEveryIssuancePath:
         with app.app_context():
             ca_row = db.session.get(CA, ca['id'])
             der = _csr(_ed25519(), cn='ed.wstep.fips.test').public_bytes(serialization.Encoding.DER)
-            cert_pem, err = wstep_service.issue(ca_row, der, 30)
+            cert_pem, err = wstep_service.issue(ca_row, der, 30, profile=None)
             assert cert_pem is None and err.startswith('Policy violation') and 'FIPS mode' in err, err
 
     def test_scep(self, app, fips, create_ca):

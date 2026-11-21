@@ -4,9 +4,13 @@
 #
 # --build-arg UCM_FIPS_BUILD=1 builds the -fips variant: OpenSSL FIPS provider
 # plus crypto libraries compiled against the system libcrypto. Default 0 = standard.
+# Needs BuildKit (docker buildx), both variants: the RUN --mount steps are not
+# understood by the legacy builder, which also builds the stages a variant skips.
 ARG UCM_FIPS_BUILD=0
-ARG FIPS_PROVIDER_VERSION=3.1.2
-ARG FIPS_PROVIDER_SHA256=a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539
+# OpenSSL FIPS Provider 3.5.9, CMVP certificate #5586; 3.1.2 (#4985, SHA-256
+# a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539) still builds with these args
+ARG FIPS_PROVIDER_VERSION=3.5.9
+ARG FIPS_PROVIDER_SHA256=603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
 
 # Stage 1: Builder - Install dependencies and build environment
 FROM python:3.13-slim-trixie AS builder-0
@@ -125,6 +129,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     openssh-client \
     softhsm2 \
+    opensc \
+    libpcsclite1 \
     libkrb5-3 \
     libgssapi-krb5-2 \
     postgresql-client \
@@ -135,10 +141,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -r -u 1000 -s /bin/false -d /opt/ucm ucm && \
     usermod -aG softhsm ucm
 
-# FIPS variant: fips.so in the module directory of this platform's libcrypto, its
-# module-mac (root, read-only) that the entrypoint compares at each start, and
-# /run/ucm where the entrypoint writes the module configuration at start
-COPY docker/fips-module.sh /fips-module.sh
+# FIPS variant: fips.so in the module directory of this platform's libcrypto,
+# and /run/ucm where the entrypoint writes the module configuration at start
 RUN --mount=type=bind,from=fips-provider,target=/tmp/fips-provider \
     if [ "$UCM_FIPS_BUILD" = 1 ]; then \
         set -eu; \
@@ -148,15 +152,7 @@ RUN --mount=type=bind,from=fips-provider,target=/tmp/fips-provider \
         moddir="$(openssl version -m | sed -E 's/^MODULESDIR: "(.*)"$/\1/')"; \
         test "$moddir" = "/usr/lib/$triplet/ossl-modules"; \
         install -m 0644 /tmp/fips-provider/out/fips.so "$moddir/fips.so"; \
-        tmp="$(mktemp -d)"; \
-        openssl fipsinstall -pedantic -module "$moddir/fips.so" -provider_name fips \
-            -out "$tmp/fipsmodule.cnf" >/dev/null; \
-        install -d -m 0755 /usr/share/ucm; \
-        . /fips-module.sh; fips_module_mac "$tmp/fipsmodule.cnf" > /usr/share/ucm/fips-module.mac; \
-        grep -Eq '^([0-9A-F]{2}:){31}[0-9A-F]{2}$' /usr/share/ucm/fips-module.mac; \
-        chmod 0444 /usr/share/ucm/fips-module.mac; \
-        cat /usr/share/ucm/fips-module.mac; \
-        rm -rf "$tmp"; \
+        openssl fipsinstall -module "$moddir/fips.so" -provider_name fips -out /dev/null; \
         install -d -o ucm -g ucm -m 0700 /run/ucm; \
     fi
 
@@ -174,6 +170,31 @@ WORKDIR /opt/ucm
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
 COPY --chown=ucm:ucm LICENSE NOTICE COMMERCIAL-LICENSE.md /opt/ucm/
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
+COPY --chown=ucm:ucm docker/fips-module.sh /fips-module.sh
+# FIPS variant: what the module approves, asked of it under the configuration the
+# entrypoint writes, so the readiness check judges keys by it before the switch; and the
+# module-mac of this install, root-owned, that the entrypoint compares at each start
+RUN if [ "$UCM_FIPS_BUILD" = 1 ]; then \
+        set -eu; \
+        tmp="$(mktemp -d)"; \
+        moddir="$(openssl version -m | sed -E 's/^MODULESDIR: "(.*)"$/\1/')"; \
+        openssl fipsinstall -pedantic -module "$moddir/fips.so" -provider_name fips \
+            -out "$tmp/fipsmodule.cnf" >/dev/null; \
+        printf '%s\n' 'config_diagnostics = 1' 'openssl_conf = openssl_init' \
+            ".include $tmp/fipsmodule.cnf" '[openssl_init]' 'providers = provider_sect' \
+            '[provider_sect]' 'fips = fips_sect' 'base = base_sect' '[base_sect]' 'activate = 1' \
+            > "$tmp/openssl.cnf"; \
+        install -d -m 0755 /usr/share/ucm; \
+        OPENSSL_CONF="$tmp/openssl.cnf" python3 -I -c 'import sys; sys.path.insert(0, "/opt/ucm/backend"); \
+import fips_mode; fips_mode.write_build_capability(sys.argv[1])' /usr/share/ucm/fips-module.json; \
+        chmod 0644 /usr/share/ucm/fips-module.json; \
+        cat /usr/share/ucm/fips-module.json; \
+        . /fips-module.sh; fips_module_mac "$tmp/fipsmodule.cnf" > /usr/share/ucm/fips-module.mac; \
+        grep -Eq '^([0-9A-F]{2}:){31}[0-9A-F]{2}$' /usr/share/ucm/fips-module.mac; \
+        chmod 0444 /usr/share/ucm/fips-module.mac; \
+        cat /usr/share/ucm/fips-module.mac; \
+        rm -rf "$tmp"; \
+    fi
 # Only the built interface: the server serves frontend/dist, while frontend/
 # as a whole carries the sources and node_modules, several hundred megabytes
 # of build-time dependencies that have no place in a runtime image
@@ -226,6 +247,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Copy entrypoint before switching user
 COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
 COPY --chown=ucm:ucm docker/dns-update-port.sh /dns-update-port.sh
+COPY --chown=ucm:ucm docker/ha-secret.sh /ha-secret.sh
+COPY --chown=ucm:ucm docker/ha-database.sh /ha-database.sh
 RUN chmod +x /entrypoint.sh
 
 # Switch to non-root user
@@ -234,5 +257,6 @@ USER ucm
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command - Gunicorn from /opt/ucm/backend (same as packages)
-CMD ["sh", "-c", "cd /opt/ucm/backend && gunicorn -c gunicorn_config.py wsgi:app"]
+# Default command - Gunicorn from /opt/ucm/backend (same as packages); exec makes it
+# PID 1, so docker stop's SIGTERM reaches it instead of a shell that ignores it
+CMD ["sh", "-c", "cd /opt/ucm/backend && exec gunicorn -c gunicorn_config.py wsgi:app"]

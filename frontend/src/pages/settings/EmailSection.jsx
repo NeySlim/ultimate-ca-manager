@@ -71,7 +71,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                   }}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     (settings.smtp_auth_method || 'password') === method
-                      ? 'bg-accent-primary text-white'
+                      ? 'bg-accent-primary text-on-accent'
                       : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                   }`}
                 >
@@ -82,6 +82,14 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
 
             {(settings.smtp_auth_method || 'password') === 'none' && (
               <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
+            )}
+            {/* Saving without authentication deletes the stored OAuth2 credentials (api/v2/settings/email) */}
+            {(settings.smtp_auth_method || 'password') === 'none' &&
+              (settings.has_oauth_client_secret || settings.has_oauth_refresh_token) && (
+              <p className="flex items-start gap-1.5 text-xs text-status-warning">
+                <Warning size={14} className="mt-0.5 shrink-0" />
+                {t('settings.smtpNoAuthClearsOauth')}
+              </p>
             )}
 
             {(settings.smtp_auth_method || 'password') === 'password' && (
@@ -130,7 +138,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                       onClick={() => applyOAuthProviderPreset(provider)}
                       className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                         (settings.smtp_oauth_provider || 'google') === provider
-                          ? 'bg-accent-primary text-white'
+                          ? 'bg-accent-primary text-on-accent'
                           : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                       }`}
                     >
@@ -334,7 +342,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                     onClick={() => updateSetting('smtp_security', mode)}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                       (settings.smtp_security || 'starttls') === mode
-                        ? 'bg-accent-primary text-white'
+                        ? 'bg-accent-primary text-on-accent'
                         : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                     }`}
                   >
@@ -351,7 +359,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                     onClick={() => updateSetting('smtp_content_type', fmt)}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                       (settings.smtp_content_type || 'html') === fmt
-                        ? 'bg-accent-primary text-white'
+                        ? 'bg-accent-primary text-on-accent'
                         : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                     }`}
                   >
@@ -417,7 +425,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
               {t('settings.editTemplate')}
             </Button>
             {isMobile && (
-              <div className="absolute bottom-full right-0 mb-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-[11px] text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+              <div className="absolute bottom-full right-0 mb-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-xs text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
                 {t('settings.templateDesktopOnly')}
               </div>
             )}
@@ -429,7 +437,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
         <EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} />
       )}
 
-      <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-rose">
+      <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-orange">
         {!settings.smtp_host ? (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary text-text-secondary text-sm">
             <Warning size={20} className="text-status-warning shrink-0" />
@@ -462,7 +470,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                   }}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     expiryAlerts.alert_days.includes(d)
-                      ? 'bg-accent-primary text-white'
+                      ? 'bg-accent-primary text-on-accent'
                       : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                   }`}
                 >

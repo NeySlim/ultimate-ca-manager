@@ -19,12 +19,14 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 from flask import has_request_context, request
+from sqlalchemy.exc import IntegrityError
 from fips_mode import FipsRestricted
 from utils.key_codec import refuse_eddsa_key
+from utils.certificate_readability import UnreadableCertificate
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
-from .chain_builder import ChainBuilder, ChainInfo, find_ca_by_ski
+from .chain_builder import ChainBuilder, ChainInfo
 from security.encryption import encrypt_private_key
 
 
@@ -36,8 +38,9 @@ from .matcher import KeyMatcher
 from utils.foreign_algorithms import spki_der
 from utils.cert_issuer import signing_ca_for
 from .validator import ImportValidator, ValidationResult
+from utils import key_algorithms
 from utils.datetime_utils import utc_now
-from utils.key_type import unsignable_csr_key
+from utils.key_type import unsignable_csr_key, weak_ca_key_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +96,8 @@ class ImportResult:
         "cas": [],
         "csrs": []
     })
+    # CAs left without a parent whose signature cannot be checked here, with the one proposed
+    unverifiable_parents: List[Dict] = field(default_factory=list)
     
     def to_dict(self) -> Dict:
         return {
@@ -104,7 +109,8 @@ class ImportResult:
             "errors": self.errors,
             "warnings": self.warnings,
             "warning_details": self.warning_details,
-            "imported_ids": self.imported_ids
+            "imported_ids": self.imported_ids,
+            "unverifiable_parents": self.unverifiable_parents,
         }
 
 
@@ -162,15 +168,18 @@ class SmartImporter:
     def _parse_fresh(self, content, password) -> List[ParsedObject]:
         # Before any parsing, as the other imports: the FIPS provider cannot load an EdDSA key
         refuse_eddsa_key(content, 'the imported file')
-        return self.parser.parse(content, password)
+        objects = self.parser.parse(content, password)
+        key_algorithms.refuse_unapproved_mldsa((o.key_algorithm for o in objects), 'the imported file')
+        return objects
 
-    def analyze(self, content: str | bytes, password=None) -> AnalysisResult:
+    def analyze(self, content: str | bytes, password=None, include_pem: bool = False) -> AnalysisResult:
         """
         Analyze content without importing.
         
         Args:
             content: PEM/DER/PKCS12 content
             password: Optional password for encrypted content, or a list tried in turn
+            include_pem: add `pem` to each certificate and private key (what the caller gave, opened)
             
         Returns:
             AnalysisResult with detected objects and validation info
@@ -180,6 +189,13 @@ class SmartImporter:
         # Parse content
         objects = self._parse_fresh(content, password)
         result.objects = [o.to_dict() for o in objects]
+        if include_pem:
+            for obj, entry in zip(objects, result.objects):
+                # A key still sealed (no password, or a wrong one) has no usable PEM to hand back
+                if obj.type == ObjectType.CERTIFICATE or (
+                        obj.type == ObjectType.PRIVATE_KEY and not obj.error
+                        and 'ENCRYPTED' not in obj.raw_pem):
+                    entry['pem'] = obj.raw_pem
         
         # Build chains
         chains = self.chain_builder.build_chains(objects)
@@ -279,7 +295,7 @@ class SmartImporter:
                 result.errors.extend(f"Private key cannot be used: {e}" for e in unusable)
                 return result
             if import_csrs:  # refused as the upload refuses it, before anything is imported
-                refused = [f"CSR '{self._get_cn(o.subject)}' refused: {reason}" for o in objects
+                refused = [f"CSR '{self._get_cn(o)}' refused: {reason}" for o in objects
                            if o.type == ObjectType.CSR
                            and (reason := unsignable_csr_key(x509.load_pem_x509_csr(o.raw_pem.encode())))]
                 if refused:
@@ -306,26 +322,39 @@ class SmartImporter:
                 self._import_csrs(objects, matching, result, desc_prefix, username)
 
             self._stage_audit()
+            # Snapshotted before the commit expires the rows, announced once it holds
+            submitted = [db.session.get(Certificate, cid).to_dict()
+                         for cid in result.imported_ids.get('csrs', [])]
             db.session.commit()
             from services.ca import cross_certs
             for target, row in self._attached_cross:
                 cross_certs.announce(target, 'attached', row, username)
 
-            # Fire certificate.imported for each successfully imported certificate
-            # (CAs live in a separate table and have their own ca.created event)
+            # ca.created for each imported CA, certificate.imported for each certificate
             try:
-                from services.webhook_service import emit_cert_imported
-                from models import Certificate
+                from services.webhook_service import emit_ca_created, emit_cert_imported, emit_csr_submitted
+                for ca_id in result.imported_ids.get('cas', []):
+                    ca_obj = db.session.get(CA, ca_id)
+                    if ca_obj:
+                        emit_ca_created(ca_obj.to_dict(), actor=username)
                 for cid in result.imported_ids.get('certificates', []):
                     obj = db.session.get(Certificate, cid)
                     if obj:
                         emit_cert_imported(obj.to_dict(), ca_refid=obj.caref)
+                for csr in submitted:
+                    emit_csr_submitted(csr, actor=username)
             except Exception as e:
                 logger.error(f"Webhook emit (import) failed: {e}")
 
-        except FipsRestricted:
+        except (FipsRestricted, UnreadableCertificate):
             db.session.rollback()
             raise
+        except IntegrityError:
+            # A row stored concurrently under the same (CA, serial): no SQL reaches the user
+            db.session.rollback()
+            logger.warning("Smart import refused by a unique constraint", exc_info=True)
+            result.success = False
+            result.errors.append(f"Import failed: a certificate is {Certificate.DUPLICATE_SERIAL}")
         except Exception as e:
             db.session.rollback()
             result.success = False
@@ -355,24 +384,23 @@ class SmartImporter:
         subject_to_refid: Dict[str, str] = {}
         ski_to_refid: Dict[str, str] = {}
         bundle_roots = [o for o in ca_objects if o.is_self_signed and o.ski]
-        unverified_ids = []
         from services.import_service import relink_parent_caref  # imported late: import_service imports this package
 
         for ca_obj in ca_objects:
             counterpart = self._cross_counterpart(ca_obj, bundle_roots)
             if counterpart is not None:
-                cn = self._get_cn(ca_obj.subject)
+                cn = self._get_cn(ca_obj)
                 refid = counterpart or subject_to_refid.get(ca_obj.subject)
                 attached = self._attach_cross(refid, ca_obj, username)
                 if attached is True:
                     result.warnings.append(
-                        f"Attached cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"Attached cross-certificate: {cn} issued by {self._get_cn(ca_obj, issuer=True)} "
                         f"(the self-signed {cn} is kept)")
                     result.warning_details.append({
                         'code': 'cross_certificate_attached', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
                 else:
                     result.warnings.append(
-                        f"Skipped cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"Skipped cross-certificate: {cn} issued by {self._get_cn(ca_obj, issuer=True)} "
                         f"(the self-signed {cn} is kept{'; ' + attached if attached else ''})")
                     result.warning_details.append({
                         'code': 'cross_certificate_skipped', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
@@ -394,44 +422,40 @@ class SmartImporter:
                         CA, ca_obj.serial_number, ca_obj.issuer, ca_obj.raw_pem
                     )
                 if existing:
-                    result.warnings.append(f"Skipped duplicate CA: {self._get_cn(ca_obj.subject)}")
+                    result.warnings.append(f"Skipped duplicate CA: {self._get_cn(ca_obj)}")
                     subject_to_refid[ca_obj.subject] = existing.refid
                     if existing.ski:
                         ski_to_refid[existing.ski] = existing.refid
                     continue
 
-            # The parent is the stored CA whose key signed this certificate (flushed batch CAs included);
-            # failing that, the former AKI then issuer DN guess, kept for parents whose signature cannot be checked
+            # The parent is the stored CA whose key signed this certificate (flushed batch CAs included)
             caref = relink_parent_caref(x509.load_pem_x509_certificate(ca_obj.raw_pem.encode()), None)
-            verified = caref is not None
-            if not caref and not ca_obj.is_self_signed:
-                if ca_obj.aki:
-                    caref = ski_to_refid.get(ca_obj.aki)
-                    if not caref:
-                        parent = find_ca_by_ski(ca_obj.aki)
-                        if parent:
-                            caref = parent.refid
-                if not caref:
-                    caref = subject_to_refid.get(ca_obj.issuer)
-                if not caref:
-                    parent = CA.query.filter(CA.subject == ca_obj.issuer).first()
-                    if parent:
-                        caref = parent.refid
-            
+
             # Find matching private key
             prv = None
+            refused = None
             for key_idx, cert_idx in matching.get("matched_pairs", []):
                 if objects[cert_idx] == ca_obj:
                     key_obj = objects[key_idx]
+                    weak = weak_ca_key_refusal(key_obj.raw_pem)
+                    if weak:
+                        refused = weak
+                        break
                     prv = _encrypt_prv(key_obj.raw_pem)
                     result.keys_matched += 1
                     break
             
+            if refused:
+                cn = self._get_cn(ca_obj)
+                result.warnings.append(f"Skipped CA '{cn}': {refused}")
+                result.warning_details.append({'code': 'ca_key_refused', 'subject': ca_obj.subject, 'reason': refused})
+                continue
+
             # Create CA
             refid = secrets.token_hex(8)
             ca = CA(
                 refid=refid,
-                descr=self._get_cn(ca_obj.subject),
+                descr=self._get_cn(ca_obj),
                 caref=caref,
                 crt=base64.b64encode(ca_obj.raw_pem.encode()).decode(),
                 prv=prv,
@@ -456,17 +480,18 @@ class SmartImporter:
                 ski_to_refid[ca_obj.ski] = refid
             result.cas_imported += 1
             result.imported_ids["cas"].append(ca.id)
-            if not verified:
-                unverified_ids.append(ca.id)
             
             # Audit log
             self._log_audit("import_ca", ca.id, ca.descr, username)
 
-        # A child listed before its parent found no signer at creation: relink once the whole batch is stored
-        for ca in CA.query.filter(CA.id.in_(unverified_ids)).all() if unverified_ids else []:
-            ca.caref = relink_parent_caref(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), ca.caref,
+        # A child listed before its parent found no parent at creation: relink once the whole batch is stored
+        unlinked = [ca for ca in CA.query.filter(CA.id.in_(result.imported_ids["cas"])).all() if not ca.caref]
+        for ca in unlinked:
+            ca.caref = relink_parent_caref(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), None,
                                            exclude_ca_id=ca.id)
         db.session.flush()
+        from services.ca import parent_confirmation
+        result.unverifiable_parents = parent_confirmation.notices([ca for ca in unlinked if not ca.caref])
     
     @staticmethod
     def _is_self_signed_record(ca) -> bool:
@@ -532,7 +557,7 @@ class SmartImporter:
                     Certificate, cert_obj.serial_number, cert_obj.issuer, cert_obj.raw_pem
                 )
                 if existing:
-                    result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj.subject)}")
+                    result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj)}")
                     continue
             
             # The issuing CA is the stored one whose key signed it, found by AKI then DN
@@ -543,6 +568,12 @@ class SmartImporter:
             except ValueError:
                 pass
             
+            # The unique (caref, serial_number) index holds whatever skip_duplicates says
+            if Certificate.stored_under(caref, cert_obj.serial_number):
+                result.warnings.append(f"Skipped certificate {self._get_cn(cert_obj)}: "
+                                       f"serial {cert_obj.serial_number} {Certificate.DUPLICATE_SERIAL}")
+                continue
+
             # Find matching private key
             prv = None
             key_pem = None
@@ -567,12 +598,12 @@ class SmartImporter:
                 self._log_audit("certificate_imported", pending_csr.id,
                                 pending_csr.descr, username)
                 result.warnings.append(
-                    f"Certificate {self._get_cn(cert_obj.subject)} attached to its pending CSR"
+                    f"Certificate {self._get_cn(cert_obj)} attached to its pending CSR"
                 )
                 continue
             
             # Extract CN for subject_cn
-            cn = self._get_cn(cert_obj.subject)
+            cn = self._get_cn(cert_obj)
             if not cn or cn == "Unknown":
                 cn = cert_obj.san_dns[0] if cert_obj.san_dns else None
             
@@ -626,7 +657,7 @@ class SmartImporter:
         csr_objects = [o for o in objects if o.type == ObjectType.CSR]
         
         for csr_obj in csr_objects:
-            cn = self._get_cn(csr_obj.subject)
+            cn = self._get_cn(csr_obj)
             if not cn or cn == "Unknown":
                 cn = csr_obj.san_dns[0] if csr_obj.san_dns else "CSR"
             
@@ -686,15 +717,12 @@ class SmartImporter:
             caref=caref, key_pem=key_pem, username=username, commit=False,
         )
 
-    def _get_cn(self, subject: str) -> str:
-        """Extract CN from subject"""
-        if not subject:
-            return "Unknown"
-        for part in subject.split(','):
-            if part.strip().upper().startswith('CN='):
-                return part.strip()[3:]
-        return "Unknown"
-    
+    def _get_cn(self, obj: ParsedObject, issuer: bool = False) -> str:
+        """The most specific CN the parser read on the subject (or issuer), else "Unknown".
+        A CN present but empty stays ''."""
+        cn = obj.issuer_cn if issuer else obj.subject_cn
+        return "Unknown" if cn is None else cn
+
     def _log_audit(self, action: str, resource_id: int, resource_name: str,
                    username: str, details: str = None):
         """Note an audit entry; `_stage_audit` stages them just before the commit.

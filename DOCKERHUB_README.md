@@ -30,7 +30,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443
-**Credentials:** admin / changeme123, changed on first login.
+**Credentials:** `admin`, with the password generated at first start: `docker exec <container> cat /opt/ucm/data/initial-admin-password`, changed at first login. To choose it, mount a secret and set `INITIAL_ADMIN_PASSWORD_FILE`.
 
 > **Mount `/etc/ucm`.** It holds `master.key`, which decrypts every private key in the database. The image declares it as a volume, so leaving it unmounted creates an anonymous one: recreate the container and the key is gone, along with any chance of reading the keys it protected.
 
@@ -85,7 +85,7 @@ volumes:
 - **Deploy hooks** -- Push an issued or renewed certificate to the host that serves it over SSH/SFTP, and run its reload command
 - **Key protection** -- Private keys encrypted at rest, key archival and dual-control recovery under four eyes
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS, OpenBao/Vault Transit
-- **FIPS mode (preview)** -- `-fips` image on the OpenSSL FIPS Provider 3.1.2 that, with `UCM_FIPS=1`, refuses non-approved algorithms; UCM itself is not FIPS validated
+- **FIPS mode** -- `-fips` image on the OpenSSL FIPS Provider 3.5.9 (CMVP certificate #5586), which approves ML-DSA, Ed25519 and Ed448; with `UCM_FIPS=1` UCM starts only on the active, self-tested module and refuses what it does not approve. UCM itself is not a validated module, and Debian 13 and arm64 are not among the tested configurations of certificate #5586
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP, mTLS, API keys
 - **SSO** -- LDAP/Active Directory, OAuth2 (Google, GitHub, Azure AD), SAML 2.0, with role mapping
 - **RBAC** -- Four built-in roles plus custom roles, and groups that grant extra permissions
@@ -94,7 +94,7 @@ volumes:
 - **Reports and alerts** -- Scheduled PDF reports, SMTP notifications with OAuth2, expiry alerts at several thresholds
 - **Metrics** -- Opt-in, bearer-gated Prometheus endpoint
 - **Backup** -- Manual and scheduled encrypted backups with retention
-- **Interface** -- Six themes, 9 languages, command palette, WebSocket live updates, responsive down to phone width
+- **Interface** -- Six themes, 10 languages, command palette, WebSocket live updates, responsive down to phone width
 
 ---
 
@@ -126,11 +126,14 @@ volumes:
 
 ## Tags
 
-- `latest` -- Latest stable release
-- Version tags (e.g. `2.254`, `2.254.1`)
-- `latest-fips` and `<version>-fips` -- FIPS variant on the OpenSSL FIPS Provider, run with `UCM_FIPS=1`
+- `latest` -- Latest stable release, whatever its major version
+- `3`, `2` -- Latest stable release of that major version: pin `3` to receive every 3.x and never a 4.0, `2` to stay on 2.x
+- Version tags (e.g. `3.0`, `2.254.4`)
+- `latest-fips`, `3-fips` and `<version>-fips` -- FIPS variant on the OpenSSL FIPS Provider 3.5.9, run with `UCM_FIPS=1`
 
-Release candidates are published under their own `X.Y-rcN` or `X.Y.Z-rcN` (and `-fips`) tag and never move `latest` or `latest-fips`. A stable tag takes `latest` and `latest-fips` only while it is the highest stable version published.
+Release candidates are published under their own `X.Y-rcN` (and `X.Y-rcN-fips`) tag and never move `latest`, a major tag or their `-fips` forms.
+
+A 3.x image started on a volume last used by 2.254 stops without changing anything until `UCM_ACCEPT_MAJOR_UPGRADE=3` is set: back up first, see UPGRADE.md.
 
 ## Image Details
 

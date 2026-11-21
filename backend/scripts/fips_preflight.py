@@ -7,9 +7,12 @@ is set without the FIPS provider.
 import argparse
 import json
 import os
+import pwd
 import sys
+from pathlib import Path
 
 import fips_mode
+from migration_runner import encoding_refusal, pending_migrations
 from models import db
 from services import fips_preflight, preflight_core
 
@@ -22,12 +25,23 @@ def read_only_app(config=None):
     return preflight_core.read_only_app('ucm-fips-preflight', config)
 
 
+def _command() -> str:
+    """This run again, as the account that runs it now, from the backend directory."""
+    backend = Path(__file__).resolve().parents[1]
+    return (f'cd {backend} && sudo -u {pwd.getpwuid(os.geteuid()).pw_name} '
+            f'{sys.executable} -m scripts.fips_preflight')
+
+
 def render_text(report: dict) -> str:
     lines = []
     summary = report['summary']
     state = 'FIPS mode is active' if report['fips_active'] else 'FIPS mode is not active'
     lines.append(f"FIPS readiness ({state}): {summary['blocker']} blocker(s), "
                  f"{summary['warning']} warning(s), {summary['info']} info")
+    if report.get('module_known') is False:
+        lines.append('No FIPS module was asked: EdDSA and ML-DSA keys are listed as refused. '
+                     'With Docker, run this check with the -fips image, without UCM_FIPS, '
+                     'to judge them by its module.')
     for finding in report['findings']:
         lines.append('')
         lines.append(f"[{finding['severity'].upper()}] {finding['id']} ({finding['count']})")
@@ -43,7 +57,11 @@ def render_text(report: dict) -> str:
             lines.append(f"[ERROR] {error['id']}: {error['error']}")
         else:
             lines.append(f"[ERROR] {error['id']}: the check could not run ({error['error']})")
-    if not report['findings'] and not report['errors']:
+    if report.get('deferred'):
+        lines.append('')
+        lines.append(f"[INFO] {report['deferred']['count']} checks need the upgraded database: "
+                     f"run {report['deferred']['command']} after the first start")
+    if not report['findings'] and not report['errors'] and not report.get('deferred'):
         lines.append('Nothing found that FIPS mode would refuse.')
     return '\n'.join(lines)
 
@@ -60,10 +78,21 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     app = read_only_app()
     with app.app_context():
+        # On a bare connection: the first SQLAlchemy one fails on such a database, unnamed
+        refusal = encoding_refusal(db.engine)
+        if refusal:
+            print(f'[ERROR] database: {refusal}')
+            return 2
         try:
-            report = fips_preflight.run()
+            # Before the upgrade the next start applies, the model and the tables differ: the
+            # checks that read the database wait for it, the others run
+            deferred = [d for d in fips_preflight.DETECTORS if d.reads_database] \
+                if pending_migrations(db.engine) else []
+            report = fips_preflight.run([d for d in fips_preflight.DETECTORS if d not in deferred])
         finally:
             db.session.rollback()
+    if deferred:
+        report['deferred'] = {'count': len(deferred), 'command': _command()}
     if fips_mode.requested() and not fips_mode.provider_active():
         # A docker exec does not inherit the entrypoint's OPENSSL_CONF: the header would say FIPS is off.
         remedy = ('set OPENSSL_CONF=/run/ucm/openssl-fips.cnf' if os.getenv('UCM_DOCKER') == '1' else

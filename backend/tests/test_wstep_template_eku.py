@@ -27,17 +27,15 @@ from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates
 from services.wstep import wstep_service
+from tests.windows_profile_support import windows_profiles_restored, restore, set_config, snapshot  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 SMARTCARD_LOGON = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.2')
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
@@ -45,11 +43,7 @@ def smartcard_template_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Smartcard CA')
     keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
@@ -79,16 +73,7 @@ def smartcard_template_config(app, create_ca):
     with app.app_context():
         delete_templates([template_id])
         db.session.commit()
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _make_csr(common_name, ekus=None):
@@ -164,7 +149,7 @@ def test_issue_restores_smartcard_logon_from_matched_template(app, smartcard_tem
     )
     with app.app_context():
         ca = db.session.get(CA, smartcard_template_config['id'])
-        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
 
     assert err is None, err
     cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -187,7 +172,7 @@ def test_issue_with_no_matching_template_has_no_smartcard_logon(app, create_ca):
         csr, _key = _make_csr(
             'plain-user.hagland.domain', ekus=[ExtendedKeyUsageOID.CLIENT_AUTH]
         )
-        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
 
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())

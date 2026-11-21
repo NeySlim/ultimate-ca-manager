@@ -87,12 +87,26 @@ class TestCommandLine:
         code = cli.main(list(args))
         return code, capsys.readouterr().out
 
+    def test_a_database_not_in_utf8_is_named_before_any_check_reads_it(self, monkeypatch, capsys):
+        """Simulated: the server answers SQL_ASCII, on which SQLAlchemy's first connection fails."""
+        import migration_runner
+
+        class Unreachable:
+            SQLALCHEMY_DATABASE_URI = 'postgresql://ucm:x@127.0.0.1:1/ucm'
+            SQLALCHEMY_TRACK_MODIFICATIONS = False
+            HTTPS_CERT_PATH = None
+
+        monkeypatch.setattr(migration_runner, '_server_encoding', lambda engine: 'SQL_ASCII')
+        code, out = self._run(monkeypatch, capsys, Unreachable)
+        assert code == 2
+        assert '[ERROR] database: This PostgreSQL database uses the encoding SQL_ASCII' in out, out
+
     def test_blockers_exit_1_in_text_and_json(self, instance_db, monkeypatch, capsys):
         engine, config = instance_db
         with engine.begin() as connection:
             connection.execute(text(
-                "INSERT INTO users (username, email, password_hash, role, auth_source) "
-                "VALUES ('cli-scrypt', 'c@example.com', :h, 'viewer', 'local')"), {'h': SCRYPT_HASH})
+                "INSERT INTO users (username, email, password_hash, role) "
+                "VALUES ('cli-scrypt', 'c@example.com', :h, 'viewer')"), {'h': SCRYPT_HASH})
         code, out = self._run(monkeypatch, capsys, config, '--json')
         assert code == 1
         report = json.loads(out)
@@ -234,25 +248,25 @@ class TestScheduledBackupKdf:
         from services.backup import schedule
         from utils.encryption import encrypt_if_needed
         monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
-        monkeypatch.setattr(schedule, '_LAST_ATTEMPT', {'at': None})
         with app.app_context():
             try:
                 _set('auto_backup_enabled', 'true')
                 _set('backup_password', encrypt_if_needed('a scheduled backup password'))
                 _set('backup_kdf', kdf)
                 _delete('backup.last_run')
+                _delete('backup.concluded_run')
                 result = schedule.run_scheduled_backup()
                 assert result['status'] == 'ok'
                 assert (tmp_path / result['filename']).read_bytes()[6] == expected
             finally:
-                for key in ('auto_backup_enabled', 'backup_password', 'backup_kdf', 'backup.last_run'):
+                for key in ('auto_backup_enabled', 'backup_password', 'backup_kdf', 'backup.last_run',
+                            'backup.concluded_run'):
                     _delete(key)
 
     def test_a_stored_argon2id_falls_back_to_pbkdf2_in_fips_mode(self, app, tmp_path, monkeypatch, caplog):
         from services.backup import schedule
         from utils.encryption import encrypt_if_needed
         monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
-        monkeypatch.setattr(schedule, '_LAST_ATTEMPT', {'at': None})
         monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
         with app.app_context():
             try:
@@ -260,10 +274,62 @@ class TestScheduledBackupKdf:
                 _set('backup_password', encrypt_if_needed('a scheduled backup password'))
                 _set('backup_kdf', 'argon2id')
                 _delete('backup.last_run')
+                _delete('backup.concluded_run')
                 result = schedule.run_scheduled_backup()
                 assert result['status'] == 'ok'
                 assert (tmp_path / result['filename']).read_bytes()[6] == container.KDF_PBKDF2
                 assert 'using PBKDF2' in caplog.text
             finally:
-                for key in ('auto_backup_enabled', 'backup_password', 'backup_kdf', 'backup.last_run'):
+                for key in ('auto_backup_enabled', 'backup_password', 'backup_kdf', 'backup.last_run',
+                            'backup.concluded_run'):
                     _delete(key)
+
+
+def _registry(engine, names):
+    with engine.begin() as connection:
+        connection.execute(text('CREATE TABLE IF NOT EXISTS _migrations '
+                                '(id INTEGER PRIMARY KEY, name VARCHAR(255) UNIQUE)'))
+        for name in names:
+            connection.execute(text('INSERT INTO _migrations (name) VALUES (:n)'), {'n': name})
+
+
+class TestBeforeTheUpgrade:
+    """Installed over 2.254, the package runs the report before the first start applies the
+    upgrade: the checks that read the database wait for it, the others run."""
+
+    def _run(self, monkeypatch, capsys, config, *args):
+        monkeypatch.setattr(cli, 'read_only_app', lambda: _READ_ONLY_APP(config))
+        code = cli.main(list(args))
+        return code, capsys.readouterr().out
+
+    def test_a_database_waiting_for_its_upgrade_defers_the_checks_that_read_it(
+            self, instance_db, monkeypatch, capsys):
+        from migrations._from_2_254 import PIVOT_NAMES
+        engine, config = instance_db
+        _registry(engine, sorted(PIVOT_NAMES))
+        with engine.begin() as connection:
+            # A table of the 3.0 model the 2.254 schema lacks
+            connection.execute(text('DROP TABLE users'))
+        code, out = self._run(monkeypatch, capsys, config)
+        assert code == 0, out
+        assert '[ERROR]' not in out and 'could not run' not in out, out
+        deferred = [d for d in cli.fips_preflight.DETECTORS if d.reads_database]
+        line = [l for l in out.splitlines() if 'checks need the upgraded database' in l]
+        assert line == [f'[INFO] {len(deferred)} checks need the upgraded database: run cd '
+                        f'{cli.Path(cli.__file__).resolve().parents[1]} && sudo -u '
+                        f'{cli.pwd.getpwuid(os.geteuid()).pw_name} {cli.sys.executable} '
+                        f'-m scripts.fips_preflight after the first start'], out
+        report = json.loads(self._run(monkeypatch, capsys, config, '--json')[1])
+        assert sorted(report['checked']) == sorted(
+            d.id for d in cli.fips_preflight.DETECTORS if not d.reads_database)
+        assert report['errors'] == []
+
+    def test_an_upgraded_database_runs_every_check(self, instance_db, monkeypatch, capsys):
+        from migration_runner import _list_migration_names
+        engine, config = instance_db
+        _registry(engine, _list_migration_names())
+        code, out = self._run(monkeypatch, capsys, config, '--json')
+        report = json.loads(out)
+        assert code == 0, out
+        assert 'deferred' not in report
+        assert sorted(report['checked']) == sorted(d.id for d in cli.fips_preflight.DETECTORS)

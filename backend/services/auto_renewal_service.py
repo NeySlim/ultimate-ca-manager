@@ -14,7 +14,8 @@ import logging
 from sqlalchemy.orm.exc import ObjectDeletedError
 
 from models import db, Certificate, CA, SystemConfig
-from services.cert.renewal import RenewalError, SERIAL_UNSET, renew_certificate_in_place
+from services.cert.renewal import (RenewalError, SERIAL_UNSET, check_renewable,
+                                  renew_certificate_in_place)
 from utils.datetime_utils import to_naive_utc, utc_now
 
 logger = logging.getLogger(__name__)
@@ -57,18 +58,23 @@ class AutoRenewalService:
             'notify_on_failure': True,
         }
 
-        enabled = SystemConfig.query.filter_by(key='auto_renewal_enabled').first()
+        # One query for the five settings: the dashboard queue reads them on every request
+        stored = {row.key: row for row in SystemConfig.query.filter(SystemConfig.key.in_((
+            'auto_renewal_enabled', 'auto_renewal_days', 'auto_renewal_sources',
+            'auto_renewal_notify_on_renewal', 'auto_renewal_notify_on_failure')))}
+
+        enabled = stored.get('auto_renewal_enabled')
         if enabled:
             config['enabled'] = enabled.value == 'true'
 
-        days = SystemConfig.query.filter_by(key='auto_renewal_days').first()
+        days = stored.get('auto_renewal_days')
         if days:
             try:
                 config['days_before_expiry'] = int(days.value)
             except (TypeError, ValueError):
                 logger.warning("Setting auto_renewal_days is not an integer; ignored")
 
-        sources = SystemConfig.query.filter_by(key='auto_renewal_sources').first()
+        sources = stored.get('auto_renewal_sources')
         if sources:
             parsed = _json_list('auto_renewal_sources', sources.value)
             if parsed is not None and all(isinstance(v, str) for v in parsed):
@@ -77,7 +83,7 @@ class AutoRenewalService:
                 logger.warning("Setting auto_renewal_sources holds non-string values; ignored")
 
         for flag in ('notify_on_renewal', 'notify_on_failure'):
-            row = SystemConfig.query.filter_by(key=f'auto_renewal_{flag}').first()
+            row = stored.get(f'auto_renewal_{flag}')
             if row:
                 config[flag] = row.value == 'true'
         return config
@@ -132,7 +138,9 @@ class AutoRenewalService:
             # the scheduler; the device renews through its protocol
             Certificate.prv.isnot(None),
             Certificate.prv != '',
-            Certificate.source.in_(config['renewal_sources'])
+            Certificate.source.in_(config['renewal_sources']),
+            # A certificate of a Windows enrollment profile renews through Windows only
+            Certificate.windows_profile_id.is_(None),
         ).all()
 
         return [c for c in certs if AutoRenewalService._in_renewal_window(c, config['days_before_expiry'])]
@@ -177,7 +185,8 @@ class AutoRenewalService:
     @staticmethod
     def renew_certificate(cert: Certificate, regenerate_crl: bool = True, known_serial=SERIAL_UNSET) -> tuple:
         """Renew one certificate in place for the scheduler: ``(True, id)``,
-        ``(None, message)`` when the row is gone, else ``(False, message)``."""
+        ``(None, message)`` when the row is gone or another request overtook the renewal,
+        else ``(False, message)``."""
         # Read before the call: a rollback expires the instance
         try:
             cert_id, common_name = cert.id, cert.common_name
@@ -186,12 +195,13 @@ class AutoRenewalService:
             return None, 'Certificate no longer exists'
 
         try:
-            renew_certificate_in_place(
+            outcome = renew_certificate_in_place(
                 cert, username=AUTO_RENEWAL_ACTOR, actor_user_id=None, rekey=False,
                 regenerate_crl=regenerate_crl, trigger='auto', known_serial=known_serial)
         except RenewalError as e:
             db.session.rollback()
-            if not AutoRenewalService._row_exists(cert_id):
+            # Gone, or overtaken by another request: the next pass reads the row anew
+            if e.overtaken or not AutoRenewalService._row_exists(cert_id):
                 logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
                 return None, e.message
             logger.warning(f"Auto-renewal of cert {cert_id} refused: {e.message}")
@@ -204,6 +214,8 @@ class AutoRenewalService:
             return False, 'Renewal failed'
 
         logger.info(f"Auto-renewed cert {cert_id} ({common_name})")
+        for notice in outcome.get('notices') or []:
+            logger.info(f"Auto-renewed cert {cert_id}: {notice}")
         return True, cert_id
 
     @staticmethod
@@ -242,6 +254,7 @@ class AutoRenewalService:
         very certificate (same serial): a decision, kept until it changes."""
         import json as _json
         from models.policy import ApprovalRequest
+        from utils.serial_format import names_certificate
         rows = ApprovalRequest.query.filter_by(status='rejected', request_type='renewal').filter(
             ApprovalRequest.request_data.like(f'%"certificate_id": {int(cert.id)},%')).all()
         for row in rows:
@@ -250,7 +263,7 @@ class AutoRenewalService:
             except ValueError:
                 continue
             if (data.get('trigger') == 'auto' and data.get('certificate_id') == cert.id
-                    and data.get('serial_number') == cert.serial_number):
+                    and names_certificate(data.get('serial_number'), cert, row.created_at)):
                 return True
         return False
 
@@ -297,8 +310,8 @@ class AutoRenewalService:
         # otherwise come back as not yet due
         stats = {'renewed': 0, 'failed': 0, 'skipped': 0, 'queued': 0, 'errors': [],
                  'waiting': AutoRenewalService.waiting_certificates(config)}
-        # CAs whose CRL is published once, after the batch
-        renewed_carefs = set()
+        # Renewed rows: the CRL of the CA each names by then is published once, after the batch
+        renewed_ids = []
 
         # A renewal an operator queued for approval is a human decision the
         # scheduler does not pre-empt, as long as that decision (or the
@@ -338,6 +351,8 @@ class AutoRenewalService:
             common_name = cert.common_name
             try:
                 partner = renewal_partner(cert)
+            except RenewalError:  # an unreadable member: the renewal below refuses and records it
+                partner = None
             except Exception:  # the renewal itself then reports what is wrong with the row
                 logger.warning(f"Auto-renewal: related certificate of {cert_id} not read", exc_info=True)
                 partner = None
@@ -349,12 +364,21 @@ class AutoRenewalService:
                 stats['skipped'] += 1
                 continue
             # A policy that requires approval for renewals holds the scheduler
-            # too: the renewal is queued once, and performed on approval only
+            # too: the renewal is queued once, and performed on approval only.
+            # As on the routes, a renewal no approval could honour is refused before the gate
             try:
+                check_renewable(cert, 'auto')
                 held = AutoRenewalService._held_for_approval(
                     cert, already_queued=bool(deadlines))
-            except PairApprovalConflict as e:
+            except (PairApprovalConflict, RenewalError) as e:  # RenewalError: refused, or the pair not read
                 db.session.rollback()
+                # Gone, or overtaken by another request: the next pass reads the row anew
+                if isinstance(e, RenewalError) and (
+                        e.overtaken or not AutoRenewalService._row_exists(cert_id)):
+                    logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
+                    stats['skipped'] += 1
+                    continue
+                logger.warning(f"Auto-renewal of cert {cert_id} refused: {e}")
                 AutoRenewalService._log_failure(cert_id, common_name, str(e))
                 stats['failed'] += 1
                 stats['errors'].append({'cert_id': cert_id, 'common_name': common_name, 'error': str(e)})
@@ -383,12 +407,7 @@ class AutoRenewalService:
 
             if success:
                 stats['renewed'] += 1
-                # The renewal links the row to the CA that really signed it
-                # (resolved by signature when the row named none): that CA's
-                # CRL is the one carrying the superseded serial
-                for row in (cert, db.session.get(Certificate, partner_id) if partner_id else None):
-                    if row is not None and row.caref:
-                        renewed_carefs.add(row.caref)
+                renewed_ids += [cert_id] + ([partner_id] if partner_id else [])
                 if partner_id is not None:
                     done_with_pair[partner_id] = 'renewed'
             elif success is None:
@@ -401,7 +420,11 @@ class AutoRenewalService:
                     'error': result
                 })
 
-        AutoRenewalService._publish_crls(carefs=renewed_carefs)
+        # The renewal links a row to the CA that really signed it, and that record may have
+        # been merged into another one since: the CRL to publish is the one the row names now
+        from services.cert.renewal import current_issuer
+        issuers = [current_issuer(row_id) for row_id in renewed_ids]
+        AutoRenewalService._publish_crls(carefs={issuer[1] for issuer in issuers if issuer})
         logger.info(f"Auto-renewal complete: {stats['renewed']} renewed, {stats['failed']} failed")
 
         # Send notifications if configured
@@ -485,4 +508,5 @@ class AutoRenewalService:
 # Scheduler task function
 def run_auto_renewal_task():
     """Scheduled task for auto-renewal"""
+    # Leader-only; each certificate is also claimed FOR UPDATE by renewal._reread (409 to a second renewer)
     return AutoRenewalService.run_auto_renewal()

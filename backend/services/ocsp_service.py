@@ -230,9 +230,9 @@ def _build_unknown_certificate(serial: int, issuer: x509.Certificate) -> x509.Ce
 
 
 # The shared reason table, minus the one entry a responder cannot mean:
-# ``removeFromCRL`` is a delta-CRL instruction (RFC 5280 §5.3.1) and an
-# unhold stages it on the row for the moment it takes to publish that delta.
-# Answering ``unspecified`` for it is this responder's own rule and stays.
+# ``removeFromCRL`` is a delta-CRL instruction (RFC 5280 §5.3.1). A row an
+# unhold staged so is answered as its hold (``answered_revocation``); only a
+# row and its record both in reason 8 (an old ACME revocation) say unspecified.
 #
 # The copy this replaces had drifted from the CRL builder's on the spelling
 # the revoke API stores: ``cACompromise`` was absent, so the same
@@ -1114,6 +1114,9 @@ class OCSPService:
         revocation_reason: Optional[int]
     ):
         """Cache OCSP response in database"""
+        from services.cluster_maintenance import blocks_writes
+        if blocks_writes():
+            return  # HA maintenance: answered from the state before it, never stored
         try:
             # Check if response already exists
             existing = OCSPResponse.query.filter_by(

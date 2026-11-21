@@ -8,6 +8,7 @@ import logging
 from typing import List
 
 from models import CA, db
+from utils.ca_serial_counter import next_ca_serial
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +228,8 @@ class CAOperationsMixin:
         if not ca:
             raise ValueError("CA not found")
 
-        ca.serial = (ca.serial or 0) + 1
+        # This call's count: ca.serial reloaded after the commit may hold another worker's
+        count = next_ca_serial(ca)
         try:
             db.session.commit()
         except Exception as _commit_err:
@@ -235,7 +237,7 @@ class CAOperationsMixin:
             logger.error(f"Commit failed in services/ca/ca_operations.py:41: {_commit_err}", exc_info=True)
             raise
 
-        return ca.serial
+        return count
 
     @staticmethod
     def get_ca_chain(ca_id: int, variant: str = 'auto', include_root: bool = True) -> List[bytes]:

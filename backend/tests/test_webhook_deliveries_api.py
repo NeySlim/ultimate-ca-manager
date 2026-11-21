@@ -53,6 +53,26 @@ class TestDeliveriesList:
     def test_unknown_endpoint_404(self, auth_client):
         assert auth_client.get('/api/v2/webhooks/999999/deliveries').status_code == 404
 
+    def test_second_page_and_filtered_total(self, app, auth_client, endpoint_with_deliveries):
+        with app.app_context():
+            for _ in range(24):
+                db.session.add(WebhookDelivery(
+                    endpoint_id=endpoint_with_deliveries, event_type='certificate.issued',
+                    payload='{}', event_timestamp=utc_now().isoformat(), status='failed',
+                    next_attempt_at=utc_now(), attempts=1, max_attempts=5))
+            db.session.commit()
+        url = f'/api/v2/webhooks/{endpoint_with_deliveries}/deliveries'
+        first = json.loads(auth_client.get(f'{url}?per_page=10').data)
+        second = json.loads(auth_client.get(f'{url}?per_page=10&page=2').data)
+        assert first['meta']['total'] == 27 and first['meta']['total_pages'] == 3
+        assert len(second['data']) == 10
+        assert not {d['id'] for d in first['data']} & {d['id'] for d in second['data']}
+        # newest first: the first page holds the highest ids, the second the next ones
+        ids = [d['id'] for d in first['data'] + second['data']]
+        assert ids == sorted(ids, reverse=True)
+        failed = json.loads(auth_client.get(f'{url}?status=failed&per_page=10&page=3').data)
+        assert failed['meta']['total'] == 25 and len(failed['data']) == 5
+
 
 class TestRetry:
     def test_retry_requeues_failed_delivery(self, app, auth_client, endpoint_with_deliveries):

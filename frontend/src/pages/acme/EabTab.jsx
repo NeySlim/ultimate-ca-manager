@@ -336,7 +336,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
                           autoFocus
                         />
                         <Button type="button" variant="ghost" size="sm" onClick={() => saveNotes(cred.id)} title={t('common.save')}>
-                          <Check size={14} className="text-green-500" />
+                          <Check size={14} className="text-status-success" />
                         </Button>
                         <Button type="button" variant="ghost" size="sm" onClick={cancelEditingNotes} title={t('common.cancel')}>
                           <X size={14} className="text-text-tertiary" />
@@ -383,7 +383,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
                         onClick={() => handleRevokeEabCredential(cred)}
                         title={t('acme.eab.revoke')}
                       >
-                        <Trash size={14} className="text-yellow-500" />
+                        <Trash size={14} className="text-status-warning" />
                       </Button>
                     )}
                     {canDelete && cred.status === 'revoked' && (
@@ -394,7 +394,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
                         onClick={() => handleDeleteEabCredential(cred)}
                         title={t('acme.eab.delete')}
                       >
-                        <Trash size={14} className="text-red-500" />
+                        <Trash size={14} className="text-status-danger" />
                       </Button>
                     )}
                     {canDelete && cred.status === 'used' && (
@@ -405,7 +405,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
                         onClick={() => handleDeleteEabCredential(cred)}
                         title={t('acme.eab.delete')}
                       >
-                        <Trash size={14} className="text-red-500" />
+                        <Trash size={14} className="text-status-danger" />
                       </Button>
                     )}
                   </div>
@@ -468,8 +468,8 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       >
         {newEabSecret && (
           <div className="p-4 space-y-4">
-            <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 flex gap-2">
-              <Warning size={20} className="text-yellow-500 shrink-0 mt-0.5" weight="duotone" />
+            <div className="rounded-lg border border-status-warning-op40 bg-status-warning-op10 p-3 flex gap-2">
+              <Warning size={20} className="text-status-warning shrink-0 mt-0.5" weight="duotone" />
               <div className="text-sm">
                 <div className="font-semibold">{t('acme.eab.secretWarningTitle')}</div>
                 <div className="text-text-tertiary mt-1">{t('acme.eab.secretWarning')}</div>

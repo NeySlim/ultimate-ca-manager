@@ -135,7 +135,7 @@ export function MultiSelectFilter({
           'absolute z-[300] mt-1 min-w-[200px] max-w-[280px]',
           'bg-secondary-op95 backdrop-blur-md',
           'border border-border-op50 rounded-lg',
-          'shadow-xl shadow-black/20',
+          'shadow-xl',
           'overflow-hidden',
           s.content
         )}>
@@ -200,7 +200,7 @@ export function MultiSelectFilter({
                       ? 'bg-accent-primary border-accent-primary' 
                       : 'border-border bg-bg-primary'
                   )}>
-                    {checked && <Check size={10} weight="bold" className="text-white" />}
+                    {checked && <Check size={10} weight="bold" className="text-on-accent" />}
                   </div>
                   <span className="truncate">{option.label}</span>
                 </button>

@@ -294,7 +294,53 @@ class TestApi:
         crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
         assert crypto == {'fips_requested': False, 'fips_active': False, 'provider_active': False,
                           'library': fips_mode.library_version(), 'provider': None,
-                          'module_settings': None}
+                          'module_settings': None, 'blockers': None, 'blockers_checked_at': None}
+
+    def test_status_carries_the_blockers_found_at_startup(self, auth_client, monkeypatch):
+        from services import fips_preflight
+        found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
+                  'examples': ['alice (#3)'], 'remedy': 'r'}]
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found,
+                                                         'checked_at': '2026-11-14T08:00:00Z'})
+        crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
+        assert crypto['blockers'] == found
+        assert crypto['blockers_checked_at'] == '2026-11-14T08:00:00Z'
+
+    def test_the_preflight_route_does_not_change_the_status(self, auth_client, monkeypatch):
+        from services import fips_preflight
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': [],
+                                                         'checked_at': '2026-11-14T08:00:00Z'})
+        before = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
+        found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
+                  'examples': [], 'remedy': 'r'}]
+        monkeypatch.setattr(fips_preflight, 'run_detectors', lambda *a, **k: {
+            'summary': {'blocker': 1, 'warning': 0, 'info': 0}, 'findings': found, 'errors': [],
+            'checked': ['users.password_scrypt']})
+        assert auth_client.get('/api/v2/system/fips-preflight').get_json()['data']['findings'] == found
+        after = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
+        assert (after['blockers'], after['blockers_checked_at']) == ([], '2026-11-14T08:00:00Z')
+        assert before['blockers'] == after['blockers']
+
+    def test_status_hides_blocker_examples_without_admin_system(self, app, monkeypatch,
+                                                                create_user, auth_client, request):
+        """read:settings sees what blocks and how many; the names need admin:system."""
+        from services import fips_preflight
+        found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
+                  'examples': ['alice (#3)'], 'remedy': 'r'}]
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found, 'checked_at': None})
+        user = create_user(username='fips-status-operator', password='Operator-Pass-123!',
+                           role='operator')
+        request.addfinalizer(lambda: auth_client.delete(f"/api/v2/users/{user['id']}"))
+        client = app.test_client()
+        assert client.post('/api/v2/auth/login', json={
+            'username': 'fips-status-operator', 'password': 'Operator-Pass-123!'}).status_code == 200
+        assert client.get('/api/v2/system/fips-preflight').status_code == 403
+        r = client.get('/api/v2/system/service/status')
+        assert r.status_code == 200
+        assert 'alice' not in r.get_data(as_text=True)
+        assert r.get_json()['data']['crypto']['blockers'] == [
+            {'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1}]
 
     @pytest.mark.parametrize('active', [True, False])
     def test_health_says_whether_fips_is_on_without_versions(self, client, monkeypatch, active):
@@ -304,7 +350,23 @@ class TestApi:
         assert 'library' not in body and 'provider' not in body
 
 
-GROUPS_CNF = """openssl_conf = openssl_init
+def _entrypoint_groups():
+    """The Groups line the image's entrypoint writes into its FIPS configuration."""
+    import os
+    import re
+    path = os.path.join(os.path.dirname(fips_mode.__file__), '..', 'docker', 'entrypoint.sh')
+    with open(path, encoding='utf-8') as handle:
+        return re.search(r'^Groups = (\S+)$', handle.read(), re.MULTILINE).group(1)
+
+
+def test_entrypoint_offers_the_three_approved_hybrids_first():
+    """Policy #5586 §2.7 and IG D.S name three hybrid schemes; each optional, ahead of ECDHE."""
+    groups = _entrypoint_groups().split(':')
+    assert groups[:3] == ['?X25519MLKEM768', '?SecP256r1MLKEM768', '?SecP384r1MLKEM1024']
+    assert 'X25519' not in groups and 'X448' not in groups
+
+
+GROUPS_CNF = f"""openssl_conf = openssl_init
 
 [openssl_init]
 ssl_conf = ssl_sect
@@ -313,7 +375,7 @@ ssl_conf = ssl_sect
 system_default = system_default_sect
 
 [system_default_sect]
-Groups = P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
+Groups = {_entrypoint_groups()}
 """
 
 
@@ -380,3 +442,95 @@ class TestTlsGroups:
         with caplog.at_level(logging.ERROR), pytest.raises(SystemExit):
             fips_mode.enforce_at_startup(LOG)
         assert 'FIPS self-test failed: TLS still negotiates X25519' in caplog.text
+
+
+def _free_port():
+    import socket
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        return sock.getsockname()[1]
+
+
+def _openssl_has_mlkem():
+    import shutil
+    import subprocess
+    binary = shutil.which('openssl')
+    if not binary:
+        return False
+    out = subprocess.run([binary, 'list', '-kem-algorithms'], capture_output=True, text=True,
+                         timeout=10, check=False).stdout
+    return 'ML-KEM-768' in out
+
+
+@pytest.mark.skipif(not _openssl_has_mlkem(), reason='needs the openssl command with ML-KEM (3.5+)')
+class TestEntrypointGroupsOnTheWire:
+    """A server on the entrypoint's Groups negotiates the ML-KEM hybrids, never X25519 alone."""
+
+    @pytest.fixture(scope='class')
+    def server(self, tmp_path_factory):
+        import subprocess
+        import time
+        tmp = tmp_path_factory.mktemp('groups')
+        key, cert = tmp / 'k.pem', tmp / 'c.pem'
+        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'ec', '-pkeyopt',
+                        'ec_paramgen_curve:P-256', '-nodes', '-keyout', str(key), '-out', str(cert),
+                        '-subj', '/CN=groups', '-days', '1'], capture_output=True, check=True, timeout=30)
+        (tmp / 'groups.cnf').write_text(GROUPS_CNF)
+        port = _free_port()
+        env = {k: v for k, v in __import__('os').environ.items() if k != 'OPENSSL_CONF'}
+        env['OPENSSL_CONF'] = str(tmp / 'groups.cnf')
+        proc = subprocess.Popen(['openssl', 's_server', '-accept', f'127.0.0.1:{port}', '-cert', str(cert),
+                                 '-key', str(key), '-quiet'], env=env, stdin=subprocess.PIPE,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.5)
+        yield port
+        proc.kill()
+        proc.wait(timeout=10)
+
+    def _handshake(self, port, group):
+        import os
+        import subprocess
+        env = {k: v for k, v in os.environ.items() if k != 'OPENSSL_CONF'}
+        return subprocess.run(['openssl', 's_client', '-connect', f'127.0.0.1:{port}', '-groups', group],
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20,
+                              env=env, check=False).stdout
+
+    @pytest.mark.parametrize('group', ['X25519MLKEM768', 'SecP256r1MLKEM768', 'SecP384r1MLKEM1024'])
+    def test_hybrids_are_negotiated(self, server, group):
+        assert f'Negotiated TLS1.3 group: {group}' in self._handshake(server, group)
+
+    def test_p256_is_negotiated(self, server):
+        assert 'Cipher is TLS_' in self._handshake(server, 'P-256')
+
+    @pytest.mark.parametrize('group', ['X25519', 'X448'])
+    def test_refused_alone(self, server, group):
+        assert 'Cipher is TLS_' not in self._handshake(server, group)
+
+
+class TestStartupBlockersWiring:
+    """create_app runs the blocker check once the database is ready; its failure never stops it."""
+
+    def test_it_runs_on_the_ready_database(self, monkeypatch):
+        from services import fips_preflight
+        from tests.fresh_app import fresh_app
+        seen = []
+
+        def spy(log):
+            from models import User
+            seen.append(User.query.count())
+        monkeypatch.setattr(fips_preflight, 'log_startup_blockers', spy)
+        with fresh_app():
+            pass
+        assert len(seen) == 1 and seen[0] >= 0
+
+    def test_its_failure_never_stops_the_start(self, monkeypatch, caplog):
+        from services import fips_preflight
+        from tests.fresh_app import fresh_app
+
+        def broken(log):
+            raise RuntimeError('check broken')
+        monkeypatch.setattr(fips_preflight, 'log_startup_blockers', broken)
+        with fresh_app() as application:
+            assert application is not None
+        assert any('check broken' in r.getMessage() for r in caplog.records
+                   if r.levelno == logging.ERROR)

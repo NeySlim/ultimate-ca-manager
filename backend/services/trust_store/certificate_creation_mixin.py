@@ -33,8 +33,8 @@ class CertificateCreationMixin:
         ca_private_key,
         cert_type: str = 'server_cert',
         validity_days: int = 397,
-        digest: str = 'sha256',
-        key_type: str = '2048',
+        digest: Optional[str] = None,
+        key_type: Optional[str] = None,
         san_dns: Optional[List[str]] = None,
         san_ip: Optional[List[str]] = None,
         san_uri: Optional[List[str]] = None,
@@ -56,7 +56,10 @@ class CertificateCreationMixin:
         check_issuer_window(ca_cert)
 
         # Generate private key for certificate
-        private_key = KeyOperationsMixin.generate_private_key(key_type)
+        # No database here: callers that know a CA, template or policy pass the resolved key
+        from utils import issuance_defaults, key_algorithms
+        private_key = KeyOperationsMixin.generate_private_key(
+            key_type or key_algorithms.get(issuance_defaults.BASELINE_ISSUE_KEY).trust_store_id)
 
         # Build certificate
         builder = x509.CertificateBuilder()

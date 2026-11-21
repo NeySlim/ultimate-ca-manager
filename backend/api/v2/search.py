@@ -8,6 +8,7 @@ from models import Certificate, CA, User, CertificateTemplate
 from utils.response import success_response
 from utils.pagination import parse_request_limit
 from utils.datetime_utils import utc_now
+from utils.serial_format import serial_search_forms
 
 bp = Blueprint('search', __name__)
 
@@ -49,10 +50,11 @@ def global_search():
     # Search certificates
     certs = Certificate.query.filter(
         or_(
-            Certificate.subject.ilike(search_pattern),
-            Certificate.issuer.ilike(search_pattern),
-            Certificate.descr.ilike(search_pattern),
-            Certificate.serial_number.ilike(search_pattern)
+            Certificate.subject.ilike(search_pattern, escape='\\'),
+            Certificate.issuer.ilike(search_pattern, escape='\\'),
+            Certificate.descr.ilike(search_pattern, escape='\\'),
+            Certificate.serial_number.ilike(search_pattern, escape='\\'),
+            Certificate.serial_number.in_(serial_search_forms(query)),
         )
     ).limit(limit).all()
     
@@ -77,9 +79,9 @@ def global_search():
     # Search CAs
     cas = CA.query.filter(
         or_(
-            CA.descr.ilike(search_pattern),
-            CA.subject.ilike(search_pattern),
-            CA.issuer.ilike(search_pattern)
+            CA.descr.ilike(search_pattern, escape='\\'),
+            CA.subject.ilike(search_pattern, escape='\\'),
+            CA.issuer.ilike(search_pattern, escape='\\')
         )
     ).limit(limit).all()
     
@@ -96,9 +98,9 @@ def global_search():
     if has_permission('read:users', g.permissions):
         users = User.query.filter(
             or_(
-                User.username.ilike(search_pattern),
-                User.email.ilike(search_pattern),
-                User.full_name.ilike(search_pattern)
+                User.username.ilike(search_pattern, escape='\\'),
+                User.email.ilike(search_pattern, escape='\\'),
+                User.full_name.ilike(search_pattern, escape='\\')
             )
         ).limit(limit).all()
 
@@ -116,8 +118,8 @@ def global_search():
     # Search templates
     templates = CertificateTemplate.query.filter(
         or_(
-            CertificateTemplate.name.ilike(search_pattern),
-            CertificateTemplate.description.ilike(search_pattern)
+            CertificateTemplate.name.ilike(search_pattern, escape='\\'),
+            CertificateTemplate.description.ilike(search_pattern, escape='\\')
         )
     ).limit(limit).all()
     
@@ -132,11 +134,6 @@ def global_search():
 
 
 def _extract_cn(subject):
-    """Extract CN from subject string"""
-    if not subject:
-        return None
-    for part in subject.split(','):
-        part = part.strip()
-        if part.upper().startswith('CN='):
-            return part[3:]
-    return None
+    """The first CN of a stored subject string, escapes honoured."""
+    from utils.dn_parse import stored_dn_common_name
+    return stored_dn_common_name(subject)

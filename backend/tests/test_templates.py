@@ -15,6 +15,7 @@ import pytest
 import os
 import sys
 import json
+import uuid
 import io
 import tempfile
 
@@ -44,6 +45,8 @@ def app():
     app = create_app('testing')
     app.config['TESTING'] = True
     app.config['WTF_CSRF_ENABLED'] = False
+    from tests.header_guard import guard_latin1_headers
+    guard_latin1_headers(app)  # this app serves exports: refuse what the real server refuses
 
     from tests.conftest import clear_admin_password_flag
     clear_admin_password_flag(app)
@@ -96,6 +99,28 @@ def _create_template(auth_client, name=None, **overrides):
 # ============================================================
 # 1. Authentication Required
 # ============================================================
+
+
+@pytest.fixture
+def system_template(app):
+    """A system template's id: one the database holds, else one made for the test."""
+    from models import db
+    from models.certificate_template import CertificateTemplate
+    with app.app_context():
+        row = CertificateTemplate.query.filter_by(is_system=True).order_by(CertificateTemplate.id).first()
+        made = row is None
+        if made:
+            row = CertificateTemplate(name=f'system-probe-{uuid.uuid4().hex[:8]}', template_type='custom',
+                                      is_system=True)
+            db.session.add(row)
+            db.session.commit()
+        template_id = row.id
+    yield template_id
+    if made:
+        with app.app_context():
+            CertificateTemplate.query.filter_by(id=template_id, is_system=True).delete()
+            db.session.commit()
+
 
 class TestTemplatesAuth:
     """All template endpoints require authentication."""
@@ -380,13 +405,9 @@ class TestUpdateTemplate:
                             content_type='application/json')
         assert_error(r, 404)
 
-    def test_update_system_template_forbidden(self, auth_client):
+    def test_update_system_template_forbidden(self, auth_client, system_template):
         """System templates cannot be modified."""
-        data = assert_success(auth_client.get('/api/v2/templates'))
-        system = [t for t in data if t.get('is_system')]
-        if not system:
-            pytest.skip('No system templates found')
-        tid = system[0]['id']
+        tid = system_template
         r = auth_client.put(f'/api/v2/templates/{tid}',
                             data=json.dumps({'description': 'hacked'}),
                             content_type='application/json')
@@ -532,13 +553,9 @@ class TestDeleteTemplate:
         r = auth_client.delete('/api/v2/templates/999999')
         assert_error(r, 404)
 
-    def test_delete_system_template_forbidden(self, auth_client):
+    def test_delete_system_template_forbidden(self, auth_client, system_template):
         """System templates cannot be deleted."""
-        data = assert_success(auth_client.get('/api/v2/templates'))
-        system = [t for t in data if t.get('is_system')]
-        if not system:
-            pytest.skip('No system templates found')
-        tid = system[0]['id']
+        tid = system_template
         r = auth_client.delete(f'/api/v2/templates/{tid}')
         assert r.status_code == 403
         # Confirm still exists
@@ -589,13 +606,9 @@ class TestDuplicateTemplate:
         r = auth_client.post('/api/v2/templates/999999/duplicate')
         assert_error(r, 404)
 
-    def test_duplicate_system_template(self, auth_client):
+    def test_duplicate_system_template(self, auth_client, system_template):
         """Duplicating a system template should work (clone is non-system)."""
-        data = assert_success(auth_client.get('/api/v2/templates'))
-        system = [t for t in data if t.get('is_system')]
-        if not system:
-            pytest.skip('No system templates found')
-        tid = system[0]['id']
+        tid = system_template
         r = auth_client.post(f'/api/v2/templates/{tid}/duplicate')
         assert r.status_code in (200, 201)
         clone = get_json(r)['data']
@@ -773,13 +786,9 @@ class TestBulkDelete:
         result = get_json(r)['data']
         assert len(result['failed']) == 2
 
-    def test_bulk_delete_skips_system(self, auth_client):
+    def test_bulk_delete_skips_system(self, auth_client, system_template):
         """System templates should be reported as failed in bulk delete."""
-        data = assert_success(auth_client.get('/api/v2/templates'))
-        system = [t for t in data if t.get('is_system')]
-        if not system:
-            pytest.skip('No system templates found')
-        sid = system[0]['id']
+        sid = system_template
         r = auth_client.post('/api/v2/templates/bulk/delete',
                              data=json.dumps({'ids': [sid]}),
                              content_type='application/json')

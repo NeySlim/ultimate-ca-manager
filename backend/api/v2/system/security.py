@@ -14,7 +14,7 @@ from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
 )
-from services.database_admin.persistence import update_env_file
+from services.database_admin.persistence import update_env_file, env_file_path
 from pathlib import Path
 import os
 import shutil
@@ -41,11 +41,44 @@ def get_encryption_status():
             key_encryption, MASTER_KEY_PATH, count_master_key_values,
         )
 
+        from security.dek_rotation import (
+            disable_done, disable_grace, grace_end, retained, retiring, rotation_in_progress,
+            shown_as_enabled, removes_key_file,
+        )
+
+        def stamp(moment):
+            return moment.isoformat(timespec='seconds') + 'Z' if moment else None
+
         encrypted, unencrypted = count_master_key_values()
+        # The short grace of a change: enable (after a disable) or rotate waits for its end,
+        # known once every live node applied the change (None until then)
+        disabled_grace = disable_grace()
+        grace = None if disabled_grace else retiring()
+        disabled_end = grace_end(disabled_grace) if disabled_grace else None
+        grace_until = grace_end(grace) if grace else None
+        done = disable_done()
+        kept = retained()
 
         return success_response(data={
-            'enabled': key_encryption.is_enabled,
+            'enabled': shown_as_enabled(),
+            # A disable left half-way: values still open, none is encrypted any more
+            'disabling': (key_encryption.is_enabled and not key_encryption.is_encrypting
+                          and not done),
+            'enable_available_after': stamp(disabled_end),
+            'enable_waits_for_nodes': bool(disabled_grace) and disabled_end is None,
+            # Old DEKs kept for reading only, each dropped after its date and a clean sweep
+            'retained_keys': [{'version': r.version, 'retire_after': stamp(r.retire_after)}
+                              for r in kept],
+            # Outside HA master.key goes with the last DEK a disable kept
+            'key_file_kept_for_retained_keys': bool(done and kept and removes_key_file()),
             'key_source': key_encryption.key_source,
+            # Fingerprint and version only: neither key ever leaves the server here
+            'kek_fingerprint': key_encryption.kek_fingerprint(),
+            'dek_version': key_encryption.active_version,
+            'rotation_in_progress': rotation_in_progress(),
+            'rotation_available': key_encryption.is_encrypting and grace is None,
+            'rotation_available_after': stamp(grace_until),
+            'rotation_waits_for_nodes': bool(grace) and grace_until is None,
             'key_file_path': str(MASTER_KEY_PATH),
             'key_file_exists': key_encryption.key_file_exists(),
             'encrypted_count': encrypted,
@@ -59,22 +92,125 @@ def get_encryption_status():
         return error_response("Failed to get encryption status", 500)
 
 
+def _wait_for_nodes(command):
+    """HA: the live nodes load the new DEKs before values are written under them."""
+    from security.dek_rotation import wait_for_nodes
+    lagging = wait_for_nodes(command)
+    if lagging:
+        logger.warning(f"Encryption change: node(s) {', '.join(lagging)} did not reload in time")
+    return lagging
+
+
+def _enable_with_configured_kek():
+    """A KEK is configured (variable, or HA): encryption restarts under it, nothing is written to disk."""
+    from models import EncryptionKey
+    from security.encryption import key_encryption, encrypt_all_keys as do_encrypt
+    from security.dek_rotation import lock_key_state
+    from security.master_key_bootstrap import record_operator_choice
+    from security import envelope
+    from services.cluster_commands import RELOAD_ENCRYPTION, emit
+    lock_key_state()
+    # A live node under another KEK would read this one as DEK version 1 once the markers go
+    from security.master_key_bootstrap import live_peers_with_another_kek
+    strangers = live_peers_with_another_kek()
+    if strangers:
+        db.session.rollback()
+        names = ', '.join(f"{node} (fingerprint {fp})" for node, fp in strangers)
+        return error_response(
+            f"Encryption not enabled: live node(s) {names} hold another key-encryption key than "
+            f"this node's ({key_encryption.kek_fingerprint()}). Configure the same "
+            "KEY_ENCRYPTION_KEY on every node, or stop those nodes, then enable again.", 409)
+    # Only the disabled marker goes. The DEKs a disable kept for its retention go on opening
+    # late values under a new active DEK; any other stored DEK means this KEK cannot open it
+    mine = key_encryption.kek_fingerprint()
+    keys = EncryptionKey.query.filter(
+        EncryptionKey.state.in_((envelope.ACTIVE, envelope.PREVIOUS))).all()
+    # retire_after None: defensive, not reached by the normal paths (shown_as_enabled refused it)
+    if key_encryption.dek_error or any(r.retire_after is None or r.kek_id != mine for r in keys):
+        db.session.rollback()
+        return error_response("The stored data-encryption keys do not open with the configured "
+                              "key-encryption key; nothing was changed.", 409)
+    EncryptionKey.query.filter_by(state=envelope.DISABLED).delete(synchronize_session=False)
+    version = 1
+    if keys:
+        for row in keys:
+            row.state = envelope.PREVIOUS
+        version = max(r.version for r in keys) + 1
+        kek = key_encryption.kek_bytes_for_envelope()
+        db.session.add(EncryptionKey(version=version, state=envelope.ACTIVE, kek_id=mine,
+                                     wrapped=envelope.wrap(kek, version, envelope.new_dek()),
+                                     created_at=utc_now()))
+    record_operator_choice(auto=True)
+    command = emit(RELOAD_ENCRYPTION, {'version': version})
+    db.session.commit()
+    key_encryption.reload()
+    if not key_encryption.is_enabled:
+        return error_response("Failed to initialize encryption with the configured key", 500)
+    _wait_for_nodes(command)
+    encrypted, skipped, errors = do_encrypt(dry_run=False)
+    # As with a new master.key: the plaintext .key mirrors a disable wrote go (#320)
+    from security.master_key_bootstrap import purge_plaintext_key_files
+    purge = purge_plaintext_key_files()
+    AuditService.log_action(
+        action='encryption_enabled',
+        resource_type='system',
+        resource_name='Private Key Encryption',
+        details=(f"Encryption enabled with the configured key-encryption key "
+                 f"({key_encryption.kek_fingerprint()}). Encrypted {encrypted} keys, "
+                 f"{skipped} already encrypted. Removed {purge['removed']} key files; "
+                 f"kept {purge['kept_no_db_key']} without a database key."),
+        success=not errors)
+    return success_response(
+        message=f"Encryption enabled. {encrypted} keys encrypted.",
+        data={'enabled': True, 'encrypted': encrypted, 'skipped': skipped, 'errors': errors,
+              'key_files_removed': purge['removed'], 'key_files_kept': purge['kept_no_db_key'],
+              'master_key': None, 'backup_required': False})
+
+
 @bp.route('/api/v2/system/security/enable-encryption', methods=['POST'])
 @require_auth(['admin:system'])
 def enable_encryption():
     """
     Enable private key encryption.
-    Generates a master key, writes it to /etc/ucm/master.key,
-    and encrypts all existing private keys in the database.
+    Without a KEK, generates a master key, writes it to master.key in UCM_CONFIG_DIR;
+    with one (HA, KEY_ENCRYPTION_KEY), uses it. Encrypts every stored private key.
     """
     try:
         from security.encryption import KeyEncryption, key_encryption
+        from security import encryption as _encryption
         from security.master_key_bootstrap import (
             KeyActivationError, activate_new_master_key, ephemeral_key_dir_refusal,
         )
+        from utils.ha import ha_enabled
+        from security.dek_rotation import RotationError, grace_refusal, retire_if_due, retiring
 
-        if key_encryption.is_enabled:
+        grace = retiring()
+        if grace and grace.get('disable'):
+            # The DEKs of the last disable still open late values: they go first
+            try:
+                retire_if_due()
+            except RotationError as e:
+                return error_response(str(e), e.status)
+            grace = retiring()
+            if grace is not None:
+                return error_response(grace_refusal(grace), 409)
+        from security.dek_rotation import shown_as_enabled
+        # Keys a disable kept for reading leave is_enabled on: the disable still stands
+        if shown_as_enabled():
             return error_response("Encryption is already enabled", 400)
+        if key_encryption.kek_loaded:
+            return _enable_with_configured_kek()
+        from security.dek_rotation import retained
+        if retained():
+            # A new master.key could not open them: a value still under them would be lost
+            return error_response(
+                "Data-encryption keys kept from the last disable are wrapped by a key-encryption "
+                "key that is not configured: restore that master.key (or KEY_ENCRYPTION_KEY) "
+                "and enable again.", 409)
+        if ha_enabled():
+            return error_response(
+                "No key-encryption key is configured: set the same KEY_ENCRYPTION_KEY on "
+                "every node and restart them.", 409)
         refusal = ephemeral_key_dir_refusal()
         if refusal:
             return error_response(f"Encryption not enabled: {refusal}.", 409)
@@ -91,7 +227,7 @@ def enable_encryption():
 
         # Read the freshly-written key so the caller can immediately download
         # a backup. This is the ONLY chance to surface it cleanly: if the
-        # operator never backs it up and later loses /etc/ucm/master.key,
+        # operator never backs it up and later loses master.key,
         # every encrypted private key in the DB becomes unrecoverable.
         try:
             from security.encryption import MASTER_KEY_PATH
@@ -115,7 +251,7 @@ def enable_encryption():
             message=f"Encryption enabled. {encrypted} keys encrypted.",
             data={
                 'enabled': True,
-                'key_file': str(KeyEncryption.key_file_exists() and '/etc/ucm/master.key'),
+                'key_file': str(KeyEncryption.key_file_exists() and _encryption.MASTER_KEY_PATH),
                 'encrypted': encrypted,
                 'skipped': skipped,
                 'errors': errors,
@@ -127,16 +263,18 @@ def enable_encryption():
         )
 
     except PermissionError:
+        from security.encryption import MASTER_KEY_PATH
+        conf = MASTER_KEY_PATH.parent
         is_docker = os.path.exists('/.dockerenv')
         hint = (
-            " In Docker, mount a volume to /etc/ucm/ or ensure the container "
-            "runs with write access (e.g. --user root or chown 1000:1000 /etc/ucm)."
+            f" In Docker, mount a volume to {conf}/ or ensure the container "
+            f"runs with write access (e.g. --user root or chown 1000:1000 {conf})."
             if is_docker else
-            " Check that the UCM service user owns /etc/ucm/ "
-            "(sudo mkdir -p /etc/ucm && sudo chown ucm:ucm /etc/ucm)."
+            f" Check that the UCM service user owns {conf}/ "
+            f"(sudo mkdir -p {conf} && sudo chown ucm:ucm {conf})."
         )
         return error_response(
-            f"Permission denied: cannot write to /etc/ucm/master.key.{hint}", 403
+            f"Permission denied: cannot write to {MASTER_KEY_PATH}.{hint}", 403
         )
     except Exception as e:
         logger.error(f"Failed to enable encryption: {e}")
@@ -207,16 +345,34 @@ def download_master_key():
         return error_response("Failed to download master key", 500)
 
 
+def _env_kek_fingerprint():
+    import base64
+    from security.envelope import kek_id
+    value = os.getenv('KEY_ENCRYPTION_KEY', '').strip()
+    if not value:
+        return None
+    try:
+        return kek_id(base64.urlsafe_b64decode(value.encode()))
+    except Exception:
+        return None
+
+
+# How long a disable waits for a running file reconciliation before reporting it
+FILES_WAIT_SECONDS = 30
+
+
 @bp.route('/api/v2/system/security/disable-encryption', methods=['POST'])
 @require_auth(['admin:system'])
 def disable_encryption():
     """
     Disable private key encryption.
-    Decrypts all keys in database, then removes the master key file.
+    Decrypts all keys in database; the DEKs are kept for reading through their retention, then
+    dropped with a master.key file outside HA. A KEK that stays configured (variable, HA) is
+    kept, unused.
     """
     try:
         from security.encryption import (
-            KeyEncryption, key_encryption, key_encryption_required,
+            key_encryption, key_encryption_required,
             decrypt_all_keys as do_decrypt
         )
 
@@ -237,17 +393,22 @@ def disable_encryption():
                 "encryption.", 409
             )
 
-        if not key_encryption.is_enabled:
-            return error_response("Encryption is not enabled", 400)
+        from security.dek_rotation import (
+            RotationError, begin_disable, finish_disable, grace_end, retained, retire_if_due,
+            retiring, settle,
+        )
+        from utils.ha import ha_enabled
 
-        # Once the key file is gone, reload() would take the variable's key
-        if os.getenv('KEY_ENCRYPTION_KEY'):
-            return error_response(
-                "The KEY_ENCRYPTION_KEY environment variable is set, so "
-                "encryption cannot be disabled from here.", 409
-            )
+        # Phase 1, under the lock: nothing new is encrypted, every DEK still opens what it did
+        try:
+            if retiring() is not None:
+                retire_if_due()  # a grace that is over no longer holds the disable
+            command = begin_disable()
+        except RotationError as e:
+            return error_response(str(e), e.status)
+        settle()
+        _wait_for_nodes(command)
 
-        # Decrypt all keys first (while we still have the key)
         decrypted, skipped, errors = do_decrypt(dry_run=False)
 
         if errors:
@@ -256,22 +417,38 @@ def disable_encryption():
                 "Encryption NOT disabled to prevent data loss.", 500
             )
 
-        # Nothing is encrypted any more: without this the next start would create a key
-        from security.master_key_bootstrap import record_operator_choice
-        record_operator_choice(auto=False)
-        db.session.commit()
-
-        # Remove key file
-        KeyEncryption.remove_key_file()
+        # A master.key file outside HA is removed with the DEKs; the KEK that stays configured
+        # (this one, or the variable the next reload falls back to) is marked unused
+        remove_file = key_encryption.key_source == 'file' and not ha_enabled()
+        kept_kek = key_encryption.kek_fingerprint() if not remove_file else _env_kek_fingerprint()
+        # Phase 2: only if no value is encrypted any more; the DEKs stay for their retention
+        try:
+            finish_disable(kept_kek)
+        except RotationError as e:
+            return error_response(str(e), e.status)
+        try:
+            dropped = retire_if_due()
+        except RotationError as e:
+            logger.error(f"🔑 Data-encryption keys kept after the disable: {e}")
+            dropped = 0
 
         # Reload singleton
         key_encryption.reload()
+        grace = retiring()
+        enable_after = grace_end(grace) if grace else None
+        kept_until = max((r.retire_after for r in retained()), default=None)
 
         from services.file_regen_service import regenerate_all_files
-        regeneration_stats = regenerate_all_files()
+        regeneration_stats = regenerate_all_files(wait=FILES_WAIT_SECONDS)
         key_files_written = (
             regeneration_stats['ca_keys'] + regeneration_stats['cert_keys']
         )
+        # Directories held or their lock not taken: nothing written. The periodic pass only
+        # runs when the files generation is behind, so the next start writes them
+        files_pending = regeneration_stats['status'] == 'busy'
+        files_note = (" The key files are not written yet: the file directories were busy "
+                      "or could not be locked; they are written at the next start."
+                      if files_pending else '')
 
         AuditService.log_action(
             action='encryption_disabled',
@@ -279,18 +456,24 @@ def disable_encryption():
             resource_name='Private Key Encryption',
             details=(
                 f"Encryption disabled. Decrypted {decrypted} keys and wrote "
-                f"{key_files_written} key files."
+                f"{key_files_written} key files.{files_note}"
             ),
             success=True
         )
 
         return success_response(
-            message=f"Encryption disabled. {decrypted} keys decrypted.",
+            message=f"Encryption disabled. {decrypted} keys decrypted.{files_note}",
             data={
                 'enabled': False,
                 'decrypted': decrypted,
                 'skipped': skipped,
                 'key_files_written': key_files_written,
+                'key_files': {'busy': 'pending', 'done': 'written'}.get(
+                    regeneration_stats['status'], 'incomplete'),
+                'keys_kept_until': (None if dropped or not kept_until
+                                    else kept_until.isoformat(timespec='seconds') + 'Z'),
+                'enable_available_after': (enable_after.isoformat(timespec='seconds') + 'Z'
+                                           if enable_after else None),
             }
         )
 
@@ -339,6 +522,48 @@ def encrypt_all_keys():
         return error_response("Encryption failed", 500)
 
 
+@bp.route('/api/v2/system/security/rotate-encryption-key', methods=['POST'])
+@require_auth(['admin:system'])
+def rotate_encryption_key():
+    """New data-encryption key, every stored value rewritten under it; resumes an unfinished one.
+
+    The KEK (master.key, KEY_ENCRYPTION_KEY) is unchanged: it only changes by hand.
+    """
+    from security.encryption import key_encryption
+    from security import dek_rotation
+    if not key_encryption.is_enabled:
+        return error_response("Encryption is not enabled", 400)
+    try:
+        result = dek_rotation.rotate()
+    except dek_rotation.RotationError as e:
+        db.session.rollback()
+        return error_response(str(e), e.status)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"DEK rotation failed: {type(e).__name__}: {e}")
+        AuditService.log_action(
+            action='encryption_key_rotated', resource_type='system',
+            resource_name='Data Encryption Key',
+            details=f"DEK rotation interrupted ({type(e).__name__}); run it again to resume",
+            success=False)
+        return error_response("Key rotation interrupted: run it again to resume", 500)
+    done = result['state'] == 'done'
+    AuditService.log_action(
+        action='encryption_key_rotated', resource_type='system',
+        resource_name='Data Encryption Key',
+        details=(f"DEK rotated to version {result['version']}: {result['rewritten']} values "
+                 f"rewritten, {result['dropped']} previous key(s) dropped" if done else
+                 f"DEK rotation to version {result['version']} started, waiting for node(s) "
+                 f"{', '.join(result['waiting_for'])}"),
+        success=True)
+    if done:
+        return success_response(message=f"Data-encryption key rotated to version {result['version']}",
+                                data=result)
+    return success_response(
+        message="Rotation started: some nodes have not loaded the new key yet, run it again "
+                "to finish", data=result, status=202)
+
+
 @bp.route('/api/v2/system/security/generate-key', methods=['GET'])
 @require_auth(['admin:system'])
 def generate_encryption_key():
@@ -355,8 +580,8 @@ def generate_encryption_key():
             'key_file_path': str(MASTER_KEY_PATH),
             'instructions': (
                 '1. Save this key to a secure location\n'
-                '2. Write it to /etc/ucm/master.key on the server\n'
-                '3. Set permissions: chmod 600 /etc/ucm/master.key\n'
+                f'2. Write it to {MASTER_KEY_PATH} on the server\n'
+                f'3. Set permissions: chmod 600 {MASTER_KEY_PATH}\n'
                 '4. Restart UCM service'
             )
         })
@@ -391,31 +616,40 @@ def get_rate_limit_config():
 def update_rate_limit_config():
     """Update rate limiting configuration"""
     try:
-        from security.rate_limiter import RateLimitConfig
         data = request.get_json() or {}
+        from security.rate_limiter import RateLimitConfig
+        invalid = RateLimitConfig.validate_update(data)
+        if invalid:
+            return error_response(invalid, 400)
 
-        if 'enabled' in data:
-            RateLimitConfig.set_enabled(data['enabled'])
-
-        if 'custom_limits' in data:
-            for path, limit in data['custom_limits'].items():
-                RateLimitConfig.set_custom_limit(path, limit['rpm'], limit.get('burst', limit['rpm'] // 3))
-
-        if 'whitelist_add' in data:
-            for ip in data['whitelist_add']:
-                RateLimitConfig.add_whitelist(ip)
-
-        if 'whitelist_remove' in data:
-            for ip in data['whitelist_remove']:
-                RateLimitConfig.remove_whitelist(ip)
-
-        return success_response(
-            message="Rate limit config updated",
-            data=RateLimitConfig.get_config()
-        )
+        # Stored in the database on every deployment, so a restart keeps it
+        return _update_stored_rate_limits(data)
     except Exception as e:
         logger.error(f"Failed to update rate limit config: {e}")
         return error_response("Failed to update config", 500)
+
+
+def _update_stored_rate_limits(data):
+    """The change is stored (and, in HA, its command emitted) in one transaction, then applied here."""
+    import json
+    from models import SystemConfig
+    from security.rate_limiter import STORED_KEY, RateLimitConfig
+    from services.cluster_commands import RELOAD_RATE_LIMITS, emit
+    row = SystemConfig.query.filter_by(key=STORED_KEY).with_for_update().first()
+    stored = RateLimitConfig.merge_stored(json.loads(row.value) if row and row.value else None, data)
+    if row is None:
+        row = SystemConfig(key=STORED_KEY)
+        db.session.add(row)
+    row.value = json.dumps(stored, sort_keys=True)
+    emit(RELOAD_RATE_LIMITS, stored)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Rate limit config not saved: {type(e).__name__}: {e}")
+        return error_response("Failed to update config", 500)
+    RateLimitConfig.compose(stored)
+    return success_response(message="Rate limit config updated", data=RateLimitConfig.get_config())
 
 
 @bp.route('/api/v2/system/security/rate-limit/stats', methods=['GET'])
@@ -457,14 +691,70 @@ def reset_rate_limits():
 @require_auth(['admin:system'])
 def rotate_secrets():
     """
-    Rotate session secret key with automatic .env update.
+    Rotate the session secret key (SECRET_KEY).
 
-    Process:
-    1. Backup current .env file
-    2. Generate new SECRET_KEY
-    3. Service restart
-    4. All active sessions are invalidated (users must re-login)
+    Encryption on (in HA, the KEK every node holds): the new key is stored in the database
+    under the data-encryption key, every node reloads it without a restart, and tokens signed
+    with the previous key stay valid for its grace period. Encryption off: on a single node
+    the environment file is rewritten and the service restarts, as before; refused in HA.
     """
+    from security import session_key
+    from utils.ha import ha_enabled, ha_refusal, LOCAL_ONLY
+    if session_key.stored_mode():
+        return _rotate_stored_secret(session_key)
+    if session_key.kept_by_unfinished_disable():
+        return error_response("A disable of encryption is unfinished and the stored session "
+                              "key still signs: run the disable again, then rotate", 409)
+    if ha_enabled():
+        return ha_refusal(LOCAL_ONLY)
+    return _rotate_secret_in_env_file()
+
+
+def _rotate_stored_secret(session_key):
+    data = request.get_json() or {}
+    new_secret = data.get('new_secret')
+    if new_secret and (not isinstance(new_secret, str) or len(new_secret) < session_key.MIN_LENGTH):
+        return error_response("Secret must be at least 32 characters", 400)
+    if data.get('auto_apply') is False:
+        return error_response("With encryption enabled the session key is stored in the "
+                              "database; there is nothing to apply by hand", 400)
+    try:
+        until, _command, reloaded = session_key.rotate(current_app._get_current_object(),
+                                                       new_secret)
+    except session_key.SessionKeyError as e:
+        return error_response(str(e), e.status)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Failed to rotate the session key: {type(e).__name__}")
+        return error_response("Failed to rotate secrets", 500)
+    end = session_key.stamp(until)
+    # Stored and committed either way; a node whose reload failed retries before its requests
+    caught_up = '' if reloaded else ('; the node that rotated it did not load it yet and '
+                                     'tries again on its own')
+    AuditService.log_action(
+        action='secrets_rotated',
+        resource_type='security',
+        details=f'Session secret key rotated in the database; the previous key is accepted '
+                f'until {end}{caught_up}',
+        success=True
+    )
+    return success_response(
+        data={
+            'rotated': True,
+            'mode': 'database',
+            'reloaded': reloaded,
+            'previous_accepted_until': end,
+            'note': ('Every node loads the new key within seconds; pages opened before the '
+                     'rotation keep working until the previous key is retired. No restart.')
+            if reloaded else
+            ('The new key is stored; this node did not load it yet and tries again on its '
+             'own, pages opened before the rotation keep working meanwhile. No restart.'),
+        },
+        message='Session secret rotated. No restart, nobody is logged out.'
+    )
+
+
+def _rotate_secret_in_env_file():
     data = request.get_json() or {}
     new_secret = data.get('new_secret')
     auto_apply = data.get('auto_apply', True)
@@ -476,17 +766,7 @@ def rotate_secrets():
         return error_response("Secret must be at least 32 characters", 400)
 
     if auto_apply:
-        # Determine .env path based on environment
-        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
-        if is_docker:
-            env_path = Path('/opt/ucm/.env')
-            if not env_path.exists():
-                # Fallback for older Docker images
-                env_path = Path('/app/.env')
-                if not env_path.exists():
-                    env_path = Path('/app/backend/.env')
-        else:
-            env_path = Path('/etc/ucm/ucm.env')
+        env_path = env_file_path()
 
         if not env_path.exists():
             return error_response(f"Environment file not found: {env_path}", 500)
@@ -537,7 +817,8 @@ def rotate_secrets():
             return success_response(
                 data={
                     'rotated': True,
-                    'note': 'Service is restarting. All users will need to log in again.'
+                    'mode': 'environment_file',
+                    'note': 'Service is restarting. Pages opened before it must be reloaded.'
                 },
                 message='Session secret rotated successfully. Service restarting.'
             )
@@ -560,7 +841,7 @@ def rotate_secrets():
             data={
                 'new_secret': new_secret,
                 'instructions': [
-                    '1. Edit /etc/ucm/ucm.env',
+                    f'1. Edit {env_file_path()}',
                     f'2. Set SECRET_KEY={new_secret}',
                     '3. Restart UCM: systemctl restart ucm'
                 ]
@@ -571,18 +852,34 @@ def rotate_secrets():
 
 # ============ Security Status ============
 
+def _key_file_exists():
+    from security.encryption import KeyEncryption
+    return KeyEncryption.key_file_exists()
+
+
 @bp.route('/api/v2/system/security/secrets-status', methods=['GET'])
 @require_auth(['admin:system'])
 def secrets_status():
     """Get status of secret keys (without revealing them)"""
     from config.settings import Config
+    from security import session_key
+    from utils.ha import ha_enabled
 
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
-    encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or os.path.exists('/etc/ucm/master.key')
+    encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or _key_file_exists()
+    stored = session_key.status(current_app._get_current_object())
 
     return success_response(data={
         'session_secret': {
-            'configured': session_configured
+            'configured': session_configured or stored['source'] == 'database',
+            # Where the key that signs comes from, and how the next rotation applies
+            'source': stored['source'],
+            'previous_accepted_until': stored['previous_accepted_until'],
+            'rotation': ('database' if session_key.stored_mode() else
+                         'blocked' if session_key.kept_by_unfinished_disable() else
+                         'environment_file'),
+            # In HA the environment-file rotation is refused: the screen says so
+            'ha': ha_enabled(),
         },
         'encryption_key': {
             'configured': encryption_configured

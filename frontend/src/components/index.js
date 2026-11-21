@@ -7,7 +7,6 @@
 
 // Layout
 export { AppShell } from './AppShell'
-export { Sidebar } from './Sidebar'
 export { BottomSheet } from './BottomSheet'
 export { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 
@@ -69,15 +68,15 @@ export {
 } from './DetailCard'
 
 // Certificate Details (reusable)
-export { CertificateDetails } from './CertificateDetails'
-export { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
+export { CertificatePanel } from './detail/CertificatePanel'
+export { CertificateExtensions, SubjectAltNames } from './detail/CertificateExtensions'
 export { CertificateCompareModal } from './CertificateCompareModal'
 export { CertificateLintModal } from './CertificateLintModal'
 export { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
 export { TemplatePreviewModal } from './TemplatePreviewModal'
-export { CADetails } from './CADetails'
-export { CSRDetails } from './CSRDetails'
-export { TrustCertDetails } from './TrustCertDetails'
+export { CAPanel } from './detail/CAPanel'
+export { CSRPanel } from './detail/CSRPanel'
+export { TrustCertPanel } from './detail/TrustCertPanel'
 export { EkuMultiSelect } from './EkuMultiSelect'
 
 // Filter components
@@ -90,15 +89,10 @@ export { MobileCard, SimpleMobileCard } from './ui/MobileCard'
 export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
 export { RichStatsBar } from './ui/RichStatsBar'
 
-// Dashboard charts
-// Charts are lazy loaded - NOT exported from main bundle
-// Import directly: import { CertificateTrendChart, ... } from './DashboardChart'
 export { UpdateChecker } from './UpdateChecker'
 export { ServiceReconnectOverlay } from './ServiceReconnectOverlay'
 export { SafeModeOverlay } from './SafeModeOverlay'
 export { SessionWarning } from './SessionWarning'
 export { ForcePasswordChange } from './ForcePasswordChange'
 export { ForceEnroll2FA } from './ForceEnroll2FA'
-export { FloatingDetailWindow } from './FloatingDetailWindow'
-export { DetailWindowLayer } from './DetailWindowLayer'
-export { FloatingWindow } from './ui/FloatingWindow'
+export { InspectorDock } from './inspector/InspectorDock'

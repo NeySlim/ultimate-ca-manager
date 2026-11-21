@@ -3,7 +3,8 @@ from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models.sso import SSOProvider
-from .helpers import _parse_json_field, _parse_group_list, _resolve_mapped_roles, _resolve_role, sso_admission, _mapping_rules, _build_ldap_tls
+from .helpers import _parse_json_field, _parse_group_list, _resolve_mapped_roles, _resolve_role, sso_admission, _mapping_rules, _build_ldap_tls, _external_groups
+from .diagnostics import GroupSource, refusal_diagnosis
 from . import connection_tests
 import logging
 from models import db
@@ -49,15 +50,22 @@ def test_mapping(provider_id):
                 'message': f'User "{test_username}" not found in LDAP'
             })
         user_dn = user_entry.entry_dn
+        identity = connection_tests._ldap_entry_identity(provider, user_entry, test_username)
+        report = {}
         groups, groups_error = connection_tests._ldap_entry_groups(
-            provider, server, user_dn, test_username)
+            provider, server, user_dn, test_username, report)
         refusal = connection_tests._ldap_entry_refusal(
             provider, user_entry, user_dn, escape_filter_chars(test_username), groups, groups_error)
-        external = {'groups': groups}
+        external = dict(identity, groups=groups)
         if refusal is None and not sso_admission(provider, external):
             refusal = 'unmapped' if _mapping_rules(provider) else 'no_default_role'
 
-        # A user the login would refuse has no role.
+        # The same text the login's audit entry gives for this refusal.
+        diagnosis = None
+        if refusal in ('unmapped', 'no_default_role'):
+            diagnosis = refusal_diagnosis(_external_groups(external),
+                                          GroupSource(report.get('source') or 'the directory'))
+
         resolved_role = resolved_custom = None
         if refusal is None:
             mapped_role, mapped_custom = _resolve_mapped_roles(provider, external)
@@ -67,10 +75,13 @@ def test_mapping(provider_id):
         return success_response(data={
             'found': True,
             'user_dn': user_dn,
-            'username': str(getattr(user_entry, provider.ldap_username_attr, test_username)),
-            'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
+            'username': identity['username'],
+            'email': identity['email'],
             'groups': groups,
             'groups_readable': groups_error is None,
+            'groups_error': groups_error[:500] if groups_error else None,
+            'group_source': report.get('source'),
+            'diagnosis': diagnosis,
             'refusal': refusal,
             'access_allowed': refusal is None,
             'resolved_role': resolved_role,

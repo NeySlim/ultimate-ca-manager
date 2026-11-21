@@ -5,9 +5,9 @@ Reading a backup means running on bytes the caller chose. Every step below
 is bounded by container.py before it is computed: the framing, the KDF
 profile, the decompressed size, the shape of the JSON.
 """
-import base64
-import json
+import io
 import logging
+from contextlib import contextmanager
 from typing import Dict, Any, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -29,6 +29,7 @@ from utils.datetime_utils import utc_now
 
 from . import container
 from .container import ContainerError
+from .errors import BackupSchemaError
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,18 @@ logger = logging.getLogger(__name__)
 class BackupDecryptionError(ValueError):
     """The backup could not be decrypted: wrong password or corrupted file.
     Distinct from other ValueErrors so the operator is told which."""
+
+
+@contextmanager
+def _first_chunk_is_the_password():
+    """A v4 whose first chunk does not open was sealed under another password."""
+    try:
+        yield
+    except container.ChunkAuthError as exc:
+        if exc.counter == 0:
+            raise BackupDecryptionError(
+                "Decryption failed - wrong password or corrupted file") from None
+        raise
 
 
 class DecryptMixin:
@@ -64,36 +77,26 @@ class DecryptMixin:
         return master_key, container.json_loads_bounded(plaintext)
 
     def _decrypt_framed(self, backup_bytes: bytes, password: str) -> Tuple[bytes, Dict[str, Any]]:
-        """Read a framed container, v2 or v3.
+        """Read a framed container, v2, v3 or v4, into one payload dict.
 
-        The two differ in one respect, and it is the point of v3: v2 signs
-        only the magic, so its header could be rewritten without breaking the
-        tag, while v3 signs the whole header. Everything else — the bounds on
-        the KDF profile, the salt and nonce sizes, the decompressed size, the
-        shape of the JSON — applies to both.
+        v2 signs only the magic, so its header could be rewritten without
+        breaking the tag, while v3 signs the whole header. Everything else (the
+        bounds on the KDF profile, the salt and nonce sizes, the decompressed
+        size, the shape of the JSON) applies to both. A v4 archive is read
+        through its chunks and returned whole, for callers that inspect it.
         """
+        if container.format_version_of(backup_bytes) == container.FORMAT_VERSION_V4:
+            from .section_store import SectionStore
+            with SectionStore() as store:
+                master_key = self._read_v4(io.BytesIO(backup_bytes), password, store)
+                return master_key, store.to_dict()
+
         metadata, header, ciphertext = container.parse_header(backup_bytes)
         version = metadata['format_version']
         kdf_id = metadata['kdf_id']
 
         salt, nonce, kdf_params = container.validate_kdf(kdf_id, metadata)
-
-        if kdf_id == self.KDF_ARGON2ID:
-            if fips_mode.enabled():
-                raise FipsRestricted(
-                    "Backups protected with Argon2id cannot be restored in FIPS mode: "
-                    "restore it on a standard instance and back up again with the PBKDF2 KDF")
-            if not _ARGON2_AVAILABLE:
-                raise ValueError("Backup uses Argon2id but argon2-cffi is not installed")
-            master_key = self._derive_argon2id(
-                password, salt,
-                time_cost=kdf_params['time_cost'],
-                memory_cost=kdf_params['memory_cost'],
-                parallelism=kdf_params['parallelism'],
-                hash_len=kdf_params['hash_len'],
-            )
-        else:
-            master_key = self._derive_pbkdf2(password, salt, kdf_params['iterations'])
+        master_key = self._derive_archive_key(password, kdf_id, salt, kdf_params)
 
         # v3 authenticates the canonical header; v2 only ever authenticated
         # the magic, and is read that way so old archives still open.
@@ -107,6 +110,93 @@ class DecryptMixin:
             plaintext = container.decompress_bounded(plaintext)
 
         return master_key, container.json_loads_bounded(plaintext)
+
+    def _derive_archive_key(self, password: str, kdf_id: int, salt: bytes,
+                            kdf_params: Dict[str, int]) -> bytes:
+        if kdf_id == self.KDF_ARGON2ID:
+            if fips_mode.enabled():
+                raise FipsRestricted(
+                    "Backups protected with Argon2id cannot be restored in FIPS mode: "
+                    "restore it on a standard instance and back up again with the PBKDF2 KDF")
+            if not _ARGON2_AVAILABLE:
+                raise ValueError("Backup uses Argon2id but argon2-cffi is not installed")
+            return self._derive_argon2id(
+                password, salt,
+                time_cost=kdf_params['time_cost'],
+                memory_cost=kdf_params['memory_cost'],
+                parallelism=kdf_params['parallelism'],
+                hash_len=kdf_params['hash_len'],
+            )
+        return self._derive_pbkdf2(password, salt, kdf_params['iterations'])
+
+    def _open_v4(self, stream, password: str):
+        """Read and bound a v4 header, derive its key: (master key, chunk reader)."""
+        metadata, header = container.read_header(stream)
+        kdf_id = metadata['kdf_id']
+        salt, nonce_base, kdf_params = container.validate_kdf(
+            kdf_id, metadata, nonce_field='nonce_base_b64', nonce_size=container.NONCE_BASE_SIZE)
+        container.validate_v4_metadata(metadata)
+        master_key = self._derive_archive_key(password, kdf_id, salt, kdf_params)
+        return master_key, container.ChunkReader(stream, master_key, header, metadata, nonce_base)
+
+    def check_archive_opens(self, stream, password: str) -> None:
+        """Raise what a restore raises for a wrong password, a bad header or KDF, FIPS, or a
+        later schema, writing nothing: a v4's header and first chunk, an older archive whole.
+        The stream is put back where it was."""
+        start = stream.tell()
+        try:
+            head = stream.read(container.HEADER_PREFIX_SIZE)
+            stream.seek(start)
+            if container.format_version_of(head) == container.FORMAT_VERSION_V4:
+                _key, reader = self._open_v4(stream, password)
+                parts = reader.parts()
+                try:
+                    with _first_chunk_is_the_password():
+                        first = next(parts, None)
+                finally:
+                    parts.close()
+                # The first chunk is the metadata: an archive of a later release stops here
+                if first is not None and first[0] == 'metadata':
+                    self._check_schema_version(first[2])
+                return
+            size = stream.seek(0, io.SEEK_END) - start
+            stream.seek(start)
+            container.refuse_oversized_size(size)
+            data = stream.read()
+            if len(data) >= 4 and data[:4] == self.MAGIC:
+                self._decrypt_framed(data, password)
+            else:
+                self._decrypt_v1(data, password)
+        finally:
+            stream.seek(start)
+
+    def _read_v4(self, stream, password: str, store) -> bytes:
+        """Decrypt a v4 archive chunk by chunk into `store`; returns the master key.
+
+        The payload metadata is completed from the end record: the counts of
+        every section and the key mismatches known only once all were written.
+        """
+        from .restore.transaction import checkpoint
+        master_key, reader = self._open_v4(stream, password)
+        with _first_chunk_is_the_password():
+            for name, part, rows in reader.parts():
+                checkpoint('read')
+                store.add_part(name, part, rows)
+        store.seal()
+
+        payload_metadata = store.get('metadata')
+        if not isinstance(payload_metadata, dict):
+            raise ContainerError("Invalid backup format: metadata is not an object")
+        payload_metadata['sections'] = {
+            name: store.length(name) for name in store.keys()
+            if name != 'metadata' and store.kind(name) in ('list', 'mapping')}
+        # Already compared chunk by chunk; carried so the payload reads as a v3 one does
+        payload_metadata['section_digests'] = {
+            name: digest for name, digest in reader.digests.items() if name != 'metadata'}
+        mismatches = reader.end.get('key_mismatches')
+        payload_metadata['key_mismatches'] = (
+            [str(item) for item in mismatches] if isinstance(mismatches, list) else [])
+        return master_key
 
     def _decrypt_private_key(self, encrypted_data: Dict[str, str], master_key: bytes) -> str:
         """Decrypt individual private key.
@@ -136,3 +226,15 @@ class DecryptMixin:
         plaintext = aesgcm.decrypt(nonce, ciphertext, None)
 
         return plaintext.decode()
+
+    def _decrypt_archived_key(self, encrypted_data: Dict[str, str], master_key: bytes,
+                              what: str) -> str:
+        """The key of ``what`` (e.g. "CA x"); an archive error naming it when it does not decrypt.
+
+        The library's message is not passed on: the archive is the fault, not the server."""
+        try:
+            return self._decrypt_private_key(encrypted_data, master_key)
+        except Exception as exc:
+            raise BackupSchemaError(
+                f"Invalid backup: the private key of {what} could not be decrypted. Nothing "
+                "has been changed.") from exc

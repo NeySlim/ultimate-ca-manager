@@ -33,3 +33,16 @@ describe('ImportResultStep cross-certificates', () => {
     expect(screen.queryByTestId('cross-skipped')).toBeNull()
   })
 })
+
+describe('ImportResultStep parents to confirm', () => {
+  it('lists each CA left without a parent whose signature cannot be verified', () => {
+    show({ cas_imported: 2, warning_details: [], warnings: [], errors: [],
+           unverifiable_parents: [{ ca_id: 4, ca_name: 'Child', candidate: { id: 3, name: 'Root' }, algorithm: 'GOST2012-256' }] })
+    expect(screen.getByTestId('unverifiable-parents').textContent).toContain('import.unverifiableParent')
+  })
+
+  it('shows no such block otherwise', () => {
+    show({ cas_imported: 1, warning_details: [], warnings: [], errors: [] })
+    expect(screen.queryByTestId('unverifiable-parents')).toBeNull()
+  })
+})

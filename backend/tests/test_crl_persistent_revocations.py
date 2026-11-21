@@ -143,10 +143,12 @@ def _issue(ca_key, ca_cert, serial):
 def _store(ca, leaf, column=None, *, revoked=False, reason='keyCompromise',
            valid_to='default', revoked_at=None):
     now = _now()
+    # A spelling other than the canonical one is a row migration 144 left pending: raw SQL
+    legacy = column is not None and column != str(leaf.serial_number)
     row = Certificate(
         refid=f'b6-cert-{uuid.uuid4().hex[:10]}', descr='b6', caref=ca.refid,
         crt=base64.b64encode(leaf.public_bytes(serialization.Encoding.PEM)).decode(),
-        serial_number=column if column is not None else str(leaf.serial_number),
+        serial_number=None if legacy else str(leaf.serial_number),
         subject=leaf.subject.rfc4514_string(), issuer=leaf.issuer.rfc4514_string(),
         revoked=revoked,
         revoked_at=(revoked_at or now) if revoked else None,
@@ -156,6 +158,11 @@ def _store(ca, leaf, column=None, *, revoked=False, reason='keyCompromise',
     )
     db.session.add(row)
     db.session.commit()
+    if legacy:
+        db.session.execute(text(f'UPDATE {Certificate.__tablename__} SET serial_number = :s WHERE id = :i'),
+                           {'s': column, 'i': row.id})
+        db.session.commit()
+        db.session.refresh(row)
     return row
 
 
@@ -300,7 +307,7 @@ class TestFullCrl:
         assert all(_reason(e) == x509.ReasonFlags.superseded for e in entries.values())
 
     def test_a_hold_record_its_unrevoked_certificate_still_carries_is_listed(self, backend):
-        """A record says revoked with no exception: the holds a lift left were deleted once (136)."""
+        """A record says revoked with no exception: the holds a lift left were deleted once (154)."""
         ca, ca_key, ca_cert = _make_ca()
         row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'X'), reason='certificateHold', certificate_id=row.id)
@@ -424,39 +431,6 @@ class TestDeltaCrl:
 # --------------------------------------------------------------------------
 # OCSP
 # --------------------------------------------------------------------------
-
-# What no writer produces (each stores the row's column: decimal, lower or upper hex): the
-# unambiguous-spelling rule names no serial by them, so neither the CRL nor OCSP reads them
-_HEX_A = format(SERIAL_A, 'x')
-ODD_SPELLINGS = {'0x': '0x' + _HEX_A, 'leading-zeros': '00' + _HEX_A,
-                 'mixed-case': _HEX_A[:4] + _HEX_A[4:].upper(),
-                 'colons': ':'.join(_HEX_A[i:i + 2] for i in range(0, len(_HEX_A), 2))}
-WRITTEN_SPELLINGS = {'decimal': str(SERIAL_A), 'lower-hex': _HEX_A, 'upper-hex': _HEX_A.upper()}
-_SPELLINGS = [pytest.param(v, True, id=k) for k, v in WRITTEN_SPELLINGS.items()] + \
-    [pytest.param(v, False, id=k) for k, v in ODD_SPELLINGS.items()]
-
-
-class TestTheCrlAndOcspReadTheSameSpellings:
-
-    @pytest.mark.parametrize('column, named', _SPELLINGS)
-    def test_a_record_alone(self, app, backend, column, named):
-        ca, ca_key, ca_cert = _make_ca()
-        leaf = _issue(ca_key, ca_cert, SERIAL_A)
-        _persist(ca, column, reason='superseded')
-        listed = SERIAL_A in _entries(_full_crl(ca))
-        revoked = _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
-        assert (listed, revoked) == (named, named)
-
-    @pytest.mark.parametrize('column, named', _SPELLINGS)
-    def test_a_final_record_over_a_held_row(self, app, backend, column, named):
-        ca, ca_key, ca_cert = _make_ca()
-        leaf = _issue(ca_key, ca_cert, SERIAL_A)
-        _store(ca, leaf, revoked=True, reason='certificateHold')
-        _persist(ca, column, reason='keyCompromise')
-        expected = x509.ReasonFlags.key_compromise if named else x509.ReasonFlags.certificate_hold
-        assert _reason(_entries(_full_crl(ca))[SERIAL_A]) == expected
-        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, expected)
-
 
 class TestOcsp:
 
@@ -737,3 +711,83 @@ class TestAutoDeleteEndToEnd:
                 caref=ca_row.refid, serial_number=serial).all()
             assert len(records) == 1
             assert records[0].certificate_id is None
+
+
+# --------------------------------------------------------------------------
+# Rows written before migration 144, then converted by it
+# --------------------------------------------------------------------------
+
+def _migrate_rows_of(ca):
+    """Migration 144's conversion, run on this CA's rows only (the session database is shared)."""
+    import importlib
+    migration = importlib.import_module('migrations._from_2_254.144_canonical_certificate_serials')
+    certs = db.session.execute(text(
+        f"SELECT id, caref, serial_number, crt FROM {Certificate.__tablename__} "
+        "WHERE caref = :c AND serial_number IS NOT NULL AND serial_number <> ''"), {'c': ca.refid}).fetchall()
+    revoked = db.session.execute(text(
+        f"SELECT id, serial_number, certificate_id FROM {RevokedSerial.__tablename__} WHERE caref = :c"),
+        {'c': ca.refid}).fetchall()
+    cert_updates, revoked_updates, pending = migration.plan(certs, revoked)
+    for table, updates in ((Certificate.__tablename__, cert_updates), (RevokedSerial.__tablename__, revoked_updates)):
+        for row_id, serial in updates:
+            db.session.execute(text(f"UPDATE {table} SET serial_number = :s WHERE id = :i"),
+                               {'s': serial, 'i': row_id})
+    db.session.commit()
+    db.session.expire_all()
+    return pending
+
+
+class TestMigratedRows:
+
+    def test_a_revoked_hex_row_and_its_record_answer_revoked(self, app, backend):
+        from services.cert.issued_lookup import REVOKED, issued_certificate_status
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        row = _store(ca, leaf, format(SERIAL_A, 'X'), revoked=True)
+        record = _persist(ca, str(SERIAL_A), certificate_id=row.id)
+        db.session.execute(text(f"UPDATE {RevokedSerial.__tablename__} SET serial_number = :s WHERE id = :i"),
+                           {'s': format(SERIAL_A, 'x'), 'i': record.id})
+        db.session.commit()
+        assert _migrate_rows_of(ca) == []
+        assert db.session.get(Certificate, row.id).serial_number == str(SERIAL_A)
+        assert db.session.get(RevokedSerial, record.id).serial_number == str(SERIAL_A)
+        assert SERIAL_A in _entries(_full_crl(ca))
+        assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
+        assert issued_certificate_status(ca, leaf)[1] == REVOKED
+
+    def test_a_migrated_row_revoked_afterwards_keeps_one_record(self, app, backend):
+        from services.cert_service import CertificateService
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_B)
+        row = _store(ca, leaf, format(SERIAL_B, 'x'))
+        assert _migrate_rows_of(ca) == []
+        CertificateService.revoke_certificate(row.id, reason='keyCompromise', username='admin')
+        db.session.commit()
+        records = RevokedSerial.query.filter_by(caref=ca.refid).all()
+        assert [r.serial_number for r in records] == [str(SERIAL_B)]
+        assert SERIAL_B in _entries(_full_crl(ca))
+        assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
+
+    def test_twins_stay_pending_and_a_revoked_one_is_still_listed(self, app, backend):
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_C)
+        first = _store(ca, leaf, str(SERIAL_C))
+        twin = _store(ca, leaf, format(SERIAL_C, 'x'), revoked=True)
+        assert _migrate_rows_of(ca) == [{
+            'caref': ca.refid, 'serial_number': str(SERIAL_C), 'count': 2,
+            'rows': [{'id': first.id, 'stored': str(SERIAL_C)}, {'id': twin.id, 'stored': format(SERIAL_C, 'x')}]}]
+        assert db.session.get(Certificate, twin.id).serial_number == format(SERIAL_C, 'x')
+        assert SERIAL_C in _entries(_full_crl(ca))
+        assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
+
+    def test_a_pending_row_revoked_reuses_the_record_of_its_serial(self, app, backend):
+        from services.cert_service import CertificateService
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        _store(ca, leaf, str(SERIAL_A))
+        twin = _store(ca, leaf, format(SERIAL_A, 'x'))
+        # A suspension: a final record already revokes the row, and revoking it again is refused
+        _persist(ca, str(SERIAL_A), reason='certificateHold')
+        CertificateService.revoke_certificate(twin.id, reason='keyCompromise', username='admin')
+        db.session.commit()
+        assert [r.serial_number for r in RevokedSerial.query.filter_by(caref=ca.refid)] == [str(SERIAL_A)]

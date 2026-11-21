@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 ROLE_PERMISSIONS = {
     'admin': ['*'],  # Full access
     'operator': [
+        'read:dashboard',
         'read:certificates', 'write:certificates',
         'read:user_certificates', 'write:user_certificates', 'delete:user_certificates',
         'read:cas', 'write:cas',
@@ -33,6 +34,7 @@ ROLE_PERMISSIONS = {
         'read:groups', 'write:groups',
     ],
     'auditor': [
+        'read:dashboard',
         'read:certificates',
         'read:user_certificates',
         'read:cas',
@@ -54,6 +56,7 @@ ROLE_PERMISSIONS = {
         'read:groups',
     ],
     'viewer': [
+        'read:dashboard',
         'read:certificates',
         'read:user_certificates',
         'read:cas',
@@ -118,11 +121,13 @@ GROUP_GRANTABLE_PERMISSIONS = sorted(
 # Every scope @require_auth checks, recorded as routes are declared.
 ENFORCED_PERMISSIONS = set()
 
-# Scopes checked inline with has_permission() rather than by the decorator.
+# Scopes checked inline with has_permission(), or through the overview's permission
+# tables, rather than by the decorator.
 INLINE_CHECKED_PERMISSIONS = frozenset({
     'admin:key_recovery', 'admin:settings', 'admin:system', 'read:audit',
-    'read:cas', 'read:certificates', 'read:deploy', 'read:private_keys', 'read:system',
-    'read:users', 'write:approvals', 'write:cas',
+    'read:cas', 'read:certificates', 'read:deploy', 'read:hsm', 'read:private_keys', 'read:settings',
+    'read:system', 'read:truststore', 'read:users', 'read:kerberos', 'read:wstep', 'write:approvals', 'write:cas',
+    'write:kerberos', 'write:wstep', 'write:xcep',
 })
 
 # Kept for administrators, beyond `*`, wildcards and every `admin:*` action.
@@ -159,6 +164,7 @@ CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted({
     'read:certificates', 'write:certificates', 'delete:certificates',
     'read:crl', 'write:crl',
     'read:csrs', 'write:csrs', 'delete:csrs',
+    'read:dashboard',
     'read:est', 'write:est',
     'read:groups', 'write:groups', 'delete:groups',
     'read:hsm', 'delete:hsm',
@@ -343,9 +349,10 @@ def require_permission(permission: str):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            from utils.response import error_response
+            from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
             if not hasattr(g, 'current_user') or not g.current_user:
-                return error_response('Authentication required', 401)
+                return error_response('Authentication required', 401,
+                                         problem_type=AUTHENTICATION_REQUIRED_PROBLEM)
 
             user_role = g.current_user.role
             if not has_permission(user_role, permission):

@@ -1,7 +1,8 @@
-"""Release version chain: grammar, conversions, notes, `latest`, installed-instance updates.
+"""Release version chain: grammar, conversions, notes, branch guard, version files.
 
 The workflow steps are the real `run:` blocks of the YAML, executed in bash; nothing compares text.
 """
+import functools
 import importlib.util
 import json
 import os
@@ -21,12 +22,18 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / 'scripts' / 'ci' / 'release_version.py'
 WORKFLOWS = ROOT / '.github' / 'workflows'
 BASH = shutil.which('bash')
-# A commit hook exports GIT_DIR and friends: scratch repositories must not inherit them.
-for _k in [k for k in os.environ if k.startswith('GIT_')]:
-    os.environ.pop(_k)
 
-ACCEPTED = ['2.254', '2.254-rc1', '2.254.1', '2.254.1-rc2']
-REFUSED = ['2.254-1', '2.254.1.1', 'v2.254.1', '2.254.1-dev', '2.254.', '2.254.1\n', '2.254.0', '', '2']
+
+@pytest.fixture(autouse=True)
+def _no_inherited_git_environment(monkeypatch):
+    """A commit hook exports GIT_DIR and friends: scratch repositories must not inherit them."""
+    for key in [k for k in os.environ if k.startswith('GIT_')]:
+        monkeypatch.delenv(key)
+
+# Major.Build for this line, X.Y.Z for the maintenance releases of the previous one
+ACCEPTED = ['3.0', '3.1', '3.0-rc1', '2.254.2', '2.254.2-rc1']
+REFUSED = ['3.0.0', '2.254-1', 'v3', 'v3.0', '', '3', '3.0-dev', '3.0.', '3.0-rc', '3.0-beta1', '03.0',
+           '3.0.1.1', '3.0\n']
 
 pytestmark = pytest.mark.skipif(BASH is None, reason='bash is required')
 
@@ -38,15 +45,17 @@ def _load():
     return mod
 
 
-rv = _load()
-
-
 def _cli(*args, stdin=None):
-    return subprocess.run(['python3', str(SCRIPT), *args], input=stdin, capture_output=True, text=True)
+    return subprocess.run([sys.executable, str(SCRIPT), *args], input=stdin, capture_output=True, text=True)
+
+
+@functools.lru_cache(maxsize=None)
+def _workflow(name):
+    return yaml.safe_load((WORKFLOWS / name).read_text())
 
 
 def _step(workflow, job, name, index=0):
-    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
+    data = _workflow(workflow)
     steps = [s for s in data['jobs'][job]['steps'] if s.get('name') == name]
     return steps[index]
 
@@ -63,7 +72,7 @@ def _run_step(step, cwd, env=None, subst=None):
 # ---- 1. grammar, by every validation of the repository -------------------------------------------
 
 @pytest.mark.parametrize('v', ACCEPTED)
-def test_the_script_accepts_the_four_forms(v):
+def test_the_script_accepts_the_release_forms(v):
     assert _cli('validate', v).returncode == 0
 
 
@@ -80,12 +89,12 @@ def _validations(tmp_path, version):
     out['build-deb'] = _run_step(_step('build-release.yml', 'build-deb', 'Extract version'), ROOT, env).returncode
     out['validate-tag'] = _run_step(_step('build-release.yml', 'validate-tag', 'Validate the tag grammar'), ROOT,
                                     {'GITHUB_REF': f'refs/tags/v{version}'}).returncode
-    smoke = yaml.safe_load((WORKFLOWS / 'release-smoke.yml').read_text())
+    smoke = _workflow('release-smoke.yml')
     for job, body in smoke['jobs'].items():
         step = next(s for s in body['steps'] if s.get('name') == 'Resolve version')
         out[job] = _run_step(step, ROOT, {'GITHUB_OUTPUT': str(out_file), 'EVENT_NAME': 'workflow_dispatch',
                                           'INPUT_VERSION': version, 'INPUT_IMAGE': 'x/ucm'}).returncode
-    assert len(out) == 5
+    assert len(out) == 6
     return out
 
 
@@ -94,7 +103,7 @@ def test_every_validation_accepts(tmp_path, v):
     assert set(_validations(tmp_path, v).values()) == {0}
 
 
-@pytest.mark.parametrize('v', [r for r in REFUSED if r not in ('', '2.254.1\n')])
+@pytest.mark.parametrize('v', [r for r in REFUSED if r not in ('', '3.0\n')])
 def test_every_validation_refuses(tmp_path, v):
     assert 0 not in _validations(tmp_path, v).values()
 
@@ -102,10 +111,11 @@ def test_every_validation_refuses(tmp_path, v):
 # ---- 2. conversions ----------------------------------------------------------------------------
 
 @pytest.mark.parametrize('v,deb,tar,fv,npm', [
-    ('2.254', '2.254', '2.254', '2.254', '2.254.0'),
-    ('2.254-rc1', '2.254~rc1', '2.254_rc1', '2.254.rc1', '2.254.0-rc1'),
-    ('2.254.1', '2.254.1', '2.254.1', '2.254.1', '2.254.1'),
-    ('2.254.1-rc2', '2.254.1~rc2', '2.254.1_rc2', '2.254.1.rc2', '2.254.1-rc2'),
+    ('3.0', '3.0', '3.0', '3.0', '3.0.0'),
+    ('3.1', '3.1', '3.1', '3.1', '3.1.0'),
+    ('3.0-rc1', '3.0~rc1', '3.0_rc1', '3.0.rc1', '3.0.0-rc1'),
+    ('2.254.2', '2.254.2', '2.254.2', '2.254.2', '2.254.2'),
+    ('2.254.2-rc1', '2.254.2~rc1', '2.254.2_rc1', '2.254.2.rc1', '2.254.2-rc1'),
 ])
 def test_conversions(v, deb, tar, fv, npm):
     assert _cli('deb', v).stdout.strip() == deb
@@ -116,24 +126,35 @@ def test_conversions(v, deb, tar, fv, npm):
     assert re.fullmatch(r'\d+\.\d+\.\d+(-rc\d+)?', npm)
 
 
+def _stamp(tmp_path, job, version):
+    """The real `Stamp release version` step of *job*, run on copies of the two npm files."""
+    work = tmp_path / job
+    (work / 'frontend').mkdir(parents=True)
+    (work / 'scripts').mkdir()
+    (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
+    for f in ('package.json', 'package-lock.json'):
+        shutil.copy(ROOT / 'frontend' / f, work / 'frontend' / f)
+    step = _step('build-release.yml', job, 'Stamp release version')
+    r = _run_step(step, work, subst={'${{ steps.version.outputs.version }}': version,
+                                     '${{ needs.build-deb.outputs.version }}': version})
+    assert r.returncode == 0, r.stderr
+    pkg = json.loads((work / 'frontend' / 'package.json').read_text())
+    lock = json.loads((work / 'frontend' / 'package-lock.json').read_text())
+    return (work / 'VERSION').read_text(), pkg['version'], lock['version'], lock['packages']['']['version']
+
+
+@pytest.mark.skipif(shutil.which('node') is None, reason='node is required')
+@pytest.mark.parametrize('job', ['build-deb', 'build-rpm', 'build-docker', 'build-docker-fips'])
+@pytest.mark.parametrize('v,npm', [('3.0', '3.0.0'), ('3.0-rc1', '3.0.0-rc1'), ('2.254.2', '2.254.2')])
+def test_every_stamp_step_writes_the_npm_form(tmp_path, job, v, npm):
+    assert _stamp(tmp_path, job, v) == (v, npm, npm, npm)
+
+
 @pytest.mark.skipif(shutil.which('dpkg') is None, reason='dpkg is required')
 def test_dpkg_ranks_the_converted_versions():
-    order = [rv.deb_version(v) for v in ('2.254', '2.254.1-rc1', '2.254.1', '2.254.2')]
+    order = [_load().deb_version(v) for v in ('2.254.2-rc1', '2.254.2', '3.0-rc1', '3.0', '3.1')]
     for lo, hi in zip(order, order[1:]):
         assert subprocess.run(['dpkg', '--compare-versions', lo, 'lt', hi]).returncode == 0, (lo, hi)
-
-
-@pytest.mark.skipif(shutil.which('rpm') is None, reason='rpm is required')
-def test_rpm_ranks_the_converted_versions():
-    def vercmp(a, b):
-        out = subprocess.run(['rpm', '--eval', f'%{{lua: print(rpm.vercmp("{a}","{b}"))}}'],
-                             capture_output=True, text=True).stdout.strip()
-        return int(out)
-    order = [rv.rpm_version(v) for v in ('2.254', '2.254.1-rc1', '2.254.1', '2.254.2')]
-    for lo, hi in zip(order, order[1:]):
-        assert vercmp(lo, hi) == -1, (lo, hi)
-    # A RC sorts before its own stable, as 2.254~rc1 does against 2.254 today.
-    assert vercmp(rv.rpm_version('2.254-rc1'), rv.rpm_version('2.254')) == -1
 
 
 # ---- 3. release notes --------------------------------------------------------------------------
@@ -142,51 +163,179 @@ CHANGELOG = """# Changelog
 
 ## [Unreleased]
 
-## [2.254.1] - 2026-11-20
+### Added
+- Next thing.
 
-### Security
-- Fixed the thing.
-
-## [2.254] - 2026-11-13
+## [3.0] - 2026-12-20
 
 ### Added
-- Something else.
+- Phare thing.
 
-## [2.253] - 2026-11-11
-- Older.
+## [2.254.1] - 2026-11-14
+- Maintenance fix.
+
+## [2.254] - 2026-11-13
+- Last 2.x.
 """
 
 
+def _notes(tmp_path, version, text=CHANGELOG):
+    (tmp_path / 'CHANGELOG.md').write_text(text)
+    return _cli('notes', version, str(tmp_path / 'CHANGELOG.md'))
+
+
+def test_a_rc_takes_the_unreleased_section(tmp_path):
+    r = _notes(tmp_path, '3.1-rc1')
+    assert r.returncode == 0, r.stderr
+    assert 'Next thing.' in r.stdout and 'Phare thing' not in r.stdout and 'Maintenance' not in r.stdout
+
+
+def test_a_stable_takes_its_own_section(tmp_path):
+    r = _notes(tmp_path, '3.0')
+    assert r.returncode == 0, r.stderr
+    assert 'Phare thing.' in r.stdout and 'Next thing' not in r.stdout and 'Maintenance' not in r.stdout
+
+
 def test_a_three_segment_section_is_extracted_alone(tmp_path):
-    (tmp_path / 'CHANGELOG.md').write_text(CHANGELOG)
-    out = _cli('notes', '2.254.1', str(tmp_path / 'CHANGELOG.md')).stdout
-    assert 'Fixed the thing.' in out and 'Something else' not in out and '2.254' not in out
-    out = _cli('notes', '2.254', str(tmp_path / 'CHANGELOG.md')).stdout
-    assert 'Something else.' in out and 'Fixed the thing.' not in out and 'Older' not in out
+    r = _notes(tmp_path, '2.254.1')
+    assert 'Maintenance fix.' in r.stdout and 'Last 2.x' not in r.stdout
+    r = _notes(tmp_path, '2.254')
+    assert 'Last 2.x.' in r.stdout and 'Maintenance' not in r.stdout
+
+
+@pytest.mark.parametrize('version,text', [
+    ('3.1', CHANGELOG),
+    ('3.1-rc1', CHANGELOG.replace('## [Unreleased]', '## [Later]')),
+    ('3.1-rc1', CHANGELOG.replace('### Added\n- Next thing.\n', '', 1)),
+    ('3.0', CHANGELOG.replace('### Added\n- Phare thing.\n', '', 1)),
+    ('3.0-rc1', '## [Unreleased]\n\n## [3.0-rc1] - 2026-12-01\n\n## [3.0] - 2026-12-20\n- X.\n'),
+    ('3.0', '## [3.0] - 2026-12-20\n\n   \n## [2.254] - 2026-11-13\n- Old.\n'),
+])
+def test_a_missing_or_empty_section_fails_explicitly(tmp_path, version, text):
+    r = _notes(tmp_path, version, text)
+    assert r.returncode == 1 and r.stdout == ''
+    assert 'CHANGELOG' in r.stderr
+    assert f'[{version}]' in r.stderr
+    if '-rc' in version:
+        assert '[Unreleased]' in r.stderr
+
+
+def test_a_rc_with_an_empty_own_section_falls_back_to_unreleased(tmp_path):
+    text = CHANGELOG.replace('## [3.0] - 2026-12-20', '## [3.0-rc1] - 2026-12-01\n\n## [3.0] - 2026-12-20')
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0, r.stderr
+    assert 'Next thing.' in r.stdout
+
+
+def test_a_section_of_subheadings_only_has_no_entries(tmp_path):
+    empty = '### Added\n\n### Fixed\n'
+    rc = f'## [Unreleased]\n{empty}\n## [3.0-rc1] - 2026-12-01\n{empty}\n## [3.0] - 2026-12-20\n{empty}'
+    assert _notes(tmp_path, '3.0', rc).returncode == 1
+    assert _notes(tmp_path, '3.0-rc1', rc).returncode == 1
+    own = rc.replace('## [Unreleased]\n' + empty, '## [Unreleased]\n### Added\n- Next.\n')
+    r = _notes(tmp_path, '3.0-rc1', own)
+    assert r.returncode == 0 and 'Next.' in r.stdout
 
 
 def test_the_fallback_heading_does_not_bite_on_a_longer_version():
+    rv = _load()
     text = '## 2.254.1\n- three\n\n## 2.254\n- two\n'
     assert 'two' in rv.changelog_section('2.254', text) and 'three' not in rv.changelog_section('2.254', text)
     assert 'three' in rv.changelog_section('2.254.1', text) and 'two' not in rv.changelog_section('2.254.1', text)
 
 
-@pytest.mark.parametrize('v', ACCEPTED)
-def test_the_release_notes_step_names_the_published_files(tmp_path, v):
-    """The real notes step, run on a scratch tree: install links name the files the build publishes."""
+def test_a_rc_with_a_section_of_its_own_name_takes_that_section(tmp_path):
+    text = CHANGELOG.replace('## [3.0] - 2026-12-20', '## [3.0-rc1] - 2026-12-01\n- Named.\n\n## [3.0] - 2026-12-20')
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0 and 'Named.' in r.stdout and 'Next thing.' not in r.stdout
+
+
+def test_a_rc_section_is_used_when_unreleased_is_empty(tmp_path):
+    text = '## [Unreleased]\n\n## [3.0-rc1] - 2026-12-01\n- Named.\n\n## [2.254] - 2026-11-13\n- Old.\n'
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0, r.stderr
+    assert 'Named.' in r.stdout and 'Old.' not in r.stdout
+
+
+def test_a_corrective_release_candidate_takes_unreleased(tmp_path):
+    r = _notes(tmp_path, '2.254.2-rc1')
+    assert 'Next thing.' in r.stdout and 'Maintenance' not in r.stdout
+
+
+def test_the_history_command_is_gone(tmp_path):
+    assert _notes(tmp_path, '3.0').returncode == 0
+    assert _cli('history', '3.0', str(tmp_path / 'CHANGELOG.md')).returncode == 2
+
+
+def _notes_step(tmp_path, v, changelog, env=None):
     work = tmp_path / 'w'
     (work / 'scripts').mkdir(parents=True)
     (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
-    (work / 'CHANGELOG.md').write_text(f'## [{v}] - 2026-11-30\n- Marker.\n\n## [2.200] - 2026-01-01\n- Old.\n')
+    (work / 'CHANGELOG.md').write_text(changelog)
     step = _step('build-release.yml', 'release', 'Generate release notes')
     result = _run_step(step, work, subst={'${{ needs.build-deb.outputs.version }}': v,
-                                          '${{ github.repository }}': 'o/r'})
-    assert result.returncode == 0, result.stderr
-    notes = (work / 'notes.md').read_text()
-    for name in rv.asset_names(v).values():
-        assert name in notes, name
-    assert f'releases/download/v{v}/' in notes and 'Marker.' in notes
+                                          '${{ github.repository }}': 'o/r'}, env=env)
+    return result, work / 'notes.md'
 
+
+@pytest.mark.parametrize('v', ACCEPTED)
+def test_the_release_notes_step_names_the_published_files(tmp_path, v):
+    """The real notes step, run on a scratch tree: install links name the files the build publishes."""
+    changelog = (f'## [Unreleased]\n- Marker.\n\n' if '-rc' in v else f'## [{v}] - 2026-11-30\n- Marker.\n\n')
+    result, notes = _notes_step(tmp_path, v, changelog + '## [2.200] - 2026-01-01\n- Old.\n')
+    assert result.returncode == 0, result.stderr
+    text = notes.read_text()
+    for name in _load().asset_names(v).values():
+        assert name in text, name
+    assert f'releases/download/v{v}/' in text and 'Marker.' in text
+    # earlier sections are not copied: a link to the CHANGELOG at the tag stands in
+    assert 'Old.' not in text and 'Recent release history' not in text
+    assert f'https://github.com/o/r/blob/v{v}/CHANGELOG.md' in text
+
+
+@pytest.mark.parametrize('v', ['3.0', '3.0-rc1'])
+def test_every_link_of_the_release_notes_is_absolute(tmp_path, v):
+    """A release page resolves no relative link: each one names the repository, the docs at the tag."""
+    result, notes = _notes_step(tmp_path, v, '## [Unreleased]\n- x\n' if '-rc' in v else f'## [{v}] - d\n- x\n')
+    assert result.returncode == 0, result.stderr
+    links = re.findall(r'\]\(([^)]+)\)', notes.read_text())
+    assert links and all(link.startswith('https://') for link in links), links
+    for doc in ('docs/installation/README.md', 'UPGRADE.md'):
+        assert f'https://github.com/o/r/blob/v{v}/{doc}' in links, doc
+        assert (ROOT / doc).is_file(), doc
+
+
+@pytest.mark.parametrize('v,changelog', [('3.0', '## [Unreleased]\n- x\n'), ('3.0-rc1', '## [2.254] - d\n- x\n')])
+def test_the_release_notes_step_fails_without_its_section(tmp_path, v, changelog):
+    result, notes = _notes_step(tmp_path, v, changelog)
+    assert result.returncode != 0
+    assert 'CHANGELOG' in result.stdout + result.stderr
+
+
+
+@pytest.mark.parametrize('v', ['3.0', '2.254.1'])
+def test_a_rehearsed_stable_without_its_section_takes_unreleased_with_a_warning(tmp_path, v):
+    """A stable is rehearsed before its bump commit: the dry run borrows [Unreleased], the tag run stays strict."""
+    changelog = '## [Unreleased]\n- Marker.\n\n## [2.200] - 2026-01-01\n- Old.\n'
+    result, notes = _notes_step(tmp_path, v, changelog, env={'REHEARSAL': 'true'})
+    assert result.returncode == 0, result.stderr
+    assert 'Marker.' in notes.read_text() and 'Old.' not in notes.read_text()
+    assert f'::warning::CHANGELOG.md has no [{v}] section' in result.stdout + result.stderr
+    for strict in ({'REHEARSAL': 'false'}, {'REHEARSAL': ''}):
+        assert _notes_step(tmp_path / ('s' + strict['REHEARSAL']), v, changelog, env=strict)[0].returncode != 0
+
+
+def test_the_notes_step_reads_the_rehearsal_flag_from_the_dispatch():
+    step = _step('build-release.yml', 'release', 'Generate release notes')
+    assert step['env']['REHEARSAL'] == '${{ inputs.dry_run }}'
+
+
+def test_a_rehearsal_does_not_relax_the_notes_of_a_rc_or_a_present_section(tmp_path):
+    r = _notes(tmp_path, '3.0', CHANGELOG)
+    rr = _cli('notes', '3.0', str(tmp_path / 'CHANGELOG.md'), '--rehearsal')
+    assert rr.returncode == 0 and rr.stdout == r.stdout and '::warning::' not in rr.stderr
+    assert _notes(tmp_path, '3.0-rc1', '## [2.254] - d\n- x\n').returncode == 1
+    assert _cli('notes', '3.0-rc1', str(tmp_path / 'CHANGELOG.md'), '--rehearsal').returncode == 1
 
 # ---- 3b. the branch a tag must sit on -------------------------------------------------------------
 
@@ -210,263 +359,125 @@ def _tagged_checkout(tmp_path, branches, tag_on):
     return work
 
 
-@pytest.mark.parametrize('branches,tag_on,version,accepted', [
-    (['main', 'test'], 'main', '2.254.1', True),
-    (['main', 'test'], 'test', '2.254.1-rc1', True),
-    (['main', 'test'], 'test', '2.254.1', False),
-    (['main', 'test', 'v2.x'], 'v2.x', '2.254.2', True),
-    (['main', 'test', 'v2.x'], 'v2.x', '2.254.2-rc1', True),
-    (['main', 'test', 'v2.x'], 'main', '2.254.2', True),
-    (['main', 'test', 'v2.x'], 'v2.x', '2.255', False),
-    (['main', 'test', 'v2.x'], 'v2.x', '1.0.1', False),
-    (['main', 'test', 'v1.x'], 'v1.x', '1.0.1', True),
-    (['main', 'test', 'backport/v2.x'], 'main', '2.254.1', True),
-    (['main', 'test', 'v2.x'], 'nowhere', '2.254.2', False),
-    (['main', 'test'], 'nowhere', '2.254.2', False),
-])
-def test_a_tag_sits_on_its_release_branch_or_its_maintenance_branch(tmp_path, branches, tag_on, version, accepted):
-    work = _tagged_checkout(tmp_path, branches, tag_on)
+def _guard(work, version):
     step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
-    result = _run_step(step, work, {'GITHUB_REF': f'refs/tags/v{version}'})
+    return _run_step(step, work, {'GITHUB_REF': f'refs/tags/v{version}'})
+
+
+@pytest.mark.parametrize('branches,tag_on,version,accepted', [
+    (['main', 'test'], 'main', '3.0', True),
+    (['main', 'test'], 'test', '3.0-rc1', True),
+    (['main', 'test'], 'test', '3.0', False),
+    (['main', 'test'], 'main', '3.0-rc1', False),
+    (['main', 'test'], 'nowhere', '3.0', False),
+    # A v2.x tag is built by the workflow of the v2.x branch, which carries its own guard
+    (['main', 'test', 'v2.x'], 'v2.x', '2.254.2', False),
+    (['main', 'test', 'v2.x'], 'v2.x', '2.254.2-rc1', False),
+])
+def test_a_tag_sits_on_its_release_branch(tmp_path, branches, tag_on, version, accepted):
+    result = _guard(_tagged_checkout(tmp_path, branches, tag_on), version)
     assert (result.returncode == 0) is accepted, result.stdout + result.stderr
 
 
-@pytest.mark.parametrize('name,version', [('v2.x', '2.254.2'), ('main', '2.254.2'), ('main', '2.255'), ('test', '2.254.2-rc1')])
+@pytest.mark.parametrize('name,version', [('main', '3.0'), ('test', '3.0-rc1')])
 def test_a_tag_named_like_a_release_branch_opens_nothing(tmp_path, name, version):
-    """A tag `v2.x` or `main` pushed on any commit is not the branch of that name."""
-    work = _tagged_checkout(tmp_path, ['main', 'test', 'v2.x'], 'nowhere')
+    """A tag `main` or `test` pushed on any commit is not the branch of that name."""
+    work = _tagged_checkout(tmp_path, ['main', 'test'], 'nowhere')
     subprocess.run(['git', 'tag', name], cwd=work, check=True)
     subprocess.run(['git', 'push', '-q', 'origin', f'refs/tags/{name}'], cwd=work, check=True)
-    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
-    result = _run_step(step, work, {'GITHUB_REF': f'refs/tags/v{version}'})
+    result = _guard(work, version)
     assert result.returncode != 0, result.stdout + result.stderr
     assert 'Refusing to build release from an unexpected commit' in result.stdout
 
 
-@pytest.mark.parametrize('ref', ['refs/tags/refs/heads/v2.x', 'refs/heads/refs/heads/v2.x'])
-@pytest.mark.parametrize('version', ['2.254.2', '2.254.2-rc1'])
-def test_a_ref_that_only_ends_like_the_maintenance_branch_opens_nothing(tmp_path, ref, version):
-    work = _tagged_checkout(tmp_path, ['main', 'test'], 'nowhere')
+@pytest.mark.parametrize('ref', ['refs/heads/foo/refs/heads/main', 'refs/tags/refs/heads/main'])
+def test_a_ref_that_only_ends_like_the_branch_opens_nothing(tmp_path, ref):
+    work = _tagged_checkout(tmp_path, ['test'], 'nowhere')
     subprocess.run(['git', 'push', '-q', 'origin', f'HEAD:{ref}'], cwd=work, check=True)
-    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
-    result = _run_step(step, work, {'GITHUB_REF': f'refs/tags/v{version}'})
+    result = _guard(work, '3.0')
     assert result.returncode != 0, result.stdout + result.stderr
-    assert 'Refusing to build release from an unexpected commit' in result.stdout
-
-
-def test_a_branch_that_only_ends_like_the_maintenance_branch_refuses_nothing(tmp_path):
-    work = _tagged_checkout(tmp_path, ['test', 'foo/refs/heads/v2.x', 'main'], 'main')
-    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
-    result = _run_step(step, work, {'GITHUB_REF': 'refs/tags/v2.254.1'})
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_an_unreachable_remote_never_validates_a_tag(tmp_path):
     work = _tagged_checkout(tmp_path, ['main', 'test'], 'main')
     subprocess.run(['git', 'remote', 'set-url', 'origin', str(tmp_path / 'missing.git')], cwd=work, check=True)
-    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
-    result = _run_step(step, work, {'GITHUB_REF': 'refs/tags/v2.254.1'})
-    assert result.returncode != 0
+    assert _guard(work, '3.0').returncode != 0
 
 
-# ---- 4. latest ---------------------------------------------------------------------------------
+# ---- 4. an installed instance ------------------------------------------------------------------
 
-@pytest.mark.parametrize('published,tag,expected', [
-    (['v2.253', 'v2.254'], '2.254.1', 'true'),
-    (['v2.254', 'v9.0'], '2.254.2', 'false'),
-    (['v2.254', 'v2.254.1-rc1'], '2.254.1-rc1', 'false'),
-    (['v9.0'], '9.1', 'true'),
-    (['v2.254', 'v2.254.1', 'v2.254.2-rc1', 'v9.0-rc1'], '2.254.1', 'true'),
-    (['v2.254.1'], '2.254', 'false'),
-    (['v2.254', 'v2.254.1'], '2.254.1', 'true'),
-    (['v2.9', 'v2.10'], '2.9', 'false'),
-])
-def test_latest_table(published, tag, expected):
-    assert _cli('latest', tag, stdin='\n'.join(published)).stdout.strip() == expected
-
-
-def _origin_with_tags(tmp_path, tags):
-    bare = tmp_path / 'origin.git'
-    work = tmp_path / 'work'
-    git = ['git', '-c', 'user.name=t', '-c', 'user.email=t@t']
-    subprocess.run(['git', 'init', '-q', '--bare', str(bare)], check=True)
-    subprocess.run(['git', 'init', '-q', str(work)], check=True)
-    subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'x'], cwd=work, check=True)
-    subprocess.run(['git', 'remote', 'add', 'origin', str(bare)], cwd=work, check=True)
-    for t in tags:
-        subprocess.run(['git', 'tag', t], cwd=work, check=True)
-    subprocess.run(['git', 'push', '-q', 'origin', '--tags'], cwd=work, check=True)
-    (work / 'scripts').mkdir()
-    (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
-    return work
-
-
-@pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest', 'release'])
-@pytest.mark.parametrize('tags,version,expected', [
-    (['v2.253', 'v2.254', 'v2.254.1'], '2.254.1', 'true'),
-    (['v2.254', 'v9.0', 'v2.254.2'], '2.254.2', 'false'),
-    (['v2.254', 'v2.254.1-rc1'], '2.254.1-rc1', 'false'),
-])
-def test_the_latest_step_reads_the_remote_tags(tmp_path, job, tags, version, expected):
-    work = _origin_with_tags(tmp_path, tags)
-    out = tmp_path / 'gh_output'
-    step = _step('build-release.yml', job, 'Decide latest')
-    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': version, 'GITHUB_REF': f'refs/tags/v{version}'})
-    assert result.returncode == 0, result.stderr
-    assert out.read_text().strip() == f'latest={expected}'
-
-
-@pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest', 'release'])
-def test_a_branch_run_never_takes_latest(tmp_path, job):
-    work = _origin_with_tags(tmp_path, ['v2.253'])
-    out = tmp_path / 'gh_output'
-    step = _step('build-release.yml', job, 'Decide latest')
-    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': '2.254', 'GITHUB_REF': 'refs/heads/dev'})
-    assert result.returncode == 0, result.stderr
-    assert out.read_text().strip() == 'latest=false'
-
-
-@pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest', 'release'])
-def test_a_run_of_another_tag_never_takes_latest(tmp_path, job):
-    work = _origin_with_tags(tmp_path, ['v2.253', 'v2.254'])
-    out = tmp_path / 'gh_output'
-    step = _step('build-release.yml', job, 'Decide latest')
-    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': '2.254.2', 'GITHUB_REF': 'refs/tags/v2.254'})
-    assert result.returncode == 0, result.stderr
-    assert out.read_text().strip() == 'latest=false'
-
-
-def test_an_unreachable_remote_never_decides_latest(tmp_path):
-    work = _origin_with_tags(tmp_path, ['v2.254'])
-    subprocess.run(['git', 'remote', 'set-url', 'origin', str(tmp_path / 'missing.git')], cwd=work, check=True)
-    step = _step('build-release.yml', 'docker-manifest', 'Decide latest')
-    result = _run_step(step, work, {'GITHUB_OUTPUT': str(tmp_path / 'o'), 'VERSION': '2.254.1', 'GITHUB_REF': 'refs/tags/v2.254.1'})
-    assert result.returncode != 0
-
-
-def _evaluate(expr, outputs):
-    """Evaluate the only expression forms the workflow uses: ref, ref ==/!= 'lit', !ref."""
-    expr = expr.strip()
-    ref = r'steps\.latest\.outputs\.latest'
-    if re.fullmatch(ref, expr):
-        return outputs
-    m = re.fullmatch(ref + r"\s*(==|!=)\s*'([^']*)'", expr)
-    if m:
-        return (outputs == m.group(2)) if m.group(1) == '==' else (outputs != m.group(2))
-    m = re.fullmatch(r'!\s*' + ref, expr)
-    if m:
-        return outputs not in ('true', True)
-    raise AssertionError(f'unsupported expression: {expr}')
-
-
-def _render(text, outputs):
-    def one(m):
-        v = _evaluate(m.group(1), outputs)
-        return str(v).lower() if isinstance(v, bool) else v
-    return re.sub(r'\$\{\{(.*?)\}\}', one, text)
-
-
-@pytest.mark.parametrize('latest', ['true', 'false'])
-def test_the_image_and_release_tags_follow_the_step(latest):
-    data = yaml.safe_load((WORKFLOWS / 'build-release.yml').read_text())
-    for job, tag in (('docker-manifest', 'latest'), ('docker-fips-manifest', 'latest-fips')):
-        meta = next(s for s in data['jobs'][job]['steps'] if s.get('id') == 'meta')
-        line = next(ln for ln in meta['with']['tags'].splitlines() if f'value={tag},' in ln)
-        assert _render(line.strip(), latest).endswith(f'enable={latest}'), line
-    rel = next(s for s in data['jobs']['release']['steps'] if s.get('name') == 'Create release')
-    assert _render(str(rel['with']['make_latest']), latest) == latest
-
-
-# ---- 5. an installed instance ------------------------------------------------------------------
-
-def _release(tag, kind='deb'):
-    fv = rv.file_version(tag)
-    names = rv.asset_names(tag)
-    if kind == 'deb':
-        assets = [names['deb']]
-    else:
-        assets = [names['rpm'], names['rpm_el9']]
+def _release(tag):
+    fv = _load().file_version(tag)
     return {'tag_name': f'v{tag}', 'draft': False, 'prerelease': '-rc' in tag, 'body': '',
-            'assets': [{'name': n, 'browser_download_url': f'http://x/{n}'} for n in assets] + [
-                {'name': f'ucm_{fv}_all.deb.sha256', 'browser_download_url': 'http://x/s'}][:kind == 'deb']}
+            'assets': [{'name': f'ucm_{fv}_all.deb', 'browser_download_url': f'http://x/ucm_{fv}_all.deb'}]}
 
 
 @pytest.fixture
 def instance(monkeypatch):
-    def setup(current, releases, deb=True, el=None):
+    def setup(current, releases):
         monkeypatch.setattr(updates, 'get_current_version', lambda: current)
         monkeypatch.setitem(updates._releases_cache, 'data', releases)
         monkeypatch.setitem(updates._releases_cache, 'ts', time.time())
-        monkeypatch.setattr(updates.os.path, 'exists',
-                            lambda p: p == ('/usr/bin/dpkg' if deb else '/usr/bin/rpm'))
-        monkeypatch.setattr(updates, '_el_release', lambda: el)
+        monkeypatch.setattr(updates.os.path, 'exists', lambda p: p == '/usr/bin/dpkg')
         monkeypatch.delenv('UCM_DOCKER', raising=False)
     return setup
 
 
-def test_stable_channel_offers_the_maintenance_release(instance):
-    instance('2.254', [_release('2.254'), _release('2.254.1'), _release('2.254.1-rc1')])
+def test_a_later_maintenance_release_of_the_previous_line_is_not_offered(instance):
+    instance('3.0', [_release('3.0'), _release('2.254.2'), _release('2.254.3-rc1')])
+    assert updates.check_for_updates(channel='rc')['update_available'] is False
+
+
+def test_the_new_line_is_a_major_upgrade_not_an_update_of_the_previous_line(instance):
+    instance('2.254.2', [_release('2.254.2'), _release('3.0')])
     result = updates.check_for_updates(channel='stable')
-    assert (result['update_available'], result['latest_version']) == (True, '2.254.1')
+    assert (result['update_available'], result['latest_version']) == (False, '2.254.2')
+    assert result['major_upgrade']['version'] == '3.0'
 
 
-def test_only_the_rc_channel_sees_a_maintenance_rc(instance):
-    instance('2.254', [_release('2.254'), _release('2.254.1-rc1')])
-    assert updates.check_for_updates(channel='stable')['update_available'] is False
-    result = updates.check_for_updates(channel='rc')
-    assert (result['update_available'], result['latest_version']) == (True, '2.254.1-rc1')
-
-
-def test_a_maintenance_instance_is_not_offered_the_base_release(instance):
-    instance('2.254.1', [_release('2.254'), _release('2.254.1')])
-    assert updates.check_for_updates(channel='stable')['update_available'] is False
-
-
-def test_the_rc_of_a_maintenance_release_sits_between_the_two(instance):
-    assert updates.compare_versions('2.254.1-rc1', '2.254') == 1
-    assert updates.compare_versions('2.254.1-rc1', '2.254.1') == -1
-
-
-@pytest.mark.parametrize('tag', ['2.254.1', '2.254.1-rc1'])
-@pytest.mark.parametrize('kind,deb,el,asset', [('deb', True, None, 'deb'), ('rpm', False, None, 'rpm'),
-                                               ('rpm', False, '9', 'rpm_el9')])
-def test_the_requested_package_is_the_published_one(instance, tag, kind, deb, el, asset):
-    instance('2.254', [_release('2.254'), _release(tag, kind)], deb=deb, el=el)
-    result = updates.check_for_updates(channel='rc')
-    assert result['latest_version'] == tag
-    assert result['package_name'] == rv.asset_names(tag)[asset]
-
-
-# ---- 6. version files and helper scripts -------------------------------------------------------
-
-def _npm_of(version):
-    """VERSION as package.json spells it: X.Y[.Z] with -dev (dev), -rcN (test) or nothing (main)."""
-    m = re.fullmatch(r'((?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(\.[1-9]\d*)?(-dev|-rc\d+)?', version)
-    assert m, version
-    return f'{m.group(1)}{m.group(2) or ".0"}{m.group(3) or ""}'
-
+# ---- 5. version files and the bump script ------------------------------------------------------
 
 @pytest.mark.parametrize('version,npm', [
-    ('2.254.1-dev', '2.254.1-dev'), ('2.254-dev', '2.254.0-dev'),
-    ('2.254.1-rc1', '2.254.1-rc1'), ('2.254-rc2', '2.254.0-rc2'),
-    ('2.254.1', '2.254.1'), ('2.254', '2.254.0'),
+    ('3.0-dev', '3.0.0-dev'), ('3.1-dev', '3.1.0-dev'), ('2.254.2-dev', '2.254.2-dev'),
+    ('3.0-rc1', '3.0.0-rc1'), ('3.0', '3.0.0'), ('2.254.2', '2.254.2'),
 ])
-def test_npm_spelling_of_each_branch_version(version, npm):
-    assert _npm_of(version) == npm == rv.npm_version(version)
+def test_npm_form_of_each_branch_version(version, npm):
+    assert _cli('npm', version).stdout.strip() == npm
 
 
-@pytest.mark.parametrize('version', ['2.254.1-beta', '2.254.1.2', 'v2.254', '2.254-rc', '', '2.254.0',
-                                     '2.254.0-rc1', '02.254', '2.254.01', '2.254.1-dev-dev'])
-def test_npm_spelling_refuses_another_grammar(version):
-    with pytest.raises(AssertionError):
-        _npm_of(version)
+@pytest.mark.parametrize('version', ['3.0.0-dev', '3.0-dev-dev', '3.0-rc1-dev', '3.0-1', 'v3.0-dev', ''])
+def test_npm_form_refuses_another_grammar(version):
+    assert _cli('npm', version).returncode == 1
+
+
+@pytest.mark.parametrize('version,chart,prerelease', [
+    ('3.0', '3.0.0', 'false'), ('3.0-rc1', '3.0.0-rc1', 'true'), ('3.1', '3.1.0', 'false'),
+    ('2.254.2', '2.254.2', 'false'), ('2.254.2-rc1', '2.254.2-rc1', 'true'),
+])
+def test_chart_version_and_prerelease_of_a_tag(version, chart, prerelease):
+    assert _cli('chart', version).stdout.strip() == chart
+    assert _cli('prerelease', version).stdout.strip() == prerelease
+
+
+@pytest.mark.parametrize('cmd', ['chart', 'prerelease'])
+@pytest.mark.parametrize('version', ['3.0-dev', '3.0.0', 'v3.0', ''])
+def test_chart_and_prerelease_refuse_what_is_not_a_tag(cmd, version):
+    r = _cli(cmd, version)
+    assert r.returncode == 1 and not r.stdout
+
+
+def test_a_dev_version_is_never_a_tag():
+    assert _cli('validate', '3.0-dev').returncode == 1
+    assert _cli('deb', '3.0-dev').returncode == 1
 
 
 def test_version_files_agree():
-    npm = _npm_of((ROOT / 'VERSION').read_text().strip())
+    npm = _cli('npm', (ROOT / 'VERSION').read_text().strip()).stdout.strip()
     pkg = json.loads((ROOT / 'frontend' / 'package.json').read_text())
     lock = json.loads((ROOT / 'frontend' / 'package-lock.json').read_text())
-    assert pkg['version'] == lock['version'] == lock['packages']['']['version'] == npm
+    assert npm and pkg['version'] == lock['version'] == lock['packages']['']['version'] == npm
+    # The chart is versioned with the application it deploys
+    assert yaml.safe_load((ROOT / 'charts' / 'ucm' / 'Chart.yaml').read_text())['version'] == npm
 
 
 def _scratch_tree(tmp_path):
@@ -481,66 +492,44 @@ def _scratch_tree(tmp_path):
     return root
 
 
+def _chart(root):
+    return yaml.safe_load((root / 'charts/ucm/Chart.yaml').read_text())
+
+
 @pytest.mark.skipif(shutil.which('node') is None, reason='node is required')
-@pytest.mark.parametrize('v,npm,chart', [
-    ('2.254', '2.254.0', True), ('2.254.1', '2.254.1', True), ('2.254.2-rc1', '2.254.2-rc1', False),
-    ('2.254.1-dev', '2.254.1-dev', False), ('2.254-dev', '2.254.0-dev', False),
+@pytest.mark.parametrize('v,npm,chart_app', [
+    ('3.0', '3.0.0', '3.0'), ('3.1', '3.1.0', '3.1'), ('3.0-rc1', '3.0.0-rc1', '3.0-rc1'),
+    ('2.254.2', '2.254.2', '2.254.2'), ('2.254.2-rc1', '2.254.2-rc1', '2.254.2-rc1'),
+    # No image is published for a -dev version: appVersion is left as it is
+    ('3.1-dev', '3.1.0-dev', None), ('2.254.3-dev', '2.254.3-dev', None),
 ])
-def test_bump_version_updates_every_file(tmp_path, v, npm, chart):
+def test_bump_version_updates_every_file(tmp_path, v, npm, chart_app):
     root = _scratch_tree(tmp_path)
+    before = _chart(root)
     r = subprocess.run([BASH, str(root / 'scripts' / 'bump-version.sh'), v], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     lock = json.loads((root / 'frontend' / 'package-lock.json').read_text())
     assert (root / 'VERSION').read_text().strip() == v
     assert json.loads((root / 'frontend' / 'package.json').read_text())['version'] == npm
     assert lock['version'] == lock['packages']['']['version'] == npm
-    assert (f'appVersion: "{v}"' in (root / 'charts/ucm/Chart.yaml').read_text()) is chart
+    after = _chart(root)
+    assert after['appVersion'] == (chart_app or before['appVersion'])
+    # The chart is versioned with the application, in the semver form helm requires
+    assert after['version'] == npm
+    assert {k: v for k, v in after.items() if k not in ('version', 'appVersion')} == \
+        {k: v for k, v in before.items() if k not in ('version', 'appVersion')}
 
 
-def test_bump_version_refuses_a_version_the_release_grammar_refuses(tmp_path):
+@pytest.mark.parametrize('v', ['2.254-1', '3.0.0', 'v3', ''])
+def test_bump_version_refuses_a_version_the_release_grammar_refuses(tmp_path, v):
     root = _scratch_tree(tmp_path)
-    r = subprocess.run([BASH, str(root / 'scripts' / 'bump-version.sh'), '2.254-1'], capture_output=True, text=True)
+    pkg = (root / 'frontend' / 'package.json').read_text()
+    chart = (root / 'charts' / 'ucm' / 'Chart.yaml').read_text()
+    r = subprocess.run([BASH, str(root / 'scripts' / 'bump-version.sh'), v], capture_output=True, text=True)
     assert r.returncode != 0
     assert not (root / 'VERSION').exists()
-
-
-def test_npm_form_of_a_dev_version_and_tags_still_refuse_dev():
-    assert _cli('npm', '2.254.1-dev').stdout.strip() == '2.254.1-dev'
-    assert _cli('npm', '2.254-dev').stdout.strip() == '2.254.0-dev'
-    assert _cli('validate', '2.254.1-dev').returncode != 0
-    assert _cli('deb', '2.254.1-dev').returncode != 0
-
-
-def test_wiki_versions_follow_a_three_segment_release(tmp_path):
-    wiki = tmp_path / 'wiki'
-    wiki.mkdir()
-    (wiki / 'Installation-Guide.md').write_text('')
-    (wiki / 'Home.md').write_text(
-        '![v](https://img/version-2.254-brightgreen)\n'
-        'docker pull neyslim/ultimate-ca-manager:2.254\n'
-        'wget https://h/releases/download/v2.254/ucm_2.254_all.deb\n'
-        'wget https://h/releases/download/v2.254/ucm-el9-2.254-1.el9.noarch.rpm\n'
-        '| Latest Stable | 2.254 |\n')
-    subprocess.run(['git', 'init', '-q'], cwd=wiki, check=True)
-    subprocess.run(['git', 'add', '-A'], cwd=wiki, check=True)
-    subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'x'], cwd=wiki, check=True)
-    r = subprocess.run([BASH, str(ROOT / 'scripts' / 'update-wiki-versions.sh'), '2.254.1', str(wiki)],
-                       capture_output=True, text=True)
-    assert r.returncode == 0, r.stderr
-    text = (wiki / 'Home.md').read_text()
-    assert 'version-2.254.1-brightgreen' in text and 'manager:2.254.1\n' in text
-    assert 'v2.254.1/ucm_2.254.1_all.deb' in text and 'ucm-el9-2.254.1-1.el9.noarch.rpm' in text
-    assert '| Latest Stable | 2.254.1 |' in text and '2.254.1.1' not in text
-
-
-def test_the_watcher_matches_a_three_segment_target():
-    src = (ROOT / 'packaging' / 'scripts' / 'ucm-watcher.sh').read_text()
-    func = re.search(r'^versions_match\(\) \{.*?^\}', src, re.S | re.M).group(0)
-    def match(d, t):
-        return subprocess.run([BASH, '-c', f'{func}\nversions_match "$1" "$2"', 'x', d, t]).returncode == 0
-    assert match('2.254.1', '2.254.1') and match('2.254.1~rc1', '2.254.1-rc1') and match('2.254.1-1', '2.254.1')
-    assert not match('2.254', '2.254.1') and not match('2.254.1', '2.254')
-    assert not match('2.254.1-1', '2.254')
+    assert (root / 'frontend' / 'package.json').read_text() == pkg
+    assert (root / 'charts' / 'ucm' / 'Chart.yaml').read_text() == chart
 
 
 # ---- 6. smoke_release compares the reported version exactly -------------------------------------
@@ -563,60 +552,124 @@ def _health_run(monkeypatch, reported, expected):
     return str(exc.value)
 
 
-def test_smoke_release_refuses_a_version_that_only_starts_the_same(monkeypatch):
-    assert 'version mismatch' in _health_run(monkeypatch, '2.254.1', '2.254')
-    assert 'version mismatch' in _health_run(monkeypatch, '2.254', '2.254.1')
+@pytest.mark.parametrize('reported,expected', [('3.10', '3.1'), ('3.1', '3.10'), ('3.0-rc1', '3.0')])
+def test_smoke_release_refuses_a_version_that_only_starts_the_same(monkeypatch, reported, expected):
+    assert 'version mismatch' in _health_run(monkeypatch, reported, expected)
 
 
 def test_smoke_release_accepts_the_exact_version(monkeypatch):
-    assert 'version mismatch' not in _health_run(monkeypatch, '2.254.1', '2.254.1')
+    assert 'version mismatch' not in _health_run(monkeypatch, '3.1', '3.1')
 
 
-# ---- 7. the manual publisher follows the same rules ---------------------------------------------
+# ---- 7. the manual publisher takes the same section ---------------------------------------------
 
-def _publish(tmp_path, tags, version, changelog, *flags):
-    work = _origin_with_tags(tmp_path, tags)
-    (work / 'scripts' / 'release_publish.sh').write_text((ROOT / 'scripts' / 'release_publish.sh').read_text())
+def _publish(tmp_path, version, changelog, *flags):
+    """Notes the script hands to `gh release edit` (it only edits a release the workflow created)."""
+    bare, work = tmp_path / 'origin.git', tmp_path / 'work'
+    # Under the pre-commit hook GIT_DIR points at the real repository: never hand it down
+    clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    git = ['git', '-c', 'user.name=t', '-c', 'user.email=t@t']
+    subprocess.run(['git', 'init', '-q', '--bare', str(bare)], check=True, env=clean)
+    subprocess.run(['git', 'init', '-q', str(work)], check=True, env=clean)
+    subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'x'], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'remote', 'add', 'origin', str(bare)], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'tag', f'v{version}'], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'push', '-q', 'origin', '--tags'], cwd=work, check=True, env=clean)
+    (work / 'scripts').mkdir()
+    (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
+    shutil.copy(ROOT / 'scripts' / 'release_publish.sh', work / 'scripts')
     (work / 'CHANGELOG.md').write_text(changelog)
     fake = tmp_path / 'bin'
     fake.mkdir()
     log = tmp_path / 'gh.args'
-    gh = fake / 'gh'
-    gh.write_text(
+    (fake / 'gh').write_text(
         '#!/bin/sh\n'
-        f'if [ "$1 $2" = "release view" ] && [ ! -e "{log}" ]; then exit 1; fi\n'
-        'if [ "$1 $2" = "release create" ]; then\n'
+        'if [ "$1 $2" = "release edit" ]; then\n'
         f'  for a in "$@"; do echo "$a"; done > "{log}"\n'
-        '  while [ $# -gt 0 ]; do [ "$1" = "--notes-file" ] && '
-        f'cp "$2" "{log}.notes"; shift; done\n'
+        f'  while [ $# -gt 0 ]; do [ "$1" = "--notes-file" ] && cp "$2" "{log}.notes"; shift; done\n'
         'fi\n')
-    gh.chmod(0o755)
-    env = {**os.environ, 'PATH': f'{fake}:{os.environ["PATH"]}'}
-    result = subprocess.run([BASH, 'scripts/release_publish.sh', version, *flags], cwd=work, env=env,
+    (fake / 'gh').chmod(0o755)
+    env = {**clean, 'PATH': f'{fake}:{os.environ["PATH"]}'}
+    result = subprocess.run([BASH, 'scripts/release_publish.sh', version, '--edit', *flags], cwd=work, env=env,
                             capture_output=True, text=True)
-    return result, log
+    notes = pathlib.Path(str(log) + '.notes')
+    return result, (notes.read_text() if notes.exists() else None)
 
 
-PUBLISH_CHANGELOG = ('## [2x254x1]\n- Dots are literal.\n\n## [2.254.1] - 2026-12-01\n- Fixed a.b thing.\n\n'
-             '## [2.254] - 2026-11-13\n- Older entry.\n')
+PUBLISH_CHANGELOG = ('## [Unreleased]\n- Coming next.\n\n## [3x0]\n- Dots are literal.\n\n'
+                     '## [3.0] - 2026-12-01\n- Fixed a.b thing.\n\n## [2.254] - 2026-11-13\n- Older entry.\n')
 
 
-@pytest.mark.parametrize('tags,version,latest', [
-    (['v2.253', 'v2.254', 'v2.254.1'], '2.254.1', 'true'),
-    (['v2.254', 'v2.254.1', 'v9.0'], '2.254.1', 'false'),
+@pytest.mark.parametrize('version,marker', [('3.0', 'Fixed a.b thing.'), ('3.1-rc1', 'Coming next.')])
+def test_release_publish_takes_the_section_of_the_workflow(tmp_path, version, marker):
+    result, notes = _publish(tmp_path, version, PUBLISH_CHANGELOG)
+    assert result.returncode == 0, result.stderr
+    assert marker in notes
+    for other in ('Fixed a.b thing.', 'Coming next.', 'Older entry', 'Dots are literal'):
+        assert other == marker or other not in notes
+
+
+def test_release_publish_refuses_a_missing_section(tmp_path):
+    result, notes = _publish(tmp_path, '3.2', PUBLISH_CHANGELOG)
+    assert result.returncode != 0 and notes is None
+    assert "'## [3.2]'" in result.stderr and 'Unreleased' not in result.stderr.replace('[3.2]', '')
+
+
+def test_release_publish_names_both_sections_for_a_rc_without_notes(tmp_path):
+    result, notes = _publish(tmp_path, '3.2-rc1', '## [3.0] - 2026-12-01\n- Entry.\n')
+    assert result.returncode != 0 and notes is None
+    assert "'## [3.2-rc1]' or '## [Unreleased]'" in result.stderr
+
+
+# ---- 8. the release notes prescribe the FIPS stream of the installation guide ----------------------
+
+def _pro_streams(text):
+    return set(re.findall(r'sudo pro enable ([a-z-]+)', text))
+
+
+def test_the_release_notes_enable_the_ubuntu_stream_of_the_guide(tmp_path):
+    result, notes = _notes_step(tmp_path, '3.0', '## [3.0] - 2026-12-01\n- Marker.\n')
+    assert result.returncode == 0, result.stderr
+    guide = (ROOT / 'docs' / 'installation' / 'README.md').read_text()
+    # The `fips` stream ships the binaries certified under CMVP #5115; `fips-updates` does not
+    assert _pro_streams(notes.read_text()) == _pro_streams(guide) == {'fips'}
+
+
+@pytest.mark.parametrize('version, content, code', [
+    ('3.0-rc3', '3.0-rc3\n', 0), ('3.0-rc3', '  3.0-rc3 \r\n', 0), ('3.0', '3.0', 0),
+    ('2.254.5-rc1', '2.254.5-rc1\n', 0),
+    ('3.0-rc3', '3.0-dev\n', 1), ('3.0-rc3', '3.0-rc2\n', 1), ('3.0-rc3', '3.0\n', 1),
+    ('3.0-rc3', '', 1), ('3.0-rc3', '\n', 1),
 ])
-def test_release_publish_passes_the_latest_rule_and_the_section(tmp_path, tags, version, latest):
-    result, log = _publish(tmp_path, tags, version, PUBLISH_CHANGELOG)
-    assert result.returncode == 0, result.stderr
-    args = log.read_text().splitlines()
-    assert f'--latest={latest}' in args
-    notes = pathlib.Path(str(log) + '.notes').read_text()
-    assert 'Fixed a.b thing.' in notes and 'Older entry' not in notes and 'Dots are literal' not in notes
+def test_matches_compares_a_tag_to_the_version_file(tmp_path, version, content, code):
+    f = tmp_path / 'VERSION'
+    f.write_text(content)
+    r = _cli('matches', version, str(f))
+    assert r.returncode == code and not r.stdout
+    if code:
+        assert r.stderr.startswith('::error::') and version in r.stderr
+        assert repr(content.strip()) in r.stderr
 
 
-@pytest.mark.parametrize('flag', ['--draft', '--pre'])
-def test_release_publish_never_marks_a_draft_or_a_prerelease_latest(tmp_path, flag):
-    result, log = _publish(tmp_path, ['v2.253', 'v2.254', 'v2.254.1'], '2.254.1', PUBLISH_CHANGELOG, flag)
-    assert result.returncode == 0, result.stderr
-    assert '--latest=false' in log.read_text().splitlines()
+def test_matches_refuses_a_missing_file(tmp_path):
+    r = _cli('matches', '3.0-rc3', str(tmp_path / 'absent'))
+    assert r.returncode == 1 and r.stderr.startswith('::error::') and 'absent' in r.stderr
 
+
+def test_matches_refuses_a_file_that_is_not_utf8_with_an_annotation(tmp_path):
+    f = tmp_path / 'VERSION'
+    f.write_bytes(b'3.0-rc3\xff\xfe\n')
+    r = _cli('matches', '3.0-rc3', str(f))
+    assert r.returncode == 1 and r.stderr.startswith('::error::') and str(f) in r.stderr
+
+
+def test_notes_refuses_a_missing_changelog_with_an_annotation(tmp_path):
+    r = _cli('notes', '3.0-rc3', str(tmp_path / 'absent'))
+    assert r.returncode == 1 and r.stderr.startswith('::error::') and 'absent' in r.stderr
+
+
+def test_notes_refuses_a_changelog_that_is_not_utf8_with_an_annotation(tmp_path):
+    f = tmp_path / 'CHANGELOG.md'
+    f.write_bytes(b'# Changelog\n\n## 3.0-rc3\n\xff\xfe\n')
+    r = _cli('notes', '3.0-rc3', str(f))
+    assert r.returncode == 1 and r.stderr.startswith('::error::') and str(f) in r.stderr

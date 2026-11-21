@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Émission', text: 'Le formulaire d\'émission, la signature de CSR et la signature en masse, ainsi que les renouvellements effectués par un opérateur' },
           { label: 'Renouvellement', text: 'Renouvellements par un opérateur, un seul ou en masse, et par le planificateur, qui met son renouvellement en file au lieu de l\'effectuer' },
-          { label: 'Révocation', text: 'Révocations de certificats et de CA intermédiaires par un opérateur (une CA aussi sous les politiques qui la ciblent) ; un client ACME ne peut pas attendre une décision, sa révocation est donc refusée' },
+          { label: 'Révocation', text: 'Révocations de certificats et d\'AC intermédiaires par un opérateur (une AC aussi sous les politiques qui la ciblent) ; un client ACME ne peut pas attendre une décision, sa révocation est donc refusée' },
           { label: 'Plusieurs à la fois', text: 'Une politique peut couvrir plusieurs opérations ; une politique sans aucune (ancien type renouvellement ou révocation, jamais appliqué) ne couvre rien tant que vous n\'en choisissez pas' },
         ]
       },
@@ -17,10 +17,10 @@ export default {
         title: 'Règles',
         items: [
           { label: 'Validité maximale', text: 'Durée de vie maximale du certificat en jours' },
-          { label: 'Types de clés autorisés', text: 'Restreindre les algorithmes et tailles de clés pouvant être utilisés, ML-DSA-44, ML-DSA-65 et ML-DSA-87 compris ; le mode FIPS retire ML-DSA' },
-          { label: 'Schémas de signature autorisés', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA ou SLH-DSA, comparés à la clé de la CA signataire. Les algorithmes de hachage de signature autorisés ne contraignent pas une CA ML-DSA, qui signe sans digest séparé' },
-          { label: 'Restrictions SAN', text: 'Limiter le nombre de noms DNS (les autres types de SAN ne sont pas comptés) et imposer des motifs de noms DNS' },
-          { label: 'Algorithmes de hachage de signature autorisés', text: 'SHA-256, SHA-384 ou SHA-512 ; aucun sélectionné autorise tout. Quand personne n\'a choisi le hachage, celui par défaut s\'applique s\'il est autorisé, sinon le plus faible autorisé. Le formulaire d\'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés' },
+          { label: 'Types de clés autorisés', text: 'Restreindre les algorithmes et tailles de clés pouvant être utilisés, ML-DSA-44, ML-DSA-65 et ML-DSA-87 compris ; le mode FIPS retire ML-DSA quand le module FIPS ne l\'approuve pas' },
+          { label: 'Schémas de signature (API seulement)', text: 'La règle allowed_signature_schemes, absente du formulaire de politique : PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA ou SLH-DSA, comparés à la clé de l\'AC signataire. Les algorithmes de hachage de signature autorisés ne contraignent pas une AC ML-DSA, qui signe sans digest séparé' },
+          { label: 'Restrictions SAN', text: 'Limiter le nombre de noms DNS (les autres types de SAN ne sont pas comptés) ; un motif DNS par politique (*.company.com, ou company.com pour inclure le domaine lui-même) limite la politique aux noms correspondants' },
+          { label: 'Algorithmes de hachage de signature autorisés', text: 'SHA-256, SHA-384 ou SHA-512 ; aucun sélectionné autorise tout. Quand personne n\'a choisi le hachage, celui par défaut s\'applique s\'il est autorisé, sinon le plus faible autorisé. Le formulaire d\'émission ne propose que les types de clé autorisés, Créer une AC que les types de clé et hachages autorisés' },
         ]
       },
       {
@@ -34,7 +34,7 @@ export default {
     ],
     tips: [
       'Nombre de priorité plus bas = précédence plus élevée pour l\'approbation. Les règles de toutes les politiques concernées s\'appliquent ensemble, la plus stricte l\'emportant.',
-      'Scopez les politiques à des CA spécifiques pour un contrôle granulaire.',
+      'Scopez les politiques à des AC spécifiques pour un contrôle granulaire.',
       'Activez les notifications pour détecter tôt les violations de politique.',
     ],
   },
@@ -43,7 +43,7 @@ export default {
     content: `
 ## Vue d'ensemble
 
-Les politiques de certificat définissent les règles et contraintes appliquées lors de l'émission, du renouvellement ou de la révocation de certificats. Les politiques sont évaluées par **ordre de priorité** (nombre plus bas = priorité plus élevée) et peuvent être scopées à des CA spécifiques.
+Les politiques de certificat définissent les règles et contraintes appliquées lors de l'émission, du renouvellement ou de la révocation de certificats. Les politiques sont évaluées par **ordre de priorité** (nombre plus bas = priorité plus élevée) et peuvent être scopées à des AC spécifiques.
 
 ## Opérations
 
@@ -56,7 +56,7 @@ Le formulaire d'émission, la signature de CSR et la signature en masse, ainsi q
 Renouvellements par un opérateur, un seul ou en masse, et par le planificateur. Sous une politique de renouvellement qui exige une approbation, le planificateur met le renouvellement en file au lieu de l'effectuer, et l'approbation re-signe la clé détenue par le serveur.
 
 ### Révocation
-Révocations de certificats (un seul, en masse, depuis les certificats utilisateur) et de CA intermédiaires. Limitée par la CA émettrice, le modèle et le motif DNS ; la révocation d'une CA est aussi retenue par les politiques limitées à cette CA, puisque tous les certificats qu'elle a émis tombent avec elle. Les autres règles ne s'appliquent pas. Un client ACME ne peut pas attendre une décision : sa révocation est refusée et laissée aux opérateurs. Supprimer une inscription mTLS est refusé tant que son certificat n'est pas révoqué, quel qu'en soit le titulaire ; les administrateurs contournent.
+Révocations de certificats (un seul, en masse, depuis les certificats utilisateur) et d'AC intermédiaires. Limitée par l'AC émettrice, le modèle et le motif DNS ; la révocation d'une AC est aussi retenue par les politiques limitées à cette AC, puisque tous les certificats qu'elle a émis tombent avec elle. Les autres règles ne s'appliquent pas. Un client ACME ne peut pas attendre une décision : sa révocation est refusée et laissée aux opérateurs. Supprimer une inscription mTLS est refusé tant que son certificat n'est pas révoqué, quel qu'en soit le titulaire ; les administrateurs contournent.
 
 Une politique créée avant l'existence des opérations conserve son comportement : une politique d'émission le reste, et un type renouvellement ou révocation, jamais appliqué, ne couvre rien tant que vous n'en choisissez pas les opérations.
 
@@ -72,20 +72,20 @@ Durée de vie maximale du certificat en jours. Valeurs courantes :
 ### Types de clés autorisés
 Restreindre les algorithmes et tailles de clés pouvant être utilisés :
 - **RSA-2048** : Minimum pour la confiance publique
-- **RSA-3072** : La taille de clé par défaut des nouvelles CA
+- **RSA-3072** : La taille de clé par défaut des nouvelles AC
 - **RSA-4096** : Sécurité plus élevée, certificats plus volumineux
 - **EC-P256** : Moderne, rapide, recommandé
 - **EC-P384** : Courbe elliptique à sécurité plus élevée
 - **EC-P521** : Sécurité maximale (rarement nécessaire)
-- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87** : Post-quantique (FIPS 204), niveaux NIST 2, 3 et 5 ; retirés en mode FIPS
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87** : Post-quantique (FIPS 204), niveaux NIST 2, 3 et 5 ; retirés en mode FIPS quand le module FIPS ne les approuve pas
 
-**Schémas de signature autorisés** restreint la façon dont signe la CA signataire (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Les algorithmes de hachage de signature autorisés ne contraignent pas une CA ML-DSA, qui signe sans digest séparé.
+La règle \`allowed_signature_schemes\`, définie par l'API seulement (le formulaire de politique ne l'affiche pas), restreint la façon dont signe l'AC signataire (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Les algorithmes de hachage de signature autorisés ne contraignent pas une AC ML-DSA, qui signe sans digest séparé.
 
-**Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés.
+**Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission ne propose que les types de clé autorisés, Créer une AC que les types de clé et hachages autorisés.
 
 ### Restrictions SAN
-- **Noms DNS max** : Limiter le nombre de noms DNS du SAN ; les entrées IP, e-mail et URI ne sont pas comptées
-- **Motif DNS** : Restreindre à des motifs de domaine spécifiques (par ex. \`*.entreprise.com\`)
+- **SANs max** : Limiter le nombre de noms DNS du SAN ; les entrées IP, e-mail et URI ne sont pas comptées. En ACME, un nom DNS porté par le seul CN compte aussi (RFC 8555 §7.4)
+- **Motif DNS** : Limite la politique aux requêtes dont le CN ou les SAN DNS correspondent, étiquette par étiquette et sans tenir compte de la casse : \`*.company.com\` couvre les noms sous company.com, \`company.com\` couvre aussi company.com. Les autres noms ne sont pas refusés : la politique ne s'applique pas à eux
 
 ## Flux d'approbation
 
@@ -109,11 +109,11 @@ Lorsque plusieurs politiques correspondent à une demande de certificat, la poli
 
 ## Portée
 
-### Toutes les CA
-La politique s'applique à chaque CA du système. À utiliser pour les règles à l'échelle de l'organisation.
+### Toutes les AC
+La politique s'applique à chaque AC du système. À utiliser pour les règles à l'échelle de l'organisation.
 
-### CA spécifique
-La politique s'applique uniquement aux certificats émis par la CA sélectionnée. À utiliser pour un contrôle granulaire.
+### AC spécifique
+La politique s'applique uniquement aux certificats émis par l'AC sélectionnée. À utiliser pour un contrôle granulaire.
 
 ## Politiques par défaut
 

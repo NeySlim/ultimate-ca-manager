@@ -24,14 +24,12 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import (
-    ACCOUNT_GONE,
     ORDER_GONE,
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
-    CERT_KEY_TYPES,
+    cert_key_type_refusal,
     csr_identifiers_match_order,
     fips_csr_refusal,
-    fips_key_type_refusal,
     fips_private_key_refusal,
 )
 from services.audit_service import AuditService
@@ -271,11 +269,9 @@ def request_certificate():
 
     # Key type for certificate (ignored when key_source=csr)
     key_type = data.get('key_type')
-    if key_type and key_type not in CERT_KEY_TYPES:
-        return error_response(
-            f'Invalid key type: must be one of {", ".join(CERT_KEY_TYPES)}', 400)
-    if key_type and fips_key_type_refusal(key_type):
-        return error_response(fips_key_type_refusal(key_type), 400)
+    refusal = cert_key_type_refusal(key_type)
+    if refusal:
+        return error_response(refusal, 400)
 
     key_source = (data.get('key_source') or 'generate').lower()
     if key_source not in ('generate', 'reuse', 'csr'):
@@ -464,7 +460,7 @@ def verify_challenges(order_id):
     try:
         client = AcmeClientService.for_existing_order(order)
         if client is None:
-            return error_response(ACCOUNT_GONE, 409)
+            return error_response(AcmeClientService.missing_account_message(order), 409)
 
         results = {}
         challenges = order.challenges_dict
@@ -575,7 +571,7 @@ def check_order_status(order_id):
     try:
         client = AcmeClientService.for_existing_order(order)
         if client is None:
-            return error_response(ACCOUNT_GONE, 409)
+            return error_response(AcmeClientService.missing_account_message(order), 409)
         status, data = client.check_order_status(order)
         if status == 'gone':
             status = order.status  # invalid with the reason, or issued as it was
@@ -622,7 +618,7 @@ def finalize_order(order_id):
     try:
         client = AcmeClientService.for_existing_order(order)
         if client is None:
-            return error_response(ACCOUNT_GONE, 409)
+            return error_response(AcmeClientService.missing_account_message(order), 409)
         success, message, cert_id = client.finalize_order(order, lease=lease)
 
         if success:
@@ -994,7 +990,7 @@ def _run_auto_poll_background(order_id: int, environment: str) -> None:
                 client = AcmeClientService.for_existing_order(order)
                 if client is None:
                     order.status = 'pending'
-                    order.error_message = ACCOUNT_GONE
+                    order.error_message = AcmeClientService.missing_account_message(order)
                     db.session.commit()
                     return
                 _auto_poll_and_finalize(client, order)
@@ -1072,6 +1068,10 @@ def preflight_certificate():
             return error_response('dns_provider_id must be an integer', 400)
     else:
         dns_provider_id = None
+
+    refusal = cert_key_type_refusal(data.get('key_type'))
+    if refusal:
+        return error_response(refusal, 400)
 
     key_source = (data.get('key_source') or 'generate').lower()
     csr_pem = data.get('csr_pem') or data.get('csr')

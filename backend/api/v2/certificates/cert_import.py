@@ -14,8 +14,9 @@ from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from models import Certificate, CA, RevokedSerial, db
 from services.audit_service import AuditService
 from utils.cert_issuer import ca_signature_verdict, ca_signed, private_key_matches, signing_ca_for, stored_private_key_matches
+from utils.key_type import weak_ca_key_refusal
 from services.import_service import (
-    KeyPasswordError, parse_certificate_file, is_ca_certificate, extract_cert_info,
+    KeyPasswordError, UnreadableCertificate, parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca_for_import, cross_mode_from, finish_cross_attach,
     find_existing_certificate, find_pending_csr_for_certificate,
     AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import, install_on_pending_ca, stored_certificate_serial,
@@ -129,6 +130,10 @@ def import_certificate():
             # Check for existing CA
             if not has_permission('write:cas', g.permissions):
                 return error_response('write:cas permission required to import a CA certificate', 403)
+            # A CA that would sign must clear the RSA floor; without its key it is only read
+            weak = import_key and private_key is not None and weak_ca_key_refusal(private_key)
+            if weak:
+                return error_response(weak, 400)
             username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
             try:
                 existing_ca, attached = find_existing_ca_for_import(cert_info, cert, cross_mode, username)
@@ -190,6 +195,10 @@ def import_certificate():
                     details=f'Updated CA via import: {existing_ca.descr}',
                     success=True
                 )
+                from services.ca import parent_confirmation
+                parent_confirmation.audit_dropped(existing_ca)
+                from services.webhook_service import emit_ca_updated
+                emit_ca_updated(existing_ca.to_dict(), actor=username, changes={'certificate': 'imported'})
 
                 message = f'CA certificate "{existing_ca.descr}" updated (already existed)'
                 if key_dropped:
@@ -202,7 +211,11 @@ def import_certificate():
             # certificates table (an intermediate requested here, signed outside):
             # the request's key becomes the CA's and the request is fulfilled
             pending_request = find_pending_csr_for_certificate(cert)
-            if pending_request is not None and not encrypted_prv:
+            if pending_request is not None and not encrypted_prv and pending_request.prv:
+                # The request's key is the certificate's (matched by SPKI): same RSA floor as a key in the file
+                weak = weak_ca_key_refusal(cert.public_key())
+                if weak:
+                    return error_response(weak, 400)
                 encrypted_prv = pending_request.prv
             ca = CA(
                 refid=refid,
@@ -238,6 +251,8 @@ def import_certificate():
                 details=f'Imported CA (auto-detected): {ca.descr}',
                 success=True
             )
+            from services.webhook_service import emit_ca_created
+            emit_ca_created(ca.to_dict(), actor=username)
 
             message = f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
             if fulfilled:
@@ -345,9 +360,20 @@ def import_certificate():
                 ).update({RevokedSerial.certificate_id: None}, synchronize_session='fetch')
             came_back_revoked = apply_persisted_revocation(existing_cert)
 
+            # A key reaching a renewed certificate takes the bindings left behind for it;
+            # a new serial deploys them through its renewal event
+            https_moved = False
+            if key_pem and not came_back_revoked:
+                from services.binding_attention import follow_key
+                user = getattr(g, 'current_user', None)
+                https_moved = follow_key(existing_cert, actor=getattr(user, 'username', None) or 'system',
+                                         queue=not serial_changed)
             ok, err = safe_commit(logger, "Failed to update certificate")
             if not ok:
                 return err
+            if https_moved and not serial_changed:
+                from services.https_binding import apply_bound_now
+                apply_bound_now(existing_cert.refid)
             AuditService.log_action(
                 action='certificate_updated',
                 resource_type='certificate',
@@ -357,13 +383,16 @@ def import_certificate():
                 success=True
             )
 
-            # A new serial is a renewal, so deploy bindings push it; the same serial stays silent
+            # A new serial is a renewal (deploy bindings, webhooks and HTTPS binding
+            # follow), a first certificate an import; the same serial stays silent
             cert_dict = existing_cert.to_dict()
+            from services.webhook_service import WebhookService, emit_cert_stored
+            user = getattr(g, 'current_user', None)
             # A certificate its CA revoked is no renewal of the one it replaces
-            if serial_changed and not came_back_revoked:
-                from services.webhook_service import emit_cert_renewed
-                actor = getattr(getattr(g, 'current_user', None), 'username', None)
-                emit_cert_renewed(cert_dict, ca_refid=cert_dict.get('caref'), actor=actor)
+            if not (came_back_revoked and serial_changed):
+                emit_cert_stored(cert_dict, old_serial, cert.serial_number,
+                                 first_event=WebhookService.CERT_IMPORTED,
+                                 ca_refid=existing_cert.caref, actor=getattr(user, 'username', None))
 
             message = f'Certificate "{existing_cert.descr}" updated (already existed)'
             if key_dropped:
@@ -407,16 +436,20 @@ def import_certificate():
             details=f'Imported certificate: {certificate.descr}',
             success=True
         )
+        cert_dict = certificate.to_dict()
+        from services.webhook_service import emit_cert_imported
+        emit_cert_imported(cert_dict, ca_refid=certificate.caref,
+                           actor=getattr(getattr(g, 'current_user', None), 'username', None))
 
         return created_response(
-            data=certificate.to_dict(),
+            data=cert_dict,
             message=f'Certificate "{certificate.descr}" imported successfully'
         )
 
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
-    except (MalformedKey, KeyPasswordError) as e:
+    except (MalformedKey, KeyPasswordError, UnreadableCertificate) as e:
         db.session.rollback()
         return error_response(str(e), 400)
     except ValueError as e:

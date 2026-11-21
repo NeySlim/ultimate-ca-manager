@@ -8,14 +8,14 @@ import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key) => key,
+    t: (key, opts) => (opts?.ids ? `${key} ${opts.ids}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
-const mocks = vi.hoisted(() => ({ bulkDelete: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn() }))
+const mocks = vi.hoisted(() => ({ bulkDelete: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn() }))
 
 vi.mock('../../contexts', () => ({
   useNotification: () => ({
@@ -26,8 +26,8 @@ vi.mock('../../contexts', () => ({
     isMobile: false, isTablet: false, isDesktop: true, isTouch: false,
     isLargeScreen: true, screenWidth: 1440, sidebarOpen: true, setSidebarOpen: vi.fn(),
   }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(),closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -94,6 +94,17 @@ describe('OperationsPage bulk user deletion with unrevoked mTLS certificates', (
     await deleteSelected()
     await waitFor(() => expect(mocks.showWarning)
       .toHaveBeenCalledWith('1 users deleted; mTLS certificate(s) #3 could not be revoked'))
+  })
+
+  it('warns of both when the ACME CA of another certificate was not told', async () => {
+    mocks.bulkDelete.mockResolvedValue({
+      data: { success: [9], failed: [], acme_local_only: [4], unrevoked: [{ user_id: 9, certificates: [{ id: 3 }] }] },
+      message: '1 users deleted; mTLS certificate(s) #3 could not be revoked',
+    })
+    await deleteSelected()
+    await waitFor(() => expect(mocks.showWarning)
+      .toHaveBeenCalledWith('1 users deleted; mTLS certificate(s) #3 could not be revoked'))
+    expect(mocks.showWarning).toHaveBeenCalledWith('revocation.bulkRevokedLocallyOnly #4')
   })
 
   it('does not warn when every certificate was revoked', async () => {

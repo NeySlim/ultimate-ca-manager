@@ -14,6 +14,10 @@ export const keyRecoveryService = {
     return apiClient.get(`/key-recovery${qs}`)
   },
 
+  async get(id) {
+    return apiClient.get(`/key-recovery/${id}`)
+  },
+
   async approve(id, note) {
     return apiClient.post(`/key-recovery/${id}/approve`, { note })
   },

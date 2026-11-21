@@ -21,6 +21,9 @@ negotiable:
   restore into an error: each purge is isolated, a failure is logged, and
   only the caches that were really dropped are reported.
 
+Each publishing CA that can sign gets a fresh CRL (and delta); one that cannot is
+reported, never a failed restore.
+
 The restart is asked for last and only when the caller asks for it, through
 ``utils.service_manager`` -- the one mechanism that works across packagings
 (systemd, DEB/RPM, container) and needs no privilege of its own. A restart
@@ -68,11 +71,11 @@ def _revoke_database_sessions() -> Dict[str, int]:
 
 
 def _advance_session_epoch() -> None:
-    """Refuse every session begun before now, whatever the store, or raise.
+    """Refuse every session begun before now, on every store and node, or raise.
 
     Removing the stored sessions is not enough: Redis entries stay, and a request in
-    flight may write its session back; that session holds the old epoch. The caller's
-    own session is emptied too, so this response never writes it back.
+    flight may write its session back. The session it carries holds the old epoch.
+    The caller's own session is emptied too, so this response never writes it back.
     """
     from flask import has_request_context, session
     from auth.session_epoch import advance_epoch
@@ -85,6 +88,26 @@ def _advance_session_epoch() -> None:
     if has_request_context():
         session.clear()
     logger.info("Restore: session epoch %s, every session begun before it is refused", epoch)
+
+
+def _revoke_flask_sessions() -> int:
+    """Empty the SQL session store, or raise; 0 when sessions live elsewhere.
+
+    The table is excluded from the archive, so it survives a restore with
+    every session opened before it: all of them are deleted here.
+    """
+    if current_app.config.get('SESSION_TYPE') != 'sqlalchemy':
+        return 0
+    table = current_app.config.get('SESSION_SQLALCHEMY_TABLE', 'flask_sessions')
+    try:
+        count = db.session.execute(db.text(f'DELETE FROM "{table}"')).rowcount
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.error("Restore: the session table %s could not be emptied; access "
+                     "granted before the restore may still be usable", table)
+        raise
+    return count
 
 
 def _session_directory() -> Optional[Path]:
@@ -111,7 +134,7 @@ def _session_directory() -> Optional[Path]:
     return path
 
 
-def _remove_session_files() -> int:
+def _remove_session_files(older_than: Optional[float] = None) -> int:
     """Remove the session files, which are what a cookie actually resolves to.
 
     The database rows are the operator-visible list of sessions; the file in
@@ -126,23 +149,31 @@ def _remove_session_files() -> int:
         return 0
 
     removed = 0
-    try:
-        entries = list(os.scandir(directory))
-    except OSError as exc:
-        logger.error("Restore: session store %s could not be read: %s", directory, exc)
-        return 0
-
-    for entry in entries:
+    from utils.session_store import removal_lock
+    failures = []
+    # Listed and removed under the exclusive lock: no save in flight writes a file back meanwhile
+    with removal_lock(directory, 'the restore removed the sessions'):
         try:
-            if not entry.is_file(follow_symlinks=False):
-                continue
-            os.unlink(entry.path)
-            removed += 1
+            entries = list(os.scandir(directory))
         except OSError as exc:
-            logger.error(
-                "Restore: session file %s could not be removed, the session it "
-                "holds may still be usable: %s", entry.path, exc,
-            )
+            logger.error("Restore: session store %s could not be read: %s", directory, exc)
+            return 0
+        for entry in entries:
+            try:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                # A replay leaves the sessions opened since the first pass (the epoch refuses the rest)
+                if older_than is not None and entry.stat(follow_symlinks=False).st_mtime > older_than:
+                    continue
+                os.unlink(entry.path)
+                removed += 1
+            except OSError as exc:
+                failures.append((entry.path, exc))
+    for path, exc in failures:
+        logger.error(
+            "Restore: session file %s could not be removed, the session it "
+            "holds may still be usable: %s", path, exc,
+        )
     return removed
 
 
@@ -231,6 +262,13 @@ def _purge_oidc_cache() -> None:
     clear_oidc_cache()
 
 
+def _purge_sso_sign_in_tests() -> None:
+    """OIDC and SAML sign-in tests: their owner and provider are rows of the content replaced."""
+    from models.sso import SSOSignInTest
+    SSOSignInTest.query.delete(synchronize_session=False)
+    db.session.commit()
+
+
 def _purge_smtp_oauth_tokens() -> None:
     """Access tokens obtained with the SMTP credentials that were replaced."""
     from services import smtp_oauth
@@ -268,10 +306,49 @@ CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
     ('ocsp_responses', _purge_ocsp_responses),
     ('certificate_fingerprints', _purge_fingerprint_cache),
     ('oidc_discovery', _purge_oidc_cache),
+    ('sso_sign_in_tests', _purge_sso_sign_in_tests),
     ('smtp_oauth_tokens', _purge_smtp_oauth_tokens),
     ('kerberos_contexts', _purge_kerberos_contexts),
     ('ca_request_chain', _purge_ca_request_caches),
 )
+
+
+def _has_delta_after(ca_id: int, base_number: int) -> bool:
+    """Whether a delta CRL newer than base `base_number` was stored (generate_crl only logs its failure)."""
+    from models.crl import CRLMetadata
+    return db.session.query(CRLMetadata.id).filter(
+        CRLMetadata.ca_id == ca_id, CRLMetadata.is_delta.is_(True),
+        CRLMetadata.crl_number > base_number).first() is not None
+
+
+def _regenerate_crls() -> Tuple[list, list, list]:
+    """A fresh CRL (and delta) for each publishing authority that can sign: the one served
+    may list the revocations of the replaced instance. Returns (regenerated, failed, delta_failed)
+    names: delta_failed holds the authorities whose base CRL was signed but not its delta."""
+    from models import CA
+    from services.crl_service import CRLService
+    regenerated, failed, delta_failed = [], [], []
+    for ca in CA.query.filter_by(cdp_enabled=True).order_by(CA.id).all():
+        if not (ca.has_private_key and ca.crt) or ca.offline:
+            continue  # signed elsewhere or not yet issued: the CDP keeps what it has
+        name = ca.descr
+        base = None
+        try:
+            base = CRLService.generate_crl(ca.id, username='system')
+            if ca.delta_crl_enabled and not _has_delta_after(ca.id, base.crl_number):
+                raise ValueError("its delta CRL is older than the new base")
+        except Exception as exc:
+            db.session.rollback()
+            if base is None:
+                logger.warning("Restore: the CRL of CA %s was not regenerated: %s", name, exc)
+                failed.append(name)
+            else:
+                logger.warning("Restore: the base CRL was signed for CA %s but its delta CRL was not: %s",
+                               name, exc)
+                delta_failed.append(name)
+        else:
+            regenerated.append(name)
+    return regenerated, failed, delta_failed
 
 
 def _request_restart() -> bool:
@@ -318,9 +395,14 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
 
         {'sessions_revoked': int,       # rows deleted from user_sessions
          'sso_sessions_revoked': int,   # rows deleted from pro_sso_sessions
+         'flask_sessions_revoked': int, # rows deleted from the SQL session store
          'session_files_removed': int,  # files deleted from the session store
          'caches_cleared': [str],       # caches really dropped
          'caches_failed': [str],        # caches that refused to drop
+         'crls_regenerated': [str],     # CAs whose CRL was signed again
+         'crls_failed': [str],          # CAs that could not sign one (HSM absent...)
+         'crls_delta_failed': [str],    # CAs whose base CRL was signed but not its delta
+         'crls_not_regenerated': bool,  # the regeneration itself failed, no CA was tried
          'restart_requested': bool}     # the mechanism accepted the request
     """
     _advance_session_epoch()
@@ -329,6 +411,7 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
     summary: Dict[str, Any] = {
         'sessions_revoked': revoked['user_sessions'],
         'sso_sessions_revoked': revoked['sso_sessions'],
+        'flask_sessions_revoked': _revoke_flask_sessions(),
         'session_files_removed': _remove_session_files(),
         'caches_cleared': [],
         'caches_failed': [],
@@ -346,17 +429,191 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
         else:
             summary['caches_cleared'].append(name)
 
+    summary['crls_not_regenerated'] = False
+    try:
+        (summary['crls_regenerated'], summary['crls_failed'],
+         summary['crls_delta_failed']) = _regenerate_crls()
+    except Exception as exc:
+        db.session.rollback()
+        logger.warning("Restore: the CRLs were not regenerated: %s", exc)
+        summary['crls_regenerated'], summary['crls_failed'] = [], []
+        summary['crls_delta_failed'] = []
+        summary['crls_not_regenerated'] = True  # no CA was tried: the operator is told so
+
     if request_restart:
         summary['restart_requested'] = _request_restart()
 
     logger.info(
         "Restore: revoked %s sessions and %s SSO sessions, removed %s session "
-        "files, cleared %s caches (%s failed), restart requested: %s",
+        "files and %s database session rows, cleared %s caches (%s failed), regenerated %s CRLs "
+        "(%s failed, %s with a delta CRL failed), restart requested: %s",
         summary['sessions_revoked'], summary['sso_sessions_revoked'],
-        summary['session_files_removed'], len(summary['caches_cleared']),
-        len(summary['caches_failed']), summary['restart_requested'],
+        summary['session_files_removed'], summary['flask_sessions_revoked'],
+        len(summary['caches_cleared']), len(summary['caches_failed']),
+        len(summary['crls_regenerated']), len(summary['crls_failed']),
+        len(summary['crls_delta_failed']), summary['restart_requested'],
     )
     return summary
+
+
+# -- the end steps of a restore job, each one replayable ---------------------------------
+
+def revoke_sessions_with(claim) -> Optional[Dict[str, int]]:
+    """Every session row and the epoch, in one transaction with ``claim(counts)``, the job's
+    mark of the step: the counts, or None (rolled back) when the claim says another actor did it."""
+    from auth.session_epoch import advance_epoch
+    try:
+        counts = {
+            'sessions_revoked': UserSession.query.delete(synchronize_session=False),
+            'sso_sessions_revoked': SSOSession.query.delete(synchronize_session=False),
+            'flask_sessions_revoked': 0,
+        }
+        if current_app.config.get('SESSION_TYPE') == 'sqlalchemy':
+            table = current_app.config.get('SESSION_SQLALCHEMY_TABLE', 'flask_sessions')
+            counts['flask_sessions_revoked'] = db.session.execute(
+                db.text(f'DELETE FROM "{table}"')).rowcount
+        if not claim(counts):
+            db.session.rollback()
+            return None
+        epoch = advance_epoch()  # commits the deletions and the claim with it
+    except Exception:
+        db.session.rollback()
+        logger.error("Restore: the sessions could not be revoked; access granted before the "
+                     "restore may still be usable")
+        raise
+    note_purged_epoch(epoch)
+    logger.info("Restore: session epoch %s, every session begun before it is refused", epoch)
+    return counts
+
+
+def remove_session_files(older_than: Optional[float] = None) -> int:
+    return _remove_session_files(older_than)
+
+
+# The OCSP cache is a table: purged once by the restore, not by every process
+_TABLE_PURGES = frozenset({'ocsp_responses'})
+
+
+def purge_caches(with_tables: bool = False) -> Tuple[list, list]:
+    """This process's caches (and the cache tables when ``with_tables``): (cleared, failed)."""
+    cleared, failed = [], []
+    for name, purge in CACHE_PURGES:
+        if name in _TABLE_PURGES and not with_tables:
+            continue
+        try:
+            purge()
+        except Exception as exc:
+            db.session.rollback()
+            logger.warning("Restore: the %s cache was not cleared: %s", name, exc)
+            failed.append(name)
+        else:
+            cleared.append(name)
+    return cleared, failed
+
+
+def regenerate_crls_summary() -> Dict[str, Any]:
+    summary: Dict[str, Any] = {'crls_not_regenerated': False}
+    try:
+        (summary['crls_regenerated'], summary['crls_failed'],
+         summary['crls_delta_failed']) = _regenerate_crls()
+    except Exception as exc:
+        db.session.rollback()
+        logger.warning("Restore: the CRLs were not regenerated: %s", exc)
+        summary.update(crls_regenerated=[], crls_failed=[], crls_delta_failed=[],
+                       crls_not_regenerated=True)
+    return summary
+
+
+# -- every process drops its caches once the epoch has moved (Q4) -------------------------
+
+EPOCH_CHECK_SECONDS = 2.0
+_purged = {'epoch': None, 'checked': 0.0}
+
+
+def note_purged_epoch(epoch: Optional[int] = None) -> None:
+    """This process's caches hold nothing older than ``epoch`` (read now when None)."""
+    if epoch is None:
+        from auth.session_epoch import current_epoch
+        try:
+            epoch = current_epoch()
+        except Exception:
+            db.session.rollback()
+            return
+    _purged['epoch'] = epoch
+
+
+def refresh_caches_on_epoch(force: bool = False) -> bool:
+    """A restore elsewhere advanced the epoch: this process purges its caches once.
+    Read at most every EPOCH_CHECK_SECONDS; True when it purged."""
+    import time
+    now = time.monotonic()
+    if not force and now - _purged['checked'] < EPOCH_CHECK_SECONDS:
+        return False
+    _purged['checked'] = now
+    from services.cluster_maintenance import blocks_writes
+    if blocks_writes():
+        return False  # a restore runs: its end purges, and the database may be held
+    from auth.session_epoch import current_epoch
+    try:
+        epoch = current_epoch()
+    except Exception:
+        db.session.rollback()
+        return False
+    seen = _purged['epoch']
+    _purged['epoch'] = epoch
+    if seen is None or epoch == seen:
+        return False
+    cleared, failed = purge_caches()
+    logger.warning("Session epoch moved to %s: this process cleared %s caches (%s failed)",
+                   epoch, len(cleared), len(failed))
+    return True
+
+
+class _EpochWatcher:
+    """A web worker's own timer for refresh_caches_on_epoch: no request ever pays its read."""
+
+    def __init__(self, app, interval):
+        import threading
+        self.app, self.interval = app, interval
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True, name='EpochCacheWatcher')
+
+    def _loop(self):
+        while not self._stop.wait(self.interval):
+            try:
+                with self.app.app_context():
+                    try:
+                        refresh_caches_on_epoch(force=True)
+                    finally:
+                        db.session.remove()
+            except Exception as e:
+                logger.error(f"Caches not checked against the session epoch: {type(e).__name__}")
+
+    def start(self):
+        self._thread.start()
+        return self
+
+    def stop(self, timeout=5.0):
+        self._stop.set()
+        self._thread.join(timeout)
+
+
+_watcher: Optional[_EpochWatcher] = None
+
+
+def start_epoch_watcher(app, interval: float = EPOCH_CHECK_SECONDS) -> _EpochWatcher:
+    """Web worker (post_worker_init): the scheduler process checks from its own loop."""
+    global _watcher
+    if _watcher is None:
+        _watcher = _EpochWatcher(app, interval).start()
+    return _watcher
+
+
+def stop_epoch_watcher() -> None:
+    global _watcher
+    watcher, _watcher = _watcher, None
+    if watcher is not None:
+        watcher.stop()
 
 
 __all__ = ['invalidate_after_restore', 'CACHE_PURGES']

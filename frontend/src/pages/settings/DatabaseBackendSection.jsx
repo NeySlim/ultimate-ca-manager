@@ -181,7 +181,7 @@ export default function DatabaseBackendSection() {
                 {t('settings.backend.test')}
               </Button>
             </div>
-            <p className="text-[10px] text-text-tertiary">
+            <p className="text-xs text-text-tertiary">
               {t('settings.backend.urlExample')}: <span className="font-mono">postgresql://ucm:secret@db.example.com:5432/ucm</span>
             </p>
           </div>

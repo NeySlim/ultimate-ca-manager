@@ -4,7 +4,6 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
 import {
   Stamp, CheckCircle, XCircle, Clock, Warning, User,
   ChatText, Gavel, Certificate, Funnel
@@ -17,8 +16,11 @@ import { approvalsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { useLinkedId } from '../hooks/useLinkedId'
 import { formatDate, cn } from '../lib/utils'
+import { stateLabel } from '../lib/stateLabel'
 import { showNotices } from '../lib/notices'
+import { approvedLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 
 // What a request asks for: labels resolved via t() inside component
 const REQUEST_TYPES = {
@@ -28,6 +30,11 @@ const REQUEST_TYPES = {
   revocation: { labelKey: 'approvals.requestType.revocation', variant: 'danger' },
   ca_revocation: { labelKey: 'approvals.requestType.ca_revocation', variant: 'danger' },
   cross_revocation: { labelKey: 'approvals.requestType.cross_revocation', variant: 'danger' },
+  // Held by a policy on an enrolment protocol; the approval issues through that protocol
+  acme_order: { labelKey: 'approvals.requestType.acme_order', variant: 'primary' },
+  est_enroll: { labelKey: 'approvals.requestType.est_enroll', variant: 'primary' },
+  scep_request: { labelKey: 'approvals.requestType.scep_request', variant: 'primary' },
+  wstep_request: { labelKey: 'approvals.requestType.wstep_request', variant: 'primary' },
 }
 
 function RequestTypeBadge({ type, t }) {
@@ -53,7 +60,7 @@ const STATUS_ICONS = {
 
 export default function ApprovalsPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showWarning } = useNotification()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const { canWrite } = usePermission()
   const openEntity = useOpenEntity()
 
@@ -91,17 +98,26 @@ export default function ApprovalsPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Deep link from a notification e-mail: /approvals?id=N opens that request
-  const [searchParams] = useSearchParams()
-  const linkedId = searchParams.get('id')
+  // /approvals?request=N (work queue) and ?id=N (e-mails already sent) open that request
+  const linkedId = useLinkedId('request', 'id')
   useEffect(() => {
-    if (!linkedId || !/^\d+$/.test(linkedId)) return
+    if (!linkedId) return
     let cancelled = false
     approvalsService.getById(linkedId)
-      .then(res => { if (!cancelled && res?.data) setSelectedRequest(res.data) })
-      .catch(() => { if (!cancelled) showError(t('approvals.loadFailed')) })
+      .then(res => {
+        if (cancelled || !res?.data) return
+        setSelectedRequest(res.data)
+        if (res.data.status !== 'pending') {
+          showInfo(t('overview.link.handled', { id: res.data.id, status: stateLabel(t, res.data.status) }))
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        if (err?.status === 404) showInfo(t('overview.link.gone', { id: linkedId }))
+        else showError(t('approvals.loadFailed'))
+      })
     return () => { cancelled = true }
-  }, [linkedId, showError, t])
+  }, [linkedId, showError, showInfo, t])
 
   // Stats bar
   const statItems = useMemo(() => [
@@ -191,7 +207,7 @@ export default function ApprovalsPage() {
         return (
           <Badge variant={STATUS_VARIANTS[val] || 'default'}>
             <Icon size={12} weight="fill" className="mr-1" />
-            {val}
+            {stateLabel(t, val)}
           </Badge>
         )
       },
@@ -240,9 +256,14 @@ export default function ApprovalsPage() {
         result = await approvalsService.approve(req.id, comment || undefined)
         if (result?.data?.certificate_issued && result.data.certificate?.revoked) {
           showSuccess(t('approvals.revocationPerformed'))
+          const localOnly = approvedLocalOnlyRevocationWarning(result.data.certificate, t)
+          if (localOnly) showWarning(localOnly)
         } else if (result?.data?.certificate_issued) {
           showSuccess(t('approvals.certificateIssued'))
           showNotices(result, showWarning)
+        } else if (result?.data?.deferred) {
+          // Approved: the protocol issues when its client comes back
+          showSuccess(t('approvals.approvedSuccess'))
         } else if (result?.data?.request_closed) {
           // Nothing can satisfy the request any more: it was closed
           showError(t('approvals.requestClosed', { reason: result.data.issue_error || '' }))
@@ -279,7 +300,7 @@ export default function ApprovalsPage() {
       {/* Status */}
       <div className="flex items-center gap-2">
         <Badge variant={STATUS_VARIANTS[selectedRequest.status]} size="lg">
-          {selectedRequest.status}
+          {stateLabel(t, selectedRequest.status)}
         </Badge>
         <RequestTypeBadge type={selectedRequest.request_type} t={t} />
       </div>
@@ -332,6 +353,17 @@ export default function ApprovalsPage() {
                   <div className="text-text-primary">{t('approvals.triggerScheduler')}</div>
                 </>
               )}
+              {selectedRequest.request_summary.protocol && (
+                <>
+                  <div className="text-text-tertiary">{t('approvals.summaryProtocol')}</div>
+                  <div className="text-text-primary">
+                    {selectedRequest.request_summary.protocol.toUpperCase()}
+                    {selectedRequest.request_summary.operation ? ` (${selectedRequest.request_summary.operation})` : ''}
+                  </div>
+                  <div className="text-text-tertiary">{t('approvals.summaryIdentity')}</div>
+                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.identity || '—'}</div>
+                </>
+              )}
               {selectedRequest.request_summary.validity_days && (
                 <>
                   <div className="text-text-tertiary">{t('approvals.summaryValidity')}</div>
@@ -375,6 +407,16 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
+      {/* The CSR a protocol request carries */}
+      {selectedRequest.request_summary?.csr && (
+        <div className="border-t border-border pt-3">
+          <h4 className="text-sm font-semibold text-text-primary mb-2">{t('approvals.summaryCsr')}</h4>
+          <pre className="text-xs font-mono text-text-secondary bg-bg-tertiary rounded-lg p-3 overflow-x-auto whitespace-pre">
+            {selectedRequest.request_summary.csr}
+          </pre>
+        </div>
+      )}
+
       {/* Requester Comment */}
       {selectedRequest.requester_comment && (
         <div className="border-t border-border pt-3">
@@ -393,8 +435,8 @@ export default function ApprovalsPage() {
             {selectedRequest.approvals.map((approval, idx) => (
               <div key={idx} className="flex items-start gap-2 text-sm bg-bg-tertiary rounded-lg p-3">
                 {approval.action === 'approve'
-                  ? <CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" weight="fill" />
-                  : <XCircle size={16} className="text-red-500 mt-0.5 shrink-0" weight="fill" />
+                  ? <CheckCircle size={16} className="text-status-success mt-0.5 shrink-0" weight="fill" />
+                  : <XCircle size={16} className="text-status-danger mt-0.5 shrink-0" weight="fill" />
                 }
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
@@ -476,8 +518,8 @@ export default function ApprovalsPage() {
         <div className="p-4 space-y-4">
           <div className="flex items-center gap-2 text-sm">
             {actionModal?.type === 'approve'
-              ? <CheckCircle size={20} className="text-green-500" weight="fill" />
-              : <XCircle size={20} className="text-red-500" weight="fill" />
+              ? <CheckCircle size={20} className="text-status-success" weight="fill" />
+              : <XCircle size={20} className="text-status-danger" weight="fill" />
             }
             <span className="text-text-primary">
               {actionModal?.type === 'approve'

@@ -13,6 +13,7 @@ from fips_mode import FipsRestricted
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import parse_request_pagination
 from services.ssh_cert_service import SSHCertificateService
+from services.ssh_cert.signing import MAX_VALIDITY_SECONDS, SSHSerialConflict
 from services.ssh_ca_service import normalize_key_type
 from services.audit_service import AuditService
 from sqlalchemy import or_, and_
@@ -34,9 +35,25 @@ _MAX_PRINCIPAL_LEN = 256
 _MAX_KEY_ID_LEN = 256
 _MAX_EXT_OR_OPTS = 32
 _MAX_OPT_VALUE_LEN = 1024
-_MAX_VALIDITY_SECONDS = 10 * 365 * 24 * 3600  # 10 years
+_MAX_VALIDITY_SECONDS = MAX_VALIDITY_SECONDS
 _VALID_CERT_TYPES = ('user', 'host')
 _VALID_KEY_TYPES = ('ed25519', 'rsa', 'ecdsa-p256', 'ecdsa-p384', 'ecdsa-p521')
+
+
+def _parse_instant(data, name):
+    """(epoch seconds or None, error): an ISO 8601 instant, UTC when it names no offset."""
+    value = data.get(name)
+    if value is None or value == '':
+        return None, None
+    if not isinstance(value, str):
+        return None, error_response(f'{name} must be an ISO 8601 date and time', 400)
+    try:
+        moment = datetime.fromisoformat(value.strip().replace('Z', '+00:00'))
+    except ValueError:
+        return None, error_response(f'{name} must be an ISO 8601 date and time', 400)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return int(moment.timestamp()), None
 
 
 def _validate_ssh_sign_payload(data, *, require_pubkey):
@@ -85,6 +102,20 @@ def _validate_ssh_sign_payload(data, *, require_pubkey):
             return None, error_response(
                 f'validity_seconds must be between 60 and {_MAX_VALIDITY_SECONDS}', 400)
 
+    valid_from, err = _parse_instant(data, 'valid_from')
+    if err:
+        return None, err
+    valid_to, err = _parse_instant(data, 'valid_to')
+    if err:
+        return None, err
+    if valid_from is not None and valid_to is None:
+        return None, error_response('valid_to is required with valid_from', 400)
+    if valid_to is not None and validity_seconds is not None:
+        return None, error_response(
+            'validity_seconds cannot be combined with valid_from or valid_to', 400)
+    if valid_from is not None and valid_to is not None and valid_to <= valid_from:
+        return None, error_response('valid_to must be after valid_from', 400)
+
     key_id = data.get('key_id')
     if key_id is not None:
         if not isinstance(key_id, str):
@@ -129,10 +160,28 @@ def _validate_ssh_sign_payload(data, *, require_pubkey):
         'cert_type': cert_type,
         'principals': principals,
         'validity_seconds': validity_seconds,
+        'valid_from': valid_from,
+        'valid_to': valid_to,
         'key_id': key_id,
         'extensions': extensions,
         'critical_options': critical_options,
     }, None
+
+
+
+def _listed(names):
+    """'a', 'a and b', 'a, b and c'."""
+    return names[0] if len(names) == 1 else ', '.join(names[:-1]) + ' and ' + names[-1]
+
+_SORT_COLUMNS = {
+    'id': SSHCertificate.id,
+    'key_id': SSHCertificate.key_id,
+    'cert_type': SSHCertificate.cert_type,
+    'serial': SSHCertificate.serial,
+    'valid_from': SSHCertificate.valid_from,
+    'valid_to': SSHCertificate.valid_to,
+    'created_at': SSHCertificate.created_at,
+}
 
 
 @bp.route('/api/v2/ssh/certificates', methods=['GET'])
@@ -187,11 +236,17 @@ def list_ssh_certificates():
             )
         )
 
-    query = query.order_by(SSHCertificate.created_at.desc())
+    # An unknown column or direction gives the default order, as on the other lists
+    sort_col = _SORT_COLUMNS.get(request.args.get('sort_by', ''), SSHCertificate.created_at)
+    if request.args.get('sort_order', 'desc').lower() == 'asc':
+        query = query.order_by(sort_col.asc(), SSHCertificate.id.asc())
+    else:
+        query = query.order_by(sort_col.desc(), SSHCertificate.id.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    shared = SSHCertificate.shared_serials()
 
     return success_response(
-        data=[cert.to_dict() for cert in pagination.items],
+        data=[cert.to_dict(shared) for cert in pagination.items],
         meta={
             'total': pagination.total,
             'page': page,
@@ -298,6 +353,8 @@ def sign_ssh_certificate():
             cert_type=validated['cert_type'],
             principals=validated['principals'],
             validity_seconds=validated['validity_seconds'],
+            valid_from=validated['valid_from'],
+            valid_to=validated['valid_to'],
             key_id=validated['key_id'],
             extensions=validated['extensions'],
             critical_options=validated['critical_options'],
@@ -329,6 +386,8 @@ def sign_ssh_certificate():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except SSHSerialConflict as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -363,6 +422,8 @@ def generate_ssh_certificate():
             principals=validated['principals'],
             key_type=key_type,
             validity_seconds=validated['validity_seconds'],
+            valid_from=validated['valid_from'],
+            valid_to=validated['valid_to'],
             key_id=validated['key_id'],
             extensions=validated['extensions'],
             critical_options=validated['critical_options'],
@@ -399,6 +460,8 @@ def generate_ssh_certificate():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except SSHSerialConflict as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -416,26 +479,44 @@ def revoke_ssh_certificate(cert_id):
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
         cert = SSHCertificateService.revoke_certificate(cert_id, reason, username)
+        others = list(getattr(cert, 'revoked_with', []))
+        through = getattr(cert, 'revoked_through', {})
+        # Each KRL entry that took a certificate, in order: a key ID may take a serial, whose holders follow
+        entries = []
+        for entry in through.values():
+            if entry not in entries:
+                entries.append(entry)
+
+        def named(entry):
+            return f"key ID '{entry['key_id']}'" if 'key_id' in entry else f"serial {entry['serial']}"
+        message = 'SSH certificate revoked'
+        if others:
+            message = (f'SSH certificate revoked with {len(others)} other certificate(s) the KRL revokes '
+                       f'with it under this CA, by ' + _listed([named(e) for e in entries]))
 
         AuditService.log_action(
             action='ssh_cert_revoked',
             resource_type='ssh_certificate',
             resource_id=str(cert.id),
             resource_name=cert.key_id,
-            details=f'SSH certificate revoked: {reason}',
+            details=f'SSH certificate revoked: {reason}' + ''.join(
+                f'; {named(e)} also revokes ' + ', '.join(f"#{o.id} '{o.key_id}'"
+                                                         for o in others if through[o.id] == e)
+                for e in entries),
             success=True,
             username=username,
         )
 
         try:
             from websocket.emitters import on_ssh_certificate_revoked
-            on_ssh_certificate_revoked(cert.id, cert.key_id, reason, username)
+            for revoked in [cert] + others:
+                on_ssh_certificate_revoked(revoked.id, revoked.key_id, reason, username)
         except Exception:
             pass
 
         return success_response(
-            data=cert.to_dict(),
-            message='SSH certificate revoked'
+            data={**cert.to_dict(), 'revoked_with': [o.id for o in others], 'revoked_by': entries},
+            message=message
         )
 
     except ValueError as e:

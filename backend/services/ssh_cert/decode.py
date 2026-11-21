@@ -7,7 +7,9 @@ from cryptography.hazmat.primitives.serialization import ssh as ssh_serializatio
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
+from services.ssh_ca_service import SSHCAService
 from utils.key_codec import refuse_eddsa_key
+from utils import ssh_serials as SSHSerials
 from .utils import SSHCertificateUtilsMixin
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,8 @@ class SSHCertificateDecodeMixin:
                 f"A certificate with serial {decoded['serial']} from this CA already exists"
             )
 
+        SSHSerials.refuse_revoked_key_id(matched_ca.id, decoded['key_id'], imported=True)
+
         principals = decoded['principals']
         cert_type = decoded['type']
 
@@ -135,8 +139,19 @@ class SSHCertificateDecodeMixin:
         )
 
         try:
+            # Explicit, so the guard does not rest on the lock the foreign key takes at the INSERT
+            SSHCAService.lock_ca(matched_ca.id)
             db.session.add(ssh_cert)
+            db.session.flush()
+            # Under the CA row, and after the write (SQLite's write lock): a revocation of
+            # the key ID that committed meanwhile is seen here
+            SSHSerials.refuse_revoked_key_id(matched_ca.id, decoded['key_id'], imported=True)
+            # The CA chose this serial outside UCM: the next one UCM gives out comes after it
+            SSHCAService.raise_serial_counter(matched_ca.id)
             db.session.commit()
+        except SSHSerials.RevokedKeyId:
+            db.session.rollback()
+            raise
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to store imported SSH certificate: {e}")

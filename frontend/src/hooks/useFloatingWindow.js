@@ -3,7 +3,6 @@
  * 
  * Extracted from FloatingHelpPanel to be shared across:
  * - FloatingHelpPanel (help system)
- * - FloatingDetailWindow (certificate/CA/trust store detail windows)
  * 
  * Features:
  * - RAF-batched transforms (zero React re-renders during drag/resize)

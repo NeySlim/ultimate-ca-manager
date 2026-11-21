@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.constants import OneLogin_Saml2_Constants
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
@@ -200,12 +201,13 @@ def _purge_expired():
     db.session.execute(delete(SAMLMessageId).where(SAMLMessageId.expires_at < utc_now()))
 
 
-def remember_request(request_id, provider_id):
-    """Record an AuthnRequest id until its response arrives or REQUEST_TTL passes."""
+def remember_request(request_id, provider_id, next_path=None):
+    """Record an AuthnRequest id, and the page to return to, until its response
+    arrives or REQUEST_TTL passes."""
     _purge_expired()
     db.session.add(SAMLMessageId(
         kind=SAMLMessageId.KIND_REQUEST, message_id=request_id,
-        provider_id=provider_id, expires_at=utc_now() + REQUEST_TTL))
+        provider_id=provider_id, expires_at=utc_now() + REQUEST_TTL, next_path=next_path))
     db.session.commit()
 
 
@@ -219,6 +221,27 @@ def request_pending(request_id, provider_id):
         SAMLMessageId.provider_id == provider_id,
         SAMLMessageId.expires_at >= utc_now(),
     ).first() is not None
+
+
+def request_next_path(request_id, provider_id):
+    """Page stored with an AuthnRequest, expired or not. Served on a redirect to /login, or after a winning take_request."""
+    if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
+        return None
+    return db.session.query(SAMLMessageId.next_path).filter(
+        SAMLMessageId.kind == SAMLMessageId.KIND_REQUEST,
+        SAMLMessageId.message_id == request_id,
+        SAMLMessageId.provider_id == provider_id,
+    ).scalar()
+
+
+def request_provider_id(request_id):
+    """The provider an AuthnRequest was sent for, expired or not; None when no row holds it."""
+    if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
+        return None
+    return db.session.query(SAMLMessageId.provider_id).filter(
+        SAMLMessageId.kind == SAMLMessageId.KIND_REQUEST,
+        SAMLMessageId.message_id == request_id,
+    ).order_by(SAMLMessageId.id).limit(1).scalar()
 
 
 def take_request(request_id, provider_id):
@@ -286,3 +309,26 @@ def clear_request_cookie(response, base):
     secure = urlsplit(base).scheme == 'https'
     response.delete_cookie(REQUEST_COOKIE, path=_cookie_path(base), secure=secure,
                            httponly=True, samesite='None' if secure else 'Lax')
+
+
+class Saml2Auth(OneLogin_Saml2_Auth):
+    """The library's Auth, also keeping each attribute's FriendlyName by Name, read from
+    the same validated assertion as the attributes: for the refusal diagnosis only."""
+
+    def store_valid_response(self, response):
+        super().store_valid_response(response)
+        names = {}
+        try:
+            for node in response._query_assertion('/saml:AttributeStatement/saml:Attribute'):
+                name, friendly = node.get('Name'), node.get('FriendlyName')
+                if name and friendly and name not in names:
+                    names[name] = friendly
+        except Exception as e:  # a diagnosis aid never fails a login
+            logger.debug(f"SAML FriendlyName not read: {type(e).__name__}")
+        self.ucm_friendly_names = names
+
+
+def attribute_friendly_names(saml_auth):
+    """``{Name: FriendlyName}`` of the last valid assertion; empty when not known."""
+    names = getattr(saml_auth, 'ucm_friendly_names', None)
+    return names if isinstance(names, dict) else {}

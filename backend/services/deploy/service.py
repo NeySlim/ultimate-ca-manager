@@ -18,7 +18,8 @@ from models import (
     CRLDeployBinding, DeployDelivery,
 )
 from security.encryption import encrypt_text, decrypt_text
-from utils.datetime_utils import utc_now
+# next_attempt_at is due time and claim lease alike: one clock for every node
+from services.scheduler_leader import cluster_utc_now
 from utils.export_options import json_boolean
 from utils.key_codec import load_pem_bytes
 from services.deploy import ssh as deploy_ssh
@@ -225,7 +226,7 @@ class DeployService:
         to commit, as they always did: nothing has left this process yet, so
         there is no record that has to outlive the request.
         """
-        now = utc_now()
+        now = cluster_utc_now()
         binding_type = delivery.binding_type or DeployDelivery.BINDING_CERTIFICATE
         if binding_type not in (
                 DeployDelivery.BINDING_CERTIFICATE, DeployDelivery.BINDING_CRL):
@@ -425,7 +426,7 @@ class DeployService:
         if not bindings:
             return
 
-        now = utc_now()
+        now = cluster_utc_now()
         actor = (meta or {}).get('actor')
         for binding in bindings:
             db.session.add(DeployDelivery(
@@ -486,7 +487,7 @@ class DeployService:
             logger.error(f"CRL deploy enqueue skipped: {e}")
             return
 
-        now = utc_now()
+        now = cluster_utc_now()
         actor = (meta or {}).get('actor') or 'system'
         queued = 0
         for binding in bindings:
@@ -530,7 +531,7 @@ class DeployService:
     @staticmethod
     def process_pending_deliveries(limit: int = 20) -> dict:
         """Scheduler task: run due pending deliveries with backoff."""
-        now = utc_now()
+        now = cluster_utc_now()
         result = {'attempted': 0, 'delivered': 0, 'retry': 0, 'failed': 0}
         try:
             due = (DeployDelivery.query
@@ -665,9 +666,7 @@ class DeployService:
         for field in ('cert_path', 'key_path', 'fullchain_path', 'reload_command'):
             if fields.get(field):
                 raise ValueError(f'{field} does not apply to an HTTP target')
-        names = {name for source in (target.url, target.body_template)
-                 for name, _ in deploy_http.template_variables(source or '')}
-        if 'key_pem' in names and not certificate.prv:
+        if 'key_pem' in deploy_http.template_names(target) and not certificate.prv:
             raise ValueError("This certificate has no private key in UCM, "
                              "but the target's body template sends one")
 
@@ -855,7 +854,7 @@ class DeployService:
             binding_id=binding.id,
             event_type='initial',
             status=DeployDelivery.STATUS_PENDING,
-            next_attempt_at=utc_now(),
+            next_attempt_at=cluster_utc_now(),
             max_attempts=DeployService.DEFAULT_MAX_ATTEMPTS,
             triggered_by=actor,
         )
@@ -871,7 +870,7 @@ class DeployService:
             binding_type=DeployDelivery.BINDING_CRL,
             event_type='initial',
             status=DeployDelivery.STATUS_PENDING,
-            next_attempt_at=utc_now(),
+            next_attempt_at=cluster_utc_now(),
             max_attempts=DeployService.DEFAULT_MAX_ATTEMPTS,
             triggered_by=actor,
         )
@@ -893,7 +892,7 @@ class DeployService:
         if not binding.enabled or not binding.target or not binding.target.enabled:
             return None
 
-        now = utc_now()
+        now = cluster_utc_now()
         pending = DeployDelivery.query.filter_by(
             binding_id=binding.id,
             binding_type=binding_type,

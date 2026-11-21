@@ -21,9 +21,11 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from models import CA, SystemConfig, db
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 OPENSSL = shutil.which('openssl')
 TST_INFO_OID = '1.2.840.113549.1.9.16.1.4'
@@ -163,7 +165,7 @@ def _issue(auth_client, ca, **body):
 
 @pytest.fixture
 def tsa_settings(app):
-    keys = ('tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid')
+    keys = ('tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid', 'tsa_require_dedicated_cert')
     with app.app_context():
         saved = {k: getattr(SystemConfig.query.filter_by(key=k).first(), 'value', None) for k in keys}
     yield
@@ -175,7 +177,8 @@ def tsa_settings(app):
 
 def _enable(app, **values):
     with app.app_context():
-        for key, value in {'tsa_enabled': 'true', **values}.items():
+        # The CA-certificate signer is the compatibility mode: these tests turn it on explicitly
+        for key, value in {'tsa_enabled': 'true', 'tsa_require_dedicated_cert': 'false', **values}.items():
             row = SystemConfig.query.filter_by(key=key).first() or SystemConfig(key=key)
             row.value = value
             db.session.add(row)

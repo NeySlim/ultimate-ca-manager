@@ -7,6 +7,9 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _key_pem(key):
@@ -92,7 +95,7 @@ def test_opnsense_import_uses_refid_and_links_cert_caref(app, auth_client, monke
 
     r = auth_client.post('/api/v2/import/opnsense/import',
                          data=json.dumps({
-                             "host": "192.168.1.254",
+                             "host": "192.0.2.10",
                              "port": 443,
                              "api_key": "key",
                              "api_secret": "secret",
@@ -148,7 +151,7 @@ def test_opnsense_ca_import_requires_write_cas(app, auth_client, monkeypatch):
     r = client.post(
         '/api/v2/import/opnsense/import',
         data=json.dumps({
-            "host": "192.168.1.254",
+            "host": "192.0.2.10",
             "port": 443,
             "api_key": "key",
             "api_secret": "secret",
@@ -187,7 +190,7 @@ def test_opnsense_test_defaults_to_verify_ssl_true(app, auth_client, monkeypatch
     r = auth_client.post(
         '/api/v2/import/opnsense/test',
         data=json.dumps({
-            "host": "192.168.1.254",
+            "host": "192.0.2.10",
             "port": 443,
             "api_key": "key",
             "api_secret": "secret",
@@ -207,7 +210,7 @@ def test_opnsense_import_defaults_to_verify_ssl_true(app, auth_client, monkeypat
     r = auth_client.post(
         '/api/v2/import/opnsense/import',
         data=json.dumps({
-            "host": "192.168.1.254",
+            "host": "192.0.2.10",
             "port": 443,
             "api_key": "key",
             "api_secret": "secret",
@@ -241,7 +244,7 @@ def test_opnsense_test_tls_failure_names_the_certificate(app, auth_client, monke
     r = auth_client.post(
         '/api/v2/import/opnsense/test',
         data=json.dumps({
-            "host": "192.168.1.254",
+            "host": "192.0.2.10",
             "port": 443,
             "api_key": "key",
             "api_secret": "secret",
@@ -265,7 +268,7 @@ def test_opnsense_import_tls_failure_names_the_certificate(app, auth_client, mon
     r = auth_client.post(
         '/api/v2/import/opnsense/import',
         data=json.dumps({
-            "host": "192.168.1.254",
+            "host": "192.0.2.10",
             "port": 443,
             "api_key": "key",
             "api_secret": "secret",
@@ -289,7 +292,7 @@ def test_opnsense_explicit_verify_ssl_false_is_honored(app, auth_client, monkeyp
     r = auth_client.post(
         '/api/v2/import/opnsense/test',
         data=json.dumps({
-            "host": "192.168.1.254",
+            "host": "192.0.2.10",
             "port": 443,
             "api_key": "key",
             "api_secret": "secret",

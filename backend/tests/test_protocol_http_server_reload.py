@@ -157,6 +157,10 @@ def gunicorn_conf(app, monkeypatch):
     # post_worker_init replaces the handle_error of the hub: use a stand-in hub
     monkeypatch.setattr(gevent, 'get_hub', lambda: types.SimpleNamespace(handle_error=None))
     calls = []
+    # A real watcher would outlive the test and roll back the shared test connection
+    monkeypatch.setattr('services.backup.restore.invalidate.start_epoch_watcher',
+                        lambda app, interval=None: None)
+    monkeypatch.setattr('services.ws_relay.start_reader', lambda a: None)
     monkeypatch.setattr(phs, 'start_http_protocol_server',
                         lambda a, **kw: calls.append((a, kw)))
     return module, calls
@@ -169,3 +173,11 @@ def test_post_worker_init_reports_after_the_graceful_timeout(gunicorn_conf, app,
                                    log=logging.getLogger('test.worker'))
     module.post_worker_init(worker)
     assert calls[0] == (app, {'error_after': expected})
+
+
+def test_post_worker_init_leaves_no_epoch_watcher_behind_neg(gunicorn_conf):
+    import threading
+    module = gunicorn_conf[0]
+    module.post_worker_init(types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=30), log=logging.getLogger('test.worker')))
+    # A live watcher would roll back the shared test connection under later tests
+    assert [t.name for t in threading.enumerate() if t.name == 'EpochCacheWatcher'] == []

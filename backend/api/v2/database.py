@@ -18,6 +18,7 @@ from flask import Blueprint, request
 import logging
 
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from utils.response import success_response, error_response
 from services import database_admin_service as svc
 from services.database_admin.lock import (
@@ -27,7 +28,7 @@ from services.database_admin.lock import (
     pending_switch_refusal,
 )
 from services.audit_service import AuditService
-from config.settings import is_docker, restart_ucm_service
+from config.settings import Config, is_docker, restart_ucm_service
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,7 @@ def test_connection():
 
 @bp.route('/api/v2/database/switch', methods=['POST'])
 @require_auth(['admin:settings'])
+@reject_in_ha()
 def switch_backend():
     """
     Switch database backend WITHOUT migrating data.
@@ -142,7 +144,8 @@ def switch_backend():
     """
     if is_docker():
         return error_response(
-            'Switching DB in Docker is not supported. Set DATABASE_URL env var on the container.',
+            'Switching the database is not available in a container (Docker, Kubernetes). '
+            'Set the DATABASE_URL environment variable of the container.',
             400
         )
 
@@ -176,16 +179,31 @@ def _switch_backend():
         # this, the new DB has no users and the operator is locked out.
         ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
         if not ok_boot:
-            reset = (
-                ' The target now carries a schema; reset it before retrying.'
-                if boot_stats.get('target_written') else ''
-            )
+            # A transient failure is retried as it is, before or after the target was written. A
+            # step cut short otherwise resumes once its cause is corrected; accounts that failed
+            # their verification are emptied, copied and verified again; a refused plan stays refused.
+            advice, status = '', _refusal_status(boot_stats)
+            if boot_stats.get('transient'):
+                again = ('resumes the switch' if boot_stats.get('target_written')
+                         else 'starts it again')
+                advice = f' A transient failure stopped it: retrying on the same target {again}.'
+                status = 503
+            elif boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
+                if boot_stats.get('refusal') == 'verification':
+                    advice = ' The copy on the target failed its verification; retrying copies the accounts again.'
+                else:
+                    advice = ' Correct the cause above, then retry: the switch resumes on the same target.'
             return error_response(
                 'Pre-flight bootstrap failed, so the backend was not '
-                f'switched. {svc._redact_uri(boot_msg)}{reset}',
-                _refusal_status(boot_stats),
+                f'switched. {svc._redact_uri(boot_msg)}{advice}',
+                status,
             )
     else:
+        # The file DATABASE_PATH names may be left by an older release: the start must accept it
+        refusal = svc.start_refusal(f'sqlite:///{Config.DATABASE_PATH}')
+        if refusal:
+            return error_response(
+                f'The backend was not switched back to SQLite. {refusal}', 409)
         boot_msg = 'Reverting to SQLite default, no bootstrap needed'
         boot_stats = {}
 
@@ -248,6 +266,7 @@ def _undo_configuration(env_backup, reason: str, summary: str):
 
 @bp.route('/api/v2/database/migrate', methods=['POST'])
 @require_auth(['admin:settings'])
+@reject_in_ha()
 def migrate_data():
     """
     Migrate all data from current backend → target_url.
@@ -307,8 +326,8 @@ def _migrate_data():
             'restart_initiated': False,
             'docker': True,
             'next_step': (
-                'Data migrated and verified. Now update your container with '
-                '-e DATABASE_URL=<target_url> and restart it to use the new backend.'
+                'Data migrated and verified. Now set the DATABASE_URL environment variable of '
+                'the container to the target URL and restart it to use the new backend.'
             ),
         }, message='Data migrated and verified. Update container env var and restart manually.')
 

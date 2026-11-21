@@ -2,7 +2,7 @@ name: Tests & Quality Checks
 
 on:
   push:
-    branches: [main, master, develop, dev, test, 'v*', '*-dev', 'feature/**']
+    branches: [main, master, develop, dev, test, sextant, 'v*', '*-dev', 'feature/**']
     # Prose-only commits do not need the suite (no required checks on any
     # branch), except the two files tests read.
     paths:
@@ -14,6 +14,11 @@ on:
   pull_request:
     branches: [main, master, develop, dev]
   workflow_dispatch:
+    inputs:
+      ha:
+        description: 'Also run the three-node HA bench (backend/tests/ha)'
+        type: boolean
+        default: false
   schedule:
     # Nightly sequential run of dev (the default branch is main, see the job)
     - cron: '0 3 * * *'
@@ -23,11 +28,12 @@ permissions:
   security-events: write
 
 # A new push to a branch replaces the run of its previous commit, except on
-# test and main where every run is a release record: one group per commit
-# there, so nothing is cancelled or queued away
+# test and main, where every run is a release record, and on the 3.0 integration
+# branch, where a push carries the FIPS build and a manual run the sequential job:
+# one group per commit and event there, so a newer commit never cancels a run
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main') && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' }}
+  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'sextant' }}
 
 jobs:
   lint:
@@ -46,7 +52,7 @@ jobs:
           cache: 'pip'
       
       - name: Install ruff
-        run: pip install ruff==0.17.4
+        run: pip install ruff==0.17.5
 
       # Blocking: undefined names, bad star imports, syntax errors. The four
       # ignored codes are style debt tracked in backend/pyproject.toml.
@@ -87,7 +93,7 @@ jobs:
           output: 'trivy-results.sarif'
       
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
@@ -132,23 +138,32 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           cd backend
+          # A failed or empty list stops the step: pytest without files runs the whole suite
           files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 2)
           [ -n "$files" ]
           pytest -v --tb=short -n 4 --dist loadfile $files
 
   # One database for the whole suite, as a user runs it: the integration judge.
-  # Release branches, the nightly run of dev, and on demand. Not on dev pushes.
+  # Release branches, the nightly run of dev, and on demand. A schedule runs only
+  # the default branch's copy, so the 3.0 line runs it on a manual run of its
+  # integration branch instead, each push having played it in one process before.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
-    timeout-minutes: 120
+    timeout-minutes: 150
+    # On the 3.0 integration branch one run at a time: the running one finishes, the
+    # newest manual run waits and replaces any older waiting one; elsewhere one group per commit
+    concurrency:
+      group: tests-sequential-${{ github.event_name }}-${{ github.ref_name == 'sextant' && github.ref || github.sha }}
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || github.ref }}
+          # The commit of the run, not the branch tip a waiting job would find later
+          ref: ${{ github.event_name == 'schedule' && 'dev' || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -177,12 +192,13 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           cd backend
-          pytest -v --tb=short --durations=30
+          # The tests marked slow (an hour of fault scenarios) stay with the shards: this job has a time limit
+          pytest -v --tb=short --durations=30 -m "not ha and not slow"
 
-      # The same suite in random order on the nightly run: a report, not a gate.
-      # The job summary gives the seed that replays the order locally.
+      # The same suite in random order on the nightly run and on manual runs of the 3.0
+      # integration branch: a report, not a gate. The job summary gives the seed that replays the order.
       - name: Run tests in random order (report only)
-        if: ${{ !cancelled() && github.event_name == 'schedule' && steps.deterministic.outcome != 'skipped' }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
         continue-on-error: true
         timeout-minutes: 45
         env:
@@ -199,14 +215,14 @@ jobs:
           seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
           set +e
           # Inside the step timeout, so a slow run still writes its summary (exit 124).
-          timeout 40m pytest -p randomly --randomly-seed="$seed" -q --tb=line -rfE > random-order.log 2>&1
+          timeout 40m pytest -p randomly --randomly-seed="$seed" -m "not ha and not slow" -q --tb=line -rfE > random-order.log 2>&1
           status=$?
           set -e
           tail -n 60 random-order.log
           {
             echo "### Random order: seed $seed, commit $sha, pytest exit $status"
             echo
-            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed\`"
+            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed -m 'not ha and not slow'\`"
             echo
             echo "Files with failures or errors:"
             echo
@@ -305,9 +321,9 @@ jobs:
             tests/test_database_migration_matrix.py \
             tests/test_database_migration_scale.py \
             tests/test_database_admin.py \
-            tests/test_migration_036.py \
-            tests/test_migration_runner_pg.py
-  
+            tests/test_migration_runner_pg.py \
+            tests/test_scep_intune_ca_lock_pg.py
+
   # The application suite on PostgreSQL, in three shards of scripts/ci/pg-app-tests.txt,
   # each with a PostgreSQL service of its own.
   test-backend-postgres-app:
@@ -394,7 +410,201 @@ jobs:
           files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 3 ../scripts/ci/pg-app-tests.txt)
           [ -n "$files" ]
           pytest --tb=short $files
-  
+
+  # The tests of a real SoftHSM token, of the system GSSAPI and of a Redis server, installed here.
+  # Selected by marker; a skip of a marked test fails the job (tests/optional_backends.py).
+  test-optional-backends:
+    name: Backend Tests (SoftHSM, GSSAPI, Redis)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev softhsm2 redis-server
+
+      # The tests start their own redis-server on a Unix socket: only the binary serves
+      - name: Stop the system Redis service
+        run: sudo systemctl stop redis-server
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install --no-deps pyjks==20.0.0
+          # The Kerberos extra at the pyspnego version of the requirements, as the image does
+          pip install "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')"
+
+      # Every token lives in the job's temporary directory, never in the system token store
+      - name: Throwaway SoftHSM configuration
+        run: |
+          mkdir -p "${{ runner.temp }}/softhsm/tokens"
+          printf '%s\n' 'directories.tokendir = ${{ runner.temp }}/softhsm/tokens' \
+            'objectstore.backend = file' 'log.level = ERROR' > "${{ runner.temp }}/softhsm2.conf"
+
+      - name: Run the SoftHSM tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          SOFTHSM2_CONF: ${{ runner.temp }}/softhsm2.conf
+          UCM_TEST_REQUIRE_SOFTHSM: '1'
+        run: |
+          cd backend
+          pytest --tb=short -rs -m needs_softhsm tests/
+
+      - name: Run the GSSAPI tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          UCM_TEST_REQUIRE_GSSAPI: '1'
+        run: |
+          cd backend
+          pytest --tb=short -rs -m needs_gssapi tests/
+
+      - name: Run the Redis tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          UCM_TEST_REQUIRE_REDIS: '1'
+        run: |
+          cd backend
+          pytest --tb=short -rs -m needs_redis tests/
+
+  # Real UCM nodes (two, then three) in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
+  # Manual only: run the workflow by hand with the `ha` input ticked. In shards
+  # (scripts/ci/ha-bench-shard.sh): the whole bench in one job outlasts the time limit.
+  test-ha-bench:
+    name: HA bench (three nodes, ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.ha
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [crash-crl, jobs, restore, rest]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ucm
+          POSTGRES_PASSWORD: ucm_ci_password
+          POSTGRES_DB: ucm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev libpq-dev postgresql-client
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U ucm && break
+            sleep 1
+          done
+
+      - name: Create the unprivileged role the bench runs as
+        env:
+          PGPASSWORD: ucm_ci_password
+        run: |
+          psql -h localhost -U ucm -d ucm_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE ucm_migtest LOGIN PASSWORD 'ucm_migtest_ci' NOSUPERUSER;
+          CREATE DATABASE ucm_migtest OWNER ucm_migtest;
+          SQL
+
+      - name: Run the HA bench
+        env:
+          UCM_TEST_HA: '1'
+          UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
+        run: |
+          cd backend
+          # A failed or empty list stops the step: pytest without files runs the whole suite
+          files=$(../scripts/ci/ha-bench-shard.sh ${{ matrix.shard }})
+          [ -n "$files" ]
+          pytest --tb=short -m ha $files
+
+  # The pytest tests that call `helm template` are skipped without helm: they run here.
+  test-helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Helm
+        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.16.3
+
+      - name: Lint and render the chart
+        run: |
+          helm lint charts/ucm
+          helm template t charts/ucm > /dev/null
+          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm --set secrets.keyEncryptionKey=K --set secrets.dbEncryptionKey=D"
+          helm lint charts/ucm $HA
+          helm template t charts/ucm $HA > /dev/null
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+
+      - name: Run the chart tests
+        run: |
+          cd backend
+          pytest --tb=short -rs tests/test_helm_ha.py tests/test_helm_db_key.py tests/test_helm_security_context.py tests/test_helm_initial_admin_password.py tests/test_no_jwt_secret_generated.py tests/test_health_ha.py tests/test_compose_ha.py tests/test_entrypoint_ha_database.py
+
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
@@ -420,7 +630,76 @@ jobs:
         run: |
           cd frontend
           npm test -- --run
+
+      - name: Lint
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Check the locale files are in sync
+        run: |
+          cd frontend
+          npm run check:i18n
   
+  # Playwright against a real instance: backend from this checkout, fresh SQLite, built
+  # interface, all set up by scripts/ci/e2e.sh (the same script runs it locally).
+  test-e2e:
+    name: End-to-end (browser)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/sextant')
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev
+
+      - name: Install backend dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install the browser's system libraries
+        run: |
+          cd frontend
+          npx playwright install-deps chromium
+
+      - name: Run the end-to-end suite
+        run: bash scripts/ci/e2e.sh
+
+      - name: Upload the report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 14
+
   build-test:
     name: Docker Build Test
     runs-on: ubuntu-latest
@@ -462,27 +741,37 @@ jobs:
           docker run -d --name ucm-test -p 8443:8443 \
             -e SECRET_KEY=test_secret_key_for_ci \
             ucm:test
-          sleep 15
-          
+          # HTTP 200 and a healthy body within the bound, or the step fails
+          if ! scripts/ci/wait-health.sh https://localhost:8443/api/v2/health 120; then
+            docker logs ucm-test
+            exit 1
+          fi
+
           echo "=== Docker Container Logs ==="
           docker logs ucm-test
           
           if docker ps | grep ucm-test; then
             echo "✅ Container is running"
-            docker exec ucm-test curl -sk https://localhost:8443/health
           else
             echo "❌ Container exited"
             exit 1
           fi
           
-          docker stop ucm-test && docker rm ucm-test
+          # A clean stop: the server received the signal and exited by itself
+          docker stop ucm-test
+          code=$(docker inspect -f '{{.State.ExitCode}}' ucm-test)
+          docker rm ucm-test
+          if [ "$code" != 0 ]; then
+            echo "❌ Container was killed on stop (exit $code)"
+            exit 1
+          fi
 
-  # Pushes to dev only: the source build is too slow for every PR
+  # Pushes to the integration and release branches: the source build is too slow for every PR
   build-test-fips:
     name: Docker Build Test (FIPS)
     runs-on: ubuntu-24.04
     needs: [test-frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/sextant' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/main')
     timeout-minutes: 60
 
     steps:

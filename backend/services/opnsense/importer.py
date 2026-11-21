@@ -4,14 +4,15 @@ OPNsense importer mixin — imports parsed CAs and certificates into UCM.
 import base64
 import json
 import logging
-import os
 import traceback
-from pathlib import Path
 from typing import Dict, List
 
+from cryptography import x509
+
 from models import db, CA, Certificate
-from services.file_regen_service import mirror_private_key
 from utils.key_codec import store_pem_bytes
+from utils.key_type import weak_ca_key_refusal
+from utils.certificate_readability import stored_pem_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +31,14 @@ class ImportMixin:
         Returns:
             Dict with import statistics.
         """
+        created = []
         stats = {
             'total': len(cas_data),
             'imported': 0,
             'skipped': 0,
             'failed': 0,
-            'errors': []
+            'errors': [],
+            'unverifiable_parents': [],
         }
 
         # Sort CAs: root CAs first, then intermediates
@@ -52,6 +55,15 @@ class ImportMixin:
                     if existing:
                         stats['skipped'] += 1
                         continue
+
+                unreadable = stored_pem_refusal(ca_data.get('crt'))
+                if unreadable:
+                    raise ValueError(f"'{ca_data.get('descr', refid)}' not imported: {unreadable}")
+
+                if ca_data.get('prv'):
+                    weak = weak_ca_key_refusal(base64.b64decode(ca_data['prv']))
+                    if weak:
+                        raise ValueError(f"'{ca_data.get('descr', refid)}' not imported: {weak}")
 
                 ca = CA(
                     refid=refid,
@@ -73,7 +85,6 @@ class ImportMixin:
 
                 if not ca_data.get('is_root', False):
                     # Chained under the stored CA whose key signed it, never a namesake
-                    from cryptography import x509
                     from services.import_service import relink_parent_caref
                     try:
                         ca.caref = relink_parent_caref(
@@ -83,29 +94,9 @@ class ImportMixin:
 
                 db.session.add(ca)
                 db.session.flush()
+                created.append(ca)
 
-                if ca_data.get('crt'):
-                    data_dir = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-                    )
-                    ca_dir = os.path.join(data_dir, "ca")
-                    os.makedirs(ca_dir, exist_ok=True)
-
-                    ca_file = os.path.join(ca_dir, f"{refid}.crt")
-                    with open(ca_file, "wb") as f:
-                        f.write(base64.b64decode(ca_data['crt']))
-
-                    if ca_data.get('prv'):
-                        private_dir = os.path.join(data_dir, "private")
-                        os.makedirs(private_dir, exist_ok=True)
-
-                        key_file = os.path.join(private_dir, f"{refid}.key")
-                        mirror_private_key(
-                            Path(key_file),
-                            base64.b64decode(ca_data['prv']),
-                            context=f"OPNsense CA {ca.id}",
-                        )
-
+                # Its files come from the insert listeners, under DATA_DIR like any CA's
                 stats['imported'] += 1
 
             except Exception as e:
@@ -113,6 +104,21 @@ class ImportMixin:
                 stats['errors'].append(f"CA {ca_data.get('refid', 'unknown')}: {e}")
                 logger.error(f"Failed to import CA: {e}")
                 traceback.print_exc()
+
+        # A CA listed before its parent finds it once the whole batch is stored
+        from services.import_service import relink_parent_caref
+        for ca in created:
+            if ca.caref or not ca.crt:
+                continue
+            try:
+                ca.caref = relink_parent_caref(
+                    x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), None, exclude_ca_id=ca.id)
+            except ValueError:
+                continue
+        # Left without a parent whose signature cannot be checked here: the one proposed
+        from services.ca import parent_confirmation
+        stats['unverifiable_parents'] = parent_confirmation.notices(
+            [ca for ca in created if not ca.caref and ca.crt])
 
         try:
             db.session.commit()
@@ -133,9 +139,9 @@ class ImportMixin:
         Returns:
             Dict with import statistics.
         """
-        from cryptography import x509
         from cryptography.hazmat.backends import default_backend
 
+        created = []
         stats = {
             'total': len(certs_data),
             'imported': 0,
@@ -154,6 +160,10 @@ class ImportMixin:
                         stats['skipped'] += 1
                         continue
 
+                unreadable = stored_pem_refusal(cert_data.get('crt'))
+                if unreadable:
+                    raise ValueError(f"'{cert_data.get('descr', refid)}' not imported: {unreadable}")
+
                 caref = cert_data.get('caref')
                 if caref:
                     ca = CA.query.filter_by(refid=caref).first()
@@ -169,6 +179,12 @@ class ImportMixin:
                         caref = signer.refid if signer else None
                     except Exception:
                         caref = None
+
+                serial = cert_data.get('serial_number', '')
+                if Certificate.stored_under(caref, serial):  # uix_certificates_ca_serial
+                    stats['skipped'] += 1
+                    stats['errors'].append(f"Cert {refid}: serial {serial} {Certificate.DUPLICATE_SERIAL}")
+                    continue
 
                 san_dns_list = []
                 san_ip_list = []
@@ -207,7 +223,7 @@ class ImportMixin:
                     cert_type=cert_data.get('type', 'server_cert'),
                     subject=cert_data.get('subject', ''),
                     issuer=cert_data.get('issuer', ''),
-                    serial_number=cert_data.get('serial_number', ''),
+                    serial_number=serial,
                     valid_from=cert_data.get('valid_from'),
                     valid_to=cert_data.get('valid_to'),
                     san_dns=json.dumps(san_dns_list) if san_dns_list else None,
@@ -222,28 +238,7 @@ class ImportMixin:
 
                 db.session.add(cert)
                 db.session.flush()
-
-                if cert_data.get('crt'):
-                    data_dir = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-                    )
-                    certs_dir = os.path.join(data_dir, "certs")
-                    os.makedirs(certs_dir, exist_ok=True)
-
-                    cert_file = os.path.join(certs_dir, f"{refid}.crt")
-                    with open(cert_file, "wb") as f:
-                        f.write(base64.b64decode(cert_data['crt']))
-
-                    if cert_data.get('prv'):
-                        private_dir = os.path.join(data_dir, "private")
-                        os.makedirs(private_dir, exist_ok=True)
-
-                        key_file = os.path.join(private_dir, f"{refid}.key")
-                        mirror_private_key(
-                            Path(key_file),
-                            base64.b64decode(cert_data['prv']),
-                            context=f"OPNsense certificate {cert.id}",
-                        )
+                created.append(cert)
 
                 stats['imported'] += 1
 
@@ -258,7 +253,11 @@ class ImportMixin:
         except Exception as e:
             db.session.rollback()
             stats['errors'].append(f"Database commit failed: {e}")
+            return stats
 
+        from services.webhook_service import emit_cert_imported
+        for cert in created:
+            emit_cert_imported(cert.to_dict(), ca_refid=cert.caref)
         return stats
 
     def full_import(self, skip_existing: bool = True) -> Dict:

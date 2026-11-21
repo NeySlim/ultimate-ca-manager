@@ -18,7 +18,7 @@ const notify = vi.hoisted(() => ({
   showConfirm: vi.fn(), showPrompt: vi.fn(),
 }))
 const perms = vi.hoisted(() => ({ write: true, del: true }))
-const windows = vi.hoisted(() => ({ openWindow: vi.fn(), closeWindow: vi.fn() }))
+const windows = vi.hoisted(() => ({ openEntity: vi.fn(), closeWindow: vi.fn() }))
 const svc = vi.hoisted(() => ({
   getAll: vi.fn(), getById: vi.fn(), rename: vi.fn(), renew: vi.fn(),
   revoke: vi.fn(), delete: vi.fn(), export: vi.fn(),
@@ -33,7 +33,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../contexts', () => ({
   useNotification: () => notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: () => {} }),
-  useWindowManager: () => ({
+  useInspector: () => ({
     ...windows, windows: [], prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: () => {},
   }),
 }))
@@ -125,7 +125,7 @@ describe('CertificatesPage row actions', () => {
   it('opens the detail window', async () => {
     const row = await renderWith(VALID)
     fireEvent.click(within(row).getByTitle('common.details'))
-    expect(windows.openWindow).toHaveBeenCalledWith('certificate', 7)
+    expect(windows.openEntity).toHaveBeenCalledWith('certificate', 7)
   })
 
   it('opens the export dialog for that row', async () => {

@@ -22,6 +22,7 @@ from utils.process_lock import (  # noqa: F401  (_local: the test suite resets i
     LockBusyError,
     _local,
     lock_depth,
+    lock_held,
     process_lock,
 )
 
@@ -58,13 +59,19 @@ def operation_lock_path() -> Path:
     return Path(Config.BACKUP_DIR) / LOCK_NAME
 
 
+def operation_lock_held() -> bool:
+    """Whether this thread holds the backup lock for real, not fail-open."""
+    return lock_held(operation_lock_path())
+
+
 def operation_lock_depth() -> int:
     """How many nested backup blocks this thread currently holds."""
     return lock_depth(operation_lock_path())
 
 
 @contextmanager
-def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup'):
+def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup',
+                          fail_open: bool = True):
     """Hold the backup lock for the duration of the block.
 
     Every path that creates, validates or deletes an archive takes this same
@@ -73,5 +80,6 @@ def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup'):
     without flock are documented on ``utils.process_lock.process_lock``.
     """
     with process_lock(operation_lock_path(), timeout=timeout, purpose=purpose,
-                      subject=_SUBJECT, busy_error=BackupBusyError):
+                      subject=_SUBJECT, busy_error=BackupBusyError,
+                      fail_open=fail_open, where='the backup directory'):
         yield

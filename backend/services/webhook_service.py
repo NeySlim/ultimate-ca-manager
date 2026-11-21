@@ -5,12 +5,14 @@ Sends HTTP notifications for certificate lifecycle events.
 import base64
 from datetime import datetime, timedelta
 from models import db, SystemConfig
-from utils.encryption import decrypt_if_needed
+from utils.encryption import SecretUnreadable, decrypt_required
 import requests
 import json
 import hmac
-import hashlib
 import logging
+
+import fips_mode
+from services.scheduler_leader import cluster_utc_now
 from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
@@ -244,11 +246,14 @@ class WebhookService:
     # Event types — certificate lifecycle
     CERT_ISSUED = 'certificate.issued'
     CERT_REVOKED = 'certificate.revoked'
+    CERT_UNHELD = 'certificate.unheld'
     CERT_RENEWED = 'certificate.renewed'
     CERT_EXPIRING = 'certificate.expiring'
     CERT_EXPIRED = 'certificate.expired'
     CERT_IMPORTED = 'certificate.imported'
     CERT_DELETED = 'certificate.deleted'
+    # A renewal left a binding on the previous certificate (services.binding_attention)
+    CERT_BINDING_LEFT_BEHIND = 'certificate.binding_left_behind'
     # CA lifecycle
     CA_CREATED = 'ca.created'
     CA_UPDATED = 'ca.updated'
@@ -273,8 +278,8 @@ class WebhookService:
     UPDATE_FAILED = 'system.update_failed'
 
     ALL_EVENTS = [
-        CERT_ISSUED, CERT_REVOKED, CERT_RENEWED, CERT_EXPIRING,
-        CERT_EXPIRED, CERT_IMPORTED, CERT_DELETED,
+        CERT_ISSUED, CERT_REVOKED, CERT_UNHELD, CERT_RENEWED, CERT_EXPIRING,
+        CERT_EXPIRED, CERT_IMPORTED, CERT_DELETED, CERT_BINDING_LEFT_BEHIND,
         CA_CREATED, CA_UPDATED, CA_DELETED,
         CSR_SUBMITTED, CSR_APPROVED, CSR_REJECTED,
         TEMPLATE_CREATED, TEMPLATE_UPDATED,
@@ -312,7 +317,7 @@ class WebhookService:
             logger.error(f"Webhook enqueue skipped ({event_type}): {e}")
             return
 
-        now = utc_now()
+        now = cluster_utc_now()  # next_attempt_at is a lease: one clock for every node
         payload_json = json.dumps(payload, default=str)
         ts = now.isoformat()
         queued = 0
@@ -359,6 +364,14 @@ class WebhookService:
     @staticmethod
     def _perform_delivery(endpoint: WebhookEndpoint, event_type: str, body_json: str):
         """Build headers, sign, and POST. Returns (ok, status_code, error)."""
+        # A stored secret this node cannot open stops the delivery: never sent unsigned or unauthenticated
+        try:
+            secret_plain = decrypt_required(endpoint.secret, f'webhook {endpoint.id} secret')
+            if endpoint._auth_token and (endpoint.auth_type or 'none').strip().lower() != 'none':
+                decrypt_required(endpoint._auth_token, f'webhook {endpoint.id} auth token')
+        except SecretUnreadable as e:
+            logger.error(str(e))
+            return False, None, str(e)
         headers = {}
         headers.update(_safe_custom_headers(endpoint.get_headers()))
         headers.update(_build_auth_header(endpoint))
@@ -367,9 +380,14 @@ class WebhookService:
             'User-Agent': 'UCM-Webhook/2.0',
             'X-UCM-Event': event_type,
         })
-        secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
         if secret_plain:
-            signature = hmac.new(secret_plain.encode(), body_json.encode(), hashlib.sha256).hexdigest()
+            # A secret saved before the switch may be short: FIPS refuses it on every module
+            try:
+                fips_mode.refuse_short_hmac_key(secret_plain.encode(), 'Webhook secret')
+            except fips_mode.FipsRestricted as e:
+                return False, None, str(e)
+            # The one-shot call: on the 3.5 module the only one its HMAC key check sees
+            signature = hmac.digest(secret_plain.encode(), body_json.encode(), 'sha256').hex()
             headers['X-UCM-Signature'] = f'sha256={signature}'
 
         from utils.ssrf_protection import safe_request_post
@@ -393,7 +411,7 @@ class WebhookService:
     def process_pending_deliveries(limit: int = 50) -> dict:
         """Scheduler task: deliver due pending webhook deliveries with backoff."""
         from models import WebhookDelivery
-        now = utc_now()
+        now = cluster_utc_now()
         result = {'attempted': 0, 'delivered': 0, 'retry': 0, 'failed': 0}
         try:
             due = (WebhookDelivery.query
@@ -515,8 +533,23 @@ def emit_cert_revoked(cert: dict, reason: str = None, ca_refid: str = None, acto
     _emit(WebhookService.CERT_REVOKED, {'certificate': cert, 'reason': reason}, ca_refid, _meta(actor, reason=reason))
 
 
+def emit_cert_unheld(cert: dict, ca_refid: str = None, actor: str = None):
+    _emit(WebhookService.CERT_UNHELD, {'certificate': cert}, ca_refid, _meta(actor))
+
+
 def emit_cert_renewed(cert: dict, ca_refid: str = None, actor: str = None):
     _emit(WebhookService.CERT_RENEWED, {'certificate': cert}, ca_refid, _meta(actor))
+
+
+def emit_cert_stored(cert: dict, old_serial, new_serial, first_event: str = None,
+                     ca_refid: str = None, actor: str = None):
+    """For a row that now holds a certificate: certificate.renewed when it held another
+    one, *first_event* (default certificate.issued) when it held none readable, nothing
+    when it held this one. Serials are compared as integers."""
+    if old_serial is None:
+        _emit(first_event or WebhookService.CERT_ISSUED, {'certificate': cert}, ca_refid, _meta(actor))
+    elif int(old_serial) != int(new_serial):
+        emit_cert_renewed(cert, ca_refid=ca_refid, actor=actor)
 
 
 def emit_cert_expiring(cert: dict, days_left: int = None, ca_refid: str = None):

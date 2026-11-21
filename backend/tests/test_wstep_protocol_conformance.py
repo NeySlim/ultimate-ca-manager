@@ -17,6 +17,10 @@ from tests.test_wstep_renew import wstep_renew_config  # noqa: F401
 from tests.test_wstep_renew_tls import _cmc_renewal, _signer_info
 from tests.test_wstep_renew_tls import _issue as _ca_issued, _post as _post_renewal, _renewal_csr
 from tests.test_wstep_renew_tls import _rst as _renewal_rst
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 PKCS7 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
 PKCS10 = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10'
@@ -142,18 +146,26 @@ def test_a_cmc_request_under_the_pkcs10_value_type_is_unwrapped(client, wstep_co
     assert cert.public_key().public_numbers() == key.public_key().public_numbers()
 
 
-def test_only_an_issue_request_type_is_served(client, wstep_config):
+def test_only_issue_and_query_token_status_are_served(client, wstep_config):
     """MS-WSTEP 3.1.4.2.1: absent or any other value MUST get a SOAP fault."""
     der = _make_csr('conf-rt.example.test')[0].public_bytes(Encoding.DER)
-    for request_type in (None, 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Renew',
-                         'http://schemas.microsoft.com/windows/pki/2009/01/enrollment/QueryTokenStatus',
-                         'urn:bogus'):
+    for request_type in (None, 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Renew', 'urn:bogus'):
         r = _post(client, _rst(der, request_type=request_type))
         assert r.status_code == 400, request_type
         reason, relates_to, _sub = _fault(r.data)
-        assert reason == 'Unsupported wst:RequestType: only Issue is served'
+        assert reason == 'Unsupported wst:RequestType: only Issue and QueryTokenStatus are served'
         assert relates_to == 'urn:uuid:conf-1'
         assert _fault_code(r.data) == 's:Sender'
+
+
+def test_query_token_status_without_request_id_is_a_fault(client, wstep_config):
+    """MS-WSTEP 3.1.4.2.1.2: an absent RequestID MUST get a SOAP fault."""
+    der = _make_csr('conf-qts.example.test')[0].public_bytes(Encoding.DER)
+    r = _post(client, _rst(der, request_type=(
+        'http://schemas.microsoft.com/windows/pki/2009/01/enrollment/QueryTokenStatus')))
+    assert r.status_code == 400
+    assert 'RequestID' in _fault(r.data)[0]
+    assert _fault_code(r.data) == 's:Sender'
 
 
 def test_an_expired_message_is_refused(client, wstep_config):

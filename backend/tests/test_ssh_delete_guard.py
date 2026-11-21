@@ -5,6 +5,7 @@ from models import db
 from models.ssh import SSHCertificate
 from utils.datetime_utils import utc_now
 from tests.test_ssh import _create_ssh_ca, _generate_test_ssh_key, post_json
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 MSG = 'Cannot delete a valid, non-revoked SSH certificate. Revoke it first.'
 

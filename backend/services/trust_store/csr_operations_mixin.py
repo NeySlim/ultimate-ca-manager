@@ -511,8 +511,8 @@ class CSROperationsMixin:
     @staticmethod
     def generate_csr(
         subject: x509.Name,
-        key_type: str = '2048',
-        digest: str = 'sha256',
+        key_type: Optional[str] = None,
+        digest: Optional[str] = None,
         san_dns: Optional[List[str]] = None,
         san_ip: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,
@@ -524,7 +524,10 @@ class CSROperationsMixin:
         """Generate a Certificate Signing Request. With *related_certificate* (A) and
         its *related_private_key*, the request carries an RFC 9763 relatedCertRequest."""
         # Generate private key
-        private_key = KeyOperationsMixin.generate_private_key(key_type)
+        # No database here: callers that know a CA, template or policy pass the resolved key
+        from utils import issuance_defaults, key_algorithms
+        private_key = KeyOperationsMixin.generate_private_key(
+            key_type or key_algorithms.get(issuance_defaults.BASELINE_ISSUE_KEY).trust_store_id)
 
         # Build CSR
         builder = x509.CertificateSigningRequestBuilder()
@@ -574,7 +577,7 @@ class CSROperationsMixin:
     def generate_ca_csr(
         subject: x509.Name,
         private_key,
-        digest: Optional[str] = 'sha256',
+        digest: Optional[str] = None,
         path_length: Optional[int] = None,
         key_usage: Optional[List[str]] = None,
     ) -> bytes:
@@ -646,8 +649,10 @@ class CSROperationsMixin:
         custom_extensions: Optional[list] = None,
         not_before: Optional[datetime] = None,
         not_after: Optional[datetime] = None,
+        before_publication=None,
     ) -> bytes:
-        """Sign a CSR with a CA. ``renewal_of``: existing certificate this
+        """Sign a CSR with a CA. ``before_publication``: called with the signed leaf before
+        anything leaves the server (the CT pre-certificate), to refuse it first. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation,
         and stand for the SAN of a CSR that carries none.
         ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
@@ -688,9 +693,11 @@ class CSROperationsMixin:
         ``extra_san``: names the operator adds to the request's own (admin
         Sign CSR only); with a request that names none, they join those its
         CN implies, a CN that is not a hostname giving no DNS name.
-        ``policy_scope``: ``{ca_id, template_id, digest_explicit}`` of the
-        issuance; the policies in that scope bind the key type and the digest
+        ``policy_scope``: ``{ca_id, template_id, digest_explicit, subject_dns}`` of
+        the issuance; the policies in that scope bind the key type and the digest
         (an implicit one yields to them). Every production caller passes it.
+        ``subject_dns``: DNS names the subject requests (ACME CN, RFC 8555 §7.4),
+        counted with the SAN's.
         ``san_template``: template whose SAN types bind the request's names;
         names implied by the subject alone are dropped instead of refused.
         ``qualification_template``: template whose qcStatements and policy OIDs
@@ -713,7 +720,8 @@ class CSROperationsMixin:
         if key_err:
             raise RequestRejected(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
-            raise RequestRejected("CSR has invalid signature")
+            from utils.csr_diagnostics import weak_csr_hash_error
+            raise RequestRejected(weak_csr_hash_error(csr) or "CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise
@@ -795,9 +803,10 @@ class CSROperationsMixin:
         check_issuer_window(ca_cert)
 
         # Issuance policies: key type and signature hash (#397)
-        from services.policy_service import (PolicyEvaluationService, PolicyViolation,
-                                             key_label_for_public_key)
+        from services.policy_service import (DnsNameCountRefused, PolicyEvaluationService, PolicyViolation,
+                                             RequestedValidityRefused, key_label_for_public_key)
         policies = []
+        window_refused = count_refused = False
         if policy_scope is not None:
             cn_attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
             policies = PolicyEvaluationService.applicable_policies(
@@ -819,7 +828,11 @@ class CSROperationsMixin:
                 (not_after - (not_before or utc_now()) - CERT_NOT_BEFORE_SKEW).total_seconds() / 86400))
         if policy_scope is not None:
             # Name count, validity ceiling and key horizons, for the protocols as for the form
-            dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
+            # Every SAN dNSName, plus each requested subject name the SAN does not already carry
+            san_dns = [n.value for n in (effective_sans or []) if isinstance(n, x509.DNSName)]
+            landed = {d.lower().rstrip('.') for d in san_dns}
+            dns_count = len(san_dns) + len({d.lower().rstrip('.') for d in policy_scope.get('subject_dns') or ()}
+                                           - landed)
             limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
                 policies, key_type=key_label_for_public_key(csr.public_key()),
                 dns_name_count=dns_count, validity_days=validity_days,
@@ -828,14 +841,18 @@ class CSROperationsMixin:
                 not_before=not_before,
                 context=policy_context, pq_hybrid=related_a is not None)
             violations = list(dict.fromkeys(list(violations) + limit_violations))
+            count_refused = bool(PolicyEvaluationService.dns_name_count_violations(policies, dns_count))
             if capped_by and not_after is not None:
+                window_refused = True
                 violations.append(f"The requested validity exceeds the {capped} days "
                                   f"allowed by policy '{capped_by}'")
             elif capped_by:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
                 validity_days = capped
         if violations:
-            raise PolicyViolation('; '.join(violations))
+            if count_refused and not window_refused:
+                raise DnsNameCountRefused('; '.join(violations), policies)
+            raise (RequestedValidityRefused if window_refused else PolicyViolation)('; '.join(violations))
 
         # Build certificate from CSR
         builder = x509.CertificateBuilder()
@@ -1291,6 +1308,8 @@ class CSROperationsMixin:
         # the web create-certificate path honored CT, so ct_required silently
         # did nothing for ACME. Never applied to intermediate CAs.
         if not issuing_ca:
+            if before_publication is not None:
+                before_publication(certificate)
             from utils.ct_client import apply_ct_policy
             certificate, _ = apply_ct_policy(certificate, ca_cert, ca_private_key)
 

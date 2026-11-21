@@ -7,7 +7,7 @@ from sqlalchemy import or_
 from models import db
 from models.acme_models import AcmeClientOrder
 from services.acme.order_lease import LEASE_DURATION
-from utils.datetime_utils import utc_now
+from services.scheduler_leader import cluster_utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,13 @@ def recover_interrupted_orders() -> int:
     renewal's own order, resumed by their own paths, and proxy orders are left as they are, and
     so is an order updated in the last 15 minutes: an instance sharing the database may be
     polling it."""
-    now = utc_now()
+    now = cluster_utc_now()  # the clock order leases are written on
     candidates = (
         AcmeClientOrder.status == 'processing', _not_proxy(), _no_live_lease(now),
         AcmeClientOrder.renewal_of_order_id.is_(None), AcmeClientOrder._pending_key.is_(None),
     )
     idle = or_(AcmeClientOrder.updated_at.is_(None), AcmeClientOrder.updated_at < now - PROCESSING_IDLE)
+    # Already conditional: a second executor matches no row once the first committed
     count = AcmeClientOrder.query.filter(*candidates, idle).update(
         {'status': 'pending', 'error_message': INTERRUPTED}, synchronize_session=False)
     db.session.commit()
@@ -93,7 +94,7 @@ def purge_stale_pending_orders() -> int:
     """Remove the orders pending for more than 7 days whose CA order has expired, or whose
     expiry is unknown."""
     from services.audit.staging import stage_audit_entry
-    now = utc_now()
+    now = cluster_utc_now()  # the clock order leases are written on
     stale = AcmeClientOrder.query.filter(
         AcmeClientOrder.status == 'pending', _not_proxy(), _no_live_lease(now),
         AcmeClientOrder.created_at < now - PENDING_KEPT,

@@ -68,6 +68,10 @@ class AcmeAccount(db.Model):
 class AcmeOrder(db.Model):
     """ACME Order - RFC 8555 Section 7.1.3"""
     __tablename__ = 'acme_orders'
+    # The dashboard queue lists the orders that failed recently (migration 139); a certificate's
+    # orders are found by certificate_id (upgrade step 157, the ACME routes, revocation)
+    __table_args__ = (db.Index('ix_acme_orders_status_created_at', 'status', 'created_at'),
+                      db.Index('ix_acme_orders_certificate_id', 'certificate_id'))
     
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
@@ -146,7 +150,8 @@ class AcmeAuthorization(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     authorization_id = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
-    order_id = db.Column(db.String(64), db.ForeignKey('acme_orders.order_id'), nullable=True)
+    # Indexed: the order purge finds an order's authorizations by it (migration 171)
+    order_id = db.Column(db.String(64), db.ForeignKey('acme_orders.order_id'), nullable=True, index=True)
     account_id = db.Column(db.String(64), db.ForeignKey('acme_accounts.account_id'), nullable=True)
     
     identifier = db.Column(db.Text, nullable=False)  # JSON of {"type": "dns", "value": "example.com"}
@@ -209,7 +214,8 @@ class AcmeChallenge(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     challenge_id = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
-    authorization_id = db.Column(db.String(64), db.ForeignKey('acme_authorizations.authorization_id'), nullable=False)
+    # Indexed: the order purge finds an authorization's challenges by it (migration 171)
+    authorization_id = db.Column(db.String(64), db.ForeignKey('acme_authorizations.authorization_id'), nullable=False, index=True)
     
     type = db.Column(db.String(20), nullable=False)  # http-01, dns-01, tls-alpn-01
     status = db.Column(db.String(20), default='pending', nullable=False)
@@ -391,8 +397,8 @@ class AcmeClientOrder(db.Model):
         db.Integer, db.ForeignKey('acme_client_accounts.id'), nullable=True, index=True
     )
     
-    # Resulting certificate (after issuance)
-    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))
+    # Resulting certificate (after issuance); indexed for the work queue (migration 139)
+    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'), index=True)
     
     # Auto-renewal settings
     renewal_enabled = db.Column(db.Boolean, default=True)
@@ -409,6 +415,9 @@ class AcmeClientOrder(db.Model):
     renewal_claimed_at = db.Column(db.DateTime)
     # JSON list of replaced certificates whose revocation the CA has not confirmed yet
     upstream_revocations = db.Column(db.Text)
+    # JSON list of {certificate_id, serial, fingerprint} a renewal moved off into a new row:
+    # still this account's. Matched by serial and SHA-256 fingerprint, the id is informative
+    replaced_certificates = db.Column(db.Text)
     # On the order a renewal opens: the order it renews
     renewal_of_order_id = db.Column(
         db.Integer, db.ForeignKey('acme_client_orders.id', ondelete='SET NULL'), nullable=True, index=True)
@@ -435,6 +444,8 @@ class AcmeClientOrder(db.Model):
     dns_provider = db.relationship('DnsProvider', back_populates='client_orders')
     certificate = db.relationship('Certificate', foreign_keys=[certificate_id])
     account = db.relationship('AcmeAccount', foreign_keys=[account_id])
+    # SQLite does not honour the link's ondelete: the ORM deletes them with the order
+    proxy_links = db.relationship('AcmeProxyChallengeLink', cascade='all, delete-orphan')
     acme_client_account = db.relationship(
         'AcmeClientAccount', foreign_keys=[acme_client_account_id]
     )
@@ -460,17 +471,57 @@ class AcmeClientOrder(db.Model):
         else:
             self._pending_key = None
 
-    @property
-    def upstream_revocations_list(self):
+    @staticmethod
+    def parse_upstream_revocations(text):
         try:
-            entries = json.loads(self.upstream_revocations) if self.upstream_revocations else []
+            entries = json.loads(text) if text else []
         except ValueError:
             return []
         return entries if isinstance(entries, list) else []
 
+    @property
+    def upstream_revocations_list(self):
+        return self.parse_upstream_revocations(self.upstream_revocations)
+
     @upstream_revocations_list.setter
     def upstream_revocations_list(self, entries):
         self.upstream_revocations = json.dumps(entries) if entries else None
+
+    @staticmethod
+    def _fingerprint(certificate) -> str:
+        return (getattr(certificate, 'thumbprint_sha256', '') or '').replace(':', '').lower()
+
+    def _replaced_entries(self) -> list:
+        try:
+            entries = json.loads(self.replaced_certificates) if self.replaced_certificates else []
+        except ValueError:
+            return []
+        return [e for e in entries if isinstance(e, dict)] if isinstance(entries, list) else []
+
+    def names_replaced(self, certificate) -> bool:
+        """Whether a renewal of this order moved off ``certificate``.
+
+        Serial and fingerprint survive a restore elsewhere; an entry without a
+        fingerprint (written before 2.253) falls back on the row number.
+        """
+        fingerprint = self._fingerprint(certificate)
+        for entry in self._replaced_entries():
+            if entry.get('serial') != certificate.serial_number:
+                continue
+            if entry.get('fingerprint') and fingerprint:
+                if entry['fingerprint'] == fingerprint:
+                    return True
+            elif entry.get('certificate_id') == certificate.id:
+                return True
+        return False
+
+    def add_replaced(self, certificate) -> None:
+        if certificate is None or self.names_replaced(certificate):
+            return
+        entries = self._replaced_entries()
+        entries.append({'certificate_id': certificate.id, 'serial': certificate.serial_number,
+                        'fingerprint': self._fingerprint(certificate) or None})
+        self.replaced_certificates = json.dumps(entries)
 
     @property
     def domains_list(self):
@@ -592,6 +643,23 @@ class AcmeClientOrder(db.Model):
     
     def __repr__(self):
         return f'<AcmeClientOrder {self.primary_domain} status={self.status}>'
+
+
+class AcmeProxyChallengeLink(db.Model):
+    """Which proxy order, identifier and authorization an upstream challenge belongs to,
+    per requester: shared by every worker and node, unlike a process cache."""
+    __tablename__ = 'acme_proxy_challenge_links'
+    # Ids never reused, as step 142 creates the table
+    __table_args__ = {'sqlite_autoincrement': True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    # SHA-256 of (challenge URL, requester account, requester thumbprint)
+    key_sha256 = db.Column(db.String(64), unique=True, nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('acme_client_orders.id', ondelete='CASCADE'),
+                         nullable=False, index=True)
+    identifier = db.Column(db.String(255))
+    authz_url = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False, index=True)
 
 
 class AcmeDomain(db.Model):

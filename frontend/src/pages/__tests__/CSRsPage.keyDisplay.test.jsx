@@ -40,8 +40,8 @@ vi.mock('../../contexts', () => ({
     showConfirm: vi.fn().mockResolvedValue(false), showPrompt: vi.fn().mockResolvedValue(null),
   }),
   useMobile: () => mobile,
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -67,7 +67,7 @@ vi.mock('../../services', () => ({
   certificatesService: { export: vi.fn() },
   casService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
   templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
-  mscaService: { getEnabled: vi.fn().mockResolvedValue({ data: [] }) },
+  mscaService: { getEnabled: vi.fn().mockResolvedValue({ data: [] }), getPendingRequests: vi.fn().mockResolvedValue({ data: [] }) },
   ekuService: { getKnown: vi.fn().mockResolvedValue({ data: { ekus: [] } }) },
 }))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))

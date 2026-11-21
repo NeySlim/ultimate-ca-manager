@@ -18,14 +18,29 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import NameOID
 
-from models import CA, ADConnectorConfig, CATemplatePin, db
+from models import CA, CATemplatePin, db
+from tests.ad_connector_support import mount_connector
 from models.certificate_template import CertificateTemplate
 from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
 from services.wstep import wstep_service
+from tests.windows_profile_support import connectors_kept, default_profile, default_realm, template_extension
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
-def _make_csr(attrs=None, common_name=None):
+# The CAs and certificates this file issues are removed after it
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """The connector rows this file deletes and rewrites are the session's: put back."""
+    with connectors_kept(app), default_realm(app, 'HAGLAND.DOMAIN'):
+        yield
+
+
+
+def _make_csr(attrs=None, common_name=None, template=None):
     """A CSR with an arbitrary subject (given as x509.NameAttribute list),
     or just a CN when ``common_name`` is given, or fully naked (no CN, no
     SAN -- what real Windows GPO machine autoenrollment submits) when
@@ -33,22 +48,16 @@ def _make_csr(attrs=None, common_name=None):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     if attrs is None and common_name is not None:
         attrs = [x509.NameAttribute(NameOID.COMMON_NAME, common_name)]
-    csr = x509.CertificateSigningRequestBuilder().subject_name(
-        x509.Name(attrs or [])
-    ).sign(key, hashes.SHA256())
-    return csr, key
+    builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(attrs or []))
+    if template is not None:
+        builder = builder.add_extension(template, critical=False)
+    return builder.sign(key, hashes.SHA256()), key
 
 
 def _configure_ad_connector(app):
     with app.app_context():
-        ADConnectorConfig.query.delete()
-        config = ADConnectorConfig(
-            server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
-            bind_dn='svc-ucm', enabled=True,
-        )
-        config.bind_password = 'irrelevant'
-        db.session.add(config)
-        db.session.commit()
+        mount_connector(server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
+                        bind_dn='svc-ucm', enabled=True)
 
 
 def _clear_pinned_templates(app):
@@ -168,7 +177,7 @@ class TestRequiredPinnedSubjectFieldsConflict:
                     extensions_template='{}', is_active=True,
                     pinned_subject_fields=json.dumps({'O': 'Acme Corp'}),
                 )
-                result = wstep_service._required_pinned_subject_fields(ca, template)
+                result = wstep_service._required_pinned_subject_fields(ca, template, profile=None)
             assert result == {'O': 'Acme Corp'}
         finally:
             _clear_pinned_templates(app)
@@ -187,7 +196,7 @@ class TestRequiredPinnedSubjectFieldsConflict:
                     {'O': 'Other Corp'}, extended_key_usage=['clientAuth'],
                 )
                 with caplog.at_level(logging.WARNING):
-                    result = wstep_service._required_pinned_subject_fields(ca, None)
+                    result = wstep_service._required_pinned_subject_fields(ca, None, profile=None)
             assert 'O' not in result
             assert result.get('C') == 'US'
             assert any('conflicting values' in r.message for r in caplog.records)
@@ -203,7 +212,7 @@ class TestRequiredPinnedSubjectFieldsConflict:
                     app, ca.id, 'Test Pinned Template',
                     {'O': 'Acme Corp', 'OU': 'IT'}, extended_key_usage=['clientAuth'],
                 )
-                result = wstep_service._required_pinned_subject_fields(ca, None)
+                result = wstep_service._required_pinned_subject_fields(ca, None, profile=None)
             assert result == {'O': 'Acme Corp', 'OU': 'IT'}
         finally:
             _clear_pinned_templates(app)
@@ -220,13 +229,13 @@ class TestPinnedSubjectFieldsIssuance:
         try:
             with app.app_context():
                 ca = db.session.get(CA, ca_data['id'])
-                _configure_pinned_template(
+                template_id = _configure_pinned_template(
                     app, ca.id, 'Test Pinned Template',
                     {'O': 'Acme Corp', 'OU': 'IT'}, extended_key_usage=['clientAuth'],
                 )
                 monkeypatch.setattr(
                     ad_lookup, 'lookup_computer_dns_hostname',
-                    lambda sam_account_name: 'win11.hagland.domain',
+                    lambda _config, sam_account_name: 'win11.hagland.domain',
                 )
                 # Kerberos-bound issuance refuses when the AD Connector is
                 # enabled but the requester SID lookup fails (KB5014754
@@ -234,12 +243,14 @@ class TestPinnedSubjectFieldsIssuance:
                 # Kerberos-bound tests do.
                 monkeypatch.setattr(
                     ad_lookup, 'lookup_object_sid',
-                    lambda sam_account_name: 'S-1-5-21-3623811015-3361044348-30300820-1105',
+                    lambda _config, sam_account_name: 'S-1-5-21-3623811015-3361044348-30300820-1105',
                 )
-                csr, _key = _make_csr()
+                # Named by the request, as GPO autoenrollment names its template
+                template = db.session.get(CertificateTemplate, template_id)
+                csr, _key = _make_csr(template=template_extension(ca, template))
                 cert_pem, err = wstep_service.issue(
                     ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                    kerberos_principal='WIN11$@HAGLAND.DOMAIN',
+                    kerberos_principal='WIN11$@HAGLAND.DOMAIN', profile=default_profile(),
                 )
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -264,7 +275,7 @@ class TestPinnedSubjectFieldsIssuance:
                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Evil Corp'),
                     x509.NameAttribute(NameOID.COMMON_NAME, 'device.hagland.domain'),
                 ])
-                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
             assert cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value == 'Acme Corp'
@@ -285,7 +296,7 @@ class TestPinnedSubjectFieldsIssuance:
                 )
                 csr, _key = _make_csr(common_name='device.hagland.domain')
                 cert_pem, err = wstep_service.issue(
-                    ca, csr.public_bytes(Encoding.DER), validity_days=30, kerberos_principal=None,
+                    ca, csr.public_bytes(Encoding.DER), validity_days=30, kerberos_principal=None, profile=None,
                 )
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -305,7 +316,7 @@ class TestPinnedSubjectFieldsIssuance:
                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Whatever Corp'),
                     x509.NameAttribute(NameOID.COMMON_NAME, 'device.hagland.domain'),
                 ])
-                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
             assert cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value == 'Whatever Corp'

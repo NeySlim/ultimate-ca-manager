@@ -9,6 +9,15 @@ from typing import Dict, List, Mapping, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Marks a failed CAA lookup (transient: retry later), never a CAA denial
+DNS_ERROR_MARKER = 'DNS error'
+
+
+def is_transient_caa_failure(message) -> bool:
+    """True when a CAA refusal is a lookup failure, not the domain's policy."""
+    return DNS_ERROR_MARKER.lower() in str(message or '').lower()
+
+
 _KNOWN_PROPERTY_TAGS = frozenset({'issue', 'issuewild', 'iodef'})
 _CRITICAL_FLAG = 128
 
@@ -107,7 +116,7 @@ def check_caa(
             # acme_caa_enforce setting restores fail-closed semantics.
             if fail_hard:
                 logger.warning("CAA DNS lookup failed for %s: %s", lookup_domain, exc)
-                return False, f"CAA DNS lookup failed (DNS error) for {lookup_domain}"
+                return False, f"CAA DNS lookup failed ({DNS_ERROR_MARKER}) for {lookup_domain}"
             logger.warning(
                 "CAA DNS lookup failed for %s (%s); treating as no CAA at "
                 "this label (soft-fail)", lookup_domain, exc,

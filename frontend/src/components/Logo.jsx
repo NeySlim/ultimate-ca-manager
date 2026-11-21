@@ -96,7 +96,7 @@ export function Logo({
           <div
             className="font-semibold uppercase"
             style={{
-              fontSize: '9px',
+              fontSize: '12px',
               letterSpacing: '2px',
               color: 'var(--text-tertiary)',
               marginTop: '2px'
@@ -125,7 +125,7 @@ export function Logo({
           <div
             className="font-semibold uppercase"
             style={{
-              fontSize: '9px',
+              fontSize: '12px',
               letterSpacing: '2px',
               color: 'var(--text-tertiary)',
               marginTop: '2px'

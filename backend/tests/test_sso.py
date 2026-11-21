@@ -12,6 +12,7 @@ import os
 import sys
 import json
 import tempfile
+from tests.sso_identity_support import legacy_user
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,8 +32,8 @@ def app():
 
     from app import create_app
     app = create_app('testing')
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
+    from tests.conftest import configure_test_app
+    configure_test_app(app)
 
     from tests.conftest import clear_admin_password_flag
     clear_admin_password_flag(app)
@@ -156,18 +157,26 @@ class TestSSOProviderCRUD:
 
     def test_update_provider_invalid_role(self, auth_client):
         """PUT /sso/providers/<id> with an unknown role → 400, role unchanged"""
-        r = auth_client.get('/api/v2/sso/providers')
-        providers = json.loads(r.data).get('data', [])
-        test_provider = next((p for p in providers if p['name'] == 'test-ldap'), None)
-        if not test_provider:
-            pytest.skip('No test provider found')
-
+        # One LDAP provider per installation: the one there, else one of this test's own
+        providers = json.loads(auth_client.get('/api/v2/sso/providers').data)['data']
+        test_provider = next((p for p in providers if p['provider_type'] == 'ldap'), None)
+        made = test_provider is None
+        if made:
+            r = auth_client.post('/api/v2/sso/providers', data=json.dumps({
+                'name': 'role-probe-ldap', 'provider_type': 'ldap', 'enabled': False,
+                'default_role': 'viewer', 'ldap_server': 'ldap.test.com', 'ldap_port': 389,
+                'ldap_base_dn': 'ou=users,dc=test', 'ldap_user_filter': '(uid={username})'}),
+                content_type='application/json')
+            assert r.status_code in (200, 201), r.data
+            test_provider = json.loads(r.data)['data']
         r = auth_client.put(f'/api/v2/sso/providers/{test_provider["id"]}',
             data=json.dumps({'default_role': 'root'}),
             content_type='application/json')
         assert r.status_code == 400
         r = auth_client.get(f'/api/v2/sso/providers/{test_provider["id"]}')
         assert json.loads(r.data)['data']['default_role'] == test_provider['default_role']
+        if made:
+            assert auth_client.delete(f'/api/v2/sso/providers/{test_provider["id"]}').status_code in (200, 204)
 
     def test_available_providers_public(self, client):
         """GET /sso/available → public endpoint, no auth"""
@@ -394,17 +403,18 @@ class TestSSOUserProvisioning:
         return provider
 
     def _ensure_user(self, app, username='sso.alice', role='admin'):
-        from models import db, User
+        from models import db, User, UserSSOIdentity
+        from tests.sso_identity_support import legacy_user
         # Not bound yet, orphaned by a deleted provider for this IdP: a kind a name matches.
         u = User.query.filter_by(username=username).first()
         if u:
             u.role = role
             u.password_hash = '!SSO_NO_PASSWORD!'
-            u.auth_source, u.sso_provider_id, u.sso_external_id = 'oauth2', None, None
-            u.sso_orphan_of = IDP_KEY
+            u.sso_identities.clear()
+            u.sso_identities.append(UserSSOIdentity(orphan_of=IDP_KEY))
             db.session.commit()
             return u
-        u = User(
+        u = legacy_user(
             username=username,
             email=f'{username}@example.test',
             full_name='Alice',
@@ -526,7 +536,6 @@ class TestSSOUserProvisioning:
             local = User(
                 username='local.bob136', email=shared, full_name='Local Bob',
                 role='admin', active=True, password_hash='hashed-local-pw',
-                auth_source='local',
             )
             db.session.add(local)
             db.session.commit()
@@ -538,7 +547,7 @@ class TestSSOUserProvisioning:
 
             assert err is None
             assert user is not None and user.username == 'sso.bob136'
-            assert user.sso_external_id == 'sub-bob-136'
+            assert [r.external_id for r in user.sso_identities] == ['sub-bob-136']
             # Both accounts coexist with the same email.
             assert User.query.filter_by(email=shared).count() == 2
 
@@ -552,7 +561,7 @@ class TestSSOUserProvisioning:
             db.session.commit()
             provider = self._make_provider(provider_type='oauth2', default_role='viewer',
                                            auto_update_users=True)
-            u = User(username='stable.user', email='old@example.test', full_name='S',
+            u = legacy_user(username='stable.user', email='old@example.test', full_name='S',
                      role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
                      auth_source='oauth2', sso_provider_id=provider.id,
                      sso_external_id='sub-stable-1')
@@ -578,7 +587,7 @@ class TestSSOUserProvisioning:
             User.query.filter(User.email == 'tofu@example.test').delete()
             db.session.commit()
             provider = self._make_provider(provider_type='oauth2', default_role='viewer')
-            linked = User(username='tofu.local', email='tofu@example.test', full_name='T',
+            linked = legacy_user(username='tofu.local', email='tofu@example.test', full_name='T',
                           role='admin', active=True, password_hash='pw',
                           auth_source='oauth2', sso_provider_id=provider.id,
                           sso_external_id=None)
@@ -591,7 +600,7 @@ class TestSSOUserProvisioning:
                 provider, 'tofu.sso', 'tofu@example.test', 'T', {'sub': 'sub-tofu', 'groups': []}
             )
             assert err is None and user.id == uid
-            assert user.sso_external_id == 'sub-tofu'
+            assert [r.external_id for r in user.sso_identities] == ['sub-tofu']
 
     def test_sso_login_adopts_linked_account_by_email(self, app):
         """#138: a linked account is adopted by email even when the SSO username
@@ -606,7 +615,7 @@ class TestSSOUserProvisioning:
 
             provider = self._make_provider(provider_type='ldap', default_role='viewer')
             # Admin linked the LOCAL account, keeping its local username 'jdoe.local'.
-            linked = User(
+            linked = legacy_user(
                 username='jdoe.local', email=email, full_name='J Doe', role='admin',
                 active=True, password_hash='hashed-local-pw',
                 auth_source='ldap', sso_provider_id=provider.id,
@@ -633,7 +642,7 @@ class TestSSOUserProvisioning:
             User.query.filter(User.email == 'Case.User@example.test').delete()
             db.session.commit()
             provider = self._make_provider(provider_type='ldap', default_role='viewer')
-            linked = User(
+            linked = legacy_user(
                 username='case.local', email='Case.User@example.test', full_name='C',
                 role='viewer', active=True, password_hash='x',
                 auth_source='ldap', sso_provider_id=provider.id,
@@ -705,7 +714,7 @@ class TestSamlStableMatch:
             from models import db, User
             User.query.filter_by(username='saml.local').delete(); db.session.commit()
             provider = self._make_provider()
-            u = User(username='saml.local', email='s@example.test', full_name='S',
+            u = legacy_user(username='saml.local', email='s@example.test', full_name='S',
                      role='admin', active=True, password_hash='!SSO_NO_PASSWORD!',
                      auth_source='saml', sso_provider_id=provider.id,
                      sso_external_id='nameid-persistent-1')
@@ -726,46 +735,38 @@ class TestLDAPRateLimiting:
     """Test LDAP brute-force protection"""
 
     def test_lockout_check_nonexistent_user(self, app):
-        """Non-existent user should not be locked"""
+        """An entry with no local account counts nothing and is not locked"""
         with app.app_context():
-            from api.v2.sso import _check_ldap_lockout
-            assert _check_ldap_lockout('nonexistent_user_xyz') is False
+            from api.v2.sso import _reserve_ldap_attempt
+            assert _reserve_ldap_attempt(None) == (None, None, None)
 
     def test_record_failed_attempts_and_lockout(self, app):
-        """After 5 failed attempts, user should be locked"""
+        """After 5 reserved attempts, user should be locked"""
         with app.app_context():
-            from api.v2.sso import (
-                _record_ldap_failed_attempt,
-                _check_ldap_lockout,
-                _clear_ldap_failed_attempts,
-            )
+            from api.v2.sso import _reserve_ldap_attempt, _clear_ldap_failed_attempts
             from models import db, User
 
-            # Use the admin user for testing
             user = User.query.filter_by(username='admin').first()
             assert user is not None
-
-            # Clear any existing lockout
             user.failed_logins = 0
             user.locked_until = None
             db.session.commit()
 
             # Default max attempts is 5
             max_attempts = 5
+            for rank in range(1, max_attempts):
+                assert _reserve_ldap_attempt(user) == (user, rank, None)
+            # The last one armed the lock: it is handed the lock it wrote
+            assert _reserve_ldap_attempt(user) == (user, max_attempts, user.locked_until)
+            assert user.locked_until is not None
 
-            # Record failures up to threshold
-            for i in range(max_attempts):
-                assert _check_ldap_lockout('admin') is False
-                _record_ldap_failed_attempt('admin')
+            # Locked now: no further attempt is counted
+            assert _reserve_ldap_attempt(user) == (user, None, None)
 
-            # Should now be locked
-            assert _check_ldap_lockout('admin') is True
+            _clear_ldap_failed_attempts(user)
+            assert _reserve_ldap_attempt(user) == (user, 1, None)
 
-            # Clear and verify unlocked
-            _clear_ldap_failed_attempts('admin')
-            assert _check_ldap_lockout('admin') is False
-
-            # Verify user state is clean
+            _clear_ldap_failed_attempts(user)
             db.session.refresh(user)
             assert user.failed_logins == 0
             assert user.locked_until is None

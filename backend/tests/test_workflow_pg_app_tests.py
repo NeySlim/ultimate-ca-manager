@@ -1,15 +1,16 @@
-"""Every test gated on UCM_TEST_APP_PG_URL runs in the CI PostgreSQL application job, and the shards lose no file."""
+"""Every test gated on UCM_TEST_APP_PG_URL runs in the CI PostgreSQL application step."""
 import fnmatch
 import pathlib
-import re
 import subprocess
 
 import pytest
-import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIST = ROOT / 'scripts' / 'ci' / 'pg-app-tests.txt'
 SHARD = ROOT / 'scripts' / 'ci' / 'shard-tests.sh'
+# Not gated on the variable, but code whose PostgreSQL branch must be exercised too
+ALSO_ON_PG = ('tests/test_discovery_recovery_ha.py', 'tests/test_health_ha.py',
+              'tests/test_migration_runner_isolation.py')
 
 
 def _step_patterns():
@@ -23,13 +24,13 @@ def _shard(k, n, *extra):
     return out.split()
 
 
-def test_pg_gated_tests_run_in_the_pg_application_job():
+def test_pg_gated_tests_run_in_the_pg_application_step():
     patterns = _step_patterns()
     assert patterns
     tests = ROOT / 'backend' / 'tests'
     gated = [f'tests/{f.name}' for f in sorted(tests.glob('test_*.py'))
              if f.name != pathlib.Path(__file__).name and 'UCM_TEST_APP_PG_URL' in f.read_text()]
-    missing = [f for f in gated if not any(fnmatch.fnmatch(f, p) for p in patterns)]
+    missing = [f for f in [*gated, *ALSO_ON_PG] if not any(fnmatch.fnmatch(f, p) for p in patterns)]
     assert not missing, missing
 
 
@@ -56,77 +57,50 @@ def test_a_listed_pattern_matching_no_file_fails_the_shard(tmp_path):
     assert run.returncode != 0 and 'no_such_file' in run.stderr
 
 
-WORKFLOW = ROOT / '.github' / 'workflows' / 'tests.yml'
-CUT_JOBS = {'test-backend': 2, 'test-backend-postgres-app': 3}
+def _sharded_jobs():
+    import yaml
+    jobs = yaml.safe_load((ROOT / '.github' / 'workflows' / 'tests.yml').read_text())['jobs']
+    found = {}
+    for name, job in jobs.items():
+        runs = [step['run'] for step in job.get('steps', []) if 'shard-tests.sh' in step.get('run', '')]
+        if runs:
+            found[name] = (job, runs)
+    return found
 
 
-def _jobs():
-    return yaml.safe_load(WORKFLOW.read_text())['jobs']
+def test_the_workflow_runs_every_shard_it_cuts():
+    jobs = _sharded_jobs()
+    assert {'test-backend', 'test-backend-postgres-app'} <= set(jobs), sorted(jobs)
+    for name, (job, runs) in jobs.items():
+        matrix = job['strategy']['matrix']
+        assert set(matrix) == {'shard'}, (name, matrix)  # no include or exclude
+        n = len(matrix['shard'])
+        assert matrix['shard'] == list(range(1, n + 1)), (name, matrix)
+        assert len(runs) == 1 and f'shard-tests.sh ${{{{ matrix.shard }}}} {n}' in runs[0], (name, runs)
 
 
-def _cut_step(job):
-    steps = [s for s in job['steps'] if 'shard-tests.sh' in s.get('run', '')]
-    assert len(steps) == 1
-    return steps[0]
-
-
-@pytest.mark.parametrize('name,n', sorted(CUT_JOBS.items()))
-def test_the_workflow_runs_every_shard_it_cuts(name, n):
-    job = _jobs()[name]
-    matrix = job['strategy']['matrix']
-    assert matrix['shard'] == list(range(1, n + 1))
-    assert 'exclude' not in matrix and 'include' not in matrix
-    calls = re.findall(r'shard-tests\.sh (\$\{\{ matrix\.shard \}\}|\S+) (\d+)', _cut_step(job)['run'])
-    assert calls and all(k == '${{ matrix.shard }}' and int(m) == n for k, m in calls)
-
-
-@pytest.fixture
-def sandbox(tmp_path):
+@pytest.mark.parametrize('job', ['test-backend', 'test-backend-postgres-app'])
+@pytest.mark.parametrize('shard_out, shard_rc, runs_pytest', [
+    ('tests/test_a.py\ntests/test_b.py\n', 0, True),
+    ('', 1, False),   # the script failed
+    ('', 0, False),   # it printed nothing: pytest would run the whole suite
+])
+def test_a_failed_or_empty_shard_list_stops_the_step(tmp_path, job, shard_out, shard_rc, runs_pytest):
+    # The step as GitHub runs it (bash -e), with stand-ins for the script and pytest
+    run = _sharded_jobs()[job][1][0].replace('${{ matrix.shard }}', '1')
     (tmp_path / 'backend').mkdir()
-    (tmp_path / 'backend' / 'tests').mkdir()
-    for f in (ROOT / 'backend' / 'tests').glob('test_*.py'):
-        (tmp_path / 'backend' / 'tests' / f.name).symlink_to(f)
-    (tmp_path / 'scripts').symlink_to(ROOT / 'scripts')
+    (tmp_path / 'scripts' / 'ci').mkdir(parents=True)
     bin_dir = tmp_path / 'bin'
     bin_dir.mkdir()
-    witness = tmp_path / 'pytest-called'
-    stub = bin_dir / 'pytest'
-    stub.write_text(f'#!/bin/sh\necho "$@" > {witness}\n')
-    stub.chmod(0o755)
-    return tmp_path, witness
-
-
-def _run_step(name, sandbox, shard):
-    tmp, _ = sandbox
-    script = _cut_step(_jobs()[name])['run'].replace('${{ matrix.shard }}', str(shard))
-    env = {'PATH': f'{tmp / "bin"}:/usr/bin:/bin', 'HOME': str(tmp)}
-    return subprocess.run(['bash', '-eo', 'pipefail', '-c', script], cwd=tmp, env=env,
-                          capture_output=True, text=True)
-
-
-@pytest.mark.parametrize('name', sorted(CUT_JOBS))
-def test_a_failing_cut_never_starts_pytest(name, sandbox):
-    run = _run_step(name, sandbox, 9)
-    assert run.returncode != 0
-    assert not sandbox[1].exists()
-
-
-@pytest.mark.parametrize('name', sorted(CUT_JOBS))
-def test_a_working_cut_hands_pytest_files(name, sandbox):
-    run = _run_step(name, sandbox, 1)
-    assert run.returncode == 0, run.stderr
-    assert 'tests/test_' in sandbox[1].read_text()
-
-
-@pytest.mark.parametrize('name', sorted(CUT_JOBS))
-def test_an_empty_cut_never_starts_pytest(name, sandbox):
-    tmp, witness = sandbox
-    for f in (tmp / 'backend' / 'tests').iterdir():
-        f.unlink()
-    (tmp / 'scripts').unlink()
-    (tmp / 'scripts' / 'ci').mkdir(parents=True)
-    (tmp / 'scripts' / 'ci' / 'shard-tests.sh').symlink_to(SHARD)
-    (tmp / 'scripts' / 'ci' / 'pg-app-tests.txt').write_text('')
-    run = _run_step(name, sandbox, 1)
-    assert run.returncode != 0
-    assert not witness.exists()
+    called = tmp_path / 'pytest-args'
+    for path, body in ((tmp_path / 'scripts' / 'ci' / 'shard-tests.sh',
+                        f'printf %s "{shard_out}"\nexit {shard_rc}\n'),
+                       (bin_dir / 'pytest', f'printf "%s\\n" "$@" > {called}\n')):
+        path.write_text('#!/bin/sh\n' + body)
+        path.chmod(0o755)
+    result = subprocess.run(['bash', '-e', '-c', run], cwd=tmp_path, capture_output=True, text=True,
+                            env={'PATH': f'{bin_dir}:/usr/bin:/bin'})
+    assert (result.returncode == 0) is runs_pytest, result.stderr
+    assert called.exists() is runs_pytest
+    if runs_pytest:
+        assert called.read_text().split()[-2:] == ['tests/test_a.py', 'tests/test_b.py']

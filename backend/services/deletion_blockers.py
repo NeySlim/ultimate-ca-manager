@@ -23,6 +23,7 @@ from typing import Iterator, Optional
 from models import CA, Certificate, db
 from models.policy import CertificatePolicy
 from utils.datetime_utils import utc_now
+from utils.revocation_reasons import HOLD_REASONS
 
 # Bulk id lists are capped so one request cannot turn into an unbounded number
 # of per-item transactions and audit entries. 100 is the cap the CA bulk routes
@@ -99,6 +100,16 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
             'Rebind or delete them first.',
             f'{scep_profiles} SCEP profile(s) issue from it',
         )
+    from models import WindowsEnrollmentProfile as Profile
+    windows_profiles = Profile.query.filter(
+        db.or_(Profile.issuing_ca_refid == ca.refid, Profile.policy_ca_refid == ca.refid)).count()
+    if windows_profiles > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete CA: {windows_profiles} Windows enrollment profile(s) use it. '
+            'Point them at another CA first.',
+            f'{windows_profiles} Windows enrollment profile(s) use it',
+        )
     from models.acme_models import AcmeDomain, AcmeLocalDomain
     acme_domains = (AcmeDomain.query.filter_by(issuing_ca_id=ca.id).count()
                     + AcmeLocalDomain.query.filter_by(issuing_ca_id=ca.id).count())
@@ -118,16 +129,7 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
             'Rescope or delete them first.',
             f'{policies} issuance policy(ies) scoped to it',
         )
-    # Kept as a bare id: SQLite may hand it to the next CA created (#426)
-    from models.system_config import SystemConfig
-    scep_default = SystemConfig.query.filter_by(key='scep_ca_id').first()
-    if scep_default and scep_default.value in (str(ca.id), ca.refid):
-        yield DeletionBlocker(
-            409,
-            'Cannot delete CA: it is the default SCEP CA. '
-            'Clear it or choose another one in the SCEP settings first.',
-            'default SCEP CA',
-        )
+    yield from _ca_setting_blockers(ca)
     from models.deploy import CRLDeployBinding
     crl_bindings = CRLDeployBinding.query.filter_by(ca_id=ca.id).count()
     if crl_bindings > 0:
@@ -136,6 +138,72 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
             f'Cannot delete CA: its CRL is deployed to {crl_bindings} target(s). '
             'Remove the CRL deployment binding(s) first.',
             f'CRL deployed to {crl_bindings} target(s)',
+        )
+
+
+# What each setting naming a CA is called, and where it is changed
+CA_SETTING_WORDING = {
+    'scep_ca_id': ('the default SCEP CA', 'the SCEP settings'),
+    'acme.issuing_ca_id': ('the default ACME issuing CA', 'the ACME settings'),
+    'est_ca_refid': ('the default EST CA', 'the EST settings'),
+    'tsa_ca_refid': ('the timestamping (TSA) CA', 'the TSA settings'),
+    'mtls_trusted_ca_id': ('the trusted CA of mTLS client certificates', 'the mTLS settings'),
+}
+
+
+def setting_names_ca(value, ca, by_number=True) -> bool:
+    """A setting value names this CA: its refid, or (number settings) what the readers' int() takes."""
+    value = (value or '').strip()
+    return bool(value) and (value == ca.refid or (by_number and _int_or_none(value) == ca.id))
+
+
+def _int_or_none(value):
+    """The number the readers' int() takes from a setting ('05' and ' +5' are 5), or None."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ca_setting_blockers(ca) -> Iterator[DeletionBlocker]:
+    """Global settings whose value names this CA, as the backup manifest declares them.
+
+    A number would pass to the next CA SQLite gives it (#426) and a refid would
+    dangle: the setting is changed first, never emptied behind the administrator.
+    """
+    import json
+    import re
+    from models.system_config import SystemConfig
+    from services.backup.manifest import CA_REFID_SETTINGS, SETTING_REFERENCES
+
+    declared = [(r, True) for r in SETTING_REFERENCES]
+    declared += [(r, False) for r in CA_REFID_SETTINGS]
+    declared = [(r, by_number) for r, by_number in declared if r.value == 'certificate_authorities']
+    # The declared settings have fixed keys (a test holds it): read those rows, not the table
+    fixed = {re.sub(r'\\(.)', r'\1', reference.pattern) for reference, _ in declared}
+    for row in SystemConfig.query.filter(SystemConfig.key.in_(fixed)).order_by(SystemConfig.key):
+        value = (row.value or '').strip()
+        for reference, by_number in declared:
+            if setting_names_ca(value, ca, by_number) and re.fullmatch(reference.pattern, row.key):
+                label, screen = CA_SETTING_WORDING.get(row.key, (f'named by the setting {row.key}', 'Settings'))
+                yield DeletionBlocker(
+                    409,
+                    f'Cannot delete CA: it is {label}. Clear it or choose another one in {screen} first.',
+                    label[4:] if label.startswith('the ') else label,
+                )
+    # est_labels maps each EST label to the refid of the CA it reaches
+    labels = SystemConfig.query.filter_by(key='est_labels').first()
+    try:
+        mapping = json.loads(labels.value) if labels and labels.value else {}
+    except ValueError:
+        mapping = {}
+    names = sorted(k for k, v in mapping.items() if v == ca.refid) if isinstance(mapping, dict) else []
+    if names:
+        yield DeletionBlocker(
+            409,
+            f"Cannot delete CA: EST label(s) {', '.join(names)} route to it. "
+            'Remove them or point them at another CA in the EST settings first.',
+            f"EST label(s) {', '.join(names)} route to it",
         )
 
 
@@ -194,6 +262,16 @@ def template_deletion_blockers(template) -> Iterator[DeletionBlocker]:
             f'Cannot delete: template is bound to {scep_count} SCEP '
             'profile(s); unbind it first',
             f'Bound to {scep_count} SCEP profile(s)',
+        )
+
+    from models import WindowsProfileTemplate
+    windows_count = WindowsProfileTemplate.query.filter_by(template_id=template_id).count()
+    if windows_count > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete: template is offered by {windows_count} Windows enrollment '
+            'profile(s); remove it from them first',
+            f'Offered by {windows_count} Windows enrollment profile(s)',
         )
 
     from services.acme import profiles as acme_profiles
@@ -300,4 +378,42 @@ def acme_account_deletion_blockers(acct, deactivate=False) -> Iterator[DeletionB
             f'Cannot {verb} the ACME account: {len(domains)} issued order(s) renew through it '
             f'({shown}). Turn off their automatic renewal in the order list, or delete them, first.',
             f'{len(domains)} issued order(s) renew through it',
+        )
+
+
+def connector_deletion_blockers(connector) -> Iterator[DeletionBlocker]:
+    """Why this Active Directory connector may not be deleted."""
+    from models import WindowsEnrollmentProfile
+    profiles = WindowsEnrollmentProfile.query.filter_by(connector_id=connector.id).count()
+    if profiles > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete the connector: {profiles} Windows enrollment profile(s) use it. '
+            'Point them at another connector first.',
+            f'{profiles} Windows enrollment profile(s) use it',
+        )
+
+
+def windows_profile_deletion_blockers(profile) -> Iterator[DeletionBlocker]:
+    """Why this Windows enrollment profile may not be deleted."""
+    if profile.is_default:
+        yield DeletionBlocker(
+            409,
+            'Cannot delete the default profile. Disable it instead.',
+            'it is the default profile',
+        )
+    now = utc_now()
+    # A held certificate may be released (RFC 5280 5.3.1), so it counts as valid
+    valid = Certificate.query.filter(
+        Certificate.windows_profile_id == profile.id,
+        db.or_(Certificate.revoked.is_(None), Certificate.revoked.is_(False),
+               Certificate.revoke_reason.in_(HOLD_REASONS)),
+        db.or_(Certificate.valid_to.is_(None), Certificate.valid_to > now),
+    ).count()
+    if valid > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete the profile: {valid} valid certificate(s) were issued through it. '
+            'Disable it instead, or revoke them first.',
+            f'{valid} valid certificate(s) were issued through it',
         )

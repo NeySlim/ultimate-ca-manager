@@ -1,10 +1,11 @@
-"""Which provider an account belongs to, and how an administrator moves it.
+"""Which providers open an account, and how an administrator attaches one.
 
-An account belongs to one provider and one stable identity (OIDC Core 1.0 §5.7:
-only ``iss`` + ``sub`` identify the End-User). Link to SSO is the explicit,
-audited way to attach any account to a provider; a sign-in never takes an
-account by name or e-mail, and never creates a second account in silence when
-one it may not open owns the presented e-mail.
+An account is opened by the providers it is attached to, each with one stable
+identity (OIDC Core 1.0 §5.7: only ``iss`` + ``sub`` identify the End-User).
+Attaching a provider is the explicit, audited way to let it open any account;
+a sign-in never takes an account by name or e-mail, and never creates a second
+account in silence when one it may not open owns the presented e-mail. The
+accounts are written as 2.254 held them and given the rows the upgrade gives.
 """
 import uuid
 
@@ -12,6 +13,7 @@ import pytest
 
 from models import db, User, AuditLog
 from models.sso import SSOProvider
+from tests.sso_identity_support import ext, identities, identity_for, legacy_user, prov, several_per_type
 
 NOPASS = '!SSO_NO_PASSWORD!'
 PREFIX = 'sb3'
@@ -46,19 +48,21 @@ def providers(app):
 
     with app.app_context():
         _cleanup()
-    a = make(name=f'{PREFIX}-a-{tag}', oauth2_issuer='https://a.example',
-             oauth2_userinfo_url='https://a.example/userinfo')
-    b = make(name=f'{PREFIX}-b-{tag}', oauth2_issuer='https://b.example',
-             oauth2_userinfo_url='https://b.example/userinfo')
-    make.a, make.b = a, b
-    yield make
-    with app.app_context():
-        _cleanup()
-        for pid in made:
-            row = db.session.get(SSOProvider, pid)
-            if row is not None:
-                db.session.delete(row)
-        db.session.commit()
+    # Two OIDC providers: what binds an account to its provider, not to its type
+    with several_per_type(app):
+        a = make(name=f'{PREFIX}-a-{tag}', oauth2_issuer='https://a.example',
+                 oauth2_userinfo_url='https://a.example/userinfo')
+        b = make(name=f'{PREFIX}-b-{tag}', oauth2_issuer='https://b.example',
+                 oauth2_userinfo_url='https://b.example/userinfo')
+        make.a, make.b = a, b
+        yield make
+        with app.app_context():
+            _cleanup()
+            for pid in made:
+                row = db.session.get(SSOProvider, pid)
+                if row is not None:
+                    db.session.delete(row)
+            db.session.commit()
 
 
 def _name():
@@ -71,7 +75,7 @@ def _add(app, **kw):
         kw.setdefault('full_name', 'N')
         kw.setdefault('role', 'operator')
         kw.setdefault('active', True)
-        u = User(**kw)
+        u = legacy_user(**kw)
         db.session.add(u)
         db.session.commit()
         return u.id
@@ -93,6 +97,28 @@ def _last_audit(app, action, name):
         return row.details if row else ''
 
 
+def _link(app, client, uid, pid, **body):
+    """What Link to SSO did in one call: attach ``pid``, or reset the identity of the
+    attachment the account already has to it."""
+    with app.app_context():
+        row = identity_for(db.session.get(User, uid), pid)
+        row_id = row.id if row is not None else None
+    if row_id is None:
+        return client.post(f'/api/v2/users/{uid}/sso-identities', json=dict(body, provider_id=pid))
+    return client.post(f'/api/v2/users/{uid}/sso-identities/{row_id}/reset')
+
+
+def _detach(app, client, uid, pid):
+    with app.app_context():
+        row_id = identity_for(db.session.get(User, uid), pid).id
+    return client.delete(f'/api/v2/users/{uid}/sso-identities/{row_id}')
+
+
+def _ok(r):
+    assert r.status_code in (200, 201), r.get_json()
+    return r
+
+
 def _count(app, **filters):
     with app.app_context():
         return User.query.filter_by(**filters).count()
@@ -104,10 +130,10 @@ def _state(app, providers, state, name):
     """An account in ``state`` with respect to provider B; returns its id."""
     a = providers.a
     if state == 'local_password':
-        return _add(app, username=name, auth_source='local', password_hash='hash-x')
+        return _add(app, username=name, password_hash='hash-x')
     if state == 'unlinked_no_password':
         # What Unlink SSO leaves on an account that never had a password.
-        return _add(app, username=name, auth_source='local', password_hash=NOPASS,
+        return _add(app, username=name, password_hash=NOPASS,
                     force_password_change=True)
     if state == 'other_provider':
         return _add(app, username=name, auth_source='oauth2', sso_provider_id=a,
@@ -136,29 +162,31 @@ def test_link_to_sso_attaches_any_account_and_the_next_sign_in_opens_it(
     uid = _state(app, providers, state, name)
     # Before: provider B refuses the name, whatever the state.
     assert _login(app, providers.b, name, {'sub': 'sub-new'}) == (None, 'sso_username_conflict')
-    r = auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': providers.b})
-    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        before = [r for r in identities(db.session.get(User, uid)) if r[0] != providers.b]
+    _ok(_link(app, auth_client, uid, providers.b))
     assert _login(app, providers.b, name, {'sub': 'sub-new'}) == (name, None)
     with app.app_context():
         u = db.session.get(User, uid)
-        assert (u.auth_source, u.sso_provider_id, u.sso_external_id, u.sso_orphan_of) == \
-            ('oauth2', providers.b, 'sub-new', None)
+        assert identity_for(u, providers.b).external_id == 'sub-new'
+        # The rows it had for other providers stay as they were
+        assert [r for r in identities(u) if r[0] != providers.b] == before
         if state == 'local_password':
             assert u.password_hash == 'hash-x'
         else:
             assert u.password_hash == NOPASS and u.force_password_change is False
     if state == 'other_provider':
-        # Moved: its former provider no longer opens it.
-        assert _login(app, providers.a, name, {'sub': 'sub-at-a'}) == (None, 'sso_username_conflict')
+        # Attached, not moved: its first provider still opens it by its own identity.
+        assert _login(app, providers.a, name, {'sub': 'sub-at-a'}) == (name, None)
 
 
 def test_relinked_account_without_password_is_not_asked_for_one(app, providers, auth_client):
-    """Unlink SSO then Link to SSO: the SSO session is not confined to a password change."""
+    """Detach the last provider, then attach one: the SSO session is not confined to a
+    password change."""
     name = _name()
     uid = _state(app, providers, 'other_provider', name)
-    assert auth_client.post(f'/api/v2/users/{uid}/unlink-sso').status_code == 200
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
+    _ok(_detach(app, auth_client, uid, providers.a))
+    _ok(_link(app, auth_client, uid, providers.b))
     assert _login(app, providers.b, name, {'sub': 'sub-b'}) == (name, None)
     # Opened after the link, which closes the sessions it finds.
     r = _open_session(app, uid, name).get('/api/v2/certificates')
@@ -186,11 +214,12 @@ def test_link_that_changes_the_owner_closes_the_account_sessions(app, providers,
     uid = _state(app, providers, state, name)
     held = _open_session(app, uid, name)
     assert held.get('/api/v2/certificates').status_code == 200
-    r = auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': providers.b})
-    assert r.status_code == 200, r.get_json()
+    r = _ok(_link(app, auth_client, uid, providers.b))
     assert held.get('/api/v2/certificates').status_code == 401
     assert auth_client.get('/api/v2/certificates').status_code == 200
-    assert 'sessions closed' in _last_audit(app, 'user_link_sso', name)
+    assert r.get_json()['meta']['other_sessions_closed'] in (1, None)
+    action = 'user_sso_reset' if state == 'same_provider_other_identity' else 'user_sso_attach'
+    assert 'other session' in _last_audit(app, action, name)
 
 
 def test_link_that_changes_nothing_keeps_the_account_sessions(app, providers, auth_client):
@@ -198,57 +227,55 @@ def test_link_that_changes_nothing_keeps_the_account_sessions(app, providers, au
     uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.b,
                sso_external_id=None, password_hash=NOPASS)
     held = _open_session(app, uid, name)
-    r = auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': providers.b})
-    assert r.status_code == 200
-    assert 'sessions closed' not in _last_audit(app, 'user_link_sso', name)
+    r = _link(app, auth_client, uid, providers.b)
+    assert r.status_code == 200 and r.get_json()['meta']['other_sessions_closed'] == 0
     assert held.get('/api/v2/certificates').status_code == 200
 
 
 def test_link_keeps_a_password_change_an_account_with_a_password_owes(app, providers, auth_client):
     name = _name()
-    uid = _add(app, username=name, auth_source='local', password_hash='hash-y',
+    uid = _add(app, username=name, password_hash='hash-y',
                force_password_change=True)
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
+    _ok(_link(app, auth_client, uid, providers.b))
     with app.app_context():
         u = db.session.get(User, uid)
         assert u.password_hash == 'hash-y' and u.force_password_change is True
 
 
 @pytest.mark.parametrize('state, origin', [
-    ('local_password', 'was a local account'),
-    ('other_provider', "was linked to provider '{a}', identity 'sub-at-a'"),
-    ('orphan_unknown_idp', 'had no provider (its IdP is unknown), identity'),
-    ('orphan_other_idp', "had no provider (orphan of 'oauth2:https://gone.example')"),
-    ('same_provider_other_identity', "identity 'sub-before' reset"),
+    ('local_password', 'before: a local account'),
+    ('other_provider', "before: provider '{a}', identity 'sub-at-a'"),
+    ('orphan_unknown_idp', 'before: no provider (its IdP is unknown), identity'),
+    ('orphan_other_idp', "before: no provider (orphan of 'oauth2:https://gone.example')"),
+    ('same_provider_other_identity', "Reset identity 'sub-before'"),
 ])
 def test_link_audit_says_where_the_account_comes_from(app, providers, auth_client, state, origin):
     with app.app_context():
         a_name = db.session.get(SSOProvider, providers.a).name
     name = _name()
     uid = _state(app, providers, state, name)
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
-    details = _last_audit(app, 'user_link_sso', name)
+    _ok(_link(app, auth_client, uid, providers.b))
+    action = 'user_sso_reset' if state == 'same_provider_other_identity' else 'user_sso_attach'
+    details = _last_audit(app, action, name)
     assert origin.format(a=a_name) in details, details
 
 
 def test_link_audit_bounds_the_former_identity(app, providers, auth_client):
     name = _name()
-    long_id = 'x' * 500
+    long_id = 'x' * 255  # the widest identity the column holds
     uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.a,
                sso_external_id=long_id, password_hash=NOPASS)
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
-    details = _last_audit(app, 'user_link_sso', name)
+    _ok(_link(app, auth_client, uid, providers.b))
+    details = _last_audit(app, 'user_sso_attach', name)
     assert 'x' * 64 in details and 'x' * 65 not in details, details
 
 
 def test_an_unlinked_account_without_password_is_still_not_taken_by_name(app, providers, auth_client):
-    """Unlink makes the account local: no provider takes it back without Link to SSO."""
+    """Detaching its last provider makes the account local: no provider takes it back
+    without being attached."""
     name = _name()
     uid = _state(app, providers, 'other_provider', name)
-    assert auth_client.post(f'/api/v2/users/{uid}/unlink-sso').status_code == 200
+    _ok(_detach(app, auth_client, uid, providers.a))
     for pid in (providers.a, providers.b):
         assert _login(app, pid, name, {'sub': 'sub-z'}) == (None, 'sso_username_conflict')
 
@@ -260,16 +287,15 @@ def test_unverified_email_of_an_admin_linked_account_is_refused_not_duplicated(
         app, providers, auth_client, flag):
     """(a) Linked by an administrator, other name, the IdP says the e-mail is unverified."""
     name, idp_name = _name(), _name()
-    uid = _add(app, username=name, email=f'{name}@corp.example', auth_source='local',
+    uid = _add(app, username=name, email=f'{name}@corp.example',
                password_hash='hash')
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
+    _ok(_link(app, auth_client, uid, providers.b))
     got = _login(app, providers.b, idp_name, {'sub': 'sub-u', 'email_verified': flag},
                  email=f'{name}@corp.example')
     assert got == (None, 'sso_email_conflict')
     assert _count(app, username=idp_name) == 0
     with app.app_context():
-        assert db.session.get(User, uid).sso_external_id is None
+        assert ext(db.session.get(User, uid)) is None
     details = _last_audit(app, 'login_failure', name)
     assert 'unverified' in details and repr(idp_name) in details, details
 
@@ -284,15 +310,14 @@ def test_unverified_email_of_an_orphan_of_this_idp_names_the_real_cause(app, pro
     assert _login(app, providers.b, idp_name, ext, email=f'{name}@corp.example') == \
         (None, 'sso_email_conflict')
     details = _last_audit(app, 'login_failure', name)
-    assert 'have the IdP verify' in details and 'Link to SSO' not in details, details
-    # The text is true: linking it changes nothing, the refusal stands.
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
+    assert 'have the IdP verify' in details and 'attach provider' not in details, details
+    # The text is true: attaching the provider changes nothing, the refusal stands.
+    _ok(_link(app, auth_client, uid, providers.b))
     assert _login(app, providers.b, idp_name, ext, email=f'{name}@corp.example') == \
         (None, 'sso_email_conflict')
 
 
-def test_unverified_email_of_an_account_of_another_provider_says_link_moves_it(app, providers):
+def test_unverified_email_of_an_account_of_another_provider_says_attach_this_one(app, providers):
     with app.app_context():
         a_name = db.session.get(SSOProvider, providers.a).name
     name, idp_name = _name(), _name()
@@ -301,8 +326,8 @@ def test_unverified_email_of_an_account_of_another_provider_says_link_moves_it(a
     assert _login(app, providers.b, idp_name, {'sub': 'sub-b', 'email_verified': False},
                   email=f'{name}@corp.example') == (None, 'sso_email_conflict')
     details = _last_audit(app, 'login_failure', name)
-    assert repr(a_name) in details and 'Link to SSO moves it' in details, details
-    assert 'have the IdP verify' not in details, details
+    assert repr(a_name) in details and 'attach provider' in details, details
+    assert 'keep opening it' in details and 'have the IdP verify' not in details, details
 
 
 def test_email_of_an_account_of_another_provider_is_refused_not_duplicated(app, providers):
@@ -316,51 +341,10 @@ def test_email_of_an_account_of_another_provider_is_refused_not_duplicated(app, 
     assert got == (None, 'sso_email_conflict')
     assert _count(app, username=idp_name) == 0
     details = _last_audit(app, 'login_failure', name)
-    assert repr(a_name) in details and 'Link to SSO' in details, details
+    assert repr(a_name) in details and 'attach provider' in details, details
 
 
-@pytest.mark.parametrize('orphan_of', ['oauth2:https://okta-gone.example', None])
-@pytest.mark.parametrize('verified', [True, False])
-def test_email_of_an_orphan_of_another_or_unknown_idp_is_refused_not_duplicated(
-        app, providers, orphan_of, verified):
-    """A provider deleted, another created, another name sent: no second account."""
-    name, idp_name = _name(), _name()
-    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
-         sso_provider_id=None, sso_orphan_of=orphan_of, sso_external_id='sub-old',
-         password_hash=NOPASS)
-    got = _login(app, providers.b, idp_name, {'sub': 'sub-new', 'email_verified': verified},
-                 email=f'{name}@corp.example')
-    assert got == (None, 'sso_email_conflict')
-    assert _count(app, username=idp_name) == 0
-    assert _count(app, email=f'{name}@corp.example') == 1
-    details = _last_audit(app, 'login_failure', name)
-    assert 'no provider' in details and 'Link to SSO attaches it' in details, details
-
-
-def test_email_of_a_bound_orphan_of_this_idp_does_not_block_another_identity(app, providers):
-    """Two identities of one IdP sharing an e-mail keep an account each, orphaned or not."""
-    name, idp_name = _name(), _name()
-    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
-         sso_provider_id=None, sso_orphan_of='oauth2:https://b.example', sso_external_id='sub-old',
-         password_hash=NOPASS)
-    assert _login(app, providers.b, idp_name, {'sub': 'sub-new'},
-                  email=f'{name}@corp.example') == (idp_name, None)
-    assert _count(app, email=f'{name}@corp.example') == 2
-
-
-def test_email_of_an_unbound_orphan_of_this_idp_is_still_taken_back(app, providers):
-    """The orphan check leaves this IdP's own orphans to the adoption that precedes it."""
-    name, idp_name = _name(), _name()
-    uid = _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
-               sso_provider_id=None, sso_orphan_of='oauth2:https://b.example',
-               sso_external_id=None, password_hash=NOPASS)
-    assert _login(app, providers.b, idp_name, {'sub': 'sub-o'},
-                  email=f'{name}@corp.example') == (name, None)
-    with app.app_context():
-        assert db.session.get(User, uid).sso_provider_id == providers.b
-
-
-def test_another_person_sharing_the_email_signs_in_once_an_account_is_created_and_linked(
+def test_another_person_sharing_the_email_signs_in_once_an_account_is_created_and_attached(
         app, providers, auth_client):
     """The remedy the refusal names for a shared mailbox: no setting, an explicit account."""
     name, idp_name = _name(), _name()
@@ -368,13 +352,13 @@ def test_another_person_sharing_the_email_signs_in_once_an_account_is_created_an
          sso_provider_id=providers.a, sso_external_id='sub-a', password_hash=NOPASS)
     assert _login(app, providers.b, idp_name, {'sub': 'sub-b'},
                   email=f'{name}@corp.example') == (None, 'sso_email_conflict')
-    assert 'link it, removing its local password' in _last_audit(app, 'login_failure', name)
+    assert 'attach this provider to it, removing its local password' in \
+        _last_audit(app, 'login_failure', name)
     r = auth_client.post('/api/v2/users', json={'username': idp_name, 'email': f'{name}@corp.example',
                                                  'password': 'Shared-Mailbox-9x!', 'role': 'viewer'})
     assert r.status_code in (200, 201), r.get_json()
     uid = r.get_json()['data']['id']
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
+    _ok(_link(app, auth_client, uid, providers.b))
     assert _login(app, providers.b, idp_name, {'sub': 'sub-b'},
                   email=f'{name}@corp.example') == (idp_name, None)
 
@@ -414,7 +398,7 @@ def test_a_provider_without_auto_create_answers_as_before_on_a_taken_email(
     entry = {'dn': f'uid={idp_name},dc=example', 'uid': str(uuid.uuid4()),
              'email': f'{name}@corp.example'}
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda _p, username, _pw: (dict(entry, username=username), None))
+                        lambda _p, username, _pw, before_bind=None: (dict(entry, username=username), None))
     r = app.test_client().post('/api/v2/sso/ldap/login',
                                json={'username': idp_name, 'password': 'pw', 'provider_id': lid})
     assert (r.status_code, r.get_json()['message']) == (401, 'Invalid credentials')
@@ -436,14 +420,12 @@ def test_link_can_remove_the_local_password_the_account_was_created_with(app, pr
         db.session.commit()
     login = {'username': idp_name, 'password': pw}
     assert app.test_client().post('/api/v2/auth/login', json=login).status_code == 200
-    r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                         json={'provider_id': providers.b, 'remove_password': True})
-    assert r.status_code == 200, r.get_json()
+    _ok(_link(app, auth_client, uid, providers.b, remove_password=True))
     with app.app_context():
         u = db.session.get(User, uid)
         assert (u.password_hash, u.force_password_change, u.password_reset_token) == \
             (NOPASS, False, None)
-    assert 'local password removed' in _last_audit(app, 'user_link_sso', idp_name)
+    assert 'local password removed' in _last_audit(app, 'user_sso_attach', idp_name)
     assert app.test_client().post('/api/v2/auth/login', json=login).status_code == 401
     assert _login(app, providers.b, idp_name, {'sub': 'sub-s'},
                   email=f'{name}@corp.example') == (idp_name, None)
@@ -451,93 +433,35 @@ def test_link_can_remove_the_local_password_the_account_was_created_with(app, pr
     assert held.status_code == 200 and not held.get_json().get('must_change_password')
 
 
-@pytest.fixture
-def mailbox(app, monkeypatch):
-    from api.v2 import auth as auth_api
-    from services.notification_service import NotificationService
-    sent = []
-    monkeypatch.setattr(auth_api, '_is_email_configured', lambda: True)
-    monkeypatch.setattr(auth_api, 'get_admin_canonical_origin', lambda: 'https://pki.example.test')
-    monkeypatch.setattr(NotificationService, 'send_email',
-                        staticmethod(lambda **kw: sent.append(kw) or True))
-    return sent
-
-
-def _forgot(app, email):
-    return app.test_client().post('/api/v2/auth/forgot-password', json={'email': email})
-
-
-def test_the_password_reset_never_gives_a_password_to_an_sso_account(
-        app, providers, auth_client, mailbox):
-    """After Link to SSO removes the password, no password door opens the account."""
-    name = _name()
-    uid = _add(app, username=name, auth_source='local', password_hash='hash-r')
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso', json={
-        'provider_id': providers.b, 'remove_password': True}).status_code == 200
-    r = _forgot(app, f'{name}@corp.example')
-    assert r.status_code == 200 and 'If an account' in r.get_json()['message']
-    assert mailbox == []
-    with app.app_context():
-        assert db.session.get(User, uid).password_reset_token is None
-
-
-def test_a_reset_token_issued_before_the_link_no_longer_sets_a_password(
-        app, providers, auth_client, mailbox):
-    name, pw = _name(), 'Reset-After-Link-9x!'
-    # What Unlink SSO leaves: no password, a change owed; the reset is its way back.
-    uid = _add(app, username=name, auth_source='local', password_hash=NOPASS,
-               force_password_change=True)
-    assert _forgot(app, f'{name}@corp.example').status_code == 200
-    token = mailbox[0]['context']['reset_url'].split('token=')[1]
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                            json={'provider_id': providers.b}).status_code == 200
-    r = app.test_client().post('/api/v2/auth/reset-password', json={'token': token, 'password': pw})
-    assert (r.status_code, r.get_json()['message']) == (400, 'Invalid or expired reset token')
-    with app.app_context():
-        assert db.session.get(User, uid).password_hash == NOPASS
-    assert app.test_client().post('/api/v2/auth/login',
-                                  json={'username': name, 'password': pw}).status_code == 401
-
-
-def test_the_reset_reaches_the_local_account_sharing_an_sso_account_email(
-        app, providers, mailbox):
-    name, other = _name(), _name()
-    email = f'{name}@corp.example'
-    _add(app, username=other, email=email, auth_source='oauth2', sso_provider_id=providers.b,
-         sso_external_id='sub-x', password_hash=NOPASS)
-    _add(app, username=name, email=email, auth_source='local', password_hash='hash-l')
-    assert _forgot(app, email).status_code == 200
-    assert [m['context']['username'] for m in mailbox] == [name]
-
-
-def test_removing_the_password_closes_sessions_of_an_account_that_does_not_move(
+def test_removing_the_password_with_an_attachment_closes_the_account_sessions(
         app, providers, auth_client):
+    """The password goes only with an attachment now; both end what the account had opened."""
     name = _name()
-    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.b,
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.a,
                sso_external_id=None, password_hash='hash-z')
     held = _open_session(app, uid, name)
-    r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                         json={'provider_id': providers.b, 'remove_password': True})
-    assert r.status_code == 200
+    r = _link(app, auth_client, uid, providers.b, remove_password=True)
+    assert r.status_code == 201 and r.get_json()['meta']['other_sessions_closed'] in (1, None)
     assert held.get('/api/v2/certificates').status_code == 401
+    with app.app_context():
+        assert db.session.get(User, uid).password_hash == NOPASS
 
 
 @pytest.mark.parametrize('value', ['yes', 1, None])
 def test_remove_password_must_be_a_boolean(app, providers, auth_client, value):
     name = _name()
-    uid = _add(app, username=name, auth_source='local', password_hash='hash-q')
-    r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                         json={'provider_id': providers.b, 'remove_password': value})
+    uid = _add(app, username=name, password_hash='hash-q')
+    r = _link(app, auth_client, uid, providers.b, remove_password=value)
     assert r.status_code == 400
     with app.app_context():
         u = db.session.get(User, uid)
-        assert (u.password_hash, u.sso_provider_id) == ('hash-q', None)
+        assert (u.password_hash, identities(u)) == ('hash-q', [])
 
 
 def test_email_of_a_local_account_still_gives_a_distinct_sso_account(app, providers):
     """E-mail is unique among local accounts only (#136): an SSO account may share it."""
     name, idp_name = _name(), _name()
-    _add(app, username=name, email=f'{name}@corp.example', auth_source='local', password_hash='hash')
+    _add(app, username=name, email=f'{name}@corp.example', password_hash='hash')
     got = _login(app, providers.b, idp_name, {'sub': 'sub-l'}, email=f'{name}@corp.example')
     assert got == (idp_name, None)
 
@@ -552,7 +476,7 @@ def test_the_ldap_door_says_the_email_conflict_without_naming_the_account(app, p
     entry = {'dn': f'uid={idp_name},dc=example', 'uid': str(uuid.uuid4()),
              'email': f'{name}@corp.example'}
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda _p, username, _pw: (dict(entry, username=username), None))
+                        lambda _p, username, _pw, before_bind=None: (dict(entry, username=username), None))
     r = app.test_client().post('/api/v2/sso/ldap/login',
                                json={'username': idp_name, 'password': 'pw', 'provider_id': lid})
     assert r.status_code == 403
@@ -564,14 +488,15 @@ def test_the_ldap_door_says_the_email_conflict_without_naming_the_account(app, p
 # ── 3. The refusal says the state of the account and what repairs it ───────
 
 @pytest.mark.parametrize('state, says', [
-    ('local_password', ['is a local account', 'Link to SSO attaches it']),
-    ('other_provider', ["is linked to provider '{a}'", 'Link to SSO moves it',
-                        "after which '{a}' no longer opens it"]),
+    ('local_password', ['is a local account', "attach provider '{b}' to the account"]),
+    ('other_provider', ["is attached to provider '{a}'", "attach provider '{b}' to the account",
+                        "the providers it is attached to keep opening it"]),
     ('same_provider_other_identity', ["bound to another identity of '{b}' ('sub-before')",
-                                      'Link to SSO resets its identity']),
-    ('orphan_unknown_idp', ['has no provider (its IdP is unknown)', 'Link to SSO attaches it']),
+                                      "reset the identity of its '{b}' attachment"]),
+    ('orphan_unknown_idp', ['has no provider (its IdP is unknown)',
+                            "attach provider '{b}' to the account"]),
     ('orphan_other_idp', ["has no provider (orphan of 'oauth2:https://gone.example')",
-                          'Link to SSO attaches it']),
+                          "attach provider '{b}' to the account"]),
 ])
 def test_name_conflict_audit_and_log_name_the_state_and_the_remedy(
         app, providers, state, says, caplog):
@@ -605,14 +530,14 @@ def test_no_rule_and_no_default_role_is_its_own_code(app, providers):
 # ── 4. Same IdP ─────────────────────────────────────────────────────────────
 
 def test_oidc_orphan_is_taken_back_under_its_exact_idp_key_only(app, providers, auth_client):
-    """OIDC Core 5.7: iss and sub together identify the user. An orphan recorded under a
-    UserInfo URL is not the issuer's: Link to SSO attaches it, a sign-in does not."""
+    """OIDC Core §5.7: iss and sub together identify the user. An orphan recorded under a
+    UserInfo URL is not the issuer's: attaching the provider lets it in, a sign-in does not."""
     name = _name()
     uid = _add(app, username=name, auth_source='oauth2', sso_orphan_of='oauth2:https://c.example/userinfo',
                sso_external_id='sub-c', password_hash=NOPASS)
     with_issuer = providers(oauth2_issuer='https://c.example', oauth2_userinfo_url='https://c.example/userinfo')
     assert _login(app, with_issuer, name, {'sub': 'sub-c'}) == (None, 'sso_username_conflict')
-    assert auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': with_issuer}).status_code == 200
+    _ok(_link(app, auth_client, uid, with_issuer))
     assert _login(app, with_issuer, name, {'sub': 'sub-c'}) == (name, None)
     # Control: the provider recorded under that same key takes its orphan back by itself
     other = _name()
@@ -676,52 +601,161 @@ def test_ldap_orphan_is_not_taken_back_through_another_host_without_a_unique_id(
         assert _login(app, same, name, data) == (name, None)
 
 
+@pytest.fixture
+def reset_mail(monkeypatch):
+    """Password reset available; the fixture lists who was sent a link."""
+    import api.v2.auth as auth_api
+    from services.notification_service import NotificationService
+    sent = []
+    monkeypatch.setattr(auth_api, '_is_email_configured', lambda: True)
+    monkeypatch.setattr(auth_api, 'get_admin_canonical_origin', lambda: 'https://ucm.example.test')
+    monkeypatch.setattr(NotificationService, 'send_email',
+                        staticmethod(lambda **kw: sent.append(kw['context']['username'])))
+    return sent
+
+
+def _forgot(app, email):
+    r = app.test_client().post('/api/v2/auth/forgot-password', json={'email': email})
+    assert r.status_code == 200 and 'If an account' in r.get_json()['message']
+
+
 @pytest.mark.parametrize('fields, sent', [
     ({'auth_source': 'oauth2', 'password_hash': NOPASS}, False),
-    ({'auth_source': 'local', 'password_hash': NOPASS, 'force_password_change': False}, False),
     ({'auth_source': 'oauth2', 'password_hash': 'kept-hash'}, True),
     ({'auth_source': 'local', 'password_hash': NOPASS, 'force_password_change': True}, True),
     ({'auth_source': 'local', 'password_hash': 'local-hash'}, True),
-], ids=['sso-no-password', 'sso-before-auth-source', 'sso-kept-password', 'unlinked', 'local'])
-def test_the_reset_link_goes_to_every_account_but_one_its_provider_alone_opens(
-        app, providers, mailbox, fields, sent):
-    """No password is handed to an account that has none and signs in through its provider;
-    one that holds a password, or was unlinked to set one, keeps the reset."""
+], ids=['sso-no-password', 'sso-kept-password', 'unlinked-no-password', 'local'])
+def test_forgot_password_sends_no_link_to_an_sso_account_without_password(
+        app, providers, reset_mail, fields, sent):
+    """An account the provider alone opens gets no password by e-mail; the answer is the same."""
     name = _name()
     if fields['auth_source'] != 'local':
         fields = dict(fields, sso_provider_id=providers.b)
     uid = _add(app, username=name, **fields)
-    r = _forgot(app, f'{name}@corp.example')
-    assert r.status_code == 200 and 'If an account' in r.get_json()['message']
-    assert [m['context']['username'] for m in mailbox] == ([name] if sent else [])
+    _forgot(app, f'{name}@corp.example')
+    assert reset_mail == ([name] if sent else [])
     with app.app_context():
         assert bool(db.session.get(User, uid).password_reset_token) is sent
 
 
-def test_the_reset_reaches_the_active_account_behind_an_inactive_one(app, providers, mailbox):
-    gone, name = _name(), _name()
-    email = f'{name}@corp.example'
-    _add(app, username=gone, email=email, auth_source='oauth2', sso_provider_id=providers.b,
-         password_hash='old-hash', active=False)
-    _add(app, username=name, email=email, auth_source='local', password_hash='hash-l')
-    assert _forgot(app, email).status_code == 200
-    assert [m['context']['username'] for m in mailbox] == [name]
+def test_forgot_password_reaches_the_local_account_that_shares_the_email(app, providers, reset_mail):
+    sso_name, local_name, email = _name(), _name(), f'{_name()}@corp.example'
+    _add(app, username=sso_name, email=email, auth_source='oauth2', sso_provider_id=providers.b,
+         password_hash=NOPASS)
+    _add(app, username=local_name, email=email, password_hash='local-hash')
+    _forgot(app, email)
+    assert reset_mail == [local_name]
+
+
+def test_a_reset_token_sets_no_password_on_an_sso_account_without_one(app, providers):
+    import hashlib
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    name, token = _name(), 'token-of-an-sso-only-account'
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.b,
+               password_hash=NOPASS, password_reset_token=hashlib.sha256(token.encode()).hexdigest(),
+               password_reset_expires=utc_now() + timedelta(hours=1))
+    r = app.test_client().post('/api/v2/auth/reset-password',
+                               json={'token': token, 'password': 'Brand-New-Passw0rd!x'})
+    assert r.status_code == 400 and r.get_json()['message'] == 'Invalid or expired reset token'
+    with app.app_context():
+        assert db.session.get(User, uid).password_hash == NOPASS
+
+
+def test_removing_the_password_forgets_a_generated_initial_password(app, providers, auth_client):
+    import json
+    from auth.initial_admin import MARKER_KEY
+    from models import SystemConfig
+    name = _name()
+    uid = _add(app, username=name, password_hash='generated-hash', role='admin')
+    with app.app_context():
+        before = SystemConfig.query.filter_by(key=MARKER_KEY).first()
+        assert before is None, 'this test owns the marker'
+        db.session.add(SystemConfig(key=MARKER_KEY, value=json.dumps({'user_id': uid})))
+        db.session.commit()
+    try:
+        _ok(_link(app, auth_client, uid, providers.b, remove_password=True))
+        with app.app_context():
+            assert SystemConfig.query.filter_by(key=MARKER_KEY).first() is None
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key=MARKER_KEY).delete()
+            db.session.commit()
 
 
 def test_an_administrator_cannot_remove_the_password_of_their_own_account(app, providers, auth_client):
     with app.app_context():
         me = User.query.filter_by(username='admin').one()
-        uid, before = me.id, (me.password_hash, me.auth_source, me.sso_provider_id)
+        uid, before = me.id, (me.password_hash, identities(me))
     try:
-        r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
-                             json={'provider_id': providers.b, 'remove_password': True})
+        r = _link(app, auth_client, uid, providers.b, remove_password=True)
         assert r.status_code == 400 and 'your own account' in r.get_json()['message']
         with app.app_context():
             me = db.session.get(User, uid)
-            assert (me.password_hash, me.auth_source, me.sso_provider_id) == before
+            assert (me.password_hash, identities(me)) == before
     finally:  # the shared admin account stays usable whatever the answer was
         with app.app_context():
             me = db.session.get(User, uid)
-            me.password_hash, me.auth_source, me.sso_provider_id = before
-            me.sso_external_id = None
+            me.password_hash = before[0]
+            me.sso_identities.clear()
             db.session.commit()
+
+
+@pytest.mark.parametrize('orphan_of', ['oauth2:https://okta-gone.example', None])
+@pytest.mark.parametrize('verified', [True, False])
+def test_email_of_an_orphan_of_another_or_unknown_idp_is_refused_not_duplicated(
+        app, providers, orphan_of, verified):
+    """A provider deleted, another created, another name sent: no second account."""
+    name, idp_name = _name(), _name()
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=None, sso_orphan_of=orphan_of, sso_external_id='sub-old',
+         password_hash=NOPASS)
+    got = _login(app, providers.b, idp_name, {'sub': 'sub-new', 'email_verified': verified},
+                 email=f'{name}@corp.example')
+    assert got == (None, 'sso_email_conflict')
+    assert _count(app, username=idp_name) == 0
+    assert _count(app, email=f'{name}@corp.example') == 1
+    details = _last_audit(app, 'login_failure', name)
+    assert 'no provider' in details and 'attach provider' in details, details
+
+
+def test_email_of_a_bound_orphan_of_this_idp_does_not_block_another_identity(app, providers):
+    """Two identities of one IdP sharing an e-mail keep an account each, orphaned or not."""
+    name, idp_name = _name(), _name()
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=None, sso_orphan_of='oauth2:https://b.example', sso_external_id='sub-old',
+         password_hash=NOPASS)
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-new'},
+                  email=f'{name}@corp.example') == (idp_name, None)
+    assert _count(app, email=f'{name}@corp.example') == 2
+
+
+def test_email_of_an_unbound_orphan_of_this_idp_is_still_taken_back(app, providers):
+    """The orphan check leaves this IdP's own orphans to the adoption that precedes it."""
+    name, idp_name = _name(), _name()
+    uid = _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+               sso_provider_id=None, sso_orphan_of='oauth2:https://b.example',
+               sso_external_id=None, password_hash=NOPASS)
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-o'},
+                  email=f'{name}@corp.example') == (name, None)
+    with app.app_context():
+        assert prov(db.session.get(User, uid)) == providers.b
+
+
+def test_forgot_password_sends_no_link_to_an_sso_account_older_than_its_auth_source(
+        app, providers, reset_mail):
+    """Local by its column, without password and owing no change: its provider alone opens it."""
+    name = _name()
+    _add(app, username=name, password_hash=NOPASS, force_password_change=False)
+    _forgot(app, f'{name}@corp.example')
+    assert reset_mail == []
+
+
+def test_forgot_password_reaches_the_active_account_behind_an_inactive_one(app, providers, reset_mail):
+    gone, name = _name(), _name()
+    email = f'{name}@corp.example'
+    _add(app, username=gone, email=email, auth_source='oauth2', sso_provider_id=providers.b,
+         password_hash='old-hash', active=False)
+    _add(app, username=name, email=email, password_hash='hash-l')
+    _forgot(app, email)
+    assert reset_mail == [name]

@@ -128,7 +128,28 @@ def message_expired(security_header, now=None):
     return when + TIMESTAMP_SKEW < now
 
 
-def build_soap_fault(reason, code='s:Receiver', relates_to=None, subcode=None):
+XSI_NS = 'http://www.w3.org/2001/XMLSchema-instance'
+
+
+def _enrollment_detail(fault, request_id, invalid_request):
+    """MS-WSTEP 3.1.4.1.3.7 CertificateEnrollmentWSDetail: no BinaryResponse
+    nor ErrorCode to give (nil), InvalidRequest true for a denied request."""
+    detail = etree.SubElement(fault, '{%s}Detail' % SOAP_NS)
+    wsdetail = etree.SubElement(detail, '{%s}CertificateEnrollmentWSDetail' % WSTEP_NS)
+    # ErrorCode nil: MS-WSTEP 3.1.4.1.3.7 allows it, AD CS sends an HRESULT
+    for name in ('BinaryResponse', 'ErrorCode'):
+        etree.SubElement(wsdetail, '{%s}%s' % (WSTEP_NS, name)).set('{%s}nil' % XSI_NS, 'true')
+    etree.SubElement(wsdetail, '{%s}InvalidRequest' % WSTEP_NS).text = \
+        'true' if invalid_request else 'false'
+    request_el = etree.SubElement(wsdetail, '{%s}RequestID' % WSTEP_NS)
+    if request_id is None:
+        request_el.set('{%s}nil' % XSI_NS, 'true')
+    else:
+        request_el.text = str(request_id)
+
+
+def build_soap_fault(reason, code='s:Receiver', relates_to=None, subcode=None,
+                     request_id=None, invalid_request=None):
     """Build a SOAP 1.2 Fault response (not a plain-text error like EST
     uses) — XML/SOAP clients parse faults specifically, and a bare HTTP
     error body would not be recognized as one. ``subcode``: a qualified
@@ -143,4 +164,6 @@ def build_soap_fault(reason, code='s:Receiver', relates_to=None, subcode=None):
     etree.SubElement(reason_el, '{%s}Text' % SOAP_NS, attrib={
         '{http://www.w3.org/XML/1998/namespace}lang': 'en'
     }).text = reason
+    if invalid_request is not None:
+        _enrollment_detail(fault, request_id, invalid_request)
     return build_envelope(fault, action=ACTION_FAULT, relates_to=relates_to)

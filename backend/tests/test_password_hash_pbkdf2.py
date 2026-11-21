@@ -11,6 +11,7 @@ from werkzeug.security import generate_password_hash
 from models import SystemConfig, User, db
 from utils.backup_codes import consume_code, hash_codes, verify_code_only
 from utils.password_hash import PASSWORD_METHOD, hash_password, verify_password
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 CONTENT_JSON = 'application/json'
 PBKDF2 = PASSWORD_METHOD + '$'
@@ -112,28 +113,26 @@ def test_the_change_password_route_stores_pbkdf2(app, fips_scrypt):
         _drop(app, uid)
 
 
-@pytest.mark.parametrize('route,key', [('/api/v2/est/config', 'est_password'),
-                                       ('/api/v2/wstep/config', 'wstep_password'),
-                                       ('/api/v2/xcep/config', 'xcep_password')])
-def test_protocol_passwords_are_pbkdf2(app, auth_client, fips_scrypt, route, key):
+@pytest.mark.parametrize('route,field,key', [('/api/v2/est/config', 'password', 'est_password'),
+                                             ('profile', 'wstep_password', 'wstep_password'),
+                                             ('profile', 'xcep_password', 'xcep_password')])
+def test_protocol_passwords_are_pbkdf2(app, auth_client, fips_scrypt, route, field, key):
+    from tests.windows_profile_support import get_config, put_default_profile, restore, snapshot
     with app.app_context():
-        row = SystemConfig.query.filter_by(key=key).first()
-        before = row.value if row else None
+        before = snapshot((key,))
     try:
-        r = auth_client.patch(route, content_type=CONTENT_JSON,
-                              data=json.dumps({'password': 'Proto-pw-789!'}))
+        if route == 'profile':
+            r = put_default_profile(auth_client, **{field: 'Proto-pw-789!'})
+        else:
+            r = auth_client.patch(route, content_type=CONTENT_JSON,
+                                  data=json.dumps({field: 'Proto-pw-789!'}))
         assert r.status_code == 200, r.data
         with app.app_context():
-            stored = SystemConfig.query.filter_by(key=key).first().value
+            stored = get_config(key)
         assert stored.startswith(PBKDF2) and verify_password(stored, 'Proto-pw-789!')
     finally:
         with app.app_context():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if before is None and row is not None:
-                db.session.delete(row)
-            elif row is not None:
-                row.value = before
-            db.session.commit()
+            restore(before)
 
 
 def test_the_salt_carries_128_bits():

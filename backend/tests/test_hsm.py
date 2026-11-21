@@ -16,7 +16,9 @@ import pytest
 import json
 import os
 import sys
-from tests.conftest import get_json, assert_success, assert_error
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
+
+pytestmark = pytest.mark.usefixtures('drop_new_config_rows')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -253,14 +255,17 @@ class TestProviderOperations:
         """Test connection to non-existent HSM fails but doesn't crash."""
         pid = self._create_provider(auth_client)
         r = auth_client.post(f'{HSM_BASE}/providers/{pid}/test')
-        # Should return 200 with failure info or 400/500 — not crash
-        assert r.status_code in (200, 400, 500)
+        # The test itself ran: its outcome is in the answer, not in the status
+        assert assert_success(r) == {'success': False, 'message': 'token_label is required'}
 
     def test_sync_provider_fails_gracefully(self, auth_client):
         """Sync with non-existent HSM fails but doesn't crash."""
         pid = self._create_provider(auth_client)
         r = auth_client.post(f'{HSM_BASE}/providers/{pid}/sync')
-        assert r.status_code in (200, 400, 500)
+        # The provider is broken on purpose: a handled failure, with no detail
+        assert_refused(r, 500, 'HSM synchronization error')
+        keys = assert_success(auth_client.get(f'{HSM_BASE}/keys?provider_id={pid}'))
+        assert not keys
 
 
 # ============================================================

@@ -21,6 +21,8 @@ from cryptography.x509 import ocsp
 from models import CA, Certificate, SystemConfig, db
 from utils.signing_hash import pss_algorithm_identifier
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 OPENSSL = shutil.which('openssl')
 PSS_SHA256 = pss_algorithm_identifier(hashes.SHA256()).dump()
 
@@ -161,7 +163,8 @@ def test_timestamps_stay_v15_under_a_pss_ca(app, pss_ca, ca_row, tmp_path):
 
 
 def test_a_pss_ca_signing_timestamps_itself_signs_v15(app, client, pss_ca, ca_row):
-    for key, value in (('tsa_enabled', 'true'), ('tsa_ca_refid', ca_row.refid)):
+    for key, value in (('tsa_enabled', 'true'), ('tsa_ca_refid', ca_row.refid),
+                       ('tsa_require_dedicated_cert', 'false')):
         row = SystemConfig.query.filter_by(key=key).first() or SystemConfig(key=key)
         row.value = value
         db.session.add(row)
@@ -172,7 +175,8 @@ def test_a_pss_ca_signing_timestamps_itself_signs_v15(app, client, pss_ca, ca_ro
         assert tsp.TimeStampResp.load(r.data)['status']['status'].native == 'granted'
         _assert_v15_token(r.data, _cert(ca_row).public_key())
     finally:
-        SystemConfig.query.filter(SystemConfig.key.in_(['tsa_enabled', 'tsa_ca_refid'])).delete()
+        SystemConfig.query.filter(SystemConfig.key.in_(
+            ['tsa_enabled', 'tsa_ca_refid', 'tsa_require_dedicated_cert'])).delete()
         db.session.commit()
 
 

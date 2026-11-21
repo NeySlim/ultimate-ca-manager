@@ -9,74 +9,40 @@ export const helpGuides = {
 
   // ===================================================================
   dashboard: {
-    title: 'Dashboard',
+    title: 'Overview',
     content: `
 ## Overview
 
-The Dashboard is your central monitoring hub. It displays real-time metrics, charts, and alerts about your entire PKI infrastructure through customizable widgets.
+The Overview is the home page: six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state.
 
-## Widgets
+## Cards
 
-### Statistics Card
-Displays these counters:
-- **Certificates**: every certificate, expired and revoked included
-- **CAs**: Root and Intermediate Certificate Authorities
-- **CSRs**: Certificate Signing Requests awaiting signature
-- **ACME**: registered ACME accounts
-- **SSH Certificates**: shown when an SSH CA exists
+### To handle
+The six most urgent items, critical first, each linking to its record. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical). A folded tier gives the total per kind; the four renewal kinds open the certificate list.
 
-### Certificate Activity
-An area chart of the certificates issued, revoked and expired per day over the chosen period. Hover over data points to see exact counts.
+### Automation health
+Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state and, while the TSA is enabled, the state of its signer: a warning while the CA certificate signs, since those tokens do not satisfy RFC 3161. With the right to read settings, three more lines tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts.
 
-### Status Distribution
-Pie chart showing the breakdown of certificate states:
-- **Valid**: Within validity period and not revoked
-- **Expiring**: Expires within 30 days
-- **Expired**: Past the "Not After" date
-- **Revoked**: Explicitly revoked
+### Hierarchy
+The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days. Each authority opens its page.
 
-### Next Expiry
-Lists the six valid certificates that expire soonest, whatever their date. Click any certificate to navigate to its details.
+### Expiry horizon
+The expiring and expired counters, each opening its list, and the five certificates that expire next.
 
-### System Status
-Shows the health of UCM services:
-- ACME server (enabled/disabled)
-- SCEP server
-- EST protocol (enabled/disabled, assigned CA)
-- CRL auto-regeneration with CDP count
-- OCSP responder
-- TSA, SMTP and webhooks
-- Auto-renewal status
+### Compliance
+Live certificates by key algorithm and weakness: RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key. Each counter opens the matching list.
 
-The System Health panel also shows the WebSocket connection, the database, the API and the time of the last refresh.
+### Latest operations
+The five most recent operations. Without **read:audit** you only see your own events; with it, a link opens the whole trail on the Audit Logs page.
 
-### Recent Activity
-A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket. The whole feed needs **read:audit**, as the Audit Logs page does; without it you see your own events only.
+## Opening a filtered list
+Every counter that has a list opens the Certificates page filtered to exactly the certificates it counts. The filter appears as a chip above the table; remove it with its x.
 
-### Certificate Authorities
-Quick view of the latest CAs, each marked Root or Sub.
+## Choosing the cards
+Pick the **Operator**, **Manager** or **All cards** preset in the page header to choose which cards are shown. The layout is saved with your account and follows you across browsers.
 
-### Trust Store Expiry
-Trusted certificates that expire soonest.
-
-### ACME Accounts
-Lists registered ACME client accounts and their order counts.
-
-## Customization
-
-### Rearranging Widgets
-Click **Edit layout** in the page header, then drag any widget by its header to reposition it. The layout uses a responsive grid that adapts to your screen size.
-
-### Showing/Hiding Widgets
-Click **Customize** (sliders icon) in the page header, then the eye next to a widget to toggle its visibility. Hidden widgets are remembered across sessions.
-
-### Layout Persistence
-Your layout is saved in the browser, not in your account: every account that signs in from the same browser profile shares it, and another browser starts from the default layout.
-
-## Real-Time Updates
-The dashboard receives live updates via WebSocket. No manual refresh is needed: new certificates, status changes, and activity entries appear automatically.
-
-> 💡 The green dot in the sidebar shows a live WebSocket connection and disappears when it drops. Data will refresh on reconnection.
+## Refreshing
+Cards load when the page opens and reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when you return to the tab; **Refresh** reloads them all at once. While the live link is down they reload once a minute. A card in error offers **Retry**. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
 `
   },
 
@@ -133,14 +99,14 @@ Flat table with sortable columns.
 The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026. Choose RSA-3072 or larger. Under **Advanced Constraints (RFC 5280)**, permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify.
 
 ### Post-quantum CAs (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs), and the algorithm is hidden in FIPS mode.
+**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs); in FIPS mode only a software key is offered, when the FIPS module approves ML-DSA (the \`-fips\` Docker image does, RHEL 9 and Ubuntu 24.04 do not).
 
 - An ML-DSA key signs without a separate digest: the digest field disappears, and a digest sent through the API is ignored with a notice. CRLs and OCSP responses of the CA follow the same rule.
 - Hierarchies can mix: an ML-DSA root can sign an RSA or EC intermediate, and an RSA or EC CA can sign an ML-DSA intermediate, which then uses its parent's digest.
 - An ML-DSA CA exports as PEM or DER, not as PKCS#12 or JKS. Clients without ML-DSA support (OpenSSL before 3.5, most browsers today) cannot verify what it signs.
 
 ### EdDSA CAs (Ed25519, Ed448)
-**Ed25519** and **Ed448** keys can be generated for a root, intermediate or external CA, or imported with or after the CA certificate. The key is a software key (no HSM provider signs EdDSA), and the algorithm is hidden in FIPS mode.
+**Ed25519** and **Ed448** keys can be generated for a root, intermediate or external CA, or imported with or after the CA certificate. The key is a software key (no HSM provider signs EdDSA), and in FIPS mode the algorithm is offered only when the FIPS module approves it (the \`-fips\` Docker image does, RHEL 9 and Ubuntu 24.04 do not).
 
 - An EdDSA key signs without a digest, like ML-DSA: the digest field disappears and CRLs and OCSP responses follow the same rule.
 - Hierarchies can mix: an EdDSA CA can sign RSA, EC or ML-DSA intermediates and leaves, and the reverse.
@@ -257,7 +223,8 @@ UCM can store a CA's signing key on an external Hardware Security Module instead
 ### Limitations
 - HSM-backed private keys **cannot be exported**. PKCS#12, JKS and key-only export options are hidden for HSM CAs. Only the certificate (PEM/DER/P7B) can be exported.
 - There is **no in-place migration** between Local and HSM. To "move" an existing local CA onto an HSM, create a new CA on the HSM and re-issue certificates.
-- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to another CA.
+- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to an authority, X.509 or SSH: an HSM key backs one authority only.
+- Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\`; without it the **HSM** choice is disabled.
 
 ## Offline Mode
 
@@ -275,7 +242,7 @@ This is the standard way to protect a Root CA between rare ceremonies, while kee
 The password follows the standard UCM password complexity policy: minimum length, mix of character classes, no trivial sequences. The same rules as user passwords.
 
 ### Step by step. Take offline
-1. Open the CA detail panel
+1. Open the CA in the inspector
 2. Click **Take offline**
 3. Read the explanation, click **Continue**
 4. Pick a mode (*Password protected* or *File exported*)
@@ -283,7 +250,7 @@ The password follows the standard UCM password complexity policy: minimum length
 6. Confirm. For *File exported*, the encrypted key downloads immediately: store it safely.
 
 ### Step by step. Restore
-1. Open the offline CA's detail panel
+1. Open the offline CA in the inspector
 2. Click **Restore**
 3. Enter the password
 4. For *File exported*: also select the previously downloaded key file
@@ -330,7 +297,7 @@ Central management for all X.509 certificates. Issue new certificates, import ex
 5. Choose key type and size
 6. Set validity period
 7. Optionally apply a **Template** to pre-fill settings
-8. Click **Issue**
+8. Click **Issue Certificate**
 
 ### Using Templates
 Templates pre-fill Key Usage, Extended Key Usage, subject defaults, and validity. Select a template before filling the form to save time.
@@ -354,6 +321,7 @@ Since v2.214, renewal updates the certificate **in place**:
 - \`renewed_at\` / \`renewed_times\` track the renewal history
 - A revoked certificate cannot be renewed (409): issue a new one instead
 - **Renew** asks for the validity of the new certificate in days, prefilled with the current duration; issuance policies and the CA's expiry still cap it
+- **Renewal through EST, SCEP or WSTEP** stores a new certificate: its deployments and the HTTPS binding move to it. A deployment that sends the private key, and the HTTPS binding, stay on the previous certificate when UCM does not hold the new key: the deployment shows **Not following the renewal**, the bell and the overview list it, and the \`certificate.binding_left_behind\` event is sent. **Reattach to the renewed certificate** once UCM holds its key or the deployment stops sending the key; importing the key of the renewed certificate moves them on its own
 
 **Deleting**: a valid, non-revoked certificate cannot be deleted on its own: **Delete** explains why and offers **Revoke, then delete**, so relying parties see the change. Revocations are persisted independently of the certificate record and survive deletion.
 
@@ -365,13 +333,15 @@ Since v2.214, renewal updates the certificate **in place**:
 
 Revoked certificates are published in the CRL on next regeneration.
 
+A certificate obtained over ACME (by the ACME client, or by the proxy under an upstream account UCM holds) is also revoked at that CA, whether it is revoked alone, in bulk, by an approved request, as a user certificate, with the enrolment or user it belongs to, as the related member of a pair, or by its key at UCM's own ACME server. If the CA does not confirm, the revocation is kept owed and sent again by the renewal task until the CA confirms or the certificate expires; a hold stays in UCM, ACME having none. If no account of UCM can speak for it, the revocation stays local and a warning says to revoke it with the CA directly. The reason is sent when it is keyCompromise, affiliationChanged, superseded, cessationOfOperation or privilegeWithdrawn.
+
 > ⚠ Revocation is generally permanent: except for **Certificate Hold** which can be removed.
 
 ### Remove Hold (Unhold)
 
 If a certificate was revoked with the **Certificate Hold** reason, it can be restored to valid status:
 
-1. Open the revoked certificate details
+1. Open the revoked certificate in the inspector
 2. The **Remove Hold** button appears in the action bar (only for Certificate Hold revocations)
 3. Click **Remove Hold** to restore the certificate
 4. The certificate returns to valid status, the CRL is regenerated, and the OCSP cache is updated
@@ -400,7 +370,7 @@ A hybrid pair links a classical certificate (**A**, RSA or EC) and a post-quantu
 - **Issuing**: tick **Issue a hybrid pair** in the Issue Certificate form (or send \`hybrid\` in \`POST /api/v2/certificates\`) to issue both from the same CA, with the same subject, names and validity. B copies A's extensions with its own key identifier and key usage, and asserts no key usage or EKU that A lacks. Under the ANSSI, BSI and EU ACM compliance profiles, ML-DSA-65 and ML-DSA-87 are accepted only as B: never alone, and ML-DSA-44 not at all
 - **Linking by request**: a CSR carrying a **relatedCertRequest** signed by A's key issues a B linked to A, through Sign CSR, ACME, EST or WSTEP. A must be held by UCM, valid, unrevoked, an end-entity certificate issued by a CA of this instance whose chain is valid now, and the request must be at most 7 days old. A newer certificate that names the same A takes over the pair, and the previous one leaves it. A certificate given inline in the request's location must be A; other locations are not fetched
 - **Revoking** either member, alone or in bulk, revokes the other unless **Also revoke the linked certificate** is unticked. Under a policy that requires approval, the pair goes together, and two different approval policies on the two members leave the revocation to an administrator. If the other member cannot be revoked, the answer says so (\`related_not_revoked\`) and it must be revoked separately. ACME revokeCert revokes only the certificate presented (RFC 8555)
-- **Renewing** either member, by hand, in bulk or automatically, renews both, and the new B names the new A. A member renewed alone, the other being revoked, leaves the pair, as does the other member when one is deleted
+- **Renewing** either member, by hand, in bulk or automatically, renews both, and the new B names the new A: UCM holds both keys and renews the pair as one. A member renewed alone names only the certificate its original named: once that one is renewed since, revoked, archived or expired, the renewed member carries no relatedCertificate extension and leaves the pair, and the renewal says why (a warning after a renewal from this page, the audit log in every case). The other member also leaves the pair when one is deleted. A renewal is refused, and nothing changes, when the other member or the relatedCertificate extension cannot be read
 - **Exporting**: the **hybrid-bundle** format is a ZIP of both certificates, and of both private keys when the key is included; it is refused when neither certificate names the other any more
 
 > ⚠ A policy that requires approval refuses to issue a hybrid pair for now: issue it under a policy without approval.
@@ -439,14 +409,14 @@ The **Lint** action (certificate detail) checks X.509 standards conformance. Inf
     content: `
 ## Overview
 
-The User Certificates page manages mTLS client certificates enrolled via the **Account → mTLS** tab. Unlike regular certificates, these are specifically tied to user accounts for mutual TLS authentication.
+The User Certificates page manages mTLS client certificates enrolled from **My Account → Security**, section **Client Certificates (mTLS)**. Unlike regular certificates, these are specifically tied to user accounts for mutual TLS authentication.
 
 Certificates here are fully managed by UCM: they are stored in the database with private keys, and can be exported, revoked, or deleted at any time.
 
 ## Enrolling a Certificate
 
-1. Go to **Account → mTLS** tab
-2. Click **Enroll Certificate**
+1. Go to **My Account → Security**, section **Client Certificates (mTLS)**
+2. Click **Add Certificate**, keep **Generate** and click **Generate Certificate**
 3. The system generates a key pair and issues a client certificate signed by your mTLS CA
 4. The certificate appears on this page and can be used for mTLS login
 
@@ -594,7 +564,7 @@ If Microsoft CA connections are configured, a **Microsoft CA** tab appears in th
 4. Select the **certificate template** (auto-loaded from the CA)
 5. Click **Sign**
 
-If the template requires manager approval, UCM tracks the pending request. Check its status from the CSR detail panel.
+If the template requires manager approval, the request stays Pending in UCM. Open it in **Pending** and click **Check status** to fetch the certificate once the CA has issued it (also needs the permission to sign CSRs), or approve it from the CA Control Panel of the connection.
 
 ### Enroll on Behalf Of (EOBO)
 
@@ -650,7 +620,7 @@ Templates define reusable certificate profiles. Instead of manually configuring 
 Every template is one or the other, shown in the **Source** column.
 
 ### System
-The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication and Smartcard Logon. Edit and Delete are refused for them, in the interface and by the API. **Duplicate** gives you an editable copy to build on.
+The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication and Smartcard Logon. Edit and Delete are refused for them, in the interface and by the API. **Copy** gives you an editable copy to build on.
 
 ### Custom
 Everything created or imported here. These can be edited and deleted freely.
@@ -679,7 +649,7 @@ When issuing a certificate or signing a CSR, select a template from the dropdown
 
 ## Windows Autoenrollment Flags
 
-Templates carry three opt-in flags used by the Windows autoenrollment protocols (XCEP/WSTEP, configured under **Settings → Windows Autoenrollment**):
+Templates carry three opt-in flags used by the Windows autoenrollment protocols (XCEP/WSTEP, configured per realm under **Settings → Windows Autoenrollment**):
 
 - **Allow autoenrollment**: Advertise the template as \`autoEnroll=true\` in Certificate Enrollment Policy, so GPO/Kerberos-authenticated clients request it automatically at logon with no user action. Off by default: like real ADCS, a template can still be enrolled manually (MMC "Request New Certificate", \`certreq\`) without this, since Enroll and Autoenroll are separate permissions.
 - **Build subject from Active Directory**: For unattended GPO autoenrollment: derive the certificate's subject and SAN from the requester's AD object (via the AD Connector) instead of requiring the client to supply one. On the Kerberos endpoints a subject named in the request is ignored and computer accounts are refused; machine templates always take the computer's DNS name.
@@ -697,6 +667,22 @@ A template can **pin** the organizational subject fields: **C, ST, L, O, OU**: f
 
 Use this to guarantee a uniform organizational identity (e.g. a fixed \`O\` and \`C\`) across an autoenrolled fleet, regardless of what each Windows client submits.
 
+## Common Name Pattern
+
+For Windows enrollment, a template whose subject UCM builds (a computer template, or a user template with **Build subject from Active Directory**) can take its CN from a pattern: fixed text and variables in braces, read from the requester's directory object, never from the request.
+
+- **Computer templates**: \`{hostname}\` (the account name without \`$\`), \`{fqdn}\` (its dNSHostName)
+- **User templates**: \`{username}\` (sAMAccountName), \`{upn}\`, \`{mail}\`, \`{displayName}\`, \`{givenName}\`, \`{surname}\`
+- **Both**: \`{domain}\` (the DC components of the object's DN), \`{realm}\` (the realm of the profile)
+- Write \`{{\` and \`}}\` for a literal brace. An unknown variable, a variable of the other kind, or a pattern on a template whose requester supplies the subject is refused when the template is saved
+- **Keep the directory path** off: the subject is the CN alone, plus the pinned fields. On: the object's DN after its own name follows the CN (for a user, the e-mail attribute stays as without a pattern)
+- **Only the CN changes**: the SAN (the computer's DNS name, the user's UPN and e-mail) and the SID extension stay as without a pattern, and a pattern never adds a SAN
+- **Refused, never shortened**: a variable the directory leaves empty, a result longer than 64 characters or one holding a control character refuses the request; the reason names the template and the variable and is in the audit log
+- **One subject per account** (RFC 5280), checked at issuance: a subject that a certificate of the same CA, whatever its status, already carries for another account is refused (case and extra spaces ignored), and the audit names that certificate's serial; the same account renews and enrolls again
+- \`{displayName}\`, \`{givenName}\`, \`{surname}\` and \`{mail}\` are not unique, nor is \`{username}\` or \`{hostname}\` across domains: add \`{upn}\`, \`{fqdn}\`, or \`{username}\`/\`{hostname}\` with \`{domain}\` or **Keep the directory path**
+- **Renewal** with the certificate takes the pattern in force, for the account the certificate's SID names; it is refused when no connector of the profile finds that account
+- The Username/Password endpoint has no directory identity: the pattern does not apply there and the client supplies the subject
+
 ## Custom Extensions
 
 A template can add extensions UCM has no setting for. Each one is an **OID**, a **Critical** flag and the **value**: the DER encoding of the extension value, in hex. UCM copies the bytes as given and never parses them, so check the encoding with your own tools first.
@@ -706,11 +692,11 @@ A template can add extensions UCM has no setting for. Each one is an **OID**, a 
 - Extensions UCM sets itself (key usage, EKU, names, key identifiers, CRL and OCSP pointers, policies, name constraints, qcStatements...) are refused: use their own settings
 - A client that does not recognise a **critical** extension must reject the certificate (RFC 5280, section 4.2). Leave it non-critical unless every relying party understands it
 
-The certificate and CA detail panels list such extensions under **Other extensions**, with their OID, name when known, criticality and value.
+The inspector lists such extensions for certificates and CAs under **Other extensions** on the Extensions tab, with their OID, name when known, criticality and value.
 
-## Duplicating Templates
+## Copying Templates
 
-Click **Duplicate** to create a copy of an existing template. Modify the copy without affecting the original.
+Click **Copy** to create a copy of an existing template. Modify the copy without affecting the original.
 
 ## Import & Export
 
@@ -814,7 +800,7 @@ UCM caches OCSP responses for performance. The cache is:
 
 ### Delegated OCSP Responder
 
-By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead: assign one per CA from the CA's detail panel (only certificates carrying the OCSPSigning EKU and a private key are eligible).
+By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead. Assign one per CA from the **Delegated Responder** section of the CA selected in the list on this page (only certificates carrying the OCSPSigning EKU and a private key are eligible).
 
 **Automatic renewal**: a daily task re-issues the responder certificate before it expires, same key pair and extensions, renewed at par, and rebinds the CA's responder configuration to the new certificate. Short-lived OCSP signing certificates (e.g. a 90-day template) rotate without manual action. Enabled by default; it can be disabled and the renewal window tuned in Settings › Security.
 
@@ -832,7 +818,7 @@ http://your-server:8080/ca/{ca_refid}.cer   (DER format)
 http://your-server:8080/ca/{ca_refid}.pem   (PEM format)
 \`\`\`
 
-Enable CA Issuers per CA in the **AIA CA Issuers** section of the detail panel. The URL is automatically generated using the HTTP protocol server and the configured FQDN.
+Enable CA Issuers per CA in the **AIA CA Issuers** section of that CA's panel on this page. The URL is automatically generated using the HTTP protocol server and the configured FQDN.
 
 > ⚠️ **Prerequisite**: Protocol URLs (CDP, OCSP, AIA) require a valid **FQDN** or a configured **Protocol Base URL** in Settings → General. If you access UCM via \`localhost\`, enabling these features will fail, set the FQDN first.
 
@@ -909,7 +895,7 @@ Displays the SCEP endpoint URL and integration instructions.
 6. If auto-approve is off, an admin reviews and approves/rejects
 
 ### Device keys
-The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An ML-DSA signature is checked per RFC 9882 (SHA-512 digest, the key's own algorithm identifier, no parameters). Ed448 signatures are refused, and ML-DSA ones too in FIPS mode. The request is still encrypted to the RSA signing CA.
+The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An ML-DSA signature is checked per RFC 9882 (SHA-512 digest, the key's own algorithm identifier, no parameters). Ed448 signatures are refused, and ML-DSA ones too in FIPS mode when the FIPS module does not approve ML-DSA. The request is still encrypted to the RSA signing CA.
 
 ## SCEP URLs
 
@@ -979,12 +965,13 @@ Manage your ACME client configuration:
 - **Environment**: Staging (testing) or Production (live certificates)
 - **Contact Email**: Required for account registration
 - **Auto-Renewal**: Automatically renew certificates before expiry
-- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87. ML-DSA is not offered in FIPS mode or on a build without it. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
+- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87. ML-DSA is not offered on a build without it, nor in FIPS mode when the FIPS module does not approve it. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
 - **Account Key Algorithm**: ES256, ES384, or RS256 for ACME account signing
 - **Renewal in place** (v2.251): a renewal keeps the certificate's id and refid, so its HTTPS binding, deployment bindings and webhooks follow it
 - **Failed renewals** (v2.251): the order list shows the failure count and the last error; after 5 failed scheduled renewals an order is retried once a day. The **Automatic renewal** switch of a selected order stops or resumes its renewal
 - **Orders list** (v2.251): every order is loaded, four pages at a time; a page still missing after its retries leaves a notice that the list is partial
 - **Compromised keys** (v2.251): a key revoked as compromised is refused (409) at the request and before any renewal opens an order
+- **Revocation at the CA**: A certificate obtained over ACME (by the ACME client, or by the proxy under an upstream account UCM holds) is also revoked at that CA, whether it is revoked alone, in bulk, by an approved request, as a user certificate, with the enrolment or user it belongs to, as the related member of a pair, or by its key at UCM's own ACME server. If the CA does not confirm, the revocation is kept owed and sent again by the renewal task until the CA confirms or the certificate expires; a hold stays in UCM, ACME having none. If no account of UCM can speak for it, the revocation stays local and a warning says to revoke it with the CA directly. The reason is sent when it is keyCompromise, affiliationChanged, superseded, cessationOfOperation or privilegeWithdrawn.
 
 ### Custom ACME Server
 Use any RFC 8555-compliant CA, not just Let's Encrypt:
@@ -996,9 +983,9 @@ Use any RFC 8555-compliant CA, not just Let's Encrypt:
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Set your CA's directory URL as the **ACME Directory URL** of its account in **External CA Accounts**.
+Set your CA's directory URL as the **ACME Directory URL** of its account in **Certificate Authorities (CA)**.
 
-### External CA Accounts
+### Certificate Authorities (CA)
 Manage every external CA account UCM registers with:
 
 - **Multiple accounts per CA allowed**: several accounts can share the same directory URL (e.g. two Let's Encrypt accounts with different contact emails for administrative separation, useful alongside dns-persist-01). The account row, not the URL, is the identity.
@@ -1011,7 +998,7 @@ Manage every external CA account UCM registers with:
 Some CAs require EAB credentials to link your ACME account with an existing account at the CA:
 
 1. Register at your CA's portal to obtain **EAB Key ID** and **HMAC Key**
-2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **External CA Accounts**
+2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **Certificate Authorities (CA)**
 3. The HMAC key is base64url-encoded (provided by the CA)
 
 > 💡 EAB is required by ZeroSSL, HARICA, Google Trust Services, and most enterprise CAs.
@@ -1071,7 +1058,7 @@ For DNS services without a native driver, the **Custom Command** provider runs a
 - \`TTL\`: record TTL in seconds
 - \`ACTION\`: \`create\` or \`delete\`
 
-The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5–300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
+The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5-300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
 
 ### Custom DNS Resolvers
 **DNS-01 resolvers** chooses where UCM looks up \`_acme-challenge\` TXT records: **Automatic** (listed resolvers, then the zone's authoritative servers, then public resolvers, then the system resolver), **System resolver only**, or **Listed resolvers only**. The restricted modes never query public resolvers, for networks that block them. Entries are comma-separated IPs with an optional port, e.g. \`127.0.0.1:5353\` or \`[2001:db8::53]:5300\`.
@@ -1101,7 +1088,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Configuration
 1. Go to **ACME** → **Let's Encrypt** tab
 2. Scroll down to the **ACME Proxy** section
-3. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
+3. Select an **Upstream CA account** from **Certificate Authorities (CA)** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
 4. Click **Test Connection** to verify connectivity with the upstream CA
 5. Register the upstream account if needed (email + **Register Account**)
 6. UCM automatically registers an account on first proxy request if not already done
@@ -1109,7 +1096,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Dedicated proxy paths (multi-CA)
 Each external CA account can expose its own ACME proxy endpoint:
 
-1. Open **External CA Accounts** (same Let's Encrypt tab)
+1. Open **Certificate Authorities (CA)** (same Let's Encrypt tab)
 2. Edit or create a CA account
 3. Enable **Expose via ACME proxy**
 4. Set a unique **Proxy path (slug)**: e.g. \`actalis-production\`, \`letsencrypt-staging\`
@@ -1165,7 +1152,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **External CA Accounts**.
+> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **Certificate Authorities (CA)**.
 
 > ⚠ Prerequisite: the domain (or a parent domain covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy supports dns-01 only.
 
@@ -1267,7 +1254,7 @@ Browse the certificates issued through ACME:
 - Source
 
 ### Requested dates
-An order may carry \`notBefore\` and \`notAfter\` (cert-manager with a \`duration\`, lego \`--not-after\`). The certificate is issued with exactly those dates, or the request is refused as \`malformed\`: a window longer than the profile's validity (15 minutes of clock skew aside), outside the issuing CA's validity, or already past. A window a policy forbids, longer than its maximum validity or past a key type horizon, is refused at finalize as \`badCSR\`. Without them the profile's validity applies.
+An order may carry \`notBefore\` and \`notAfter\` (cert-manager with a \`duration\`, lego \`--not-after\`). The certificate is issued with exactly those dates, or the request is refused as \`malformed\`: a window longer than the profile's validity (15 minutes of clock skew aside), outside the issuing CA's validity, or already past. A window longer than a policy's maximum validity is refused at finalize as \`malformed\` and the order becomes invalid; one ending past a key type horizon is refused as \`badCSR\` and the order stays ready for a CSR with another key. Without them the profile's validity applies.
 
 ### Revocation
 A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. An account holding valid, unexpired authorizations for every name and IP address of a certificate this ACME server issued may revoke it too, whoever ordered it; authorizations granted by auto-approval do not count. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
@@ -1526,7 +1513,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 1. **Client creates a timestamp request**: hashes a file with SHA-256/SHA-512 and creates a \`TimeStampReq\` (ASN.1 DER-encoded)
 2. **Client sends request to TSA**: HTTP POST to the \`/tsa\` endpoint with \`Content-Type: application/timestamp-query\`
-3. **UCM signs the timestamp**: the dedicated signing certificate, or the configured CA's own certificate when none is set, signs the hash + current time into a \`TimeStampResp\`
+3. **UCM signs the timestamp**: the dedicated signing certificate signs the hash + current time into a \`TimeStampResp\`. The configured CA's own certificate signs only when **Require a dedicated TSA certificate** is turned off
 4. **Client receives and stores the response**: the \`.tsr\` file can later prove the document existed at that time
 
 ## Configuration
@@ -1536,7 +1523,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 1. **Enable TSA**: Toggle the TSA server on or off
 2. **Signing CA**: Select which Certificate Authority signs timestamp tokens
 3. **Policy OID**: Object Identifier for the TSA policy, included in every timestamp response
-4. **Require a dedicated TSA certificate**: Opt-in: refuse to sign timestamps with the CA certificate itself. When enabled, a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is required
+4. **Require a dedicated TSA certificate**: On by default: refuse to sign timestamps with the CA certificate itself, so \`/tsa\` answers 503 until a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is set. **Generate a signing certificate** issues one from the signing CA and selects it. Turning the option off lets the CA certificate sign, which is not RFC 3161 compliant; an installation upgraded from 2.x whose TSA signed with its CA keeps it off, and the overview shows a warning
 
 ### Choosing a Signing CA
 
@@ -1544,8 +1531,8 @@ The signing CA's private key is used to sign every timestamp token. Best practic
 
 - Use a **dedicated sub-CA** for timestamping rather than your root CA
 - RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The Settings tab warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
-- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503 and the dashboard shows the TSA offline
-- Enable **Require a dedicated timestamping certificate** to enforce this at signing time instead of relying on convention
+- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503
+- Keep **Require a dedicated TSA certificate** on to enforce this at signing time
 
 ### Policy OID
 
@@ -1668,7 +1655,7 @@ The Trust Store keeps trusted CA certificates. Fill it from the CAs UCM manages 
 **Add** lists the CAs UCM manages: select those to trust.
 
 ### External certificates
-The page has no upload form for a certificate from outside UCM. Add it through the API: \`POST /api/v2/truststore\` with its PEM, or \`POST /api/v2/truststore/import\` with a PEM or DER file.
+The page has no upload form for a certificate from outside UCM. Add it through the API: \`POST /api/v2/truststore\` with its PEM, or \`POST /api/v2/truststore/import\` with a PEM or DER file. An entry that contains a private key is refused: the trust store holds certificates only, and only the certificates of a file are kept.
 
 ### Sync from System
 Import the trusted CAs of the operating system's trust store (e.g., Mozilla's CA bundle on Linux), up to the chosen count: 500 by default, 1000 at most.
@@ -1717,10 +1704,13 @@ Manage user accounts, groups, and role assignments. Users authenticate to UCM vi
 Toggle a user's status without deleting their account.
 
 ### Password Reset
-Admins can reset any user's password. The user is not asked to change it at the next login: give them the new password and ask them to change it under My Account. **Forgot password** on the login page sends no link to an account linked to an SSO provider that has no local password: its provider alone opens it.
+Admins can reset any user's password. The user is not asked to change it at the next login: give them the new password and ask them to change it under My Account.
 
 ### Security Keys
 In a user's details, administrators see that user's security keys and can disable or remove one, typically a lost key, which otherwise still signs in without a password. Removing the last second factor of an account that requires one asks for a second confirmation; the user then enrols a factor again at the next login.
+
+### Deleting a User
+Deleting a user revokes the certificates they enrolled for mTLS (reason cessationOfOperation), then deletes them. A certificate the CA cannot revoke does not block the deletion: it stays valid, the warning and the audit log name it, and you revoke it under Certificates. If the deletion fails after some revocations, the message names the certificates already revoked: they stay revoked.
 
 ### API Keys
 Each user can have multiple API keys for programmatic access. API keys inherit the user's role permissions. See the Account page for managing your own keys.
@@ -1759,13 +1749,13 @@ Create roles with granular permissions on the **RBAC** page.
 
 ## Authentication Source
 
-The **Source** column shows where each user comes from:
+The **Source** column shows what opens each account:
 - **Local**: created and managed in UCM (local password)
-- **LDAP / OAuth2 / SAML**: auto-provisioned on first SSO login. The originating provider name is shown on the badge (e.g. \`LDAP · Corporate AD\`).
+- **LDAP / OAuth2 / SAML**: one entry per provider attached to the account, by type and name (e.g. \`LDAP · Corporate AD\`); an account may have several.
 
 Since v2.133, roles changed manually in UCM for SSO users are **preserved** between logins, unless **"Sync role on every login"** is enabled on the provider (see **Settings → SSO**).
 
-**Link to SSO** attaches an account to a provider; on an account already linked, **Change provider or reset SSO identity** moves it to another provider or clears its SSO identity, after a confirmation. The next sign-in through that provider with the account's username or email binds the new identity; a password the account has is kept unless the box that removes it is ticked, after which no password login opens the account, and an account without one is not asked to set one. **Unlink SSO** turns the account back into a local one.
+The account panel lists its **Single sign-on providers**, each linked, waiting for its first sign-in, or left by a deleted provider. **Attach a provider** adds one: the providers already attached keep opening the account, and the next sign-in through the new one with the account's username or email binds its identity. **Reset identity** clears the identity of one provider whose IdP changed it, and **Detach** removes one provider, each after a confirmation; attaching, resetting and detaching close every session of the account. To move an account to another provider, attach the new one, then detach the old one. A password the account has is kept unless the box that removes it is ticked, after which no password login opens the account; an account without a password is asked to set one only when its last provider is detached, and then becomes a local account.
 `
   },
 
@@ -1952,20 +1942,22 @@ Export filtered logs in:
 - **JSON**: Machine-readable, includes all fields
 - **CSV**: Spreadsheet-compatible, includes key fields
 
-Exports apply only the date range, up to 10,000 entries: the other filters are not applied.
+Exports follow the filters of the page (search, user, action, status and date range) and contain at most 10,000 entries.
 
 ## Cleanup
 
 Purge old logs based on retention period:
-1. Click **Cleanup**
+1. Click **Cleanup Old Logs**
 2. Set the retention period in days
-3. Confirm the cleanup
+3. Click **Delete Old Logs**
 
 > ⚠ Log cleanup is irreversible. Export important logs before purging.
 
 ## Integrity Verification
 
 Click **Verify Integrity** to check the audit log chain. UCM uses hash chaining to detect an entry modified or removed inside the chain; removing the latest entries leaves no trace in the chain itself, which is why syslog forwarding keeps a copy elsewhere.
+
+On a large ledger the verification runs in the background: the button shows how many entries are checked so far, **Cancel verification** stops it, and leaving or reloading the page does not stop it (the page picks it up again). One verification runs at a time.
 
 ## Syslog Forwarding
 
@@ -2046,7 +2038,7 @@ Require all users to enable two-factor authentication.
 
 ### Private Key Encryption
 Encrypt all private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
-A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Dashboard shows a banner while no key is loaded.
+A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Security section of Settings shows the encryption status, and the Overview shows a banner while no key is loaded.
 
 > 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
 
@@ -2079,6 +2071,8 @@ A new installation creates the master key at its first start (in a container, on
 ### Manual Backup
 Click **Create Backup** to generate a database snapshot. Backups include the certificates, CAs, keys and settings; the audit log and other history tables are not included.
 
+A manual backup runs on the server: the dialog shows its progress, can cancel it (no archive is kept) and offers the archive for download when it is ready; closing the dialog or reloading the page does not stop it. One manual backup runs at a time on the whole installation.
+
 ### Scheduled Backup
 Configure automatic backups:
 - Frequency (daily, weekly, monthly)
@@ -2089,7 +2083,9 @@ Configure automatic backups:
 Upload a backup file to restore UCM to a previous state.
 
 - Backups and restores share one lock: a restore is refused (409) while a backup runs, and a manual backup waits for a running restore
-- The upload is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default, set in the server environment); a reverse proxy in front of UCM keeps its own body limit
+- In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted
+- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
+- The restore runs in the background: past 25 seconds its dialog follows it and can cancel it until it commits; meanwhile every write is refused (503), on a single node too, and the report shows after the sign-in its end asks for
 - Archives carry ACME client orders, approval requests and key recovery requests (v2.251)
 - A DNS provider, ACME CA account or webhook whose name another row holds here is restored as \`name (2)\`
 - The API also accepts \`mode=merge\`, which adds the archive to the data here instead of replacing it
@@ -2146,6 +2142,7 @@ Manage the TLS certificate used by the UCM web interface:
 - View the current certificate details
 - Import a new certificate (PEM or PKCS#12)
 - Generate a self-signed certificate
+- When the bound certificate is renewed through a protocol without its key reaching UCM, the page says so: HTTPS keeps serving the previous certificate until the key of the renewed one is imported, which applies it
 
 > ⚠ Changing the HTTPS certificate requires a service restart.
 
@@ -2154,9 +2151,8 @@ Manage the TLS certificate used by the UCM web interface:
 - Check for new UCM versions from GitHub releases
 - View the changelog for available updates
 - Current version and build information
-- **Auto-update**: on supported installations (DEB/RPM), click **Install Update** to download and install the latest version of the installed major version automatically
-- **Later major version**: offered apart as a recommended upgrade with its release notes, installed only after confirmation, never by automatic updates; under Docker, change the image tag instead
-- **Security maintenance**: a notice states that this version line receives security fixes and no new features
+- **Auto-update**: on supported installations (DEB/RPM), click **Install Update** to download and install the latest version automatically
+- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, package of each node, node where it stopped and why, **Resume**)
 - **Update channel**: stable, pre-release (release candidates) or dev
 
 ## Webhooks
@@ -2234,39 +2230,50 @@ Settings › Backup enables automatic backups.
 
 - **Daily / weekly / monthly** cadence
 - **Retention**: backups older than the set number of days are pruned
+- **Size ceiling**: a ceiling in MiB for all archives (0 for none); the oldest are removed, each audited, until the total fits. Retention never removes, on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record and the minimum kept, and in HA the minimum kept, so the total can stay above the ceiling, which is reported
 - Backups are **encrypted** with the backup password
+- **High availability**: the archives are stored in PostgreSQL, so every node lists them, with the node that wrote them, and downloads them; retention runs on the leader. They are lost with the database: download the ones you keep out of the cluster, and back PostgreSQL up with its own tools
 
 ## Active Directory Connector
 
 UCM's own LDAP connection to Active Directory, independent of any LDAP provider configured under SSO. That one is for logging into UCM; this one is used for certificate-related AD lookups and works whether or not SSO is configured at all.
 
+- **Connectors**: One per directory (forest or domain), listed under Settings → Active Directory with its name, its realm, the domain SID that was read and its health. A Windows enrollment profile names the connector that serves its realm; a connector that profiles use cannot be deleted, and the refusal lists them
 - **Purpose**: Resolves a Kerberos machine or user principal to its AD object, so UCM can derive a certificate subject/SAN the same way a real Windows CA would
 - **Domain Controllers**: One per row, each by its own hostname, without port or scheme, tried in order: lookups fail over to the next one when a DC is down. A bare domain name fails certificate verification, since a domain controller certificate names only its own host
 - **LDAPS**: Toggle to use LDAP over SSL/TLS; **Verify SSL Certificate** validates the DC's certificate (optionally against a custom CA bundle when it isn't publicly trusted)
 - **Base DN** and **Bind DN / Password**: the domain's base DN, with its DC components (\`DC=corp,DC=example\`, which also names the Kerberos realm served) on a domain controller port (389 or 636, not a Global Catalog), and the service account used for lookups; Bind DN and password are both required while the connector is enabled
 - **Test Connection**: Verify connectivity and credentials before saving
-- **Health Check Interval**: Each domain controller is probed with a real bind at this interval; an unreachable one is skipped at enrollment time until it recovers. The verdict shows on the settings row and against each DC
+- **Health Check Interval**: Each domain controller is probed with a real bind at this interval; an unreachable one is skipped at enrollment time until it recovers. The verdict shows on the connector's row and against each DC
+- **Disabled connector**: A disabled connector looks nothing up, but its base DN still names the realm of the default profile as a last resort, when no enabled connector, SPN or keytab does
 
-### GPO Enrollment Policy URLs
-
-Once configured, register one of the displayed URLs as a Certificate Enrollment Policy server in Group Policy (Public Key Policies → Certificate Services Client – Certificate Enrollment Policy), alongside Certificate Services Client – Auto-Enrollment:
-- **Kerberos**: No credential prompt; requires a domain-joined client and the GPO's authentication type set to Kerberos
-- **Username/Password**: Prompts for credentials; for interactive "Request New Certificate" enrollment only
+The Certificate Enrollment Policy URLs to register in Group Policy are the same for every profile and are shown under Settings → Windows Autoenrollment.
 
 ## Windows Autoenrollment (XCEP/WSTEP)
 
 Native Windows certificate enrollment via **MS-XCEP** (policy discovery) and **MS-WSTEP** (certificate issuance and renewal): the same protocols real ADCS uses for MMC "Request New Certificate", \`certreq\`, and unattended GPO autoenrollment.
 
-### Setup Checklist
+### Profiles
 
-The tab tracks what's configured versus what's still needed, for both manual and unattended enrollment paths: a Certificate Authority, Policy Discovery (XCEP), Certificate Issuance (WSTEP), and, for unattended GPO autoenrollment, an Active Directory Connector, Kerberos/SPNEGO, and at least one template with autoenrollment allowed.
+One **profile per Active Directory realm**. UCM routes a client to its profile by the realm of its Kerberos principal, so every profile has its own issuing CA, policy CA, templates, AD connector and keytab; the UsernamePassword accounts belong to the default profile. The list is paginated and filtered by the server (name or realm, CA, state), so a hundred profiles open as fast as one:
+- **Realm**: In capital letters, exactly as the KDC writes it (\`CORP.EXAMPLE\`): a KDC compares realms character by character, so a lowercase name never matches a ticket. The form refuses it and says why
+- **Connector**: The AD connector that serves the realm. When its domain differs from the realm of the profile, the form warns, without blocking; the server checks the pair when either is chosen
+- **Issuing CA** and **Policy CA**: The CA that issues, and the one XCEP announces (the issuing CA when empty). The policy identifier and the template OIDs belong to the profile: set at its creation, they do not change when either CA does
+- **Templates**: The subset offered; none selected offers the templates of the CA. A required AD group and pinned subject fields can replace the template's own for the whole profile
+- **State**: Complete, Keytab missing, Connector failing or Disabled. A disabled profile refuses the machines of its realm; its keys stay in the served keytab so that the refusal is made and audited by realm
+
+The **default profile** is the one a 2.x installation turned into; it serves the UsernamePassword binding and holds its accounts. A new installation has none: while no profile is the default, the profile editor offers **Default profile** (on a new profile or a saved one), and the accounts appear once it is checked. The default is then neither withdrawn nor moved, from this screen or the API. Without a realm, Kerberos is refused until one is set (in capitals, or read from its keytab); the screen says so.
+
+### Setup Checklist, per profile
+
+The profile form lists what that profile still lacks: realm, issuing CA, keytab, a reachable connector when one is chosen, a template with autoenrollment allowed, and the profile being enabled.
 
 ### Policy Discovery (XCEP)
 
-- **Certificate Authority**: The CA whose templates are advertised and that issues certificates through this configuration
+- **Certificate Authority**: The CA whose templates are advertised and that issues certificates through the profile
 - **Validity (days)**: Validity of certificates issued via WSTEP when the request matches no template; a matched template's own validity applies otherwise
 
-A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode, and enrollment from a real Windows client has not been tested yet.
+A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode when the FIPS module does not approve ML-DSA, and enrollment from a real Windows client has not been tested yet.
 
 An **ECDSA** template is announced in policy schema 3 with its curve (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) as a signature key and a request hash, the stronger of the template digest and the one matching the curve; RSA templates outside FIPS mode stay schema 2, which names no request hash: Windows then signs its CMC request with SHA-1, which UCM accepts as those clients require; a plain PKCS#10 signed with SHA-1 is still refused. The request key must fit the template it is issued under: the same curve or ML-DSA set, or an RSA key at least as long (v2.251).
 
@@ -2277,8 +2284,8 @@ WSTEP serves the Issue request type only, renewals included, and refuses a messa
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:
-- **Service Principal Name (SPN)**: e.g. \`HTTP/ucm.example.com@EXAMPLE.COM\`
-- **Keytab**: Generated with \`ktpass\` or \`ktutil\` on the domain controller for the SPN above
+- **Service Principal Name (SPN)**: e.g. \`HTTP/ucm.example.com@EXAMPLE.COM\`, shared by every profile with the XCEP, WSTEP and Kerberos switches
+- **Keytab**: One per profile, generated with \`ktpass\` or \`ktutil\` on the domain controller of its realm. Every entry must be \`HTTP/<host>@<realm of the profile>\`; the form lists the entries of the chosen file by realm and flags a realm that is not the profile's. The keytabs of all profiles are served as one file
 
 > ⚠ Kerberos requires the server-side **\`gssapi\` backend** (the Python \`gssapi\` library plus the system Kerberos libraries): the base SPNEGO package alone is not enough. Without it, Kerberos authentication won't work even when enabled here, and the Kerberos binding is not advertised; a warning is shown on the tab.
 
@@ -2286,6 +2293,7 @@ The Docker images ship this backend since v2.251.
 
 ### Enrollment Policy URLs
 
+The same for every profile: routing is by realm, not by URL.
 - **Username/Password**: Prompts for credentials; for interactive "Request New Certificate" enrollment, doesn't require Active Directory
 - **Kerberos**: No credential prompt; requires a domain-joined client and GPO configuration
 
@@ -2295,7 +2303,13 @@ Besides Username/Password and Kerberos, WSTEP supports **client-certificate rene
 
 XML-DSig has no ML-DSA signature method, so an **ML-DSA** certificate cannot renew this way: UCM names the key in its refusal, and the client enrolls a new certificate instead.
 
-Windows can also renew with \`certreq ... Renew\`, authenticated by the certificate being renewed as TLS client certificate: enable mTLS with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews (v2.248).
+Windows can also renew with \`certreq ... Renew\`, authenticated by the certificate being renewed as TLS client certificate: enable mTLS with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews (v2.248). Since 3.0 only a certificate issued through Windows enrollment renews this way: one signed in the interface is refused (\`not issued through Windows enrollment\`) and must be reissued through Windows enrollment.
+
+Since 3.0 a renewal by certificate is served by the profile the certificate records (a 2.x WSTEP certificate: the default profile), under that profile's issuing CA, and refused when the profile was deleted or is disabled; each refusal is audited with the profile and the reason. Only the SID is checked again, by the profile's connector: revoke the certificate of a computer removed from the group. The TLS client certificate works only for a profile whose issuing CA is the mTLS CA or a CA under it, and for a former CA the profile lists (below): a certificate the listener does not trust is refused during the TLS handshake, before UCM sees a request, so nothing is audited by UCM (read the client output and the service log). The other profiles renew over Kerberos only (the profile of the principal's realm serves and the new certificate records it), and when Kerberos refuses (requester removed from the AD group, profile disabled) they cannot renew. The Kerberos keytab keeps the keys of disabled profiles, so their requests are refused with an audit entry: only deleting the profile removes them.
+
+Over Kerberos, a request signed by the requester's own valid certificate of the profile renews it when it names that certificate's template (or the certificate carries none, as one issued before 3.0): the renewed certificate is marked superseded by the new one, as on the Certificate binding, the audit entry is \`certificate.renewed\` and the webhook \`cert.renewed\`, and a second renewal of it is refused on either binding (\`Renewed certificate superseded by a newer one\`). A request naming another template is an enrollment (\`certificate.issued\`), even when the certificate that signs it was renewed already. After a change of the profile's issuing CA, a certificate of the former CA renews the same way: the new CA issues it, and the audit entry \`certificate.renewed\` names the old serial and the old CA.
+
+After a change of the profile's issuing CA, the outgoing CA is listed on the profile under **Former CAs that still renew**, and the change audit says so. A certificate UCM issued under the profile by a listed CA renews on both bindings under the same rules (same template, same subject, valid, on record): the current CA issues the new certificate, the old one is marked superseded, and \`certificate.renewed\` names the old serial and the old CA. A former CA taken off the list, revoked or deleted renews nothing from that moment: the Certificate binding refuses the renewal, and over Kerberos the request is judged as an enrollment. The list only shrinks: remove a CA to stop its renewals, for example after its compromise; a CA that never was the profile's issuing CA cannot be listed. With mTLS on, the TLS listener also trusts each listed former CA that is not under the mTLS CA, so that \`certreq ... Renew\` with a certificate of that CA reaches UCM; a save that changes what it trusts restarts the service (a rolling restart in HA). A client certificate the listener lets through on a former CA alone serves WSTEP renewal and nothing else: certificate login, EST and every other route do not see it, and while a former CA is trusted this holds for any client certificate whose issuer is not a CA of UCM under the mTLS CA.
 
 ### SID Security Extension (KB5014754)
 
@@ -2308,7 +2322,7 @@ A certificate template can opt into **Build subject from Active Directory** (Tem
 ## About
 
 - **System Information**, **Links & Resources** and the **Support UCM** link to Ko-fi. Administrators also see a dismissible Ko-fi card once per UCM version
-- **Check FIPS readiness** (admin:system): lists what FIPS mode would refuse on this instance (scrypt password hashes, Ed25519 authorities, Argon2id backups, PostgreSQL without TLS...), with a remedy for each. Nothing is changed
+- **Check FIPS readiness** (admin:system): lists what FIPS mode would refuse on this instance (scrypt password hashes, Ed25519 authorities on a module without EdDSA, Argon2id backups, PostgreSQL without TLS, HMAC secrets under 14 bytes...), with a remedy for each. Nothing is changed. In FIPS mode its blockers are also written to the log at each start, one error line each with its remedy, and the service status carries them; UCM starts anyway and refuses each affected operation when it is used
 `
   },
 
@@ -2324,14 +2338,14 @@ Manage your personal profile, security settings, and API keys.
 
 - **Full Name**: Your display name shown across UCM
 - **Email**: Used for notifications and password recovery
-- **Account Info**: Creation date, last login timestamp, total login count
+- **Account Information**: Creation date, last login timestamp, total login count
 
 ## Security
 
 ### Password Change
 Change your current password. Must comply with the system password policy (minimum length, complexity requirements). Your other sessions are signed out; the one you changed it from stays. An admin password reset or 2FA reset signs out every session of the user.
 
-When UCM asks for a new password at login (the first-boot \`admin\` account, for instance), the change comes before anything else: until it is made, the server refuses every other request of that session, API included.
+When UCM asks for a new password at login (the first-boot \`admin\` account when UCM generated its password, for instance), the change comes before anything else: until it is made, the server refuses every other request of that session, API included.
 
 ### Two-Factor Authentication (TOTP)
 Add a time-based one-time password using any authenticator app:
@@ -2388,7 +2402,7 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. **Regenerate** keeps the key's permissions and lifetime; a revoked or expired key cannot be regenerated.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. Regenerating a key, offered by the API only (\`POST /api/v2/account/apikeys/<id>/regenerate\`), keeps its permissions and lifetime; a revoked or expired key cannot be regenerated.
 
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
@@ -2439,7 +2453,7 @@ Import certificates and CAs from an OPNsense firewall, on demand (UCM does not k
 
 ### Import
 1. Select the items you want to import
-2. Click **Import Selected**
+2. Click **Import N selected** (N counts the selected items)
 
 UCM imports certificates with their private keys (if available) and preserves the CA hierarchy.
 
@@ -2691,7 +2705,7 @@ Each provider shows a connection status indicator:
 
 ### Generating Keys
 1. Select a connected provider
-2. Click **Generate Key**
+2. Click **Generate**
 3. Choose the algorithm (RSA 2048/4096, ECDSA P-256/P-384)
 4. Enter a key label/alias
 5. Click **Generate**
@@ -2706,8 +2720,17 @@ ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are offered only on providers that
 
 Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider. An ML-DSA key signs the data itself, so no digest is chosen.
 
+### Synchronizing keys
+Click **Sync keys** in the provider details to read the keys of the token again.
+- New keys are added.
+- Keys gone from the token are removed, except keys a CA uses: they are kept.
+- If the token listing fails, nothing is removed.
+
+The message gives the counts, the number of keys kept because a CA uses them, the number of unreadable keys and the number of keys used by a CA whose material changed on the token. The button is disabled while the synchronization runs.
 ### Using HSM Keys
 When creating a CA, select an HSM provider and key instead of generating a software key. The CA's signing operations are performed on the HSM.
+
+An HSM key backs one authority, X.509 or SSH. Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\` (\`write:ssh_cas\` for an SSH CA), and a key a CA holds cannot be deleted.
 
 > ⚠ Keys generated on an HSM cannot be exported. If you lose access to the HSM, you lose the keys.
 
@@ -2747,7 +2770,7 @@ Copy this URL into your IDP's "Add Service Provider" or "SAML Application" confi
 ### Configuration
 1. Obtain the IDP metadata URL or XML file from your identity provider
 2. In UCM, go to **Settings → SSO**
-3. Click **Add Provider** → SAML
+3. On the **SAML 2.0** card, click **Configure**
 4. Enter the **IDP Metadata URL**: UCM auto-populates Entity ID, SSO/SLO URLs, and certificate
 5. Or paste the IDP metadata XML directly
 6. Configure **attribute mapping** (username, email, groups)
@@ -2758,6 +2781,8 @@ Map IDP SAML attributes to UCM user fields:
 - \`username\` → UCM username (required)
 - \`email\` → UCM email (required)
 - \`groups\` → read by the role mapping rules (optional); it does not make the user a member of UCM groups
+
+Groups are read from the attributes mapped to \`groups\`, else from \`groups\` and the Microsoft claim URIs. Keycloak sends roles in \`Role\` and groups in \`member\`, Shibboleth sends \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\` (isMemberOf), other IdPs \`memberOf\`: these are read only once mapped to \`groups\`. The buttons under the attribute mapping add such a row, which takes effect once you save it. An attribute is matched by its Name, never by its FriendlyName (SAML Core 2.0 §2.7.3.1): map \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\`, not \`isMemberOf\`. A row of the new form (\`attribute → groups\`) replaces a row of the legacy form (\`groups → attribute\`), which is then no longer read; the screen names, under the mapping, the attributes no row reads any more. To keep reading both, replace the legacy row with a row \`attribute → groups\`.
 
 ### Single Logout
 When the IdP ends a session, it sends a signed **LogoutRequest** through the browser to the SLO URL. UCM checks the IdP signature, issuer, Destination (required), IssueInstant (within the clock window) and that the request was not used before, closes the UCM session of that NameID in this browser (when the request carries SessionIndex values, only a session they name), then sends a **LogoutResponse** to the IdP's SLO URL, signed with the SP key; an SP certificate that is not RSA sends it unsigned, which a strict IdP such as AD FS refuses. Without an IdP SLO URL, the browser returns to the UCM login page. An unsigned or forged LogoutRequest is refused and the session stays open.
@@ -2772,12 +2797,21 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 2. Set the **Redirect URI** to: \`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
 3. Copy the **Client ID** and **Client Secret**
 4. In UCM, go to **Settings → SSO**
-5. Click **Add Provider** → OAuth2
+5. On the **OAuth2 / OIDC** card, click **Configure**
 6. Enter the **Authorization URL** and **Token URL**
 7. Enter the **User Info URL** (for fetching user attributes after login)
 8. Enter Client ID and Secret
 9. Configure scopes (openid, profile, email)
 10. Click **Save** and **Enable**
+
+### Presets
+- **Microsoft Entra ID** (single tenant) fills the URLs and the issuer \`https://login.microsoftonline.com/{tenant}/v2.0\`: replace \`{tenant}\` with the directory (tenant) ID in all three. A provider saved with \`{tenant}\` left in is refused. For a multi-tenant application, set the issuer to \`https://login.microsoftonline.com/organizations/v2.0\` (or \`common\`), the URLs with the same authority, and list the tenant IDs (GUIDs) under **Accepted tenants**: a token is accepted only when its \`tid\` is listed, its issuer is the discovery template \`https://login.microsoftonline.com/{tenantid}/v2.0\` with that \`tid\`, and its signing key, when it names an issuer, names that one. There is no wildcard: the personal Microsoft accounts tenant is accepted only when listed, and ID token verification must stay on. An identity belongs to its tenant: the same \`sub\` in two tenants is two accounts, and a tenant taken off the list no longer signs in. An account bound before the provider accepted several tenants keeps its bare \`sub\`: reset its SSO identity and choose its tenant so that its next sign-in binds the tenant one. Accepting a tenant trusts its administrators, who choose the usernames and e-mails of their users: an attached account not bound yet is bound by its username or e-mail only by a sign-in from the **Expected tenant** chosen when attaching the provider or resetting the identity (by default the tenant of the former identity), and an attachment without one is bound by no sign-in. The role mapping reads the roles and groups of the tenants listed under **Tenants whose roles are honoured** only, which entrusts their administrators with UCM roles. When the role mapping has rules, a user of another accepted tenant matches none and is refused at sign-in, an existing account included; without rules, every accepted tenant gets the default role, so an administrator default role makes every new account of every accepted tenant an administrator.
+- **Google** fills the issuer \`https://accounts.google.com\`.
+- **GitHub** is not an OpenID Connect provider and issues no ID token: the preset turns **Verify ID token signature** off and maps \`login\` to the username. The account is recognised by its numeric GitHub \`id\` (UCM reads the UserInfo \`sub\`, else \`id\`), never by the login or the email.
+- Switching preset puts back the issuer and the verification setting the previous one set, unless they were changed since.
+
+### ID token signature
+RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512 and EdDSA (Ed25519, Ed448) are accepted, never \`none\` nor HS256, HS384 or HS512. The signing key must be of the type and curve the algorithm names, its \`alg\` and \`use\`, when present, the token's algorithm and \`sig\`, and an RSA key 2048 bits or more. Without a JWKS URI, the algorithm must also be listed in the discovery document. In FIPS mode, EdDSA is accepted only when the FIPS module approves it, and an RSA key must have an even size of 2048 to 16384 bits. A refused algorithm is named in the audit entry.
 
 ### Auto-Create Users
 When enabled, a new UCM user account is automatically created on first SSO login, using the IDP-provided attributes, with the role its mapping rule gives, else the default role.
@@ -2785,12 +2819,14 @@ When enabled, a new UCM user account is automatically created on first SSO login
 ### Groups for role mapping
 Role mapping rules compare their keys with the values of the **roles** and **groups** claims, read from the ID token of the login and from the UserInfo response together. Microsoft Entra ID sends groups and app roles only in the ID token: in the application registration, add the groups claim under **Token configuration** (the values are group object IDs, so the mapping keys are these IDs), or define app roles and map their values. A user in more than about 200 groups gets no groups claim from Entra ID: UCM logs a warning and only the app roles can match. Emit only the groups assigned to the application, or app roles. With **Verify ID token signature** off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.
 
+A row \`claim → groups\` in the attribute mapping makes that claim the source of the groups, in the ID token and in UserInfo under the same conditions, in place of **roles** and **groups**. The name is looked up as it is first (\`https://example.com/groups\`), then as a dotted path through nested objects: for Keycloak, \`realm_access.roles\` for realm roles and \`resource_access.<client id>.roles\` for client roles. A value that is neither a string nor a list of strings gives no group. A row of the new form (\`attribute → groups\`) replaces a row of the legacy form (\`groups → attribute\`), which is then no longer read; the screen names, under the mapping, the attributes no row reads any more. To keep reading both, replace the legacy row with a row \`attribute → groups\`.
+
 ## Who can sign in
 
 ### Identity matching
-A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. When no account matches, a sign-in whose email belongs to an account of another provider or left without provider by another or an unknown IdP (after a restore, for instance), or, while the email is unverified, to one linked to this provider and not bound yet, is refused rather than given a second account. To attach an account to a provider, use **Link to SSO** on that user (**Change provider or reset SSO identity** on a linked one): it accepts a local account, one of another provider, which it moves, and one whose identity changed at the IdP, which it resets. Its next sign-in through that provider binds the IdP identifier, and an account without a local password is not asked for one.
+A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. When no account matches, a sign-in whose email belongs to an account attached to other providers only or left by another or an unknown IdP (after a restore, for instance), or, while the email is unverified, to one attached to this provider and not bound yet, is refused rather than given a second account. An account may be attached to several providers, each with its own identity, and no sign-in attaches a provider to an existing account by its name or email: an administrator does, with **Attach a provider** on that user. It accepts a local account and one of other providers, which keep opening it; **Reset identity** clears the identity of an attachment the IdP changed. The next sign-in through that provider binds the IdP identifier, and an account without a local password is not asked for one.
 
-When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Link to SSO** on each account.
+When a provider is deleted, its attachments are kept as orphans and the other providers of each account keep opening it: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for attachments a restore could not place, use **Attach a provider** on each account.
 
 ### Role mapping rules
 - **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
@@ -2800,23 +2836,30 @@ When a provider is deleted, its users are kept: a provider created again for the
 
 The **User Provisioning** section opens by itself and shows a warning when the provider has no rule.
 
+### Diagnosing a refused sign-in
+A sign-in refused because no rule matches, or because the provider has no rule and no default role, is recorded in the **Audit Logs** as a failed login (quick filter **Failed Logins**). The entry gives the group values UCM read (at most 20, each cut at 64 characters) and where they were read: the ID token, UserInfo or both for OIDC, with the reason the ID token was not used; the attributes read for SAML; the group search base or \`memberOf\` for LDAP. When nothing was read through OIDC or SAML, it names the claims or attributes received that look like group lists, never their values: map one of them to \`groups\`. Then add a role mapping rule for one of the values, or set a default role. The refused user sees only the refusal message (no rule matched, or no default role and no role mapping rule), never the group values.
+
+### Testing a sign-in
+**Test sign-in**, beside **Test Connection** on a saved OIDC or SAML provider, enabled or not, opens the IdP in a new window: sign in there with the identity to try. The IdP returns to the same redirect URI or ACS URL as a sign-in, and UCM runs the same checks and the same account decision. The provider screen then shows the identity and groups read, the verdict, the role, the account that would be opened or created and, for a refusal, its reason with the attributes to map to \`groups\`. Nobody is signed in and no account changes; the window only says the test is over. The test uses the saved provider (unsaved changes are announced, not sent); only the administrator who started it reads the result, for 10 minutes. The audit log records it as \`sso_sign_in_test\`, apart from sign-ins.
+
 ## LDAP
 
 ### Configuration
 1. In UCM, go to **Settings → SSO**
-2. Click **Add Provider** → LDAP
+2. On the **LDAP / Active Directory** card, click **Configure**
 3. Enter the **LDAP Server** hostname and **Port** (389 for LDAP, 636 for LDAPS)
 4. Enable **Use SSL/TLS** (LDAPS, port 636) or, on port 389, **Use StartTLS**: the connection switches to TLS before any bind, with the same certificate verification. Without either, the bind and user passwords cross the network in clear
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Link to SSO** on each account
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Reset identity** on each account
 9. Click **Test Connection** to verify, then **Save** and **Enable**
 
 ### Groups
 - **memberOf**: read from the user's own entry (a base search on its DN); the group filter is not used
-- **member / uniqueMember**: searched under the parent of the Base DN when the directory holds it, then under the Base DN if that search fails, with the group filter (\`(objectClass=*)\` when empty); groups beside the users (\`ou=groups\` next to \`ou=people\`) are found
-- **Direct membership only**: nested groups and the Active Directory primary group (Domain Users) are not seen
+- **member / uniqueMember**: searched under the Group Search Base alone when it is set; otherwise under the parent of the Base DN when the directory holds it, then under the Base DN if that search fails, with the group filter (\`(objectClass=*)\` when empty); groups beside the users (\`ou=groups\` next to \`ou=people\`) are found
+- **Direct membership only** by default: nested groups and the Active Directory primary group (usually RID 513, Domain Users on an English-language domain) are not seen
+- **Nested groups and primary group** (Active Directory only, off by default): adds every group above the user's groups at any depth (matching rule 1.2.840.113556.1.4.1941) and the primary group, read by its SID wherever it lies, so parent groups give their roles. The parent groups are searched under the same bases as a member search (with memberOf too); the primary group's own name counts only under that base and through the group filter. Distribution groups are followed too: the group filter (&(objectClass=group)(groupType:1.2.840.113556.1.4.803:=2147483648)) keeps only the security groups this search finds. With rules or required groups, on another directory, or when the search fails, times out or passes 1000 groups, the sign-in is refused, never limited to the direct groups
 - **Matching**: group names compare with rules and required groups ignoring case and edge spaces, a run of inner spaces counting as one
 - **Unreadable groups**: with rules or required groups, a sign-in whose groups cannot be read is refused with "your groups could not be read from the directory"
 - **Test Mapping** reads the groups and decides as the sign-in does, without the password; it shows a role only for an admitted user
@@ -2830,7 +2873,7 @@ For Microsoft Active Directory, use:
 - Full name attr: \`displayName\`
 
 ## Login Flow
-1. User clicks **Login with SSO** on the UCM login page (or enters LDAP credentials)
+1. User clicks the button of their provider on the UCM login page (or enters LDAP credentials)
 2. For SAML/OAuth2: user is redirected to the IDP, authenticates, then redirected back
 3. For LDAP: credentials are verified directly against the LDAP server
 4. UCM creates or updates the user account
@@ -2986,14 +3029,14 @@ Restrict which key algorithms and sizes can be used:
 - **EC-P256**: Modern, fast, recommended
 - **EC-P384**: Higher security elliptic curve
 - **EC-P521**: Maximum security (rarely needed)
-- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantum (FIPS 204), NIST levels 2, 3 and 5; removed in FIPS mode
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantum (FIPS 204), NIST levels 2, 3 and 5; removed in FIPS mode when the FIPS module does not approve them
 
-**Allowed Signature Schemes** restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
+The \`allowed_signature_schemes\` rule, set through the API only (the policy form does not show it), restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
 
 **Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes.
 
 ### SAN Restrictions
-- **Max DNS Names**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted
+- **Max SANs**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted. Over ACME, a DNS name the CN alone carries counts too (RFC 8555 §7.4)
 - **DNS Pattern**: Scopes the policy to the requests whose CN or DNS SANs match, label by label and ignoring case: \`*.company.com\` covers the names under company.com, \`company.com\` covers company.com as well. Other names are not refused: the policy does not apply to them
 
 ## Approval Workflows
@@ -3010,8 +3053,8 @@ When **Require Approval** is enabled, certificate issuance is paused until the r
 ## Priority System
 
 Policies are evaluated in priority order. Lower numbers have higher precedence:
-- **1–10**: Critical security policies (code signing, wildcard)
-- **10–20**: Standard compliance (public TLS, internal PKI)
+- **1-10**: Critical security policies (code signing, wildcard)
+- **10-20**: Standard compliance (public TLS, internal PKI)
 - **20+**: Permissive defaults
 
 When multiple policies match a certificate request, the highest-priority (lowest number) policy decides the approval; the rules of every matching policy apply together (the smallest maximum validity, the intersection of the allowed key types, and so on).
@@ -3373,7 +3416,7 @@ UCM integrates with Microsoft Active Directory Certificate Services (AD CS) to s
 The certificate is returned immediately and imported into UCM.
 
 ### Manager Approval Templates
-UCM saves the request as **Pending** and tracks the MS CA request ID. The page offers no status check for it: once it is issued on the Windows CA, import the certificate, or let **Inventory sync** over the WinRM admin channel import the certificates UCM does not know yet.
+UCM saves the request as **Pending** and tracks the MS CA request ID. Open the CSR in **CSRs → Pending** and click **Check status**: if the CA issued the certificate (approved on the Windows CA console, for instance), UCM imports it into the request; if the CA denied it, the request becomes Denied; otherwise it stays Pending. Approving from the **CA Control Panel** imports the certificate too. **Inventory sync** completes pending requests the same way, and reports them as completed, apart from the certificates it imports. A request whose CSR is signed elsewhere (a local CA, an import) is closed; if its details are still open, **Check status** shows *This CSR was signed elsewhere: its Microsoft CA request is closed*. A certificate the CA still issues for it enters as a separate certificate when the request is approved from the **CA Control Panel**, or through a full inventory sync (\`full: true\` on \`POST /api/v2/microsoft-cas/{id}/inventory-sync\`): **Import from CA now** and the scheduled sync are incremental and can miss it.
 
 ## Enroll on Behalf Of (EOBO)
 
@@ -3461,7 +3504,7 @@ The control panel (opened from the connection, requires the admin channel) manag
 | Connection test fails | Verify hostname, port 443, and that certsrv is accessible |
 | No templates found | Check that the UCM account has enrollment permissions on the CA |
 | EOBO denied | Verify enrollment agent certificate and template permissions |
-| Request stuck pending | Approve it from the CA Control Panel, or on the Windows CA console then refresh status |
+| Request stuck pending | Click Check status on the CSR, or run an Inventory sync; or approve it from the CA Control Panel |
 | Admin channel test fails | Verify WinRM is enabled on the CA, the port/transport, and that pywinrm is installed |
 | Revocation not on the CA | Enable the WinRM admin channel, without it, revocation is local to UCM |
 | Pending not detected (non-English CA) | Fixed in v2.192. UCM now recognizes localized AD CS pending pages |
@@ -3513,6 +3556,20 @@ A Host CA signs certificates that authenticate **servers to clients**. When a cl
 6. List the allowed principals, or tick **Allow any principal**
 7. Click **Create**
 
+### On an HSM key
+
+An SSH CA can keep its private key on an HSM provider.
+
+1. In **Create SSH CA**, set **Key Storage** to **HSM**
+2. Pick the **HSM Provider**, then the **Existing HSM Key**: only unused RSA and ECDSA P-256/P-384/P-521 signing keys are listed
+3. Click **Create**. The CA takes its key type from the key, and the private key never leaves the token
+
+Good to know:
+- An SSH CA on an HSM takes an RSA or ECDSA P-256, P-384 or P-521 key. Ed25519 keys are not offered: UCM's HSM signing does not cover EdDSA, so an Ed25519 SSH CA is a software key. Brainpool and ML-DSA keys are not offered either: UCM signs with them on an HSM for X.509 CAs, but OpenSSH certificates have no key type for them.
+- An HSM key backs one authority, X.509 or SSH. A key a CA already holds is refused with the name of that CA, and neither the key nor its provider can be deleted while the CA exists.
+- It needs \`write:ssh_cas\` and \`read:hsm\`. Without \`read:hsm\` the **HSM** choice is disabled.
+- In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused, as it exists on one node only.
+- If the provider cannot be reached when the CA is created, nothing is created.
 ### Allowed Principals
 
 The **Allowed Principals** field restricts the names a CA signs for, as comma-separated patterns (\`deploy\`, \`team-*\`, \`web??.example.com\`). Every principal in a request must match one of them.
@@ -3683,7 +3740,7 @@ Choose a preset or set custom duration:
 | 30 days | Monthly rotation |
 | 365 days | Long-lived service accounts |
 
-Short-lived certificates (8h–24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
+Short-lived certificates (8h-24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
 
 A certificate is valid from 5 minutes before it is issued, so a server whose clock lags slightly behind accepts it at once; the lifetime still counts from issuance (v2.252).
 
@@ -3744,6 +3801,8 @@ On clients, add the Host CA to known_hosts:
 4. Download and deploy the updated KRL to servers (from SSH CAs page)
 
 A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
+
+The KRL names a certificate by its serial number, which UCM gives out once per CA. An installation upgraded from 2.x, or one that restored a 2.x archive, may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all; when one of them was already revoked, the others are revoked with it. Revoke them and issue new certificates. A certificate of serial 0, which OpenSSH reads as not numbered (an imported one, for instance), is listed in the KRL by its key ID once revoked, as OpenSSH does: every certificate of the CA with that key ID, whatever its serial, is refused with it, and UCM revokes them with it. A certificate with that key ID can then no longer be issued or imported under the CA. The key itself and certificates from other CAs stay valid.
 
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 

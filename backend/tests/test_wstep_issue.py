@@ -16,6 +16,10 @@ from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates, template_ids_named, templates_created_here_removed
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
+from tests.windows_profile_support import restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 ISSUE_URL = '/ADCertificateService_CES_UsernamePassword/service.svc'
@@ -30,27 +34,22 @@ def _templates_stay_in_this_module(app):
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
 def wstep_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Issue CA')
-    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_username', 'wstep_password', 'wstep_validity_days')
+    # The issuing CA is the mTLS anchor too: native TLS renewal needs it (A5)
+    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_username', 'wstep_password', 'wstep_validity_days',
+            'mtls_enabled', 'mtls_trusted_ca_id')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
+        _set_config('mtls_enabled', 'true')
+        _set_config('mtls_trusted_ca_id', ca.refid)
         _set_config('wstep_username', WSTEP_USER)
         _set_config('wstep_password', WSTEP_PASSWORD)
         _set_config('wstep_validity_days', '30')
@@ -58,16 +57,7 @@ def wstep_config(app, create_ca):
     yield ca_data
 
     with app.app_context():
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _basic_auth():
@@ -488,12 +478,12 @@ def test_a_bare_csr_is_not_issued_under_a_template_of_capped_ekus_only(client, a
     """`openssl req -new` with a CN alone: OCSP Signing, whose only EKU is never issued,
     scores as a perfect match but is no template for it; the server pair is kept."""
     from models import CA
-    from services.xcep.policy_builder import _policy_oid_for_template
+    from tests.windows_profile_support import template_oid
     with app.app_context():
         ca = db.session.get(CA, wstep_config['id'])
         ocsp = CertificateTemplate.query.filter_by(name='OCSP Signing').first()
         assert ocsp is not None and ocsp.is_active
-        ocsp_oid = _policy_oid_for_template(ca, ocsp)
+        ocsp_oid = template_oid(ca, ocsp)
     csr, _key = _make_csr(common_name='bare.example.test')
     r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
     assert r.status_code == 200, r.data
@@ -532,11 +522,11 @@ def test_a_template_of_capped_ekus_only_is_refused(client, app, wstep_config, _c
     """OCSP Signing would be signed under the server profile, its only EKU dropped: the
     request asking for it, or naming it, is refused as the client's fault."""
     from models import CA
-    from services.xcep.policy_builder import _policy_oid_for_template
     from tests.test_wstep_protocol_conformance import _fault, _fault_code
+    from tests.windows_profile_support import template_oid
     with app.app_context():
         ca = db.session.get(CA, wstep_config['id'])
-        ocsp_oid = _policy_oid_for_template(ca, CertificateTemplate.query.filter_by(name='OCSP Signing').first())
+        ocsp_oid = template_oid(ca, CertificateTemplate.query.filter_by(name='OCSP Signing').first())
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     builder = (x509.CertificateSigningRequestBuilder()
                .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ocsp.example.test')]))

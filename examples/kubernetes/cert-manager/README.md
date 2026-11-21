@@ -47,8 +47,8 @@ on renewal — UCM only requires EAB for **account creation**).
 
 ### Step 1 — Enable EAB in UCM
 1. Log in to UCM as **admin**.
-2. **Settings → ACME** → enable **External Account Required**.
-3. **ACME → EAB Credentials → Create**. UCM returns once:
+2. **ACME → EAB Credentials** → enable **Require External Account Binding**.
+3. **ACME → EAB Credentials → New EAB**. UCM returns once:
    ```
    kid:  XPD3ZsFCbGrWWib9pWYIMw
    hmac: sVbRLYu-AHNZz52yq69Leld02zVMU68GIIkLjHbVzlM
@@ -170,6 +170,6 @@ kubectl logs -n cert-manager deploy/cert-manager --tail=200 | grep -i <name>
 - **Account key change** (RFC 8555 §7.3.5) is supported and audited.
 - **Audit**: account creation, order creation, finalize, certificate
   revoke, challenge final state, and key change are written to UCM's
-  audit log (Operations → Audit Logs).
+  audit log (Modules → Administration → Audit Logs).
 - **Renewal**: cert-manager renews based on `renewBefore` (default
   2/3 of cert lifetime). UCM has no rate limit on renewals.

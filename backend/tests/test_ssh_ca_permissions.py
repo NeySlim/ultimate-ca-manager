@@ -12,6 +12,9 @@ from auth.permissions import (
 )
 from models import User
 from tests.test_ssh import _generate_test_ssh_key
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 ACTIONS = ('read', 'write', 'delete')
 

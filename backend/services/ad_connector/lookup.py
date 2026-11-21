@@ -11,9 +11,11 @@ Two things live here:
    user. The template comes from the request (311.21.7 or 311.20.2, else its
    EKUs, see wstep_service.py's ``_match_template``), never the principal.
 
-2. The actual AD lookups (``lookup_computer_dns_hostname``,
-   ``lookup_user_ad_identity``) MS-WSTEP's Kerberos issuance path uses to
-   resolve a naked (subject-less) CSR's identity: real Windows unattended
+2. The actual AD lookups, each against the connector its caller passes: the SID
+   checks of WSTEP issuance and of EST, SCEP and WSTEP renewals
+   (``lookup_object_sid``, ``lookup_account_by_sid``), group membership, and
+   ``lookup_computer_dns_hostname``/``lookup_user_ad_identity``, which MS-WSTEP's
+   Kerberos issuance path uses to resolve a naked (subject-less) CSR's identity: real Windows unattended
    GPO autoenrollment intentionally submits a CSR with no CN/SAN for
    templates configured to build the subject from Active Directory,
    trusting the CA to derive it server-side -- ``CN=<computer's AD
@@ -24,8 +26,8 @@ Two things live here:
 
 Bind/search mechanics mirror ``api/v2/sso/connection_tests.py``'s
 ``_ldap_authenticate_user``/``api/v2/sso/helpers.py``'s ``_build_ldap_tls``
-(same ``ldap3`` conventions), but operate on this module's own
-``ADConnectorConfig`` singleton -- not ``SSOProvider`` -- and fix a leaked
+(same ``ldap3`` conventions), but operate on the ``ADConnectorConfig`` row the caller passes
+-- not ``SSOProvider`` -- and fix a leaked
 temp CA-bundle file that exists in that code (no matching cleanup there).
 
 The public lookups never raise: they answer None (or False) when the connector is
@@ -34,11 +36,14 @@ account), and the falsy ``UNREACHABLE`` when no DC binds, a
 search raises or returns an LDAP error result, or the enabled connector lacks a server
 or base DN, so a caller can refuse the request or fault on its own side.
 """
+from utils.encryption import SecretUnreadable, decrypt_required
+import contextvars
 import logging
 import os
 import re
 import ssl
 import tempfile
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +64,8 @@ class _Falsy:
 
 # No DC bound, a search failed, or the enabled connector has no server or base DN.
 UNREACHABLE = _Falsy('UNREACHABLE')
+# The account exists but has no userPrincipalName.
+NO_UPN = _Falsy('NO_UPN')
 # The account exists but its objectSid is missing or malformed.
 UNUSABLE_SID = _Falsy('UNUSABLE_SID')
 # The Kerberos principal or the SID names no account (a SID matching a non-account
@@ -68,12 +75,9 @@ NO_ACCOUNT = _Falsy('NO_ACCOUNT')
 FOREIGN_REALM = _Falsy('FOREIGN_REALM')
 
 
-def _enabled_config():
+def _enabled_config(config):
     """(config, None) for a complete enabled connector; (None, None) when it is absent or
     disabled; (None, UNREACHABLE) when it is enabled but has no server or base DN."""
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled:
         return None, None
     if not config.server or not config.base_dn:
@@ -145,7 +149,22 @@ def realm_of_base_dn(base_dn):
     return '.'.join(dc_values).upper()
 
 
-def realm_matches_connector(realm):
+def domain_head_dn(base_dn):
+    """The DN made of the DC components of ``base_dn`` alone (the domain head), escapes
+    kept; None when it has none."""
+    from ldap3.utils.dn import parse_dn
+
+    if not base_dn:
+        return None
+    try:
+        components = parse_dn(_normalized_dn(base_dn))
+    except Exception:
+        return None
+    head = [f'{attr}={value}' for attr, value, _sep in components if attr.upper() == 'DC']
+    return ','.join(head) or None
+
+
+def realm_matches_connector(config, realm):
     """Whether ``realm`` (from an authenticated Kerberos principal, e.g.
     ``'HAGLAND.DOMAIN'``) matches the domain this AD Connector is configured
     against, so a caller can refuse to map a principal from an unexpected
@@ -162,9 +181,6 @@ def realm_matches_connector(realm):
     """
     if not realm:
         return False
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled or not config.base_dn:
         return False
     connector_realm = realm_of_base_dn(config.base_dn)
@@ -182,27 +198,21 @@ def _config_fault(config):
     return None
 
 
-def connector_config_fault():
-    """Why the enabled connector cannot resolve a principal, or None."""
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
+def connector_config_fault(config):
+    """Why the enabled connector ``config`` cannot resolve a principal, or None."""
     if not config or not config.enabled:
         return None
     return _config_fault(config)
 
 
-def connector_account(principal):
-    """The sAMAccountName an enabled connector checks ``principal`` against.
+def connector_account(config, principal):
+    """The sAMAccountName the enabled connector ``config`` checks ``principal`` against.
 
     None when the connector is absent or disabled; the falsy ``UNREACHABLE`` when it is
     enabled without a server or a base DN that names a realm; the falsy ``NO_ACCOUNT``
     or ``FOREIGN_REALM`` when the principal is malformed or of another realm, which a
     caller refuses rather than issuing without the checks the connector enforces.
     """
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled:
         return None
     if _config_fault(config):
@@ -210,7 +220,7 @@ def connector_account(principal):
     parsed = parse_kerberos_principal(principal)
     if not parsed:
         return NO_ACCOUNT
-    if not realm_matches_connector(parsed[1]):
+    if not realm_matches_connector(config, parsed[1]):
         return FOREIGN_REALM
     return parsed[0]
 
@@ -273,9 +283,33 @@ def _build_tls(config):
 BIND_CREDENTIAL_MISSING = 'bind credentials missing, refusing anonymous bind'
 
 
+class ADSecretUnreadable(ValueError, SecretUnreadable):
+    """The stored bind password this node's database key does not open; the message names it."""
+
+
+def _bind_password(config):
+    """The bind password: a saved row's token must open, a form object carries it typed."""
+    if not hasattr(config, '_bind_password'):
+        return getattr(config, 'bind_password', None)
+    try:
+        return decrypt_required(config._bind_password,
+                                f'AD connector {getattr(config, "id", None)} bind password')
+    except SecretUnreadable as e:
+        raise ADSecretUnreadable(str(e)) from e
+
+
 def has_bind_credentials(config):
     """Whether a config-like object carries both halves of the bind credential."""
     return bool(getattr(config, 'bind_dn', None) and getattr(config, 'bind_password', None))
+
+
+def unreadable_bind_password(config):
+    """The message naming a saved bind password this node cannot open, else None."""
+    try:
+        _bind_password(config)
+    except ADSecretUnreadable as e:
+        return str(e)
+    return None
 
 
 class ADConnectorConnectionError(Exception):
@@ -344,9 +378,12 @@ def config_servers(config):
 # indefinitely instead of failing closed like every other error mode here.
 _LDAP_CONNECT_TIMEOUT_SECONDS = 10
 _LDAP_RECEIVE_TIMEOUT_SECONDS = 10
+_clock = time.monotonic
+# Set by a caller that must not wait one connect timeout per DC: no new bind starts past it
+_bind_deadline = contextvars.ContextVar('ad_connector_bind_deadline', default=None)
 
 
-def _connect_to(config, host, tls):
+def _connect_to(config, host, tls, connect_timeout=None):
     """Bind as the connector's service account against one DC. Raises on
     any failure. ``tls`` is built once by the caller and shared across
     every host -- it carries no per-host state, and rebuilding it per
@@ -355,10 +392,10 @@ def _connect_to(config, host, tls):
 
     server = ldap3.Server(
         host, port=config.port, use_ssl=config.use_ssl,
-        tls=tls, get_info=ldap3.ALL, connect_timeout=_LDAP_CONNECT_TIMEOUT_SECONDS,
+        tls=tls, get_info=ldap3.ALL, connect_timeout=connect_timeout or _LDAP_CONNECT_TIMEOUT_SECONDS,
     )
     return ldap3.Connection(
-        server, user=config.bind_dn, password=config.bind_password,
+        server, user=config.bind_dn, password=_bind_password(config),
         auto_bind=True, check_names=False, receive_timeout=_LDAP_RECEIVE_TIMEOUT_SECONDS,
     )
 
@@ -377,6 +414,7 @@ def _connect(config):
     servers = config_servers(config)
     if not servers:
         raise ValueError('AD Connector has no server configured')
+    _bind_password(config)  # an unreadable one is named, not taken for a missing one
     if not has_bind_credentials(config):
         raise ValueError(BIND_CREDENTIAL_MISSING)
 
@@ -391,7 +429,10 @@ def _connect(config):
     tls, cleanup = _build_tls(config)
     try:
         failures = []
+        deadline = _bind_deadline.get()
         for host in servers:
+            if failures and deadline is not None and _clock() >= deadline:
+                break
             try:
                 return _connect_to(config, host, tls)
             except Exception as e:
@@ -443,7 +484,7 @@ def _single_entry(entries, sam_account_name, what='named'):
     return entries[0]
 
 
-def lookup_computer_dns_hostname(sam_account_name):
+def lookup_computer_dns_hostname(config, sam_account_name):
     """The AD computer object's ``dNSHostName`` for ``sam_account_name``
     (e.g. ``'WIN11$'``, trailing ``$`` included -- it's a real part of the
     attribute value, not an LDAP filter metacharacter to strip).
@@ -452,9 +493,22 @@ def lookup_computer_dns_hostname(sam_account_name):
     is not found or the attribute is empty/missing, and the falsy ``UNREACHABLE``
     when no DC binds or the search fails. Never raises.
     """
+    identity = lookup_computer_identity(config, sam_account_name)
+    return identity['dns_hostname'] if identity else identity
+
+
+def lookup_computer_identity(config, sam_account_name):
+    """``{'dns_hostname', 'sam_account_name', 'dn_components'}`` of the AD computer object, from
+    one search; ``dn_components`` (leaf to root, as ``lookup_user_ad_identity``'s) is None when
+    the DN does not parse.
+
+    Same answers as ``lookup_computer_dns_hostname`` otherwise: ``None`` when the connector is off,
+    the entry is not found or has no ``dNSHostName``, the falsy ``UNREACHABLE`` when the directory
+    cannot answer. Never raises.
+    """
     from ldap3.utils.conv import escape_filter_chars
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
 
@@ -467,14 +521,16 @@ def lookup_computer_dns_hostname(sam_account_name):
     try:
         safe_sam = escape_filter_chars(sam_account_name)
         entries = _search(conn, config.base_dn, f'(&(objectClass=computer)(sAMAccountName={safe_sam}))',
-                          ['dNSHostName'])
+                          ['dNSHostName', 'sAMAccountName'])
         entry = _single_entry(entries, sam_account_name)
         # Compared by identity: None and UNREACHABLE are the only non-entry answers
         if entry is None or entry is UNREACHABLE:
             return entry
         if 'dNSHostName' not in entry or not entry.dNSHostName.value:
             return None
-        return str(entry.dNSHostName.value)
+        return {'dns_hostname': str(entry.dNSHostName.value),
+                'sam_account_name': _text_attribute(entry, 'sAMAccountName'),
+                'dn_components': _dn_components(getattr(entry, 'entry_dn', None))}
     except Exception as e:
         logger.warning("AD Connector: computer lookup failed: %s", e)
         return UNREACHABLE
@@ -483,6 +539,23 @@ def lookup_computer_dns_hostname(sam_account_name):
             conn.unbind()
         except Exception:
             pass
+
+
+def _dn_components(dn):
+    """``[(attr, value), ...]`` of ``dn`` leaf to root, None when it is empty or does not parse."""
+    from ldap3.utils.dn import parse_dn
+    try:
+        return [(attr, value) for attr, value, _sep in parse_dn(dn)] or None if dn else None
+    except Exception:
+        return None
+
+
+def _text_attribute(entry, name):
+    """The single text value of ``name`` on ``entry``, None when absent or empty."""
+    if name not in entry:
+        return None
+    value = getattr(entry, name).value
+    return str(value) if value else None
 
 
 def _sid_bytes_to_string(raw):
@@ -514,7 +587,14 @@ def _sid_bytes_to_string(raw):
     return f"S-{revision}-{authority}-" + "-".join(str(s) for s in sub_authorities)
 
 
-def lookup_object_sid(sam_account_name):
+def sid_domain(sid):
+    """``'S-1-5-21-a-b-c-1105'`` -> ``'S-1-5-21-a-b-c'``: the domain an account SID belongs
+    to, its last sub-authority being the RID (MS-DTYP 2.4.2.4); None when it has none."""
+    head, sep, rid = (sid or '').rpartition('-')
+    return head if sep and rid.isdecimal() and head.count('-') >= 3 else None
+
+
+def lookup_object_sid(config, sam_account_name):
     """The AD object's ``objectSid`` (user or computer -- no ``objectClass``
     filter needed since ``sAMAccountName`` is domain-unique, machine
     accounts keep their trailing ``$``), as a ``"S-1-5-21-..."`` string --
@@ -529,13 +609,14 @@ def lookup_object_sid(sam_account_name):
     ``_sid_bytes_to_string``.
 
     ``None`` when the connector is off or the entry is not found; the falsy ``UNUSABLE_SID``
-    when its SID is missing or malformed; the falsy ``UNREACHABLE`` when the directory cannot
+    when its SID is missing, malformed or outside the connector's ``domain_sid`` (when known),
+    so a base DN reaching another domain cannot lend its SID; the falsy ``UNREACHABLE`` when the directory cannot
     answer. Never raises. A caller telling "connector off" from "not found" resolves the
     account with ``connector_account`` first.
     """
     from ldap3.utils.conv import escape_filter_chars
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
 
@@ -554,7 +635,13 @@ def lookup_object_sid(sam_account_name):
             return entry
         if 'objectSid' not in entry or not entry.objectSid.raw_values:
             return UNUSABLE_SID
-        return _sid_bytes_to_string(entry.objectSid.raw_values[0]) or UNUSABLE_SID
+        sid = _sid_bytes_to_string(entry.objectSid.raw_values[0])
+        domain = getattr(config, 'domain_sid', None)
+        if sid and domain and sid_domain(sid) != domain:
+            logger.warning("AD Connector: %r has SID %s, outside the connector's domain %s",
+                           sam_account_name, sid, domain)
+            return UNUSABLE_SID
+        return sid or UNUSABLE_SID
     except Exception as e:
         logger.warning("AD Connector: SID lookup failed: %s", e)
         return UNREACHABLE
@@ -577,7 +664,7 @@ def _sid_string_to_bytes(sid):
             + b''.join(s.to_bytes(4, 'little') for s in subs))
 
 
-def lookup_account_by_sid(sid):
+def lookup_account_by_sid(config, sid):
     """The ``sAMAccountName`` of the one directory object whose ``objectSid`` is ``sid``.
 
     None when the connector is off; the falsy ``NO_ACCOUNT`` when ``sid`` is malformed or
@@ -587,7 +674,7 @@ def lookup_account_by_sid(sid):
     """
     from ldap3.utils.conv import escape_bytes
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
     raw = _sid_string_to_bytes(sid)
@@ -625,7 +712,7 @@ def lookup_account_by_sid(sid):
             pass
 
 
-def lookup_user_ad_identity(sam_account_name):
+def lookup_user_ad_identity(config, sam_account_name):
     """The AD user object's directory path (as ordered RDN components, for
     building an x509.Name matching real ADCS's directory-path subject),
     userPrincipalName, and mail (if set), for ``sam_account_name`` (no
@@ -633,12 +720,13 @@ def lookup_user_ad_identity(sam_account_name):
     ``is_machine_principal``).
 
     Returns ``{'dn_components': [(attr, value), ...], 'upn': str, 'mail':
-    str | None}`` -- the DN components ordered exactly as AD returns them
+    str | None, 'sam_account_name', 'display_name', 'given_name', 'surname'}`` (the last four
+    None when unset) -- the DN components ordered exactly as AD returns them
     (leaf to root, e.g. ``[('CN', 'Roy Hagland'), ('CN', 'Users'), ('DC',
     'hagland'), ('DC', 'domain')]``), confirmed against a real ADCS-issued
     User certificate's subject in the lab. ``None`` when the connector is not
-    configured/disabled, the entry is not found or has no ``userPrincipalName``;
-    the falsy ``UNREACHABLE`` when no DC binds or the search fails. Never raises.
+    configured/disabled or the entry is not found; the falsy ``NO_UPN`` when the entry has no
+    ``userPrincipalName``; the falsy ``UNREACHABLE`` when no DC binds or the search fails. Never raises.
 
     ``mail`` is deliberately optional (``None`` when unset), not a failure
     mode: real ADCS's own CT_FLAG_SUBJECT_REQUIRE_EMAIL hard-declines
@@ -651,7 +739,7 @@ def lookup_user_ad_identity(sam_account_name):
     from ldap3.utils.conv import escape_filter_chars
     from ldap3.utils.dn import parse_dn
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
 
@@ -665,19 +753,24 @@ def lookup_user_ad_identity(sam_account_name):
         safe_sam = escape_filter_chars(sam_account_name)
         entries = _search(conn, config.base_dn,
                           f'(&(objectCategory=person)(objectClass=user)(sAMAccountName={safe_sam}))',
-                          ['userPrincipalName', 'mail'])
+                          ['userPrincipalName', 'mail', 'sAMAccountName', 'displayName', 'givenName', 'sn'])
         entry = _single_entry(entries, sam_account_name)
         # Compared by identity: None and UNREACHABLE are the only non-entry answers
         if entry is None or entry is UNREACHABLE:
             return entry
         if 'userPrincipalName' not in entry or not entry.userPrincipalName.value:
-            return None
+            return NO_UPN
         upn = str(entry.userPrincipalName.value)
         mail = str(entry.mail.value) if 'mail' in entry and entry.mail.value else None
         dn_components = [(attr, value) for attr, value, _sep in parse_dn(entry.entry_dn)]
         if not dn_components:
             return None
-        return {'dn_components': dn_components, 'upn': upn, 'mail': mail}
+        # The other attributes feed a template's common name pattern only, from the same search
+        return {'dn_components': dn_components, 'upn': upn, 'mail': mail,
+                'sam_account_name': _text_attribute(entry, 'sAMAccountName'),
+                'display_name': _text_attribute(entry, 'displayName'),
+                'given_name': _text_attribute(entry, 'givenName'),
+                'surname': _text_attribute(entry, 'sn')}
     except Exception as e:
         logger.warning("AD Connector: user identity lookup failed: %s", e)
         return UNREACHABLE
@@ -698,7 +791,7 @@ def _looks_like_dn(value):
     return '=' in value and ',' in value
 
 
-def is_member_of_group(sam_account_name, group):
+def is_member_of_group(config, sam_account_name, group):
     """Whether the AD account ``sam_account_name`` (no trailing ``$``
     stripped -- caller passes it exactly as parsed from the Kerberos
     principal, so a machine account keeps its ``$``) is a member of
@@ -722,7 +815,7 @@ def is_member_of_group(sam_account_name, group):
     if not sam_account_name or not group:
         return False
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault if fault is not None else False
 
@@ -769,6 +862,55 @@ def is_member_of_group(sam_account_name, group):
             pass
 
 
+def read_domain_sid(conn, base_dn):
+    """The ``objectSid`` of the domain head the base DN sits under, as a string, None
+    when it cannot be read. Never raises."""
+    import ldap3
+
+    head = domain_head_dn(base_dn)
+    if not head:
+        return None
+    try:
+        conn.search(head, '(objectClass=*)', search_scope=ldap3.BASE, attributes=['objectSid'])
+        entries = conn.entries if isinstance(getattr(conn, 'result', None), dict) \
+            and conn.result.get('result') == _RESULT_SUCCESS else []
+        if len(entries) != 1 or 'objectSid' not in entries[0] or not entries[0].objectSid.raw_values:
+            return None
+        return _sid_bytes_to_string(entries[0].objectSid.raw_values[0])
+    except Exception as e:
+        logger.warning('AD Connector: could not read the domain SID under %r: %s', base_dn, e)
+        return None
+
+
+def fetch_domain_sid(config):
+    """``read_domain_sid`` over a fresh bind to the first DC that accepts it; None when
+    no DC binds. A save waits for it: no bind starts once the per-DC connect timeout of the
+    connection test (``_LDAP_CONNECT_TIMEOUT_SECONDS``) has passed. Never raises."""
+    if not config_servers(config):
+        return None
+    unreadable = unreadable_bind_password(config)
+    if unreadable:
+        logger.warning('AD Connector: could not bind to read the domain SID: %s', unreadable)
+        return None
+    if not has_bind_credentials(config):
+        return None
+    token = _bind_deadline.set(_clock() + _LDAP_CONNECT_TIMEOUT_SECONDS)
+    try:
+        conn = _connect(config)
+    except Exception as e:
+        logger.warning('AD Connector: could not bind to read the domain SID: %s', e)
+        return None
+    finally:
+        _bind_deadline.reset(token)
+    try:
+        return read_domain_sid(conn, getattr(config, 'base_dn', None))
+    finally:
+        try:
+            conn.unbind()
+        except Exception:
+            pass
+
+
 def test_connection(config):
     """Test connectivity + bind for a config-like object -- either the
     saved ``ADConnectorConfig`` row or an unsaved ``SimpleNamespace`` built
@@ -793,6 +935,11 @@ def test_connection(config):
     if not servers:
         return {'success': False, 'partial': False,
                 'message': 'Server is required', 'servers': []}
+    try:
+        _bind_password(config)  # an unreadable one is named, not taken for a missing one
+    except ADSecretUnreadable as e:
+        logger.warning('AD Connector: %s', e)
+        return {'success': False, 'partial': False, 'message': str(e), 'servers': []}
     if not has_bind_credentials(config):
         logger.warning('AD Connector: %s', BIND_CREDENTIAL_MISSING)
         return {'success': False, 'partial': False,
@@ -808,6 +955,7 @@ def test_connection(config):
                 'message': 'Connection failed: could not prepare the TLS settings', 'servers': []}
 
     results = []
+    domain_sid = None
     try:
         for host in servers:
             try:
@@ -817,6 +965,8 @@ def test_connection(config):
                 continue
             results.append({'server': host, 'success': True,
                             'message': 'Connected and bound successfully'})
+            if domain_sid is None:
+                domain_sid = read_domain_sid(conn, getattr(config, 'base_dn', None))
             try:
                 conn.unbind()
             except Exception:
@@ -830,14 +980,14 @@ def test_connection(config):
 
     if not ok_count:
         return {'success': False, 'partial': False,
-                'message': f'Connection failed: {detail}', 'servers': results}
+                'message': f'Connection failed: {detail}', 'servers': results, 'domain_sid': domain_sid}
     if failed:
         return {'success': True, 'partial': True,
                 'message': f'{ok_count} of {len(results)} servers connected -- {detail}',
-                'servers': results}
+                'servers': results, 'domain_sid': domain_sid}
     if len(results) == 1:
         return {'success': True, 'partial': False,
-                'message': 'Connected and bound successfully', 'servers': results}
+                'message': 'Connected and bound successfully', 'servers': results, 'domain_sid': domain_sid}
     return {'success': True, 'partial': False,
             'message': f'All {len(results)} servers connected and bound successfully',
-            'servers': results}
+            'servers': results, 'domain_sid': domain_sid}

@@ -17,7 +17,7 @@ from models import db
 
 
 @pytest.fixture
-def commit_always_fails(request, monkeypatch):
+def commit_always_fails(monkeypatch, auth_client):
     """Make the next db.session.commit() fail the way a busy database does.
 
     `safe_commit` catches it, rolls back and answers (False, response). The
@@ -25,10 +25,9 @@ def commit_always_fails(request, monkeypatch):
     """
     import utils.db_transaction as transaction
 
-    # The shared client signs back in on a 401 (a restore revoked its session):
-    # let it do so now, a sign-in under failing commits is refused.
-    if 'auth_client' in request.fixturenames:
-        request.getfixturevalue('auth_client').get('/api/v2/certificates?per_page=1')
+    # A client whose session an earlier restore revoked signs in again here,
+    # while commits still work: the login itself commits.
+    assert auth_client.get('/api/v2/acme/eab-credentials').status_code == 200
 
     real_commit = transaction.db.session.commit
     calls = {'n': 0}
@@ -42,6 +41,22 @@ def commit_always_fails(request, monkeypatch):
     yield calls
     monkeypatch.setattr(transaction.db.session, 'commit', real_commit,
                         raising=False)
+
+
+@pytest.fixture
+def session_revoked(auth_client):
+    """What a restore earlier in the worker leaves: a client signed out."""
+    auth_client._client.post('/api/v2/auth/logout')
+
+
+class TestTheFailingCommitMeetsASignedInClient:
+    def test_a_revoked_session_does_not_turn_the_failure_into_a_login_error(
+            self, auth_client, session_revoked, commit_always_fails):
+        response = auth_client.put('/api/v2/acme/eab-required',
+                                   json={'eab_required': True})
+
+        assert response.status_code == 500
+        assert commit_always_fails['n'] >= 1
 
 
 class TestTheAnswerIsAPair:
@@ -134,16 +149,3 @@ class TestARouteDoesNotAnnounceWhatItDidNotWrite:
         assert response.status_code == 500, (
             f'the route answered {response.status_code} for a setting the '
             'database never took')
-
-
-class TestTheContractHoldsAfterTheSharedSessionWasRevoked(
-        TestARouteDoesNotAnnounceWhatItDidNotWrite):
-    """A restore earlier in the same worker leaves the shared client signed out."""
-
-    @pytest.fixture(autouse=True)
-    def signed_out(self, auth_client):
-        jar = auth_client._client
-        for cookie in list(getattr(jar, '_cookies', {}).values()):
-            jar.delete_cookie(cookie.key, domain=cookie.domain, path=cookie.path)
-        assert jar.get('/api/v2/certificates?per_page=1').status_code == 401
-

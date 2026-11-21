@@ -53,10 +53,12 @@ def enforcement_active_for(user, *, provider=None):
         return False
     if getattr(user, 'totp_exempt', False):
         return False
-    if (getattr(user, 'auth_source', 'local') or 'local') == 'local':
+    if user.is_local:
         return global_enforce_2fa()
-    prov = provider if provider is not None else getattr(user, 'sso_provider', None)
-    return bool(prov is not None and getattr(prov, 'enforce_2fa', False))
+    if provider is not None:
+        return bool(getattr(provider, 'enforce_2fa', False))
+    # Outside a sign-in through one of them: any provider of the account that enforces it
+    return any(row.provider is not None and row.provider.enforce_2fa for row in user.sso_identities)
 
 
 def has_security_key(user, *, excluding=None):
@@ -81,9 +83,17 @@ def second_factor_methods(user):
     return methods
 
 
-def would_leave_no_second_factor(user, *, dropping_totp=False, dropping_key=None):
+def would_leave_no_second_factor(user, *, dropping_totp=False, dropping_key=None,
+                                 dropping_choice=False):
     """True when required 2FA (enforced, or a key the user turned on) would be left
-    with neither TOTP nor an enabled key."""
+    with neither TOTP nor an enabled key.
+
+    ``dropping_choice``: the key stops being the user's own second factor. Under
+    enforcement without TOTP that choice is what keeps a factor once enforcement is
+    lifted (disable_2fa sets it), so it stays; outside enforcement it is the user's own."""
+    if dropping_choice:
+        return (enforcement_active_for(user) and bool(getattr(user, 'webauthn_2fa', False))
+                and not getattr(user, 'totp_confirmed', False) and has_security_key(user))
     required = enforcement_active_for(user) or (
         bool(getattr(user, 'webauthn_2fa', False)) and has_security_key(user))
     if not required:
@@ -104,13 +114,25 @@ def lock_user(user_id):
     return db.session.query(User).filter_by(id=user_id).populate_existing().one_or_none()
 
 
-def lock_for_factor_change(user_id, *, dropping_totp=False, dropping_key=None):
+def lock_for_factor_change(user_id, *, dropping_totp=False, dropping_key=None,
+                           dropping_choice=False):
     """(locked user, refused): the guard is read under the lock, never before it."""
     user = lock_user(user_id)
     if user is None:
         return None, False
     return user, would_leave_no_second_factor(
-        user, dropping_totp=dropping_totp, dropping_key=dropping_key)
+        user, dropping_totp=dropping_totp, dropping_key=dropping_key,
+        dropping_choice=dropping_choice)
+
+
+# Every refusal to remove the last factor of required 2FA carries this reason
+LAST_FACTOR_REASON = 'last_second_factor'
+
+
+def last_factor_refusal(message):
+    """The 403 of a user's own request that would leave required 2FA without a factor."""
+    from utils.response import error_response
+    return error_response(message, 403, {'reason': LAST_FACTOR_REASON})
 
 
 def must_enroll_2fa(user, *, auth_method='password', provider=None):

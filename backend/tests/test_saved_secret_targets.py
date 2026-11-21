@@ -11,7 +11,17 @@ import uuid
 
 import pytest
 
-from models import ADConnectorConfig, db
+from models import db
+from tests.ad_connector_support import mount_connector
+from tests.windows_profile_support import connectors_kept
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """The connector rows this file deletes and rewrites are the session's: put back."""
+    with connectors_kept(app):
+        yield
+
 
 SAVED_PASSWORD = 'saved-bind-secret'
 
@@ -21,7 +31,7 @@ def _post(client, url, body):
 
 
 class TestADConnectorTest:
-    URL = '/api/v2/ad-connector/test'
+    URL = '/api/v2/ad-connectors/test'
 
     @pytest.fixture
     def captured(self, app, monkeypatch):
@@ -29,18 +39,15 @@ class TestADConnectorTest:
         calls = []
         monkeypatch.setattr(lookup, 'test_connection',
                             lambda cfg: calls.append(cfg) or {'success': True, 'message': 'ok'})
+        # The form names the saved connector by id: its password is the one a blank field reuses
         with app.app_context():
-            ADConnectorConfig.query.delete()
-            config = ADConnectorConfig(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
-                                       verify_ssl=True, base_dn='DC=corp,DC=local',
-                                       bind_dn='CN=svc,DC=corp,DC=local')
-            config.bind_password = SAVED_PASSWORD
-            db.session.add(config)
-            db.session.commit()
+            self.saved_id = mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
+                            verify_ssl=True, base_dn='DC=corp,DC=local',
+                            bind_dn='CN=svc,DC=corp,DC=local', password=SAVED_PASSWORD).id
         return calls
 
     def _form(self, **over):
-        body = {'servers': ['dc1.corp.local'], 'port': 636, 'use_ssl': True, 'verify_ssl': True,
+        body = {'id': self.saved_id, 'servers': ['dc1.corp.local'], 'port': 636, 'use_ssl': True, 'verify_ssl': True,
                 'bind_dn': 'CN=svc,DC=corp,DC=local', 'bind_password': ''}
         body.update(over)
         return body
@@ -105,12 +112,28 @@ class TestMicrosoftCAAdminChannelTest:
 
     @pytest.mark.parametrize('over', [
         {'winrm_host': 'attacker.example'}, {'winrm_port': 5985}, {'winrm_use_ssl': False},
-        {'winrm_verify_ssl': False}, {'winrm_transport': 'kerberos'},
-    ], ids=['host', 'port', 'plaintext', 'no-verify', 'transport'])
+        {'winrm_verify_ssl': False}, {'winrm_username': 'administrator'},
+    ], ids=['host', 'port', 'plaintext', 'no-verify', 'account'])
     def test_another_target_needs_the_secret_typed(self, auth_client, msca_id, seen, over):
         r = self._test(auth_client, msca_id, {**over, 'winrm_password': ''})
         assert r.status_code == 400, r.data
         assert not seen, 'a saved WinRM or basic password went to a target from the request'
+
+    def test_kerberos_sends_no_saved_password(self, auth_client, msca_id, monkeypatch):
+        import winrm
+        sessions = []
+
+        class FakeSession:
+            def __init__(self, endpoint, auth, **kwargs):
+                sessions.append((endpoint, auth, kwargs.get('transport')))
+
+            def run_ps(self, script):
+                return type('R', (), {'status_code': 0, 'std_out': b'UCM_CERTSVC=Running', 'std_err': b''})()
+
+        monkeypatch.setattr(winrm, 'Session', FakeSession)
+        r = self._test(auth_client, msca_id, {'winrm_transport': 'kerberos', 'winrm_host': 'other.example'})
+        assert r.status_code == 200, r.data
+        assert sessions == [('https://other.example:5986/wsman', ('u', ''), 'kerberos')]
 
     def test_a_masked_secret_is_not_a_typed_one(self, auth_client, msca_id, seen):
         r = self._test(auth_client, msca_id, {'winrm_host': 'attacker.example', 'winrm_password': '********'})

@@ -15,6 +15,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
 from models import CA, Certificate, db
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 OPENSSL = shutil.which('openssl')
 CURVES = {'EC-BP256': ec.BrainpoolP256R1, 'EC-BP384': ec.BrainpoolP384R1, 'EC-BP512': ec.BrainpoolP512R1}
@@ -112,7 +115,9 @@ def test_intermediate_ca_and_leaf_chain(app, auth_client, root_label, leaf_label
         root_c = _row_cert(db.session.get(CA, root['id']))
         sub_c = _row_cert(db.session.get(CA, sub['id']))
         leaf = _row_cert(db.session.get(Certificate, r.get_json()['data']['id']))
-    assert type(sub_c.signature_hash_algorithm) is DIGESTS[leaf_label]
+    # Never below the parent's key hash nor its own
+    expected = max(DIGESTS[root_label], DIGESTS[leaf_label], key=lambda h: h.digest_size)
+    assert type(sub_c.signature_hash_algorithm) is expected
     assert type(sub_c.public_key().curve) is CURVES[leaf_label]
     assert type(leaf.public_key().curve) is CURVES[leaf_label]
     sub_c.verify_directly_issued_by(root_c)
@@ -273,23 +278,18 @@ def test_delegated_responder_and_its_renewal(app, client, auth_client, bp384_roo
 # ---------------------------------------------------------------------------
 
 def _set_config(key, value):
-    from models.system_config import SystemConfig
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    from tests.windows_profile_support import set_config
+    set_config(key, value)
 
 
 @pytest.fixture
 def protocol_config(app, bp384_root):
     """EST and WSTEP pointed at the Brainpool root, restored afterwards."""
-    from models.system_config import SystemConfig
+    from tests.windows_profile_support import restore, snapshot
     keys = ('est_enabled', 'est_ca_refid', 'est_username', 'est_password', 'est_validity_days',
             'wstep_enabled', 'wstep_ca_refid', 'wstep_username', 'wstep_password', 'wstep_validity_days')
     with app.app_context():
-        previous = {k: (r.value if (r := SystemConfig.query.filter_by(key=k).first()) else None) for k in keys}
+        previous = snapshot(keys)
         refid = db.session.get(CA, bp384_root['id']).refid
         for prefix in ('est', 'wstep'):
             _set_config(f'{prefix}_enabled', 'true')
@@ -299,15 +299,7 @@ def protocol_config(app, bp384_root):
             _set_config(f'{prefix}_validity_days', '30')
     yield
     with app.app_context():
-        for k, v in previous.items():
-            row = SystemConfig.query.filter_by(key=k).first()
-            if v is None and row is not None:
-                db.session.delete(row)
-            elif v is not None and row is None:
-                db.session.add(SystemConfig(key=k, value=v))
-            elif row is not None:
-                row.value = v
-        db.session.commit()
+        restore(previous)
 
 
 def _basic():
@@ -407,8 +399,9 @@ def test_wstep_renewal_by_a_brainpool_certificate(app, client, protocol_config, 
     from tests.test_wstep_issue import _issued_cert_from_rstr
     key, csr = _bp_csr('wstep-renew-bp.example.test', 'EC-BP256')
     with app.app_context():
+        # Issued as Windows enrollment does: the Certificate binding renews no other certificate
         cert_pem, _ = CAService.sign_csr_from_crypto(
-            ca=db.session.get(CA, bp384_root['id']), csr=csr, validity_days=30, source='test')
+            ca=db.session.get(CA, bp384_root['id']), csr=csr, validity_days=30, source='wstep')
     old = x509.load_pem_x509_certificate(cert_pem.encode() if isinstance(cert_pem, str) else cert_pem)
     new_csr = x509.CertificateSigningRequestBuilder().subject_name(old.subject).sign(key, hashes.SHA256())
     resp = client.post(RENEW_URL, data=_signed_renewal_rst(old, key, new_csr))

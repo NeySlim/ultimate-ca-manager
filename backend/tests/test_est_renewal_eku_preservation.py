@@ -30,6 +30,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 
 from services.trust_store.trust_store_service import TrustStoreService
+from tests.test_est_rfc7030 import est_config  # noqa: F401  # the EST service under test
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 SERVER_AUTH = ExtendedKeyUsageOID.SERVER_AUTH
 CLIENT_AUTH = ExtendedKeyUsageOID.CLIENT_AUTH
@@ -267,42 +270,84 @@ def test_device_cert_has_an_explicit_ceiling():
     assert 'device_cert' in _CERT_TYPE_ALLOWED_EKUS
 
 
-def _scep_allowed_eku_names():
-    """The EKU names in scep_service's method-local _ALLOWED_EKU_OIDS set
-    literal, extracted from source (it is not importable)."""
-    src = (_BACKEND / 'services' / 'scep' / 'scep_service.py').read_text(
-        encoding='utf-8'
-    )
-    for node in ast.walk(ast.parse(src)):
-        if (isinstance(node, ast.Assign)
-                and isinstance(node.value, ast.Set)
-                and any(isinstance(t, ast.Name) and t.id == '_ALLOWED_EKU_OIDS'
-                        for t in node.targets)):
-            names = []
-            for elt in node.value.elts:
-                assert isinstance(elt, ast.Attribute), (
-                    f'unexpected element in _ALLOWED_EKU_OIDS: {ast.dump(elt)}'
-                )
-                names.append(elt.attr)
-            return names
-    raise AssertionError(
-        'scep_service.py no longer builds _ALLOWED_EKU_OIDS from a set '
-        'literal — update this extractor alongside it'
-    )
+# Every EKU UCM names, and two Microsoft ones: inside the device profile, outside it, blocked
+_CANDIDATE_EKUS = sorted(
+    {v for k, v in vars(ExtendedKeyUsageOID).items() if isinstance(v, x509.ObjectIdentifier)}
+    | {MS_DOC_SIGNING, SMARTCARD_LOGON}, key=lambda oid: oid.dotted_string)
 
 
-def test_device_ceiling_matches_scep_allow_list():
-    """device_cert's comment claims "the same reviewed allow-list SCEP
-    applies" — pin that to SCEP's actual source, not a hand-copied OID list,
-    so the two ceilings cannot silently diverge. (SCEP does not route through
-    TrustStoreService.sign_csr: it builds its certificate itself and applies
-    _ALLOWED_EKU_OIDS in its own copy loop.)"""
-    from services.trust_store.csr_operations_mixin import _CERT_TYPE_ALLOWED_EKUS
-    scep = {
-        getattr(ExtendedKeyUsageOID, name)
-        for name in _scep_allowed_eku_names()
-    }
-    assert _CERT_TYPE_ALLOWED_EKUS['device_cert'] == scep
+def _eku_csr(cn, eku, key):
+    return (x509.CertificateSigningRequestBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName(cn)]), critical=False)
+            .add_extension(x509.ExtendedKeyUsage([SERVER_AUTH, eku] if eku != SERVER_AUTH else [eku]),
+                           critical=False)
+            .sign(key, hashes.SHA256()))
+
+
+def _issued_ekus(cert):
+    try:
+        return set(cert.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE).value)
+    except x509.ExtensionNotFound:
+        return None
+
+
+def _est_leaf(response):
+    import base64
+    from cryptography.hazmat.primitives.serialization import pkcs7
+    assert response.status_code == 200, response.data
+    return [c for c in pkcs7.load_der_pkcs7_certificates(base64.b64decode(response.data))
+            if not c.extensions.get_extension_for_class(x509.BasicConstraints).value.ca][0]
+
+
+def _est_renewal_keeps(client, eku):
+    """A real EST re-enrolment, under a first certificate carrying serverAuth alone, asking for *eku*."""
+    import uuid
+    from tests.test_est_rfc7030 import _basic_auth, _post_csr
+    cn = f'eku-{uuid.uuid4().hex[:8]}.example.test'
+    first = _est_leaf(_post_csr(client, 'simpleenroll',
+                                _eku_csr(cn, SERVER_AUTH, rsa.generate_private_key(65537, 2048)),
+                                headers=_basic_auth()))
+    r = _post_csr(client, 'simplereenroll', _eku_csr(cn, eku, rsa.generate_private_key(65537, 2048)),
+                  client_cert_pem=first.public_bytes(serialization.Encoding.PEM).decode())
+    if r.status_code != 200:
+        return False
+    return eku in (_issued_ekus(_est_leaf(r)) or set())
+
+
+def _scep_keeps(app, ca_id, eku):
+    import base64
+    import uuid
+    from models import CA, Certificate, SCEPRequest, db
+    from services.scep.scep_service import SCEPService
+    csr = _eku_csr(f'scep-{uuid.uuid4().hex[:8]}.example.test', eku, rsa.generate_private_key(65537, 2048))
+    with app.app_context():
+        ca_obj = db.session.get(CA, ca_id)
+        req = SCEPRequest(transaction_id=uuid.uuid4().hex, ca_refid=ca_obj.refid, status='pending',
+                          subject='CN=x', csr=base64.b64encode(csr.public_bytes(serialization.Encoding.DER)).decode())
+        db.session.add(req)
+        db.session.flush()
+        try:
+            refid = SCEPService(ca_refid=ca_obj.refid, auto_approve=True)._auto_approve_request(req, csr)
+            row = Certificate.query.filter_by(refid=refid).one()
+            cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        except Exception:  # noqa: BLE001  # a refused request keeps nothing
+            return False
+        finally:
+            db.session.rollback()
+    return eku in (_issued_ekus(cert) or set())
+
+
+def test_an_est_renewal_keeps_exactly_the_ekus_scep_keeps(app, client, est_config):
+    """device_cert's ceiling is "the same reviewed allow-list SCEP applies": per EKU, a real EST
+    re-enrolment and a SCEP issuance (which builds its certificate apart) keep or drop it alike."""
+    est = {eku.dotted_string for eku in _CANDIDATE_EKUS if _est_renewal_keeps(client, eku)}
+    scep = {eku.dotted_string for eku in _CANDIDATE_EKUS if _scep_keeps(app, est_config['id'], eku)}
+    assert est == scep
+    # Not vacuous: the list keeps device EKUs and drops the blocked ones
+    assert {IPSEC_IKE.dotted_string, EMAIL_PROTECTION.dotted_string, CODE_SIGNING.dotted_string} <= est
+    assert not {OCSP_SIGNING.dotted_string, SMARTCARD_LOGON.dotted_string,
+                MS_DOC_SIGNING.dotted_string} & est
 
 
 def test_device_profile_no_ku_csr_gets_tls_key_usage(ca, leaf_key):

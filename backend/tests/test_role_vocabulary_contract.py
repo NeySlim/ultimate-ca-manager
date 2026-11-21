@@ -25,6 +25,8 @@ import pytest
 
 from auth.permissions import BUILTIN_ROLES, ROLE_PERMISSIONS
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 
 class TestOneVocabulary:
     def test_the_builtin_roles_are_the_ones_with_permissions(self):

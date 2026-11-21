@@ -11,8 +11,10 @@ from utils.cert_issuer import cas_by_ski, is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
 from fips_mode import FipsRestricted
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
+from utils import key_algorithms
 from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions  # noqa: F401  # re-exported for the routes
 from services.smart_import.parser import PasswordNotTried, inspected_key, open_pkcs12
 
 
@@ -133,6 +135,8 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
     
     if not cert:
         raise ValueError('Could not parse certificate. Supported formats: PEM, DER, PKCS12 (.p12, .pfx), PKCS7 (.p7b)')
+    require_readable_extensions(cert)
+    key_algorithms.refuse_unapproved_mldsa((cert, private_key), 'the imported file')
     
     return cert, private_key, format_type
 
@@ -339,28 +343,45 @@ def path_length_of(cert):
 def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     """The caref a CA record should hold once *cert* is its certificate.
 
-    None for a self-signed certificate; the CA whose key verifies the
-    signature, found by AKI then by issuer name; *current_caref* when UCM
-    holds no such CA (an external root imported later relinks it).
+    None for a self-signed certificate; the CA whose subject is the issuer
+    name (RFC 5280 6.1.3(a)(4)) and whose key verifies the signature, found
+    by AKI then by issuer name, the self-signed record before a cross or link
+    certificate of the same key; else *current_caref* while it still names and
+    verifies the certificate; else None (an external root imported later
+    relinks it).
     """
     from models import CA
-    from utils.cert_issuer import certificate_signed_by, authority_key_identifier_hex, is_self_signed
+    from utils.cert_issuer import VERIFIED, authority_key_identifier_hex, is_self_signed, self_signed_first, \
+        signature_verdict
+    from utils.dn_match import same_name
     if is_self_signed(cert):
         return None
+
+    def issued_by(parent_cert):
+        # A key shared by two names does not make both the issuer: the name chains too
+        return same_name(parent_cert.subject, cert.issuer) and signature_verdict(cert, parent_cert)[0] == VERIFIED
     aki = authority_key_identifier_hex(cert)
-    candidates = cas_by_ski(aki) if aki else []
-    if not candidates:
-        candidates = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).all()
-    for parent in candidates:
+    by_key = cas_by_ski(aki) if aki else []
+    by_name = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).order_by(CA.id).all()
+    # The AKI only orders the search: a record of the issuer name stored under another SKI still counts
+    for parent in by_key + [ca for ca in self_signed_first(by_name) if ca not in by_key]:
         if exclude_ca_id is not None and parent.id == exclude_ca_id or not parent.crt:
             continue
         try:
             parent_cert = x509.load_pem_x509_certificate(base64.b64decode(parent.crt), default_backend())
-            if certificate_signed_by(cert, parent_cert):
+            # Unverifiable here: never linked without a confirmation (services/ca/parent_confirmation)
+            if issued_by(parent_cert):
                 return parent.refid
         except Exception:
             continue
-    return current_caref
+    current = CA.query.filter_by(refid=current_caref).first() if current_caref else None
+    try:
+        if current is not None and current.id != exclude_ca_id and current.crt and issued_by(
+                x509.load_pem_x509_certificate(base64.b64decode(current.crt))):
+            return current_caref
+    except Exception:
+        pass
+    return None
 
 
 def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=None, encrypted_prv=None, name=None):
@@ -411,7 +432,8 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
         existing_ca.revoke_reason = None
         existing_ca.invalidity_at = None
     existing_ca.serial_number = str(cert.serial_number)
-    existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
+    from services.ca import parent_confirmation
+    parent_confirmation.settle_parent(existing_ca, cert)
     existing_ca.path_length = path_length_of(cert)
     # Deleted after its revocation and imported again, or renewed into a serial its parent revoked (#343)
     CAService.apply_persisted_revocation(existing_ca)

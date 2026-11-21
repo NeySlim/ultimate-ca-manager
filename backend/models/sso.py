@@ -13,10 +13,14 @@ from utils.datetime_utils import utc_now, utc_isoformat
 class SSOProvider(db.Model):
     """SSO Provider configuration"""
     __tablename__ = 'pro_sso_providers'
-    
+    # One provider per type: every sign-in, return and restore finds "the provider of the type"
+    __table_args__ = (db.Index('uq_pro_sso_providers_provider_type', 'provider_type', unique=True),)
+    # The only types the product creates, signs in with and restores
+    TYPES = ('saml', 'oauth2', 'ldap')
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
-    provider_type = db.Column(db.String(50), nullable=False)  # saml, oauth2, ldap
+    provider_type = db.Column(db.String(50), nullable=False)  # one of TYPES
     enabled = db.Column(db.Boolean, default=False)
     is_default = db.Column(db.Boolean, default=False)
     
@@ -48,6 +52,11 @@ class SSOProvider(db.Model):
     oauth2_scopes = db.Column(db.String(500))  # JSON array
     oauth2_issuer = db.Column(db.String(500))
     oauth2_jwks_uri = db.Column(db.String(500))
+    # Microsoft Entra multi-tenant: JSON array of accepted tenant ids (GUIDs). Empty: one issuer.
+    # Migration 173.
+    oauth2_tenants = db.Column(db.Text)
+    # Those of them whose role claims role_mapping reads (migration 173); other tenants get default_role
+    oauth2_role_tenants = db.Column(db.Text)
     # Explicit compatibility opt-out. OIDC ID tokens are verified by default.
     id_token_verify = db.Column(db.Boolean, default=True, nullable=False)
     oauth2_verify_ssl = db.Column(db.Boolean, default=True)
@@ -73,6 +82,10 @@ class SSOProvider(db.Model):
     # auto-detect at login (objectGUID then entryUUID), falling back to the DN.
     ldap_uid_attr = db.Column(db.String(100))
     ldap_group_member_attr = db.Column(db.String(100), default='member')  # member, uniqueMember, or memberOf
+    # The only base of the member / uniqueMember group search when set; empty derives it.
+    ldap_group_base_dn = db.Column(db.String(500))
+    # Active Directory only: nested groups at any depth and the primary group. Migration 172.
+    ldap_nested_groups = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     
     # Default-deny: if set, user must belong to at least one of these groups
     # to be allowed to login. Empty/None = no restriction (all authenticated users allowed).
@@ -122,6 +135,17 @@ class SSOProvider(db.Model):
         else:
             val = ''
         return f"{self.provider_type}:{val}" if val else None
+
+    @staticmethod
+    def _tenant_list(raw):
+        """A stored tenant list: [] for none, the raw text when it does not read as a list."""
+        if not raw:
+            return []
+        try:
+            value = json.loads(raw)
+        except ValueError:
+            return raw
+        return value if isinstance(value, list) else raw
 
     # Encrypted property accessors for secrets
     @property
@@ -214,6 +238,8 @@ class SSOProvider(db.Model):
                 'oauth2_scopes': json.loads(self.oauth2_scopes) if self.oauth2_scopes else [],
                 'oauth2_issuer': self.oauth2_issuer,
                 'oauth2_jwks_uri': self.oauth2_jwks_uri,
+                'oauth2_tenants': self._tenant_list(self.oauth2_tenants),
+                'oauth2_role_tenants': self._tenant_list(self.oauth2_role_tenants),
                 # Set false only for legacy providers that cannot publish JWKS.
                 'id_token_verify': self.id_token_verify is not False,
                 'oauth2_client_secret': '***' if self.oauth2_client_secret else None,
@@ -235,6 +261,8 @@ class SSOProvider(db.Model):
                 'ldap_user_filter': self.ldap_user_filter,
                 'ldap_group_filter': self.ldap_group_filter,
                 'ldap_group_member_attr': self.ldap_group_member_attr or 'member',
+                'ldap_group_base_dn': self.ldap_group_base_dn or '',
+                'ldap_nested_groups': bool(self.ldap_nested_groups),
                 'ldap_username_attr': self.ldap_username_attr,
                 'ldap_email_attr': self.ldap_email_attr,
                 'ldap_fullname_attr': self.ldap_fullname_attr,
@@ -306,3 +334,39 @@ class SAMLMessageId(db.Model):
     message_id = db.Column(db.String(256), nullable=False)
     provider_id = db.Column(db.Integer, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    # AuthnRequest only: the page this login returns to, checked by sso.return_path.
+    next_path = db.Column(db.String(512))
+
+
+class SSOSignInTest(db.Model):
+    """An OIDC or SAML sign-in test: its transaction while the IdP answers, then its report.
+
+    The row alone marks a callback as a test, never a parameter the browser or the IdP sends:
+    it is found by the hash of its `state` or AuthnRequest id, used once, and read only by
+    the account that started it. Shared by every node; emptied once `expires_at` passes and
+    deleted a day later, so a late return still ends as a test's.
+    """
+    __tablename__ = 'pro_sso_sign_in_tests'
+    __table_args__ = (
+        db.UniqueConstraint('token', name='uq_pro_sso_sign_in_tests_token'),
+        db.UniqueConstraint('transaction_hash', name='uq_pro_sso_sign_in_tests_transaction'),
+    )
+
+    PENDING = 'pending'
+    RUNNING = 'running'
+    DONE = 'done'
+
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(64), nullable=False)
+    provider_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
+    protocol = db.Column(db.String(16), nullable=False)
+    transaction_hash = db.Column(db.String(64), nullable=False)
+    browser_hash = db.Column(db.String(64), nullable=False)
+    # OIDC: the PKCE verifier and nonce, encrypted, wiped once the callback claims the row
+    secret = db.Column(db.Text)
+    state = db.Column(db.String(16), nullable=False)
+    report = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    finished_at = db.Column(db.DateTime)

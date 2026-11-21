@@ -1,0 +1,115 @@
+"""A client of another realm than the accepting key is refused, and the admin guide says so."""
+import logging
+from pathlib import Path
+from types import SimpleNamespace
+
+from services.kerberos.negotiate_auth import _served_realm_matches
+
+GUIDE = Path(__file__).resolve().parents[2] / 'docs' / 'ADMIN_GUIDE.md'
+
+
+def _server(client, target):
+    ctx = SimpleNamespace(target_name=target)
+    return SimpleNamespace(client_principal=client, _context=SimpleNamespace(_context=ctx))
+
+
+def test_child_realm_client_refused_with_logged_line(caplog):
+    srv = _server('PC1$@CHILD.CORP.EXAMPLE', 'HTTP/ucm.example.com@CORP.EXAMPLE')
+    with caplog.at_level(logging.WARNING):
+        assert _served_realm_matches(srv) is False
+    assert 'does not match the realm' in caplog.text
+
+
+def test_same_realm_client_served():
+    assert _served_realm_matches(_server('PC1$@CORP.EXAMPLE', 'HTTP/ucm.example.com@CORP.EXAMPLE')) is True
+
+
+def test_guide_documents_cross_realm_refusal():
+    text = GUIDE.read_text()
+    assert 'one profile per realm' in text.lower()
+    assert 'does not match the realm' in text
+    # Child domains and trusts were never benched: the guide must say so, not promise a remedy.
+    assert 'child domains of a forest have not been tested' in text
+    assert 'give it its own service account' not in text
+
+
+def _refusal_row(start):
+    return next(line for line in GUIDE.read_text().splitlines() if line.startswith(start))
+
+
+def test_guide_places_keyed_profile_without_realm_in_the_400_row():
+    row = _refusal_row('| A key of that realm is served but no profile has the realm')
+    assert 'a keyed profile whose realm is not set' in row
+    assert 'HTTP 400' in row
+
+
+def test_guide_401_row_means_no_key_for_the_realm():
+    row = _refusal_row('| No keytab of any profile holds a key')
+    assert 'holds a key for that realm' in row
+    assert 'no audit entry' in row
+
+
+def test_guide_connector_409_says_realm_can_be_cleared():
+    text = GUIDE.read_text()
+    assert 'whose realm can only be moved to another realm of its keytab or cleared' in text
+    assert 'whose realm only its keytab can change' not in text
+
+
+def test_guide_says_what_the_windows_bench_showed():
+    text = GUIDE.read_text()
+    row = _refusal_row('| The AD connector cannot resolve the requester')
+    assert 'the naked autoenrollment request (empty subject, no SAN) gets the directory' in row
+    assert '`HashAlgorithm = sha256`' in text and 'signed with SHA-1 inside its CMC envelope, is served' in text
+    assert 'list the entry **Active Directory Enrollment Policy** in the GPO next to UCM' in text
+    assert '`certreq -new` with `RenewalCert` in the INF, then `certreq -submit`' in text
+    assert 'Windows keeps the policy it read for up to 8 hours' in text
+    assert 'the old certificate is marked superseded by the new one, as on the Certificate binding' in text
+    assert 'a certificate of a former CA the profile lists renews the same way' in text
+    upgrade = (GUIDE.parents[1] / 'UPGRADE.md').read_text()
+    assert '`HashAlgorithm = sha256` in the `certreq` INF' in upgrade
+    assert 'Windows enrollment, renewal over Kerberos:' in upgrade
+
+
+def test_texts_say_a_kerberos_renewal_keeps_its_template():
+    """Guide, CHANGELOG and help (en, fr) say the renewal keeps profile AND template, and that a
+    request for another template is an enrollment, as wstep_service.issue does."""
+    text = GUIDE.read_text()
+    assert 'renews that certificate when it names the same template' in text
+    assert 'A request naming another template is an enrollment (`certificate.issued`)' in text
+    root = GUIDE.parents[1]
+    changelog = (root / 'CHANGELOG.md').read_text()
+    assert 'of the same profile and template, and the requester\'s' in changelog
+    assert 'of the same profile and the requester\'s;' not in changelog
+    assert "renews it when the request names that certificate's template" in (root / 'UPGRADE.md').read_text()
+    help_dir = root / 'frontend' / 'src' / 'data'
+    en = (help_dir / 'helpGuides.js').read_text()
+    assert "renews it when it names that certificate's template" in en
+    assert 'A request naming another template is an enrollment' in en
+    fr = (help_dir / 'help' / 'fr' / 'settings.js').read_text()
+    assert 'le renouvelle quand elle nomme le modèle de ce certificat' in fr
+    assert 'Une demande qui nomme un autre modèle est un enrôlement' in fr
+
+
+def test_texts_say_how_a_former_ca_renews_and_how_to_cut_it():
+    """Guide, API reference, UPGRADE, CHANGELOG and help (en, fr, ru, zh) say what a change of the issuing CA
+    lists, that the list only shrinks, that a cut or a revocation stops renewals at once, and that the
+    listener trusts a listed CA for WSTEP renewal only."""
+    root = GUIDE.parents[1]
+    text = GUIDE.read_text()
+    assert "the outgoing CA is added to the profile's **Former CAs that still renew**" in text
+    assert 'renews nothing from that moment' in text and 'The list only shrinks' in text
+    assert 'serves WSTEP renewal only: certificate login, EST and every other route do not see it' in text
+    assert 'a rolling restart of every node in HA' in text
+    api = (root / 'docs' / 'API_REFERENCE.md').read_text()
+    assert '`renewal_ca_refids` (a list of refids) may only remove entries' in api
+    assert 'Windows enrollment, change of the issuing CA: the upgrade lists' in (root / 'UPGRADE.md').read_text()
+    assert '**Windows renewal after a change of CA.**' in (root / 'CHANGELOG.md').read_text()
+    help_dir = root / 'frontend' / 'src' / 'data'
+    for path, phrase in ((help_dir / 'helpGuides.js', 'A former CA taken off the list, revoked or deleted renews nothing'),
+                         (help_dir / 'help' / 'fr' / 'settings.js',
+                          'Une ancienne AC retirée de la liste, révoquée ou supprimée ne renouvelle plus rien'),
+                         (help_dir / 'help' / 'ru' / 'settings.js',
+                          'Прежний ЦС, убранный из списка, отозванный или удалённый, с этого момента ничего не продлевает'),
+                         (help_dir / 'help' / 'zh' / 'settings.js',
+                          '被移出列表、已吊销或已删除的原 CA 自此不再续期任何证书')):
+        assert phrase in path.read_text(), path

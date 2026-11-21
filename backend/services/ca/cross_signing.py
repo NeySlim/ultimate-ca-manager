@@ -12,7 +12,7 @@ from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 
-from models import CA
+from models import CA, db
 from models.ca_cross_certificate import CACrossCertificate
 from services.ca import cross_certs
 from services.ca.cross_certs import CrossCertError
@@ -183,14 +183,18 @@ def cross_sign(issuer: CA, subject: CA, validity_days=DEFAULT_VALIDITY_DAYS, pat
     pem, _ = TrustStoreService.create_ca_certificate(
         subject=subject_cert.subject, private_key=None, subject_public_key=subject_cert.public_key(),
         issuer=issuer_cert.subject, issuer_private_key=issuer_key, issuer_cert=issuer_cert,
-        validity_days=validity_days, digest=sign_hash.name if sign_hash is not None else 'sha256',
+        validity_days=validity_days, digest=sign_hash.name if sign_hash is not None else None,
         ocsp_uris=ocsp, cdp_urls=cdp, aia_ca_issuers_urls=aia,
         cps_uri=cps, cps_oid=issuer.cps_oid if cps else None, path_length=path_length,
         not_valid_after_max=to_naive_utc(issuer_cert.not_valid_after_utc),
         copied_extensions=copied, subject_key_identifier=ski,
         key_usage=_key_usage_names(subject_cert))
     cert = x509.load_pem_x509_certificate(pem)
-    row, warnings = cross_certs.attach_certificate(subject, cert, username)
+    # A cross-certificate is an issuance of the issuer, counted in the commit that stores it
+    from utils.ca_serial_counter import next_ca_serial
+    row, warnings = cross_certs.attach_certificate(subject, cert, username, commit=False)
+    next_ca_serial(issuer)
+    db.session.commit()
     notices = []
     if capped_by and validity_days < requested_days:
         notices.append(notices_mod.validity_shortened(

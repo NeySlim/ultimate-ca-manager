@@ -264,12 +264,18 @@ def eddsa_key_name(data) -> Optional[str]:
     return None
 
 
-def refuse_eddsa_key(data, context: str = 'key') -> None:
-    """In FIPS mode, FipsRestricted naming *context* before an EdDSA key reaches the crypto library."""
+def refuse_eddsa_key(data, context: str = 'key', *, signed_in_module: bool = True) -> None:
+    """In FIPS mode, FipsRestricted naming *context* before an EdDSA key the loaded module
+    does not approve reaches the crypto library; a key signed outside the module
+    (``signed_in_module=False``) is refused whatever the module approves."""
     if not fips_mode.enabled():
         return
     name = eddsa_key_name(data)
-    if name:
+    if not name:
+        return
+    if signed_in_module:
+        fips_mode.refuse_unless_approved(name.upper(), f'{name} key of {context}')
+    else:
         fips_mode.refuse(f'{name} key of {context}')
 
 

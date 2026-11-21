@@ -17,6 +17,8 @@ import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CONTENT_JSON = 'application/json'
@@ -113,8 +115,11 @@ class TestRegenerateCRL:
     def test_regenerate_crl_success(self, auth_client, create_ca):
         ca = create_ca(cn='CRL Regen CA')
         ca_id = ca.get('id', ca.get('ca_id'))
-        r = auth_client.post(f'{CRL_BASE}/{ca_id}/regenerate')
-        assert r.status_code in (200, 500)  # 500 if CRL service not fully set up in test
+        first = assert_success(auth_client.post(f'{CRL_BASE}/{ca_id}/regenerate'))
+        second = assert_success(auth_client.post(f'{CRL_BASE}/{ca_id}/regenerate'))
+        assert first['ca_id'] == ca_id and second['ca_id'] == ca_id
+        # A forced regeneration issues a new CRL, under the next number
+        assert second['crl_number'] == first['crl_number'] + 1
 
     def test_regenerate_crl_nonexistent_ca(self, auth_client):
         r = auth_client.post(f'{CRL_BASE}/99999/regenerate')

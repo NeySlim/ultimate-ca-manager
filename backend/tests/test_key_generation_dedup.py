@@ -73,11 +73,10 @@ def test_issue_refusals_happen_before_generation(args):
 # ---------------------------------------------------------------------------
 
 def _old_tsa_generate_key(key_type, key_size, curve):
-    from services.tsa_signer_cert import (DEFAULT_KEY_SIZE, DEFAULT_KEY_TYPE,
-                                          TsaSignerIssueError)
+    from services.tsa_signer_cert import DEFAULT_KEY_TYPE, TsaSignerIssueError
     try:
         normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
-                                          key_size or DEFAULT_KEY_SIZE, curve=curve)
+                                          key_size or '3072', curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)
     return _old_issue_cascade(normalized)
@@ -96,6 +95,14 @@ TSA_EC_WITHOUT_CURVE = [('ec', None, None), ('EC', '', None), ('ecdsa', 0, ''),
                         (' Ec ', None, None)]
 
 
+@pytest.fixture
+def tsa_ctx(app):
+    # The default key comes from the policies in scope: it reads the database
+    with app.app_context():
+        yield
+
+
+@pytest.mark.usefixtures('tsa_ctx')
 @pytest.mark.parametrize('key_type,key_size,curve', TSA_VALID)
 def test_tsa_valid_inputs_give_the_same_key(key_type, key_size, curve):
     from services.tsa_signer_cert import _generate_key
@@ -103,6 +110,7 @@ def test_tsa_valid_inputs_give_the_same_key(key_type, key_size, curve):
         _shape(_old_tsa_generate_key(key_type, key_size, curve))
 
 
+@pytest.mark.usefixtures('tsa_ctx')
 @pytest.mark.parametrize('key_type,key_size,curve', TSA_INVALID)
 def test_tsa_invalid_inputs_give_the_same_refusal(key_type, key_size, curve):
     from services.tsa_signer_cert import TsaSignerIssueError, _generate_key
@@ -113,6 +121,7 @@ def test_tsa_invalid_inputs_give_the_same_refusal(key_type, key_size, curve):
     assert (new.value.message, new.value.status) == (old.value.message, old.value.status)
 
 
+@pytest.mark.usefixtures('tsa_ctx')
 @pytest.mark.parametrize('key_type,key_size,curve', TSA_EC_WITHOUT_CURVE)
 def test_tsa_ec_without_curve_is_still_refused_with_a_clear_message(key_type, key_size, curve):
     from services.tsa_signer_cert import TsaSignerIssueError, _generate_key

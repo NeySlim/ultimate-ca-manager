@@ -5,9 +5,13 @@ View and manage audit logs
 from flask import Blueprint, request, jsonify, g, Response
 from auth.unified import require_auth
 from services.audit_service import AuditService
+from services import jobs
+from services.jobs import audit_verify
+from api.v2.system.jobs import busy_response, started_response, suspended_response
 from utils.pagination import parse_date_filter, parse_request_pagination, parse_request_limit
 from utils.response import success_response, error_response
 from datetime import datetime
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -137,18 +141,29 @@ def export_logs():
         date_from: Start date (ISO format)
         date_to: End date (ISO format)
         limit: Max records (default: 10000)
+        username, action (repeatable), category, resource_type (repeatable), success, search:
+            the filters of the list
     """
     format = request.args.get('format', 'json')
     limit = parse_request_limit(10000, 50000)
     
     # Parse dates
     date_from, date_to = parse_date_filter()
-    
+
+    success_param = request.args.get('success')
+    action_list = request.args.getlist('action')
+    resource_type_list = request.args.getlist('resource_type')
     data = AuditService.export_logs(
         format=format,
         date_from=date_from,
         date_to=date_to,
-        limit=limit
+        limit=limit,
+        username=request.args.get('username'),
+        action=action_list or None,
+        category=request.args.get('category'),
+        resource_type=resource_type_list or None,
+        success=None if success_param is None else success_param.lower() == 'true',
+        search=request.args.get('search'),
     )
     
     if format == 'csv':
@@ -196,13 +211,33 @@ def cleanup_logs():
     )
 
 
-@bp.route('/api/v2/audit/verify', methods=['GET'])
+def _verify_params():
+    source = request.args if request.method == 'GET' else (request.get_json(silent=True) or {})
+    values = []
+    for name in ('start_id', 'end_id'):
+        value = source.get(name)
+        if value in (None, ''):
+            values.append(None)
+            continue
+        try:
+            values.append(int(value))
+        except (TypeError, ValueError):
+            values.append(None)  # as request.args.get(type=int) has always read it
+    return audit_verify.params_of(*values)
+
+
+@bp.route('/api/v2/audit/verify', methods=['GET', 'POST'])
 @require_auth(['read:audit'])
 def verify_integrity():
     """
-    Verify the audit log hash chain.
+    Verify the audit log hash chain, as a background job.
 
-    Query params:
+    GET joins the verification already running with the same range, or starts one; POST
+    starts one (409 when another is active). Either waits at most 25 s: a verification
+    finished by then answers 200 as below, otherwise 202 with a Location to follow
+    (``Prefer: respond-async`` answers 202 at once).
+
+    Params (query for GET, JSON body for POST):
         start_id: First log ID to check (optional)
         end_id: Last log ID to check (optional)
 
@@ -213,14 +248,19 @@ def verify_integrity():
         protection: what the master key attests
         errors: integrity violations found
     """
-    start_id = request.args.get('start_id', type=int)
-    end_id = request.args.get('end_id', type=int)
+    params = _verify_params()
 
-    result = AuditService.verify_integrity(start_id=start_id, end_id=end_id)
+    def joinable(row):
+        # Joined only when it checks the same range: its report answers this request
+        return (request.method == 'GET' and row is not None and row['kind'] == audit_verify.KIND
+                and json.loads(row['params'] or '{}') == params)
 
-    messages = {
-        'intact': 'Integrity check passed',
-        'unprotected': 'No violation found, but the chain is not protected by the master key',
-        'broken': f"Chain broken at entry #{result['first_error_id']}",
-    }
-    return success_response(data=result, message=messages[result['status']])
+    try:
+        job_id = jobs.start_job(audit_verify.KIND, params=params)
+    except jobs.JobsSuspended:
+        return suspended_response()
+    except jobs.SlotBusy as busy:
+        if joinable(busy.job):
+            return started_response(busy.job['id'])
+        return busy_response(busy)
+    return started_response(job_id)

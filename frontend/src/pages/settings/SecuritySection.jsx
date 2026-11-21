@@ -15,7 +15,7 @@ function networksList(value) {
   return networksText(value).split(/[\s,;]+/).filter(Boolean)
 }
 
-export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
+export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
   // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -28,19 +28,62 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
         title={t('common.securitySettings')}
         subtitle={t('settings.securitySubtitle')}
       />
-      <DetailSection title={t('settings.keyEncryption')} icon={LockKey} iconClass="icon-bg-rose">
+      <DetailSection title={t('settings.keyEncryption')} icon={LockKey} iconClass="icon-bg-orange">
         {encryptionStatus ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
-                {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
-              </Badge>
+              {encryptionStatus.disabling ? (
+                <Badge variant="warning">{t('settings.encryptionDisabling')}</Badge>
+              ) : (
+                <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
+                  {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
+                </Badge>
+              )}
               {encryptionStatus.enabled && encryptionStatus.key_source && (
                 <span className="text-xs text-text-tertiary">
                   {t('settings.keySource')}: {encryptionStatus.key_file_path}
                 </span>
               )}
             </div>
+
+            {encryptionStatus.enabled && encryptionStatus.kek_fingerprint && (
+              <div className="flex items-center gap-3 flex-wrap text-xs text-text-secondary">
+                <span>
+                  {t('settings.kekFingerprint')}: <code className="text-text-primary">{encryptionStatus.kek_fingerprint}</code>
+                </span>
+                <span>
+                  {t('settings.dekVersion')}: <strong className="text-text-primary">{encryptionStatus.dek_version}</strong>
+                </span>
+                {encryptionStatus.rotation_in_progress && (
+                  <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
+                )}
+                {encryptionStatus.rotation_available_after ? (
+                  <Badge variant="secondary">
+                    {t('settings.rotationAvailableAfter', { date: formatDate(encryptionStatus.rotation_available_after, { hour: '2-digit', minute: '2-digit' }) })}
+                  </Badge>
+                ) : encryptionStatus.rotation_waits_for_nodes ? (
+                  <Badge variant="secondary">{t('settings.rotationAvailableAfterNodesReload')}</Badge>
+                ) : encryptionStatus.rotation_available && !encryptionStatus.rotation_in_progress && (
+                  <Badge variant="success">{t('settings.rotationAvailable')}</Badge>
+                )}
+              </div>
+            )}
+
+            {encryptionStatus.retained_keys?.length > 0 && (
+              <div className="text-xs text-text-secondary space-y-1">
+                <p>{t('settings.retainedDataKeys')}</p>
+                <ul className="list-disc pl-5">
+                  {encryptionStatus.retained_keys.map((key) => (
+                    <li key={key.version}>
+                      {t('settings.retainedDataKey', { version: key.version, date: formatDate(key.retire_after, { hour: '2-digit', minute: '2-digit' }) })}
+                    </li>
+                  ))}
+                </ul>
+                {encryptionStatus.key_file_kept_for_retained_keys && (
+                  <p>{t('settings.keyFileRemovedWithRetainedKeys')}</p>
+                )}
+              </div>
+            )}
             
             {encryptionStatus.total_keys > 0 && (
               <div className="flex gap-4 text-sm">
@@ -63,12 +106,25 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
 
             <p className="text-xs text-text-secondary">{t('settings.encryptionDesc')}</p>
 
+            {encryptionStatus.disabling && (
+              <p className="text-sm text-status-warning">{t('settings.encryptionDisablingHint')}</p>
+            )}
+
+            {encryptionStatus.enable_available_after ? (
+              <p className="text-sm text-text-secondary">
+                {t('settings.enableAvailableAfter', { date: formatDate(encryptionStatus.enable_available_after, { hour: '2-digit', minute: '2-digit' }) })}
+              </p>
+            ) : encryptionStatus.enable_waits_for_nodes && (
+              <p className="text-sm text-text-secondary">{t('settings.enableAvailableAfterNodesReload')}</p>
+            )}
+
             {hasPermission('admin:system') && (
               <div>
                 {!encryptionStatus.enabled ? (
-                  <Button 
+                  <Button
                     onClick={() => setShowEnableEncryptionModal(true)}
                     variant="primary"
+                    disabled={!!encryptionStatus.enable_available_after || !!encryptionStatus.enable_waits_for_nodes}
                   >
                     <LockKey size={16} />
                     {t('settings.enableEncryption')}
@@ -84,7 +140,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.backupMasterKey')}
                       </Button>
                     )}
-                    {encryptionStatus.unencrypted_count > 0 && handleEncryptRemainingKeys && (
+                    {!encryptionStatus.disabling && encryptionStatus.unencrypted_count > 0 && handleEncryptRemainingKeys && (
                       <Button
                         onClick={handleEncryptRemainingKeys}
                         variant="primary"
@@ -94,16 +150,26 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.encryptRemainingKeys', { count: encryptionStatus.unencrypted_count })}
                       </Button>
                     )}
-                    {/* An environment key would come back after the file is removed */}
-                    {encryptionStatus.key_source === 'file' && (
+                    {!encryptionStatus.disabling && handleRotateDataKey && (
                       <Button
-                        onClick={() => setShowDisableEncryptionModal(true)}
+                        onClick={handleRotateDataKey}
                         variant="outline"
+                        disabled={encryptionLoading || !!encryptionStatus.rotation_available_after || !!encryptionStatus.rotation_waits_for_nodes}
                       >
-                        <Lock size={16} />
-                        {t('settings.disableEncryption')}
+                        <LockKey size={16} />
+                        {encryptionStatus.rotation_in_progress
+                          ? t('settings.resumeDataKeyRotation')
+                          : t('settings.rotateDataKey')}
                       </Button>
                     )}
+                    {/* A key that stays configured (environment, HA) is kept unused */}
+                    <Button
+                      onClick={() => setShowDisableEncryptionModal(true)}
+                      variant="outline"
+                    >
+                      <Lock size={16} />
+                      {encryptionStatus.disabling ? t('settings.runDisableAgain') : t('settings.disableEncryption')}
+                    </Button>
                   </div>
                 )}
               </div>
@@ -113,6 +179,47 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
           <LoadingSpinner size="sm" />
         )}
       </DetailSection>
+      {secretsStatus?.session_secret && (
+        <DetailSection title={t('settings.sessionKeyTitle')} icon={Key} iconClass="icon-bg-violet">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={secretsStatus.session_secret.source === 'database' ? 'success' : 'secondary'}>
+                {secretsStatus.session_secret.source === 'database'
+                  ? t('settings.sessionKeyFromDatabase')
+                  : t('settings.sessionKeyFromEnvironment')}
+              </Badge>
+              {secretsStatus.session_secret.previous_accepted_until && (
+                <Badge variant="secondary">
+                  {t('settings.sessionKeyPreviousUntil', { date: formatDate(secretsStatus.session_secret.previous_accepted_until, { hour: '2-digit', minute: '2-digit' }) })}
+                </Badge>
+              )}
+            </div>
+            {/* What a rotation really does depends on whether the key can be stored encrypted;
+                in HA the environment-file rotation is refused (409 ha_mode) */}
+            <p className="text-sm text-text-secondary">
+              {secretsStatus.session_secret.rotation === 'database'
+                ? t('settings.sessionKeyRotateStoredDesc')
+                : secretsStatus.session_secret.rotation === 'blocked'
+                  ? t('settings.sessionKeyRotateBlocked')
+                : secretsStatus.session_secret.ha
+                  ? t('settings.sessionKeyRotateHaRefused')
+                  : t('settings.sessionKeyRotateFileDesc')}
+            </p>
+            {hasPermission('admin:system') && handleRotateSessionKey && (
+              <Button
+                onClick={handleRotateSessionKey}
+                variant="outline"
+                disabled={sessionKeyLoading || !!secretsStatus.session_secret.previous_accepted_until
+                  || secretsStatus.session_secret.rotation === 'blocked'
+                  || (secretsStatus.session_secret.ha && secretsStatus.session_secret.rotation !== 'database')}
+              >
+                <ArrowsClockwise size={16} />
+                {t('settings.rotateSessionKey')}
+              </Button>
+            )}
+          </div>
+        </DetailSection>
+      )}
       <DetailSection title={t('common.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
         <div className="space-y-4">
           <ToggleSwitch
@@ -176,7 +283,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
           )}
         </div>
       </DetailSection>
-      <DetailSection title={t('settings.hstsTitle')} icon={Globe} iconClass="icon-bg-sky">
+      <DetailSection title={t('settings.hstsTitle')} icon={Globe} iconClass="icon-bg-blue">
         <div className="space-y-4">
           <ToggleSwitch
             checked={settings.hsts_enabled !== false}

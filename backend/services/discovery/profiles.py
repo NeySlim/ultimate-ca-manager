@@ -3,10 +3,11 @@ Profiles mixin — scan profile CRUD operations.
 """
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from typing import List, Dict, Optional
 
 from models import db, ScanProfile
+from utils.datetime_utils import utc_now
 
 from .helpers import _validate_port
 
@@ -43,7 +44,7 @@ class ProfilesMixin:
             resolve_dns=bool(data.get('resolve_dns', False)),
         )
         if profile.schedule_enabled:
-            profile.next_scan_at = datetime.now(timezone.utc) + timedelta(
+            profile.next_scan_at = utc_now() + timedelta(
                 minutes=profile.schedule_interval_minutes)
         db.session.add(profile)
         try:
@@ -58,6 +59,8 @@ class ProfilesMixin:
         profile = db.session.get(ScanProfile, profile_id)
         if not profile:
             return None
+        was_scheduled = profile.schedule_enabled
+        was_interval = profile.schedule_interval_minutes
         if 'name' in data:
             profile.name = data['name'].strip()[:200]
         if 'description' in data:
@@ -86,9 +89,12 @@ class ProfilesMixin:
             profile.max_workers = min(max(int(data['max_workers']), 1), 50)
         if 'resolve_dns' in data:
             profile.resolve_dns = bool(data['resolve_dns'])
-        profile.updated_at = datetime.now(timezone.utc)
-        if profile.schedule_enabled and not profile.next_scan_at:
-            profile.next_scan_at = datetime.now(timezone.utc) + timedelta(
+        profile.updated_at = utc_now()
+        # A new interval, or a schedule switched on again, restarts the wait as creation does
+        rescheduled = (profile.schedule_enabled and not was_scheduled) or (
+            profile.schedule_enabled and profile.schedule_interval_minutes != was_interval)
+        if profile.schedule_enabled and (rescheduled or not profile.next_scan_at):
+            profile.next_scan_at = utc_now() + timedelta(
                 minutes=profile.schedule_interval_minutes)
         try:
             db.session.commit()

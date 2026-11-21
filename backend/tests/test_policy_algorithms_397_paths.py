@@ -21,6 +21,8 @@ from tests.test_scep_rfc8894_operations import (
     _load_ca_material, _response_attributes,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CHALLENGE = 'policy paths horse battery'
 
 
@@ -147,16 +149,16 @@ class TestWstep:
             with app.app_context():
                 ca = db.session.get(CA, ca_data['id'])
                 assert wstep_service._match_template(
-                    ca, _wstep_csr(_rsa(2048), 'probe.policy.test'))[0].id == tid
+                    ca, _wstep_csr(_rsa(2048), 'probe.policy.test'), profile=None)[0].id == tid
                 cert_pem, err = wstep_service.issue(
                     ca, _wstep_csr(_rsa(2048), 'wstep-weak.policy.test')
-                    .public_bytes(serialization.Encoding.DER), validity_days=30)
+                    .public_bytes(serialization.Encoding.DER), validity_days=30, profile=None)
                 assert cert_pem is None
                 assert err and err.startswith('Policy violation') and 'RSA-2048' in err
 
                 cert_pem, err = wstep_service.issue(
                     ca, _wstep_csr(_rsa(3072), 'wstep-ok.policy.test')
-                    .public_bytes(serialization.Encoding.DER), validity_days=30)
+                    .public_bytes(serialization.Encoding.DER), validity_days=30, profile=None)
                 assert err is None, err
                 assert x509.load_pem_x509_certificate(cert_pem.encode()).public_key().key_size == 3072
         finally:

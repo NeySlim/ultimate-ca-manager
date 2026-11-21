@@ -11,6 +11,35 @@ BACKEND = os.path.dirname(os.path.abspath(__file__))
 BACKOFF_MAX = 60
 # A process that ran this long before exiting resets the backoff
 HEALTHY_AFTER = 60
+# How often the watcher looks for the master stopping while the process runs
+STOP_POLL = 0.5
+
+
+def _gone(proc) -> bool:
+    """The process exited. The gunicorn arbiter reaps every child with waitpid(-1): when it
+    collects this one first, gevent's Popen in the master never learns of the exit."""
+    if proc.poll() is not None:
+        return True
+    try:
+        os.kill(proc.pid, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    try:  # exited, not reaped yet
+        with open(f'/proc/{proc.pid}/stat') as handle:
+            return handle.read().rsplit(')', 1)[1].split()[0] == 'Z'
+    except (OSError, IndexError):
+        return False
+
+
+def _wait_gone(proc, timeout, step=0.1) -> bool:
+    deadline = time.monotonic() + timeout
+    while not _gone(proc):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(step)
+    return True
 
 
 class SchedulerSupervisor:
@@ -25,12 +54,18 @@ class SchedulerSupervisor:
         self._stopping = False
         self._restarting = False
         self._wake = threading.Event()
+        self._on_stopped = None
+        self._stopped_lock = threading.Lock()
+        self._stopped_said = False
 
     @property
     def pid(self):
         return self._proc.pid if self._proc is not None else None
 
-    def start(self, server=None) -> None:
+    def start(self, server=None, on_stopped=None) -> None:
+        """``on_stopped`` runs once, after the process exited for the master's stop."""
+        if on_stopped is not None:
+            self._on_stopped = on_stopped
         if server is not None:
             self._server = server
             self.log = server.log
@@ -43,8 +78,9 @@ class SchedulerSupervisor:
         self._thread.start()
 
     def _spawn(self):
-        from scheduler_main import GRACE_ENV
-        env = dict(os.environ, UCM_SCHEDULER_PROCESS='1', **{GRACE_ENV: str(self.graceful_timeout)})
+        from scheduler_main import GRACE_ENV, MASTER_ENV
+        env = dict(os.environ, UCM_SCHEDULER_PROCESS='1',
+                   **{GRACE_ENV: str(self.graceful_timeout), MASTER_ENV: str(os.getpid())})
         return subprocess.Popen(self.command, cwd=BACKEND, env=env)
 
     def _mine(self) -> bool:
@@ -77,7 +113,7 @@ class SchedulerSupervisor:
                 self._park()
             if proc is not None:
                 self.log.info("Scheduler process started (pid %s)", proc.pid)
-                code = proc.wait()
+                code = self._wait(proc)
                 if not self._mine():
                     self._park()
                 if self._master_stopping():
@@ -97,6 +133,28 @@ class SchedulerSupervisor:
             else:
                 delay = min(delay * 2, BACKOFF_MAX)
 
+    def _wait(self, proc):
+        """The process's exit code. The master stopping stops it at once, beside the workers'
+        drain: an orchestrator's kill at the end of its grace then finds the node released."""
+        while True:
+            if _wait_gone(proc, STOP_POLL, STOP_POLL):
+                return proc.returncode
+            if self._mine() and self._master_stopping():
+                self._stopping = True
+                self._terminate()
+                self._say_stopped()
+
+    def _say_stopped(self) -> None:
+        # Under the lock: on_exit, coming second, waits for the watcher's call to end
+        with self._stopped_lock:
+            if self._stopped_said or self._on_stopped is None or not self._mine():
+                return
+            self._stopped_said = True
+            try:
+                self._on_stopped()
+            except Exception as e:  # the stop goes on; atexit releases the row again
+                self.log.warning("Node stop not recorded: %s", type(e).__name__)
+
     def _terminate(self) -> None:
         """SIGTERM, graceful_timeout for the running task to end, then SIGKILL."""
         proc = self._proc
@@ -104,15 +162,16 @@ class SchedulerSupervisor:
             return
         try:
             proc.send_signal(signal.SIGTERM)
-            proc.wait(timeout=self.graceful_timeout + 5)
-        except subprocess.TimeoutExpired:
-            if not self._mine():
-                return
-            self.log.warning("Scheduler process %s killed after %ss", proc.pid, self.graceful_timeout)
-            proc.kill()
-            proc.wait(timeout=5)
         except OSError:
-            pass
+            return
+        if _wait_gone(proc, self.graceful_timeout + 5) or not self._mine():
+            return
+        self.log.warning("Scheduler process %s killed after %ss", proc.pid, self.graceful_timeout)
+        try:
+            proc.kill()
+        except OSError:
+            return
+        _wait_gone(proc, 5)
 
     def restart(self) -> None:
         """New code and configuration on HUP: stop the process, the watcher starts another."""
@@ -122,10 +181,14 @@ class SchedulerSupervisor:
         self._wake.set()
         threading.Thread(target=self._terminate, name='scheduler-restart', daemon=True).start()
 
-    def stop(self) -> None:
+    def stop(self, on_stopped=None) -> None:
+        """``on_stopped``: used when start() was given none (the master stops before ready)."""
+        if self._on_stopped is None:
+            self._on_stopped = on_stopped
         self._stopping = True
         self._wake.set()
         self._terminate()
+        self._say_stopped()
 
 
 supervisor = SchedulerSupervisor()

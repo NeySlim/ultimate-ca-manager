@@ -2,7 +2,11 @@
 
 ## Supported versions
 
-Only the latest stable release receives security fixes. 2.254 is the last version of the 2.x line, which now receives security fixes only, numbered 2.254.1, 2.254.2 and so on: upgrade to the latest of them to stay covered. Release candidates and the `dev` branch are for testing and are not supported.
+The current release line receives bug fixes, security fixes and new features: a fix ships in the next build of that line (for example 3.1 after 3.0), so upgrade to its latest stable release to stay covered.
+
+The last release of the previous line, 2.254, receives security fixes only, published as maintenance releases 2.254.1, 2.254.2 and so on; it gets no other bug fix and no new feature. Earlier 2.x releases are not supported: upgrade to the latest 2.254.N.
+
+Release candidates and the `dev` branch are for testing and are not supported.
 
 ## Reporting a vulnerability
 
@@ -17,7 +21,7 @@ Report it privately through [GitHub Security Advisories](https://github.com/NeyS
 ## What to expect
 
 - A first answer within 7 days, saying whether the report is confirmed.
-- The fix lands on `dev` and ships in the next stable release.
+- The fix ships in the next stable release of the current line and, when 2.254 is affected, in the next 2.254.N.
 - The advisory is published once that release is out, crediting you unless you prefer otherwise.
 - Please keep the details private until the advisory is published, or for 90 days after your report, whichever comes first.
 
@@ -26,3 +30,5 @@ Report it privately through [GitHub Security Advisories](https://github.com/NeyS
 UCM is meant to run on premises, and reaching LAN addresses (webhooks, SSO, ACME validation) is by design. Blocking cloud metadata and loopback is in scope; reaching an RFC 1918 address an administrator configured is not.
 
 Security features and hardening notes are documented in [docs/SECURITY.md](docs/SECURITY.md).
+
+Each release publishes a CycloneDX SBOM for every package and image platform, described in [docs/SBOM.md](docs/SBOM.md).

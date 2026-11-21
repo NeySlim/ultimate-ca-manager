@@ -49,12 +49,10 @@ except ImportError:
 
 bp = Blueprint('auth_methods', __name__)
 
-# 2FA/WebAuthn brute-force tracking
-# Uses in-memory dict with per-user lockout. Acceptable for UCM's single-worker
-# deployment model. Resets on restart, but combined with User.locked_until for
-# password attempts provides adequate protection.
-_2fa_failed_attempts = {}  # key: pending_user_id, value: {'count': int, 'locked_until': datetime}
-_WEBAUTHN_FAILED = {}      # key: username, value: {'count': int, 'locked_until': datetime}
+# Second-factor and WebAuthn lockout: one row per target in second_factor_failures,
+# shared by every node. '2fa' keys the pending login's user id, 'webauthn' the username.
+TWO_FA = '2fa'
+WEBAUTHN = 'webauthn'
 
 
 def _get_2fa_lockout_settings():
@@ -65,31 +63,89 @@ def _get_2fa_lockout_settings():
     return _get_lockout_settings()
 
 
-def _check_2fa_lockout(key: str, tracker: dict) -> bool:
-    """Check if key is locked out from 2FA/WebAuthn attempts."""
-    entry = tracker.get(key)
-    if not entry:
-        return False
-    if entry.get('locked_until') and utc_now() < entry['locked_until']:
-        return True
-    if entry.get('locked_until') and utc_now() >= entry['locked_until']:
-        tracker.pop(key, None)
-    return False
+def _check_2fa_lockout(kind: str, key: str) -> bool:
+    """Whether the database holds a lock on this target that has not expired."""
+    from models.second_factor_failure import SecondFactorFailure
+    locked_until = db.session.execute(
+        db.select(SecondFactorFailure.locked_until).filter_by(kind=kind, target=key)
+    ).scalar_one_or_none()
+    return locked_until is not None and utc_now() < locked_until
 
 
-def _record_2fa_failure(key: str, tracker: dict):
-    """Record a failed 2FA/WebAuthn attempt."""
-    from datetime import timedelta
+def _reserve_attempt(kind: str, key: str):
+    """Count one attempt before it is verified: its rank, or None when the target is locked.
+
+    One upsert decides: parallel attempts on any node get at most the threshold, the one
+    reaching it arms the lock, and a success clears the row. Expired rows are purged first.
+    """
+    from sqlalchemy import and_, case, or_
+    from models.second_factor_failure import SecondFactorFailure as F
     max_attempts, lockout_seconds = _get_2fa_lockout_settings()
-    entry = tracker.setdefault(key, {'count': 0, 'locked_until': None})
-    entry['count'] += 1
-    if entry['count'] >= max_attempts:
-        entry['locked_until'] = utc_now() + timedelta(seconds=lockout_seconds)
+    now = utc_now()
+    until = now + timedelta(seconds=lockout_seconds)
+    # Rows bounded by the window: a lock past its end, or a count idle for a whole window
+    db.session.execute(db.delete(F).where(or_(
+        F.locked_until <= now,
+        and_(F.locked_until.is_(None), F.updated_at < now - timedelta(seconds=lockout_seconds)),
+    )))
+    if db.engine.dialect.name == 'postgresql':
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    expired = and_(F.locked_until.is_not(None), F.locked_until <= now)
+    failures = case((expired, 1), else_=F.failures + 1)
+    stmt = insert(F).values(
+        kind=kind, target=key, failures=1,
+        locked_until=None, updated_at=now,
+    ).on_conflict_do_update(
+        index_elements=[F.kind, F.target],
+        set_={'failures': failures,
+              'locked_until': case((failures >= max_attempts, until), else_=None),
+              'updated_at': now},
+        where=or_(F.locked_until.is_(None), F.locked_until <= now),
+    )
+    if db.session.get_bind().dialect.insert_returning:
+        counted = db.session.execute(stmt.returning(F.failures)).scalar_one_or_none()
+    else:
+        # SQLite before 3.35: no RETURNING; the upsert holds the write lock until the
+        # commit, so the read sees this attempt's count. No row changed = target locked.
+        counted = None
+        if db.session.execute(stmt.execution_options(preserve_rowcount=True)).rowcount:
+            counted = db.session.execute(
+                db.select(F.failures).filter_by(kind=kind, target=key)).scalar_one()
+    db.session.commit()
+    return counted if counted is not None and counted <= max_attempts else None
 
 
-def _clear_2fa_failures(key: str, tracker: dict):
+def _reserve_2fa_attempt(kind: str, key: str) -> bool:
+    """Count one attempt before it is verified; False when the target is locked."""
+    return _reserve_attempt(kind, key) is not None
+
+
+def too_many_attempts(kind: str, key: str):
+    """The 429 of a locked target; Retry-After (RFC 6585 §4) gives the seconds left."""
+    import math
+    from models.second_factor_failure import SecondFactorFailure
+    locked_until = db.session.execute(
+        db.select(SecondFactorFailure.locked_until).filter_by(kind=kind, target=key)
+    ).scalar_one_or_none()
+    if locked_until is not None:
+        seconds = max(1, math.ceil((locked_until - utc_now()).total_seconds()))
+    else:
+        seconds = _get_2fa_lockout_settings()[1]
+    response, code = error_response('Too many failed attempts. Try again later.', 429,
+                                    {'retry_after': seconds})
+    response.headers['Retry-After'] = str(seconds)
+    return response, code
+
+
+
+
+def _clear_2fa_failures(kind: str, key: str):
     """Clear failed attempts on success."""
-    tracker.pop(key, None)
+    from models.second_factor_failure import SecondFactorFailure
+    db.session.execute(db.delete(SecondFactorFailure).filter_by(kind=kind, target=key))
+    db.session.commit()
 
 
 @bp.route('/api/v2/auth/methods', methods=['GET', 'POST'])
@@ -225,11 +281,20 @@ def login_password():
         )
         return error_response('Invalid credentials', 401)
 
-    # Check account lockout (using centralized settings)
+    # Counted before the password is checked: past max_attempts in flight or failed on
+    # any node, the attempt is refused unchecked, like an unknown name.
     max_attempts, lockout_seconds = _get_2fa_lockout_settings()
-    if user.locked_until and utc_now() < user.locked_until:
-        # Same answer as an unknown name: the password is not checked yet, so a
-        # distinct status would tell anyone the account exists.
+    try:
+        rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to record login attempt for {username}: {e}", exc_info=True)
+        return error_response('Failed to record login attempt', 500)
+    if rank is None:
+        if armed:
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -239,27 +304,11 @@ def login_password():
             username=username
         )
         return error_response('Invalid credentials', 401)
-    if user.locked_until and utc_now() >= user.locked_until:
-        user.locked_until = None
-        user.failed_logins = 0
-        ok, _err = safe_commit(logger, "Failed to clear account lockout")
-        if not ok:
-            return _err
 
-    # Verify password
     if not user.check_password(password):
-        # Increment failed login counter
-        user.failed_logins = (user.failed_logins or 0) + 1
-        locked = user.failed_logins >= max_attempts
-        if locked:
-            user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
-            logger.warning(f"Account {username} locked after {max_attempts} failed attempts")
-        ok, _err = safe_commit(logger, "Failed to record failed login")
-        if not ok:
-            return _err
-        if locked:
-            from api.v2.sso.helpers import notify_account_locked
-            notify_account_locked(username)
+        if armed:
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -270,13 +319,21 @@ def login_password():
         )
         return error_response('Invalid credentials', 401)
 
-    # Update login stats
+    # Admitted within the threshold: the success clears the stored count and any lock
+    # armed since by attempts counted after this one.
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
-    user.failed_logins = 0  # Reset failed logins on successful login
-    ok, _err = safe_commit(logger, "Failed to update login stats")
-    if not ok:
-        return _err
+    try:
+        user.clear_failed_logins()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to update login stats for {username}: {e}", exc_info=True)
+        if armed:
+            # The lock this attempt armed stays as stored, the safe side: it is announced
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
+        return error_response('Failed to update login stats', 500)
 
     # Second factor: TOTP (with recovery codes) and/or a security key, the key
     # when 2FA is enforced or the user turned it on as second factor.
@@ -418,6 +475,8 @@ def login_2fa():
     code = str(data['code']).strip().upper()[:32]
     if not code or len(code) < 6:
         return error_response('Invalid verification code format', 400)
+    if not _reserve_2fa_attempt(TWO_FA, lockout_key):
+        return too_many_attempts(TWO_FA, lockout_key)
 
     # Verify TOTP code (a key-only account has none to check), once only
     from auth.totp import consume_totp
@@ -451,10 +510,9 @@ def login_2fa():
                 success=False,
                 username=pending_username
             )
-            _record_2fa_failure(lockout_key, _2fa_failed_attempts)
             return error_response('Invalid verification code', 401)
 
-    _clear_2fa_failures(lockout_key, _2fa_failed_attempts)
+    _clear_2fa_failures(TWO_FA, lockout_key)
     return _complete_2fa_login(user, auth_method, f'Login successful with 2FA for {user.username}')
 
 
@@ -464,8 +522,8 @@ def _pending_2fa_user():
     if not pending_user_id:
         return None, None, error_response('No pending 2FA verification', 401)
     lockout_key = str(pending_user_id)
-    if _check_2fa_lockout(lockout_key, _2fa_failed_attempts):
-        return None, None, error_response('Too many failed attempts. Try again later.', 429)
+    if _check_2fa_lockout(TWO_FA, lockout_key):
+        return None, None, too_many_attempts(TWO_FA, lockout_key)
     user = db.session.get(User, pending_user_id)
     from auth.session_start import session_is_current
     if not user or not user.active or not session_is_current(user):
@@ -545,6 +603,8 @@ def login_2fa_webauthn_verify():
     credential_response = data.get('response')
     if not isinstance(credential_response, dict) or len(str(credential_response)) > 50000:
         return error_response('Invalid WebAuthn response format', 400)
+    if not _reserve_2fa_attempt(TWO_FA, lockout_key):
+        return too_many_attempts(TWO_FA, lockout_key)
 
     # One attempt per challenge: whatever the outcome, the next try needs new options.
     expected = session.pop(_2FA_WEBAUTHN_CHALLENGE, None)
@@ -563,10 +623,9 @@ def login_2fa_webauthn_verify():
             success=False,
             username=user.username
         )
-        _record_2fa_failure(lockout_key, _2fa_failed_attempts)
         return error_response('Security key verification failed', 401)
 
-    _clear_2fa_failures(lockout_key, _2fa_failed_attempts)
+    _clear_2fa_failures(TWO_FA, lockout_key)
     return _complete_2fa_login(
         user, session.get('pending_2fa_method', 'password'),
         f'Login successful with 2FA (security key) for {user.username}',
@@ -626,10 +685,9 @@ def login_mtls():
     if not user or not user.active:
         return error_response('Certificate authentication failed', 401)
 
-    # Update login stats
+    # The password's count and lock are left as they are (NIST SP 800-63B §3.2.2)
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
-    user.failed_logins = 0  # Reset failed logins on successful login
     ok, _err = safe_commit(logger, "Failed to update login stats")
     if not ok:
         return _err
@@ -769,15 +827,15 @@ def webauthn_verify():
     if not isinstance(credential_response, dict) or len(str(credential_response)) > 50000:
         return error_response('Invalid WebAuthn response format', 400)
 
-    # SEC-04: Brute-force protection on WebAuthn
-    if _check_2fa_lockout(username, _WEBAUTHN_FAILED):
-        return error_response('Too many failed attempts. Try again later.', 429)
+    # SEC-04: Brute-force protection on WebAuthn. Counted before the lookup, so an unknown
+    # name locks exactly like a known one; its row goes with the purge of expired rows.
+    if not _reserve_2fa_attempt(WEBAUTHN, username):
+        return too_many_attempts(WEBAUTHN, username)
 
     # Find user. Return the SAME generic error as a failed verification so this
     # path is not an existence oracle (mirrors webauthn_start's anti-enumeration).
     user = User.query.filter_by(username=username).first()
     if not user or not user.active:
-        _record_2fa_failure(username, _WEBAUTHN_FAILED)
         return error_response('WebAuthn verification failed', 401)
     try:
         from services.audit_service import AuditService
@@ -796,14 +854,12 @@ def webauthn_verify():
                 success=False,
                 username=username
             )
-            _record_2fa_failure(username, _WEBAUTHN_FAILED)
             return error_response('WebAuthn verification failed', 401)
 
-        # Update login stats
-        _clear_2fa_failures(username, _WEBAUTHN_FAILED)
+        # Only the passkey's own count is reset: the password's stays (NIST SP 800-63B §3.2.2)
+        _clear_2fa_failures(WEBAUTHN, username)
         user.last_login = utc_now()
         user.login_count = (user.login_count or 0) + 1
-        user.failed_logins = 0  # Reset failed logins on successful login
         ok, _err = safe_commit(logger, "Failed to update login stats")
         if not ok:
             return _err

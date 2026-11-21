@@ -10,6 +10,9 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 
 from models import CA, Certificate, db
 from tests.fixtures.templates import templates_created_here_removed
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -547,8 +550,9 @@ def test_an_rsa_tsa_signer_issued_by_an_eddsa_ca_signs(app, client, auth_client,
 
 
 def test_an_eddsa_ca_is_refused_as_the_tsa_signer(auth_client, ed_root, tsa_settings):
+    # Only in compatibility mode does the CA certificate sign the tokens
     r = auth_client.patch('/api/v2/tsa/config', content_type='application/json',
-                          data=json.dumps({'ca_refid': ed_root['refid']}))
+                          data=json.dumps({'ca_refid': ed_root['refid'], 'require_dedicated_cert': False}))
     assert r.status_code == 400, r.get_json()
     assert 'EdDSA' in r.get_json()['message']
 
@@ -840,27 +844,27 @@ def test_an_hsm_eddsa_ca_key_is_refused_with_a_400(app, auth_client, type_name, 
 
 @pytest.fixture
 def xcep_ca_setting(app):
-    from models import SystemConfig
+    from tests.windows_profile_support import restore, snapshot
     with app.app_context():
-        saved = getattr(SystemConfig.query.filter_by(key='xcep_ca_refid').first(), 'value', None)
-        _set_config('xcep_ca_refid', None)
+        saved = snapshot(('xcep_ca_refid',))
+        restore({'xcep_ca_refid': None})
     yield
     with app.app_context():
-        _set_config('xcep_ca_refid', saved)
+        restore(saved)
 
 
-@pytest.mark.parametrize('field', ['ca_id', 'ca_refid'])
 @pytest.mark.parametrize('name', ['Ed25519', 'Ed448'])
-def test_xcep_settings_refuse_an_eddsa_ca(app, auth_client, xcep_ca_setting, field, name):
-    from models import SystemConfig
-    ca = _ca(auth_client, f'{name} XCEP {field}', keyAlgo=name)
-    r = auth_client.patch('/api/v2/xcep/config', json={field: ca['id'] if field == 'ca_id' else ca['refid']})
+def test_xcep_settings_refuse_an_eddsa_ca(app, auth_client, xcep_ca_setting, name):
+    from tests.windows_profile_support import get_config, put_default_profile
+    ca = _ca(auth_client, f'{name} XCEP policy', keyAlgo=name)
+    r = put_default_profile(auth_client, policy_ca_refid=ca['refid'])
     assert r.status_code == 400, r.get_json()
     assert name in r.get_json()['message'] and 'Windows' in r.get_json()['message']
     with app.app_context():
-        assert not getattr(SystemConfig.query.filter_by(key='xcep_ca_refid').first(), 'value', None)
+        assert not get_config('xcep_ca_refid')
 
 
 def test_xcep_settings_still_take_an_rsa_ca(app, auth_client, xcep_ca_setting, rsa_root):
-    r = auth_client.patch('/api/v2/xcep/config', json={'ca_id': rsa_root['id']})
+    from tests.windows_profile_support import put_default_profile
+    r = put_default_profile(auth_client, policy_ca_refid=rsa_root['refid'])
     assert r.status_code == 200, r.get_json()

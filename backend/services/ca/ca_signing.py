@@ -12,9 +12,13 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from models import CA, Certificate, db
+from utils.ca_serial_counter import (
+    log_commit_failure, next_ca_serial, retry_on_serial_collision,
+    rollback_unless_serial_collision)
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
+from services.cert.unique_subject import SubjectTaken, refuse_taken_subject, successor_holder
 from .helpers import get_ca_cert_pem
 
 logger = logging.getLogger(__name__)
@@ -29,28 +33,96 @@ class AlreadySuperseded(Exception):
     """The certificate being renewed was superseded by a concurrent renewal."""
 
 
-def _claim_superseded(row):
-    """Archive every live row holding *row*'s certificate (same DER, under any CA: it is
-    replaced everywhere); False when another renewal got there first. One row at a time
-    in id order, so two concurrent claims never lock in opposite orders."""
+def _claim_superseded(row, presented=None, successor=None):
+    """Archive every live row holding *presented*, the certificate the client renews (by
+    default *row*'s), same DER under any CA: it is replaced everywhere. False when another
+    renewal got there first. One row at a time in id order, so two claims never cross.
+    With *successor*, the archived rows' bindings move to it in the same transaction."""
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
     from services.cert.issued_lookup import _rows_holding
-    held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+    from utils.serial_format import serial_variants
+    held = presented if presented is not None else \
+        x509.load_pem_x509_certificate(base64.b64decode(row.crt))
     live = sorted(r.id for r in _rows_holding(held, Certificate.archived.isnot(True)))
     if row.id not in live:
         return False
     for row_id in live:
+        # Re-checked after any lock wait: a row renewed in place meanwhile holds another serial
         result = db.session.execute(
             update(Certificate)
-            .where(Certificate.id == row_id, Certificate.archived.isnot(True))
+            .where(Certificate.id == row_id, Certificate.archived.isnot(True),
+                   Certificate.serial_number.in_(serial_variants(held.serial_number)))
             .values(archived=True)
             .execution_options(synchronize_session=False)
         )
         if result.rowcount != 1:
             return False
     set_committed_value(row, 'archived', True)
+    if successor is not None:
+        _bindings_follow(live, successor)
     return True
+
+
+def _pushes_key(binding):
+    """An SSH binding with a key_path, or an HTTP binding whose target template names
+    key_pem (same predicate as DeployService.validate_http_binding)."""
+    if binding.key_path:
+        return True
+    target = binding.target
+    if target is None or not target.is_http:
+        return False
+    from services.deploy import http as deploy_http
+    try:
+        names = deploy_http.template_names(target)
+    except ValueError:
+        return True  # an unreadable template must not move a binding or abort the renewal
+    return 'key_pem' in names
+
+
+def _bindings_follow(old_ids, successor):
+    """Deploy bindings and the HTTPS listener binding of the archived rows *old_ids*, and
+    those left behind waiting for one of them, now name *successor*; a target keeps one
+    binding per certificate (lowest id wins). A binding that pushes the key, and the
+    HTTPS binding, follow only a successor holding one, and otherwise wait for it."""
+    from sqlalchemy import or_
+    from models import DeployBinding, SystemConfig
+    from services import binding_attention
+    from services.https_binding import BOUND_REFID_KEY
+    if successor.id is None:
+        db.session.flush()
+    keyed = successor.has_private_key
+    taken = {t for (t,) in db.session.query(DeployBinding.target_id)
+             .filter(DeployBinding.certificate_id == successor.id)}
+    stayed = []
+    for binding in (DeployBinding.query.filter(or_(
+            DeployBinding.certificate_id.in_(old_ids),
+            DeployBinding.attention_successor_id.in_(old_ids)))
+            .order_by(DeployBinding.id)):
+        if not keyed and _pushes_key(binding):
+            stayed.append(f'deploy binding {binding.id}')
+            binding_attention.mark_deploy(binding, successor)
+            continue
+        binding_attention.clear(binding)
+        if binding.target_id not in taken:
+            binding.certificate_id = successor.id
+            taken.add(binding.target_id)
+    refids = [r for (r,) in db.session.query(Certificate.refid).filter(Certificate.id.in_(old_ids))]
+    https = SystemConfig.query.filter(SystemConfig.key == BOUND_REFID_KEY).first()
+    awaited = binding_attention.https_left_behind_for() in refids
+    if https is None or not (https.value in refids or awaited):
+        https = None
+    if https is not None and keyed:
+        https.value = successor.refid
+        if awaited:
+            binding_attention.clear_https()
+    elif https is not None:
+        stayed.append('the HTTPS listener binding')
+        binding_attention.mark_https(successor)
+    if stayed:
+        logger.warning(
+            f"Renewed certificate {successor.refid} has no private key in UCM: "
+            f"{', '.join(stayed)} {'stays' if len(stayed) == 1 else 'stay'} on the previous certificate")
 
 
 class CASigningMixin:
@@ -71,6 +143,7 @@ class CASigningMixin:
             )
 
     @staticmethod
+    @retry_on_serial_collision
     def sign_csr_from_crypto(
         ca: CA,
         csr: x509.CertificateSigningRequest,
@@ -89,6 +162,13 @@ class CASigningMixin:
         template_ekus: list = None,
         template_id: int = None,
         template_key_usage: list = None,
+        on_stored=None,
+        windows_profile_id: int = None,
+        unique_subject: bool = False,
+        subject_holder: str = None,
+        renews: list = None,
+        audit_subject_refusal: bool = True,
+        emits_renewal: bool = False,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -132,6 +212,19 @@ class CASigningMixin:
                 its row (WSTEP: the one whose OID it carries).
             template_key_usage: Key Usage names that replace the CSR's, as a
                 bound template's do (WSTEP, for a request that carries none).
+            on_stored: called with the new row once flushed, so what it
+                writes is committed with the certificate (an approval's link).
+            windows_profile_id: the Windows enrollment profile a WSTEP issuance
+                or renewal served, recorded on the row; None for other protocols.
+            unique_subject: raise SubjectTaken when another entity's certificate of
+                the CA carries the issued subject, even with the CA's option off; WSTEP
+                passes it for a subject built by a common name pattern.
+            subject_holder: the requester's identity recorded on the row (WSTEP: its SID).
+            renews: rows of a designated renewal that ``supersedes`` does not archive (WSTEP's
+                template-less Kerberos renewal): the same entity, whose lineage the row inherits.
+            audit_subject_refusal: False when the caller audits a SubjectTaken itself (WSTEP).
+            emits_renewal: the certificate replaces another without ``renewal_of``'s grace (WSTEP's
+                Kerberos renewal): the webhook says cert.renewed, as for ``renewal_of``.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -140,8 +233,8 @@ class CASigningMixin:
 
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
-        # RFC 9763: A is found before signing, so linking after it cannot fail
-        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
+        # RFC 9763: A is found before signing; linking refuses only an A renewed since
+        from services.cert.related_pair import link_issued, named_by, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr.public_bytes(serialization.Encoding.DER))
 
         # Load CA cert and key (local or HSM-backed)
@@ -191,6 +284,11 @@ class CASigningMixin:
                           'digest_explicit': False},
             san_template=policy_template,
             custom_extensions=template_custom_extensions(policy_template),
+            # Without the lock, before the CT logs see a pre-certificate; checked again below
+            before_publication=lambda leaf: refuse_taken_subject(
+                ca, leaf, renews=[named_by(leaf, related_a), supersedes, *(renews or ())],
+                holder=subject_holder, requester_sid=requester_sid, pattern=unique_subject,
+                source=source, locked=False, audited=audit_subject_refusal),
         )
 
         # Extract serial number
@@ -208,15 +306,14 @@ class CASigningMixin:
         # CSR's -- for WSTEP's Kerberos binding, override_subject can mean
         # the two differ entirely (a naked CSR issued with a server-derived
         # subject), and the issued cert's subject is what's actually true.
-        # [-1] (the last/most-specific CN), not [0]: a directory-path
+        # The last (most specific) CN, not the first: a directory-path
         # subject like an AD-derived user's has more than one CN RDN
         # (``CN=Roy Hagland,CN=Users,DC=hagland,DC=domain``), and in the
         # root-to-leaf DER order x509.Name encodes, the person's own name
         # is the last one, not the container ("Users") that happens first.
-        cn = ''
-        try:
-            cn = cert_obj.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[-1].value
-        except (IndexError, Exception):
+        from utils.dn_parse import most_specific_common_name
+        cn = most_specific_common_name(cert_obj.subject)
+        if cn is None:  # an empty CN stays empty; only a subject without one falls back
             cn = cert_obj.subject.rfc4514_string()
 
         cert_pem_raw = cert_pem_bytes if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes.encode()
@@ -256,27 +353,47 @@ class CASigningMixin:
             san_upn=json.dumps(san_upn) if san_upn else None,
             source=source,
             template_id=template_id,
+            windows_profile_id=windows_profile_id,
+            subject_holder=successor_holder(subject_holder, [supersedes, *(renews or ())]),
         )
         db.session.add(new_cert)
 
-        # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
         try:
             db.session.flush()
+            # A (RFC 9763) is locked before the renewed row: an in-place renewal of A
+            # locks A, then the rows it unlinks, this one among them
+            if related_a is not None:
+                db.session.query(Certificate.id).filter(
+                    Certificate.id == related_a[0].id).with_for_update().first()
             # The renewed row is archived in the commit that stores its successor,
             # compare-and-set: of two concurrent renewals, only one stores a certificate
-            if supersedes is not None and not _claim_superseded(supersedes):
+            if supersedes is not None and not _claim_superseded(supersedes, renewal_of, new_cert):
                 db.session.rollback()
                 raise AlreadySuperseded('the renewed certificate is already superseded')
-            link_issued(new_cert, cert_obj, related_a)
+            # A verified relatedCertRequest proves A's key: B is A's entity (RFC 9763 pair)
+            a_row = link_issued(new_cert, cert_obj, related_a)
+            # The renewed row's lineage first: its archived predecessor stays this entity
+            designated = [supersedes, a_row, *(renews or ())]
+            new_cert.subject_holder = successor_holder(subject_holder, designated)
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
+            if on_stored is not None:
+                on_stored(new_cert)
+            # Every row written (A's link included) is locked before the CA row, last
+            db.session.flush()
+            next_ca_serial(ca)
+            # Read once the CA row is locked (PostgreSQL) or the database write lock held
+            # (SQLite, since the flush): a concurrent issuance under this CA commits before or after
+            refuse_taken_subject(ca, cert_obj, own=[new_cert], renews=designated,
+                                 holder=subject_holder, requester_sid=requester_sid,
+                                 pattern=unique_subject, source=source,
+                                 audited=audit_subject_refusal)
             db.session.commit()
-        except AlreadySuperseded:
+        except (AlreadySuperseded, SubjectTaken):
             raise
         except Exception as _commit_err:
-            db.session.rollback()
-            logger.error(f"Storing the certificate signed via {source} failed: {_commit_err}", exc_info=True)
+            rollback_unless_serial_collision(_commit_err)
+            log_commit_failure(logger, f"Storing the certificate signed via {source} failed", _commit_err)
             raise
 
         logger.info(f"Signed CSR via {source}: CN={cn}, serial={serial}, CA={ca.descr}")
@@ -284,9 +401,11 @@ class CASigningMixin:
         # Renewal flows pass source like '<orig>-renewal'; everything else
         # (EST enrollment, etc.) is a fresh issuance.
         from services.webhook_service import emit_cert_renewed, emit_cert_issued
-        if renewal_of is not None or 'renewal' in (source or ''):
+        if renewal_of is not None or emits_renewal or 'renewal' in (source or ''):
             emit_cert_renewed(new_cert.to_dict(), ca_refid=ca.refid)
         else:
             emit_cert_issued(new_cert.to_dict(), ca_refid=ca.refid)
+        from services.binding_attention import emit_pending
+        emit_pending()
 
         return cert_pem_str, serial

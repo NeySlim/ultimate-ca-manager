@@ -1,5 +1,5 @@
 /**
- * "Close on navigate" closes the floating windows when the operator changes page.
+ * "Close on navigate" closes the inspector objects when the operator changes page.
  * A detail link (/certificates/12) that settles on its list page is the same page.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -9,10 +9,9 @@ import { MemoryRouter, useNavigate } from 'react-router-dom'
 const wm = vi.hoisted(() => ({ closeAll: vi.fn(), windowCount: 1 }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, fallback) => fallback ?? key }) }))
-vi.mock('../../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    windowCount: wm.windowCount, closeAll: wm.closeAll, tileWindows: vi.fn(), stackWindows: vi.fn(),
-    sameWindow: true, closeOnNav: true, toggleSameWindow: vi.fn(), toggleCloseOnNav: vi.fn(),
+vi.mock('../../../contexts/InspectorContext', () => ({
+  useInspector: () => ({
+    openCount: wm.windowCount, closeAll: wm.closeAll, closeOnNav: true, toggleCloseOnNav: vi.fn(),
   }),
 }))
 

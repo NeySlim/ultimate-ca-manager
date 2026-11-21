@@ -9,6 +9,8 @@ from models import CA
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from tests.test_opnsense_import import _Session
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _row(cert, descr):
     return {'uuid': str(uuid.uuid4()), 'refid': uuid.uuid4().hex[:13], 'descr': descr,
@@ -19,7 +21,7 @@ def _run(auth_client, monkeypatch, ca_rows):
     from api.v2 import import_opnsense
     monkeypatch.setattr(import_opnsense, 'create_session', lambda verify_ssl=True: _Session(ca_rows, []))
     r = auth_client.post('/api/v2/import/opnsense/import', json={
-        'host': '192.168.1.254', 'port': 443, 'api_key': 'k', 'api_secret': 's',
+        'host': '192.0.2.10', 'port': 443, 'api_key': 'k', 'api_secret': 's',
         'verify_ssl': False, 'items': []})
     assert r.status_code == 200, r.data
     return json.loads(r.data)['data']
@@ -65,7 +67,7 @@ def test_certificates_naming_an_attached_entry_link_to_its_counterpart_and_its_k
     monkeypatch.setattr(import_opnsense, 'create_session', lambda verify_ssl=True: _Session(
         [_row(pki.root_a, pki.name_a), _row(pki.root_b, pki.name_b), cross_row], [leaf]))
     r = auth_client.post('/api/v2/import/opnsense/import', json={
-        'host': '192.168.1.254', 'port': 443, 'api_key': 'k', 'api_secret': 's',
+        'host': '192.0.2.10', 'port': 443, 'api_key': 'k', 'api_secret': 's',
         'verify_ssl': False, 'items': []})
     assert r.status_code == 200, r.data
     with app.app_context():

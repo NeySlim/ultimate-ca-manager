@@ -35,31 +35,16 @@ def init_database():
         admin_username = app.config.get("INITIAL_ADMIN_USERNAME", "admin")
         admin = User.query.filter_by(username=admin_username).first()
         if not admin:
-            # Create default admin user with the same properties as the
-            # canonical bootstrap paths in app.py / database_health.py.
-            # NOTE: the User column is `active` — `is_active=True` made this
-            # constructor raise TypeError whenever the block was reached.
-            from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
-            initial_password = app.config.get("INITIAL_ADMIN_PASSWORD", DEFAULT_INITIAL_PASSWORD)
-            admin = User(
-                username=admin_username,
-                email=app.config.get("INITIAL_ADMIN_EMAIL", "admin@localhost"),
-                role='admin',
-                active=True,
-                # The default password is public knowledge, so it must be
-                # rotated at first login rather than silently remaining valid.
-                force_password_change=initial_password_needs_change(initial_password),
-                # Exempt the bootstrap admin from forced 2FA enrolment (#141)
-                # so enabling global enforcement can never lock out this
-                # account — same as the other bootstrap paths.
-                totp_exempt=True
-            )
-            admin.set_password(initial_password)
-            db.session.add(admin)
+            # The same account as the start-up path: provided or generated, never a default
+            from auth.initial_admin import password_file, read_command, seed_admin
+            admin = seed_admin(app.config)
             db.session.commit()
-            print(f"✓ Default admin user created (username: {admin_username}, "
-                  "password: INITIAL_ADMIN_PASSWORD, default changeme123)")
-            print("  ⚠️  CHANGE THIS PASSWORD IMMEDIATELY!")
+            if admin.force_password_change:
+                path = password_file(app.config)
+                print(f"✓ Admin user created ({admin_username}); generated password in {path}, "
+                      f"read it with: {read_command(path)}")
+            else:
+                print(f"✓ Admin user created ({admin_username}) with the password provided")
         else:
             print("✓ Admin user already exists")
         

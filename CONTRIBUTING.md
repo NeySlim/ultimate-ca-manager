@@ -72,13 +72,50 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
   and impossible to revert cleanly.
 - **A CHANGELOG entry** under `## [Unreleased]`, one or two sentences: what was
   broken, what is no longer broken. Not the investigation.
-- **Translations.** UCM ships in 9 languages. A new user-facing string goes into all
+- **Translations.** UCM ships in 10 languages. A new user-facing string goes into all
   of `frontend/src/i18n/locales/*.json`, and `node scripts/check-i18n-sync.js` tells
   you if one is missing.
-- **Migrations** work on SQLite *and* PostgreSQL. See the existing files in
-  `backend/migrations/` for the pattern.
+- **Built-in help.** It exists in English (`helpContent.js`, `helpGuides.js`), French,
+  Russian and Chinese (`frontend/src/data/help/<lang>/<page>.js`); the other
+  interface languages show the English text. A change to a help page updates all four
+  versions; the parity test checks that each translated page has the English structure
+  (entries per section, item types, tips and warnings), not that its text says the same.
+- **Migrations** work on SQLite *and* PostgreSQL: a file
+  `backend/migrations/NNN_name.py` numbered from 301 (300 is the upgrade from
+  2.254), with `pg_compatible = True` and an `upgrade(conn)` that takes a
+  `sqlite3.Connection` or a SQLAlchemy connection. The runner refuses a migration
+  without `pg_compatible` on PostgreSQL. It must be safe to run twice: SQLite
+  commits as it goes, so a start after an interruption runs it again.
 - **Commit subjects** as `type(scope): summary`, in the imperative, under 72
   characters.
+
+## Migrations and rolling updates
+
+An HA cluster upgrades one node at a time: the nodes still on version N run against the
+schema the first node on N+1 migrated. A migration of N+1 therefore only adds: a table, a
+nullable column or one with a default, an index, or a unique index or constraint on new
+columns. It never drops or renames a table or a column N reads or writes, never changes a
+column's type, never makes a column `NOT NULL` without a default or adds a `NOT NULL` column
+without one, never puts a new check, unique or foreign key constraint on columns N writes,
+never deletes rows, and never stops accepting an enumeration value N writes.
+
+The removal comes in a later release, once no version that can share the cluster reads the
+object, in a migration that says so at module level:
+
+```python
+requires_full_stop = "why the release before cannot run against it"
+```
+
+The value is a string literal: it is read from the source without running it. A rolling
+update refuses a release that brings a pending marked migration before installing anything,
+and in HA a node refuses to apply one while another node beats fresh on another version. Say
+in the CHANGELOG entry of that release that it requires every node stopped.
+
+`tests/test_migration_expand_only.py` applies every migration numbered after 300 to a
+populated database of each backend and fails on one without the mark that removes or narrows
+any of the above. It compares the schema and the row counts, so it does not see a value
+rewritten in place or an enumeration value the code stops accepting: those stay for the
+author and the reviewer to check.
 
 ## Security
 

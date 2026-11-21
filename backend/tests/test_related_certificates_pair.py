@@ -12,9 +12,11 @@ from cryptography.hazmat.primitives import serialization
 from models import CA, Certificate, db
 from utils import key_algorithms, related_cert
 from utils.datetime_utils import utc_now
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_users', 'drop_new_cas_and_certificates')
 
 CLASSICAL = next(label for label in key_algorithms.labels('EC') if label.endswith('P256'))
 PQ = next(label for label in key_algorithms.labels('ML-DSA') if label.endswith('65'))
@@ -465,8 +467,10 @@ def test_the_bundle_holds_both_keys_when_asked(auth_client, create_ca):
 def test_the_bundle_keys_need_the_private_key_permission(app, auth_client, create_ca, create_user):
     a, _b = _pair(auth_client, create_ca, 'pair-export-denied.example.com')
     operator = _login(app, create_user)
-    r = operator.get(f"/api/v2/certificates/{a['id']}/export?format=hybrid-bundle&include_key=true")
-    assert r.status_code == 403
+    r = operator.post(f"/api/v2/certificates/{a['id']}/export",
+                      json={'format': 'hybrid-bundle', 'include_key': True})
+    assert r.status_code == 403, r.data
+    assert 'read:private_keys' in r.get_json()['message']
     assert operator.get(f"/api/v2/certificates/{a['id']}/export?format=hybrid-bundle").status_code == 200
 
 
@@ -656,6 +660,63 @@ def test_the_partner_policy_holds_a_user_certificate_revocation(
         with app.app_context():
             AuthCertificate.query.filter_by(cert_serial=str(_x509(a).serial_number)).delete()
             db.session.commit()
+
+
+def _drop_made(app, cert_ids, ca_ids, user_ids):
+    """The rows a test made: its certificates, then their CAs, then its users."""
+    from models import User
+    from services.ca_service import CAService
+    from services.cert_service import CertificateService
+    with app.app_context():
+        for cert_id in cert_ids:
+            if db.session.get(Certificate, cert_id) is not None:
+                CertificateService.delete_certificate(cert_id, username='test')
+        for ca_id in ca_ids:
+            if db.session.get(CA, ca_id) is not None:
+                CAService.delete_ca(ca_id, username='test')
+        for user_id in user_ids:
+            user = db.session.get(User, user_id)
+            if user is not None:
+                db.session.delete(user)
+        db.session.commit()
+
+
+def test_a_superseded_partner_does_not_bring_its_policy_to_a_user_certificate_revocation(
+        app, auth_client, create_ca, create_user):
+    """The user-certificate route follows ``revocation_partner``: an archived partner is left alone."""
+    from models import AuthCertificate
+    a, b = _pair(auth_client, create_ca, 'pair-archived-user.example.com')
+    ca_ids = [_ca_id_of(app, a['id'])]
+    ca_ids.append(_move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 archived'))
+    pid = _approval_policy(app, ca_ids[1], ['revocation'])
+    user_ids = []
+    try:
+        user = create_user(username='pair_archived_holder')
+        user_ids.append(user['id'])
+        with app.app_context():
+            db.session.get(Certificate, b['id']).archived = True
+            cert = _x509(a)
+            enrolment = AuthCertificate(user_id=user['id'], cert_pem=a['pem'].encode(),
+                                        cert_serial=str(cert.serial_number),
+                                        cert_subject=cert.subject.rfc4514_string())
+            db.session.add(enrolment)
+            db.session.commit()
+            enrolment_id = enrolment.id
+        operator = create_user(username='pair_archived_operator', role='operator')
+        user_ids.append(operator['id'])
+        client = app.test_client()
+        r = client.post('/api/v2/auth/login', json={'username': operator['username'], 'password': 'TestPass123!'})
+        assert r.status_code == 200, r.data
+        r = client.post(f'/api/v2/user-certificates/{enrolment_id}/revoke', json={'reason': 'keyCompromise'})
+        assert r.status_code == 200, r.data
+        assert not json.loads(r.data)['data'].get('approval_required'), r.data
+        assert _revoked(app, a['id'], b['id']) == [True, False]
+    finally:
+        _drop_policy(app, pid)
+        with app.app_context():
+            AuthCertificate.query.filter_by(cert_serial=str(_x509(a).serial_number)).delete()
+            db.session.commit()
+        _drop_made(app, [a['id'], b['id']], ca_ids, user_ids)
 
 
 @pytest.mark.parametrize('route', ['single', 'bulk', 'user'])

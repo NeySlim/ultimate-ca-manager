@@ -22,7 +22,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 
 from models import CA, Certificate, RevokedSerial, db
 from utils.datetime_utils import utc_isoformat, utc_now
-from utils.serial_format import serial_named_by, serial_to_int, serial_variants, unambiguous_serial_spellings
+from utils.serial_format import canonical_serial, serial_variants
 
 OK = 'ok'
 UNKNOWN = 'unknown'
@@ -30,6 +30,8 @@ REVOKED = 'revoked'
 EXPIRED = 'expired'
 NOT_YET_VALID = 'not_yet_valid'
 SUPERSEDED = 'superseded'
+# EST and SCEP only: the certificate renews through its Windows enrollment profile (WSTEP)
+WINDOWS_PROFILE = 'windows_profile'
 
 
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
@@ -47,13 +49,37 @@ def find_stored_rows(cert: x509.Certificate) -> list:
     return _rows_holding(cert)
 
 
+def acme_ordered_first(rows: list) -> list:
+    """``rows`` with those an ACME order names first, then by id: a client order names its
+    row, or the one its renewal moved off, and says which CA account to tell; a server order
+    names the row it issued. A copy stored again never stands in for them."""
+    from models.acme_models import AcmeClientOrder, AcmeOrder
+    ids = [row.id for row in rows]
+    named = set()
+    for model in (AcmeClientOrder, AcmeOrder):
+        named.update(cid for (cid,) in model.query.with_entities(model.certificate_id)
+                     .filter(model.certificate_id.in_(ids)))
+    rank = {row.id: 0 if row.id in named else 2 for row in rows}
+    for row in rows:
+        if row.id in named or not row.serial_number:
+            continue
+        for order in AcmeClientOrder.query.filter(
+                AcmeClientOrder.replaced_certificates.contains(row.serial_number, autoescape=True)):
+            if order.names_replaced(row):
+                # The id a renewal recorded tells the row it moved from the copies of the same certificate
+                recorded = any(e.get('certificate_id') == row.id for e in order._replaced_entries())
+                rank[row.id] = min(rank[row.id], 0 if recorded else 1)
+    return sorted(rows, key=lambda row: (rank[row.id], row.id))
+
+
 def _rows_holding(cert: x509.Certificate, *criteria) -> list:
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
         *criteria,
+        # Every spelling: rows the upgrade step 144 left pending may hold the revoked twin
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
-    ).all()
+    ).order_by(Certificate.id).all()    # one order on both engines: callers read the first row
     rows = []
     for row in candidates:
         try:
@@ -96,8 +122,9 @@ def gravest_revocation(*holders):
 
 
 def record_serial_clause(serial):
-    """The records of ``serial``, in each spelling that cannot be another serial's."""
-    return RevokedSerial.serial_number.in_(unambiguous_serial_spellings(serial))
+    """The records of ``serial``: the column is canonical decimal (upgrade step 144), so only
+    equality names it; another serial's all-digit hex spelling never does."""
+    return RevokedSerial.serial_number == canonical_serial(serial)
 
 
 def record_reason_replaceable(record, reason) -> bool:
@@ -118,7 +145,7 @@ def revocation_records(ca: CA, serial: int) -> list:
 
 def persisted_revocation(ca: CA, serial: int):
     """The record that says ``serial`` is revoked under ``ca``, or None. Any record does,
-    whichever row it is linked to (migration 136 deleted the holds older releases left lifted)."""
+    whichever row it is linked to (migration 154 deleted the holds older releases left lifted)."""
     records = revocation_records(ca, serial)
     return records[0] if records else None
 
@@ -134,28 +161,53 @@ def lift_persisted_revocation(ca: CA, serial: int) -> int:
 
 def gravest_records_by_serial(records) -> dict:
     """The gravest of ``records`` per serial they name (``revocation_order``), keyed by the
-    integer ``record_serial_clause`` would match (``serial_named_by``): read once, not per row."""
+    canonical column ``record_serial_clause`` compares: ``records`` are read once, not per row."""
     gravest = {}
     for record in sorted(records, key=revocation_order):
-        serial = serial_named_by(record.serial_number)
-        if serial is not None:
-            gravest.setdefault(serial, record)
+        gravest.setdefault(record.serial_number, record)
     return gravest
 
 
-def answered_revocation(row: Certificate, ca: CA, records: Optional[dict] = None):
+class _HeldThroughLift:
+    """A row staged removeFromCRL with no record of its serial: the hold it was, row's date."""
+    revoke_reason = 'certificateHold'
+
+    def __init__(self, row):
+        self._row = row
+
+    def __getattr__(self, name):
+        return getattr(self._row, name)
+
+
+def answered_revocation(row: Certificate, ca: CA, records: Optional[dict] = None, *, delta: bool = False):
     """What the CRL and OCSP say of the revoked ``row``: itself, or when it is only held, the
     final record of its serial under ``ca`` (or a record of its key), the graver of the two.
-    ``records`` (``gravest_records_by_serial`` of the key's records) spares a query per row."""
+    ``records`` (``gravest_records_by_serial`` of the key's records) spares a query per row.
+    A lift in progress (``removeFromCRL``) is said only by a ``delta`` CRL (``_lift_in_progress``)."""
     from utils.revocation_reasons import HOLD_REASONS
     from services.cert.serial_resolution import resolve_record_serial
-    if row.revoke_reason not in HOLD_REASONS:
+    lifting = row.revoke_reason == 'removeFromCRL'
+    if not lifting and row.revoke_reason not in HOLD_REASONS:
         return row
     serial = resolve_record_serial(row)
     if serial is None:
-        return row
-    record = records.get(serial) if records is not None else persisted_revocation(ca, serial)
+        return row  # no serial to read: listed by no CRL, matched by no OCSP request
+    record = records.get(canonical_serial(serial)) if records is not None else persisted_revocation(ca, serial)
+    if lifting:
+        return _lift_in_progress(row, record, delta)
     return gravest_revocation(row, record)
+
+
+def _lift_in_progress(row: Certificate, record, delta: bool):
+    """An unhold is still a hold until it is lifted (RFC 5280 §5.3.1: removeFromCRL only on a
+    delta): its hold ``record`` (or the row as held) answers; a final record always prevails."""
+    from utils.revocation_reasons import HOLD_REASONS
+    if record is not None and reason_rank(record.revoke_reason) < reason_rank('certificateHold'):
+        return record
+    if delta or (record is not None and record.revoke_reason not in HOLD_REASONS):
+        # The delta's instruction, or reason 8 recorded too (no lift: ``interrupted_lift``)
+        return row
+    return record if record is not None else _HeldThroughLift(row)
 
 
 def _row_serial(row: Certificate) -> Optional[int]:
@@ -195,13 +247,13 @@ def persisted_revocations_of(rows) -> dict:
                and (serial := _row_serial(row)) is not None}
     if not serials:
         return {}
-    by_serial = {}
-    for record in RevokedSerial.query.filter(RevokedSerial.serial_number.in_(
-            {form for s in serials.values() for form in unambiguous_serial_spellings(s)})):
-        by_serial.setdefault(serial_named_by(record.serial_number), []).append(record)
+    by_column = {}
+    for record in RevokedSerial.query.filter(
+            RevokedSerial.serial_number.in_({canonical_serial(s) for s in serials.values()})):
+        by_column.setdefault(record.serial_number, []).append(record)
     refids, found = {}, {}
     for row in rows:
-        records = by_serial.get(serials[row.id]) if row.id in serials else None
+        records = by_column.get(canonical_serial(serials[row.id])) if row.id in serials else None
         if not records:
             continue
         if row.caref not in refids:
@@ -216,7 +268,10 @@ def persisted_revocations_of(rows) -> dict:
 def show_effective_revocation(data: dict, row: Certificate, record) -> dict:
     """``data`` (``row.to_dict()``) with the revocation ``record`` makes when it is graver
     than the row's own, as OCSP and the CRL answer it."""
-    holder = gravest_revocation(row if row.revoked else None, record)
+    if row.revoked and row.revoke_reason == 'removeFromCRL':
+        holder = _lift_in_progress(row, record, False)
+    else:
+        holder = gravest_revocation(row if row.revoked else None, record)
     if holder is not None and holder is not row:
         data.update(revoked=True, status='revoked', revoke_reason=holder.revoke_reason,
                     revoked_at=utc_isoformat(holder.revoked_at), invalidity_at=utc_isoformat(holder.invalidity_at))
@@ -253,7 +308,7 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
 
 def _records_still_held(records) -> set:
     """The ids of ``records`` still stored, read again under share locks (PostgreSQL) held to the
-    commit and taken by ascending id, the order unholds and revocations lock records in: an unhold
+    commit and taken by ascending id, the order an unhold locks a pair's records in: an unhold
     that deleted one first wins, and one deleting it later waits for the mark. The records take
     the values they hold under the lock: a revocation committed meanwhile is what gets marked."""
     ids, held = sorted({record.id for record in records}), set()
@@ -287,14 +342,29 @@ def _mark_while_recorded(row: Certificate, record) -> bool:
     return bool(done)
 
 
-def lock_serial_records(ca: CA, serial: int) -> list:
-    """``revocation_records`` locked for update (PostgreSQL) to the commit: taken before the
-    certificate row, the order the hourly pass and a revocation follow, so none deadlocks.
-    Locked by id like a revocation's own records, then sorted gravest first."""
+def interrupted_lift(row: Certificate) -> bool:
+    """A row in removeFromCRL is an unhold stopped between its two commits unless a record
+    of its serial says otherwise: a hold record or none is a lift to finish, a final one is not."""
+    from utils.revocation_reasons import HOLD_REASONS
+    from services.cert.serial_resolution import resolve_record_serial
+    ca = CA.query.filter_by(refid=row.caref).first() if row.caref else None
+    serial = resolve_record_serial(row)
+    records = revocation_records(ca, serial) if ca is not None and serial is not None else []
+    return all(r.revoke_reason in HOLD_REASONS for r in records)
+
+
+def lock_serial_records(targets) -> list:
+    """The records of every ``(ca, serial)`` of ``targets`` (``revocation_records``), locked for
+    update (PostgreSQL) to the commit in one statement by ascending id: taken before the rows,
+    in the order the hourly pass takes them, so an unhold of a pair and the pass never deadlock."""
+    from sqlalchemy import and_, or_
     from utils.cert_issuer import same_key_refids
-    return sorted(RevokedSerial.query.filter(
-        RevokedSerial.caref.in_(same_key_refids(ca)), record_serial_clause(serial))
-        .order_by(RevokedSerial.id).with_for_update().populate_existing().all(), key=revocation_order)
+    clauses = [and_(RevokedSerial.caref.in_(same_key_refids(ca)), record_serial_clause(serial))
+               for ca, serial in targets]
+    if not clauses:
+        return []
+    return RevokedSerial.query.filter(or_(*clauses)).order_by(RevokedSerial.id) \
+        .with_for_update().populate_existing().all()
 
 
 def apply_persisted_revocations(ids=None) -> list:
@@ -305,14 +375,11 @@ def apply_persisted_revocations(ids=None) -> list:
     # Read afresh: a revocation or hold another worker made since this session loaded it counts
     db.session.flush()
     db.session.expire_all()
-    # A record column reads as its own serial only (an all-digit one in decimal), as a row's does
-    serials = {serial_to_int(column) for (column,) in RevokedSerial.query.with_entities(
-        RevokedSerial.serial_number).distinct()}
-    columns = sorted({form for serial in serials if serial is not None
-                      for form in unambiguous_serial_spellings(serial)})
+    # Both columns are canonical (upgrade step 144): a record names the rows of its own serial only
+    columns = sorted({column for (column,) in RevokedSerial.query.with_entities(
+        RevokedSerial.serial_number).distinct() if column})
     found = []
     for start in range(0, len(columns), 500):
-        # A pre-filter only: row_persisted_revocation below is the guard
         for row in Certificate.query.filter(
                 Certificate.serial_number.in_(columns[start:start + 500]),
                 Certificate.caref.isnot(None), Certificate.crt.isnot(None),
@@ -322,10 +389,10 @@ def apply_persisted_revocations(ids=None) -> list:
             record = row_persisted_revocation(row)
             if record is not None:
                 found.append((row, record))
-    # Every record locked before any row is marked, as an unhold or a revocation takes them
-    held = _records_still_held(record for _, record in found)
     # Rows marked in id order, whatever order the database returned them in
     found.sort(key=lambda pair: pair[0].id)
+    # Every record locked before any row is marked, as an unhold takes them
+    held = _records_still_held(record for _, record in found)
     return [(row, record) for row, record in found
             if record.id in held and _mark_while_recorded(row, record)]
 
@@ -356,6 +423,19 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     if not_after <= now or (row.valid_to and row.valid_to < now):
         return row, EXPIRED
     return row, OK
+
+
+def protocol_renewal_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
+    """``issued_certificate_status`` for an EST or SCEP renewal: a certificate a Windows enrollment
+    profile holds (an id, even of a profile deleted since, or a ``wstep`` row) answers WINDOWS_PROFILE,
+    expired or superseded alike; only REVOKED takes precedence."""
+    row, status = issued_certificate_status(ca, cert)
+    # The row that carries the profile answers, not a plain twin beside it: the audit names it
+    held = next((r for r in find_issued_rows(ca, cert)
+                 if r.windows_profile_id is not None or r.source == 'wstep'), None)
+    if status != REVOKED and held is not None:
+        return held, WINDOWS_PROFILE
+    return row, status
 
 
 def _san_identity(cert_or_csr):

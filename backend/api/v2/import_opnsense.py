@@ -17,6 +17,8 @@ from models import db, CA, Certificate
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.key_codec import store_pem_bytes
+from utils.key_type import weak_ca_key_refusal
+from utils.certificate_readability import stored_pem_refusal
 from utils.safe_requests import create_session
 from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
@@ -68,6 +70,17 @@ def _encoded_private_key(row):
     return None
 
 
+def _decoded_private_key(row):
+    """The PEM of the key ``_encoded_private_key`` stores for an OPNsense row, or None when it
+    carries none. A ``prv`` that is not base64 comes back as it is: it is a key that cannot be read."""
+    if row.get('prv'):
+        try:
+            return base64.b64decode(row['prv'])
+        except ValueError:
+            return row['prv']
+    return row.get('prv_payload') or None
+
+
 def _signing_parent(ca):
     """The caref of the stored CA whose key signed *ca*'s certificate, None for a root or an unknown parent."""
     from services.import_service import relink_parent_caref
@@ -92,9 +105,13 @@ def _keep_attached_key(ca, entry, stats):
     try:
         from cryptography.hazmat.primitives import serialization
         from utils.key_codec import load_pem_bytes
-        serialization.load_pem_private_key(load_pem_bytes(key), password=None)
+        loaded = serialization.load_pem_private_key(load_pem_bytes(key), password=None)
     except Exception:
         stats['errors'].append(f"{label}: the key could not be read")
+        return
+    weak = weak_ca_key_refusal(loaded)
+    if weak:
+        stats['errors'].append(f"{label}: {weak}")
         return
     cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
     if ca.prv:
@@ -578,6 +595,8 @@ def import_items():
         "certs_skipped": 0,
         "errors": []
     }
+    # Announced once committed: certificate.imported per row created
+    created_certs = []
     
     try:
         ca_rows = _fetch_rows(session, base_url, api_key, api_secret, 'ca', pin)
@@ -618,6 +637,12 @@ def import_items():
                 stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}' is missing refid or certificate data")
                 continue
             
+            unreadable = stored_pem_refusal(crt)
+            if unreadable:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}': {unreadable}")
+                continue
+
             # Check if already exists by refid
             existing = CA.query.filter_by(refid=ca_refid).first()
             if existing:
@@ -651,6 +676,12 @@ def import_items():
                 stats['errors'].append(f"CA '{ca_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
                 continue
             
+            weak = weak_ca_key_refusal(_decoded_private_key(ca_data))
+            if weak:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}' not imported: {weak}")
+                continue
+
             cert_info = _parse_cert(crt)
             try:
                 serial = int(ca_data.get('serial') or 0)
@@ -682,6 +713,8 @@ def import_items():
         db.session.flush()
         for ca in created_cas:
             ca.caref = _signing_parent(ca)
+        from services.ca import parent_confirmation
+        unverifiable_parents = parent_confirmation.notices([ca for ca in created_cas if not ca.caref])
 
         for item_id in selected_ids:
             if item_id in all_certs:
@@ -695,6 +728,12 @@ def import_items():
                     stats['errors'].append(f"Certificate '{_display_name(cert_data, item_id)}' is missing refid or certificate data")
                     continue
                 
+                unreadable = stored_pem_refusal(crt)
+                if unreadable:
+                    stats['certs_skipped'] += 1
+                    stats['errors'].append(f"Certificate '{_display_name(cert_data, item_id)}': {unreadable}")
+                    continue
+
                 # Check if already exists by refid
                 existing = Certificate.query.filter_by(refid=cert_refid).first()
                 if existing:
@@ -718,6 +757,12 @@ def import_items():
                 caref = attached_refids.get(caref, caref)
                 if caref:
                     caref = _entry_issuer_refid(CA.query.filter_by(refid=caref).first(), crt)
+                # uix_certificates_ca_serial: a config may hold the same certificate twice
+                if Certificate.stored_under(caref, cert_info['serial_number']):
+                    stats['certs_skipped'] += 1
+                    stats['errors'].append(f"Certificate '{_display_name(cert_data, item_id)}': serial "
+                                           f"{cert_info['serial_number']} {Certificate.DUPLICATE_SERIAL}")
+                    continue
                  
                 # Create certificate
                 cert = Certificate(
@@ -744,6 +789,7 @@ def import_items():
                 apply_persisted_revocation(cert)
                 
                 db.session.add(cert)
+                created_certs.append(cert)
                 stats['certs_imported'] += 1
         
         # Commit all changes
@@ -752,6 +798,9 @@ def import_items():
             return _err
         for ca, row in attached_cross:
             cross_certs.announce(ca, 'attached', row, 'import')
+        from services.webhook_service import emit_cert_imported
+        for cert in created_certs:
+            emit_cert_imported(cert.to_dict(), ca_refid=cert.caref, actor=g.current_user.username)
         for ca in keys_stored:
             AuditService.log_action(action='ca_key_imported', resource_type='ca', resource_id=ca.id,
                                     resource_name=ca.descr, details=f'Private key imported for CA: {ca.descr}',
@@ -774,7 +823,9 @@ def import_items():
             },
             "cross_certificates_attached": stats.get('cas_cross_attached', 0),
             "skipped": stats['cas_skipped'] + stats['certs_skipped'],
-            "errors": stats['errors']
+            "errors": stats['errors'],
+            # CAs left without a parent whose signature cannot be checked here, with the one proposed
+            "unverifiable_parents": unverifiable_parents,
         })
     
     except requests.exceptions.SSLError as e:

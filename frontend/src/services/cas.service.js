@@ -25,6 +25,15 @@ export const casService = {
     return apiClient.delete(`/cas/${id}`)
   },
 
+  // Parent whose signature cannot be verified here: linked or unlinked on an explicit confirmation
+  async confirmParent(id, parentId) {
+    return apiClient.post(`/cas/${id}/parent-confirmation`, { parent_id: parentId, confirm: true })
+  },
+
+  async withdrawParent(id) {
+    return apiClient.delete(`/cas/${id}/parent-confirmation`, { body: { confirm: true } })
+  },
+
   async import(formData) {
     // FormData for file upload
     return apiClient.upload('/cas/import', formData)

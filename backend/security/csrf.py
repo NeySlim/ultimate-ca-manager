@@ -17,13 +17,14 @@ No route ever carried it. Anything that needs a narrower rule belongs in
 
 import os
 import hmac
-import hashlib
 import secrets
 import time
 import logging
 from typing import Optional, Tuple
 from functools import wraps
 from flask import request, g, session, current_app
+
+import fips_mode
 
 from auth.unified import presented_api_key
 
@@ -104,11 +105,8 @@ class CSRFProtection:
         # Create signature using SECRET_KEY + user_id
         secret = current_app.config.get('SECRET_KEY', '')
         message = f"{timestamp}:{nonce}:{user_id}"
-        signature = hmac.new(
-            secret.encode('utf-8'),
-            message.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()  # Full 256-bit signature (no truncation)
+        fips_mode.refuse_short_hmac_key(secret.encode('utf-8'), 'Session key (SECRET_KEY)')
+        signature = hmac.digest(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hex()  # Full 256-bit signature (no truncation)
         
         return f"{timestamp}:{nonce}:{signature}"
     
@@ -138,20 +136,18 @@ class CSRFProtection:
             if token_age < 0:
                 return False, "Invalid token timestamp"
             
-            # Verify signature
-            secret = current_app.config.get('SECRET_KEY', '')
+            # The active key, then the previous one while its grace runs (security.session_key)
+            from security.session_key import verification_keys
             message = f"{timestamp}:{nonce}:{user_id}"
-            expected_sig = hmac.new(
-                secret.encode('utf-8'),
-                message.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
-            
-            if not hmac.compare_digest(provided_sig, expected_sig):
-                return False, "Invalid CSRF token"
-            
-            return True, ""
-            
+            for secret in verification_keys(current_app):
+                fips_mode.refuse_short_hmac_key(secret.encode('utf-8'), 'Session key (SECRET_KEY)')
+                expected_sig = hmac.digest(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hex()
+                if hmac.compare_digest(provided_sig, expected_sig):
+                    return True, ""
+            return False, "Invalid CSRF token"
+
+        except fips_mode.FipsRestricted as e:
+            return False, str(e)
         except Exception as e:
             logger.warning(f"CSRF validation error: {e}")
             return False, "Token validation failed"
@@ -169,6 +165,53 @@ class CSRFProtection:
         return False
 
 
+def check_request():
+    """The CSRF refusal for this request, or None (also called where the hook is skipped)."""
+    if not CSRFProtection.is_enabled():
+        return None
+    
+    # Only protect state-changing methods
+    if request.method not in CSRF_PROTECTED_METHODS:
+        return None
+    
+    # Check exempt paths
+    if CSRFProtection.is_exempt(request.path):
+        return None
+    
+    # Skip for API key auth (X-API-Key or Bearer): a browser never sends
+    # either on its own, and a presented key never falls back to the session.
+    if presented_api_key(request):
+        return None
+    
+    # Get user_id from session or g (set by auth middleware)
+    user_id = getattr(g, 'user_id', None) or session.get('user_id')
+    if not user_id:
+        # No user context, let auth middleware handle it
+        return None
+    
+    # Get token from header
+    token = request.headers.get('X-CSRF-Token')
+    
+    if not token:
+        # Also check for token in JSON body (fallback for forms)
+        try:
+            if request.is_json and request.content_length and request.content_length > 0:
+                body = request.get_json(silent=True)
+                if body:
+                    token = body.get('_csrf_token')
+        except Exception as e:
+            logger.warning(f"Failed to extract CSRF token from request body for {request.path}: {e}")
+    
+    is_valid, error = CSRFProtection.validate_token(token, user_id)
+    
+    if not is_valid:
+        logger.warning(f"CSRF validation failed for {request.path}: {error}")
+        from utils.response import error_response
+        return error_response(f"CSRF validation failed: {error}", 403)
+    
+    return None
+
+
 def init_csrf_middleware(app):
     """
     Initialize CSRF middleware for the application.
@@ -178,48 +221,6 @@ def init_csrf_middleware(app):
     @app.before_request
     def check_csrf():
         """Global CSRF check before each request"""
-        if not CSRFProtection.is_enabled():
-            return None
-        
-        # Only protect state-changing methods
-        if request.method not in CSRF_PROTECTED_METHODS:
-            return None
-        
-        # Check exempt paths
-        if CSRFProtection.is_exempt(request.path):
-            return None
-        
-        # Skip for API key auth (X-API-Key or Bearer): a browser never sends
-        # either on its own, and a presented key never falls back to the session.
-        if presented_api_key(request):
-            return None
-        
-        # Get user_id from session or g (set by auth middleware)
-        user_id = getattr(g, 'user_id', None) or session.get('user_id')
-        if not user_id:
-            # No user context, let auth middleware handle it
-            return None
-        
-        # Get token from header
-        token = request.headers.get('X-CSRF-Token')
-        
-        if not token:
-            # Also check for token in JSON body (fallback for forms)
-            try:
-                if request.is_json and request.content_length and request.content_length > 0:
-                    body = request.get_json(silent=True)
-                    if body:
-                        token = body.get('_csrf_token')
-            except Exception as e:
-                logger.warning(f"Failed to extract CSRF token from request body for {request.path}: {e}")
-        
-        is_valid, error = CSRFProtection.validate_token(token, user_id)
-        
-        if not is_valid:
-            logger.warning(f"CSRF validation failed for {request.path}: {error}")
-            from utils.response import error_response
-            return error_response(f"CSRF validation failed: {error}", 403)
-        
-        return None
-    
+        return check_request()
+
     logger.info("✅ CSRF protection middleware initialized")

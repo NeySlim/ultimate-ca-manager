@@ -17,6 +17,7 @@ from services.deletion_blockers import (
 from models import CA, db
 from utils.cert_status import holds_certificate
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 
 logger = logging.getLogger(__name__)
 
@@ -87,24 +88,20 @@ def bulk_export_cas():
     if not cas:
         return error_response('No CAs found', 404)
 
+    if export_format not in ('pem', 'pkcs7', 'p7b'):
+        return error_response('Supported formats: pem, p7b', 400)
     try:
+        pems, skipped = readable_pems(((ca.id, ca.crt) for ca in cas), 'CA')
+        if not pems:
+            return nothing_readable(skipped, 'CA')
+        headers = skipped_headers(skipped, 'CAs')
+        headers['X-Exported-Count'] = str(len(pems))
         if export_format == 'pem':
-            pem_data = b''
-            for ca in cas:
-                if not ca.crt:
-                    continue  # pending external-CSR CA — nothing to export
-                pem_data += base64.b64decode(ca.crt)
-                if not pem_data.endswith(b'\n'):
-                    pem_data += b'\n'
-            return Response(pem_data, mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="ca-certificates.pem"'})
-        elif export_format in ('pkcs7', 'p7b'):
-            # a pending external-CSR CA has nothing to export (#298)
-            p7b_output = p7b_from_pems(base64.b64decode(ca.crt) for ca in cas if ca.crt)
-            return Response(p7b_output, mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'})
-        else:
-            return error_response('Supported formats: pem, p7b', 400)
+            headers['Content-Disposition'] = 'attachment; filename="ca-certificates.pem"'
+            return Response(b''.join(p if p.endswith(b'\n') else p + b'\n' for p in pems),
+                            mimetype='application/x-pem-file', headers=headers)
+        headers['Content-Disposition'] = 'attachment; filename="ca-certificates.p7b"'
+        return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
     except Exception as e:
         logger.error(f"Export failed: {e}")
         return error_response('Export failed', 500)

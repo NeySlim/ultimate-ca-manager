@@ -1,8 +1,9 @@
 """A refused connection update keeps nothing it was asked to change.
 
 The fields of a Microsoft CA connection are applied to the row one at a time
-with no commit between them. A value of the wrong type part way down raises,
-and the route answers 500 with the earlier fields still staged.
+with no commit between them. An error part way down (simulated below, a value
+of the wrong type being a 400 before any field is applied) answers 500 with the
+earlier fields still staged.
 
 That was harmless until the refusal was audited, because nothing committed.
 `AuditService.log_action` commits the session it is given, so the audit entry
@@ -36,16 +37,25 @@ def a_connection(app, request):
         return row.id, label
 
 
+@pytest.fixture
+def fails_part_way(monkeypatch):
+    """The CRL URL is read after the name and server are applied: make it raise there."""
+    import api.v2.msca as routes
+
+    def boom(raw):
+        raise RuntimeError('unreadable field')
+
+    monkeypatch.setattr(routes, '_clean_crl_url', boom)
+    return {'name': 'renamed-by-a-refused-request', 'crl_url': 'http://crl.example/ca.crl'}
+
+
 class TestARefusedUpdateChangesNothing:
     def test_a_field_of_the_wrong_type_keeps_the_fields_before_it(
-            self, app, auth_client, a_connection):
+            self, app, auth_client, a_connection, fails_part_way):
         connection_id, label = a_connection
-        # `server` is read with `.strip()`, so a number raises part way
-        # through, after `name` has already been applied to the row.
         r = auth_client.put(
             f'/api/v2/microsoft-cas/{connection_id}',
-            data=json.dumps({'name': 'renamed-by-a-refused-request',
-                             'server': 123}),
+            data=json.dumps({**fails_part_way, 'server': 'other.internal.example'}),
             content_type='application/json')
         assert r.status_code == 500, (
             f'this request is supposed to be refused: {r.status_code}')
@@ -59,7 +69,7 @@ class TestARefusedUpdateChangesNothing:
                 f'the refused request changed the server: {row.server!r}')
 
     def test_the_refusal_is_still_recorded(
-            self, app, auth_client, a_connection):
+            self, app, auth_client, a_connection, fails_part_way):
         connection_id, label = a_connection
         """Rolling back must not cost the trail: a refused attempt on a
         connection that holds credentials is worth knowing about."""
@@ -67,8 +77,7 @@ class TestARefusedUpdateChangesNothing:
 
         auth_client.put(
             f'/api/v2/microsoft-cas/{connection_id}',
-            data=json.dumps({'name': 'renamed-by-a-refused-request',
-                             'server': 123}),
+            data=json.dumps(fails_part_way),
             content_type='application/json')
 
         with app.app_context():

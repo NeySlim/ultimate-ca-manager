@@ -22,7 +22,10 @@ export default function MappingTestResult({ result }) {
       <p>
         <span className="text-text-secondary font-medium">{t('sso.testMappingGroups')}:</span>{' '}
         {result.groups_readable === false
-          ? <span className="text-status-error">{t('sso.testMappingGroupsUnreadable')}</span>
+          ? <>
+              <span className="text-status-error">{t('sso.testMappingGroupsUnreadable')}</span>
+              {result.groups_error && <span className="ml-1 font-mono text-text-tertiary">{result.groups_error}</span>}
+            </>
           : result.groups?.length > 0
             ? result.groups.map(g => <Badge key={g} variant="secondary" size="sm" className="mr-1">{g}</Badge>)
             : <span className="text-text-tertiary italic">{t('sso.testMappingNoGroups')}</span>

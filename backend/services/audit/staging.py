@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from models import db, AuditLog
 from utils.datetime_utils import utc_now
+from utils.nul_text import NUL, escape_nul
 from utils.trusted_proxy import client_ip
 from .chain import append_entry
 
@@ -42,8 +43,8 @@ def fit_to_columns(entry):
         value = getattr(entry, name)
         if not isinstance(value, str):
             continue
-        if '\x00' in value:
-            value = value.replace('\x00', '\\0')
+        if NUL in value:
+            value = escape_nul(value)
             setattr(entry, name, value)
         cap = getattr(column.type, 'length', None) or _TEXT_CAPS.get(name)
         if cap and len(value) > cap:
@@ -68,9 +69,11 @@ def syslog_copy(entry):
     return SimpleNamespace(**{name: getattr(entry, name, None) for name in _SYSLOG_FIELDS})
 
 
-def forward_to_syslog(entry):
+def forward_to_syslog(entry, reload=True):
     try:
         from services.syslog_service import syslog_forwarder
+        if reload:
+            syslog_forwarder.reload_if_changed()
         if syslog_forwarder.is_enabled:
             syslog_forwarder.send(entry)
     except Exception as e:
@@ -85,7 +88,7 @@ def _syslog_after_commit(session):
     if session.in_nested_transaction():
         return
     for _tx, entry in session.info.pop(_PENDING_SYSLOG, ()):
-        forward_to_syslog(entry)
+        forward_to_syslog(entry, reload=False)  # reloaded at staging: no SQL in this hook
 
 
 def _within(tx, ended):
@@ -119,6 +122,7 @@ def _staged_copy(entry):
     copy = syslog_copy(entry)
     try:
         from services.syslog_service import syslog_forwarder
+        syslog_forwarder.reload_if_changed()
         if syslog_forwarder.is_enabled:
             copy.syslog_hostname = syslog_forwarder._resolve_hostname()
     except Exception:

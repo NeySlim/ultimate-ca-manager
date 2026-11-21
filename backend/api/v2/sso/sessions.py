@@ -26,6 +26,23 @@ def list_sessions():
 
 # ============ SAML Metadata ============
 
+def _typed_ssl_verify(verify, ca_bundle):
+    """requests `verify` value for a typed flag and CA bundle PEM (a temp file path for a bundle)."""
+    if not verify:
+        return False
+    if not ca_bundle:
+        return True
+    fd, path = tempfile.mkstemp(suffix='.pem', prefix='ucm_sso_ca_')
+    try:
+        os.write(fd, ca_bundle.encode('utf-8') if isinstance(ca_bundle, str) else ca_bundle)
+    except BaseException:
+        os.unlink(path)
+        raise
+    finally:
+        os.close(fd)
+    return path
+
+
 @bp.route('/api/v2/sso/saml/metadata/fetch', methods=['POST'])
 @require_auth(['write:sso'])
 def fetch_idp_metadata():
@@ -51,32 +68,34 @@ def fetch_idp_metadata():
     except ValueError:
         return error_response("metadata_url cannot target cloud metadata or loopback", 400)
 
+    if not isinstance(data.get('ca_bundle') or '', str):
+        return error_response("ca_bundle must be a string", 400)
+
+    verify = True
     try:
-        # Use provider SSL settings if provider_id provided, otherwise default to True
+        # Values typed in the form (tested before saving) win; the saved provider fills the rest
         provider_id = data.get('provider_id')
-        if provider_id:
-            provider = db.session.get(SSOProvider, provider_id)
-            verify = _get_ssl_verify(provider, 'saml') if provider else True
+        provider = db.session.get(SSOProvider, provider_id) if provider_id else None
+        typed_verify = data.get('verify_ssl')
+        typed_ca = data.get('ca_bundle')
+        if provider and typed_verify is None and not typed_ca:
+            verify = _get_ssl_verify(provider, 'saml')
+        elif provider:
+            if typed_verify is None:
+                typed_verify = provider.saml_verify_ssl is not False
+            ca_bundle = typed_ca or provider.saml_ca_bundle
+            verify = _typed_ssl_verify(typed_verify, ca_bundle)
         else:
             # Check if verify_ssl was explicitly passed (for new providers not yet saved)
-            verify = data.get('verify_ssl', True)
-            ca_bundle = data.get('ca_bundle')
-            if not verify:
-                verify = False
-            elif ca_bundle:
-                fd, path = tempfile.mkstemp(suffix='.pem', prefix='ucm_sso_ca_')
-                try:
-                    os.write(fd, ca_bundle.encode('utf-8') if isinstance(ca_bundle, str) else ca_bundle)
-                finally:
-                    os.close(fd)
-                verify = path
+            verify = _typed_ssl_verify(data.get('verify_ssl', True), typed_ca)
 
         resp = safe_request_get(metadata_url, timeout=10, verify=verify)
         resp.raise_for_status()
     except http_requests.exceptions.SSLError as e:
         logger.error(f"Failed to fetch IDP metadata (SSL): {e}")
         return error_response(
-            "SSL certificate verification failed. Enable 'Skip SSL Verification' or upload the CA certificate.", 400)
+            "SSL certificate verification failed. Upload the CA certificate that signed the "
+            "IdP certificate, or turn SSL verification off for this provider.", 400)
     except Exception as e:
         logger.error(f"Failed to fetch IDP metadata: {e}")
         return error_response("Failed to fetch metadata. Check the URL is reachable.", 400)

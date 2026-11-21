@@ -120,7 +120,9 @@ def trigger_expiry_check():
     """Manually trigger expiry check using NotificationService"""
     try:
         result = NotificationService.run_scheduled_checks()
-        total_sent = sum(v.get('notified', 0) for v in result.values())
+        if result.get('status') == 'skipped':
+            return success_response(message="Check not run: another node is running it", data=result)
+        total_sent = sum(v.get('notified', 0) for v in result.values() if isinstance(v, dict))
         return success_response(
             message=f"Check complete: {total_sent} alerts sent",
             data=result

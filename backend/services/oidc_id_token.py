@@ -7,23 +7,48 @@ import json
 import logging
 import math
 import numbers
+import re
 import threading
 import time
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding, rsa
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
+import fips_mode
+from utils.key_algorithms import fips_rsa_bits_approved
 from utils.ssrf_protection import safe_request_get, validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_ALGORITHMS = frozenset({'RS256', 'ES256'})
+# RFC 7518 §3.1 and RFC 8037: (kty, curve for EC, hash). Never none nor HS*: a shared
+# secret would make the client secret a signing key (RFC 8725 §3.1).
+_ALGORITHMS = {
+    'RS256': ('RSA', None, hashes.SHA256), 'RS384': ('RSA', None, hashes.SHA384),
+    'RS512': ('RSA', None, hashes.SHA512), 'PS256': ('RSA', None, hashes.SHA256),
+    'PS384': ('RSA', None, hashes.SHA384), 'PS512': ('RSA', None, hashes.SHA512),
+    'ES256': ('EC', 'P-256', hashes.SHA256), 'ES384': ('EC', 'P-384', hashes.SHA384),
+    'ES512': ('EC', 'P-521', hashes.SHA512), 'EdDSA': ('OKP', None, None),
+}
+_ALLOWED_ALGORITHMS = frozenset(_ALGORITHMS)
+_EC_CURVES = {'P-256': (ec.SECP256R1, 32), 'P-384': (ec.SECP384R1, 48), 'P-521': (ec.SECP521R1, 66)}
+_OKP_CURVES = {'Ed25519': ed25519.Ed25519PublicKey, 'Ed448': ed448.Ed448PublicKey}
+# RFC 7518 §3.3: "A key of size 2048 bits or larger MUST be used with these algorithms."
+_MIN_RSA_BITS = 2048
+_SHOWN_ALGORITHM = re.compile(r'[A-Za-z0-9+._-]{1,32}')
 _CACHE_TTL_SECONDS = 3600
+# A cached document is read again ahead of its TTL at most once per window: a burst of forged
+# tokens costs one outbound request, not one per attempt
+_REFRESH_INTERVAL_SECONDS = 60
 _CLOCK_SKEW_SECONDS = 60
 _MAX_DOCUMENT_BYTES = 1024 * 1024
+# Microsoft Entra tenant-independent metadata: the issuer is this template, ``tid`` a GUID
+TENANT_PLACEHOLDER = '{tenantid}'
+_GUID = re.compile(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
+MAX_TENANTS = 200
 _cache = {}
+_refreshed = {}  # cache key -> time.monotonic() of its last early reading
 _cache_lock = threading.Lock()
 
 
@@ -35,6 +60,69 @@ def clear_oidc_cache():
     """Clear cached discovery documents and JWKS (used on config changes/tests)."""
     with _cache_lock:
         _cache.clear()
+        _refreshed.clear()
+
+
+def is_tenant_id(value):
+    """Whether ``value`` is a tenant id as Entra writes ``tid``: a GUID string, nothing around it."""
+    return isinstance(value, str) and _GUID.fullmatch(value) is not None
+
+
+def normalize_tenants(value):
+    """The accepted tenant ids ``value`` lists (a list, or text split on commas and blanks), in lower
+    case without repeats; ValueError for anything that is not a GUID. No wildcard exists."""
+    if value is None or value == '':
+        return []
+    if isinstance(value, str):
+        value = [item for item in re.split(r'[\s,;]+', value) if item]
+    if not isinstance(value, list):
+        raise ValueError('accepted tenants must be a list of tenant ids')
+    tenants = []
+    for item in value:
+        item = item.strip() if isinstance(item, str) else item
+        if not is_tenant_id(item):
+            raise ValueError(f'accepted tenant {json.dumps(item)[:60]} is not a tenant id (GUID)')
+        if item.lower() not in tenants:
+            tenants.append(item.lower())
+    if len(tenants) > MAX_TENANTS:
+        raise ValueError(f'at most {MAX_TENANTS} accepted tenants')
+    return tenants
+
+
+def provider_tenants(provider):
+    """The tenant ids ``provider`` accepts, or () when it validates one issuer.
+
+    A stored value that does not read as tenant ids refuses every token, never "any tenant"."""
+    raw = getattr(provider, 'oauth2_tenants', None)
+    # The column is text: only a string (or a list built in code) can configure tenants
+    if not isinstance(raw, (str, list)) or raw == '':
+        return ()
+    try:
+        return tuple(normalize_tenants(json.loads(raw) if isinstance(raw, str) else raw))
+    except (TypeError, ValueError) as exc:
+        raise OIDCValidationError('the accepted tenants of this provider are not readable') from exc
+
+
+def provider_role_tenants(provider):
+    """The accepted tenants whose role and group claims ``provider`` honours; () for none, and for
+    a stored value that does not read as tenant ids within the accepted ones."""
+    raw = getattr(provider, 'oauth2_role_tenants', None)
+    if not isinstance(raw, (str, list)) or raw == '':
+        return ()
+    try:
+        honoured = normalize_tenants(json.loads(raw) if isinstance(raw, str) else raw)
+        accepted = provider_tenants(provider)
+    except (TypeError, ValueError, OIDCValidationError):
+        return ()
+    return tuple(t for t in honoured if t in accepted)
+
+
+def has_tenants(provider):
+    """Whether ``provider`` is set up for several tenants (its list may still be unreadable)."""
+    try:
+        return bool(provider_tenants(provider))
+    except OIDCValidationError:
+        return True
 
 
 def _b64url_decode(value):
@@ -89,6 +177,17 @@ def _cache_put(key, value):
         _cache[key] = (time.monotonic() + _CACHE_TTL_SECONDS, value)
 
 
+def _may_refresh(key):
+    """Whether ``key`` may be read again ahead of its TTL now; counts the reading."""
+    now = time.monotonic()
+    with _cache_lock:
+        last = _refreshed.get(key)
+        if last is not None and now - last < _REFRESH_INTERVAL_SECONDS:
+            return False
+        _refreshed[key] = now
+        return True
+
+
 def _cache_invalidate(key):
     with _cache_lock:
         _cache.pop(key, None)
@@ -124,15 +223,36 @@ def _provider_cache_key(provider, kind, url):
     return (getattr(provider, 'id', None), kind, url)
 
 
-def _get_discovery(provider, issuer, verify):
+def _check_issuer_template(template, issuer):
+    """``template`` is ``issuer`` with one path segment (organizations, common) as ``{tenantid}``:
+    the tenant-independent metadata of the authority the provider names, nothing wider."""
+    if not isinstance(template, str) or template.count(TENANT_PLACEHOLDER) != 1:
+        raise OIDCValidationError(_NOT_A_TEMPLATE)
+    prefix, suffix = template.split(TENANT_PLACEHOLDER)
+    segment = issuer[len(prefix):len(issuer) - len(suffix)]
+    if (not prefix.endswith('/') or not (suffix == '' or suffix.startswith('/'))
+            or len(issuer) <= len(prefix) + len(suffix)
+            or not issuer.startswith(prefix) or not issuer.endswith(suffix)
+            or not segment or '/' in segment or '{' in segment or '}' in segment):
+        raise OIDCValidationError(_NOT_A_TEMPLATE)
+
+
+_NOT_A_TEMPLATE = ('OIDC discovery issuer is not a {tenantid} template of the configured issuer: '
+                   'accepted tenants need a multi-tenant authority (organizations or common)')
+
+
+def _get_discovery(provider, issuer, verify, force_refresh=False):
+    """The discovery document; ``force_refresh`` reads it again (kept cached until that succeeds)."""
     discovery_url = f"{issuer.rstrip('/')}/.well-known/openid-configuration"
     key = _provider_cache_key(provider, 'discovery', discovery_url)
     cached = _cache_get(key)
-    if cached is not None:
+    if cached is not None and not (force_refresh and _may_refresh(key)):
         return cached
 
     document = _fetch_json(discovery_url, verify, 'OIDC discovery')
-    if document.get('issuer') != issuer:
+    if provider_tenants(provider):
+        _check_issuer_template(document.get('issuer'), issuer)
+    elif document.get('issuer') != issuer:
         raise OIDCValidationError('OIDC discovery issuer mismatch')
     jwks_uri = document.get('jwks_uri')
     if not isinstance(jwks_uri, str) or not jwks_uri:
@@ -151,7 +271,7 @@ def _get_jwks(provider, issuer, verify, force_refresh=False):
         jwks_uri = _get_discovery(provider, issuer, verify)['jwks_uri']
 
     key = _provider_cache_key(provider, 'jwks', jwks_uri)
-    if force_refresh:
+    if force_refresh and _may_refresh(key):
         _cache_invalidate(key)
     else:
         cached = _cache_get(key)
@@ -194,38 +314,89 @@ def _jwk_int(jwk, field):
 
 
 def _public_key_from_jwk(jwk, algorithm):
+    """The key ``jwk`` holds, once its type and curve are the ones ``algorithm`` names:
+    a key never verifies a token announced for another type (RFC 8725 §3.1)."""
+    kty, curve, _hash = _ALGORITHMS[algorithm]
+    key_kty, key_crv = jwk.get('kty'), jwk.get('crv')
+    if key_kty != kty or (curve is not None and key_crv != curve):
+        raise OIDCValidationError('JWKS key type does not match algorithm')
     try:
-        if algorithm == 'RS256':
-            if jwk.get('kty') != 'RSA':
-                raise OIDCValidationError('JWKS key type does not match algorithm')
-            return rsa.RSAPublicNumbers(
-                _jwk_int(jwk, 'e'),
-                _jwk_int(jwk, 'n'),
-            ).public_key()
-
-        if jwk.get('kty') != 'EC' or jwk.get('crv') != 'P-256':
-            raise OIDCValidationError('JWKS key type does not match algorithm')
-        return ec.EllipticCurvePublicNumbers(
-            _jwk_int(jwk, 'x'),
-            _jwk_int(jwk, 'y'),
-            ec.SECP256R1(),
-        ).public_key()
+        if key_kty == 'RSA':
+            key = rsa.RSAPublicNumbers(_jwk_int(jwk, 'e'), _jwk_int(jwk, 'n')).public_key()
+            if key.key_size < _MIN_RSA_BITS:
+                raise OIDCValidationError(f'JWKS RSA key is shorter than {_MIN_RSA_BITS} bits')
+            if fips_mode.enabled() and not fips_rsa_bits_approved(key.key_size):
+                raise OIDCValidationError(
+                    f'RSA key of {key.key_size} bits not available in FIPS mode')
+            return key
+        if key_kty == 'EC' and key_crv in _EC_CURVES:
+            return ec.EllipticCurvePublicNumbers(
+                _jwk_int(jwk, 'x'), _jwk_int(jwk, 'y'), _EC_CURVES[key_crv][0]()).public_key()
+        if key_kty == 'OKP' and key_crv in _OKP_CURVES:
+            # The rule of every EdDSA key in FIPS mode: allowed when the loaded module approves it
+            fips_mode.refuse_unless_approved(key_crv.upper(), f'{key_crv} ID token signatures')
+            try:
+                point = _b64url_decode(jwk.get('x'))
+            except OIDCValidationError as exc:
+                raise OIDCValidationError('malformed JWKS signing key') from exc
+            return _OKP_CURVES[key_crv].from_public_bytes(point)
+        raise OIDCValidationError('JWKS key type does not match algorithm')
+    except fips_mode.FipsRestricted as exc:
+        raise OIDCValidationError(str(exc)) from exc
     except OIDCValidationError:
         raise
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, KeyError) as exc:
         raise OIDCValidationError('malformed JWKS signing key') from exc
 
 
 def _verify_signature(jwk, algorithm, signing_input, signature):
     key = _public_key_from_jwk(jwk, algorithm)
-    if algorithm == 'RS256':
-        key.verify(signature, signing_input, padding.PKCS1v15(), hashes.SHA256())
+    _kty, _curve, hash_class = _ALGORITHMS[algorithm]
+    if algorithm.startswith('RS'):
+        key.verify(signature, signing_input, padding.PKCS1v15(), hash_class())
+    elif algorithm.startswith('PS'):
+        # RFC 7518 §3.5: MGF1 with the same hash, salt as long as the hash output
+        key.verify(signature, signing_input,
+                   padding.PSS(padding.MGF1(hash_class()), hash_class.digest_size), hash_class())
+    elif algorithm.startswith('ES'):
+        # RFC 7518 §3.4: R || S, each as long as the order of the key's curve
+        size = _EC_CURVES[jwk['crv']][1]
+        if len(signature) != 2 * size:
+            raise InvalidSignature
+        r = int.from_bytes(signature[:size], 'big')
+        s = int.from_bytes(signature[size:], 'big')
+        key.verify(encode_dss_signature(r, s), signing_input, ec.ECDSA(hash_class()))
+    else:
+        key.verify(signature, signing_input)
+
+
+def _shown(algorithm):
+    """``algorithm`` as a refusal names it: a JWS name as is, anything else escaped and cut."""
+    if isinstance(algorithm, str) and _SHOWN_ALGORITHM.fullmatch(algorithm):
+        return algorithm
+    return json.dumps(algorithm, ensure_ascii=True)[:40]
+
+
+def _check_discovery_algorithm(provider, issuer, verify, algorithm):
+    """OIDC Discovery: the header algorithm is one the provider says it signs ID tokens with.
+
+    Read only where the discovery document is loaded anyway (no JWKS URI configured). The
+    caller has already refused an algorithm outside the product's list, whatever this one says."""
+    if getattr(provider, 'oauth2_jwks_uri', None):
         return
-    if len(signature) != 64:
-        raise InvalidSignature
-    r = int.from_bytes(signature[:32], 'big')
-    s = int.from_bytes(signature[32:], 'big')
-    key.verify(encode_dss_signature(r, s), signing_input, ec.ECDSA(hashes.SHA256()))
+    # An algorithm the provider added since the cached reading: read once more (_may_refresh)
+    for force_refresh in (False, True):
+        supported = _get_discovery(provider, issuer, verify, force_refresh=force_refresh).get(
+            'id_token_signing_alg_values_supported')
+        if supported is None:
+            return
+        if not isinstance(supported, list):
+            raise OIDCValidationError(
+                'OIDC discovery has an invalid id_token_signing_alg_values_supported')
+        if algorithm in supported:
+            return
+    raise OIDCValidationError(f'ID token signing algorithm {algorithm} is not listed '
+                              'in the provider discovery document')
 
 
 def _numeric_date(claims, name, required=False):
@@ -298,11 +469,47 @@ def unverified_claims_error(claims, provider, expected_nonce):
     apply; step 6 lets TLS stand in for the signature only.
     """
     try:
+        if has_tenants(provider):
+            raise OIDCValidationError(_TENANTS_NEED_VERIFICATION)
         issuer, client_id = _configured_issuer_and_client_id(provider)
         _validate_claims(claims or {}, issuer, client_id, expected_nonce)
     except OIDCValidationError as exc:
         return str(exc)
     return None
+
+
+_TENANTS_NEED_VERIFICATION = 'accepted tenants require ID token verification'
+
+
+def _token_tenant(claims):
+    """The ``tid`` of ``claims``, once a GUID string (before it enters any issuer)."""
+    tid = claims.get('tid')
+    if not is_tenant_id(tid):
+        raise OIDCValidationError('ID token has no tenant id (tid) that is a GUID')
+    return tid
+
+
+def _check_key_issuer(jwk, tid, token_issuer):
+    """Entra keys document: a key that names an issuer signs only for it, ``{tenantid}`` read as
+    the token's ``tid``; a key without one is bound by the issuer check that follows."""
+    if 'issuer' not in jwk:
+        return
+    key_issuer = jwk['issuer']
+    if not isinstance(key_issuer, str) or key_issuer.replace(TENANT_PLACEHOLDER, tid) != token_issuer:
+        raise OIDCValidationError('JWKS key issuer does not match the ID token issuer')
+
+
+def tenant_of(claims, provider):
+    """The tenant of verified ``claims`` for a multi-tenant ``provider``, else None."""
+    if not has_tenants(provider) or not isinstance(claims, dict):
+        return None
+    tid = claims.get('tid')
+    return tid if is_tenant_id(tid) else None
+
+
+def unverified_claims_are_valid(claims, provider, expected_nonce):
+    """True when a token read in compatibility mode passes every check but the signature."""
+    return unverified_claims_error(claims, provider, expected_nonce) is None
 
 
 def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=True):
@@ -312,6 +519,8 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     provider's explicit compatibility setting; nonce binding is still checked.
     """
     if not verify:
+        if has_tenants(provider):
+            raise OIDCValidationError(_TENANTS_NEED_VERIFICATION)
         claims = decode_id_token_unverified(id_token)
         nonce = claims.get('nonce')
         if expected_nonce and (
@@ -329,15 +538,26 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     header, claims, signature, signing_input = _parse_token(id_token)
     algorithm = header.get('alg')
     kid = header.get('kid')
-    if algorithm not in _ALLOWED_ALGORITHMS:
-        raise OIDCValidationError('unsupported ID token signing algorithm')
+    if not isinstance(algorithm, str) or algorithm not in _ALLOWED_ALGORITHMS:
+        raise OIDCValidationError(f'unsupported ID token signing algorithm {_shown(algorithm)}')
     if not isinstance(kid, str) or not kid:
         raise OIDCValidationError('ID token is missing key ID')
+    tenants = provider_tenants(provider)
+    tid = None
+    if tenants:
+        # The template comes from the authority's discovery document, never from the token
+        template = _get_discovery(provider, issuer, ssl_verify)['issuer']
+        # Checked on the document used: one cached while the provider had a single issuer is not a template
+        _check_issuer_template(template, issuer)
+        tid = _token_tenant(claims)
+    _check_discovery_algorithm(provider, issuer, ssl_verify, algorithm)
 
     for force_refresh in (False, True):
         try:
             jwks = _get_jwks(provider, issuer, ssl_verify, force_refresh=force_refresh)
             jwk = _select_jwk(jwks, kid, algorithm)
+            if tid is not None:
+                _check_key_issuer(jwk, tid, claims.get('iss'))
             _verify_signature(jwk, algorithm, signing_input, signature)
             break
         except InvalidSignature:
@@ -349,5 +569,9 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     else:  # pragma: no cover - loop always breaks or raises
         raise OIDCValidationError('ID token signature is invalid')
 
+    if tid is not None:
+        if tid not in tenants:
+            raise OIDCValidationError(f'ID token tenant {tid} is not accepted by this provider')
+        issuer = template.replace(TENANT_PLACEHOLDER, tid)
     _validate_claims(claims, issuer, client_id, expected_nonce)
     return claims

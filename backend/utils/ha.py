@@ -1,0 +1,94 @@
+"""HA helpers: startup validation and the guard for host-local operations."""
+import logging
+import os
+from functools import wraps
+
+logger = logging.getLogger(__name__)
+
+
+def ha_enabled():
+    from config.settings import Config
+    return bool(Config.HA_MODE)
+
+
+def validate_ha_config(config=None):
+    """Exit at startup when UCM_HA=1 meets a configuration that cannot span nodes."""
+    from config.settings import Config
+    cfg = config or Config
+    if not cfg.HA_MODE:
+        return
+    if cfg.DATABASE_TYPE != 'postgresql':
+        raise SystemExit("UCM_HA=1 requires a PostgreSQL DATABASE_URL (SQLite is single-node)")
+    if not os.getenv('SECRET_KEY'):
+        raise SystemExit("UCM_HA=1 requires SECRET_KEY set in the environment, identical on every node")
+    from security.encryption import MASTER_KEY_PATH
+    if MASTER_KEY_PATH.exists():
+        # The runtime reads master.key before KEY_ENCRYPTION_KEY. Identity between nodes:
+        # the KEK fingerprint check at start (refuse_kek_mismatch_with_peers)
+        if os.getenv('KEY_ENCRYPTION_KEY'):
+            logger.warning("HA: the local master.key overrides KEY_ENCRYPTION_KEY on this node")
+    elif not os.getenv('KEY_ENCRYPTION_KEY'):
+        raise SystemExit("UCM_HA=1 requires KEY_ENCRYPTION_KEY set in the environment, identical on every node")
+    # The integration secrets' key: a machine-derived one differs on every node
+    db_key = os.getenv('UCM_DB_ENCRYPTION_KEY')
+    if not db_key:
+        raise SystemExit("UCM_HA=1 requires UCM_DB_ENCRYPTION_KEY set in the environment, identical on "
+                         "every node (it encrypts the integration secrets)")
+    from cryptography.fernet import Fernet
+    try:
+        Fernet(db_key.encode())
+    except Exception:
+        raise SystemExit("UCM_DB_ENCRYPTION_KEY is not a Fernet key (32 bytes, url-safe base64): generate one "
+                         "with: python -c \"from cryptography.fernet import Fernet; "
+                         "print(Fernet.generate_key().decode())\"") from None
+
+
+def ha_refusal(reason):
+    """409 body for an operation that only writes to the local host."""
+    from flask import jsonify
+    from utils.response import build_problem, PROBLEM_CONTENT_TYPE
+    body = build_problem(reason, 409)
+    body['code'] = 'ha_mode'
+    resp = jsonify(body)
+    resp.mimetype = PROBLEM_CONTENT_TYPE
+    return resp, 409
+
+
+class HaRestricted(Exception):
+    """Raised by a service for an operation HA mode refuses; the app answers 409 ha_mode."""
+
+
+SOFTHSM_LOCAL = ("Not available in HA mode: a SoftHSM token lives on one node only, "
+                 "use a network HSM or a KMS provider")
+
+
+def refuse_softhsm_in_ha():
+    if ha_enabled():
+        raise HaRestricted(SOFTHSM_LOCAL)
+
+
+def reader_local_message():
+    """The refusal of a smart card reader key in HA mode, naming the modules UCM takes for one."""
+    from services.compliance_signer import LOCAL_READER_MODULES
+    return (f"Not available in HA mode: a smart card reader ({', '.join(LOCAL_READER_MODULES.values())}) "
+            "is attached to one node only, use a network HSM or a KMS provider")
+
+
+def refuse_reader_in_ha():
+    if ha_enabled():
+        raise HaRestricted(reader_local_message())
+
+
+LOCAL_ONLY = "Not available in HA mode: this operation only changes the local host"
+
+
+def reject_in_ha(reason=LOCAL_ONLY):
+    """Route decorator: answer 409 ha_mode when the node runs with UCM_HA=1."""
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if ha_enabled():
+                return ha_refusal(reason)
+            return fn(*args, **kwargs)
+        return wrapper
+    return deco

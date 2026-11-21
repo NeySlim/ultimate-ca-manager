@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import fips_mode
 from utils import cms_signed
+from utils.key_algorithms import default_digest_for_key
 from utils.cms_envelope import (  # noqa: F401 (oaep_padding re-exported)
     OAEP_HASHES, oaep_algorithm, oaep_parameters, oaep_padding,
 )
@@ -61,10 +62,26 @@ def create_degenerate_pkcs7(certs: list, crls: Optional[list] = None) -> bytes:
     return cms_signed.certs_only(certs, crls or ())
 
 
-# CertRep keeps its PKCS#7-era encoding: SHA-256 whatever the key (Ed25519: SHA-512),
-# NULL digest parameters, rsaEncryption for v1.5, DSA accepted, Ed448 and ML-DSA refused
-_CERTREP_SUITE = {'hsm_digest': False, 'null_digest_params': True, 'rsa_encryption': True,
+# CertRep keeps its PKCS#7-era encoding: NULL digest parameters, rsaEncryption for v1.5, DSA accepted, Ed448 and ML-DSA refused
+_CERTREP_SUITE = {'hsm_digest': True, 'null_digest_params': True, 'rsa_encryption': True,
                   'accept': ('rsa', 'ec', 'dsa', 'ed25519')}
+
+
+_CERTREP_DIGESTS = ('sha256', 'sha384', 'sha512')
+
+
+def certrep_digest(signer_key, request_digest: Optional[str] = None) -> Optional[str]:
+    """Digest of a reply signature: the client's own when the signer supports it, never below
+    the signer key's default; None for EdDSA/ML-DSA. RFC 8894 leaves the reply digest open
+    (SHA-256 mandatory, SHA-1 legacy): this rule is UCM's choice."""
+    floor = default_digest_for_key(signer_key)
+    if floor is None:
+        return None
+    if request_digest in _CERTREP_DIGESTS and (
+            floor not in _CERTREP_DIGESTS
+            or _CERTREP_DIGESTS.index(request_digest) >= _CERTREP_DIGESTS.index(floor)):
+        return request_digest
+    return floor
 
 
 def create_signed_pkcs7(
@@ -72,6 +89,7 @@ def create_signed_pkcs7(
     signer_key,
     signer_cert: x509.Certificate,
     signed_attributes: Optional[list] = None,
+    request_digest: Optional[str] = None,
 ) -> bytes:
     """Build a CMS SignedData message signed by *signer_key*.
 
@@ -79,7 +97,8 @@ def create_signed_pkcs7(
     attribute. The signer certificate is included so recipients can identify
     and validate the signature.
     """
-    suite = cms_signed.signature_suite(signer_key, 'sha256', **_CERTREP_SUITE)
+    suite = cms_signed.signature_suite(
+        signer_key, certrep_digest(signer_key, request_digest), **_CERTREP_SUITE)
     signing_time = {'type': 'signing_time',
                     'values': [asn1crypto.core.UTCTime(datetime.now(timezone.utc))]}
     return cms_signed.signed_data(

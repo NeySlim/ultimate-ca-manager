@@ -42,6 +42,7 @@ from . import mapping_tests
 from . import sessions
 from . import saml_routes
 from . import login_routes
+from . import sign_in_tests
 from . import ldap_routes
 
 # Re-export commonly used helper functions for backward compatibility with tests
@@ -53,8 +54,9 @@ from .helpers import (
     _decrypt_ldap_password,
     _parse_json_field,
     _get_ldap_lockout_settings,
-    _check_ldap_lockout,
-    _record_ldap_failed_attempt,
+    _reserve_ldap_attempt,
+    _ldap_attempt_failed,
+    _release_ldap_attempt,
     _clear_ldap_failed_attempts,
     _resolve_role_from_mapping,
     _resolve_mapped_roles,
@@ -73,8 +75,9 @@ __all__ = [
     '_decrypt_ldap_password',
     '_parse_json_field',
     '_get_ldap_lockout_settings',
-    '_check_ldap_lockout',
-    '_record_ldap_failed_attempt',
+    '_reserve_ldap_attempt',
+    '_ldap_attempt_failed',
+    '_release_ldap_attempt',
     '_clear_ldap_failed_attempts',
     '_resolve_role_from_mapping',
     '_resolve_mapped_roles',

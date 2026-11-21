@@ -13,6 +13,7 @@ import re
 from models import db
 from models.msca import MicrosoftCA
 from utils.datetime_utils import utc_now
+from services.msca.client_keytab import client_keytab
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ _CERTUTIL_REASON = {
 _CERTUTIL_UNREVOKE = -1
 
 _SERIAL_RE = re.compile(r'^[0-9a-fA-F]+$')
+# What the keytab wrapper needs of a pywinrm 0.5.0 Transport
+_PYWINRM_TRANSPORT = ('message_encryption', 'endpoint', 'build_session', 'setup_encryption')
 
 
 def kerberos_transport_available() -> bool:
@@ -56,7 +59,8 @@ class MicrosoftCAAdminChannelMixin:
         if not msca.winrm_enabled:
             return False
         if msca.winrm_transport == 'kerberos':
-            return bool(msca.kerberos_principal or msca.winrm_username)
+            # A keytab alone signs in as its first principal
+            return bool(msca.kerberos_principal or msca.winrm_username or msca.kerberos_keytab_path)
         return bool(msca.winrm_effective_username and msca.winrm_effective_password)
 
     @staticmethod
@@ -184,13 +188,11 @@ class MicrosoftCAAdminChannelMixin:
         server_cert_validation = 'validate' if (msca.winrm_use_ssl and msca.winrm_verify_ssl) else 'ignore'
 
         if transport == 'kerberos':
-            # Kerberos reuses the enroll keytab/principal already on the host.
-            import os
-            if msca.kerberos_keytab_path:
-                os.environ['KRB5_CLIENT_KTNAME'] = msca.kerberos_keytab_path
+            # The enrollment principal and keytab, unless the channel names its own account;
+            # _run_ps names the keytab for the time of the exchange
             return winrm.Session(
                 endpoint,
-                auth=(msca.winrm_effective_username or '', ''),
+                auth=(msca.winrm_effective_username or msca.kerberos_principal or '', ''),
                 transport='kerberos',
                 server_cert_validation=server_cert_validation,
             )
@@ -220,6 +222,49 @@ class MicrosoftCAAdminChannelMixin:
         )
 
     @staticmethod
+    def _bind_client_keytab(session, msca):
+        """Name the keytab only around pywinrm's credential acquisition, never a whole command.
+
+        pywinrm 0.5.0 acquires in its HTTPKerberosAuth.generate_request_header, called
+        preemptively by the first request: the message encryption setup that build_session
+        sends over HTTP, else open_shell. The session is built with that setup held back so
+        the wrapper is in place, then the setup is sent as build_session would have.
+        False when pywinrm is not shaped as expected: the caller then holds the keytab throughout.
+        """
+        keytab = msca.kerberos_keytab_path
+        transport = getattr(getattr(session, 'protocol', None), 'transport', None)
+        if transport is None or getattr(transport, 'session', True) is not None or not all(
+                hasattr(transport, name) for name in _PYWINRM_TRANSPORT):
+            return False
+        wanted = transport.message_encryption
+        transport.message_encryption = 'never'
+        try:
+            http = transport.build_session()
+        finally:
+            transport.message_encryption = wanted
+        auth = getattr(http, 'auth', None)
+        # A session pywinrm does not keep would carry the wrapper to no request
+        if transport.session is not http or not (callable(getattr(auth, 'generate_request_header', None))
+                                                 and getattr(auth, 'force_preemptive', None) is not None):
+            transport.session = None  # rebuilt by pywinrm itself, under the caller's lock
+            return False
+        acquire = auth.generate_request_header
+
+        def generate_request_header(*args, **kwargs):
+            with client_keytab(keytab):
+                return acquire(*args, **kwargs)
+
+        auth.generate_request_header = generate_request_header
+        # The end of Transport.build_session, skipped above
+        available = bool(getattr(auth, 'winrm_encryption_available', False))
+        if wanted == 'always' and not available:
+            raise MSCAAdminChannelError('WinRM message encryption is not available with this Kerberos library')
+        if available and (wanted == 'always' or (
+                wanted == 'auto' and not transport.endpoint.lower().startswith('https'))):
+            transport.setup_encryption(http)
+        return True
+
+    @staticmethod
     def _run_ps(msca, script):
         """Run a PowerShell script on the CA; raise on non-zero exit.
 
@@ -227,8 +272,14 @@ class MicrosoftCAAdminChannelMixin:
         so stderr is only surfaced when the exit code is non-zero.
         """
         session = MicrosoftCAAdminChannelMixin._build_session(msca)
+        kerberos = (msca.winrm_transport or 'kerberos').lower() == 'kerberos'
         try:
-            result = session.run_ps(script)
+            if not (kerberos and msca.kerberos_keytab_path) \
+                    or MicrosoftCAAdminChannelMixin._bind_client_keytab(session, msca):
+                result = session.run_ps(script)
+            else:
+                with client_keytab(msca.kerberos_keytab_path):
+                    result = session.run_ps(script)
         except Exception as e:
             raise MSCAAdminChannelError(f'WinRM execution failed: {e}')
 

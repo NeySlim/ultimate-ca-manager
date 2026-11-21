@@ -164,6 +164,18 @@ def test_openssl_modules_elsewhere_is_refused_neg(bench, modules):
     assert list((bench / 'run').iterdir()) == []
 
 
+def test_openssl_modules_is_refused_when_it_cannot_be_resolved_neg(bench):
+    # no realpath on the PATH: the comparison has nothing to compare, so it refuses
+    for tool in ('bash', 'dirname', 'mktemp', 'rm', 'tr', 'grep', 'awk', 'mv', 'cat'):
+        (bench / 'bin' / tool).symlink_to(shutil.which(tool))
+    (bench / 'other').mkdir()
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), PATH=str(bench / 'bin'),
+                   OPENSSL_MODULES=str(bench / 'other'))
+    assert rc == 1 and 'continued' not in out and 'OPENSSL_MODULES' in out
+    assert 'cannot be resolved' in out and 'is not the absolute path' not in out
+    assert list((bench / 'run').iterdir()) == []
+
+
 def test_a_relative_openssl_modules_is_refused_neg(bench):
     # relative to the entrypoint's directory here, to another one in the process that loads fips.so
     rc, out = _run(bench, _reference(bench, BUILD_MAC), OPENSSL_MODULES=os.path.relpath(bench))
@@ -194,3 +206,14 @@ def test_the_build_shell_can_source_the_helper_pos(bench, shell):
                        env={'PATH': '/usr/bin:/bin'}, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == BUILD_MAC
+
+
+def test_accepted_module_pins_openssl_modules_to_its_directory_pos(bench):
+    # ucm.env is read by the app after this check and must not move the module directory
+    script = (f'. {HELPER}; install_fips_module "{bench / "fips.so"}" "{bench / "run"}" '
+              f'"{_reference(bench, BUILD_MAC)}" && printf "%s" "$OPENSSL_MODULES" > "{bench / "seen"}" '
+              f'&& env | grep -q "^OPENSSL_MODULES=" && echo exported')
+    env = {'PATH': f'{bench / "bin"}:/usr/bin:/bin', 'FAKE_MAC': BUILD_MAC}
+    r = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True)
+    assert r.returncode == 0 and 'exported' in r.stdout
+    assert (bench / 'seen').read_text() == str(bench)

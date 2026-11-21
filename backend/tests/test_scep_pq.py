@@ -27,9 +27,11 @@ from tests.test_scep_rfc8894_operations import (
     _client_identity, _decrypt_password_response, _load_ca_material, _response_attributes,
 )
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 CHALLENGE = 'pq challenge for scep'
 

@@ -246,7 +246,6 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
 ):
     import base64
 
-    from services.backup_service import BackupService
     from services.cert_service import CertificateService
     from utils.file_naming import cert_csr_path
     from utils.key_codec import load_pem_bytes
@@ -297,30 +296,31 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
 
             for item in (cert, imported, csr):
                 cert_key_path(item).write_bytes(b'stale plaintext')
-            # The certificate files are staged and published with the rest of
-            # the restore now; the key mirrors are still a direct write, and
-            # removing a stale one is what this checks.
-            from services.backup.restore.files import StagedFiles
-            with StagedFiles(base_dir=tmp_path / 'staging') as staged:
-                BackupService()._regenerate_files(staged)
-                staged.publish()
-                staged.discard()
+            # After a restore the reconciliation writes the files: never a key mirror
+            # while values are encrypted, and a stale one is removed
+            from services.file_regen_service import advance_generation, reconcile_files
+            advance_generation()
+            db.session.commit()
+            reconcile_files()
             assert all(not cert_key_path(item).exists() for item in (cert, imported, csr))
     finally:
         _cleanup_models(app, cert_ids, ca_data['id'])
 
 
 def test_legacy_opnsense_import_skips_key_mirrors_when_encrypted(
-    app, encryption_enabled, monkeypatch, tmp_path
+    app, encryption_enabled
 ):
     import base64
 
     from services.opnsense import importer
 
-    fake_module = tmp_path / 'services' / 'opnsense' / 'importer.py'
-    monkeypatch.setattr(importer, '__file__', str(fake_module))
     encoded_key = base64.b64encode(KEY_PEM).decode()
     encoded_cert = base64.b64encode(b'public certificate').decode()
+    # A CA key is read before it is admitted: this one has to be a real key
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
 
     with app.app_context():
         ca_refid = str(uuid.uuid4())
@@ -329,7 +329,7 @@ def test_legacy_opnsense_import_skips_key_mirrors_when_encrypted(
             'refid': ca_refid,
             'descr': 'Legacy OPNsense encrypted CA',
             'crt': encoded_cert,
-            'prv': encoded_key,
+            'prv': base64.b64encode(ca_key).decode(),
             'is_root': True,
         }])
         cert_result = importer.ImportMixin().import_certificates([{
@@ -341,12 +341,13 @@ def test_legacy_opnsense_import_skips_key_mirrors_when_encrypted(
 
         assert ca_result['imported'] == 1
         assert cert_result['imported'] == 1
-        data_dir = tmp_path / 'data'
-        assert (data_dir / 'ca' / f'{ca_refid}.crt').exists()
-        assert (data_dir / 'certs' / f'{cert_refid}.crt').exists()
-        assert not (data_dir / 'private' / f'{ca_refid}.key').exists()
-        assert not (data_dir / 'private' / f'{cert_refid}.key').exists()
+        ca = CA.query.filter_by(refid=ca_refid).one()
+        cert = Certificate.query.filter_by(refid=cert_refid).one()
+        assert ca_cert_path(ca).exists() and cert_cert_path(cert).exists()
+        assert not ca_key_path(ca).exists() and not cert_key_path(cert).exists()
 
+        ca_cert_path(ca).unlink()
+        cert_cert_path(cert).unlink()
         CA.query.filter_by(refid=ca_refid).delete()
         Certificate.query.filter_by(refid=cert_refid).delete()
         db.session.commit()
@@ -377,3 +378,67 @@ def test_api_creation_keeps_key_mirrors_when_encryption_disabled(
             assert cert_key_path(cert).exists()
     finally:
         _cleanup_models(app, cert_id, ca_data['id'])
+
+
+def test_mirrors_follow_the_values_while_a_disable_keeps_its_deks(
+    app, encryption_enabled, monkeypatch, tmp_path
+):
+    """A disable's DEKs stay loaded for its grace, but values are stored in the clear: mirrored."""
+    import base64
+
+    import pytest
+
+    from config.settings import Config
+    from models import EncryptionKey
+    from security import dek_rotation
+    from services.ca import helpers
+    from services.file_regen_service import write_ca_files, write_cert_files
+
+    key_encryption = encryption_enabled.key_encryption
+    for name in ('PRIVATE_DIR', 'CERT_DIR', 'CA_DIR'):
+        monkeypatch.setattr(Config, name, tmp_path / name.lower())
+    prv = base64.b64encode(KEY_PEM).decode()
+    with app.app_context():
+        dek_rotation.begin_disable()
+        try:
+            assert key_encryption.is_enabled and not key_encryption.is_encrypting
+            orphan = Config.PRIVATE_DIR / 'cert_orphan.key'
+            assert mirror_private_key(orphan, KEY_PEM, context='grace') is True
+            assert purge_private_key_files()['removed'] == 0 and orphan.exists()
+
+            cert = Certificate(refid=str(uuid.uuid4()), descr='Grace mirror cert', prv=prv)
+            write_cert_files(cert)
+            assert cert_key_path(cert).read_bytes() == KEY_PEM
+            ca = CA(refid=str(uuid.uuid4()), descr='Grace mirror CA', prv=prv)
+            write_ca_files(ca)
+            assert ca_key_path(ca).read_bytes() == KEY_PEM
+
+            # A mirror that fails to write is an error, not "skipped because encrypted"
+            monkeypatch.setattr(helpers, 'mirror_private_key', lambda *a, **k: False)
+            with pytest.raises(OSError):
+                helpers.save_ca_key_file(ca, KEY_PEM)
+        finally:
+            EncryptionKey.query.delete()
+            db.session.commit()
+
+
+def test_purge_keeps_the_mirror_of_a_row_whose_key_is_empty(
+    app, encryption_enabled, monkeypatch, tmp_path
+):
+    from config.settings import Config
+
+    monkeypatch.setattr(Config, 'PRIVATE_DIR', tmp_path)
+    keyless = Certificate(refid=str(uuid.uuid4()), descr='Empty key purge row', prv='')
+    with app.app_context():
+        db.session.add(keyless)
+        db.session.commit()
+        path = cert_key_path(keyless)
+        path.write_bytes(b'plaintext')
+        try:
+            stats = purge_private_key_files()
+            assert stats == {'removed': 0, 'kept_no_db_key': 1, 'errors': 0}
+            assert path.exists()
+        finally:
+            path.unlink(missing_ok=True)
+            db.session.delete(keyless)
+            db.session.commit()

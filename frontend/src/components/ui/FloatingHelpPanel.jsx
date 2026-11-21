@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next'
 import { helpContent as defaultHelpData } from '../../data/helpContent'
 import { helpGuides as defaultHelpGuides } from '../../data/helpGuides'
 import { FloatingWindow } from './FloatingWindow'
+import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
+import { loadHelpPage } from '../../data/helpLoader'
 
 const STORAGE_KEY = 'ucm-help-panel'
 const READER_KEY = 'ucm-help-reader'
@@ -80,7 +82,7 @@ function useHelpTranslation(lang, pageKey) {
   const langKey = lang?.substring(0, 2)
 
   useEffect(() => {
-    if (!langKey || langKey === 'en' || !pageKey) {
+    if (!pageKey || !HELP_TRANSLATED_LANGUAGES.includes(langKey)) {
       setTranslation(null)
       return
     }
@@ -89,12 +91,16 @@ function useHelpTranslation(lang, pageKey) {
       setTranslation(sectionCache[cacheKey])
       return
     }
-    import(`../../data/help/${langKey}/${pageKey}.js`)
+    // Drop the previous language's text while loading; a superseded load must not overwrite the state.
+    setTranslation(null)
+    let live = true
+    loadHelpPage(langKey, pageKey)
       .then(mod => {
         sectionCache[cacheKey] = mod.default
-        setTranslation(mod.default)
+        if (live) setTranslation(mod.default)
       })
-      .catch(() => setTranslation(null))
+      .catch(() => {}) // the translation is already null: English stays
+    return () => { live = false }
   }, [langKey, pageKey])
 
   return translation
@@ -103,7 +109,9 @@ function useHelpTranslation(lang, pageKey) {
 export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
   const { t, i18n } = useTranslation()
   const { isMobile } = useMobile()
-  const translation = useHelpTranslation(i18n.language, pageKey)
+  const translation = useHelpTranslation(i18n.resolvedLanguage, pageKey)
+  const langKey = i18n.resolvedLanguage?.substring(0, 2)
+  const englishNotice = !!langKey && langKey !== 'en' && !HELP_TRANSLATED_LANGUAGES.includes(langKey)
 
   const quickContent = useMemo(() => {
     const en = pageKey ? defaultHelpData[pageKey] : null
@@ -122,15 +130,15 @@ export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
   if (!isOpen || (!quickContent && !guideContent)) return null
 
   return isMobile
-    ? <MobileSheet quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} />
-    : <DesktopPanel quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} />
+    ? <MobileSheet quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} englishNotice={englishNotice} />
+    : <DesktopPanel quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} englishNotice={englishNotice} />
 }
 
 // =============================================================================
 // DESKTOP — Using shared FloatingWindow component
 // =============================================================================
 
-function DesktopPanel({ quickContent, guideContent, onClose, t }) {
+function DesktopPanel({ quickContent, guideContent, onClose, t, englishNotice }) {
   const title = quickContent?.title || guideContent?.title || t('common.help')
   const subtitle = quickContent?.subtitle || ''
 
@@ -152,7 +160,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
       zIndex={50}
       onClose={onClose}
     >
-      <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={false} panelWidth={640} />
+      <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} englishNotice={englishNotice} isMobileView={false} panelWidth={640} />
     </FloatingWindow>
   )
 }
@@ -161,7 +169,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
 // HELP BODY — Tab switching Quick / Guide
 // =============================================================================
 
-function HelpBody({ quickContent, guideContent, t, isMobileView, panelWidth }) {
+function HelpBody({ quickContent, guideContent, t, englishNotice, isMobileView, panelWidth }) {
   const hasQuick = !!quickContent
   const hasGuide = !!guideContent
   const defaultTab = hasGuide ? 'guide' : 'quick'
@@ -172,6 +180,11 @@ function HelpBody({ quickContent, guideContent, t, isMobileView, panelWidth }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
+      {englishNotice && (
+        <p className="shrink-0 px-4 py-1.5 text-2xs text-text-tertiary border-b border-border">
+          {t('help.englishOnlyNotice')}
+        </p>
+      )}
       {showTabs && (
         <div className="shrink-0 flex border-b border-border bg-secondary-op30">
           <button
@@ -286,13 +299,13 @@ function QuickHelpContent({ content, t }) {
 
       {content.related?.length > 0 && (
         <div className="pt-3 border-t border-border">
-          <h4 className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <h4 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <LinkIcon size={10} weight="bold" />
             {t('help.seeAlso')}
           </h4>
           <div className="flex flex-wrap gap-1.5">
             {content.related.map((item, idx) => (
-              <span key={idx} className="px-2.5 py-1 rounded-md bg-bg-tertiary text-[11px] font-medium text-text-secondary border border-border">
+              <span key={idx} className="px-2.5 py-1 rounded-md bg-bg-tertiary text-xs font-medium text-text-secondary border border-border">
                 {item}
               </span>
             ))}
@@ -341,7 +354,7 @@ function QuickSection({ section }) {
           </dl>
         )}
         {section.example && (
-          <div className="mt-2 p-2 rounded-lg bg-bg-tertiary border border-border font-mono text-[11px] text-text-secondary overflow-x-auto whitespace-pre-wrap break-all">
+          <div className="mt-2 p-2 rounded-lg bg-bg-tertiary border border-border font-mono text-xs text-text-secondary overflow-x-auto whitespace-pre-wrap break-all">
             {section.example}
           </div>
         )}
@@ -520,7 +533,7 @@ function GuideContent({ markdown, t, isMobileView, panelWidth }) {
                   key={idx}
                   onClick={() => scrollTo(idx)}
                   className={cn(
-                    'w-full text-left px-3 py-1.5 text-[11px] leading-snug transition-colors border-l-2',
+                    'w-full text-left px-3 py-1.5 text-xs leading-snug transition-colors border-l-2',
                     activeSection === idx
                       ? 'border-accent-primary text-accent-primary bg-accent-primary-op5 font-medium'
                       : 'border-transparent text-text-tertiary hover:text-text-secondary hover:bg-tertiary-op50'
@@ -613,9 +626,9 @@ function ReaderToolbar({
               key={idx}
               onClick={() => updatePref('fontSize', idx)}
               className={cn(
-                'px-1.5 py-0.5 text-[10px] font-bold transition-colors rounded-sm',
+                'px-1.5 py-0.5 text-xs font-bold transition-colors rounded-sm',
                 readerPrefs.fontSize === idx
-                  ? 'bg-accent-primary text-white'
+                  ? 'bg-accent-primary text-on-accent'
                   : 'text-text-tertiary hover:text-text-primary'
               )}
               style={{ fontSize: idx === 0 ? '9px' : idx === 2 ? '12px' : '10px' }}
@@ -716,7 +729,7 @@ function MobileTocDropdown({ toc, activeSection, scrollTo, t }) {
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-tertiary-op50 transition-colors"
       >
         <List size={13} className="text-text-tertiary shrink-0" />
-        <span className="text-[11px] font-medium text-text-secondary flex-1 truncate">
+        <span className="text-xs font-medium text-text-secondary flex-1 truncate">
           {toc[activeSection] || t('help.tableOfContents', 'Contents')}
         </span>
         {open ? <CaretDown size={11} className="text-text-tertiary" /> : <CaretRight size={11} className="text-text-tertiary" />}
@@ -728,7 +741,7 @@ function MobileTocDropdown({ toc, activeSection, scrollTo, t }) {
               key={idx}
               onClick={() => { scrollTo(idx); setOpen(false) }}
               className={cn(
-                'w-full text-left px-3 py-1.5 rounded-md text-[11px] transition-colors',
+                'w-full text-left px-3 py-1.5 rounded-md text-xs transition-colors',
                 activeSection === idx
                   ? 'bg-accent-primary-op10 text-accent-primary font-medium'
                   : 'text-text-tertiary hover:bg-bg-tertiary'
@@ -813,7 +826,7 @@ function renderLines(lines) {
     const h4 = line.match(/^#### (.+)/)
     if (h4) {
       elements.push(
-        <h5 key={i} className="text-[11px] font-semibold text-text-secondary mt-2 mb-0.5">
+        <h5 key={i} className="text-xs font-semibold text-text-secondary mt-2 mb-0.5">
           {formatInline(h4[1].trim())}
         </h5>
       )
@@ -830,7 +843,7 @@ function renderLines(lines) {
       }
       i++ // skip closing ```
       elements.push(
-        <pre key={`code-${i}`} className="p-2.5 rounded-lg bg-bg-tertiary border border-border font-mono text-[11px] text-text-secondary overflow-x-auto whitespace-pre leading-relaxed">
+        <pre key={`code-${i}`} className="p-2.5 rounded-lg bg-bg-tertiary border border-border font-mono text-xs text-text-secondary overflow-x-auto whitespace-pre leading-relaxed">
           {codeLines.join('\n')}
         </pre>
       )
@@ -891,7 +904,7 @@ function renderLines(lines) {
         <ol key={`ol-${i}`} className="space-y-1">
           {listItems.map((item, j) => (
             <li key={j} className="flex items-start gap-2 text-xs text-text-secondary">
-              <span className="text-[10px] font-semibold text-text-tertiary mt-0.5 min-w-[14px] shrink-0">{j + 1}.</span>
+              <span className="text-xs font-semibold text-text-tertiary mt-0.5 min-w-[14px] shrink-0">{j + 1}.</span>
               <span className="leading-relaxed">{formatInline(item)}</span>
             </li>
           ))}
@@ -950,7 +963,7 @@ function formatInline(text) {
     if (type === 'bold') {
       parts.push(<strong key={key++} className="font-semibold text-text-primary">{earliest[1]}</strong>)
     } else if (type === 'code') {
-      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-bg-tertiary border border-border font-mono text-[10px]">{earliest[1]}</code>)
+      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-bg-tertiary border border-border font-mono text-xs">{earliest[1]}</code>)
     } else if (type === 'italic') {
       parts.push(<em key={key++} className="italic">{earliest[1]}</em>)
     }
@@ -965,7 +978,7 @@ function formatInline(text) {
 // MOBILE — Bottom sheet
 // =============================================================================
 
-function MobileSheet({ quickContent, guideContent, onClose, t }) {
+function MobileSheet({ quickContent, guideContent, onClose, t, englishNotice }) {
   const [translateY, setTranslateY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const startYRef = useRef(0)
@@ -995,7 +1008,7 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40 animate-fade-in" onClick={onClose} />
+      <div className="absolute inset-0 bg-scrim-40 animate-fade-in" onClick={onClose} />
       <div
         className={cn(
           'absolute inset-x-0 bottom-0 bg-bg-primary rounded-t-2xl',
@@ -1025,7 +1038,7 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
           </div>
         </div>
 
-        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={true} />
+        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} englishNotice={englishNotice} isMobileView={true} />
       </div>
     </div>
   )

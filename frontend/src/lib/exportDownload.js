@@ -10,6 +10,9 @@
  * own way of naming the file, because those are page-level decisions.
  */
 import { downloadBlob } from './utils'
+import { sanitizeFilename } from './filename'
+
+export { sanitizeFilename }
 
 // The formats ExportModal can ask for, plus the pfx alias some callers pass.
 export const EXPORT_EXTENSIONS = {
@@ -21,32 +24,6 @@ export const EXPORT_EXTENSIONS = {
   jks: 'jks',
   key: 'key',
   'hybrid-bundle': 'zip',
-}
-
-// Long enough for any CN (RFC 5280 caps it at 64) or ACME domain, short
-// enough that name + extension stays well inside the 255-byte limit every
-// common filesystem enforces.
-const MAX_BASENAME = 128
-
-/**
- * Make a caller-supplied label safe to use as a filename.
- *
- * The label is a CN, an ACME domain or a CA description, and none of those are
- * the operator's own text: they ride in on externally submitted CSRs, ACME
- * orders, SCEP/EST enrolments and discovery scans. RFC 5280 happily allows
- * `/`, `\`, `:`, `..` and control characters in a CN, while several of the
- * files named here contain a private key.
- *
- * @param {string} name - the untrusted label
- * @param {number} [maxLength] - cap for the returned base name
- * @returns {string} a single path segment, never empty, never "." or ".."
- */
-export function sanitizeFilename(name, maxLength = MAX_BASENAME) {
-  let safe = String(name ?? '').replace(/[^A-Za-z0-9._-]+/g, '_')
-  // Leading dots would hide the file, and "." / ".." are not names at all.
-  safe = safe.replace(/^\.+/, '')
-  if (safe.length > maxLength) safe = safe.slice(0, maxLength)
-  return safe || 'export'
 }
 
 /**

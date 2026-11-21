@@ -6,11 +6,14 @@ Factory pattern for provider instantiation and database operations.
 from typing import Dict, List, Optional, Any, Type
 from datetime import datetime
 from pathlib import Path
+import hashlib
 import json
 import logging
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
-from sqlalchemy import or_
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from sqlalchemy import or_, update
 
 import fips_mode
 from config.settings import Config
@@ -20,10 +23,12 @@ from services import compliance_signer
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo, brainpool_refusal, mldsa_refusal,
-    HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
+    HsmError, HsmConnectionError, HsmOperationError, HsmConfigError, HsmSecretUnreadable
 )
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
+from utils.encryption import SecretUnreadable
+from utils.ha import SOFTHSM_LOCAL, ha_enabled, refuse_softhsm_in_ha
 from utils.process_lock import LockBusyError, process_lock
 from utils import hsm_check, pkcs11_config
 
@@ -34,12 +39,14 @@ GENERATE_LOCK_TIMEOUT = 60
 
 
 
-def _parses_as_spki(pem) -> bool:
+def _spki_fingerprint(pem) -> Optional[bytes]:
     try:
-        serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
-        return True
-    except Exception:
-        return False
+        public = serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
+        der = public.public_bytes(serialization.Encoding.DER,
+                                  serialization.PublicFormat.SubjectPublicKeyInfo)
+        return hashlib.sha256(der).digest()
+    except (ValueError, TypeError, UnsupportedAlgorithm):
+        return None
 
 
 def _spki_from_pkcs1_pem(pem):
@@ -104,6 +111,14 @@ class HsmService:
         return mldsa_refusal(f"provider type '{provider_type}'", algorithm, supported, library)
 
     @staticmethod
+    def refuse_in_fips_mode(algorithm: Optional[str]) -> None:
+        """The HSM signs, not the loaded module: FIPS mode takes only what every module
+        approves (RSA, NIST curves), whatever the loaded one approves on top."""
+        registered = key_algorithms.get(algorithm) if algorithm else None
+        if registered is not None and not registered.fips_static:
+            fips_mode.refuse(f'{registered.display} keys')
+
+    @staticmethod
     def eddsa_refusal(algorithm: Optional[str]) -> Optional[str]:
         """Why an EdDSA *algorithm* key is not used on any HSM, or None: no provider wrapper signs with one."""
         alg = key_algorithms.get(algorithm) if algorithm else None
@@ -144,7 +159,10 @@ class HsmService:
             )
         
         provider_class = cls._provider_registry[provider.type]
-        config = provider.get_config()
+        try:
+            config = provider.connection_config()
+        except SecretUnreadable as e:
+            raise HsmSecretUnreadable(str(e)) from e
         return provider_class(config)
     
     # =========================================================================
@@ -200,6 +218,7 @@ class HsmService:
             raise ValueError(error)
         if compliance_signer.softhsm_config(provider_type, config, name):
             fips_mode.refuse_softhsm()
+            refuse_softhsm_in_ha()
 
         # Check name uniqueness
         if HsmProvider.query.filter_by(name=name).first():
@@ -261,6 +280,7 @@ class HsmService:
         if not compliance_signer.softhsm_provider(provider) and compliance_signer.softhsm_config(
                 provider.type, provider.get_config() if config is None else config, name or provider.name):
             fips_mode.refuse_softhsm()
+            refuse_softhsm_in_ha()
 
         if name:
             # Check name uniqueness
@@ -271,7 +291,7 @@ class HsmService:
         
         if config is not None:
             # The form never carries the PIN kept when a new SoftHSM token took over.
-            previous_pin = provider.get_config().get('previous_user_pin')
+            previous_pin = provider.editable_config().get('previous_user_pin')
             if previous_pin and 'previous_user_pin' not in config:
                 config = {**config, 'previous_user_pin': previous_pin}
             # set_config encrypts sensitive fields and drops mask sentinels
@@ -430,6 +450,8 @@ class HsmService:
         provider = db.session.get(HsmProvider, provider_id)
         if not provider:
             raise ValueError(f"Provider not found: {provider_id}")
+        if compliance_signer.softhsm_provider(provider):
+            refuse_softhsm_in_ha()
         
         # Validate algorithm
         if algorithm not in HsmKey.VALID_ALGORITHMS:
@@ -441,8 +463,7 @@ class HsmService:
         if registered is None and key_algorithms.is_post_quantum(algorithm):
             raise ValueError(f'{algorithm} keys are not available on this build: '
                              'they need OpenSSL 3.5 or later')
-        if registered is not None and not registered.fips_approved:
-            fips_mode.refuse(f'{registered.display} keys')
+        cls.refuse_in_fips_mode(algorithm)
         
         # Validate purpose
         if purpose not in HsmKey.VALID_PURPOSES:
@@ -612,13 +633,17 @@ class HsmService:
         """The digest the key's provider signs with when *requested* is asked
         for. Providers that hash with any digest return the request; those
         that bind the digest to the key (curve-matched ECDSA, a KMS key
-        version) return that one. Cached per key and request."""
-        cache_key = (key_id, requested)
-        if cache_key in cls._signing_hash_cache:
-            return cls._signing_hash_cache[cache_key]
+        version) return that one. Cached per key material and request."""
         key = db.session.get(HsmKey, key_id)
         if not key:
             raise ValueError(f"Key not found: {key_id}")
+        # Read the shared row even if this session still holds an older ORM instance.
+        pem = db.session.execute(db.select(HsmKey.public_key_pem).where(HsmKey.id == key_id)).scalar_one()
+        fingerprint = _spki_fingerprint(pem)
+        cache_key = (key_id, fingerprint, requested)
+        # No SPKI, no cache: the row has no version to bind to; wrappers load the SPKI first, so one round trip.
+        if fingerprint and cache_key in cls._signing_hash_cache:
+            return cls._signing_hash_cache[cache_key]
         try:
             hsm = cls._get_provider_instance(key.provider)
             name = hsm.hash_for_key(key.key_identifier, key_algorithm or key.algorithm, requested) or requested
@@ -627,19 +652,60 @@ class HsmService:
             # the request stands, and signing itself will say what is wrong
             logger.debug(f"Signing digest for HSM key {key_id} left as requested: {e}")
             return requested
-        cls._signing_hash_cache[cache_key] = name
+        if fingerprint:
+            cls._signing_hash_cache[cache_key] = name
         return name
 
     @staticmethod
-    def _registered_algorithm(key: HsmKey):
-        """Registry entry of *key*, read off its public key before its stored label."""
+    def _cached_public_key(key: HsmKey):
         try:
             pem = key.public_key_pem
-            public = serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
-            label = key_algorithms.label_for_public_key(public)
+            return serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
         except Exception:
-            label = None
+            return None
+
+    @classmethod
+    def _registered_algorithm(cls, key: HsmKey):
+        """Registry entry of *key*, read off its public key before its stored label."""
+        public = cls._cached_public_key(key)
+        label = key_algorithms.label_for_public_key(public) if public is not None else None
         return key_algorithms.get(label) or key_algorithms.get(key.algorithm)
+
+    @classmethod
+    def fips_signing_refusal(cls, key: HsmKey) -> Optional[str]:
+        """What FIPS mode refuses to sign with *key* ('RSA 1024 keys'), or None: only RSA keys
+        ``fips_rsa_bits_approved`` admits and the registered algorithms every module approves sign.
+        Cached public key, then label."""
+        public = cls._cached_public_key(key)
+        if isinstance(public, rsa.RSAPublicKey):
+            approved = key_algorithms.fips_rsa_bits_approved(public.key_size)
+            return None if approved else f'RSA {public.key_size} keys'
+        if public is None and key_algorithms.rsa_bits_of_label(key.algorithm) is not None:
+            approved = key_algorithms.fips_rsa_bits_approved(key_algorithms.rsa_bits_of_label(key.algorithm))
+            return None if approved else f'{key.algorithm} keys'
+        # A public key that can be read decides alone: its label may say anything
+        label = key.algorithm if public is None else key_algorithms.label_for_public_key(public)
+        registered = key_algorithms.get(label)
+        if registered is not None:
+            return None if registered.fips_static else f'{registered.display} keys'
+        if isinstance(public, ec.EllipticCurvePublicKey):
+            return f'EC {public.curve.name} keys'
+        return f'{key.algorithm or "UNKNOWN"} keys'
+
+    @classmethod
+    def refuse_signing_in_fips_mode(cls, key: HsmKey, fetch: bool = True) -> None:
+        """FipsRestricted unless *key* signs in FIPS mode; with *fetch*, a public key missing
+        from the cache is asked of the provider first, and its label decides if none comes."""
+        if not fips_mode.enabled():
+            return
+        if fetch and not key.public_key_pem:
+            try:
+                cls.get_public_key(key.id)
+            except Exception as e:
+                logger.debug(f"Public key of HSM key {key.id} unavailable, judged on its label: {e}")
+        refusal = cls.fips_signing_refusal(key)
+        if refusal:
+            fips_mode.refuse(refusal)
 
     @classmethod
     def sign(cls, key_id: int, data: bytes, algorithm: Optional[str] = None,
@@ -664,6 +730,9 @@ class HsmService:
         
         if key.purpose not in ('signing', 'all'):
             raise ValueError(f"Key {key.label} is not for signing")
+        # The HSM signs, not the module: a key bound before the switch or restored after it
+        # signs in FIPS mode only if every module approves its algorithm
+        cls.refuse_signing_in_fips_mode(key)
         registered = cls._registered_algorithm(key)
         pure = registered is not None and not registered.needs_digest
         if pure and (hash_algorithm or padding):
@@ -684,7 +753,8 @@ class HsmService:
             # PKCS#11 and Azure return ECDSA as raw r || s; X.509 needs DER (#366).
             if not pure:
                 signature = ecdsa_to_der(
-                    signature, coordinate_bytes(key.algorithm, key.public_key_pem))
+                    signature, coordinate_bytes(key.algorithm, key.public_key_pem),
+                    signature_format=getattr(hsm, 'ECDSA_SIGNATURE_FORMAT', 'der'))
 
             logger.debug(f"Signed data with HSM key: {key.label}")
             return signature
@@ -700,18 +770,27 @@ class HsmService:
     # =========================================================================
     
     @classmethod
-    def _refresh_reading(cls, known: HsmKey, key_info: HsmKeyInfo) -> None:
-        """Take a valid label and a public key the row could not parse from a newer
-        listing; an UNKNOWN reading never overwrites what the row holds."""
-        if key_info.algorithm in HsmKey.VALID_ALGORITHMS and key_info.algorithm != known.algorithm:
+    def _refresh_reading(cls, known: HsmKey, key_info: HsmKeyInfo) -> bool:
+        """Refresh readable material; return whether a previously known key changed."""
+        previous = _spki_fingerprint(known.public_key_pem)
+        current = _spki_fingerprint(key_info.public_key_pem)
+        algorithm_changed = (key_info.algorithm in HsmKey.VALID_ALGORITHMS
+                             and key_info.algorithm != known.algorithm)
+        if algorithm_changed:
             known.algorithm = key_info.algorithm
-            cls.forget_signing_hash(known.id)
-        if key_info.public_key_pem and not _parses_as_spki(known.public_key_pem) \
-                and _parses_as_spki(key_info.public_key_pem):
+        if current:
             known.public_key_pem = key_info.public_key_pem
+        elif algorithm_changed:
+            known.public_key_pem = None
+        # A corrected label over the same readable SPKI is not new key material.
+        same_material = bool(current) and current == previous
+        changed = not same_material and (algorithm_changed or bool(previous and current))
+        if changed:
+            cls.forget_signing_hash(known.id)
+        return changed
 
     @classmethod
-    def sync_keys(cls, provider_id: int) -> Dict[str, int]:
+    def sync_keys(cls, provider_id: int) -> Dict[str, Any]:
         """
         Sync keys from HSM to database.
         Adds new keys found in HSM and removes missing ones, except keys another
@@ -723,11 +802,15 @@ class HsmService:
 
         Returns:
             Dict with 'added', 'removed', 'unchanged', 'missing_kept' and
-            'listing_errors' counts
+            'listing_errors' counts, plus 'changed_referenced_key_ids' for authorities
+            whose token material changed
         """
         provider = db.session.get(HsmProvider, provider_id)
         if not provider:
             raise ValueError(f"Provider not found: {provider_id}")
+        # Rows synced from a SoftHSM token would only be valid on the node that answered
+        if compliance_signer.softhsm_provider(provider):
+            refuse_softhsm_in_ha()
         
         try:
             hsm = cls._get_provider_instance(provider)
@@ -735,13 +818,16 @@ class HsmService:
                 hsm_keys = hsm.list_keys()
             listing_errors = len(getattr(hsm, 'list_errors', None) or [])
 
-            # Get existing keys in DB
-            db_keys = {k.key_identifier: k for k in provider.keys}
+            # Rows read under the provider lock: a concurrent sync commits first, then this one
+            # finds its rows, as a sync run after it would (the token is read outside the lock)
+            cls._lock_provider(provider_id)
+            db_keys = {k.key_identifier: k for k in HsmKey.query.filter_by(provider_id=provider_id)}
             hsm_key_ids = {k.key_identifier for k in hsm_keys}
             
             added = 0
             removed = 0
             unchanged = 0
+            changed_ids = set()
             
             # Add new keys from HSM
             for key_info in hsm_keys:
@@ -764,12 +850,14 @@ class HsmService:
                     level = (key_info.metadata or {}).get('protection_level')
                     if level:
                         known.set_metadata({**known.get_metadata(), 'protection_level': level})
-                    cls._refresh_reading(known, key_info)
+                    if cls._refresh_reading(known, key_info):
+                        changed_ids.add(known.id)
                     unchanged += 1
             
             # A partial listing proves nothing missing; a referenced key is never dropped
             # (deleting it would null the CA's hsm_key_id).
             referenced = cls._referenced_hsm_key_ids()
+            changed_referenced = sorted(changed_ids & referenced)
             missing_kept = 0
             for key_id, key in db_keys.items():
                 if key_id in hsm_key_ids:
@@ -788,7 +876,8 @@ class HsmService:
                     f"{missing_kept} missing key(s) kept")
             logger.info(f"Synced HSM keys for {provider.name}: +{added} -{removed} ={unchanged}")
             return {'added': added, 'removed': removed, 'unchanged': unchanged,
-                    'missing_kept': missing_kept, 'listing_errors': listing_errors}
+                    'missing_kept': missing_kept, 'listing_errors': listing_errors,
+                    'changed_referenced_key_ids': changed_referenced}
 
         except HsmError:
             db.session.rollback()
@@ -797,6 +886,17 @@ class HsmService:
             db.session.rollback()
             logger.exception(f"Failed to sync HSM keys for {provider.name}")
             raise HsmOperationError(f"Failed to sync keys: {str(e)}")
+
+    @staticmethod
+    def _lock_provider(provider_id):
+        """Lock the provider row until the transaction ends: FOR UPDATE on PostgreSQL, the
+        database write lock (no-op UPDATE) on SQLite, as key_binding.lock_key does for a key."""
+        if db.session.get_bind().dialect.name == 'sqlite':
+            table = HsmProvider.__table__
+            # updated_at is named so its onupdate does not date a sync as an edit
+            db.session.execute(update(table).where(table.c.id == provider_id)
+                               .values(id=table.c.id, updated_at=table.c.updated_at))
+        return HsmProvider.query.filter_by(id=provider_id).with_for_update().one_or_none()
 
     @staticmethod
     def _referenced_hsm_key_ids() -> set:
@@ -817,11 +917,29 @@ class HsmService:
         """Rewrite legacy PKCS#11 config keys (library_path/pin) in-place."""
         if provider.type != 'pkcs11':
             return False
-        raw = provider.get_config()
+        raw = provider.editable_config()
         if not pkcs11_config.pkcs11_config_needs_normalization(raw):
             return False
         provider.set_config(pkcs11_config.normalize_pkcs11_config(raw))
         return True
+
+    @staticmethod
+    def warn_local_softhsm():
+        """HA node start: say once that SoftHSM providers only work where their token is."""
+        if not ha_enabled():
+            return []
+        names = []
+        for provider in HsmProvider.query.all():
+            try:
+                if compliance_signer.softhsm_provider(provider):
+                    names.append(provider.name)
+            except Exception as exc:
+                # One unreadable configuration must not hide the others
+                logger.warning("HA: HSM provider %s could not be read: %s", provider.name, type(exc).__name__)
+        if names:
+            logger.warning("HA: SoftHSM provider(s) %s keep their token on this node only; "
+                           "CAs on those keys cannot sign elsewhere", ", ".join(names))
+        return names
 
     @staticmethod
     def auto_register_softhsm():
@@ -843,7 +961,7 @@ class HsmService:
         pin = os.environ.get('HSM_DEFAULT_PIN')
         existing = HsmProvider.query.filter_by(name='SoftHSM-Default').first()
         if existing:
-            config = existing.get_config()
+            config = existing.editable_config()
             aimed_at_default = config.get('token_label', 'UCM-Default') == 'UCM-Default'
             takeover = bool(pin and os.environ.get('HSM_TOKEN_CREATED') == '1' and aimed_at_default)
             restore = bool(
@@ -895,6 +1013,9 @@ class HsmService:
             fips_mode.refuse_softhsm()
         except fips_mode.FipsRestricted as e:
             logger.warning("SoftHSM-Default not registered: %s", e)
+            return
+        if ha_enabled():
+            logger.warning("SoftHSM-Default not registered: %s", SOFTHSM_LOCAL)
             return
 
         try:

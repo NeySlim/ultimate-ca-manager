@@ -42,7 +42,7 @@ function StatusBadge({ status }) {
   )
 }
 
-export default function PublicEndpointsPanel({ settings, updateSetting, refreshKey = 0 }) {
+export default function PublicEndpointsPanel({ settings, updateSetting, refreshKey = 0, adminLocked = false }) {
   const { t } = useTranslation()
   const { showError, showSuccess } = useNotification()
   const [effective, setEffective] = useState(null)
@@ -94,7 +94,7 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
       <p className="text-sm text-text-secondary mb-4">{t('settings.publicEndpoints.subtitle')}</p>
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <Button type="button" variant="secondary" size="sm" onClick={detectFromBrowser}>
+        <Button type="button" variant="secondary" size="sm" onClick={detectFromBrowser} disabled={adminLocked}>
           {t('settings.publicEndpoints.detectFromBrowser')}
         </Button>
         <Button type="button" variant="secondary" size="sm" onClick={runPreflight} disabled={checking}>
@@ -107,14 +107,14 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
       </div>
 
       {eff.env_locked?.fqdn_env && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1">
+        <p className="text-xs text-status-warning mb-3 flex items-center gap-1">
           <WarningCircle size={14} />
           {t('settings.publicEndpoints.fqdnEnvLocked')}
         </p>
       )}
 
       {eff.host_role_ok === false && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1">
+        <p className="text-xs text-status-warning mb-3 flex items-center gap-1">
           <WarningCircle size={14} />
           {t('settings.publicEndpoints.wrongHost', { host: eff.request_host, admin: eff.admin?.host })}
         </p>

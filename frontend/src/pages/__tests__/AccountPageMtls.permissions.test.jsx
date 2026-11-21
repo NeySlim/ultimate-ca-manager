@@ -37,8 +37,8 @@ vi.mock('../../contexts', () => ({
   }),
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: ['light', 'dark'] }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(),
+  useInspector: () => ({
+    openEntity: vi.fn(),
     closeWindow: vi.fn(),
     windows: [],
     prefs: { sameWindow: true, closeOnNav: true },
@@ -48,7 +48,7 @@ vi.mock('../../contexts', () => ({
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 // usePermission reads `permissions` from AuthContext directly.

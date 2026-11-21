@@ -277,7 +277,9 @@ class NotificationLog(db.Model):
     def was_recently_sent(cls, notification_type: str, resource_type: str, resource_id: str, hours: int = 24) -> bool:
         """Check if this notification was already sent recently (for deduplication)"""
         from datetime import timedelta
-        cutoff = utc_now() - timedelta(hours=hours)
+        from services.scheduler_leader import cluster_utc_now
+        # The writers date sent_at on the same clock (log_clock), whichever node sent
+        cutoff = cluster_utc_now() - timedelta(hours=hours)
         existing = cls.query.filter(
             cls.type == notification_type,
             cls.resource_type == resource_type,

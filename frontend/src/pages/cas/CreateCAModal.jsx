@@ -135,6 +135,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [hsmProviders, setHsmProviders] = useState([])
   const [hsmKeys, setHsmKeys] = useState([])
   const [hsmLoading, setHsmLoading] = useState(false)
+  // The server refused the HSM list (no read:hsm) or the creation on the chosen key (403, 409)
+  const [hsmDenied, setHsmDenied] = useState(false)
+  const [hsmRefusal, setHsmRefusal] = useState('')
 
   // Load HSM providers when modal opens
   useEffect(() => {
@@ -146,11 +149,20 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         if (cancelled) return
         const list = extractData(res) || []
         setHsmProviders(list.filter(p => p.enabled))
+        setHsmDenied(false)
       })
-      .catch(() => { if (!cancelled) setHsmProviders([]) })
+      .catch((error) => {
+        if (cancelled) return
+        setHsmProviders([])
+        setHsmDenied(error?.status === 403)
+      })
       .finally(() => { if (!cancelled) setHsmLoading(false) })
     return () => { cancelled = true }
   }, [open])
+
+  // A refusal belongs to the key that was tried
+  useEffect(() => { setHsmRefusal('') },
+    [createFormHsmKeyId, createFormHsmProviderId, createFormHsmKeyMode, createFormKeyStorage])
 
   // Reset form when modal closes
   useEffect(() => {
@@ -220,12 +232,12 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormKeyUsage(createFormType === 'root' && !mldsaKey ? ROOT_KEY_USAGE : INTERMEDIATE_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
   }, [createFormType, mldsaKey])
-  const { fips, mldsa } = policyLimits
+  const { fips, fipsKeys, mldsa } = policyLimits
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
-      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, mldsa })
+      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, fipsKeys, mldsa })
       && !(pqStandalone && isPostQuantum(caKeyLabel(algo, size)))),
-    [allowedKeyTypes, fips, mldsa, pqStandalone],
+    [allowedKeyTypes, fips, fipsKeys, mldsa, pqStandalone],
   )
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
@@ -270,7 +282,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const rsa2048PastHorizon = createFormType !== 'external' && usesShortRsa
     && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= SHORT_RSA_HORIZON
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
-  // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
+  // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen. An HSM key
+  // signs outside the loaded module: in FIPS mode only what every module approves (no fipsKeys)
   const hsmAlgorithms = useMemo(
     () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, mldsa })
       .filter(a => isAllowed(allowedKeyTypes, a.label) && !(pqStandalone && isPostQuantum(a.label))),
@@ -294,6 +307,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const profileHorizon = createFormType !== 'external' ? horizons[horizonLabel] : null
   const pastProfileHorizon = Boolean(profileHorizon) && Number.isFinite(validityDaysValue)
     && Date.now() + validityDaysValue * 86400000 > Date.parse(profileHorizon) + 86400000
+  // An intermediate is signed by a parent: without one the server refuses it
+  const missingParent = createFormType === 'intermediate' && !createFormParentCAId
   const policyBlocksCreate = noDigestAllowed || noSchemeAllowed || (keyStorage === 'local'
     ? noKeyAllowed
     : createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0)
@@ -329,7 +344,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
 
   const handleCreateCA = async (e) => {
     e.preventDefault()
-    if (creatingRef.current) return
+    if (creatingRef.current || missingParent) return
     creatingRef.current = true
     setCreating(true)
     try {
@@ -404,12 +419,13 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         }
       }
 
+      setHsmRefusal('')
       muteToasts()
       const response = await casService.create(data)
       const created = extractData(response)
       if (created?.pending && created?.csr_pem) {
         // Hand the CSR to the user right away — it goes to the external CA.
-        const name = (created.descr || created.common_name || 'ca').replace(/[^a-zA-Z0-9._-]+/g, '_')
+        const name = created.descr || created.common_name || 'ca'
         downloadBlob(new Blob([created.csr_pem], { type: 'application/x-pem-file' }), `${name}.csr`)
         showSuccess(t('cas.csrDownloadStarted'))
       } else {
@@ -419,6 +435,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       onSuccess(created)
     } catch (error) {
       showError(error.message || t('cas.createFailed'))
+      if (keyStorage === 'hsm' && (error?.status === 403 || error?.status === 409)) {
+        setHsmRefusal(error.message || t('cas.createFailed'))
+      }
     } finally {
       creatingRef.current = false
       setCreating(false)
@@ -494,7 +513,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               {t('cas.create.keyStorageLocal')}
             </label>
             <label className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all',
+              hsmDenied ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
               keyStorage === 'hsm'
                 ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
                 : 'border-border hover:border-border-hover text-text-secondary'
@@ -505,11 +525,13 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                 value="hsm"
                 className="sr-only"
                 checked={keyStorage === 'hsm'}
+                disabled={hsmDenied}
                 onChange={() => setCreateFormKeyStorage('hsm')}
               />
               {t('cas.create.keyStorageHsm')}
             </label>
           </div>
+          {hsmDenied && <p className="mt-1 text-xs text-text-secondary">{t('cas.create.hsmNeedsRead')}</p>}
         </div>
 
         {keyStorage === 'local' && (
@@ -680,6 +702,11 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                 )
               )}
             </>
+          )}
+          {hsmRefusal && (
+            <div role="alert" className="px-3 py-2 rounded-lg border border-status-danger-op30 bg-status-danger-op10 text-xs text-status-danger">
+              {hsmRefusal}
+            </div>
           )}
         </div>
         )}
@@ -867,7 +894,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           <Button
             type="submit"
             disabled={
-              creating || policyBlocksCreate || (
+              creating || policyBlocksCreate || missingParent || (
               keyStorage === 'hsm' && (
                 hsmProviders.length === 0 ||
                 (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && usableHsmKeys.length === 0)

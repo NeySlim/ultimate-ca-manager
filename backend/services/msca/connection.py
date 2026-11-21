@@ -6,18 +6,57 @@ from typing import Optional
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
+from utils.encryption import decrypt_required
+from utils.secret_target import MASKS, changed_targets, keeps_saved_secret
+from .client_keytab import KerberosBusy, client_keytab
 
 logger = logging.getLogger(__name__)
+
+# What a form can change in a connection test; the secrets are handled apart
+_TESTED_FIELDS = ('server', 'ca_name', 'auth_method', 'username', 'client_cert_pem',
+                  'kerberos_principal', 'kerberos_keytab_path', 'use_ssl', 'verify_ssl', 'ca_bundle')
+# Where and how a saved secret is sent, and the saved secret of each method. A Kerberos keytab
+# path and principal are read back in clear: moving them is a permission (admin:system), not a retype
+_TARGET_FIELDS = ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'auth_method')
+_SAVED_CREDENTIALS = {'basic': (('password', '_password'),),
+                      'certificate': (('client_key_pem', '_client_key_pem'),)}
+
+
+def saved_credential_retargets(msca, overrides):
+    """Fields of a test or save that would send a saved secret it did not retype elsewhere.
+    A blank value is no secret, never the saved one."""
+    method = overrides.get('auth_method', msca.auth_method)
+    if not any(keeps_saved_secret(overrides, field, getattr(msca, column), blank_clears=True)
+               for field, column in _SAVED_CREDENTIALS.get(method, ())):
+        return []
+    current = {k: getattr(msca, k) for k in _TARGET_FIELDS}
+    if method == 'basic':
+        current['username'] = msca.username
+    return changed_targets(current, overrides)
+
+
+def tested_values(msca, overrides):
+    """The saved fields a test reads, under the form's; secrets aside.
+    The Kerberos columns of a row saved under another method are never read."""
+    values = {k: getattr(msca, k) for k in _TESTED_FIELDS}
+    if msca.auth_method != 'kerberos':
+        values.update(kerberos_principal=None, kerberos_keytab_path=None)
+    values.update({k: v for k, v in overrides.items() if k in _TESTED_FIELDS})
+    return values
 
 
 class MicrosoftCAConnectionMixin:
 
     @staticmethod
-    def _get_client(msca):
+    def _get_client(msca, typed=False):
+        """typed: the secrets come from the form, in plaintext, never decrypted."""
         import certsrv
 
         server = msca.server
         temp_files = []
+
+        def _secret(stored, what):
+            return stored if typed else decrypt_required(stored, f'Microsoft CA {msca.id} {what}')
 
         def _write_temp(content):
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pem', mode='w')
@@ -33,7 +72,7 @@ class MicrosoftCAConnectionMixin:
 
             if msca.auth_method == 'certificate':
                 cert_path = _write_temp(msca.client_cert_pem)
-                key_path = _write_temp(msca.client_key_pem)
+                key_path = _write_temp(_secret(msca._client_key_pem, 'client key'))
 
                 client = certsrv.Certsrv(
                     server=server,
@@ -52,9 +91,15 @@ class MicrosoftCAConnectionMixin:
                         "Install with: pip install requests-kerberos"
                     )
 
-                # KRB5_KTNAME is the keytab XCEP and WSTEP accept with: a client never writes it
-                if msca.kerberos_principal:
-                    os.environ['KRB5_CLIENT_KTNAME'] = msca.kerberos_keytab_path or ''
+                # KRB5_KTNAME is the acceptor's keytab: a client never writes it (A12)
+                keytab = msca.kerberos_keytab_path or None
+                principal = msca.kerberos_principal or None
+
+                class _ConnectionKerberosAuth(HTTPKerberosAuth):
+                    # The credential is acquired here: the connection keytab is named only meanwhile
+                    def generate_request_header(self, *args, **kwargs):
+                        with client_keytab(keytab):
+                            return super().generate_request_header(*args, **kwargs)
 
                 # auth_method='basic' is a placeholder: the real auth is the
                 # Kerberos handler set below. 'ntlm' would make certsrv import
@@ -66,15 +111,17 @@ class MicrosoftCAConnectionMixin:
                     auth_method='basic',
                     cafile=cafile,
                 )
-                client.session.auth = HTTPKerberosAuth(
-                    mutual_authentication=OPTIONAL
+                # principal selects the credential in the cache or keytab (None: default)
+                client.session.auth = _ConnectionKerberosAuth(
+                    mutual_authentication=OPTIONAL,
+                    principal=principal,
                 )
 
             elif msca.auth_method == 'basic':
                 client = certsrv.Certsrv(
                     server=server,
                     username=msca.username or '',
-                    password=msca.password or '',
+                    password=_secret(msca._password, 'password') or '',
                     auth_method='basic',
                     cafile=cafile,
                 )
@@ -106,7 +153,29 @@ class MicrosoftCAConnectionMixin:
                 pass
 
     @staticmethod
-    def test_connection(msca_id):
+    def _with_form_values(msca, overrides):
+        """The saved connection under the form's values: what a test runs on, never persisted.
+        A secret left out or masked is the saved one, decrypted, and only for the saved target."""
+        from types import SimpleNamespace
+        if saved_credential_retargets(msca, overrides):
+            raise ValueError('A saved credential is not sent to another target')
+        values = tested_values(msca, overrides)
+        for field, column in (('password', '_password'), ('client_key_pem', '_client_key_pem')):
+            typed = overrides.get(field)
+            if isinstance(typed, str) and typed.strip() and typed.strip() not in MASKS:
+                secret = typed
+            elif not keeps_saved_secret(overrides, field, getattr(msca, column), blank_clears=True):
+                secret = ''
+            else:
+                secret = decrypt_required(getattr(msca, column), f'Microsoft CA {msca.id} {field}') \
+                    if getattr(msca, column) else ''
+            values[field] = secret
+            values[column] = secret
+        return SimpleNamespace(id=msca.id, name=msca.name, **values)
+
+    @staticmethod
+    def test_connection(msca_id, overrides=None):
+        """overrides: form values to test instead of the saved ones; nothing is saved then."""
         from .templates import MicrosoftCATemplatesMixin
 
         msca = db.session.get(MicrosoftCA, msca_id)
@@ -115,7 +184,12 @@ class MicrosoftCAConnectionMixin:
 
         client = None
         try:
-            client = MicrosoftCAConnectionMixin._get_client(msca)
+            if overrides:
+                tested = MicrosoftCAConnectionMixin._with_form_values(msca, overrides)
+                client = MicrosoftCAConnectionMixin._get_client(tested, typed=True)
+            else:
+                tested = msca
+                client = MicrosoftCAConnectionMixin._get_client(msca)
             ca_cert = client.get_ca_cert()
 
             templates = []
@@ -127,23 +201,26 @@ class MicrosoftCAConnectionMixin:
                 permissions_ok = len(templates) > 0
                 if not permissions_ok:
                     permission_warning = 'authenticated_but_no_templates'
+            except KerberosBusy:
+                raise
             except Exception as tpl_err:
                 permission_warning = 'authenticated_but_template_access_denied'
                 logger.warning(
                     f"MS CA '{msca.name}': auth OK but template listing failed: {tpl_err}"
                 )
 
-            msca.last_test_at = utc_now()
-            msca.last_test_result = 'success' if permissions_ok else 'partial'
-            try:
-                db.session.commit()
-            except Exception as commit_err:
-                db.session.rollback()
-                logger.error(f"MS CA test result commit failed: {commit_err}")
+            if not overrides:
+                msca.last_test_at = utc_now()
+                msca.last_test_result = 'success' if permissions_ok else 'partial'
+                try:
+                    db.session.commit()
+                except Exception as commit_err:
+                    db.session.rollback()
+                    logger.error(f"MS CA test result commit failed: {commit_err}")
 
             result = {
                 'success': True,
-                'ca_name': msca.ca_name or msca.server,
+                'ca_name': tested.ca_name or tested.server,
                 'ca_cert_available': ca_cert is not None,
                 'templates': templates,
                 'permissions_ok': permissions_ok,
@@ -151,15 +228,18 @@ class MicrosoftCAConnectionMixin:
             if permission_warning:
                 result['warning'] = permission_warning
             return result
+        except KerberosBusy:
+            raise  # a wait, not a result: nothing is recorded
         except Exception as e:
             logger.error(f"MS CA connection test failed for '{msca.name}': {e}")
-            msca.last_test_at = utc_now()
-            msca.last_test_result = f'failed: {str(e)[:200]}'
-            try:
-                db.session.commit()
-            except Exception as commit_err:
-                db.session.rollback()
-                logger.error(f"MS CA test result commit failed: {commit_err}")
+            if not overrides:
+                msca.last_test_at = utc_now()
+                msca.last_test_result = f'failed: {str(e)[:200]}'
+                try:
+                    db.session.commit()
+                except Exception as commit_err:
+                    db.session.rollback()
+                    logger.error(f"MS CA test result commit failed: {commit_err}")
             return {'success': False, 'error': str(e)}
         finally:
             if client:
@@ -170,7 +250,12 @@ class MicrosoftCAConnectionMixin:
         from types import SimpleNamespace
         from .templates import MicrosoftCATemplatesMixin
 
+        # _get_client reads the stored columns (_password, _client_key_pem) and id; here they
+        # hold the plaintext typed in the form, used as typed even when it looks like a token.
         fake_msca = SimpleNamespace(
+            id='unsaved',
+            _password=data.get('password', ''),
+            _client_key_pem=data.get('client_key_pem', ''),
             server=data.get('server', ''),
             ca_name=data.get('ca_name', ''),
             auth_method=data.get('auth_method', 'basic'),
@@ -186,7 +271,7 @@ class MicrosoftCAConnectionMixin:
         )
         client = None
         try:
-            client = MicrosoftCAConnectionMixin._get_client(fake_msca)
+            client = MicrosoftCAConnectionMixin._get_client(fake_msca, typed=True)
             client.get_ca_cert()
 
             templates = []
@@ -196,6 +281,8 @@ class MicrosoftCAConnectionMixin:
                 templates = sorted(templates) if templates else []
                 if not templates:
                     permission_warning = 'authenticated_but_no_templates'
+            except KerberosBusy:
+                raise
             except Exception:
                 permission_warning = 'authenticated_but_template_access_denied'
 
@@ -207,6 +294,8 @@ class MicrosoftCAConnectionMixin:
             if permission_warning:
                 result['warning'] = permission_warning
             return result
+        except KerberosBusy:
+            raise
         except Exception as e:
             logger.error(f"MS CA inline test failed: {e}")
             return {'success': False, 'error': str(e)}

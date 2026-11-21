@@ -6,7 +6,7 @@ from flask import Blueprint, request, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from services.report_service import ReportService, schedulable_reports, send_report
 from models import db, SystemConfig
 import json
@@ -94,7 +94,7 @@ def download_report(report_type):
                 report['content'],
                 mimetype='text/csv',
                 headers={
-                    'Content-Disposition': f'attachment; filename=ucm-report-{sanitize_filename(report_type)}.csv'
+                    'Content-Disposition': content_disposition(report_type, '.csv', prefix='ucm-report-')
                 }
             )
         else:
@@ -102,7 +102,7 @@ def download_report(report_type):
                 report['content'],
                 mimetype='application/json',
                 headers={
-                    'Content-Disposition': f'attachment; filename=ucm-report-{sanitize_filename(report_type)}.json'
+                    'Content-Disposition': content_disposition(report_type, '.json', prefix='ucm-report-')
                 }
             )
     except Exception as e:
@@ -173,7 +173,7 @@ def generate_custom_pdf():
             pdf_bytes,
             mimetype='application/pdf',
             headers={
-                'Content-Disposition': f'attachment; filename={sanitize_filename(filename)}'
+                'Content-Disposition': content_disposition(filename)
             }
         )
     except ImportError as e:

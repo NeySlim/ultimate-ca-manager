@@ -22,7 +22,9 @@ import base64
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
-from tests.conftest import get_json, assert_success, assert_error
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -717,7 +719,7 @@ class TestImportCA:
         r = auth_client.post('/api/v2/cas/import',
                              content_type='multipart/form-data',
                              data={'pem_content': 'not-a-valid-pem'})
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid CA data')
 
     def test_import_valid_ca_pem(self, auth_client, create_ca):
         """Export a CA in PEM then re-import it."""

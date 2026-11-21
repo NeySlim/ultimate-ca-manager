@@ -31,10 +31,10 @@ vi.mock('../../contexts', () => ({
     showConfirm: vi.fn().mockResolvedValue(false),
   }),
   useMobile: () => ({ isMobile: true }),
-  useWindowManager: () => ({ openWindow: vi.fn(), closeWindow: vi.fn(), windows: [] }),
+  useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [] }),
 }))
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({ openWindow: vi.fn(), closeWindow: vi.fn(), windows: [] }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [] }),
 }))
 vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: true }) }))
 vi.mock('../../hooks', async () => {
@@ -93,8 +93,8 @@ describe('TrustStorePage key display', () => {
     await openDetail(MLDSA)
     // Quick stats and key section
     expect(screen.getAllByText('ML-DSA-65 (level 3)')).toHaveLength(2)
-    // The bare name is the signature algorithm's only
-    expect(screen.getAllByText('ML-DSA-65')).toHaveLength(1)
+    // The bare name is the signature algorithm's only (quick stats and technical details)
+    expect(screen.getAllByText('ML-DSA-65')).toHaveLength(2)
   })
 
   it('names an RSA key with its size and its signature algorithm', async () => {

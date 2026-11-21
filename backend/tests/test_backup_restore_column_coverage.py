@@ -34,6 +34,14 @@ UNFILLABLE: dict = {}
 
 _STAMP = datetime.datetime(2025, 3, 4, 5, 6, 7)
 
+_TENANT = '0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1'
+# {(section, column): value} -- columns a restore checks or normalizes: a value the product accepts
+_PARTICULAR = {
+    ('sso_providers', 'oauth2_tenants'): f'["{_TENANT}"]',          # tenant ids (GUIDs)
+    ('sso_providers', 'oauth2_role_tenants'): f'["{_TENANT}"]',     # among the accepted tenants
+    ('user_sso_identities', 'expected_tenant'): _TENANT,            # a lower-case GUID
+}
+
 
 def _fill_nullable(rows):
     """A value in every empty column the restore could drop without anyone noticing.
@@ -50,6 +58,8 @@ def _fill_nullable(rows):
             declared = str(column.type).upper()
             if 'DATETIME' in declared or 'TIMESTAMP' in declared:
                 value = _STAMP      # a moment no restore would produce
+            elif (name, column.name) in _PARTICULAR:
+                value = _PARTICULAR[(name, column.name)]
             elif getattr(row, attribute) is None:
                 index += 1
                 value = _value_for(column, index)
@@ -89,8 +99,7 @@ def both_archives(app, tmp_path_factory):
         leaf = _certificate_row(f'coverage-leaf-{uuid.uuid4().hex[:6]}', issuer)
         # Custom sections the factory leaves to fixtures; a record of the leaf's own serial
         # would revoke it on restore, so it names the serial the leaf was renewed away from
-        db.session.add(RevokedSerial(caref=issuer[0].refid,
-                                     serial_number=format(int(leaf.serial_number, 16) + 1, 'x'),
+        db.session.add(RevokedSerial(caref=issuer[0].refid, serial_number=str(int(leaf.serial_number) + 1),
                                      revoked_at=_STAMP, revoke_reason='keyCompromise',
                                      invalidity_at=_STAMP, valid_to=_STAMP, certificate_id=leaf.id,
                                      public_key_sha256='ab' * 32))
@@ -151,7 +160,23 @@ def test_every_exemption_is_still_needed_and_explained(both_archives):
 
 
 
+def test_the_particular_values_are_the_archived_ones(both_archives):
+    """Each particular value reaches the archive, so the comparison above sees its column."""
+    archived, _restored, _refused = both_archives
+    for (name, column), value in _PARTICULAR.items():
+        assert [row.get(column) for row in archived[name]] == [value], (name, column)
+
+
 def test_a_column_left_empty_is_one_written_down(both_archives):
     """A column the seeder could not fill is a column the comparison cannot see."""
     _archived, _restored, refused = both_archives
     assert refused == UNFILLABLE, f'columns the seeder could not fill: {refused}'
+
+
+
+def test_columns_derived_from_the_certificate_do_not_travel(both_archives):
+    """key_bits and sig_hash are set again from crt when the restore stores it."""
+    archived, _restored, _refused = both_archives
+    assert archived['certificates']
+    for row in archived['certificates']:
+        assert not {'key_bits', 'sig_hash'} & set(row), sorted(row)

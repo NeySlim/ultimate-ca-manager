@@ -19,6 +19,7 @@ from sqlalchemy import inspect as sa_inspect
 
 from ..export_generic import REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS, Section
+from .transaction import ticking
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,8 @@ class RestorePlan:
         self._archived_by_identity: Dict[str, Dict[Tuple, Dict[str, Any]]] = {}
         # Source row numbers mean something here only on the same database.
         self.same_installation = False
+        # The sections a replacing restore prunes; empty in a merge
+        self.pruned = frozenset()
         # Rows an older archive cannot place, and secrets it carries under a
         # key this installation does not hold: both told in the result.
         self.left_out: List[str] = []
@@ -64,6 +67,12 @@ class RestorePlan:
         # the row each archived row was written to, which a second pass reuses
         self._claims: Dict[Tuple, List[int]] = {}
         self._placed: Dict[Tuple[str, int], Any] = {}
+        # The identity rows here per key, as first read since the last refresh
+        self._sso_rows: Dict[Tuple, List[Any]] = {}
+        # Audit entries written back under their archived ids (a replacement of an archive
+        # carrying them), else the number of those written under ids of this installation
+        self.keep_audit_ids = False
+        self.audit_new = 0
 
     # -- building ---------------------------------------------------------
 
@@ -73,8 +82,12 @@ class RestorePlan:
         from ..installation import same_installation
 
         plan = cls()
+        plan.pruned = frozenset(pruned)
         plan.same_installation = same_installation(backup_data)
         plan._validate_shape(backup_data)
+        from .audit_ids import SECTION as _AUDIT, carried_ids, ceiling
+        replacing = _AUDIT in plan.pruned
+        plan.keep_audit_ids = carried_ids(plan.rows.get(_AUDIT), ceiling(replacing)) and replacing
         plan._index_target_rows(backup_data)
         plan._warn_shared_identities(pruned)
         return plan
@@ -101,7 +114,7 @@ class RestorePlan:
                 raise RestoreValidationError(
                     f"Invalid backup: section '{name}' should be a list of rows")
 
-            for position, row in enumerate(value):
+            for position, row in enumerate(ticking(value)):
                 if not isinstance(row, dict):
                     raise RestoreValidationError(
                         f"Invalid backup: row {position} of section '{name}' is "
@@ -127,7 +140,9 @@ class RestorePlan:
         """
         if section.identity == ('id',):
             return  # singleton configuration rows
-        missing = [field for field in section.identity
+        # An attachment is its account's, by provider or by IdP key (sso_identity_key)
+        fields = ('user_id',) if name == _SSO_IDENTITIES else section.identity
+        missing = [field for field in fields
                    if missing_identity_value(name, field, row.get(field))]
         if not missing:
             return
@@ -174,6 +189,10 @@ class RestorePlan:
     def _warn_shared_identities(self, pruned) -> None:
         for name in sorted(set(self.shared) - set(pruned)):
             for key, ids in self.shared[name].items():
+                if unbound_of_known_idp(name, key):
+                    self.warnings.append(shared_identity_warning(
+                        name, key, ids, '', others=[], taken=_UNBOUND_TAKEN + ', and the rest are left as they are'))
+                    continue
                 self.warnings.append(shared_identity_warning(name, key, ids, 'left as they are'))
 
     def refresh(self, section_names=None) -> None:
@@ -184,6 +203,7 @@ class RestorePlan:
         archive carries, a reference pointing at one of them can be resolved,
         which the first pass could not do.
         """
+        self._sso_rows.clear()
         for name in (section_names or list(self.target_ids)):
             section = SECTIONS.get(name)
             if section is None or name in _MAPPING_SECTIONS:
@@ -247,6 +267,9 @@ class RestorePlan:
             # with two configurations and used whichever the query returned.
             return next(iter(index.values()), None)
 
+        if section_name == _SSO_IDENTITIES:
+            return self._sso_identity_here(row)
+
         if not _identified_by_a_reference(section):
             return self._claimed(section_name, _identity_key(
                 row, section.identity, _temporal_identity(section_name)), row)
@@ -256,6 +279,35 @@ class RestorePlan:
         if key not in index and self.source_numbers_hold(section_name, row):
             key = _identity_key(row, section.identity, _temporal_identity(section_name))
         return self._claimed(section_name, key, row)
+
+    def _sso_identity_here(self, row: Dict[str, Any]) -> Optional[Any]:
+        """The attachment here an archived one is: the account's row for the same provider,
+        else, for one whose provider is not here, its orphan of the same IdP key (or of none)
+        with the same identity: an account may hold several orphans of one IdP.
+        A bound orphan that finds none binds an unbound orphan of its IdP still here, as its
+        sign-in would: left unbound beside it, the account could still be claimed by name.
+        An orphan's identity holds NULLs, which the generic index matches with nothing."""
+        from models import UserSSOIdentity
+        user_id = self.resolve(_SSO_IDENTITIES, row, 'user_id')
+        if user_id is None:
+            return None
+        provider_id = self.resolve(_SSO_IDENTITIES, row, 'provider_id')
+        orphan_of, external_id = row.get('orphan_of'), row.get('external_id')
+
+        def here(identity):
+            # Read once per key: a row bound for one archived row must keep its rank for the next
+            key = sso_identity_key(user_id, provider_id, orphan_of, identity)
+            if key not in self._sso_rows:
+                query = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id)
+                if provider_id is None:
+                    query = query.filter_by(orphan_of=orphan_of, external_id=identity)
+                self._sso_rows[key] = [found.id for found in query.order_by(UserSSOIdentity.id)]
+            return self.rank(_SSO_IDENTITIES, key, row, self._sso_rows[key])
+
+        found = here(external_id)
+        if found is None and provider_id is None and orphan_of is not None:
+            found = here(None)
+        return found
 
     def _claimed(self, section_name: str, key: Tuple, row: Dict[str, Any]) -> Optional[Any]:
         """The row here for that identity, by rank: the n-th archived row of it takes the n-th oldest."""
@@ -376,6 +428,27 @@ class RestorePlan:
             self._archived_by_identity[section_name] = index
         return index.get(_identity_key(identity, fields,
                                        _temporal_identity(section_name)))
+
+
+_SSO_IDENTITIES = 'user_sso_identities'
+# What sso_identity_key is made of, in its order
+_SSO_IDENTITY_FIELDS = ('user_id', 'provider_id', 'orphan_of', 'external_id')
+
+
+def sso_identity_key(user_id, provider_id, orphan_of, external_id) -> Tuple:
+    """What an identity row is: its account's row for a provider, or, without a provider, its
+    orphan of an IdP key or of an unknown IdP, told apart by its identity (an account may hold several).
+    The manifest's identity is never complete on its own: a live row has no orphan_of, an
+    orphan no provider."""
+    orphan_of = orphan_of if provider_id is None else None
+    return tuple(_normalise(value) for value in
+                 (user_id, provider_id, orphan_of, external_id if provider_id is None else None))
+
+
+def _sso_identity_fields(key: Tuple) -> Tuple[str, ...]:
+    """The fields that tell an identity key apart, for a message: the provider for a live
+    row, else the IdP key and the identity, either of which may be empty."""
+    return _SSO_IDENTITY_FIELDS[:2] if key[1] is not None else ('user_id',) + _SSO_IDENTITY_FIELDS[2:]
 
 
 def _identity_key(values: Dict[str, Any], fields: Tuple[str, ...],
@@ -506,25 +579,62 @@ def _index_of(section_name: str, section: Section):
     temporal = _temporal_identity(section_name)
     singleton = section.identity == ('id',)
     rows, incomplete = {}, []
-    for row in model.query.order_by(getattr(model, primary[0])).all():
-        values = [getattr(row, field, None) for field in section.identity]
+    if section_name == _SSO_IDENTITIES:
+        for key_value, values in _identities_here(model, primary[0], _SSO_IDENTITY_FIELDS):
+            rows.setdefault(sso_identity_key(*values), []).append(key_value)
+        return ({key: ids[0] for key, ids in rows.items()},
+                {key: ids for key, ids in rows.items() if len(ids) > 1}, [])
+    for key_value, values in ticking(_identities_here(model, primary[0], section.identity)):
         if not singleton and any(missing_identity_value(section_name, field, value)
                                  for field, value in zip(section.identity, values)):
-            incomplete.append(getattr(row, primary[0]))
+            incomplete.append(key_value)
             continue
         key = tuple(_normalise(value, field in temporal) for field, value in zip(section.identity, values))
-        rows.setdefault(key, []).append(getattr(row, primary[0]))
+        rows.setdefault(key, []).append(key_value)
     index = {key: ids[0] for key, ids in rows.items()}
     shared = {key: ids for key, ids in rows.items() if len(ids) > 1 and not singleton}
     return index, shared, incomplete
 
 
+def _identities_here(model, primary: str, fields: Tuple[str, ...]):
+    """(primary key, identity values) of each row here, oldest first: the identity columns
+    alone when they are columns, never the whole row."""
+    from sqlalchemy.orm import ColumnProperty
+    from models import db
+
+    order = getattr(model, primary)
+    attributes = [getattr(model, field, None) for field in fields]
+    if all(isinstance(getattr(attr, 'property', None), ColumnProperty) for attr in attributes):
+        for row in db.session.query(order, *attributes).order_by(order):
+            yield row[0], list(row[1:])
+        return
+    for row in model.query.order_by(order).all():
+        yield getattr(row, primary), [getattr(row, field, None) for field in fields]
+
+
+# Unbound orphans of a known IdP are also what the archive's bound orphans without a row bind
+_UNBOUND_TAKEN = ("the archive's unbound rows of it and its orphans of this IdP that have no row "
+                  "left here take them oldest first, in the archive's order")
+
+
+def unbound_of_known_idp(section_name: str, key: Tuple) -> bool:
+    """Whether the key is an account's unbound orphans of one IdP key, which bound ones bind."""
+    return section_name == _SSO_IDENTITIES and key[1] is None and key[2] is not None and key[3] is None
+
+
 def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate: str,
-                            others: Optional[List[Any]] = None) -> str:
+                            others: Optional[List[Any]] = None,
+                            taken: Optional[str] = None) -> str:
     others = ids[1:] if others is None else others
-    message = (f"{section_name} {'/'.join(key)}: {len(ids)} rows here share this "
-               f"{'/'.join(SECTIONS[section_name].identity)} (id {', '.join(map(str, ids))}); "
-               "the archive's rows of it go to them oldest first")
+    taken = taken or "the archive's rows of it go to them oldest first"
+    fields, parts = SECTIONS[section_name].identity, key
+    if section_name == _SSO_IDENTITIES:
+        fields = _sso_identity_fields(key)
+        parts = [key[_SSO_IDENTITY_FIELDS.index(field)] for field in fields]
+    # A part holding the separator is quoted: an IdP key ending in '/' must not read as '//'
+    spelt = '/'.join('' if part is None else f'"{part}"' if '/' in str(part) else str(part) for part in parts)
+    message = (f"{section_name} {spelt}: {len(ids)} rows here share this "
+               f"{'/'.join(fields)} (id {', '.join(map(str, ids))}); {taken}")
     return f"{message}, and the others (id {', '.join(map(str, others))}) are {fate}" if others else message
 
 

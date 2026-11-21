@@ -17,6 +17,7 @@ from services.ssh_krl_service import SSHKRLService
 from utils.datetime_utils import utc_now
 from tests.test_ssh import _create_ssh_ca, _generate_test_ssh_key, post_json
 from tests.test_ssh_cert_service import _client_pubkey
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 needs_ssh_keygen = pytest.mark.skipif(not shutil.which('ssh-keygen'),
                                       reason='ssh-keygen not available')
@@ -82,6 +83,110 @@ class TestRevokedCertificateStaysInTheKrl:
             SSHCertificateService.revoke_certificate(cert.id, username='t')
             time.sleep(0.002)
             assert version(SSHKRLService.generate_krl(ca.id)) > first
+
+
+def _signed(ca_key, subject, serial, key_id):
+    from cryptography.hazmat.primitives import serialization
+    now = int(time.time())
+    cert = (serialization.SSHCertificateBuilder().public_key(subject).serial(serial)
+            .type(serialization.SSHCertificateType.USER).key_id(key_id)
+            .valid_principals([b'outside']).valid_after(now - 60).valid_before(now + 3600).sign(ca_key))
+    return cert.public_bytes().decode()
+
+
+@needs_ssh_keygen
+@pytest.mark.parametrize('stored_public_key', ('kept', 'empty'))
+def test_a_revoked_certificate_of_serial_zero_is_revoked_within_its_ca(app, tmp_path, stored_public_key):
+    """Serial 0 names no certificate (PROTOCOL.certkeys): the KRL lists the certificate as
+    ssh-keygen -k does, by key ID under the CA, never the bare key nor another CA's certificate."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from tests.test_ssh_serial_counter_matrix import _imported_ca
+    with app.app_context():
+        ca_id, key = _imported_ca('KRL serial zero CA')
+        subject = ed25519.Ed25519PrivateKey.generate().public_key()
+        zero = _signed(key, subject, 0, b'alice')
+        cert = SSHCertificateService.import_certificate(zero, ssh_ca_id=ca_id, username='t')
+        assert cert.serial == 0
+        SSHCertificateService.revoke_certificate(cert.id, username='t')
+        if stored_public_key == 'empty':
+            cert.public_key = ''
+            db.session.commit()
+        krl = SSHKRLService.generate_krl(ca_id)
+        assert 'REVOKED' in _query(tmp_path, krl, zero).stdout
+        bare = subject.public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH).decode()
+        other_ca = ed25519.Ed25519PrivateKey.generate()
+        for still_valid in (bare, _signed(key, subject, 0, b'bob'), _signed(other_ca, subject, 77, b'alice')):
+            result = _query(tmp_path, krl, still_valid)
+            assert result.returncode == 0 and 'REVOKED' not in result.stdout, still_valid
+
+
+@needs_ssh_keygen
+@pytest.mark.parametrize('key_id', (b'alice', b''))
+def test_revoking_serial_zero_revokes_the_numbered_certificates_of_its_key_id(app, tmp_path, key_id):
+    """The KRL revokes the key ID of a serial 0 certificate under its CA, whatever the serial or
+    the key of the certificate bearing it: UCM revokes those certificates with it, no others."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from tests.test_ssh_serial_counter_matrix import _imported_ca
+    with app.app_context():
+        ca_id, key = _imported_ca('KRL key ID CA')
+        subject = ed25519.Ed25519PrivateKey.generate().public_key
+        zero = _signed(key, subject(), 0, key_id)
+        same = _signed(key, subject(), 5, key_id)
+        other = _signed(key, subject(), 6, b'bob')
+        ids = [SSHCertificateService.import_certificate(c, ssh_ca_id=ca_id, username='t').id
+               for c in (zero, same, other)]
+        cert = SSHCertificateService.revoke_certificate(ids[0], 'keyCompromise', username='t')
+        assert [c.id for c in cert.revoked_with] == [ids[1]]
+        db.session.expire_all()
+        rows = [db.session.get(SSHCertificate, i) for i in ids]
+        assert [(r.revoked, r.revoke_reason) for r in rows] == [
+            (True, 'keyCompromise'), (True, 'keyCompromise'), (False, None)]
+        assert rows[1].revoked_at == rows[0].revoked_at
+        krl = SSHKRLService.generate_krl(ca_id)
+        for row, certificate in zip(rows, (zero, same, other)):
+            assert ('REVOKED' in _query(tmp_path, krl, certificate).stdout) is bool(row.revoked)
+
+
+def _krl_log(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelname == 'ERROR' and 'KRL' in r.getMessage()]
+
+
+@pytest.mark.parametrize('certificate', ('', '   '))
+def test_a_revoked_serial_zero_without_its_certificate_fails_once_in_the_log(app, auth_client, caplog,
+                                                                             certificate):
+    """A serial 0 entry is the certificate itself: without it the KRL cannot be built, the API
+    answers 500, and the log says why once, naming the certificate."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from tests.test_ssh_serial_counter_matrix import _imported_ca
+    with app.app_context():
+        ca_id, key = _imported_ca('KRL empty certificate CA')
+        zero = _signed(key, ed25519.Ed25519PrivateKey.generate().public_key(), 0, b'alice')
+        cert = SSHCertificateService.import_certificate(zero, ssh_ca_id=ca_id, username='t')
+        SSHCertificateService.revoke_certificate(cert.id, username='t')
+        cert.certificate = certificate
+        db.session.commit()
+        cert_id = cert.id
+    with caplog.at_level('ERROR'):
+        response = auth_client.get(f'/api/v2/ssh/cas/{ca_id}/krl')
+    assert response.status_code == 500
+    assert response.get_json()['message'] == 'Failed to generate KRL'
+    assert _krl_log(caplog) == [
+        f'Failed to generate KRL for CA {ca_id}: SSH certificate #{cert_id} has serial 0 and no certificate']
+
+
+def test_an_ssh_keygen_failure_is_logged_once(app, auth_client, caplog, monkeypatch):
+    import services.ssh_krl_service as krl_service
+    with app.app_context():
+        ca = SSHCAService.create_ca(descr='KRL failing CA', ca_type='user', key_type='ed25519', username='t',
+                                    allow_any_principal=True)
+        ca_id = ca.id
+    monkeypatch.setattr(krl_service.subprocess, 'run', lambda *a, **k: subprocess.CompletedProcess(
+        a[0], 1, stdout='', stderr='bad spec line'))
+    with caplog.at_level('ERROR'):
+        response = auth_client.get(f'/api/v2/ssh/cas/{ca_id}/krl')
+    assert response.status_code == 500
+    assert _krl_log(caplog) == [f'Failed to generate KRL for CA {ca_id}: ssh-keygen: bad spec line']
 
 
 class TestCriticalOptions:

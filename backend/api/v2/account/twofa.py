@@ -14,8 +14,11 @@ from utils.backup_codes import (
     verify_code_only as backup_verify,
 )
 from auth.unified import require_auth
+from auth.session_reverify import check_session_password
+from auth.session_start import closed_sessions_note, sessions_closed_by
 from auth.twofa_enforcement import (
-    enforcement_active_for, has_security_key, lock_for_factor_change, lock_user,
+    enforcement_active_for, has_security_key, last_factor_refusal, lock_for_factor_change,
+    lock_user,
 )
 import pyotp
 from auth.totp import consume_totp
@@ -26,25 +29,20 @@ from . import bp
 logger = logging.getLogger(__name__)
 
 
-def _code_checks_locked(user_id):
-    """The 429 to answer while the account's second factor is locked, or None.
+def _reserve_code_check(user_id):
+    """The 429 to answer, or None once this check is counted on the login's budget.
 
-    Same counter as the login's second step: the secret guessed is the same, so a
-    stolen session gets no tries beyond what the login allows."""
-    from api.v2.auth_methods import _2fa_failed_attempts, _check_2fa_lockout
-    if _check_2fa_lockout(str(user_id), _2fa_failed_attempts):
-        return error_response('Too many failed attempts. Try again later.', 429)
-    return None
-
-
-def _code_check_failed(user_id):
-    from api.v2.auth_methods import _2fa_failed_attempts, _record_2fa_failure
-    _record_2fa_failure(str(user_id), _2fa_failed_attempts)
+    One counter per account (the pending login's): the secret guessed is the same,
+    so a stolen session gets no tries beyond what the login allows."""
+    from api.v2.auth_methods import TWO_FA, _reserve_2fa_attempt, too_many_attempts
+    if _reserve_2fa_attempt(TWO_FA, str(user_id)):
+        return None
+    return too_many_attempts(TWO_FA, str(user_id))
 
 
-def _code_check_passed(user_id):
-    from api.v2.auth_methods import _2fa_failed_attempts, _clear_2fa_failures
-    _clear_2fa_failures(str(user_id), _2fa_failed_attempts)
+def _clear_code_checks(user_id):
+    from api.v2.auth_methods import TWO_FA, _clear_2fa_failures
+    _clear_2fa_failures(TWO_FA, str(user_id))
 
 
 # ============================================================================
@@ -122,9 +120,11 @@ def confirm_2fa():
     # plaintext list is only ever returned here.
     user.totp_confirmed = True
     user.backup_codes = backup_hash_codes(backup_codes)
+    user.end_sessions()  # a factor change closes the other sessions, as a password change
     ok, _err = safe_commit(logger, "Failed to enable 2FA")
     if not ok:
         return _err
+    closed = sessions_closed_by(user)
 
     # If this confirmation satisfied a forced-enrolment session (#141), lift the
     # gate so the now-enrolled user gets a full session.
@@ -137,14 +137,27 @@ def confirm_2fa():
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'2FA enabled for user: {user.username}',
+        details=f'2FA enabled for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
 
     return success_response(
         data={'backup_codes': backup_codes},
-        message='2FA enabled successfully. Save backup codes!'
+        message='2FA enabled successfully. Save backup codes!',
+        meta={'other_sessions_closed': closed},
     )
+
+
+def _disable_refusal(user, refused, code):
+    """The answer of a disable request that no code can make succeed, or None."""
+    if not user:
+        return error_response('User not found', 404)
+    if refused:
+        return last_factor_refusal(
+            'Your account requires a second factor: register a security key before disabling TOTP')
+    if code and not user.totp_secret:
+        return error_response('2FA not enabled', 400)
+    return None
 
 
 @bp.route('/api/v2/account/2fa/disable', methods=['POST'])
@@ -162,59 +175,75 @@ def disable_2fa():
     if not code and not backup_code:
         return error_response('Code or backup code required', 400)
 
-    # Required 2FA (#141, or a key turned on as second factor) keeps one factor;
-    # checked under the user row lock so a concurrent key removal cannot race it.
-    user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
-    if not user:
-        return error_response('User not found', 404)
-    if refused:
-        return error_response(
-            'Your account requires a second factor: register a security key before disabling TOTP', 403)
-    # Refused whatever the code, so checked before the lockout: no attempt is used up
-    if not user.totp_secret:
-        return error_response('2FA not enabled', 400)
+    # A request refused whatever its code checks none: it must not use up an attempt
+    user_id = g.current_user.id  # g.current_user expires with the rollback below
+    user, refused = lock_for_factor_change(user_id, dropping_totp=True)
+    answer = _disable_refusal(user, refused, code)
+    if answer:
+        db.session.rollback()
+        return answer
+
     # A secret not confirmed yet is no factor of the login: its codes are not counted
     counted = bool(user.totp_confirmed)
-    locked = _code_checks_locked(user.id) if counted else None
+    db.session.rollback()
+    # Counted before the row lock below, which the reservation's commit releases
+    locked = _reserve_code_check(user_id) if counted else None
     if locked:
         return locked
+
+    # Required 2FA (#141, or a key turned on as second factor) keeps one factor;
+    # checked under the user row lock so a concurrent key removal cannot race it.
+    user, refused = lock_for_factor_change(user_id, dropping_totp=True)
+    answer = _disable_refusal(user, refused, code)
+    if answer:
+        return answer
 
     # Verify with TOTP code
     if code:
         if not consume_totp(user, code):
-            if counted:
-                _code_check_failed(user.id)
             return error_response('Invalid verification code', 400)
     # Or verify with backup code
     elif backup_code:
         if not backup_verify(user.backup_codes, backup_code):
-            if counted:
-                _code_check_failed(user.id)
             return error_response('Invalid backup code', 400)
 
     # Disable 2FA. Under enforcement the remaining key becomes the user's own
     # second factor, so lifting enforcement later does not silently drop it.
+    before = (bool(user.totp_confirmed), bool(user.webauthn_2fa))
     if enforcement_active_for(user) and has_security_key(user):
         user.webauthn_2fa = True
     user.totp_confirmed = False
     user.totp_secret = None
     user.backup_codes = None
+    # A setup never confirmed was no factor: dropping it alone closes no session
+    changed = before != (False, bool(user.webauthn_2fa))
+    if changed:
+        user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to disable 2FA")
     if not ok:
         return _err
+    if not changed:
+        return success_response(message='2FA disabled successfully',
+                                meta={'other_sessions_closed': 0})
+    closed = sessions_closed_by(user)
     if counted:
-        _code_check_passed(user.id)
+        _clear_code_checks(user.id)
 
     AuditService.log_action(
         action='mfa_disable',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'2FA disabled for user: {user.username}',
+        details=f'2FA disabled for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
 
-    return success_response(message='2FA disabled successfully')
+    return success_response(message='2FA disabled successfully',
+                            meta={'other_sessions_closed': closed})
+
+
+_KEY_CHOICE_MESSAGE = ('Your account requires a second factor: set up TOTP before turning off '
+                       'the security key as second factor')
 
 
 @bp.route('/api/v2/account/2fa/webauthn', methods=['PUT'])
@@ -230,30 +259,53 @@ def set_webauthn_second_factor():
     if not isinstance(enabled, bool):
         return error_response('enabled must be true or false', 400)
 
-    user = lock_user(g.current_user.id)
+    user_id = g.current_user.id  # g.current_user expires with the counter's commit below
+    user, refused = lock_for_factor_change(user_id, dropping_choice=not enabled)
     if not user:
         return error_response('User not found', 404)
     if enabled and not has_security_key(user):
         return error_response('Register a security key first', 400)
-    if not enabled and (user.auth_source or 'local') == 'local':
+    # A request refused whatever its password checks none: it must not use up an attempt
+    if not enabled and refused:
+        db.session.rollback()
+        return last_factor_refusal(_KEY_CHOICE_MESSAGE)
+    if not enabled and user.is_local:
         password = data.get('password')
-        if not isinstance(password, str) or not user.check_password(password):
+        if not isinstance(password, str) or not password:
             return error_response('Invalid password', 403)
+        db.session.rollback()
+        # Counted before the row lock below, which the counter's commit releases
+        answer = check_session_password(user, password, error_response('Invalid password', 403))
+        if answer:
+            return answer
+        user, refused = lock_for_factor_change(user_id, dropping_choice=True)
+        if not user:
+            db.session.rollback()
+            return error_response('User not found', 404)
+        if refused:
+            return last_factor_refusal(_KEY_CHOICE_MESSAGE)
 
+    # The choice left as it was changes no factor: no session closes, nothing is audited
+    if bool(user.webauthn_2fa) == enabled:
+        db.session.rollback()
+        return success_response(data={'webauthn_2fa': enabled}, meta={'other_sessions_closed': 0})
     user.webauthn_2fa = enabled
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to update the security key second factor")
     if not ok:
         return _err
+    closed = sessions_closed_by(user)
 
     AuditService.log_action(
         action='mfa_webauthn_enable' if enabled else 'mfa_webauthn_disable',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Security key as second factor {"enabled" if enabled else "disabled"} for {user.username}',
+        details=(f'Security key as second factor {"enabled" if enabled else "disabled"} '
+                 f'for {user.username} ({closed_sessions_note(closed)})'),
         success=True
     )
-    return success_response(data={'webauthn_2fa': enabled})
+    return success_response(data={'webauthn_2fa': enabled}, meta={'other_sessions_closed': closed})
 
 
 @bp.route('/api/v2/account/2fa/recovery-codes', methods=['GET'])
@@ -288,25 +340,40 @@ def regenerate_recovery_codes():
     user = db.session.get(User, g.current_user.id)
     if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
-    locked = _code_checks_locked(user.id)
+    user_id = user.id  # the reservation commits: the account is read again after it
+    locked = _reserve_code_check(user_id)
     if locked:
         return locked
+    user = lock_user(user_id)
+    if user is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
 
     # Verify code, once only
     if not consume_totp(user, code):
-        _code_check_failed(user.id)
         return error_response('Invalid verification code', 400)
 
     # Generate new backup codes
     new_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
 
     user.backup_codes = backup_hash_codes(new_codes)
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to regenerate backup codes")
     if not ok:
         return _err
-    _code_check_passed(user.id)
+    closed = sessions_closed_by(user)
+    _clear_code_checks(user.id)
 
+    AuditService.log_action(
+        action='mfa_recovery_regenerate',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'Recovery codes regenerated for user: {user.username} ({closed_sessions_note(closed)})',
+        success=True
+    )
     return success_response(
         data={'backup_codes': new_codes},
-        message='Recovery codes regenerated. Save them now!'
+        message='Recovery codes regenerated. Save them now!',
+        meta={'other_sessions_closed': closed},
     )

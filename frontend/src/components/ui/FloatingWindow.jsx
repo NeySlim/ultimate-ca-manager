@@ -3,7 +3,6 @@
  * 
  * Used by:
  * - FloatingHelpPanel (help system)
- * - FloatingDetailWindow (detail panels)
  * 
  * Features:
  * - RAF-based drag/resize via useFloatingWindow hook
@@ -123,7 +122,7 @@ export function FloatingWindow({
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-text-primary truncate">{title}</h3>
             {!minimized && subtitle && (
-              <p className="text-[10px] text-text-tertiary truncate leading-tight">{subtitle}</p>
+              <p className="text-xs text-text-tertiary truncate leading-tight">{subtitle}</p>
             )}
           </div>
         </div>

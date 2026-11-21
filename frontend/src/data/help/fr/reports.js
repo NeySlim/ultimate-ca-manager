@@ -2,16 +2,16 @@ export default {
   helpContent: {
     title: 'Rapports',
     subtitle: 'Rapports de conformité et d\'inventaire PKI',
-    overview: 'Générez, téléchargez et programmez des rapports pour l\'audit de conformité. Les rapports couvrent l\'inventaire des certificats, les certificats expirants, la hiérarchie des CA, l\'activité d\'audit et le statut de conformité aux politiques. Téléchargez un rapport PDF exécutif pour les revues de direction.',
+    overview: 'Générez, téléchargez et programmez des rapports pour l\'audit de conformité. Les rapports couvrent l\'inventaire des certificats, les certificats expirants, la hiérarchie des AC, l\'activité d\'audit et le statut de conformité aux politiques. Téléchargez un rapport PDF exécutif pour les revues de direction.',
     sections: [
       {
         title: 'Types de rapports',
         items: [
           { label: 'Inventaire des certificats', text: 'Liste complète de tous les certificats avec leur statut' },
           { label: 'Certificats expirants', text: 'Certificats expirant dans une fenêtre temporelle spécifiée' },
-          { label: 'Hiérarchie des CA', text: 'Structure et statistiques des autorités de certification' },
+          { label: 'Hiérarchie des AC', text: 'Structure et statistiques des autorités de certification' },
           { label: 'Résumé d\'audit', text: 'Les actions les plus fréquentes et les utilisateurs les plus actifs sur la période' },
-          { label: 'Statut de conformité', text: 'Trois contrôles : certificats actifs, CA expirées et certificats expirant dans les 30 jours ; les politiques de certificat ne sont pas lues' },
+          { label: 'Statut de conformité', text: 'Trois contrôles : certificats actifs, AC expirées et certificats expirant dans les 30 jours ; les politiques de certificat ne sont pas lues' },
           { label: 'Certificats révoqués', text: 'Certificats révoqués sur la période, avec date et raison' },
         ]
       },
@@ -19,7 +19,7 @@ export default {
         title: 'Rapport PDF exécutif',
         items: [
           { label: 'Télécharger PDF', text: 'Rapport PDF professionnel en un clic pour la direction et les auditeurs' },
-          { label: 'Contenu', text: 'Résumé exécutif, évaluation des risques, inventaire des certificats, scores de conformité, infrastructure CA, activité d\'audit et recommandations' },
+          { label: 'Contenu', text: 'Résumé exécutif, évaluation des risques, inventaire des certificats, scores de conformité, infrastructure AC, activité d\'audit et recommandations' },
           { label: 'Graphiques et visuels', text: 'Inclut jauge de risque, distribution des statuts, chronologie d\'expiration et répartition de la conformité' },
         ]
       },
@@ -52,14 +52,14 @@ Liste complète de tous les certificats gérés par UCM. Inclut le sujet, l'éme
 ### Certificats expirants
 Certificats expirant dans une fenêtre temporelle spécifiée (par défaut : 30 jours). Critique pour éviter les pannes, consultez ce rapport régulièrement ou programmez-le pour une livraison quotidienne.
 
-### Hiérarchie des CA
-Structure de l'autorité de certification montrant les relations parent-enfant, les comptages de certificats par CA. Utile pour comprendre votre topologie PKI.
+### Hiérarchie des AC
+Structure de l'autorité de certification montrant les relations parent-enfant, les comptages de certificats par AC. Utile pour comprendre votre topologie PKI.
 
 ### Résumé d'audit
 Les dix actions les plus fréquentes et les dix utilisateurs les plus actifs sur la période.
 
 ### Statut de conformité
-Trois contrôles avec un nombre et une gravité : certificats actifs, CA expirées et certificats expirant dans les 30 jours. Il ne lit pas les politiques de certificat.
+Trois contrôles avec un nombre et une gravité : certificats actifs, AC expirées et certificats expirant dans les 30 jours. Il ne lit pas les politiques de certificat.
 
 ### Certificats révoqués
 Certificats révoqués sur la période choisie (30 jours par défaut), avec la date et la raison de révocation. Consultez-le pour suivre les révocations et leurs causes.
@@ -74,10 +74,10 @@ Le rapport PDF comprend 9 sections :
 2. **Table des matières** : Navigation rapide
 3. **Résumé exécutif** : Santé globale de la PKI, distribution des certificats et niveau de risque
 4. **Évaluation des risques** : Conclusions critiques, certificats expirants, algorithmes faibles
-5. **Inventaire des certificats** : Répartition par statut, type de clé et CA émettrice
+5. **Inventaire des certificats** : Répartition par statut, type de clé et AC émettrice
 6. **Analyse de conformité** : Distribution des scores, répartition des notes, scores par catégorie
 7. **Cycle de vie des certificats** : Chronologie d'expiration et taux d'automatisation
-8. **Infrastructure CA** : Détails des CA racines et intermédiaires, hiérarchie
+8. **Infrastructure AC** : Détails des AC racines et intermédiaires, hiérarchie
 9. **Recommandations** : Actions concrètes basées sur l'état actuel de la PKI
 
 ### Graphiques et visuels

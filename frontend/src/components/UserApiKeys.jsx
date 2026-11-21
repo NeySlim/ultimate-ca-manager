@@ -71,7 +71,7 @@ export default function UserApiKeys({ user }) {
                       {key.name}
                       {key.key_prefix && <span className="ml-1 font-mono text-text-tertiary">{key.key_prefix}…</span>}
                     </p>
-                    <p className="text-[10px] text-text-tertiary">
+                    <p className="text-xs text-text-tertiary">
                       {t('common.expires')} {key.expires_at ? formatDate(key.expires_at) : t('common.never')}
                       {' · '}
                       {t('account.apiKeyLastUsed')} {key.last_used_at ? formatDate(key.last_used_at) : t('common.never')}

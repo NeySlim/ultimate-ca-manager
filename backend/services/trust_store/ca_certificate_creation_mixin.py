@@ -40,7 +40,7 @@ class CACertificateCreationMixin:
         issuer_private_key = None,
         issuer_cert: Optional[x509.Certificate] = None,
         validity_days: int = 825,
-        digest: str = 'sha256',
+        digest: Optional[str] = None,
         ocsp_uri: Optional[str] = None,
         ocsp_uris: Optional[List[str]] = None,
         cdp_url: Optional[str] = None,

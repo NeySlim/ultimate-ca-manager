@@ -12,8 +12,7 @@ from services.mtls_auth_service import MTLSAuthService
 import logging
 from utils.datetime_utils import utc_now
 from utils.admin_allowlist import is_exempt_path
-from utils.public_endpoints import is_file_request
-from auth.session_epoch import holds_current_epoch
+from auth.session_epoch import holds_current_epoch, note_request_epoch
 from auth.session_start import ACCOUNT_KEY, account_proof, begin_session
 
 logger = logging.getLogger(__name__)
@@ -60,6 +59,12 @@ def _extract_certificate():
             return cert_info
 
     return None
+
+
+def _is_file_request(path):
+    """A static file (favicon, bundle, font): browsers may fetch these without the
+    session cookie, so a login there would open a session nobody keeps."""
+    return not path.startswith('/api/') and '.' in path.rsplit('/', 1)[-1]
 
 
 def _names_no_stored_session():
@@ -123,7 +128,7 @@ def process_client_certificate():
     """
     # Protocol and probe paths read client certificates themselves; touching the
     # session there would keep a cookie's inactivity clock running from anywhere.
-    if is_exempt_path(request.path) or is_file_request(request.path):
+    if is_exempt_path(request.path) or _is_file_request(request.path):
         return
     # A valid session of any method is kept (password/LDAP/WebAuthn never overwritten);
     # an expired one, certificate included, takes the expired-cookie path below
@@ -148,6 +153,8 @@ def process_client_certificate():
     # Store cert_info in g for /auth/methods to use without re-parsing
     g.mtls_cert_info = cert_info
 
+    # Before the certificate is checked: every path outside LOGIN_PATHS skipped the global read
+    note_request_epoch()
     user, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
 
     if user:

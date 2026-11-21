@@ -35,7 +35,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443 or https://your-server-fqdn:8443
-**Credentials:** admin / changeme123: the first login must set a new password before anything else
+**Credentials:** `admin`, with the password generated at first start: `docker exec <container> cat /opt/ucm/data/initial-admin-password`. The first login must set a new password before anything else, which removes the file. To provide the password yourself, see [First access](README.md#first-access).
 
 ---
 
@@ -58,11 +58,13 @@ services:
       - "8080:8080"   # HTTP — CRL/CDP and OCSP public endpoints
     volumes:
       - ucm-data:/opt/ucm/data
+      - ucm-config:/etc/ucm   # holds master.key
     environment:
       - UCM_FQDN=ucm.example.com
 
 volumes:
   ucm-data:
+  ucm-config:
 ```
 
 **Start:**
@@ -89,6 +91,9 @@ services:
     volumes:
       # Persistent data
       - ucm-data:/opt/ucm/data
+
+      # Persistent configuration: master.key, which encrypts the private keys
+      - ucm-config:/etc/ucm
 
       # Optional: Custom HTTPS certificates
       # - ./certs/https_cert.pem:/opt/ucm/data/https_cert.pem:ro
@@ -122,6 +127,7 @@ services:
 
 volumes:
   ucm-data:
+  ucm-config:
 ```
 
 ---
@@ -143,9 +149,15 @@ volumes:
 | `UCM_LOG_LEVEL` | `INFO` | Log level (DEBUG/INFO/WARNING/ERROR) |
 | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `/opt/ucm/data/ucm.log` is rotated (10 MB) |
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
+| `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before the worker is restarted, 30 to 3600; out of bounds the container refuses to start |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
+| `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`. Changing it does not change the Docker mounts: mount a persistent directory at the configured path as well as the data directory |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
-| `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. |
+| `UCM_HA` | (unset) | `1` enables HA mode: settings and restarts propagate to every node (a restart exits each container in turn with code 0: use the restart policy `always` or `unless-stopped`, as `on-failure` and `no` leave the container stopped), operations that only change the local host are refused (see [HA.md](../HA.md)). Requires `DATABASE_URL` (PostgreSQL), `UCM_SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node |
+| `UCM_NODE_ID` | container hostname | Node name reported as `node_id` by `/health` |
+| `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive written before 3.0 (format v1 to v3) a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. |
+| `BACKUP_MAX_ARCHIVE_MB` | `0` | Largest v4 archive (written since 3.0) a restore accepts, in MB; `0` accepts any size. |
+| `UCM_ACCEPT_MAJOR_UPGRADE` | (unset) | `3` lets the 3.x image upgrade a database last started by 2.254; unset or any other value, the container stops on such a database without changing anything (see [Image tags and major upgrades](#image-tags-and-major-upgrades)). A fresh or 3.x database ignores it. |
 
 See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the session timeout and the other application settings are configured in the web interface.
 
@@ -154,6 +166,8 @@ See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the
 ## Data Persistence
 
 ### Using Named Volumes (Recommended)
+
+Mount both the data and configuration directories on persistent volumes.
 
 ```bash
 docker volume create ucm-data
@@ -164,9 +178,9 @@ docker run -v ucm-data:/opt/ucm/data -v ucm-config:/etc/ucm ...
 ### Using Bind Mounts
 
 ```bash
-mkdir -p /opt/ucm/data
-chown -R 1000:1000 /opt/ucm/data
-docker run -v /opt/ucm/data:/opt/ucm/data ...
+mkdir -p /opt/ucm/data /opt/ucm/config
+chown -R 1000:1000 /opt/ucm/data /opt/ucm/config
+docker run -v /opt/ucm/data:/opt/ucm/data -v /opt/ucm/config:/etc/ucm ...
 ```
 
 The container runs as UID 1000 and cannot change the owner of a bind-mounted directory, so a directory left to root (or created by Docker on the first run) is refused at startup. Give it to UID 1000 as above rather than opening it to everyone with `chmod 777`; the same applies to a host directory mounted on `/etc/ucm`.
@@ -237,6 +251,27 @@ docker run -d \
 docker-compose pull
 docker-compose up -d
 ```
+
+### Image tags and major upgrades
+
+| Tag | Moves to |
+|-----|----------|
+| `3.0`, `2.254.4`, ... | Never: one release |
+| `3` (and `3-fips`) | Each stable 3.x release, never a later major version |
+| `2` (and `2-fips`) | Each stable 2.254.N maintenance release |
+| `latest` (and `latest-fips`) | The highest stable release, whatever its major version |
+
+Release candidates get only their own tag (`3.1-rc1`, `3.1-rc1-fips`). Pin `3` to receive every 3.x update automatically without a later major version arriving unannounced.
+
+Moving to a new major version is an explicit step. A 3.x image started on a database last started by 2.254 (SQLite in the volume, or PostgreSQL through `DATABASE_URL`, every HA node included) stops before writing anything and prints:
+
+```
+This database was last started by UCM 2.254 and this image is UCM 3: starting it would upgrade the database to the new major version, which 2.254 cannot start afterwards. Nothing was changed.
+To upgrade: back up the data volume (and the PostgreSQL database if you use one), then set UCM_ACCEPT_MAJOR_UPGRADE=3 and start again. See UPGRADE.md, Upgrading to v3.0.
+To stay on 2.x: pin the image tag '2' (or an exact version, 2.254.N) instead of 'latest'.
+```
+
+The container exits with code 78: `docker logs <container>` shows the message, `docker ps -a` shows `Exited (78)`, or `Restarting (78)` with a restart policy, each new start refusing the same way. To upgrade, back up, then add `-e UCM_ACCEPT_MAJOR_UPGRADE=3` (or `UCM_ACCEPT_MAJOR_UPGRADE: "3"` under `environment:` in Compose) and start again; the variable can stay set, a 3.x database ignores it. An accepted upgrade of a SQLite database that stopped partway resumes at the next start, variable set or not. Any other value (`true`, `1`, `4`) is refused, so consent given for 3 never covers a later major version. The Helm chart sets it for you (`majorUpgrade.accept`).
 
 ### Backup Data
 

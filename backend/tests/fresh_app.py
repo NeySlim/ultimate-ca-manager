@@ -26,7 +26,7 @@ _UNSET = object()
 def fresh_app():
     """create_app('testing') on its own database; paths, session store and scheduler put back on exit."""
     from app import create_app
-    from config.settings import Config
+    from config.settings import Config, config
     from models import db
     from services import scheduler_service
 
@@ -35,18 +35,22 @@ def fresh_app():
     # A store of its own, bound when create_app builds the session interface:
     # a restore empties the store, which signed the session app's clients out.
     sessions = Path(tempfile.mkdtemp(prefix='ucm-test-sessions-'))
-    shared_sessions = Config.__dict__.get('SESSION_FILE_DIR', _UNSET)
-    Config.SESSION_FILE_DIR = sessions
+    # TestingConfig may define its own SESSION_FILE_DIR (database session type), which shadows Config's.
+    holders = (Config, config['testing'])
+    shared_sessions = [holder.__dict__.get('SESSION_FILE_DIR', _UNSET) for holder in holders]
+    for holder in holders:
+        holder.SESSION_FILE_DIR = sessions
     application = sandbox = None
     replaced = {}
     try:
         try:
             application = create_app('testing')
         finally:
-            if shared_sessions is _UNSET:
-                del Config.SESSION_FILE_DIR
-            else:
-                Config.SESSION_FILE_DIR = shared_sessions
+            for holder, previous in zip(holders, shared_sessions):
+                if previous is _UNSET:
+                    del holder.SESSION_FILE_DIR
+                else:
+                    holder.SESSION_FILE_DIR = previous
         sandbox, _ = sandbox_paths(application, replaced)
         configure_test_app(application)
         clear_admin_password_flag(application)

@@ -6,7 +6,6 @@ from .service_manager import (
     reload_service,
     is_service_running,
     get_service_status,
-    schedule_restart,
     cancel_scheduled_restart,
     # Aliases
     restart,
@@ -20,7 +19,6 @@ __all__ = [
     'reload_service',
     'is_service_running',
     'get_service_status',
-    'schedule_restart',
     'cancel_scheduled_restart',
     'restart',
     'reload',

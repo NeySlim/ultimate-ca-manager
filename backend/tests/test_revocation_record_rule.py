@@ -214,23 +214,6 @@ class TestLiftingAHoldDeletesEveryRecordOfTheSerial:
                 RevokedSerial.serial_number == str(real.serial_number)).count() == 0
         assert _surfaces(app, ca_id, real) == ('good', None, None, 'ok')
 
-    def test_a_record_in_another_spelling_goes_with_the_hold(self, app, auth_client, issuer):
-        """Issued with a hexadecimal serial column, deleted, imported again in decimal."""
-        ca_id, refid, ca_cert, ca_key = issuer
-        real, key = _leaf('unhold-hex.example.test', ca_cert, ca_key)
-        row_id = _store(app, real, refid, key=key)
-        _record(app, refid, real, reason='certificateHold', column=format(real.serial_number, 'x'))
-        with app.app_context():
-            row = db.session.get(Certificate, row_id)
-            row.revoked, row.revoke_reason, row.revoked_at = True, 'certificateHold', EARLY
-            db.session.commit()
-        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
-        assert r.status_code == 200, r.data
-        with app.app_context():
-            assert RevokedSerial.query.filter_by(caref=refid).filter(RevokedSerial.serial_number.in_(
-                [str(real.serial_number), format(real.serial_number, 'x')])).count() == 0
-        assert _surfaces(app, ca_id, real) == ('good', None, None, 'ok')
-
     def test_a_hold_is_not_lifted_over_a_compromise(self, app, auth_client, issuer, twin):
         ca_id, refid, ca_cert, ca_key = issuer
         real, key = _leaf('unhold-compromised.example.test', ca_cert, ca_key)
@@ -317,19 +300,20 @@ class TestAnAttachedRowTakesTheRecord:
 
 class TestAnUpdateThatComesBackRevokedIsNoRenewal:
 
-    def test_no_renewal_event(self, app, auth_client, issuer, monkeypatch):
-        from services import webhook_service
+    def test_no_renewal_event_and_no_binding_follows(self, app, auth_client, issuer, monkeypatch):
+        from services import binding_attention, webhook_service
         _, refid, ca_cert, ca_key = issuer
         current, key = _leaf('revoked-update.example.test', ca_cert, ca_key)
         row_id = _store(app, current, refid, key=key)
         revoked, _ = _leaf('revoked-update.example.test', ca_cert, ca_key, key=key)
         _record(app, refid, revoked)
-        renewed = []
+        renewed, followed = [], []
         monkeypatch.setattr(webhook_service, 'emit_cert_renewed', lambda *a, **k: renewed.append(a))
+        monkeypatch.setattr(binding_attention, 'follow_key', lambda *a, **k: followed.append(a) or False)
         r = _import(auth_client, revoked, key)
         assert r.status_code == 200, r.data
         assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
-        assert renewed == []
+        assert renewed == [] and followed == []
 
 
 class TestTheSchedulerMarksARecordedRevocation:
@@ -359,8 +343,7 @@ class TestTheSchedulerMarksARecordedRevocation:
 
 class TestAPairPartnerRevokedOnlyByItsRecord:
 
-    def test_it_is_left_out_like_a_revoked_partner(self, app, issuer, monkeypatch):
-        from services.cert import related_pair
+    def test_it_is_left_out_like_a_revoked_partner(self, app, issuer):
         from services.cert.renewal import _renewal_members
         _, refid, ca_cert, ca_key = issuer
         first, key_a = _leaf('pair-a.example.test', ca_cert, ca_key)
@@ -369,7 +352,8 @@ class TestAPairPartnerRevokedOnlyByItsRecord:
         _record(app, refid, second)
         with app.app_context():
             a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, b_id)
-            monkeypatch.setattr(related_pair, 'mutual_partner', lambda cert: b if cert is a else a)
+            a.related_certificate_id, b.related_certificate_id = b_id, a_id
+            db.session.commit()
             assert _renewal_members(a) == [a]
 
 
@@ -471,34 +455,9 @@ class TestAnotherSerialsHexSpellingNamesNothing:
         assert _row(app, h_id) == (False, None, None)
 
 
-class TestAnIssuedSpellingIsStillFound:
-    """Issuance stores the serial in hexadecimal, an import in decimal."""
-
-    def test_revoked_deleted_and_imported_again_it_comes_back_revoked(self, app, auth_client, issuer):
-        ca_id, refid, ca_cert, ca_key = issuer
-        serial = x509.random_serial_number()
-        while format(serial, 'x').isdigit():
-            serial = x509.random_serial_number()
-        real, key = _leaf('issued-hex.example.test', ca_cert, ca_key, serial=serial)
-        row_id = _store(app, real, refid, key=key)
-        with app.app_context():
-            db.session.get(Certificate, row_id).serial_number = format(serial, 'x')
-            db.session.commit()
-        assert auth_client.post(f'/api/v2/certificates/{row_id}/revoke',
-                                json={'reason': 'keyCompromise'}).status_code == 200
-        with app.app_context():
-            assert RevokedSerial.query.filter_by(caref=refid, serial_number=format(serial, 'x')).count() == 1
-        assert auth_client.delete(f'/api/v2/certificates/{row_id}').status_code in (200, 204)
-        r = _import(auth_client, real, key)
-        assert r.status_code in (200, 201), r.data
-        again = r.get_json()['data']['id']
-        assert _row(app, again)[:2] == (True, 'keyCompromise')
-        assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
-
-
 class TestARecordAloneHoldsItsRow:
     """A suspension record linked to its unrevoked row of the same serial is a hold, with no
-    exception (migration 136 deleted, once, those an earlier lift left behind)."""
+    exception (migration 154 deleted, once, those an earlier lift left behind)."""
 
     def test_every_surface_answers_hold_and_the_hourly_pass_marks_the_row(self, app, issuer):
         from services.ski_aki_backfill import backfill_ski_aki
@@ -603,28 +562,6 @@ class TestAHeldRowUnderAFinalRecordAnswersTheGraverReason:
         assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
 
 
-def _es256_revocation(client, key, pem, reason):
-    """A revokeCert to UCM's own ACME server, signed by the certificate's key (RFC 8555 §7.6)."""
-    import json
-    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
-
-    def b64(raw):
-        return base64.urlsafe_b64encode(raw).rstrip(b'=').decode()
-
-    numbers = key.public_key().public_numbers()
-    jwk = {'kty': 'EC', 'crv': 'P-256', 'x': b64(numbers.x.to_bytes(32, 'big')),
-           'y': b64(numbers.y.to_bytes(32, 'big'))}
-    der = x509.load_pem_x509_certificate(pem).public_bytes(serialization.Encoding.DER)
-    nonce = client.get('/acme/new-nonce').headers.get('Replay-Nonce')
-    protected = b64(json.dumps({'alg': 'ES256', 'nonce': nonce, 'jwk': jwk,
-                                'url': 'http://localhost/acme/revoke-cert'}).encode())
-    payload = b64(json.dumps({'certificate': b64(der), 'reason': reason}).encode())
-    r, s = decode_dss_signature(key.sign(f'{protected}.{payload}'.encode(), ec.ECDSA(hashes.SHA256())))
-    jws = {'protected': protected, 'payload': payload,
-           'signature': b64(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}
-    return client.post('/acme/revoke-cert', data=json.dumps(jws), content_type='application/jose+json')
-
-
 class TestARecordedFinalRevocationIsNotRevokedAgain:
     """A row its CA's record revokes for good is already revoked: each caller takes its own
     "already revoked" path, and the check commits nothing (the hourly pass marks the row)."""
@@ -677,6 +614,7 @@ class TestARecordedFinalRevocationIsNotRevokedAgain:
         assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
 
     def test_acme_revoke_cert_answers_already_revoked(self, app, client, issuer):
+        from tests.test_acme_revocation_parallel_paths import _es256_revocation
         real, key, row_id, record_id = self._covered(app, issuer, 'acme-over-compromise.example.test')
         r = _es256_revocation(client, key, real.public_bytes(serialization.Encoding.PEM), 4)
         assert r.status_code == 400, r.data[:300]
@@ -807,9 +745,8 @@ class TestAWriterNeverReplacesAGraverReason:
 class TestRelatedAndMtlsReadTheRecord:
 
     def test_a_partner_revoked_by_its_record_is_not_named(self, app, issuer):
-        from cryptography.x509 import UnrecognizedExtension
         from services.cert.renewal import _current_related
-        from utils.related_cert import RELATED_CERT_EXTENSION_OID
+        from utils.related_cert import related_certificate_extension
         _, refid, ca_cert, ca_key = issuer
         first, key_a = _leaf('related-a.example.test', ca_cert, ca_key)
         now = datetime.now(timezone.utc)
@@ -819,7 +756,7 @@ class TestRelatedAndMtlsReadTheRecord:
                   .issuer_name(ca_cert.subject).public_key(key_b.public_key())
                   .serial_number(x509.random_serial_number())
                   .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
-                  .add_extension(UnrecognizedExtension(RELATED_CERT_EXTENSION_OID, b'\x30\x00'), critical=False)
+                  .add_extension(related_certificate_extension(first), critical=False)
                   .sign(ca_key, hashes.SHA256()))
         a_id, b_id = _store(app, first, refid, key=key_a), _store(app, second, refid, key=key_b)
         with app.app_context():
@@ -1012,27 +949,14 @@ class TestAPageReadsTheRecordsOnce:
         assert set(found) == set(made)
 
 
-@pytest.mark.parametrize('column, serial', [
-    ('171', 171), ('ab', 171), ('AB', 171), ('10', 10), ('0x10', None), ('007', None), ('', None),
-    ('not a serial', None), ('-10', -10)])
-def test_a_record_column_names_one_serial_at_most(column, serial):
-    from utils.serial_format import serial_named_by, unambiguous_serial_spellings
-    assert serial_named_by(column) == serial
-    if serial is not None:
-        assert column in unambiguous_serial_spellings(serial)
-
-
 class TestANegativeSerialNamesItsOwnRecordOnly:
-    """format(-16, 'x') is "-10", the decimal of -10: a hex spelling counts only with a letter."""
-
-    def test_the_spellings(self):
-        from utils.serial_format import serial_named_by, unambiguous_serial_spellings
-        assert unambiguous_serial_spellings(-16) == {'-16'}
-        assert unambiguous_serial_spellings(-10) == {'-10', '-a', '-A'}
-        assert serial_named_by('-10') == -10 and serial_named_by('-a') == -10
+    """Non-regression: ``canonical_serial`` keeps a negative serial in signed decimal
+    (-16 is "-16", never "-10"), and records are compared by equality."""
 
     def test_minus_ten_and_minus_sixteen(self, app, issuer):
         from services.cert.issued_lookup import record_serial_clause
+        from utils.serial_format import canonical_serial
+        assert (canonical_serial(-16), canonical_serial(-10)) == ('-16', '-10')
         _, refid, _, _ = issuer
         with app.app_context():
             made = [RevokedSerial(caref=refid, serial_number=column, revoke_reason='keyCompromise',
@@ -1047,58 +971,6 @@ class TestANegativeSerialNamesItsOwnRecordOnly:
             finally:
                 for record in made:
                     db.session.delete(record)
-                db.session.commit()
-
-
-class TestCaAndCrossRecordsReadUnambiguousSpellings:
-    """A CA's or a cross-certificate's record lookup: another serial's all-digit hex is no match."""
-
-    def test_a_child_ca(self, app, issuer):
-        ca_id, refid, ca_cert, ca_key = issuer
-        d, h = _homonyms()
-        now = datetime.now(timezone.utc)
-        child_key = ec.generate_private_key(ec.SECP256R1())
-        name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, f'homonym child {uuid.uuid4().hex[:6]}')])
-        child = (x509.CertificateBuilder().subject_name(name).issuer_name(ca_cert.subject)
-                 .public_key(child_key.public_key()).serial_number(h)
-                 .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
-                 .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
-                 .sign(ca_key, hashes.SHA256()))
-        with app.app_context():
-            row = CA(refid=str(uuid.uuid4()), descr='homonym child', caref=refid, serial=0,
-                     crt=base64.b64encode(child.public_bytes(serialization.Encoding.PEM)).decode(),
-                     subject=name.rfc4514_string(), issuer=ca_cert.subject.rfc4514_string(),
-                     serial_number=str(h))
-            db.session.add(row)
-            db.session.commit()
-            child_id = row.id
-        other = _record(app, refid, ca_cert, column=str(d))
-        try:
-            with app.app_context():
-                assert db.session.get(CA, child_id).persisted_revocation() is None
-            own = _record(app, refid, ca_cert, column=str(h))
-            with app.app_context():
-                assert db.session.get(CA, child_id).persisted_revocation().id == own
-        finally:
-            with app.app_context():
-                RevokedSerial.query.filter(RevokedSerial.id.in_([other])).delete(synchronize_session=False)
-                RevokedSerial.query.filter_by(caref=refid, serial_number=str(h)).delete()
-                db.session.delete(db.session.get(CA, child_id))
-                db.session.commit()
-
-    def test_a_cross_certificate(self, app, issuer):
-        from types import SimpleNamespace
-        from services.ca.cross_certs import published_record
-        ca_id, refid, ca_cert, _ = issuer
-        d, h = _homonyms()
-        other = _record(app, refid, ca_cert, column=str(d))
-        try:
-            with app.app_context():
-                assert published_record(SimpleNamespace(serial_number=str(h)), db.session.get(CA, ca_id)) is None
-                assert published_record(SimpleNamespace(serial_number=str(d)), db.session.get(CA, ca_id)).id == other
-        finally:
-            with app.app_context():
-                db.session.delete(db.session.get(RevokedSerial, other))
                 db.session.commit()
 
 
@@ -1172,7 +1044,7 @@ class TestARecordedHoldIsShownAndLifted:
 
     def test_a_final_record_beside_a_hold_record_is_no_interrupted_lift(self, app, auth_client, issuer, twin):
         """Every record of the serial must be a hold: one final record under a twin refuses."""
-        from api.v2.certificates.cert_lifecycle import _interrupted_lift
+        from services.cert.issued_lookup import interrupted_lift
         _, row_id, _ = self._recorded(app, issuer, 'hold-beside-final.example.test')
         with app.app_context():
             row = db.session.get(Certificate, row_id)
@@ -1181,7 +1053,7 @@ class TestARecordedHoldIsShownAndLifted:
             real = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
         _record(app, twin[1], real, reason='keyCompromise', certificate_id=row_id)
         with app.app_context():
-            assert _interrupted_lift(db.session.get(Certificate, row_id)) is False
+            assert interrupted_lift(db.session.get(Certificate, row_id)) is False
         r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
         assert r.status_code == 409, r.data
         assert _row(app, row_id) == (True, 'removeFromCRL', LATER)
@@ -1349,8 +1221,8 @@ def _on_postgresql(app):
         return db.engine.dialect.name == 'postgresql'
 
 
-def _wait_for_a_lock_waiter(conn, seconds=5.0, at_least=1):
-    """Whether ``at_least`` other sessions of this worker wait on a lock within ``seconds`` (polled).
+def _wait_for_a_lock_waiter(conn, seconds=5.0):
+    """Whether another session of this worker waits on a lock within ``seconds`` (polled).
     The workers share the database: a waiter is ours when it holds locks on our schema's tables."""
     import time
     from sqlalchemy import text
@@ -1362,7 +1234,7 @@ def _wait_for_a_lock_waiter(conn, seconds=5.0, at_least=1):
                 "AND a.datname = current_database() AND a.pid <> pg_backend_pid() AND EXISTS ("
                 "SELECT 1 FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
                 "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                "WHERE l.pid = a.pid AND l.granted AND n.nspname = current_schema())")).scalar() >= at_least:
+                "WHERE l.pid = a.pid AND l.granted AND n.nspname = current_schema())")).scalar():
             return True
         time.sleep(0.02)
     return False
@@ -1545,3 +1417,55 @@ def test_the_pass_marks_a_row_from_its_record_as_locked_not_as_collected(app, is
         assert len(issued_lookup.apply_persisted_revocations({row_id})) == 1
         db.session.commit()
     assert _row(app, row_id)[:2] == (True, 'keyCompromise')
+
+
+class TestCaAndCrossRecordsReadUnambiguousSpellings:
+    """A CA's or a cross-certificate's record lookup: another serial's all-digit hex is no match."""
+
+    def test_a_child_ca(self, app, issuer):
+        ca_id, refid, ca_cert, ca_key = issuer
+        d, h = _homonyms()
+        now = datetime.now(timezone.utc)
+        child_key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, f'homonym child {uuid.uuid4().hex[:6]}')])
+        child = (x509.CertificateBuilder().subject_name(name).issuer_name(ca_cert.subject)
+                 .public_key(child_key.public_key()).serial_number(h)
+                 .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+                 .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                 .sign(ca_key, hashes.SHA256()))
+        with app.app_context():
+            row = CA(refid=str(uuid.uuid4()), descr='homonym child', caref=refid, serial=0,
+                     crt=base64.b64encode(child.public_bytes(serialization.Encoding.PEM)).decode(),
+                     subject=name.rfc4514_string(), issuer=ca_cert.subject.rfc4514_string(),
+                     serial_number=str(h))
+            db.session.add(row)
+            db.session.commit()
+            child_id = row.id
+        other = _record(app, refid, ca_cert, column=str(d))
+        try:
+            with app.app_context():
+                assert db.session.get(CA, child_id).persisted_revocation() is None
+            own = _record(app, refid, ca_cert, column=str(h))
+            with app.app_context():
+                assert db.session.get(CA, child_id).persisted_revocation().id == own
+        finally:
+            with app.app_context():
+                RevokedSerial.query.filter(RevokedSerial.id.in_([other])).delete(synchronize_session=False)
+                RevokedSerial.query.filter_by(caref=refid, serial_number=str(h)).delete()
+                db.session.delete(db.session.get(CA, child_id))
+                db.session.commit()
+
+    def test_a_cross_certificate(self, app, issuer):
+        from types import SimpleNamespace
+        from services.ca.cross_certs import published_record
+        ca_id, refid, ca_cert, _ = issuer
+        d, h = _homonyms()
+        other = _record(app, refid, ca_cert, column=str(d))
+        try:
+            with app.app_context():
+                assert published_record(SimpleNamespace(serial_number=str(h)), db.session.get(CA, ca_id)) is None
+                assert published_record(SimpleNamespace(serial_number=str(d)), db.session.get(CA, ca_id)).id == other
+        finally:
+            with app.app_context():
+                db.session.delete(db.session.get(RevokedSerial, other))
+                db.session.commit()

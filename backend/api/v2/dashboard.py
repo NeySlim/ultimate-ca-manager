@@ -9,7 +9,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from auth.unified import require_auth
-from utils.response import success_response
+from utils.response import error_response, success_response
 from utils.pagination import parse_request_limit
 
 # The dashboard widgets show a handful of rows each. The number is the
@@ -17,7 +17,7 @@ from utils.pagination import parse_request_limit
 # /dashboard/activity loaded and serialised the whole audit table for any
 # authenticated account.
 DASHBOARD_MAX_ROWS = 100
-from models import db, CA, Certificate
+from models import db, CA, Certificate, SystemConfig
 from utils.cert_status import (
     expired_condition, expiring_condition, issued_certificates,
     pending_requests, revoked_condition, valid_condition,
@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('dashboard_v2', __name__)
 
 # A dedicated TSA signer within this many days of expiry shows as `warning` on
-# the System Health widget. Matches the auto-renewal window used further down.
-TSA_SIGNER_WARN_DAYS = 30
+# the System Health widget; the overview alerts at the same threshold.
+from services.dashboard_aggregates import TSA_SIGNER_WARN_DAYS  # noqa: E402
 
 
 def _scep_ca_usable(ca):
@@ -69,6 +69,49 @@ def _status_rollback():
         db.session.rollback()
     except Exception:
         pass
+
+_LEGACY_WITNESS = {
+    ('smtp', 'not_configured'): ('offline', 'Not configured'),
+    ('smtp', 'disabled'): ('warning', 'Configured but disabled'),
+    ('smtp', 'incomplete'): ('warning', 'Enabled, port or From address missing'),
+    ('webhooks', 'not_configured'): ('offline', 'No endpoints'),
+    ('auto_renewal', 'enabled'): ('online', 'Scheduled'),
+    ('auto_renewal', 'disabled'): ('offline', 'Disabled'),
+}
+
+
+def _legacy_detail(read):
+    """The figure a legacy message adds to its state, or None when it cannot be read."""
+    try:
+        return read()
+    except Exception:
+        logger.debug('legacy status detail unreadable', exc_info=True)
+        _status_rollback()
+        return None
+
+
+def _legacy_witness(name, witness):
+    """A witness of /health as the {status, message} pair of the historical route."""
+    state, count = witness['state'], witness['count']
+    if state == 'unavailable':
+        return {'status': 'warning', 'message': 'Status unavailable'}
+    if name == 'smtp' and state == 'ready':
+        from models.email_notification import SMTPConfig
+        host = _legacy_detail(lambda: (SMTPConfig.query.first().smtp_host or '').strip())
+        return {'status': 'online', 'message': f'Host: {host}' if host else 'Configured'}
+    if name == 'webhooks' and state == 'active':
+        return {'status': 'online', 'message': f'{count} active endpoint(s)'}
+    if name == 'webhooks' and state == 'none_active':
+        return {'status': 'warning', 'message': f'{count} endpoint(s), none active'}
+    if name == 'auto_renewal' and state == 'enabled':
+        now_dt = utc_now()
+        pending = _legacy_detail(lambda: Certificate.query.filter(
+            Certificate.revoked.isnot(True), Certificate.valid_to >= now_dt,
+            Certificate.valid_to <= now_dt + timedelta(days=30)).count())
+        return {'status': 'online', 'message': f'Scheduled ({pending} pending)' if pending else 'Scheduled'}
+    status, message = _LEGACY_WITNESS[(name, state)]
+    return {'status': status, 'message': message}
+
 
 # Client-safe messages for a dedicated TSA signer that /tsa cannot load, keyed
 # by the coarse `reason` from describe_configured_signer(). The underlying
@@ -237,9 +280,17 @@ def get_expiring_certificates():
 
     # Flag the configured dedicated TSA signer so the widget can mark it as
     # infrastructure — its expiry means /tsa starts returning 503.
-    tsa_signer_refid = db.session.execute(
-        text("SELECT value FROM system_config WHERE key = 'tsa_signer_cert_refid'")
-    ).scalar() or None
+    from services.tsa_service import configured_signer_refid
+    tsa_signer_refid = configured_signer_refid() or None
+
+    # Delegated OCSP responders are infrastructure too: their expiry ends OCSP answers for the CA
+    ocsp_ids = set()
+    for row in SystemConfig.query.filter(
+            SystemConfig.key.startswith('ocsp_responder_cert_', autoescape=True)).all():
+        try:
+            ocsp_ids.add(int(row.value))
+        except (TypeError, ValueError):
+            continue
 
     return success_response(data=[{
         'id': cert.id,
@@ -250,6 +301,7 @@ def get_expiring_certificates():
         'valid_from': utc_isoformat(cert.valid_from),
         'valid_to': utc_isoformat(cert.valid_to),
         'is_tsa_signer': bool(tsa_signer_refid) and cert.refid == tsa_signer_refid,
+        'is_ocsp_responder': cert.id in ocsp_ids,
     } for cert in certs])
 
 
@@ -321,8 +373,10 @@ def get_activity_log():
         
         return success_response(data={'activity': activity})
     except Exception as e:
+        # A failure is an error, never an empty feed: the card tells the two apart
         logger.error(f"Activity log error: {e}")
-        return success_response(data={'activity': []})
+        _status_rollback()
+        return error_response('Activity log unavailable', 500)
 
 
 @bp.route('/api/v2/dashboard/certificate-trend', methods=['GET'])
@@ -400,7 +454,7 @@ def get_certificate_trend():
 @bp.route('/api/v2/dashboard/system-status', methods=['GET'])
 @require_auth()
 def get_system_status():
-    """Get system services status (no auth required - for login page)"""
+    """Get system services status (any authenticated caller)"""
     
     status = {
         'database': {'status': 'online', 'message': 'Connected'},
@@ -525,68 +579,11 @@ def get_system_status():
         _status_rollback()
         status['crl'] = {'status': 'online', 'message': 'Distribution active'}
     
-    # Auto-renewal status
-    try:
-        renewal_enabled = db.session.execute(
-            text("SELECT value FROM system_config WHERE key = 'auto_renewal_enabled'")
-        ).scalar()
-        if renewal_enabled == 'true':
-            now_dt = utc_now()
-            window_end = now_dt + timedelta(days=30)
-            pending = db.session.execute(
-                text("""SELECT COUNT(*) FROM certificates
-                    WHERE revoked IS NOT TRUE AND valid_to IS NOT NULL
-                    AND valid_to >= :now AND valid_to <= :end"""),
-                {'now': now_dt, 'end': window_end}
-            ).scalar() or 0
-            msg = f'Scheduled ({pending} pending)' if pending > 0 else 'Scheduled'
-            status['auto_renewal'] = {'status': 'online', 'message': msg}
-        else:
-            status['auto_renewal'] = {'status': 'offline', 'message': 'Disabled'}
-    except Exception:
-        _status_rollback()
-        status['auto_renewal'] = {'status': 'offline', 'message': 'Disabled'}
-    
-    # SMTP / Email notifications status. The configuration lives in the
-    # smtp_config row Settings > Email writes, not in system_config keys
-    # (#329: the tile read keys nothing ever wrote, so a working SMTP setup
-    # showed as "Not configured"). Same readiness rules as the sender:
-    # enabled, with host, port and From address.
-    try:
-        from models.email_notification import SMTPConfig
-        smtp = SMTPConfig.query.first()
-        smtp_host = (smtp.smtp_host or '').strip() if smtp else ''
-        if not smtp_host:
-            status['smtp'] = {'status': 'offline', 'message': 'Not configured'}
-        elif not smtp.enabled:
-            status['smtp'] = {'status': 'warning', 'message': 'Configured but disabled'}
-        elif not (smtp.smtp_port and (smtp.smtp_from or '').strip()):
-            status['smtp'] = {'status': 'warning', 'message': 'Enabled, port or From address missing'}
-        else:
-            status['smtp'] = {'status': 'online', 'message': f'Host: {smtp_host}'}
-    except Exception:
-        _status_rollback()
-        logger.debug('SMTP status check failed')
-        status['smtp'] = {'status': 'offline', 'message': 'Status unknown'}
-    
-    # Webhooks status
-    try:
-        webhook_count = db.session.execute(
-            text("SELECT COUNT(*) FROM webhook_endpoints WHERE enabled = true")
-        ).scalar() or 0
-        total_webhooks = db.session.execute(
-            text("SELECT COUNT(*) FROM webhook_endpoints")
-        ).scalar() or 0
-        if webhook_count > 0:
-            status['webhooks'] = {'status': 'online', 'message': f'{webhook_count} active endpoint(s)'}
-        elif total_webhooks > 0:
-            status['webhooks'] = {'status': 'warning', 'message': f'{total_webhooks} endpoint(s), none active'}
-        else:
-            status['webhooks'] = {'status': 'offline', 'message': 'No endpoints'}
-    except Exception:
-        _status_rollback()
-        status['webhooks'] = {'status': 'offline', 'message': 'Not configured'}
-    
+    # Mail, webhook and renewal witnesses: the rules and the read:settings gate of /health
+    from services.dashboard_aggregates import WITNESS_PERMISSION, allowed, witness_health
+    for name in allowed(WITNESS_PERMISSION, g.permissions or []):
+        status[name] = _legacy_witness(name, witness_health(name, db.session))
+
     # TSA (RFC 3161). A configured dedicated signer is a single point of failure:
     # /tsa returns 503 the moment it expires, is revoked, or its key stops
     # decrypting, with no CA fallback. Surface its health before that happens.
@@ -604,8 +601,9 @@ def get_system_status():
             signer = describe_configured_signer()
             if not signer.get('configured'):
                 if tsa_ca_certificate_path_ready():
-                    status['tsa'] = {'status': 'online',
-                                     'message': 'Signing with CA certificate'}
+                    # Only with tsa_require_dedicated_cert turned off: RFC 3161 §2.3 refuses these tokens
+                    status['tsa'] = {'status': 'warning',
+                                     'message': 'Signing with CA certificate, not RFC 3161 compliant'}
                 else:
                     status['tsa'] = {'status': 'offline',
                                      'message': 'No signing certificate configured'}
@@ -635,15 +633,15 @@ def get_system_status():
         logger.debug('TSA status check failed', exc_info=True)
         status['tsa'] = {'status': 'warning', 'message': 'Status unavailable'}
 
-    # Without a loaded master key, private keys are written to the database
-    # unencrypted; only those who can enable encryption are told
-    from security.encryption import key_encryption
+    # Off (no key, or a disable done and in its grace): private keys are written to the
+    # database unencrypted; only those who can enable encryption are told, as the status says
+    from security.dek_rotation import shown_as_enabled
     from auth.unified import has_permission
     if has_permission('admin:system', g.permissions):
-        if key_encryption.is_enabled:
+        if shown_as_enabled():
             status['key_encryption'] = {'status': 'online', 'message': 'Private keys encrypted'}
         else:
-            status['key_encryption'] = {'status': 'warning', 'message': 'No master key loaded'}
+            status['key_encryption'] = {'status': 'warning', 'message': 'Private keys not encrypted'}
 
     # Core is online if we can respond
     status['core'] = {'status': 'online', 'message': 'Operational'}

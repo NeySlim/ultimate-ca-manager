@@ -142,7 +142,7 @@ export function MscaCaControlModal({ connection, open, onClose }) {
               {t('msca.noPending')}
             </p>
           ) : (
-            <div className="border border-border rounded-lg divide-y divide-white/5 max-h-[40vh] overflow-y-auto">
+            <div className="border border-border rounded-lg divide-y divide-border-op30 max-h-[40vh] overflow-y-auto">
               {pending.map((r) => (
                 <div key={r.request_id} className="p-2.5 flex items-center gap-2">
                   <div className="min-w-0 flex-1">

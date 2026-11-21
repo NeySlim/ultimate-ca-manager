@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { TestTube, FloppyDisk, Plus, Trash, CheckCircle, XCircle } from '@phosphor-icons/react'
 import { Button, Input, Textarea } from '../../components'
 import { formatDate } from '../../lib/utils'
-import { adConnectorService } from '../../services'
+import { adConnectorsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
 
@@ -25,6 +25,7 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
   // hostname, so both simply miss, which is the honest answer.
   const health = config?.health?.servers || {}
   const [formData, setFormData] = useState({
+    name: config?.name || '',
     port: config?.port || 389,
     health_probe_interval: config?.health_probe_interval || 120,
     use_ssl: config?.use_ssl ?? false,
@@ -58,7 +59,7 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
     setTestResults(null)
   }
 
-  const payload = () => ({ ...formData, servers })
+  const payload = () => ({ ...formData, name: formData.name.trim(), servers })
 
   // Dropping a DC sends the password nowhere new; adding one does
   const savedServers = config?.servers || []
@@ -91,7 +92,7 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
       // Always test the current (possibly unsaved) form values -- testing
       // the saved config here would silently ignore any edit the user just
       // made (e.g. a corrected bind DN) until they hit Save.
-      const response = await adConnectorService.test(payload())
+      const response = await adConnectorsService.test({ ...payload(), id: config?.id })
       setTestResults(response.data?.servers || null)
       const message = response.data?.message || t('adConnector.testSuccess')
       // A partial pass is not a pass: the connector works today only
@@ -110,6 +111,22 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <Input
+        label={t('adConnector.name')}
+        value={formData.name}
+        onChange={(e) => updateField('name', e.target.value)}
+        placeholder={t('adConnector.namePlaceholder')}
+        maxLength={100}
+        required
+      />
+      {config?.id && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          <dt className="text-text-secondary">{t('adConnector.realm')}</dt>
+          <dd className="font-mono text-text-primary">{config.realm || '-'}</dd>
+          <dt className="text-text-secondary">{t('adConnector.domainSid')}</dt>
+          <dd className="font-mono text-text-primary break-all">{config.domain_sid || t('adConnector.domainSidUnknown')}</dd>
+        </dl>
+      )}
       <div className="space-y-2">
         <label className="block text-xs font-medium text-text-secondary leading-[20px]">
           <span className="flex items-center gap-1 h-[20px]">
@@ -218,7 +235,7 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
         placeholder={t('adConnector.baseDnPlaceholder')}
         required
       />
-      {/* The switch asks for both, the same rule update_config applies. A
+      {/* The switch asks for both, the same rule the API applies. A
           blank password on a stored one means "unchanged", and handleSubmit
           drops it from the payload. */}
       <Input

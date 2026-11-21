@@ -6,8 +6,10 @@ from sqlalchemy import or_, and_, case, func
 from sqlalchemy.orm import selectinload
 from auth.unified import require_auth
 from utils.response import success_response
+from utils.serial_format import serial_search_forms
 from utils.pagination import parse_request_pagination
 from models import Certificate, CA, db
+from models.windows_profile import profile_names_of
 from utils.cert_status import (
     CERTIFICATE_STATUS_FILTERS, expired_condition, expiring_condition,
     issued_certificates, normalize_status_filters, orphan_condition,
@@ -16,6 +18,7 @@ from utils.cert_status import (
 from utils.response import error_response
 from services.compliance_service import calculate_compliance_score, key_algo_sort_levels, key_algo_sort_points
 from utils.datetime_utils import utc_now
+from services.dashboard_aggregates import certificate_list_conditions
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -119,6 +122,12 @@ def list_certificates():
     if request.args.get('has_private_key', '').lower() in ('1', 'true', 'yes'):
         query = query.filter(Certificate.prv.isnot(None), Certificate.prv != '')
 
+    # Compliance and renewal filters share their SQL with the dashboard counters
+    try:
+        query = query.filter(*certificate_list_conditions(request.args, db.session.get_bind().dialect.name))
+    except ValueError as exc:
+        return error_response(str(exc), 400)
+
     # Certificates issued from a template but diverging from its defaults (#258)
     if template_modified:
         query = query.filter(Certificate.template_overrides.isnot(None))
@@ -144,7 +153,9 @@ def list_certificates():
                 Certificate.subject.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.issuer.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.descr.ilike(f'%{safe_search}%', escape='\\'),
-                Certificate.serial_number.ilike(f'%{safe_search}%', escape='\\')
+                Certificate.serial_number.ilike(f'%{safe_search}%', escape='\\'),
+                # A whole serial typed in hex or colon hex, as the UI shows it
+                Certificate.serial_number.in_(serial_search_forms(search)),
             )
         )
 
@@ -166,9 +177,9 @@ def list_certificates():
         )
 
         if sort_order == 'desc':
-            query = query.order_by(status_order.desc(), Certificate.subject.asc())
+            query = query.order_by(status_order.desc(), Certificate.subject.asc(), Certificate.id.asc())
         else:
-            query = query.order_by(status_order.asc(), Certificate.subject.asc())
+            query = query.order_by(status_order.asc(), Certificate.subject.asc(), Certificate.id.asc())
     elif sort_by == 'compliance_grade':
         # Approximate compliance score in SQL for sorting:
         # Key strength: RSA 4096/EC = best, RSA 2048 = good, RSA 1024 = bad
@@ -191,9 +202,9 @@ def list_certificates():
 
         level_order = key_level_order(Certificate.key_algo)
         if sort_order == 'desc':
-            query = query.order_by(compliance_order.desc(), level_order.desc(), _cn_sort.asc())
+            query = query.order_by(compliance_order.desc(), level_order.desc(), _cn_sort.asc(), Certificate.id.asc())
         else:
-            query = query.order_by(compliance_order.asc(), level_order.asc(), _cn_sort.asc())
+            query = query.order_by(compliance_order.asc(), level_order.asc(), _cn_sort.asc(), Certificate.id.asc())
     elif sort_column not in ('special', 'special_compliance'):
         # Tie-break on the primary key. Every sortable column here has
         # duplicates — `revoked` has two distinct values for the whole table —
@@ -211,9 +222,10 @@ def list_certificates():
     # The records of the page in one query: a revocation they make shows as OCSP answers it
     from services.cert.issued_lookup import persisted_revocations_of, show_effective_revocation
     recorded = persisted_revocations_of(pagination.items)
+    profile_names = profile_names_of(pagination.items)
     certs = []
     for cert in pagination.items:
-        d = show_effective_revocation(cert.to_dict(), cert, recorded.get(cert.id))
+        d = show_effective_revocation(cert.to_dict(windows_profile_names=profile_names), cert, recorded.get(cert.id))
         compliance = calculate_compliance_score(d)
         d['compliance_score'] = compliance['score']
         d['compliance_grade'] = compliance['grade']

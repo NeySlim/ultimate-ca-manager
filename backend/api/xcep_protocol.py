@@ -30,11 +30,12 @@ import logging
 
 from flask import Blueprint, Response, request
 
-from models import CA, CertificateTemplate, SystemConfig
+from models import CertificateTemplate, SystemConfig
 from services.kerberos import negotiate_auth
 from services.wstep import CES_CERTIFICATE_PATH, CES_KERBEROS_PATH, CES_USERNAME_PASSWORD_PATH
 from services.wstep.soap_envelope import build_soap_fault, extract_username_token
 from services.xcep.request_parser import GetPoliciesParseError, parse_get_policies
+from utils.trusted_proxy import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +77,11 @@ def _read_xcep_body():
 def _check_credentials(username, password):
     if not username or not password:
         return False
-    xcep_username = SystemConfig.query.filter_by(key='xcep_username').first()
-    xcep_password = SystemConfig.query.filter_by(key='xcep_password').first()
-    if not (xcep_username and xcep_password and xcep_username.value and xcep_password.value):
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    xcep_username = profile.xcep_username if profile is not None else None
+    xcep_password = profile.xcep_password if profile is not None else None
+    if not (xcep_username and xcep_password):
         return False
 
     # hmac.compare_digest on two `str` operands requires both to be
@@ -86,12 +89,12 @@ def _check_credentials(username, password):
     # username/password would 500 instead of the SOAP auth-failed fault
     # every other bad-credential case gets. bytes operands have no such
     # restriction, so encode first.
-    username_match = hmac.compare_digest(username.encode('utf-8'), xcep_username.value.encode('utf-8'))
+    username_match = hmac.compare_digest(username.encode('utf-8'), xcep_username.encode('utf-8'))
     from utils.password_hash import HASH_PREFIXES, verify_password
-    if xcep_password.value.startswith(HASH_PREFIXES):
-        password_match = verify_password(xcep_password.value, password)
+    if xcep_password.startswith(HASH_PREFIXES):
+        password_match = verify_password(xcep_password, password)
     else:
-        password_match = hmac.compare_digest(password.encode('utf-8'), xcep_password.value.encode('utf-8'))
+        password_match = hmac.compare_digest(password.encode('utf-8'), xcep_password.encode('utf-8'))
     return username_match and password_match
 
 
@@ -110,15 +113,15 @@ def _authenticate_xcep_client(security_header):
     return False, None
 
 
-def _resolve_xcep_ca():
-    """Return (ca, error_response) for the single configured XCEP CA."""
-    ca_refid = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-    if not ca_refid or not ca_refid.value:
+def _resolve_xcep_ca(profile):
+    """Return (ca, error_response) for the policy CA of *profile*."""
+    from services.windows_profiles import policy_ca
+    if profile is None or not profile.policy_refid:
         logger.warning("XCEP request refused: XCEP not configured")
         return None, build_soap_fault('XCEP not configured')
-    ca = CA.query.filter_by(refid=ca_refid.value).first()
+    ca = policy_ca(profile)
     if not ca:
-        logger.warning("XCEP request refused: configured CA %r not found", ca_refid.value)
+        logger.warning("XCEP request refused: configured CA %r not found", profile.policy_refid)
         return None, build_soap_fault('XCEP not configured')
     return ca, None
 
@@ -130,15 +133,16 @@ def _fault_response(reason, status, relates_to=None):
                     status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
-def _handle_get_policies(parsed, ad_identity):
+def _handle_get_policies(parsed, ad_identity, profile):
     """Shared GetPoliciesResponse construction for every CEP binding, once
     that binding's own auth check has already succeeded. Not itself
     binding-specific: the CAURI collection it builds advertises every
     configured WSTEP CES endpoint regardless of which CEP endpoint a client
     happened to poll, exactly like real ADCS. ``ad_identity``: whether the
     binding authenticates an AD principal (Kerberos), see ``subject_name_flags``.
+    ``profile``: the Windows enrollment profile served, its CA and templates.
     """
-    ca, ca_error = _resolve_xcep_ca()
+    ca, ca_error = _resolve_xcep_ca(profile)
     if ca_error:
         return Response(ca_error, status=503, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
@@ -166,11 +170,13 @@ def _handle_get_policies(parsed, ad_identity):
             (AUTH_USERNAME_PASSWORD, f'{base}{CES_USERNAME_PASSWORD_PATH}', False),
             (AUTH_CLIENT_CERTIFICATE, f'{base}{CES_CERTIFICATE_PATH}', True),
         ]
-        if negotiate_auth.is_library_available() and negotiate_auth.is_configured():
+        from services.windows_profiles import kerberos_refusal
+        if (negotiate_auth.is_library_available() and negotiate_auth.is_configured()
+                and kerberos_refusal(profile) is None):
             enrollment_uris.append((AUTH_KERBEROS, f'{base}{CES_KERBEROS_PATH}', False))
         xml_body = build_get_policies_response(
             ca, templates, enrollment_uris=enrollment_uris, message_id=parsed.message_id,
-            ad_identity=ad_identity,
+            ad_identity=ad_identity, profile=profile,
         )
         return Response(xml_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
     except Exception as e:
@@ -211,7 +217,9 @@ def get_policies():
     if not authenticated:
         return _fault_response('Authentication failed', status=400, relates_to=parsed.message_id)
 
-    return _handle_get_policies(parsed, ad_identity=False)
+    # A2: the shared account serves the default profile alone
+    from services.windows_profiles import serving_profile
+    return _handle_get_policies(parsed, ad_identity=False, profile=serving_profile())
 
 
 @bp.route('/ADPolicyProvider_CEP_Kerberos/service.svc', methods=['GET', 'POST', 'HEAD'])
@@ -240,7 +248,7 @@ def get_policies_kerberos():
     if cl is not None and cl > XCEP_MAX_BODY_BYTES:
         return Response('Request body too large', status=413)
 
-    connection_key = request.environ.get('REMOTE_ADDR')
+    connection_key = client_ip()
     result = negotiate_auth.authenticate_negotiate(request.headers.get('Authorization'), connection_key)
     if result.status in ('challenge', 'continue'):
         # 'continue': an intermediate SPNEGO leg (e.g. a request-mic round) --
@@ -263,7 +271,15 @@ def get_policies_kerberos():
     except GetPoliciesParseError as e:
         return _fault_response(f'Malformed request: {e}', status=400)
 
-    response = _handle_get_policies(parsed, ad_identity=True)
+    from services.windows_profiles import serve_kerberos
+    from services.wstep.wstep_service import REALM_NOT_SERVED
+    profile = serve_kerberos(result.client_principal, 'CEP')
+    if profile is None:
+        # Authenticated (RFC 4559): a refused realm is the request's fault, never a new challenge
+        response = _fault_response(REALM_NOT_SERVED, status=400, relates_to=parsed.message_id)
+    else:
+        logger.info("XCEP: policy of profile %s served to %s", profile.name, result.client_principal)
+        response = _handle_get_policies(parsed, ad_identity=True, profile=profile)
     if result.response_token_b64:
         response.headers['WWW-Authenticate'] = f'Negotiate {result.response_token_b64}'
     return response

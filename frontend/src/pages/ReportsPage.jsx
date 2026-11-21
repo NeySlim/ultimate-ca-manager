@@ -717,7 +717,7 @@ export default function ReportsPage() {
                           onChange={(e) => updateScheduleField(r.key, 'enabled', e.target.checked)}
                           className="rounded border-border"
                         />
-                        <Icon size={18} className="text-purple-500 shrink-0" />
+                        <Icon size={18} className="text-accent-pro shrink-0" />
                         <span className="text-sm font-medium text-text-primary truncate">{r.label}</span>
                         <Badge variant="default" size="sm" className="ml-1">PDF</Badge>
                       </label>
@@ -743,7 +743,7 @@ export default function ReportsPage() {
             <Card>
               <div className="px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                  <FilePdf size={16} className="text-purple-500" />
+                  <FilePdf size={16} className="text-accent-pro" />
                   {t('reports.pdf.templates')}
                 </h3>
               </div>
@@ -754,7 +754,7 @@ export default function ReportsPage() {
                     return (
                       <div
                         key={key}
-                        className="p-4 rounded-lg border-2 border-border hover:border-purple-400 bg-tertiary-50 transition-all flex flex-col gap-3"
+                        className="p-4 rounded-lg border-2 border-border hover:border-accent-pro bg-tertiary-50 transition-all flex flex-col gap-3"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 icon-bg-purple">

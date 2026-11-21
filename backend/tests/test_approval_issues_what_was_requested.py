@@ -11,6 +11,9 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 
 from models import Certificate, db
 from models.policy import ApprovalRequest
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
 UPN_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.3')
 

@@ -62,11 +62,12 @@ class MicrosoftCACRLSyncMixin:
                     reason,
                 )
 
-            candidates = MicrosoftCACRLSyncMixin._connection_certificates(msca)
+            # In id order: two syncs lock the rows they revoke in one order, never crosswise
+            candidates = sorted(MicrosoftCACRLSyncMixin._connection_certificates(msca), key=lambda c: c.id)
             newly_revoked = []
             for cert in candidates:
                 try:
-                    serial_int = int(cert.serial_number, 16)
+                    serial_int = int(cert.serial_number, 10)  # canonical decimal (utils/serial_format.py)
                 except (TypeError, ValueError):
                     continue
                 if serial_int not in revoked_entries:
@@ -76,9 +77,14 @@ class MicrosoftCACRLSyncMixin:
                 # syncs revocations, so skip rather than revoke.
                 if reason == 'removeFromCRL':
                     continue
-                cert.revoked = True
-                cert.revoked_at = revoked_at
-                cert.revoke_reason = reason
+                # Conditional: of two syncs reading the certificate unrevoked, one revokes and announces it
+                moved = Certificate.query.filter(
+                    Certificate.id == cert.id, Certificate.revoked.isnot(True),
+                ).update({Certificate.revoked: True, Certificate.revoked_at: revoked_at,
+                          Certificate.revoke_reason: reason}, synchronize_session=False)
+                db.session.expire(cert, ['revoked', 'revoked_at', 'revoke_reason'])
+                if moved != 1:
+                    continue
                 remember_if_compromised(cert)
                 newly_revoked.append(cert)
 

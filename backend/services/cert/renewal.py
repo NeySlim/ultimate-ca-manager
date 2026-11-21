@@ -13,7 +13,8 @@ from datetime import timedelta
 import cryptography.x509 as x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import ExtensionOID, NameOID
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy import select
+from sqlalchemy.exc import InvalidRequestError, SQLAlchemyError
 
 from models import db, CA, Certificate, RevokedSerial, SystemConfig
 from security.encryption import encrypt_private_key
@@ -38,8 +39,11 @@ from utils.qc_statements import carried_policy_oids, template_policy_oids
 from utils.leaf_key_usage import constrain_builder_key_usage
 from utils.spki_digest import certificate_key_sha256
 from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
+from utils.serial_format import canonical_serial
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
+from services.cert.unique_subject import SubjectTaken, lock_issuers, refuse_taken_subject
+from utils.ca_serial_counter import next_ca_serial
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils import notices as notices_mod
@@ -66,28 +70,40 @@ _ISSUER_OWNED_EXTENSION_OIDS = frozenset({
 _SUPERSEDED_FALLBACK = timedelta(days=365)
 
 
+# ``related_to`` of a member naming the A its row links to, as re-read under its lock
+CURRENT_RELATED = object()
+
 # ``known_serial`` default: the caller passes nothing, the instance's own
 # serial is the reference (None is a real value: a row that gained a serial
 # meanwhile was renewed)
 SERIAL_UNSET = object()
 
 
-def _renewed_meanwhile_message(trigger: str) -> str:
+def _overtaken(what: str, trigger: str) -> 'RenewalError':
+    """The 409 of a renewal another request overtook: the next attempt reads the new state."""
+    return RenewalError(_retry_message(what, trigger), 409, overtaken=True)
+
+
+def _renewed_meanwhile(trigger: str) -> 'RenewalError':
+    return _overtaken('Certificate was renewed by another request', trigger)
+
+
+def _retry_message(what: str, trigger: str) -> str:
     """The 409 message: the retry advice is for an operator, not a batch."""
-    if trigger == 'auto':
-        return 'Certificate was renewed by another request'
-    return 'Certificate was renewed by another request; reload it and retry'
+    return what if trigger == 'auto' else f'{what}; reload it and retry'
 
 
 class RenewalError(Exception):
     """A renewal refused or failed: ``status`` is the HTTP code to answer,
-    ``problem_type`` the FIPS problem type when FIPS mode refused it."""
+    ``problem_type`` the FIPS problem type when FIPS mode refused it, ``overtaken``
+    True when another request changed the row or its pair meanwhile (a retry may pass)."""
 
-    def __init__(self, message: str, status: int = 400, problem_type=None):
+    def __init__(self, message: str, status: int = 400, problem_type=None, overtaken=False):
         super().__init__(message)
         self.message = str(message)
         self.status = int(status)
         self.problem_type = problem_type
+        self.overtaken = bool(overtaken)
 
     def __str__(self) -> str:
         return self.message
@@ -146,21 +162,21 @@ def resolve_issuing_ca(cert: Certificate) -> 'CA | None':
     return verified[0][0]
 
 
-def check_renewable(cert: Certificate) -> None:
+def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
     """Raise :class:`RenewalError` when ``cert`` cannot be renewed at all
     (no certificate, revoked, issued by a Microsoft CA, key not held by the
-    server). Shared by the renewal itself and by the routes, which check it
-    before queueing a renewal for approval: a request no renewal could honour
-    must not wait for an approver."""
+    server, key type closed by FIPS, stored certificate unreadable, SAN types
+    its template refuses), in that order. Shared by the renewal itself, the
+    routes and the scheduler, which check it before queueing a renewal for
+    approval: a request no renewal could honour must not wait for an approver.
+    ``trigger`` words the refusal of a row renewed since it was read."""
     if not cert.crt:
         raise RenewalError('Certificate data not available', 400)
     # Any revocation, a suspension included: renewing would hand back a good serial
     if cert.revoked:
         raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
     # The record outlives the row: a row left unrevoked beside it renews nothing
-    from services.cert.issued_lookup import row_persisted_revocation
-    if row_persisted_revocation(cert) is not None:
-        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+    _refuse_recorded_revocation(cert, None, trigger)
     if cert.source == 'msca':
         raise RenewalError('Microsoft CA certificates must be renewed through the AD CS connector', 400)
 
@@ -182,9 +198,13 @@ def check_renewable(cert: Certificate) -> None:
         name = alg.display if alg else _stored_eddsa_name(cert)
         if name in ('Ed25519', 'Ed448'):
             try:
-                fips_mode.refuse(f'{name} key of certificate {cert.id}')
+                fips_mode.refuse_unless_approved(name.upper(), f'{name} key of certificate {cert.id}')
             except FipsRestricted as e:
                 raise RenewalError.from_fips(e) from e
+
+    # After the refusals above, before the first decoding of the certificate below
+    if _stored(cert) is None:
+        raise _unreadable(cert.id, False, link=cert.related_certificate_id is not None)
 
     # The template's SAN types bind the renewed names as they bound the issuance
     template_id = getattr(cert, 'template_id', None)
@@ -204,6 +224,21 @@ def check_renewable(cert: Certificate) -> None:
                 raise RenewalError(f'Policy violation: {refusal}', 400)
 
 
+def _refuse_recorded_revocation(cert: Certificate, ca, trigger: str) -> None:
+    """Refuse ``cert`` when a record revokes the serial it was read with. A renewal that
+    committed since records that serial as superseded: only the serial the row carries
+    now is revoked by its record, an older one was renewed meanwhile."""
+    from services.cert.issued_lookup import row_persisted_revocation
+    if row_persisted_revocation(cert, ca) is None:
+        return
+    stored = db.session.query(Certificate.serial_number).filter(Certificate.id == cert.id).first()
+    if stored is None:
+        raise RenewalError('Certificate no longer exists', 404)
+    if stored[0] != cert.serial_number:
+        raise _renewed_meanwhile(trigger)
+    raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+
+
 def _stored_eddsa_name(cert: Certificate):
     try:
         return eddsa_key_name(load_pem_bytes(cert.prv, context=f'certificate {cert.id}'))
@@ -220,35 +255,62 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     the caller decided on (default: the one ``cert`` carries). The other member
     of a related pair is renewed with it, A first, in the same commit."""
     try:
-        members = _renewal_members(cert)
+        # The caller's view, taken before judging a partner's link re-reads this very row
+        try:
+            known_serial = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
+            was_archived = bool(cert.archived)
+        except InvalidRequestError as e:  # deleted since the caller read it
+            raise RenewalError('Certificate no longer exists', 404) from e
+        members, linked = _linked_members(cert)
+        # Read before a row takes its new certificate: the replaced ones prove the entity
+        previous = [(m, _stored(m)) for m in members]
         pair = len(members) == 2
         staged_all, renewed_a = [], None
         for index, member in enumerate(members):
             is_cert = member is cert
-            # B names A as renewed a moment ago; a lone certificate names its A as it is
-            related_to = renewed_a if pair and index == 1 else _current_related(member)
+            # B names A as renewed a moment ago; any other member the A its locked row hashes
+            related_to = renewed_a if pair and index == 1 else CURRENT_RELATED
             try:
                 staged_member = _stage_renewal(
                     member, ca if is_cert else None, rekey=rekey, trigger=trigger,
                     known_serial=known_serial if is_cert else SERIAL_UNSET,
-                    validity_days=validity_days, related_to=related_to)
+                    was_archived=was_archived if is_cert else None,
+                    link=members[1 - index].id if pair else linked,
+                    validity_days=validity_days, related_to=related_to,
+                    precheck=lambda signer, issued: _refuse_taken(
+                        signer, issued, members, trigger, username, locked=False,
+                        previous=previous))
             except RenewalError as e:
                 if is_cert:
                     raise
                 raise RenewalError(f'Related certificate {member.id}: {e.message}', e.status,
-                                   e.problem_type) from e
+                                   e.problem_type, e.overtaken) from e
             if pair and index == 0:
                 renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
             staged_all.append(staged_member)
-        if not pair and related_to is None:
+        if not pair and staged_all[0]['related_to'] is None:
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
+        # A renewal is an issuance, counted in its commit; the CA rows (twins' lowest records
+        # included) are locked last, after every certificate row written, all in id order
+        try:
+            db.session.flush()
+        except SQLAlchemyError as e:
+            logger.error(f'Failed to renew certificate {cert.id}: {e}', exc_info=True)
+            raise RenewalError('Failed to renew certificate', 500) from e
+        lock_issuers([s['ca'] for s in staged_all])
+        for s in sorted(staged_all, key=lambda s: s['ca'].id):
+            next_ca_serial(s['ca'])
+        # The renewed row is the same entity (RFC 5280 §4.1.2.6), and so is its pair partner
+        rows = [s['cert'] for s in staged_all]
+        for s in staged_all:
+            _refuse_taken(s['ca'], x509.load_pem_x509_certificate(s['cert_pem']), rows, trigger, username,
+                          previous=previous)
     except Exception:
         db.session.rollback()
         raise
     staged = staged_all[members.index(cert)]
-    cert, ca = staged['cert'], staged['ca']
     cert_id = staged['cert_id']
     if not commit_or_rollback(logger, f'Failed to renew certificate {cert_id}'):
         raise RenewalError('Failed to renew certificate', 500)
@@ -260,36 +322,112 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         'new_serial': staged['new_serial'],
         'valid_from': utc_isoformat(staged['valid_from']),
         'valid_to': utc_isoformat(staged['valid_to']),
-        'ca_id': ca.id,
-        'ca_refid': ca.refid,
+        'ca_id': staged['ca_id'],
+        'ca_refid': staged['ca_refid'],
         'rekeyed': bool(rekey),
-        'notices': staged['notices'],
-        'related': [{'cert_id': s['cert_id'], 'ca_id': s['ca'].id, 'new_serial': s['new_serial']}
+        # A partner's dropped extension is said too: the caller renewed that member as well
+        'notices': staged['notices'] + [s['dropped'] for s in others if s['dropped']],
+        'related': [{'cert_id': s['cert_id'], 'ca_id': s['ca_id'], 'new_serial': s['new_serial']}
                     for s in others],
     }
     crl_done = set()
     for s in [staged] + others:
-        _after_commit(s['cert'], s['ca'], s, username=username, actor_user_id=actor_user_id,
-                      rekey=rekey, regenerate_crl=regenerate_crl and s['ca'].id not in crl_done,
-                      trigger=trigger)
-        crl_done.add(s['ca'].id)
+        issuer = current_issuer(s['cert_id'])
+        _after_commit(s['cert'], issuer, s, username=username, actor_user_id=actor_user_id,
+                      rekey=rekey, regenerate_crl=regenerate_crl and issuer is not None
+                      and issuer[0] not in crl_done, trigger=trigger)
+        if issuer is not None:
+            crl_done.add(issuer[0])
     return outcome
+
+
+def current_issuer(cert_id):
+    """``(id, refid, cdp_enabled)`` of the CA the certificate row names now, read as plain
+    values: once committed, the record it was signed under may have been merged away."""
+    try:
+        row = db.session.execute(
+            select(CA.id, CA.refid, CA.cdp_enabled)
+            .join(Certificate, Certificate.caref == CA.refid)
+            .where(Certificate.id == cert_id)).first()
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.warning(f"Issuer of renewed certificate {cert_id} not read: {e}")
+        return None
+    return tuple(row) if row is not None else None
+
+
+def _refuse_taken(ca, issued, rows, trigger, username, locked=True, previous=()):
+    """RFC 5280 §4.1.2.6: the renewed rows are the same entity; another one's subject is a 409."""
+    try:
+        refuse_taken_subject(ca, issued, own=rows, source=f'renewal ({trigger})', requester=username,
+                             locked=locked, previous=previous)
+    except SubjectTaken as e:
+        raise RenewalError(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to '
+                           'another entity: the CA requires a unique subject', 409) from e
+
+
+def _stored(row):
+    try:
+        return x509.load_pem_x509_certificate(b64decode(row.crt)) if row.crt else None
+    except (ValueError, InvalidRequestError):  # unreadable or deleted: check_renewable answers
+        return None
 
 
 def _renewal_members(cert):
     """``[cert]``, or both members of its related pair with A first. A partner whose key
-    the server does not hold (enrolled by a device) renews through its own protocol, never here."""
-    from services.cert.related_pair import anchor_first, mutual_partner
+    the server does not hold (enrolled by a device) renews through its own protocol, never
+    here; an archived one (superseded) is not renewed at all. Refused (RenewalError, 409) when a
+    member cannot be read."""
+    return _linked_members(cert)[0]
+
+
+def _linked_members(cert):
+    """The members, and the stored link of ``cert`` they were chosen on: _reread refuses
+    the renewal when a newer B has taken the certificate since."""
+    from services.cert.related_pair import anchor_first
     try:
-        partner = mutual_partner(cert)
+        # The stored link, not the caller's copy: a newer B may have taken this certificate
+        linked = db.session.scalar(
+            select(Certificate.related_certificate_id).where(Certificate.id == cert.id))
+        partner = _as_stored(linked) if linked else None
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
-        return [cert]
-    if partner is None or not cert.crt or not partner.crt or not partner.prv:
-        return [cert]
+        return [cert], None
+    if (partner is None or partner.related_certificate_id != cert.id or partner.archived
+            or not cert.crt or not partner.crt or not partner.prv):
+        return [cert], linked
     from services.cert.issued_lookup import row_revoked
     if row_revoked(partner):  # by its row or by the record of its serial
-        return [cert]
-    return list(anchor_first(cert, partner))
+        return [cert], linked
+    _refuse_unreadable(partner, related=True)
+    _refuse_unreadable(cert)
+    return list(anchor_first(cert, partner)), linked
+
+
+def _refuse_unreadable(row, related=False):
+    """Refuse, naming *row*, when its certificate or its RelatedCertificate extension cannot be
+    read: a corrupt row never unlinks a pair in silence."""
+    from services.cert.related_pair import row_certificate
+    from utils.related_cert import read_related_certificate
+    try:
+        certificate = row_certificate(row)
+        if certificate is not None:
+            read_related_certificate(certificate)
+    except ValueError as e:  # RelatedCertError included
+        raise _unreadable(row.id, related) from e
+
+
+def _unreadable(row_id, related, link=True) -> 'RenewalError':
+    what = f'Related certificate {row_id}' if related else f'Certificate {row_id}'
+    if not link:
+        return RenewalError(f'{what} cannot be read: the renewal is refused', 409)
+    return RenewalError(f'{what} cannot be read: renewing would drop its RFC 9763 link, so the '
+                        f'renewal is refused', 409)
+
+
+def _as_stored(row_id):
+    """The row as the database holds it now, None once deleted: one the session kept may have
+    been renewed or revoked since, and its revocation is judged on the serial it carries now."""
+    return db.session.get(Certificate, row_id, populate_existing=True)
 
 
 def renewal_partner(cert):
@@ -298,37 +436,79 @@ def renewal_partner(cert):
 
 
 def _current_related(row):
-    """The certificate A that *row*'s certificate names, while A is held, valid and
-    unrevoked; None otherwise (the renewed certificate then names nothing)."""
+    """The certificate A that *row*'s RelatedCertificate extension hashes, None when none is
+    named (RFC 9763 §4.1): see :func:`_named_related`."""
+    return _named_related(row)[0]
+
+
+def _named_related(row):
+    """``(A, why)``: the A *row*'s extension hashes (RFC 9763 §4.1) while held, valid, unrevoked and
+    unarchived, else None and why it is no longer named (None: the original named nothing).
+    Refused when that extension, or a linked row that could hold A, cannot be read."""
     from services.cert.related_pair import row_certificate
+    from utils import related_cert
     try:
-        if not row.related_certificate_id or not row.crt:
-            return None
+        if not row.crt:
+            return None, None
+        row_id, linked_id = row.id, row.related_certificate_id
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
-        return None
-    original = x509.load_pem_x509_certificate(b64decode(row.crt))
+        return None, None
     try:
-        original.extensions.get_extension_for_oid(RELATED_CERT_EXTENSION_OID)
-    except x509.ExtensionNotFound:
-        return None
-    a_row = db.session.get(Certificate, row.related_certificate_id)
-    if a_row is None or not a_row.crt:
-        return None
+        original = x509.load_pem_x509_certificate(b64decode(row.crt))
+    except ValueError as e:  # binascii.Error included: the row itself is unreadable
+        raise _unreadable(row_id, False, link=linked_id is not None) from e
+    try:
+        if related_cert.read_related_certificate(original) is None:
+            return None, None
+    except related_cert.RelatedCertError as e:  # an unreadable hash: refused, not dropped
+        raise _unreadable(row_id, False) from e
+    a_row = _row_named_by(original, row_id, linked_id)
+    if a_row is None:
+        return None, 'has been replaced or removed'
+    if a_row.archived:
+        return None, 'is archived'
     from services.cert.issued_lookup import row_revoked
     if row_revoked(a_row):  # by its row or by the record of its serial
-        return None
+        return None, 'has been revoked'
     cert_a = row_certificate(a_row)
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():
-        return None
-    return cert_a
+        return None, 'has expired'
+    return cert_a, None
 
 
-def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None) -> dict:
+def _row_named_by(original, row_id, linked_id):
+    """The row, as stored now, holding the certificate *original*'s extension hashes (RFC 9763
+    §4.1): the linked row, else a row linked to *row_id*. One unreadable refuses the renewal."""
+    from services.cert.related_pair import row_certificate
+    from utils.related_cert import references
+
+    def hashed(candidate):
+        try:
+            return bool(candidate.crt) and references(original, row_certificate(candidate))
+        except ValueError as e:  # it may be the one hashed: never read as "not named"
+            raise _unreadable(candidate.id, True) from e
+
+    if linked_id:
+        linked = _as_stored(linked_id)
+        if linked is not None and hashed(linked):
+            return linked
+    linking = (Certificate.query.populate_existing()
+               .filter(Certificate.related_certificate_id == row_id).order_by(Certificate.id).all())
+    return next((c for c in linking if hashed(c)), None)
+
+
+def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
+                   precheck=None, was_archived=None, link=SERIAL_UNSET) -> dict:
     """Every check, the signature and the writes, left uncommitted; *related_to*
-    is the certificate A the renewed one names (RFC 9763)."""
-    cert = _reread(cert, known_serial, trigger)
-    check_renewable(cert)
-    ca, ca_cert, ca_key = _signing_ca(cert, ca)
+    is the certificate A the renewed one names (RFC 9763), CURRENT_RELATED to read it
+    from the locked row, *link* the row the members were chosen on."""
+    cert = _reread(cert, known_serial, trigger, was_archived, link)
+    dropped = None
+    if related_to is CURRENT_RELATED:
+        related_to, why = _named_related(cert)
+        dropped = why and notices_mod.related_certificate_dropped(cert.id, why)
+    check_renewable(cert, trigger)
+    ca, ca_cert, ca_key = _signing_ca(cert, ca, trigger)
 
     original = x509.load_pem_x509_certificate(b64decode(cert.crt))
     public_key = original.public_key()
@@ -343,6 +523,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     if not_after < wanted:
         notices.append(notices_mod.validity_shortened(
             granted, max((not_after - now).days, 0), notices_mod.issuer_expiry_reason(not_after)))
+    if dropped:
+        notices.append(dropped)
     _check_name_constraints(ca_cert, original)
 
     new_key = None
@@ -358,11 +540,13 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
                        _template_custom_extensions(getattr(cert, 'template_id', None)))
     renewed = builder.sign(private_key=ca_key, algorithm=sign_hash,
                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
+    if precheck is not None:  # without the lock, before the CT logs see a pre-certificate
+        precheck(ca, renewed)
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
 
     old_serial, old_valid_to = cert.serial_number, cert.valid_to
     old_digest = certificate_key_sha256(cert.crt)  # read before the row takes the new key
-    new_serial = format(renewed.serial_number, 'x')
+    new_serial = canonical_serial(renewed.serial_number)  # query.update skips the validator
     _take_serial(cert.id, old_serial, new_serial, trigger)
 
     cert_pem = renewed.public_bytes(serialization.Encoding.PEM)
@@ -371,27 +555,37 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     _record_superseded(cert.id, ca, old_serial, old_valid_to, now, old_digest)
     _record_scts(cert.id, scts)
     return {
-        'cert': cert, 'cert_id': cert.id, 'ca': ca, 'old_serial': old_serial,
+        # Plain values: the outcome is built after the commit, when these rows may be gone
+        'cert': cert, 'cert_id': cert.id, 'ca': ca, 'ca_id': ca.id, 'ca_refid': ca.refid,
+        'old_serial': old_serial,
         'new_serial': new_serial, 'valid_from': cert.valid_from, 'valid_to': cert.valid_to,
-        'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem,
+        'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem, 'related_to': related_to,
+        'dropped': dropped,
     }
 
 
-def _reread(cert, known_serial, trigger):
-    """The row as stored now, locked until the commit on PostgreSQL."""
+def _reread(cert, known_serial, trigger, was_archived=None, link=SERIAL_UNSET):
+    """The row as stored now, locked until the commit on PostgreSQL. A row renewed or
+    archived since the caller read it is refused: an archived row is renewed only by a
+    caller that read it archived, never revived behind another renewal's back. So is one
+    whose related certificate is no longer ``link``: a newer B took it after the members
+    were chosen, and writes that link under this same lock."""
     try:
         expected = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
+        was_archived = bool(cert.archived) if was_archived is None else was_archived
         fresh = db.session.get(Certificate, cert.id, populate_existing=True, with_for_update=True)
     except InvalidRequestError:  # deleted since the caller read it
         fresh = None
     if fresh is None:
         raise RenewalError('Certificate no longer exists', 404)
-    if fresh.serial_number != expected:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+    if fresh.serial_number != expected or bool(fresh.archived) != was_archived:
+        raise _renewed_meanwhile(trigger)
+    if link is not SERIAL_UNSET and fresh.related_certificate_id != link:
+        raise _overtaken('The related pair was changed by another request', trigger)
     return fresh
 
 
-def _signing_ca(cert, ca):
+def _signing_ca(cert, ca, trigger='manual'):
     """``(ca, ca certificate, signing key)`` of the CA that really signed ``cert``."""
     if ca is None:
         ca = resolve_issuing_ca(cert)
@@ -413,9 +607,7 @@ def _signing_ca(cert, ca):
             f'This certificate\'s signature does not verify with the current key of CA "{ca.descr}" '
             '(re-keyed or replaced): it cannot be renewed under it, issue a new certificate instead', 400)
     # Under the CA that really signed it, which a row without caref only now names
-    from services.cert.issued_lookup import row_persisted_revocation
-    if row_persisted_revocation(cert, ca) is not None:
-        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+    _refuse_recorded_revocation(cert, ca, trigger)
 
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:
@@ -643,7 +835,7 @@ def _take_serial(cert_id, old_serial, new_serial, trigger) -> None:
     taken = db.session.query(Certificate).filter(Certificate.id == cert_id, holds_old).update(
         {Certificate.serial_number: new_serial}, synchronize_session=False)
     if taken != 1:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+        raise _renewed_meanwhile(trigger)
 
 
 def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -> None:
@@ -683,7 +875,7 @@ def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=No
     from services.cert.issued_lookup import record_reason_replaceable
     if not old_serial or ca is None:
         return
-    row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=old_serial).first()
+    row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=canonical_serial(old_serial)).first()
     fresh = row is None
     if fresh:
         row = RevokedSerial(caref=ca.refid, serial_number=old_serial)
@@ -709,8 +901,10 @@ def _record_scts(cert_id, scts) -> None:
         db.session.delete(row)
 
 
-def _after_commit(cert, ca, staged, *, username, actor_user_id, rekey, regenerate_crl, trigger) -> None:
-    """Each effect is tried on its own: a failure is logged, never raised."""
+def _after_commit(cert, issuer, staged, *, username, actor_user_id, rekey, regenerate_crl,
+                  trigger) -> None:
+    """Each effect is tried on its own: a failure is logged, never raised. *issuer* is the
+    ``current_issuer`` of the row, None when it names no CA any more."""
     cert_id = staged['cert_id']
     old_serial = staged['old_serial']
 
@@ -738,16 +932,16 @@ def _after_commit(cert, ca, staged, *, username, actor_user_id, rekey, regenerat
     try:
         if old_serial:
             from services.ocsp_service import OCSPService
-            OCSPService.invalidate_cached_responses(old_serial, ca_id=ca.id)
+            OCSPService.invalidate_cached_responses(old_serial, ca_id=staged['ca_id'])
     except Exception as e:
         logger.warning(f"OCSP cache of superseded serial {old_serial} not cleared: {e}")
 
     try:
-        if regenerate_crl and ca.cdp_enabled:
+        if regenerate_crl and issuer[2]:
             from services.crl import CRLService
-            CRLService.generate_crl(ca.id, username=username)
+            CRLService.generate_crl(issuer[0], username=username)
     except Exception as e:
-        logger.warning(f"CRL of CA {ca.id} not regenerated after renewing certificate {cert_id}: {e}")
+        logger.warning(f"CRL of CA {issuer[0]} not regenerated after renewing certificate {cert_id}: {e}")
 
     try:
         from services.audit_service import AuditService
@@ -759,7 +953,7 @@ def _after_commit(cert, ca, staged, *, username, actor_user_id, rekey, regenerat
             resource_name=cert.subject,
             details=(f"Renewed until {utc_isoformat(valid_to)} (trigger: {trigger}, "
                      f"{'rekeyed' if rekey else 'same key'}); serial {old_serial} -> "
-                     f"{staged['new_serial']}"),
+                     f"{staged['new_serial']}" + (f"; {staged['dropped']}" if staged['dropped'] else '')),
             success=True,
             username=username,
             user_id=actor_user_id,
@@ -769,7 +963,8 @@ def _after_commit(cert, ca, staged, *, username, actor_user_id, rekey, regenerat
 
     try:
         from services.webhook_service import emit_cert_renewed
-        emit_cert_renewed(cert.to_dict(), ca_refid=ca.refid, actor=username)
+        emit_cert_renewed(cert.to_dict(), ca_refid=issuer[1] if issuer else staged['ca_refid'],
+                          actor=username)
     except Exception as e:
         logger.warning(f"Renewal webhook of certificate {cert_id} not emitted: {e}")
 

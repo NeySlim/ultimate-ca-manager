@@ -231,7 +231,6 @@ class TestImportLinksOnlyTheSigningCa:
 
     def test_the_legacy_opnsense_service_does_not_link_it_either(self, app, issuer, monkeypatch, tmp_path):
         from services.opnsense import importer
-        monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
         _, refid, ca_cert, ca_key = issuer
         forged, _ = _leaf('forged-legacy.example.test', ca_cert, _gen())
         real, _ = _leaf('real-legacy.example.test', ca_cert, ca_key)
@@ -300,11 +299,12 @@ class TestStoredRowsAreIssuedOnlyWhenTheCaSignedThem:
         """Non-regression: passes with or without the signature check, not a proof of it."""
         from models import RevokedSerial
         from services.cert.issued_lookup import REVOKED, issued_certificate_status
+        from utils.serial_format import canonical_serial
         ca_id, refid, ca_cert, _ = issuer
         forged, _ = _leaf('forged-revoked.example.test', ca_cert, _gen())
         _store(app, forged, refid)
         with app.app_context():
-            db.session.add(RevokedSerial(caref=refid, serial_number=str(forged.serial_number),
+            db.session.add(RevokedSerial(caref=refid, serial_number=canonical_serial(forged.serial_number),
                                          valid_to=forged.not_valid_after_utc.replace(tzinfo=None)))
             db.session.commit()
             assert issued_certificate_status(db.session.get(CA, ca_id), forged)[1] == REVOKED
@@ -417,11 +417,12 @@ class TestALiveRowNeverHidesAPersistentRevocation:
 
     def test_a_forged_row_of_a_revoked_serial(self, app, issuer):
         from models import RevokedSerial
+        from utils.serial_format import canonical_serial
         ca_id, refid, ca_cert, _ = issuer
         forged, _ = _leaf('forged-ocsp.example.test', ca_cert, _gen())
         _store(app, forged, refid)
         with app.app_context():
-            db.session.add(RevokedSerial(caref=refid, serial_number=str(forged.serial_number),
+            db.session.add(RevokedSerial(caref=refid, serial_number=canonical_serial(forged.serial_number),
                                          valid_to=forged.not_valid_after_utc.replace(tzinfo=None)))
             db.session.commit()
         assert self._answers(app, ca_id, forged.serial_number) == ('revoked', True)
@@ -505,7 +506,6 @@ class TestACaIsChainedOnlyUnderTheCaThatSignedIt:
 
     def test_the_legacy_opnsense_service(self, app, issuer, monkeypatch, tmp_path, created):
         from services.opnsense import importer
-        monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
         _, refid, root_cert, root_key = issuer
         entries = [{'refid': uuid.uuid4().hex[:13], 'descr': 'legacy sub', 'is_root': False,
                     'crt': base64.b64encode(_pem(cert).encode()).decode(),
@@ -541,7 +541,6 @@ class TestAnOpnsenseEntryNamingTheWrongCaFindsItsSigner:
 
     def test_the_legacy_service(self, app, issuer, other_refid, monkeypatch, tmp_path):
         from services.opnsense import importer
-        monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
         _, refid, ca_cert, ca_key = issuer
         real, _ = _leaf('misnamed-legacy.example.test', ca_cert, ca_key)
         entries = [{'refid': uuid.uuid4().hex[:13], 'caref': other_refid, 'descr': 'legacy misnamed',

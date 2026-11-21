@@ -24,6 +24,7 @@ from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
 
 from . import installation
+from .export_generic import iter_model_pages
 from .key_material import (
     as_pem, decrypt_stored_key, decrypt_stored_secret, key_matches_certificate,
 )
@@ -36,7 +37,7 @@ class ExportCoreMixin:
         """Generate backup metadata.
 
         The schema fields (version, dialect, sections, counts, exclusions) are
-        added by _schema_metadata() once the payload is known.
+        added by iter_backup() before the sections are written.
         """
         return {
             'version': '1.0',
@@ -59,7 +60,7 @@ class ExportCoreMixin:
         # Get all system config entries
         system_configs = SystemConfig.query.all()
         for sc in system_configs:
-            if sc.key in installation.LOCAL_SETTINGS:
+            if installation.is_local_setting(sc.key):
                 continue    # the installation's own; its id is carried in the metadata
             val = sc.value
             # A setting is secret either because the row says so or because
@@ -108,70 +109,69 @@ class ExportCoreMixin:
         if not include:
             return []
 
-        import base64
-        cas = []
-        for ca in CA.query.all():
-            ca_data = {
-                'refid': ca.refid,
-                'descr': ca.descr,
-                'subject': ca.subject,
-                'issuer': ca.issuer,
-                'valid_from': ca.valid_from.isoformat() if ca.valid_from else None,
-                'valid_to': ca.valid_to.isoformat() if ca.valid_to else None,
-                'serial': ca.serial,
-                'caref': ca.caref,  # Parent CA for intermediates
-                'cdp_enabled': ca.cdp_enabled,
-                'cdp_url': ca.cdp_url,
-                'cdp_urls': ca.get_cdp_urls(),
-                'ocsp_enabled': ca.ocsp_enabled,
-                'ocsp_url': ca.ocsp_url,
-                'ocsp_urls': ca.get_ocsp_urls(),
-                'aia_ca_issuers_enabled': getattr(ca, 'aia_ca_issuers_enabled', False),
-                'aia_ca_issuers_url': getattr(ca, 'aia_ca_issuers_url', None),
-                'aia_ca_issuers_urls': ca.get_aia_urls(),
-                'cps_enabled': ca.cps_enabled,
-                'cps_uri': ca.cps_uri,
-                'cps_oid': ca.cps_oid,
-                'signature_scheme': ca.signature_scheme or 'pkcs1v15',
-                'compliance_profile': ca.compliance_profile,
-                'issuance_hidden': bool(ca.issuance_hidden),
-                'imported_from': ca.imported_from,
-                'serial_number': ca.serial_number,
-                'ski': ca.ski,
-                'offline': bool(ca.offline),
-                'offline_reason': ca.offline_reason,
-                'offline_mode': ca.offline_mode,
-                # Revocation state (#343): without it a restore brings a
-                # revoked CA back as active, answering good over OCSP and
-                # free to sign again
-                'revoked': bool(ca.revoked),
-                'revoked_at': ca.revoked_at.isoformat() if ca.revoked_at else None,
-                'revoke_reason': ca.revoke_reason,
-                'invalidity_at': ca.invalidity_at.isoformat() if ca.invalidity_at else None,
-                'certificate_pem': base64.b64decode(ca.crt).decode() if ca.crt else None,
-                # A CA awaiting its external certificate keeps its request:
-                # without it the restored CA can never be completed (#298)
-                'csr_pem': ca.csr,
-                'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
-            }
+        return [self._ca_row(ca) for page in iter_model_pages(CA) for ca in page]
 
-            # Decrypt at-rest encryption before export (backup uses its own
-            # encryption). A key that cannot be decrypted aborts the backup:
-            # archiving the stored ciphertext in its place produced an archive
-            # whose restored CA could no longer sign anything.
-            if ca.prv:
-                label = f"CA {ca.refid}"
-                ca_data['_private_key_plaintext'] = as_pem(
-                    decrypt_stored_key(ca.prv, label=label), label=label
-                )
-                if not key_matches_certificate(
-                        ca_data['_private_key_plaintext'],
-                        ca_data.get('certificate_pem'), label=label):
-                    ca_data['_key_mismatch'] = True
+    def _ca_row(self, ca) -> Dict[str, Any]:
+        """The dedicated part of one CA's row: PEMs, URL lists, the key in the clear."""
+        ca_data = {
+            'refid': ca.refid,
+            'descr': ca.descr,
+            'subject': ca.subject,
+            'issuer': ca.issuer,
+            'valid_from': ca.valid_from.isoformat() if ca.valid_from else None,
+            'valid_to': ca.valid_to.isoformat() if ca.valid_to else None,
+            'serial': ca.serial,
+            'caref': ca.caref,  # Parent CA for intermediates
+            'cdp_enabled': ca.cdp_enabled,
+            'cdp_url': ca.cdp_url,
+            'cdp_urls': ca.get_cdp_urls(),
+            'ocsp_enabled': ca.ocsp_enabled,
+            'ocsp_url': ca.ocsp_url,
+            'ocsp_urls': ca.get_ocsp_urls(),
+            'aia_ca_issuers_enabled': getattr(ca, 'aia_ca_issuers_enabled', False),
+            'aia_ca_issuers_url': getattr(ca, 'aia_ca_issuers_url', None),
+            'aia_ca_issuers_urls': ca.get_aia_urls(),
+            'cps_enabled': ca.cps_enabled,
+            'cps_uri': ca.cps_uri,
+            'cps_oid': ca.cps_oid,
+            'signature_scheme': ca.signature_scheme or 'pkcs1v15',
+            'compliance_profile': ca.compliance_profile,
+            'issuance_hidden': bool(ca.issuance_hidden),
+            'enforce_unique_subject': bool(ca.enforce_unique_subject),
+            'imported_from': ca.imported_from,
+            'serial_number': ca.serial_number,
+            'ski': ca.ski,
+            'offline': bool(ca.offline),
+            'offline_reason': ca.offline_reason,
+            'offline_mode': ca.offline_mode,
+            # Revocation state (#343): without it a restore brings a
+            # revoked CA back as active, answering good over OCSP and
+            # free to sign again
+            'revoked': bool(ca.revoked),
+            'revoked_at': ca.revoked_at.isoformat() if ca.revoked_at else None,
+            'revoke_reason': ca.revoke_reason,
+            'invalidity_at': ca.invalidity_at.isoformat() if ca.invalidity_at else None,
+            'certificate_pem': base64.b64decode(ca.crt).decode() if ca.crt else None,
+            # A CA awaiting its external certificate keeps its request:
+            # without it the restored CA can never be completed (#298)
+            'csr_pem': ca.csr,
+            'private_key_pem_encrypted': None  # Will be set in _encrypt_section_keys
+        }
 
-            cas.append(ca_data)
-
-        return cas
+        # Decrypt at-rest encryption before export (backup uses its own
+        # encryption). A key that cannot be decrypted aborts the backup:
+        # archiving the stored ciphertext in its place produced an archive
+        # whose restored CA could no longer sign anything.
+        if ca.prv:
+            label = f"CA {ca.refid}"
+            ca_data['_private_key_plaintext'] = as_pem(
+                decrypt_stored_key(ca.prv, label=label), label=label
+            )
+            if not key_matches_certificate(
+                    ca_data['_private_key_plaintext'],
+                    ca_data.get('certificate_pem'), label=label):
+                ca_data['_key_mismatch'] = True
+        return ca_data
 
     def _export_revoked_serials(self, include: bool) -> List[Dict[str, Any]]:
         """Export the persistent revocation records (#343).
@@ -184,76 +184,76 @@ class ExportCoreMixin:
             return []
 
         from models.revoked_serial import RevokedSerial
-        return [
-            {
-                'caref': rs.caref,
-                'serial_number': rs.serial_number,
-                'revoked_at': rs.revoked_at.isoformat() if rs.revoked_at else None,
-                'revoke_reason': rs.revoke_reason,
-                'invalidity_at': rs.invalidity_at.isoformat() if rs.invalidity_at else None,
-                'valid_to': rs.valid_to.isoformat() if rs.valid_to else None,
-                'certificate_id': rs.certificate_id,
-                'public_key_sha256': rs.public_key_sha256,
-            }
-            for rs in RevokedSerial.query.order_by(RevokedSerial.id).all()
-        ]
+        return [self._revoked_serial_row(rs) for page in iter_model_pages(RevokedSerial) for rs in page]
+
+    @staticmethod
+    def _revoked_serial_row(rs) -> Dict[str, Any]:
+        return {
+            'caref': rs.caref,
+            'serial_number': rs.serial_number,
+            'revoked_at': rs.revoked_at.isoformat() if rs.revoked_at else None,
+            'revoke_reason': rs.revoke_reason,
+            'invalidity_at': rs.invalidity_at.isoformat() if rs.invalidity_at else None,
+            'valid_to': rs.valid_to.isoformat() if rs.valid_to else None,
+            'certificate_id': rs.certificate_id,
+            'public_key_sha256': rs.public_key_sha256,
+        }
 
     def _export_certificates(self, include: bool) -> List[Dict[str, Any]]:
         """Export certificates with encrypted private keys"""
         if not include:
             return []
 
-        import base64
-        certs = []
-        for cert in Certificate.query.all():
-            cert_data = {
-                'refid': cert.refid,
-                'descr': cert.descr,
-                'caref': cert.caref,
-                'cert_type': cert.cert_type,
-                'subject': cert.subject,
-                'issuer': cert.issuer,
-                'serial_number': cert.serial_number,
-                'valid_from': cert.valid_from.isoformat() if cert.valid_from else None,
-                'valid_to': cert.valid_to.isoformat() if cert.valid_to else None,
-                'key_algo': cert.key_algo,
-                'san_dns': cert.san_dns,
-                'san_ip': cert.san_ip,
-                'san_email': cert.san_email,
-                'san_uri': cert.san_uri,
-                'ocsp_uri': cert.ocsp_uri,
-                'ocsp_must_staple': getattr(cert, 'ocsp_must_staple', False),
-                'private_key_location': cert.private_key_location,
-                'revoked': bool(cert.revoked),
-                'revoked_at': cert.revoked_at.isoformat() if cert.revoked_at else None,
-                'revoke_reason': cert.revoke_reason,
-                'invalidity_at': cert.invalidity_at.isoformat() if cert.invalidity_at else None,
-                'archived': bool(cert.archived),
-                'imported_from': cert.imported_from,
-                'created_at': cert.created_at.isoformat() if cert.created_at else None,
-                'created_by': cert.created_by,
-                'source': cert.source,
-                'template_id': cert.template_id,
-                'owner_group_id': cert.owner_group_id,
-                'certificate_pem': base64.b64decode(cert.crt).decode() if cert.crt else None,
-                'csr_pem': base64.b64decode(cert.csr).decode() if cert.csr else None,
-                'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
-            }
+        return [self._certificate_row(cert) for page in iter_model_pages(Certificate) for cert in page]
 
-            # Decrypt at-rest encryption before export (see _export_cas)
-            if cert.prv:
-                label = f"certificate {cert.refid}"
-                cert_data['_private_key_plaintext'] = as_pem(
-                    decrypt_stored_key(cert.prv, label=label), label=label
-                )
-                if not key_matches_certificate(
-                        cert_data['_private_key_plaintext'],
-                        cert_data.get('certificate_pem'), label=label):
-                    cert_data['_key_mismatch'] = True
+    def _certificate_row(self, cert) -> Dict[str, Any]:
+        """The dedicated part of one certificate's row: PEMs, the key in the clear."""
+        cert_data = {
+            'refid': cert.refid,
+            'descr': cert.descr,
+            'caref': cert.caref,
+            'cert_type': cert.cert_type,
+            'subject': cert.subject,
+            'issuer': cert.issuer,
+            'serial_number': cert.serial_number,
+            'valid_from': cert.valid_from.isoformat() if cert.valid_from else None,
+            'valid_to': cert.valid_to.isoformat() if cert.valid_to else None,
+            'key_algo': cert.key_algo,
+            'san_dns': cert.san_dns,
+            'san_ip': cert.san_ip,
+            'san_email': cert.san_email,
+            'san_uri': cert.san_uri,
+            'ocsp_uri': cert.ocsp_uri,
+            'ocsp_must_staple': getattr(cert, 'ocsp_must_staple', False),
+            'private_key_location': cert.private_key_location,
+            'revoked': bool(cert.revoked),
+            'revoked_at': cert.revoked_at.isoformat() if cert.revoked_at else None,
+            'revoke_reason': cert.revoke_reason,
+            'invalidity_at': cert.invalidity_at.isoformat() if cert.invalidity_at else None,
+            'archived': bool(cert.archived),
+            'imported_from': cert.imported_from,
+            'created_at': cert.created_at.isoformat() if cert.created_at else None,
+            'created_by': cert.created_by,
+            'source': cert.source,
+            'subject_holder': cert.subject_holder,
+            'template_id': cert.template_id,
+            'owner_group_id': cert.owner_group_id,
+            'certificate_pem': base64.b64decode(cert.crt).decode() if cert.crt else None,
+            'csr_pem': base64.b64decode(cert.csr).decode() if cert.csr else None,
+            'private_key_pem_encrypted': None  # Will be set in _encrypt_section_keys
+        }
 
-            certs.append(cert_data)
-
-        return certs
+        # Decrypt at-rest encryption before export (see _export_cas)
+        if cert.prv:
+            label = f"certificate {cert.refid}"
+            cert_data['_private_key_plaintext'] = as_pem(
+                decrypt_stored_key(cert.prv, label=label), label=label
+            )
+            if not key_matches_certificate(
+                    cert_data['_private_key_plaintext'],
+                    cert_data.get('certificate_pem'), label=label):
+                cert_data['_key_mismatch'] = True
+        return cert_data
 
 
 

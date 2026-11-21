@@ -3,56 +3,35 @@
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
-  MagnifyingGlass, House, Certificate, ShieldCheck, FileText, List,
-  User, Key, Gear, Robot, UploadSimple, ClockCounterClockwise,
-  UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star,
-  Spinner, Database, Wrench, Lightning, Gavel, Stamp, ChartBar, Globe, Terminal
+  MagnifyingGlass,
+  Certificate,
+  ShieldCheck,
+  FileText,
+  List,
+  User,
+  ArrowRight,
+  Clock,
+  Star,
+  Spinner,
+  Database
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useTranslation } from 'react-i18next'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
+import { paletteCommands } from '../navigation/registry'
 
-const COMMANDS = [
-  // Navigation
-  { id: 'dashboard', labelKey: 'commands.nav.dashboard', icon: House, path: '/', categoryKey: 'commands.categories.navigation' },
-  { id: 'certificates', labelKey: 'commands.nav.certificates', icon: Certificate, path: '/certificates', categoryKey: 'commands.categories.navigation' },
-  { id: 'cas', labelKey: 'commands.nav.cas', icon: ShieldCheck, path: '/cas', categoryKey: 'commands.categories.navigation' },
-  { id: 'csrs', labelKey: 'commands.nav.csrs', icon: FileText, path: '/csrs', categoryKey: 'commands.categories.navigation' },
-  { id: 'templates', labelKey: 'commands.nav.templates', icon: List, path: '/templates', categoryKey: 'commands.categories.navigation' },
-  { id: 'users', labelKey: 'commands.nav.users', icon: User, path: '/users', categoryKey: 'commands.categories.navigation' },
-  { id: 'acme', labelKey: 'commands.nav.acme', icon: Key, path: '/acme', categoryKey: 'commands.categories.navigation' },
-  { id: 'scep', labelKey: 'commands.nav.scep', icon: Robot, path: '/scep-config', categoryKey: 'commands.categories.navigation' },
-  { id: 'est', labelKey: 'commands.nav.est', icon: Globe, path: '/est-config', categoryKey: 'commands.categories.navigation' },
-  { id: 'import', labelKey: 'commands.nav.operations', icon: Lightning, path: '/operations', categoryKey: 'commands.categories.navigation' },
-  { id: 'tools', labelKey: 'commands.nav.tools', icon: Wrench, path: '/tools', categoryKey: 'commands.categories.navigation' },
-  { id: 'audit', labelKey: 'commands.nav.audit', icon: ClockCounterClockwise, path: '/audit', categoryKey: 'commands.categories.navigation' },
-  { id: 'settings', labelKey: 'commands.nav.settings', icon: Gear, path: '/settings', categoryKey: 'commands.categories.navigation' },
-  { id: 'account', labelKey: 'commands.nav.account', icon: UserCircle, path: '/account', categoryKey: 'commands.categories.navigation' },
-  { id: 'groups', labelKey: 'commands.nav.groups', icon: UsersThree, path: '/users?tab=groups', categoryKey: 'commands.categories.navigation' },
-  
-  // Pro Navigation
-  { id: 'rbac', labelKey: 'commands.nav.rbac', icon: Shield, path: '/rbac', categoryKey: 'commands.categories.proFeatures', pro: true },
-  { id: 'sso', labelKey: 'commands.nav.sso', icon: Key, path: '/sso', categoryKey: 'commands.categories.proFeatures', pro: true },
-  { id: 'hsm', labelKey: 'commands.nav.hsm', icon: Lock, path: '/hsm', categoryKey: 'commands.categories.proFeatures', pro: true },
-  { id: 'policies', labelKey: 'commands.nav.policies', icon: Gavel, path: '/policies', categoryKey: 'commands.categories.governance' },
-  { id: 'approvals', labelKey: 'commands.nav.approvals', icon: Stamp, path: '/approvals', categoryKey: 'commands.categories.governance' },
-  { id: 'reports', labelKey: 'commands.nav.reports', icon: ChartBar, path: '/reports', categoryKey: 'commands.categories.governance' },
-  
-  // SSH
-  { id: 'ssh-cas', labelKey: 'commands.nav.sshCas', icon: Terminal, path: '/ssh/cas', categoryKey: 'commands.categories.navigation' },
-  { id: 'ssh-certificates', labelKey: 'commands.nav.sshCertificates', icon: Terminal, path: '/ssh/certificates', categoryKey: 'commands.categories.navigation' },
-  
-  // Actions
-  { id: 'new-cert', labelKey: 'commands.actions.newCertificate', icon: Certificate, path: '/certificates', action: 'new', categoryKey: 'commands.categories.actions' },
-  { id: 'new-ca', labelKey: 'commands.actions.newCA', icon: ShieldCheck, path: '/cas', action: 'new', categoryKey: 'commands.categories.actions' },
-  { id: 'upload-csr', labelKey: 'commands.actions.uploadCSR', icon: FileText, path: '/csrs', action: 'upload', categoryKey: 'commands.categories.actions' },
-]
+const COMMANDS = paletteCommands()
 
 export function CommandPalette({ open, onOpenChange }) {
   const navigate = useNavigate()
+  const openInInspector = useOpenEntity()
+  // The control focused before the palette opened, and whether the palette handed over to the inspector
+  const returnTo = useRef(null)
+  const openedInspector = useRef(false)
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -76,6 +55,18 @@ export function CommandPalette({ open, onOpenChange }) {
     }
   }
   
+  // Certificates and CAs open in the inspector; the other types still go to their page
+  const INSPECTOR_TYPE = { certificates: 'certificate', certificate: 'certificate', cas: 'ca', ca: 'ca' }
+  const openItem = (type, id) => {
+    const inspectorType = INSPECTOR_TYPE[type]
+    if (inspectorType) {
+      openedInspector.current = true
+      openInInspector(inspectorType, id, { origin: returnTo.current })
+    }
+    else navigate(getTypePath(type, id))
+    onOpenChange(false)
+  }
+
   // Get path for item type
   const getTypePath = (type, id) => {
     switch (type) {
@@ -241,10 +232,12 @@ export function CommandPalette({ open, onOpenChange }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300]" />
+        <Dialog.Overlay className="fixed inset-0 bg-scrim-60 backdrop-blur-sm z-[300]" />
         <Dialog.Content
           className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-bg-secondary border border-border rounded-lg shadow-2xl z-[301] overflow-hidden"
           onKeyDown={handleKeyDown}
+          onOpenAutoFocus={() => { returnTo.current = document.activeElement; openedInspector.current = false }}
+          onCloseAutoFocus={(e) => { if (openedInspector.current) e.preventDefault() }}
           aria-describedby={undefined}
         >
           {/* Search Input */}
@@ -283,8 +276,7 @@ export function CommandPalette({ open, onOpenChange }) {
                       <button
                         key={`cert-${item.id}`}
                         onClick={() => {
-                          navigate(`/certificates?selected=${item.id}`)
-                          onOpenChange(false)
+                          openItem('certificate', item.id)
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
@@ -315,12 +307,11 @@ export function CommandPalette({ open, onOpenChange }) {
                       <button
                         key={`ca-${item.id}`}
                         onClick={() => {
-                          navigate(`/cas?selected=${item.id}`)
-                          onOpenChange(false)
+                          openItem('ca', item.id)
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
-                        <ShieldCheck size={16} weight="duotone" className="text-violet-500" />
+                        <ShieldCheck size={16} weight="duotone" className="text-accent-pro" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
                           <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
@@ -402,7 +393,7 @@ export function CommandPalette({ open, onOpenChange }) {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
-                        <FileText size={16} weight="duotone" className="text-teal-500" />
+                        <FileText size={16} weight="duotone" className="text-accent-primary" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
                           <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
@@ -447,8 +438,7 @@ export function CommandPalette({ open, onOpenChange }) {
                     <button
                       key={`fav-${item.type}-${item.id}`}
                       onClick={() => {
-                        navigate(getTypePath(item.type, item.id))
-                        onOpenChange(false)
+                        openItem(item.type, item.id)
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                     >
@@ -479,8 +469,7 @@ export function CommandPalette({ open, onOpenChange }) {
                     <button
                       key={`recent-${item.type}-${item.id}`}
                       onClick={() => {
-                        navigate(getTypePath(item.type, item.id))
-                        onOpenChange(false)
+                        openItem(item.type, item.id)
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                     >

@@ -15,6 +15,8 @@ import pytest
 
 from services.compliance_service import calculate_compliance_score
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CERTIFICATES = '/api/v2/certificates'
 
 
@@ -37,7 +39,7 @@ def _detail(auth_client, cert_id):
 
 
 def _row(auth_client, cert_id):
-    r = auth_client.get(f'{CERTIFICATES}?per_page=200')
+    r = auth_client.get(f'{CERTIFICATES}?search=compliance-views&per_page=100')
     assert r.status_code == 200
     rows = r.get_json()['data']
     return next(row for row in rows if row['id'] == cert_id)

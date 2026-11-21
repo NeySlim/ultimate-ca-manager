@@ -12,6 +12,8 @@ from cryptography.x509.oid import NameOID
 
 from models import db, CA
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _pem(key, password=None):
     enc = serialization.BestAvailableEncryption(password.encode()) if password else serialization.NoEncryption()

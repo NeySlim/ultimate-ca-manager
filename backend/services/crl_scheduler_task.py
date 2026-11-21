@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
+from fips_mode import FipsRestricted
 from models import db, CA
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
@@ -52,10 +53,11 @@ class CRLSchedulerTask:
             if not ca.crt:
                 return False, f"CA '{ca.descr}' is awaiting its certificate"
             
-            # Get latest CRL
+            # The CRL served, the highest number (RFC 5280 §5.2.3): a slower node may commit a
+            # lower one after it
             latest_crl = CRLMetadata.query.filter_by(
                 ca_id=ca_id, is_delta=False
-            ).order_by(CRLMetadata.created_at.desc()).first()
+            ).order_by(CRLMetadata.crl_number.desc()).first()
             
             if not latest_crl:
                 return True, f"No CRL exists for CA '{ca.descr}' - needs generation"
@@ -122,7 +124,11 @@ class CRLSchedulerTask:
                 f"(#{ crl_metadata.crl_number}, {crl_metadata.revoked_count} revoked certs)"
             )
             return True
-        
+
+        except FipsRestricted as e:
+            # Expected state, repeated every pass until the CA changes: one line, no trace
+            logger.warning(f"CRL of CA {ca_id} not signed: {e}")
+            return False
         except Exception as e:
             logger.error(
                 f"Error regenerating CRL for CA {ca_id}: {e}",
@@ -130,12 +136,72 @@ class CRLSchedulerTask:
             )
             return False
     
+    # HA: the CRL of a CA is published by one node at a time; a dead holder's lease ends
+    LEASE = timedelta(minutes=15)
+
     @staticmethod
-    def execute() -> None:
+    def _under_lease(ca_id: int, run, retries=None):
+        """*run(ca_id)* on the node holding the CA's lease, None on the others, which append to
+        *retries* when that lease frees. Due-ness is read again by *run* under the lease: a CRL
+        committed by the previous holder counts."""
+        from utils.ha import ha_enabled
+        if not ha_enabled():
+            return run(ca_id)
+        from utils.config_cas import ConfigLease
+        lease = ConfigLease(f'crl_schedule_lease_{ca_id}', CRLSchedulerTask.LEASE)
+        try:
+            if not lease.take():
+                logger.info(f"CRL of CA {ca_id} left to the node publishing it")
+                if retries is not None and lease.retry_in() is not None:
+                    retries.append(lease.retry_in())
+                return None
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"CRL of CA {ca_id} not reserved: {e}")
+            return False
+        try:
+            return run(ca_id)
+        finally:
+            lease.end()
+
+    @staticmethod
+    def _regenerate_if_due(ca_id: int):
+        should_regen, reason = CRLSchedulerTask.should_regenerate_crl(ca_id)
+        if not should_regen:
+            return None
+        logger.info(f"Regenerating CRL: {reason}")
+        return CRLSchedulerTask.regenerate_crl(ca_id)
+
+    @staticmethod
+    def _delta_interval_if_due(ca_id: int):
+        """The CA's delta interval in hours when its delta CRL is due, else None."""
+        ca = db.session.get(CA, ca_id)
+        interval_hours = ca.delta_crl_interval or 4
+        latest_delta = CRLService.get_latest_delta_crl(ca_id)
+        if not latest_delta:
+            # Only generate delta if a base CRL exists
+            return interval_hours if CRLService.get_latest_base_crl(ca_id) else None
+        if latest_delta.is_stale:
+            return interval_hours
+        age_hours = (utc_now() - latest_delta.this_update).total_seconds() / 3600
+        return interval_hours if age_hours >= interval_hours else None
+
+    @staticmethod
+    def _delta_if_due(ca_id: int):
+        interval_hours = CRLSchedulerTask._delta_interval_if_due(ca_id)
+        if interval_hours is None:
+            return None
+        CRLService.generate_delta_crl(ca_id, validity_hours=interval_hours * 2, username='scheduler')
+        return True
+
+    @staticmethod
+    def execute():
         """
         Main task to check all CAs and regenerate CRLs as needed
-        Called by scheduler every N seconds
+        Called by scheduler every N seconds. A CA left to the node holding its lease asks
+        one retry of the whole pass once the last such lease is over.
         """
+        retries = []
         try:
             logger.debug("Starting CRL regeneration check")
             
@@ -167,12 +233,15 @@ class CRLSchedulerTask:
             error_count = 0
             
             for ca in cas_with_keys:
-                should_regen, reason = CRLSchedulerTask.should_regenerate_crl(ca.id)
+                ca_id = ca.id
+                should_regen, reason = CRLSchedulerTask.should_regenerate_crl(ca_id)
                 
                 if should_regen:
-                    logger.info(f"Regenerating CRL: {reason}")
-                    success = CRLSchedulerTask.regenerate_crl(ca.id)
-                    if success:
+                    success = CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._regenerate_if_due,
+                                                            retries)
+                    if success is None:
+                        skipped_count += 1
+                    elif success:
                         regenerated_count += 1
                     else:
                         error_count += 1
@@ -197,39 +266,27 @@ class CRLSchedulerTask:
             
             delta_count = 0
             for ca in delta_cas:
+                ca_id = ca.id
                 try:
-                    # Check if delta CRL needs regeneration
-                    latest_delta = CRLService.get_latest_delta_crl(ca.id)
-                    interval_hours = ca.delta_crl_interval or 4
-                    
-                    need_delta = False
-                    if not latest_delta:
-                        # Only generate delta if a base CRL exists
-                        base = CRLService.get_latest_base_crl(ca.id)
-                        if base:
-                            need_delta = True
-                    elif latest_delta.is_stale:
-                        need_delta = True
-                    else:
-                        age_hours = (utc_now() - latest_delta.this_update).total_seconds() / 3600
-                        if age_hours >= interval_hours:
-                            need_delta = True
-                    
-                    if need_delta:
-                        CRLService.generate_delta_crl(
-                            ca.id,
-                            validity_hours=interval_hours * 2,
-                            username='scheduler'
-                        )
+                    if CRLSchedulerTask._delta_interval_if_due(ca_id) is not None \
+                            and CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._delta_if_due, retries):
                         delta_count += 1
+                except FipsRestricted as e:
+                    # As for the base CRL: an expected state, one line, no trace
+                    db.session.rollback()
+                    logger.warning(f"Delta CRL of CA {ca_id} not signed: {e}")
                 except Exception as e:
-                    logger.error(f"Error generating delta CRL for CA {ca.id}: {e}")
+                    db.session.rollback()
+                    logger.error(f"Error generating delta CRL for CA {ca_id}: {e}")
             
             if delta_count > 0:
                 logger.info(f"Generated {delta_count} delta CRL(s)")
         
         except Exception as e:
             logger.error(f"Error in CRL regeneration task: {e}", exc_info=True)
+        if retries:
+            return {'status': 'ok', 'retry_in': max(retries)}
+        return None
 
 
 def get_crl_scheduler_task():

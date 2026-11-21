@@ -17,6 +17,7 @@ row is decided here, the same way on every database engine: see
 `DEPENDENT_TABLES`.
 """
 import logging
+import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -27,8 +28,12 @@ from models import db
 
 from ..export_generic import load_model
 from ..manifest import SECTIONS
+from . import audit_ids
 from .conflict import RestoreConflictError, describe_row
-from .plan import RestorePlan, _normalise, _temporal_identity, shared_identity_warning
+from .plan import (
+    _UNBOUND_TAKEN, RestorePlan, _normalise, _temporal_identity, shared_identity_warning,
+    sso_identity_key, unbound_of_known_idp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +126,8 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
     section = SECTIONS[section_name]
     if section.identity == ('id',):
         return []          # singleton configuration: nothing to prune
+    if section_name == audit_ids.SECTION and plan.keep_audit_ids:
+        return audit_ids.rows_to_remove(archived_rows, plan)
 
     archived = Counter()
     for row in archived_rows:
@@ -133,7 +140,8 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
     for key, ids in shared.items():
         gone = ids[archived.get(key, 0):]
         doomed.extend(gone)
-        plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone))
+        taken = _UNBOUND_TAKEN if unbound_of_known_idp(section_name, key) else None
+        plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone, taken=taken))
     # No archived row can be one whose identity misses a part
     incomplete = plan.incomplete.get(section_name) or []
     if incomplete:
@@ -153,6 +161,8 @@ def _archived_identities(section_name: str, section, row: Dict[str, Any],
     they are a spelling here only when `plan.source_numbers_hold` says the
     archive is this database's and the numbers still name the same rows.
     """
+    if section_name == 'user_sso_identities':
+        return _archived_sso_identities(row, plan)
     resolved, raw = [], []
     for field_name in section.identity:
         raw.append(row.get(field_name))
@@ -173,20 +183,36 @@ def _archived_identities(section_name: str, section, row: Dict[str, Any],
     return spellings
 
 
+def _archived_sso_identities(row: Dict[str, Any], plan: RestorePlan) -> Set[Tuple]:
+    """The spellings of an archived identity row, in the key its rows here are indexed by."""
+    section = 'user_sso_identities'
+    spellings = set()
+    candidates = [(plan.resolve(section, row, 'user_id'), plan.resolve(section, row, 'provider_id'))]
+    if plan.source_numbers_hold(section, row):
+        candidates.append((row.get('user_id'), row.get('provider_id')))
+    for user_id, provider_id in candidates:
+        if user_id is not None:
+            spellings.add(sso_identity_key(user_id, provider_id, row.get('orphan_of'),
+                                           row.get('external_id')))
+    return spellings
+
+
 # Tables a replacing restore does not prune itself, and why their rows may go.
 # A row pointing at a removed row loses that link where the column allows it,
 # and goes with the row otherwise (see REMOVED_WITH_TARGET).
 DEPENDENT_TABLES: Dict[str, str] = {
     'crl_metadata': 'regenerated from the authorities',
+    'crls': 'legacy CRL rows, named by the refid of their authority',
     'ocsp_responses': 'a response cache',
     'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',
     'user_sessions': 'live sessions, revoked after every restore anyway',
     'pro_sso_sessions': 'live SSO sessions',
     'webauthn_challenges': 'single-use challenges',
     'acme_orders': 'in-flight protocol state of the ACME server',
-    'acme_authorizations': 'in-flight protocol state, tied to orders',
+    'acme_authorizations': 'in-flight protocol state, tied to orders and accounts',
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
     'acme_proxy_dns_challenges': 'expected TXT values of in-flight proxy orders',
+    'acme_proxy_challenge_links': 'which in-flight proxy order a challenge belongs to',
     # Carried by default since 2.250, so pruned with the rest; listed for an
     # archive without them (older, or an include map). Unlinked as deleting
     # the certificate, account or user they name does.
@@ -203,12 +229,18 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',
     'deploy_deliveries': 'delivery queue, removed with its binding as deleting it does',
     'pro_sso_saml_message_ids': 'replay cache of SAML message ids',
+    'pro_sso_sign_in_tests': 'sign-in tests: reports minutes long, emptied rows kept a day',
+    # 3.0 only: a 2.254 archive carries the provider on the account row instead
+    'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
 }
 
-# Integer links the schema holds without a foreign key, handled as if it had one:
-# SQLite hands a removed row's id to the next row inserted.
+# Links the schema holds without a foreign key, handled as if it had one: SQLite
+# hands a removed row's id to the next row inserted, and a refid outlives its row.
 SOFT_LINKS = (
+    ('crls', 'caref', 'certificate_authorities', 'refid'),
     ('certificates', 'related_certificate_id', 'certificates', 'id'),
+    ('certificates', 'windows_profile_id', 'windows_enrollment_profiles', 'id'),
+    ('deploy_bindings', 'attention_successor_id', 'certificates', 'id'),
     ('scep_profiles', 'template_id', 'certificate_templates', 'id'),
     ('scep_requests', 'profile_id', 'scep_profiles', 'id'),
     ('acme_eab_credentials', 'created_by_user_id', 'users', 'id'),
@@ -216,6 +248,8 @@ SOFT_LINKS = (
     ('acme_dns_update_keys', 'created_by_user_id', 'users', 'id'),
     ('acme_proxy_dns_challenges', 'acme_client_account_id', 'acme_client_accounts', 'id'),
     ('pro_sso_saml_message_ids', 'provider_id', 'pro_sso_providers', 'id'),
+    ('pro_sso_sign_in_tests', 'provider_id', 'pro_sso_providers', 'id'),
+    ('pro_sso_sign_in_tests', 'user_id', 'users', 'id'),
     ('revoked_serials', 'certificate_id', 'certificates', 'id'),
     ('key_recovery_requests', 'cert_id', 'certificates', 'id'),
     ('webhook_deliveries', 'endpoint_id', 'webhook_endpoints', 'id'),
@@ -242,8 +276,18 @@ def link_scope(dependent, column, named):
 CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
 
 # Links whose row goes with the row it names although the column allows none:
-# an approval of a certificate that is gone, as deleting the certificate does.
-REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id')}
+# an approval of a certificate that is gone, as deleting the certificate does, and
+# an ACME authorization of an order or account that is gone, as deleting the account does.
+REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id'),
+                       ('acme_authorizations', 'order_id'), ('acme_authorizations', 'account_id')}
+
+# An identity row whose provider goes keeps that provider's IdP key, as deleting the provider
+# does: only a provider for the exact same IdP takes it back (OIDC Core §5.7).
+ORPHANED_WITH_PROVIDER = ('user_sso_identities', 'provider_id')
+
+# Rows removed only after the writes, once their deletion blockers have nothing to say: the
+# rows they would leave dangling (SQLite enforces no key) are known only then.
+BLOCKED_DELETIONS = {'ad_connector': 'connector_deletion_blockers'}
 
 _CHUNK = 500
 _FOREIGN_KEYS_INTO: Optional[Dict[str, List[Tuple[Any, Any, Any]]]] = None
@@ -304,6 +348,8 @@ class Replacement:
     deferred: Dict[str, Set[Any]] = field(default_factory=dict)
     # Rows that give their name up to an archived row: they must go before the writes
     displaced: Dict[str, Set[Any]] = field(default_factory=dict)
+    # Rows the archive carries under another name: renamed in place once the names are free
+    renamed_here: Dict[str, Dict[Any, Tuple[str, str]]] = field(default_factory=dict)
     removed: Dict[str, int] = field(default_factory=dict)
     cleared: Dict[str, int] = field(default_factory=dict)
     unlinked: Dict[str, int] = field(default_factory=dict)
@@ -317,11 +363,16 @@ class Replacement:
 
 def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: Set[str], *,
                      keep: Optional[Dict[str, Set[Any]]] = None,
-                     displaced: Optional[Dict[str, Set[Any]]] = None) -> Replacement:
+                     displaced: Optional[Dict[str, Set[Any]]] = None,
+                     renamed_here: Optional[Dict[str, Dict[Any, Tuple[str, str]]]] = None
+                     ) -> Replacement:
     """The rows each pruned section loses, in the order they can go."""
     _index_tables()
-    keep = keep or {}
+    keep = {name: set(ids) for name, ids in (keep or {}).items()}
     displaced = displaced or {}
+    renamed_here = {name: dict(rows) for name, rows in (renamed_here or {}).items() if rows}
+    for name, rows in renamed_here.items():
+        keep.setdefault(name, set()).update(rows)
     pruned = {name for name in sections
               if isinstance(backup_data.get(name), list) and name not in MERGED_ONLY}
     doomed: Dict[str, Set[Any]] = {}
@@ -332,7 +383,8 @@ def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: S
             doomed[name] = ids
     return Replacement(order=[name for name in deletion_order(set(doomed))],
                        doomed=doomed, pruned=pruned,
-                       displaced={name: set(ids) for name, ids in displaced.items() if ids})
+                       displaced={name: set(ids) for name, ids in displaced.items() if ids},
+                       renamed_here=renamed_here)
 
 
 def remove_before_writes(replacement: Replacement) -> Replacement:
@@ -358,8 +410,38 @@ def remove_before_writes(replacement: Replacement) -> Replacement:
         _release_dependents(replacement, table, _primary(table), replacement.doomed[name], name)
     for name in replacement.order:
         _delete(replacement, name, replacement.doomed[name] - replacement.deferred.get(name, set()))
+    _rename_in_place(replacement)
+    _release_waiting_hsm_keys(replacement)
     db.session.expire_all()
     return replacement
+
+
+def _rename_in_place(replacement: Replacement) -> None:
+    """Each kept row takes the archive's name, freed by the deletions just made.
+
+    Through a unique placeholder first, so rows trading names never collide.
+    """
+    for name, rows in replacement.renamed_here.items():
+        table = _table_of(name)
+        primary = _primary(table)
+        for final in (False, True):
+            for row_id, (column, value) in sorted(rows.items()):
+                value = value if final else f'restore-{uuid.uuid4().hex}'
+                db.session.execute(table.update().where(primary == row_id).values({column: value}))
+
+
+# An authority that waits for the writes goes with them: its HSM key is free for an archived one now
+_HSM_KEY_HOLDERS = ('certificate_authorities', 'ssh_cas')
+
+
+def _release_waiting_hsm_keys(replacement: Replacement) -> None:
+    for name in _HSM_KEY_HOLDERS:
+        waiting = replacement.deferred.get(name)
+        if not waiting:
+            continue
+        table = _table_of(name)
+        for chunk in _chunks(waiting):
+            db.session.execute(table.update().where(_primary(table).in_(chunk)).values(hsm_key_id=None))
 
 
 def remove_after_writes(replacement: Replacement) -> Replacement:
@@ -374,6 +456,7 @@ def remove_after_writes(replacement: Replacement) -> Replacement:
             continue
         table = _table_of(name)
         primary = _primary(table)
+        _refuse_blocked(name, waiting)
         for dependent, column, named in _foreign_keys_into(table.name):
             dependent_section = _SECTION_OF_TABLE.get(dependent.name)
             if dependent_section not in replacement.pruned or _primary(dependent) is None:
@@ -392,6 +475,21 @@ def remove_after_writes(replacement: Replacement) -> Replacement:
         _delete(replacement, name, waiting)
     db.session.expire_all()
     return replacement
+
+
+def _refuse_blocked(name: str, ids: Set[Any]) -> None:
+    """Refused when a deletion blocker of the section still holds one of these rows."""
+    if name not in BLOCKED_DELETIONS:
+        return
+    from services import deletion_blockers
+    blockers = getattr(deletion_blockers, BLOCKED_DELETIONS[name])
+    model = load_model(SECTIONS[name])
+    for row_id in sorted(ids):
+        blocker = deletion_blockers.first_blocker(blockers(db.session.get(model, row_id)))
+        if blocker is not None:
+            raise RestoreConflictError(
+                f"Refusing to restore: the archive removes {describe_row(name, row_id)}. "
+                f"{blocker.message} Nothing has been changed.")
 
 
 def _defer_what_kept_rows_need(replacement: Replacement) -> None:
@@ -413,6 +511,10 @@ def _defer_what_kept_rows_need(replacement: Replacement) -> None:
             for key, value in _select([_primary(dependent), column], column, by_value):
                 if key not in gone:
                     deferred[name].update(by_value[value])
+
+    for name, ids in replacement.doomed.items():
+        if name in BLOCKED_DELETIONS:
+            deferred[name].update(ids - replacement.displaced.get(name, set()))
 
     # A row that waits keeps what it points at waiting too.
     pending = [(name, set(ids)) for name, ids in deferred.items()]
@@ -438,7 +540,9 @@ def _defer_what_kept_rows_need(replacement: Replacement) -> None:
 
 
 def _detach_kept_rows(replacement: Replacement, name: str, table) -> None:
-    """Kept rows naming a doomed row through an optional column: the writes set it again."""
+    """Kept rows naming a doomed row through an optional column: the writes set it again.
+    A kept identity of a removed provider becomes an orphan of its IdP instead: the writes
+    add the archive's row beside it."""
     primary = _primary(table)
     ids = replacement.doomed[name]
     for dependent, column, named in _foreign_keys_into(table.name):
@@ -451,6 +555,9 @@ def _detach_kept_rows(replacement: Replacement, name: str, table) -> None:
         dependent_primary = _primary(dependent)
         kept = [row[0] for row in _select([dependent_primary], column, values)
                 if row[0] not in gone]
+        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
+            _orphan_identities(replacement, dependent, values, only=kept)
+            continue
         for chunk in _chunks(kept):
             db.session.execute(update(dependent).where(dependent_primary.in_(chunk))
                                .values({column.name: None}))
@@ -483,6 +590,9 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         if (dependent.name, column.name) in CLOSED_WITH_TARGET:
             _close_requests(replacement, dependent, column, values)
             continue
+        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
+            _orphan_identities(replacement, dependent, values)
+            continue
         if column.nullable and (dependent.name, column.name) not in REMOVED_WITH_TARGET:
             for chunk in _chunks(values):
                 result = db.session.execute(update(dependent).where(column.in_(chunk), scope)
@@ -498,6 +608,21 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         for chunk in _chunks(values):
             result = db.session.execute(delete(dependent).where(column.in_(chunk), scope))
             _count(replacement.cleared, dependent.name, result.rowcount)
+
+
+def _orphan_identities(replacement: Replacement, table, provider_ids, only=None) -> None:
+    """The identity rows of removed providers become orphans of their IdP; *only* names the
+    rows concerned when some of them are removed too."""
+    from models.sso import SSOProvider
+
+    for provider in SSOProvider.query.filter(SSOProvider.id.in_(provider_ids)):
+        mine = table.c.provider_id == provider.id
+        scopes = [mine] if only is None else [mine & _primary(table).in_(chunk)
+                                              for chunk in _chunks(only)]
+        for scope in scopes:
+            result = db.session.execute(update(table).where(scope)
+                                        .values(provider_id=None, orphan_of=provider.idp_key()))
+            _count(replacement.unlinked, f'{table.name}.provider_id', result.rowcount)
 
 
 def _close_requests(replacement: Replacement, table, column, values) -> None:

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowsClockwise, ArrowClockwise } from '@phosphor-icons/react'
+import { ArrowsClockwise, ArrowClockwise, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Modal, Button, Badge } from '../../components'
 import { useNotification } from '../../contexts'
 import { settingsService } from '../../services'
 
+const PER_PAGE = 25
 const STATUS_VARIANT = { delivered: 'success', failed: 'danger', pending: 'warning' }
 
 function rel(iso) {
@@ -26,20 +27,29 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   const [retrying, setRetrying] = useState({})
 
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
     if (!webhook) return
+    // An answer older than the last request sent is dropped
+    const seq = ++loadSeq.current
     setLoading(true)
     try {
-      const res = await settingsService.getWebhookDeliveries(webhook.id, { status: statusFilter || undefined })
+      const res = await settingsService.getWebhookDeliveries(webhook.id, { page, perPage: PER_PAGE, status: statusFilter || undefined })
+      if (seq !== loadSeq.current) return
       setItems((res.data || res) || [])
+      setTotal(res.meta?.total ?? 0)
+      setTotalPages(Math.max(1, res.meta?.total_pages ?? 1))
     } catch (e) {
-      showError(e.message || t('webhooks.deliveries.loadFailed'))
+      if (seq === loadSeq.current) showError(e.message || t('webhooks.deliveries.loadFailed'))
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
-  }, [webhook, statusFilter, showError, t])
+  }, [webhook, statusFilter, page, showError, t])
 
   useEffect(() => { load() }, [load])
 
@@ -65,7 +75,7 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
             {['', 'pending', 'delivered', 'failed'].map((s) => (
               <Button key={s || 'all'} type="button" size="sm"
                       variant={statusFilter === s ? 'primary' : 'secondary'}
-                      onClick={() => setStatusFilter(s)}>
+                      onClick={() => { setStatusFilter(s); setPage(1) }}>
                 {s ? t(`webhooks.deliveries.status.${s}`) : t('common.all')}
               </Button>
             ))}
@@ -83,7 +93,7 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
           <div className="max-h-[55vh] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-secondary">
-                <tr className="text-left text-xs text-text-tertiary border-b border-white/5">
+                <tr className="text-left text-xs text-text-tertiary border-b border-border-op30">
                   <th className="py-2 pr-3 font-medium">{t('webhooks.deliveries.event')}</th>
                   <th className="py-2 px-3 font-medium">{t('webhooks.deliveries.statusCol')}</th>
                   <th className="py-2 px-3 font-medium text-right">{t('webhooks.deliveries.attempts')}</th>
@@ -93,12 +103,12 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
               </thead>
               <tbody>
                 {items.map((d) => (
-                  <tr key={d.id} className="border-b border-white/5 last:border-0 align-top">
+                  <tr key={d.id} className="border-b border-border-op30 last:border-0 align-top">
                     <td className="py-2 pr-3 font-mono text-xs text-text-primary">{d.event_type}</td>
                     <td className="py-2 px-3">
                       <Badge variant={STATUS_VARIANT[d.status] || 'secondary'} size="sm">{d.status}</Badge>
                       {d.last_error && (
-                        <p className="text-xs text-amber-500/90 mt-1 font-mono max-w-[260px] truncate" title={d.last_error}>
+                        <p className="text-xs text-status-warning mt-1 font-mono max-w-[260px] truncate" title={d.last_error}>
                           {d.last_response_code ? `${d.last_response_code} · ` : ''}{d.last_error}
                         </p>
                       )}
@@ -123,6 +133,22 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between text-xs text-text-secondary">
+            <span className="tabular-nums">{page} / {totalPages} ({total})</span>
+            <div className="flex gap-1">
+              <Button type="button" size="sm" variant="secondary" aria-label={t('common.back')}
+                      disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                <CaretLeft size={14} />
+              </Button>
+              <Button type="button" size="sm" variant="secondary" aria-label={t('common.next')}
+                      disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                <CaretRight size={14} />
+              </Button>
+            </div>
           </div>
         )}
       </div>

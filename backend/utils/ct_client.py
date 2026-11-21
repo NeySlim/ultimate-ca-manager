@@ -295,9 +295,8 @@ def _store_auto_submitted(serial, scts, wait_seconds=10):
 
     deadline = time.monotonic() + wait_seconds
     while True:
-        # Stored in decimal or in hex depending on the issuance path
-        row = Certificate.query.filter(Certificate.serial_number.in_(
-            (str(serial), format(serial, 'x'), format(serial, 'X')))).first()
+        from utils.serial_format import canonical_serial
+        row = Certificate.query.filter(Certificate.serial_number == canonical_serial(serial)).first()
         if row is not None or time.monotonic() >= deadline:
             break
         db.session.rollback()

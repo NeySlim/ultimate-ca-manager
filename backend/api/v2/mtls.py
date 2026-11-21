@@ -15,7 +15,7 @@ from cryptography import x509 as cx509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.issuance_defaults import browser_key_type
 
@@ -28,6 +28,7 @@ from services.cert_service import CertificateService
 from services.certificate_parser import CertificateParser
 from utils import trusted_proxy
 from utils.key_codec import load_pem_bytes
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import (
     certificate_row_for, enrolments_of, issuing_ca_for, made_for_account, normalized_fingerprint,
@@ -36,8 +37,8 @@ from services.mtls_enrollment import (
 from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
 from utils.db_transaction import safe_commit
-from utils.sanitize import sanitize_filename
-from utils.export_options import json_boolean, query_boolean
+from utils.sanitize import content_disposition
+from utils.export_options import BOOL, FORMAT, PASSWORD, read_export_options
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,14 @@ def update_mtls_settings():
         _set_mtls_config('mtls_trusted_ca_id', ca_id)
         changes.append(f"trusted_ca_id={ca_id}")
 
+    # SSL context needs reload; HA: the restart is queued with the settings, or neither is saved
+    from utils.ha import ha_enabled
+    needs_restart = enabled is not None or required is not None or ca_id is not None
+    rolling = needs_restart and ha_enabled()
+    if rolling:
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)
+
     ok, _err = safe_commit(logger, "Failed to update mTLS settings")
     if not ok:
         return _err
@@ -141,10 +150,11 @@ def update_mtls_settings():
         success=True
     )
 
-    # Trigger restart if mTLS config changed (SSL context needs reload)
-    needs_restart = enabled is not None or required is not None or ca_id is not None
     restart_message = None
-    if needs_restart:
+    if rolling:
+        from services.cluster_commands import ROLLING_RESTART_MESSAGE
+        restart_message = ROLLING_RESTART_MESSAGE
+    elif needs_restart:
         if is_docker():
             restart_message = 'Restart the container to apply mTLS changes.'
         else:
@@ -246,6 +256,7 @@ def create_mtls_certificate():
             cert_type='usr_cert',
             key_type=browser_key_type(ca, f'{user.username}@mtls'),
             validity_days=validity_days,
+            subject_holder=f'user:{user.id}',
             username=user.username,
         )
     except ValueError as e:
@@ -327,10 +338,10 @@ def delete_mtls_certificate(cert_id):
 
     serial = auth_cert.cert_serial
     cert_name = auth_cert.name or serial
-    removed, failure = remove_enrolment(
+    removed, answer = remove_enrolment(
         auth_cert, username=getattr(user, 'username', 'system'), actor=user)
     if not removed:
-        return failure
+        return answer
 
     AuditService.log_action(
         action='mtls_cert_delete',
@@ -341,7 +352,14 @@ def delete_mtls_certificate(cert_id):
         success=True,
     )
 
-    return success_response(message='Certificate deleted')
+    return success_response(**(answer or {'message': 'Certificate deleted'}))
+
+
+DOWNLOAD_FORMATS = ('pem', 'pkcs12', 'p12', 'pfx')
+DOWNLOAD_OPTIONS = {
+    'format': FORMAT, 'password': PASSWORD, 'include_chain': BOOL, 'include_root': BOOL,
+    'legacy': BOOL,
+}
 
 
 @bp.route('/certificates/<int:cert_id>/download', methods=['GET', 'POST'])
@@ -350,37 +368,20 @@ def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
 
     user = g.current_user
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json() or {}
-        fmt = str(data.get('format', 'pem')).lower()
-        password = data.get('password', '')
-        try:
-            include_chain = json_boolean(data, 'include_chain', True)
-            include_root = json_boolean(data, 'include_root', False)
-            legacy_value = json_boolean(data, 'legacy', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        legacy = legacy_flag(legacy_value)  # 3DES/SHA-1 profile (#331)
-    else:
-        fmt = request.args.get('format', 'pem')
-        password = request.args.get('password', '')
-        legacy = False
-        try:
-            include_chain = query_boolean(request.args, 'include_chain', True)
-            include_root = query_boolean(request.args, 'include_root', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        # SECURITY: never accept PKCS12 passwords via query string (proxy logs).
-        if password or fmt in ('p12', 'pkcs12'):
-            if password:
-                logger.warning(
-                    'Rejected mTLS PKCS12 download with password in query string (cert_id=%s)',
-                    cert_id,
-                )
-            return error_response(
-                'PKCS12 export requires POST with JSON body (format, password)',
-                400,
-            )
+    opts, refused = read_export_options(DOWNLOAD_OPTIONS, DOWNLOAD_FORMATS, 'mTLS certificate')
+    if refused:
+        return refused
+    fmt = opts.get('format', 'pem')
+    if fmt in ('p12', 'pfx'):
+        fmt = 'pkcs12'
+    password = opts.get('password', '')
+    include_chain = opts.get('include_chain', True)
+    include_root = opts.get('include_root', False)
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
+    chain_sent = 'include_chain' in opts or 'include_root' in opts
+    # A PKCS#12 needs the password only a JSON body carries
+    if request.method != 'POST' and fmt == 'pkcs12':
+        return error_response('PKCS12 export requires POST with JSON body (format, password)', 400)
 
     # Authorize via auth_certificates ownership (not string match on subject)
     auth_cert = AuthCertificate.query.filter_by(id=cert_id, user_id=user.id).first()
@@ -441,10 +442,20 @@ def download_mtls_certificate(cert_id):
         return Response(
             p12_bytes,
             mimetype='application/x-pkcs12',
-            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(user.username)}-mtls.p12"'},
+            headers={'Content-Disposition': content_disposition(user.username, '-mtls.p12', fallback=f'user-{user.id}')},
         )
 
-    # Default: PEM
+    # Default: PEM. The leaf alone (a stored import may carry its chain), plus the issuers only when asked
+    from api.v2.certificates.export import _build_ca_chain, _split_pem_certs
+    issuers = (_build_ca_chain(cert, cert_pem, include_root=include_root)
+               if chain_sent and include_chain else [])
+    stored = _split_pem_certs(cert_pem)
+    if stored:
+        cert_pem = stored[0].public_bytes(serialization.Encoding.PEM)
+    if issuers:
+        cert_pem = cert_pem.rstrip(b'\n') + b'\n' + b''.join(
+            c.public_bytes(serialization.Encoding.PEM) for c in issuers)
+
     AuditService.log_action(
         action='mtls_cert_download',
         resource_type='certificate',
@@ -457,7 +468,7 @@ def download_mtls_certificate(cert_id):
     return Response(
         cert_pem,
         mimetype='application/x-pem-file',
-        headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(user.username)}-mtls.pem"'},
+        headers={'Content-Disposition': content_disposition(user.username, '-mtls.pem', fallback=f'user-{user.id}')},
     )
 
 
@@ -586,17 +597,30 @@ def enroll_import_certificate():
         return error_response('PEM certificate data is required', 400)
 
     try:
-        if not pem_text.startswith('-----BEGIN'):
+        if pem_text.startswith('BASE64:'):
+            # A binary .cer/.crt, as the account page sends it: the DER bytes in base64
+            raw = base64.b64decode(pem_text[len('BASE64:'):], validate=True)
             try:
-                pem_text = base64.b64decode(pem_text).decode('utf-8')
-            except Exception:
-                return error_response('Invalid certificate format. Expected PEM data.', 400)
-
-        pem_bytes = pem_text.encode('utf-8')
-        cert_obj = cx509.load_pem_x509_certificate(pem_bytes, default_backend())
+                cert_obj = cx509.load_der_x509_certificate(raw, default_backend())
+                pem_bytes = cert_obj.public_bytes(serialization.Encoding.PEM)
+            except ValueError:
+                pem_bytes = raw
+                cert_obj = cx509.load_pem_x509_certificate(raw, default_backend())
+        else:
+            if not pem_text.startswith('-----BEGIN'):
+                try:
+                    pem_text = base64.b64decode(pem_text).decode('utf-8')
+                except Exception:
+                    return error_response('Invalid certificate format. Expected PEM data.', 400)
+            pem_bytes = pem_text.encode('utf-8')
+            cert_obj = cx509.load_pem_x509_certificate(pem_bytes, default_backend())
     except Exception as e:
-        logger.error(f"Failed to parse imported PEM: {e}")
+        logger.error(f"Failed to parse imported certificate: {e}")
         return error_response('Invalid PEM certificate data', 400)
+    try:
+        require_readable_extensions(cert_obj)
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
 
     issuing_ca = issuing_ca_for(cert_obj)
     if issuing_ca is None:
@@ -675,7 +699,8 @@ def enroll_import_certificate():
             enroll_username = target.username
 
     # Create Certificate record if not exists
-    if not existing_cert:
+    created = existing_cert is None
+    if created:
         # The CA resolved by signature above (never a namesake by DN)
         ca_ref = issuing_ca.refid
 
@@ -721,6 +746,9 @@ def enroll_import_certificate():
         details=f'Imported PEM certificate for user: {enroll_username}',
         success=True,
     )
+    if created:
+        from services.webhook_service import emit_cert_imported
+        emit_cert_imported(existing_cert.to_dict(), ca_refid=existing_cert.caref, actor=user.username)
 
     resp = auth_cert.to_dict()
     resp['cert_id'] = existing_cert.id

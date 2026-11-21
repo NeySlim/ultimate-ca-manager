@@ -5,7 +5,7 @@ and logged it to the audit trail as a change: nothing was stored.
 """
 import json
 
-from models import AuditLog
+from models import AuditLog, CA, db
 
 
 def test_is_active_is_not_reported_as_a_change(app, auth_client, create_ca):
@@ -13,6 +13,11 @@ def test_is_active_is_not_reported_as_a_change(app, auth_client, create_ca):
     r = auth_client.patch(f"/api/v2/cas/{ca['id']}", data=json.dumps({'is_active': True}),
                           content_type='application/json')
     assert r.status_code == 200, r.data
-    with app.app_context():
-        details = [r.details or '' for r in AuditLog.query.all()]
-        assert not any('is_active' in d for d in details)
+    try:
+        with app.app_context():
+            details = [r.details or '' for r in AuditLog.query.all()]
+            assert not any('is_active' in d for d in details)
+    finally:
+        with app.app_context():
+            CA.query.filter_by(id=ca['id']).delete()
+            db.session.commit()

@@ -8,7 +8,6 @@ from os import environ
 import sys
 from pathlib import Path
 from flask import Flask, jsonify as flask_jsonify, redirect, request
-from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_caching import Cache
 from flask_session import Session
@@ -21,7 +20,8 @@ from flasgger import Swagger
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config.settings import get_config, BASE_DIR, redis_url as config_redis_url
+from config.settings import get_config, BASE_DIR, redis_url as config_redis_url, session_store, SESSION_TABLE
+from config.settings import rate_limit_enabled
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
@@ -73,15 +73,21 @@ def _rate_limit_lan_exempt():
 
 
 def run_startup_housekeeping(app):
-    """Files missing on disk rewritten from the database, interrupted ACME orders reset."""
+    """Files reconciled with the database, a restored HTTPS pair settled, ACME orders reset."""
     try:
         with app.app_context():
-            from services.file_regen_service import regenerate_all_files
-            stats = regenerate_all_files()
-            if sum(stats.values()) > 0:
-                app.logger.info(f"✓ File regeneration completed: {stats}")
+            from services.file_regen_service import reconcile_files
+            stats = reconcile_files()
+            app.logger.info(f"File reconciliation at start: {stats}")
     except Exception as e:
-        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
+        app.logger.error(f"File reconciliation failed, retried by its task: {e}")
+
+    try:
+        with app.app_context():
+            from services.https_binding import settle_restored_https
+            settle_restored_https()
+    except Exception as e:
+        app.logger.warning(f"Restored HTTPS certificate not settled (non-fatal): {e}")
 
     # No auto-poll thread survives a restart: its orders go back to pending
     try:
@@ -94,7 +100,9 @@ def run_startup_housekeeping(app):
 
 def create_app(config_name=None):
     """Application factory"""
-    app = Flask(__name__, 
+    # Stamps this process's start before any setting is read (HA cluster commands)
+    import services.cluster_commands  # noqa: F401
+    app = Flask(__name__,
                 static_folder=str(BASE_DIR / "frontend" / "static"),
                 template_folder=str(BASE_DIR / "frontend" / "templates"))
     
@@ -151,6 +159,10 @@ def create_app(config_name=None):
         _logging.getLogger(_lib).setLevel(_logging.WARNING)
 
     app.logger.setLevel(_log_level)
+
+    # Before any database work, after logging so its warnings reach the handlers
+    from utils.ha import validate_ha_config
+    validate_ha_config(config)
     # ─────────────────────────────────────────────────────────────
     # Here, not where settings read the URL: logging did not exist yet
     log_normalised_scheme(os.getenv('DATABASE_URL', ''), _logging.getLogger('utils.db_url'))
@@ -220,24 +232,22 @@ def create_app(config_name=None):
             auto_generate=True
         )
     
-    # Run schema migrations BEFORE SQLAlchemy init (critical for upgrades).
-    # Backend-agnostic: the runner detects FRESH/LEGACY/TRACKED state and
-    # skips legacy SQL migrations on PostgreSQL or fresh installs (schema is
-    # built by SQLAlchemy create_all() instead). See migration_runner.py.
+    # Run schema migrations BEFORE SQLAlchemy init: the runner upgrades a 2.254 or 3.0 database,
+    # refuses any other existing one without writing, and leaves a fresh one to build_fresh_schema
+    # below. See migration_runner.py.
     #
     # Failure here MUST stop startup: continuing with a broken schema causes
     # silent data corruption or 500s on every request. Operators should see
     # the failure immediately and fix it before the service comes back up.
-    from migration_runner import run_all_migrations
+    from migration_runner import _get_db_url
+    from services.scheduler_leader import boot_lock
+    from startup_refusal import migrate_or_refuse
     db_path = config.DATABASE_PATH
     if db_path:
         os.environ.setdefault('DATABASE_PATH', str(db_path))
-    if not run_all_migrations(dry_run=False, verbose=False):
-        raise RuntimeError(
-            "Schema migration failed at startup. Refusing to start with an "
-            "inconsistent database. Check the migration log and fix the issue "
-            "before restarting the service."
-        )
+    # HA: once no restore holds the cluster, one node at a time migrates; the next one finds
+    # nothing left to apply
+    migrate_or_refuse(boot_lock)
     
     # A backend switch that asked for this restart has now been applied: the
     # configuration read above is the new one. Clearing the marker is what
@@ -285,12 +295,43 @@ def create_app(config_name=None):
             app.logger.info("✓ Redis session store enabled")
         except (ImportError, ValueError) as exc:
             reason = "redis library not installed" if isinstance(exc, ImportError) else "unsupported Redis URL"
-            app.logger.warning(f"⚠ {reason}, falling back to filesystem sessions")
-            app.config['SESSION_TYPE'] = 'filesystem'
+            fallback = session_store(None, config.DATABASE_TYPE)
+            app.logger.warning(f"⚠ {reason}, falling back to {fallback} sessions")
+            app.config['SESSION_TYPE'] = fallback
             app.config['SESSION_FILE_DIR'] = config.DATA_DIR / 'sessions'
+            app.config['SESSION_SQLALCHEMY_TABLE'] = SESSION_TABLE
+            app.config.pop('SESSION_REDIS', None)
+    if app.config.get('SESSION_TYPE') == 'sqlalchemy':
+        app.config['SESSION_SQLALCHEMY'] = db
+        app.config.pop('SESSION_FILE_DIR', None)  # no directory to harden
+        # Flask-Session defines its model on each call; a second app in this process must not clash
+        stale = db.metadata.tables.get(app.config['SESSION_SQLALCHEMY_TABLE'])
+        if stale is not None:
+            db.metadata.remove(stale)
     
-    Session(app)
-    
+    # Flask-Session creates its table here: under the HA boot lock, or two nodes
+    # starting on an empty schema both try to create it and one fails
+    with boot_lock(_get_db_url()):
+        Session(app)
+        if app.config.get('SESSION_TYPE') == 'sqlalchemy':
+            from utils.session_store import IsolatedSqlSessionInterface
+            # Same object and model, only the transaction handling differs
+            IsolatedSqlSessionInterface.adopt(app)
+            # The purge filters on expiry; fresh or switched installs never ran upgrade step 138
+            from sqlalchemy import Index
+            model = app.session_interface.sql_session_model
+            try:
+                with app.app_context():
+                    Index(f'ix_{model.__tablename__}_expiry', model.expiry).create(db.engine, checkfirst=True)
+            except Exception as exc:
+                app.logger.warning("Could not create the session expiry index: %s", exc)
+        elif app.config.get('SESSION_TYPE') == 'filesystem':
+            from utils.session_store import GuardedFileSystemSessionInterface
+            GuardedFileSystemSessionInterface.adopt(app)
+        elif app.config.get('SESSION_TYPE') == 'redis':
+            from utils.session_store_redis import GuardedRedisSessionInterface
+            GuardedRedisSessionInterface.adopt(app)
+
     # Ensure session directory exists with correct permissions (filesystem mode).
     # Session files contain CSRF tokens and authenticated user IDs — anyone with
     # read access to /opt/ucm/data/sessions can hijack live sessions. Pin the
@@ -334,6 +375,10 @@ def create_app(config_name=None):
     from utils.upload_spool import SpoolingRequest, prepare_spool_dir
     app.config['UPLOAD_SPOOL_DIR'] = prepare_spool_dir(config.DATA_DIR)
     app.request_class = SpoolingRequest
+    from services.backup.section_store import sweep_stale_stores
+    sweep_stale_stores(spool=app.config['UPLOAD_SPOOL_DIR'])
+    from services.backup.storage import sweep_orphan_spools
+    sweep_orphan_spools()
 
     # Initialize cache
     cache.init_app(app, config={
@@ -342,7 +387,7 @@ def create_app(config_name=None):
     })
     
     # Initialize rate limiter
-    if config.RATE_LIMIT_ENABLED:
+    if rate_limit_enabled():
         limiter.init_app(app)
         app.logger.info("✓ Rate limiting enabled")
     
@@ -358,38 +403,43 @@ def create_app(config_name=None):
             "UCM_ADMIN_ALLOWLIST_DISABLE is set: the admin source-address "
             "allowlist is not enforced")
     
-    # CORS - dynamic origins (admin base URL + localhost + env extras)
-    class _DynamicCorsOrigins:
-        """Iterable allowlist recomputed from SystemConfig on each CORS check."""
-        def __iter__(self):
-            from utils.public_endpoints import get_cors_origins
-            return iter(get_cors_origins())
-
-        def __contains__(self, origin):
-            from utils.public_endpoints import get_cors_origins
-            return origin in get_cors_origins()
-
-        def __len__(self):
-            from utils.public_endpoints import get_cors_origins
-            return len(get_cors_origins())
-
-    _cors_origins = _DynamicCorsOrigins()
-
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": _cors_origins,
+    # CORS: Flask-CORS's headers, its options resolved per request so the allowlist (admin base
+    # URL + localhost + env extras) is the one stored now; CORS(app) would freeze it at start.
+    import re
+    from urllib.parse import unquote
+    from flask_cors.core import ACL_ORIGIN, get_cors_options, probably_regex, set_cors_headers
+    _cors_resources = [
+        (re.compile(r"/api/*"), {
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
+            "expose_headers": ["Content-Disposition", "X-Skipped-Certificates", "X-Skipped-Certificates-Count",
+                               "X-Skipped-CAs", "X-Skipped-CAs-Count", "X-Exported-Count"],
             "supports_credentials": True
-        },
-        r"/socket.io/*": {
-            "origins": _cors_origins,
+        }),
+        (re.compile(r"/socket.io/*"), {
             "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
             "supports_credentials": True
-        }
-    })
-    
+        }),
+    ]
+
+    @app.after_request
+    def _cors_headers(resp):
+        if resp.headers.get(ACL_ORIGIN):
+            return resp
+        path = unquote(request.path)
+        for pattern, options in _cors_resources:
+            if pattern.match(path):
+                if not request.headers.get('Origin'):
+                    # Not a CORS request: nothing to allow, no database read (health probes)
+                    resp.vary.add('Origin')
+                    return resp
+                from utils.public_endpoints import get_cors_origins
+                # Literal origins only (no '*', no pattern): an Origin is echoed only when listed
+                origins = [o for o in get_cors_origins() if not probably_regex(o)]
+                return set_cors_headers(resp, get_cors_options(app, options, {'origins': origins}))
+        return resp
+
     # Swagger/OpenAPI Documentation
     swagger_config = {
         "headers": [],
@@ -476,7 +526,8 @@ def create_app(config_name=None):
     
     lock_file = os.path.join(DATA_DIR, '.db_init.lock')
     
-    with app.app_context():
+    # The host flock orders this node's processes, the HA boot lock the other nodes
+    with app.app_context(), boot_lock(_get_db_url()):
         # Acquire exclusive lock to ensure only one worker initializes DB
         with open(lock_file, 'w') as lock:
             app.logger.info("Waiting for database initialization lock...")
@@ -484,20 +535,13 @@ def create_app(config_name=None):
             app.logger.info("✓ Database lock acquired")
             
             try:
-                # Check if DB is already initialized by another worker
+                # Registry first, then tables, then any index a cut start left out; a failure stops the start
                 from sqlalchemy import inspect
-                inspector = inspect(db.engine)
-                tables = inspector.get_table_names()
-                
-                fresh_install = not ('users' in tables and 'certificate_authorities' in tables)
-                
-                if not fresh_install:
-                    app.logger.info("✓ Database tables already exist")
+                from migration_runner import start_schema
+                if start_schema(db.engine, db.metadata, db.create_all):
+                    app.logger.info("✓ Database tables created/verified, migration baseline marked")
                 else:
-                    # Create all tables
-                    app.logger.info("Creating database tables...")
-                    db.create_all()
-                    app.logger.info("✓ Database tables created/verified")
+                    app.logger.info("✓ Database tables already exist")
                 
                 # ===== EXTENDED TABLES =====
                 # Import models to register them with SQLAlchemy
@@ -540,19 +584,7 @@ def create_app(config_name=None):
                 
                 app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
                 
-                # On fresh install, mark all current legacy migrations as applied
-                # so future migrations from this point forward are the only ones
-                # that run. The schema we just created via SQLAlchemy already
-                # matches (or supersedes) every legacy migration.
-                if fresh_install:
-                    try:
-                        from migration_runner import mark_all_applied
-                        mark_all_applied()
-                        app.logger.info("✓ Migration baseline marked (fresh install)")
-                    except Exception as e:
-                        app.logger.warning(f"Could not mark migration baseline: {e}")
-                
-                # Migrations already run at startup before SQLAlchemy init
+                # Pending migrations ran before SQLAlchemy init; a fresh install recorded its registry above
                 
                 # Run database health check and repair
                 app.logger.info("Running database health check...")
@@ -576,6 +608,33 @@ def create_app(config_name=None):
     app.logger.info("✓ DATABASE INITIALIZATION COMPLETE - Safe to proceed")
     app.logger.info("=" * 60)
     
+    # ===== HA NODE IDENTIFIER =====
+    # Right after the schema, before anything this node's start changes (housekeeping, scan
+    # recovery, master key): a second live process under this identifier stops here (NodeIdTaken
+    # is a SystemExit); a registry that cannot be read leaves it to the heartbeat
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        with app.app_context():
+            from services.scheduler_leader import claim_node_at_start
+            try:
+                claim_node_at_start()
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"HA: node identifier not claimed at start: {type(e).__name__}: {e}")
+            # Secrets saved under another key (a former single instance): named, the service starts
+            if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':
+                from services.db_key_rewrap import report_unreadable_at_start
+                report_unreadable_at_start()
+
+    # FIPS mode: each blocker of the readiness check as an ERROR line, on every node; the
+    # operations it names are refused at use, the service itself always starts
+    with app.app_context():
+        try:
+            from services import fips_preflight
+            fips_preflight.log_startup_blockers(app.logger)
+        except Exception as e:
+            app.logger.error(f"FIPS readiness check at startup failed: {type(e).__name__}: {e}")
+
     # Under gunicorn the scheduler process does this before its loop: the master
     # leaves the database alone once the workers are forked
     from services.scheduler_service import supervised
@@ -623,6 +682,55 @@ def create_app(config_name=None):
             )
         except ImportError:
             pass
+
+        from security.dek_rotation import scheduled_retire, scheduled_sweep
+        scheduler.register_task(
+            name="dek_retire",
+            func=scheduled_retire,
+            interval=60,
+            description="End the grace period of a key change, drop old data-encryption "
+                        "keys past their retention"
+        )
+        scheduler.register_task(
+            name="dek_sweep",
+            func=scheduled_sweep,
+            interval=86400,
+            description="Rewrite under the current data-encryption key every value still "
+                        "under an old one"
+        )
+
+        from services.sso_sign_in_test_purge import scheduled_purge as purge_sign_in_tests
+        scheduler.register_task(
+            name="sso_sign_in_test_purge",
+            func=purge_sign_in_tests,
+            interval=60,
+            description="Purge OIDC and SAML sign-in tests and their reports past their expiry"
+        )
+
+        from security.session_key import scheduled_retire as retire_session_key
+        scheduler.register_task(
+            name="session_key_retire",
+            func=retire_session_key,
+            interval=600,
+            description="Drop the previous session key once its grace period is over"
+        )
+
+        from utils.ha import ha_enabled
+        if ha_enabled():
+            from services.cluster_commands import purge_old_commands
+            scheduler.register_task(
+                name="cluster_command_purge",
+                func=purge_old_commands,
+                interval=3600,
+                description="Delete HA cluster commands older than 24 hours"
+            )
+            from services.update_campaign import campaign_tick
+            scheduler.register_task(
+                name="update_campaign",
+                func=campaign_tick,
+                interval=60,
+                description="Move the HA rolling update to its next node"
+            )
 
         # Delivery history does not grow for ever (webhooks, deployments,
         # notifications) — every 6 hours, same cadence as the ACME purge
@@ -746,30 +854,48 @@ def create_app(config_name=None):
         # Register update check task (hourly tick; the task itself checks at
         # most daily and only installs in the configured window, #301)
         try:
-            from services.updates import scheduled_update_check
+            from services.updates import scheduled_update_check, scheduled_update_result
             scheduler.register_task(
                 name="update_check",
                 func=scheduled_update_check,
                 interval=3600,  # hourly gate for the auto-install window
                 description="Check for available UCM updates (opt-in auto-install)"
             )
+            scheduler.register_task(
+                name="update_result",
+                func=scheduled_update_result,
+                interval=3600,
+                description="Report the outcome of the last update installed on this node",
+                per_node=True
+            )
             app.logger.info("Registered update check task (hourly)")
         except ImportError:
             pass
+
+        # Every node: its certificate and key files follow the rows, after a restore anywhere
+        from services.file_regen_service import reconcile_if_behind
+        scheduler.register_task(
+            name="files_reconcile",
+            func=reconcile_if_behind,
+            interval=60,
+            description="Write and remove this node's certificate and key files after a restore",
+            per_node=True
+        )
         
+        # SQLite only: its statistics stay as the last ANALYZE left them (PostgreSQL has autovacuum)
+        if app.config.get('SQLALCHEMY_DATABASE_URI', '').startswith('sqlite'):
+            from services.sqlite_statistics import scheduled_refresh
+            scheduler.register_task(
+                name="sqlite_statistics",
+                func=scheduled_refresh,
+                interval=3600,
+                description="Refresh the SQLite planner statistics (PRAGMA optimize from 3.46, bounded ANALYZE before)"
+            )
+
         # Register discovery scheduler task (checks every 60s for due profiles)
         try:
             from services.discovery_scheduler_task import DiscoverySchedulerTask
-            # Scan runs orphaned by a crash/restart stay 'running' forever and
-            # would block future scheduled scans of their profile (#293)
-            with app.app_context():
-                DiscoverySchedulerTask.recover_stale_runs()
-            scheduler.register_task(
-                name="discovery_scan",
-                func=DiscoverySchedulerTask.execute,
-                interval=60,  # Check every minute for due profiles
-                description="Run scheduled network discovery scans"
-            )
+            DiscoverySchedulerTask.register(scheduler, app)
             app.logger.info("Registered discovery scan scheduler task (every 60s)")
         except ImportError:
             pass
@@ -834,6 +960,7 @@ def create_app(config_name=None):
                 func=run_backup_retention,
                 interval=86400,  # 24 hours
                 description="Prune backups past their retention period"
+                # HA: the leader alone, over the archives of the database
             )
             app.logger.info("Registered backup retention task (daily)")
         except ImportError:
@@ -900,7 +1027,7 @@ def create_app(config_name=None):
                 name="session_cleanup",
                 func=SessionCleanupTask.execute,
                 interval=900,  # Every 15 minutes
-                description="Clean up expired session files"
+                description="Clean up expired sessions"
             )
             app.logger.info("Registered session cleanup task (every 15m)")
         except ImportError:
@@ -938,6 +1065,25 @@ def create_app(config_name=None):
     except Exception as e:
         app.config['SAFE_MODE'] = False
         app.logger.warning(f"Safe mode check skipped: {e}")
+
+    # After the master key: the keytab is stored under it and written from the database
+    from services.kerberos.negotiate_auth import restore_keytab_at_start
+    restore_keytab_at_start(app)
+
+    # After the master key and before any request: the stored session key replaces the
+    # environment's when it opens (security.session_key); load() never raises
+    from security.session_key import load_keys as load_session_key, reload_if_pending
+    with app.app_context():
+        load_session_key(app, at_start=True)
+    # HA cluster maintenance: first hook, so a node in maintenance refuses before any other work
+    from services import cluster_maintenance
+    cluster_maintenance.init_app(app)
+    # After the gate (a node in maintenance refuses without a read), before a login route
+    # checks an identity; the certificate hook reads the epoch for itself
+    from auth.session_epoch import remember_request_epoch
+    app.before_request(remember_request_epoch)
+    # Before the CSRF check registered below: a failed load is retried before a token is checked
+    app.before_request(reload_if_pending)
     
     # HSM availability check at startup
     try:
@@ -946,6 +1092,22 @@ def create_app(config_name=None):
     except Exception as e:
         app.logger.debug(f"HSM check skipped: {e}")
 
+    try:
+        from utils.serial_duplicates import check_pending_serial_index
+        check_pending_serial_index(app)
+    except Exception as e:
+        app.logger.debug(f"Serial index check skipped: {e}")
+    try:
+        from utils.trust_pem import report_removed_keys
+        report_removed_keys(app)
+    except Exception as e:
+        app.logger.warning(f"Trust store key report skipped: {e}")
+    try:
+        from utils import ssh_serials
+        ssh_serials.report_marked_duplicates(app)
+    except Exception as e:
+        app.logger.warning(f"SSH serial report skipped: {e}")
+
     # Auto-register SoftHSM provider if Docker entrypoint initialized a token
     try:
         with app.app_context():
@@ -953,6 +1115,14 @@ def create_app(config_name=None):
             HsmService.auto_register_softhsm()
     except Exception as e:
         app.logger.debug(f"SoftHSM auto-register skipped: {e}")
+    # Once per node: the gunicorn master warns, the scheduler process it starts does not
+    if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':
+        try:
+            with app.app_context():
+                from services.hsm.hsm_service import HsmService
+                HsmService.warn_local_softhsm()
+        except Exception as e:
+            app.logger.debug(f"SoftHSM HA warning skipped: {e}")
     
     # Load syslog forwarder config
     try:
@@ -970,14 +1140,8 @@ def create_app(config_name=None):
         app.logger.warning(f"CSRF middleware not loaded: {e}")
 
     # Enable rate-limiting middleware (auth brute-force protection, etc.)
-    try:
-        from security.rate_limiter import init_rate_limiter
-        if os.environ.get('RATE_LIMIT_ENABLED', 'true').lower() in ('true', '1', 'yes', 'on'):
-            init_rate_limiter(app)
-        else:
-            app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
-    except Exception as e:
-        app.logger.warning(f"Rate limiter not loaded: {e}")
+    from security.rate_limiter import start_rate_limiting
+    start_rate_limiting(app)
     
     # Security headers and cleanup
     @app.teardown_request
@@ -1022,7 +1186,9 @@ def create_app(config_name=None):
         # HSTS is operator-configurable (Settings -> General, or UCM_HSTS_*
         # env vars) so instances serving self-signed certs during setup can
         # opt out entirely — see issue #154.
-        if 'Strict-Transport-Security' not in response.headers:
+        from utils.public_endpoints import PROBE_PATHS
+        # HSTS settings live in the database: a probe answers without them
+        if 'Strict-Transport-Security' not in response.headers and request.path not in PROBE_PATHS:
             from utils.hsts import build_hsts_header
             hsts_value = build_hsts_header()
             if hsts_value:
@@ -1087,10 +1253,11 @@ def create_app(config_name=None):
             return None
         
         from flask import jsonify as _jsonify
+        from security import encryption as _encryption
         return _jsonify({
             'error': True,
             'message': 'UCM is in safe mode: encryption key missing. '
-                       'Place your master.key at /etc/ucm/master.key and restart UCM.',
+                       f'Place your master.key at {_encryption.MASTER_KEY_PATH} and restart UCM.',
             'safe_mode': True
         }), 503
     
@@ -1116,10 +1283,10 @@ def create_app(config_name=None):
         return (admin_allowlist.REFUSAL_MESSAGE, 403,
                 {'Content-Type': 'text/plain; charset=utf-8'})
 
-    # Ahead of every hook that may sign in (mTLS), and of every identity check
-    from auth.session_epoch import remember_request_epoch
-    app.before_request_funcs.setdefault(None, []).insert(0, remember_request_epoch)
     app.before_request_funcs.setdefault(None, []).insert(0, enforce_admin_allowlist)
+    # First of all: a client certificate trusted on a former CA alone reaches WSTEP renewal only
+    from utils.client_cert import set_aside_former_ca_peercert
+    app.before_request_funcs[None].insert(0, set_aside_former_ca_peercert)
 
     # ── Global error handlers ─────────────────────────────────
     # Ensure ALL errors return JSON (not HTML) for API requests
@@ -1159,11 +1326,10 @@ def create_app(config_name=None):
     @app.errorhandler(413)
     def handle_413(e):
         if request.path.startswith('/api/'):
-            from services.backup.storage import RESTORE_FORM_MARGIN, restore_upload_limit
-            if request.max_content_length == restore_upload_limit() + RESTORE_FORM_MARGIN:
-                return _json_error(413, 'Backup archive too large: a restore accepts up to '
-                                        f'{restore_upload_limit() // (1024 * 1024)} MB '
-                                        '(BACKUP_MAX_UPLOAD_MB)')
+            from services.backup.storage import restore_body_limit, restore_body_too_large_message
+            # A restore route's body ceiling exists only when BACKUP_MAX_ARCHIVE_MB is set
+            if request.max_content_length == restore_body_limit():
+                return _json_error(413, restore_body_too_large_message())
             return _json_error(413, 'Request too large')
         return e
     
@@ -1185,6 +1351,9 @@ def create_app(config_name=None):
             response.headers.extend(
                 (k, v) for k, v in e.get_headers() if k.lower() != 'content-type')
             return response, code
+        from utils.ha import HaRestricted, ha_refusal
+        if isinstance(e, HaRestricted):
+            return ha_refusal(str(e))
         from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
         if isinstance(e, FipsRestricted):
             from compliance_profiles import ProfileRestricted, PROBLEM_TYPE as PROFILE_PROBLEM
@@ -1203,6 +1372,12 @@ def create_app(config_name=None):
             return response, 400
         if isinstance(e, (OverflowError, ValueError)):
             return _json_error(400, 'Invalid parameter value')
+        # A SQLite lock this request may not wait for is a 503 with Retry-After, never a 500
+        from utils.sqlite_wait import locked_refusal
+        refused = locked_refusal(e)
+        if refused is not None:
+            app.logger.warning("Database busy on %s: answered 503", request.path)
+            return refused
         app.logger.error("Unhandled exception on %s: %s", request.path, e, exc_info=True)
         return _json_error(500, 'Internal server error')
 
@@ -1414,174 +1589,44 @@ def init_database(app):
         conn.close()
     
     try:
-        add_missing_columns()
-        create_missing_tables()
+        # These helpers speak raw sqlite3 to DATABASE_PATH: meaningless on other backends.
+        if db.engine.dialect.name == 'sqlite':
+            add_missing_columns()
+            create_missing_tables()
     except Exception as e:
         app.logger.warning(f"Schema migration check failed (may be normal): {e}")
     
-    # Create initial admin user if none exists
-    # Use try/except to handle race conditions with multiple workers
+    # Create initial admin user if none exists (auth.initial_admin: provided or generated)
+    from auth import initial_admin
     try:
         if User.query.count() == 0:
-            admin = User(
-                username=app.config["INITIAL_ADMIN_USERNAME"],
-                email=app.config["INITIAL_ADMIN_EMAIL"],
-                role="admin",
-                active=True
-            )
-            admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
-            from auth.password_change_gate import initial_password_needs_change
-            admin.force_password_change = initial_password_needs_change(app.config["INITIAL_ADMIN_PASSWORD"])
-            # Exempt the bootstrap admin from forced 2FA enrolment (#141) so
-            # enabling global enforcement can never lock out this account.
-            admin.totp_exempt = True
-            db.session.add(admin)
+            admin = initial_admin.seed_admin(app.config)
 
-            # Add initial system config
-            configs = [
-                SystemConfig(key="app.version", value=app.config["APP_VERSION"],
-                            description="Application version"),
-            ]
-            
-            for config in configs:
-                db.session.add(config)
-            
+            # Add initial system config; an existing app.version is never rewritten here
+            if not SystemConfig.query.filter_by(key="app.version").first():
+                db.session.add(SystemConfig(key="app.version", value=app.config["APP_VERSION"],
+                                            description="Application version"))
             db.session.commit()
-            print(f"\n[SETUP] Initial admin user created: {admin.username}")
-            if initial_password_needs_change(app.config['INITIAL_ADMIN_PASSWORD']):
-                print(f"[SETUP] Using default password - CHANGE THIS IMMEDIATELY!")
-            else:
-                print(f"[SETUP] Using custom password from INITIAL_ADMIN_PASSWORD")
-            print(f"[SETUP] Login and change password in Settings > Account\n")
+            app.logger.info(f"Initial administrator '{admin.username}' created")
     except IntegrityError:
         # Another worker already created the initial data
         db.session.rollback()
-        pass
-    
+    initial_admin.sweep(app.config)
+    if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':  # the web master already said it
+        initial_admin.announce(app.config)
+
     # Create system certificate templates if none exist
     try:
-        import json
         from models.certificate_template import CertificateTemplate
-        
+        from services.template_service import TemplateService
+
         if CertificateTemplate.query.count() == 0:
-            app.logger.info("Creating system certificate templates...")
-            
-            templates = [
-                {
-                    "name": "Web Server (TLS/SSL)",
-                    "description": "Standard HTTPS/TLS web server certificate",
-                    "template_type": "web_server",
-                    "key_type": "RSA-2048",
-                    "validity_days": 397,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization", "OU": "IT"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["serverAuth"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["dns", "ip"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "Client Certificate",
-                    "description": "User authentication certificate for client devices",
-                    "template_type": "client_auth",
-                    "key_type": "RSA-2048",
-                    "validity_days": 365,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["clientAuth"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["dns", "email", "upn"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "VPN Server",
-                    "description": "VPN server certificate (OpenVPN, IPsec, etc.)",
-                    "template_type": "vpn_server",
-                    "key_type": "RSA-2048",
-                    "validity_days": 730,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["serverAuth"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["dns", "ip"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "Email (S/MIME)",
-                    "description": "Email encryption and signing certificate",
-                    "template_type": "email",
-                    "key_type": "RSA-2048",
-                    "validity_days": 365,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["emailProtection"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["email"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                # CA template removed — CAs are created from the CAs page, not via templates
-                {
-                    "name": "Code Signing",
-                    "description": "Code signing certificate for software/drivers",
-                    "template_type": "code_signing",
-                    "key_type": "RSA-2048",
-                    "validity_days": 365,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "O": "Organization"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature"],
-                        "extended_key_usage": ["codeSigning"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": []
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "Smartcard Logon",
-                    "description": "Windows smartcard / PKINIT logon certificate for Active Directory (clientAuth + msSmartcardLogin EKU, UPN otherName SAN)",
-                    "template_type": "smartcard_logon",
-                    "key_type": "RSA-2048",
-                    "validity_days": 397,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "OU": "Users"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["upn", "email"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                }
-            ]
-            
-            for tmpl_data in templates:
-                tmpl = CertificateTemplate(**tmpl_data)
-                db.session.add(tmpl)
-            
-            db.session.commit()
-            app.logger.info(f"✓ Created {len(templates)} system certificate templates")
+            # One list for fresh installs and upgrades: TemplateService.SYSTEM_TEMPLATES
+            created = TemplateService.seed_system_templates()
+            app.logger.info(f"✓ Created {created} system certificate templates")
 
         # System templates added after initial install (upgraded instances
         # skip the count()==0 block above) — ensure they exist by name
-        from services.template_service import TemplateService
         for _tmpl_name in ("OCSP Signing", "Smartcard Logon"):
             if CertificateTemplate.query.filter_by(name=_tmpl_name).first():
                 continue
@@ -1933,7 +1978,8 @@ def main():
     print(f"{'='*60}")
     print(f"  HTTPS Server: https://{config.HOST}:{config.HTTPS_PORT}")
     print(f"  Certificate: {config.HTTPS_CERT_PATH}")
-    print(f"  Database: {config.DATABASE_PATH}")
+    from utils.db_url import database_label
+    print(f"  Database: {database_label(os.getenv('DATABASE_URL'), config.DATABASE_PATH)}")
     print(f"{'='*60}\n")
     
     # Start HTTP protocol server for CDP/OCSP (dev mode, non-blocking thread)

@@ -17,6 +17,8 @@ from tests.test_acme_security_paths import (  # reuse the JWS/account harness
     _build_jws, _csr_b64, _nonce, _post_jws, acme_account,  # noqa: F401
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 PROFILES = {
     'default': {
         'description': '90-day server certificate',
@@ -221,7 +223,9 @@ class TestWithdrawnProfileAtFinalize:
         assert response.get_json()['type'].endswith(':invalidProfile')
         with app.app_context():
             refused = AcmeOrder.query.filter_by(order_id=order_id).first()
-            assert refused.status == 'ready' and refused.certificate_id is None
+            # No CSR lifts it: the order is invalid (RFC 8555 §7.1.6)
+            assert refused.status == 'invalid' and refused.certificate_id is None
+            assert json.loads(refused.error)['type'].endswith(':invalidProfile')
 
 
 class TestDefaultDigest:

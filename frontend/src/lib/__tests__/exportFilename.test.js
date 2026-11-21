@@ -18,9 +18,51 @@ vi.mock('../utils', () => ({ downloadBlob }))
 import { exportFileName, sanitizeFilename } from '../exportDownload'
 
 describe('sanitizeFilename', () => {
-  it('collapses anything outside [A-Za-z0-9._-] to a single underscore', () => {
+  it('collapses anything that is not a letter, a digit or ._- to a single underscore', () => {
     expect(sanitizeFilename('a/b\\c:d')).toBe('a_b_c_d')
     expect(sanitizeFilename('spaces   and %%% signs')).toBe('spaces_and_signs')
+  })
+
+  it('keeps a name written in another script (#448)', () => {
+    expect(sanitizeFilename('テスト用')).toBe('テスト用')
+    expect(sanitizeFilename('Сервер №1')).toBe('Сервер_1')
+    expect(sanitizeFilename('Café crème')).toBe('Café_crème')
+    expect(sanitizeFilename('हिन्दी')).toBe('हिन्दी')
+  })
+
+  it('drops bidi marks, fullwidth separators and symbols', () => {
+    expect(sanitizeFilename('n\u202eb')).toBe('n_b')
+    expect(sanitizeFilename('a\uff0fb\uff3cc')).toBe('a_b_c')
+    expect(sanitizeFilename('a\u2028b\u200ec')).toBe('a_b_c')
+    expect(sanitizeFilename('🔐🔐')).toBe('_')
+  })
+
+  it('clips whole characters within a byte budget', () => {
+    const cjk = sanitizeFilename('\u6f22'.repeat(300))
+    expect(new TextEncoder().encode(cjk).length).toBeLessThanOrEqual(200)
+    expect(cjk).toBe('\u6f22'.repeat(66))
+    const astral = sanitizeFilename('a' + '\u{20000}'.repeat(200))
+    expect(astral).toBe('a' + '\u{20000}'.repeat(49))
+    expect(sanitizeFilename('x'.repeat(300))).toBe('x'.repeat(128))
+  })
+
+  it('drops invisible letters and a mark that opens the name', () => {
+    expect(sanitizeFilename('a\u3164b\u115fc\ufe0fd\u034fe')).toBe('abcde')
+    expect(sanitizeFilename('\u0301abc')).toBe('abc')
+    expect(sanitizeFilename('\u3164')).toBe('export')
+  })
+
+  it('never hands back a Windows device name', () => {
+    expect(sanitizeFilename('CON')).toBe('CON_')
+    expect(sanitizeFilename('com\u00b9')).toBe('com\u00b9_')
+    expect(sanitizeFilename('lpt3')).toBe('lpt3_')
+    expect(sanitizeFilename('console')).toBe('console')
+  })
+
+  it('nor a device name followed by dots, which Windows reserves as well', () => {
+    expect(sanitizeFilename('nul.example.com')).toBe('nul_.example.com')
+    expect(sanitizeFilename('nul_.example.com')).toBe('nul_.example.com')
+    expect(sanitizeFilename('null.example.com')).toBe('null.example.com')
   })
 
   it('strips control characters, newlines included', () => {

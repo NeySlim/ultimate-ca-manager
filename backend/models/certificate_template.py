@@ -81,6 +81,12 @@ class CertificateTemplate(db.Model):
     # enforced value.
     pinned_subject_fields = db.Column(db.Text)
 
+    # WSTEP common name pattern (services/wstep/cn_pattern.py): fixed text and directory
+    # variables, for templates whose subject the CA builds; NULL keeps the built-in subject.
+    subject_cn_pattern = db.Column(db.String(255))
+    # With a pattern: the object's directory path follows the CN instead of the CN alone
+    subject_cn_keep_path = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
     # Extensions added verbatim to issued certificates (#437): JSON list of
     # {oid, critical, value} with the DER value in hex (utils.custom_extensions)
     custom_extensions = db.Column(db.Text)
@@ -125,6 +131,8 @@ class CertificateTemplate(db.Model):
             "autoenroll_enabled": bool(self.autoenroll_enabled),
             "allowed_ad_group": self.allowed_ad_group,
             "pinned_subject_fields": json.loads(self.pinned_subject_fields) if self.pinned_subject_fields else {},
+            "subject_cn_pattern": self.subject_cn_pattern,
+            "subject_cn_keep_path": bool(self.subject_cn_keep_path),
             "custom_extensions": self.custom_extensions_list(),
             "custom_extensions_error": self.custom_extensions_error(),
             "created_at": utc_isoformat(self.created_at),

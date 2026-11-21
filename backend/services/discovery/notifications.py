@@ -90,11 +90,12 @@ class NotificationsMixin:
     def _expiring_in_window(profile_id):
         """``(count, ids)`` of the profile's certificates expiring within 30 days or
         expired; *ids* only those not yet reported under their current fingerprint."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import timedelta
         from models import DiscoveredCertificate
+        from utils.datetime_utils import utc_now
         if not profile_id:
             return 0, []
-        threshold = datetime.now(timezone.utc) + timedelta(days=30)
+        threshold = utc_now() + timedelta(days=30)
         rows = DiscoveredCertificate.query.filter(
             DiscoveredCertificate.scan_profile_id == profile_id,
             DiscoveredCertificate.not_after.isnot(None),

@@ -17,6 +17,8 @@ from models import db, CA, Certificate, OCSPResponse, SystemConfig
 from services.cert_service import CertificateService
 from services.ocsp_service import OCSPService
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _ca_model(ca_dict):
     return db.session.get(CA, ca_dict['id'])
@@ -141,7 +143,7 @@ class TestGenerateResponse:
             ca = create_ca(cn='OCSP Good CA')
             cert = create_cert(cn='good.example.com', ca_id=ca['id'])
             ca_obj = _ca_model(ca)
-            serial = int(_cert_model(cert).serial_number, 16)
+            serial = int(_cert_model(cert).serial_number)
 
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good'
@@ -155,7 +157,7 @@ class TestGenerateResponse:
             cert = create_cert(cn='revoked.example.com', ca_id=ca['id'])
             CertificateService.revoke_certificate(cert['id'], reason='keyCompromise', username='test')
             ca_obj = _ca_model(ca)
-            serial = int(_cert_model(cert).serial_number, 16)
+            serial = int(_cert_model(cert).serial_number)
 
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'revoked'
@@ -566,7 +568,7 @@ class TestKeylessCASigning:
         with app.app_context():
             ca_obj, _, target, responder_cert = self._keyless_with_responder(
                 create_ca, create_cert, monkeypatch, 'Keyless Single CA')
-            serial = int(_cert_model(target).serial_number, 16)
+            serial = int(_cert_model(target).serial_number)
 
             der, status = OCSPService().generate_response(ca_obj, serial)
 
@@ -605,7 +607,7 @@ class TestKeylessCASigning:
             ca = create_ca(cn='Keyless Unauthorized CA')
             target = create_cert(cn='keyless-unauth.example.com', ca_id=ca['id'])
             ca_obj = _ca_model(ca)
-            serial = int(_cert_model(target).serial_number, 16)
+            serial = int(_cert_model(target).serial_number)
             ca_obj.prv = None
             db.session.commit()
 
@@ -629,7 +631,7 @@ class TestKeylessCASigning:
             target = create_cert(
                 cn=f'offline-{offline_mode.replace("_", "-")}.example.com', ca_id=ca['id'])
             ca_obj = _ca_model(ca)
-            serial = int(_cert_model(target).serial_number, 16)
+            serial = int(_cert_model(target).serial_number)
             ca_obj.offline = True
             ca_obj.offline_mode = offline_mode
             if wipe_key:
@@ -652,7 +654,7 @@ class TestKeylessCASigning:
             ca = create_ca(cn='HSM Fault OCSP CA')
             target = create_cert(cn='hsm-fault.example.com', ca_id=ca['id'])
             ca_obj = _ca_model(ca)
-            serial = int(_cert_model(target).serial_number, 16)
+            serial = int(_cert_model(target).serial_number)
 
             def _hsm_down(self, ca_arg):
                 raise ValueError('HSM signing failed: provider unreachable')
@@ -674,7 +676,7 @@ class TestKeylessCASigning:
             ca_obj.offline = True
             ca_obj.offline_mode = 'file_exported'
             db.session.commit()
-            serial = int(_cert_model(target).serial_number, 16)
+            serial = int(_cert_model(target).serial_number)
 
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good'
@@ -686,10 +688,25 @@ class TestKeylessCASigning:
 
 
 class TestCleanup:
-    def test_cleanup_runs(self, app):
+    def test_cleanup_removes_only_the_expired_answers(self, app, create_ca):
+        ca_id = create_ca(cn='OCSP cleanup CA')['id']
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         with app.app_context():
-            # Should not raise even with nothing to clean
+            rows = [OCSPResponse(ca_id=ca_id, cert_serial=f'cleanup-{name}', response_der=b'0',
+                                 status='good', this_update=now - timedelta(days=2),
+                                 next_update=now + delta)
+                    for name, delta in (('expired', timedelta(hours=-1)),
+                                        ('current', timedelta(hours=1)))]
+            db.session.add_all(rows)
+            db.session.commit()
+            expired, current = (row.id for row in rows)
+
             OCSPService().cleanup_expired_responses()
+            db.session.expire_all()
+            assert db.session.get(OCSPResponse, expired) is None
+            assert db.session.get(OCSPResponse, current) is not None
+            OCSPResponse.query.filter_by(id=current).delete()
+            db.session.commit()
 
 
 if __name__ == '__main__':
@@ -732,7 +749,7 @@ class TestResponderIdRfc6960:
             cert = create_cert(cn='responder-id.example.com', ca_id=ca['id'])
             ca_obj = _ca_model(ca)
             ca_cert = _load_x509(ca_obj)
-            serial = int(_cert_model(cert).serial_number, 16)
+            serial = int(_cert_model(cert).serial_number)
 
             der, _ = OCSPService().generate_response(ca_obj, serial)
             assert self._responder_id_by_key(der) == self._key_hash(ca_cert)
@@ -748,7 +765,7 @@ class TestResponderIdRfc6960:
             responder_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
             responder_cert = _delegated_certificate(ca_cert, ca_key, responder_key)
             _configure_delegated_responder(ca_obj, _cert_model(cert), responder_cert, responder_key)
-            serial = int(_cert_model(cert).serial_number, 16)
+            serial = int(_cert_model(cert).serial_number)
 
             der, _ = OCSPService().generate_response(ca_obj, serial)
             responder_id = self._responder_id_by_key(der)
@@ -844,7 +861,7 @@ class TestResponderIdRfc6960:
             _configure_delegated_responder(ca_obj, _cert_model(first), responder_cert, responder_key)
             expected = hashlib.sha1(point, usedforsecurity=False).digest()
 
-            single, _ = OCSPService().generate_response(ca_obj, int(_cert_model(first).serial_number, 16))
+            single, _ = OCSPService().generate_response(ca_obj, int(_cert_model(first).serial_number))
             assert self._responder_id_by_key(single) == expected
             ids = [_cert_id(_load_x509(_cert_model(c)), ca_cert, hashes.SHA1()) for c in (first, second)]
             parsed = OCSPService().parse_request_details(_build_asn1_request(ids))
@@ -1010,7 +1027,7 @@ class TestDelegatedResponderIssuance:
             assert r.status_code == 200, r.data
 
             ca_obj = _ca_model(ca)
-            serial = int(_cert_model(leaf).serial_number, 16)
+            serial = int(_cert_model(leaf).serial_number)
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good'
             resp = ocsp.load_der_ocsp_response(der)
@@ -1055,7 +1072,7 @@ class TestDelegatedResponderLifecycle:
             assert self._assign(auth_client, ca['id'], responder['id']).status_code == 200
             ca_obj = _ca_model(ca)
             ca_cert = _load_x509(ca_obj)
-            serial = int(_cert_model(leaf).serial_number, 16)
+            serial = int(_cert_model(leaf).serial_number)
             responder_cert = x509.load_pem_x509_certificate(responder['pem'].encode())
 
             der, _ = OCSPService().generate_response(ca_obj, serial)
@@ -1080,7 +1097,7 @@ class TestDelegatedResponderLifecycle:
             leaf = create_cert(cn='leaf-cache.example.com', ca_id=ca['id'])
             ca_obj = _ca_model(ca)
             ca_cert = _load_x509(ca_obj)
-            serial = int(_cert_model(leaf).serial_number, 16)
+            serial = int(_cert_model(leaf).serial_number)
 
             der, _ = OCSPService().generate_response(ca_obj, serial)
             assert self._responder_id(der) == TestResponderIdRfc6960._key_hash(ca_cert)
@@ -1235,7 +1252,7 @@ class TestDelegatedResponderStrictness:
             responder = json.loads(r.data)['data']
             responder_cert = x509.load_pem_x509_certificate(responder['pem'].encode())
             assert self._assign(auth_client, ca['id'], responder['id']).status_code == 200
-            serial = int(_cert_model(leaf).serial_number, 16)
+            serial = int(_cert_model(leaf).serial_number)
 
             # On hold: the CA signs, and that answer is cached
             r = auth_client.post(f"/api/v2/certificates/{responder['id']}/revoke",
@@ -1294,7 +1311,7 @@ class TestResponderKeyOwnership:
             # Forced into the configuration anyway: the responder still refuses it
             db.session.add(SystemConfig(key=f"ocsp_responder_cert_{ca['id']}", value=str(row.id)))
             db.session.commit()
-            serial = int(_cert_model(leaf).serial_number, 16)
+            serial = int(_cert_model(leaf).serial_number)
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good'
             resp = ocsp.load_der_ocsp_response(der)
@@ -1382,7 +1399,7 @@ class TestEd25519Responder:
                                  data=json.dumps({'certificate_id': row.id}), content_type='application/json')
             assert r.status_code == 200, r.data
 
-            serial = int(_cert_model(leaf).serial_number, 16)
+            serial = int(_cert_model(leaf).serial_number)
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good', status
             resp = ocsp.load_der_ocsp_response(der)
@@ -1425,7 +1442,7 @@ class TestDsaResponder:
                                  data=json.dumps({'certificate_id': row.id}), content_type='application/json')
             assert r.status_code == 200, r.data
 
-            serial = int(_cert_model(leaf).serial_number, 16)
+            serial = int(_cert_model(leaf).serial_number)
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good'
             resp = ocsp.load_der_ocsp_response(der)

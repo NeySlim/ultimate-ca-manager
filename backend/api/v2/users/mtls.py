@@ -19,6 +19,7 @@ from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
 from services.audit_service import AuditService
 from utils.key_codec import load_pem_bytes
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
 from utils.issuance_defaults import browser_key_type
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import parse_validity_days, remove_enrolment
@@ -74,6 +75,10 @@ def create_user_mtls_certificate(user_id):
             cert_obj = cx509.load_pem_x509_certificate(pem_bytes, default_backend())
         except Exception as e:
             return error_response('Invalid PEM certificate data', 400)
+        try:
+            require_readable_extensions(cert_obj)
+        except UnreadableCertificate as e:
+            return error_response(str(e), 400)
 
         serial = str(cert_obj.serial_number)
         subject_dn = cert_obj.subject.rfc4514_string()
@@ -107,7 +112,8 @@ def create_user_mtls_certificate(user_id):
         if (existing_cert is not None and existing_cert.revoked) or (
                 issuer_ca is not None and persisted_revocation(issuer_ca, cert_obj.serial_number) is not None):
             return error_response('This certificate has been revoked', 400)
-        if not existing_cert:
+        created = existing_cert is None
+        if created:
             existing_cert = Certificate(
                 refid=str(uuid.uuid4()),
                 descr=cert_name,
@@ -151,6 +157,10 @@ def create_user_mtls_certificate(user_id):
             details=f'Admin imported mTLS cert for user {target_user.username}',
             success=True,
         )
+        if created:
+            from services.webhook_service import emit_cert_imported
+            emit_cert_imported(existing_cert.to_dict(), ca_refid=existing_cert.caref,
+                               actor=g.current_user.username)
         return created_response(data=auth_cert.to_dict(), message='Certificate imported')
 
     else:
@@ -182,10 +192,11 @@ def create_user_mtls_certificate(user_id):
             result = CertificateService.create_certificate(
                 descr=f"mTLS certificate for {target_user.username}",
                 caref=ca.refid,
-                dn={'commonName': name},
+                dn={'CN': name},
                 cert_type='usr_cert',
                 key_type=browser_key_type(ca, name),
                 validity_days=validity_days,
+                subject_holder=f'user:{target_user.id}',
                 username=target_user.username,
             )
         except ValueError as e:
@@ -261,11 +272,11 @@ def delete_user_mtls_certificate(user_id, cert_id):
         return error_response('Certificate not found', 404)
 
     cert_name = auth_cert.name or f'Certificate #{cert_id}'
-    removed, failure = remove_enrolment(
+    removed, answer = remove_enrolment(
         auth_cert, username=getattr(g.current_user, 'username', 'system'),
         actor=g.current_user)
     if not removed:
-        return failure
+        return answer
 
     AuditService.log_action(
         action='admin_mtls_delete',
@@ -276,4 +287,4 @@ def delete_user_mtls_certificate(user_id, cert_id):
         success=True,
     )
 
-    return no_content_response()
+    return success_response(**answer) if answer else no_content_response()

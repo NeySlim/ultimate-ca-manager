@@ -31,6 +31,8 @@ const CATEGORY_LABELS = [
   ['groups', 'rbac.categories.groups'],
   ['settings', 'rbac.categories.settings'],
 ]
+/** Resources the frontend knows how to label. */
+export const PERMISSION_RESOURCES = CATEGORY_LABELS.map(([resource]) => resource)
 const ORDER = new Map(CATEGORY_LABELS.map(([resource], i) => [resource, i]))
 const LABELS = new Map(CATEGORY_LABELS)
 const ACTION_ORDER = ['read', 'write', 'delete']

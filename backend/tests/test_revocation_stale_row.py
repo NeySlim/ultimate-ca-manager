@@ -15,13 +15,12 @@ from tests.test_revocation_record_rule import (  # noqa: F401  (issuer is a fixt
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
-def _held_leaf(app, issuer, cn, *, recorded=True, spelling=None):
+def _held_leaf(app, issuer, cn, *, recorded=True):
     _, refid, ca_cert, ca_key = issuer
     real, key = _leaf(cn, ca_cert, ca_key, days=200)
     row_id = _store(app, real, refid, key=key)
     _held(app, row_id)
-    column = spelling(real.serial_number) if spelling else None
-    record_id = _record(app, refid, real, reason='certificateHold', at=EARLY, column=column,
+    record_id = _record(app, refid, real, reason='certificateHold', at=EARLY,
                         certificate_id=row_id) if recorded else None
     return row_id, record_id
 
@@ -145,12 +144,6 @@ class TestTwoConnections:
 
     def test_with_a_ca_record(self, app, issuer):
         row_id, record_id = _held_leaf(app, issuer, 'race-unhold.example.test')
-        self._race(app, row_id, record_id)
-
-    def test_with_a_ca_record_in_another_spelling(self, app, issuer):
-        """The record an unhold locks in its hex spelling is the one the revocation waits on."""
-        row_id, record_id = _held_leaf(app, issuer, 'race-unhold-hex.example.test',
-                                       spelling=lambda n: format(n, 'x'))
         self._race(app, row_id, record_id)
 
     def test_without_a_ca_record(self, app, issuer):

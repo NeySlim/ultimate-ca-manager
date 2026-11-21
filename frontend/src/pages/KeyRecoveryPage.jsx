@@ -12,6 +12,8 @@ import {
 import { keyRecoveryService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
+import { useLinkedId } from '../hooks/useLinkedId'
+import { stateLabel } from '../lib/stateLabel'
 import { formatDate, downloadBlob } from '../lib/utils'
 
 const STATUS_VARIANTS = { pending: 'warning', approved: 'success', rejected: 'danger', recovered: 'info', cancelled: 'default' }
@@ -19,7 +21,7 @@ const FILTERS = ['', 'pending', 'approved', 'recovered', 'rejected']
 
 export default function KeyRecoveryPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showInfo } = useNotification()
   const { hasPermission } = usePermission()
   const isAdmin = hasPermission('admin:key_recovery')
   const canRecover = hasPermission('write:key_recovery')
@@ -49,12 +51,51 @@ export default function KeyRecoveryPage() {
 
   useEffect(() => { load() }, [load])
 
+  // /key-recovery?request=N shows that request, even past the 500 the list holds
+  const linkedId = useLinkedId('request')
+  const [linked, setLinked] = useState(null)
+  useEffect(() => {
+    if (!linkedId) return
+    let cancelled = false
+    keyRecoveryService.get(linkedId)
+      .then((res) => {
+        if (cancelled) return
+        const row = res.data || res
+        setLinked(row)
+        if (row.status !== 'pending') {
+          showInfo(t('overview.link.handled', { id: row.id, status: stateLabel(t, row.status) }))
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return
+        if (e?.status === 404) showInfo(t('overview.link.gone', { id: linkedId }))
+        else showError(e.message || t('keyRecovery.loadFailed'))
+      })
+    return () => { cancelled = true }
+  }, [linkedId, showError, showInfo, t])
+  // The linked request comes first, in its listed copy when there is one, and only while the filter keeps its state
+  const current = linked && (requests.find((r) => r.id === linked.id) || linked)
+  const rest = current ? requests.filter((r) => r.id !== current.id) : requests
+  const shown = current && (!statusFilter || current.status === statusFilter) ? [current, ...rest] : rest
+
+  // A decision on the linked request re-reads it: the filtered list may no longer hold it
+  const refreshLinked = async (id) => {
+    if (linked?.id !== id) return
+    try {
+      const res = await keyRecoveryService.get(id)
+      setLinked(res.data || res)
+    } catch {
+      setLinked(null)
+    }
+  }
+
   const decide = async (req, action) => {
     const toastKey = action === 'approve' ? 'approved' : 'rejected'
     setBusy(req.id)
     try {
       await keyRecoveryService[action](req.id)
       showSuccess(t(`keyRecovery.${toastKey}`))
+      await refreshLinked(req.id)
       await load()
     } catch (e) {
       showError(e.message || t('keyRecovery.actionFailed'))
@@ -71,6 +112,7 @@ export default function KeyRecoveryPage() {
       downloadBlob(blob, `${recoverFor.cert_cn || recoverFor.cert_refid || 'recovered'}.p12`)
       showSuccess(t('keyRecovery.recovered'))
       setRecoverFor(null); setPassword(''); setLegacy(false)
+      await refreshLinked(recoverFor.id)
       await load()
     } catch (e) {
       showError(e.message || t('keyRecovery.actionFailed'))
@@ -99,17 +141,18 @@ export default function KeyRecoveryPage() {
 
         {loading ? (
           <div className="flex justify-center py-12"><LoadingSpinner /></div>
-        ) : requests.length === 0 ? (
+        ) : shown.length === 0 ? (
           <EmptyState icon={Vault} title={t('keyRecovery.empty')} description={t('keyRecovery.emptyDesc')} />
         ) : (
           <div className="space-y-2">
-            {requests.map((r) => (
-              <Card key={r.id} className="p-4">
+            {shown.map((r) => (
+              <Card key={r.id} className={`p-4 ${linked?.id === r.id ? 'ring-2 ring-accent-primary' : ''}`}
+                    aria-current={linked?.id === r.id ? 'true' : undefined}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-text-primary truncate">{r.cert_cn || r.cert_refid || `#${r.cert_id}`}</span>
-                      <Badge variant={STATUS_VARIANTS[r.status] || 'default'} size="sm">{t(`keyRecovery.status.${r.status}`, r.status)}</Badge>
+                      <Badge variant={STATUS_VARIANTS[r.status] || 'default'} size="sm">{t(`keyRecovery.status.${r.status}`, stateLabel(t, r.status))}</Badge>
                     </div>
                     <p className="text-xs text-text-secondary mt-1">{t('keyRecovery.reason')}: {r.reason}</p>
                     <p className="text-2xs text-text-tertiary mt-1">

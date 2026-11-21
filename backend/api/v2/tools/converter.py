@@ -11,8 +11,10 @@ import fips_mode
 from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.export_password import validate_export_password
+from utils.password_field import password_type_error
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.key_codec import refuse_eddsa_key
+from utils.certificate_readability import UnreadableCertificate
 from cryptography.hazmat.primitives.serialization import pkcs7
 
 from . import tools_bp, logger
@@ -33,7 +35,16 @@ def convert_certificate():
     input_data = data.get('pem', '').strip()
     output_format = data.get('output_format', 'pem')
     password = data.get('password', '') or None
-    pkcs12_password = data.get('pkcs12_password', '')
+    # output_password is the neutral name of pkcs12_password: the password of the OUTPUT (PEM key, PKCS#12, JKS)
+    for field in ('output_password', 'pkcs12_password'):
+        type_err = password_type_error(data.get(field), field)
+        if type_err:
+            return error_response(type_err, 400)
+    output_password = data.get('output_password') or ''
+    pkcs12_password = data.get('pkcs12_password') or ''
+    if output_password and pkcs12_password and output_password != pkcs12_password:
+        return error_response('Send the output password as output_password only', 400)
+    pkcs12_password = output_password or pkcs12_password
     chain_pem = data.get('chain', '').strip()
     key_pem = data.get('private_key', '').strip()
 
@@ -132,8 +143,13 @@ def convert_certificate():
             pem_parts = []
             for cert in certs:
                 pem_parts.append(cert.public_bytes(serialization.Encoding.PEM).decode())
+            if keys and pkcs12_password:
+                pw_err = validate_export_password(pkcs12_password)
+                if pw_err:
+                    return error_response(pw_err, 400)
             for key in keys:
-                enc = serialization.NoEncryption()
+                enc = (serialization.BestAvailableEncryption(pkcs12_password.encode())
+                       if pkcs12_password else serialization.NoEncryption())
                 pem_parts.append(key.private_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PrivateFormat.PKCS8,
@@ -160,6 +176,10 @@ def convert_certificate():
                 der_data = certs[0].public_bytes(serialization.Encoding.DER)
                 filename = 'certificate.der'
             elif keys:
+                if pkcs12_password:
+                    return error_response(
+                        'A DER private key cannot be encrypted: use output_format pem, pkcs12 or jks '
+                        'for an output_password, or send no output_password', 400)
                 der_data = keys[0].private_bytes(
                     encoding=serialization.Encoding.DER,
                     format=serialization.PrivateFormat.PKCS8,
@@ -277,6 +297,8 @@ def convert_certificate():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f'Conversion failed: {e}')
         return error_response('Conversion failed', 400)

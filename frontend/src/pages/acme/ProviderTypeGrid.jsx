@@ -41,11 +41,11 @@ export default function ProviderTypeGrid({ label, providers, value, onChange, di
             : "border-border-op50 bg-tertiary-op40 hover:border-secondary-op40 hover:bg-tertiary-op70"
         )}
       >
-        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm"
+        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-paper shadow-sm"
           style={{ backgroundColor: brandColor }}>
           <ProviderIcon type={pt.type} size={18} />
         </span>
-        <span className={cn("text-[11px] font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
+        <span className={cn("text-xs font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
           {pt.name}
         </span>
       </button>
@@ -78,7 +78,7 @@ export default function ProviderTypeGrid({ label, providers, value, onChange, di
         )}
         {search === '' && popularProviders.length > 0 && (
           <>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">{t('common.popular', 'Popular')}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{t('common.popular', 'Popular')}</p>
             <div className="grid grid-cols-3 gap-2">
               {popularProviders.map(renderCard)}
             </div>
@@ -86,7 +86,7 @@ export default function ProviderTypeGrid({ label, providers, value, onChange, di
         )}
         {search === '' && otherProviders.length > 0 && (
           <>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary pt-1">{t('common.other', 'Other')}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary pt-1">{t('common.other', 'Other')}</p>
             <div className="grid grid-cols-3 gap-2">
               {otherProviders.map(renderCard)}
             </div>

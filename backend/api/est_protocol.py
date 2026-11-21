@@ -6,7 +6,8 @@ from flask import Blueprint, request, Response
 from models import db, CA
 from services.ad_connector import renewal_identity
 from services.ca_service import CAService
-from services.ca.ca_signing import AlreadySuperseded
+from services.ca.ca_signing import AlreadySuperseded, SubjectTaken
+from services.est_key_generator import DelegateRenewedMeanwhile
 from services.policy_service import PolicyViolation
 from utils.request_names import RequestRejected
 from services.audit_service import AuditService
@@ -593,11 +594,8 @@ def _validate_est_csr(csr):
                 "EST: CSR signed with weak hash algorithm %s (subject=%s)",
                 weak_algo, csr.subject.rfc4514_string(),
             )
-            return False, Response(
-                f'CSR signed with an unsupported hash algorithm ({weak_algo}); '
-                'use SHA-256 or stronger',
-                status=400,
-            )
+            from utils.csr_diagnostics import weak_csr_hash_error
+            return False, Response(weak_csr_hash_error(csr), status=400)
         logger.warning(
             "EST: CSR self-signature invalid (subject=%s)",
             csr.subject.rfc4514_string(),
@@ -629,8 +627,155 @@ def _validate_est_csr(csr):
     return True, None
 
 
-# Seconds a client is asked to wait before sending a refused-for-now request again
+# RFC 7030 §4.2.3: seconds a client waits before sending a held request again
 EST_RETRY_AFTER_DEFAULT = 300
+
+
+def _retry_after_seconds():
+    from models import SystemConfig
+    row = SystemConfig.query.filter_by(key='est_retry_after_seconds').first()
+    try:
+        value = int(row.value) if row and row.value else EST_RETRY_AFTER_DEFAULT
+    except (TypeError, ValueError):
+        value = EST_RETRY_AFTER_DEFAULT
+    return value if value > 0 else EST_RETRY_AFTER_DEFAULT
+
+
+def _est_identity(username):
+    """Who is asking: the TLS client certificate (its fingerprint) or the Basic user."""
+    client_cert = _trusted_client_cert()
+    if client_cert:
+        import hashlib
+        cert = x509.load_pem_x509_certificate(
+            client_cert.encode() if isinstance(client_cert, str) else client_cert, default_backend())
+        return 'mtls:' + hashlib.sha256(cert.public_bytes(_crypto_serialization.Encoding.DER)).hexdigest()
+    return f'basic:{username or ""}'
+
+
+def sign_est_csr(ca, csr, *, renewal_of=None, supersedes=None, on_stored=None, renews=None):
+    """Sign an EST request (direct or approved): ``(cert_pem, serial)``. *renews*: rows of the
+    entity the request designates without renewing them (serverkeygen by its client certificate)."""
+    from models import SystemConfig
+    validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
+    days = int(validity_days.value) if validity_days else 365
+    # A re-enrolment keeps the renewed certificate's SID extension, resolved at signing
+    requester_sid = (renewal_identity.renewal_requester_sid(
+        renewal_of, x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend()), 'EST')
+        if renewal_of is not None else None)
+    return CAService.sign_csr_from_crypto(
+        ca=ca, csr=csr, validity_days=days, source='est', cert_type='device_cert',
+        renewal_of=renewal_of, supersedes=supersedes, on_stored=on_stored,
+        requester_sid=requester_sid, renews=renews,
+    )
+
+
+def _client_certificate_entity(ca, client_cert, csr):
+    """The rows of the TLS client certificate when *ca* issued it with the subject asked for: the
+    serverkeygen request is that entity's (a designated replacement, as simplereenroll's)."""
+    if client_cert is None or not getattr(ca, 'enforce_unique_subject', False):
+        return None
+    from services.cert.issued_lookup import find_issued_rows
+    from utils.dn_match import same_name
+    if not same_name(client_cert.subject, csr.subject):
+        return None
+    return find_issued_rows(ca, client_cert) or None
+
+
+def _request_ref(ca, csr, operation, identity):
+    from services import protocol_approval
+    return protocol_approval.make_ref('est', operation, ca.id, identity, protocol_approval.csr_ref(csr))
+
+
+def _approved_delivery(ca, csr, operation, identity, renewed_revoked=False):
+    """The answer to an approved request not yet delivered, else None: its
+    certificate, or a 403 once it is closed because the renewed certificate
+    was revoked or its own went away (delivered, so never judged again)."""
+    from services import protocol_approval
+    from models import Certificate
+    approval = protocol_approval.find_protocol_request('est', _request_ref(ca, csr, operation, identity))
+    if approval is None or approval.status != 'approved':
+        return None
+    row = db.session.get(Certificate, approval.certificate_id) if approval.certificate_id else None
+    if renewed_revoked or row is None or not row.crt:
+        protocol_approval.close_withdrawn(
+            approval, protocol_approval.RENEWED_REVOKED if renewed_revoked
+            else protocol_approval.CERTIFICATE_WITHDRAWN)
+        protocol_approval.mark_delivered(approval)
+        return Response(protocol_approval.decision_reason(approval), status=403)
+    cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
+    # Built first: an answer that cannot be built leaves the delivery to the next retry
+    response = _certs_only_response(cert, ca=ca)
+    protocol_approval.mark_delivered(approval)
+    return response
+
+
+def _approval_gate(ca, csr, operation, identity, extra=None):
+    """``(response, approval)``: the answer for a request a policy holds
+    (RFC 7030 §4.2.3: 202 with Retry-After while pending, the certificate
+    once approved, 403 once rejected), or ``(None, None)`` to issue now;
+    ``(None, approval)`` for an approved server key generation, claimed
+    (marked delivered) before its key is generated, so two retries never
+    generate twice. The client sends the same request again: it is found by
+    its CSR, CA, operation and identity."""
+    from services import protocol_approval
+    cn, dns = protocol_approval.csr_names(csr)
+    ref = _request_ref(ca, csr, operation, identity)
+    try:
+        approval = protocol_approval.gate_protocol_issuance(
+            'est', ca=ca, cn=cn, san_list=dns, identity=identity, protocol_ref=ref,
+            renewal=operation == 'reenroll',
+            csr_pem=csr.public_bytes(_crypto_serialization.Encoding.PEM).decode(),
+            extra=dict(extra or {}, operation=operation))
+    except protocol_approval.ApprovalGateUnavailable:
+        return Response('Policy evaluation failed; the request was not processed', status=500), None
+    if approval is None:
+        return None, None
+    if approval.status == 'rejected':
+        protocol_approval.mark_delivered(approval)
+        return Response(protocol_approval.decision_reason(approval), status=403), None
+    if approval.status == 'approved':
+        if operation == 'serverkeygen':
+            if protocol_approval.claim_delivery(approval):
+                return None, approval
+            # Another retry took this approval: this one is a new request
+            return _approval_gate(ca, csr, operation, identity, extra)
+        from models import Certificate
+        row = db.session.get(Certificate, approval.certificate_id) if approval.certificate_id else None
+        if row is None or not row.crt:
+            protocol_approval.close_withdrawn(approval)
+            protocol_approval.mark_delivered(approval)
+            return Response(protocol_approval.decision_reason(approval), status=403), None
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
+        response = _certs_only_response(cert, ca=ca)
+        protocol_approval.mark_delivered(approval)
+        return response, None
+    logger.info('EST %s held for approval #%s', operation, approval.id)
+    return Response(f'Request held for approval (#{approval.id}); retry later', status=202,
+                    headers={'Retry-After': str(_retry_after_seconds())}), None
+
+
+def _release_claim(approval):
+    """An approved key generation that issued nothing waits for the next retry."""
+    if approval is not None:
+        from services import protocol_approval
+        protocol_approval.release_delivery(approval)
+
+
+def _refuse_claim(approval):
+    """An approved key generation refused for good at issuance is closed:
+    the client's next retry is a new request, not the same refusal again."""
+    if approval is not None:
+        from services import protocol_approval
+        db.session.rollback()
+        protocol_approval.close_withdrawn(approval, protocol_approval.REFUSED_AT_ISSUANCE)
+
+
+def _link_issued(approval, cert, ca):
+    """Link an approved server key generation to the certificate issued for it."""
+    from models import Certificate
+    row = Certificate.query.filter_by(serial_number=str(cert.serial_number), caref=ca.refid).first()
+    if row is not None and approval.certificate_id is None:
+        approval.certificate_id = row.id
 
 
 @_labelled_route('/cacerts', methods=['GET'], endpoint='get_ca_certs')
@@ -718,19 +863,12 @@ def simple_enroll(label=None):
         if not ok:
             return deny
 
-        # Get validity from config
-        from models import SystemConfig
-        validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
-        days = int(validity_days.value) if validity_days else 365
-        
-        # Sign the CSR
-        cert_pem, serial = CAService.sign_csr_from_crypto(
-            ca=ca,
-            csr=csr,
-            validity_days=days,
-            source='est',
-            cert_type='device_cert',
-        )
+        held, _approved = _approval_gate(ca, csr, 'enroll', _est_identity(username),
+                                         extra={'label': label})
+        if held is not None:
+            return held
+
+        cert_pem, serial = sign_est_csr(ca, csr)
         
         # Create audit log
         from services.audit.staging import stage_audit_entry
@@ -752,7 +890,7 @@ def simple_enroll(label=None):
     except PolicyViolation as e:
         logger.warning(f"EST simpleenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
-    except RequestRejected as e:
+    except (RequestRejected, SubjectTaken) as e:  # RFC 7030 §4.2.3: a 4xx with a plaintext reason
         logger.warning(f"EST simpleenroll refused: {e}")
         return Response(str(e), status=400)
     except Exception as e:
@@ -821,14 +959,27 @@ def simple_reenroll(label=None):
             # (a revoked one, or one from another CA sharing the names,
             # used to be re-enrolled and even graced its EKUs and names)
             from services.cert.issued_lookup import (
-                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
+                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, WINDOWS_PROFILE,
+                protocol_renewal_status,
             )
-            renewed_row, status = issued_certificate_status(ca, client_cert_obj)
+            renewed_row, status = protocol_renewal_status(ca, client_cert_obj)
+            # An approved re-enrolment is delivered whatever the presented certificate
+            # became (superseded, expired, no longer on record); only a revocation closes it
+            delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None),
+                                           renewed_revoked=status == REVOKED)
+            if delivered is not None:
+                return delivered
             if status != OK:
                 logger.warning(
                     'EST reenroll: client certificate refused (%s), serial=%s',
                     status, client_cert_obj.serial_number,
                 )
+                if status == WINDOWS_PROFILE:
+                    from services.windows_profiles import (
+                        PROTOCOL_RENEWAL_REFUSED, audit_protocol_renewal_refusal,
+                    )
+                    audit_protocol_renewal_refusal('EST', renewed_row, 'mtls-client')
+                    return Response(PROTOCOL_RENEWAL_REFUSED, status=403)
                 return Response({
                     REVOKED: 'Client certificate has been revoked',
                     EXPIRED: 'Client certificate has expired',
@@ -839,18 +990,14 @@ def simple_reenroll(label=None):
             logger.error(f"EST reenroll: failed to parse client cert: {e}")
             return Response('Invalid client certificate', status=400)
         
-        from models import SystemConfig
-        validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
-        days = int(validity_days.value) if validity_days else 365
-        
-        # A re-enrolment keeps the renewed certificate's SID extension, never the CSR's
-        requester_sid = renewal_identity.renewal_requester_sid(
-            client_cert_obj, x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend()), 'EST')
-        cert_pem, serial = CAService.sign_csr_from_crypto(
-            ca=ca, csr=csr, validity_days=days, source='est',
-            renewal_of=client_cert_obj, cert_type='device_cert',
-            supersedes=renewed_row, requester_sid=requester_sid,
-        )
+        held, _approved = _approval_gate(
+            ca, csr, 'reenroll', _est_identity(None),
+            extra={'label': label, 'renewal_of': client_cert_obj.public_bytes(
+                _crypto_serialization.Encoding.PEM).decode()})
+        if held is not None:
+            return held
+
+        cert_pem, serial = sign_est_csr(ca, csr, renewal_of=client_cert_obj, supersedes=renewed_row)
 
         from services.audit.staging import stage_audit_entry
         stage_audit_entry(
@@ -872,11 +1019,11 @@ def simple_reenroll(label=None):
         return Response('Client certificate has been superseded by a newer one', status=403)
     except renewal_identity.RenewalIdentityUnresolved as e:
         # A passing outage (RFC 9110 §15.6.4): the client may send the same request later
-        return Response(str(e), status=503, headers={'Retry-After': str(EST_RETRY_AFTER_DEFAULT)})
+        return Response(str(e), status=503, headers={'Retry-After': str(_retry_after_seconds())})
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
-    except RequestRejected as e:
+    except (RequestRejected, SubjectTaken) as e:  # RFC 7030 §4.2.3: a 4xx with a plaintext reason
         logger.warning(f"EST simplereenroll refused: {e}")
         return Response(str(e), status=400)
     except Exception as e:
@@ -949,6 +1096,7 @@ def server_keygen(label=None):
     remote_ip = client_ip()
     auth_method = 'mtls' if _trusted_client_cert() else 'basic'
 
+    approved = None  # an approval this request claimed, released if nothing is issued
     try:
         csr_data, err = _read_est_body_text()
         if err is not None:
@@ -1041,6 +1189,13 @@ def server_keygen(label=None):
             return Response('CSR subject must include a non-empty CN', status=400)
         subject_cn = str(cn_attrs[0].value).strip()
 
+        # RFC 7030 §4.4.2 answers a held request as §4.2.3 does; the key is
+        # generated only once approved, when the client sends the request again
+        held, approved = _approval_gate(ca, csr, 'serverkeygen', _est_identity(username),
+                                        extra={'label': label})
+        if held is not None:
+            return held
+
         # Audit BEFORE issuing — keeps a record even if signing fails
         # mid-flight or the response is dropped on the wire.
         AuditService.log_action(
@@ -1089,8 +1244,13 @@ def server_keygen(label=None):
                     key, signer_key, signer_cert, recipient_cert, chain=(ca_cert,),
                     key_encryption=key_encryption,
                 )
+            except DelegateRenewedMeanwhile:
+                _release_claim(approved)
+                return Response('The EST key generator certificate was renewed meanwhile; '
+                                'retry the request', status=409)
             except Exception as e:
                 logger.error(f"EST serverkeygen: the key package could not be signed: {e}")
+                _release_claim(approved)
                 return Response(
                     'Server key generation failed: the key package could not be signed',
                     status=500,
@@ -1109,16 +1269,14 @@ def server_keygen(label=None):
         new_csr = new_csr_builder.sign(key, HASH_BY_NAME[csr_digest]() if csr_digest else None,
                                        default_backend())
         
-        from models import SystemConfig
-        validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
-        days = int(validity_days.value) if validity_days else 365
-        
-        cert_pem, serial = CAService.sign_csr_from_crypto(
-            ca=ca, csr=new_csr, validity_days=days, source='est',
-            cert_type='device_cert',
-        )
-        
+        cert_pem, serial = sign_est_csr(ca, new_csr,
+                                        renews=_client_certificate_entity(ca, mtls_cert_obj, csr))
+
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+        if approved is not None:
+            _link_issued(approved, cert, ca)
+            db.session.commit()
+            approved = None  # issued: the claim stands whatever follows
         
         # The certificate part exactly matches /simpleenroll: one certificate.
         p7_b64 = _certs_only_base64(cert)
@@ -1150,10 +1308,13 @@ Content-Transfer-Encoding: base64\r
         
     except PolicyViolation as e:
         logger.warning(f"EST serverkeygen refused by policy: {e}")
+        _refuse_claim(approved)
         return Response(f"Policy violation: {e}", status=400)
-    except RequestRejected as e:
+    except (RequestRejected, SubjectTaken) as e:  # RFC 7030 §4.2.3: a 4xx with a plaintext reason
         logger.warning(f"EST serverkeygen refused: {e}")
+        _refuse_claim(approved)
         return Response(str(e), status=400)
     except Exception as e:
         logger.error(f"EST serverkeygen failed: {e}")
+        _release_claim(approved)
         return Response("Server key generation failed", status=400)

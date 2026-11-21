@@ -198,7 +198,7 @@ export default function PoliciesPage() {
         <div className="flex items-center gap-2">
           <div className={cn(
             'w-2 h-2 rounded-full shrink-0',
-            row.is_active ? 'bg-green-500' : 'bg-gray-400'
+            row.is_active ? 'bg-status-success' : 'bg-text-tertiary'
           )} />
           <div>
             <div className="font-medium text-text-primary">{val}</div>
@@ -305,11 +305,14 @@ export default function PoliciesPage() {
       notify_on_violation: policy.notify_on_violation ?? true,
       is_active: policy.is_active ?? true,
       priority: policy.priority || 100,
+      // The update replaces the rules: keys the form does not show go back unchanged
       rules: {
+        ...(policy.rules || {}),
         max_validity_days: policy.rules?.max_validity_days || 397,
         allowed_key_types: policy.rules?.allowed_key_types || [],
         allowed_digests: policy.rules?.allowed_digests || [],
         san_restrictions: {
+          ...(policy.rules?.san_restrictions || {}),
           max_dns_names: policy.rules?.san_restrictions?.max_dns_names || 50,
           dns_pattern: policy.rules?.san_restrictions?.dns_pattern || '',
         },

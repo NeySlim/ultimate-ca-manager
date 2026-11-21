@@ -92,9 +92,10 @@ SECTIONS: Dict[str, Section] = {
             'password_reset_expires': 'goes with the reset token',
             'totp_last_step': 'live replay guard of the TOTP codes',
             'session_version': 'live session state: an older value would reopen sessions closed since the backup',
+            'has_sso_identity': 'derived from user_sso_identities, set again once the restore wrote them',
         },
         secrets=('totp_secret', 'backup_codes'),
-        references={'custom_role_id': 'custom_roles', 'sso_provider_id': 'sso_providers'},
+        references={'custom_role_id': 'custom_roles'},
     ),
     'certificate_authorities': Section(
         model='models:CA',
@@ -108,9 +109,13 @@ SECTIONS: Dict[str, Section] = {
     'certificates': Section(
         model='models:Certificate',
         identity=('refid',),
-        exclude={**_SURROGATE},
+        exclude={**_SURROGATE,
+                 'key_bits': 'derived from crt on restore, by the listener on Certificate.crt',
+                 'sig_hash': 'derived from crt on restore, by the listener on Certificate.crt',
+                 'subject_key': 'derived from crt on restore, by the listener on Certificate.crt'},
         references={'template_id': 'certificate_templates', 'owner_group_id': 'groups',
-                    'related_certificate_id': 'certificates'},
+                    'related_certificate_id': 'certificates',
+                    'windows_profile_id': 'windows_enrollment_profiles'},
         custom=True,
         handled={'crt': 'certificate_pem', 'prv': 'private_key_pem_encrypted',
                  'csr': 'csr_pem'},
@@ -291,6 +296,7 @@ SECTIONS: Dict[str, Section] = {
         identity=('label',),
         exclude={**_SURROGATE},
         secrets=('account_key', 'eab_hmac_key'),
+        # eab_hmac_key is a property that writes under the KEK itself: no layer to name
         stored={'account_key': 'master'},
     ),
     'acme_client_orders': Section(
@@ -327,7 +333,7 @@ SECTIONS: Dict[str, Section] = {
         model='models.ssh:SSHCertificateAuthority',
         identity=('refid',),
         exclude={**_SURROGATE},
-        references={'owner_group_id': 'groups'},
+        references={'owner_group_id': 'groups', 'hsm_key_id': 'hsm_keys'},
         custom=True,
         handled={'private_key': 'private_key_pem_encrypted'},
     ),
@@ -397,14 +403,31 @@ SECTIONS: Dict[str, Section] = {
     ),
     'ad_connector': Section(
         model='models.ad_connector:ADConnectorConfig',
-        identity=('id',),
+        identity=('name',),
         exclude={
+            **_SURROGATE,
             'last_test_at': 'live connection state',
             'last_test_result': 'live connection state',
             'health': 'live connection state: this installation\'s view of '
                       'which domain controllers answered, meaningless on another',
         },
         secrets=('bind_password',),
+    ),
+    'windows_enrollment_profiles': Section(
+        model='models.windows_profile:WindowsEnrollmentProfile',
+        identity=('name',),
+        exclude={**_SURROGATE},
+        # A1/A7: the keytab travels like the connector's bind password, re-encrypted on restore
+        secrets=('keytab',),
+        stored={'keytab': 'master'},
+        references={'connector_id': 'ad_connector'},
+    ),
+    'windows_profile_templates': Section(
+        model='models.windows_profile:WindowsProfileTemplate',
+        identity=('profile_id', 'template_id'),
+        exclude={**_SURROGATE},
+        references={'profile_id': 'windows_enrollment_profiles',
+                    'template_id': 'certificate_templates'},
     ),
     'webhook_endpoints': Section(
         model='services.webhook_service:WebhookEndpoint',
@@ -435,7 +458,8 @@ SECTIONS: Dict[str, Section] = {
         model='models.deploy:DeployBinding',
         identity=('target_id', 'certificate_id'),
         exclude={**_SURROGATE},
-        references={'target_id': 'deploy_targets', 'certificate_id': 'certificates'},
+        references={'target_id': 'deploy_targets', 'certificate_id': 'certificates',
+                    'attention_successor_id': 'certificates'},
     ),
     'crl_deploy_bindings': Section(
         model='models.deploy:CRLDeployBinding',
@@ -485,7 +509,8 @@ SECTIONS: Dict[str, Section] = {
     'audit_logs': Section(
         model='models.audit_log:AuditLog',
         identity=('entry_hash',),
-        exclude={**_SURROGATE},
+        # The id is carried: the entry's seal covers it (restore/audit_ids.py)
+        exclude={},
         optional=True,
     ),
     'configuration': Section(
@@ -499,6 +524,14 @@ SECTIONS: Dict[str, Section] = {
         identity=('group_id', 'user_id'),
         exclude={**_SURROGATE},
         references={'group_id': 'groups', 'user_id': 'users'},
+    ),
+    # The providers that open each account; one whose provider the restore cannot place is
+    # left as an orphan of an unknown IdP, which no sign-in takes back by itself.
+    'user_sso_identities': Section(
+        model='models.user:UserSSOIdentity',
+        identity=('user_id', 'provider_id', 'orphan_of'),
+        exclude={**_SURROGATE},
+        references={'user_id': 'users', 'provider_id': 'sso_providers'},
     ),
     'webauthn_credentials': Section(
         model='models.webauthn:WebAuthnCredential',
@@ -517,6 +550,8 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
     'acme_proxy_dns_challenges': ('expected TXT values of in-flight proxy orders, valid for at most 24 hours; '
                                   'rebuilt when the client fetches the authorization'),
+    'acme_proxy_challenge_links': ('which in-flight proxy order a challenge belongs to, kept 24 hours; '
+                                   'rebuilt when the client fetches the authorization'),
     'crls': 'regenerated from the CAs and their revocation records',
     'crl_metadata': 'regenerated with the CRLs; their numbering travels in crl_number_counters',
     'ocsp_responses': 'a response cache, rebuilt on demand',
@@ -526,9 +561,28 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'deploy_deliveries': 'delivery queue and history; targets and bindings are exported',
     'user_sessions': 'live sessions, deliberately not carried into a restore',
     'pro_sso_sessions': 'live SSO sessions',
+    'flask_sessions': 'the SQL session store (PostgreSQL without Redis): live sessions, emptied after every restore',
     'pro_sso_saml_message_ids': 'pending SAML request ids and a replay cache, valid for minutes',
+    'pro_sso_sign_in_tests': 'OIDC and SAML sign-in tests: reports valid for minutes, emptied rows kept a day',
     'webauthn_challenges': 'single-use registration and login challenges',
     'related_cert_requests': 'a replay cache of relatedCertRequests, each honoured for at most 7 days',
+    'cluster_nodes': 'heartbeats of the running HA nodes: runtime state of one cluster, never restored',
+    'scheduler_requests': 'pending run-now requests of one cluster: runtime state, never restored',
+    'cluster_commands': 'HA reload and restart queue of one cluster: runtime state, never restored',
+    'cluster_maintenance': 'the HA maintenance a restore holds while it runs: runtime state, never restored',
+    'encryption_keys': ('data-encryption keys wrapped by this installation\'s key-encryption key: '
+                        'the archive carries the values in the clear and the target encrypts them '
+                        'under its own key'),
+    'websocket_relay': 'WebSocket events waiting minutes for the web workers: runtime state, never restored',
+    'shared_files': ('the Kerberos keytab file every node writes, rebuilt from the profiles '
+                     'when their section is restored and at startup, and the HTTPS pair, '
+                     'carried as the https_server files instead'),
+    'backup_archives': 'the HA archive store: earlier archives, never carried inside a new one',
+    'backup_archive_chunks': 'the bytes of the HA archive store, never carried inside a new archive',
+    'file_removals': 'paths a restore removed, deleted by each node from its own disk: never restored',
+    'background_jobs': ('backups, restores and audit verifications in progress or done: runtime state '
+                        'of this installation, kept across a restore, never exported'),
+    'second_factor_failures': 'second-factor and WebAuthn lockout counters: runtime state, never restored',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }
@@ -546,9 +600,9 @@ class SettingReference:
 # Settings holding a row number: carried with the identity of that row
 # (`settings_refs` in the configuration section) and renumbered on restore.
 # A refid reads the same everywhere and is not one of them: est_ca_refid,
-# tsa_ca_refid, tsa_signer_cert_refid, wstep_ca_refid, xcep_ca_refid,
-# mtls_trusted_ca_id, https_bound_certificate_refid, est_labels. The number in
-# `ca_url_alias_<n>` is the one published URLs carry, and stays the source's.
+# tsa_ca_refid, tsa_signer_cert_refid, mtls_trusted_ca_id, https_bound_certificate_refid, https_binding_left_behind_for,
+# est_labels. The number in `ca_url_alias_<n>` is the one published URLs carry,
+# and stays the source's.
 SETTING_REFERENCES: Tuple[SettingReference, ...] = (
     SettingReference(r'scep_ca_id', value='certificate_authorities'),
     SettingReference(r'acme\.issuing_ca_id', value='certificate_authorities'),
@@ -559,4 +613,12 @@ SETTING_REFERENCES: Tuple[SettingReference, ...] = (
     SettingReference(r'scep_challenge_(\d+)(?:_generated_at)?', key='certificate_authorities'),
     SettingReference(r'cert_scts_(\d+)', key='certificates'),
     SettingReference(r'ca_url_cross_.+', value='ca_cross_certificates'),
+)
+
+# Settings naming a CA by refid: carried as they are by a backup (a refid reads the
+# same everywhere), but a CA they name is not deleted (services/deletion_blockers.py).
+CA_REFID_SETTINGS: Tuple[SettingReference, ...] = (
+    SettingReference(r'est_ca_refid', value='certificate_authorities'),
+    SettingReference(r'tsa_ca_refid', value='certificate_authorities'),
+    SettingReference(r'mtls_trusted_ca_id', value='certificate_authorities'),
 )

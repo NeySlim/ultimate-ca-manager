@@ -42,6 +42,41 @@ def postgres_connect_args(url, environ=None) -> dict:
     return {'prepare_threshold': int(raw)}
 
 
+# Client side: a dead server or a partition is noticed within about a minute, an
+# unreachable one refused in ten seconds, data it never acknowledges given up after 30 s
+# (the application pool and the leader's lock)
+POSTGRES_KEEPALIVE_ARGS = {'keepalives': 1, 'keepalives_idle': 30, 'keepalives_interval': 10,
+                           'keepalives_count': 3, 'connect_timeout': 10, 'tcp_user_timeout': 30000}
+
+
+def postgres_engine_options(url, environ=None) -> dict:
+    """Engine options of the application pool on PostgreSQL: each checkout pinged, so a
+    connection the server dropped is replaced unseen, and the keepalives above unless the
+    URL sets them; postgres_connect_args on top. Empty for another database."""
+    if not is_postgres_url(url):
+        return {}
+    try:
+        in_url = set(make_url(str(url)).query)
+    except Exception:
+        in_url = set()
+    args = {k: v for k, v in POSTGRES_KEEPALIVE_ARGS.items() if k not in in_url}
+    args.update(postgres_connect_args(url, environ))
+    return {'pool_pre_ping': True, 'connect_args': args}
+
+
+def database_label(url, sqlite_path) -> str:
+    """The database a start announces: engine and name, never the address or the password."""
+    if not url:
+        return f'SQLite, {sqlite_path}'
+    if not is_postgres_url(url):
+        return 'DATABASE_URL'
+    try:
+        name = make_url(str(url)).database
+    except Exception:
+        name = None
+    return f'PostgreSQL, database {name}' if name else 'PostgreSQL (DATABASE_URL)'
+
+
 def is_postgres_url(url: str) -> bool:
     """True for every PostgreSQL spelling: postgres://, postgresql://, postgresql+driver://."""
     return (url or '').startswith(('postgresql://', 'postgres://', 'postgresql+'))

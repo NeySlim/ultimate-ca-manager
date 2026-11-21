@@ -10,6 +10,20 @@ import uuid
 import pytest
 
 from models import db
+from tests.ad_connector_support import connector_row, mount_connector
+from tests.windows_profile_support import connectors_kept
+
+
+# The CAs and certificates this file issues are removed after it
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """The connector rows this file deletes and rewrites are the session's: put back."""
+    with connectors_kept(app):
+        yield
+
 
 MESSAGE = 'Re-enter the secret to change the target'
 
@@ -25,6 +39,25 @@ def _refused(r):
 
 def _suffix():
     return uuid.uuid4().hex[:8]
+
+
+@pytest.fixture
+def dropped(app):
+    """Rows to delete after the test: an unreadable secret left behind stops later backups."""
+    rows = []
+    yield rows
+    with app.app_context():
+        for model, row_id in rows:
+            row = db.session.get(model, row_id)
+            if row is not None:
+                db.session.delete(row)
+        db.session.commit()
+
+
+def _foreign_token(value='saved-under-another-key'):
+    """A secret this node's database key does not open (another node, another key)."""
+    from cryptography.fernet import Fernet
+    return Fernet(Fernet.generate_key()).encrypt(value.encode()).decode()
 
 
 class TestSmtp:
@@ -466,24 +499,16 @@ class TestMicrosoftCA:
 
 
 class TestADConnector:
-    URL = '/api/v2/ad-connector'
-
     @pytest.fixture
     def saved(self, app):
-        from models import ADConnectorConfig
         with app.app_context():
-            ADConnectorConfig.query.delete()
-            row = ADConnectorConfig(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
-                                    verify_ssl=True, base_dn='DC=corp,DC=local',
-                                    bind_dn='CN=svc,DC=corp,DC=local')
-            row.bind_password = 'saved-bind'
-            db.session.add(row)
-            db.session.commit()
+            self.URL = '/api/v2/ad-connectors/' + str(mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
+                            verify_ssl=True, base_dn='DC=corp,DC=local',
+                            bind_dn='CN=svc,DC=corp,DC=local', password='saved-bind').id)
 
     def _row(self, app):
-        from models import ADConnectorConfig
         with app.app_context():
-            row = ADConnectorConfig.get_singleton()
+            row = connector_row()
             return row.server, row.port, row.verify_ssl, row.bind_dn, row.bind_password, row.base_dn
 
     @pytest.mark.parametrize('over', [
@@ -506,6 +531,10 @@ class TestADConnector:
 
 
 class TestHsmProvider:
+    @pytest.fixture(autouse=True)
+    def _drop_made(self, dropped):
+        self._made = dropped
+
     def _make(self, app, kind, config):
         from models.hsm import HsmProvider
         with app.app_context():
@@ -513,6 +542,7 @@ class TestHsmProvider:
             row.set_config(config)
             db.session.add(row)
             db.session.commit()
+            self._made.append((HsmProvider, row.id))
             return row.id
 
     def _config(self, app, provider_id):
@@ -538,6 +568,34 @@ class TestHsmProvider:
                   {'config': dict(config, **over)})
         _refused(r)
         assert self._config(app, provider_id) == config
+
+    def _stored(self, app, provider_id):
+        from models.hsm import HsmProvider
+        with app.app_context():
+            return json.loads(db.session.get(HsmProvider, provider_id).config)
+
+    @pytest.mark.parametrize('kind,config,over', [
+        ('openbao', {'url': 'https://bao.example.com', 'mount_path': 'transit', 'token': 'FOREIGN'},
+         {'url': 'http://evil.invalid:8200', 'token': '********'}),
+        ('pkcs11', {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'ucm',
+                    'user_pin': 'FOREIGN'},
+         {'module_path': '/tmp/evil.so', 'user_pin': '***'}),
+        ('pkcs11', {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'ucm',
+                    'previous_user_pin': 'FOREIGN'},
+         {'module_path': '/tmp/evil.so'}),
+    ], ids=['openbao-token', 'pkcs11-pin', 'pkcs11-previous-pin'])
+    def test_an_unreadable_kept_credential_still_needs_retyping(self, app, auth_client, dropped,
+                                                                kind, config, over):
+        # This node cannot open it, yet the update keeps it: a node that can would send it on
+        from models.hsm import HsmProvider
+        form = {k: v for k, v in config.items() if v != 'FOREIGN'}
+        provider_id = self._make(app, kind, {k: (_foreign_token() if v == 'FOREIGN' else v)
+                                             for k, v in config.items()})
+        dropped.append((HsmProvider, provider_id))
+        before = self._stored(app, provider_id)
+        _refused(_send(auth_client, 'put', f'/api/v2/hsm/providers/{provider_id}',
+                       {'config': dict(form, **over)}))
+        assert self._stored(app, provider_id) == before
 
     def test_the_carried_over_previous_pin_counts_as_kept(self, app, auth_client):
         config = {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'ucm',
@@ -620,3 +678,139 @@ class TestIntune:
         finally:
             # Other suites count the SCEP profiles on file
             auth_client.delete(url)
+
+
+class TestUnreadableSavedSecret:
+    """A saved secret this node cannot open is still kept by a masked or blank field,
+    so it holds its target exactly as a readable one does."""
+
+    def test_ad_bind_password(self, app, auth_client):
+        with app.app_context():
+            url = '/api/v2/ad-connectors/' + str(mount_connector(
+                server='dc1.corp.local', port=636, use_ssl=True, verify_ssl=True,
+                base_dn='DC=corp,DC=local', bind_dn='CN=svc,DC=corp,DC=local',
+                password=_foreign_token()).id)
+
+        def stored():
+            with app.app_context():
+                row = connector_row()
+                return row.server, row.port, row.use_ssl, row._bind_password
+
+        before = stored()
+        for body in ({'servers': ['dc.attacker.example'], 'bind_password': '***'},
+                     {'port': 389, 'use_ssl': False}):
+            _refused(_send(auth_client, 'put', url, body))
+            assert stored() == before
+
+    @pytest.mark.parametrize('kind', ['ldap', 'oauth2'])
+    def test_sso_secret(self, app, auth_client, kind):
+        from models.sso import SSOProvider
+        with app.app_context():
+            if kind == 'ldap':
+                row = SSOProvider(name=f'unreadable-ldap-{_suffix()}', provider_type='ldap',
+                                  enabled=False, ldap_server='ldap.example.com', ldap_port=636,
+                                  ldap_use_ssl=True, ldap_bind_dn='cn=svc')
+                row._ldap_bind_password = _foreign_token()
+                body = {'ldap_server': 'ldap.attacker.example', 'ldap_bind_password': '***'}
+            else:
+                row = SSOProvider(name=f'unreadable-oauth-{_suffix()}', provider_type='oauth2',
+                                  enabled=False, oauth2_client_id='client',
+                                  oauth2_token_url='https://idp.example.com/token')
+                row._oauth2_client_secret = _foreign_token()
+                body = {'oauth2_token_url': 'https://idp.attacker.example/token'}
+            db.session.add(row)
+            db.session.commit()
+            provider_id = row.id
+
+        def stored():
+            with app.app_context():
+                row = db.session.get(SSOProvider, provider_id)
+                return (row.ldap_server, row._ldap_bind_password, row.oauth2_token_url,
+                        row._oauth2_client_secret)
+
+        try:
+            before = stored()
+            _refused(_send(auth_client, 'put', f'/api/v2/sso/providers/{provider_id}', body))
+            assert stored() == before
+        finally:
+            _drop_sso(app, provider_id)
+
+    @pytest.mark.parametrize('which', ['basic', 'winrm'])
+    def test_msca_password(self, app, auth_client, dropped, which):
+        from models.msca import MicrosoftCA
+        with app.app_context():
+            row = MicrosoftCA(name=f'Unreadable CA {_suffix()}', server='adcs.corp.example',
+                              auth_method='basic', username='u', enabled=True)
+            row.winrm_enabled, row.winrm_transport = True, 'ntlm'
+            if which == 'basic':
+                row._password = _foreign_token()
+                body = {'server': 'adcs.attacker.example', 'password': '***'}
+            else:
+                # Certificate auth: the WinRM password is the only one in play
+                row.auth_method = 'certificate'
+                row.winrm_host = 'winrm.corp.example'
+                row._winrm_password = _foreign_token()
+                body = {'winrm_host': 'winrm.attacker.example'}
+            db.session.add(row)
+            db.session.commit()
+            msca_id = row.id
+        dropped.append((MicrosoftCA, msca_id))
+
+        def stored():
+            with app.app_context():
+                row = db.session.get(MicrosoftCA, msca_id)
+                return row.server, row._password, row.winrm_host, row._winrm_password
+
+        before = stored()
+        _refused(_send(auth_client, 'put', f'/api/v2/microsoft-cas/{msca_id}', body))
+        assert stored() == before
+
+    def _msca_with_unreadable_winrm(self, app, dropped, winrm_host):
+        from models.msca import MicrosoftCA
+        with app.app_context():
+            row = MicrosoftCA(name=f'Unreadable CA {_suffix()}', server='adcs.corp.example',
+                              auth_method='basic', username='u', enabled=True)
+            row.password = 'saved-basic'
+            row.winrm_enabled, row.winrm_transport, row.winrm_host = True, 'ntlm', winrm_host
+            row._winrm_password = _foreign_token()
+            db.session.add(row)
+            db.session.commit()
+            dropped.append((MicrosoftCA, row.id))
+            return f'/api/v2/microsoft-cas/{row.id}'
+
+    def test_msca_clearing_an_unreadable_winrm_password_on_the_ca_host(self, app, auth_client, dropped):
+        # The basic password would take over the WinRM channel
+        _refused(_send(auth_client, 'put', self._msca_with_unreadable_winrm(app, dropped, None),
+                       {'winrm_password': ''}))
+
+    def test_msca_an_unreadable_winrm_password_is_not_the_basic_one(self, app, auth_client, dropped):
+        # Cleared on a host of its own: the basic password never reaches it
+        r = _send(auth_client, 'put', self._msca_with_unreadable_winrm(app, dropped, 'winrm.corp.example'),
+                  {'winrm_password': '', 'winrm_port': 5985})
+        assert r.status_code == 200, r.data
+
+    def test_smtp_password(self, app, auth_client):
+        from models.email_notification import SMTPConfig
+        with app.app_context():
+            SMTPConfig.query.delete()
+            row = SMTPConfig(smtp_host='smtp.corp.example', smtp_port=587, smtp_user='mailer',
+                             smtp_use_tls=True, smtp_use_ssl=False, smtp_auth=True,
+                             smtp_auth_method='password')
+            row._smtp_password = _foreign_token()
+            db.session.add(row)
+            db.session.commit()
+
+        def stored():
+            with app.app_context():
+                row = SMTPConfig.query.first()
+                return row.smtp_host, row._smtp_password
+
+        try:
+            before = stored()
+            _refused(_send(auth_client, 'patch', TestSmtp.URL,
+                           {'smtp_host': 'smtp.attacker.example', 'smtp_password': '********'}))
+            assert stored() == before
+        finally:
+            with app.app_context():
+                SMTPConfig.query.delete()
+                db.session.commit()

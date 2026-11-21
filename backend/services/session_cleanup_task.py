@@ -1,6 +1,6 @@
 """
-Session Cleanup Task — removes expired filesystem sessions
-Runs every 15 minutes to clean up stale session files.
+Session Cleanup Task: removes expired sessions from the file or SQL store.
+Runs every 15 minutes; Redis expires its own keys.
 """
 import os
 import time
@@ -10,13 +10,38 @@ logger = logging.getLogger(__name__)
 
 
 class SessionCleanupTask:
-    """Clean up expired session files from the filesystem store"""
+    """Clean up expired sessions from the filesystem or database store"""
+
+    @staticmethod
+    def _purge_database_sessions(app):
+        """Delete the rows whose expiry has passed, in one statement."""
+        from datetime import datetime
+        from sqlalchemy import text
+        from models import db
+
+        table = app.config.get('SESSION_SQLALCHEMY_TABLE', 'flask_sessions')
+        try:
+            # Flask-Session stores naive UTC expiries
+            result = db.session.execute(
+                text(f'DELETE FROM "{table}" WHERE expiry < :now'), {'now': datetime.utcnow()})
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        if result.rowcount:
+            logger.info(f"Session cleanup: removed {result.rowcount} expired database sessions")
 
     @staticmethod
     def execute():
-        """Remove session files older than the max session lifetime"""
+        """Remove expired session files (file store) or expired rows (SQL store); Redis expires its own."""
         try:
             from flask import current_app
+            store = current_app.config.get('SESSION_TYPE')
+            if store == 'sqlalchemy':
+                SessionCleanupTask._purge_database_sessions(current_app)
+                return
+            if store == 'redis':
+                return
             data_dir = current_app.config.get('SESSION_FILE_DIR')
             if not data_dir or not os.path.isdir(data_dir):
                 data_dir = os.path.join(
@@ -40,20 +65,29 @@ class SessionCleanupTask:
             cutoff = time.time() - max_lifetime - 3600
             cleaned = 0
 
+            from utils.session_store import HELD, session_files_lock
+            unlocked = 0
             for filename in os.listdir(data_dir):
                 filepath = os.path.join(data_dir, filename)
                 if not os.path.isfile(filepath):
                     continue
                 try:
-                    mtime = os.path.getmtime(filepath)
-                    if mtime < cutoff:
-                        os.unlink(filepath)
-                        cleaned += 1
+                    if os.path.getmtime(filepath) >= cutoff:
+                        continue
+                    # Checked again under the lock: a save may have refreshed it meanwhile
+                    with session_files_lock(data_dir, exclusive=True) as state:
+                        if os.path.getmtime(filepath) < cutoff:
+                            os.unlink(filepath)
+                            cleaned += 1
+                            unlocked += state != HELD
                 except OSError:
                     pass
 
             if cleaned > 0:
                 logger.info(f"Session cleanup: removed {cleaned} expired session files")
+            if unlocked:
+                logger.warning("Session cleanup: %s expired session files removed without the "
+                               "store's lock, a save in flight may have been lost", unlocked)
 
         except Exception as e:
             logger.error(f"Session cleanup error: {e}")

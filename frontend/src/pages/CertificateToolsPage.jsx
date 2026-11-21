@@ -110,6 +110,10 @@ export default function CertificateToolsPage() {
 
   // Detect if uploaded file needs a password (binary: p12, pfx, encrypted key)
   const needsInputPassword = convertFile && /\.(p12|pfx)$/i.test(convertFile.name)
+  // The server opens the input and a separate key with the same password
+  const sealedPem = /ENCRYPTED/.test(convertPem) || /ENCRYPTED/.test(convertKey)
+  const mustGivePassword = Boolean(needsInputPassword || sealedPem)
+  const showPasswordField = mustGivePassword || Boolean(convertKeyFile || convertKey.trim())
 
   const resetResult = () => setResult(null)
 
@@ -207,7 +211,7 @@ export default function CertificateToolsPage() {
       return
     }
     // Guard: PKCS12/PFX input requires password
-    if (needsInputPassword && !convertPassword) {
+    if (mustGivePassword && !convertPassword) {
       showError(t('tools.pkcs12PasswordRequired'))
       return
     }
@@ -229,7 +233,7 @@ export default function CertificateToolsPage() {
         private_key: keyContent,
         chain: convertChain.trim(),
         password: convertPassword,
-        pkcs12_password: pkcs12Password
+        output_password: (convertFormat === 'pkcs12' || convertFormat === 'jks') ? pkcs12Password : ''
       })
       setResult({ type: 'convert', data: response.data })
     } catch (error) {
@@ -553,14 +557,14 @@ export default function CertificateToolsPage() {
           </div>
         )}
 
-        {/* Password field — shown when PKCS12/PFX file is uploaded */}
-        {needsInputPassword && (
+        {/* Password field: a PKCS12/PFX file, an encrypted PEM, or a separate key */}
+        {showPasswordField && (
           <Input
             label={t('tools.inputPassword')}
             type="password"
             noAutofill
-            required
-            placeholder={t('tools.pkcs12PasswordPlaceholder')}
+            required={mustGivePassword}
+            placeholder={needsInputPassword ? t('tools.pkcs12PasswordPlaceholder') : t('tools.keyOrFilePasswordPlaceholder')}
             value={convertPassword}
             onChange={(e) => setConvertPassword(e.target.value)}
           />

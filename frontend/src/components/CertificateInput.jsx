@@ -12,7 +12,7 @@ import { useState, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   TextAlignLeft, UploadSimple, Certificate, LockSimple,
-  CheckCircle, X, File
+  CheckCircle, X, File as FileIcon
 } from '@phosphor-icons/react'
 import { Button } from './Button'
 import { Textarea } from './Textarea'
@@ -85,17 +85,20 @@ export function CertificateInput({
 
     setUploading(true)
     try {
-      let fileData
+      let content
       if (isBinary) {
-        const buffer = await file.arrayBuffer()
-        fileData = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        let binary = ''
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+        }
+        content = btoa(binary)
       } else {
-        fileData = await file.text()
+        content = await file.text()
       }
 
-      const payload = {
-        files: [{ name: file.name, type: isBinary ? 'binary' : 'text', data: fileData }],
-      }
+      // The route reads `content` (text or base64) and returns each `pem` only on request
+      const payload = { content, include_pem: true }
       if (password) payload.password = password
 
       const result = await api.post('/import/analyze', payload)
@@ -104,6 +107,14 @@ export function CertificateInput({
       const cert = objects.find(o => o.type === 'certificate' && !o.is_ca)
         || objects.find(o => o.type === 'certificate')
       const key = objects.find(o => o.type === 'private_key')
+
+      // A sealed key comes back without its PEM: ask for the password, or report a wrong one
+      if (key && !key.pem) {
+        if (key.error && password) throw new Error(key.error)
+        setNeedsPassword(true)
+        setUploadedFile(file)
+        return
+      }
 
       if (!cert && !key) {
         // Maybe needs password (PKCS12)
@@ -292,8 +303,8 @@ export function CertificateInput({
           {/* Upload result */}
           {uploadedFile?.parsed && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
-              <CheckCircle size={16} className="text-green-500 shrink-0" />
-              <File size={14} className="text-text-tertiary shrink-0" />
+              <CheckCircle size={16} className="text-status-success shrink-0" />
+              <FileIcon size={14} className="text-text-tertiary shrink-0" />
               <span className="text-sm text-text-primary flex-1 truncate">{uploadedFile.name}</span>
               <button
                 type="button"
@@ -306,7 +317,7 @@ export function CertificateInput({
           )}
 
           {uploadedFile?.error && (
-            <div className="text-xs text-red-500 px-1">{uploadedFile.error}</div>
+            <div className="text-xs text-status-danger px-1">{uploadedFile.error}</div>
           )}
 
           {/* Show parsed PEM preview (read-only) */}
@@ -319,7 +330,7 @@ export function CertificateInput({
               {value.key_pem && (
                 <>
                   <div className="text-xs text-text-tertiary">{effectiveKeyLabel}</div>
-                  <div className="text-xs text-green-600 flex items-center gap-1">
+                  <div className="text-xs text-status-success flex items-center gap-1">
                     <LockSimple size={12} /> {t('certInput.keyExtracted')}
                   </div>
                 </>
@@ -351,11 +362,11 @@ export function CertificateInput({
           {/* Show what was selected */}
           {value.cert_pem && (
             <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-green-600">
+              <div className="flex items-center gap-1 text-xs text-status-success">
                 <CheckCircle size={12} /> {t('certInput.certLoaded')}
               </div>
               {value.key_pem && (
-                <div className="flex items-center gap-1 text-xs text-green-600">
+                <div className="flex items-center gap-1 text-xs text-status-success">
                   <LockSimple size={12} /> {t('certInput.keyLoaded')}
                 </div>
               )}

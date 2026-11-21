@@ -17,9 +17,11 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from lxml import etree
 
 from models import CA, CATemplatePin, Certificate, CertificateTemplate, db
-from models.system_config import SystemConfig
 from tests.conftest import get_json
 from tests.fixtures.templates import templates_created_here_removed
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -135,15 +137,11 @@ def test_issuance_from_a_legacy_spelled_template_works(app, auth_client, create_
 # ---------------------------------------------------------------- XCEP
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
+    from tests.windows_profile_support import delete_config, set_config
     if value is None:
-        if row is not None:
-            db.session.delete(row)
-    elif row is None:
-        db.session.add(SystemConfig(key=key, value=value))
+        delete_config(key)
     else:
-        row.value = value
-    db.session.commit()
+        set_config(key, value)
 
 
 @pytest.fixture
@@ -153,8 +151,8 @@ def xcep_ca(app, create_ca):
     keys = ('xcep_enabled', 'xcep_ca_refid', 'xcep_username', 'xcep_password')
     pinned = []
     with app.app_context():
-        previous = {k: getattr(SystemConfig.query.filter_by(key=k).first(), 'value', None)
-                    for k in keys}
+        from tests.windows_profile_support import snapshot
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         for key, value in zip(keys, ('true', ca.refid, XCEP_USER, XCEP_PASSWORD)):
             _set_config(key, value)
@@ -230,60 +228,3 @@ class TestXcepAnnouncesTheTemplateKeyType:
 
 
 # ----------------------------------------------------------- migration
-
-def _migration():
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'migrations', '096_template_key_type_canonical.py')
-    spec = importlib.util.spec_from_file_location('m096', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_migration_normalizes_known_spellings_and_keeps_the_rest():
-    migration = _migration()
-    assert migration.pg_compatible is True
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE TABLE certificate_templates (id INTEGER PRIMARY KEY, key_type VARCHAR(20))')
-    rows = [(1, 'ec:p384'), (2, 'rsa:4096'), (3, 'dsa:1024'), (4, 'EC-P256'), (5, None)]
-    conn.executemany('INSERT INTO certificate_templates VALUES (?, ?)', rows)
-    expected = {1: 'EC-P384', 2: 'RSA-4096', 3: 'dsa:1024', 4: 'EC-P256', 5: None}
-
-    for _ in range(2):  # idempotent
-        migration.upgrade(conn)
-        assert dict(conn.execute('SELECT id, key_type FROM certificate_templates')) == expected
-
-
-def test_migration_without_the_table_is_a_no_op():
-    conn = sqlite3.connect(':memory:')
-    _migration().upgrade(conn)
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not os.getenv('UCM_TEST_PG_URL'), reason='UCM_TEST_PG_URL not set')
-def test_migration_on_postgresql():
-    from sqlalchemy import create_engine, text
-    # A schema of its own: the bench is one database shared by other files.
-    schema = f"m096_{os.getenv('PYTEST_XDIST_WORKER', 'main')}_{uuid.uuid4().hex[:6]}"
-    engine = create_engine(os.environ['UCM_TEST_PG_URL'])
-    migration = _migration()
-    expected = {1: 'EC-P384', 2: 'RSA-4096', 3: 'dsa:1024', 4: 'EC-P256', 5: None}
-    try:
-        with engine.begin() as conn:
-            conn.execute(text(f'CREATE SCHEMA {schema}'))
-            conn.execute(text(f'SET search_path TO {schema}'))
-            migration.upgrade(conn)     # no table yet
-            conn.execute(text('CREATE TABLE certificate_templates '
-                              '(id INTEGER PRIMARY KEY, key_type VARCHAR(20))'))
-            conn.execute(text("INSERT INTO certificate_templates VALUES (1, 'ec:p384'), "
-                              "(2, 'rsa:4096'), (3, 'dsa:1024'), (4, 'EC-P256'), (5, NULL)"))
-        for _ in range(2):
-            with engine.begin() as conn:
-                conn.execute(text(f'SET search_path TO {schema}'))
-                migration.upgrade(conn)
-                rows = dict(conn.execute(text('SELECT id, key_type FROM certificate_templates')).fetchall())
-            assert rows == expected
-    finally:
-        with engine.begin() as conn:
-            conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        engine.dispose()

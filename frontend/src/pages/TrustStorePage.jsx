@@ -7,34 +7,33 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
-  ShieldCheck, Plus, Trash, Download, Certificate, Clock,
-  CheckCircle, Warning, UploadSimple, ArrowsClockwise, Calendar,
-  Globe, Buildings, Fingerprint, Key, Hash, Info
+  ShieldCheck, Plus, Trash, Download, Certificate, 
+  CheckCircle, Warning, UploadSimple, ArrowsClockwise
 } from '@phosphor-icons/react'
 import {
   Button, Input, Badge, Modal, Textarea, HelpCard,
-  CompactSection, CompactGrid, CompactField, FormSelect
+  FormSelect
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
-import { formatDate, cn, daysRemaining, downloadBlob } from '../lib/utils'
+import { formatDate, cn, downloadBlob, warnSkippedExport, daysRemaining } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
+import { TRUST_STORE_EXPIRY_WINDOW_DAYS, expiryBucket, trustStoreExpiryStatus } from '../lib/expiry'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
+import { TrustCertPanel } from '../components/detail/TrustCertPanel'
+
 export default function TrustStorePage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
   const { isMobile } = useMobile()
-  const { openWindow } = useWindowManager()
   const openEntity = useOpenEntity()
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { modals, open: openModal, close: closeModal } = useModals(['add', 'sync'])
   
@@ -66,16 +65,11 @@ export default function TrustStorePage() {
         truststoreService.getStats()
       ])
       const rawCerts = certsRes.data || []
-      // Add computed expiry status for filtering
-      const now = new Date()
-      const enrichedCerts = rawCerts.map(c => {
-        const date = c.not_after ? new Date(c.not_after) : null
-        const daysLeft = date ? Math.floor((date - now) / (1000 * 60 * 60 * 24)) : null
-        return {
-          ...c,
-          _expiry_status: daysLeft === null ? 'valid' : daysLeft <= 0 ? 'expired' : daysLeft <= 90 ? 'expiring' : 'valid'
-        }
-      })
+      // Same buckets as the export's expiry filter (api/v2/truststore)
+      const enrichedCerts = rawCerts.map(c => ({
+        ...c,
+        _expiry_status: trustStoreExpiryStatus(c.not_after)
+      }))
       setCertificates(enrichedCerts)
       setCertStats(statsRes.data || { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
     } catch (error) {
@@ -89,7 +83,7 @@ export default function TrustStorePage() {
     loadCertificates()
   }, [])
 
-  // Reload when floating window actions change data. loadCertificates must be
+  // Reload when inspector actions change data. loadCertificates must be
   // in the dependencies: a listener registered once keeps the loader captured
   // at mount and reloads with the state of that moment (#345).
   useEffect(() => {
@@ -112,9 +106,9 @@ export default function TrustStorePage() {
   }, [certificates, filterPurpose, filterExpiryStatus])
 
   const handleSelectCert = async (cert) => {
-    // Desktop: floating window
+    // Desktop: inspector
     if (!isMobile) {
-      openWindow('truststore', cert.id)
+      openEntity('truststore', cert.id)
       return
     }
     // Mobile: slide-over
@@ -133,7 +127,7 @@ export default function TrustStorePage() {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
-          openWindow('truststore', id)
+          openEntity('truststore', id)
         } else {
           handleSelectCert({ id })
         }
@@ -281,15 +275,16 @@ export default function TrustStorePage() {
     if (!cert?.certificate_pem) return
     
     const blob = new Blob([cert.certificate_pem], { type: 'application/x-pem-file' })
-    downloadBlob(blob, `${cert.name.replace(/\s+/g, '_')}.pem`)
+    downloadBlob(blob, `${cert.name}.pem`)
   }
 
   const handleExportBundle = async (format = 'pem') => {
     try {
-      const response = await truststoreService.exportBundle(format, 'all')
+      const response = await truststoreService.exportBundle(format, filterPurpose.length > 0 ? filterPurpose : 'all', filterExpiryStatus)
       const blob = response instanceof Blob ? response : response?.data instanceof Blob ? response.data : new Blob([response?.data || response], { type: 'application/x-pem-file' })
       downloadBlob(blob, `truststore-bundle.${format}`)
       showSuccess(t('trustStore.bundleExported'))
+      warnSkippedExport(response, t, showWarning)
     } catch (error) {
       showError(error.message || t('trustStore.exportFailed'))
     }
@@ -347,10 +342,9 @@ export default function TrustStorePage() {
         </div>
       ),
       mobileRender: (val, row) => {
-        const date = row.not_after ? new Date(row.not_after) : null
-        const isExpired = date && date < new Date()
-        const daysLeft = date ? Math.floor((date - new Date()) / (1000 * 60 * 60 * 24)) : null
-        const isExpiringSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 30
+        const bucket = expiryBucket(daysRemaining(row.not_after), TRUST_STORE_EXPIRY_WINDOW_DAYS)
+        const isExpired = bucket === 'expired'
+        const isExpiringSoon = bucket === 'expiring'
         return (
           <div className="flex items-center justify-between gap-2 w-full">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -393,10 +387,9 @@ export default function TrustStorePage() {
       mono: true,
       render: (val) => {
         if (!val) return <span className="text-text-tertiary">—</span>
-        const date = new Date(val)
-        const isExpired = date < new Date()
-        const daysLeft = Math.floor((date - new Date()) / (1000 * 60 * 60 * 24))
-        const isExpiringSoon = daysLeft > 0 && daysLeft <= 30
+        const bucket = expiryBucket(daysRemaining(val), TRUST_STORE_EXPIRY_WINDOW_DAYS)
+        const isExpired = bucket === 'expired'
+        const isExpiringSoon = bucket === 'expiring'
         return (
           <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot pulse={isExpired || isExpiringSoon}>
             {formatDate(val)}
@@ -423,149 +416,21 @@ export default function TrustStorePage() {
     ] : [])
   ]
 
-  // Calculate days remaining for expiry indicator
-  const getDaysRemaining = (cert) => {
-    if (!cert?.not_after) return null
-    const expiryDate = new Date(cert.not_after)
-    return daysRemaining(expiryDate)
-  }
-
-  // Detail panel content - same design as CertificateDetails
-  const detailContent = selectedCert && (() => {
-    const daysRemaining = getDaysRemaining(selectedCert)
-    const isExpired = daysRemaining !== null && daysRemaining <= 0
-    const isExpiring = daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 30
-    
-    return (
-      <div className="space-y-4 p-4">
-        {/* Header */}
-        <div className="flex items-start gap-3">
-          <div className={cn(
-            "p-2.5 rounded-lg shrink-0",
-            isExpired ? "bg-status-danger-op10" : "bg-accent-primary-op10"
-          )}>
-            <Certificate size={24} className={isExpired ? "text-status-danger" : "text-accent-primary"} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-lg font-semibold text-text-primary truncate">
-                {selectedCert.name || t('common.certificate')}
-              </h3>
-              <Badge variant={isExpired ? 'danger' : isExpiring ? 'warning' : 'success'} size="sm">
-                {isExpired ? t('common.expired') : isExpiring ? t('common.detailsExpiring') : t('common.valid')}
-              </Badge>
-              <Badge variant={selectedCert.purpose === 'root_ca' ? 'info' : 'default'} size="sm">
-                {selectedCert.purpose?.replace('_', ' ') || 'trusted'}
-              </Badge>
-            </div>
-            <p className="text-xs text-text-tertiary truncate mt-0.5">{selectedCert.subject || selectedCert.issuer}</p>
-          </div>
-        </div>
-
-        {/* Expiry Indicator */}
-        {daysRemaining !== null && (
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-lg",
-            isExpired && "bg-status-danger-op10",
-            isExpiring && "bg-status-warning-op10",
-            !isExpired && !isExpiring && "bg-status-success-op10"
-          )}>
-            <Clock size={16} className={cn(
-              isExpired && "text-status-danger",
-              isExpiring && "text-status-warning",
-              !isExpired && !isExpiring && "text-status-success"
-            )} />
-            <div>
-              <div className={cn(
-                "text-sm font-medium",
-                isExpired && "text-status-danger",
-                isExpiring && "text-status-warning",
-                !isExpired && !isExpiring && "text-status-success"
-              )}>
-                {isExpired ? t('common.expired') : t('trustStore.daysRemaining', { count: daysRemaining })}
-              </div>
-              <div className="text-xs text-text-tertiary">
-                {t('common.expires')} {formatDate(selectedCert.not_after)}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
-            <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary">{keyAlgorithmLabel(selectedCert.key_type, t, selectedCert.security_level) || '—'}</div>
-            <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
-          </div>
-          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
-            <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || '—'}</div>
-            <div className="text-2xs text-text-tertiary" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
-          </div>
-          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
-            <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary">{selectedCert.is_ca ? t('common.ca') : t('common.endEntity')}</div>
-            <div className="text-2xs text-text-tertiary">{t('common.type')}</div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2 flex-wrap">
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
-            <Download size={14} /> {t('common.export')}
+  // Detail panel content: the shared panel, with this page's own actions
+  const detailContent = selectedCert && (
+    <TrustCertPanel cert={selectedCert}>
+      <div className="flex gap-2 flex-wrap">
+        <Button type="button" size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
+          <Download size={14} /> {t('common.export')}
+        </Button>
+        {canDelete('truststore') && (
+          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
+            <Trash size={14} /> {t('common.delete')}
           </Button>
-          {canDelete('truststore') && (
-            <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
-              <Trash size={14} /> {t('common.delete')}
-            </Button>
-          )}
-        </div>
-
-        {/* Subject Section */}
-        <CompactSection title={t('common.subject')} icon={Globe}>
-          <CompactGrid>
-            <CompactField icon={Globe} label={t('common.subject')} value={selectedCert.subject || selectedCert.name} mono />
-          </CompactGrid>
-        </CompactSection>
-
-        {/* Issuer Section */}
-        <CompactSection title={t('common.issuer')} icon={ShieldCheck}>
-          <CompactField autoIcon="issuer" label={t('common.issuer')} value={selectedCert.issuer} mono />
-        </CompactSection>
-
-        {/* Validity Section */}
-        <CompactSection title={t('common.validity')} icon={Calendar}>
-          <CompactGrid>
-            <CompactField icon={Calendar} label={t('common.validFrom')} value={selectedCert.not_before ? formatDate(selectedCert.not_before) : '—'} />
-            <CompactField icon={Calendar} label={t('common.validUntil')} value={selectedCert.not_after ? formatDate(selectedCert.not_after) : '—'} />
-          </CompactGrid>
-        </CompactSection>
-
-        {/* Technical Details */}
-        <CompactSection title={t('common.technicalDetails')} icon={Info}>
-          <CompactGrid>
-            <CompactField icon={Hash} label={t('common.serial')} value={selectedCert.serial_number} mono copyable />
-            <CompactField icon={Key} label={t('common.keyType')} value={keyAlgorithmLabel(selectedCert.key_type, t, selectedCert.security_level)} />
-          </CompactGrid>
-        </CompactSection>
-
-        {/* Fingerprints */}
-        {selectedCert.fingerprint_sha256 && (
-          <CompactSection title={t('common.fingerprints')} icon={Fingerprint} collapsible defaultOpen={false}>
-            <CompactField icon={Fingerprint} label={t('common.sha256')} value={selectedCert.fingerprint_sha256} mono copyable />
-          </CompactSection>
-        )}
-
-        {/* Notes */}
-        {selectedCert.notes && (
-          <CompactSection title={t('common.notes')} icon={Warning}>
-            <p className="text-sm text-text-secondary">{selectedCert.notes}</p>
-          </CompactSection>
         )}
       </div>
-    )
-  })()
+    </TrustCertPanel>
+  )
 
   // Help content
   const helpContent = (
@@ -721,7 +586,7 @@ export default function TrustStorePage() {
                         <div className="text-sm font-medium truncate">{ca.descr || ca.common_name}</div>
                         {ca.organization && <div className="text-xs text-text-tertiary truncate">{ca.organization}</div>}
                       </div>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
                         {ca.is_root ? 'Root' : 'Inter'}
                       </span>
                       {ca.alreadyInTruststore && (

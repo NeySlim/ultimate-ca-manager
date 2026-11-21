@@ -261,6 +261,8 @@ SECRET_VALUES = {
     ('scep_profiles', 'challenge_password'): 'xinst-scep-challenge',
     ('intune_apps', 'client_secret'): 'xinst-intune-secret',
     ('ad_connector', 'bind_password'): 'xinst-ad-bind-password',
+    # Base64 of the keytab bytes, as the profile keeps it under the master key
+    ('windows_enrollment_profiles', 'keytab'): 'eGluc3Qta2V5dGFi',
     ('webhook_endpoints', 'secret'): 'xinst-webhook-secret',
     ('webhook_endpoints', 'auth_token'): 'xinst-webhook-auth-token',
     ('deploy_targets', 'private_key'): 'xinst-deploy-private-key',
@@ -285,6 +287,7 @@ SECRET_ROW = {
     'intune_apps': {'name': 'xinst-intune'},
     'scep_profiles': {'name': 'xinst-scep'},
     'ad_connector': {},
+    'windows_enrollment_profiles': {'name': 'xinst-windows'},
     'webhook_endpoints': {'name': 'xinst-webhook'},
     'deploy_targets': {'name': 'xinst-deploy-b'},
     'acme_client_orders': {'order_url': 'https://acme-b.example.test/order/1'},
@@ -323,6 +326,7 @@ WRAPPED_WITH_THE_MASTER_KEY = {
     ('acme_client_accounts', 'account_key'),
     ('acme_client_accounts', 'eab_hmac_key'),
     ('deploy_targets', 'http_headers'),
+    ('windows_enrollment_profiles', 'keytab'),
 }
 
 
@@ -422,8 +426,9 @@ def _seed_source():
                      template_type='server', extensions_template='{}')
                  for suffix in 'ab']
 
+    # One provider per type (uq_pro_sso_providers_provider_type)
     providers = [add('sso_providers', name=f'xinst-sso-{suffix}',
-                     provider_type='oauth2') for suffix in 'ab']
+                     provider_type=kind) for suffix, kind in (('a', 'saml'), ('b', 'oauth2'))]
     for column in ('oauth2_client_secret', 'ldap_bind_password'):
         secret(providers[1], 'sso_providers', column)
 
@@ -441,7 +446,6 @@ def _seed_source():
                  email=f'xinst-{suffix}@example.test', password_hash='x' * 32,
                  role='operator', active=True) for suffix in 'ab']
     users[1].custom_role_id = roles[1].id
-    users[1].sso_provider_id = providers[1].id
     # A role built on another role, and a provider recording who added it:
     # two numbers that named a different row on every other installation.
     roles[1].inherits_from = roles[0].id
@@ -490,6 +494,8 @@ def _seed_source():
     cross = add('ca_cross_certificates', ca_id=authorities[1].id, crt='xinst-cross-crt',
         fingerprint_sha256='xinst-cross-fingerprint', issuer_caref='xinst-ca-a')
     add('group_members', group_id=groups[1].id, user_id=users[1].id, role='member')
+    add('user_sso_identities', user_id=users[1].id, provider_id=providers[1].id,
+        external_id='xinst-sub')
     add('api_keys', user_id=users[1].id, key_hash='xinst-api-key-hash',
         name='xinst-api-key', permissions='[]')
     add('auth_certificates', user_id=users[1].id, cert_serial='xinst-auth-serial',
@@ -597,6 +603,11 @@ def _seed_source():
             key_type='ed25519', fingerprint=f'SHA256:xinst{suffix}')
         for suffix in 'ab']
     ssh_authorities[1].owner_group_id = groups[1].id
+    # An authority whose private key never left the token: only its hsm_keys
+    # link travels, and the restore must point it at the row of the new install
+    ssh_authorities[0].key_source = 'hsm'
+    ssh_authorities[0].private_key = ''
+    ssh_authorities[0].hsm_key_id = hsm_keys[0].id
     db.session.flush()
 
     add('ssh_certificates', refid='xinst-sshcert', ssh_ca_id=ssh_authorities[1].id,
@@ -638,7 +649,8 @@ def _seed_source():
     db.session.flush()
 
     add('deploy_bindings', target_id=deploy_targets[1].id,
-        certificate_id=leaves[1].id, chain_variant=f'cross:{cross.id}')
+        certificate_id=leaves[1].id, chain_variant=f'cross:{cross.id}',
+        attention_reason='successor_without_key', attention_successor_id=leaves[0].id)
     add('crl_deploy_bindings', target_id=deploy_targets[1].id,
         ca_id=authorities[1].id, crl_path='/etc/ucm/xinst.crl',
         format='pem', include_parent_crls=True,
@@ -667,6 +679,13 @@ def _seed_source():
     connector = add('ad_connector', enabled=False, server='ad.example.test',
                     bind_dn='CN=ucm', base_dn='DC=example,DC=test')
     secret(connector, 'ad_connector', 'bind_password')
+    db.session.flush()
+    windows = add('windows_enrollment_profiles', name='xinst-windows', realm='XINST.TEST',
+                  is_default=True, connector_id=connector.id, issuing_ca_refid='xinst-ca-b')
+    secret(windows, 'windows_enrollment_profiles', 'keytab')
+    db.session.flush()
+    add('windows_profile_templates', profile_id=windows.id, template_id=templates[1].id)
+    leaves[1].windows_profile_id = windows.id
 
     endpoint = add('webhook_endpoints', name='xinst-webhook',
                    url='https://hook.example.test/xinst', auth_type='bearer')
@@ -751,13 +770,14 @@ RESTORABLE_SECTIONS = tuple(
         'scep_profiles', 'scep_requests', 'deploy_targets', 'scan_profiles', 'scan_runs',
         'intune_apps',
         'discovered_certificates', 'smtp_config', 'ad_connector',
+        'windows_enrollment_profiles', 'windows_profile_templates',
         'webhook_endpoints',
         # These six used to abort the restore outright: their references
         # point at rows the same restore creates, and the plan was indexed
         # before the first write. `apply_section` now rebuilds the index of
         # the sections it points at, so they are ordinary sections of the
         # round trip like any other.
-        'role_permissions', 'group_members', 'webauthn_credentials',
+        'role_permissions', 'group_members', 'user_sso_identities', 'webauthn_credentials',
         'deploy_bindings', 'crl_deploy_bindings', 'ca_template_pins',
         'ca_cross_certificates',
         'key_recovery_requests',
@@ -1055,6 +1075,15 @@ def _assert_binding_follows_its_cross_certificate(app, restored):
         assert DeployBinding.query.one().chain_variant == f'cross:{landed.id}'
 
 
+def _assert_ssh_ca_on_its_hsm_key(app, restored):
+    """Checked by name: the manifest-driven loop loses the case with the reference itself."""
+    from models.ssh import SSHCertificateAuthority
+    with restored.open(app):
+        ca = SSHCertificateAuthority.query.filter_by(refid='xinst-sshca-a').one()
+        assert ca.key_source == 'hsm' and ca.private_key == ''
+        assert ca.hsm_key is not None and ca.hsm_key.key_identifier == 'xinst-key-a'
+
+
 class TestEveryReferenceLandsOnTheRowTheArchiveNames:
     """The restore used to write the source's numbers into the target."""
 
@@ -1080,6 +1109,14 @@ class TestEveryReferenceLandsOnTheRowTheArchiveNames:
         with restored_on_sqlite.open(app):
             request = SCEPRequest.query.filter_by(transaction_id='xinst-scep-tx').one()
             assert db.session.get(ScepProfile, request.profile_id).name == 'xinst-scep'
+
+    def test_an_hsm_ssh_ca_lands_on_the_key_the_archive_names_on_sqlite(self, app, restored_on_sqlite):
+        _assert_ssh_ca_on_its_hsm_key(app, restored_on_sqlite)
+
+    @_needs_pg
+    def test_an_hsm_ssh_ca_lands_on_the_key_the_archive_names_on_postgresql(
+            self, app, restored_on_postgresql):
+        _assert_ssh_ca_on_its_hsm_key(app, restored_on_postgresql)
 
     def test_a_binding_pinned_to_a_cross_certificate_follows_it_on_sqlite(
             self, app, restored_on_sqlite):
@@ -1346,6 +1383,7 @@ AT_REST_AFTER_A_RESTORE = {
     ('acme_dns_update_keys', 'secret'): 'database key',
     ('ad_connector', 'bind_password'): 'database key',
     ('dns_providers', 'credentials'): 'database key',
+    ('windows_enrollment_profiles', 'keytab'): 'key-encryption key',
     ('microsoft_cas', 'password'): 'database key',
 
     # Put back under the target's database key now that their restorers go

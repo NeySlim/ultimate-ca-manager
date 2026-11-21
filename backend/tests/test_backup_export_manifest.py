@@ -47,6 +47,7 @@ class TestSectionsNoArchiveUsedToCarry:
         'ca_template_pins',
         'role_permissions',       # a custom role without them grants nothing
         'group_members',
+        'user_sso_identities',    # the providers that open each account
         'webauthn_credentials',
     ])
     def test_the_section_is_present(self, payload, section):
@@ -57,8 +58,7 @@ class TestFieldsNoArchiveUsedToCarry:
     def test_users_carry_their_authentication_state(self, payload):
         user = payload['users'][0]
         for field in ('totp_secret', 'totp_confirmed', 'totp_exempt', 'backup_codes',
-                      'sso_provider_id', 'sso_external_id', 'custom_role_id',
-                      'auth_source', 'preferences', 'force_password_change'):
+                      'custom_role_id', 'preferences', 'force_password_change'):
             assert field in user, f"users.{field} is missing"
 
     def test_authorities_carry_their_recent_pki_settings(self, app, create_ca, payload):
@@ -371,12 +371,10 @@ def _reseal(svc, original_blob, data):
     """Rewrite an archive's payload, keeping its container and password."""
     import gzip
     import hashlib
-    import struct
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    from services.backup import container
+    from tests.backup_v3 import v3_header
 
-    metadata_len = struct.unpack('>H', original_blob[8:10])[0]
-    header = original_blob[:10 + metadata_len]
+    header = v3_header(original_blob)
     metadata = json.loads(header[10:].decode())
     salt = base64.b64decode(metadata['salt_b64'])
     nonce = base64.b64decode(metadata['nonce_b64'])

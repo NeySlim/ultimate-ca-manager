@@ -25,7 +25,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives.serialization import Encoding
 
 from models import db, SystemConfig, Certificate, DnsProvider, AcmeClientOrder
-from services.acme.dns_providers import create_provider, get_provider_class
+from services.acme.dns_providers import create_provider, get_provider_class, saved_credentials
 from services.acme.dns_selfcheck import acme_allow_loopback_upstream
 from services.acme.jwk_thumbprint import jwk_thumbprint
 from services.acme import outbound
@@ -68,6 +68,11 @@ ACCOUNT_GONE = ('The ACME CA account this order was issued under no longer exist
                 'account could be at another CA. Request a new certificate for these names '
                 'with the account to use, then delete this order.')
 
+# A proxy order recorded before upstream accounts were: its proxy client placed it
+PROXY_ACCOUNT_UNKNOWN = ('This order went through the ACME proxy before UCM recorded the upstream '
+                         'account of its orders, so UCM cannot act for it at the CA. The proxy '
+                         'client that placed it renews or revokes it.')
+
 CERT_KEY_TYPES = {
     'RSA-2048': lambda: key_algorithms.generate('RSA-2048'),
     'RSA-4096': lambda: key_algorithms.generate('RSA-4096'),
@@ -90,9 +95,28 @@ def fips_key_type_refusal(label):
     return None
 
 
+def cert_key_type_refusal(key_type):
+    """Why the certificate key type *key_type* is refused (unknown, or not allowed in FIPS mode), or None."""
+    if not key_type:
+        return None
+    if not isinstance(key_type, str) or key_type not in CERT_KEY_TYPES:
+        return f'Invalid key type: must be one of {", ".join(CERT_KEY_TYPES)}'
+    return fips_key_type_refusal(key_type)
+
+
 def fips_private_key_refusal(private_key):
-    """Why FIPS mode refuses signing with *private_key* (a reused key), or None."""
-    return fips_key_type_refusal(key_algorithms.label_for_private_key(private_key))
+    """Why FIPS mode refuses signing with *private_key* (a reused key), or None.
+    RSA is judged by its size alone, so a size outside the registry is still judged."""
+    if not fips_mode.enabled() or key_algorithms.fips_approved_for_key(private_key):
+        return None
+    alg = key_algorithms.get(key_algorithms.label_for_private_key(private_key))
+    if alg is not None:
+        name = alg.display
+    elif isinstance(private_key, rsa.RSAPrivateKey):
+        name = f'RSA {private_key.key_size}'
+    else:
+        name = type(private_key).__name__
+    return f'{name} keys not available in FIPS mode'
 
 
 def fips_csr_refusal(csr):
@@ -381,12 +405,21 @@ class AcmeClientService:
 
     @classmethod
     def for_existing_order(cls, order: 'AcmeClientOrder') -> Optional['AcmeClientService']:
-        """:meth:`for_order`, or None when the order names a CA account that no longer exists:
-        another account, maybe at another CA, would answer in its place."""
+        """:meth:`for_order`, or None when the order names a CA account that no longer exists,
+        or is a proxy order naming none: another account, maybe at another CA, would answer."""
         named = order.acme_client_account_id or order.account_url
+        if not named and order.is_proxy_order:
+            return None
         if named and cls.order_account(order) is None:
             return None
         return cls.for_order(order)
+
+    @staticmethod
+    def missing_account_message(order: 'AcmeClientOrder') -> str:
+        """Why :meth:`for_existing_order` gave None: an account never recorded, or one deleted."""
+        if order.is_proxy_order and not (order.acme_client_account_id or order.account_url):
+            return PROXY_ACCOUNT_UNKNOWN
+        return ACCOUNT_GONE
 
     def _sync_legacy_eab_to_account(self) -> bool:
         """Copy legacy EAB keys (``acme.client.eab_*``) onto the account row.
@@ -1102,10 +1135,11 @@ class AcmeClientService:
         # Add padding if needed
         padded = eab_hmac_key + '=' * (4 - len(eab_hmac_key) % 4)
         hmac_key_bytes = base64.urlsafe_b64decode(padded)
+        fips_mode.refuse_short_hmac_key(hmac_key_bytes, 'EAB HMAC key of this ACME account')
         
         # Sign with HMAC-SHA256
         signing_input = f"{protected_b64}.{payload_b64}".encode()
-        mac = hmac.new(hmac_key_bytes, signing_input, hashlib.sha256).digest()
+        mac = hmac.digest(hmac_key_bytes, signing_input, 'sha256')
         signature_b64 = base64.urlsafe_b64encode(mac).rstrip(b'=').decode()
         
         return {
@@ -1310,7 +1344,7 @@ class AcmeClientService:
                 return False, "DNS provider not found", {}
             
             try:
-                credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
+                credentials = saved_credentials(dns_provider_model)
                 provider = create_provider(dns_provider_model.provider_type, credentials)
             except Exception as e:
                 return False, f"Failed to initialize DNS provider: {e}", {}
@@ -1769,6 +1803,7 @@ class AcmeClientService:
                 self._record_finalize_failure(order, message)
                 return False, message, None
 
+            already_held = order.certificate_id == cert_id
             order.certificate_id = cert_id
             order.certificate_url = cert_url
             order.status = 'issued'
@@ -1780,6 +1815,8 @@ class AcmeClientService:
             if not_after is not None:
                 order.expires_at = not_after
             db.session.commit()
+            if not already_held:
+                self._announce_import(cert_id, renewal=False)
 
             logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
             return True, "Certificate issued and imported successfully", cert_id
@@ -1833,6 +1870,8 @@ class AcmeClientService:
                 self._record_finalize_failure(order, message)
                 return False, message, None
 
+        if row is not None and row.id != cert_id:
+            renews.add_replaced(row)  # still revocable at the CA under this order's account
         renews.certificate_id = cert_id
         renews.order_url = order.order_url
         renews.certificate_url = cert_url
@@ -1856,8 +1895,21 @@ class AcmeClientService:
 
         if in_place:
             client_certificates.after_renewal_commit(row, cert_pem, key_pem, old_serial)
+        else:
+            self._announce_import(cert_id, renewal=True)
         logger.info(f"Certificate renewed for {renews.domains_list}, ID: {cert_id}")
         return True, "Certificate renewed and imported successfully", cert_id
+
+    @staticmethod
+    def _announce_import(cert_id: int, renewal: bool) -> None:
+        """The event of an order that just stored its certificate: fired once, after the
+        commit that moves the order on, so a resumed import does not fire it twice."""
+        row = db.session.get(Certificate, cert_id)
+        if row is None:
+            return
+        from services.webhook_service import emit_cert_issued, emit_cert_renewed
+        emit = emit_cert_renewed if renewal else emit_cert_issued
+        emit(row.to_dict(), ca_refid=row.caref, actor='system')
 
     @staticmethod
     def _record_finalize_failure(order, message: str) -> None:
@@ -1929,13 +1981,14 @@ class AcmeClientService:
     
     @staticmethod
     def _get_default_key_type() -> str:
-        """The certificate key type setting, RSA-2048 when unset; ValueError when this
-        instance cannot generate the configured type, FIPS mode included (never another
-        type in its place)."""
+        """The certificate key type setting, DEFAULT_ACME_CLIENT_CERT_KEY_TYPE when unset;
+        ValueError when this instance cannot generate the configured type, FIPS mode
+        included (never another type in its place)."""
+        from utils import issuance_defaults
         cfg = SystemConfig.query.filter_by(key='acme.client.key_type').first()
         kt = (cfg.value or '').strip() if cfg else ''
         if not kt:
-            return 'RSA-2048'
+            return issuance_defaults.DEFAULT_ACME_CLIENT_CERT_KEY_TYPE
         if kt not in CERT_KEY_TYPES:
             raise ValueError(f'Configured ACME certificate key type {kt} is not supported here '
                              f'(one of {", ".join(CERT_KEY_TYPES)})')
@@ -2002,7 +2055,7 @@ class AcmeClientService:
             return True, "Manual cleanup required"
         
         try:
-            credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
+            credentials = saved_credentials(dns_provider_model)
             provider = create_provider(dns_provider_model.provider_type, credentials)
             
             challenges = order.challenges_dict

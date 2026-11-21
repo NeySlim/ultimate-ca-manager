@@ -167,9 +167,8 @@ class TestTheScheduleReportsWhatHappened:
             _set('auto_backup_enabled', 'true')
             _set('backup_frequency', 'daily')
             SystemConfig.query.filter_by(key='backup_password').delete()
-            SystemConfig.query.filter_by(key='backup.last_run').delete()
+            SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
             db.session.commit()
-            schedule._LAST_ATTEMPT['at'] = None
             try:
                 with pytest.raises(Exception):
                     schedule.run_scheduled_backup()
@@ -178,4 +177,17 @@ class TestTheScheduleReportsWhatHappened:
                 assert 'password' in (status['last_outcome_reason'] or '')
             finally:
                 _set('auto_backup_enabled', 'false')
-                schedule._LAST_ATTEMPT['at'] = None
+
+
+def test_protection_checks_the_archives_once_per_pass(monkeypatch):
+    # tampered() hashes every archive: one call per pass, not one per archive
+    from services.backup import schedule, storage
+    calls = []
+    monkeypatch.setattr(storage, 'newest_validated', lambda paths: None)
+    monkeypatch.setattr(storage, 'unrecorded', lambda paths: [])
+    monkeypatch.setattr(storage, 'tampered', lambda paths: calls.append(1) or [])
+    monkeypatch.setattr(schedule, '_newest_first', lambda paths: list(paths))
+    monkeypatch.setattr(schedule, '_min_keep', lambda: 2)
+    paths = [f'/nonexistent/b{i}.ucmbkp' for i in range(30)]
+    assert schedule._protected_archives(paths) == set(paths[:2])
+    assert len(calls) == 1

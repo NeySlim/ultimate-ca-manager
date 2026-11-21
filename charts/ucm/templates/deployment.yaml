@@ -5,18 +5,30 @@ metadata:
   labels:
     {{- include "ucm.labels" . | nindent 4 }}
 spec:
-  # Single instance: SQLite + the per-pod scheduler are not HA-safe, and the
-  # RWO volumes cannot be mounted by two pods at once.
+  {{- include "ucm.haValidate" . }}
+  # Default render (ha.enabled=false): one pod, SQLite unless database.type is
+  # postgresql. Several pods need ha.enabled (shared PostgreSQL, elected
+  # scheduler); the RWO volumes cannot be mounted by two pods at once.
   replicas: {{ .Values.replicaCount }}
+  {{- if .Values.ha.enabled }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  {{- else }}
   strategy:
     type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "ucm.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        # Over what the operator sets: generated values never change once stored, and a
+        # sum over a fresh draw would restart the pods at the first upgrade
+        checksum/secret: {{ include "ucm.secretInputs" . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -27,6 +39,7 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "ucm.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -39,6 +52,13 @@ spec:
         - name: ucm
           image: {{ include "ucm.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if gt (int .Values.lifecycle.preStopSleepSeconds) 0 }}
+          # Out of the Service's endpoints before SIGTERM: no new connection reaches a stopping pod
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ .Values.lifecycle.preStopSleepSeconds }}"]
+          {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -66,12 +86,45 @@ spec:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
                   key: UCM_SECRET_KEY
-            {{- if .Values.initialAdminPassword }}
+            {{- if .Values.ha.enabled }}
+            - name: UCM_HA
+              value: "1"
+            - name: UCM_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # SoftHSM tokens are local to a pod: a fresh token per pod would clobber the shared registration
+            - name: HSM_AUTO_INIT
+              value: "false"
+            {{- with .Values.redis.url }}
+            - name: REDIS_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if or .Values.ha.enabled (include "ucm.existingKek" .) }}
+            - name: KEY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ucm.secretName" . }}
+                  key: KEY_ENCRYPTION_KEY
+            {{- end }}
+            {{- if or .Values.ha.enabled (include "ucm.existingDbKey" .) }}
+            - name: UCM_DB_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ucm.secretName" . }}
+                  key: UCM_DB_ENCRYPTION_KEY
+            {{- end }}
+            {{- if not (include "ucm.adminPasswordFromExtraEnv" .) }}
             - name: UCM_INITIAL_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
                   key: UCM_INITIAL_ADMIN_PASSWORD
+            {{- end }}
+            {{- if include "ucm.adminPasswordGenerated" . }}
+            - name: INITIAL_ADMIN_PASSWORD_FORCE_CHANGE
+              value: "1"
             {{- end }}
             {{- if .Values.database.existingSecret }}
             - name: DATABASE_URL
@@ -106,13 +159,29 @@ spec:
               value: {{ . | quote }}
             {{- end }}
             {{- end }}
+            {{- if .Values.majorUpgrade.accept }}
+            # helm upgrade to this chart is the operator's consent to its major (see values.yaml)
+            - name: UCM_ACCEPT_MAJOR_UPGRADE
+              value: {{ splitList "." (toString .Chart.AppVersion) | first | quote }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          # A first start that upgrades the database, or in HA the wait for a previous heartbeat
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: https
+              scheme: HTTPS
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          {{- end }}
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: https
               scheme: HTTPS
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
@@ -123,7 +192,7 @@ spec:
           {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: https
               scheme: HTTPS
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
@@ -138,20 +207,23 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /opt/ucm/data
+            {{- if not .Values.ha.enabled }}
             - name: etc
               mountPath: /etc/ucm
+            {{- end }}
             {{- if .Values.fips.enabled }}
             - name: fips-run
               mountPath: /run/ucm
             {{- end }}
       volumes:
         - name: data
-          {{- if .Values.persistence.enabled }}
+          {{- if and .Values.persistence.enabled (or (not .Values.ha.enabled) .Values.persistence.data.existingClaim) }}
           persistentVolumeClaim:
             claimName: {{ include "ucm.dataPvcName" . }}
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if not .Values.ha.enabled }}
         - name: etc
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
@@ -159,6 +231,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- end }}
         {{- if .Values.fips.enabled }}
         - name: fips-run
           emptyDir:
@@ -169,9 +242,19 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- if .Values.affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else if .Values.ha.enabled }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "ucm.selectorLabels" . | nindent 20 }}
       {{- end }}
       {{- with .Values.tolerations }}
       tolerations:

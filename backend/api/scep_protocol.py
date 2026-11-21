@@ -172,11 +172,8 @@ def get_scep_service(profile_slug=None):
 
         if profile.intune_enabled:
             try:
-                from services.scep.intune_client import IntuneScepClient
-                tenant_id, client_id, client_secret = profile.intune_credentials()
-                intune_client = IntuneScepClient(
-                    tenant_id=tenant_id, client_id=client_id, client_secret=client_secret,
-                )
+                from services.scep import intune_client as intune
+                intune_client = intune.client_for_profile(profile)
             except Exception as e:
                 return _reject(
                     f"SCEP profile {profile.name!r} has Intune validation "
@@ -405,7 +402,8 @@ def handle_pki_operation(profile_slug=None):
             if len(message_b64) > MAX_PKI_BODY_BYTES:
                 return make_error_response("PKIOperation body too large", 413)
             try:
-                pkcs7_data = base64.b64decode(message_b64)
+                # An unencoded '+' reaches us as a space; base64 has no space of its own
+                pkcs7_data = base64.b64decode(message_b64.replace(' ', '+'))
             except Exception:
                 return make_error_response("Invalid base64 in 'message' parameter", 400)
 

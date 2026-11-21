@@ -16,6 +16,8 @@ from services import report_service
 from services.email_service import EmailService
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _post(c, url, body):
     return c.post(url, data=json.dumps(body), content_type='application/json')
@@ -103,6 +105,7 @@ def schedules(app):
     with app.app_context():
         for key in keys:
             SystemConfig.query.filter_by(key=f'report_schedule_{key}').delete()
+            SystemConfig.query.filter_by(key=f'report_last_sent_{key}').delete()
         db.session.commit()
 
 

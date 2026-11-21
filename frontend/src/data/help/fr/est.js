@@ -7,7 +7,7 @@ export default {
       {
         title: 'Onglets',
         items: [
-          { label: 'Paramètres', text: 'Activer EST, sélectionner la CA de signature, configurer les identifiants d\'authentification et la validité des certificats' },
+          { label: 'Paramètres', text: 'Activer EST, sélectionner l\'AC de signature, configurer les identifiants d\'authentification et la validité des certificats' },
           { label: "Points d'accès EST", text: 'URL des points de terminaison EST pour l\'intégration et statistiques d\'inscription' },
         ]
       },
@@ -16,7 +16,7 @@ export default {
         items: [
           { label: 'mTLS (TLS mutuel)', text: 'Le client présente un certificat lors de la poignée de main TLS, méthode d\'authentification la plus forte' },
           { label: 'HTTP Basic Auth', text: 'Repli par nom d\'utilisateur/mot de passe lorsque mTLS n\'est pas disponible. Avec allow_empty_username défini via PATCH /api/v2/est/config, un client peut aussi envoyer un nom d\'utilisateur vide avec le mot de passe (RFC 7030 §3.2.3, v2.252)' },
-          { label: 'Certificat présenté', text: 'Pour /simpleenroll et /serverkeygen en mTLS, un certificat signé par la CA EST doit être un certificat qu\'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2) ; un certificat qu\'une autre CA de ce serveur a émis est refusé dès que lui ou une CA au-dessus est révoqué, ou une fois expiré (v2.252) ; celui d\'une autorité que ce serveur ne détient pas est laissé à la couche TLS' },
+          { label: 'Certificat présenté', text: 'Pour /simpleenroll et /serverkeygen en mTLS, un certificat signé par l\'AC EST doit être un certificat qu\'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2) ; un certificat qu\'une autre AC de ce serveur a émis est refusé dès que lui ou une AC au-dessus est révoqué, ou une fois expiré (v2.252) ; celui d\'une autorité que ce serveur ne détient pas est laissé à la couche TLS' },
           { label: 'Liaison tls-unique', text: 'Une CSR avec un challengePassword doit porter la valeur tls-unique de sa connexion TLS 1.2 vers UCM (RFC 7030 §3.5) ; elle est refusée avec 400 quand la valeur diffère ou ne peut pas être vérifiée (TLS 1.3, proxy devant). /csrattrs n\'en demande pas. ignore_challenge_password, défini via PATCH /api/v2/est/config, désactive la vérification pour un client qui y met un mot de passe (v2.252)' },
           { label: 'Clés compromises', text: 'Une CSR dont la clé a été révoquée comme compromise (keyCompromise) est refusée avec 400 (v2.252)' },
         ]
@@ -24,11 +24,11 @@ export default {
       {
         title: 'Points de terminaison',
         items: [
-          { label: '/cacerts', text: 'Récupérer la chaîne de certificats CA (aucune authentification requise)' },
+          { label: '/cacerts', text: 'Récupérer la chaîne de certificats AC (aucune authentification requise)' },
           { label: '/simpleenroll', text: 'Soumettre une CSR et recevoir un certificat signé' },
           { label: '/simplereenroll', text: 'Renouveler un certificat existant (nécessite mTLS ; sans certificat client : 403). Une CSR sans SubjectAltName renouvelle les noms propres du certificat, ou aucun s\'il n\'en avait pas, au lieu d\'un nom construit à partir du CN (RFC 7030 §4.2.2, v2.252)' },
           { label: '/csrattrs', text: 'Obtenir les attributs CSR recommandés par le serveur : keyUsage, subjectAltName et extKeyUsage sous forme d\'OID nus (RFC 9908 §5.2, v2.252). csrattrs_legacy_encoding, défini via PATCH /api/v2/est/config, sert l\'ancienne forme (les OID dans une extensionRequest) pour un client qui en a besoin' },
-          { label: 'Erreurs', text: 'Les refus d\'inscription, limitation de débit comprise, arrivent sous forme d\'un message en texte brut (text/plain, RFC 8951 §5) qui en donne la raison, par exemple un corps qui n\'est pas du base64 ou pas une CSR PKCS#10, ou les contraintes de noms de la CA (v2.252)' },
+          { label: 'Erreurs', text: 'Les refus d\'inscription, limitation de débit comprise, arrivent sous forme d\'un message en texte brut (text/plain, RFC 8951 §5) qui en donne la raison, par exemple un corps qui n\'est pas du base64 ou pas une CSR PKCS#10, ou les contraintes de noms de l\'AC (v2.252)' },
           { label: '/serverkeygen', text: 'Le serveur génère une paire de clés et retourne le certificat + la clé. La clé prend la force de l\'AC émettrice, dans la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l\'AC, ramenée au type autorisé le plus proche par les politiques. La clé est livrée en PKCS#8 non chiffré sous TLS ; une CSR qui nomme la clé du certificat mTLS (AsymmetricDecryptKeyIdentifier) la reçoit chiffrée vers ce certificat, par transport de clé pour une clé RSA de 2048 bits ou plus (keyEncipherment) ou par accord de clé pour une clé EC (keyAgreement), avec les algorithmes que liste la SMIMECapabilities de la CSR, dans un paquet de clé signé par un certificat « EST key generator » que l\'AC émettrice délivre à cet effet (Ed25519 sous une AC Ed448, v2.252)' },
         ]
       },
@@ -40,7 +40,7 @@ export default {
       'Copiez les URL des points de terminaison depuis l\'onglet Points d\'accès EST pour configurer vos clients EST',
     ],
     warnings: [
-      'EST nécessite HTTPS : le client doit faire confiance au certificat du serveur UCM ou à la CA',
+      'EST nécessite HTTPS : le client doit faire confiance au certificat du serveur UCM ou à l\'AC',
       'L\'authentification mTLS nécessite une configuration correcte de la terminaison TLS (le proxy inverse doit transmettre les certificats client)',
     ],
   },
@@ -49,16 +49,17 @@ export default {
     content: `
 ## Vue d'ensemble
 
-L'inscription par transport sécurisé (EST) est définie dans le **RFC 7030** et fournit l'inscription de certificats, la ré-inscription et la récupération de certificats CA via HTTPS. EST est le remplacement moderne de SCEP, offrant une sécurité renforcée grâce à l'authentification TLS mutuel (mTLS).
+L'inscription par transport sécurisé (EST) est définie dans le **RFC 7030** et fournit l'inscription de certificats, la ré-inscription et la récupération de certificats AC via HTTPS. EST est le remplacement moderne de SCEP, offrant une sécurité renforcée grâce à l'authentification TLS mutuel (mTLS).
 
 ## Configuration
 
 ### Onglet Paramètres
 
 1. **Activer EST** : Basculer le protocole EST on ou off
-2. **CA de signature** : Sélectionner quelle autorité de certification signe les certificats inscrits via EST
+2. **AC de signature** : Sélectionner quelle autorité de certification signe les certificats inscrits via EST
 3. **Authentification** : Configurer les identifiants HTTP Basic Auth (nom d'utilisateur et mot de passe)
 4. **Validité du certificat** : Période de validité par défaut pour les certificats émis via EST (en jours)
+5. **Libellés d'AC** : servez d'autres AC sous \`/.well-known/est/<label>/\`. Un nom d'opération (\`cacerts\`, \`simpleenroll\`, \`simplereenroll\`, \`fullcmc\`, \`serverkeygen\`, \`csrattrs\`) ne peut pas être un libellé (RFC 7030 §3.2.2, v2.252)
 
 ### Enregistrer la configuration
 
@@ -74,9 +75,8 @@ Le client présente un certificat lors de la poignée de main TLS. UCM valide le
 
 - **Méthode la plus forte** : identité client cryptographique
 - **Requis pour** \`/simplereenroll\` : le client doit présenter son certificat actuel
-- **Certificat présenté** : pour \`/simpleenroll\` et \`/serverkeygen\`, un certificat signé par la CA EST doit être un certificat qu'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2) ; un certificat d'une autre autorité de confiance reste accepté
-- **Port 8443** : quand UCM termine le TLS, la poignée de main accepte les certificats de la CA de confiance mTLS (Paramètres → Sécurité) et des CA situées en dessous uniquement ; pour ré-inscrire des certificats d'une CA EST hors de cette branche, faites confiance à une CA au-dessus des deux (v2.252)
-- **Certificat présenté** : pour \`/simpleenroll\` et \`/serverkeygen\`, un certificat signé par la CA EST doit être un certificat qu'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2). Un certificat qu'une autre CA de ce serveur a émis est refusé dès que lui ou une CA au-dessus est révoqué, ou une fois expiré (v2.252) ; celui d'une autorité que ce serveur ne détient pas est laissé à la couche TLS
+- **Port 8443** : quand UCM termine le TLS, la poignée de main accepte les certificats de l'AC de confiance mTLS (Paramètres → Sécurité) et des AC situées en dessous uniquement ; pour ré-inscrire des certificats d'une AC EST hors de cette branche, faites confiance à une AC au-dessus des deux (v2.252)
+- **Certificat présenté** : pour \`/simpleenroll\` et \`/serverkeygen\`, un certificat signé par l'AC EST doit être un certificat qu'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2). Un certificat qu'une autre AC de ce serveur a émis est refusé dès que lui ou une AC au-dessus est révoqué, ou une fois expiré (v2.252) ; celui d'une autorité que ce serveur ne détient pas est laissé à la couche TLS
 - **Liaison tls-unique** : une CSR avec un \`challengePassword\` doit porter la valeur \`tls-unique\` de sa connexion TLS 1.2 vers UCM (RFC 7030 §3.5), et est refusée avec 400 quand la valeur diffère ou ne peut pas être vérifiée (TLS 1.3, proxy devant) ; \`/csrattrs\` n'en demande pas. \`ignore_challenge_password\`, défini via \`PATCH /api/v2/est/config\`, désactive la vérification pour un client qui y met un mot de passe (v2.252)
 - **Dépend de** la configuration correcte de la terminaison TLS (le proxy inverse doit transmettre \`SSL_CLIENT_CERT\` à UCM)
 
@@ -96,12 +96,12 @@ Une CSR dont la clé a été révoquée comme compromise est refusée avec 400, 
 Tous les points de terminaison sont sous \`/.well-known/est/\` :
 
 ### GET /cacerts
-Récupérer la chaîne de certificats CA. **Aucune authentification requise.**
+Récupérer la chaîne de certificats AC. **Aucune authentification requise.**
 
-Utilisez ceci pour établir la confiance : les clients récupèrent le certificat CA avant l'inscription.
+Utilisez ceci pour établir la confiance : les clients récupèrent le certificat AC avant l'inscription.
 
 \`\`\`bash
-curl -k https://votre-serveur:8443/.well-known/est/cacerts | \\
+curl -k https://your-server:8443/.well-known/est/cacerts | \\
   base64 -d | openssl pkcs7 -inform DER -print_certs
 \`\`\`
 
@@ -115,7 +115,7 @@ Nécessite une authentification (mTLS ou Basic Auth).
 curl -k --user est-user:est-password \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @csr.pem \\
-  https://votre-serveur:8443/.well-known/est/simpleenroll
+  https://your-server:8443/.well-known/est/simpleenroll
 \`\`\`
 
 ### POST /simplereenroll
@@ -125,7 +125,7 @@ Renouveler un certificat existant. **Nécessite mTLS** : le client doit présent
 curl -k --cert client.pem --key client.key \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @csr.pem \\
-  https://votre-serveur:8443/.well-known/est/simplereenroll
+  https://your-server:8443/.well-known/est/simplereenroll
 \`\`\`
 
 ### GET /csrattrs
@@ -151,20 +151,20 @@ Utilisez \`estclient\` avec des identifiants HTTP Basic (\`-u\` et \`-h\`) ou un
 
 ### Utiliser OpenSSL
 \`\`\`bash
-# Récupérer les certificats CA
-curl -k https://votre-serveur:8443/.well-known/est/cacerts | \\
+# Récupérer les certificats AC
+curl -k https://your-server:8443/.well-known/est/cacerts | \\
   base64 -d > cacerts.p7
 
 # Générer une CSR
 openssl req -new -newkey rsa:2048 -nodes \\
   -keyout client.key -out client.csr \\
-  -subj "/CN=mon-appareil/O=MonOrg"
+  -subj "/CN=my-device/O=MyOrg"
 
 # Inscrire (Basic Auth)
 curl -k --user est-user:est-password \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @<(openssl req -in client.csr -outform DER | base64) \\
-  https://votre-serveur:8443/.well-known/est/simpleenroll | \\
+  https://your-server:8443/.well-known/est/simpleenroll | \\
   base64 -d | openssl pkcs7 -inform DER -print_certs -out client.pem
 \`\`\`
 

@@ -10,6 +10,17 @@ import { secretInputProps, secretRequiredForTarget, typedSecret } from '../../li
 const WINRM_TARGET = ['winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
   'winrm_transport', 'winrm_username']
 
+// What a connection test reads from the form; a secret not retyped stays on the server
+const TESTED_FIELDS = ['server', 'ca_name', 'auth_method', 'username', 'client_cert_pem',
+  'kerberos_principal', 'kerberos_keytab_path', 'use_ssl', 'verify_ssl', 'ca_bundle']
+
+function testedValues(formData) {
+  const values = Object.fromEntries(TESTED_FIELDS.map((field) => [field, formData[field]]))
+  if (formData.password) values.password = formData.password
+  if (formData.client_key_pem) values.client_key_pem = formData.client_key_pem
+  return values
+}
+
 export default function MscaConnectionForm({ connection, onSave, onCancel }) {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning } = useNotification()
@@ -25,7 +36,6 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     client_key_pem: '',
     kerberos_principal: connection?.kerberos_principal || '',
     kerberos_keytab_path: connection?.kerberos_keytab_path || '',
-    use_ssl: connection?.use_ssl ?? true,
     verify_ssl: connection?.verify_ssl ?? true,
     ca_bundle: connection?.ca_bundle || '',
     default_template: connection?.default_template || '',
@@ -80,7 +90,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     saved: savedForm, current: formData, secret: formData.password,
     secretSaved: Boolean(connection?.auth_method === 'basic' && connection?.password
       && formData.auth_method === 'basic'),
-    fields: ['server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username',
+    fields: ['server', 'verify_ssl', 'ca_bundle', 'username',
       ...(connection?.winrm_password || typedSecret(formData.winrm_password) ? [] : WINRM_TARGET)],
   }
 
@@ -112,6 +122,9 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
         winrm_transport: formData.winrm_transport,
         winrm_username: formData.winrm_username,
         ca_config: formData.ca_config,
+        // A Kerberos channel signs in with these; the route needs admin:system and shows the server's refusal
+        kerberos_principal: formData.kerberos_principal,
+        kerberos_keytab_path: formData.kerberos_keytab_path,
       }
       if (formData.winrm_password) overrides.winrm_password = formData.winrm_password
       const res = await mscaService.testAdminChannel(connection.id, overrides)
@@ -130,7 +143,12 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
       const testData = { ...formData }
       let response
       if (connection?.id) {
-        response = await mscaService.test(connection.id)
+        // The saved password goes only where it was saved for (as on save)
+        if (secretRequiredForTarget(basicSecret)) {
+          showError(t('common.secretRequiredForTarget'))
+          return
+        }
+        response = await mscaService.test(connection.id, testedValues(formData))
       } else {
         response = await mscaService.testInline(testData)
       }
@@ -264,16 +282,12 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
       {/* SSL Settings */}
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={formData.use_ssl} onChange={(e) => updateField('use_ssl', e.target.checked)} className="rounded" />
-          {t('msca.useSsl')}
-        </label>
-        <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={formData.verify_ssl} onChange={(e) => updateField('verify_ssl', e.target.checked)} className="rounded" />
           {t('msca.verifySsl')}
         </label>
       </div>
 
-      {!formData.verify_ssl && (
+      {formData.verify_ssl && (
         <Textarea
           label={t('msca.caBundle')}
           value={formData.ca_bundle}

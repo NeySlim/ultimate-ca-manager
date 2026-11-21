@@ -14,9 +14,14 @@ import sys
 # tasks, which run in the scheduler process started below (when_ready)
 os.environ['UCM_SCHEDULER_SUPERVISED'] = '1'
 
+# Stamps the process start (HA cluster commands) before the mTLS and WSTEP settings are read
+import services.cluster_commands  # noqa: E402
+
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')
+# HA: the restarts committed before the settings below are read; a later one restarts this node
+services.cluster_commands.snapshot_committed_restarts(data_path)
 is_docker = os.path.exists('/.dockerenv') or os.getenv('UCM_DOCKER') == '1'
 
 # Server socket — HOST selects the listen address (0.0.0.0 by default,
@@ -30,7 +35,9 @@ backlog = 2048
 workers = 1
 worker_class = 'workers.MTLSGeventWebSocketWorker'
 worker_connections = 1000
-timeout = 120
+# UCM_WORKER_TIMEOUT, 120 s by default; out of bounds the start is refused
+from worker_timeout import worker_timeout  # noqa: E402
+timeout = worker_timeout()
 keepalive = 5
 
 # Security
@@ -75,12 +82,18 @@ def ssl_context(conf, default_ssl_context_factory):
     ``WSTEP_TLS12_CAP_NEEDED`` (read once at worker startup, see
     ``_wstep_enabled`` below) means installs that never touch Windows
     autoenrollment keep TLS 1.3 for everything else, instead of every UCM
-    instance silently losing it by default. ``api/v2/wstep.py`` restarts
+    instance silently losing it by default. The Windows settings route restarts
     the service whenever ``wstep_enabled`` is toggled, so this stays in
     sync with the setting rather than only taking effect on the next
     unrelated restart.
     """
-    ctx = default_ssl_context_factory()
+    from utils.client_cert import pin_listener_trust, pin_listener_trust_file
+    if conf.ca_certs:
+        # The guard of the application follows the bundle this context loaded, read once here
+        ctx = pin_listener_trust_file(conf.ca_certs, default_ssl_context_factory)
+    else:
+        ctx = default_ssl_context_factory()
+        pin_listener_trust(())
     if WSTEP_TLS12_CAP_NEEDED:
         ctx.maximum_version = ssl.TLSVersion.TLSv1_2
     if conf.ca_certs:
@@ -115,7 +128,8 @@ def ssl_context(conf, default_ssl_context_factory):
     return ctx
 
 
-from boot_config import anchor_client_verification, mtls_client_ca, wstep_enabled
+from boot_config import (MTLS_UNDECIDED, HttpsMaterialError, anchor_client_verification,
+                         materialize_https, mtls_client_ca, mtls_former_cas, wstep_enabled)
 
 # Drives the TLS 1.2 cap in ssl_context().
 WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
@@ -124,13 +138,33 @@ WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
 MTLS_MODE_FILE = 'mtls_mode'
 
 
-def _remember_mtls_mode(required):
-    """What the last successful read decided, for the next start."""
+def _remember_mtls_mode(mode):
+    """What the last successful read decided (required, optional or off), for the next start."""
     try:
         with open(os.path.join(data_path, MTLS_MODE_FILE), 'w') as handle:
-            handle.write('required' if required else 'optional')
+            handle.write(mode)
     except OSError as e:
         print(f"mTLS: could not record the mode: {e}", file=sys.stderr)
+
+
+def _write_private(name, content):
+    """Write *name* in the data directory atomically (temp file + rename), owner and group only."""
+    import tempfile
+    import stat
+    path = os.path.join(data_path, name)
+    fd, temp_path = tempfile.mkstemp(dir=data_path, prefix=f'.{name}_', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            f.write(content)
+        os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+        os.rename(temp_path, path)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+    return path
 
 
 def _reuse_last_known_mtls():
@@ -145,15 +179,18 @@ def _reuse_last_known_mtls():
 
     ca_file_path = os.path.join(data_path, 'mtls_ca.pem')
     mode_path = os.path.join(data_path, MTLS_MODE_FILE)
-    if not (os.path.exists(ca_file_path) and os.path.exists(mode_path)):
+    try:
+        with open(mode_path) as handle:
+            mode = handle.read().strip()
+    except OSError:
+        mode = None
+    if mode == 'off':  # off at the last start: a CA file an earlier setting left is not asked for
+        return
+    if mode is None or not os.path.exists(ca_file_path):
         print("mTLS: no previous configuration to fall back on; the socket "
               "will not ask for a client certificate", file=sys.stderr)
         return
-    try:
-        with open(mode_path) as handle:
-            required = handle.read().strip() == 'required'
-    except OSError:
-        required = False
+    required = mode == 'required'
     ca_certs = ca_file_path
     cert_reqs = 2 if required else 1
     print(f"mTLS: settings unreadable, keeping the last known configuration "
@@ -166,40 +203,54 @@ def _load_mtls_config():
 
     try:
         found = mtls_client_ca(data_path)
+        if found is MTLS_UNDECIDED:
+            # No settings to read: a first start has no mode on record, a lost table keeps the last one
+            if os.path.exists(os.path.join(data_path, MTLS_MODE_FILE)):
+                _reuse_last_known_mtls()
+            return
         if not found:
-            _remember_mtls_mode(False)
+            _remember_mtls_mode('off')
             return
         ca_pem, ca_name, required = found
-
-        # Write CA cert atomically (temp file + rename) with restricted permissions
-        import tempfile
-        import stat
-        ca_file_path = os.path.join(data_path, 'mtls_ca.pem')
-        fd, temp_path = tempfile.mkstemp(dir=data_path, prefix='.mtls_ca_', suffix='.tmp')
-        try:
-            with os.fdopen(fd, 'w') as f:
-                f.write(ca_pem)
-            os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
-            os.rename(temp_path, ca_file_path)
-        except Exception as e:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                pass
-            raise e
+        # The former CAs a Windows profile lists renew over TLS: anchors beside the mTLS CA, whose
+        # certificates the application keeps from every route but WSTEP renewal
+        former = mtls_former_cas(data_path)
+        # The bundle names its own former CAs: each worker arms its guard from the bundle it loads
+        from utils.client_cert import former_cas_header
+        ca_file_path = _write_private('mtls_ca.pem', former_cas_header(f[0] for f in former) + ''.join(
+            pem if pem.endswith('\n') else pem + '\n' for pem in [ca_pem, *(f[1] for f in former)]))
 
         ca_certs = ca_file_path
         cert_reqs = 2 if required else 1
-        _remember_mtls_mode(required)
+        _remember_mtls_mode('required' if required else 'optional')
 
         mode = "REQUIRED" if cert_reqs == 2 else "OPTIONAL"
         print(f"mTLS: {mode}, trusted CA: {ca_name}", file=sys.stderr)
+        if former:
+            print("mTLS: former CAs trusted for Windows renewal only: "
+                  + ', '.join(name for _refid, _pem, name in former), file=sys.stderr)
 
     except Exception as e:
         print(f"mTLS: config load failed: {e}", file=sys.stderr)
         _reuse_last_known_mtls()
 
 
+def _materialize_https():
+    """Before the TLS socket opens: the HTTPS pair the database names, on every node."""
+    try:
+        done = materialize_https(data_path, certfile, keyfile)
+    except HttpsMaterialError as e:
+        print(f"HTTPS: {e}; the certificate files on disk are left as they are", file=sys.stderr)
+        return
+    except Exception as e:
+        print(f"HTTPS: certificate not read from the database ({type(e).__name__}: {e}); "
+              "the certificate files on disk are left as they are", file=sys.stderr)
+        return
+    if done:
+        print(f"HTTPS: {done}", file=sys.stderr)
+
+
+_materialize_https()
 _load_mtls_config()
 
 # Logging: stdout in Docker, files in native installs
@@ -240,9 +291,15 @@ tmp_upload_dir = None
 def on_starting(server):
     server.log.info("Starting UCM with Gunicorn")
 
+def _release_node():
+    # After the scheduler process's last heartbeat: the node's next start takes its row at once
+    from services.scheduler_leader import release_claimed_node
+    release_claimed_node()
+
 def when_ready(server):
     from scheduler_supervisor import supervisor
-    supervisor.start(server)
+    # Run as soon as the master stops (beside the workers' drain), else by on_exit
+    supervisor.start(server, on_stopped=_release_node)
 
 def on_reload(server):
     server.log.info("Reloading UCM")
@@ -252,13 +309,25 @@ def on_reload(server):
 
 def on_exit(server):
     from scheduler_supervisor import supervisor
-    supervisor.stop()
+    supervisor.stop(on_stopped=_release_node)
+    # Only once Arbiter.stop() drained the workers: a full-stop migration must not run under them
+    from migration_runner import mark_node_stopped
+    mark_node_stopped()
 
 def worker_int(worker):
     worker.log.info("Worker received INT or QUIT signal")
 
 def worker_abort(worker):
     worker.log.info("Worker received SIGABRT signal")
+
+def worker_exit(server, worker):
+    # A worker leaving with a restart claim not given back would keep its successor from restarting
+    from services.cluster_commands import stop_applier
+    stop_applier()
+    from services.ws_relay import stop_reader
+    stop_reader()
+    from services.backup.restore.invalidate import stop_epoch_watcher
+    stop_epoch_watcher()
 
 def post_worker_init(worker):
     """Post-worker initialization:
@@ -276,6 +345,9 @@ def post_worker_init(worker):
     from wsgi import app as flask_app
     with flask_app.app_context():
         forget_inherited_connections(db.engines.values())
+    # A restore holding SQLite never stops this worker's greenlets in sqlite3's busy wait
+    from utils.sqlite_wait import serve_web_worker
+    serve_web_worker(flask_app)
     from services.syslog_service import syslog_forwarder
     syslog_forwarder.forget_inherited_socket()
 
@@ -317,3 +389,32 @@ def post_worker_init(worker):
         logging.getLogger('ucm.protocol').warning(
             "Could not initialize DNS UPDATE listener: %s", e
         )
+
+    # HA: this worker applies the cluster commands and owns this node's restart turn
+    try:
+        from services.cluster_commands import start_applier
+        from wsgi import app as flask_app
+        start_applier(flask_app, record=True, master_pid=worker.ppid)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.cluster').error("Cluster command applier not started: %s", e)
+
+    # A restore run by another process advanced the session epoch: this worker drops its
+    # caches within EPOCH_CHECK_SECONDS, on its own timer rather than on a request
+    try:
+        from services.backup.restore.invalidate import start_epoch_watcher
+        from wsgi import app as flask_app
+        start_epoch_watcher(flask_app)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.backup').error("Session epoch cache watcher not started: %s", e)
+
+    # Without Redis: this worker emits to its clients the events of the scheduler process,
+    # and in HA those of the other workers and nodes, to which it also publishes its own
+    try:
+        from services.ws_relay import start_reader
+        from wsgi import app as flask_app
+        start_reader(flask_app)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.websocket').error("WebSocket relay reader not started: %s", e)

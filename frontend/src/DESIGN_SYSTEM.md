@@ -1,7 +1,8 @@
 # UCM Design System
 
-> Source of truth: `src/index.css` (tokens, component classes),
-> `src/contexts/ThemeContext.jsx` (per-theme color values) and
+> Source of truth: `src/styles/tokens.css` (colour tokens), `src/index.css`
+> (non-colour tokens, component classes),
+> `src/contexts/ThemeContext.jsx` (family and mode selection) and
 > `tailwind.config.js` (Tailwind aliases). This document describes what those
 > files actually implement. `src/lib/__tests__/designTokens.test.js` and
 > `opacityClasses.test.js` fail the suite when the source uses a token, class or
@@ -9,37 +10,82 @@
 
 ## Theming model
 
-Colors are **not** hardcoded. `ThemeContext.jsx` writes CSS custom properties on
-`document.documentElement` at runtime. There are **3 theme families** × **2 modes**:
+Colors are **not** hardcoded. `ThemeContext.jsx` sets `data-theme` and
+`data-mode` on `<html>`; `styles/tokens.css` holds one block per
+`[data-theme][data-mode]` pair (bare `:root` = Atelier dark, the fallback).
+There are **4 theme families** × **2 modes**:
 
 | Family | `id` | Accent | Modes |
 |--------|------|--------|-------|
-| Gray (default) | `gray` | `#4F8EF7` | dark / light |
+| Atelier (default) | `atelier` | `#4F8EF7` | dark / light |
+| Aurore | `aurore` | `#6b78e0` | dark / light |
 | Purple Night | `purple` | `#A855F7` | dark / light |
 | Orange Sunset | `sunset` | `#F97316` | dark / light |
 
+A stored `gray` (localStorage or server preference) reads as `atelier`; the
+next write persists `atelier`.
+
+### The 21 tokens
+
+| Token | Role |
+|-------|------|
+| `--bg` `--panel` `--raised` `--hover` | Page, card, raised and hover surfaces |
+| `--text` `--muted` | Primary and secondary text |
+| `--line` | Decorative divider |
+| `--control` | Border of controls (3:1 on `--bg`) |
+| `--accent` `--selected` `--on-accent` | Accent, selected-row background, and the text colour on accent, good and bad button fills |
+| `--good` `--goodbg` `--warn` `--warn-fill` `--warnbg` `--bad` `--badbg` | Status text, tinted backgrounds, and the amber fill |
+| `--grad-a` `--grad-b` `--glow` | Aurore gradient and halo (accent for the other families) |
+
+`themeContrast.test.js` enforces WCAG on all 8 palettes: 4.5:1 for text pairs,
+3:1 for `--accent`, `--control` and `--warn-fill` on `--bg`. All text is 4.5:1, `--on-accent`
+included (on the accent, good and bad gradients, and on `--grad-a`/`--grad-b` for Aurore), as is
+`--text-tertiary` on `--bg` and `--panel`. `--line` is
+decorative and exempt. `themeBaseline.test.js` pins every value in
+`styles/tokens.baseline.json`: change a value, update the baseline in the same
+commit (`UPDATE_THEME_BASELINE=1 npx vitest run src/lib/__tests__/themeBaseline.test.js`).
+
+### Compatibility aliases (being retired)
+
+The pre-Atelier names (`--bg-primary`, `--text-secondary`, `--accent-danger`,
+`--border`, `--detail-*`, `--icon-*`, `--gradient-*`, `--logo-gradient-*`…) are
+defined once in `tokens.css` from the tokens above, so existing pages keep
+rendering. New code uses the 21 tokens; an alias goes away when its last
+consumer does. Icon hues, `--violet` and the logo gradient depend on the mode
+only, not on the family.
+
+**Rule.** No `#rrggbb`, `rgb()`/`rgba()`/`hsl()` literal and no Tailwind palette class
+(`text-red-500`, `bg-white`, `border-gray-800`) in `src`: use a token, an alias or a helper class.
+Three constants (`--ink`, `--paper`, `--scrim`) are declared in each of the 8 palettes and pinned in the baseline; `bg-scrim-NN` is the overlay. There is no `--hue-*` token.
+`styles/__tests__/noHardcodedColors.test.js` enforces it and lists the exceptions with their reason.
+
 Mode resolves from `system` / `dark` / `light` (persisted in localStorage +
 server prefs). Every component must read tokens (`var(--…)` or the Tailwind
-aliases below) so it adapts to all 6 combinations. Never hardcode a hex.
+aliases below) so it adapts to all 8 combinations. Never hardcode a hex.
 
-Two documented exceptions carry fixed colors in every theme: the Ko-fi tokens
+Documented exceptions carry fixed colors in every theme: the Ko-fi tokens
 (`--kofi-coral`, `--kofi-coral-strong`, `--kofi-coral-hover`, used by
 `.kofi-card` / `.kofi-badge` / `.kofi-button` / `.kofi-icon`) because they are a
-third party's brand, and `icon-bg-rose` / `icon-bg-sky` (see below).
+third party's brand, `ProviderIcons.jsx`, the theme picker swatches, the help reader's
+sepia palette, and the email preview canvas.
 
 ## Typography
 
 ### Font Sizes
 | Token | Size | Usage |
 |-------|------|-------|
-| `text-3xs` | 9px | Micro labels, badges |
-| `text-2xs` | 10px | Compact table cells, small badges |
+| `text-3xs` | 12px | Micro labels, badges (12px floor, same as `text-xs`) |
+| `text-2xs` | 12px | Compact table cells, small badges (12px floor) |
 | `text-xs` | 12px | Secondary text, labels |
 | `text-sm` | 14px | Body text, buttons |
 | `text-base` | 16px | Primary content |
 | `text-lg` | 18px | Section headers |
 | `text-xl` | 20px | Page subtitles |
 | `text-2xl` | 24px | Page titles |
+
+`minFontSize.test.js` fails if `index.css`, `tokens.css` or `tailwind.config.js`
+declare a size below 12px, or if a component uses an arbitrary `text-[N]` class
+below 12px. Inline `fontSize` styles are not covered.
 
 ### Font Families
 - `font-sans` — Inter (UI text), self-hosted (`/fonts/Inter-*.woff2`)
@@ -48,7 +94,7 @@ third party's brand, and `icon-bg-rose` / `icon-bg-sky` (see below).
 
 ## Colors
 
-All values below are the **gray / dark** defaults; they shift per theme family
+All values below are the **Atelier / dark** defaults; they shift per theme family
 and mode. Tailwind aliases (`tailwind.config.js`) map to the CSS vars.
 
 ### Background
@@ -111,23 +157,20 @@ Add the missing rule rather than rounding to a neighbour.
 ### Status tints (theme-aware classes)
 For each of `success`, `warning`, `danger` and `primary` (info):
 `status-X-bg` (soft tint), `status-X-bg-solid`, `status-X-text`,
-`status-X-border`, `status-X-glow`, and the composite `status-X-badge`
-(tint + text + border). `status-purple-*` has only `bg`, `bg-solid`, `text`
-and `border`; `status-orange-*` and `status-yellow-*` are derived from
-`--accent-warning`. `status-badge-{success,warning,danger}` are the
+`status-X-border`. `status-purple-*` has only `bg`, `text` and `border`.
+`status-badge-{success,warning,danger}` are the
 gradient variants used by `badge-enhanced`.
 
-### Icon background classes (theme-aware, set by ThemeContext)
+### Icon background classes (mode-aware, set by tokens.css)
 Colored tile backgrounds that avoid "ton sur ton" clashes per theme:
 `icon-bg-blue`, `icon-bg-orange`, `icon-bg-amber`, `icon-bg-emerald` /
 `icon-bg-green`, `icon-bg-teal` / `icon-bg-cyan`, `icon-bg-violet` /
 `icon-bg-purple`, backed by `--icon-{blue,orange,amber,emerald,teal,violet}-{bg,text}`.
 Derived from status tokens: `icon-bg-red` (`--accent-danger`),
-`icon-bg-gray` (`--text-tertiary`). Fixed hues in every theme: `icon-bg-rose`
-(`#F472B6`) and `icon-bg-sky` (`#38BDF8`).
+`icon-bg-gray` (`--text-tertiary`).
 
 ### Detail panel tokens
-`ThemeContext` also writes `--gradient-bg` and the `--detail-*` set
+`tokens.css` also defines `--gradient-bg` and the `--detail-*` set
 (`detail-header-bg/border/shadow`, `detail-icon-bg/shadow`,
 `detail-stats-border`, `detail-section-bg/border`, `detail-field-bg/border`),
 consumed by the detail panel classes in `index.css`.
@@ -256,6 +299,25 @@ not a flat `bg-accent-primary`. Match this when rebuilding buttons elsewhere.
 <span className="w-2 h-2 rounded-full status-success-bg-solid" />
 <span className="px-2 py-px rounded-full text-2xs status-success-bg status-success-text">Active</span>
 ```
+
+## Application shell (`components/shell/`)
+
+Top bar, Modules mega-menu, account popover and status bar, styled in
+`components/shell/shell.css` with tokens only (no hex, no `rgba()`).
+
+| Part | Contract |
+|------|----------|
+| Bar | `header` landmark, `nav` "Main navigation": Dashboard, Certificates, CAs, up to three pinned modules, then the Modules button. The active entry carries `aria-current="page"` |
+| Modules menu | Disclosure, not an ARIA menu: button with `aria-expanded` + `aria-controls`, panel `nav` with one link per visible module (`groupsFor(can)`). ArrowDown opens, arrows/Home/End move, Escape closes and refocuses the button, outside click, focus leaving and a route change close it |
+| Pins | Server preference `pins`, three ids at most, shown in stored order. A fourth is refused with a status message in the menu; a module whose right was withdrawn is hidden, not an error. Dashboard, Certificates and CAs are never pinned (always in the bar) |
+| Account popover | Same disclosure pattern; theme family, mode and language groups use `aria-pressed` buttons |
+| Status bar | Only what `/api/v2/health` reports; a missing field renders nothing |
+| Phone (<= 800px) | Bar links and mega-menu give way to one native select over the same modules; touch targets are at least 44px |
+
+Aurore (`:root[data-theme="aurore"]`) adds a drifting glow behind the page and
+glass on the bars and popovers, built from `--grad-a`, `--grad-b`, `--bg` and
+`--panel` with `color-mix`. `prefers-reduced-motion` stops the drift and
+`prefers-reduced-transparency` replaces the glass with opaque panels.
 
 ## Responsive Breakpoints
 

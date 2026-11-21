@@ -27,4 +27,10 @@ def test_fips_mode_keeps_what_the_contract_says(row, monkeypatch):
     if row['ml_dsa'] and not key_algorithms.mldsa_supported():
         pytest.skip('this build has no ML-DSA')
     monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
-    assert (fips_key_type_refusal(row['label']) is None) is row['fips']
+    if row['fips'] is not None:
+        assert (fips_key_type_refusal(row['label']) is None) is row['fips']
+        return
+    # Decided by the loaded module: kept where it approves the algorithm, refused elsewhere
+    for approves in (True, False):
+        monkeypatch.setattr(fips_mode, 'module_approves', lambda alg, a=approves: a)
+        assert (fips_key_type_refusal(row['label']) is None) is approves

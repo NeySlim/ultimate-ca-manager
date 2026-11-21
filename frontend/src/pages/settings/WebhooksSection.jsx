@@ -32,7 +32,7 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
           action={{ label: t('webhooks.addWebhook'), onClick: handleWebhookCreate }}
         />
       ) : (
-        <DetailSection title={t('webhooks.configuredWebhooks')} icon={Bell} iconClass="icon-bg-rose">
+        <DetailSection title={t('webhooks.configuredWebhooks')} icon={Bell} iconClass="icon-bg-orange">
           <div className="space-y-3">
             {webhooks.map(webhook => (
               <div key={webhook.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">

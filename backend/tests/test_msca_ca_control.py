@@ -24,6 +24,26 @@ CONTENT_JSON = 'application/json'
 BASE = '/api/v2/microsoft-cas'
 
 
+@pytest.fixture(scope='module')
+def drop_new_mscas(app):
+    """Deletes the connectors this module created, with their requests: their
+    encrypted passwords must not reach the next file's backups and migrations."""
+    from models import db
+    from models.msca import MicrosoftCA, MSCARequest
+    with app.app_context():
+        floor = db.session.query(db.func.max(MicrosoftCA.id)).scalar() or 0
+    yield
+    with app.app_context():
+        made = [row.id for row in MicrosoftCA.query.filter(MicrosoftCA.id > floor)]
+        MSCARequest.query.filter(MSCARequest.msca_id.in_(made)).delete(synchronize_session=False)
+        MicrosoftCA.query.filter(MicrosoftCA.id.in_(made)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+# Teardown runs right to left: connectors and requests go before the certificates.
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_mscas')
+
+
 def post_json(client, url, data=None):
     return client.post(url, data=json.dumps(data or {}), content_type=CONTENT_JSON)
 
@@ -277,10 +297,23 @@ class TestApproveDenyService:
             assert cert is not None
             assert cert.source == 'msca'
             assert cert.subject_cn == 'appr-d.test.local'
-            assert (cert.serial_number or '').lower() == serial
+            assert cert.serial_number == str(int(serial, 16))
 
         # certutil got the resubmit for the right request id
         assert any('-resubmit 201' in s for s in fake_ca.calls)
+
+    def test_approve_announces_the_certificate_it_imports(self, app, fake_ca, monkeypatch):
+        from services.events import event_bus
+        msca_id = _make_msca(app, 'CAC Approve Event')
+        fake_ca.add_pending(211, 'appr-evt.test.local')
+        fake_ca.issue(211, 'appr-evt.test.local')
+        seen = []
+        monkeypatch.setattr(event_bus, 'emit', lambda t, p, ref=None, meta=None: seen.append((t, p)))
+        with app.app_context():
+            from services.msca_service import MicrosoftCAService
+            result = MicrosoftCAService.approve_request(msca_id, 211)
+        assert [(t, p['certificate']['id']) for t, p in seen] == [
+            ('certificate.issued', result['imported_cert_id'])]
 
     def test_approve_known_serial_no_duplicate(self, app, fake_ca):
         msca_id = _make_msca(app, 'CAC Approve Dup E')
@@ -299,7 +332,7 @@ class TestApproveDenyService:
 
             from models import Certificate
             matches = [c for c in Certificate.query.all()
-                       if (c.serial_number or '').lower() == serial]
+                       if c.serial_number == str(int(serial, 16))]
             assert len(matches) == 1
             assert matches[0].id == pre_id
 
@@ -451,7 +484,7 @@ class TestCaControlEndpoints:
             from models import Certificate, db
             cert = db.session.get(Certificate, data['imported_cert_id'])
             assert cert.source == 'msca'
-            assert (cert.serial_number or '').lower() == serial
+            assert cert.serial_number == str(int(serial, 16))
 
     def test_post_deny(self, app, auth_client, fake_ca):
         msca_id = _make_msca(app, 'CAC EP Deny N')

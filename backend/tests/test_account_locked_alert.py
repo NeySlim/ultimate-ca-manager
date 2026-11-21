@@ -6,7 +6,7 @@ import pytest
 
 from models import db, User
 from models.email_notification import NotificationConfig
-from models.sso import SSOProvider
+from models.sso import SSOProvider, SSOSession
 
 PASSWORD = 'Locked-Passw0rd!'
 
@@ -78,11 +78,19 @@ def user(app):
         db.session.commit()
 
 
+def _wrong_password_in_the_directory(provider, name, password, before_bind=None):
+    """The entry is found, its attempt counted by the door's hook, the bind refused."""
+    entry = {'dn': f'uid={name}', 'uid': name, 'username': name, 'email': '', 'fullname': ''}
+    if before_bind is not None and not before_bind(entry):
+        return None, 'attempt_refused'
+    return None, 'Invalid credentials'
+
+
 @pytest.fixture
 def ldap_provider(app, monkeypatch):
     import api.v2.sso.ldap_routes as ldap_routes
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda provider, user, password: (None, 'Invalid credentials'))
+                        _wrong_password_in_the_directory)
     with app.app_context():
         provider = SSOProvider(
             name=f'lock-ldap-{uuid.uuid4().hex[:6]}', provider_type='ldap', enabled=True,
@@ -94,6 +102,8 @@ def ldap_provider(app, monkeypatch):
         provider_id = provider.id
     yield provider_id
     with app.app_context():
+        # SQLite hands a deleted provider's id out again: a session an earlier test left on it goes too
+        SSOSession.query.filter_by(provider_id=provider_id).delete()
         db.session.delete(db.session.get(SSOProvider, provider_id))
         db.session.commit()
 

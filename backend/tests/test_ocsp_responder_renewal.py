@@ -14,6 +14,9 @@ from cryptography.x509.oid import ExtensionOID
 
 from tests.conftest import get_json
 from utils.datetime_utils import utc_now
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 CONTENT_JSON = 'application/json'
 OCSP_SIGNING_OID = '1.3.6.1.5.5.7.3.9'
@@ -66,6 +69,18 @@ def _binding_value(app, ca_id):
 
 
 class TestOcspResponderRenewal:
+
+    def test_a_renewal_emits_certificate_renewed(self, app, auth_client, create_ca, monkeypatch):
+        from services.events import event_bus
+        ca = create_ca(cn='OCSP Renewal Event CA')
+        cert_id = _issue_responder_cert(auth_client, ca['id'], 'ocsp-renew-event.test')
+        _bind_responder(app, ca['id'], cert_id)
+        _set_cert_window(app, cert_id, utc_now() - timedelta(days=85), utc_now() + timedelta(days=5))
+        seen = []
+        monkeypatch.setattr(event_bus, 'emit', lambda t, p, ref=None, meta=None: seen.append((t, p)))
+        assert _run(app)['renewed'] == 1
+        renewed = [p for t, p in seen if t == 'certificate.renewed']
+        assert [c['certificate']['id'] for c in renewed] == [int(_binding_value(app, ca['id']))]
 
     def test_renews_expiring_responder_and_rebinds(self, app, auth_client, create_ca):
         ca = create_ca(cn='OCSP Renewal CA')
@@ -164,6 +179,27 @@ class TestOcspResponderRenewal:
         stats = _run(app)
         assert stats['renewed'] == 0
         assert int(_binding_value(app, ca['id'])) == cert_id
+
+    def test_archived_bound_responder_is_renewed(self, app, auth_client, create_ca):
+        # An archived row stays eligible as a responder and can be bound again
+        ca = create_ca(cn='OCSP Archived CA')
+        cert_id = _issue_responder_cert(auth_client, ca['id'], 'ocsp-archived.test')
+        _bind_responder(app, ca['id'], cert_id)
+        _set_cert_window(app, cert_id,
+                         utc_now() - timedelta(days=85),
+                         utc_now() + timedelta(days=5))
+        with app.app_context():
+            from models import Certificate, db
+            db.session.get(Certificate, cert_id).archived = True
+            db.session.commit()
+
+        stats = _run(app)
+        new_id = int(_binding_value(app, ca['id']))
+        assert new_id != cert_id, stats
+        with app.app_context():
+            from models import Certificate, db
+            assert db.session.get(Certificate, cert_id).archived is True
+            assert db.session.get(Certificate, new_id).archived in (False, None)
 
 
 class TestNocheckOnRenewal:

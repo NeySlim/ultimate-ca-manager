@@ -527,7 +527,7 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
         {tabGroups.map((group, i) => (
           <div key={i}>
             {group.labelKey && (
-              <div className="px-2 pb-1.5 text-[11px] font-semibold tracking-wide text-text-tertiary">
+              <div className="px-2 pb-1.5 text-xs font-semibold tracking-wide text-text-tertiary">
                 {t(group.labelKey)}
               </div>
             )}
@@ -572,7 +572,7 @@ function MobileSidebarMenu({ tabs, tabGroups, activeTab, onTabChange, t }) {
       >
         {TabIcon && (
           <span className={cn('shrink-0 w-8 h-8 rounded-lg flex items-center justify-center', tab.color || 'bg-bg-tertiary')}>
-            <TabIcon size={18} weight={isActive ? "fill" : "regular"} className={isActive ? 'text-accent-primary' : 'text-white'} />
+            <TabIcon size={18} weight={isActive ? "fill" : "regular"} className={isActive ? 'text-accent-primary' : 'text-paper'} />
           </span>
         )}
         <span className="flex-1 text-left truncate">{tab.label}</span>
@@ -807,7 +807,7 @@ function MobileSlideOver({ title, onClose, children }) {
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/40 animate-fade-in"
+        className="absolute inset-0 bg-scrim-40 animate-fade-in"
         onClick={onClose}
       />
       
@@ -908,7 +908,7 @@ function MobileDrawer({ open, onClose, title, children }) {
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/40 animate-fade-in"
+        className="absolute inset-0 bg-scrim-40 animate-fade-in"
         onClick={onClose}
       />
       
@@ -1020,7 +1020,7 @@ function FilterContent({ filters, onClearFilters, onClose }) {
           type="button"
           onClick={onClose}
           className={cn(
-            'flex-1 h-11 rounded-lg bg-accent-primary text-white',
+            'flex-1 h-11 rounded-lg bg-accent-primary text-on-accent',
             'font-medium text-sm hover:bg-accent-primary-op90 transition-colors'
           )}
         >

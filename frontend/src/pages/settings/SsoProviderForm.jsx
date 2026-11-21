@@ -18,6 +18,46 @@ import SsoLdapFields from './sso/SsoLdapFields'
 import SsoOAuth2Fields from './sso/SsoOAuth2Fields'
 import SsoSamlFields, { NAMEID_UNSPECIFIED } from './sso/SsoSamlFields'
 
+// Entra keeps {tenant} in its URLs and issuer for the administrator to replace (the server
+// refuses it left in). GitHub is not an OpenID Connect provider: no ID token to verify.
+const OAUTH2_PRESETS = {
+  azure: { fields: {
+    oauth2_auth_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize',
+    oauth2_token_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token',
+    oauth2_userinfo_url: 'https://graph.microsoft.com/oidc/userinfo',
+    oauth2_scopes: 'openid profile email',
+    oauth2_issuer: 'https://login.microsoftonline.com/{tenant}/v2.0',
+    id_token_verify: true,
+  } },
+  google: { fields: {
+    oauth2_auth_url: 'https://accounts.google.com/o/oauth2/v2/auth',
+    oauth2_token_url: 'https://oauth2.googleapis.com/token',
+    oauth2_userinfo_url: 'https://openidconnect.googleapis.com/v1/userinfo',
+    oauth2_scopes: 'openid profile email',
+    oauth2_issuer: 'https://accounts.google.com',
+    id_token_verify: true,
+  } },
+  github: { fields: {
+    oauth2_auth_url: 'https://github.com/login/oauth/authorize',
+    oauth2_token_url: 'https://github.com/login/oauth/access_token',
+    oauth2_userinfo_url: 'https://api.github.com/user',
+    oauth2_scopes: 'read:user user:email',
+    oauth2_issuer: '',
+    id_token_verify: false,
+  }, mapping: { login: 'username' } },
+}
+// What a field a preset set goes back to when another preset is chosen
+const PRESET_RESET = { oauth2_issuer: '', id_token_verify: true }
+
+const mapsUsername = (mapping) => Object.entries(mapping || {}).some(([k, v]) => k === 'username' || v === 'username')
+const withPresetRows = (mapping, rows) => (rows && !mapsUsername(mapping) ? { ...mapping, ...rows } : mapping)
+const withoutPresetRows = (mapping, rows) => {
+  if (!rows) return mapping
+  const kept = { ...mapping }
+  for (const [key, value] of Object.entries(rows)) if (kept[key] === value) delete kept[key]
+  return kept
+}
+
 // Stored as JSON array string in DB — display as comma-separated text
 const requiredGroupsToText = (raw) => {
   if (!raw) return ''
@@ -28,6 +68,9 @@ const requiredGroupsToText = (raw) => {
   } catch { /* legacy plain-text value */ }
   return raw
 }
+
+// A stored list one per line; a value the server could not read is shown as it is
+const tenantLines = (value) => (Array.isArray(value) ? value.join('\n') : (value || ''))
 
 export default function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
   const { t } = useTranslation()
@@ -61,6 +104,8 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     ldap_user_filter: provider?.ldap_user_filter || '(uid={username})',
     ldap_group_filter: provider?.ldap_group_filter || '',
     ldap_group_member_attr: provider?.ldap_group_member_attr || 'member',
+    ldap_group_base_dn: provider?.ldap_group_base_dn || '',
+    ldap_nested_groups: provider?.ldap_nested_groups === true,
     ldap_username_attr: provider?.ldap_username_attr || 'uid',
     ldap_email_attr: provider?.ldap_email_attr || 'mail',
     ldap_fullname_attr: provider?.ldap_fullname_attr || 'cn',
@@ -78,6 +123,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     oauth2_ca_bundle: '',
     oauth2_issuer: provider?.oauth2_issuer || '',
     oauth2_jwks_uri: provider?.oauth2_jwks_uri || '',
+    // Entra multi-tenant: accepted tenant ids, and those whose roles are honoured, one per line
+    oauth2_tenants: tenantLines(provider?.oauth2_tenants),
+    oauth2_role_tenants: tenantLines(provider?.oauth2_role_tenants),
     id_token_verify: provider?.id_token_verify ?? true,
     // SAML
     saml_metadata_url: provider?.saml_metadata_url || '',
@@ -207,6 +255,11 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     if (!data.ldap_ca_bundle) delete data.ldap_ca_bundle
     if (data.provider_type === 'oauth2') {
       data.oauth2_scopes = data.oauth2_scopes.split(/\s+/).filter(Boolean)
+      data.oauth2_tenants = (data.oauth2_tenants || '').split(/[\s,;]+/).filter(Boolean)
+      data.oauth2_role_tenants = (data.oauth2_role_tenants || '').split(/[\s,;]+/).filter(Boolean)
+    } else {
+      delete data.oauth2_tenants
+      delete data.oauth2_role_tenants
     }
     if (data.provider_type === 'ldap') {
       const groups = (data.ldap_required_groups || '').split(',').map(s => s.trim()).filter(Boolean)
@@ -225,33 +278,25 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     onSave(data)
   }
 
+  // Switching preset first puts back what the previous one set and nobody changed since
   const applyOAuth2Preset = (preset) => {
+    const previous = OAUTH2_PRESETS[oauth2Preset]
+    const next = OAUTH2_PRESETS[preset]
     setOauth2Preset(preset)
-    if (preset === 'azure') {
-      setFormData(prev => ({
-        ...prev,
-        oauth2_auth_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize',
-        oauth2_token_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token',
-        oauth2_userinfo_url: 'https://graph.microsoft.com/oidc/userinfo',
-        oauth2_scopes: 'openid profile email',
-      }))
-    } else if (preset === 'google') {
-      setFormData(prev => ({
-        ...prev,
-        oauth2_auth_url: 'https://accounts.google.com/o/oauth2/v2/auth',
-        oauth2_token_url: 'https://oauth2.googleapis.com/token',
-        oauth2_userinfo_url: 'https://openidconnect.googleapis.com/v1/userinfo',
-        oauth2_scopes: 'openid profile email',
-      }))
-    } else if (preset === 'github') {
-      setFormData(prev => ({
-        ...prev,
-        oauth2_auth_url: 'https://github.com/login/oauth/authorize',
-        oauth2_token_url: 'https://github.com/login/oauth/access_token',
-        oauth2_userinfo_url: 'https://api.github.com/user',
-        oauth2_scopes: 'read:user user:email',
-      }))
-    }
+    setFormData(prev => {
+      const data = { ...prev }
+      if (previous) {
+        for (const [field, value] of Object.entries(PRESET_RESET)) {
+          if (data[field] === previous.fields[field]) data[field] = value
+        }
+        data.attribute_mapping = withoutPresetRows(data.attribute_mapping, previous.mapping)
+      }
+      if (next) {
+        Object.assign(data, next.fields)
+        data.attribute_mapping = withPresetRows(data.attribute_mapping, next.mapping)
+      }
+      return data
+    })
   }
 
   const baseUrl = window.location.origin
@@ -280,7 +325,10 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
 
   const defaultRoleOptions = [{ value: '', label: t('sso.defaultRoleNone') }, ...roleOptions]
 
-  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection,
+  // A sign-in test runs on the saved provider: the screen says so when the form differs
+  const dirty = JSON.stringify(formData) !== JSON.stringify(savedForm)
+
+  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection, dirty,
     secretProps: secretTarget ? secretInputProps(t, secretTarget) : {} }
 
   return (

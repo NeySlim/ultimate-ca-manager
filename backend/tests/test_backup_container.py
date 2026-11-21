@@ -16,6 +16,7 @@ import pytest
 from services.backup import container
 from services.backup.container import ContainerError
 
+from tests.backup_v3 import as_v3
 from tests.fresh_app import fresh_app_fixtures
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
@@ -30,10 +31,17 @@ PASSWORD = 'Correct-Horse-Battery-9'
 
 
 @pytest.fixture(scope='module')
-def archive(app):
-    """A real v3 archive of the test instance."""
+def written(app):
+    """A real archive of the test instance, as written today."""
     with app.app_context():
         return _service().create_backup(PASSWORD)
+
+
+@pytest.fixture(scope='module')
+def archive(app, written):
+    """A real v3 archive of the test instance: v3 is still read, no longer written."""
+    with app.app_context():
+        return as_v3(written, PASSWORD)
 
 
 def _split(blob):
@@ -51,9 +59,9 @@ def _rebuild(blob: bytes, metadata: dict, ciphertext: bytes, *, version=None):
 
 
 class TestWhatIsWritten:
-    def test_archives_are_written_as_v3(self, archive):
-        assert archive[:4] == container.MAGIC
-        assert archive[4] == container.FORMAT_VERSION_V3
+    def test_archives_are_written_as_v4(self, written):
+        assert written[:4] == container.MAGIC
+        assert written[4] == container.FORMAT_VERSION_V4
 
     def test_the_whole_header_is_authenticated(self, app, archive):
         """Editing any header byte must break the tag, not just the magic."""

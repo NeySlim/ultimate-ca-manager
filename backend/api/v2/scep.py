@@ -3,12 +3,14 @@ SCEP Management Routes v2.0
 /api/scep/* - SCEP configuration and requests
 """
 
+from services.cert.unique_subject import SubjectTaken
 from utils.signing_ca import scep_ca_problem
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.secret_target import SECRET_TARGET_MESSAGE, keeps_saved_secret, retarget_error
+from utils.encryption import SecretUnreadable, decrypt_required
 from models import db, SCEPRequest, SystemConfig, CA
 from services.audit_service import AuditService
 from services.policy_service import PolicyViolation
@@ -141,17 +143,41 @@ def update_scep_config():
 @bp.route('/api/v2/scep/requests', methods=['GET'])
 @require_auth(['read:scep'])
 def list_scep_requests():
-    """List SCEP certificate requests"""
-    status = request.args.get('status')
+    """List SCEP certificate requests, newest first, paged."""
+    from utils.pagination import parse_request_pagination, paginate
+    page, per_page = parse_request_pagination(default_per_page=50)
+    from utils.cert_status import (
+        SCEP_REQUEST_STATUS_FILTERS, normalize_status_filters, unknown_status_message)
+    statuses, unknown = normalize_status_filters(
+        [v for v in request.args.getlist('status') if v], SCEP_REQUEST_STATUS_FILTERS)
+    if unknown:
+        return error_response(unknown_status_message(unknown, SCEP_REQUEST_STATUS_FILTERS), 400)
+    search = request.args.get('search', '').strip()
     query = SCEPRequest.query
-    
-    if status:
-        query = query.filter_by(status=status)
-        
-    requests_list = query.order_by(SCEPRequest.created_at.desc()).limit(50).all()
-    
-    data = [req.to_dict() for req in requests_list]
-    return success_response(data=data)
+
+    if statuses:
+        query = query.filter(SCEPRequest.status.in_(statuses))
+    if search:
+        safe = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        pattern = f'%{safe}%'
+        query = query.filter(db.or_(
+            SCEPRequest.subject.ilike(pattern, escape='\\'),
+            SCEPRequest.transaction_id.ilike(pattern, escape='\\'),
+            SCEPRequest.client_ip.ilike(pattern, escape='\\')))
+
+    query = query.order_by(SCEPRequest.created_at.desc(), SCEPRequest.id.desc())
+    result = paginate(query, page, per_page)
+    return success_response(data=[req.to_dict() for req in result['items']], meta=result['meta'])
+
+
+@bp.route('/api/v2/scep/requests/<int:request_id>', methods=['GET'])
+@require_auth(['read:scep'])
+def get_scep_request(request_id):
+    """One SCEP request, whatever its age (the list holds only the latest)."""
+    scep_req = db.session.get(SCEPRequest, request_id)
+    if not scep_req:
+        return error_response('Request not found', 404)
+    return success_response(data=scep_req.to_dict())
 
 
 def _issuing_service(scep_req):
@@ -174,6 +200,24 @@ def _issuing_service(scep_req):
             if template is None:
                 raise LookupError('The template bound to the SCEP profile no longer exists')
     return SCEPService(ca_refid=scep_req.ca_refid, template=template, profile_id=scep_req.profile_id)
+
+
+def _held_by_policy(scep_req):
+    """The pending approval request a policy holds *scep_req* with, else None."""
+    from services.scep.approval import linked_approval
+    return linked_approval(scep_req)
+
+
+def _vote_on_held(approval, vote):
+    """A request a policy holds is decided in the approval queue: a vote cast
+    here is recorded there, under the same rules (group, own request, one
+    vote per approver), so the two queues never disagree."""
+    from auth.unified import has_permission
+    if not has_permission('write:approvals', getattr(g, 'permissions', None) or []):
+        return error_response(
+            f'This request is held for approval by policy (request #{approval.id}): '
+            'deciding it requires the write:approvals permission', 403)
+    return vote()
 
 
 def _close_refused(request_id, username, reason):
@@ -214,6 +258,11 @@ def approve_scep_request(request_id):
     if not (hasattr(g, 'current_user') and g.current_user):
         return error_response('Authentication context required', 401)
     username = g.current_user.username
+    held = _held_by_policy(scep_req)
+    if held is not None:
+        from api.v2.policies import approve_approval_request
+        return _vote_on_held(held, lambda: approve_approval_request(
+            held.id, (request.get_json(silent=True) or {}).get('comment')))
     # Approving means issuing: the client polls for the certificate, and a
     # request flipped to "approved" without one stayed PENDING for it forever
     try:
@@ -228,12 +277,15 @@ def approve_scep_request(request_id):
     except PolicyViolation as e:
         db.session.rollback()
         return error_response(f'Policy violation: {e}', 400)
+    except SubjectTaken as e:
+        # The approver reads the serial; the request stays pending until rejected
+        return error_response(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to another entity', 409)
     except RenewalIdentityUnresolved as e:
         # The directory did not answer: the same approval may pass later
         db.session.rollback()
         return error_response(str(e), 503)
     except RenewalAccountGone as e:
-        # The renewed certificate's account is gone for good: closed, approving again cannot pass
+        # The renewed certificate's account is gone for good: closed, as from the approvals queue
         db.session.rollback()
         return _close_refused(request_id, username, str(e))
     except ValueError as e:
@@ -252,10 +304,12 @@ def approve_scep_request(request_id):
     db.session.refresh(scep_req)
     try:
         from models import Certificate as _Certificate
-        from services.webhook_service import emit_cert_issued
+        from services.webhook_service import emit_cert_issued, emit_cert_renewed
         issued = _Certificate.query.filter_by(refid=cert_refid).first()
         if issued is not None:
-            emit_cert_issued(issued.to_dict(), ca_refid=issued.caref)
+            # A RenewalReq is a renewal, as on auto-approval
+            emit = emit_cert_renewed if scep_req.renewal_of else emit_cert_issued
+            emit(issued.to_dict(), ca_refid=issued.caref)
     except Exception as e:
         logger.error(f"Webhook emit (SCEP approval) failed: {e}")
     
@@ -291,6 +345,10 @@ def reject_scep_request(request_id):
     if not (hasattr(g, 'current_user') and g.current_user):
         return error_response('Authentication context required', 401)
     username = g.current_user.username
+    held = _held_by_policy(scep_req)
+    if held is not None:
+        from api.v2.policies import reject_approval_request
+        return _vote_on_held(held, lambda: reject_approval_request(held.id, reason))
 
     scep_req.status = 'rejected'
     scep_req.rejection_reason = reason
@@ -953,9 +1011,10 @@ def delete_intune_app(app_id):
 
 
 def _saved_intune_secret(app, tenant, client):
-    """The stored secret, only for the tenant and client it was stored with."""
+    """The stored secret, only for the tenant and client it was stored with. One this
+    node's key does not open raises SecretUnreadable naming it, never reads as blank."""
     if app and tenant == (app.tenant_id or '').strip() and client == (app.client_id or '').strip():
-        return app.decrypted_secret()
+        return decrypt_required(app.client_secret, f'Intune app {app.id} client secret') or ''
     return ''
 
 
@@ -971,7 +1030,10 @@ def test_intune_app():
         return error_response('Intune app registration not found', 404)
     tenant = (data.get('tenant_id') or (app.tenant_id if app else '')).strip()
     client = (data.get('client_id') or (app.client_id if app else '')).strip()
-    secret = (data.get('client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    try:
+        secret = (data.get('client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    except SecretUnreadable as e:
+        return error_response(str(e), 400)
     if not tenant or not client or not secret:
         return error_response('Tenant ID, client ID and client secret are all required', 400)
     result = _test_intune_credentials(tenant, client, secret)
@@ -996,7 +1058,10 @@ def test_intune_connection():
         app = db.session.get(IntuneApp, data['intune_app_id'])
     tenant = (data.get('intune_tenant_id') or (app.tenant_id if app else '')).strip()
     client = (data.get('intune_client_id') or (app.client_id if app else '')).strip()
-    secret = (data.get('intune_client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    try:
+        secret = (data.get('intune_client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    except SecretUnreadable as e:
+        return error_response(str(e), 400)
     if not tenant or not client or not secret:
         return error_response('Tenant ID, client ID and client secret are all required', 400)
     result = _test_intune_credentials(tenant, client, secret)

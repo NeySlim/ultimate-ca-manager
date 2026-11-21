@@ -6,10 +6,10 @@ export default {
     sections: [
       {
         title: "Métriques Prometheus",
-        content: "Endpoint /metrics optionnel exposant des compteurs (certificats, CA, planificateur, webhooks, ACME) au format Prometheus.",
+        content: "Endpoint /metrics optionnel exposant des compteurs (certificats, AC, planificateur, webhooks, ACME) au format Prometheus.",
         items: [
           { label: "Activation", text: "Définissez un jeton de métriques dans Paramètres › Général ; sans jeton, l'endpoint renvoie 404 (désactivé)" },
-          { label: "Authentification", text: "Scrapez avec Authorization: Bearer <jeton>" },
+          { label: "Authentification", text: "Scrapez avec Authorization: Bearer <token>" },
           { label: "Compteurs", text: "ucm_certificates, ucm_certificate_authorities, ucm_scheduler_task_*, ucm_webhook_deliveries, ucm_acme_*" },
         ]
       },
@@ -20,7 +20,7 @@ export default {
           { label: "Admin", text: "admin.ucm.example.com, GUI et API (mTLS selon politique)" },
           { label: "ACME", text: "acme.ucm.example.com, /acme/* et /acme/proxy/* (sans mTLS client)" },
           { label: "TLS wildcard", text: "Nom concret (ex. acme.ucm.example.com). Un SAN *.ucm.example.com sur le certificat couvre le TLS admin et ACME, ne pas saisir *.ucm.example.com comme vhost" },
-          { label: "Avant enregistrement", text: "DNS et TLS opérationnels pour le vhost ACME, les clients basculent les URL du directory immédiatement" },
+          { label: "Avant enregistrement", text: "DNS et TLS opérationnels pour le vhost ACME d'abord : les clients qui relisent le directory basculent les URL immédiatement, et les renouvellements échouent si le vhost est injoignable" },
           { label: "ID certificat TLS", text: "Métadonnée du certificat déployé sur le vhost ACME (ex. wildcard)" },
         ]
       },
@@ -51,19 +51,32 @@ export default {
         items: [
           { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle" },
           { label: "Rétention", text: "Les sauvegardes plus anciennes que le nombre de jours défini (30 par défaut) sont purgées" },
+          { label: "Plafond de taille", text: "Un plafond en Mio pour toutes les archives (0 pour aucun) : les plus anciennes sont supprimées, chacune auditée, jusqu'à ce que le total passe dessous. La rétention ne supprime jamais, sur un nœud seul, l'archive la plus récente qui correspond à son enregistrement de validation, jusqu'à 2 archives sans enregistrement de validation et le minimum conservé, et en HA le minimum conservé : le total peut rester au-dessus du plafond, ce qui est signalé. Une sauvegarde manuelle ne supprime rien. Réglages > Sauvegarde affiche la place occupée" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
+          { label: "Haute disponibilité", text: "En HA, les archives sont stockées dans PostgreSQL : chaque nœud les liste, avec le nœud qui les a écrites, et les télécharge, et la rétention s'exécute sur le leader. Elles disparaissent avec la base : téléchargez celles que vous gardez hors du cluster, et sauvegardez PostgreSQL avec ses propres outils" },
           { label: "Dérivation de clé", text: "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS" },
+        ]
+      },
+      {
+        title: "Sauvegarde manuelle",
+        items: [
+          { label: "En tâche de fond", text: "Créer une sauvegarde s'exécute sur le serveur : la fenêtre montre quelle partie de la base est exportée et propose de télécharger l'archive quand elle est prête. Une sauvegarde finie en 25 secondes se télécharge aussitôt, comme avant. Fermer la fenêtre ou recharger la page ne l'arrête pas : Créer une sauvegarde la montre de nouveau" },
+          { label: "Annuler", text: "Annuler la sauvegarde l'arrête entre deux parties de l'export : aucune archive n'est gardée et son fichier temporaire est supprimé" },
+          { label: "Une à la fois", text: "Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation, cluster HA compris : une seconde est refusée (409) et nomme celle en cours. Une sauvegarde qui trouve le verrou de sauvegarde tenu par une sauvegarde programmée ou une restauration attend jusqu'à 15 secondes, puis est refusée (409)" },
         ]
       },
       {
         title: 'Restauration (v2.251)',
         items: [
           { label: "Remplacer ou fusionner", text: "Restaurer depuis une sauvegarde remplace les données d'ici par celles de l'archive et supprime ce que l'archive ne contient pas ; l'entrée d'audit liste ce qui a été supprimé. L'API accepte aussi mode=merge, qui ajoute l'archive aux données d'ici" },
+          { label: "Bilan et taille", text: "Le sélecteur accepte les tailles d'archive que le serveur accepte : il lit l'en-tête de l'archive pour appliquer le plafond de son format avant l'envoi, laisse au serveur un fichier qu'il ne reconnaît pas, et montre la progression de l'envoi. Quand la restauration se termine avec quelque chose à faire, un bilan reste affiché jusqu'à sa fermeture : ce qui a été restauré, puis une liste À faire avec une ligne par avertissement (sections non restaurées, AC dont la CRL n'a pu être signée, secrets à ressaisir, liaisons de déploiement ramenées à la chaîne automatique) et l'état du redémarrage. Sans rien à faire, la page se recharge après deux secondes. Une archive sans données ne restaure rien, et le bilan le dit. Il est conservé avec la tâche de fond de la restauration ; la restauration elle-même est consignée dans le journal d'audit" },
           { label: "Verrou partagé", text: "Sauvegardes et restaurations partagent un même verrou : une restauration est refusée (409) pendant une sauvegarde, et une sauvegarde manuelle attend la fin d'une restauration en cours" },
-          { label: "Limite de téléversement", text: "Une restauration accepte une archive jusqu'à BACKUP_MAX_UPLOAD_MB (512 Mo par défaut), défini dans l'environnement du serveur, et un refus nomme ce paramètre. Un reverse proxy placé devant UCM garde sa propre limite de corps de requête" },
+          { label: "Mode HA", text: "En mode HA, une restauration lancée depuis n'importe quel nœud fait d'abord refuser les écritures à tous les nœuds (503), sortis de la rotation du répartiteur jusqu'à sa fin ; elle est refusée, avec le nom du nœud, quand un nœud ne l'a pas acquittée en 30 s. Les nœuds redémarrent ensuite un par un, et chacun sert l'état restauré après son redémarrage" },
+          { label: "Limite de téléversement", text: "Une archive créée depuis la 3.0 est restaurée par morceaux et n'a pas de limite de taille, sauf si BACKUP_MAX_ARCHIVE_MB en fixe une. Une archive plus ancienne est acceptée jusqu'à BACKUP_MAX_UPLOAD_MB (512 Mo par défaut). Les deux se règlent dans l'environnement du serveur et un refus nomme son paramètre. Un reverse proxy placé devant UCM conserve sa propre limite de corps de requête" },
           { label: "Contenu d'une archive", text: "Les archives incluent les orders du client ACME, les demandes d'approbation et les demandes de récupération de clé. Restaurer une archive écrite avant cette version laisse ces lignes ici telles quelles" },
-          { label: "Mêmes noms", text: "Un fournisseur DNS, un compte CA ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous « nom (2) », et le résultat de restauration renvoyé par l'API le liste" },
+          { label: "Mêmes noms", text: "Un fournisseur DNS, un compte AC ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous « name (2) », et le résultat de restauration renvoyé par l'API le liste" },
           { label: "Paramètres qui désignent une ligne", text: "Les AC émettrices SCEP et ACME, les répondeurs OCSP et paramètres similaires suivent les lignes archivées. Depuis une archive plus ancienne restaurée sur une autre installation, ils sont vidés et doivent être choisis de nouveau" },
+          { label: "Restauration en arrière-plan", text: "La restauration se déroule en arrière-plan, dans le processus du planificateur. Au-delà de 25 secondes, la boîte de dialogue montre son avancement et un bouton Annuler la restauration, qui ne restaure rien tant que la restauration n'est pas validée. Pendant qu'elle tourne, toute écriture est refusée (503), sur un seul nœud comme en HA, et les lectures, l'OCSP et les CRL restent servis. Sur un seul nœud avec SQLite, pendant que la restauration écrit les lignes de l'archive, sa transaction tient la base : seuls l'avancement, le bouton Annuler et les contrôles de santé répondent alors, toute autre requête reçoit 503 avec Retry-After et l'OCSP répond tryLater. Elle se termine en fermant toutes les sessions : la boîte de dialogue demande de se reconnecter, et le bilan s'affiche après la reconnexion. Une connexion refusée entre-temps (503 ; en HA jusqu'au redémarrage de ce nœud) est retentée seule par la page de connexion, après le délai demandé par le serveur, et un bouton Réessayer maintenant la retente aussitôt. Une connexion par clé de sécurité n'est jamais retentée seule : Réessayer maintenant redemande la clé. Rien d'autre ne tourne à côté d'une restauration : une sauvegarde ou une vérification lancée pendant ce temps est refusée (409). Une restauration validée qui n'a pas pu se terminer le dit dans un message qui reste affiché jusqu'à sa fermeture : redémarrez l'application avant de l'utiliser" },
         ]
       },
       {
@@ -71,12 +84,12 @@ export default {
         content: "Paramètres › Mises à jour : vérification quotidienne en arrière-plan des nouvelles versions, et installation sans surveillance optionnelle.",
         items: [
           { label: "Canal", text: "« Versions stables » ne suit que les releases finales ; « Versions candidates » n'accepte en plus que les versions rcN, jamais les alpha/bêta" },
-          { label: "Notification", text: "Une version nouvellement disponible déclenche l'événement webhook system.update_available, une fois par version" },
-          { label: "Versions majeures", text: "Les mises à jour restent dans la version majeure installée. Une version majeure ultérieure publiée en version finale est proposée à part comme passage recommandé, installé seulement sur une demande explicite et confirmée ; les mises à jour automatiques ne l'installent jamais, et system.update_available est émis une fois par version majeure, avec major_upgrade positionné" },
-          { label: "Maintenance de sécurité", text: "Cette ligne de versions est en maintenance de sécurité : les correctifs de sécurité continuent, les nouvelles fonctionnalités non. La page Mises à jour affiche cet avis en permanence" },
+          { label: "Notification", text: "Une version nouvellement disponible déclenche l'événement webhook/e-mail system.update_available, une fois par version" },
+          { label: "Versions majeures", text: "Les mises à jour restent dans la version majeure installée, sur les deux canaux. La dernière version finale de la version majeure suivante (installée + 1) est proposée à part, avec son propre bouton Mettre à niveau et une confirmation ; les mises à jour automatiques ne l'installent jamais, et system.update_available est émis une fois par version majeure proposée, avec major_upgrade positionné" },
           { label: "Installation auto", text: "Désactivée par défaut. Une fois activée, UCM télécharge, vérifie et installe la mise à jour à l'heure choisie, puis redémarre, installations DEB/RPM uniquement" },
           { label: "Somme de contrôle", text: "Une installation sans surveillance exige le SHA256 publié de la release pour vérification ; une installation manuelle vérifie aussi dès qu'une somme de contrôle est publiée" },
           { label: "Docker", text: "Les conteneurs ne peuvent pas se mettre à jour eux-mêmes, la vérification et la notification fonctionnent toujours ; récupérez la nouvelle image pour mettre à jour" },
+          { label: 'Mode HA', text: 'En mode HA sur DEB/RPM, Installer la mise à jour et l\'installation auto mettent les nœuds à jour un par un ; le nœud suivant démarre quand le précédent est revenu sur la nouvelle version. L\'écran montre les nœuds terminés, le nœud en cours et le nœud où l\'opération s\'est arrêtée avec la raison ; Reprendre continue à partir de là. Docker et Kubernetes laissent cela à l\'orchestrateur' },
           { label: 'Popup post-mise à jour', text: 'Optionnel (v2.217) : affiche une fois les notes de version après l\'installation d\'une mise à jour, par utilisateur. Désactivé par défaut' },
         ]
       },
@@ -95,22 +108,22 @@ export default {
         items: [
           { label: 'Général', text: 'Nom d\'hôte syslog (envoyé comme HOSTNAME dans les messages syslog transmis), URL de base et valeurs par défaut à l\'échelle du système' },
           { label: 'Apparence', text: 'Sélection du thème (clair/sombre/système), couleur d\'accentuation, mode bureau' },
-          { label: 'E-mail (SMTP)', text: 'Serveur SMTP, identifiants, éditeur de modèle d\'e-mail et notifications d\'alerte d\'expiration' },
+          { label: 'E-mail (SMTP)', text: 'Serveur SMTP, identifiants, éditeur de modèle d\'e-mail et notifications d\'alerte d\'expiration. Prend en charge OAuth2 (XOAUTH2) pour Gmail, Outlook.com et Microsoft 365 en plus de l\'authentification historique par mot de passe' },
           { label: 'Sécurité', text: 'Politique de mot de passe, durée de session, liste d\'accès administrateur, mTLS, chiffrement des clés privées ; le délai d\'inactivité et le verrouillage de compte sont sous Général' },
           { label: 'SSO', text: 'Intégration d\'authentification unique SAML 2.0, OAuth2/OIDC et LDAP' },
           { label: 'Sauvegarde', text: 'Sauvegardes de base de données manuelles et programmées' },
           { label: 'Audit', text: 'Rétention des journaux, transfert syslog, vérification d\'intégrité' },
-          { label: 'Base de données', text: 'Backend actif (SQLite ou PostgreSQL), taille, nombre de tables, tester/basculer/migrer entre les backends' },
+          { label: 'Base de données', text: 'Backend actif (SQLite ou PostgreSQL natif), taille, nombre de tables, interface de migration bidirectionnelle avec contrôles de sécurité' },
           { label: "Schéma PostgreSQL (v2.251)", text: "Une URL PostgreSQL dont le search_path désigne un schéma autre que public est prise en charge : le contrôle d'intégrité compte les tables de ce schéma, et une migration vers lui réaligne ses séquences" },
-          { label: 'HTTPS', text: 'Certificat TLS pour l\'interface web UCM. Le certificat appliqué est mémorisé et réappliqué lors de son renouvellement (v2.217) ; le certificat lié est affiché avec un bouton pour le délier et ne plus suivre les renouvellements (v2.218)' },
+          { label: 'HTTPS', text: 'Certificat TLS pour l\'interface web UCM. Le certificat appliqué est mémorisé et réappliqué lors de son renouvellement (v2.217) ; le certificat lié est affiché avec un bouton pour le délier et ne plus suivre les renouvellements (v2.218). Un renouvellement par protocole dont UCM ne détient pas la clé laisse HTTPS sur le certificat précédent et le signale, jusqu\'à l\'import de la clé du certificat renouvelé' },
           { label: 'Mises à jour', text: 'Vérifier les nouvelles versions, voir le journal des modifications, vérification quotidienne planifiée avec installation sans surveillance en opt-in (DEB/RPM)' },
-          { label: 'Webhooks', text: 'Webhooks HTTP pour les événements de certificat (émission, révocation, expiration). Authentification sortante optionnelle : Bearer, Basic, API key ou en-tête personnalisé' },
-          { label: "Noms de webhooks uniques (v2.251)", text: "Un nom de webhook déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « nom (2) », « nom (3) », du plus ancien au plus récent" },
+          { label: 'Webhooks', text: 'Webhooks HTTP pour les événements de certificat (émission, révocation, expiration) : URL de LAN interne autorisées, IP de métadonnées cloud bloquées. Authentification sortante optionnelle : Bearer, Basic, API key ou en-tête personnalisé' },
+          { label: "Noms de webhooks uniques (v2.251)", text: "Un nom de webhook déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « name (2) », « name (3) », du plus ancien au plus récent" },
           { label: 'Déploiement', text: "Cibles de déploiement : connexions SSH/SFTP réutilisables, ou requête d'API HTTP (v2.252) ; chaque déploiement de certificat ou de CRL définit ses propres chemins et sa commande de rechargement facultative (réservé aux admins, v2.215)" },
           { label: 'Active Directory', text: "Connexion AD/LDAP propre à UCM pour les recherches liées aux certificats (résolution de principal Kerberos, sujets dérivés d'AD)" },
           { label: 'Auto-inscription Windows', text: 'Inscription Windows native MS-XCEP/MS-WSTEP : découverte de stratégie, émission de certificats et liaison Kerberos/SPNEGO' },
           { label: 'À propos', text: 'Informations système, Liens & Ressources et le lien Soutenir UCM mènent à Ko-fi (les administrateurs voient aussi une carte Ko-fi masquable une fois par version d\'UCM). Avec admin:system, Vérifier la préparation à FIPS liste ce que le mode FIPS refuserait sur cette instance, avec un remède pour chacun, et ne modifie rien' },
-          { label: 'Profils de conformité', text: "Dans À propos, avec admin:system : Vérifier le profil liste ce qu'ANSSI, BSI ou EU ACM (règles alignées sur un texte de référence) refuserait ou déconseillerait sur cette instance, sans rien modifier. Avec admin:settings, Profil par défaut des nouvelles CA définit le profil reçu par une CA quand aucun n'est choisi ; les CA existantes ne changent pas" },
+          { label: 'Profils de conformité', text: "Dans À propos, avec admin:system : Vérifier le profil liste ce qu'ANSSI, BSI ou EU ACM (règles alignées sur un texte de référence) refuserait ou déconseillerait sur cette instance, sans rien modifier. Avec admin:settings, Profil par défaut des nouvelles AC définit le profil reçu par une AC quand aucun n'est choisi ; les AC existantes ne changent pas" },
         ]
       },
       {
@@ -138,28 +151,35 @@ export default {
       },
       {
         title: 'Connecteur Active Directory',
-        content: 'Connexion LDAP propre à UCM à Active Directory, indépendante de tout fournisseur LDAP configuré sous SSO -- celui-ci sert à se connecter à UCM, celui-ci aux recherches AD liées aux certificats.',
+        content: 'Connexion LDAP propre à UCM à Active Directory, indépendante de tout fournisseur LDAP configuré sous SSO : celui-là sert à se connecter à UCM, celui-ci aux recherches AD liées aux certificats.',
         items: [
           { label: 'Objectif', text: "Résout un principal de machine ou d'utilisateur Kerberos vers son objet AD, afin qu'UCM puisse dériver un sujet/SAN de certificat, comme le ferait une vraie AC Windows" },
-          { label: 'Champs', text: 'Contrôleurs de domaine (un par ligne, chacun par son propre nom d\'hôte, essayés dans l\'ordre avec basculement), port, LDAPS avec vérification AC facultative, DN de base, DN de liaison et mot de passe (tous deux requis tant que le connecteur est activé)' },
-          { label: 'Tester la connexion', text: "Vérifier la connectivité et les identifiants avant d'enregistrer" },
-          { label: "URL d'inscription GPO", text: "URL de stratégie d'inscription de certificats Kerberos et Nom d'utilisateur/Mot de passe à enregistrer dans la stratégie de groupe" },
+          { label: 'Connecteurs', text: "Un par annuaire (forêt ou domaine), listé avec son realm, le SID de domaine lu et son état de santé. Un connecteur que des profils d'inscription Windows utilisent ne peut pas être supprimé, et le refus les liste" },
+          { label: 'Champs', text: 'Nom, contrôleurs de domaine (un par ligne, chacun par son propre nom d\'hôte, essayés dans l\'ordre avec basculement), port, LDAPS avec vérification AC facultative, DN de base, DN de liaison et mot de passe (tous deux requis tant que le connecteur est activé)' },
+          { label: 'Connecteur désactivé', text: "Un connecteur désactivé ne fait aucune recherche, mais son DN de base nomme encore le realm du profil par défaut en dernier recours, quand ni un connecteur activé, ni le SPN, ni le keytab ne le nomment" },
+          { label: 'Tester la connexion', text: "Vérifier la connectivité et les identifiants avant d'enregistrer ; le test lit aussi le SID du domaine" },
           { label: 'Contrôle d\'état', text: 'Chaque contrôleur de domaine est sondé par une vraie liaison à l\'intervalle de contrôle d\'état ; un contrôleur injoignable est ignoré lors de l\'inscription jusqu\'à son rétablissement. Le verdict s\'affiche sur la ligne des paramètres et pour chaque DC' },
         ]
       },
       {
         title: 'Auto-inscription Windows (XCEP/WSTEP)',
-        content: "Inscription de certificats Windows native via la découverte de stratégie MS-XCEP et l'émission MS-WSTEP -- prend en charge l'inscription manuelle MMC/certreq et l'auto-inscription GPO sans surveillance.",
+        content: "Inscription de certificats Windows native via la découverte de stratégie MS-XCEP et l'émission MS-WSTEP : prend en charge l'inscription manuelle MMC/certreq et l'auto-inscription GPO sans surveillance.",
         items: [
+          { label: 'Profils', text: "Un profil par realm Active Directory, choisi d'après le realm du principal Kerberos du client : ses propres AC d'émission et de politique, sous-ensemble de modèles, connecteur AD et keytab ; les comptes UsernamePassword appartiennent au profil par défaut. La liste est paginée et filtrée par le serveur (nom ou realm, AC, état : complet, keytab manquant, connecteur en échec, désactivé)" },
+          { label: 'Realm', text: "En majuscules, exactement comme le KDC l'écrit (CORP.EXAMPLE) : un KDC compare les realms caractère par caractère. Le profil par défaut sans realm refuse Kerberos tant qu'aucun n'est renseigné. Un profil désactivé refuse les postes de son realm ; ses clés restent dans le keytab servi, pour que le refus soit audité par realm" },
           { label: 'XCEP', text: "Permet aux clients Windows de découvrir les modèles de certificat disponibles avant l'inscription" },
           { label: 'WSTEP', text: 'Gère la demande et le renouvellement du certificat une fois la stratégie découverte' },
-          { label: 'Kerberos/SPNEGO', text: "Lie les points de terminaison authentifiés par Kerberos utilisés pour l'auto-inscription GPO silencieuse (nécessite un SPN et un keytab du contrôleur de domaine)" },
-          { label: 'Liste de contrôle de configuration', text: "L'onglet affiche une liste de contrôle en direct de ce qui est configuré par rapport à ce qui manque encore, pour l'inscription manuelle et sans surveillance" },
+          { label: 'Kerberos/SPNEGO', text: "Lie les points de terminaison authentifiés par Kerberos utilisés pour l'auto-inscription GPO silencieuse (un SPN commun à tous les profils, et un keytab par profil issu du contrôleur de domaine de son realm ; le formulaire liste par realm les entrées du fichier choisi et signale un realm qui n'est pas celui du profil)" },
+          { label: 'Liste de contrôle de configuration', text: "Le formulaire de chaque profil liste ce qui lui manque encore : realm, AC d'émission, keytab, un connecteur joignable, un modèle qui autorise l'inscription automatique, le profil activé" },
+          { label: "URL de stratégie", text: "Les mêmes pour tous les profils : le routage se fait par realm, pas par URL" },
           { label: "Sujets dérivés d'AD", text: "Les modèles peuvent choisir de dériver leur sujet/SAN depuis Active Directory (via le connecteur AD) pour l'inscription sans surveillance" },
-          { label: 'Templates ML-DSA (v2.248)', text: 'Annoncés par l\'OID de leur algorithme de clé avec le Microsoft Software Key Storage Provider, pas encore testés avec un vrai client Windows, et masqués en mode FIPS. Le renouvellement par certificat ne peut pas utiliser un certificat ML-DSA (XML-DSig n\'a pas de signature ML-DSA) : inscrivez-en un nouveau' },
-          { label: "Templates ECDSA (v2.251)", text: "Annoncés en schéma de stratégie 3 avec leur courbe (ECDSA_P256, ECDSA_P384, ECDSA_P521) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe. Les templates RSA hors mode FIPS restent en schéma 2" },
+          { label: 'Templates ML-DSA (v2.248)', text: 'Annoncés par l\'OID de leur algorithme de clé avec le Microsoft Software Key Storage Provider, pas encore testés avec un vrai client Windows, et masqués en mode FIPS quand le module FIPS n\'approuve pas ML-DSA. Le renouvellement par certificat ne peut pas utiliser un certificat ML-DSA (XML-DSig n\'a pas de signature ML-DSA) : inscrivez-en un nouveau' },
+          { label: "Templates ECDSA (v2.251)", text: "Annoncés en schéma de stratégie 3 avec leur courbe (ECDSA_P256, ECDSA_P384, ECDSA_P521) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe. Les templates RSA hors mode FIPS restent en schéma 2, où Windows signe sa requête CMC en SHA-1, ce qu\'UCM accepte (un PKCS#10 en SHA-1 simple reste refusé)" },
+          { label: 'Template nommé dans la requête (v2.252)', text: 'Chaque stratégie annonce son extension de template (szOID_CERTIFICATE_TEMPLATE), que Windows copie dans sa requête : le certificat est émis sous le template choisi sur le client, même si un autre a les mêmes EKU. Une requête qui ne nomme aucun template est appariée par ses EKU. Un template dont tous les EKU ne sont jamais émis à un inscrit, comme la signature OCSP, n\'est pas annoncé, et une requête pour lui est refusée' },
           { label: "Template et clé (v2.251)", text: "La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue. Une requête P-384 n'est donc plus émise sous un template P-256 qui partage son EKU. L'enveloppe de requête que Windows signe avec une clé ECDSA est acceptée" },
-          { label: "Renouvellement depuis Windows (v2.248)", text: "certreq ... Renew s'authentifie avec le certificat à renouveler comme certificat client TLS : mTLS doit être activé, avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé" },
+          { label: "Renouvellement depuis Windows (v2.248)", text: "certreq ... Renew s\'authentifie avec le certificat à renouveler comme certificat client TLS : mTLS doit être activé, avec l'AC WSTEP, ou l\'un de ses ancêtres, en confiance. Depuis la 3.0, seul un certificat émis par l\'inscription Windows se renouvelle ainsi : un certificat signé dans l\'interface est refusé et doit être réémis par l\'inscription Windows. Un renouvellement conserve le template et les EKU du certificat renouvelé, et son SubjectAltName quand la CSR n\'en porte aucun (v2.252)" },
+          { label: "Renouvellement par certificat (3.0)", text: "Servi par le profil que le certificat enregistre (un certificat WSTEP 2.x : le profil par défaut), sous son AC d\'émission, et refusé quand ce profil a été supprimé ou est désactivé ; chaque refus est audité avec le profil et la raison. Seul le SID est revérifié, par le connecteur du profil : un ordinateur retiré du groupe continue de se renouveler jusqu\'à la révocation de son certificat. Sous TLS, il faut que l'AC d\'émission du profil soit l'AC mTLS ou en dépende ; les autres profils se renouvellent par Kerberos, où le profil du realm sert et le nouveau certificat l\'enregistre" },
+          { label: 'Type de certificat', text: 'Sans Server Auth, un template avec Email Protection ou EFS émet un certificat S/MIME, un avec Client Auth ou Smartcard Logon un certificat client : une requête utilisateur CN=jdoe sans SAN ne reçoit aucun nom DNS depuis son CN. Une requête sans Key Usage reçoit celui que configure le template, sinon celui du type de template : Digital Signature, Key Encipherment et Non Repudiation pour S/MIME ou EFS, Digital Signature et Key Encipherment pour Smartcard Logon, Digital Signature seul pour Client Auth. Tout autre template, ou aucun, émet un certificat serveur' },
           { label: "Kerberos dans Docker (v2.251)", text: "Les images Docker embarquent le backend Kerberos de pyspnego : la liaison Kerberos fonctionne en conteneur comme dans les installations DEB et RPM" },
         ]
       },
@@ -177,7 +197,7 @@ export default {
 
     ],
     tips: [
-      'Utilisez le widget État du système en haut pour vérifier rapidement la santé des services',
+      'Utilisez la barre d\'état en bas pour vérifier que le service répond',
       'Testez les paramètres SMTP avant de vous fier aux notifications par e-mail',
       'Personnalisez le modèle d\'e-mail avec votre marque à l\'aide de l\'éditeur HTML/Texte intégré',
       'Programmez des sauvegardes automatiques pour les environnements de production',
@@ -198,9 +218,9 @@ Configuration à l'échelle du système organisée en onglets. Les modifications
 ## Général
 
 - **Nom d'hôte syslog** : Envoyé comme HOSTNAME dans les messages syslog transmis ; le nom d'hôte de la machine si vide
-- **URL de base** : URL HTTPS canonique de l'interface d'administration et de l'API ; les autres noms d'hôte et IP y sont redirigés
+- **URL de base** : URL HTTPS canonique de l'interface d'administration et de l'API ; les autres noms d'hôte et IP y sont redirigés. Les e-mails de réinitialisation de mot de passe pointent vers elle, sinon vers le FQDN du serveur (\`UCM_FQDN\`) ; sans l'un ni l'autre, la page de connexion masque Mot de passe oublié et la réinitialisation est refusée
 - **URL de base protocole** : URL de base écrite dans les adresses CDP et OCSP ; utilisez http:// pour éviter les boucles de vérification TLS, ou laissez vide pour utiliser l'URL de base
-- **Port HTTP protocole** : Port HTTP simple qui sert CDP et OCSP ; 0 le désactive, un changement nécessite un redémarrage
+- **Port HTTP protocole** : Port HTTP simple qui sert CDP et OCSP, et SCEP quand son option Servir en HTTP simple est activée ; 0 le désactive, un changement nécessite un redémarrage
 - **Vhost ACME public** : Nom d'hôte concret dans les URL du directory ACME (ex. \`acme.ucm.example.com\`, pas \`*.ucm.example.com\`). Un **SAN de certificat TLS** wildcard \`*.ucm.example.com\` couvre à la fois \`admin.ucm.example.com\` et \`acme.ucm.example.com\`. Configurez le DNS et le TLS du vhost ACME **avant** d'enregistrer : les clients qui relisent le directory basculent immédiatement d'URL.
 
 ## Apparence
@@ -257,7 +277,8 @@ Limiter l'interface web et l'API de gestion aux adresses IP et réseaux CIDR lis
 Exiger que tous les utilisateurs activent l'authentification à deux facteurs.
 
 ### Chiffrement des clés privées
-Chiffrez toutes les clés privées stockées en base de données avec AES-256, protégées par un fichier de clé maîtresse. La section affiche l'état du chiffrement et les compteurs de clés **chiffrées / non chiffrées**. Deux variables d'environnement opt-in rendent l'absence de clé fatale au démarrage : \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (chiffrement des secrets d'intégration) et \`UCM_REQUIRE_KEY_ENCRYPTION\` (chiffrement des clés privées).
+Chiffrez toutes les clés privées stockées en base de données avec AES-128 (Fernet, avec HMAC-SHA256), protégées par un fichier de clé maître. La section affiche l'état du chiffrement et les compteurs de clés **chiffrées / non chiffrées**. Deux variables d'environnement opt-in rendent l'absence de clé fatale au démarrage : \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (chiffrement des secrets d'intégration) et \`UCM_REQUIRE_KEY_ENCRYPTION\` (chiffrement des clés privées).
+Une nouvelle installation crée la clé maître à son premier démarrage (dans un conteneur, seulement si \`/etc/ucm\` est un volume à part) ; la section Sécurité des Paramètres affiche l'état du chiffrement, et la Vue d'ensemble affiche une bannière tant qu'aucune clé n'est chargée.
 
 > 💡 Les paramètres sensibles (session, verrouillage, HSTS, URL publique, politique de mot de passe) exigent la permission **admin:settings** : les champs sont verrouillés pour les opérateurs.
 
@@ -288,7 +309,9 @@ Chiffrez toutes les clés privées stockées en base de données avec AES-256, p
 ## Sauvegarde
 
 ### Sauvegarde manuelle
-Cliquez sur **Créer une sauvegarde** pour générer un instantané de la base de données. Les sauvegardes incluent les certificats, CA, clés et paramètres ; le journal d'audit et les autres tables d'historique n'y figurent pas.
+Cliquez sur **Créer une sauvegarde** pour générer un instantané de la base de données. Les sauvegardes incluent les certificats, AC, clés et paramètres ; le journal d'audit et les autres tables d'historique n'y figurent pas.
+
+Une sauvegarde manuelle s'exécute sur le serveur : la fenêtre montre son avancement, peut l'annuler (aucune archive n'est gardée) et propose de télécharger l'archive quand elle est prête ; fermer la fenêtre ou recharger la page ne l'arrête pas. Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation.
 
 ### Sauvegarde programmée
 Configurez des sauvegardes automatiques :
@@ -300,9 +323,11 @@ Configurez des sauvegardes automatiques :
 Téléversez un fichier de sauvegarde pour restaurer UCM à un état précédent.
 
 - Sauvegardes et restaurations partagent un même verrou : une restauration est refusée (409) pendant une sauvegarde, et une sauvegarde manuelle attend la fin d'une restauration en cours
-- Le téléversement est accepté jusqu'à \`BACKUP_MAX_UPLOAD_MB\` (512 Mo par défaut, défini dans l'environnement du serveur) ; un reverse proxy placé devant UCM garde sa propre limite de corps de requête
+- En mode HA, une restauration lancée depuis n'importe quel nœud fait d'abord refuser les écritures à tous les nœuds (503), sortis de la rotation du répartiteur jusqu'à sa fin ; elle est refusée, avec le nom du nœud, quand un nœud ne l'a pas acquittée en 30 s. Les nœuds redémarrent ensuite un par un, et chacun sert l'état restauré après son redémarrage
+- Une archive créée depuis la 3.0 est restaurée par morceaux, sans limite de taille sauf si \`BACKUP_MAX_ARCHIVE_MB\` en fixe une ; une archive plus ancienne est acceptée jusqu'à \`BACKUP_MAX_UPLOAD_MB\` (512 Mo par défaut). Les deux se règlent dans l'environnement du serveur ; un reverse proxy placé devant UCM conserve sa propre limite de corps de requête
+- La restauration se déroule en arrière-plan : au-delà de 25 secondes, sa boîte de dialogue la suit et peut l'annuler jusqu'à sa validation ; pendant ce temps toute écriture est refusée (503), sur un seul nœud aussi, et le bilan s'affiche après la reconnexion que sa fin demande
 - Les archives contiennent les orders du client ACME, les demandes d'approbation et les demandes de récupération de clé (v2.251)
-- Un fournisseur DNS, un compte CA ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous \`nom (2)\`
+- Un fournisseur DNS, un compte AC ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous \`name (2)\`
 - L'API accepte aussi \`mode=merge\`, qui ajoute l'archive aux données d'ici au lieu de les remplacer
 
 > ⚠ La restauration d'une sauvegarde remplace TOUTES les données actuelles.
@@ -357,6 +382,7 @@ Gérez le certificat TLS utilisé par l'interface web UCM :
 - Voir les détails du certificat actuel
 - Importer un nouveau certificat (PEM ou PKCS#12)
 - Générer un certificat auto-signé
+- Quand le certificat lié est renouvelé par un protocole sans que sa clé parvienne à UCM, la page le signale : HTTPS continue de servir le certificat précédent jusqu'à l'import de la clé du certificat renouvelé, ce qui l'applique
 
 > ⚠ Le changement du certificat HTTPS nécessite un redémarrage du service.
 
@@ -366,6 +392,7 @@ Gérez le certificat TLS utilisé par l'interface web UCM :
 - Voir le journal des modifications pour les mises à jour disponibles
 - Version actuelle et informations de build
 - **Mise à jour automatique** : sur les installations prises en charge (DEB/RPM), cliquez sur **Installer la mise à jour** pour télécharger et installer automatiquement la dernière version
+- **Mode HA** : sur DEB/RPM, **Installer la mise à jour** et l'installation auto mettent les nœuds à jour un par un, et l'écran suit la mise à jour progressive (nœuds terminés, nœud en cours, paquet de chaque nœud, nœud où elle s'est arrêtée et pourquoi, **Reprendre**)
 - **Canal de mise à jour** : stable, pré-version (versions candidates) ou dev
 
 ## Webhooks
@@ -374,7 +401,7 @@ Configurez des webhooks HTTP pour notifier les systèmes externes lors d'événe
 
 ### Événements pris en charge
 - Certificat émis, révoqué, renouvelé, bientôt expiré, expiré, importé, supprimé
-- CA créée, modifiée, supprimée
+- AC créée, modifiée, supprimée
 - CSR soumise, approuvée, rejetée
 - Modèle créé, modifié
 - ACME preflight, échec de renouvellement, échec de révocation
@@ -388,9 +415,9 @@ Authentification sortante optionnelle (s'ajoute à la signature HMAC optionnelle
 
 - **Aucune** : Pas d'en-tête d'authentification (webhooks publics)
 - **Bearer** : Authorization: Bearer {token}
-- **Basic** : Authorization: Basic base64(utilisateur:motdepasse)
+- **Basic** : Authorization: Basic base64(username:password)
 - **Clé API** : En-tête personnalisé (p.ex. X-Api-Key: {token})
-- **Personnalisée** : Authorization: {schéma} {token} (p.ex. auth-key VALEUR)
+- **Personnalisée** : Authorization: {scheme} {token} (p.ex. auth-key VALUE)
 
 Les tokens sont stockés chiffrés et jamais renvoyés dans l'UI.
 
@@ -409,7 +436,7 @@ Cliquez sur **Tester** pour envoyer un événement exemple à l'URL du webhook e
 Endpoint **\`/metrics\`** opt-in et protégé par jeton.
 
 - Activez-le en définissant un jeton de métriques (Paramètres › Général) ; sans jeton → 404
-- Scrapez avec l'en-tête \`Authorization: Bearer <jeton>\`
+- Scrapez avec l'en-tête \`Authorization: Bearer <token>\`
 - Expose \`ucm_certificates\`, \`ucm_certificate_authorities\`, \`ucm_scheduler_task_*\`, \`ucm_webhook_deliveries\`, \`ucm_acme_*\`
 
 ## Historique de livraison des webhooks
@@ -445,48 +472,63 @@ Paramètres › Sauvegarde permet des sauvegardes automatiques.
 
 - Cadence **quotidienne / hebdomadaire / mensuelle**
 - **Rétention** : les sauvegardes plus anciennes que le nombre de jours défini sont purgées
+- **Plafond de taille** : un plafond en Mio pour toutes les archives (0 pour aucun) ; les plus anciennes sont supprimées, chacune auditée, jusqu'à ce que le total passe dessous. La rétention ne supprime jamais, sur un nœud seul, l'archive la plus récente qui correspond à son enregistrement de validation, jusqu'à 2 archives sans enregistrement de validation et le minimum conservé, et en HA le minimum conservé : le total peut donc rester au-dessus du plafond, ce qui est signalé
 - Sauvegardes **chiffrées** avec le mot de passe de sauvegarde
+- **Haute disponibilité** : les archives sont stockées dans PostgreSQL, si bien que chaque nœud les liste, avec le nœud qui les a écrites, et les télécharge ; la rétention s'exécute sur le leader. Elles disparaissent avec la base : téléchargez celles que vous gardez hors du cluster, et sauvegardez PostgreSQL avec ses propres outils
 
 
 ## Connecteur Active Directory
 
 Connexion LDAP propre à UCM à Active Directory, indépendante de tout fournisseur LDAP configuré sous SSO. Celui-ci sert à se connecter à UCM ; celui-ci est utilisé pour les recherches AD liées aux certificats et fonctionne indépendamment du fait que le SSO soit configuré ou non.
 
+- **Connecteurs** : Un par annuaire (forêt ou domaine), listé sous Paramètres › Active Directory avec son nom, son realm, le SID de domaine lu et son état de santé. Un profil d'inscription Windows nomme le connecteur qui sert son realm ; un connecteur que des profils utilisent ne peut pas être supprimé, et le refus les liste
 - **Objectif** : Résout un principal de machine ou d'utilisateur Kerberos vers son objet AD, afin qu'UCM puisse dériver un sujet/SAN de certificat comme le ferait une vraie AC Windows
-- **Contrôleurs de domaine** : Un par ligne, chacun par son propre nom d'hôte, essayés dans l'ordre : les recherches basculent sur le suivant quand un DC est hors service. Un nom de domaine seul échoue à la vérification du certificat, car le certificat d'un contrôleur de domaine ne nomme que son propre hôte
+- **Contrôleurs de domaine** : Un par ligne, chacun par son propre nom d'hôte, sans port ni schéma, essayés dans l'ordre : les recherches basculent sur le suivant quand un DC est hors service. Un nom de domaine seul échoue à la vérification du certificat, car le certificat d'un contrôleur de domaine ne nomme que son propre hôte
 - **LDAPS** : Activer pour utiliser LDAP sur SSL/TLS ; **Vérifier le certificat SSL** valide le certificat du DC (éventuellement par rapport à un bundle d'AC personnalisé lorsqu'il n'est pas approuvé publiquement)
-- **DN de base** et **DN de liaison / Mot de passe** : Identifiants du compte de service utilisés pour les recherches ; le DN de liaison et le mot de passe sont tous deux requis tant que le connecteur est activé
+- **DN de base** et **DN de liaison / Mot de passe** : le DN de base du domaine, avec ses composants DC (\`DC=corp,DC=example\`, qui nomme aussi le realm Kerberos servi), sur un port de contrôleur de domaine (389 ou 636, pas un Catalogue global), et le compte de service utilisé pour les recherches ; le DN de liaison et le mot de passe sont tous deux requis tant que le connecteur est activé
 - **Tester la connexion** : Vérifier la connectivité et les identifiants avant d'enregistrer
-- **Intervalle de contrôle d'état** : Chaque contrôleur de domaine est sondé par une vraie liaison à cet intervalle ; un contrôleur injoignable est ignoré lors de l'inscription jusqu'à son rétablissement. Le verdict s'affiche sur la ligne des paramètres et pour chaque DC
+- **Intervalle de contrôle d'état** : Chaque contrôleur de domaine est sondé par une vraie liaison à cet intervalle ; un contrôleur injoignable est ignoré lors de l'inscription jusqu'à son rétablissement. Le verdict s'affiche sur la ligne du connecteur et pour chaque DC
+- **Connecteur désactivé** : Un connecteur désactivé ne fait aucune recherche, mais son DN de base nomme encore le realm du profil par défaut en dernier recours, quand ni un connecteur activé, ni le SPN, ni le keytab ne le nomment
 
-### URL de stratégie d'inscription GPO
-
-Une fois configuré, enregistrez l'une des URL affichées comme serveur de stratégie d'inscription de certificats dans la stratégie de groupe (Stratégies de clé publique → Client des services de certificats – Stratégie d'inscription de certificats), avec Client des services de certificats – Inscription automatique :
-- **Kerberos** : Aucune invite d'identifiants ; nécessite un client joint au domaine et le type d'authentification de la GPO défini sur Kerberos
-- **Nom d'utilisateur/Mot de passe** : Demande des identifiants ; pour l'inscription interactive « Demander un nouveau certificat » uniquement
+Les URL de stratégie d'inscription à enregistrer dans la stratégie de groupe sont les mêmes pour tous les profils ; elles s'affichent sous Paramètres › Auto-inscription Windows.
 
 ## Auto-inscription Windows (XCEP/WSTEP)
 
-Inscription de certificats Windows native via **MS-XCEP** (découverte de stratégie) et **MS-WSTEP** (émission et renouvellement de certificats) -- les mêmes protocoles qu'un vrai ADCS utilise pour l'inscription interactive « Demander un nouveau certificat » dans MMC, \`certreq\`, et l'auto-inscription GPO sans surveillance.
+Inscription de certificats Windows native via **MS-XCEP** (découverte de stratégie) et **MS-WSTEP** (émission et renouvellement de certificats) : les mêmes protocoles qu'un vrai ADCS utilise pour l'inscription interactive « Demander un nouveau certificat » dans MMC, \`certreq\`, et l'auto-inscription GPO sans surveillance.
 
-### Liste de contrôle de configuration
+### Profils
 
-L'onglet suit ce qui est configuré par rapport à ce qui manque encore, pour les parcours d'inscription manuelle et sans surveillance -- une autorité de certification, la découverte de stratégie (XCEP), l'émission de certificats (WSTEP) et, pour l'auto-inscription GPO sans surveillance, un connecteur Active Directory, Kerberos/SPNEGO et au moins un modèle avec l'auto-inscription autorisée.
+Un **profil par realm Active Directory**. UCM oriente un client vers son profil d'après le realm de son principal Kerberos : chaque profil a ses propres AC d'émission et de politique, modèles, connecteur AD et keytab ; les comptes UsernamePassword appartiennent au profil par défaut. La liste est paginée et filtrée par le serveur (nom ou realm, AC, état), si bien que cent profils s'ouvrent aussi vite qu'un seul :
+- **Realm** : En majuscules, exactement comme le KDC l'écrit (\`CORP.EXAMPLE\`) : un KDC compare les realms caractère par caractère, un nom en minuscules ne correspond jamais à un ticket. Le formulaire le refuse et dit pourquoi
+- **Connecteur** : Le connecteur AD qui sert le realm. Quand son domaine diffère du realm du profil, le formulaire avertit sans bloquer ; le serveur contrôle le couple quand l'un des deux est choisi
+- **AC d'émission** et **AC de politique** : L'AC qui émet, et celle qu'XCEP annonce (l'AC d'émission si vide). L'identifiant de politique et les OID de modèles appartiennent au profil : fixés à sa création, ils ne changent pas quand l'une ou l'autre AC change
+- **Modèles** : Le sous-ensemble proposé ; aucun coché propose les modèles de l'AC. Un groupe AD exigé et des champs du sujet épinglés peuvent remplacer ceux du modèle pour tout le profil
+- **État** : Complet, Keytab manquant, Connecteur en échec ou Désactivé. Un profil désactivé refuse les postes de son realm ; ses clés restent dans le keytab servi, pour que le refus soit prononcé et audité par realm
+
+Le **profil par défaut** est celui dont une installation 2.x a hérité ; il sert la liaison UsernamePassword et porte ses comptes. Une installation neuve n'en a pas : tant qu'aucun profil ne l'est, l'éditeur de profil propose **Profil par défaut** (sur un nouveau profil comme sur un profil enregistré), et les comptes apparaissent une fois la case cochée. Le profil par défaut n'est ensuite ni retiré ni déplacé, ni depuis cet écran ni par l'API. Sans realm, Kerberos est refusé tant qu'un realm n'est pas renseigné (en majuscules, ou lu dans son keytab) ; l'écran le dit.
+
+### Liste de contrôle de configuration, par profil
+
+Le formulaire du profil liste ce qui lui manque encore : realm, AC d'émission, keytab, un connecteur joignable quand il y en a un, un modèle qui autorise l'inscription automatique, et le profil activé.
 
 ### Découverte de stratégie (XCEP)
 
-- **Autorité de certification** : L'AC dont les modèles sont annoncés et qui émet des certificats via cette configuration
+- **Autorité de certification** : L'AC dont les modèles sont annoncés et qui émet des certificats via le profil
 - **Validité (jours)** : Validité des certificats émis via WSTEP quand la demande ne correspond à aucun modèle ; sinon, la validité du modèle correspondant s'applique
 
-Un modèle avec un type de clé **ML-DSA** est annoncé par l'OID de son algorithme de clé, avec le Microsoft Software Key Storage Provider et une spécification de clé réservée à la signature. Il est masqué en mode FIPS, et l'inscription depuis un vrai client Windows n'a pas encore été testée.
+Un modèle avec un type de clé **ML-DSA** est annoncé par l'OID de son algorithme de clé, avec le Microsoft Software Key Storage Provider et une spécification de clé réservée à la signature. Il est masqué en mode FIPS quand le module FIPS n'approuve pas ML-DSA, et l'inscription depuis un vrai client Windows n'a pas encore été testée.
 
-Un template **ECDSA** est annoncé en schéma de stratégie 3 avec sa courbe (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe ; les templates RSA hors mode FIPS restent en schéma 2. La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue (v2.251).
+Un template **ECDSA** est annoncé en schéma de stratégie 3 avec sa courbe (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe ; les templates RSA hors mode FIPS restent en schéma 2, qui ne nomme aucun condensat de requête : Windows signe alors sa requête CMC en SHA-1, ce qu'UCM accepte comme l'exigent ces clients ; une PKCS#10 simple signée en SHA-1 reste refusée. La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue (v2.251).
+
+Une requête qui nomme son template, par OID (\`szOID_CERTIFICATE_TEMPLATE\`) ou par nom (\`szOID_ENROLL_CERTTYPE\`), est émise sous ce template ; un template que l'AC n'offre pas ou inactif, deux noms pour deux templates, ou des EKU que le template n'émet pas sont refusés. Chaque stratégie annonce l'extension \`szOID_CERTIFICATE_TEMPLATE\` de son template, que Windows CertEnroll copie dans sa requête, ce qui distingue deux templates aux EKU identiques (v2.252). Une requête qui n'en nomme aucun est appariée à un template par ses EKU. Un template dont tous les EKU ne sont jamais émis à un inscrit, comme la signature OCSP, n'est pas annoncé, et une requête pour lui est refusée. Le certificat porte les EKU de son template, pas ceux que la requête demande.
+
+WSTEP ne sert que le type de requête Issue, renouvellements compris, et refuse un message dont le \`wsu:Timestamp\` a expiré depuis plus de 5 minutes. Une PKCS#10 simple ou une requête CMC est reconnue à son contenu quel que soit son ValueType, et chaque réponse porte la CMC Full PKI Response à côté du certificat.
 
 ### Kerberos / SPNEGO
 
 Lie les points de terminaison XCEP/WSTEP authentifiés par Kerberos utilisés pour l'auto-inscription GPO silencieuse, afin que les machines et les utilisateurs soient authentifiés par leur ticket Kerberos plutôt que par une invite d'identifiants :
-- **Nom de principal de service (SPN)** : p. ex. \`HTTP/ucm.exemple.fr@EXEMPLE.FR\`
-- **Keytab** : Généré avec \`ktpass\` ou \`ktutil\` sur le contrôleur de domaine pour le SPN ci-dessus
+- **Nom de principal de service (SPN)** : p. ex. \`HTTP/ucm.example.com@EXAMPLE.COM\`, commun à tous les profils avec les interrupteurs XCEP, WSTEP et Kerberos
+- **Keytab** : Un par profil, généré avec \`ktpass\` ou \`ktutil\` sur le contrôleur de domaine de son realm. Chaque entrée doit être \`HTTP/<host>@<realm of the profile>\` ; le formulaire liste par realm les entrées du fichier choisi et signale un realm qui n'est pas celui du profil. Les keytabs de tous les profils sont servis comme un seul fichier
 
 > ⚠ Kerberos nécessite le **backend \`gssapi\`** côté serveur (la bibliothèque Python \`gssapi\` plus les bibliothèques Kerberos système) : le paquet SPNEGO de base seul ne suffit pas. Sans lui, l'authentification Kerberos ne fonctionnera pas même si elle est activée ici, et la liaison Kerberos n'est pas annoncée ; un avertissement s'affiche sur l'onglet.
 
@@ -494,29 +536,36 @@ Les images Docker embarquent ce backend depuis la v2.251.
 
 ### URL de stratégie d'inscription
 
+Les mêmes pour tous les profils : le routage se fait par realm, pas par URL.
 - **Nom d'utilisateur/Mot de passe** : Demande des identifiants ; pour l'inscription interactive « Demander un nouveau certificat », ne nécessite pas Active Directory
 - **Kerberos** : Aucune invite d'identifiants ; nécessite un client joint au domaine et une configuration GPO
 
 ### Liaison de renouvellement par certificat
 
-En plus de Nom d'utilisateur/Mot de passe et Kerberos, WSTEP prend en charge le **renouvellement par certificat client**, à l'image des vrais endpoints CES d'ADCS : la requête de renouvellement (RST) doit être signée en XML-DSig avec la clé privée d'un certificat **émis par UCM lui-même**. Le certificat présenté est comparé **octet par octet** au certificat stocké pour la CA configurée, le numéro de série ou le sujet seuls ne suffisent jamais. Cela permet aux clients Windows de renouveler sans surveillance avec leur certificat actuel, sans identifiants ni ticket Kerberos.
+En plus de Nom d'utilisateur/Mot de passe et Kerberos, WSTEP prend en charge le **renouvellement par certificat client**, à l'image des vrais endpoints CES d'ADCS : la requête de renouvellement (RST) doit être signée en XML-DSig avec la clé privée d'un certificat **émis par UCM lui-même**. Le certificat présenté est comparé **octet par octet** au certificat stocké pour l'AC configurée, le numéro de série ou le sujet seuls ne suffisent jamais. Cela permet aux clients Windows de renouveler sans surveillance avec leur certificat actuel, sans identifiants ni ticket Kerberos.
 
 XML-DSig n'a pas de méthode de signature ML-DSA : un certificat **ML-DSA** ne peut donc pas se renouveler ainsi, UCM nomme la clé dans son refus et le client inscrit un nouveau certificat.
 
-Windows peut aussi renouveler avec \`certreq ... Renew\`, authentifié par le certificat à renouveler comme certificat client TLS : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248).
+Windows peut aussi renouveler avec \`certreq ... Renew\`, authentifié par le certificat à renouveler comme certificat client TLS : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248). Depuis la 3.0, seul un certificat émis par l'inscription Windows se renouvelle ainsi : un certificat signé dans l'interface est refusé (\`not issued through Windows enrollment\`) et doit être réémis par l'inscription Windows.
+
+Depuis la 3.0, un renouvellement par certificat est servi par le profil que le certificat enregistre (un certificat WSTEP 2.x : le profil par défaut), sous l'AC d'émission de ce profil, et refusé quand le profil a été supprimé ou est désactivé ; chaque refus est audité avec le profil et la raison. Seul le SID est revérifié, par le connecteur du profil : révoquez le certificat d'un ordinateur retiré du groupe. Le certificat client TLS ne fonctionne que pour un profil dont l'AC d'émission est l'AC mTLS ou une AC qui en dépend, et pour une ancienne AC que le profil liste (ci-dessous) : un certificat que l'écouteur ne reconnaît pas est refusé pendant la poignée de main TLS, avant qu'UCM voie une requête, donc UCM n'audite rien (lire la sortie du client et le journal du service). Les autres profils se renouvellent uniquement par Kerberos (le profil du realm du principal sert et le nouveau certificat l'enregistre), et quand Kerberos refuse (demandeur retiré du groupe AD, profil désactivé) ils ne peuvent pas se renouveler. Le keytab Kerberos garde les clés des profils désactivés, si bien que leurs requêtes sont refusées avec une entrée d'audit : seule la suppression du profil les retire.
+
+Par Kerberos, une demande signée par le certificat valide du demandeur, issu du même profil, le renouvelle quand elle nomme le modèle de ce certificat (ou que le certificat n'en porte aucun, comme un certificat émis avant la 3.0) : le certificat renouvelé est marqué remplacé par le nouveau, comme par la liaison par certificat, l'entrée d'audit est \`certificate.renewed\` et le webhook \`cert.renewed\`, et un second renouvellement du même certificat est refusé par l'une ou l'autre liaison (\`Renewed certificate superseded by a newer one\`). Une demande qui nomme un autre modèle est un enrôlement (\`certificate.issued\`), même quand le certificat qui la signe a déjà été renouvelé. Après un changement d'AC d'émission du profil, un certificat de l'ancienne AC se renouvelle de même : la nouvelle AC l'émet, et l'entrée d'audit \`certificate.renewed\` nomme l'ancien numéro de série et l'ancienne AC.
+
+Après un changement d'AC d'émission du profil, l'AC sortante est ajoutée au profil sous **Anciennes AC qui renouvellent encore**, et l'audit du changement le dit. Un certificat émis par UCM sous le profil par une AC de la liste se renouvelle sur les deux liaisons aux mêmes règles (même modèle, même sujet, valide, enregistré) : l'AC actuelle émet le nouveau certificat, l'ancien est marqué remplacé, et \`certificate.renewed\` nomme l'ancien numéro de série et l'ancienne AC. Une ancienne AC retirée de la liste, révoquée ou supprimée ne renouvelle plus rien dès cet instant : la liaison par certificat refuse le renouvellement, et par Kerberos la demande est jugée comme un enrôlement. La liste ne fait que diminuer : retirez une AC pour arrêter ses renouvellements, par exemple après sa compromission ; une AC qui n'a jamais été l'AC d'émission du profil ne peut pas y figurer. Avec mTLS activé, l'écouteur TLS fait aussi confiance à chaque ancienne AC de la liste qui ne dépend pas de l'AC mTLS, pour que \`certreq ... Renew\` avec un certificat de cette AC atteigne UCM ; un enregistrement qui change ce qu'il reconnaît redémarre le service (redémarrage progressif en haute disponibilité). Un certificat client que l'écouteur laisse passer sur une ancienne AC seule ne sert qu'au renouvellement WSTEP : la connexion par certificat, EST et toutes les autres routes ne le voient pas, et tant qu'une ancienne AC est reconnue, il en va de même pour tout certificat client dont l'émetteur n'est pas une AC d'UCM dépendant de l'AC mTLS.
 
 ### Extension de sécurité SID (KB5014754)
 
-Lors d'une **émission authentifiée par Kerberos**, UCM intègre le SID AD du demandeur dans l'extension de sécurité SID de Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) du certificat émis. Les contrôleurs de domaine l'utilisent pour le **mappage fort de certificats** (KB5014754) : requis depuis l'application par AD du mappage fort pour l'authentification par certificat (connexion par carte à puce, PKINIT). Un renouvellement WSTEP, EST ou SCEP reprend l'extension SID du certificat qu'il renouvelle, jamais celle de la CSR ; si le connecteur AD est activé, ce SID doit encore désigner un compte de l'annuaire.
+Lors d'une **émission authentifiée par Kerberos**, UCM intègre le SID AD du demandeur dans l'extension de sécurité SID de Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) du certificat émis. Les contrôleurs de domaine l'utilisent pour le **mappage fort de certificats** (KB5014754) : requis depuis l'application par AD du mappage fort pour l'authentification par certificat (connexion par carte à puce, PKINIT). Avec le connecteur AD activé, une requête dont le SID ne peut pas être résolu est refusée plutôt qu'émise sans lui, y compris pour un principal d'un realm autre que le domaine du connecteur. Un renouvellement WSTEP, EST ou SCEP reprend l'extension SID du certificat qu'il renouvelle, jamais celle de la CSR ; si le connecteur AD est activé, ce SID doit encore désigner un compte de l'annuaire.
 
 ### Sujets dérivés d'AD
 
-Un modèle de certificat peut choisir **Construire le sujet depuis Active Directory** (Modèles → Inscription) : pour l'auto-inscription GPO sans surveillance, le sujet et le SAN sont dérivés de l'objet AD du demandeur via le connecteur AD au lieu d'exiger que le client en fournisse un -- correspond à la configuration d'un modèle ADCS réel pour l'auto-inscription. Indépendamment, **Autoriser l'auto-inscription** annonce le modèle comme \`autoEnroll=true\` dans la stratégie d'inscription de certificats, afin que les clients authentifiés par GPO/Kerberos le demandent automatiquement à la connexion.
+Un modèle de certificat peut choisir **Construire le sujet depuis Active Directory** (Modèles → Inscription) : pour l'auto-inscription GPO sans surveillance, le sujet et le SAN sont dérivés de l'objet AD du demandeur via le connecteur AD au lieu d'exiger que le client en fournisse un, comme pour un modèle ADCS réel configuré pour l'auto-inscription. Sur les endpoints Kerberos, le sujet d'un tel modèle et de chaque modèle machine (types Serveur web, VPN, signature OCSP) vient toujours d'Active Directory, quoi que nomme la requête : un modèle machine prend le nom DNS de l'ordinateur, est refusé à un compte utilisateur, et un modèle « Construire le sujet depuis Active Directory » est refusé à un ordinateur. Un modèle sans l'un ni l'autre garde le sujet fourni par le client, à condition qu'il configure ses EKU, comme tout modèle sur les endpoints Nom d'utilisateur/Mot de passe, qui n'ont pas d'identité d'annuaire pour en construire un. Sur les endpoints Kerberos, une requête qui ne correspond à aucun modèle reçoit aussi son sujet d'Active Directory : le nom DNS d'un ordinateur, celui d'un utilisateur seulement si un modèle l'a choisi, sinon elle est refusée. Indépendamment, **Autoriser l'auto-inscription** annonce le modèle comme \`autoEnroll=true\` dans la stratégie d'inscription de certificats, afin que les clients authentifiés par GPO/Kerberos le demandent automatiquement à la connexion.
 
 ## À propos
 
 - **Informations système**, **Liens & Ressources** et le lien **Soutenir UCM** mènent à Ko-fi. Les administrateurs voient aussi une carte Ko-fi masquable une fois par version d'UCM
-- **Vérifier la préparation à FIPS** (admin:system) : liste ce que le mode FIPS refuserait sur cette instance (hachages de mots de passe scrypt, autorités Ed25519, sauvegardes Argon2id, PostgreSQL sans TLS...), avec un remède pour chacun. Rien n'est modifié
+- **Vérifier la préparation à FIPS** (admin:system) : liste ce que le mode FIPS refuserait sur cette instance (hachages de mots de passe scrypt, autorités Ed25519 sur un module sans EdDSA, sauvegardes Argon2id, PostgreSQL sans TLS, secrets HMAC de moins de 14 octets...), avec un remède pour chacun. Rien n'est modifié. En mode FIPS, ses points bloquants sont aussi écrits dans le journal à chaque démarrage, une ligne d'erreur chacun avec son remède, et l'état du service les porte ; UCM démarre quand même et refuse chaque opération concernée à son usage
 `
   }
 }

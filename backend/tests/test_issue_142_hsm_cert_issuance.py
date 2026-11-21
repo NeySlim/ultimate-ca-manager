@@ -27,7 +27,37 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from models import db
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+_ABSENT = object()
+
+
+@pytest.fixture(autouse=True, scope='module')
+def scep_settings_restored(app, drop_new_cas_and_certificates):
+    """The SCEP default CA and switch as the file found them, before its CAs are deleted:
+    a missing row stays missing, a row holding NULL keeps it."""
+    from models.system_config import SystemConfig
+    keys = ('scep_enabled', 'scep_ca_id')
+    with app.app_context():
+        saved = {}
+        for k in keys:
+            row = SystemConfig.query.filter_by(key=k).first()
+            saved[k] = _ABSENT if row is None else row.value
+    yield
+    with app.app_context():
+        for k in keys:
+            row = SystemConfig.query.filter_by(key=k).first()
+            if saved[k] is _ABSENT:
+                if row is not None:
+                    db.session.delete(row)
+            elif row is None:
+                db.session.add(SystemConfig(key=k, value=saved[k]))
+            else:
+                row.value = saved[k]
+        db.session.commit()
 
 
 @pytest.fixture

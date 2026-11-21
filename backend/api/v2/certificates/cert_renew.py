@@ -71,6 +71,8 @@ def renew_certificate(cert_id):
         policy, approval = _approval_for_renewal(g.current_user, cert, data, validity_days)
     except PairApprovalConflict as e:
         return error_response(str(e), 409)
+    except RenewalError as refusal:  # the pair could not be read
+        return error_response(refusal.message, refusal.status, problem_type=refusal.problem_type)
     except Exception as e:
         logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the certificate was not renewed', 500)
@@ -109,7 +111,8 @@ def _actor():
 
 def _renew_msca_certificate(cert):
     """Renew a Microsoft-CA-issued certificate through its AD CS connection."""
-    from api.v2.msca import renew_via_msca  # deferred: avoids circular import
+    from api.v2.msca import kerberos_busy_response, renew_via_msca  # deferred: avoids circular import
+    from services.msca.client_keytab import KerberosBusy
 
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
     cert_id = cert.id
@@ -118,6 +121,9 @@ def _renew_msca_certificate(cert):
         result = renew_via_msca(cert, username=username)
     except PermissionError as e:
         return error_response(str(e), 403)
+    except KerberosBusy as e:
+        # nothing is pending here: a rekey was already restored and committed
+        return kerberos_busy_response(e)
     except ValueError as e:
         logger.error(f"Cannot renew certificate {cert_id} via Microsoft CA: {e}")
         return error_response(str(e), 400)
@@ -146,13 +152,9 @@ def _renew_msca_certificate(cert):
     except Exception:
         pass
 
-    cert_dict = cert.to_dict()
-    cert_caref = cert.caref
-    from services.webhook_service import emit_cert_renewed
-    emit_cert_renewed(cert_dict, ca_refid=cert_caref, actor=username)
-
+    # certificate.renewed was fired by the import, after its commit
     return success_response(
-        data=cert_dict,
+        data=cert.to_dict(),
         message='Certificate renewed by Microsoft CA',
         meta={'msca_status': 'issued'}
     )

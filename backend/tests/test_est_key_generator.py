@@ -26,6 +26,8 @@ from tests.test_est_serverkeygen_cms import (
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 _KEYS = ('est_enabled', 'est_ca_refid', 'est_username', 'est_password', 'est_validity_days')
 
 
@@ -104,6 +106,9 @@ class TestLifecycle:
             row = _delegate_row(ca_id)
             delegate = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
             assert int(row.serial_number) == serial == delegate.serial_number
+            # The pointer is compared to certificates.serial_number by string equality
+            link = EstSignerCert.query.filter_by(ca_id=ca_id).one()
+            assert link.serial_number == row.serial_number == str(serial)
             assert row.source == 'est_key_generator' and row.subject_cn == 'EST key generator'
             assert not row.prv.startswith('-----')
             from models import AuditLog
@@ -114,6 +119,28 @@ class TestLifecycle:
         assert delegate.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value \
             .key_identifier == ca_cert.extensions.get_extension_for_class(
                 x509.SubjectKeyIdentifier).value.digest
+
+    def test_issue_then_reissue_each_tell_the_bus(self, app, client, use, monkeypatch):
+        from services.events import event_bus
+        ca_id, _ = use('lazy')
+        _reset(app, ca_id)
+        seen = []
+        monkeypatch.setattr(event_bus, 'emit', lambda t, p, ref=None, meta=None: seen.append((t, p)))
+        _signer_serial(client, 'evt-1.generator.test')
+        with app.app_context():
+            first_id = _delegate_row(ca_id).id
+            assert [(t, p['certificate']['id']) for t, p in seen
+                    if p['certificate']['id'] == first_id] == [('certificate.issued', first_id)]
+            row = _delegate_row(ca_id)
+            row.valid_to = utc_now() + datetime.timedelta(days=10)
+            db.session.commit()
+        del seen[:]
+        _signer_serial(client, 'evt-2.generator.test')
+        with app.app_context():
+            second_id = _delegate_row(ca_id).id
+        assert second_id != first_id
+        assert [(t, p['certificate']['id']) for t, p in seen
+                if p['certificate']['id'] == second_id] == [('certificate.renewed', second_id)]
 
     def test_reused_across_requests(self, app, client, use):
         ca_id, _ = use('main')
@@ -184,17 +211,16 @@ class TestLifecycle:
                 db.session.get(Certificate, row_id).prv = readable
                 db.session.commit()
 
-    def test_listed_like_a_certificate_without_consuming_a_ca_serial(self, app, client, use):
+    def test_listed_like_a_certificate_and_counted_as_an_issuance(self, app, client, use):
         ca_id, _ = use('main')
         _reset(app, ca_id)
         with app.app_context():
             before = db.session.get(CA, ca_id).serial
         _signer_serial(client, 'uncounted.generator.test')
         with app.app_context():
-            # The transport and the generated key's certificate count; the delegate, like a
-            # renewed OCSP responder, does not
+            # The transport, the delegate and the generated key's certificate each count
             ca = db.session.get(CA, ca_id)
-            assert ca.serial == (before or 0) + 2
+            assert ca.serial == (before or 0) + 3
             assert Certificate.query.filter_by(caref=ca.refid, subject_cn='EST key generator',
                                                archived=False, revoked=False).count() >= 1
 
@@ -237,13 +263,90 @@ class TestLifecycle:
         _reset(app, ca_id)
         with app.app_context():
             ca = db.session.get(CA, ca_id)
+            counted = ca.serial or 0
             with patch.object(est_key_generator, '_issue', side_effect=racing_issue):
                 _key, cert = est_key_generator.key_generator(ca, ca_cert)
             assert cert == competitor['cert']
+            # The loser's count went with its savepoint too
+            assert (db.session.get(CA, ca_id, populate_existing=True).serial or 0) == counted
             assert EstSignerCert.query.filter_by(ca_id=ca_id).count() == 1
             # The loser's certificate row went with its savepoint
             ours = competitor['ours'][0]
             assert Certificate.query.filter_by(serial_number=str(ours.serial_number)).count() == 0
+        # The same issuance, unraced this time, counts one
+        _reset(app, ca_id)
+        with app.app_context():
+            est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+            assert (db.session.get(CA, ca_id, populate_existing=True).serial or 0) == counted + 1
+
+
+def test_a_delegate_renewed_in_place_meanwhile_is_not_archived(app, use, caplog):
+    """The replaced delegate is archived only if it still holds the serial read: a row
+    renewed in place meanwhile is left live, and this replacement goes with its savepoint."""
+    ca_id, ca_cert = use('main')
+    with app.app_context():
+        est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+        row = _delegate_row(ca_id)
+        row.valid_to = utc_now() + datetime.timedelta(days=10)
+        db.session.commit()
+        old_id, old_serial = row.id, row.serial_number
+        counted = db.session.get(CA, ca_id).serial or 0
+        db.session.remove()
+    original = est_key_generator._certificate_row
+    renewed = str(x509.random_serial_number())
+    caplog.clear()  # the issuance above logs too, whatever level the logger was left at
+
+    def renewed_in_place_meanwhile(*args):
+        from sqlalchemy import update
+        with db.engine.begin() as conn:
+            conn.execute(update(Certificate.__table__).where(Certificate.__table__.c.id == old_id)
+                         .values(serial_number=renewed))
+        return original(*args)
+
+    with app.app_context(), caplog.at_level('INFO', logger='services.est_key_generator'):
+        with patch.object(est_key_generator, '_certificate_row', side_effect=renewed_in_place_meanwhile):
+            with pytest.raises(est_key_generator.DelegateRenewedMeanwhile):
+                est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+        assert [r.getMessage() for r in caplog.records if r.name == 'services.est_key_generator'] == [
+            f'EST key generator certificate {old_id} of CA {ca_id} was renewed meanwhile; '
+            'it is not replaced']
+        db.session.rollback()
+        db.session.expire_all()
+        row = db.session.get(Certificate, old_id)
+        link = EstSignerCert.query.filter_by(ca_id=ca_id).one()
+        assert (row.serial_number, bool(row.archived)) == (renewed, False)
+        assert (link.certificate_id, link.serial_number) == (old_id, old_serial)
+        assert (db.session.get(CA, ca_id).serial or 0) == counted
+    _reset(app, ca_id)
+
+
+def test_serverkeygen_answers_409_when_its_delegate_was_renewed_meanwhile(app, client, use):
+    ca_id, ca_cert = use('main')
+    with app.app_context():
+        est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+        row = _delegate_row(ca_id)
+        row.valid_to = utc_now() + datetime.timedelta(days=10)
+        db.session.commit()
+        old_id = row.id
+    transport, _, client_pem = _enrol_transport(client, 'transport-renewed.generator.test')
+    csr, _ = _make_csr(common_name='renewed.generator.test',
+                       extra_attributes=((ASYMMETRIC_ID, _ski(transport)),))
+    original = est_key_generator._certificate_row
+
+    def renewed_in_place_meanwhile(*args):
+        from sqlalchemy import update
+        with db.engine.begin() as conn:
+            conn.execute(update(Certificate.__table__).where(Certificate.__table__.c.id == old_id)
+                         .values(serial_number=str(x509.random_serial_number())))
+        return original(*args)
+
+    with patch.object(est_key_generator, '_certificate_row', side_effect=renewed_in_place_meanwhile):
+        r = _post_csr(client, 'serverkeygen', csr, client_cert_pem=client_pem)
+    assert r.status_code == 409, r.data
+    assert b'renewed meanwhile' in r.data
+    with app.app_context():
+        assert Certificate.query.filter_by(subject_cn='renewed.generator.test').count() == 0
+    _reset(app, ca_id)
 
 
 def _ca_like(key, *, hsm_key_id=None, name=None, days=3650, extensions=()):

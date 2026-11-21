@@ -21,6 +21,8 @@ from tests.db_write_probe import watching_writes
 from utils.datetime_utils import utc_now
 from utils.key_codec import load_pem_bytes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _pub(key_or_cert):
     return key_or_cert.public_key().public_bytes(serialization.Encoding.DER,
@@ -196,7 +198,7 @@ def test_a_deployment_bound_to_the_certificate_is_queued_by_the_renewal(bench):
     db.session.commit()
     binding_id = binding.id
     bench.renew()
-    queued = DeployDelivery.query.filter_by(binding_id=binding_id).all()
+    queued = DeployDelivery.query.filter_by(binding_id=binding_id, binding_type='certificate').all()
     assert [d.event_type for d in queued] == ['certificate.renewed']
 
 
@@ -774,7 +776,12 @@ def test_a_kept_order_whose_key_cannot_be_read_is_replaced(bench, encryption_ena
 
 
 def test_deleting_an_order_leaves_no_dangling_renewal_link(app, auth_client, bench):
+    from sqlalchemy import text
     from services.database_admin.verify import check_declared_foreign_keys
+    # Other files on the worker delete orders in bulk and leave their proxy links: not this route's
+    db.session.execute(text('DELETE FROM acme_proxy_challenge_links WHERE order_id NOT IN '
+                            '(SELECT id FROM acme_client_orders)'))
+    db.session.commit()
     kept = bench.child(status='processing', renewal_enabled=False, renewal_of_order_id=bench.parent_id)
     with patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=bench.client):
         answer = auth_client.delete(f'/api/v2/acme/client/orders/{bench.parent_id}')

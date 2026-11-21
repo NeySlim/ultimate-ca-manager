@@ -55,9 +55,9 @@ export function CustomExtensionsEditor({ rows, onChange, hint, t: tProp }) {
         </div>
       ))}
       {anyCritical && (
-        <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2 text-xs text-text-secondary"
+        <div className="p-3 rounded-lg border border-status-warning-op30 bg-status-warning-op10 flex items-start gap-2 text-xs text-text-secondary"
           data-testid="custom-extensions-critical-warning">
-          <Warning size={16} className="text-yellow-500 shrink-0 mt-0.5" weight="bold" />
+          <Warning size={16} className="text-status-warning shrink-0 mt-0.5" weight="bold" />
           <span>{t('customExtensions.criticalWarning')}</span>
         </div>
       )}

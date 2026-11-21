@@ -30,11 +30,20 @@ const stable = vi.hoisted(() => ({
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useAuth: () => ({ user: { id: 999 } }),
+}))
+
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
+  InspectorProvider: ({ children }) => children,
 }))
+
+vi.mock('../../components/UserSecurityKeys', () => ({ default: () => null }))
+vi.mock('../../components/UserApiKeys', () => ({ default: () => null }))
+vi.mock('../users/UserSecuritySection', () => ({ default: () => null }))
 
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual('../../hooks/usePersistedState')
@@ -88,6 +97,19 @@ describe('UsersGroupsPage delete with unrevoked mTLS certificates', () => {
     await deleteUser()
     await waitFor(() => expect(mocks.showWarning)
       .toHaveBeenCalledWith('User alice deleted; its mTLS certificate(s) #3 could not be revoked'))
+    expect(mocks.showSuccess).not.toHaveBeenCalled()
+  })
+
+  it('warns once with both notes when the ACME CA was not told either', async () => {
+    const message = 'User alice deleted; its mTLS certificate(s) #3 could not be revoked. Certificate #4: not told'
+    mocks.del.mockResolvedValue({
+      data: { unrevoked_certificates: [{ id: 3, serial_number: 'AB' }] },
+      meta: { acme_local_only: [4] },
+      message,
+    })
+    await deleteUser()
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(message))
+    expect(mocks.showWarning).toHaveBeenCalledTimes(1)
     expect(mocks.showSuccess).not.toHaveBeenCalled()
   })
 

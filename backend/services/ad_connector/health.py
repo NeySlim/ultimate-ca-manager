@@ -11,7 +11,9 @@ gets a turn. A WSTEP enrollment would sit there wearing that delay, and
 nothing anywhere would say why.
 
 So the same bind this connector actually uses is run on a schedule instead,
-and the verdict is written to the config row. ``_connect`` then skips a DC
+with a shorter connect timeout (a DC slower than that is noted down, an
+advisory state that only orders the list), and the verdict is written to
+the config row. ``_connect`` then skips a DC
 already known to be down, and an operator learns about it from the log and
 the settings page rather than from a slow enrollment.
 
@@ -261,6 +263,10 @@ def probe(config):
     servers = lookup.config_servers(config)
     if not servers:
         return []
+    unreadable = lookup.unreadable_bind_password(config)
+    if unreadable:
+        logger.warning('AD Connector: %s', unreadable)
+        return None
     # The same rule the lookups and the save apply: an anonymous bind is
     # not a connection this connector makes, so nothing is probed either.
     if not lookup.has_bind_credentials(config):
@@ -277,7 +283,7 @@ def probe(config):
     try:
         for host in servers:
             try:
-                conn = lookup._connect_to(config, host, tls)
+                conn = lookup._connect_to(config, host, tls, PROBE_CONNECT_TIMEOUT_SECONDS)
             except Exception as e:
                 results.append((host, False, str(e)))
                 continue
@@ -307,30 +313,27 @@ def _is_due(config, previous):
     return age is None or age >= interval
 
 
-def run_health_probe():
-    """The scheduled task. Probes the connector's DCs, logs what changed and
-    stores the verdict.
+# One pass probes for at most this long; the connectors it did not reach wait for
+# the next one, so unreachable forests cannot hold the scheduler's thread.
+PROBE_BUDGET_SECONDS = 30
+# A probe gives up sooner than a lookup on a DC that drops the connection attempt: with 150
+# one-DC connectors, 15 down, three budgeted passes reach every one (15 * 3 s + 135 * 0.25 s
+# fits in 90 s). A DC that accepts and then stays silent still costs the receive timeout.
+PROBE_CONNECT_TIMEOUT_SECONDS = 3
 
-    Returns the scheduler's outcome contract -- ``{'status': 'ok' |
-    'skipped' | 'failed', 'reason': ...}``, as ``services/backup/
-    schedule.py`` does (see ``scheduler_service._outcome_of``). The task is
-    registered at the scheduler's own one-minute cadence and does nothing on
-    most wakes, so reporting that as a successful run would fill the admin
-    view with green runs that never touched a domain controller, and would
-    count a probe that failed among them.
 
-    Never raises -- a probe that blows up must not take the scheduler's
-    whole loop with it, and must not leave a stale verdict looking fresh.
-    """
-    from models import ADConnectorConfig
+def _probe_one(config):
+    """One connector's probe, verdict stored: the scheduler's outcome for it."""
     from services.ad_connector import lookup
     from utils.db_transaction import safe_commit
 
-    config = ADConnectorConfig.get_singleton()
-    if config is None or not config.enabled or not config.server:
+    if not config.enabled or not config.server:
         return {'status': 'skipped', 'reason': 'not configured or disabled'}
     # A skip, not a warning: the scheduler wakes every minute, and the fix
     # for this is in the settings dialog, not in the log.
+    unreadable = lookup.unreadable_bind_password(config)
+    if unreadable:
+        return {'status': 'skipped', 'reason': unreadable}
     if not lookup.has_bind_credentials(config):
         return {'status': 'skipped', 'reason': 'bind credentials missing'}
 
@@ -365,3 +368,54 @@ def run_health_probe():
         'healthy': new['healthy'],
         'total': new['total'],
     }
+
+
+def _probe_order(config):
+    """Never probed first, then the oldest verdict: the connectors a bounded pass left
+    over come first in the next one, with no cursor to store."""
+    checked = parse_health(config._health).get('checked_at') or ''
+    return (checked != '', checked, config.id)
+
+
+def run_health_probe(budget=PROBE_BUDGET_SECONDS, clock=None):
+    """The scheduled task. Probes the due connectors' DCs for at most ``budget``
+    seconds (checked before each connector), logs what changed and stores the verdicts.
+
+    Returns the scheduler's outcome contract -- ``{'status': 'ok' |
+    'skipped' | 'failed', 'reason': ...}``, as ``services/backup/
+    schedule.py`` does (see ``scheduler_service._outcome_of``). The task is
+    registered at the scheduler's own one-minute cadence and does nothing on
+    most wakes, so reporting that as a successful run would fill the admin
+    view with green runs that never touched a domain controller, and would
+    count a probe that failed among them. With one connector the outcome is
+    that connector's; with several it adds ``probed``, ``failed`` and ``pending``.
+
+    Never raises -- a probe that blows up must not take the scheduler's
+    whole loop with it, and must not leave a stale verdict looking fresh.
+    """
+    import time
+
+    from models import ADConnectorConfig
+
+    clock = clock or time.monotonic
+    started = clock()
+    rows = sorted(ADConnectorConfig.query.all(), key=_probe_order)
+    if not rows:
+        return {'status': 'skipped', 'reason': 'not configured or disabled'}
+
+    outcomes, skipped, pending = [], [], 0
+    for position, config in enumerate(rows):
+        if outcomes and clock() - started >= budget:
+            pending = sum(1 for rest in rows[position:] if rest.enabled and rest.server)
+            break
+        outcome = _probe_one(config)
+        (skipped if outcome['status'] == 'skipped' else outcomes).append(outcome)
+    if not outcomes:
+        return skipped[-1]
+    failures = [o for o in outcomes if o['status'] == 'failed']
+    if len(rows) == 1:
+        return outcomes[0]
+    if len(failures) == len(outcomes):
+        return {'status': 'failed', 'reason': failures[0]['reason'], 'probed': len(outcomes),
+                'failed': len(failures), 'pending': pending}
+    return {'status': 'ok', 'probed': len(outcomes), 'failed': len(failures), 'pending': pending}

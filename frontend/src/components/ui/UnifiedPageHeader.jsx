@@ -51,7 +51,7 @@ export function UnifiedPageHeader({
 
   return (
     <div className={cn(
-      'shrink-0 border-b border-border-op60 bg-bg-secondary shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]',
+      'shrink-0 border-b border-border-op60 bg-bg-secondary shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--paper)_3%,transparent)]',
       className
     )}>
       {/* Title row - HIDDEN on mobile (title already in AppShell navbar) */}
@@ -67,7 +67,7 @@ export function UnifiedPageHeader({
               "rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary-op70 flex items-center justify-center shrink-0 shadow-sm",
               isMobile ? "w-7 h-7" : "w-9 h-9"
             )}>
-              <Icon size={isMobile ? 14 : 18} weight="bold" className="text-white" />
+              <Icon size={isMobile ? 14 : 18} weight="bold" className="text-on-accent" />
             </div>
           )}
           <div className="min-w-0">
@@ -127,7 +127,7 @@ export function UnifiedPageHeader({
             >
               <Funnel size={16} className="text-text-secondary" />
               {activeFilters > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-primary text-white text-2xs flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-primary text-on-accent text-2xs flex items-center justify-center">
                   {activeFilters}
                 </span>
               )}

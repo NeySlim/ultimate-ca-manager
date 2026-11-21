@@ -16,7 +16,10 @@ Modules tested:
 Uses shared conftest fixtures: app, client, auth_client, create_ca, create_user.
 """
 import json
-from tests.conftest import get_json, assert_success, assert_error
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_config_rows')
 
 CONTENT_JSON = 'application/json'
 
@@ -137,7 +140,7 @@ class TestReports:
 
     def test_download_nonexistent_type(self, auth_client):
         r = auth_client.get('/api/v2/reports/download/nonexistent')
-        assert r.status_code in (400, 404, 500)
+        assert_refused(r, 400, 'Unknown report type')
 
 
 # ============================================================
@@ -168,11 +171,11 @@ class TestSmartImport:
 
     def test_analyze_without_content(self, auth_client):
         r = post_json(auth_client, '/api/v2/import/analyze', {})
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'No data provided')
 
     def test_execute_without_content(self, auth_client):
         r = post_json(auth_client, '/api/v2/import/execute', {})
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'No data provided')
 
     def test_execute_ca_import_requires_write_cas(self, auth_client, app, monkeypatch):
         """write:certificates alone must not import CAs present in the content."""
@@ -766,22 +769,25 @@ class TestOPNsense:
     def test_test_without_host(self, auth_client):
         """Test connection without host should fail."""
         r = post_json(auth_client, '/api/v2/import/opnsense/test', {})
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Missing required fields: host, api_key, api_secret')
 
     def test_import_without_data(self, auth_client):
         """Import without proper data should fail."""
         r = post_json(auth_client, '/api/v2/import/opnsense/import', {})
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Missing required fields')
 
-    def test_test_with_invalid_host(self, auth_client, monkeypatch):
-        """Test connection with unreachable host.
+    @pytest.mark.parametrize('failure, status, message', [
+        ('Timeout', 408, 'Connection timeout. Check host and port.'),
+        ('ConnectionError', 503, 'Connection failed. Check host and port.'),
+    ])
+    def test_test_with_invalid_host(self, auth_client, monkeypatch, failure, status, message):
+        """An appliance that does not answer, injected: each failure has its own answer."""
+        import requests
 
-        192.0.2.1 (RFC 5737) answers nothing, so the route waits out its own
-        timeout. The wait is what is shortened here, not the path: the request
-        is really attempted and really fails, which is what this pins.
-        """
-        monkeypatch.setattr(
-            'api.v2.import_opnsense.REQUEST_TIMEOUT_SECONDS', 0.5)
+        def unreachable(self, url, **kwargs):
+            raise getattr(requests.exceptions, failure)('injected')
+
+        monkeypatch.setattr(requests.Session, 'get', unreachable)
         r = post_json(auth_client, '/api/v2/import/opnsense/test', {
             'host': '192.0.2.1',
             'port': 443,
@@ -789,7 +795,4 @@ class TestOPNsense:
             'api_secret': 'test',
             'verify_ssl': False
         })
-        # Should fail — unreachable host. Depending on the network, the
-        # connection to 192.0.2.1 either times out (408) or is refused
-        # immediately, which the route maps to 503 (ConnectionError).
-        assert r.status_code in (400, 408, 500, 503)
+        assert_refused(r, status, message)

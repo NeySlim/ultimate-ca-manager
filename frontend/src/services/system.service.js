@@ -46,12 +46,13 @@ export const systemService = {
     return apiClient.delete(`/system/backup/${encodeURIComponent(filename)}`)
   },
 
-  async restore(file, password) {
+  // The archive travels as multipart form data, never read into memory or encoded.
+  async restore(file, password, { onProgress } = {}) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('password', password)
     
-    return apiClient.upload('/system/restore', formData)
+    return apiClient.upload('/system/restore', formData, { onProgress })
   },
 
   // Database Management
@@ -96,7 +97,7 @@ export const systemService = {
 
   // Logs
   async getLogs(limit = 100) {
-    return apiClient.get(`/system/logs?limit=${limit}`)
+    return apiClient.get(`/system/logs?lines=${limit}`)
   },
 
   // Service Management

@@ -8,6 +8,8 @@ import re
 import secrets
 
 from flask import Blueprint, g, request
+
+import fips_mode
 from auth.unified import require_auth
 from models import db
 from services.audit_service import AuditService
@@ -287,6 +289,7 @@ def create_webhook():
     if isinstance(secret_in, str) and not secret_in.strip():
         return error_response('Secret cannot be empty (omit field for auto-generation)', 400)
     secret_value = secret_in or secrets.token_urlsafe(32)
+    fips_mode.refuse_short_hmac_key(secret_value.encode(), 'Webhook secret')
 
     # Validate auth fields
     auth_fields, auth_err = _validate_auth(data, is_create=True)
@@ -358,6 +361,7 @@ def update_webhook(endpoint_id):
         secret_in = data['secret']
         if not isinstance(secret_in, str) or not secret_in.strip():
             return error_response('Secret must be a non-empty string', 400)
+        fips_mode.refuse_short_hmac_key(secret_in.encode(), 'Webhook secret')
         endpoint.secret = encrypt_if_needed(secret_in)
     if 'events' in data:
         ok, err = _validate_events(data['events'])
@@ -546,8 +550,11 @@ def list_events():
         'descriptions': {
             'certificate.issued': 'When a new certificate is issued',
             'certificate.revoked': 'When a certificate is revoked',
+            'certificate.unheld': 'When a certificate hold is lifted',
             'certificate.renewed': 'When a certificate is auto-renewed',
             'certificate.expiring': 'When a certificate is about to expire',
+            'certificate.binding_left_behind': 'When a renewal leaves a deployment or the HTTPS '
+                                               'binding on the previous certificate (no key in UCM)',
             'ca.created': 'When a new CA is created',
             'ca.updated': 'When a CA is updated',
             'csr.submitted': 'When a CSR is submitted',

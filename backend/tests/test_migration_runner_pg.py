@@ -8,9 +8,9 @@ Fix: open a single transactional ``Connection`` via ``engine.begin()`` and
 hand THAT to ``mod.upgrade(conn)``. SQLite path was unaffected.
 
 This test guards against re-introduction of the regression by:
-  1. Asserting the source of `_run_pending_pg` calls `engine.begin()` and
-     passes the resulting `conn` to `mod.upgrade()` (static guard, runs in
-     the SQLite CI job too — fast, no Postgres needed).
+  1. Running `_run_pending_pg` against a recording engine and checking that
+     `mod.upgrade()` receives the transaction's Connection (runs in the
+     SQLite CI job too, no Postgres needed).
   2. When `UCM_TEST_POSTGRES_URL` is set (PG CI job only), running an actual
      migration against a real PostgreSQL instance and asserting it applied.
 
@@ -19,7 +19,6 @@ skipped in plain SQLite runs.
 """
 from __future__ import annotations
 
-import inspect
 import os
 import textwrap
 
@@ -30,28 +29,75 @@ import pytest
 # Static guard — runs in every CI job (no PG needed)
 # ---------------------------------------------------------------------------
 
-def test_run_pending_pg_uses_connection_not_engine():
-    """`_run_pending_pg` must hand a Connection (via engine.begin()) to upgrade(),
-    NOT the engine itself. This is the exact regression of #103/#104."""
+class _RecordingEngine:
+    """An engine that hands out one recording connection per transaction: no server needed."""
+
+    def __init__(self):
+        self.connections, self.committed = [], []
+
+    def begin(self):
+        engine = self
+
+        class _Conn:
+            def __init__(self):
+                self.statements = []
+
+            def execute(self, statement, params=None):
+                self.statements.append((str(statement), params))
+
+            def __enter__(self):
+                engine.connections.append(self)
+                return self
+
+            def __exit__(self, kind, value, tb):
+                if kind is None:
+                    engine.committed.append(self)
+                return False
+        return _Conn()
+
+
+def _migration(directory, name, body):
+    (directory / f"{name}.py").write_text(textwrap.dedent(body).lstrip())
+
+
+def test_run_pending_pg_uses_connection_not_engine(tmp_path, monkeypatch):
+    """`_run_pending_pg` hands upgrade() the Connection of the transaction that also
+    records it, never the engine: the exact regression of #103/#104."""
     import migration_runner
 
-    src = inspect.getsource(migration_runner._run_pending_pg)
+    _migration(tmp_path, "999_conn_probe", """
+        pg_compatible = True
+        RECEIVED = []
 
-    # Must open a transactional connection.
-    assert "engine.begin()" in src, (
-        "_run_pending_pg must use `with engine.begin() as conn:` — "
-        "regression of #103/#104 (engine vs. connection)."
-    )
+        def upgrade(conn):
+            RECEIVED.append(conn)
+    """)
+    monkeypatch.setattr(migration_runner, "MIGRATIONS_DIR", tmp_path)
+    loaded = []
+    real_load = migration_runner._load_module
+    monkeypatch.setattr(migration_runner, "_load_module",
+                        lambda path: loaded.append(real_load(path)) or loaded[-1])
+    engine = _RecordingEngine()
 
-    # Must pass the conn (not engine) to mod.upgrade.
-    # We allow either `mod.upgrade(conn)` or any call that names the conn.
-    assert "mod.upgrade(conn)" in src, (
-        "_run_pending_pg must call `mod.upgrade(conn)`, not `mod.upgrade(engine)`. "
-        "Migration modules expect a Connection."
-    )
-    assert "mod.upgrade(engine)" not in src, (
-        "Found `mod.upgrade(engine)` in _run_pending_pg — this is the #103 bug."
-    )
+    assert migration_runner._run_pending_pg(engine, ["999_conn_probe"], dry_run=False) is True
+    (conn,) = engine.committed
+    assert loaded[0].RECEIVED == [conn]
+    # The registry row is written in that same transaction
+    assert [params for _sql, params in conn.statements] == [{"n": "999_conn_probe"}]
+
+
+def _migration_sources():
+    """Every migration file and every step of migration 300, which shares its PostgreSQL transaction."""
+    import pathlib
+    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
+    files = list(migrations_dir.glob("*.py")) + list((migrations_dir / "_from_2_254").glob("*.py"))
+    return sorted(p for p in files if not p.name.startswith("__"))
+
+
+def test_the_guards_read_the_steps_of_migration_300():
+    from migrations._from_2_254 import STEPS
+    names = {p.stem for p in _migration_sources()}
+    assert set(STEPS) <= names and "300_upgrade_from_2_254" in names
 
 
 # ---------------------------------------------------------------------------
@@ -67,13 +113,9 @@ def test_pg_migrations_do_not_open_nested_transactions():
     because the runner already opens the transaction.
     """
     import ast
-    import pathlib
 
-    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
     offenders = []
-    for path in sorted(migrations_dir.glob("*.py")):
-        if path.name.startswith("__"):
-            continue
+    for path in _migration_sources():
         src = path.read_text()
         if "pg_compatible = True" not in src:
             continue
@@ -107,14 +149,10 @@ def test_modern_migrations_declare_pg_compatible():
     silently skipped on PostgreSQL. From 020 onward, every migration MUST be
     multi-backend or it will silently no-op on PG and corrupt the schema.
     """
-    import pathlib
     import re
 
-    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
     offenders = []
-    for path in sorted(migrations_dir.glob("*.py")):
-        if path.name.startswith("__"):
-            continue
+    for path in _migration_sources():
         # Extract leading numeric index
         m = re.match(r"^(\d+)_", path.name)
         if not m:
@@ -133,22 +171,69 @@ def test_modern_migrations_declare_pg_compatible():
     )
 
 
-def test_runner_rejects_modern_migration_without_pg_compatible():
-    """The runner must raise (return False) when a migration numbered >= 020
-    lacks `pg_compatible = True`, instead of silently marking it applied.
-    """
+def _on_sqlite_path(stack):
+    """True inside a function named for SQLite or the body of `if isinstance(x, sqlite3.Connection)`."""
+    import ast
+    for parent, child in zip(stack, stack[1:]):
+        if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)) and "sqlite" in parent.name:
+            return True
+        if (isinstance(parent, ast.If) and child in parent.body and isinstance(parent.test, ast.Call)
+                and getattr(parent.test.func, "id", None) == "isinstance" and len(parent.test.args) == 2
+                and ast.unparse(parent.test.args[1]) == "sqlite3.Connection"):
+            return True
+    return False
+
+
+def test_pg_paths_never_commit_or_roll_back():
+    """Migration 300 runs every step in one PostgreSQL transaction: a commit or rollback on the
+    PostgreSQL path would end it halfway. Only the SQLite path may call them."""
+    import ast
+
+    offenders = []
+
+    def walk(node, stack, path):
+        stack = stack + [node]
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("commit", "rollback") and not _on_sqlite_path(stack)):
+            offenders.append(f"{path.name}:{node.lineno}")
+        for child in ast.iter_child_nodes(node):
+            walk(child, stack, path)
+
+    for path in _migration_sources():
+        walk(ast.parse(path.read_text()), [], path)
+    assert not offenders, f"commit or rollback outside the SQLite path: {offenders}"
+
+
+def test_runner_rejects_modern_migration_without_pg_compatible(tmp_path, monkeypatch):
+    """A migration numbered >= 020 without `pg_compatible = True` stops the run:
+    nothing of it or after it is applied or recorded (silent skip was #115)."""
     import migration_runner
 
-    src = inspect.getsource(migration_runner._run_pending_pg)
-    # Must reference the threshold and refuse to continue.
-    assert "PG_COMPATIBLE_REQUIRED_FROM" in src, (
-        "Runner must check PG_COMPATIBLE_REQUIRED_FROM threshold; "
-        "silent-skip caused issue #115."
-    )
-    assert "return False" in src, (
-        "Runner must return False (hard fail) on missing pg_compatible "
-        "for modern migrations, not silently skip."
-    )
+    _migration(tmp_path, "025_sqlite_only", """
+        def upgrade(conn):
+            raise AssertionError('a migration that is not pg_compatible ran')
+    """)
+    _migration(tmp_path, "026_after", """
+        pg_compatible = True
+
+        def upgrade(conn):
+            raise AssertionError('the run went on past a refused migration')
+    """)
+    # Below the threshold the same file is a legacy one: recorded, not run
+    _migration(tmp_path, "010_legacy", """
+        def upgrade(conn):
+            raise AssertionError('a legacy SQLite-only migration ran on PostgreSQL')
+    """)
+    monkeypatch.setattr(migration_runner, "MIGRATIONS_DIR", tmp_path)
+
+    legacy = _RecordingEngine()
+    assert migration_runner._run_pending_pg(legacy, ["010_legacy"], dry_run=False) is True
+    assert [p for _s, p in legacy.committed[0].statements] == [{"n": "010_legacy"}]
+
+    engine = _RecordingEngine()
+    assert migration_runner._run_pending_pg(
+        engine, ["025_sqlite_only", "026_after"], dry_run=False) is False
+    assert engine.connections == []
 
 
 # ---------------------------------------------------------------------------
@@ -220,3 +305,67 @@ def test_pg_migration_runs_against_real_postgres(tmp_path, monkeypatch):
     with engine.begin() as conn:
         conn.execute(text("DROP TABLE IF EXISTS regression_103_marker"))
         conn.execute(text("DELETE FROM _migrations WHERE name = '999_regression_103'"))
+
+
+@pytest.mark.skipif(not PG_URL, reason="needs UCM_TEST_POSTGRES_URL")
+def test_the_ledger_records_utc_whatever_the_session_zone():
+    """`_mark_applied` writes naive UTC, so a copy from SQLite and a native write agree."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine, text
+
+    import migration_runner
+
+    schema = f"ledger_{uuid.uuid4().hex[:8]}"
+    admin = create_engine(PG_URL)
+    with admin.begin() as conn:
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+    engine = create_engine(PG_URL, connect_args={"options": f"-c search_path={schema} -c TimeZone=Pacific/Kiritimati"})
+    try:
+        migration_runner._ensure_tracking_table(engine, True)
+        migration_runner._mark_applied(engine, ["999_zone"], True)
+        with engine.begin() as conn:
+            stored = conn.execute(text("SELECT applied_at FROM _migrations WHERE name = '999_zone'")).scalar()
+        assert abs((datetime.now(timezone.utc).replace(tzinfo=None) - stored).total_seconds()) < 120
+    finally:
+        engine.dispose()
+        with admin.begin() as conn:
+            conn.execute(text(f"DROP SCHEMA {schema} CASCADE"))
+        admin.dispose()
+
+
+@pytest.mark.skipif(not PG_URL, reason="needs UCM_TEST_POSTGRES_URL")
+def test_run_pending_pg_records_utc_whatever_the_session_zone(tmp_path, monkeypatch):
+    """The migration path itself, not only `_mark_applied`, stamps naive UTC."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine, text
+
+    import migration_runner
+
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    (migrations_dir / "999_zone_path.py").write_text("pg_compatible = True\n\ndef upgrade(conn):\n    pass\n")
+    monkeypatch.setattr(migration_runner, "MIGRATIONS_DIR", migrations_dir)
+
+    schema = f"ledger_{uuid.uuid4().hex[:8]}"
+    admin = create_engine(PG_URL)
+    with admin.begin() as conn:
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+    engine = create_engine(PG_URL, connect_args={"options": f"-c search_path={schema} -c TimeZone=Pacific/Kiritimati"})
+    try:
+        # A ledger created before the UTC default existed: only the INSERT can make it UTC
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE _migrations (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL UNIQUE, "
+                              "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"))
+        assert migration_runner._run_pending_pg(engine, ["999_zone_path"], dry_run=False)
+        with engine.begin() as conn:
+            stored = conn.execute(text("SELECT applied_at FROM _migrations WHERE name = '999_zone_path'")).scalar()
+        assert abs((datetime.now(timezone.utc).replace(tzinfo=None) - stored).total_seconds()) < 120
+    finally:
+        engine.dispose()
+        with admin.begin() as conn:
+            conn.execute(text(f"DROP SCHEMA {schema} CASCADE"))
+        admin.dispose()

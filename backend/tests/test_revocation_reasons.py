@@ -17,6 +17,8 @@ from utils.revocation_reasons import (
     REVOCATION_REASONS, invalid_reason_message, normalize_revocation_reason,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 BASE = '/api/v2/certificates'
 
 

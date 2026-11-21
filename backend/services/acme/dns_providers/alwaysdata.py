@@ -15,14 +15,19 @@ class AlwaysdataDnsProvider(BaseDnsProvider):
     PROVIDER_TYPE = "alwaysdata"
     PROVIDER_NAME = "Alwaysdata"
     PROVIDER_DESCRIPTION = "Alwaysdata DNS API (France)"
-    REQUIRED_CREDENTIALS = ["api_key", "account"]
+    REQUIRED_CREDENTIALS = ["api_key"]
+    OPTIONAL_CREDENTIALS = ["account"]
     
     BASE_URL = "https://api.alwaysdata.com/v1"
     
     def _request(self, method, path, data=None):
         try:
+            # A token of a delegated account names it: "<token> account=<name>" as basic-auth user
+            user = self.credentials['api_key']
+            if self.credentials.get('account'):
+                user = f"{user} account={self.credentials['account']}"
             resp = requests.request(method, f"{self.BASE_URL}{path}",
-                auth=(self.credentials['api_key'], ''),
+                auth=(user, ''),
                 json=data, timeout=30, headers={'Content-Type': 'application/json'})
             if resp.status_code >= 400:
                 return False, self._error(resp)
@@ -73,6 +78,6 @@ class AlwaysdataDnsProvider(BaseDnsProvider):
         return [
             {'name': 'api_key', 'label': 'API Key', 'type': 'password', 'required': True,
              'help': 'admin.alwaysdata.com > Profile > API Keys'},
-            {'name': 'account', 'label': 'Account Name', 'type': 'text', 'required': True,
-             'help': 'Your Alwaysdata account name'},
+            {'name': 'account', 'label': 'Account Name', 'type': 'text', 'required': False,
+             'help': 'Only for a token of another account: its account name'},
         ]

@@ -8,6 +8,9 @@ from cryptography.x509.oid import NameOID
 
 from tests.test_csr_sign_extra_names import _upload
 from tests.test_custom_extensions import DER_B, OID_B, _SEQ
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 # ── display ─────────────────────────────────────────────────────────────────

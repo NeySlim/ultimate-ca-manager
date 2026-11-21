@@ -26,15 +26,15 @@ vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: ['light', 'dark'] }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
   AuthProvider: ({ children }) => children,
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -152,8 +152,9 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
     const label = await screen.findByText('tsa.requireDedicatedCert')
     const toggle = label.closest('label').querySelector('button[role="switch"]')
     expect(toggle).not.toBeDisabled()
-    expect(screen.getByText('tsa.requireDedicatedCertBlocked')).toBeInTheDocument()
+    expect(screen.getByText('tsa.strictNoSigner')).toBeInTheDocument()
   })
+
 
   it('sends signer_cert_refid in the PATCH payload on save', async () => {
     setConfig({ signer_cert_refid: 'cert-ts-1', signer: USABLE_SIGNER })

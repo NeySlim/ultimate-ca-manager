@@ -18,6 +18,8 @@ import pytest
 from models import db, AcmeClientAccount, AcmeEabCredential, AcmeDomain, DnsProvider, SystemConfig
 from models.acme_dns_update import AcmeDnsUpdateKey
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 PORT_KEY = 'acme.proxy.dns_update_port'
 TLS_KEY = 'acme.client.tls_alpn_port'
 

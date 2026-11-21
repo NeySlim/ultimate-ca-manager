@@ -23,7 +23,7 @@ describe('key algorithm registry', () => {
     expect(KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => [a.label, a.securityLevel]))
       .toEqual([['ML-DSA-44', 2], ['ML-DSA-65', 3], ['ML-DSA-87', 5]])
     expect(findAlgorithm('ML-DSA-65')).toMatchObject({
-      family: 'ML-DSA', bits: null, digest: null, fips: false, generate: true,
+      family: 'ML-DSA', bits: null, digest: null, fips: null, generate: true,
       issue: ['ml-dsa', '65'], ca: ['ML-DSA', '65'], csr: 'ML-DSA-65',
     })
     // Held by the HSM types whose provider signs ML-DSA, none on Azure Key Vault
@@ -43,6 +43,22 @@ describe('key algorithm registry', () => {
     expect(labels(listAlgorithms({ generate: true, fips: true }))).toEqual([
       'RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521',
     ])
+  })
+
+  it('offers in FIPS mode what the server says its module approves, and only that', () => {
+    const approving = ['RSA-2048', 'EC-P256', 'ED25519', 'ED448', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
+    expect(labels(listAlgorithms({ generate: true, fips: true, fipsKeys: approving }))).toEqual([
+      'RSA-2048', 'EC-P256', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87',
+    ])
+    expect(isUsable(findAlgorithm('ED25519'), { fips: true, fipsKeys: approving })).toBe(true)
+    expect(isUsable(findAlgorithm('ED448'), { fips: true, fipsKeys: ['RSA-2048'] })).toBe(false)
+    expect(isUsable(findAlgorithm('EC-BP256'), { fips: true, fipsKeys: approving })).toBe(false)
+    // Outside FIPS mode the list changes nothing
+    expect(isUsable(findAlgorithm('EC-BP256'), { fips: false, fipsKeys: ['RSA-2048'] })).toBe(true)
+    // No list from the server: no module-decided row is offered
+    for (const row of KEY_ALGORITHMS.filter(a => a.fips === null)) {
+      expect(isUsable(row, { fips: true })).toBe(false)
+    }
   })
 
   it('hides ML-DSA, and only ML-DSA, on a build without it', () => {

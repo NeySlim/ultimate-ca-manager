@@ -112,7 +112,8 @@ def _smtp_retarget_check(smtp, data):
     stale = []
     for key, current, used in (('smtp_password', server, auth_on and method == 'password'),
                                ('smtp_oauth_client_secret', oauth, auth_on and method == 'oauth2')):
-        if not keeps_saved_secret(data, key, getattr(smtp, key)):
+        # The stored token: a secret this node cannot open is kept all the same
+        if not keeps_saved_secret(data, key, getattr(smtp, '_' + key)):
             continue
         if used:
             err = retarget_error(current, request_view, True)
@@ -182,9 +183,11 @@ def update_email_settings():
     if 'smtp_auth_method' in data:
         method = data['smtp_auth_method']
         if method == 'none':
-            # Authentication off; the stored method is irrelevant until it is
-            # turned back on (#322)
+            # Authentication off: no method and no OAuth2 secret is left stored (#322)
             smtp.smtp_auth = False
+            smtp.smtp_auth_method = 'password'
+            stale += [k for k in ('smtp_oauth_client_secret', 'smtp_oauth_client_id',
+                                  'smtp_oauth_refresh_token') if k not in stale]
         elif method in ('password', 'oauth2'):
             smtp.smtp_auth_method = method
             if 'smtp_auth' not in data:

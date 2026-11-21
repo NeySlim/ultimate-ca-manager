@@ -46,13 +46,16 @@ const brainpool = (bits) => ({
   curveParam: `brainpoolP${bits}r1`, i18nKey: null, sizeKey: null, csrKey: null, exportExcluded: [],
 })
 
+// fips: true approved by every FIPS module, false by none, null decided by the loaded module
+// (EdDSA, ML-DSA), which the server names in the effective policy's fips_key_types
+
 // EdDSA: generated for a CA only (ca), never on an HSM; leaf keys arrive through CSRs
 // and enrollment protocols (generate: false)
 const eddsa = (label, i18nKey) => {
   const display = label === 'ED25519' ? 'Ed25519' : 'Ed448'
   return {
     label, bits: null, family: 'EDDSA', group: GROUP_EDDSA, display,
-    securityLevel: null, digest: null, fips: false, generate: false, providers: [],
+    securityLevel: null, digest: null, fips: null, generate: false, providers: [],
     issue: null, ca: ['EdDSA', display], csr: null, curveParam: null, i18nKey, sizeKey: null, csrKey: null,
     exportExcluded: [],
   }
@@ -66,7 +69,7 @@ export const ML_DSA_UNTESTED_PROVIDERS = ['google-kms']
 
 const mldsa = (param, securityLevel) => ({
   label: `ML-DSA-${param}`, bits: null, family: 'ML-DSA', group: GROUP_PQ, display: `ML-DSA-${param}`,
-  securityLevel, digest: null, fips: false, generate: true, providers: ML_DSA_PROVIDERS,
+  securityLevel, digest: null, fips: null, generate: true, providers: ML_DSA_PROVIDERS,
   untestedProviders: ML_DSA_UNTESTED_PROVIDERS,
   issue: ['ml-dsa', param], ca: ['ML-DSA', param], csr: `ML-DSA-${param}`,
   curveParam: null, i18nKey: null, sizeKey: null, csrKey: null,
@@ -133,12 +136,18 @@ export function algorithmName(row, t, key = 'i18nKey') {
   return row.securityLevel ? keyAlgorithmLabel(row.label, t, row.securityLevel) : row.display
 }
 
-export const isFipsApproved = (label) => findAlgorithm(label)?.fips === true
+/** Whether FIPS mode allows *label*: the server's list of what its module approves
+ *  (`fipsKeys`, the effective policy's fips_key_types) when known, else every module's verdict. */
+export const isFipsApproved = (label, fipsKeys = null) => {
+  const row = findAlgorithm(label)
+  if (!row) return false
+  return Array.isArray(fipsKeys) ? fipsKeys.includes(row.label) : row.fips === true
+}
 
 /** Whether this server can use a row: FIPS mode drops what the module does not approve,
  *  a build without ML-DSA (`mldsa: false`, the effective policy's `ml_dsa`) drops ML-DSA. */
-export const isUsable = (row, { fips = false, mldsa = true } = {}) =>
-  !!row && (!fips || row.fips) && (mldsa || row.family !== 'ML-DSA')
+export const isUsable = (row, { fips = false, mldsa = true, fipsKeys = null } = {}) =>
+  !!row && (!fips || isFipsApproved(row.label, fipsKeys)) && (mldsa || row.family !== 'ML-DSA')
 
 export const isBrainpool = (label) => findAlgorithm(label)?.group === GROUP_BRAINPOOL
 
@@ -177,13 +186,13 @@ export function caKeyParts(keyType) {
 /**
  * Algorithms a form may offer. `labels` restricts and orders the list, `generate`
  * keeps keys the product creates, `provider` keeps what that HSM type can hold,
- * and `fips` / `mldsa` drop what this server cannot use (see isUsable).
+ * and `fips` / `fipsKeys` / `mldsa` drop what this server cannot use (see isUsable).
  */
-export function listAlgorithms({ labels, generate = false, provider, fips = false, mldsa = true } = {}) {
+export function listAlgorithms({ labels, generate = false, provider, fips = false, mldsa = true, fipsKeys = null } = {}) {
   const rows = labels ? labels.map(findAlgorithm).filter(Boolean) : KEY_ALGORITHMS
   return rows.filter(a =>
     (!generate || a.generate)
-    && isUsable(a, { fips, mldsa })
+    && isUsable(a, { fips, mldsa, fipsKeys })
     && (provider === undefined || a.providers == null || a.providers.includes(provider)))
 }
 

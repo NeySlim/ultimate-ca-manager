@@ -93,4 +93,25 @@ describe('SsoProviderForm SAML strict options', () => {
     render(<SsoProviderForm provider={PROVIDER} onSave={vi.fn()} onCancel={vi.fn()} />)
     expect(await screen.findByText('sso.spOriginNotConfigured')).toBeInTheDocument()
   })
+
+  it('adds a groups row for a common attribute only when the operator clicks', async () => {
+    const onSave = vi.fn()
+    render(<SsoProviderForm provider={{ ...PROVIDER, attribute_mapping: { email: 'email' } }}
+      onSave={onSave} onCancel={vi.fn()} />)
+    fireEvent.click(screen.getByText('sso.attributeRoleMappingSection'))
+    expect(screen.getByText('sso.samlGroupShortcutKeycloakRoles')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /urn:oid:1\.3\.6\.1\.4\.1\.5923\.1\.5\.1\.1/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Role/ }))
+    expect(screen.getByDisplayValue('urn:oid:1.3.6.1.4.1.5923.1.5.1.1')).toBeInTheDocument()
+    const payload = await submit(onSave)
+    expect(payload.attribute_mapping).toEqual({
+      email: 'email', 'urn:oid:1.3.6.1.4.1.5923.1.5.1.1': 'groups', Role: 'groups' })
+  })
+
+  it('saves no groups row the operator did not add', async () => {
+    const onSave = vi.fn()
+    render(<SsoProviderForm provider={{ ...PROVIDER, attribute_mapping: { email: 'email' } }}
+      onSave={onSave} onCancel={vi.fn()} />)
+    expect((await submit(onSave)).attribute_mapping).toEqual({ email: 'email' })
+  })
 })

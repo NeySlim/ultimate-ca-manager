@@ -11,7 +11,14 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from models import db
 
 from security.master_key_bootstrap import OPT_OUT_KEY
+from security.session_key import ALL_KEYS as SESSION_KEY_SETTINGS
+from services.scheduler_service import STATE_KEY as SCHEDULER_STATE_KEY
+from auth.initial_admin import MARKER_KEY as INITIAL_PASSWORD_MARKER_KEY
 from auth.session_epoch import EPOCH_KEY as SESSION_EPOCH_KEY
+from utils.serial_duplicates import PENDING_KEY
+from utils.trust_pem import REMOVED_KEY as TRUST_KEYS_REMOVED_KEY
+from utils.ssh_serials import MARKED_KEY as SSH_SERIALS_MARKED_KEY
+from services.file_regen_service import GENERATION_KEY as FILES_GENERATION_KEY
 
 from .errors import BackupExportError
 
@@ -19,9 +26,25 @@ logger = logging.getLogger(__name__)
 
 CONFIG_KEY = 'backup_installation_id'
 METADATA_KEY = 'installation_id'
-# Settings about this installation itself (the session epoch a restore advances
-# included): never exported, never restored
-LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SESSION_EPOCH_KEY))
+# Settings about this installation or cluster itself (scheduler state, the pending
+# serial index of the upgrade from 2.254, the scheduled backup's reservation and conclusion,
+# services/backup/schedule.py, the expiry webhooks mark, the scheduled passes' leases, the
+# session key that signs this installation's tokens, the node holding the generated
+# initial password, the session epoch, the files generation a restore advances and the
+# trust store keys the upgrade removed and the SSH serials it found shared, reported at the
+# next start):
+# never exported, never restored
+LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SCHEDULER_STATE_KEY, PENDING_KEY,
+                            'backup.last_run', 'backup.concluded_run',
+                            'expiry_alerts.webhooks_mark', 'expiry_alerts.lease',
+                            INITIAL_PASSWORD_MARKER_KEY, SESSION_EPOCH_KEY, FILES_GENERATION_KEY,
+                            TRUST_KEYS_REMOVED_KEY, SSH_SERIALS_MARKED_KEY)
+                           + SESSION_KEY_SETTINGS)
+LOCAL_SETTING_PREFIXES = ('crl_schedule_lease_',)
+
+
+def is_local_setting(key) -> bool:
+    return key in LOCAL_SETTINGS or str(key).startswith(LOCAL_SETTING_PREFIXES)
 
 
 def installation_id(create: bool = False) -> Optional[str]:

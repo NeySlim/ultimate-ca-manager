@@ -13,6 +13,8 @@ from models import CA, Certificate, SystemConfig, db
 from tests.fixtures.cross_pki import openssl_verify, pem
 from tests.fixtures.cross_world import admin_enrolment, build_world, set_served
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 PEM_BLOCK = re.compile(rb'-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----', re.S)
 
 
@@ -154,6 +156,16 @@ def acme_cert(app, client, w):
         acme_api.get_acme_service, acme_api.verify_jws, acme_api._account_id_from_jws = saved
     assert r.status_code == 200, r.data
     return _loads(r.data)
+
+
+@pytest.fixture(autouse=True)
+def _dual_control_back_to_its_default(app):
+    """No test leaves the setting behind: the next file reads the default (on)."""
+    yield
+    from models import SystemConfig, db
+    with app.app_context():
+        SystemConfig.query.filter_by(key='key_recovery_dual_control').delete()
+        db.session.commit()
 
 
 def key_recovery(app, client, w):

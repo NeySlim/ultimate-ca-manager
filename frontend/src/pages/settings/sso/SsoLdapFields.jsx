@@ -5,6 +5,7 @@ import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import RoleMappingEditor from '../RoleMappingEditor'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
 import MappingTestResult from './MappingTestResult'
+import TestConnectionButton from './TestConnectionButton'
 
 export default function SsoLdapFields({
   formData,
@@ -17,6 +18,7 @@ export default function SsoLdapFields({
   testingMapping,
   testMappingResult,
   handleTestConnection,
+  dirty,
   handleTestMapping,
   roleOptions,
   defaultRoleOptions,
@@ -109,7 +111,7 @@ export default function SsoLdapFields({
             />
           )}
           {!formData.ldap_use_ssl && !formData.ldap_start_tls && (
-            <p className="text-xs text-amber-500">{t('sso.ldapPlainWarning')}</p>
+            <p className="text-xs text-status-warning">{t('sso.ldapPlainWarning')}</p>
           )}
           {(formData.ldap_use_ssl || formData.ldap_start_tls) && (
             <>
@@ -120,7 +122,7 @@ export default function SsoLdapFields({
                 size="sm"
               />
               {!formData.ldap_verify_ssl && (
-                <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>
+                <p className="text-xs text-status-warning">{t('sso.sslWarning')}</p>
               )}
             </>
           )}
@@ -146,10 +148,7 @@ export default function SsoLdapFields({
             placeholder={formData._directoryType === 'ad' ? 'DC=example,DC=com' : t('sso.baseDnPlaceholder')}
           />
           {provider?.id && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleTestConnection} disabled={testingConnection} className="gap-1.5">
-              {testingConnection ? <LoadingSpinner size="xs" /> : <Plugs size={14} />}
-              {t('sso.testConnection')}
-            </Button>
+            <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} icon={Plugs} />
           )}
         </div>
       </CompactSection>
@@ -190,7 +189,7 @@ export default function SsoLdapFields({
           {/* Default-deny: Required groups */}
           <div className="p-3 rounded-lg border border-border bg-bg-tertiary">
             <div className="flex items-center gap-2 mb-1">
-              <ShieldWarning size={16} className="text-amber-500" />
+              <ShieldWarning size={16} className="text-status-warning" />
               <p className="text-sm font-medium text-text-secondary">{t('sso.requiredGroups')}</p>
             </div>
             <p className="text-xs text-text-tertiary mb-2">{t('sso.requiredGroupsHelp')}</p>
@@ -216,6 +215,26 @@ export default function SsoLdapFields({
               { value: 'uniqueMember', label: t('sso.ldapGroupAttrs.uniqueMember') },
             ]}
           />
+          <ToggleSwitch
+            checked={formData.ldap_nested_groups === true}
+            onChange={(val) => handleChange('ldap_nested_groups', val)}
+            label={t('sso.ldapNestedGroups')}
+            description={t('sso.ldapNestedGroupsHelp')}
+            size="sm"
+          />
+          {formData.ldap_nested_groups === true && (
+            <p className="text-xs text-status-warning">{t('sso.ldapNestedGroupsWarning')}</p>
+          )}
+          {/* With the nested option, the parent groups are searched under this base, memberOf included */}
+          {((formData.ldap_group_member_attr || 'member') !== 'memberOf' || formData.ldap_nested_groups === true) && (
+            <Input
+              label={t('sso.groupBaseDn')}
+              value={formData.ldap_group_base_dn || ''}
+              onChange={e => handleChange('ldap_group_base_dn', e.target.value)}
+              placeholder="ou=groups,dc=example,dc=com"
+              helperText={t('sso.groupBaseDnHelp')}
+            />
+          )}
           <Select
             label={t('sso.defaultRole')}
             value={formData.default_role}

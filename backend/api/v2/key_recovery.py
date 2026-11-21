@@ -18,7 +18,8 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.export_options import BOOL, PASSWORD, read_export_options
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 import fips_mode
 from fips_mode import FipsRestricted
@@ -33,6 +34,7 @@ from utils.export_password import validate_export_password
 from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
+from utils.sanitize import content_disposition
 from models import db, Certificate, CA, KeyRecoveryRequest
 from models.key_recovery import (
     STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_RECOVERED,
@@ -151,6 +153,16 @@ def list_key_recovery():
     })
 
 
+@bp.route('/api/v2/key-recovery/<int:rid>', methods=['GET'])
+@require_auth(['read:key_recovery'])
+def get_key_recovery(rid):
+    """One recovery request, whatever its age (the list holds only the latest 500)."""
+    req = db.session.get(KeyRecoveryRequest, rid)
+    if not req:
+        return error_response('Recovery request not found', 404)
+    return success_response(data=req.to_dict())
+
+
 @bp.route('/api/v2/key-recovery/<int:rid>/approve', methods=['POST'])
 @require_auth(['admin:key_recovery'])
 def approve_key_recovery(rid):
@@ -199,6 +211,9 @@ def reject_key_recovery(rid):
     return success_response(data=req.to_dict(), message='Recovery request rejected')
 
 
+RECOVER_OPTIONS = {'password': PASSWORD, 'legacy': BOOL}
+
+
 @bp.route('/api/v2/key-recovery/<int:rid>/recover', methods=['POST'])
 @require_auth(['write:key_recovery'])
 def recover_key(rid):
@@ -212,12 +227,14 @@ def recover_key(rid):
     if req.requested_by != _username() and not has_permission('admin:key_recovery', getattr(g, 'permissions', [])):
         return error_response('Only the requester or an admin may recover this key', 403)
 
-    data = request.get_json(silent=True) or {}
-    password = data.get('password') or ''
+    opts, refused = read_export_options(RECOVER_OPTIONS, log_name='key recovery')
+    if refused:
+        return refused
+    password = opts.get('password') or ''
     pw_err = validate_export_password(password)
     if pw_err:
         return error_response(pw_err, 400)
-    legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
 
     cert = _requested_certificate(req)
     if not cert or not cert.prv:
@@ -254,6 +271,6 @@ def recover_key(rid):
         return err
     _audit('key_recovery.recovered', req)
 
-    filename = f"{(cert.descr or cert.refid or 'recovered')}.p12"
     return Response(p12, mimetype='application/x-pkcs12',
-                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+                    headers={'Content-Disposition': content_disposition(
+                        cert.descr or cert.refid, '.p12', fallback=cert.refid or 'recovered')})

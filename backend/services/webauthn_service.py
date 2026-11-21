@@ -27,6 +27,7 @@ from webauthn.helpers.structs import (
 )
 from webauthn.helpers.cose import COSEAlgorithmIdentifier
 
+import fips_mode
 from models import db, User
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 import logging
@@ -146,9 +147,11 @@ class WebAuthnService:
         return json.loads(options_to_json(options))
     
     @staticmethod
-    def verify_registration(user_id: int, credential_data: dict, hostname: str, credential_name: str = None) -> Tuple[bool, str, Optional[WebAuthnCredential]]:
+    def verify_registration(user_id: int, credential_data: dict, hostname: str, credential_name: str = None,
+                            second_factor_of=None) -> Tuple[bool, str, Optional[WebAuthnCredential]]:
         """
-        Verify registration response and create credential
+        Verify registration response and create credential; ``second_factor_of`` (the
+        owner's User row) gets webauthn_2fa set in the credential's own commit.
         """
         rp_id = get_rp_id(hostname)
         
@@ -202,6 +205,8 @@ class WebAuthnService:
             )
             
             db.session.add(credential)
+            if second_factor_of is not None:
+                second_factor_of.webauthn_2fa = True
             db.session.commit()
             
             logger.info(f"WebAuthn credential registered: user_id={user_id}, cred_id={verification.credential_id.hex()[:16]}...")
@@ -289,11 +294,15 @@ class WebAuthnService:
         """
         rp_id = get_rp_id(hostname)
         challenge_bytes = secrets.token_bytes(32)
-        decoy_id = hmac.new(
-            secret or b'ucm-webauthn-decoy',
+        key = secret or b'ucm-webauthn-decoy'
+        # The FIPS module refuses a key under 14 bytes: condensed, or a 500 would name the phantom
+        if fips_mode.enabled() and len(key) < fips_mode.MIN_HMAC_KEY_BYTES:
+            key = hashlib.sha256(key).digest()
+        decoy_id = hmac.digest(
+            key,
             b'webauthn-decoy:' + username.strip().lower().encode('utf-8'),
-            hashlib.sha256,
-        ).digest()
+            'sha256',
+        )
         options = generate_authentication_options(
             rp_id=rp_id,
             challenge=challenge_bytes,

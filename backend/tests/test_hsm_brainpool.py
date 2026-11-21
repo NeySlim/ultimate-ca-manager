@@ -18,13 +18,14 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
+from tests.optional_backends import needs
 from models.hsm import HsmKey
 from services.hsm.base_provider import HsmOperationError
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 
 SOFTHSM_LIB = '/usr/lib/softhsm/libsofthsm2.so'
 HAS_SOFTHSM = bool(shutil.which('softhsm2-util')) and os.path.exists(SOFTHSM_LIB)
-needs_softhsm = pytest.mark.skipif(not HAS_SOFTHSM, reason='SoftHSM not installed')
+needs_softhsm = needs('softhsm', HAS_SOFTHSM, reason='SoftHSM not installed')
 
 BRAINPOOL = {
     'EC-BP256': (ec.BrainpoolP256R1, 32, hashes.SHA256, 'sha256'),
@@ -51,7 +52,7 @@ def test_raw_signature_becomes_der_at_each_size(label):
     from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
     r, s = decode_dss_signature(der)
     raw = r.to_bytes(size, 'big') + s.to_bytes(size, 'big')
-    assert ecdsa_to_der(raw, coordinate_bytes(label)) == der
+    assert ecdsa_to_der(raw, coordinate_bytes(label), 'raw') == der
 
 
 def _provider_for(type_name):
@@ -211,7 +212,7 @@ def test_softhsm_generates_reads_and_signs_brainpool(softhsm, label):
                                     ('sha512', hashes.SHA512)):
             raw = provider.sign(info.key_identifier, b'tbs', label, hash_algorithm=hash_name)
             assert len(raw) == 2 * size
-            public_key.verify(ecdsa_to_der(raw, size), b'tbs', ec.ECDSA(hash_cls()))
+            public_key.verify(ecdsa_to_der(raw, size, 'raw'), b'tbs', ec.ECDSA(hash_cls()))
 
 
 @needs_softhsm

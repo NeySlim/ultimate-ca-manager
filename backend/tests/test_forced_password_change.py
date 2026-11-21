@@ -8,12 +8,11 @@ from uuid import uuid4
 
 import pytest
 
-from auth.session_start import ACCOUNT_KEY, account_proof
+from tests.session_support import pose_signed_in
 from models import User, db
 from models.api_key import APIKey
 from models.user import UserSession
 from tests.conftest import assert_success
-from utils.datetime_utils import utc_now
 from websocket import socketio
 
 _FIRST = 'FirstBoot-Pass-123!'
@@ -118,14 +117,8 @@ def test_an_api_key_made_with_full_access_keeps_working(app, flagged_admin):
 @contextmanager
 def _socket(app, user_id):
     client = app.test_client()
-    with client.session_transaction() as sess:
-        now = utc_now().isoformat()
-        # A real login also records the username and the account proof.
-        with app.app_context():
-            user = db.session.get(User, user_id)
-            sess.update(user_id=user_id, username=user.username,
-                        **{ACCOUNT_KEY: account_proof(user)})
-        sess.update(login_time=now, last_activity=now)
+    with client.session_transaction() as sess, app.app_context():
+        pose_signed_in(sess, db.session.get(User, user_id))
     ws = socketio.test_client(app, flask_test_client=client)
     try:
         yield ws
@@ -158,52 +151,3 @@ def test_2fa_enrolment_paths_stay_closed_without_a_forced_enrolment(app, flagged
     _, username = flagged_admin
     client, _ = _login(app, username)
     assert _refused(client.post('/api/v2/account/2fa/enable'))
-
-
-@pytest.mark.parametrize('initial,forced', [('changeme123', True), ('Operator-Chosen-1!', False)])
-def test_only_the_public_default_password_is_forced_at_first_boot(monkeypatch, initial, forced):
-    """A password the operator set through INITIAL_ADMIN_PASSWORD is not public."""
-    import database_health
-
-    created = []
-
-    class _Query:
-        def filter_by(self, **_kw):
-            return self
-
-        def first(self):
-            return None
-
-        def count(self):
-            return 0
-
-    class _User:
-        query = _Query()
-
-        def __init__(self, **kw):
-            self.__dict__.update(kw)
-            created.append(self)
-
-        def set_password(self, password):
-            self.password = password
-
-    class _Session:
-        def add(self, _obj):
-            pass
-
-        def commit(self):
-            pass
-
-        def rollback(self):
-            pass
-
-    class _Db:
-        session = _Session()
-
-    class _App:
-        config = {'INITIAL_ADMIN_PASSWORD': initial}
-
-    monkeypatch.setattr(database_health, 'User', _User)
-    monkeypatch.setattr(database_health, 'db', _Db())
-    database_health.ensure_admin_user(_App())
-    assert created and created[0].force_password_change is forced

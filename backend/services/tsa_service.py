@@ -113,34 +113,16 @@ class TSAService:
 
     @staticmethod
     def _require_dedicated_tsa_cert() -> bool:
-        """Whether signing timestamps with a CA certificate is refused.
-
-        RFC 3161 §2.3 wants a dedicated end-entity signer with a critical,
-        exclusive timeStamping EKU. UCM historically signs with the configured
-        CA's own certificate, which makes /tsa an anonymous signing oracle over
-        attacker-structured content using the CA private key. Refusing that
-        outright would break every pre-2.200 deployment, so it stays the
-        default and operators opt in to the strict behaviour with
-        ``tsa_require_dedicated_cert = true``.
-        """
-        try:
-            from models import SystemConfig
-            cfg = SystemConfig.query.filter_by(
-                key='tsa_require_dedicated_cert'
-            ).first()
-            return bool(cfg and str(cfg.value).lower() == 'true')
-        except Exception:
-            return False
+        """Whether signing timestamps with a CA certificate is refused (RFC 3161 §2.3)."""
+        return tsa_requires_dedicated_signer()
 
     @staticmethod
     def _accept_ca_signer_or_raise() -> None:
         """Compatibility path for signing timestamps with a CA's own certificate.
 
-        UCM has always signed with the configured CA certificate, which is not
-        an RFC 3161 §2.3 dedicated signer: a root usually carries no EKU, and a
-        constrained sub-CA carries an EKU that does not list timeStamping (#309).
-        Both are accepted with a warning unless the operator opted into the
-        strict tsa_require_dedicated_cert mode.
+        A CA certificate is not an RFC 3161 §2.3 dedicated signer: it is refused
+        unless the operator wrote tsa_require_dedicated_cert=false (kept by the
+        upgrade from 2.x for a TSA that signed with its CA), then accepted with a warning.
         """
         if TSAService._require_dedicated_tsa_cert():
             raise TSAConfigurationError(
@@ -154,20 +136,17 @@ class TSAService:
             'timeStamping signer. The /tsa endpoint is unauthenticated, so this '
             'makes the CA private key an anonymous signing oracle over '
             'caller-supplied content. Issue a dedicated TSA certificate with a '
-            'critical, exclusive timeStamping EKU (RFC 3161 §2.3) and set '
-            'tsa_require_dedicated_cert=true to enforce it.'
+            'critical, exclusive timeStamping EKU (RFC 3161 §2.3), then turn '
+            'tsa_require_dedicated_cert back on.'
         )
 
     @staticmethod
     def validate_certificate(tsa_cert: x509.Certificate) -> None:
-        """Validate the TSA signer. A dedicated end-entity TSA certificate
-        (RFC 3161 §2.3: critical, exclusive timeStamping EKU) is the
-        recommended setup, but UCM historically signs with the configured
-        CA's own certificate. A root carries no EKU; a constrained sub-CA
-        carries an EKU without timeStamping (#309). Refusing either broke
-        existing deployments, so a CA certificate stays accepted (with a
-        warning), and only an end-entity certificate lacking the
-        timeStamping EKU is refused."""
+        """Validate the TSA signer. RFC 3161 §2.3 wants a dedicated end-entity
+        certificate (critical, exclusive timeStamping EKU). A CA certificate (a root
+        carries no EKU, a constrained sub-CA one without timeStamping, #309) is
+        accepted with a warning only while tsa_require_dedicated_cert is off; an
+        end-entity certificate lacking the timeStamping EKU is always refused."""
         try:
             bc = tsa_cert.extensions.get_extension_for_oid(
                 ExtensionOID.BASIC_CONSTRAINTS
@@ -403,8 +382,9 @@ class TSAService:
 SIGNER_CONFIG_KEY = 'tsa_signer_cert_refid'
 
 
-def _get_signer_refid() -> str:
-    """Configured dedicated-signer refid, or '' when unset."""
+def configured_signer_refid() -> str:
+    """Configured dedicated-signer refid, stripped, or '' when unset: what /tsa, the
+    configuration API and the overview read the setting through."""
     try:
         from models import SystemConfig
         cfg = SystemConfig.query.filter_by(key=SIGNER_CONFIG_KEY).first()
@@ -536,7 +516,7 @@ def load_configured_signer():
     historical CA-certificate behaviour unchanged. Raises
     TSAConfigurationError when a signer is configured but unusable.
     """
-    refid = _get_signer_refid()
+    refid = configured_signer_refid()
     if not refid:
         return None
     _record, cert, key, chain = _load_signer_certificate(refid)
@@ -545,7 +525,7 @@ def load_configured_signer():
 
 def describe_configured_signer() -> dict:
     """Describe the configured dedicated signer for the config API. Never raises."""
-    refid = _get_signer_refid()
+    refid = configured_signer_refid()
     if not refid:
         return {'configured': False}
 
@@ -601,6 +581,13 @@ def describe_configured_signer() -> dict:
     }
 
 
+def tsa_requires_dedicated_signer() -> bool:
+    """Whether /tsa refuses to sign with a CA certificate. Absent reads true; only the exact
+    word false allows the CA, and a read that fails refuses it."""
+    from services.settings_registry import effective
+    return effective('tsa_require_dedicated_cert')
+
+
 def tsa_is_enabled() -> bool:
     """Whether /tsa will serve timestamp requests, per the tsa_enabled row.
 
@@ -615,21 +602,25 @@ def tsa_is_enabled() -> bool:
     existed. Callers that must not raise (the dashboard) wrap their own block.
     """
     from models import SystemConfig
+    from services.tsa_upgrade import tsa_enabled_reads_on
     row = SystemConfig.query.filter_by(key='tsa_enabled').first()
-    return row is None or str(row.value).lower() == 'true'
+    return tsa_enabled_reads_on(row is not None, row.value if row is not None else None)
 
 
 def tsa_ca_certificate_path_ready() -> bool:
     """Whether the historical CA-certificate signing path can serve /tsa.
 
     Only meaningful when no dedicated signer is configured. Mirrors the gates
-    in api/tsa_protocol.py: an admin-designated tsa_ca_refid resolving to a CA
-    that exists, holds its cert and key, is not offline, and is within its
-    validity period. Without this the
+    in api/tsa_protocol.py: tsa_require_dedicated_cert turned off, and an
+    admin-designated tsa_ca_refid resolving to a CA
+    that exists, holds its cert and key, is not offline, is within its
+    validity period and has a key that signs timestamps. Without this the
     protocol returns 503, so the dashboard must not report the CA path online.
     Only consumer is the dashboard, which wraps its own block.
     """
     from models import SystemConfig, CA
+    if tsa_requires_dedicated_signer():
+        return False
     row = SystemConfig.query.filter_by(key='tsa_ca_refid').first()
     refid = (row.value or '').strip() if row and row.value else ''
     if not refid:
@@ -642,4 +633,5 @@ def tsa_ca_certificate_path_ready() -> bool:
         cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
     except Exception:
         return False
-    return certificate_validity_problem(cert) is None
+    return (certificate_validity_problem(cert) is None
+            and tsa_signer_key_problem(cert.public_key()) is None)

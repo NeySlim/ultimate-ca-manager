@@ -26,7 +26,8 @@ PEBBLE_MGMT = f'https://{PEBBLE_IP}:15000'
 DIRECTORY = 'https://pebble:14000/dir'
 UCM_C, PEBBLE_C = f'{PREFIX}-ucm', f'{PREFIX}-ca'
 USER = os.environ.get('UCM_USER', 'admin')
-PASSWORD = os.environ.get('UCM_PASSWORD', 'changeme123')
+# Unset: the password UCM generated at its first start, read from its data directory
+PASSWORD = os.environ.get('UCM_PASSWORD', '')
 # The first login must change the initial password; the bench sets this one.
 BENCH_PASSWORD = os.environ.get('UCM_BENCH_PASSWORD', 'Pebble-Bench-2026!')
 DOMAIN = os.environ.get('BENCH_DOMAIN', 'bench.example.com')
@@ -61,6 +62,11 @@ def sh(*args, check=True, inp=None, stderr=True):
     return proc.stdout + (proc.stderr if stderr else '')
 
 
+def generated_password():
+    return sh('docker', 'exec', UCM_C, 'cat', '/opt/ucm/data/initial-admin-password',
+              check=False, stderr=False).strip()
+
+
 class Ucm:
     def __init__(self):
         self.jar = http.cookiejar.CookieJar()
@@ -88,7 +94,7 @@ class Ucm:
 
     def login(self):
         for _ in range(60):
-            for password in (BENCH_PASSWORD, PASSWORD):
+            for password in (BENCH_PASSWORD, PASSWORD or generated_password()):
                 self.jar.clear()
                 self.csrf = None
                 try:

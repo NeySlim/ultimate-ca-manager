@@ -21,7 +21,8 @@ import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
-import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshKeyOptions, useFipsMode } from '../lib/policyAlgorithms'
+import { sanitizeDownloadName } from '../lib/filename'
+import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 
 // ============= CONSTANTS =============
 
@@ -214,8 +215,16 @@ export default function SSHCertificatesPage() {
     if (!revokingCert) return
     try {
       muteToasts()
-      await sshCertificatesService.revoke(revokingCert.id, reason)
-      showSuccess(t('messages.success.revoke.sshCertificate'))
+      const res = await sshCertificatesService.revoke(revokingCert.id, reason)
+      // The KRL revokes serial 0 by key ID under the CA, any other serial by number; a key ID
+      // may take a numbered certificate, whose serial takes its other holders (revoked_by)
+      showSuccess(!res?.data?.revoked_with?.length
+        ? t('messages.success.revoke.sshCertificate')
+        : (res.data.revoked_by || []).length > 1
+          ? t('sshCertificates.revokedWithKeyIdAndSerials', { keyId: revokingCert.key_id })
+        : revokingCert.serial
+          ? t('sshCertificates.revokedWithShared', { serial: revokingCert.serial })
+          : t('sshCertificates.revokedWithKeyId', { keyId: revokingCert.key_id }))
       setShowRevokeModal(false)
       setRevokingCert(null)
       if (selectedCert?.id === revokingCert.id) setSelectedCert(null)
@@ -248,7 +257,7 @@ export default function SSHCertificatesPage() {
       const res = await sshCertificatesService.export(cert.id)
       const text = typeof res === 'string' ? res : (res.data?.certificate || res.data || JSON.stringify(res))
       const blob = new Blob([text], { type: 'text/plain' })
-      downloadBlob(blob, `${cert.key_id || t('sshCertificates.export.filename')}-cert.pub`)
+      downloadBlob(blob, sanitizeDownloadName(cert.key_id || t('sshCertificates.export.filename'), '-cert.pub'))
       showSuccess(t('sshCertificates.export.success'))
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
@@ -342,6 +351,9 @@ export default function SSHCertificatesPage() {
                 : <User size={14} weight="duotone" />}
             </div>
             <span className="font-medium truncate">{val || t('common.unnamed')}</span>
+            {row.serial_shared_with?.length > 0 && (
+              <Badge variant="warning" size="sm" icon={Warning}>{t('sshCertificates.serialShared')}</Badge>
+            )}
           </div>
         )
       },
@@ -386,6 +398,8 @@ export default function SSHCertificatesPage() {
       key: 'principals',
       header: t('sshCertificates.principals'),
       priority: 3,
+      // Not in the server's sort list: a click would change nothing
+      sortable: false,
       hideOnMobile: true,
       render: (val) => {
         const principals = Array.isArray(val) ? val : (val ? String(val).split(',') : [])
@@ -439,6 +453,7 @@ export default function SSHCertificatesPage() {
       key: 'ca_name',
       header: t('sshCertificates.caName'),
       priority: 5,
+      sortable: false,
       hideOnMobile: true,
       render: (val) => (
         <span className="text-xs text-text-secondary truncate">
@@ -495,6 +510,16 @@ export default function SSHCertificatesPage() {
           </Button>
         )}
       </div>
+
+      {/* Another certificate of the CA holds this serial: the KRL revokes by serial */}
+      {selectedCert.serial_shared_with?.length > 0 && (
+        <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
+          <div className="flex items-start gap-2 text-status-warning text-xs">
+            <Warning size={16} className="shrink-0" />
+            <span>{t('sshCertificates.serialSharedDetail', { serial: selectedCert.serial })}</span>
+          </div>
+        </div>
+      )}
 
       {/* Certificate Information */}
       <CompactSection title={t('sshCertificates.certInformation')} icon={Certificate}>
@@ -807,11 +832,12 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
   const [keyId, setKeyId] = useState('')
   const [publicKey, setPublicKey] = useState('')
   const [keyAlgorithm, setKeyAlgorithm] = useState('ed25519')
-  // FIPS mode offers no Ed25519: generated keys then default to ECDSA P-256
-  const fips = useFipsMode()
+  // FIPS mode on a module without Ed25519: generated keys then default to ECDSA P-256
+  const { fips, fipsKeys } = useKeyPlatform()
+  const eddsaRefused = sshEddsaRefused(fips, fipsKeys)
   useEffect(() => {
-    if (fips) setKeyAlgorithm(prev => (SSH_EDDSA_KEY_TYPES.includes(prev) ? SSH_FIPS_DEFAULT_KEY_TYPE : prev))
-  }, [fips])
+    if (eddsaRefused) setKeyAlgorithm(prev => (SSH_EDDSA_KEY_TYPES.includes(prev) ? SSH_FIPS_DEFAULT_KEY_TYPE : prev))
+  }, [eddsaRefused])
   const [principalsText, setPrincipalsText] = useState('')
   const [validityPreset, setValidityPreset] = useState('24h')
   const [customFrom, setCustomFrom] = useState('')
@@ -881,8 +907,9 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
       }
 
       if (validityPreset === 'custom') {
-        if (customFrom) data.valid_from = customFrom
-        if (customTo) data.valid_to = customTo
+        // The inputs hold local time without an offset: the server reads UTC
+        if (customFrom) data.valid_from = new Date(customFrom).toISOString()
+        if (customTo) data.valid_to = new Date(customTo).toISOString()
       }
 
       const criticalOptions = {}
@@ -1025,7 +1052,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
           <Select
             value={keyAlgorithm}
             onChange={setKeyAlgorithm}
-            options={sshKeyOptions(KEY_ALGORITHMS, fips)}
+            options={sshKeyOptions(KEY_ALGORITHMS, fips, fipsKeys)}
           />
         </div>
       )}
@@ -1076,6 +1103,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
             </label>
             <Input
               type="datetime-local"
+              required
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
             />
@@ -1151,7 +1179,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
         <Button type="submit" disabled={loading || !caId || (mode === 'sign' && !publicKey.trim())}>
           {loading ? (
             <span className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="w-3.5 h-3.5 border-2 spinner-on-accent rounded-full animate-spin" />
               {t('sshCertificates.issueCertificate')}
             </span>
           ) : (
@@ -1185,7 +1213,6 @@ function GeneratedResultView({ result, onClose }) {
   }
 
   const keyId = result.key_id || 'ssh_cert'
-  const safeKeyId = keyId.replace(/[^a-zA-Z0-9_-]/g, '_')
 
   return (
     <div className="p-4 space-y-4">
@@ -1213,7 +1240,7 @@ function GeneratedResultView({ result, onClose }) {
                 {t('sshCertificates.generatedPrivateKey')}
               </label>
               <div className="flex items-center gap-1">
-                <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.private_key, safeKeyId)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.private_key, sanitizeDownloadName(keyId, ''))}>
                   <Download size={12} /> {t('common.download')}
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.private_key)}>
@@ -1236,7 +1263,7 @@ function GeneratedResultView({ result, onClose }) {
               {t('sshCertificates.generatedCertificate')}
             </label>
             <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.certificate, `${safeKeyId}-cert.pub`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.certificate, sanitizeDownloadName(keyId, '-cert.pub'))}>
                 <Download size={12} /> {t('common.download')}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.certificate)}>
@@ -1258,7 +1285,7 @@ function GeneratedResultView({ result, onClose }) {
               {t('sshCertificates.publicKey')}
             </label>
             <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.public_key, `${safeKeyId}.pub`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.public_key, sanitizeDownloadName(keyId, '.pub'))}>
                 <Download size={12} /> {t('common.download')}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.public_key)}>
@@ -1305,6 +1332,16 @@ function RevokeCertificateForm({ cert, onSubmit, onCancel }) {
           <Warning size={16} />
           {t('sshCertificates.revokeConfirm')}
         </div>
+        {cert?.serial_shared_with?.length > 0 && (
+          <p className="mt-2 text-xs text-status-danger">
+            {t('sshCertificates.revokeSharedSerial', { serial: cert.serial })}
+          </p>
+        )}
+        {cert && cert.serial === 0 && (
+          <p className="mt-2 text-xs text-status-danger">
+            {t('sshCertificates.revokeSerialZero', { keyId: cert.key_id })}
+          </p>
+        )}
       </div>
 
       {cert && (
@@ -1333,7 +1370,7 @@ function RevokeCertificateForm({ cert, onSubmit, onCancel }) {
         <Button type="submit" variant="danger" disabled={loading}>
           {loading ? (
             <span className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="w-3.5 h-3.5 border-2 spinner-on-accent rounded-full animate-spin" />
               {t('sshCertificates.revokeCertificate')}
             </span>
           ) : (

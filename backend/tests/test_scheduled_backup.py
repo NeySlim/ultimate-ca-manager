@@ -62,6 +62,73 @@ class TestDueLogic:
             two_days = utc_isoformat(utc_now() - timedelta(days=2))
             assert _is_due({'frequency': 'weekly', 'last_run': two_days}, utc_now()) is False
 
+    def test_an_upgraded_install_without_a_conclusion_marker_counts_as_concluded(self, app):
+        """last_run written before the marker existed: no early archive past the lease."""
+        with app.app_context():
+            from services.backup.schedule import _is_due
+            three_hours = utc_isoformat(utc_now() - timedelta(hours=3))
+            assert _is_due({'frequency': 'daily', 'last_run': three_hours,
+                            'concluded_run': None}, utc_now()) is False
+
+    def test_a_reservation_never_concluded_is_due_once_its_lease_is_over(self, app):
+        with app.app_context():
+            from services.backup.schedule import _is_due
+            three_hours = utc_isoformat(utc_now() - timedelta(hours=3))
+            one_hour = utc_isoformat(utc_now() - timedelta(hours=1))
+            older = utc_isoformat(utc_now() - timedelta(days=1))
+            assert _is_due({'frequency': 'daily', 'last_run': three_hours,
+                            'concluded_run': older}, utc_now()) is True
+            assert _is_due({'frequency': 'daily', 'last_run': one_hour,
+                            'concluded_run': older}, utc_now()) is False
+            assert _is_due({'frequency': 'daily', 'last_run': three_hours,
+                            'concluded_run': three_hours}, utc_now()) is False
+
+
+class TestConclusionMarker:
+    def test_an_existing_marker_is_not_inserted_again(self, app):
+        """The INSERT of a compare-and-set fails on the unique key: a PostgreSQL log ERROR."""
+        from sqlalchemy import event
+        from services.backup.schedule import _CONCLUDED_KEY, _start_marking_conclusions
+        with app.app_context():
+            saved = SystemConfig.query.filter_by(key=_CONCLUDED_KEY).first()
+            saved = saved.value if saved else None
+            _set(_CONCLUDED_KEY, 'an earlier run')
+            statements = []
+
+            def record(conn, cursor, statement, *args):
+                statements.append(statement)
+            engine = db.engine
+            event.listen(engine, 'before_cursor_execute', record)
+            try:
+                _start_marking_conclusions('an earlier run')
+            finally:
+                event.remove(engine, 'before_cursor_execute', record)
+            try:
+                assert not [s for s in statements if s.lstrip().upper().startswith('INSERT')]
+                assert SystemConfig.query.filter_by(key=_CONCLUDED_KEY).one().value == 'an earlier run'
+            finally:
+                if saved is None:
+                    SystemConfig.query.filter_by(key=_CONCLUDED_KEY).delete()
+                    db.session.commit()
+                else:
+                    _set(_CONCLUDED_KEY, saved)
+
+    def test_a_missing_marker_is_created(self, app):
+        from services.backup.schedule import _CONCLUDED_KEY, _start_marking_conclusions
+        with app.app_context():
+            saved = SystemConfig.query.filter_by(key=_CONCLUDED_KEY).first()
+            saved = saved.value if saved else None
+            SystemConfig.query.filter_by(key=_CONCLUDED_KEY).delete()
+            db.session.commit()
+            try:
+                _start_marking_conclusions('prev')
+                assert SystemConfig.query.filter_by(key=_CONCLUDED_KEY).one().value == 'prev'
+            finally:
+                SystemConfig.query.filter_by(key=_CONCLUDED_KEY).delete()
+                db.session.commit()
+                if saved is not None:
+                    _set(_CONCLUDED_KEY, saved)
+
 
 class TestScheduledTaskGating:
     def test_disabled_is_noop(self, app, monkeypatch):
@@ -69,7 +136,7 @@ class TestScheduledTaskGating:
             from services.backup import schedule
             _set('auto_backup_enabled', 'false')
             called = []
-            monkeypatch.setattr('services.backup_service.BackupService.create_backup',
+            monkeypatch.setattr('services.backup_service.BackupService.iter_backup',
                                 lambda self, pw, **k: called.append(1) or b'x')
             schedule.run_scheduled_backup()
             assert called == []
@@ -86,7 +153,7 @@ class TestScheduledTaskGating:
             SystemConfig.query.filter_by(key='backup.last_run').delete()
             db.session.commit()
             called = []
-            monkeypatch.setattr('services.backup_service.BackupService.create_backup',
+            monkeypatch.setattr('services.backup_service.BackupService.iter_backup',
                                 lambda self, pw, **k: called.append(1) or b'x')
             with pytest.raises(ScheduledBackupError):
                 schedule.run_scheduled_backup()

@@ -22,7 +22,9 @@ from .lock import (
 from .snapshot import SnapshotError, create_source_snapshot
 from .preflight import PreflightError
 from .verify import VerificationError
-from .migration import BOOTSTRAP_AUTH_TABLES, bootstrap_auth_to_target, migrate_data
+from .migration import (
+    BOOTSTRAP_AUTH_TABLES, bootstrap_auth_to_target, migrate_data, start_refusal,
+)
 
 __all__ = [
     'UCM_ENV_PATH', 'BACKUP_DIR',
@@ -37,4 +39,5 @@ __all__ = [
     'SnapshotError', 'create_source_snapshot',
     'PreflightError', 'VerificationError',
     'BOOTSTRAP_AUTH_TABLES', 'bootstrap_auth_to_target', 'migrate_data',
+    'start_refusal',
 ]

@@ -26,6 +26,8 @@ from models.acme_models import (
 )
 from services.acme.acme_service import AcmeService
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _int_to_b64(n):
     raw = n.to_bytes((n.bit_length() + 7) // 8, 'big')
@@ -1104,8 +1106,10 @@ class TestRfc8555StateMachine:
 
             assert success is False
             assert error == 'signing failed'
+            # A request failure: badCSR, the route then reopens the order (RFC 8555 §7.4)
+            assert service._last_finalize_error_type == 'badCSR'
             db.session.refresh(order)
-            assert order.status == 'invalid'
+            assert order.status == 'processing'
 
 
 class TestExternalAccountBinding:

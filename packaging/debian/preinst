@@ -4,6 +4,14 @@
 
 set -e
 
+# An upgrade of a UCM older than 2.254 is refused before anything below writes a file.
+# `install <version>` (removed, config files kept) is not: the postinst archives what it left.
+# @UCM_PIVOT_GUARD@
+command -v ucm_pivot_guard >/dev/null || exit 1
+case "$1" in
+    upgrade) ucm_pivot_guard "$2" || exit 1 ;;
+esac
+
 # The rotation configuration became a package file in 2.230. Where an operator
 # had written one by hand, following documentation that promised the packages
 # shipped it, dpkg would stop and ask what to do, and an unattended upgrade
@@ -28,8 +36,8 @@ case "$1" in
         PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
         PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
         
-        if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]; }; then
-            echo "Error: Python 3.10 or higher is required (found $PYTHON_VERSION)" >&2
+        if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 12 ]; }; then
+            echo "Error: Python 3.12 or higher is required (found $PYTHON_VERSION)" >&2
             exit 1
         fi
         
@@ -39,18 +47,10 @@ case "$1" in
             exit 1
         fi
         
-        # On upgrade, backup existing database and config
+        # On upgrade, backup the configuration
         if [ "$1" = "upgrade" ]; then
             BACKUP_DIR="/var/lib/ucm/backups"
             mkdir -p "$BACKUP_DIR"
-            
-            # Backup database
-            if [ -f "/var/lib/ucm/ucm.db" ]; then
-                echo "Creating backup of existing database..."
-                BACKUP_FILE="$BACKUP_DIR/ucm-pre-upgrade-$(date +%Y%m%d-%H%M%S).db"
-                cp "/var/lib/ucm/ucm.db" "$BACKUP_FILE"
-                echo "✓ Database backup: $BACKUP_FILE"
-            fi
             
             # Backup configuration
             if [ -f "/etc/ucm/ucm.env" ]; then

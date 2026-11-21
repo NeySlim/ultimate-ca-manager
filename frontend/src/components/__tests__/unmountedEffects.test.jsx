@@ -8,10 +8,6 @@
  * provider, which outlives the component (it wraps the whole route tree in
  * App.jsx). The user therefore sees a toast about a screen they have left —
  * for AppShell, an expiry warning appearing on the login page after logout.
- *
- * Sidebar has the same unguarded shape but its continuation only calls
- * setExpiringCount, so there is nothing to assert on; it is fixed alongside
- * these two without a test of its own.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, act } from '@testing-library/react'
