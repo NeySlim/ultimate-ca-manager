@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Archive } from '@phosphor-icons/react'
-import { Button } from '../../components'
+import { Btn, Props, RecordList, RecordRow } from '../../components/atelier'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
@@ -11,7 +11,6 @@ import { compactAgo } from '../../lib/relativeTime'
 import FipsPreflightPanel from './FipsPreflightPanel'
 import CompliancePreflightPanel from './CompliancePreflightPanel'
 import { KOFI_URL } from '../../lib/support'
-import { FormGroup, FormProps } from '../../components/sectioned'
 
 const REPO = 'https://github.com/NeySlim/ultimate-ca-manager'
 
@@ -61,59 +60,44 @@ export default function AboutSection() {
 
   return (
     <>
-      <FormGroup title={t('settings.about.systemInfo')}>
-        <FormProps items={[
+      <SettingsGroup legend={t('settings.about.systemInfo')} grid={false}>
+        <Props items={[
           [t('settings.about.version'), info?.version || __APP_VERSION__],
           [t('settings.about.pythonVersion'), info?.python_version || '—'],
           [t('settings.about.started'), started],
           [t('settings.about.memory'), info?.memory_mb ? formatBytes(info.memory_mb * 1024 * 1024, i18n?.language) : '—'],
           [t('settings.about.environment'), info ? (info.is_docker ? 'Docker' : t('settings.about.envNative')) : '—'],
         ]} />
-      </FormGroup>
+      </SettingsGroup>
 
       {/* Diagnostic bundle: admin only */}
       {isAdmin() && (
-        <FormGroup title={t('settings.about.diagnostic')}>
-          <ul className="sf-records">
-            <li>
-              <div className="sf-record-main">
-                <strong>{t('settings.about.logBundle')}</strong>
-                <span className="sf-record-meta">{t('settings.about.logBundleHint')}</span>
-              </div>
-              <div className="sf-record-actions">
-                <Button type="button" variant="secondary" onClick={handleDownloadBundle} disabled={bundleLoading}>
-                  <Archive size={16} />
+        <SettingsGroup legend={t('settings.about.diagnostic')} grid={false}>
+          <RecordList>
+            <RecordRow title={t('settings.about.logBundle')} meta={t('settings.about.logBundleHint')}
+              action={(
+                <Btn icon="archive" onClick={handleDownloadBundle} disabled={bundleLoading}>
                   {bundleLoading ? t('common.preparing') : t('common.download')}
-                </Button>
-              </div>
-            </li>
-          </ul>
-        </FormGroup>
+                </Btn>
+              )} />
+          </RecordList>
+        </SettingsGroup>
       )}
 
-      <FormGroup title={t('settings.about.links')}>
-        <ul className="sf-records">
+      <SettingsGroup legend={t('settings.about.links')} grid={false}>
+        <RecordList>
           {links.map((link) => (
-            <li key={link.href}>
-              <div className="sf-record-main">
-                <strong><a className="sf-link" href={link.href} target="_blank" rel="noopener noreferrer">{link.title}</a></strong>
-                <span className="sf-record-meta">{link.meta}</span>
-              </div>
-            </li>
+            <RecordRow key={link.href} meta={link.meta}
+              title={<a className="text-link" href={link.href} target="_blank" rel="noopener noreferrer">{link.title}</a>} />
           ))}
-        </ul>
-      </FormGroup>
+        </RecordList>
+      </SettingsGroup>
 
-      <FormGroup title={t('settings.about.license')}>
-        <ul className="sf-records">
-          <li>
-            <div className="sf-record-main">
-              <strong>GNU AGPL v3.0 only</strong>
-              <span className="sf-record-meta">© 2025-2026 Lionel Alarcon: {t('settings.about.licenseDesc')}</span>
-            </div>
-          </li>
-        </ul>
-      </FormGroup>
+      <SettingsGroup legend={t('settings.about.license')} grid={false}>
+        <RecordList>
+          <RecordRow title="GNU AGPL v3.0 only" meta={`© 2025-2026 Lionel Alarcon: ${t('settings.about.licenseDesc')}`} />
+        </RecordList>
+      </SettingsGroup>
 
       {/* The checks last, as the mockup ends a frame with its test */}
       {hasPermission('admin:system') && <FipsPreflightPanel />}

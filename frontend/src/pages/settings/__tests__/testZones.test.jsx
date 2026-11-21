@@ -20,22 +20,22 @@ describe('section test zones', () => {
   it('keeps the syslog test button while syslog is off, with the hint at rest', () => {
     audit()
     expect(screen.getByRole('button', { name: /settings.syslogTest/ })).toBeEnabled()
-    expect(screen.getByText('settings.syslogTestSavedHint').closest('.sf-test-result')).not.toHaveClass('is-bad')
+    expect(screen.getByText('settings.syslogTestSavedHint').closest('.test-result')).toHaveClass('muted')
   })
 
   it('shows the syslog test result beside the button in its tone', () => {
     audit({ syslogTestResult: { ok: false, text: 'refused' } })
     const result = screen.getByRole('status')
     expect(result).toHaveTextContent('refused')
-    expect(result).toHaveClass('is-bad')
-    expect(result.closest('.sf-test')).toContainElement(screen.getByRole('button', { name: /settings.syslogTest/ }))
+    expect(result).toHaveClass('bad')
+    expect(result.closest('.settings-test')).toContainElement(screen.getByRole('button', { name: /settings.syslogTest/ }))
   })
 
   it('shows the auto-renewal run result beside Run now', () => {
     render(<AutoRenewalSection arSettings={ar} setArSettings={vi.fn()} arRunResult={{ ok: true, text: '2 renewed' }} handleArRunNow={vi.fn()} />)
     const result = screen.getByRole('status')
     expect(result).toHaveTextContent('2 renewed')
-    expect(result).toHaveClass('is-good')
+    expect(result).toHaveClass('good')
     expect(screen.getByRole('button', { name: /settings.autoRenewalSource_acme/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: /settings.autoRenewalSource_est/ })).toHaveAttribute('aria-pressed', 'false')
   })

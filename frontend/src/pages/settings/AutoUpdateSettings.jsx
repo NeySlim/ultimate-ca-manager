@@ -4,11 +4,11 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Select } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { Select, ToggleSwitch } from '../../components/atelier/Form'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { apiClient } from '../../services'
 import { useNotification } from '../../contexts'
-import { FormGroup, useSavePart, keptPartDraft } from '../../components/sectioned'
+import { useSavePart, keptPartDraft } from '../../components/sectioned'
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
   value: h,
@@ -92,45 +92,19 @@ export default function AutoUpdateSettings() {
   if (loading) return null
 
   return (
-    <FormGroup title={t('settings.autoUpdateTitle')} description={t('settings.autoUpdateDesc')}>
-      <div className="space-y-4" aria-busy={saving || undefined}>
-
-      <Select
-        label={t('settings.autoUpdateChannel')}
-        value={channel}
-        onChange={(val) => setChannel(val)}
+    <SettingsGroup legend={t('settings.autoUpdateTitle')} hint={t('settings.autoUpdateDesc')} aria-busy={saving || undefined}>
+      <Select id="set-update_channel" label={t('settings.autoUpdateChannel')} value={channel} onChange={(val) => setChannel(val)}
         options={[
           { value: 'stable', label: t('settings.autoUpdateChannelStable') },
           { value: 'rc', label: t('settings.autoUpdateChannelRc') },
-        ]}
-      />
-
-      <ToggleSwitch
-        checked={autoInstall}
-        onChange={(val) => setAutoInstall(val)}
-        label={t('settings.autoUpdateEnable')}
-        description={canAutoUpdate
-          ? t('settings.autoUpdateEnableDesc')
-          : t('settings.autoUpdateDockerHint')}
-        disabled={!canAutoUpdate}
-      />
-
-      <ToggleSwitch
-        checked={popupEnabled}
-        onChange={(val) => setPopupEnabled(val)}
-        label={t('settings.updatePopupEnable')}
-        description={t('settings.updatePopupEnableDesc')}
-      />
-
+        ]} />
       {autoInstall && canAutoUpdate && (
-        <Select
-          label={t('settings.autoUpdateHour')}
-          value={hour}
-          onChange={(val) => setHour(Number(val))}
-          options={HOUR_OPTIONS}
-        />
+        <Select id="set-update_hour" short label={t('settings.autoUpdateHour')} value={hour} onChange={(val) => setHour(Number(val))} options={HOUR_OPTIONS} />
       )}
-      </div>
-    </FormGroup>
+      <ToggleSwitch id="set-update_auto_install" checked={autoInstall} onChange={(val) => setAutoInstall(val)} label={t('settings.autoUpdateEnable')}
+        description={canAutoUpdate ? t('settings.autoUpdateEnableDesc') : t('settings.autoUpdateDockerHint')} disabled={!canAutoUpdate} />
+      <ToggleSwitch id="set-update_popup" checked={popupEnabled} onChange={(val) => setPopupEnabled(val)} label={t('settings.updatePopupEnable')}
+        description={t('settings.updatePopupEnableDesc')} />
+    </SettingsGroup>
   )
 }

@@ -50,8 +50,9 @@ describe('BackupSection size ceiling', () => {
     expect(field.value).toBe('512')
     fireEvent.change(field, { target: { value: '64' } })
     expect(updateSetting).toHaveBeenCalledWith('backup_max_total_mb', 64)
+    // Emptied, it stays empty: the checks refuse it at the save, no 0 under the fingers
     fireEvent.change(field, { target: { value: '' } })
-    expect(updateSetting).toHaveBeenLastCalledWith('backup_max_total_mb', 0)
+    expect(updateSetting).toHaveBeenLastCalledWith('backup_max_total_mb', '')
   })
 
   it('says how much room the archives retention counts take, from the server', () => {

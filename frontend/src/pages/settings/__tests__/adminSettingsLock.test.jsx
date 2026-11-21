@@ -4,7 +4,7 @@
  * not a card button, stores the fields write:settings may change.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
@@ -208,13 +208,12 @@ describe('BackupSection', () => {
     renderBackup(OPERATOR)
     expect(field('settings.autoBackupPassword').control.disabled).toBe(true)
     expect(field('settings.autoBackupPassword').locked).toBe(true)
-    expect(toggle('settings.enableAutoBackups').disabled).toBe(true)
+    // The mockup's frequency carries the off entry: locked with the rest of the schedule
     expect(field('settings.backupFrequency').control.disabled).toBe(true)
     expect(field('settings.backupFrequency').control.value).toBe('weekly')
-    const retention = screen.getAllByText('settings.retentionPeriod')
-      .map((n) => n.closest('[data-field]')).find(Boolean).querySelector('input')
-    expect(retention.disabled).toBe(true)
-    expect(retention.value).toBe('14')
+    expect(field('settings.retentionPeriod').control.disabled).toBe(true)
+    expect(field('settings.retentionPeriod').control.value).toBe('14')
+    expect(field('settings.retentionPeriod').locked).toBe(true)
     expect(screen.queryAllByText('settings.saveSettings')).toHaveLength(0)
     expect(screen.getByText('settings.createBackup')).toBeInTheDocument()
     expect(screen.queryByText('settings.backupCleanupNow')).not.toBeInTheDocument()
@@ -230,8 +229,8 @@ describe('BackupSection', () => {
     renderBackup(ADMIN)
     expect(field('settings.autoBackupPassword').control.disabled).toBeFalsy()
     expect(field('settings.autoBackupPassword').locked).toBe(false)
-    expect(toggle('settings.enableAutoBackups').disabled).toBeFalsy()
     expect(field('settings.backupFrequency').control.disabled).toBeFalsy()
+    expect(field('settings.retentionPeriod').locked).toBe(false)
   })
 })
 

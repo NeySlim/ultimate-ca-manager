@@ -4,16 +4,14 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  CheckCircle, WarningCircle, Question, Copy, Lightning, ArrowsClockwise, FloppyDisk
-} from '@phosphor-icons/react'
-import { Button, Input, Badge, ConfirmModal } from '../../components'
-import { HelpCard } from '../../components/HelpCard'
+import { Btn, IconBtn, Pill, Notice, Props } from '../../components/atelier'
+import { Input, ConfirmModal } from '../../components/atelier/Form'
+import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
+import { useRefocusAfter } from '../../components/sectioned/useRefocus'
 import { useClipboard } from '../../hooks/useClipboard'
 import { formatBytes } from '../../lib/fileSize'
 import { databaseService } from '../../services'
 import { useNotification } from '../../contexts'
-import { FormGroup, FormProps } from '../../components/sectioned'
 
 export default function DatabaseBackendSection() {
   const { t, i18n } = useTranslation()
@@ -30,6 +28,8 @@ export default function DatabaseBackendSection() {
   const [targetUrl, setTargetUrl] = useState('')
   const [testResult, setTestResult] = useState(null)
   const [testing, setTesting] = useState(false)
+  // Disabled while it runs: the focus goes back to the test button, as in the mockup
+  useRefocusAfter(testing, testButton)
 
   const [confirmAction, setConfirmAction] = useState(null) // 'switch' | 'migrate' | null
   const [working, setWorking] = useState(false)
@@ -61,8 +61,6 @@ export default function DatabaseBackendSection() {
       setTestResult({ success: false, message: e.message })
     } finally {
       setTesting(false)
-      // The button was disabled during the test: the focus goes back to it, as in the mockup
-      requestAnimationFrame(() => testButton.current?.focus())
     }
   }
 
@@ -123,114 +121,63 @@ export default function DatabaseBackendSection() {
 
   return (
     <>
-      <FormGroup title={t('settings.backend.currentTitle')}>
-        <FormProps items={[
+      <SettingsGroup legend={t('settings.backend.currentTitle')} grid={false}>
+        <Props items={[
           [t('settings.backend.type'), isPg ? 'PostgreSQL' : 'SQLite'],
           [t('settings.backend.version'), status?.version || '—'],
           [t('settings.backend.tableCount'), status?.table_count ?? '—'],
           [t('settings.backend.size'), status ? formatBytes(status.size_bytes, i18n?.language) : '—'],
           [t('settings.backend.uri'), (
-            <span className="sf-record-digest">
-              <span>{status?.uri_redacted || '—'}</span>
-              {status?.uri_redacted && (
-                <button type="button" className="sf-inline-icon" onClick={copyUri}
-                  title={t('common.copy')} aria-label={t('common.copy')}>
-                  <Copy size={14} aria-hidden="true" />
-                </button>
-              )}
+            <span className="copy-value">
+              <span className="mono">{status?.uri_redacted || '—'}</span>
+              {status?.uri_redacted && <IconBtn icon="copy" quiet label={t('common.copy')} onClick={copyUri} />}
             </span>
           )],
           [t('settings.backend.health'), (
-            <Badge variant={status?.healthy ? 'success' : 'danger'}>
-              {status?.healthy ? t('settings.backend.healthy') : t('settings.backend.unhealthy')}
-            </Badge>
+            <Pill tone={status?.healthy ? 'good' : 'bad'} label={status?.healthy ? t('settings.backend.healthy') : t('settings.backend.unhealthy')} />
           )],
         ]} />
-        {status?.error && <p className="ui-error sf-under" role="alert">{status.error}</p>}
-      </FormGroup>
+        {status?.error && <Notice tone="bad">{status.error}</Notice>}
+      </SettingsGroup>
 
-      <FormGroup
-        title={t('settings.backend.switchTitle')}
-        description={inDocker ? t('settings.backend.dockerHint') : t('settings.backend.switchHint')}
-      >
-        <div className="sf-stack">
-          <Input
-            label={t('settings.backend.targetUrl')}
-            type="text"
-            placeholder="postgresql://user:password@host:5432/dbname"
-            value={targetUrl}
-            onChange={(e) => { setTargetUrl(e.target.value); setTestResult(null) }}
-            autoComplete="off"
-            spellCheck={false}
-            helperText={`${t('settings.backend.urlExample')}${t('work.sep')}postgresql://ucm:secret@db.example.com:5432/ucm`}
-          />
-
-          {/* The test as the mockup's test zone: the button, then its result on the line */}
-          <div className="sf-test">
-            <Button ref={testButton} type="button" variant="secondary" onClick={handleTest} disabled={testing || !targetUrl.trim()}>
-              <Lightning size={16} className={testing ? 'animate-pulse' : undefined} />
-              {t('settings.backend.test')}
-            </Button>
-            {testResult ? (
-              <p className={testResult.success ? 'sf-test-result is-good' : 'sf-test-result is-bad'} role="status">
-                {testResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
-                <span>{testResult.message}</span>
-              </p>
-            ) : (
-              <p className="sf-test-result">
-                <Question aria-hidden="true" />
-                <span>{t('settings.backend.testHint')}</span>
-              </p>
-            )}
-          </div>
-
-          <div className="sf-actions-row">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setConfirmAction('migrate')}
-              disabled={!testResult?.success || working}
-            >
-              <FloppyDisk size={16} />
-              {t('settings.backend.migrateData')}
-            </Button>
-            {!inDocker && (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setConfirmAction('switch')}
-                disabled={!testResult?.success || working}
-              >
-                <ArrowsClockwise size={16} />
-                {t('settings.backend.switchOnly')}
-              </Button>
-            )}
-          </div>
-
-          <HelpCard variant="warning" title={t('settings.backend.warningTitle')}>
-            {t('settings.backend.warningBody')}
-          </HelpCard>
+      <SettingsGroup legend={t('settings.backend.switchTitle')} hint={inDocker ? t('settings.backend.dockerHint') : t('settings.backend.switchHint')}>
+        <Input id="set-db_target_url" full mono label={t('settings.backend.targetUrl')}
+          placeholder="postgresql://user:password@host:5432/dbname" value={targetUrl}
+          onChange={(e) => { setTargetUrl(e.target.value); setTestResult(null) }}
+          hint={`${t('settings.backend.urlExample')}${t('work.sep')}postgresql://ucm:secret@db.example.com:5432/ucm`} />
+        <Notice tone="warn"><strong>{t('settings.backend.warningTitle')}</strong>{' '}{t('settings.backend.warningBody')}</Notice>
+        <div className="settings-actions">
+          <Btn icon="upload" write onClick={() => setConfirmAction('migrate')} disabled={!testResult?.success || working}>
+            {t('settings.backend.migrateData')}
+          </Btn>
+          {!inDocker && (
+            <Btn icon="refresh" write onClick={() => setConfirmAction('switch')} disabled={!testResult?.success || working}>
+              {t('settings.backend.switchOnly')}
+            </Btn>
+          )}
         </div>
-      </FormGroup>
+      </SettingsGroup>
+      {/* The test as the mockup's test zone: the button, then its result on the line */}
+      <SettingsTest id="database" label={t('settings.backend.test')} icon="plug" onTest={handleTest} busy={testing || !targetUrl.trim()}
+        buttonRef={testButton} write={false} result={testResult ? { ok: !!testResult.success, text: testResult.message } : null}
+        hint={t('settings.backend.testHint')} />
 
-      {confirmAction && (
-        <ConfirmModal
-          open={true}
-          onClose={() => setConfirmAction(null)}
-          onConfirm={confirmAction === 'migrate' ? handleMigrate : handleSwitch}
-          title={confirmAction === 'migrate'
-            ? t('settings.backend.confirmMigrateTitle')
-            : t('settings.backend.confirmSwitchTitle')}
-          message={confirmAction === 'migrate'
-            ? t('settings.backend.confirmMigrateMessage')
-            : t('settings.backend.confirmSwitchMessage')}
-          confirmLabel={confirmAction === 'migrate'
-            ? t('settings.backend.confirmMigrateButton')
-            : t('settings.backend.confirmSwitchButton')}
-          variant="danger"
-          loading={working}
-        />
-      )}
+      <ConfirmModal
+        open={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={confirmAction === 'migrate' ? handleMigrate : handleSwitch}
+        title={confirmAction === 'migrate'
+          ? t('settings.backend.confirmMigrateTitle')
+          : t('settings.backend.confirmSwitchTitle')}
+        message={confirmAction === 'migrate'
+          ? t('settings.backend.confirmMigrateMessage')
+          : t('settings.backend.confirmSwitchMessage')}
+        confirmLabel={confirmAction === 'migrate'
+          ? t('settings.backend.confirmMigrateButton')
+          : t('settings.backend.confirmSwitchButton')}
+        variant="danger"
+        loading={working}
+      />
     </>
   )
 }

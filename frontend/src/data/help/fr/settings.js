@@ -51,7 +51,7 @@ export default {
         items: [
           { label: "Tâches", text: "Vérifications d’expiration, rafraîchissement CRL, livraison webhooks, sauvegardes planifiées, renouvellement auto, etc." },
           { label: "Exécuter", text: "Déclencher n’importe quelle tâche à la demande" },
-          { label: "Visibilité", text: "Dernière exécution, dernière durée et nombre d’échecs par tâche" },
+          { label: "Visibilité", text: "État en toutes lettres (réussie, en échec, sautée), dernière exécution, dernière durée et nombre d’exécutions par tâche ; sur un téléphone chaque tâche est une carte avec son bouton Exécuter" },
           { label: "Processus du planificateur (v2.251)", text: "Les tâches s’exécutent dans un processus de planification dédié, lancé avec le service et relancé en quelques secondes après un plantage ou un rechargement : une tâche longue ne retarde ni les requêtes ni les workers. Il occupe environ 150 Mo de mémoire" },
           { label: "Statut périmé (v2.251)", text: "Quand le processus du planificateur n’a pas donné signe de vie depuis un moment, l’onglet avertit que le statut affiché peut être obsolète" },
           { label: "Tâches longues (v2.251)", text: "Exécuter attend jusqu’à 30 secondes le résultat. Une tâche encore en cours est alors signalée comme démarrée et toujours en cours, et son résultat apparaît à un rafraîchissement ultérieur" },
@@ -61,7 +61,7 @@ export default {
         title: "Sauvegardes planifiées",
         content: "Sauvegardes chiffrées et automatiques de la base de données, à cadence configurable et avec rétention.",
         items: [
-          { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle" },
+          { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle, ou Désactivée (déconseillé), qui arrête les sauvegardes programmées" },
           { label: "Rétention", text: "Les sauvegardes plus anciennes que le nombre de jours défini (30 par défaut) sont purgées" },
           { label: "Plafond de taille", text: "Un plafond en Mo pour toutes les archives (0 pour aucun) : les plus anciennes sont supprimées, chacune auditée, jusqu’à ce que le total passe dessous. La rétention ne supprime jamais, sur un nœud seul, l’archive la plus récente qui correspond à son enregistrement de validation, jusqu’à 2 archives sans enregistrement de validation et le minimum conservé, et en HA le minimum conservé : le total peut rester au-dessus du plafond, ce qui est signalé. Une sauvegarde manuelle ne supprime rien. Réglages > Sauvegarde affiche la place occupée" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
@@ -327,7 +327,7 @@ Une sauvegarde manuelle s’exécute sur le serveur : la fenêtre montre son ava
 
 ### Sauvegarde programmée
 Configurez des sauvegardes automatiques :
-- Fréquence (quotidienne, hebdomadaire, mensuelle)
+- Fréquence (quotidienne, hebdomadaire, mensuelle, ou désactivée, déconseillé, qui arrête les sauvegardes programmées)
 - Rétention en jours : les sauvegardes plus anciennes sont purgées (30 par défaut)
 - **Dérivation de clé** : Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS
 
@@ -347,7 +347,7 @@ Téléversez un fichier de sauvegarde pour restaurer UCM à un état précédent
 ## Audit
 
 - **Rétention des journaux** : Nettoyage automatique des anciens journaux après N jours
-- **Transfert syslog** : Envoyer les événements à un serveur syslog distant (UDP/TCP/TLS)
+- **Transfert syslog** : Envoyer les événements à un serveur syslog distant en TLS (RFC 5425), TCP ou UDP
 - **Vérification d’intégrité** : Vérifier la chaîne de hachages qui relie chaque entrée d’audit ; la chaîne est toujours active, il n’y a rien à activer
 
 ## Base de données
