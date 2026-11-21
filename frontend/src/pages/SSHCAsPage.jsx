@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
   Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, FormModal, Notice,
+  useClientList,
 } from '../components/atelier'
 import { sshCasService, hsmService } from '../services'
 import { useNotification } from '../contexts'
@@ -35,7 +36,7 @@ const DEFAULT_EXTENSIONS = [
   { value: 'permit-user-rc', labelKey: 'sshCas.extensions.permitUserRc' },
 ]
 
-const PAGE_SIZE = 25
+const BY_NAME = { key: 'name', asc: true }
 
 // An HSM key decides the SSH key type it signs with: 'EC-P384' -> 'ecdsa-p384', 'RSA-3072' -> 'rsa'.
 // Only RSA and NIST ECDSA: the HSM wrappers do not sign Ed25519, and OpenSSH has no Brainpool or ML-DSA type.
@@ -76,8 +77,6 @@ export default function SSHCAsPage() {
   const [query, setQuery] = useState('')
   const [typeView, setTypeView] = useState('')
   const [section, setSection] = useState('overview')
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(PAGE_SIZE)
 
   // ============= ACTIONS =============
 
@@ -200,9 +199,7 @@ export default function SSHCAsPage() {
 
   const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return [...sshCas]
-      .filter((ca) => !q || ['descr', 'ca_type', 'key_type', 'fingerprint', 'hsm_key_label'].some((k) => String(ca[k] || '').toLowerCase().includes(q)))
-      .sort((a, b) => String(a.descr || '').localeCompare(String(b.descr || '')))
+    return sshCas.filter((ca) => !q || ['descr', 'ca_type', 'key_type', 'fingerprint', 'hsm_key_label'].some((k) => String(ca[k] || '').toLowerCase().includes(q)))
   }, [sshCas, query])
   const shown = searched.filter((ca) => !typeView || ca.ca_type === typeView)
   const views = [
@@ -210,18 +207,19 @@ export default function SSHCAsPage() {
     { id: 'user', label: t('sshCas.typeUser'), count: searched.filter((ca) => ca.ca_type === 'user').length },
     { id: 'host', label: t('sshCas.typeHost'), count: searched.filter((ca) => ca.ca_type === 'host').length },
   ]
-  const pages = Math.max(1, Math.ceil(shown.length / perPage))
-  const current = Math.min(page, pages)
-  const paged = shown.slice((current - 1) * perPage, current * perPage)
+  const list = useClientList(shown, {
+    initial: BY_NAME,
+    resetKey: `${query}|${typeView}`,
+    sorts: { name: (ca) => ca.descr, type: typeLabel, key: (ca) => ca.key_type, certs: (ca) => ca.cert_count || 0, created: (ca) => ca.created_at && Date.parse(ca.created_at) },
+  })
   const narrowed = Boolean(query.trim() || typeView)
   const openCreate = () => { setEditingCA(null); setShowModal(true) }
   const openEdit = (ca) => { setEditingCA(ca); setShowModal(true) }
   const create = canWrite('ssh_cas') ? { label: t('sshCas.createCA'), icon: 'plus', onClick: openCreate, primary: true } : undefined
 
-  const footer = shown.length > PAGE_SIZE ? {
-    range: t('sshCas.pageRange', { start: (current - 1) * perPage + 1, end: Math.min(current * perPage, shown.length), count: shown.length }),
-    pagination: { page: current, pages, perPage, sizes: [10, 25, 50, 100], onPage: setPage, onPerPage: (n) => { setPerPage(n); setPage(1) } },
-  } : { range: t('sshCas.range', { shown: shown.length, count: sshCas.length }) }
+  const footer = list.paged
+    ? { range: t('sshCas.pageRange', { start: list.start, end: list.end, count: list.total }) }
+    : { range: t('sshCas.range', { shown: list.total, count: sshCas.length }) }
 
   const open = selectedCA
   const openCA = (ca) => { if (open?.id !== ca.id) setSection('overview'); setSelectedCA(ca) }
@@ -330,21 +328,21 @@ export default function SSHCAsPage() {
           {canWrite('ssh_cas') && <Btn icon="upload" id="ssh-ca-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
           {create && <Btn tone="primary" icon="plus" id="ssh-ca-new" onClick={create.onClick}>{create.label}</Btn>}
         </>} />
-      <ListView label={t('sshCas.title')} caption={t('sshCas.caption')} icon="terminal" rows={paged} loading={loading && !sshCas.length}
-        filters={{ views, active: typeView, onChange: (v) => { setTypeView(v); setPage(1) }, label: t('sshCas.filterByType'),
+      <ListView label={t('sshCas.title')} caption={t('sshCas.caption')} icon="terminal" list={list} nameSort="name" loading={loading && !sshCas.length}
+        filters={{ views, active: typeView, onChange: setTypeView, label: t('sshCas.filterByType'),
           aside: <span id="ssh-cert-total">{t('sshCas.certTotal')} {sshCas.reduce((n, ca) => n + (ca.cert_count || 0), 0)}</span> }}
         toolbar={(
           <Toolbar>
             <SearchField id="ssh-ca-search" name="q" label={t('sshCas.searchPlaceholder')} placeholder={t('sshCas.searchPlaceholder')} value={query}
-              onChange={(v) => { setQuery(v); setPage(1) }} />
+              onChange={setQuery} />
           </Toolbar>
         )}
         title={(ca) => ca.descr || t('common.unnamed')} status={() => null} openedId={open?.id} onOpen={openCA}
         columns={[
-          { id: 'type', label: t('sshCas.caType'), cell: typeLabel },
-          { id: 'key', label: t('sshCas.keyType'), cell: keyCell, grow: true },
-          { id: 'certs', label: t('sshCas.stats.certificates'), cell: (ca) => ca.cert_count || 0, fit: true },
-          { id: 'created', label: t('common.created'), cell: (ca) => formatDate(ca.created_at), muted: true, fit: true },
+          { id: 'type', label: t('sshCas.caType'), cell: typeLabel, sort: 'type' },
+          { id: 'key', label: t('sshCas.keyType'), cell: keyCell, grow: true, sort: 'key' },
+          { id: 'certs', label: t('sshCas.stats.certificates'), cell: (ca) => ca.cert_count || 0, fit: true, sort: 'certs' },
+          { id: 'created', label: t('common.created'), cell: (ca) => formatDate(ca.created_at), muted: true, fit: true, sort: 'created' },
         ]}
         rowActions={(ca) => [
           ...(canWrite('ssh_cas') ? [{ icon: 'settings', label: t('common.edit'), write: true, onClick: openEdit }] : []),

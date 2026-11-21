@@ -71,6 +71,28 @@ describe('the SSH CA list', () => {
     expect(screen.getByRole('button', { name: 'Hosts CA' })).toBeInTheDocument()
   })
 
+  it('sorts its columns from their headers and pages a long list, back to page one on a chip', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ ...HOSTS, id: 10 + i, refid: `r${i}`, descr: `Host ${String(i + 1).padStart(2, '0')}`, cert_count: i }))
+    m.getAll.mockResolvedValue({ data: [USERS, ...many] })
+    const { container } = page()
+    await screen.findByRole('button', { name: 'Host 01' })
+    const footer = container.querySelector('footer.table-footer')
+    const names = () => [...container.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)
+    expect(names()).toHaveLength(25)
+    expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    expect(names()).toEqual(['Host 26', 'Host 27', 'Host 28', 'Host 29', 'Host 30', 'Users CA'])
+    fireEvent.click(container.querySelector('[data-status="host"]'))
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.click(screen.getByRole('button', { name: 'sshCas.stats.certificates' }))
+    fireEvent.click(screen.getByRole('button', { name: 'sshCas.stats.certificates' }))
+    expect(names()[0]).toBe('Host 30')
+    for (const name of ['sshCas.caType', 'sshCas.keyType', 'common.created']) {
+      fireEvent.click(screen.getByRole('button', { name }))
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+    }
+  })
+
   it('links to the SSH certificates at their registered address', async () => {
     page()
     await screen.findByRole('button', { name: 'Users CA' })
