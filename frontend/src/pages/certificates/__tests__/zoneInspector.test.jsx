@@ -124,6 +124,14 @@ describe('the zone inspector frame (dockFrame)', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('open-7')))
   })
 
+  it('keeps its size in the user\'s inspector preference', async () => {
+    mount()
+    await open('open-7', 'web.example.com')
+    fireEvent.click(within(dock()).getByRole('button', { name: 'inspector.grow' }))
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('ucm-inspector-prefs')).height).toBe(420))
+    expect(dock().style.getPropertyValue('--dock')).toBe('420px')
+  })
+
   it('keeps the product panel of another object opened from here', async () => {
     mount()
     await open('open-ca')

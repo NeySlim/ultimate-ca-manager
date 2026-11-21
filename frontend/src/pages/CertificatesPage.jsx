@@ -329,12 +329,11 @@ export default function CertificatesPage() {
   }, [urlFilters, linkView, viewStatus, t])
   const removeUrlFilter = useCallback(([key, value]) => {
     setPage(1)
-    if (key === 'view') { setStatus([]); return }
     const search = key === WEAK_KEY
       ? withoutFilter(withoutFilter(location.search, 'key_algo_prefix'), 'key_bits_below')
       : withoutFilter(location.search, key, value)
     navigate({ pathname: location.pathname, search }, { replace: true })
-  }, [location.pathname, location.search, navigate, setStatus])
+  }, [location.pathname, location.search, navigate])
   const liveScope = urlFilters.some(([k]) => k === 'live')
 
   // Selection: the ticked rows of the page, or every result

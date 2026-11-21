@@ -43,7 +43,7 @@ export function InspectorDock() {
   const onTitle = useCallback((key, title) => setTitles((prev) => (prev[key] === title ? prev : { ...prev, [key]: title })), [])
 
   // Escape closes the whole inspector wherever the focus is; a layer that answers Escape itself keeps it
-  const shown = opened.length > 0 && !!placement && !ins.dockClaimed
+  const shown = opened.length > 0 && !!placement
   useEffect(() => {
     if (!shown) return undefined
     const onKey = (e) => {
