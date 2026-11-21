@@ -473,7 +473,8 @@
       "active": "アクティブ",
       "revoked": "失効済み"
     },
-    "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません"
+    "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません",
+    "chooseFile": "Choose a file…"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -529,7 +530,12 @@
     },
     "selectResource": "リソースタイプ",
     "selectCA": "CAを選択してください",
-    "tocLabel": "Operations"
+    "tocLabel": "Operations",
+    "openSmartImport": "Import files…",
+    "bulkListLabel": "Items for bulk actions",
+    "bulkTableLabel": "Table of items",
+    "exportPem": "Export PEM",
+    "selectionOnly": "Selection ({{count}})"
   },
   "auth": {
     "login": "ログイン",
@@ -3327,6 +3333,7 @@
       "configSaved": "設定が保存されました",
       "hostPlaceholder": "192.168.1.1",
       "selectAll": "すべて選択",
+      "foundItems": "Items found on the firewall",
       "importSelected": "{{count}} 件をインポート",
       "importSuccess": "{{count}} 件を正常にインポートしました（{{skipped}} 件スキップ）",
       "noItemsSelected": "少なくとも1つのアイテムを選択してください",
@@ -3406,6 +3413,8 @@
     "inputAnyFormat": "入力（任意の形式）",
     "supportsFormats": "対応形式: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
     "binaryFileLoaded": "バイナリファイルを読み込みました",
+    "removeFile": "Remove the file",
+    "binaryFileLoadedSize": "Binary file loaded, {{bytes}} bytes.",
     "sectionConnection": "接続",
     "sectionPemInput": "PEM入力",
     "sectionCertificateInput": "証明書入力",
@@ -3478,7 +3487,13 @@
     "pkcs12PasswordPlaceholder": "PKCS12/PFXファイルのパスワード",
     "tocLabel": "Tools",
     "toolCount_one": "{{count}} tool",
-    "toolCount_other": "{{count}} tools"
+    "toolCount_other": "{{count}} tools",
+    "runHint": "The outcome shows here; nothing is saved.",
+    "decodedBelow": "Decoded, details below.",
+    "csrSignatureInvalid": "Decoded, but the request's signature is not valid.",
+    "itemRead": "Read",
+    "itemUnreadable": "Unreadable",
+    "noParsedItems": "Nothing could be read."
   },
   "audit": {
     "event": "イベント",
@@ -4690,6 +4705,8 @@
     "mtlsOrUploadFile": "またはファイルをアップロード",
     "importCertificate": "証明書をインポート",
     "mtlsAssign": "既存を割り当て",
+    "mtlsAssignChoice": "Certificate to assign",
+    "mtlsWay": "Certificate source",
     "mtlsNoAvailableCerts": "割り当て可能なユーザー証明書がありません",
     "mtlsExpiresOn": "有効期限: {{date}}",
     "mtlsCertAssigned": "証明書が正常に割り当てられました",
@@ -4709,6 +4726,7 @@
     "apiKeySavedDone": "キーを保存しました",
     "apiKeyPrefixUnavailable": "プレフィックスは利用できません (古いキー)",
     "expiresInDaysHelp": "無期限のキーにするには空欄または0を入力してください。",
+    "expiresInDaysInvalid": "Type a whole number of days, or leave the field empty.",
     "expiresInDaysPlaceholder": "例: 365 (空欄 = 無期限)",
     "enroll2faRequired": "二要素認証が必要です",
     "enroll2faReason": "管理者がアカウントに2FAを要求しています。続行するには今すぐ設定してください。",
@@ -4731,7 +4749,9 @@
     "backupCodesSaved": "バックアップコードを保存しました",
     "intent": "Your profile, the security of your sign-in and your API keys.",
     "tocLabel": "Account sections",
-    "apiKeysIntent": "Keys that call the API on behalf of your account."
+    "apiKeysIntent": "Keys that call the API on behalf of your account.",
+    "profileSaved": "Profile saved.",
+    "profileReset": "Profile changes undone."
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
@@ -7486,7 +7506,8 @@
     "weak": "弱い",
     "fair": "普通",
     "good": "良い",
-    "strong": "強い"
+    "strong": "強い",
+    "reading": "Strength: {{level}}"
   },
   "websocket": {
     "status": {

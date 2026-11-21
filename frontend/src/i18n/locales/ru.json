@@ -475,7 +475,8 @@
       "never": "Не запускалось",
       "active": "Активно",
       "revoked": "Отозван"
-    }
+    },
+    "chooseFile": "Выбрать файл…"
   },
   "commandPalette": {
     "searchPlaceholder": "Поиск команд, сертификатов, ЦС, пользователей...",
@@ -531,7 +532,12 @@
     },
     "selectResource": "Тип ресурса",
     "selectCA": "Выберите ЦС",
-    "tocLabel": "Операции"
+    "tocLabel": "Операции",
+    "openSmartImport": "Импортировать файлы…",
+    "bulkListLabel": "Элементы для массовых действий",
+    "bulkTableLabel": "Таблица элементов",
+    "exportPem": "Экспорт в PEM",
+    "selectionOnly": "Выбранное ({{count}})"
   },
   "auth": {
     "login": "Войти",
@@ -3471,6 +3477,7 @@
       "configSaved": "Конфигурация сохранена",
       "hostPlaceholder": "192.168.1.1",
       "selectAll": "Выбрать все",
+      "foundItems": "Элементы, найденные на межсетевом экране",
       "importSelected": "Импортировать выбранные ({{count}})",
       "importSuccess": "Импортировано элементов: {{count}} (пропущено: {{skipped}})",
       "noItemsSelected": "Выберите хотя бы один элемент для импорта",
@@ -3550,6 +3557,8 @@
     "inputAnyFormat": "Входные данные (любой формат)",
     "supportsFormats": "Поддерживается: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
     "binaryFileLoaded": "Двоичный файл загружен",
+    "removeFile": "Убрать файл",
+    "binaryFileLoadedSize": "Загружен двоичный файл, {{bytes}} байт.",
     "sectionConnection": "Подключение",
     "sectionPemInput": "Ввод PEM",
     "sectionCertificateInput": "Ввод сертификата",
@@ -3624,7 +3633,13 @@
     "toolCount_one": "{{count}} инструмент",
     "toolCount_other": "{{count}} инструмента",
     "toolCount_few": "{{count}} инструмента",
-    "toolCount_many": "{{count}} инструментов"
+    "toolCount_many": "{{count}} инструментов",
+    "runHint": "Результат появится здесь; ничего не сохраняется.",
+    "decodedBelow": "Декодировано, подробности ниже.",
+    "csrSignatureInvalid": "Декодировано, но подпись запроса недействительна.",
+    "itemRead": "Прочитан",
+    "itemUnreadable": "Не читается",
+    "noParsedItems": "Ничего не удалось прочитать."
   },
   "audit": {
     "event": "Событие",
@@ -4852,6 +4867,8 @@
     "mtlsOrUploadFile": "Или загрузите файл",
     "importCertificate": "Импорт сертификата",
     "mtlsAssign": "Назначить существующий",
+    "mtlsAssignChoice": "Сертификат для привязки",
+    "mtlsWay": "Источник сертификата",
     "mtlsNoAvailableCerts": "Нет неназначенных сертификатов пользователей",
     "mtlsExpiresOn": "Истекает: {{date}}",
     "mtlsCertAssigned": "Сертификат назначен",
@@ -4871,6 +4888,7 @@
     "apiKeySavedDone": "Я сохранил ключ",
     "apiKeyPrefixUnavailable": "Префикс ключа недоступен (устаревший ключ)",
     "expiresInDaysHelp": "Оставьте пустым или задайте 0 для ключа без срока действия.",
+    "expiresInDaysInvalid": "Введите целое число дней или оставьте поле пустым.",
     "expiresInDaysPlaceholder": "например, 365 (пусто = без срока)",
     "enroll2faRequired": "Требуется двухфакторная аутентификация",
     "enroll2faReason": "Администратор требует 2FA для вашей учётной записи. Настройте её сейчас, чтобы продолжить.",
@@ -4893,7 +4911,9 @@
     "backupCodesSaved": "Я сохранил резервные коды",
     "intent": "Ваш профиль, безопасность входа и ключи API.",
     "tocLabel": "Разделы учётной записи",
-    "apiKeysIntent": "Ключи для вызова API от имени вашей учётной записи."
+    "apiKeysIntent": "Ключи для вызова API от имени вашей учётной записи.",
+    "profileSaved": "Профиль сохранён.",
+    "profileReset": "Изменения профиля отменены."
   },
   "rbac": {
     "title": "Управление доступом на основе ролей",
@@ -7784,7 +7804,8 @@
     "weak": "Слабый",
     "fair": "Средний",
     "good": "Хороший",
-    "strong": "Надёжный"
+    "strong": "Надёжный",
+    "reading": "Надёжность: {{level}}"
   },
   "websocket": {
     "status": {

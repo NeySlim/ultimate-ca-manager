@@ -6,7 +6,7 @@ export default {
     sections: [
       {
         title: 'Disposition de la page',
-        content: 'Le sommaire à gauche range les outils par groupes (Analyse, Vérification, Conversion) ; l’outil choisi s’affiche dans son cadre, son résultat en dessous.',
+        content: 'Le sommaire à gauche liste les cinq outils ; l’outil choisi s’affiche dans son cadre. Son bouton le lance sur la ligne sous les champs, qui dit alors le résultat ; le détail suit en dessous. Un fichier se lit par Choisir un fichier…, sous chaque champ PEM.',
         items: [
           { label: 'Changer d’outil', text: 'Choisir un autre outil efface le résultat du précédent' },
           { label: 'Liens', text: 'Un lien vers /tools?tab=<outil> (ssl-checker, csr-decoder, cert-decoder, key-matcher, converter) ouvre cet outil' },

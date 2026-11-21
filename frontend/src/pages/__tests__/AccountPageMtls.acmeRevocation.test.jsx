@@ -99,7 +99,7 @@ async function deleteTheCertificate() {
   const securityTabs = await screen.findAllByText('common.security')
   fireEvent.click(securityTabs[0])
   await screen.findByText('Account mTLS certificate')
-  fireEvent.click(screen.getByLabelText('common.delete'))
+  fireEvent.click(screen.getByRole('button', { name: 'common.delete Account mTLS certificate' }))
 }
 
 describe('Removing an own mTLS certificate the ACME CA was not told of', () => {

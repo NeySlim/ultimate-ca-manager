@@ -59,15 +59,15 @@ vi.mock('../../services', () => ({
   usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }), bulkDelete: vi.fn() },
 }))
 
-vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }))
+vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
-vi.mock('../../components', async (orig) => ({
+// The list stands in for the Atelier table: one button ticks the records, the selection bar follows
+vi.mock('../../components/atelier', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ onSelectionChange, bulkActions }) => (
+  TableView: ({ selection, batch }) => (
     <div>
-      <button onClick={() => onSelectionChange(new Set([1]))}>select-certs</button>
-      {bulkActions}
+      <button onClick={() => ([1]).forEach((id) => selection.onToggle(id))}>select-certs</button>
+      {batch}
     </div>
   ),
 }))
@@ -129,7 +129,7 @@ describe('OperationsPage bulk export of a selection', () => {
   const exportSelection = async () => {
     await openTab('bulk')
     fireEvent.click(await screen.findByText('select-certs'))
-    fireEvent.click(await screen.findByText(/export\.title/))
+    fireEvent.click(await screen.findByText('operations.exportPem'))
   }
 
   it('warns when certificates of the selection were left out', async () => {

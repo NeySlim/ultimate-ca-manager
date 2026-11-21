@@ -473,7 +473,8 @@
       "never": "Never run",
       "active": "Active",
       "revoked": "Revoked"
-    }
+    },
+    "chooseFile": "Choose a file…"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificate, page or action…",
@@ -529,7 +530,12 @@
     },
     "selectResource": "Resource type",
     "selectCA": "Please select a CA",
-    "tocLabel": "Operations"
+    "tocLabel": "Operations",
+    "openSmartImport": "Import files…",
+    "bulkListLabel": "Items for bulk actions",
+    "bulkTableLabel": "Table of items",
+    "exportPem": "Export PEM",
+    "selectionOnly": "Selection ({{count}})"
   },
   "auth": {
     "login": "Sign In",
@@ -3327,6 +3333,7 @@
       "configSaved": "Configuration saved",
       "hostPlaceholder": "192.168.1.1",
       "selectAll": "Select all",
+      "foundItems": "Items found on the firewall",
       "importSelected": "Import {{count}} selected",
       "importSuccess": "Successfully imported {{count}} items ({{skipped}} skipped)",
       "noItemsSelected": "Please select at least one item to import",
@@ -3406,6 +3413,8 @@
     "inputAnyFormat": "Input (any format)",
     "supportsFormats": "Supports: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
     "binaryFileLoaded": "Binary file loaded",
+    "removeFile": "Remove the file",
+    "binaryFileLoadedSize": "Binary file loaded, {{bytes}} bytes.",
     "sectionConnection": "Connection",
     "sectionPemInput": "PEM Input",
     "sectionCertificateInput": "Certificate Input",
@@ -3478,7 +3487,13 @@
     "pkcs12PasswordPlaceholder": "PKCS12/PFX file password",
     "tocLabel": "Tools",
     "toolCount_one": "{{count}} tool",
-    "toolCount_other": "{{count}} tools"
+    "toolCount_other": "{{count}} tools",
+    "runHint": "The outcome shows here; nothing is saved.",
+    "decodedBelow": "Decoded, details below.",
+    "csrSignatureInvalid": "Decoded, but the request's signature is not valid.",
+    "itemRead": "Read",
+    "itemUnreadable": "Unreadable",
+    "noParsedItems": "Nothing could be read."
   },
   "audit": {
     "event": "Event",
@@ -4690,6 +4705,8 @@
     "mtlsOrUploadFile": "Or upload a file",
     "importCertificate": "Import Certificate",
     "mtlsAssign": "Assign Existing",
+    "mtlsAssignChoice": "Certificate to assign",
+    "mtlsWay": "Certificate source",
     "mtlsNoAvailableCerts": "No unassigned user certificates available",
     "mtlsExpiresOn": "Expires: {{date}}",
     "mtlsCertAssigned": "Certificate assigned successfully",
@@ -4709,6 +4726,7 @@
     "apiKeySavedDone": "I've saved the key",
     "apiKeyPrefixUnavailable": "Key prefix unavailable (legacy key)",
     "expiresInDaysHelp": "Leave empty or set 0 for a key that never expires.",
+    "expiresInDaysInvalid": "Type a whole number of days, or leave the field empty.",
     "expiresInDaysPlaceholder": "e.g. 365 (empty = no expiration)",
     "enroll2faRequired": "Two-factor authentication required",
     "enroll2faReason": "Your administrator requires 2FA on your account. Set it up now to continue.",
@@ -4731,7 +4749,9 @@
     "backupCodesSaved": "I've saved my backup codes",
     "intent": "Your profile, the security of your sign-in and your API keys.",
     "tocLabel": "Account sections",
-    "apiKeysIntent": "Keys that call the API on behalf of your account."
+    "apiKeysIntent": "Keys that call the API on behalf of your account.",
+    "profileSaved": "Profile saved.",
+    "profileReset": "Profile changes undone."
   },
   "rbac": {
     "title": "Role-Based Access Control",
@@ -7486,7 +7506,8 @@
     "weak": "Weak",
     "fair": "Fair",
     "good": "Good",
-    "strong": "Strong"
+    "strong": "Strong",
+    "reading": "Strength: {{level}}"
   },
   "websocket": {
     "status": {

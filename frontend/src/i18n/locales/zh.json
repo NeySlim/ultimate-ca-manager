@@ -473,7 +473,8 @@
       "active": "活跃",
       "revoked": "已吊销"
     },
-    "duplicateKey": "上方另一行已使用“{{key}}”：只能保存其中一行"
+    "duplicateKey": "上方另一行已使用“{{key}}”：只能保存其中一行",
+    "chooseFile": "选择文件…"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -529,7 +530,12 @@
     },
     "selectResource": "资源类型",
     "selectCA": "请选择一个CA",
-    "tocLabel": "操作"
+    "tocLabel": "操作",
+    "openSmartImport": "导入文件…",
+    "bulkListLabel": "批量操作的项目",
+    "bulkTableLabel": "项目表",
+    "exportPem": "导出 PEM",
+    "selectionOnly": "已选（{{count}}）"
   },
   "auth": {
     "login": "登录",
@@ -3327,6 +3333,7 @@
       "configSaved": "配置已保存",
       "hostPlaceholder": "192.168.1.1",
       "selectAll": "全选",
+      "foundItems": "在防火墙上找到的项目",
       "importSelected": "导入 {{count}} 个已选",
       "importSuccess": "成功导入 {{count}} 个项目（跳过 {{skipped}} 个）",
       "noItemsSelected": "请至少选择一个要导入的项目",
@@ -3406,6 +3413,8 @@
     "inputAnyFormat": "输入 (任何格式)",
     "supportsFormats": "支持: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
     "binaryFileLoaded": "已加载二进制文件",
+    "removeFile": "移除文件",
+    "binaryFileLoadedSize": "已加载二进制文件，{{bytes}} 字节。",
     "sectionConnection": "连接",
     "sectionPemInput": "PEM输入",
     "sectionCertificateInput": "证书输入",
@@ -3478,7 +3487,13 @@
     "pkcs12PasswordPlaceholder": "PKCS12/PFX文件密码",
     "tocLabel": "工具",
     "toolCount_one": "{{count}} 个工具",
-    "toolCount_other": "{{count}} 个工具"
+    "toolCount_other": "{{count}} 个工具",
+    "runHint": "结果显示在此处，不会保存任何内容。",
+    "decodedBelow": "已解码，详情见下方。",
+    "csrSignatureInvalid": "已解码，但请求的签名无效。",
+    "itemRead": "已读取",
+    "itemUnreadable": "无法读取",
+    "noParsedItems": "未能读取任何内容。"
   },
   "audit": {
     "event": "事件",
@@ -4689,6 +4704,8 @@
     "mtlsOrUploadFile": "或上传文件",
     "importCertificate": "导入证书",
     "mtlsAssign": "分配现有证书",
+    "mtlsAssignChoice": "要关联的证书",
+    "mtlsWay": "证书来源",
     "mtlsNoAvailableCerts": "没有可用的未分配用户证书",
     "mtlsExpiresOn": "到期日期: {{date}}",
     "mtlsCertAssigned": "证书分配成功",
@@ -4708,6 +4725,7 @@
     "apiKeySavedDone": "我已保存密钥",
     "apiKeyPrefixUnavailable": "前缀不可用（旧密钥）",
     "expiresInDaysHelp": "留空或设为 0 表示永不过期。",
+    "expiresInDaysInvalid": "请输入整数天数，或留空。",
     "expiresInDaysPlaceholder": "例如 365 (留空 = 永不过期)",
     "enroll2faRequired": "需要双重身份验证",
     "enroll2faReason": "您的管理员要求为您的账户启用双重验证。请立即设置以继续。",
@@ -4730,7 +4748,9 @@
     "backupCodesSaved": "我已保存备份码",
     "intent": "您的个人资料、登录安全和 API 密钥。",
     "tocLabel": "账户部分",
-    "apiKeysIntent": "以您的账户名义调用 API 的密钥。"
+    "apiKeysIntent": "以您的账户名义调用 API 的密钥。",
+    "profileSaved": "个人资料已保存。",
+    "profileReset": "已撤销个人资料的修改。"
   },
   "rbac": {
     "title": "基于角色的访问控制",
@@ -7483,7 +7503,8 @@
     "weak": "弱",
     "fair": "一般",
     "good": "良好",
-    "strong": "强"
+    "strong": "强",
+    "reading": "强度：{{level}}"
   },
   "websocket": {
     "status": {

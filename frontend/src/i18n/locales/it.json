@@ -473,7 +473,8 @@
       "active": "Attivo",
       "revoked": "Revocato"
     },
-    "duplicateKey": "Un'altra riga qui sopra usa già \"{{key}}\": solo una delle due può essere salvata"
+    "duplicateKey": "Un'altra riga qui sopra usa già \"{{key}}\": solo una delle due può essere salvata",
+    "chooseFile": "Choose a file…"
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -529,7 +530,12 @@
     },
     "selectResource": "Tipo di risorsa",
     "selectCA": "Selezionare una CA",
-    "tocLabel": "Operations"
+    "tocLabel": "Operations",
+    "openSmartImport": "Import files…",
+    "bulkListLabel": "Items for bulk actions",
+    "bulkTableLabel": "Table of items",
+    "exportPem": "Export PEM",
+    "selectionOnly": "Selection ({{count}})"
   },
   "auth": {
     "login": "Accedi",
@@ -3327,6 +3333,7 @@
       "configSaved": "Configurazione salvata",
       "hostPlaceholder": "192.168.1.1",
       "selectAll": "Seleziona tutto",
+      "foundItems": "Items found on the firewall",
       "importSelected": "Importa {{count}} selezionati",
       "importSuccess": "{{count}} elementi importati con successo ({{skipped}} saltati)",
       "noItemsSelected": "Seleziona almeno un elemento da importare",
@@ -3406,6 +3413,8 @@
     "inputAnyFormat": "Input (qualsiasi formato)",
     "supportsFormats": "Supporta: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
     "binaryFileLoaded": "File binario caricato",
+    "removeFile": "Remove the file",
+    "binaryFileLoadedSize": "Binary file loaded, {{bytes}} bytes.",
     "sectionConnection": "Connessione",
     "sectionPemInput": "Input PEM",
     "sectionCertificateInput": "Input certificato",
@@ -3478,7 +3487,13 @@
     "pkcs12PasswordPlaceholder": "Password del file PKCS12/PFX",
     "tocLabel": "Tools",
     "toolCount_one": "{{count}} tool",
-    "toolCount_other": "{{count}} tools"
+    "toolCount_other": "{{count}} tools",
+    "runHint": "The outcome shows here; nothing is saved.",
+    "decodedBelow": "Decoded, details below.",
+    "csrSignatureInvalid": "Decoded, but the request's signature is not valid.",
+    "itemRead": "Read",
+    "itemUnreadable": "Unreadable",
+    "noParsedItems": "Nothing could be read."
   },
   "audit": {
     "event": "Evento",
@@ -4689,6 +4704,8 @@
     "mtlsOrUploadFile": "Oppure carica un file",
     "importCertificate": "Importa certificato",
     "mtlsAssign": "Assegna esistente",
+    "mtlsAssignChoice": "Certificate to assign",
+    "mtlsWay": "Certificate source",
     "mtlsNoAvailableCerts": "Nessun certificato utente non assegnato disponibile",
     "mtlsExpiresOn": "Scade il: {{date}}",
     "mtlsCertAssigned": "Certificato assegnato con successo",
@@ -4708,6 +4725,7 @@
     "apiKeySavedDone": "Ho salvato la chiave",
     "apiKeyPrefixUnavailable": "Prefisso non disponibile (chiave precedente)",
     "expiresInDaysHelp": "Lascia vuoto o imposta 0 per una chiave senza scadenza.",
+    "expiresInDaysInvalid": "Type a whole number of days, or leave the field empty.",
     "expiresInDaysPlaceholder": "es. 365 (vuoto = nessuna scadenza)",
     "enroll2faRequired": "Autenticazione a due fattori richiesta",
     "enroll2faReason": "L'amministratore richiede la 2FA sul tuo account. Configurala ora per continuare.",
@@ -4730,7 +4748,9 @@
     "backupCodesSaved": "Ho salvato i miei codici di backup",
     "intent": "Your profile, the security of your sign-in and your API keys.",
     "tocLabel": "Account sections",
-    "apiKeysIntent": "Keys that call the API on behalf of your account."
+    "apiKeysIntent": "Keys that call the API on behalf of your account.",
+    "profileSaved": "Profile saved.",
+    "profileReset": "Profile changes undone."
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",
@@ -7483,7 +7503,8 @@
     "weak": "Debole",
     "fair": "Discreto",
     "good": "Buono",
-    "strong": "Forte"
+    "strong": "Forte",
+    "reading": "Strength: {{level}}"
   },
   "websocket": {
     "status": {

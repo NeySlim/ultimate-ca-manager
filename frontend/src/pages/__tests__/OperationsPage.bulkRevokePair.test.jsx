@@ -72,15 +72,15 @@ vi.mock('../../services', () => ({
   usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }), bulkDelete: (...args) => mocks.bulkDeleteUsers(...args) },
 }))
 
-vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }))
+vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
-vi.mock('../../components', async (orig) => ({
+// The list stands in for the Atelier table: one button ticks the records, the selection bar follows
+vi.mock('../../components/atelier', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ onSelectionChange, bulkActions }) => (
+  TableView: ({ selection, batch }) => (
     <div>
-      <button onClick={() => onSelectionChange(new Set(mocks.selection))}>select-certs</button>
-      {bulkActions}
+      <button onClick={() => (mocks.selection).forEach((id) => selection.onToggle(id))}>select-certs</button>
+      {batch}
     </div>
   ),
 }))
@@ -94,7 +94,7 @@ const openBulk = async (action) => {
   fireEvent.click(await screen.findByText(action))
   return screen.findByRole('dialog')
 }
-const confirm = (dialog) => fireEvent.click(within(dialog).getByRole('button', { name: 'common.confirm' }))
+const confirm = (dialog, name = 'common.revoke') => fireEvent.click(within(dialog).getByRole('button', { name }))
 
 describe('OperationsPage bulk revocation of hybrid pair members', () => {
   beforeEach(() => {
@@ -235,14 +235,14 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
   it('reports the other members renewed outside the selection', async () => {
     mocks.bulkRenew.mockResolvedValue({ data: { success: [1], failed: [] } })
     const dialog = await openBulk('common.renew')
-    confirm(dialog)
+    confirm(dialog, 'common.renew')
     await waitFor(() => expect(mocks.showInfo).toHaveBeenCalledWith('certificates.hybrid.bulkRelatedRenewed:1'))
   })
 
   it('reports no renewal outside a selection holding both members', async () => {
     mocks.selection = [1, 2]
     const dialog = await openBulk('common.renew')
-    confirm(dialog)
+    confirm(dialog, 'common.renew')
     await waitFor(() => expect(mocks.bulkRenew).toHaveBeenCalled())
     expect(mocks.showInfo).not.toHaveBeenCalledWith(expect.stringMatching(/bulkRelatedRenewed/))
   })
@@ -250,7 +250,7 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
   it('hands the pairs to the bulk renewal so a pair stays in one request', async () => {
     mocks.selection = [1, 2]
     const dialog = await openBulk('common.renew')
-    confirm(dialog)
+    confirm(dialog, 'common.renew')
     await waitFor(() => expect(mocks.bulkRenew).toHaveBeenCalled())
     const [ids, options] = mocks.bulkRenew.mock.calls[0]
     expect(ids).toEqual([1, 2])
@@ -263,7 +263,7 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
       success: [3], failed: [],
       notices: [{ id: 3, notices: ['Certificate 3 was renewed without its RelatedCertificate extension', 'Validity cut'] }] } })
     const dialog = await openBulk('common.renew')
-    confirm(dialog)
+    confirm(dialog, 'common.renew')
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
       '#3: Certificate 3 was renewed without its RelatedCertificate extension'))
     expect(mocks.showWarning).toHaveBeenCalledWith('#3: Validity cut')
@@ -273,7 +273,7 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
     mocks.selection = [3]
     mocks.bulkRenew.mockResolvedValue({ data: { success: [3], failed: [] } })
     const dialog = await openBulk('common.renew')
-    confirm(dialog)
+    confirm(dialog, 'common.renew')
     await waitFor(() => expect(mocks.bulkRenew).toHaveBeenCalled())
     expect(mocks.showWarning).not.toHaveBeenCalled()
   })

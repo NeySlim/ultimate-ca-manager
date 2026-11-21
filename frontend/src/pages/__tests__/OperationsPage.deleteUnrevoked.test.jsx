@@ -51,15 +51,15 @@ vi.mock('../../services', () => ({
   },
 }))
 
-vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }))
+vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
-vi.mock('../../components', async (orig) => ({
+// The list stands in for the Atelier table: one button ticks the records, the selection bar follows
+vi.mock('../../components/atelier', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ onSelectionChange, bulkActions }) => (
+  TableView: ({ selection, batch }) => (
     <div>
-      <button onClick={() => onSelectionChange(new Set([9]))}>select-users</button>
-      {bulkActions}
+      <button onClick={() => ([9]).forEach((id) => selection.onToggle(id))}>select-users</button>
+      {batch}
     </div>
   ),
 }))

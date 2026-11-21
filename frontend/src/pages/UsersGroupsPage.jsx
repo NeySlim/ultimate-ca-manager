@@ -9,13 +9,14 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Certificate, LinkSimple } from '@phosphor-icons/react'
-import { Button, Modal, Input, Select, LoadingSpinner, MemberTransferModal } from '../components'
+import { MemberTransferModal } from '../components'
 import {
-  Modal as AtelierModal, Input as FieldInput, Select as FieldSelect, ToggleSwitch as FieldToggle,
+  Modal as AtelierModal, Input as FieldInput, Select as FieldSelect, ToggleSwitch as FieldToggle, Textarea as FieldTextarea,
   Zone, Icon, Btn, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, RecordList, RecordRow,
   SimpleOverview, EmptyBlock, NoMatch, AtelierDialog,
 } from '../components/atelier'
+import { MtlsCertificateDialog } from '../components/mtls/MtlsCertificateDialog'
+import { validityDays } from '../components/mtls/validity'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
@@ -23,7 +24,7 @@ import UserSecurityKeys from '../components/UserSecurityKeys'
 import UserApiKeys from '../components/UserApiKeys'
 import { useNotification, useAuth } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
-import { formatDate, downloadBlob } from '../lib/utils'
+import { downloadBlob } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { deletedUserWarning, localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import UserSecuritySection from './users/UserSecuritySection'
@@ -483,7 +484,7 @@ export default function UsersGroupsPage() {
   const handleOpenMtlsModal = () => {
     setMtlsTab('generate')
     setMtlsResult(null)
-    setMtlsForm({ name: `${selectedUser?.username || 'user'}@mtls`, validity_days: 365, ca_id: '' })
+    setMtlsForm({ name: `${selectedUser?.username || 'user'}@mtls`, validity_days: '365', ca_id: '' })
     setShowHiddenCas(false)
     setMtlsImportForm({ name: '', pem: '' })
     setShowMtlsModal(true)
@@ -504,7 +505,7 @@ export default function UsersGroupsPage() {
         mode: 'generate',
         name: mtlsForm.name || undefined,
         ca_id: mtlsForm.ca_id || undefined,
-        validity_days: mtlsForm.validity_days,
+        validity_days: validityDays(mtlsForm.validity_days),
       })
       setMtlsResult(response.data || {})
       showSuccess(t('users.mtls.generated'))
@@ -554,22 +555,7 @@ export default function UsersGroupsPage() {
     }
   }
 
-  const handleMtlsPemFileUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      const bytes = new Uint8Array(evt.target.result)
-      const header = String.fromCharCode(...bytes.slice(0, 11))
-      if (header.startsWith('-----BEGIN')) {
-        setMtlsImportForm(prev => ({ ...prev, pem: new TextDecoder().decode(bytes) }))
-      } else {
-        const b64 = btoa(String.fromCharCode(...bytes))
-        setMtlsImportForm(prev => ({ ...prev, pem: 'BASE64:' + b64 }))
-      }
-    }
-    reader.readAsArrayBuffer(file)
-  }
+
 
   const loadAvailableCerts = async () => {
     setAvailableCertsLoading(true)
@@ -814,6 +800,86 @@ export default function UsersGroupsPage() {
             onCancel={() => { setShowGroupModal(false); setEditingGroup(null) }}
           />
         </AtelierModal>
+        {/* Attach a provider (#136): the providers the account has keep opening it */}
+        {showLinkModal && (
+        <AtelierDialog title={t('users.sso.attachTitle', { name: linkTarget?.username || '' })} size="narrow"
+          onClose={() => { setShowLinkModal(false); setLinkTarget(null) }} testId="user-sso-attach">
+          <form onSubmit={(e) => { e.preventDefault(); handleSubmitLink() }} noValidate>
+            <p>{t('users.sso.attachHelp')}</p>
+            <div className="form-fields">
+              {attachable.length === 0 && linkProviders.length > 0 ? (
+                <p className="field full muted small">{t('users.sso.noProviderLeft')}</p>
+              ) : (
+                <FieldSelect id="sso-attach-provider" data-autofocus full label={t('users.sso.provider')} value={linkProviderId} onChange={(val) => setLinkProviderId(val)}
+                  placeholder={t('users.sso.selectProvider')}
+                  options={attachable.map(p => ({ value: String(p.id), label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})` }))} />
+              )}
+              {linkTenants.length > 0 && (
+                <FieldSelect id="sso-attach-tenant" full label={t('users.sso.expectedTenant')} value={linkTenant} onChange={(val) => setLinkTenant(val)}
+                  placeholder={t('users.sso.selectTenant')} hint={t('users.sso.expectedTenantHelp')} options={tenantOptions(linkTenants)} />
+              )}
+              <FieldToggle id="sso-attach-remove-password" checked={linkRemovePassword} onChange={setLinkRemovePassword} label={t('users.sso.removePassword')} />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={() => { setShowLinkModal(false); setLinkTarget(null) }}>{t('common.cancel')}</button>
+              <Btn type="submit" tone="primary" icon="link" disabled={!linkProviderId || (linkTenants.length > 0 && !linkTenant) || linkSaving || undefined}>
+                {t('users.sso.attach')}
+              </Btn>
+            </div>
+          </form>
+        </AtelierDialog>
+        )}
+
+        {/* Expected tenant of an attachment to a multi-tenant provider, set on a reset or a pending row */}
+        {tenantEdit && (
+        <AtelierDialog title={tenantEdit.row.external_id ? t('users.sso.resetIdentity') : t('users.sso.setTenant')} size="narrow"
+          onClose={() => setTenantEdit(null)} testId="user-sso-tenant">
+          <form onSubmit={(e) => { e.preventDefault(); handleSubmitTenant() }} noValidate>
+            {tenantEdit.row.external_id && <p>{t('users.sso.confirmReset', { name: tenantEdit.user.username, provider: rowName(tenantEdit.row) })}</p>}
+            <div className="form-fields">
+              <FieldSelect id="sso-tenant" data-autofocus full label={t('users.sso.expectedTenant')} value={tenantEdit.tenant} onChange={(val) => setTenantEdit({ ...tenantEdit, tenant: val })}
+                placeholder={t('users.sso.selectTenant')} hint={t('users.sso.expectedTenantHelp')} options={tenantOptions(tenantEdit.row.provider_tenants || [])} />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={() => setTenantEdit(null)}>{t('common.cancel')}</button>
+              <Btn type="submit" tone={tenantEdit.row.external_id ? 'danger' : 'primary'} disabled={!tenantEdit.tenant || tenantSaving || undefined}>
+                {tenantEdit.row.external_id ? t('users.sso.resetIdentity') : t('users.sso.setTenant')}
+              </Btn>
+            </div>
+          </form>
+        </AtelierDialog>
+        )}
+
+        {/* User mTLS Certificate dialog */}
+        {selectedUser && showMtlsModal && (
+          <MtlsCertificateDialog title={t('users.mtls.addCert', { username: selectedUser.username })} onClose={handleCloseMtlsModal} busy={mtlsCreating}
+            tab={mtlsTab} onTab={(way) => { setMtlsTab(way); if (way === 'assign') loadAvailableCerts() }}
+            generateForm={mtlsForm} setGenerateForm={setMtlsForm} namePlaceholder={`${selectedUser.username}@mtls`} onGenerate={handleGenerateUserMtls}
+            caPicker={(
+              <FieldSelect id="mtls-ca" full label={t('account.mtlsIssuingCA')} value={mtlsForm.ca_id} placeholder={t('account.mtlsDefaultCA')}
+                onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
+                options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
+                hint={(unlistedPickerCas(cas, mtlsForm.ca_id) > 0 || hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id) > 0) && <>
+                  {unlistedPickerCas(cas, mtlsForm.ca_id) > 0 && t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) })}{' '}
+                  <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+                </>} />
+            )}
+            importForm={mtlsImportForm} setImportForm={setMtlsImportForm} onImport={handleImportUserMtls}
+            assign={{ loading: availableCertsLoading, certs: availableCerts, selected: selectedAssignCert, onSelect: setSelectedAssignCert }}
+            onAssign={handleAssignUserMtls}
+            result={mtlsResult && (
+              <>
+                <p className="test-result good" role="status"><span>{t('users.mtls.generated')}</span></p>
+                <div className="form-fields">
+                  <FieldTextarea id="mtls-result-cert" mono readOnly rows={4} label={t('common.certificate')} value={mtlsResult.certificate || ''} />
+                  <FieldTextarea id="mtls-result-key" mono readOnly rows={4} label={t('account.privateKey')} value={mtlsResult.private_key || ''} />
+                </div>
+                <div className="modal-actions">
+                  <Btn tone="primary" write={false} onClick={handleCloseMtlsModal}>{t('common.close')}</Btn>
+                </div>
+              </>
+            )} />
+        )}
         {disabling && (
         <AtelierDialog title={t('users.disableTitle')} subtitle={userName(disabling)} size="narrow" onClose={() => setDisabling(null)} returnTo="user-disable">
           <div className="notice warn"><Icon name="warning" /><span>{t('users.disableText', { login: disabling.username })}</span></div>
@@ -859,93 +925,6 @@ export default function UsersGroupsPage() {
         )}
       </Zone>
 
-      {/* Attach a provider (#136): the providers the account has keep opening it */}
-      <Modal
-        open={showLinkModal}
-        onOpenChange={(open) => { setShowLinkModal(open); if (!open) setLinkTarget(null) }}
-        title={t('users.sso.attachTitle', { name: linkTarget?.username || '' })}
-        size="md"
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">{t('users.sso.attachHelp')}</p>
-          {attachable.length === 0 && linkProviders.length > 0 ? (
-            <p className="text-sm text-text-secondary">{t('users.sso.noProviderLeft')}</p>
-          ) : (
-            <Select
-              label={t('users.sso.provider')}
-              value={linkProviderId}
-              onChange={(val) => setLinkProviderId(val)}
-              placeholder={t('users.sso.selectProvider')}
-              options={attachable.map(p => ({
-                value: String(p.id),
-                label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})`,
-              }))}
-            />
-          )}
-          {linkTenants.length > 0 && (
-            <Select
-              label={t('users.sso.expectedTenant')}
-              value={linkTenant}
-              onChange={(val) => setLinkTenant(val)}
-              placeholder={t('users.sso.selectTenant')}
-              helperText={t('users.sso.expectedTenantHelp')}
-              options={tenantOptions(linkTenants)}
-            />
-          )}
-          <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
-            <input
-              type="checkbox"
-              checked={linkRemovePassword}
-              onChange={(e) => setLinkRemovePassword(e.target.checked)}
-              className="mt-0.5 rounded border-border"
-            />
-            <span>{t('users.sso.removePassword')}</span>
-          </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => { setShowLinkModal(false); setLinkTarget(null) }}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={handleSubmitLink} disabled={!linkProviderId || (linkTenants.length > 0 && !linkTenant) || linkSaving} loading={linkSaving}>
-              <LinkSimple size={16} /> {t('users.sso.attach')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Expected tenant of an attachment to a multi-tenant provider, set on a reset or a pending row */}
-      <Modal
-        open={!!tenantEdit}
-        onOpenChange={(open) => { if (!open) setTenantEdit(null) }}
-        title={tenantEdit?.row?.external_id ? t('users.sso.resetIdentity') : t('users.sso.setTenant')}
-        size="md"
-      >
-        {tenantEdit && (
-          <div className="p-4 space-y-4">
-            {tenantEdit.row.external_id && (
-              <p className="text-sm text-text-secondary">
-                {t('users.sso.confirmReset', { name: tenantEdit.user.username, provider: rowName(tenantEdit.row) })}
-              </p>
-            )}
-            <Select
-              label={t('users.sso.expectedTenant')}
-              value={tenantEdit.tenant}
-              onChange={(val) => setTenantEdit({ ...tenantEdit, tenant: val })}
-              placeholder={t('users.sso.selectTenant')}
-              helperText={t('users.sso.expectedTenantHelp')}
-              options={tenantOptions(tenantEdit.row.provider_tenants || [])}
-            />
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setTenantEdit(null)}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="button" onClick={handleSubmitTenant} disabled={!tenantEdit.tenant || tenantSaving} loading={tenantSaving}>
-                {tenantEdit.row.external_id ? t('users.sso.resetIdentity') : t('users.sso.setTenant')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
       {/* Member Transfer Modal */}
       {selectedGroup && (
         <MemberTransferModal
@@ -959,141 +938,6 @@ export default function UsersGroupsPage() {
         />
       )}
 
-      {/* User mTLS Certificate Modal */}
-      {selectedUser && (
-        <Modal
-          open={showMtlsModal}
-          onOpenChange={handleCloseMtlsModal}
-          title={t('users.mtls.addCert', { username: selectedUser.username })}
-        >
-          <div className="p-4 space-y-4">
-            {mtlsResult ? (
-              <>
-                <div className="p-3 rounded-lg bg-status-success-op10 text-sm text-status-success font-medium">
-                  {t('users.mtls.generated')}
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-text-secondary font-medium">{t('common.certificate')}</label>
-                    <textarea readOnly value={mtlsResult.certificate || ''} className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-text-secondary font-medium">{t('account.privateKey')}</label>
-                    <textarea readOnly value={mtlsResult.private_key || ''} className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none" />
-                  </div>
-                </div>
-                <div className="flex justify-end pt-4 border-t border-border">
-                  <Button type="button" variant="secondary" onClick={handleCloseMtlsModal}>
-                    {t('common.close')}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex border-b border-border">
-                  <button type="button" className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mtlsTab === 'generate' ? 'border-accent-primary text-accent-primary' : 'border-transparent text-text-secondary hover:text-text-primary'}`} onClick={() => setMtlsTab('generate')}>
-                    {t('account.mtlsGenerate')}
-                  </button>
-                  <button type="button" className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mtlsTab === 'import' ? 'border-accent-primary text-accent-primary' : 'border-transparent text-text-secondary hover:text-text-primary'}`} onClick={() => setMtlsTab('import')}>
-                    {t('account.mtlsImport')}
-                  </button>
-                  <button type="button" className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mtlsTab === 'assign' ? 'border-accent-primary text-accent-primary' : 'border-transparent text-text-secondary hover:text-text-primary'}`} onClick={() => { setMtlsTab('assign'); loadAvailableCerts() }}>
-                    {t('account.mtlsAssign')}
-                  </button>
-                </div>
-
-                {mtlsTab === 'generate' && (
-                  <>
-                    <Input label={t('account.mtlsCertName')} value={mtlsForm.name} onChange={(e) => setMtlsForm(prev => ({ ...prev, name: e.target.value }))} placeholder={`${selectedUser.username}@mtls`} />
-                    <div>
-                      <Select
-                        label={t('account.mtlsIssuingCA')}
-                        value={mtlsForm.ca_id}
-                        onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
-                        placeholder={t('account.mtlsDefaultCA')}
-                        options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
-                        helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
-                      />
-                      <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
-                    </div>
-                    <Input label={t('account.mtlsValidityDays')} type="number" value={mtlsForm.validity_days} onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))} min="1" max="3650" />
-                    <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                      <Button type="button" variant="secondary" onClick={handleCloseMtlsModal}>{t('common.cancel')}</Button>
-                      <Button type="button" onClick={handleGenerateUserMtls} loading={mtlsCreating} disabled={mtlsCreating}>
-                        <Certificate size={16} /> {t('account.generateCertificate')}
-                      </Button>
-                    </div>
-                  </>
-                )}
-
-                {mtlsTab === 'import' && (
-                  <>
-                    <Input label={t('account.mtlsCertName')} value={mtlsImportForm.name} onChange={(e) => setMtlsImportForm(prev => ({ ...prev, name: e.target.value }))} placeholder={t('account.mtlsImportNamePlaceholder')} />
-                    <div>
-                      <label className="block text-sm font-medium text-text-primary mb-1">{t('account.mtlsPemData')}</label>
-                      <textarea value={mtlsImportForm.pem} onChange={(e) => setMtlsImportForm(prev => ({ ...prev, pem: e.target.value }))} placeholder="-----BEGIN CERTIFICATE-----" className="w-full h-32 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-text-secondary mb-1">{t('account.mtlsOrUploadFile')}</label>
-                      <input type="file" accept=".pem,.crt,.cer" onChange={handleMtlsPemFileUpload} className="block w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border file:text-sm file:font-medium file:bg-bg-secondary file:text-text-primary hover:file:bg-bg-tertiary" />
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                      <Button type="button" variant="secondary" onClick={handleCloseMtlsModal}>{t('common.cancel')}</Button>
-                      <Button type="button" onClick={handleImportUserMtls} loading={mtlsCreating} disabled={mtlsCreating || !mtlsImportForm.pem.trim()}>
-                        <Certificate size={16} /> {t('account.importCertificate')}
-                      </Button>
-                    </div>
-                  </>
-                )}
-
-                {mtlsTab === 'assign' && (
-                  <>
-                    {availableCertsLoading ? (
-                      <div className="flex justify-center py-8">
-                        <LoadingSpinner size="sm" />
-                      </div>
-                    ) : availableCerts.length === 0 ? (
-                      <div className="text-center py-8 text-text-secondary text-sm">
-                        <Certificate size={32} className="mx-auto mb-2 opacity-50" />
-                        <p>{t('account.mtlsNoAvailableCerts')}</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {availableCerts.map(cert => (
-                          <button
-                            key={cert.id}
-                            type="button"
-                            className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                              selectedAssignCert?.id === cert.id
-                                ? 'border-accent-primary bg-accent-primary-op10'
-                                : 'border-border hover:border-text-secondary bg-bg-secondary'
-                            }`}
-                            onClick={() => setSelectedAssignCert(cert)}
-                          >
-                            <div className="font-medium text-sm text-text-primary">{cert.name}</div>
-                            <div className="text-xs text-text-secondary mt-1 truncate">{cert.subject}</div>
-                            {cert.valid_to && (
-                              <div className="text-xs text-text-tertiary mt-0.5">
-                                {t('account.mtlsExpiresOn', { date: formatDate(cert.valid_to) })}
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                      <Button type="button" variant="secondary" onClick={handleCloseMtlsModal}>{t('common.cancel')}</Button>
-                      <Button type="button" onClick={handleAssignUserMtls} loading={mtlsCreating} disabled={mtlsCreating || !selectedAssignCert}>
-                        <Certificate size={16} /> {t('account.assignCertificate')}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        </Modal>
-      )}
     </>
   )
 }

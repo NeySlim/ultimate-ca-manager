@@ -1,69 +1,64 @@
 /**
- * Account Page - User Profile & Security Settings
- * Uses DetailCard design system like SettingsPage
+ * Account page, on the mockup's sectioned form (settingsView()): the table of contents, then the
+ * profile, the security of the sign-in and the API keys, each in its frame, one page; the profile's
+ * fields save with the save bar. Its dialogs are the mockup's modal().
  */
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  User, Key, FloppyDisk, Certificate,
-  PencilSimple, Trash, Plus, Warning, ShieldCheck, Download, Copy, X
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout,
-  Button, Input, Select, Badge, Modal, FormModal, HelpCard, ExperimentalBadge,
-  ListButton,
-  LoadingSpinner, ExportModal
-} from '../components'
 import { accountService, casService, userCertificatesService } from '../services'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
-import { useAuth, useNotification, useMobile, useInspector } from '../contexts'
+import { useAuth, useNotification, useInspector } from '../contexts'
 import { useClipboard, usePermission } from '../hooks'
-import { formatDate , downloadBlob} from '../lib/utils'
+import { formatDate, downloadBlob } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
-import {
-  FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam, keepDraft, readDraft, useUnloadGuard,
-} from '../components/sectioned'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
+import { keepDraft, readDraft, useUnloadGuard } from '../components/sectioned'
+import { Zone, PageHead, Btn, IconBtn, Pill, Props, RecordList, RecordRow, SkeletonPanel, AtelierDialog } from '../components/atelier'
+import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsSaveBar } from '../components/atelier/SettingsView'
+import { Field, FormModal, Input, NumberInput, Notice, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
+import { useSectionParam } from '../components/atelier/useSectionParam'
+import { MtlsCertificateDialog } from '../components/mtls/MtlsCertificateDialog'
+import { validityDays } from '../components/mtls/validity'
+import { ExportDialog } from './certificates/dialogs/ExportDialog'
+import { ROLE_KEYS } from './users/userFacts'
+import { languages } from '../i18n'
+import { persistPreference } from '../stores/userPreferencesStore'
 
 // Profile edit left pending, kept for the tab (components/sectioned/draftMemory)
 const PROFILE_DRAFT = 'account:profile'
-import LanguageSelector from '../components/ui/LanguageSelector'
+const SECTION_IDS = ['profile', 'security', 'api-keys']
+const NO_KEY_FORM = { name: '', expires_days: '', scope: 'full' }
 
 export default function AccountPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user } = useAuth()
-  const { isMobile } = useMobile()
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { copy } = useClipboard()
   const { hasPermission } = usePermission()
   const { closeOnNav, toggleCloseOnNav } = useInspector()
 
-  // State
   const [loading, setLoading] = useState(true)
   // The section a link names (/account?tab=security) is the one the page lands on
-  const [activeTab, setActiveTab] = useSectionParam(['profile', 'security', 'api-keys'], 'profile', { stacked: true, ready: !loading })
+  const [activeTab, setActiveTab] = useSectionParam(SECTION_IDS, 'profile', { stacked: true, ready: !loading })
   const [saving, setSaving] = useState(false)
   const [accountData, setAccountData] = useState({})
-  const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState({ full_name: '', email: '' })
   const keptProfile = useRef(readDraft(PROFILE_DRAFT))
-  
-  // Security state
+  const saveState = useRef(null)
+  const [announce, setAnnounce] = useState('')
+
   const [apiKeys, setApiKeys] = useState([])
   const [webauthnCredentials, setWebauthnCredentials] = useState([])
   const [mtlsCertificates, setMtlsCertificates] = useState([])
   const [cas, setCas] = useState([])
-  
-  // Modals
+
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
-  // Holds the freshly-created key + metadata so we can display it once,
-  // not in a fleeting toast (#90).
+  // The freshly created key, shown once in its dialog (#90)
   const [newApiKey, setNewApiKey] = useState(null)
   const [show2FAModal, setShow2FAModal] = useState(false)
   const [showWebAuthnModal, setShowWebAuthnModal] = useState(false)
@@ -73,7 +68,7 @@ export default function AccountPage() {
   const [mtlsP12Password, setMtlsP12Password] = useState('')
   const [mtlsP12Legacy, setMtlsP12Legacy] = useState(false)  // PKCS#12 3DES/SHA-1 profile (#331)
   const [mtlsP12Downloading, setMtlsP12Downloading] = useState(false)
-  const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
+  const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: '365', ca_id: '' })
   const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [mtlsTab, setMtlsTab] = useState('generate')
   const [mtlsImportForm, setMtlsImportForm] = useState({ name: '', pem: '' })
@@ -81,19 +76,16 @@ export default function AccountPage() {
   const [availableCerts, setAvailableCerts] = useState([])
   const [availableCertsLoading, setAvailableCertsLoading] = useState(false)
   const [selectedAssignCert, setSelectedAssignCert] = useState(null)
-  
-  // 2FA state
+
   const [qrData, setQrData] = useState(null)
   const [confirmCode, setConfirmCode] = useState('')
-  
-  // WebAuthn state
+
   const [webauthnName, setWebauthnName] = useState('')
   const hasEnabledKey = webauthnCredentials.some(c => c.enabled)
   const activeFactors = accountData.two_factor_methods || []
   const [webauthnRegistering, setWebauthnRegistering] = useState(false)
 
-  // API Key form state
-  const [apiKeyForm, setApiKeyForm] = useState({ name: '', expires_days: '', scope: 'full' })
+  const [apiKeyForm, setApiKeyForm] = useState(NO_KEY_FORM)
 
   // Mirror the backend's mTLS issuance gates so the UI never offers an action
   // that can only 403: POST /api/v2/mtls/certificates requires
@@ -102,7 +94,6 @@ export default function AccountPage() {
   // Import and assign stay available to every authenticated user.
   const canGenerateMtls = hasPermission('write:user_certificates')
   const canChooseMtlsCa = hasPermission('write:cas')
-  const effectiveMtlsTab = mtlsTab === 'generate' && !canGenerateMtls ? 'import' : mtlsTab
 
   // Load data
   useEffect(() => {
@@ -140,7 +131,6 @@ export default function AccountPage() {
       const kept = keptProfile.current
       keptProfile.current = null
       setFormData(kept || { full_name: data.full_name || '', email: data.email || '' })
-      if (kept) setEditMode(true)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.generic'))
     }
@@ -173,8 +163,9 @@ export default function AccountPage() {
     try {
       await accountService.updateProfile(formData)
       showSuccess(t('messages.success.update.user'))
-      setEditMode(false)
       await loadAccount()
+      setAnnounce(t('account.profileSaved'))
+      requestAnimationFrame(() => saveState.current?.focus())
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.user'))
     } finally {
@@ -402,7 +393,7 @@ export default function AccountPage() {
     try {
       const response = await accountService.createMTLSCertificate({
         name: mtlsForm.name || undefined,
-        validity_days: mtlsForm.validity_days,
+        validity_days: validityDays(mtlsForm.validity_days),
         ca_id: mtlsForm.ca_id || undefined,
       })
       const data = response.data || {}
@@ -422,7 +413,7 @@ export default function AccountPage() {
     setMtlsP12Password('')
     setMtlsP12Legacy(false)
     setMtlsP12Downloading(false)
-    setMtlsForm({ name: '', validity_days: 365, ca_id: '' })
+    setMtlsForm({ name: '', validity_days: '365', ca_id: '' })
     setShowHiddenCas(false)
     setMtlsImportForm({ name: '', pem: '' })
     setMtlsTab('generate')
@@ -446,23 +437,6 @@ export default function AccountPage() {
     } finally {
       setMtlsCreating(false)
     }
-  }
-
-  const handlePemFileUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      const bytes = new Uint8Array(evt.target.result)
-      const header = String.fromCharCode(...bytes.slice(0, 11))
-      if (header.startsWith('-----BEGIN')) {
-        setMtlsImportForm(prev => ({ ...prev, pem: new TextDecoder().decode(bytes) }))
-      } else {
-        const b64 = btoa(String.fromCharCode(...bytes))
-        setMtlsImportForm(prev => ({ ...prev, pem: 'BASE64:' + b64 }))
-      }
-    }
-    reader.readAsArrayBuffer(file)
   }
 
   const loadAvailableCerts = async () => {
@@ -533,908 +507,345 @@ export default function AccountPage() {
     }
   }
 
-  // An edit with changes is kept for the return to the page; a reload or a close asks the browser
-  const profileChanged = editMode && (formData.full_name !== (accountData.full_name || '')
-    || formData.email !== (accountData.email || ''))
+  // The profile's fields against the saved values: a change is « modifié, non enregistré » until saved or undone
+  const profileLabels = { full_name: t('account.fullName'), email: t('common.email') }
+  const changedFields = Object.keys(profileLabels).filter((k) => formData[k] !== (accountData[k] || ''))
+  const profileChanged = !loading && changedFields.length > 0
   useUnloadGuard(profileChanged)
   useEffect(() => {
     if (!loading) keepDraft(PROFILE_DRAFT, profileChanged ? formData : null)
   }, [loading, profileChanged, formData])
-  const cancelProfileEdit = () => {
+  const resetProfile = () => {
     setFormData({ full_name: accountData.full_name || '', email: accountData.email || '' })
-    setEditMode(false)
+    setAnnounce(t('account.profileReset'))
+    requestAnimationFrame(() => saveState.current?.focus())
   }
+  const saveOnEnter = (e) => {
+    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.closest('#set-sec-profile')) return
+    e.preventDefault()
+    if (profileChanged && !saving) handleSaveProfile()
+  }
+  const changeLanguage = (code) => {
+    i18n.changeLanguage(code)
+    try { localStorage.setItem('i18nextLng', code) } catch { /* Safari private mode */ }
+    persistPreference('language', code)
+  }
+  const closeKeyModal = () => { setShowApiKeyModal(false); setApiKeyForm(NO_KEY_FORM) }
+  const close2FA = () => { setShow2FAModal(false); setQrData(null); setConfirmCode('') }
+  const closeWebAuthn = () => { setShowWebAuthnModal(false); setWebauthnName('') }
+  const openMtlsWay = (way) => { setMtlsTab(way); if (way === 'assign') loadAvailableCerts() }
+  const onOff = (on) => <Pill tone={on ? 'good' : 'muted'} label={on ? t('common.enabled') : t('common.disabled')} />
 
-  // ============ RENDER TAB CONTENT ============
-
-  // Editing the profile is its own action: Edit, then Cancel or Save in the frame heading
-  const profileActions = editMode ? (
-    <>
-      <ListButton onClick={cancelProfileEdit}>{t('common.cancel')}</ListButton>
-      <ListButton primary icon={FloppyDisk} onClick={handleSaveProfile} disabled={saving}>
-        {saving ? t('common.saving') : t('common.save')}
-      </ListButton>
-    </>
-  ) : (
-    <ListButton icon={PencilSimple} onClick={() => setEditMode(true)}>{t('common.edit')}</ListButton>
-  )
-
-  const renderProfileContent = () => (
-    <>
-      <FormGroup title={t('common.accountInformation')}>
-        {/* A pending edit says so, as the settings save bar does: the changed fields by name */}
-        {profileChanged && (
-          <p className="sf-pending" role="status">
-            <Warning aria-hidden="true" />
-            <span>
-              <strong>{t('sectioned.pendingTitle')}</strong>
-              {t('sectioned.pendingFields', { fields: [
-                formData.full_name !== (accountData.full_name || '') && t('account.fullName'),
-                formData.email !== (accountData.email || '') && t('common.email'),
-              ].filter(Boolean).join(', ') })}
-            </span>
-          </p>
-        )}
-        {editMode ? (
-          <div className="space-y-4">
-            <Input
-              label={t('account.fullName')}
-              value={formData.full_name}
-              onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
-              placeholder={t('account.enterYourName')}
-            />
-            <Input
-              label={t('common.email')}
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
-            />
-          </div>
-        ) : (
-          <dl className="sf-props">
-            <dt>{t('common.username')}</dt><dd>{accountData.username || '—'}</dd>
-            <dt>{t('account.fullName')}</dt><dd>{accountData.full_name || accountData.username || '—'}</dd>
-            <dt>{t('common.email')}</dt><dd>{accountData.email || '—'}</dd>
-            <dt>{t('common.role')}</dt>
-            <dd>
-              <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
-                {accountData.role || t('common.user')}
-              </Badge>
-            </dd>
-          </dl>
-        )}
-      </FormGroup>
-
-      {/* The account's language, saved with its preferences (the account menu no longer carries it) */}
-      <FormGroup title={t('settings.language')}>
-        <div className="sf-grid"><LanguageSelector /></div>
-      </FormGroup>
-
-      {/* Preferences of this browser; the inspector reads this one when the page changes */}
-      <FormGroup title={t('account.preferences')}>
-        <ToggleSwitch
-          checked={closeOnNav}
-          onChange={(on) => { if (on !== closeOnNav) toggleCloseOnNav() }}
-          label={t('account.closeInspectorOnNav')}
-          description={t('account.closeInspectorOnNavHint')}
-        />
-      </FormGroup>
-      
-      <FormGroup title={t('account.accountActivity')}>
-        <dl className="sf-props">
-          <dt>{t('account.accountCreated')}</dt>
-          <dd>{accountData.created_at ? formatDate(accountData.created_at) : '—'}</dd>
-          <dt>{t('common.lastLogin')}</dt>
-          <dd>{accountData.last_login ? formatDate(accountData.last_login, true) : '—'}</dd>
-          <dt>{t('account.totalLogins')}</dt>
-          <dd>{accountData.login_count || 0}</dd>
-          <dt>{t('common.status')}</dt>
-          <dd>
-            <Badge variant={accountData.active ? 'success' : 'danger'}>
-              {accountData.active ? t('common.active') : t('common.inactive')}
-            </Badge>
-          </dd>
-        </dl>
-      </FormGroup>
-    </>
-  )
-
-  const renderSecurityContent = () => (
-    <>
-      {/* Password */}
-      <FormGroup title={t('common.password')}>
-        <ul className="sf-records">
-          <li>
-            <div className="sf-record-main">
-              <strong>{t('account.changeYourPassword')}</strong>
-              <span className="sf-record-meta">
-                {t('account.lastChanged')}{t('work.sep')}{accountData.password_changed_at
-                  ? formatDate(accountData.password_changed_at)
-                  : t('common.never')}
-              </span>
-            </div>
-            <div className="sf-record-actions">
-              <Button type="button" variant="secondary" onClick={() => setShowPasswordModal(true)}>
-                {t('common.changePassword')}
-              </Button>
-            </div>
-          </li>
-        </ul>
-      </FormGroup>
-
-      {/* 2FA */}
-      <FormGroup title={t('common.twoFactorAuth')}>
-        <ul className="sf-records">
-          <li>
-            <div className="sf-record-main">
-              <span className="sf-record-title">
-                <strong>{t('account.authenticatorApp')}</strong>
-                <Badge variant={accountData.two_factor_enabled ? 'success' : 'secondary'}>
-                  {accountData.two_factor_enabled ? t('common.enabled') : t('common.disabled')}
-                </Badge>
-              </span>
-            </div>
-            <div className="sf-record-actions">
-              <Button
-                variant={accountData.two_factor_enabled ? 'danger' : 'secondary'}
-                onClick={handleToggle2FA}
-              >
-                {accountData.two_factor_enabled ? t('common.disable2FA') : t('common.enable2FA')}
-              </Button>
-            </div>
-          </li>
-          <li>
-            <div className="sf-record-main">
-              <span className="sf-record-title">
-                <strong>{t('account.keyAsSecondFactor')}</strong>
-                <Badge variant={accountData.webauthn_2fa ? 'success' : 'secondary'}>
-                  {accountData.webauthn_2fa ? t('common.enabled') : t('common.disabled')}
-                </Badge>
-              </span>
-              <span className="sf-record-meta">
-                {hasEnabledKey ? t('account.keyAsSecondFactorHint') : t('account.keyAsSecondFactorNoKey')}
-              </span>
-            </div>
-            <div className="sf-record-actions">
-              <Button
-                variant={accountData.webauthn_2fa ? 'danger' : 'secondary'}
-                disabled={!accountData.webauthn_2fa && !hasEnabledKey}
-                onClick={handleToggleKey2FA}
-              >
-                {accountData.webauthn_2fa ? t('account.turnOffKey2fa') : t('account.turnOnKey2fa')}
-              </Button>
-            </div>
-          </li>
-        </ul>
-        <p className="sf-hint sf-under">
-          {t('account.activeSecondFactors')}{t('work.sep')}{activeFactors.length
-            ? activeFactors.map(m => (m === 'totp' ? t('account.authenticatorApp') : t('account.securityKey'))).join(', ')
-            : t('account.noSecondFactor')}
-          {accountData.two_factor_enforced && ` (${t('account.twoFactorEnforced')})`}
-        </p>
-      </FormGroup>
-
-      {/* WebAuthn */}
-      <FormGroup 
-        title={t('account.securityKeys')}
-        subtitle={t('account.webauthnDescription')}
-        actions={
-          <Button type="button" variant="secondary" onClick={() => setShowWebAuthnModal(true)}>
-            <Plus size={16} />
-            {t('account.addKey')}
-          </Button>
-        }
-      >
-        {webauthnCredentials.length === 0 ? (
-          <p className="sf-records-empty">{t('account.noSecurityKeys')}</p>
-        ) : (
-          <ul className="sf-records">
-            {webauthnCredentials.map(cred => (
-              <li key={cred.id}>
-                <div className="sf-record-main">
-                  <strong>{cred.name || t('account.securityKey')}</strong>
-                  <span className="sf-record-meta">
-                    {t('account.added')} {formatDate(cred.created_at)}
-                    {cred.last_used_at && ` · ${t('common.used')} ${formatDate(cred.last_used_at)}`}
-                  </span>
-                </div>
-                <div className="sf-record-actions">
-                  <Button type="button" variant="danger" onClick={() => handleDeleteWebAuthn(cred.id)} aria-label={t('common.delete')} title={t('common.delete')}>
-                    <Trash size={16} />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </FormGroup>
-
-      {/* mTLS Certificates */}
-      <FormGroup 
-        title={t('account.clientCertificates')}
-        badge={<ExperimentalBadge />}
-        actions={
-          <Button type="button" variant="secondary" onClick={() => setShowMTLSModal(true)}>
-            <Plus size={16} />
-            {t('account.addCertificate')}
-          </Button>
-        }
-      >
-        <p className="sf-hint sf-records-lead">{t('account.useMTLSCerts')}</p>
-
-        {mtlsCertificates.length === 0 ? (
-          <p className="sf-records-empty">{t('account.noCertificatesEnrolled')}</p>
-        ) : (
-          <ul className="sf-records">
-            {mtlsCertificates.map(cert => (
-              <li key={cert.id}>
-                <div className="sf-record-main">
-                  <span className="sf-record-title">
-                    <strong>{cert.name || cert.cert_subject}</strong>
-                    <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
-                      {cert.enabled ? t('common.active') : t('common.disabled')}
-                    </Badge>
-                  </span>
-                  <span className="sf-record-meta">
-                    {t('common.expires')} {formatDate(cert.valid_until)}
-                    {cert.last_used_at && ` · ${t('common.used')} ${formatDate(cert.last_used_at)}`}
-                  </span>
-                </div>
-                <div className="sf-record-actions">
-                  <Button type="button" variant="secondary" aria-label={t('common.export')} title={t('common.export')} onClick={() => setExportCert({ id: cert.id, name: cert.name || cert.cert_subject, hasPrivateKey: true, keyAlgorithm: cert.key_algorithm })}>
-                    <Download size={16} />
-                  </Button>
-                  <Button type="button" variant="danger" onClick={() => handleDeleteMTLS(cert.id)} aria-label={t('common.delete')} title={t('common.delete')}>
-                    <Trash size={16} />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-      </FormGroup>
-    </>
-  )
-
-  const apiKeyActions = (
-    <ListButton primary icon={Plus} onClick={() => setShowApiKeyModal(true)}>{t('account.createKey')}</ListButton>
-  )
-
-  const renderApiKeysContent = () => (
-    <>
-      <HelpCard 
-        variant="tip" 
-        title={t('common.aboutAPIKeys')} 
-        items={t('account.apiKeyTips', { returnObjects: true })} 
-      />
-
-      <FormGroup title={t('account.yourAPIKeys')}>
-        {apiKeys.length === 0 ? (
-          <p className="sf-records-empty">
-            {t('account.noAPIKeys')}
-            <span className="block">{t('account.createKeyToAccess')}</span>
-          </p>
-        ) : (
-          <ul className="sf-records">
-            {apiKeys.map(key => {
-              const effectivelyActive = key.is_active && !key.is_expired
-              return (
-              <li key={key.id}>
-                <div className="sf-record-main">
-                  <span className="sf-record-title">
-                    <strong>{key.name}</strong>
-                    {!key.is_active && <Badge variant="secondary" size="sm">{t('common.revoked')}</Badge>}
-                    {key.is_active && key.is_expired && <Badge variant="secondary" size="sm">{t('common.expired')}</Badge>}
-                  </span>
-                  <span className="sf-record-meta sf-record-digest">
-                    {key.key_prefix ? (
-                      <>
-                        <code className="font-mono">{key.key_prefix}…</code>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); copy(key.key_prefix); showSuccess(t('common.copied')) }}
-                          className="sf-inline-icon"
-                          aria-label={t('common.copy')}
-                          title={t('common.copy')}
-                        >
-                          <Copy size={12} />
-                        </button>
-                      </>
-                    ) : (
-                      <span className="italic">{t('account.apiKeyPrefixUnavailable')}</span>
-                    )}
-                  </span>
-                  {key.permissions && (
-                    <span className="sf-record-meta">
-                      {Array.isArray(key.permissions) ? key.permissions.join(', ') : key.permissions}
-                    </span>
-                  )}
-                  <span className="sf-record-meta">
-                    {t('common.created')}{t('work.sep')}{formatDate(key.created_at)}
-                    {' · '}{t('account.apiKeyLastUsed')}{t('work.sep')}{key.last_used_at ? formatDate(key.last_used_at) : t('common.never')}
-                    {key.expires_at && <>{' · '}{t('common.expires')}{t('work.sep')}{formatDate(key.expires_at)}</>}
-                  </span>
-                </div>
-                <div className="sf-record-actions">
-                  {effectivelyActive ? (
-                    <Button type="button" variant="danger" onClick={() => handleRevokeApiKey(key.id)} aria-label={t('common.revoke')} title={t('common.revoke')}>
-                      <X size={16} />
-                    </Button>
-                  ) : (
-                    <Button type="button" variant="danger" onClick={() => handleDeleteApiKey(key.id)} aria-label={t('common.delete')} title={t('common.delete')}>
-                      <Trash size={16} />
-                    </Button>
-                  )}
-                </div>
-              </li>
-              )
-            })}
-          </ul>
-        )}
-      </FormGroup>
-    </>
-  )
-
-  // Every section on the page, each in its frame, in the order of the table of contents
-  const SECTIONS = [
-    { id: 'profile', label: t('account.profile'), description: t('account.personalDetails'), icon: User,
-      aside: profileActions, render: renderProfileContent },
-    { id: 'security', label: t('common.security'), description: t('account.manageAccountSecurity'), icon: ShieldCheck,
-      render: renderSecurityContent },
-    { id: 'api-keys', label: t('account.apiKeys'), description: t('account.apiKeysIntent'), icon: Key,
-      aside: apiKeyActions, render: renderApiKeysContent },
+  const sections = [
+    { id: 'profile', label: t('account.profile'), description: t('account.personalDetails'), icon: 'users' },
+    { id: 'security', label: t('common.security'), description: t('account.manageAccountSecurity'), icon: 'lock' },
+    { id: 'api-keys', label: t('account.apiKeys'), description: t('account.apiKeysIntent'), icon: 'key' },
   ]
+  const head = <PageHead title={t('common.account')} total={accountData.username || user?.username} intent={t('account.intent')} />
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full w-full">
-        <LoadingSpinner message={t('account.loadingAccount')} />
-      </div>
+      <Zone testId="account-page">
+        {head}
+        <div className="scroll-view" id="view-scroll"><SkeletonPanel label={t('account.loadingAccount')} /></div>
+      </Zone>
     )
   }
 
-  return (
+  const profile = (
     <>
-      <ResponsiveLayout
-        title={t('common.account')}
-        total={accountData.username || user?.username}
-        intent={t('account.intent')}
-        helpPageKey="account"
-      >
-        <FormLayout
-          toc={<SectionToc label={t('account.tocLabel')} sections={SECTIONS} flags={profileChanged ? { profile: 'modified' } : {}} hrefFor={(id) => (id === 'profile' ? '/account' : `/account?tab=${id}`)} onJump={setActiveTab} />}
-        >
-          <SectionJump label={t('sectioned.jumpLabel')} sections={SECTIONS} value={activeTab} onJump={setActiveTab} />
-          <div className="sf-form">
-            {SECTIONS.map(section => (
-              <FormSection key={section.id} id={section.id} title={section.label} description={section.description} aside={section.aside}>
-                {section.render()}
-              </FormSection>
-            ))}
-          </div>
-        </FormLayout>
-      </ResponsiveLayout>
+      <SettingsGroup legend={t('common.accountInformation')}>
+        <Field id="set-username" label={t('common.username')} full>
+          <input id="set-username" value={accountData.username || user?.username || ''} readOnly />
+        </Field>
+        <Input id="set-full_name" label={t('account.fullName')} value={formData.full_name} placeholder={t('account.enterYourName')}
+          onChange={(e) => setFormData((p) => ({ ...p, full_name: e.target.value }))} />
+        <Input id="set-email" type="email" label={t('common.email')} value={formData.email}
+          onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))} />
+        <Field id="set-role" label={t('common.role')} full>
+          <input id="set-role" value={ROLE_KEYS[accountData.role] ? t(ROLE_KEYS[accountData.role]) : (accountData.role || t('common.user'))} readOnly />
+        </Field>
+      </SettingsGroup>
+      {/* The account's language, saved with its preferences (the account menu no longer carries it) */}
+      <SettingsGroup legend={t('settings.language')}>
+        <Select id="set-language" label={t('settings.language')} value={i18n.language?.split('-')[0] || 'en'} onChange={changeLanguage}
+          options={languages.map((l) => ({ value: l.code, label: l.name }))} />
+      </SettingsGroup>
+      {/* Preferences of this browser; the inspector reads this one when the page changes */}
+      <SettingsGroup legend={t('account.preferences')}>
+        <ToggleSwitch id="set-close_on_nav" checked={closeOnNav} onChange={(on) => { if (on !== closeOnNav) toggleCloseOnNav() }}
+          label={t('account.closeInspectorOnNav')} description={t('account.closeInspectorOnNavHint')} />
+      </SettingsGroup>
+      <SettingsGroup legend={t('account.accountActivity')} grid={false}>
+        <Props items={[
+          [t('account.accountCreated'), accountData.created_at ? formatDate(accountData.created_at) : '—'],
+          [t('common.lastLogin'), accountData.last_login ? formatDate(accountData.last_login, true) : '—'],
+          [t('account.totalLogins'), accountData.login_count || 0],
+          [t('common.status'), <Pill tone={accountData.active ? 'good' : 'bad'} label={accountData.active ? t('common.active') : t('common.inactive')} />],
+        ]} />
+      </SettingsGroup>
+    </>
+  )
 
-      {/* ============ MODALS ============ */}
+  const security = (
+    <>
+      <SettingsGroup legend={t('common.password')} grid={false}>
+        <RecordList>
+          <RecordRow title={t('account.changeYourPassword')}
+            meta={`${t('account.lastChanged')}${t('work.sep')}${accountData.password_changed_at ? formatDate(accountData.password_changed_at) : t('common.never')}`}
+            action={<Btn write id="account-password" onClick={() => setShowPasswordModal(true)}>{t('common.changePassword')}</Btn>} />
+        </RecordList>
+      </SettingsGroup>
+      <SettingsGroup legend={t('common.twoFactorAuth')} grid={false}>
+        <RecordList>
+          <RecordRow key="totp" title={t('account.authenticatorApp')} badge={onOff(accountData.two_factor_enabled)}
+            action={<Btn write tone={accountData.two_factor_enabled ? 'danger' : undefined} onClick={handleToggle2FA}>
+              {accountData.two_factor_enabled ? t('common.disable2FA') : t('common.enable2FA')}
+            </Btn>} />
+          <RecordRow key="key" title={t('account.keyAsSecondFactor')} badge={onOff(accountData.webauthn_2fa)}
+            meta={hasEnabledKey ? t('account.keyAsSecondFactorHint') : t('account.keyAsSecondFactorNoKey')}
+            action={<Btn write tone={accountData.webauthn_2fa ? 'danger' : undefined} disabled={(!accountData.webauthn_2fa && !hasEnabledKey) || undefined}
+              onClick={handleToggleKey2FA}>
+              {accountData.webauthn_2fa ? t('account.turnOffKey2fa') : t('account.turnOnKey2fa')}
+            </Btn>} />
+        </RecordList>
+        <p className="group-hint">
+          {t('account.activeSecondFactors')}{t('work.sep')}{activeFactors.length
+            ? activeFactors.map((m) => (m === 'totp' ? t('account.authenticatorApp') : t('account.securityKey'))).join(', ')
+            : t('account.noSecondFactor')}
+          {accountData.two_factor_enforced && ` (${t('account.twoFactorEnforced')})`}
+        </p>
+      </SettingsGroup>
+      <SettingsGroup legend={t('account.securityKeys')} hint={t('account.webauthnDescription')} grid={false}>
+        <RecordList empty={t('account.noSecurityKeys')}>
+          {webauthnCredentials.map((cred) => (
+            <RecordRow key={cred.id} title={cred.name || t('account.securityKey')}
+              meta={[`${t('account.added')} ${formatDate(cred.created_at)}`, cred.last_used_at && `${t('common.used')} ${formatDate(cred.last_used_at)}`].filter(Boolean).join(' · ')}
+              action={<IconBtn icon="close" write label={`${t('common.delete')} ${cred.name || t('account.securityKey')}`} onClick={() => handleDeleteWebAuthn(cred.id)} />} />
+          ))}
+        </RecordList>
+        <div className="settings-actions">
+          <Btn write icon="plus" id="account-add-key" onClick={() => setShowWebAuthnModal(true)}>{t('account.addKey')}</Btn>
+        </div>
+      </SettingsGroup>
+      <SettingsGroup legend={<>{t('account.clientCertificates')}{' '}<Pill tone="warn" icon="sparkles" label={t('common.experimental')} /></>}
+        hint={t('account.useMTLSCerts')} grid={false}>
+        <RecordList empty={t('account.noCertificatesEnrolled')}>
+          {mtlsCertificates.map((cert) => {
+            const name = cert.name || cert.cert_subject
+            return (
+              <RecordRow key={cert.id} title={name}
+                badge={<Pill tone={cert.enabled ? 'good' : 'warn'} label={cert.enabled ? t('common.active') : t('common.disabled')} />}
+                meta={[`${t('common.expires')} ${formatDate(cert.valid_until)}`, cert.last_used_at && `${t('common.used')} ${formatDate(cert.last_used_at)}`].filter(Boolean).join(' · ')}
+                action={<span className="row-actions">
+                  <IconBtn icon="download" label={`${t('common.export')} ${name}`}
+                    onClick={() => setExportCert({ id: cert.id, name, hasPrivateKey: true, keyAlgorithm: cert.key_algorithm })} />
+                  <IconBtn icon="close" write label={`${t('common.delete')} ${name}`} onClick={() => handleDeleteMTLS(cert.id)} />
+                </span>} />
+            )
+          })}
+        </RecordList>
+        <div className="settings-actions">
+          <Btn write icon="plus" id="account-add-mtls" onClick={() => setShowMTLSModal(true)}>{t('account.addCertificate')}</Btn>
+        </div>
+      </SettingsGroup>
+    </>
+  )
 
-      {/* Change Password Modal */}
-      <FormModal
-        open={showPasswordModal}
-        onOpenChange={setShowPasswordModal}
-        title={t('common.changePassword')}
-        onSubmit={handleChangePassword}
-        submitLabel={t('common.changePassword')}
-      >
-        <Input
-          label={t('common.currentPassword')}
-          type="password"
-          name="current_password"
-          autoComplete="current-password"
-          required
-        />
-        <Input
-          label={t('common.newPassword')}
-          type="password"
-          name="new_password"
-          autoComplete="new-password"
-          showStrength
-          required
-        />
-        <Input
-          label={t('common.confirmNewPassword')}
-          type="password"
-          name="confirm_password"
-          autoComplete="new-password"
-          required
-        />
+  const keys = (
+    <SettingsGroup legend={t('account.yourAPIKeys')} grid={false}>
+      {[].concat(t('account.apiKeyTips', { returnObjects: true }) || []).map((tip) => <p key={tip} className="group-hint">{tip}</p>)}
+      <RecordList empty={`${t('account.noAPIKeys')}. ${t('account.createKeyToAccess')}`}>
+        {apiKeys.map((key) => {
+          const effectivelyActive = key.is_active && !key.is_expired
+          return (
+            <RecordRow key={key.id} title={key.name}
+              badge={!key.is_active ? <Pill tone="muted" label={t('common.revoked')} /> : key.is_expired ? <Pill tone="muted" label={t('common.expired')} /> : null}
+              meta={[
+                `${t('common.created')}${t('work.sep')}${formatDate(key.created_at)}`,
+                `${t('account.apiKeyLastUsed')}${t('work.sep')}${key.last_used_at ? formatDate(key.last_used_at) : t('common.never')}`,
+                key.expires_at && `${t('common.expires')}${t('work.sep')}${formatDate(key.expires_at)}`,
+              ].filter(Boolean).join(' · ')}
+              extra={<>
+                <span className="rl-meta row-actions">
+                  {key.key_prefix ? (
+                    <>
+                      <span className="mono">{key.key_prefix}…</span>
+                      <IconBtn icon="copy" quiet label={t('common.copy')} onClick={() => { copy(key.key_prefix); showSuccess(t('common.copied')) }} />
+                    </>
+                  ) : t('account.apiKeyPrefixUnavailable')}
+                </span>
+                {key.permissions && <span className="rl-meta">{Array.isArray(key.permissions) ? key.permissions.join(', ') : key.permissions}</span>}
+              </>}
+              action={effectivelyActive
+                ? <IconBtn icon="block" write label={`${t('common.revoke')} ${key.name}`} onClick={() => handleRevokeApiKey(key.id)} />
+                : <IconBtn icon="close" write label={`${t('common.delete')} ${key.name}`} onClick={() => handleDeleteApiKey(key.id)} />} />
+          )
+        })}
+      </RecordList>
+    </SettingsGroup>
+  )
+
+  const bodies = { profile, security, 'api-keys': keys }
+  const asides = {
+    'api-keys': <Btn tone="primary" icon="plus" id="account-new-key" onClick={() => setShowApiKeyModal(true)}>{t('account.createKey')}</Btn>,
+  }
+  const scopePermissions = apiKeyScopePermissions(apiKeyForm.scope, hasPermission)
+  const expiresBad = apiKeyForm.expires_days !== '' && !/^\d+$/.test(String(apiKeyForm.expires_days).trim())
+  const unlistedCas = unlistedPickerCas(cas, mtlsForm.ca_id)
+
+  const dialogs = (
+    <>
+      <FormModal open={showPasswordModal} onOpenChange={setShowPasswordModal} title={t('common.changePassword')} size="sm"
+        onSubmit={handleChangePassword} submitLabel={t('common.changePassword')} submitIcon="lock">
+        <Input id="pw-current" full label={t('common.currentPassword')} type="password" name="current_password" autoComplete="current-password" required data-autofocus />
+        <Input id="pw-new" full label={t('common.newPassword')} type="password" name="new_password" autoComplete="new-password" showStrength required />
+        <Input id="pw-confirm" full label={t('common.confirmNewPassword')} type="password" name="confirm_password" autoComplete="new-password" required />
       </FormModal>
 
-      {/* Create API Key Modal */}
-      <Modal
-        open={showApiKeyModal}
-        onOpenChange={(open) => {
-          setShowApiKeyModal(open)
-          if (!open) setApiKeyForm({ name: '', expires_days: '', scope: 'full' })
-        }}
-        title={t('account.createAPIKey')}
-      >
-        <form onSubmit={handleCreateApiKey}>
-          <div className="p-4 space-y-4">
-            <Input
-              label={t('account.apiKeyName')}
-              value={apiKeyForm.name}
-              onChange={(e) => setApiKeyForm(f => ({ ...f, name: e.target.value }))}
-              placeholder={t('account.keyNameExample')}
-              required
-            />
-            <Select
-              label={t('account.permissionScope')}
-              value={apiKeyForm.scope}
-              onChange={(val) => setApiKeyForm(f => ({ ...f, scope: val }))}
-              options={[
-                { value: 'full', label: t('account.scopeFull') },
-                { value: 'read', label: t('account.scopeReadOnly') },
-                { value: 'readwrite', label: t('account.scopeReadWrite') },
-                { value: 'certificates', label: t('account.scopeCertificates') },
-              ]}
-            />
-            <p className="text-xs text-text-tertiary font-mono px-1">
-              {apiKeyScopePermissions(apiKeyForm.scope, hasPermission).join(', ')}
-            </p>
-            <Input
-              label={t('account.expiresInDays')}
-              type="number"
-              min="0"
-              value={apiKeyForm.expires_days}
-              onChange={(e) => setApiKeyForm(f => ({ ...f, expires_days: e.target.value }))}
-              placeholder={t('account.expiresInDaysPlaceholder')}
-              helperText={t('account.expiresInDaysHelp')}
-            />
-          </div>
-          <div className="flex justify-end gap-2 p-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setShowApiKeyModal(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit">
-              {t('account.createKey')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {showApiKeyModal && (
+        <AtelierDialog title={t('account.createAPIKey')} size="narrow" onClose={closeKeyModal}>
+          <form onSubmit={(e) => { e.preventDefault(); if (!expiresBad) handleCreateApiKey(e) }} noValidate>
+            <div className="form-fields">
+              <Input id="key-name" full label={t('account.apiKeyName')} value={apiKeyForm.name} placeholder={t('account.keyNameExample')} required data-autofocus
+                onChange={(e) => setApiKeyForm((f) => ({ ...f, name: e.target.value }))} />
+              <Select id="key-scope" full label={t('account.permissionScope')} value={apiKeyForm.scope} hint={scopePermissions.join(', ')}
+                onChange={(val) => setApiKeyForm((f) => ({ ...f, scope: val }))}
+                options={[
+                  { value: 'full', label: t('account.scopeFull') },
+                  { value: 'read', label: t('account.scopeReadOnly') },
+                  { value: 'readwrite', label: t('account.scopeReadWrite') },
+                  { value: 'certificates', label: t('account.scopeCertificates') },
+                ]} />
+              <NumberInput id="key-expires" label={t('account.expiresInDays')} value={apiKeyForm.expires_days} placeholder={t('account.expiresInDaysPlaceholder')}
+                hint={t('account.expiresInDaysHelp')} error={expiresBad ? t('account.expiresInDaysInvalid') : undefined}
+                onChange={(e) => setApiKeyForm((f) => ({ ...f, expires_days: e.target.value }))} />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={closeKeyModal}>{t('common.cancel')}</button>
+              <Btn type="submit" tone="primary" icon="key">{t('account.createKey')}</Btn>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
 
-      {/* Newly-created API key — show ONCE so the user can copy it */}
-      <Modal
-        open={!!newApiKey}
-        onOpenChange={(open) => { if (!open) setNewApiKey(null) }}
-        title={t('account.apiKeyCreatedTitle')}
-      >
-        <div className="p-4 space-y-4">
-          <div className="flex items-start gap-2 p-3 rounded-lg border border-status-warning-op40 bg-status-warning-op10">
-            <Warning size={20} className="text-status-warning shrink-0 mt-0.5" />
-            <p className="text-sm text-text-primary">
-              {t('account.apiKeyCreatedWarning')}
-            </p>
+      {/* The new key, shown once so it can be copied */}
+      {newApiKey && (
+        <AtelierDialog title={t('account.apiKeyCreatedTitle')} size="narrow" onClose={() => setNewApiKey(null)} returnTo="account-new-key">
+          <Notice tone="warn">{t('account.apiKeyCreatedWarning')}</Notice>
+          <div className="form-fields">
+            <Textarea id="key-value" mono readOnly rows={3} label={t('account.apiKeyValue')} value={newApiKey.key || ''}
+              hint={newApiKey.expires_at ? `${t('common.expires')} ${formatDate(newApiKey.expires_at)}` : t('account.apiKeyNoExpiry')} />
           </div>
-          <div>
-            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-              {t('account.apiKeyValue')}
-            </label>
-            <div className="mt-1 flex items-stretch gap-2">
-              <code className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg-tertiary text-xs font-mono text-text-primary break-all select-all">
-                {newApiKey?.key}
-              </code>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  if (newApiKey?.key) {
-                    copy(newApiKey.key)
-                    showSuccess(t('common.copied'))
-                  }
-                }}
-                aria-label={t('common.copy')}
-              >
-                <Copy size={16} />
-              </Button>
-            </div>
+          <div className="modal-actions">
+            <Btn icon="copy" onClick={() => { if (newApiKey.key) { copy(newApiKey.key); showSuccess(t('common.copied')) } }}>{t('common.copy')}</Btn>
+            <Btn tone="primary" write={false} icon="check" onClick={() => setNewApiKey(null)}>{t('account.apiKeySavedDone')}</Btn>
           </div>
-          {newApiKey?.expires_at && (
-            <p className="text-xs text-text-tertiary">
-              {t('common.expires')} {formatDate(newApiKey.expires_at)}
-            </p>
-          )}
-          {newApiKey && !newApiKey.expires_at && (
-            <p className="text-xs text-text-tertiary">
-              {t('account.apiKeyNoExpiry')}
-            </p>
-          )}
-        </div>
-        <div className="flex justify-end gap-2 p-4 border-t border-border">
-          <Button type="button" onClick={() => setNewApiKey(null)}>
-            {t('account.apiKeySavedDone')}
-          </Button>
-        </div>
-      </Modal>
+        </AtelierDialog>
+      )}
 
-      {/* 2FA Setup Modal */}
-      <Modal
-        open={show2FAModal}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShow2FAModal(false)
-            setQrData(null)
-            setConfirmCode('')
-          }
-        }}
-        title={t('account.enableTwoFactor')}
-      >
-        {qrData && (
-          <div className="p-4 space-y-4">
-            {!qrData.confirmed && <>
-            <div>
-              <p className="text-sm text-text-secondary mb-3">
-                {t('account.scanQRCode')}
-              </p>
-              <div className="flex justify-center p-4 bg-paper rounded-lg">
-                <img src={qrData.qr_code} alt="2FA QR Code" className="w-48 h-48" />
-              </div>
-            </div>
-            
-            <div>
-              <p className="text-sm text-text-secondary mb-2">
-                {t('account.enterDigitCode')}
-              </p>
-              <Input
-                type="text"
-                placeholder={t('account.codePlaceholder')}
-                value={confirmCode}
-                onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                maxLength={6}
-                className="text-center text-2xl tracking-widest font-mono"
-              />
-            </div>
-            </>}
-            
-            {qrData.backup_codes && (
-              <div className="p-3 bg-status-warning-op10 border border-status-warning-op30 rounded-lg">
-                <p className="text-sm font-medium text-status-warning flex items-center gap-2">
-                  <Warning size={16} />
-                  {t('account.backupCodes')}
-                </p>
-                <p className="text-xs text-text-secondary mt-1">{t('account.backupCodesHint')}</p>
-                <div className="mt-2 grid grid-cols-2 gap-1 font-mono text-xs">
-                  {qrData.backup_codes.map((code, i) => (
-                    <span key={i} className="text-text-secondary">{code}</span>
-                  ))}
+      {show2FAModal && qrData && (
+        <AtelierDialog title={t('account.enableTwoFactor')} size="narrow" onClose={close2FA}>
+          <form onSubmit={(e) => { e.preventDefault(); if (!qrData.confirmed && confirmCode.length === 6) handleConfirm2FA() }} noValidate>
+            {!qrData.confirmed && (
+              <div className="form-fields">
+                <div className="field full">
+                  <p>{t('account.scanQRCode')}</p>
+                  <img src={qrData.qr_code} alt={t('account.qrCodeAlt')} width={192} height={192} />
                 </div>
+                <Input id="totp-code" label={t('account.enterDigitCode')} placeholder={t('account.codePlaceholder')} inputMode="numeric" maxLength={6}
+                  value={confirmCode} data-autofocus onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
               </div>
             )}
-            
-            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            {qrData.backup_codes && (
+              <>
+                <Notice tone="warn">{t('account.backupCodesHint')}</Notice>
+                <div className="form-fields">
+                  <Textarea id="totp-backup" mono readOnly rows={Math.ceil(qrData.backup_codes.length / 2) + 1} label={t('account.backupCodes')}
+                    value={qrData.backup_codes.join('\n')} />
+                </div>
+              </>
+            )}
+            <div className="modal-actions">
               {qrData.confirmed ? (
-                <Button type="button" onClick={() => { setShow2FAModal(false); setQrData(null) }}>
-                  {t('account.backupCodesSaved')}
-                </Button>
-              ) : <>
-                <Button type="button" variant="secondary" onClick={() => setShow2FAModal(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button type="button" onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
-                  {t('account.verifyAndEnable')}
-                </Button>
-              </>}
+                <Btn tone="primary" write={false} icon="check" onClick={close2FA}>{t('account.backupCodesSaved')}</Btn>
+              ) : (
+                <>
+                  <button type="button" className="btn" data-action="close-modal" onClick={close2FA}>{t('common.cancel')}</button>
+                  <Btn type="submit" tone="primary" icon="lock" disabled={confirmCode.length !== 6 || undefined}>{t('account.verifyAndEnable')}</Btn>
+                </>
+              )}
             </div>
-          </div>
-        )}
-      </Modal>
+          </form>
+        </AtelierDialog>
+      )}
 
-      {/* WebAuthn Registration Modal */}
-      <Modal
-        open={showWebAuthnModal}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowWebAuthnModal(false)
-            setWebauthnName('')
-          }
-        }}
-        title={t('account.registerSecurityKey')}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('account.addHardwareKey')}
-          </p>
-          
-          <Input
-            label={t('account.keyName')}
-            value={webauthnName}
-            onChange={(e) => setWebauthnName(e.target.value)}
-            placeholder={t('account.keyNamePlaceholder')}
-          />
-          
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setShowWebAuthnModal(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button 
-              onClick={handleRegisterWebAuthn} 
-              disabled={webauthnRegistering || !webauthnName.trim()}
-            >
-              {webauthnRegistering ? t('account.waitingForKey') : t('account.registerKey')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {showWebAuthnModal && (
+        <AtelierDialog title={t('account.registerSecurityKey')} size="narrow" onClose={closeWebAuthn}>
+          <form onSubmit={(e) => { e.preventDefault(); if (!webauthnRegistering && webauthnName.trim()) handleRegisterWebAuthn() }} noValidate>
+            <p>{t('account.addHardwareKey')}</p>
+            <div className="form-fields">
+              <Input id="webauthn-name" full label={t('account.keyName')} value={webauthnName} placeholder={t('account.keyNamePlaceholder')} data-autofocus
+                onChange={(e) => setWebauthnName(e.target.value)} />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={closeWebAuthn}>{t('common.cancel')}</button>
+              <Btn type="submit" tone="primary" icon="key" disabled={webauthnRegistering || !webauthnName.trim() || undefined}>
+                {webauthnRegistering ? t('account.waitingForKey') : t('account.registerKey')}
+              </Btn>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
 
-      {/* mTLS Certificate Modal */}
-      <Modal
-        open={showMTLSModal}
-        onOpenChange={handleCloseMTLSModal}
-        title={t('account.addCertificate')}
-      >
-        <div className="p-4 space-y-4">
-          {mtlsResult ? (
-            <>
-              <div className="p-3 rounded-lg bg-status-success-op10 text-sm text-status-success font-medium">
-                {t('account.mtlsCertCreated')}
-              </div>
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-bg-secondary text-xs text-text-secondary">
-                <ShieldCheck size={16} weight="fill" className="flex-shrink-0 mt-0.5 text-status-success" />
-                <span>{t('account.mtlsDownloadWarning')}</span>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-text-secondary font-medium">{t('common.certificate')}</label>
-                  <textarea
-                    readOnly
-                    value={mtlsResult.certificate || ''}
-                    className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-text-secondary font-medium">{t('account.privateKey')}</label>
-                  <textarea
-                    readOnly
-                    value={mtlsResult.private_key || ''}
-                    className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none"
-                  />
-                </div>
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-status-success-op10 text-xs text-status-success">
-                  <ShieldCheck size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-                  <span>{t('account.mtlsCertManaged')}</span>
-                </div>
-              </div>
-              <Input
-                type="password"
-                label={t('export.password')}
-                value={mtlsP12Password}
-                onChange={(e) => setMtlsP12Password(e.target.value)}
-                helperText={t('export.formatP12Desc')}
-              />
-              <label className="flex items-center gap-2.5 px-1 py-1 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={mtlsP12Legacy}
-                  onChange={(e) => setMtlsP12Legacy(e.target.checked)}
-                  className="w-4 h-4 rounded accent-accent-primary"
-                />
-                <div>
-                  <div className="text-sm text-text-primary">{t('export.legacyPkcs12')}</div>
-                  <div className="text-xs text-text-tertiary">{t('export.legacyPkcs12Desc')}</div>
-                </div>
-              </label>
-              <div className="flex flex-wrap gap-2 justify-between pt-4 border-t border-border">
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => {
-                    const pem = (mtlsResult.certificate || '') + '\n' + (mtlsResult.private_key || '')
-                    const blob = new Blob([pem], { type: 'application/x-pem-file' })
-                    downloadBlob(blob, `${mtlsResult.name || 'mtls-cert'}.pem`)
-                  }}>
-                    <Download size={16} className="mr-1" />
-                    {t('account.downloadPEM')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    loading={mtlsP12Downloading}
-                    disabled={mtlsP12Downloading || mtlsP12Password.length < 8}
-                    onClick={() => handleDownloadMTLSPkcs12(
-                      mtlsResult.id,
-                      mtlsResult.name,
-                      mtlsP12Password,
-                      mtlsP12Legacy,
-                    )}
-                  >
-                    <Download size={16} className="mr-1" />
-                    {t('export.formatOptions.pkcs12')}
-                  </Button>
-                </div>
-                <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
-                  {t('common.close')}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Tab selector */}
-              <div className="flex border-b border-border">
-                {canGenerateMtls && (
-                  <button
-                    type="button"
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      effectiveMtlsTab === 'generate'
-                        ? 'border-accent-primary text-accent-primary'
-                        : 'border-transparent text-text-secondary hover:text-text-primary'
-                    }`}
-                    onClick={() => setMtlsTab('generate')}
-                  >
-                    {t('account.mtlsGenerate')}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    effectiveMtlsTab === 'import'
-                      ? 'border-accent-primary text-accent-primary'
-                      : 'border-transparent text-text-secondary hover:text-text-primary'
-                  }`}
-                  onClick={() => setMtlsTab('import')}
-                >
-                  {t('account.mtlsImport')}
-                </button>
-                <button
-                  type="button"
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    effectiveMtlsTab === 'assign'
-                      ? 'border-accent-primary text-accent-primary'
-                      : 'border-transparent text-text-secondary hover:text-text-primary'
-                  }`}
-                  onClick={() => { setMtlsTab('assign'); loadAvailableCerts() }}
-                >
-                  {t('account.mtlsAssign')}
-                </button>
-              </div>
-
-              {effectiveMtlsTab === 'generate' && canGenerateMtls && (
-                <>
-                  <Input
-                    label={t('account.mtlsCertName')}
-                    value={mtlsForm.name}
-                    onChange={(e) => setMtlsForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder={`${user?.username || 'user'} mTLS`}
-                  />
-                  {/* Directing a CA other than the configured mTLS one requires
-                      write:cas server-side, without it, only the configured
-                      default is issuable, so offer no choice that would 403. */}
-                  {canChooseMtlsCa && (
-                    <div>
-                      <Select
-                        label={t('account.mtlsIssuingCA')}
-                        value={mtlsForm.ca_id}
-                        onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
-                        placeholder={t('account.mtlsDefaultCA')}
-                        options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map(ca => ({
-                          value: ca.refid || String(ca.id),
-                          label: ca.descr || ca.subject || ca.refid,
-                        }))}
-                        helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
-                      />
-                      <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
-                    </div>
-                  )}
-                  <Input
-                    label={t('account.mtlsValidityDays')}
-                    type="number"
-                    value={mtlsForm.validity_days}
-                    onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))}
-                    min="1"
-                    max="3650"
-                  />
-                  <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                    <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
-                      {t('common.cancel')}
-                    </Button>
-                    <Button type="button" onClick={handleCreateMTLS} loading={mtlsCreating} disabled={mtlsCreating}>
-                      <Certificate size={16} />
-                      {t('account.generateCertificate')}
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {effectiveMtlsTab === 'import' && (
-                <>
-                  <Input
-                    label={t('account.mtlsCertName')}
-                    value={mtlsImportForm.name}
-                    onChange={(e) => setMtlsImportForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder={t('account.mtlsImportNamePlaceholder')}
-                  />
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1">
-                      {t('account.mtlsPemData')}
-                    </label>
-                    <textarea
-                      value={mtlsImportForm.pem}
-                      onChange={(e) => setMtlsImportForm(prev => ({ ...prev, pem: e.target.value }))}
-                      placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-                      className="w-full h-32 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-text-secondary mb-1">{t('account.mtlsOrUploadFile')}</label>
-                    <input
-                      type="file"
-                      accept=".pem,.crt,.cer"
-                      onChange={handlePemFileUpload}
-                      className="block w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border file:text-sm file:font-medium file:bg-bg-secondary file:text-text-primary hover:file:bg-bg-tertiary"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                    <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
-                      {t('common.cancel')}
-                    </Button>
-                    <Button type="button" onClick={handleImportMTLS} loading={mtlsCreating} disabled={mtlsCreating || !mtlsImportForm.pem.trim()}>
-                      <Certificate size={16} />
-                      {t('account.importCertificate')}
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {effectiveMtlsTab === 'assign' && (
-                <>
-                  {availableCertsLoading ? (
-                    <div className="flex justify-center py-8">
-                      <LoadingSpinner size="sm" />
-                    </div>
-                  ) : availableCerts.length === 0 ? (
-                    <div className="text-center py-8 text-text-secondary text-sm">
-                      <Certificate size={32} className="mx-auto mb-2 opacity-50" />
-                      <p>{t('account.mtlsNoAvailableCerts')}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {availableCerts.map(cert => (
-                        <button
-                          key={cert.id}
-                          type="button"
-                          className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                            selectedAssignCert?.id === cert.id
-                              ? 'border-accent-primary bg-accent-primary-op10'
-                              : 'border-border hover:border-text-secondary bg-bg-secondary'
-                          }`}
-                          onClick={() => setSelectedAssignCert(cert)}
-                        >
-                          <div className="font-medium text-sm text-text-primary">{cert.name}</div>
-                          <div className="text-xs text-text-secondary mt-1 truncate">{cert.subject}</div>
-                          {cert.valid_to && (
-                            <div className="text-xs text-text-tertiary mt-0.5">
-                              {t('account.mtlsExpiresOn', { date: formatDate(cert.valid_to) })}
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                    <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
-                      {t('common.cancel')}
-                    </Button>
-                    <Button type="button" onClick={handleAssignMTLS} loading={mtlsCreating} disabled={mtlsCreating || !selectedAssignCert}>
-                      <Certificate size={16} />
-                      {t('account.assignCertificate')}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </>
+      {showMTLSModal && (
+        <MtlsCertificateDialog title={t('account.addCertificate')} onClose={handleCloseMTLSModal} busy={mtlsCreating}
+          canGenerate={canGenerateMtls} tab={mtlsTab} onTab={openMtlsWay}
+          generateForm={mtlsForm} setGenerateForm={setMtlsForm} namePlaceholder={`${user?.username || 'user'} mTLS`} onGenerate={handleCreateMTLS}
+          caPicker={canChooseMtlsCa && (
+            // Directing a CA other than the configured mTLS one requires write:cas server-side
+            <Select id="mtls-ca" full label={t('account.mtlsIssuingCA')} value={mtlsForm.ca_id} placeholder={t('account.mtlsDefaultCA')}
+              onChange={(val) => setMtlsForm((prev) => ({ ...prev, ca_id: val }))}
+              options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map((ca) => ({
+                value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid,
+              }))}
+              hint={(unlistedCas > 0 || hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id) > 0) && <>
+                {unlistedCas > 0 && t('cas.notListedForSigning', { count: unlistedCas })}{' '}
+                <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas((v) => !v)} />
+              </>} />
           )}
-        </div>
-      </Modal>
+          importForm={mtlsImportForm} setImportForm={setMtlsImportForm} onImport={handleImportMTLS}
+          assign={{ loading: availableCertsLoading, certs: availableCerts, selected: selectedAssignCert, onSelect: setSelectedAssignCert }}
+          onAssign={handleAssignMTLS}
+          result={mtlsResult && (
+            <>
+              <p className="test-result good" role="status"><span>{t('account.mtlsCertCreated')}</span></p>
+              <Notice>{t('account.mtlsDownloadWarning')}</Notice>
+              <div className="form-fields">
+                <Textarea id="mtls-result-cert" mono readOnly rows={4} label={t('common.certificate')} value={mtlsResult.certificate || ''} />
+                <Textarea id="mtls-result-key" mono readOnly rows={4} label={t('account.privateKey')} value={mtlsResult.private_key || ''}
+                  hint={t('account.mtlsCertManaged')} />
+                <SecretInput id="mtls-p12-password" full label={t('export.password')} value={mtlsP12Password} hint={t('export.formatP12Desc')}
+                  onChange={(e) => setMtlsP12Password(e.target.value)} />
+                <ToggleSwitch id="mtls-p12-legacy" checked={mtlsP12Legacy} onChange={setMtlsP12Legacy}
+                  label={t('export.legacyPkcs12')} description={t('export.legacyPkcs12Desc')} />
+              </div>
+              <div className="modal-actions">
+                <Btn icon="download" onClick={() => {
+                  const pem = (mtlsResult.certificate || '') + '\n' + (mtlsResult.private_key || '')
+                  downloadBlob(new Blob([pem], { type: 'application/x-pem-file' }), `${mtlsResult.name || 'mtls-cert'}.pem`)
+                }}>{t('account.downloadPEM')}</Btn>
+                <Btn icon="download" disabled={mtlsP12Downloading || mtlsP12Password.length < 8 || undefined}
+                  onClick={() => handleDownloadMTLSPkcs12(mtlsResult.id, mtlsResult.name, mtlsP12Password, mtlsP12Legacy)}>
+                  {t('export.formatOptions.pkcs12')}
+                </Btn>
+                <Btn tone="primary" write={false} onClick={handleCloseMTLSModal}>{t('common.close')}</Btn>
+              </div>
+            </>
+          )} />
+      )}
 
-      {/* Export Modal for mTLS certificates */}
-      <ExportModal
+      <ExportDialog
         open={!!exportCert}
         onClose={() => setExportCert(null)}
         entityType="certificate"
@@ -1446,5 +857,23 @@ export default function AccountPage() {
         onExport={handleExportCert}
       />
     </>
+  )
+
+  return (
+    <Zone testId="account-page" after={dialogs}>
+      {head}
+      <SettingsLayout
+        toc={<SettingsToc label={t('account.tocLabel')} sections={sections} flags={profileChanged ? { profile: 'modified' } : {}} current={activeTab}
+          hrefFor={(id) => (id === 'profile' ? '/account' : `/account?tab=${id}`)} onJump={setActiveTab} />}
+        onKeyDown={saveOnEnter}
+      >
+        <SettingsJump sections={sections} current={activeTab} onJump={setActiveTab} />
+        {sections.map((s) => (
+          <SettingsFrame key={s.id} id={s.id} label={s.label} desc={s.description} aside={asides[s.id]}>{bodies[s.id]}</SettingsFrame>
+        ))}
+        <SettingsSaveBar stateRef={saveState} dirty={profileChanged} pending={changedFields.map((k) => profileLabels[k])}
+          saving={saving} onReset={resetProfile} onSave={handleSaveProfile} announce={announce} />
+      </SettingsLayout>
+    </Zone>
   )
 }

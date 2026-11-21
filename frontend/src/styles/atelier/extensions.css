@@ -159,12 +159,15 @@
 .atl .settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .atl .settings-grid>.settings-actions,.atl .settings-grid>.notice{grid-column:1/-1}
 .atl .settings-grid>.notice,.atl .settings-stack>.notice,.atl .settings-body>.notice{margin:0}
+/* A list in a section (the state chips and the table of Operations) keeps to the section's width: its own region scrolls. */
+.atl .settings-body>.filters-row{min-width:0}
+.atl .settings-body>.table-workspace{min-width:0}
 .atl .notice-actions{margin-top:8px}
 .atl .pre-line{white-space:pre-line}
 .atl .field>.segmented{align-self:flex-start;flex-wrap:wrap}
 .atl .lock-mark{display:inline-flex;margin-left:5px;vertical-align:-2px;color:var(--muted)}
 .atl .lock-mark .icon{width:12px;height:12px}
-.atl .settings-section .panel-heading h2[data-quiet-focus]:focus-visible{outline:none}
+.atl .settings-section .panel-heading h2[data-quiet-focus]:focus-visible{outline:none;box-shadow:none}
 /*
  * Settings, data and system sections: a sentence among the fields spans the grid; a value and
  * its copy button on one line; the archives' summary; a task's name over what its last run said;

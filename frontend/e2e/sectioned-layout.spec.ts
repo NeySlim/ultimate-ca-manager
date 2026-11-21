@@ -165,7 +165,7 @@ test('groups of a frame stand 20 px apart', async ({ page, api }) => {
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-  for (const [path, layout] of [['/settings', '.settings-layout'], ['/account', '.sf-layout'], ['/tools', '.sf-layout'], ['/operations', '.sf-layout']]) {
+  for (const [path, layout] of [['/settings', '.settings-layout'], ['/account', '.settings-layout'], ['/tools', '.settings-layout'], ['/operations', '.settings-layout']]) {
     test(`${path} is no wider than the phone`, async ({ page, api }) => {
       await page.goto(path)
       await expect(page.locator(layout)).toBeVisible()
@@ -184,6 +184,17 @@ test.describe('on a phone', () => {
       expect(wide).toBe(0)
     })
   }
+
+  test('the bulk list of Operations keeps to its frame, its rows scrolling inside it', async ({ page, api }) => {
+    await page.goto('/operations?tab=bulk')
+    const frame = page.getByRole('region', { name: 'Bulk Actions', exact: true })
+    await expect(frame.locator('.table-workspace')).toBeVisible()
+    const f = await box(frame)
+    for (const sel of ['.filters-row', '.table-workspace', '.table-workspace > .toolbar']) {
+      const b = await box(frame.locator(sel).first())
+      expect(b.x + b.width).toBeLessThanOrEqual(f.x + f.width + EPS)
+    }
+  })
 
   test('each scheduler task is a card with its run button on the screen', async ({ page, api }) => {
     await page.goto('/settings?tab=scheduler')
