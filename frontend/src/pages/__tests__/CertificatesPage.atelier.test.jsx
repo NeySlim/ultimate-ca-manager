@@ -443,13 +443,34 @@ describe('CertificatesPage: the list in the URL (shared link, reload)', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'certificates.filterBySource' }), { target: { value: 'acme' } })
     await waitFor(() => expect(where()).toBe('?q=web&sort=name&order=asc&source=acme'))
     expect(lastParams()).toMatchObject({ page: 1, source: ['acme'], search: 'web' })
-    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-source'))).toEqual(['acme']))
+    // The address is the list's only state: nothing is kept aside in this browser (a store would write within 200 ms)
+    await act(settle)
+    for (const k of ['ca', 'source', 'template']) expect(window.localStorage.getItem(`ucm-filter-certs-${k}`)).toBeNull()
   })
 
-  it('keeps the saved filters for a bare address', async () => {
+  it('shows the whole list for a bare address, whatever an earlier session stored, as the mockup', async () => {
+    window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['2']))
     window.localStorage.setItem('ucm-filter-certs-source', JSON.stringify(['manual']))
+    window.localStorage.setItem('ucm-filter-certs-template', JSON.stringify(['modified']))
     await mount('/certificates')
-    expect(lastParams().source).toEqual(['manual'])
+    expect(lastParams().ca_id).toBeUndefined()
+    expect(lastParams().source).toBeUndefined()
+    expect(lastParams().template_modified).toBeUndefined()
+    expect(screen.getByRole('combobox', { name: 'certificates.filterByCa' })).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'certificates.filterBySource' })).toHaveValue('')
+    expect(zone().querySelector('[data-action="clear-filters"]')).toBeNull()
+  })
+
+  it('a filter chosen, then the page left and opened bare, is gone (no filter the URL does not carry)', async () => {
+    const view = await mount('/certificates')
+    fireEvent.change(screen.getByRole('combobox', { name: 'certificates.filterByCa' }), { target: { value: '2' } })
+    await waitFor(() => expect(where()).toBe('?ca=2'))
+    expect(lastParams().ca_id).toEqual(['2'])
+    await act(settle)
+    view.unmount()
+    await mount('/certificates')
+    expect(lastParams().ca_id).toBeUndefined()
+    expect(screen.getByRole('combobox', { name: 'certificates.filterByCa' })).toHaveValue('')
   })
 
   it('keeps the open certificate when the list changes, and Réinitialiser leaves it', async () => {

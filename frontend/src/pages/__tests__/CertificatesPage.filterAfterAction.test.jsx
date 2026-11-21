@@ -70,8 +70,8 @@ vi.mock('../../services', () => ({
 
 import CertificatesPage from '../CertificatesPage'
 
-const renderPage = () => render(
-  <MemoryRouter><CertificatesPage /></MemoryRouter>
+const renderPage = (url = '/certificates') => render(
+  <MemoryRouter initialEntries={[url]}><CertificatesPage /></MemoryRouter>
 )
 
 const lastParams = () => getAll.mock.calls[getAll.mock.calls.length - 1][0]
@@ -146,9 +146,8 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     expect(getAll.mock.calls.length).toBe(before)
   })
 
-  it('restores a filter persisted from an earlier session', async () => {
-    window.localStorage.setItem('ucm-filter-certs-source', JSON.stringify(['import']))
-    renderPage()
+  it('keeps a filter the address carries when an action elsewhere reloads the list', async () => {
+    renderPage('/certificates?source=import')
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     expect(lastParams().source).toEqual(['import'])
 

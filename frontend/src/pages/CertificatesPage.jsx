@@ -129,19 +129,16 @@ export default function CertificatesPage() {
     patchList({ sort: plain ? '' : s.key, order: plain ? '' : (s.asc ? 'asc' : 'desc') })
   }, [sort, patchList])
 
-  // A filter the URL names wins; a bare address takes the saved one. Setting one writes both.
-  const [storedCA, storeCA] = usePersistedState('ucm-filter-certs-ca', [])
-  const [storedSource, storeSource] = usePersistedState('ucm-filter-certs-source', [])
-  const [storedTemplate, storeTemplate] = usePersistedState('ucm-filter-certs-template', [])
+  // The URL is the filters' only state, as the mockup's: a bare address shows the whole list
   const urlCA = query.getAll('ca').join(',')
   const urlSource = query.getAll('source').join(',')
   const urlTemplate = query.getAll('template').join(',')
-  const filterCA = useMemo(() => (query.has('ca') ? urlCA.split(',') : storedCA), [query, urlCA, storedCA])
-  const filterSource = useMemo(() => (query.has('source') ? urlSource.split(',') : storedSource), [query, urlSource, storedSource])
-  const filterTemplate = useMemo(() => (query.has('template') ? urlTemplate.split(',') : storedTemplate), [query, urlTemplate, storedTemplate])
-  const setFilterCA = useCallback((v) => { storeCA(v); patchList({ ca: v, page: '' }) }, [storeCA, patchList])
-  const setFilterSource = useCallback((v) => { storeSource(v); patchList({ source: v, page: '' }) }, [storeSource, patchList])
-  const setFilterTemplate = useCallback((v) => { storeTemplate(v); patchList({ template: v, page: '' }) }, [storeTemplate, patchList])
+  const filterCA = useMemo(() => (urlCA ? urlCA.split(',') : NONE), [urlCA])
+  const filterSource = useMemo(() => (urlSource ? urlSource.split(',') : NONE), [urlSource])
+  const filterTemplate = useMemo(() => (urlTemplate ? urlTemplate.split(',') : NONE), [urlTemplate])
+  const setFilterCA = useCallback((v) => patchList({ ca: v, page: '' }), [patchList])
+  const setFilterSource = useCallback((v) => patchList({ source: v, page: '' }), [patchList])
+  const setFilterTemplate = useCallback((v) => patchList({ template: v, page: '' }), [patchList])
   const searchValue = query.get('q') || ''
   const setSearchValue = useCallback((v) => patchList({ q: v, page: '' }), [patchList])
   const [typed, setTyped] = useState(null)
@@ -309,10 +306,9 @@ export default function CertificatesPage() {
   const resetFilters = useCallback(() => {
     clearTimeout(searchTimer.current)
     setTyped(null)
-    if (!linkView) { storeCA([]); storeSource([]); storeTemplate([]) }
     clearList()
     requestAnimationFrame(() => document.getElementById('search')?.focus())
-  }, [linkView, clearList, storeCA, storeSource, storeTemplate])
+  }, [clearList])
   const narrowed = Boolean(searchValue) || savedCA.length > 0 || savedSource.length > 0 || savedTemplate.length > 0
 
   // Presets: the search, the statuses and the filters, and the overview link when one is open
@@ -556,7 +552,7 @@ export default function CertificatesPage() {
         applied={(chips.length > 0 || liveScope) && (
           <AppliedFilters chips={chips.map((c) => ({ key: c.key, label: c.label, onRemove: () => removeUrlFilter(c.remove) }))}
             note={liveScope ? t('certificates.liveScope') : undefined}
-            onClearAll={() => { if (!linkView) storeTemplate([]); patchList(Object.fromEntries([...OVERVIEW_FILTER_KEYS, 'view', 'template', 'page'].map((k) => [k, '']))) }} />
+            onClearAll={() => { patchList(Object.fromEntries([...OVERVIEW_FILTER_KEYS, 'view', 'template', 'page'].map((k) => [k, '']))) }} />
         )}
         batch={n > 0 && (
           <BatchBar onClear={clearSelection}
