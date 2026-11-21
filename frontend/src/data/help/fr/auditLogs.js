@@ -11,7 +11,7 @@ export default {
           { label: 'Type d’opération', text: 'Émissions, renouvellements, révocations, connexions, utilisateurs, paramètres et les autres types regroupent chacun des codes d’action du serveur' },
           { label: 'Filtres', text: 'Dates, utilisateur, résultat et codes d’action un par un ; chaque filtre actif apparaît en pastille sous la barre d’outils, avec son bouton pour le retirer' },
           { label: 'Raccourcis et filtres enregistrés', text: 'Connexions échouées ou tous les échecs en un clic ; les filtres en cours s’enregistrent sous un nom et se réappliquent (gardés dans ce navigateur)' },
-          { label: 'Détail', text: 'Le nom de la ressource ou la flèche d’une ligne ouvre l’entrée : son texte, l’utilisateur, la date et l’heure, le résultat, le code d’action, l’adresse IP et le client ; Inspecter le certificat (ou Voir l’autorité) ouvre ce que l’entrée nomme' },
+          { label: 'Détail', text: 'Le nom de la ressource ou la flèche d’une ligne ouvre l’entrée : son texte, l’utilisateur, la date et l’heure, le résultat, le code d’action, l’adresse IP et le client ; Inspecter le certificat (ou Voir l’autorité) ouvre ce que l’entrée nomme. Sur un téléphone, chaque entrée est une carte qui s’ouvre d’un appui n’importe où' },
         ]
       },
       {
@@ -48,6 +48,8 @@ Chaque ligne montre l’heure (et le jour quand ce n’est pas aujourd’hui), l
 - **Adresse IP** et **Client** (user agent), quand ils ont été enregistrés
 
 Quand l’entrée nomme un certificat ou une autorité, **Inspecter le certificat** (ou **Voir l’autorité**) l’ouvre dans l’inspecteur.
+
+Sur un téléphone, chaque entrée est une carte qui montre les mêmes informations : un appui n’importe où sur elle, ou sur sa flèche, ouvre le détail.
 
 ## Trouver des entrées
 

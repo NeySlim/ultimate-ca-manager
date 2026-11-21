@@ -153,7 +153,7 @@ export const helpContent = {
           { label: 'Keyboard', text: 'In the tree, the arrow keys move, right and left unfold and fold, Enter opens the CA in the detail panel' },
           { label: 'Search', text: 'Filters the three views on the name, the common name and the subject; the tree keeps the branch that leads to each match' },
           { label: 'Columns view', text: 'Hierarchy browsed level by level, one column per level' },
-          { label: 'List view', text: 'Flat sortable table: one action per row (download the certificate) and a chevron that opens the detail' },
+          { label: 'List view', text: 'Flat sortable table: one action per row (download the certificate) and a chevron that opens the detail; on a phone each CA is a card, opened by a tap anywhere on it, its export in the detail' },
         ]
       },
       {
@@ -1110,7 +1110,7 @@ export const helpContent = {
           { label: 'Operation type', text: 'Issuances, renewals, revocations, sign-ins, users, settings and the other types each group the server’s action codes' },
           { label: 'Filters', text: 'Dates, user, result and individual action codes; each active filter shows as a chip under the toolbar, with its own remove button' },
           { label: 'Shortcuts and saved filters', text: 'Failed sign-ins or all failures in one click; the current filters can be saved under a name and applied again (kept in this browser)' },
-          { label: 'Detail', text: 'The resource name or the arrow of a row opens the entry: its text, user, date and time, result, action code, IP address and client; Inspect the certificate (or View the authority) opens what the entry names' },
+          { label: 'Detail', text: 'The resource name or the arrow of a row opens the entry: its text, user, date and time, result, action code, IP address and client; Inspect the certificate (or View the authority) opens what the entry names. On a phone each entry is a card that opens with a tap anywhere on it' },
         ]
       },
       {
