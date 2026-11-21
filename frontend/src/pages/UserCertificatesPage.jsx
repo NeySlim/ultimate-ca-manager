@@ -322,7 +322,7 @@ export default function UserCertificatesPage() {
           { status: true },
         ]}
         error={loadError && (
-          <LoadError id="user-certificates" title={t('messages.errors.loadFailed.certificates')} onRetry={loadData}
+          <LoadError id="user-certificates" title={t('messages.errors.loadFailed.certificates')} onRetry={loadData} journal={hasPermission?.('read:audit') ? '/audit' : undefined}
             cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/user-certificates', message: loadError.message }} />} />
         )}
         empty={(searchValue || active) && certStats.total ? (

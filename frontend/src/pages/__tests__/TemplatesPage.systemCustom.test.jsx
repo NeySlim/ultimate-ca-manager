@@ -153,7 +153,7 @@ describe('TemplatesPage: Source comes from is_system', () => {
 
 describe('TemplatesPage: system templates cannot be edited or deleted', () => {
   // The dock's heading: Exporter, Modifier (disabled with its reason on a system template),
-  // then the « ⋯ » menu (Aperçu détaillé, Dupliquer, Activer/Désactiver, Supprimer).
+  // then the « ⋯ » menu (Aperçu détaillé, Copier, Activer/Désactiver, Supprimer).
   const openDockFor = async (name) => {
     fireEvent.click(await screen.findByText(name))
     return await screen.findByRole('button', { name: /common.export/i })
@@ -168,7 +168,7 @@ describe('TemplatesPage: system templates cannot be edited or deleted', () => {
     getAll.mockResolvedValue({ data: [SYSTEM_TEMPLATES[0], CUSTOM_TEMPLATE] })
   })
 
-  it('disables Edit and offers no Delete for a system template, leaving Duplicate and Export', async () => {
+  it('disables Edit and offers no Delete for a system template, leaving Copy and Export', async () => {
     renderPage()
     await openDockFor('Email Certificate (S/MIME)')
 
@@ -179,7 +179,7 @@ describe('TemplatesPage: system templates cannot be edited or deleted', () => {
     expect(screen.getByRole('button', { name: /common.export/i }).disabled).toBe(false)
     // Duplicating a system template is the supported way to base a custom one on a built-in
     const menu = await openMenu()
-    expect(within(menu).getByRole('button', { name: /templates.module.duplicate/ })).toBeTruthy()
+    expect(within(menu).getByRole('button', { name: /common.copy/ })).toBeTruthy()
     expect(within(menu).queryByRole('button', { name: /common.delete/ })).toBeNull()
   })
 
@@ -206,7 +206,7 @@ describe('TemplatesPage: system templates cannot be edited or deleted', () => {
 
     expect(screen.queryByRole('button', { name: /common.edit/i })).toBeNull()
     const menu = await openMenu()
-    expect(within(menu).queryByRole('button', { name: /templates.module.duplicate/ })).toBeNull()
+    expect(within(menu).queryByRole('button', { name: /common.copy/ })).toBeNull()
     expect(within(menu).queryByRole('button', { name: /common.deactivate/ })).toBeNull()
     // Export asks for nothing beyond read, and Delete has its own permission
     expect(screen.getByRole('button', { name: /common.export/i })).toBeTruthy()

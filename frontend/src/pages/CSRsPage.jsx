@@ -1202,7 +1202,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
       tabs={[{ key: open.id, title: csrName(open), icon: 'file' }]} onClose={() => setSelectedCSR(null)}>
       <DockBody icon="file" title={csrName(open)} badge={csrPill(open)} section={section} onSection={setSection}
         sectionsLabel={t('atelier.sectionsOf', { name: csrName(open) })}
-        sections={[['overview', t('atelier.overview')], ...(openSigned ? [] : [['pem', 'PEM']])]}
+        sections={[['overview', t('atelier.overview')], ['details', t('csrs.module.details')], ...(openSigned ? [] : [['pem', 'PEM']])]}
         actions={<>
           {openSigned ? (
             canReadCertificates && <Btn icon="download" id="csr-download-cert" onClick={() => handleDownloadCertificate(open)}>{t('common.downloadCertificate')}</Btn>
@@ -1231,6 +1231,10 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
               ]} />
             </Section>
             <Section title={t('atelier.summary')}><p className="summary">{summary}</p></Section>
+          </div>
+        )}
+        {section === 'details' && (
+          <div className="module-detail">
             <Section title={t('common.subject')}>
               <Props items={[
                 [t('common.organization'), open.organization || '—'],
@@ -1296,7 +1300,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           { status: true },
         ]}
         error={loadError && (
-          <LoadError id="csrs" title={t('messages.errors.loadFailed.csrs')} onRetry={loadLists}
+          <LoadError id="csrs" title={t('messages.errors.loadFailed.csrs')} onRetry={loadLists} journal={hasPermission?.('read:audit') ? '/audit' : undefined}
             cause={<LoadCause error={{ status: loadError.status, request: loadError.status && `GET /api/v2/${signed ? 'csrs/history' : 'csrs'}`, message: loadError.message }} />} />
         )}
         empty={emptyBlock}

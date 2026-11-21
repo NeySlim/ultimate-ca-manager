@@ -2580,7 +2580,8 @@
       "signedSummary": "Signée par {{ca}} le {{date}}.",
       "noSans": "Aucun nom alternatif.",
       "moreActions": "Autres actions de {{name}}",
-      "actionsTitle": "Actions de la demande"
+      "actionsTitle": "Actions de la demande",
+      "details": "Détails"
     }
   },
   "dashboard": {
@@ -4801,7 +4802,6 @@
       "markers": "Marques",
       "noDescription": "Aucune description.",
       "preview": "Aperçu détaillé",
-      "duplicate": "Dupliquer",
       "moreActions": "Autres actions de {{name}}",
       "actionsTitle": "Actions du modèle",
       "sections": {

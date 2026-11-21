@@ -403,9 +403,10 @@ export const helpContent = {
         title: 'Actions',
         icon: Key,
         items: [
-          { label: 'Export', text: 'Download as PEM (with key and chain) or PKCS#12 (password-protected)' },
-          { label: 'Revoke', text: 'Revoke with a reason, the certificate will appear in the CRL' },
-          { label: 'Delete', text: 'Remove the certificate and its user association from UCM' },
+          { label: 'Export', text: 'In the certificate\'s detail: PEM, DER, PKCS#7, PKCS#12 or JKS, the private key only when ticked and allowed' },
+          { label: 'Revoke', text: 'In the detail\'s ⋯ menu: revoke with a reason, the certificate will appear in the CRL' },
+          { label: 'Delete', text: 'In the detail\'s ⋯ menu: remove the certificate and its user association from UCM' },
+          { label: 'Export the list', text: 'Every certificate the search and state filter keep, as CSV or JSON (10,000 at most)' },
         ]
       },
       {
@@ -422,8 +423,8 @@ export const helpContent = {
     tips: [
       'Enroll new mTLS certificates from My Account → Security',
       'Certificates are stored and managed by UCM like any other certificate',
-      'Use the stats bar to quickly filter by status',
-      'Click a row to view full certificate details in the inspector',
+      'The state chips above the list count and filter Valid, To renew, Expired and Revoked certificates',
+      'Click a name to open its detail under the list; Inspect the certificate opens the certificate itself on the Certificates page',
     ],
     warnings: [
       'Revoking a user certificate immediately prevents mTLS login with that certificate',
@@ -454,11 +455,12 @@ export const helpContent = {
         ]
       },
       {
-        title: 'Tabs',
+        title: 'States',
         icon: ListChecks,
         items: [
           { label: 'Pending', text: 'CSRs awaiting review and signing' },
-          { label: 'History', text: 'Signed requests with their certificate: download either one, or sign the request again. Both tabs page, search and sort across every request; History also searches by signing CA' },
+          { label: 'Signed', text: 'Signed requests with their certificate: download either one, or sign the request again. Both lists page, search and sort across every request; the signed one also searches by signing CA' },
+          { label: 'Detail', text: 'A request\'s name opens its detail under the list: Overview (subject, requester, key, state), Details (subject fields, names) and PEM. Sign and Download are its buttons; the key, Check status, Sign again, Re-key and Delete are in its ⋯ menu' },
         ]
       },
     ],
@@ -500,7 +502,7 @@ export const helpContent = {
           { label: 'SAN types', text: 'The name types (DNS, IP, Email, URI, UPN) a request made with the template may carry. With "Enforce the allowed SAN types" on, the issue form, Sign CSR, the enrollment protocols, renewals and approvals refuse any other type, and a name only implied by the CN is left out. New templates have it on; older ones and the built-in ones have it off. None checked: every type is allowed' },
           { label: 'Validity', text: 'Default validity period in days' },
           { label: 'Copy', text: 'Clone an existing template and modify it' },
-          { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
+          { label: 'Source filter', text: 'Choose Custom in the toolbar to hide the built-in templates and work with your own only. Remembered per browser' },
           { label: 'Deactivate', text: 'A deactivated template, built-in ones included, is no longer offered by the Issue Certificate form nor to Windows autoenrollment, and shows an Inactive badge. Activate brings it back. A built-in template can be deactivated, not edited: copy it to change it' },
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances: the page exports one template at a time, and an import file may hold one or several' },
           { label: 'qcStatements', text: 'Optional ETSI EN 319 412-5 statements added to every certificate issued from the template: QcCompliance, QcType (signature, seal or website), QcSSCD, QcPDS (HTTPS URL and two-letter language), QcRetentionPeriod, QcLimitValue, QcCClegislation (for a certificate qualified under a non-EU legal framework) and the semantics identifier. Not applied to EST, WSTEP or mTLS issuance, and a qcStatements extension in a CSR is ignored. QcIdentMethod, QcQSCDlegislation and PSD2 statements are not supported' },
@@ -526,7 +528,7 @@ export const helpContent = {
     tips: [
       'Create separate templates for TLS servers, clients, and code signing',
       'Use the Copy action to quickly create variations of a template, including of a system one',
-      'Templates with autoenrollment flags show AD / Auto / ACL / Pinned badges in the list',
+      'Templates with autoenrollment flags list AD / Auto / ACL / Pinned under Marks in their detail',
     ],
     related: ['Certificates', 'CSRs', 'CAs']
   },
@@ -967,7 +969,8 @@ export const helpContent = {
     ],
     tips: [
       'Use "Sync from System" to quickly populate the trust store with OS-level CAs',
-      'Filter by purpose to focus on specific certificate categories',
+      'Filter by type to focus on specific certificate categories; the chips count Valid, Expiring soon and Expired entries',
+      'The Usage column shows the entry\'s description; its notes are the summary of its detail',
     ],
     related: ['CAs', 'Certificates']
   },

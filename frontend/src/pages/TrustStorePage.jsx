@@ -42,7 +42,7 @@ export default function TrustStorePage() {
   const navigate = useNavigate()
   const openEntity = useOpenEntity()
   const { showSuccess, showError, showWarning, showConfirm } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
   const { modals, open: openModal, close: closeModal } = useModals(['add', 'sync'])
   
   const [loading, setLoading] = useState(true)
@@ -523,7 +523,7 @@ export default function TrustStorePage() {
           { status: true },
         ]}
         error={loadError && (
-          <LoadError id="truststore" title={t('messages.errors.loadFailed.truststore')} onRetry={loadCertificates}
+          <LoadError id="truststore" title={t('messages.errors.loadFailed.truststore')} onRetry={loadCertificates} journal={hasPermission?.('read:audit') ? '/audit' : undefined}
             cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/truststore', message: loadError.message }} />} />
         )}
         empty={narrowed && certificates.length ? (

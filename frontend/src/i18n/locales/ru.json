@@ -1717,7 +1717,8 @@
       "signedSummary": "Подписан {{ca}} {{date}}.",
       "noSans": "Нет альтернативных имён.",
       "moreActions": "Другие действия для {{name}}",
-      "actionsTitle": "Действия с запросом"
+      "actionsTitle": "Действия с запросом",
+      "details": "Подробности"
     }
   },
   "templates": {
@@ -1891,7 +1892,6 @@
       "markers": "Отметки",
       "noDescription": "Нет описания.",
       "preview": "Подробный просмотр",
-      "duplicate": "Дублировать",
       "moreActions": "Другие действия для {{name}}",
       "actionsTitle": "Действия с шаблоном",
       "sections": {

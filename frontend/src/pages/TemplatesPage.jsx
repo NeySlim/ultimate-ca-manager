@@ -37,7 +37,7 @@ import { CertMenu } from './certificates/inspector/CertMenu'
 export default function TemplatesPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning, showConfirm } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
   const fileRef = useRef(null)
   
   // Hook: CRUD state
@@ -325,7 +325,7 @@ export default function TemplatesPage() {
   ].filter(Boolean) : []
   const menuItems = open ? [
     { id: 'preview', icon: 'eye', label: t('templates.module.preview'), onClick: () => setShowPreviewModal(true) },
-    write && { id: 'duplicate', icon: 'copy', label: t('templates.module.duplicate'), write: true, onClick: () => handleDuplicateTemplate(open) },
+    write && { id: 'duplicate', icon: 'copy', label: t('common.copy'), write: true, onClick: () => handleDuplicateTemplate(open) },
     write && { id: 'toggle', icon: open.is_active === false ? 'check' : 'block', label: open.is_active === false ? t('templates.activate') : t('common.deactivate'), write: true, onClick: () => handleToggleActive(open) },
     canDelete('templates') && !open.is_system && { id: 'delete', icon: 'close', label: t('common.delete'), danger: true, write: true, onClick: () => handleDeleteTemplate(open) },
   ].filter(Boolean) : []
@@ -456,7 +456,7 @@ export default function TemplatesPage() {
           { status: true },
         ]}
         error={loadError && (
-          <LoadError id="templates" title={t('messages.errors.loadFailed.templates')} onRetry={loadData}
+          <LoadError id="templates" title={t('messages.errors.loadFailed.templates')} onRetry={loadData} journal={hasPermission?.('read:audit') ? '/audit' : undefined}
             cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/templates', message: loadError.message }} />} />
         )}
         empty={narrowed && templates.length ? (

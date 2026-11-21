@@ -21,7 +21,7 @@ export default {
           { label: 'Types de SAN', text: 'Les types de noms (DNS, IP, Email, URI, UPN) qu’une demande faite avec le modèle peut porter. Avec « Appliquer les types de SAN autorisés » activé, le formulaire d’émission, la signature de CSR, les protocoles d’enrôlement, les renouvellements et les approbations refusent tout autre type, et un nom seulement déduit du CN est omis. Les nouveaux modèles l’ont activé ; les anciens et les modèles intégrés l’ont désactivé. Aucune case cochée : tous les types sont permis' },
           { label: 'Validité', text: 'Période de validité par défaut en jours' },
           { label: 'Copier', text: 'Cloner un modèle existant et le modifier' },
-          { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu’avec les vôtres. Mémorisé par navigateur' },
+          { label: 'Filtre d’origine', text: 'Choisissez Personnalisé dans la barre d’outils pour masquer les modèles intégrés et ne travailler qu’avec les vôtres. Mémorisé par navigateur' },
           { label: 'Désactiver', text: 'Un modèle désactivé, intégré ou non, n’est plus proposé par le formulaire Émettre un certificat ni à l’auto-inscription Windows, et affiche un badge Inactif. Activer le remet en service. Un modèle intégré peut être désactivé, pas modifié : copiez-le pour le changer' },
           { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM : la page exporte un modèle à la fois, et un fichier d’import peut en contenir un ou plusieurs' },
           { label: 'qcStatements', text: 'Déclarations ETSI EN 319 412-5 facultatives ajoutées à chaque certificat émis depuis le modèle : QcCompliance, QcType (signature, cachet ou site web), QcSSCD, QcPDS (URL HTTPS et langue à deux lettres), QcRetentionPeriod, QcLimitValue, QcCClegislation (pour un certificat qualifié selon un cadre juridique hors UE) et l’identifiant de sémantique. Non appliquées à l’émission EST, WSTEP ou mTLS, et une extension qcStatements présente dans une CSR est ignorée. QcIdentMethod, QcQSCDlegislation et les déclarations PSD2 ne sont pas prises en charge' },
@@ -46,7 +46,7 @@ export default {
     tips: [
       'Créez des modèles séparés pour les serveurs TLS, les clients et la signature de code',
       'Utilisez l’action Copier pour créer rapidement des variantes d’un modèle, y compris d’un modèle système',
-      'Les modèles avec indicateurs d’autoenrollment affichent des badges AD / Auto / ACL / Épinglé dans la liste',
+      'Les modèles avec indicateurs d’autoenrollment listent AD / Auto / ACL / Épinglé sous Marques dans leur détail',
     ],
   },
   helpGuides: {
@@ -66,7 +66,7 @@ Les modèles fournis à l’installation : Web Server (TLS/SSL), Email Certifica
 ### Personnalisé
 Tout ce qui est créé ou importé ici. Ces modèles peuvent être modifiés et supprimés librement.
 
-Désactivez **Afficher système** dans la barre d’outils pour masquer les modèles intégrés et ne travailler qu’avec les vôtres. Le choix est mémorisé, sauf si vous n’avez encore aucun modèle personnalisé, auquel cas les modèles intégrés restent visibles.
+Choisissez **Personnalisé** dans le filtre d’origine de la barre d’outils pour masquer les modèles intégrés et ne travailler qu’avec les vôtres. Le choix est mémorisé ; sans modèle personnalisé, la liste le dit et **Effacer tous les filtres** fait revenir les modèles intégrés.
 
 Les autorités de certification ne se créent pas à partir de modèles : créez-les sur la page **Autorités de certification**.
 
@@ -96,7 +96,7 @@ Les modèles portent trois indicateurs opt-in utilisés par les protocoles d’a
 - **Construire le sujet depuis Active Directory** : Pour l’autoenrollment GPO sans intervention : dérive le sujet et les SAN du certificat depuis l’objet AD du demandeur (via le connecteur AD) au lieu d’exiger que le client les fournisse. Sur les endpoints Kerberos, un sujet nommé dans la requête est ignoré et les comptes d’ordinateur sont refusés ; les modèles machine prennent toujours le nom DNS de l’ordinateur.
 - **Restreindre l’enrôlement à un groupe AD** : Seuls les principaux appartenant au groupe Active Directory configuré (appartenance imbriquée incluse) peuvent enrôler avec ce modèle via le point de terminaison authentifié Kerberos. Saisissez un nom de groupe ou un DN complet ; laissez vide pour autoriser tout principal authentifié, comme le défaut d’un vrai ADCS. Non appliqué sur le point de terminaison Username/Password, qui n’a pas d’identité par requête à vérifier.
 
-Les modèles portant ces indicateurs affichent des badges **AD**, **Auto** et **ACL** dans la liste des modèles.
+Les modèles portant ces indicateurs listent **AD**, **Auto** et **ACL** sous **Marques** dans leur détail.
 
 ## Champs de sujet épinglés
 
@@ -104,7 +104,7 @@ Un modèle peut **épingler** les champs organisationnels du sujet : **C, ST, L,
 
 - **Le Common Name et les Subject Alternative Names ne sont jamais affectés** : ils restent dynamiques par demandeur
 - Laissez un champ vide pour le garder dynamique
-- Les modèles avec champs épinglés affichent un badge **Épinglé**, et les valeurs épinglées apparaissent dans le panneau de détails du modèle
+- Les modèles avec champs épinglés listent **Épinglé** sous **Marques**, et les valeurs épinglées apparaissent dans l’onglet **Inscription** du détail du modèle
 
 Utilisez cette fonction pour garantir une identité organisationnelle uniforme (p. ex. un \`O\` et un \`C\` fixes) sur un parc autoenrôlé, indépendamment de ce que chaque client Windows soumet.
 
@@ -137,7 +137,7 @@ L’inspecteur liste ces extensions pour les certificats et les AC sous **Autres
 
 ## Copier des modèles
 
-Cliquez sur **Copier** pour créer une copie d’un modèle existant. Modifiez la copie sans affecter l’original.
+Ouvrez un modèle, puis dans son menu **⋯** cliquez sur **Copier** pour en créer une copie. Modifiez la copie sans affecter l’original.
 
 ## Importer et exporter
 

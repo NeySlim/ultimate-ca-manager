@@ -1657,7 +1657,8 @@
       "signedSummary": "Signed by {{ca}} on {{date}}.",
       "noSans": "No alternative name.",
       "moreActions": "Other actions for {{name}}",
-      "actionsTitle": "Request actions"
+      "actionsTitle": "Request actions",
+      "details": "Details"
     }
   },
   "templates": {
@@ -1827,7 +1828,6 @@
       "markers": "Marks",
       "noDescription": "No description.",
       "preview": "Detailed preview",
-      "duplicate": "Duplicate",
       "moreActions": "Other actions for {{name}}",
       "actionsTitle": "Template actions",
       "sections": {

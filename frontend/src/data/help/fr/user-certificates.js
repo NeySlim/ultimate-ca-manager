@@ -16,9 +16,10 @@ export default {
       {
         title: 'Actions',
         items: [
-          { label: 'Exporter', text: 'Télécharger au format PEM (avec clé et chaîne) ou PKCS#12 (protégé par mot de passe)' },
-          { label: 'Révoquer', text: 'Révoquer avec un motif, le certificat apparaîtra dans la CRL' },
-          { label: 'Supprimer', text: 'Retirer le certificat et son association utilisateur de UCM' },
+          { label: 'Exporter', text: 'Dans le détail du certificat : PEM, DER, PKCS#7, PKCS#12 ou JKS, la clé privée seulement si elle est cochée et permise' },
+          { label: 'Révoquer', text: 'Dans le menu ⋯ du détail : révoquer avec un motif, le certificat apparaîtra dans la CRL' },
+          { label: 'Supprimer', text: 'Dans le menu ⋯ du détail : retirer le certificat et son association utilisateur de UCM' },
+          { label: 'Exporter la liste', text: 'Tous les certificats que gardent la recherche et le filtre d’état, en CSV ou JSON (10 000 au plus)' },
         ]
       },
       {
@@ -34,8 +35,8 @@ export default {
     tips: [
       'Enrôlez de nouveaux certificats mTLS depuis Mon compte → Sécurité',
       'Les certificats sont stockés et gérés par UCM comme n’importe quel autre certificat',
-      'Utilisez la barre de statistiques pour filtrer rapidement par statut',
-      'Cliquez sur une ligne pour afficher les détails complets du certificat dans l’inspecteur',
+      'Les puces d’état au-dessus de la liste comptent et filtrent les certificats Valides, À renouveler, Expirés et Révoqués',
+      'Cliquez sur un nom pour ouvrir son détail sous la liste ; Inspecter le certificat ouvre le certificat lui-même dans la page Certificats',
     ],
     warnings: [
       'Révoquer un certificat utilisateur empêche immédiatement la connexion mTLS avec ce certificat',
@@ -67,11 +68,13 @@ Les certificats présents ici sont entièrement gérés par UCM : ils sont stock
 
 ## Exporter un certificat
 
-1. Sélectionnez un certificat → **Exporter**
-2. Choisissez le format :
-   - **PEM** : Certificat + clé privée + chaîne d’AC au format texte
+1. Cliquez sur le nom du certificat : son détail s’ouvre sous la liste
+2. Cliquez sur **Exporter** et choisissez le format :
+   - **PEM** : Certificat, avec la chaîne d’AC et la clé privée si elle est cochée, au format texte
    - **PKCS#12** : Archive binaire, protégée par mot de passe (8 caractères minimum)
 3. Cliquez sur **Télécharger**
+
+**Exporter la liste**, dans l’en-tête de la page, enregistre tous les certificats que gardent la recherche et le filtre d’état, en CSV ou JSON.
 
 Le fichier exporté peut être importé dans des navigateurs, des systèmes d’exploitation ou des clients API pour l’authentification mTLS.
 
@@ -79,7 +82,7 @@ Le fichier exporté peut être importé dans des navigateurs, des systèmes d’
 
 ## Révoquer un certificat
 
-1. Sélectionnez un certificat → **Révoquer**
+1. Ouvrez le certificat, puis son menu **⋯** → **Révoquer**
 2. Choisissez un motif de révocation :
    - Key Compromise
    - Affiliation Changed
@@ -92,7 +95,7 @@ Le fichier exporté peut être importé dans des navigateurs, des systèmes d’
 
 ## Supprimer un certificat
 
-La suppression retire à la fois le certificat et l’association utilisateur-certificat. Seuls les admins et les operators peuvent supprimer.
+La suppression, dans le menu **⋯** du détail du certificat, retire à la fois le certificat et l’association utilisateur-certificat. Seuls les admins et les operators peuvent supprimer.
 
 > ⚠ La suppression est définitive et ne peut pas être annulée.
 

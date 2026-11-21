@@ -1657,7 +1657,8 @@
       "signedSummary": "由 {{ca}} 于 {{date}} 签名。",
       "noSans": "无备用名称。",
       "moreActions": "{{name}} 的其他操作",
-      "actionsTitle": "请求操作"
+      "actionsTitle": "请求操作",
+      "details": "详情"
     }
   },
   "templates": {
@@ -1827,7 +1828,6 @@
       "markers": "标记",
       "noDescription": "无描述。",
       "preview": "详细预览",
-      "duplicate": "复制",
       "moreActions": "{{name}} 的其他操作",
       "actionsTitle": "模板操作",
       "sections": {
