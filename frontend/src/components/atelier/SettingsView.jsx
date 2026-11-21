@@ -81,10 +81,9 @@ class SectionBoundary extends Component {
 
 /**
  * The frame of a section (settingsSection()): its heading, the refusal of its last save, then its
- * body. `aside` sits at the right of the heading (a state of the section); `legacy` keeps a body the
- * product still draws with its own styles (`.atl-out`) until its zone is converted.
+ * body. `aside` sits at the right of the heading (a state of the section).
  */
-export function SettingsFrame({ id, label, desc, error, aside, legacy = false, children }) {
+export function SettingsFrame({ id, label, desc, error, aside, children }) {
   const { t } = useTranslation()
   return (
     <section className="panel settings-section" id={`set-sec-${id}`} aria-labelledby={`set-title-${id}`}>
@@ -96,7 +95,7 @@ export function SettingsFrame({ id, label, desc, error, aside, legacy = false, c
         </div>
         {aside}
       </header>
-      <div className={legacy ? 'settings-body atl-out sf-body' : 'settings-body'}>
+      <div className="settings-body">
         <SectionBoundary fallback={<p className="field-error" role="alert"><Icon name="warning" /><span>{t('sectioned.sectionFailed')}</span></p>}>
           {children}
         </SectionBoundary>

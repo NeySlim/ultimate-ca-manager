@@ -190,35 +190,20 @@
 .atl .release-notes-body a{color:var(--accent)}
 .atl .segmented .swatch{margin-right:6px;vertical-align:-1px}
 /*
- * A section the product still draws (.atl-out, until its zone is converted) keeps its own look: the
- * mockup's rules on bare elements (button, input, p, table) outrank the product's classes, so the
- * classes they would hide are given back here, at the values the product draws. Measured node by
- * node against the page before the zone, to be removed with the last unconverted section.
+ * A panel the product still draws inside a zone (.atl-out: import widget, certificate picker field,
+ * setup card, deployment, email template, reconnect overlay) keeps its own look: the mockup's rules on
+ * bare elements (button, input, p) outrank the product's classes, so the ones these panels use are given back.
  */
 .atl .atl-out{font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .atl .atl-out .lv-btn,.atl .atl-out .ui-select-trigger,.atl .atl-out button.border{border-style:solid;border-width:1px}
 .atl .atl-out .lv-btn{font-size:12px;font-weight:500}
 .atl .atl-out button.text-xs,.atl .atl-out input.text-xs{line-height:1rem}
-.atl .atl-out .sf-inline-icon{color:var(--muted)}
-.atl .atl-out .sf-inline-icon:hover{color:var(--text)}
-.atl .atl-out .sf-link{color:var(--accent)}
-.atl .atl-out .sf-legend{font-weight:500}
-.atl .atl-out .sf-group-desc{margin:4px 0 0}
-.atl .atl-out .sf-under{margin:7px 0 0}
-.atl .atl-out .sf-records-summary{margin:0 0 12px}
-.atl .atl-out .lv-empty p{margin:9px 0 20px}
 .atl .atl-out p.mt-0\.5{margin-top:.125rem}
 .atl .atl-out p.mt-2{margin-top:.5rem}
 .atl .atl-out p.mb-1{margin-bottom:.25rem}
 .atl .atl-out p.mb-3{margin-bottom:.75rem}
 .atl .atl-out input:not(.ui-control){min-height:0}
-.atl .atl-out input.pl-8{padding-left:2rem}
 .atl .atl-out input.pl-9{padding-left:2.25rem}
-.atl .atl-out input.border-none{border-style:none}
-.atl .atl-out table{white-space:normal}
-.atl .atl-out thead{position:static}
-.atl .atl-out .ui-table th:where(:first-child){width:auto;padding:0 14px}
-.atl .atl-out .ui-table td:where(:first-child){width:auto;padding:3px 14px}
 /*
  * Settings integrations (SSO, AD, Microsoft CA, Windows, webhooks, deployment, CT). A test, a notice,
  * a row list of a folded part of a dialog form spans its two columns; a role mapping row has four

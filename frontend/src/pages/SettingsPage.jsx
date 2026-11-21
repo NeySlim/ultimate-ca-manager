@@ -120,9 +120,6 @@ const SECTION_ICONS = {
   audit: 'activity', database: 'server', https: 'cert', updates: 'download', scheduler: 'clock', webhooks: 'bell',
   ct: 'eye', autoRenewal: 'refresh', deploy: 'upload', microsoftCA: 'plug', adConnector: 'globe', xcepWstep: 'monitor', about: 'help',
 }
-// Sections drawn with the mockup's fields; the others keep the product's own styles (`.atl-out`) until converted
-const CONVERTED_SECTIONS = new Set(['general', 'security', 'email', 'https', 'appearance', 'backup', 'audit', 'database', 'updates', 'scheduler', 'autoRenewal', 'about', 'sso', 'adConnector', 'microsoftCA', 'xcepWstep', 'webhooks', 'deploy', 'ct'])
-
 // Groups of the table of contents, named by what they hold; the frames follow the same
 // order. Four groups keep every entry in view on a 1000 px high window.
 const SETTINGS_GROUPS = [
@@ -2333,7 +2330,7 @@ export default function SettingsPage() {
             <SettingsJump sections={sections} current={selectedCategory} onJump={handleCategoryChange} />
             {sections.map(section => (
               <SettingsFrame key={section.id} id={section.id} label={section.label} desc={section.description}
-                aside={sectionAside[section.id]} error={sectionErrors[section.id]} legacy={!CONVERTED_SECTIONS.has(section.id)}>
+                aside={sectionAside[section.id]} error={sectionErrors[section.id]}>
                 {renderCategoryContent(section.id)}
               </SettingsFrame>
             ))}
