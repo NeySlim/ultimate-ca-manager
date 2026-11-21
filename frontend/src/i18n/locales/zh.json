@@ -2628,7 +2628,66 @@
     "profileDeleted": "已删除 SCEP 配置文件",
     "profileDeleteConfirm": "删除 SCEP 配置文件“{{name}}”？通过其 URL 注册的设备将被拒绝。",
     "profileChallengeRegenerated": "已重新生成质询并复制到剪贴板",
-    "confirmRegenerateProfileChallenge": "重新生成配置文件“{{name}}”的质询？当前质询将立即失效，所有已配置它的设备都必须更新。"
+    "confirmRegenerateProfileChallenge": "重新生成配置文件“{{name}}”的质询？当前质询将立即失效，所有已配置它的设备都必须更新。",
+    "unit_one": "{{count}} 个配置",
+    "unit_other": "{{count}} 个配置",
+    "range_one": "{{shown}} / {{count}} 个配置",
+    "range_other": "{{shown}} / {{count}} 个配置",
+    "requestUnit_one": "{{count}} 个请求",
+    "requestUnit_other": "{{count}} 个请求",
+    "requestRange": "第 {{start}}–{{end}} 个，共 {{count}} 个请求",
+    "intuneUnit_one": "{{count}} 个注册",
+    "intuneUnit_other": "{{count}} 个注册",
+    "intuneRange_one": "{{shown}} / {{count}} 个注册",
+    "intuneRange_other": "{{shown}} / {{count}} 个注册",
+    "caption": "SCEP 配置。激活名称以打开详情。",
+    "requestsCaption": "SCEP 请求。激活主题以打开详情。",
+    "challengesCaption": "各机构的质询密码。激活名称以打开详情。",
+    "intuneCaption": "Intune 应用注册。激活名称以打开详情。",
+    "filterByState": "按状态筛选",
+    "filters": {
+      "active": "已启用",
+      "disabled": "已禁用"
+    },
+    "columns": {
+      "ca": "机构",
+      "template": "模板",
+      "profile": "配置"
+    },
+    "tabs": {
+      "profile": "配置"
+    },
+    "sections": {
+      "enrollment": "注册",
+      "issuance": "签发"
+    },
+    "enrollmentUrl": "注册 URL",
+    "copyUrl": "复制 URL",
+    "challengeHidden": "已设置，已隐藏",
+    "challengeNone": "无",
+    "challengeIntune": "由 Intune 验证",
+    "challengeSet": "已设置",
+    "disable": "禁用",
+    "enable": "启用",
+    "rotate": "重新生成密码…",
+    "rotateTitle": "重新生成质询密码？",
+    "rotateWarning": "旧密码立即失效：“{{name}}”中尚未使用它的设备需要获取新密码。",
+    "newChallengeTitle": "新的质询密码",
+    "newChallengeOnce": "“{{name}}”的新密码，仅显示一次：",
+    "newChallengeHint": "请立即将其提供给设备管理工具：之后无法再次查看。",
+    "profileEnabled": "配置“{{name}}”已启用",
+    "profileDisabled": "配置“{{name}}”已禁用",
+    "requestNumber": "第 {{id}} 号请求",
+    "caWide": "机构端点",
+    "clientIp": "客户端地址",
+    "approvedAt": "批准时间",
+    "securityDesc": "批准、质询有效期与消息检查。",
+    "challengeValidityInvalid": "整数小时，至少 1。",
+    "fixBeforeSaving_one": "保存前需修正 {{count}} 个字段。",
+    "fixBeforeSaving_other": "保存前需修正 {{count}} 个字段。",
+    "views": {
+      "challenges": "机构质询"
+    }
   },
   "crlOcsp": {
     "subtitle": "{{count}}个活跃CRL",

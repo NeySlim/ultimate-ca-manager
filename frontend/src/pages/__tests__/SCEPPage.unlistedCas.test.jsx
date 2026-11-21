@@ -56,9 +56,8 @@ async function openPicker(savedCaId, enabled = true) {
     getChallenge: vi.fn().mockResolvedValue({ data: {} }),
   })
   casService.getAll.mockResolvedValue({ data: CAS })
-  render(<MemoryRouter initialEntries={['/scep']}><SCEPPage /></MemoryRouter>)
-  fireEvent.click((await screen.findAllByText('common.config'))[0])
-  return screen.findByTestId('field-common.issuingCA')
+  render(<MemoryRouter initialEntries={['/scep-config?tab=config']}><SCEPPage /></MemoryRouter>)
+  return (await screen.findByRole('combobox', { name: 'common.issuingCA' })).closest('.field')
 }
 
 const optionValues = (box) => within(box).getAllByRole('option').map((o) => o.textContent)
@@ -81,7 +80,7 @@ describe('SCEPPage default CA picker (#426)', () => {
     expect(within(box).getByRole('combobox')).not.toBeDisabled()
     scepService.updateConfig = vi.fn().mockResolvedValue({ data: {} })
     fireEvent.change(within(box).getByRole('combobox'), { target: { value: '__none__' } })
-    fireEvent.click(screen.getByText('common.saveConfiguration'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
     await vi.waitFor(() => expect(scepService.updateConfig).toHaveBeenCalled())
     expect(scepService.updateConfig.mock.calls[0][0].ca_id).toBeNull()
   })

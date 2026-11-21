@@ -1,11 +1,16 @@
 /**
  * The challenge validity field takes its bounds from the API, so the form
- * and the server accept the same range.
+ * and the server accept the same range: outside it, the form says so and saves nothing.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import './pageRenderingSetup.jsx'
+
+vi.mock('../../hooks', async (orig) => ({
+  ...(await orig()),
+  usePermission: () => ({ hasPermission: () => true, canWrite: () => true, canDelete: () => true }),
+}))
 
 import SCEPPage from '../SCEPPage'
 import { scepService } from '../../services/scep.service'
@@ -23,11 +28,16 @@ Object.assign(scepService, {
 
 describe('SCEP challenge validity range', () => {
   it('uses the bounds the API reports', async () => {
-    render(<MemoryRouter initialEntries={['/scep']}><SCEPPage /></MemoryRouter>)
-    fireEvent.click((await screen.findAllByText('common.config'))[0])
-    const label = await screen.findByText('scep.challengeValidity')
-    const input = label.closest('div').querySelector('input')
-    expect(input.getAttribute('min')).toBe('1')
-    expect(input.getAttribute('max')).toBe('720')
+    scepService.updateConfig = vi.fn().mockResolvedValue({ data: {} })
+    render(<MemoryRouter initialEntries={['/scep-config?tab=config']}><SCEPPage /></MemoryRouter>)
+    const input = await screen.findByRole('textbox', { name: /scep.challengeValidity/ })
+    expect(input.closest('.field')).toHaveTextContent('scep.challengeValidityHelp')
+    fireEvent.change(input, { target: { value: '721' } })
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(scepService.updateConfig).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: '720' } })
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
+    await waitFor(() => expect(scepService.updateConfig).toHaveBeenCalledWith(expect.objectContaining({ challenge_validity: 720 })))
   })
 })

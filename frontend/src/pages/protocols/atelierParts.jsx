@@ -129,3 +129,11 @@ export function ViewSwitch({ id, label, value, onChange, options = [], groups = 
     </>
   )
 }
+
+/** The mockup's yesNo(): a check and Oui, or a block sign and Non, in a flag. */
+export function YesNo({ value }) {
+  const { t } = useTranslation()
+  return value
+    ? <span className="flag"><Icon name="check" />{t('common.yes')}</span>
+    : <span className="flag muted"><Icon name="block" />{t('common.no')}</span>
+}

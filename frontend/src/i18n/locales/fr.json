@@ -3253,7 +3253,7 @@
   "scep": {
     "title": "Protocole SCEP",
     "requests": "Demandes",
-    "challenge": "Mot de passe de challenge",
+    "challenge": "Mot de passe de défi",
     "info": "Informations",
     "scepURL": "URL SCEP",
     "noRequests": "Aucune demande SCEP",
@@ -3359,7 +3359,66 @@
     "profileDeleted": "Profil SCEP supprimé",
     "profileDeleteConfirm": "Supprimer le profil SCEP « {{name}} » ? Les équipements qui s’enrôlent via son URL seront refusés.",
     "profileChallengeRegenerated": "Challenge régénéré et copié dans le presse-papiers",
-    "confirmRegenerateProfileChallenge": "Régénérer le challenge du profil « {{name}} » ? L’actuel cesse de fonctionner immédiatement et tous les appareils configurés avec doivent être mis à jour."
+    "confirmRegenerateProfileChallenge": "Régénérer le challenge du profil « {{name}} » ? L’actuel cesse de fonctionner immédiatement et tous les appareils configurés avec doivent être mis à jour.",
+    "unit_one": "{{count}} profil",
+    "unit_other": "{{count}} profils",
+    "range_one": "{{shown}} sur {{count}} profil",
+    "range_other": "{{shown}} sur {{count}} profils",
+    "requestUnit_one": "{{count}} demande",
+    "requestUnit_other": "{{count}} demandes",
+    "requestRange": "{{start}}–{{end}} sur {{count}} demandes",
+    "intuneUnit_one": "{{count}} inscription",
+    "intuneUnit_other": "{{count}} inscriptions",
+    "intuneRange_one": "{{shown}} sur {{count}} inscription",
+    "intuneRange_other": "{{shown}} sur {{count}} inscriptions",
+    "caption": "Profils SCEP. Activez un nom pour ouvrir son détail.",
+    "requestsCaption": "Demandes SCEP. Activez un sujet pour ouvrir son détail.",
+    "challengesCaption": "Mots de passe de défi des autorités. Activez un nom pour ouvrir son détail.",
+    "intuneCaption": "Inscriptions d’applications Intune. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "filters": {
+      "active": "Actifs",
+      "disabled": "Désactivés"
+    },
+    "columns": {
+      "ca": "Autorité",
+      "template": "Modèle",
+      "profile": "Profil"
+    },
+    "tabs": {
+      "profile": "Profil"
+    },
+    "sections": {
+      "enrollment": "Enrôlement",
+      "issuance": "Émission"
+    },
+    "enrollmentUrl": "URL d’enrôlement",
+    "copyUrl": "Copier l’URL",
+    "challengeHidden": "Défini, masqué",
+    "challengeNone": "Aucun",
+    "challengeIntune": "Vérifié par Intune",
+    "challengeSet": "Défini",
+    "disable": "Désactiver",
+    "enable": "Activer",
+    "rotate": "Régénérer le mot de passe…",
+    "rotateTitle": "Régénérer le mot de passe de défi ?",
+    "rotateWarning": "L’ancien mot de passe cesse aussitôt de fonctionner : les équipements de « {{name}} » qui ne l’ont pas encore utilisé devront recevoir le nouveau.",
+    "newChallengeTitle": "Nouveau mot de passe de défi",
+    "newChallengeOnce": "Nouveau mot de passe de « {{name}} », affiché une seule fois :",
+    "newChallengeHint": "Transmettez-le maintenant à l’outil de gestion des équipements : il ne pourra plus être relu.",
+    "profileEnabled": "Profil « {{name}} » activé",
+    "profileDisabled": "Profil « {{name}} » désactivé",
+    "requestNumber": "Demande n° {{id}}",
+    "caWide": "Point de l’autorité",
+    "clientIp": "Adresse du client",
+    "approvedAt": "Approuvée le",
+    "securityDesc": "Approbation, validité des défis et contrôles des messages.",
+    "challengeValidityInvalid": "Un nombre entier d’heures, 1 au moins.",
+    "fixBeforeSaving_one": "{{count}} champ à corriger avant d’enregistrer.",
+    "fixBeforeSaving_other": "{{count}} champs à corriger avant d’enregistrer.",
+    "views": {
+      "challenges": "Défis des autorités"
+    }
   },
   "session": {
     "expiring": "Session en cours d’expiration",

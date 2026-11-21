@@ -31,7 +31,7 @@ beforeEach(() => {
 
 describe('SCEPPage requests paging', () => {
   it('asks the server for one page, not the first fifty', async () => {
-    render(<MemoryRouter initialEntries={['/scep']}><SCEPPage /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/scep-config?tab=requests']}><SCEPPage /></MemoryRouter>)
     await screen.findAllByText('dev1')
     const params = scepService.getRequests.mock.calls.at(-1)[0]
     expect(params).toMatchObject({ page: 1, per_page: 25 })
@@ -39,7 +39,7 @@ describe('SCEPPage requests paging', () => {
   })
 
   it('sends the typed search to the server', async () => {
-    render(<MemoryRouter initialEntries={['/scep']}><SCEPPage /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/scep-config?tab=requests']}><SCEPPage /></MemoryRouter>)
     await screen.findAllByText('dev1')
     fireEvent.change(screen.getByPlaceholderText('scep.searchRequests'), { target: { value: 'dev7' } })
     await waitFor(() => expect(scepService.getRequests.mock.calls.at(-1)[0]).toMatchObject({ search: 'dev7', page: 1 }))
@@ -51,7 +51,7 @@ describe('SCEPPage requests paging', () => {
       ? new Promise((resolve) => { pending[p.search] = resolve })
       : Promise.resolve(pageOf(p))))
     const reply = (name) => ({ data: [{ ...row(900), subject: `CN=${name}` }], meta: { total: 1 } })
-    render(<MemoryRouter initialEntries={['/scep']}><SCEPPage /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/scep-config?tab=requests']}><SCEPPage /></MemoryRouter>)
     await screen.findAllByText('dev1')
     const box = screen.getByPlaceholderText('scep.searchRequests')
     fireEvent.change(box, { target: { value: 'ab' } })

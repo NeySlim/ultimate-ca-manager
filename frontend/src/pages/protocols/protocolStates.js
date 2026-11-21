@@ -21,3 +21,12 @@ export function repeatedRows(rows) {
   }
   return repeated
 }
+
+/** The CN of a DN like "CN=device,OU=MDM,O=UCM,C=FR", and its other parts. */
+export function parseDN(dn) {
+  const parts = {}
+  const regex = /([A-Z]+)=([^,]+)/g
+  let match
+  while (dn && (match = regex.exec(dn)) !== null) parts[match[1]] = match[2]
+  return { cn: parts.CN || null, parts }
+}

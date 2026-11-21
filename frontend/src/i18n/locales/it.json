@@ -2628,7 +2628,66 @@
     "profileDeleted": "Profilo SCEP eliminato",
     "profileDeleteConfirm": "Eliminare il profilo SCEP \"{{name}}\"? I dispositivi che si registrano tramite il suo URL saranno rifiutati.",
     "profileChallengeRegenerated": "Challenge rigenerata e copiata negli appunti",
-    "confirmRegenerateProfileChallenge": "Rigenerare la challenge del profilo \"{{name}}\"? Quella attuale smette di funzionare subito e tutti i dispositivi configurati con essa vanno aggiornati."
+    "confirmRegenerateProfileChallenge": "Rigenerare la challenge del profilo \"{{name}}\"? Quella attuale smette di funzionare subito e tutti i dispositivi configurati con essa vanno aggiornati.",
+    "unit_one": "{{count}} profile",
+    "unit_other": "{{count}} profiles",
+    "range_one": "{{shown}} of {{count}} profile",
+    "range_other": "{{shown}} of {{count}} profiles",
+    "requestUnit_one": "{{count}} request",
+    "requestUnit_other": "{{count}} requests",
+    "requestRange": "{{start}}–{{end}} of {{count}} requests",
+    "intuneUnit_one": "{{count}} registration",
+    "intuneUnit_other": "{{count}} registrations",
+    "intuneRange_one": "{{shown}} of {{count}} registration",
+    "intuneRange_other": "{{shown}} of {{count}} registrations",
+    "caption": "SCEP profiles. Activate a name to open its detail.",
+    "requestsCaption": "SCEP requests. Activate a subject to open its detail.",
+    "challengesCaption": "Challenge passwords of the authorities. Activate a name to open its detail.",
+    "intuneCaption": "Intune app registrations. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "filters": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "columns": {
+      "ca": "Authority",
+      "template": "Template",
+      "profile": "Profile"
+    },
+    "tabs": {
+      "profile": "Profile"
+    },
+    "sections": {
+      "enrollment": "Enrollment",
+      "issuance": "Issuance"
+    },
+    "enrollmentUrl": "Enrollment URL",
+    "copyUrl": "Copy the URL",
+    "challengeHidden": "Set, hidden",
+    "challengeNone": "None",
+    "challengeIntune": "Checked by Intune",
+    "challengeSet": "Set",
+    "disable": "Disable",
+    "enable": "Enable",
+    "rotate": "Regenerate the password…",
+    "rotateTitle": "Regenerate the challenge password?",
+    "rotateWarning": "The old password stops working at once: the devices of “{{name}}” that have not used it yet will need the new one.",
+    "newChallengeTitle": "New challenge password",
+    "newChallengeOnce": "New password of “{{name}}”, shown once:",
+    "newChallengeHint": "Give it to the device management tool now: it cannot be read again.",
+    "profileEnabled": "Profile “{{name}}” enabled",
+    "profileDisabled": "Profile “{{name}}” disabled",
+    "requestNumber": "Request no. {{id}}",
+    "caWide": "Authority endpoint",
+    "clientIp": "Client address",
+    "approvedAt": "Approved",
+    "securityDesc": "Approval, challenge validity and message checks.",
+    "challengeValidityInvalid": "A whole number of hours, 1 at least.",
+    "fixBeforeSaving_one": "{{count}} field to fix before saving.",
+    "fixBeforeSaving_other": "{{count}} fields to fix before saving.",
+    "views": {
+      "challenges": "Challenges of the authorities"
+    }
   },
   "crlOcsp": {
     "subtitle": "{{count}} CRL attive",
