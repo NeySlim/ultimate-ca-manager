@@ -52,7 +52,9 @@ for (const route of ROUTES) {
     const landing = detail ? route.path.replace(/\/:[^/]+$/, '') : path
     await expect(page).toHaveURL(url => url.pathname === landing || url.pathname === path)
     if (detail) {
-      await expect(page.getByRole('tabpanel', { name: detail.name }).getByRole('heading', { name: detail.name })).toBeVisible()
+      // The Atelier dock names its panel by its section and heads it with the object; older inspectors name the panel
+      const named = page.getByRole('tabpanel', { name: detail.name }).getByRole('heading', { name: detail.name })
+      await expect(named.or(page.locator('#inspector').getByRole('heading', { name: detail.name }))).toBeVisible()
     }
     await expect(page.getByRole('heading', { name: 'Something went wrong' })).toHaveCount(0)
     await page.waitForLoadState('networkidle')

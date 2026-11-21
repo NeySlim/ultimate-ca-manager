@@ -31,8 +31,9 @@ test('the status bar keeps the bottom of the window under the open dock', async 
     expect(Math.abs(b.y + b.height - view.height)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(b.width - view.width)).toBeLessThanOrEqual(EPS)
     expect(d.y + d.height).toBeLessThanOrEqual(b.y + EPS)
-    // The page ends where the dock starts: its last row scrolls into view
-    expect(apart(main, d)).toBe(true)
+    // The dock sits in the page as in the Atelier; the list ends where it starts, so its last row scrolls into view
+    expect(apart(await box(page.getByRole('main').locator('.table-container')), d)).toBe(true)
+    expect(d.y + d.height).toBeLessThanOrEqual(main.y + main.height + EPS)
     expect(main.y + main.height).toBeLessThanOrEqual(b.y + EPS)
   }
   await check()
