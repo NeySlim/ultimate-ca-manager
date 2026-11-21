@@ -100,7 +100,8 @@ export function renderMarkdown(lines, { ids = [], first = 0, levelOffset = 0 } =
     if (h) {
       const depth = h[1].length
       const Tag = `h${Math.min(6, depth + levelOffset)}`
-      out.push(<Tag key={`h${at}`} id={ids[heading]} className={`help-h${depth}`} tabIndex={-1}>{inline(h[2].trim())}</Tag>)
+      // `guide-text` keeps the heading in a reader view, which drops one whose id reads as clutter (intermediate: media)
+      out.push(<Tag key={`h${at}`} id={ids[heading]} className={`help-h${depth} guide-text`} tabIndex={-1}>{inline(h[2].trim())}</Tag>)
       heading++
       i++
       continue

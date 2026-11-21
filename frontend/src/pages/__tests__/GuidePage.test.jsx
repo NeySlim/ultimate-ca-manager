@@ -44,6 +44,8 @@ const show = (path) => render(
 )
 const where = () => screen.getByTestId('where').textContent
 const toc = () => screen.getByRole('navigation', { name: 'guide.tocLabel' })
+const onPage = () => screen.getByRole('navigation', { name: 'guide.onThisPage' })
+const article = () => document.getElementById('guide-article')
 const casHeads = () => guideHeadings('cas', helpGuides.cas.content).filter((x) => x.level <= 3)
 
 beforeAll(async () => { await loadEnglishHelp() })
@@ -52,8 +54,9 @@ beforeEach(() => {
   h.perms = []
   h.load.mockReset()
   Element.prototype.scrollIntoView = vi.fn()
+  window.scrollTo = vi.fn()
 })
-afterEach(() => { delete Element.prototype.scrollIntoView })
+afterEach(() => { delete Element.prototype.scrollIntoView; delete window.scrollTo })
 
 describe('GuidePage: a chapter and its anchor', () => {
   it('opens a chapter with its title as the page\'s h1 and its sections as h2 and h3', async () => {
@@ -66,6 +69,53 @@ describe('GuidePage: a chapter and its anchor', () => {
     expect(document.title).toBe(`${helpGuides.cas.title} · Guide · UCM`)
   })
 
+  it('gives the tab its title back when the page is left', async () => {
+    document.title = 'Before · UCM'
+    const { unmount } = show('/guide/cas')
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.title).toBe(`${helpGuides.cas.title} · Guide · UCM`)
+    // A reader view takes its title from og:title: the chapter's, without the tab's « · Guide · UCM »
+    expect(document.head.querySelector('meta[property="og:title"]')).toHaveAttribute('content', helpGuides.cas.title)
+    unmount()
+    expect(document.title).toBe('Before · UCM')
+    expect(document.head.querySelector('meta[property="og:title"]')).toBeNull()
+  })
+
+  it('holds in its article the way to the chapter, its title, its subtitle and its text, nothing else', async () => {
+    h.perms = ['*']
+    show('/guide/cas')
+    await screen.findByRole('heading', { level: 1 })
+    const main = document.getElementById('main')
+    const crumbs = within(article()).getByRole('navigation', { name: 'guide.breadcrumbLabel' })
+    expect([...crumbs.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['common.navPki', 'common.cas'])
+    expect(crumbs.querySelector('[aria-current="page"]')).toHaveTextContent('common.cas')
+    expect(crumbs.compareDocumentPosition(screen.getByRole('heading', { level: 1 })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The chapter's actions, its neighbours and its sections are the article's siblings in main, the actions first
+    const open = screen.getByRole('link', { name: 'guide.openPage' })
+    const print = screen.getByRole('button', { name: 'guide.printChapter' })
+    const pager = screen.getByRole('navigation', { name: 'guide.pagerLabel' })
+    for (const node of [open, print, pager, onPage(), screen.getByRole('link', { name: 'guide.printAll' })]) {
+      expect(article().contains(node)).toBe(false)
+      expect(main.contains(node)).toBe(true)
+    }
+    expect(open.compareDocumentPosition(article()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(print.compareDocumentPosition(article()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(article().querySelector('button, select')).toBeNull()
+  })
+
+  it('names "General" in the way to a chapter outside the registry\'s groups', async () => {
+    show('/guide/navigation')
+    await screen.findByRole('heading', { level: 1 })
+    const crumbs = within(article()).getByRole('navigation', { name: 'guide.breadcrumbLabel' })
+    expect([...crumbs.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['guide.general', 'commands.categories.navigation'])
+  })
+
+  it('scrolls the document, not a column of its own', async () => {
+    show('/guide/cas')
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('.guide-scroll')).toBeNull()
+  })
+
   it('reaches the section of the anchor and gives it the focus', async () => {
     const target = casHeads().filter((x) => x.level === 2)[2]
     show(`/guide/cas#${target.id}`)
@@ -73,7 +123,7 @@ describe('GuidePage: a chapter and its anchor', () => {
     const node = document.getElementById(target.id)
     await waitFor(() => expect(document.activeElement).toBe(node))
     expect(node.scrollIntoView).toHaveBeenCalled()
-    expect(within(toc()).getByRole('link', { name: target.text })).toHaveAttribute('aria-current', 'true')
+    expect(within(onPage()).getByRole('link', { name: target.text })).toHaveAttribute('aria-current', 'true')
   })
 
   it('/guide opens the chapter of the section asked for, else the first chapter', async () => {
@@ -110,26 +160,52 @@ describe('GuidePage: the contents', () => {
     expect(hrefs).not.toContain('/guide/importExport')
   })
 
-  it('lists the ## and ### of the chapter read under it, not its ####', async () => {
+  it('lists the chapters alone at the left, without their sections', async () => {
     show('/guide/acme')
     await screen.findByRole('heading', { level: 1 })
-    const listed = [...toc().querySelectorAll('.guide-toc-sections a')].map((a) => a.getAttribute('href'))
-    expect(listed).toEqual(guideHeadings('acme', helpGuides.acme.content).filter((x) => x.level <= 3).map((x) => `#${x.id}`))
-    expect(toc().querySelectorAll('.guide-toc-sections')).toHaveLength(1)
+    expect(toc().querySelectorAll('a[href^="#"]')).toHaveLength(0)
+    expect(toc().querySelectorAll('.guide-toc-sections')).toHaveLength(0)
   })
 
-  it('follows the reading: the last heading above the column\'s top is the current section', async () => {
+  it('lists the ## and ### of the chapter read on this page, each level marked, not its ####', async () => {
+    show('/guide/acme')
+    await screen.findByRole('heading', { level: 1 })
+    const all = guideHeadings('acme', helpGuides.acme.content).filter((x) => x.level <= 3)
+    const listed = [...onPage().querySelectorAll('a')]
+    expect(listed.map((a) => a.getAttribute('href'))).toEqual(all.map((x) => `#${x.id}`))
+    expect(listed.map((a) => a.dataset.level)).toEqual(all.map((x) => String(x.level)))
+    expect(new Set(listed.map((a) => a.className))).toEqual(new Set(['guide-onpage-h2', 'guide-onpage-h3']))
+    // A ### sits in the list of the ## above it
+    const sub = listed.find((a) => a.dataset.level === '3')
+    expect(sub.closest('ul').closest('li').querySelector(':scope > a').dataset.level).toBe('2')
+    // The same list folds above the article where there is no room for the column
+    const fold = document.querySelector('details.guide-onpage-fold')
+    expect(fold.querySelector('summary')).toHaveTextContent('guide.onThisPage')
+    expect([...fold.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(all.map((x) => `#${x.id}`))
+    expect(fold.compareDocumentPosition(article()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('has no section list for the navigation chapter, a quick help', async () => {
+    show('/guide/navigation')
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('navigation', { name: 'guide.onThisPage' })).toBeNull()
+  })
+
+  it('follows the reading: the last heading above the bar\'s foot is the current section', async () => {
     show('/guide/cas')
     await screen.findByRole('heading', { level: 1 })
-    const box = document.querySelector('.guide-scroll')
+    const bar = document.querySelector('.guide-head')
     const heads = casHeads().filter((x) => x.level <= 3)
-    const tops = Object.fromEntries(heads.map((x, i) => [x.id, i < 3 ? -100 + i * 10 : 500 + i]))
+    // Under the sticky bar (62 px): the third heading at 90 px is passed, the fourth at 130 px is not
+    const tops = Object.fromEntries(heads.map((x, i) => [x.id, i < 3 ? -100 + i * 95 : 130 + i]))
     const spy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function rect() {
-      const top = this === box ? 0 : (tops[this.id] ?? 900)
-      return { top, bottom: top + 20, left: 0, right: 0, width: 0, height: 20, x: 0, y: top }
+      const top = this === bar ? 0 : (tops[this.id] ?? 900)
+      const height = this === bar ? 62 : 20
+      return { top, bottom: top + height, left: 0, right: 0, width: 0, height, x: 0, y: top }
     })
-    fireEvent.scroll(box)
-    expect(within(toc()).getByRole('link', { name: heads[2].text })).toHaveAttribute('aria-current', 'true')
+    fireEvent.scroll(window)
+    expect(within(onPage()).getByRole('link', { name: heads[2].text })).toHaveAttribute('aria-current', 'true')
+    expect(within(onPage()).getByRole('link', { name: heads[3].text })).not.toHaveAttribute('aria-current')
     spy.mockRestore()
   })
 
@@ -137,19 +213,23 @@ describe('GuidePage: the contents', () => {
     show('/guide/cas')
     await screen.findByRole('heading', { level: 1 })
     const target = casHeads()[3]
-    fireEvent.click(within(toc()).getByRole('link', { name: target.text }))
+    fireEvent.click(within(onPage()).getByRole('link', { name: target.text }))
     await waitFor(() => expect(where()).toBe(`/guide/cas#${target.id}`))
     expect(document.activeElement).toBe(document.getElementById(target.id))
   })
 
-  it('on a phone, the selects go to a chapter and to a section', async () => {
+  it('on a phone, the select goes to a chapter and the folded On this page to a section', async () => {
     show('/guide/cas')
     await screen.findByRole('heading', { level: 1 })
+    window.scrollTo.mockClear()
     fireEvent.change(screen.getByLabelText('guide.jumpChapter'), { target: { value: 'tsa' } })
     await waitFor(() => expect(where()).toBe('/guide/tsa'))
     await screen.findByRole('heading', { level: 1, name: helpGuides.tsa.title })
+    // Another chapter opens at its top: the document scrolls back
+    expect(window.scrollTo).toHaveBeenCalledWith(0, 0)
     const target = guideHeadings('tsa', helpGuides.tsa.content)[1]
-    fireEvent.change(screen.getByLabelText('guide.jumpSection'), { target: { value: target.id } })
+    const fold = document.querySelector('details.guide-onpage-fold')
+    fireEvent.click(within(fold).getByRole('link', { name: target.text }))
     await waitFor(() => expect(where()).toBe(`/guide/tsa#${target.id}`))
   })
 })
@@ -207,7 +287,15 @@ describe('GuidePage: languages', () => {
     show('/guide/cas')
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(helpGuides.cas.title)
     expect(screen.getByText('help.englishOnlyNotice')).toBeTruthy()
+    expect(article().contains(screen.getByText('help.englishOnlyNotice'))).toBe(false)
+    expect(article()).toHaveAttribute('lang', 'en')
     expect(h.load).not.toHaveBeenCalled()
+  })
+
+  it('marks an English chapter as English', async () => {
+    show('/guide/cas')
+    await screen.findByRole('heading', { level: 1 })
+    expect(article()).toHaveAttribute('lang', 'en')
   })
 
   it('reads a translated chapter, and reaches its anchor only once the translation is in', async () => {
@@ -226,6 +314,15 @@ describe('GuidePage: languages', () => {
     const node = document.getElementById(target.id)
     expect(node.textContent).toBe(`FR ${target.text}`)
     await waitFor(() => expect(document.activeElement).toBe(node))
+    expect(article()).toHaveAttribute('lang', 'fr')
+  })
+
+  it('marks as English a chapter its language has no text for', async () => {
+    h.lang = 'fr'
+    h.load.mockRejectedValue(new Error('no file'))
+    show('/guide/tsa')
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(helpGuides.tsa.title)
+    expect(article()).toHaveAttribute('lang', 'en')
   })
 })
 
@@ -267,6 +364,7 @@ describe('GuidePage: printing', () => {
     await waitFor(() => expect(document.querySelectorAll('.guide-print-chapter')).toHaveLength(GUIDE_CHAPTERS.length))
     const chapters = [...document.querySelectorAll('.guide-print-chapter')].map((a) => a.dataset.chapter)
     expect(chapters).toEqual(GUIDE_CHAPTERS.map((c) => c.key))
+    expect(new Set([...document.querySelectorAll('.guide-print-chapter')].map((x) => x.getAttribute('lang')))).toEqual(new Set(['en']))
     expect(document.querySelector('.guide-toc')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'guide.print' }))
     expect(print).toHaveBeenCalled()

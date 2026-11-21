@@ -20,7 +20,7 @@ export default {
           { label: 'Adresse', text: 'L’objet ouvert dans le panneau de détail d’une page et sa section font partie de l’adresse : un rechargement ou un lien partagé les rouvre, et Précédent du navigateur referme le panneau' },
           { label: 'Aide', text: 'Appuyez sur ? hors d’un champ de texte, ou sélectionnez le bouton d’aide de la barre, pour ouvrir l’aide de la page courante ; sur un écran étroit, où la barre n’a pas de bouton d’aide, cherchez Aide de cette page' },
           { label: 'Largeur téléphone', text: 'La barre supérieure affiche une seule liste de pages au lieu des liens et du menu' },
-          { label: 'Guide', text: 'Ouvrir dans un nouvel onglet, au pied de l’aide, ouvre tout le guide sur le chapitre de la page, à côté de la console ; Guide dans la recherche fait de même. Le guide a un sommaire de tous les chapitres, une recherche sur l’ensemble, et imprime un chapitre ou tout le guide' },
+          { label: 'Guide', text: 'Ouvrir dans un nouvel onglet, en haut de l’aide, ouvre tout le guide sur le chapitre de la page, à côté de la console ; Guide dans la recherche fait de même. Le guide liste tous les chapitres à gauche et les sections du chapitre lu sous Sur cette page, cherche dans l’ensemble, et imprime un chapitre ou tout le guide' },
         ]
       },
       {

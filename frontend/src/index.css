@@ -2490,10 +2490,9 @@ button, a, input, select, textarea {
 /* One rule for ring and arc, so no later shorthand can repaint the arc */
 .spinner-on-accent { border-color: color-mix(in srgb, var(--on-accent) 30%, transparent); border-top-color: var(--on-accent); }
 
-/* The guide prints its whole column: the document unrolls instead of holding the window's height */
-@media print {
-  html:has(.guide-app), html:has(.guide-app) body, html:has(.guide-app) #root {
-    height: auto;
-    overflow: visible;
-  }
+/* The guide scrolls in the document (a reader view and the printer see its article): it unrolls
+   instead of holding the window's height as the console does */
+html:has(.guide-app), html:has(.guide-app) body, html:has(.guide-app) #root {
+  height: auto;
+  overflow: visible;
 }

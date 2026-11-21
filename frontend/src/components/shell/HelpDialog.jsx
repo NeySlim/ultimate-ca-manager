@@ -1,7 +1,8 @@
 /**
  * The help of the current page in the mockup's help(): its wide modal(), the sections in a
  * .help-grid, Revenir à la console at the foot. The product keeps its two readings of a page
- * (Quick help, Guide) behind a segmented switch, and the guide its search and its contents line.
+ * (Quick help, Guide) behind a segmented switch, the guide its search and its contents line, and
+ * the toolbar above them the way to the whole guide in a new tab.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,7 +16,7 @@ import { Icon } from '../atelier/Icon'
 import { useEnglishHelp } from '../../data/helpData'
 import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
 import { loadHelpPage } from '../../data/helpLoader'
-import { guideHref } from '../../navigation/guide'
+import { guideChapter, guideHref } from '../../navigation/guide'
 
 const sectionCache = {}
 // One translated page per language and page, loaded on demand; a superseded load never lands
@@ -75,19 +76,17 @@ export function HelpDialog({ open, onClose, pageKey, returnTo }) {
   return (
     <AtelierDialog title={quick?.title || guide?.title || t('common.help')} subtitle={quick?.subtitle || undefined}
       size="wide" onClose={onClose} returnTo={returnTo} testId="help-dialog">
-      <HelpBody key={pageKey} pageKey={pageKey} quick={quick} guide={guide} englishNotice={englishNotice} onSection={setSection} />
+      <HelpBody key={pageKey} pageKey={pageKey} quick={quick} guide={guide} englishNotice={englishNotice} onSection={setSection}
+        guideLink={guideChapter(pageKey) ? guideHref(pageKey, section) : null} />
       <ModalActions>
-        {/* The whole guide in a page of its own, on this chapter and the section reached */}
-        <a className="btn" href={guideHref(pageKey, section)} target="_blank" rel="noopener" data-testid="help-open-guide">
-          <Icon name="expand" />{t('guide.openInTab')}
-        </a>
         <button type="button" className="btn primary" data-action="close-modal" onClick={onClose}>{t('help.back')}</button>
       </ModalActions>
     </AtelierDialog>
   )
 }
 
-function HelpBody({ pageKey, quick, guide, englishNotice, onSection }) {
+// guideLink: the page's chapter in the guide, with the section reached; null when the page has no chapter
+function HelpBody({ pageKey, quick, guide, englishNotice, onSection, guideLink }) {
   const { t } = useTranslation()
   const [tab, setTab] = useState(guide ? 'guide' : 'quick')
   const [query, setQuery] = useState('')
@@ -95,7 +94,7 @@ function HelpBody({ pageKey, quick, guide, englishNotice, onSection }) {
   return (
     <>
       {englishNotice && <Notice>{t('help.englishOnlyNotice')}</Notice>}
-      {(both || tab === 'guide') && (
+      {(both || tab === 'guide' || guideLink) && (
         <Toolbar>
           {both && (
             <div className="segmented" role="group" aria-label={t('help.views')}>
@@ -106,6 +105,12 @@ function HelpBody({ pageKey, quick, guide, englishNotice, onSection }) {
           {tab === 'guide' && (
             <SearchField id="help-search" name="helpSearch" label={t('help.searchLabel')} placeholder={t('help.searchPlaceholder')}
               value={query} onChange={setQuery} />
+          )}
+          {/* The whole guide in a page of its own, at the top: the dialog's text can be long */}
+          {guideLink && (
+            <a className="btn help-open-guide" href={guideLink} target="_blank" rel="noopener" data-testid="help-open-guide">
+              <Icon name="expand" /><span className="help-open-label">{t('guide.openInTab')}</span>
+            </a>
           )}
         </Toolbar>
       )}

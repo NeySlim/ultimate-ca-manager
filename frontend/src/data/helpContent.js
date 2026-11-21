@@ -69,7 +69,7 @@ export const helpContent = {
           { label: 'Address', text: 'The object open in a page\'s detail dock and its section are part of the address: a reload or a shared link reopens them, and the browser\'s Back closes the dock' },
           { label: 'Help', text: 'Press ? outside a text field, or select the help button of the bar, to open the help of the current page; on a narrow screen, where the bar has no help button, search Help for this page' },
           { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },
-          { label: 'Guide', text: 'Open in a new tab, at the foot of the help, opens the whole guide on the chapter of the page, beside the console; Guide in the search does the same. The guide has a contents of every chapter, a search over all of them, and prints a chapter or the whole guide' },
+          { label: 'Guide', text: 'Open in a new tab, at the top of the help, opens the whole guide on the chapter of the page, beside the console; Guide in the search does the same. The guide lists every chapter at the left and the sections of the chapter read under On this page, searches all of them, and prints a chapter or the whole guide' },
         ]
       },
       {
