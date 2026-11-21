@@ -100,7 +100,7 @@ Les demandes ouvertes sont groupées par échéance : **À traiter sous 48 h** e
 
 1. Cliquez sur **Approuver…** sur sa ligne, ou dans l’inspecteur
 2. Donnez éventuellement un motif : il est enregistré avec la décision
-3. Confirmez : ce que l’approbation a émis (un certificat, ou une AC) s’ouvre dans l’inspecteur
+3. Confirmez : ce que l’approbation a émis s’ouvre dans sa page, un certificat dans l’inspecteur de la page Certificats, une AC dans la page des Autorités
 
 ## Rejeter une demande
 
