@@ -13,6 +13,7 @@ import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Props,
   LoadError, LoadCause, EmptyBlock, NoMatch,
 } from '../components/atelier'
+import { useDockSelection } from '../components/atelier/useDockParam'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
@@ -32,6 +33,8 @@ import { CustomExtensionsEditor } from '../components/CustomExtensionsEditor'
 import { CN_PATTERN_VARIABLES, cnPatternNonUnique, cnPatternSource } from '../lib/cnPattern'
 import { CertMenu } from './certificates/inspector/CertMenu'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
+
+const TEMPLATE_SECTIONS = ['overview', 'subject', 'extensions', 'enrollment']
 
 export default function TemplatesPage() {
   const { t } = useTranslation()
@@ -53,7 +56,6 @@ export default function TemplatesPage() {
   const {
     items: templates,
     loading,
-    selectedItem: selectedTemplate, setSelectedItem: setSelectedTemplate,
     showModal: showTemplateModal, setShowModal: setShowTemplateModal,
     editing: editingTemplate, setEditing: setEditingTemplate,
     loadData,
@@ -68,9 +70,12 @@ export default function TemplatesPage() {
   const [source, setSource] = usePersistedState('ucm-templates-source', '')
   const [state, setState] = usePersistedState('ucm-templates-state', '')
   const [sort, setSort] = useState({ key: 'name', asc: true })
-  const [section, setSection] = useState('overview')
   const [menuOpen, setMenuOpen] = useState(false)
   const [loadError, setLoadError] = useState(null)
+  // The open template and its section live in the URL; the palette's former ?selected= still opens it
+  const { selected: selectedTemplate, select: setSelectedTemplate, section, setSection } = useDockSelection(templates, {
+    ready: !loading && !loadError, sections: TEMPLATE_SECTIONS, aliases: ['selected'],
+  })
 
   // Import state
   const [importFile, setImportFile] = useState(null)
@@ -279,7 +284,6 @@ export default function TemplatesPage() {
 
   const open = selectedTemplate ? (templates.find((x) => x.id === selectedTemplate.id) ? { ...templates.find((x) => x.id === selectedTemplate.id), ...selectedTemplate } : selectedTemplate) : null
   const openTemplate = (tpl) => {
-    if (tpl.id !== selectedTemplate?.id) setSection('overview')
     setSelectedTemplate(tpl)
   }
   const ext = open?.extensions_template || {}

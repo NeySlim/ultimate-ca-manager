@@ -13,6 +13,8 @@ export const SECTION_PARAM = 'section'
 const OPENED = 'ucmDockOpened'
 
 const sameId = (a, b) => a != null && b != null && String(a) === String(b)
+/** The URL's id as the API's records hold it: a number when it is one */
+export const asId = (v) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v)
 
 /**
  * @param {object} [o]
@@ -111,7 +113,10 @@ export function useDockSelection(items, { key = (x) => x?.id, ready = true, load
     open(keyRef.current(obj), o)
   }, [open, close, item])
 
-  return { ...dock, selected, select }
+  // Holds an object whose id the caller writes into the URL itself (with another parameter, in one step)
+  const hold = useCallback((obj) => { held.current = obj }, [])
+
+  return { ...dock, selected, select, hold }
 }
 
 export default useDockParam

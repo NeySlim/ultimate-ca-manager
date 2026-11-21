@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 vi.mock('react-i18next', async () => {
   const { enI18n } = await import('../../test/enT')
@@ -111,5 +111,33 @@ describe('Template dock', () => {
     fireEvent.click(within(dock).getByRole('tab', { name: 'Enrollment' }))
     expect(dock).toHaveTextContent('PKI-Users')
     expect(dock).toHaveTextContent('O=Example')
+  })
+})
+
+describe('Template dock in the URL', () => {
+  let where
+  function Where() { const l = useLocation(); where = l.pathname + l.search; return null }
+  const at = (url) => render(<MemoryRouter initialEntries={[url]}><TemplatesPage /><Where /></MemoryRouter>)
+
+  it('opens the template and section a link names (a reload)', async () => {
+    at('/templates?item=1&section=enrollment')
+    const dock = await screen.findByRole('complementary', { name: /Templates/ })
+    expect(within(dock).getByRole('tab', { name: 'Enrollment' })).toHaveAttribute('aria-selected', 'true')
+    expect(dock).toHaveTextContent('PKI-Users')
+  })
+
+  it('opens the template of a palette result (?selected=)', async () => {
+    at('/templates?selected=2')
+    const dock = await screen.findByRole('complementary', { name: /Templates/ })
+    expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Archive')
+  })
+
+  it('writes the open template and its section into the URL', async () => {
+    at('/templates')
+    fireEvent.click(await screen.findByRole('button', { name: 'Web Server' }))
+    expect(where).toBe('/templates?item=1')
+    const dock = screen.getByRole('complementary', { name: /Templates/ })
+    fireEvent.click(within(dock).getByRole('tab', { name: 'Enrollment' }))
+    expect(where).toBe('/templates?item=1&section=enrollment')
   })
 })

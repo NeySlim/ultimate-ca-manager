@@ -32,6 +32,7 @@ import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { issueWithSubjectOverride } from '../lib/uniqueSubject'
 import { dateOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
@@ -43,6 +44,8 @@ const DEFAULT_CSR_KEY_TYPE = findAlgorithm(CSR_LABELS[0]).csr
 // Registry row of a listed CSR's key: its stored spelling, else '<algorithm> <size>'
 const csrKeyRow = (csr) => algorithmForKeyType(csr.key_type)
   || algorithmForKeyType([csr.key_algorithm, csr.key_size].filter(Boolean).join(' '))
+
+const CSR_SECTIONS = ['overview', 'details', 'pem']
 
 export default function CSRsPage() {
   const { t, i18n } = useTranslation()
@@ -77,7 +80,11 @@ export default function CSRsPage() {
   const [cas, setCAs] = useState([])
   
   // Selection & modals
-  const [selectedCSR, setSelectedCSR] = useState(null)
+  // The open request and its section live in the URL (`item`, `section`); the palette's former ?selected= still opens it.
+  // Its detail is read below, so the hook never drops an id the list page lacks
+  const csrDock = useDockSelection(rows, { ready: false, sections: CSR_SECTIONS, aliases: ['selected'] })
+  const selectedCSR = csrDock.selected
+  const setSelectedCSR = csrDock.select
   const [showImportModal, setShowImportModal] = useState(false)
   const [signCA, setSignCA] = useState('')
   const [showHiddenCas, setShowHiddenCas] = useState(false)
@@ -151,7 +158,8 @@ export default function CSRsPage() {
   const [rekeyCSR, setRekeyCSR] = useState(null)
 
   // Handle tab change
-  const handleTabChange = (tabId) => {
+  // `open`: the request to show in the new tab, written with it in one step
+  const handleTabChange = (tabId, open = null) => {
     if (tabId !== activeTab) {
       // The other tab's rows must not show under this tab's columns
       setRows([])
@@ -161,9 +169,10 @@ export default function CSRsPage() {
       setLoading(true)
     }
     setActiveTab(tabId)
-    setSelectedCSR(null)
     setPage(1)
-    setSearchParams({ tab: tabId })
+    // The new tab's URL carries no open request but the one asked: the dock follows it
+    setSearchParams(open ? { tab: tabId, item: String(open.id) } : { tab: tabId })
+    if (open) csrDock.hold(open)
   }
 
   // Pagination state
@@ -280,15 +289,19 @@ export default function CSRsPage() {
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [])
 
-  const loadCSRDetails = async (csr) => {
-    try {
-      const response = await csrsService.getById(csr.id)
-      const data = extractData(response)
-      setSelectedCSR({ ...data, ...csr }) // Merge to keep signed_by info
-    } catch {
-      setSelectedCSR(csr)
-    }
-  }
+  // The open request's detail, read whether it was opened here or by a link (then perhaps off the list's page)
+  const csrItem = csrDock.item
+  useEffect(() => {
+    if (!csrItem || loading) return undefined
+    let live = true
+    const csr = rows.find((r) => String(r.id) === csrItem)
+    csrsService.getById(csr?.id ?? asId(csrItem)).then((response) => {
+      if (live) setSelectedCSR({ ...extractData(response), ...csr }) // Merge to keep signed_by info
+    }, () => {
+      if (live && !csr) setSelectedCSR(null)
+    })
+    return () => { live = false }
+  }, [csrItem, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The Microsoft CA request still awaiting approval for the selected CSR, if any
   const [mscaRequest, setMscaRequest] = useState(null)
@@ -341,8 +354,7 @@ export default function CSRsPage() {
   const openCreatedCSR = (response) => {
     const csr = extractData(response)
     if (!csr?.id) return
-    handleTabChange('pending')
-    loadCSRDetails(csr)
+    handleTabChange('pending', csr)
   }
 
   const handleUpload = async (files) => {
@@ -888,12 +900,9 @@ export default function CSRsPage() {
   )
 
   // The open request in the dock: what the list row holds, then its detail once read
-  const [section, setSection] = useState('overview')
+  const { section, setSection } = csrDock
   const [menuOpen, setMenuOpen] = useState(false)
-  const openCSR = (row) => {
-    if (row.id !== selectedCSR?.id) setSection('overview')
-    loadCSRDetails(row)
-  }
+  const openCSR = (row) => setSelectedCSR(row)
   const signed = activeTab === 'history'
   const csrName = (row) => t('csrs.module.name', { id: row.id })
   const csrSubject = (row) => row.common_name || row.cn || row.subject || t('common.unnamed')
