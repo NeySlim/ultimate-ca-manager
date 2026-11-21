@@ -2,7 +2,7 @@
  * Russian has its own help: on the real i18n instance and the real loader the
  * dialog shows the Russian page without the notice; German still gets English plus the notice.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { render, screen, cleanup, act, waitFor } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '../../../i18n'
@@ -12,6 +12,10 @@ import ruHsm from '../../../data/help/ru/hsm'
 
 
 import { HelpDialog } from '../HelpDialog'
+import { loadEnglishHelp } from '../../../data/helpData'
+
+// The English help is a chunk of its own: loaded once, the dialog opens at once
+beforeAll(async () => { await loadEnglishHelp() })
 import { helpContent } from '../../../data/helpContent'
 
 const open = async (lang) => {

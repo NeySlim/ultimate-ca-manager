@@ -248,8 +248,8 @@ class APIClient {
             && !window.location.pathname?.includes('/login')) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
           loginRedirectPending = true
-          const { pathname = '/', search = '' } = window.location
-          window.location.href = loginUrl(pathname, search)
+          const { pathname = '/', search = '', hash = '' } = window.location
+          window.location.href = loginUrl(pathname, search, hash)
         }
         
         throw error

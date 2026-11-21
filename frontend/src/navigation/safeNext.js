@@ -16,9 +16,9 @@ export function safeNext(raw) {
   return isKnownPath(path) ? raw : null
 }
 
-/** `/login` carrying the page to come back to, left out for the landing page itself. */
-export function loginUrl(pathname, search = '') {
-  const target = `${pathname || '/'}${search || ''}`
+/** `/login` carrying the page to come back to (its query and anchor), left out for the landing page itself. */
+export function loginUrl(pathname, search = '', hash = '') {
+  const target = `${pathname || '/'}${search || ''}${hash || ''}`
   if (pathname === '/' || pathname === '/dashboard' || !safeNext(target)) return '/login'
   return `/login?next=${encodeURIComponent(target)}`
 }

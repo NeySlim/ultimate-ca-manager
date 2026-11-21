@@ -2489,3 +2489,11 @@ button, a, input, select, textarea {
 .bg-scrim-70 { background-color: color-mix(in srgb, var(--scrim) 70%, transparent); }
 /* One rule for ring and arc, so no later shorthand can repaint the arc */
 .spinner-on-accent { border-color: color-mix(in srgb, var(--on-accent) 30%, transparent); border-top-color: var(--on-accent); }
+
+/* The guide prints its whole column: the document unrolls instead of holding the window's height */
+@media print {
+  html:has(.guide-app), html:has(.guide-app) body, html:has(.guide-app) #root {
+    height: auto;
+    overflow: visible;
+  }
+}

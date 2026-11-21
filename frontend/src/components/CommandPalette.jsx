@@ -22,8 +22,9 @@ const PROTOCOL_OBJECTS = [
 /**
  * `can` ({ isAdmin, hasPermission }) keeps the pages and actions the account may open; omitted, all of them.
  * onOpenHelp: the help of the current page, listed with the actions (on a phone the bar hides its button).
+ * guideHref: the guide's chapter of the current page, opened in a new tab by the Guide entry.
  */
-export function CommandPalette({ open, onOpenChange, can, onOpenHelp }) {
+export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref = '/guide' }) {
   const navigate = useNavigate()
   const openInInspector = useOpenEntity()
   // The control focused before the palette opened, and whether the palette handed over to the inspector
@@ -203,6 +204,11 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp }) {
       key: `cmd-${cmd.id}`, icon: cmd.action === 'new' || cmd.action === 'upload' ? 'plus' : glyphOf(moduleForPath(cmd.path.split('?')[0])),
       name: t(cmd.labelKey), hint: t(cmd.categoryKey), run: () => executeCommand(cmd),
     })),
+    // The whole guide in a tab of its own (absent from the mockup), on the chapter of the current page
+    ...(search && [t('guide.paletteEntry'), t('guide.paletteHint')].some(s => s.toLowerCase().includes(lower)) ? [{
+      key: 'guide', icon: 'expand', name: t('guide.paletteEntry'), hint: t('guide.paletteHint'),
+      run: () => { onOpenChange(false); window.open(guideHref, '_blank', 'noopener') },
+    }] : []),
     // The page's help (absent from the mockup's palette): on a matching search only, after the pages and modules
     ...(onOpenHelp && search && [t('commandPalette.pageHelp'), t('common.help')].some(s => s.toLowerCase().includes(lower)) ? [{
       key: 'page-help', icon: 'help', name: t('commandPalette.pageHelp'), hint: t('common.help'),

@@ -160,10 +160,14 @@ export function moduleById(id) {
 
 const patternRegex = (p) => new RegExp('^' + p.replace(/:[^/]+/g, '[^/]+') + '$')
 
-/** True when `pathname` is exactly a module path, a detail route of one, or a legacy redirect source. */
+// Routes outside the modules a sign-in may come back to: the guide and its chapters
+const OTHER_PATHS = ['/guide', '/guide/:chapter']
+
+/** True when `pathname` is exactly a module path, a detail route of one, the guide, or a legacy redirect source. */
 export function isKnownPath(pathname) {
   const clean = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
   if (REDIRECTS.some(r => r.from === clean)) return true
+  if (OTHER_PATHS.some(p => patternRegex(p).test(clean))) return true
   return MODULES.some(m => [m.path, ...m.paths].some(p => patternRegex(p).test(clean)))
 }
 

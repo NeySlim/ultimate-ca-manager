@@ -132,8 +132,8 @@ describe('the Atelier mockup, copied literally', () => {
     const added = parseRules(read(path.join(COPIES, 'extensions.css')))
     expect(added.length).toBeGreaterThan(0)
     // The rules on the scope itself: a dialog drawn outside a zone carries `.atl` without a box;
-    // the sign-in pages' zone fills the window and scrolls itself
-    const onScope = new Set(['.atl.atl-island', '.atl.atl-auth'])
+    // the sign-in pages' zone fills the window and scrolls itself, as the guide's page does
+    const onScope = new Set(['.atl.atl-island', '.atl.atl-auth', '.atl.guide-app'])
     for (const r of added) for (const sel of r.sel.split(',')) expect(sel.trim().startsWith('.atl ') || onScope.has(sel.trim()), sel).toBe(true)
   })
 

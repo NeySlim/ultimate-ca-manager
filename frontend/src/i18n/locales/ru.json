@@ -8722,5 +8722,25 @@
     "sections_few": "{{count}} раздела",
     "sections_many": "{{count}} разделов",
     "sectionsOf": "Разделы: {{name}}"
+  },
+  "guide": {
+    "title": "Руководство",
+    "tabTitle": "{{chapter}} · Руководство · UCM",
+    "tocLabel": "Содержание руководства",
+    "general": "Общее",
+    "jumpChapter": "Глава",
+    "jumpSection": "Перейти к разделу",
+    "openPage": "Открыть страницу",
+    "pagerLabel": "Другие главы",
+    "previous": "Предыдущая глава",
+    "next": "Следующая глава",
+    "printChapter": "Печать главы",
+    "printAll": "Печать всего руководства",
+    "print": "Печать",
+    "wholeGuide": "Всё руководство",
+    "skip": "Перейти к главе",
+    "openInTab": "Открыть в новой вкладке",
+    "paletteEntry": "Руководство",
+    "paletteHint": "Открывается в новой вкладке"
   }
 }

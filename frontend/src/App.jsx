@@ -16,6 +16,7 @@ const GABARITS = import.meta.env.DEV || import.meta.env.MODE === 'gabarits'
 const GabaritsPage = GABARITS ? lazyWithRetry(() => import('./pages/dev/GabaritsPage')) : null
 const SsoTestCompletePage = lazyWithRetry(() => import('./pages/SsoTestCompletePage'))
 const SsoTestLaunchPage = lazyWithRetry(() => import('./pages/SsoTestLaunchPage'))
+const GuidePage = lazyWithRetry(() => import('./pages/GuidePage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -33,8 +34,8 @@ function SignedIn() {
 }
 
 function ProtectedRoute({ children }) {
-  const { pathname, search } = useLocation()
-  const toLogin = loginUrl(pathname, search)
+  const { pathname, search, hash } = useLocation()
+  const toLogin = loginUrl(pathname, search, hash)
   const { isAuthenticated, loading } = useAuth()
   
   if (loading) {
@@ -45,8 +46,8 @@ function ProtectedRoute({ children }) {
 }
 
 function AdminRoute({ children }) {
-  const { pathname, search } = useLocation()
-  const toLogin = loginUrl(pathname, search)
+  const { pathname, search, hash } = useLocation()
+  const toLogin = loginUrl(pathname, search, hash)
   const { isAuthenticated, loading, permissions } = useAuth()
   
   if (loading) return <PageLoader />
@@ -57,8 +58,8 @@ function AdminRoute({ children }) {
 }
 
 function PermissionRoute({ children, permission }) {
-  const { pathname, search } = useLocation()
-  const toLogin = loginUrl(pathname, search)
+  const { pathname, search, hash } = useLocation()
+  const toLogin = loginUrl(pathname, search, hash)
   const { isAuthenticated, loading, permissions } = useAuth()
   
   if (loading) return <PageLoader />
@@ -136,6 +137,10 @@ export function AppRoutes() {
         <Route path="/sso-test-launch" element={<SsoTestLaunchPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
+        {/* The whole guide, read in a tab of its own: signed in, outside the console's frame */}
+        <Route path="/guide" element={<ProtectedRoute><GuidePage /></ProtectedRoute>} />
+        <Route path="/guide/:chapter" element={<ProtectedRoute><GuidePage /></ProtectedRoute>} />
+
         <Route element={<AppShell />}>
           {moduleRoutes()}
           {/* The Atelier gabarits: accessible by URL only, not a module */}

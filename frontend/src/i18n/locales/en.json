@@ -8308,5 +8308,25 @@
     "sections_one": "{{count}} section",
     "sections_other": "{{count}} sections",
     "sectionsOf": "Sections: {{name}}"
+  },
+  "guide": {
+    "title": "Guide",
+    "tabTitle": "{{chapter}} · Guide · UCM",
+    "tocLabel": "Contents of the guide",
+    "general": "General",
+    "jumpChapter": "Chapter",
+    "jumpSection": "Go to the section",
+    "openPage": "Open the page",
+    "pagerLabel": "Other chapters",
+    "previous": "Previous chapter",
+    "next": "Next chapter",
+    "printChapter": "Print the chapter",
+    "printAll": "Print the whole guide",
+    "print": "Print",
+    "wholeGuide": "Whole guide",
+    "skip": "Skip to the chapter",
+    "openInTab": "Open in a new tab",
+    "paletteEntry": "Guide",
+    "paletteHint": "Opens in a new tab"
   }
 }
