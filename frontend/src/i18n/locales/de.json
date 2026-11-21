@@ -995,6 +995,7 @@
     "listLabel": "Liste der Zertifikate",
     "uploadKey": "Upload private key",
     "listNote": "Open certificates stay available in the inspector.",
+    "listNoteCloseOnNav": "Open certificates close when you change page (setting in My Account).",
     "loadFailed": "Could not load the certificates",
     "loadFailedCause": "Cause: {{message}}. The other views and the inspector stay usable.",
     "viewLog": "View the log",

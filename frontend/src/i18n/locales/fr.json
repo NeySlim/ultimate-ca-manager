@@ -1694,6 +1694,7 @@
     "listLabel": "Liste des certificats",
     "uploadKey": "Téléverser la clé privée",
     "listNote": "Les certificats ouverts restent disponibles dans l’inspecteur.",
+    "listNoteCloseOnNav": "Les certificats ouverts se ferment quand vous changez de page (réglage de Mon compte).",
     "loadFailed": "Impossible de charger les certificats",
     "loadFailedCause": "Cause : {{message}}. Les autres vues et l’inspecteur restent utilisables.",
     "viewLog": "Voir le journal",
