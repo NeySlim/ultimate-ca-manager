@@ -68,6 +68,8 @@ describe('OperationsPage bulk list', () => {
     localStorage.setItem('ucm-ops-resource-type', 'certificates')
     open()
     await waitFor(() => expect(names()).toEqual(['first.example', 'second.example']))
+    // The server pages the certificates: a page number to type, as the mockup's large lists
+    expect(document.getElementById('page-jump')).not.toBeNull()
     const selection = screen.getByRole('button', { name: 'operations.selectionOnly' })
     expect(selection).toBeDisabled()
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'table.selectRow' })[0])
@@ -91,6 +93,7 @@ describe('OperationsPage bulk list', () => {
     localStorage.setItem('ucm-ops-resource-type', 'users')
     open()
     await waitFor(() => expect(names()).toEqual(['zoe', 'alice']))
+    expect(document.getElementById('page-jump')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'common.user' }))
     expect(names()).toEqual(['alice', 'zoe'])
     fireEvent.click(screen.getByRole('button', { name: 'common.user' }))

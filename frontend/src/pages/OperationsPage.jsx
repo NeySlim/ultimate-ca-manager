@@ -678,7 +678,7 @@ export default function OperationsPage() {
         empty={<EmptyBlock id="operations" icon={TYPE_ICONS[bulkResourceType]} title={t('operations.noData')} text={t('operations.noDataDesc')} />}
         footer={(
           <TableFooter range={total ? t('table.range', { start, end, total }) : ''}
-            pagination={selectionOnly ? undefined : { page: bulkPage, pages, perPage: bulkPerPage, onPage: setBulkPage, onPerPage: (v) => { setBulkPerPage(v); setBulkPage(1) } }} />
+            pagination={selectionOnly ? undefined : { page: bulkPage, pages, perPage: bulkPerPage, jump: serverPaged, onPage: setBulkPage, onPerPage: (v) => { setBulkPerPage(v); setBulkPage(1) } }} />
         )} />
     </>
   )

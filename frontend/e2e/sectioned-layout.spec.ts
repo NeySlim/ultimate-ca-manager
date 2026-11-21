@@ -184,6 +184,17 @@ test.describe('on a phone', () => {
     })
   }
 
+  test('the bulk list of Operations keeps to its frame, its rows scrolling inside it', async ({ page, api }) => {
+    await page.goto('/operations?tab=bulk')
+    const frame = page.getByRole('region', { name: 'Bulk Actions', exact: true })
+    await expect(frame.locator('.table-workspace')).toBeVisible()
+    const f = await box(frame)
+    for (const sel of ['.filters-row', '.table-workspace', '.table-workspace > .toolbar']) {
+      const b = await box(frame.locator(sel).first())
+      expect(b.x + b.width).toBeLessThanOrEqual(f.x + f.width + EPS)
+    }
+  })
+
   test('each scheduler task is a card with its run button on the screen', async ({ page, api }) => {
     await page.goto('/settings?tab=scheduler')
     const run = page.locator('.sf-task-table .sf-task-run button')
