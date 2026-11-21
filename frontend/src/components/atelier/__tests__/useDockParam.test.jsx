@@ -116,6 +116,7 @@ function List({ rows, ready = true, load }) {
       <span data-testid="section">{section}</span>
       {rows.map((r) => <button key={r.id} type="button" onClick={() => select(r)}>{r.name}</button>)}
       <button type="button" onClick={() => select({ id: 9, name: 'fresh' })}>created</button>
+      <button type="button" onClick={() => { select({ id: 9, name: 'fresh' }); setSection('subject') }}>created on subject</button>
       <button type="button" onClick={() => setSection('subject')}>subject</button>
       <button type="button" onClick={() => select(null)}>close</button>
       <button type="button" onClick={() => rerender((n) => n + 1)}>again</button>
@@ -136,6 +137,12 @@ describe('useDockSelection', () => {
     fireEvent.click(screen.getByText('created'))
     expect(screen.getByTestId('sel')).toHaveTextContent('fresh')
     expect(url()).toBe('/t?item=9')
+  })
+
+  it('a section set in the same handler as an open applies to the object just opened', () => {
+    at('/t?item=1', <List rows={rows} />)
+    fireEvent.click(screen.getByText('created on subject'))
+    expect(url()).toBe('/t?item=9&section=subject')
   })
 
   it('a row starts on the first section', () => {

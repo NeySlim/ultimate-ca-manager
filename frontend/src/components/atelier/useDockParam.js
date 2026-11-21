@@ -47,6 +47,8 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [] } =
     const to = { pathname: loc.pathname, search: qs ? `?${qs}` : '', hash: loc.hash }
     const state = push ? { ...(loc.state || {}), [OPENED]: true } : loc.state
     navigate(to, { replace: !push, state })
+    // A second write in the same handler builds on this one, not on the URL still rendered
+    now.current = { params: next, location: { ...loc, search: to.search, state }, item: patch.item != null ? String(patch.item) : null }
   }, [navigate, fallback, aliasKey])
 
   const open = useCallback((id, { section: asked } = {}) => {
@@ -59,8 +61,10 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [] } =
   const close = useCallback(() => {
     const { item: cur, location: loc } = now.current
     if (cur == null) return
-    if (loc.state?.[OPENED] && loc.key !== 'default') navigate(-1)
-    else write({})
+    if (loc.state?.[OPENED] && loc.key !== 'default') {
+      navigate(-1)
+      now.current = { ...now.current, item: null }
+    } else write({})
   }, [navigate, write])
 
   const setSection = useCallback((id) => {
