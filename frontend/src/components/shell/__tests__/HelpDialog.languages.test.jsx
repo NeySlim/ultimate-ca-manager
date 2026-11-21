@@ -2,7 +2,7 @@
  * Help is translated for the languages in HELP_TRANSLATED_LANGUAGES only; any
  * other interface language shows English, attempts no import and says so.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 
 const h = vi.hoisted(() => ({ lang: 'en', resolved: null, load: vi.fn() }))
@@ -16,6 +16,10 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../data/helpLoader', () => ({ loadHelpPage: (...a) => h.load(...a) }))
 
 import { HelpDialog } from '../HelpDialog'
+import { loadEnglishHelp } from '../../../data/helpData'
+
+// The English help is a chunk of its own: loaded once, the dialog opens at once
+beforeAll(async () => { await loadEnglishHelp() })
 import { helpContent } from '../../../data/helpContent'
 import { HELP_TRANSLATED_LANGUAGES } from '../../../data/helpLanguages'
 

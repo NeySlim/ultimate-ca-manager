@@ -24,4 +24,16 @@ describe('loginUrl', () => {
     expect(loginUrl('/dashboard', '')).toBe('/login')
     expect(loginUrl('/nowhere', '')).toBe('/login')
   })
+
+  it('carries the anchor of a section of the guide, under the same checks', () => {
+    expect(loginUrl('/guide/cas', '', '#cas-overview')).toBe('/login?next=%2Fguide%2Fcas%23cas-overview')
+    expect(loginUrl('/guide/acme', '?q=dns', '#acme-dns')).toBe('/login?next=%2Fguide%2Facme%3Fq%3Ddns%23acme-dns')
+    expect(safeNext('/guide/cas#cas-overview')).toBe('/guide/cas#cas-overview')
+    expect(safeNext('/guide')).toBe('/guide')
+    // An anchor never makes an unknown or foreign target acceptable
+    expect(loginUrl('/nowhere', '', '#x')).toBe('/login')
+    expect(loginUrl('/guide/cas', '', '#a b')).toBe('/login')
+    expect(safeNext('/guide/../../x#y')).toBeNull()
+    expect(safeNext('/guide/cas/extra#y')).toBeNull()
+  })
 })

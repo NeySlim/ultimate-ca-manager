@@ -2,7 +2,7 @@
  * The help of a page in the mockup's help(): a wide <dialog>, its sections in a .help-grid; the product's
  * Quick help and Guide behind a segmented switch, the guide's search and contents line, nothing lost.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
@@ -40,6 +40,10 @@ vi.mock('../../../data/helpGuides', () => ({
 }))
 
 import { HelpDialog } from '../HelpDialog'
+import { loadEnglishHelp } from '../../../data/helpData'
+
+// The English help is a chunk of its own: loaded once, the dialog opens at once
+beforeAll(async () => { await loadEnglishHelp() })
 
 const show = (pageKey, props = {}) => render(<HelpDialog open onClose={props.onClose || vi.fn()} pageKey={pageKey} {...props} />)
 const dialog = () => screen.getByTestId('help-dialog')

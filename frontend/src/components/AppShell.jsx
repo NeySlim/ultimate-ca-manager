@@ -18,6 +18,7 @@ import { usePins } from './shell/pins'
 import { resolveActivePageId } from './shell/activePage'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { HelpDialog } from './shell/HelpDialog'
+import { guideHref } from '../navigation/guide'
 import { UpdatePopup } from './UpdatePopup'
 import { KofiSupportCard } from './KofiSupportCard'
 import { usePermission } from '../hooks'
@@ -171,6 +172,7 @@ export function AppShell() {
         onOpenChange={setPalette}
         can={can}
         onOpenHelp={hasHelp ? () => openHelp(null, 'shell-search') : undefined}
+        guideHref={guideHref(helpPageKey)}
       />
 
       {/* The help of the page, the mockup's help dialog */}

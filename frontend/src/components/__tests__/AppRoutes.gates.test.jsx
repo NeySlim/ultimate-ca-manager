@@ -32,12 +32,13 @@ vi.mock('../../components', async () => {
 })
 vi.mock('../../pages/LoginPage', () => ({ default: () => <div>login-page</div> }))
 vi.mock('../../pages/OverviewPage', () => ({ default: () => <div>dashboard-page</div> }))
+vi.mock('../../pages/GuidePage', () => ({ default: () => <div>guide-page</div> }))
 
 import { AppRoutes } from '../../App'
 
 function Where() {
   const l = useLocation()
-  return <div data-testid="where">{l.pathname + l.search}</div>
+  return <div data-testid="where">{l.pathname + l.search + l.hash}</div>
 }
 
 function renderAt(path, state) {
@@ -65,6 +66,23 @@ describe('AppRoutes under the forced gates', () => {
     renderAt('/acme?tab=orders', { isAuthenticated: false })
     await screen.findByText('login-page')
     expect(screen.getByTestId('where').textContent).toBe('/login?next=%2Facme%3Ftab%3Dorders')
+  })
+
+  it('sends a signed-out reader of the guide to login carrying the section', async () => {
+    renderAt('/guide/cas#cas-overview', { isAuthenticated: false })
+    await screen.findByText('login-page')
+    expect(screen.getByTestId('where').textContent).toBe('/login?next=%2Fguide%2Fcas%23cas-overview')
+  })
+
+  it('opens the guide outside the console\'s frame, signed in', async () => {
+    renderAt('/guide/cas', {})
+    expect(await screen.findByText('guide-page')).toBeTruthy()
+    expect(screen.queryByText('app-shell')).toBeNull()
+  })
+
+  it('comes back to the guide\'s section after signing in', async () => {
+    renderAt('/login?next=%2Fguide%2Fcas%23cas-overview', {})
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/guide/cas#cas-overview'))
   })
 
   it('mounts the pages once nothing is pending', async () => {

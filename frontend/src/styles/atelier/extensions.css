@@ -239,3 +239,144 @@
 .atl .drop-zone{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:14px;border:1px dashed var(--control);border-radius:5px;color:var(--muted)}
 /* Files dragged over the field: the box takes the accent and the selected row's background */
 .atl .field.dragover .drop-zone{border-color:var(--accent);background:var(--selected)}
+/* Guide (/guide/:chapter, absent from the mockup): a page of its own, the masthead then a column that scrolls;
+   it draws its grid at every width (the scope's own display steps aside under 800 px). */
+.atl.guide-app{display:grid;height:100%;grid-template-rows:62px minmax(0,1fr);background:var(--bg)}
+/* The masthead holds the brand, the search at the middle and the way back to the console. */
+.atl .guide-head-tools{flex:1;min-width:0;display:flex;justify-content:center;gap:8px}
+/* The column that scrolls, its stage padded as a page's. */
+.atl .guide-scroll{overflow:auto;min-height:0;scrollbar-width:thin}
+/* The page's stage keeps the mockup's side padding and leaves room above and under the chapter. */
+.atl .guide-stage{padding-top:24px;padding-bottom:48px}
+/* The settings layout with a wider contents and a reading column of at most 780 px, centred. */
+.atl .guide-layout{grid-template-columns:250px minmax(0,780px);justify-content:center;gap:32px}
+/* The contents stay at hand while the chapter scrolls, and scroll themselves when longer than the window. */
+.atl .guide-toc{max-height:calc(100dvh - 86px);overflow:auto;scrollbar-width:thin;padding-bottom:12px}
+/* A group of chapters under its name, as the Modules menu groups the modules. */
+.atl .guide-toc-group+.guide-toc-group{margin-top:14px}
+/* The group's name: small and muted, aligned with the links. */
+.atl .guide-toc-head{font-size:12px;font-weight:600;color:var(--muted);padding:0 10px 4px}
+/* The chapter read and the section reached: the selected row's background, the text's colour. */
+.atl .guide-toc a[aria-current]{background:var(--selected);color:var(--text)}
+/* The sections of the chapter read, under it, indented by level and a size smaller. */
+.atl .guide-toc .guide-toc-sections{margin:2px 0 6px}
+/* A section of the contents: a line of its own, shorter than a chapter's row. */
+.atl .guide-toc-sections a{min-height:28px;padding:4px 10px 4px 22px;font-size:12px;line-height:1.4}
+/* A sub-section sits one step further in. */
+.atl .guide-toc-sections a.guide-toc-h3{padding-left:34px}
+/* The chapter: a panel with room around the text. */
+.atl .guide-article{padding:28px 36px 34px}
+/* The chapter's subtitle under its title. */
+.atl .guide-subtitle{margin-top:8px;color:var(--muted);font-size:14px;line-height:1.6}
+/* The chapter's title and a section reached take the focus without a ring, a keyboard one draws it (the mockup's settings sections). */
+.atl .guide-article [tabindex="-1"]:focus{outline:none}
+/* The keyboard's focus ring on a heading. */
+.atl .guide-article [tabindex="-1"]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+/* The text of a chapter at a reading size, in the text's colour. */
+.atl .guide-body{margin-top:8px;font-size:14px;line-height:1.7;color:var(--text);overflow-wrap:anywhere}
+/* Paragraphs and lists spaced as prose. */
+.atl .guide-body p,.atl .guide-body ul,.atl .guide-body ol{margin:0 0 12px}
+/* Lists indented under their text. */
+.atl .guide-body ul,.atl .guide-body ol{padding-left:22px}
+/* List items breathe. */
+.atl .guide-body li{margin:4px 0}
+/* A nested list follows its item closely. */
+.atl .guide-body li>ul,.atl .guide-body li>ol{margin:4px 0 0}
+/* The chapter's sections, sub-sections and their parts, by Markdown depth; a heading reached clears the column's top. */
+.atl .guide-body h2,.atl .guide-body h3,.atl .guide-body h4{scroll-margin-top:16px;line-height:1.3}
+/* A section opens with room above it and a rule. */
+.atl .guide-body h2{font-size:19px;margin:34px 0 12px;padding-top:22px;border-top:1px solid var(--line)}
+/* The chapter's first section follows its title without a rule. */
+.atl .guide-body>h2:first-child{margin-top:22px;padding-top:0;border-top:0}
+/* A sub-section. */
+.atl .guide-body h3{font-size:15px;margin:26px 0 8px}
+/* A part of a sub-section, muted. */
+.atl .guide-body h4{font-size:13px;margin:20px 0 6px;color:var(--muted)}
+/* Code spans, tables and notices at the text's size. */
+.atl .guide-body .notice,.atl .guide-body .compare-table{font-size:13px}
+/* A table in its box, spaced from the text. */
+.atl .guide-body .help-table{margin:14px 0 18px}
+/* The navigation chapter is a quick help: its grid at the reading size. */
+.atl .guide-article .help-grid{margin-top:22px}
+/* The navigation chapter's text at the reading size. */
+.atl .guide-article .help-grid p,.atl .guide-article .help-grid li{font-size:13px;line-height:1.8}
+/* While the chapter loads. */
+.atl .guide-wait{display:flex;justify-content:center;padding:48px 0}
+/* The foot of the chapter: its page, its neighbours, the printing. */
+.atl .guide-foot{display:grid;gap:14px;margin-top:4px}
+/* The open page button keeps its width. */
+.atl .guide-foot>.btn{justify-self:start}
+/* The previous and next chapters at the two ends of a line. */
+.atl .guide-pager{display:flex;gap:12px;flex-wrap:wrap}
+/* A neighbour: its direction small above its name, in the box of a button. */
+.atl .guide-pager a{display:flex;flex-direction:column;gap:3px;min-width:0;max-width:100%;padding:9px 13px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+/* The direction of a neighbour. */
+.atl .guide-pager small{font-size:12px;color:var(--muted)}
+/* The neighbour's name. */
+.atl .guide-pager span{font-weight:500}
+/* The next chapter at the right end. */
+.atl .guide-pager .guide-next{margin-left:auto;text-align:right}
+/* The printing, after the neighbours. */
+.atl .guide-print{justify-content:flex-end}
+/* The whole guide one chapter after the other, in the reading column's width. */
+.atl .guide-all-main{display:grid;gap:22px;max-width:780px;margin:0 auto;width:100%}
+/* The guide's search in the masthead: the mockup's search field, its results under it. */
+.atl .guide-search{position:relative;flex:0 1 420px;min-width:0;display:flex}
+/* The field takes the room the masthead leaves it. */
+.atl .guide-search .search{min-width:0}
+/* The results: the mockup's menu panel under the field, scrolled within the window. */
+.atl .guide-results{position:absolute;top:calc(100% + 8px);left:0;z-index:20;width:min(620px,calc(100vw - 32px));max-height:min(70dvh,560px);overflow:auto;background:var(--panel);border:1px solid var(--control);border-radius:6px;box-shadow:0 18px 50px color-mix(in srgb,var(--ink) 44%,transparent);padding:10px}
+/* The count of results and the no-result message, in the menu head's tone. */
+.atl .guide-results-count,.atl .guide-results-note{font-size:12px;color:var(--muted);padding:4px 8px 8px}
+/* A chapter's results under its name. */
+.atl .guide-results-group+.guide-results-group{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+/* The chapter's name, small and muted, as a group of the Modules menu. */
+.atl .guide-results-head{font-size:12px;font-weight:600;color:var(--muted);padding:6px 8px 2px}
+/* The results' list without its marks. */
+.atl .guide-results ul{list-style:none;margin:0;padding:0}
+/* A result: the palette's result, its title over its excerpt. */
+.atl .guide-result{width:100%;flex-direction:column;align-items:flex-start;gap:3px}
+/* The excerpt of a result. */
+.atl .guide-excerpt{font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+/* A term found: the warning's background under the text's colour, underlined by the warning's fill so it shows on every theme. */
+.atl mark.guide-hit{background:var(--warnbg);color:var(--text);box-shadow:inset 0 -2px 0 var(--warn-fill);border-radius:2px;padding:0 1px}
+/* The way back to the console keeps its words beside the search. */
+.atl .guide-back{flex-shrink:0}
+@media(max-width:800px){
+/* A phone: the way back to the console keeps its icon, its words for the screen reader. */
+.atl .guide-back .guide-back-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+/* A phone: the back button is a square target. */
+.atl .guide-back{width:40px;min-height:40px;padding:6px}
+/* A phone: the results take the window's width under the masthead. */
+.atl .guide-results{position:fixed;top:62px;left:8px;right:8px;width:auto;max-height:calc(100dvh - 76px)}
+/* A phone: one column, the contents being the selects above the chapter. */
+.atl .guide-layout{grid-template-columns:minmax(0,1fr)}
+/* A phone: the article gives the text its width. */
+.atl .guide-article{padding:20px 16px 24px}
+/* A phone: the reading size stays, sections a little closer. */
+.atl .guide-body h2{font-size:18px;margin-top:28px}
+/* A phone: the selects of chapters and sections follow each other closely. */
+.atl .guide-main{gap:12px}
+/* A phone: the page's stage starts closer to the masthead. */
+.atl .guide-stage{padding-top:14px}
+}
+@media print{
+/* Printed: the reading column alone, in the paper's colours, the page's frame and the console's chrome left out. */
+.atl.guide-app{display:block;height:auto;color-scheme:light;--text:CanvasText;--muted:CanvasText;--panel:Canvas;--bg:Canvas;--raised:Canvas;--line:GrayText;--accent:LinkText;background:Canvas;color:CanvasText}
+/* Printed: no masthead, contents, selects, foot nor notice. */
+.atl .guide-head,.atl .guide-toc,.atl .guide-jump,.atl .guide-foot,.atl .guide-skip,.atl .guide-article>.notice,.atl .guide-all-main>.notice{display:none!important}
+/* Printed: the column unrolls. */
+.atl .guide-scroll{overflow:visible}
+/* Printed: the layout is the reading column alone. */
+.atl .guide-layout{display:block}
+/* Printed: no padding around the column. */
+.atl .guide-stage{padding:0}
+/* Printed: the chapter without its panel's frame. */
+.atl .guide-article{border:0;padding:0;overflow:visible}
+/* Printed: each chapter of the whole guide starts a page. */
+.atl .guide-print-chapter+.guide-print-chapter{break-before:page}
+/* Printed: a heading stays with the text it opens. */
+.atl .guide-body h2,.atl .guide-body h3,.atl .guide-body h4{break-after:avoid}
+/* Printed: a table unrolls whole. */
+.atl .guide-body .compare-scroll{overflow:visible;max-height:none}
+}

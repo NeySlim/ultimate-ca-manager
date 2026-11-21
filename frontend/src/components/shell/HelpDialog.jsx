@@ -11,10 +11,11 @@ import { ModalActions, Notice } from '../atelier/Form'
 import { QuickHelp } from '../help/QuickHelp'
 import { mergeHelpContent } from '../help/content'
 import { guideHeadings, guideSections, renderMarkdown } from '../help/markdown'
-import { helpContent as defaultHelpData } from '../../data/helpContent'
-import { helpGuides as defaultHelpGuides } from '../../data/helpGuides'
+import { Icon } from '../atelier/Icon'
+import { useEnglishHelp } from '../../data/helpData'
 import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
 import { loadHelpPage } from '../../data/helpLoader'
+import { guideHref } from '../../navigation/guide'
 
 const sectionCache = {}
 // One translated page per language and page, loaded on demand; a superseded load never lands
@@ -48,34 +49,45 @@ function useHelpTranslation(lang, pageKey) {
 export function HelpDialog({ open, onClose, pageKey, returnTo }) {
   const { t, i18n } = useTranslation()
   const translation = useHelpTranslation(i18n.resolvedLanguage, open ? pageKey : null)
+  // The English help is its own chunk, loaded at the first opening
+  const english = useEnglishHelp(open)
+  const defaultHelpData = english?.helpContent
+  const defaultHelpGuides = english?.helpGuides
+  // The guide's section last reached from the contents line, carried by Open in a new tab
+  const [section, setSection] = useState(null)
+  useEffect(() => { setSection(null) }, [pageKey, open])
   const langKey = i18n.resolvedLanguage?.substring(0, 2)
   const englishNotice = !!langKey && langKey !== 'en' && !HELP_TRANSLATED_LANGUAGES.includes(langKey)
 
   const quick = useMemo(() => {
-    const en = pageKey ? defaultHelpData[pageKey] : null
+    const en = pageKey ? defaultHelpData?.[pageKey] : null
     return en ? mergeHelpContent(en, translation?.helpContent) : null
-  }, [pageKey, translation])
+  }, [pageKey, translation, defaultHelpData])
 
   const guide = useMemo(() => {
-    const en = pageKey ? defaultHelpGuides[pageKey] : null
+    const en = pageKey ? defaultHelpGuides?.[pageKey] : null
     if (!en) return null
     const tr = translation?.helpGuides
     return { ...en, title: tr?.title || en.title, content: tr?.content || en.content, english: en.content }
-  }, [pageKey, translation])
+  }, [pageKey, translation, defaultHelpGuides])
 
   if (!open || (!quick && !guide)) return null
   return (
     <AtelierDialog title={quick?.title || guide?.title || t('common.help')} subtitle={quick?.subtitle || undefined}
       size="wide" onClose={onClose} returnTo={returnTo} testId="help-dialog">
-      <HelpBody key={pageKey} pageKey={pageKey} quick={quick} guide={guide} englishNotice={englishNotice} />
+      <HelpBody key={pageKey} pageKey={pageKey} quick={quick} guide={guide} englishNotice={englishNotice} onSection={setSection} />
       <ModalActions>
+        {/* The whole guide in a page of its own, on this chapter and the section reached */}
+        <a className="btn" href={guideHref(pageKey, section)} target="_blank" rel="noopener" data-testid="help-open-guide">
+          <Icon name="expand" />{t('guide.openInTab')}
+        </a>
         <button type="button" className="btn primary" data-action="close-modal" onClick={onClose}>{t('help.back')}</button>
       </ModalActions>
     </AtelierDialog>
   )
 }
 
-function HelpBody({ pageKey, quick, guide, englishNotice }) {
+function HelpBody({ pageKey, quick, guide, englishNotice, onSection }) {
   const { t } = useTranslation()
   const [tab, setTab] = useState(guide ? 'guide' : 'quick')
   const [query, setQuery] = useState('')
@@ -97,13 +109,13 @@ function HelpBody({ pageKey, quick, guide, englishNotice }) {
           )}
         </Toolbar>
       )}
-      {tab === 'quick' ? <QuickHelp content={quick} /> : <GuideHelp chapter={pageKey} markdown={guide.content} english={guide.english} query={query} />}
+      {tab === 'quick' ? <QuickHelp content={quick} /> : <GuideHelp chapter={pageKey} markdown={guide.content} english={guide.english} query={query} onSection={onSection} />}
     </>
   )
 }
 
 // The guide under the dialog's own h2: `##` is an h3, `###` an h4, `####` an h5; ids from guideHeadings()
-function GuideHelp({ chapter, markdown, english, query }) {
+function GuideHelp({ chapter, markdown, english, query, onSection }) {
   const { t } = useTranslation()
   const sections = useMemo(() => guideSections(markdown), [markdown])
   const ids = useMemo(() => guideHeadings(chapter, markdown, english).map((h) => h.id), [chapter, markdown, english])
@@ -117,6 +129,8 @@ function GuideHelp({ chapter, markdown, english, query }) {
     const head = document.getElementById(id)
     head?.scrollIntoView({ block: 'start' })
     head?.focus({ preventScroll: true })
+    // A section without heading has no address in the guide
+    if (!id.startsWith('help-section-')) onSection?.(id)
   }
   return (
     <>
