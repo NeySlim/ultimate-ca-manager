@@ -8,15 +8,15 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Zone, Btn, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
+  Zone, Icon, Btn, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
   LoadError, LoadCause, EmptyBlock,
 } from '../components/atelier'
-import { Input, Select, FormModal } from '../components'
+import { Input, Select, FormModal } from '../components/atelier/Form'
 import { tsaService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
-import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
+import { withHiddenCas, pickOrToggle } from '../components/cas/hiddenCasOption'
 import { certificateLabel } from '../lib/utils'
 import { TSA_LABELS, findAlgorithm, groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
@@ -284,22 +284,23 @@ openssl ts -reply -in response.tsr -text`}</pre>
     <Zone dock={view === 'list' ? dock : null} after={generateOpen && genForm && (
       <FormModal open={generateOpen} onClose={() => setGenerateOpen(false)} title={t('tsa.signerGenerateTitle')}
         onSubmit={handleGenerateSigner} submitLabel={t('tsa.signerGenerate')} loading={generating}>
-        <p className="text-xs text-text-secondary">{t('tsa.signerGenerateModalDesc')}</p>
-        <div>
-          <Select label={t('tsa.signingCA')}
-            options={listedForIssuance(pickerCas(cas, genForm.ca_refid), showHiddenCas, genForm.ca_refid).map((ca) => ({ value: ca.refid || ca.id.toString(), label: ca.name || ca.subject }))}
-            value={genForm.ca_refid} onChange={(val) => setGenForm({ ...genForm, ca_refid: val })}
-            helperText={unlistedPickerCas(cas, genForm.ca_refid) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, genForm.ca_refid) }) : undefined} />
-          <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, genForm.ca_refid), genForm.ca_refid)} shown={showHiddenCas} onToggle={() => setShowHiddenCas((v) => !v)} />
-        </div>
-        <Input label={t('tsa.signerGenerateCn')} value={genForm.cn} onChange={(e) => setGenForm({ ...genForm, cn: e.target.value })} />
-        <Input label={t('tsa.signerGenerateValidity')} type="number" value={genForm.validity_days} onChange={(e) => setGenForm({ ...genForm, validity_days: e.target.value })} />
-        <Select label={t('tsa.signerGenerateKeyType')}
+        <p className="notice"><Icon name="help" /><span>{t('tsa.signerGenerateModalDesc')}</span></p>
+        <Select id="tsa-gen-ca" label={t('tsa.signingCA')} full
+          options={withHiddenCas(
+            listedForIssuance(pickerCas(cas, genForm.ca_refid), showHiddenCas, genForm.ca_refid).map((ca) => ({ value: ca.refid || ca.id.toString(), label: ca.name || ca.subject })),
+            { count: hiddenFromIssuance(pickerCas(cas, genForm.ca_refid), genForm.ca_refid), shown: showHiddenCas, t })}
+          value={genForm.ca_refid} onChange={pickOrToggle((val) => setGenForm({ ...genForm, ca_refid: val }), () => setShowHiddenCas((v) => !v))}
+          helperText={unlistedPickerCas(cas, genForm.ca_refid) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, genForm.ca_refid) }) : undefined} />
+        <Input id="tsa-gen-cn" label={t('tsa.signerGenerateCn')} value={genForm.cn} onChange={(e) => setGenForm({ ...genForm, cn: e.target.value })} />
+        <Input id="tsa-gen-days" label={t('tsa.signerGenerateValidity')} type="number" value={genForm.validity_days} onChange={(e) => setGenForm({ ...genForm, validity_days: e.target.value })} />
+        <Select id="tsa-gen-key" label={t('tsa.signerGenerateKeyType')} full
           options={groupedOptions(listAlgorithms({ labels: TSA_LABELS, generate: true, ...platform }), t, (k) => k.display)}
-          value={genForm.key_type} onChange={(val) => setGenForm({ ...genForm, key_type: val })} />
-        <BrainpoolNotice label={genForm.key_type} />
-        {findAlgorithm(genForm.key_type)?.family === 'ML-DSA' && <p className="text-xs text-text-secondary" role="note">{t('tsa.signerMldsaVerifyNote')}</p>}
-        <p className="text-xs text-text-tertiary">{t('tsa.signerGenerateRenewalNote')}</p>
+          value={genForm.key_type} onChange={(val) => setGenForm({ ...genForm, key_type: val })}
+          after={<>
+            <BrainpoolNotice atelier label={genForm.key_type} />
+            {findAlgorithm(genForm.key_type)?.family === 'ML-DSA' && <small role="note">{t('tsa.signerMldsaVerifyNote')}</small>}
+          </>} />
+        <p className="small muted field full">{t('tsa.signerGenerateRenewalNote')}</p>
       </FormModal>
     )}>
       <PageHead title="TSA" intent={t('shell.moduleDesc.tsa')}

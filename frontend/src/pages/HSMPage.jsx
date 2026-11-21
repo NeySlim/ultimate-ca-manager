@@ -10,11 +10,10 @@ import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
   Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch,
 } from '../components/atelier'
-import { FormModal, Input, Select, Textarea } from '../components'
+import { FormModal, Input, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { hsmService } from '../services'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { secretInputProps } from '../lib/secretTarget'
 import { KEY_GROUPS, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode, useKeyPlatform } from '../lib/policyAlgorithms'
@@ -505,58 +504,48 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
       onSubmit={() => onSave(buildPayload())}
       submitLabel={provider ? t('common.save') : t('common.create')}
     >
-      <div className="grid grid-cols-2 gap-4">
-        <Input label={t('common.providerName')} value={formData.name} onChange={e => handleChange('name', e.target.value)} required />
-        {!provider && (
-          <Select label={t('common.providerType')} value={formData.provider_type} onChange={value => handleChange('provider_type', value)} options={PROVIDER_TYPES} />
-        )}
-      </div>
+      <Input id="hsm-provider-name" label={t('common.providerName')} value={formData.name} onChange={e => handleChange('name', e.target.value)} required full={!!provider} data-autofocus="" />
+      {!provider && (
+        <Select id="hsm-provider-type" label={t('common.providerType')} value={formData.provider_type} onChange={value => handleChange('provider_type', value)} options={PROVIDER_TYPES} />
+      )}
 
       {formData.provider_type === 'pkcs11' && (
-        <div className="space-y-4">
+        <>
           {hsmStatus && !hsmStatus.ready && <Pkcs11Notice status={hsmStatus} />}
-          <Input label={t('hsm.pkcs11Config.libraryPath')} value={formData.pkcs11_library_path} onChange={e => handleChange('pkcs11_library_path', e.target.value)} placeholder={t('hsm.pkcs11Config.libraryPathPlaceholder')} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('hsm.pkcs11Config.slotId')} type="number" value={formData.pkcs11_slot_id} onChange={e => handleChange('pkcs11_slot_id', e.target.value ? parseInt(e.target.value) : '')} />
-            <Input label={t('hsm.pkcs11Config.tokenLabel')} value={formData.pkcs11_token_label} onChange={e => handleChange('pkcs11_token_label', e.target.value)} />
-          </div>
-          <Input label={t('hsm.pkcs11Config.pin')} type="password" noAutofill value={formData.pkcs11_pin === '***' ? '' : (formData.pkcs11_pin || '')} onChange={e => handleChange('pkcs11_pin', e.target.value)} hasExistingValue={provider?.pkcs11_pin === '***'} {...secretProps('pkcs11_pin')} />
-        </div>
+          <Input id="hsm-pkcs11-library" label={t('hsm.pkcs11Config.libraryPath')} full value={formData.pkcs11_library_path} onChange={e => handleChange('pkcs11_library_path', e.target.value)} placeholder={t('hsm.pkcs11Config.libraryPathPlaceholder')} />
+          <Input id="hsm-pkcs11-slot" label={t('hsm.pkcs11Config.slotId')} type="number" value={formData.pkcs11_slot_id} onChange={e => handleChange('pkcs11_slot_id', e.target.value ? parseInt(e.target.value) : '')} />
+          <Input id="hsm-pkcs11-token" label={t('hsm.pkcs11Config.tokenLabel')} value={formData.pkcs11_token_label} onChange={e => handleChange('pkcs11_token_label', e.target.value)} />
+          <SecretInput id="hsm-pkcs11-pin" label={t('hsm.pkcs11Config.pin')} full value={formData.pkcs11_pin === '***' ? '' : (formData.pkcs11_pin || '')} onChange={e => handleChange('pkcs11_pin', e.target.value)} hasExistingValue={provider?.pkcs11_pin === '***'} {...secretProps('pkcs11_pin')} />
+        </>
       )}
 
       {formData.provider_type === 'aws-cloudhsm' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('hsm.awsConfig.clusterId')} value={formData.aws_cluster_id} onChange={e => handleChange('aws_cluster_id', e.target.value)} />
-            <Input label={t('hsm.pkcs11Config.tokenLabel')} value={formData.pkcs11_token_label} onChange={e => handleChange('pkcs11_token_label', e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('hsm.awsConfig.cryptoUser')} value={formData.aws_crypto_user} onChange={e => handleChange('aws_crypto_user', e.target.value)} />
-            <Input label={t('hsm.awsConfig.cryptoPassword')} type="password" noAutofill value={formData.aws_crypto_password === '***' ? '' : (formData.aws_crypto_password || '')} onChange={e => handleChange('aws_crypto_password', e.target.value)} hasExistingValue={provider?.aws_crypto_password === '***'} {...secretProps('aws_crypto_password')} />
-          </div>
-        </div>
+        <>
+          <Input id="hsm-aws-cluster" label={t('hsm.awsConfig.clusterId')} value={formData.aws_cluster_id} onChange={e => handleChange('aws_cluster_id', e.target.value)} />
+          <Input id="hsm-aws-token" label={t('hsm.pkcs11Config.tokenLabel')} value={formData.pkcs11_token_label} onChange={e => handleChange('pkcs11_token_label', e.target.value)} />
+          <Input id="hsm-aws-user" label={t('hsm.awsConfig.cryptoUser')} value={formData.aws_crypto_user} onChange={e => handleChange('aws_crypto_user', e.target.value)} />
+          <SecretInput id="hsm-aws-password" label={t('hsm.awsConfig.cryptoPassword')} value={formData.aws_crypto_password === '***' ? '' : (formData.aws_crypto_password || '')} onChange={e => handleChange('aws_crypto_password', e.target.value)} hasExistingValue={provider?.aws_crypto_password === '***'} {...secretProps('aws_crypto_password')} />
+        </>
       )}
 
       {formData.provider_type === 'azure-keyvault' && (
-        <div className="space-y-4">
-          <Input label={t('hsm.azureConfig.vaultUrl')} value={formData.azure_vault_url} onChange={e => handleChange('azure_vault_url', e.target.value)} placeholder={t('hsm.azureConfig.vaultUrlPlaceholder')} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('hsm.azureConfig.tenantId')} value={formData.azure_tenant_id} onChange={e => handleChange('azure_tenant_id', e.target.value)} />
-            <Input label={t('common.clientId')} value={formData.azure_client_id} onChange={e => handleChange('azure_client_id', e.target.value)} />
-          </div>
-          <Input label={t('common.clientSecret')} type="password" noAutofill value={formData.azure_client_secret === '***' ? '' : (formData.azure_client_secret || '')} onChange={e => handleChange('azure_client_secret', e.target.value)} hasExistingValue={provider?.azure_client_secret === '***'} {...secretProps('azure_client_secret')} />
-        </div>
+        <>
+          <Input id="hsm-azure-vault" label={t('hsm.azureConfig.vaultUrl')} full value={formData.azure_vault_url} onChange={e => handleChange('azure_vault_url', e.target.value)} placeholder={t('hsm.azureConfig.vaultUrlPlaceholder')} />
+          <Input id="hsm-azure-tenant" label={t('hsm.azureConfig.tenantId')} value={formData.azure_tenant_id} onChange={e => handleChange('azure_tenant_id', e.target.value)} />
+          <Input id="hsm-azure-client" label={t('common.clientId')} value={formData.azure_client_id} onChange={e => handleChange('azure_client_id', e.target.value)} />
+          <SecretInput id="hsm-azure-secret" label={t('common.clientSecret')} full value={formData.azure_client_secret === '***' ? '' : (formData.azure_client_secret || '')} onChange={e => handleChange('azure_client_secret', e.target.value)} hasExistingValue={provider?.azure_client_secret === '***'} {...secretProps('azure_client_secret')} />
+        </>
       )}
 
       {formData.provider_type === 'google-kms' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('hsm.gcpConfig.projectId')} value={formData.gcp_project_id} onChange={e => handleChange('gcp_project_id', e.target.value)} />
-            <Input label={t('hsm.gcpConfig.location')} value={formData.gcp_location} onChange={e => handleChange('gcp_location', e.target.value)} />
-          </div>
-          <Input label={t('hsm.gcpConfig.keyRing')} value={formData.gcp_keyring} onChange={e => handleChange('gcp_keyring', e.target.value)} />
+        <>
+          <Input id="hsm-gcp-project" label={t('hsm.gcpConfig.projectId')} value={formData.gcp_project_id} onChange={e => handleChange('gcp_project_id', e.target.value)} />
+          <Input id="hsm-gcp-location" label={t('hsm.gcpConfig.location')} value={formData.gcp_location} onChange={e => handleChange('gcp_location', e.target.value)} />
+          <Input id="hsm-gcp-keyring" label={t('hsm.gcpConfig.keyRing')} full value={formData.gcp_keyring} onChange={e => handleChange('gcp_keyring', e.target.value)} />
           <Textarea
+            id="hsm-gcp-credentials"
             label={t('hsm.gcpConfig.credentialsJson')}
+            mono
             rows={4}
             value={formData.gcp_credentials_json === '***' ? '' : formData.gcp_credentials_json}
             onChange={e => handleChange('gcp_credentials_json', e.target.value || (provider?.gcp_credentials_json === '***' ? '***' : ''))}
@@ -571,26 +560,26 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
               label={t('hsm.gcpConfig.useDefaultCredentials')}
             />
           )}
-        </div>
+        </>
       )}
 
       {formData.provider_type === 'openbao' && (
-        <div className="space-y-4">
-          <Input label={t('hsm.openbaoConfig.url')} value={formData.openbao_url} onChange={e => handleChange('openbao_url', e.target.value)} placeholder="https://openbao.example.com:8200" required />
-          <Input label={t('hsm.openbaoConfig.token')} type="password" noAutofill value={formData.openbao_token === '***' ? '' : (formData.openbao_token || '')} onChange={e => handleChange('openbao_token', e.target.value)} hasExistingValue={provider?.openbao_token === '***'} {...secretProps('openbao_token')} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('hsm.openbaoConfig.mountPath')} value={formData.openbao_mount_path} onChange={e => handleChange('openbao_mount_path', e.target.value)} placeholder="transit" />
-            <Input label={t('hsm.openbaoConfig.namespace')} value={formData.openbao_namespace} onChange={e => handleChange('openbao_namespace', e.target.value)} placeholder={t('common.optional')} />
-          </div>
+        <>
+          <Input id="hsm-openbao-url" label={t('hsm.openbaoConfig.url')} full value={formData.openbao_url} onChange={e => handleChange('openbao_url', e.target.value)} placeholder="https://openbao.example.com:8200" required />
+          <SecretInput id="hsm-openbao-token" label={t('hsm.openbaoConfig.token')} full value={formData.openbao_token === '***' ? '' : (formData.openbao_token || '')} onChange={e => handleChange('openbao_token', e.target.value)} hasExistingValue={provider?.openbao_token === '***'} {...secretProps('openbao_token')} />
+          <Input id="hsm-openbao-mount" label={t('hsm.openbaoConfig.mountPath')} value={formData.openbao_mount_path} onChange={e => handleChange('openbao_mount_path', e.target.value)} placeholder="transit" />
+          <Input id="hsm-openbao-namespace" label={t('hsm.openbaoConfig.namespace')} value={formData.openbao_namespace} onChange={e => handleChange('openbao_namespace', e.target.value)} placeholder={t('common.optional')} />
           <ToggleSwitch
             checked={formData.openbao_tls_skip_verify}
             onChange={(val) => handleChange('openbao_tls_skip_verify', val)}
             label={t('hsm.openbaoConfig.tlsSkipVerify')}
           />
-        </div>
+        </>
       )}
 
       <Select
+        id="hsm-certification"
+        full
         label={t('hsm.certification.label')}
         value={formData.certification}
         onChange={value => handleChange('certification', value)}
@@ -651,24 +640,23 @@ export function KeyModal({ provider, onSave, onClose }) {
       onSubmit={handleSubmit}
       submitLabel={t('common.generate')}
     >
-      <Input label={t('hsm.keyLabel')} value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} required placeholder={t('hsm.keyLabelPlaceholder')} />
-      <div className="grid grid-cols-2 gap-4">
+      <Input id="hsm-key-label" label={t('hsm.keyLabel')} full value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} required placeholder={t('hsm.keyLabelPlaceholder')} data-autofocus="" />
         <Select
+          id="hsm-key-group"
           label={t('common.keyType')}
           value={formData.group}
           onChange={value => setFormData({ ...formData, group: value, algorithm: algorithmsOf(value)[0] })}
           options={groupOptions}
         />
         <Select
+          id="hsm-key-algorithm"
           label={t('common.keySize')}
           value={formData.algorithm}
           onChange={value => setFormData({ ...formData, algorithm: value })}
           options={algorithmsOf(formData.group).map(label => ({ value: label, label }))}
+          after={<><BrainpoolNotice atelier label={formData.algorithm} /><UntestedKeyNotice atelier label={formData.algorithm} provider={providerType} /></>}
         />
-      </div>
-      <BrainpoolNotice label={formData.algorithm} />
-      <UntestedKeyNotice label={formData.algorithm} provider={providerType} />
-      <Select label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'signing', label: t('hsm.purposes.caSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }, { value: 'wrapping', label: t('hsm.purposes.general') }, { value: 'all', label: t('common.all') }]} />
+      <Select id="hsm-key-purpose" full label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'signing', label: t('hsm.purposes.caSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }, { value: 'wrapping', label: t('hsm.purposes.general') }, { value: 'all', label: t('common.all') }]} />
     </FormModal>
   )
 }

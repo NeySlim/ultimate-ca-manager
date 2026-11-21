@@ -1,41 +1,12 @@
 /**
- * TemplatePreviewModal - Preview what a certificate would look like with this template
+ * TemplatePreviewModal: what a certificate issued from this template would carry, in the mockup's
+ * modal(): the notice, then the sample in the review-summary of the issue form (dl.props), its restrictions as pills.
  */
+import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Certificate, Eye, ShieldCheck, Key, Clock, Globe, ListBullets } from '@phosphor-icons/react'
-import { Modal } from './Modal'
-import { Badge } from './Badge'
-import { cn } from '../lib/utils'
+import { AtelierDialog, Icon, Pill } from './atelier'
 import { VALIDITY } from '../constants/config'
 import { algorithmName, findAlgorithm } from '../lib/keyAlgorithms'
-
-// Preview field component
-function PreviewField({ label, value, icon: Icon, mono = false, badge = false }) {
-  return (
-    <div className="flex items-start gap-3 py-2 border-b border-border-op30 last:border-0">
-      {Icon && (
-        <div className="w-6 h-6 rounded flex items-center justify-center icon-bg-blue shrink-0 mt-0.5">
-          <Icon size={14} className="text-accent-primary" />
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-text-secondary mb-0.5">{label}</div>
-        {badge ? (
-          <Badge variant={value === 'RSA' ? 'info' : value === 'EC' ? 'success' : 'default'} size="sm">
-            {value}
-          </Badge>
-        ) : (
-          <div className={cn(
-            "text-sm text-text-primary",
-            mono && "font-mono text-xs"
-          )}>
-            {value || '—'}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 const SAN_SAMPLES = {
   dns: 'DNS: server.example.com',
@@ -62,129 +33,52 @@ function SANPreview({ template, t }) {
 
 export function TemplatePreviewModal({ open, onClose, template }) {
   const { t } = useTranslation()
-  if (!template) return null
+  if (!open || !template) return null
 
   // Calculate sample validity dates
   const now = new Date()
   const validFrom = now.toISOString().split('T')[0]
   const validityDays = template.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS
   const validTo = new Date(now.getTime() + validityDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  
-  // Determine key info
+
   // A template stores a registry label ('RSA-2048', 'EC-P384', 'ML-DSA-65')
   const keyRow = findAlgorithm(template.key_type)
   const keyDisplay = keyRow ? algorithmName(keyRow, t) : (template.key_type || '—')
+  const list = (v) => (Array.isArray(v) ? v.join(', ') : v)
+  const rows = [
+    [t('templates.commonName'), template.default_cn || template.allow_any_cn ? 'your-common-name.domain.com' : t('templates.fixedCN')],
+    [t('templates.template'), template.name],
+    [t('common.keyAlgorithm'), keyDisplay],
+    [t('common.validityPeriod'), `${t('templates.validityDays', { count: validityDays })} (${validFrom} → ${validTo})`],
+    template.key_usage && [t('common.keyUsage'), list(template.key_usage)],
+    template.extended_key_usage && [t('common.extKeyUsage'), list(template.extended_key_usage)],
+    [t('common.subjectAltNames'), <span className="mono" style={{ whiteSpace: 'pre-line' }}>{SANPreview({ template, t })}</span>],
+  ].filter(Boolean)
+  const restricted = template.max_path_length !== undefined || template.require_cn || !template.allow_any_cn
 
   return (
-    <Modal open={open} onClose={onClose} size="lg">
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg icon-bg-purple flex items-center justify-center">
-              <Eye size={18} />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-text-primary">{t('templates.preview')}</h2>
-              <p className="text-xs text-text-secondary">{t('templates.previewFor')}: <strong>{template.name}</strong></p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary" aria-label={t('common.close')}>
-            <X size={18} />
-          </button>
-        </div>
-        
-        {/* Preview info banner */}
-        <div className="flex items-center gap-2 p-2 mb-4 rounded-lg bg-accent-primary-op10 border border-accent-primary-op20">
-          <Eye size={16} className="text-accent-primary" />
-          <span className="text-xs text-text-secondary">
-            {t('templates.previewDescription')}
-          </span>
-        </div>
-        
-        {/* Certificate preview card */}
-        <div className="border border-border rounded-lg overflow-hidden">
-          {/* Certificate header */}
-          <div className="bg-bg-tertiary px-4 py-3 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Certificate size={20} className="text-accent-primary" />
-              <span className="font-medium text-text-primary">{t('templates.sampleCertificate')}</span>
-              <Badge variant="success" size="sm">{t('common.valid')}</Badge>
-            </div>
-          </div>
-          
-          {/* Certificate fields */}
-          <div className="p-4 space-y-1">
-            <PreviewField 
-              icon={Certificate}
-              label={t('templates.commonName')}
-              value={template.default_cn || template.allow_any_cn ? 'your-common-name.domain.com' : t('templates.fixedCN')}
-            />
-            
-            <PreviewField 
-              icon={ShieldCheck}
-              label={t('templates.template')}
-              value={template.name} 
-            />
-            
-            <PreviewField 
-              icon={Key}
-              label={t('common.keyAlgorithm')}
-              value={keyDisplay}
-            />
-            
-            <PreviewField 
-              icon={Clock}
-              label={t('common.validityPeriod')}
-              value={`${t('templates.validityDays', { count: validityDays })} (${validFrom} → ${validTo})`}
-            />
-            
-            {template.key_usage && (
-              <PreviewField 
-                icon={ListBullets}
-                label={t('common.keyUsage')}
-                value={Array.isArray(template.key_usage) ? template.key_usage.join(', ') : template.key_usage} 
-              />
-            )}
-            
-            {template.extended_key_usage && (
-              <PreviewField 
-                icon={ListBullets}
-                label={t('common.extKeyUsage')}
-                value={Array.isArray(template.extended_key_usage) ? template.extended_key_usage.join(', ') : template.extended_key_usage} 
-              />
-            )}
-            
-            <PreviewField 
-              icon={Globe}
-              label={t('common.subjectAltNames')}
-              value={SANPreview({ template, t })}
-              mono
-            />
-          </div>
-          
-          {/* Template restrictions */}
-          {(template.max_path_length !== undefined || template.require_cn || !template.allow_any_cn) && (
-            <div className="px-4 py-3 bg-bg-tertiary border-t border-border">
-              <div className="text-xs font-medium text-text-secondary mb-2">{t('templates.restrictions')}</div>
-              <div className="flex flex-wrap gap-2">
-                {!template.allow_any_cn && (
-                  <Badge variant="warning" size="sm">{t('templates.fixedCN')}</Badge>
-                )}
-                {template.require_cn && (
-                  <Badge variant="info" size="sm">{t('templates.cnRequired')}</Badge>
-                )}
-                {template.max_path_length !== undefined && template.max_path_length >= 0 && (
-                  <Badge variant="default" size="sm">{t('common.pathLength')}: {template.max_path_length}</Badge>
-                )}
-                {template.basic_constraints === 'ca' && (
-                  <Badge variant="purple" size="sm">{t('common.caCertificate')}</Badge>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+    <AtelierDialog title={t('templates.preview')} subtitle={`${t('templates.previewFor')}: ${template.name}`} onClose={onClose} testId="template-preview-dialog">
+      <p className="notice"><Icon name="eye" /><span>{t('templates.previewDescription')}</span></p>
+      <div className="review-summary">
+        <h3>{t('templates.sampleCertificate')} <Pill tone="good" label={t('common.valid')} /></h3>
+        <dl className="props">
+          {rows.map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd>{v || '—'}</dd></Fragment>)}
+        </dl>
       </div>
-    </Modal>
+      {restricted && (
+        <section style={{ marginTop: 18 }}>
+          <h3 className="section-title">{t('templates.restrictions')}</h3>
+          <div className="ca-badges">
+            {!template.allow_any_cn && <Pill tone="warn" label={t('templates.fixedCN')} />}
+            {template.require_cn && <Pill tone="muted" label={t('templates.cnRequired')} />}
+            {template.max_path_length !== undefined && template.max_path_length >= 0 && <Pill tone="muted" label={`${t('common.pathLength')}: ${template.max_path_length}`} />}
+            {template.basic_constraints === 'ca' && <Pill tone="muted" label={t('common.caCertificate')} />}
+          </div>
+        </section>
+      )}
+      <div className="modal-actions">
+        <button type="button" className="btn primary" data-action="close-modal" data-write="false" onClick={onClose}>{t('common.close')}</button>
+      </div>
+    </AtelierDialog>
   )
 }

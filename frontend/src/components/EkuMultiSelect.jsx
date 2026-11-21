@@ -1,19 +1,20 @@
 /**
- * EkuMultiSelect — Pick well-known Extended Key Usage (EKU) OIDs from a
- * dropdown and/or enter custom dotted OIDs (RFC 5280 §4.2.1.12).
+ * EkuMultiSelect: the Extended Key Usage OIDs a signing adds (RFC 5280 §4.2.1.12), drawn as the
+ * issue form's EKU block: `fieldset.field.full`, the locked defaults and the added ones as
+ * `.eku-list` check lines (name and OID), a known EKU to add from a native list, a dotted OID typed
+ * in `.inline-row`, then the error and the count left.
  *
  * Props:
  *  - value:       array of dotted OID strings (currently selected extras)
  *  - onChange:    (newValue: string[]) => void
- *  - defaults:    array of dotted OID strings rendered as locked chips (cert_type defaults)
+ *  - defaults:    array of dotted OID strings the certificate type sets (shown ticked, locked)
  *  - knownEkus:   [{oid, name}] — catalogue from GET /api/v2/eku/known
  *  - max:         max total extras (default 16)
  *  - disabled
  */
-import { useMemo, useState } from 'react'
-import { Plus, X, Lock, WarningCircle } from '@phosphor-icons/react'
+import { useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button } from './Button'
+import { FieldError } from './atelier/SettingsView'
 
 const OID_REGEX = /^[0-2](?:\.(?:0|[1-9]\d*)){1,15}$/
 const ANY_EKU = '2.5.29.37.0'
@@ -27,9 +28,9 @@ export function EkuMultiSelect({
   disabled = false,
 }) {
   const { t } = useTranslation()
+  const id = useId().replace(/:/g, '')
   const [customOid, setCustomOid] = useState('')
   const [customError, setCustomError] = useState('')
-  const [picker, setPicker] = useState('')
 
   const oidToName = useMemo(() => {
     const m = {}
@@ -38,7 +39,6 @@ export function EkuMultiSelect({
   }, [knownEkus])
 
   const labelFor = (oid) => oidToName[oid] || oid
-
   const remaining = max - value.length
 
   const addOid = (oid) => {
@@ -46,9 +46,7 @@ export function EkuMultiSelect({
     if (!trimmed) return
     let resolved = trimmed
     // Allow entering a name from the catalogue
-    const byName = knownEkus.find(
-      (e) => e.name.toLowerCase() === trimmed.toLowerCase()
-    )
+    const byName = knownEkus.find((e) => e.name.toLowerCase() === trimmed.toLowerCase())
     if (byName) resolved = byName.oid
 
     if (!OID_REGEX.test(resolved)) {
@@ -72,128 +70,48 @@ export function EkuMultiSelect({
     setCustomError('')
   }
 
-  const removeOid = (oid) => {
-    onChange?.(value.filter((o) => o !== oid))
-  }
+  const removeOid = (oid) => onChange?.(value.filter((o) => o !== oid))
 
-  const handlePickerChange = (e) => {
-    const oid = e.target.value
-    setPicker('')
-    if (oid) addOid(oid)
-  }
-
-  const handleCustomKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      addOid(customOid)
-    }
-  }
-
-  // Filter out OIDs already locked or selected from the dropdown
-  const availableOptions = knownEkus.filter(
-    (e) => !defaults.includes(e.oid) && !value.includes(e.oid)
-  )
+  // The known EKUs not already locked or added
+  const availableOptions = knownEkus.filter((e) => !defaults.includes(e.oid) && !value.includes(e.oid))
 
   return (
-    <div className="ui-field">
-      <span className="ui-label">
-        {t('certificates.eku.title')}
-      </span>
-
-      {/* Locked defaults from cert_type */}
-      {defaults.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+    <fieldset className="field full" aria-describedby={`hint-${id}`}>
+      <legend>{t('certificates.eku.title')}</legend>
+      {(defaults.length > 0 || value.length > 0) && (
+        <div className="eku-list">
           {defaults.map((oid) => (
-            <span
-              key={oid}
-              className="ui-badge lv-pill is-muted is-chip"
-              title={`${labelFor(oid)} (${oid}): ${t('certificates.eku.defaultLocked')}`}
-            >
-              <Lock size={12} weight="fill" />
-              <span>{labelFor(oid)}</span>
-            </span>
+            // Set by the certificate type: shown ticked, it cannot be taken off (the API only adds)
+            <label className="checkbox-line" key={oid} title={t('certificates.eku.defaultLocked')}>
+              <input type="checkbox" checked readOnly aria-disabled="true" onClick={(e) => e.preventDefault()} />
+              <span>{labelFor(oid)}<small className="mono">{oid}</small></span>
+            </label>
           ))}
-        </div>
-      )}
-
-      {/* Selected extras */}
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
           {value.map((oid) => (
-            <span
-              key={oid}
-              className="lv-chip"
-              title={oid}
-            >
-              <span>{labelFor(oid)}</span>
-              {oidToName[oid] && (
-                <span className="text-text-tertiary font-mono">({oid})</span>
-              )}
-              <button
-                type="button"
-                onClick={() => removeOid(oid)}
-                disabled={disabled}
-                aria-label={t('common.remove')}
-              >
-                <X aria-hidden="true" />
-              </button>
-            </span>
+            <label className="checkbox-line" key={oid}>
+              <input type="checkbox" checked disabled={disabled} onChange={() => removeOid(oid)} />
+              <span>{labelFor(oid)}<small className="mono">{oid}</small></span>
+            </label>
           ))}
         </div>
       )}
-
-      {/* Add controls */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        {/* Native select keeps things simple and works with FormData-free state */}
-        <select
-          value={picker}
-          onChange={handlePickerChange}
-          disabled={disabled || remaining <= 0 || availableOptions.length === 0}
-          aria-label={t('certificates.eku.addKnown')}
-          className="ui-control flex-1"
-        >
-          <option value="">{t('certificates.eku.addKnown')}</option>
-          {availableOptions.map((e) => (
-            <option key={e.oid} value={e.oid}>
-              {e.name} ({e.oid})
-            </option>
-          ))}
-        </select>
-
-        <div className="flex flex-1 gap-2">
-          <input
-            type="text"
-            value={customOid}
-            onChange={(e) => {
-              setCustomOid(e.target.value)
-              if (customError) setCustomError('')
-            }}
-            onKeyDown={handleCustomKeyDown}
-            placeholder={t('certificates.eku.customPlaceholder')}
-            disabled={disabled || remaining <= 0}
-            aria-label={t('certificates.eku.customPlaceholder')}
-            className="ui-control flex-1 font-mono"
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => addOid(customOid)}
-            disabled={disabled || !customOid || remaining <= 0}
-            aria-label={t('common.add')}
-          >
-            <Plus aria-hidden="true" />
-          </Button>
-        </div>
+      <label className="sr-only" htmlFor={`${id}-known`}>{t('certificates.eku.addKnown')}</label>
+      <select id={`${id}-known`} value="" disabled={disabled || remaining <= 0 || availableOptions.length === 0}
+        onChange={(e) => { if (e.target.value) addOid(e.target.value) }}>
+        <option value="">{t('certificates.eku.addKnown')}</option>
+        {availableOptions.map((e) => <option key={e.oid} value={e.oid}>{e.name} ({e.oid})</option>)}
+      </select>
+      <div className="inline-row">
+        <label className="sr-only" htmlFor={`${id}-oid`}>{t('certificates.eku.customPlaceholder')}</label>
+        <input id={`${id}-oid`} className="mono" value={customOid} placeholder={t('certificates.eku.customPlaceholder')} autoComplete="off" spellCheck="false"
+          disabled={disabled || remaining <= 0} aria-invalid={customError ? 'true' : undefined} aria-describedby={customError ? `err-${id}` : undefined}
+          onChange={(e) => { setCustomOid(e.target.value); if (customError) setCustomError('') }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOid(customOid) } }} />
+        <button type="button" className="btn" disabled={disabled || !customOid || remaining <= 0 || undefined} onClick={() => addOid(customOid)}>{t('common.add')}</button>
       </div>
-
-      {customError && (
-        <p className="ui-error"><WarningCircle aria-hidden="true" />{customError}</p>
-      )}
-      <p className="ui-help">
-        {t('certificates.eku.helper', { remaining })}
-      </p>
-    </div>
+      {customError && <FieldError id={`err-${id}`} message={customError} />}
+      <small id={`hint-${id}`}>{t('certificates.eku.helper', { remaining })}</small>
+    </fieldset>
   )
 }
 

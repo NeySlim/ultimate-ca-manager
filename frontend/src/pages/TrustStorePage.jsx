@@ -9,17 +9,16 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ShieldCheck, CheckCircle, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Input, Modal } from '../components'
+import { Input } from '../components/atelier/Form'
 import {
-  Zone, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Props,
+  Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Props,
   LoadError, LoadCause, EmptyBlock, NoMatch,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
 import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals, usePersistedState } from '../hooks'
-import { cn, downloadBlob, warnSkippedExport } from '../lib/utils'
+import { downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { trustStoreExpiryStatus } from '../lib/expiry'
 import { runInBatches } from '../lib/bulkChunks'
@@ -288,110 +287,67 @@ export default function TrustStorePage() {
     }
   }
 
+  const addable = managedCAs.filter(ca => !ca.alreadyInTruststore)
   const dialogs = (
     <>
-      {/* Add from Managed CAs Modal */}
-      <Modal
-        open={modals.add}
-        onClose={() => closeModal('add')}
-        title={t('trustStore.addFromManagedCAs')}
-      >
-        <div className="p-4 space-y-4">
+      {/* Add from managed CAs: tick the CAs to trust, those already in the store stay ticked off */}
+      {modals.add && (
+        <AtelierDialog title={t('trustStore.addFromManagedCAs')} size="narrow" onClose={() => closeModal('add')} testId="truststore-add-dialog">
           {loadingCAs ? (
-            <div className="flex items-center justify-center py-8">
-              <ArrowsClockwise size={20} className="animate-spin text-text-tertiary" />
-            </div>
+            <p className="small muted" role="status">{t('common.loading')}</p>
           ) : managedCAs.length === 0 ? (
-            <p className="text-sm text-text-secondary text-center py-8">{t('trustStore.noManagedCAs')}</p>
+            <p className="event-detail">{t('trustStore.noManagedCAs')}</p>
           ) : (
             <>
-              <p className="text-sm text-text-secondary">{t('trustStore.selectCAsToAdd')}</p>
-              <div className="border border-border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border">
-                  <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedCAIds.length === managedCAs.filter(ca => !ca.alreadyInTruststore).length && selectedCAIds.length > 0}
-                      onChange={(e) => setSelectedCAIds(e.target.checked ? managedCAs.filter(ca => !ca.alreadyInTruststore).map(ca => ca.id) : [])}
-                      className="w-4 h-4 rounded border-border text-accent-primary"
-                    />
-                    {t('common.selectAll')} ({selectedCAIds.length}/{managedCAs.filter(ca => !ca.alreadyInTruststore).length})
+              <p className="muted" style={{ marginBottom: 14 }}>{t('trustStore.selectCAsToAdd')}</p>
+              <div className="columns-list" style={{ maxHeight: '45dvh', overflow: 'auto' }}>
+                <label className="checkbox-line">
+                  <input type="checkbox"
+                    checked={selectedCAIds.length === addable.length && selectedCAIds.length > 0}
+                    onChange={(e) => setSelectedCAIds(e.target.checked ? addable.map(ca => ca.id) : [])} />
+                  {t('common.selectAll')} ({selectedCAIds.length}/{addable.length})
+                </label>
+                {managedCAs.map(ca => (
+                  <label key={ca.id} className="checkbox-line">
+                    <input type="checkbox" checked={selectedCAIds.includes(ca.id)} disabled={ca.alreadyInTruststore}
+                      onChange={() => {
+                        if (ca.alreadyInTruststore) return
+                        setSelectedCAIds(prev => prev.includes(ca.id) ? prev.filter(id => id !== ca.id) : [...prev, ca.id])
+                      }} />
+                    <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                      {ca.descr || ca.common_name}{ca.organization && <span className="muted"> · {ca.organization}</span>}
+                    </span>
+                    <Pill tone="muted" icon="shield" label={ca.is_root ? 'Root' : 'Inter'} />
+                    {ca.alreadyInTruststore && <Pill tone="good" label={t('trustStore.alreadyInTruststore')} />}
                   </label>
-                </div>
-                <div className="max-h-64 overflow-y-auto divide-y divide-border">
-                  {managedCAs.map(ca => (
-                    <label key={ca.id} className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                      ca.alreadyInTruststore ? "opacity-50 cursor-not-allowed" : "hover:bg-bg-secondary cursor-pointer"
-                    )}>
-                      <input
-                        type="checkbox"
-                        checked={selectedCAIds.includes(ca.id)}
-                        onChange={() => {
-                          if (ca.alreadyInTruststore) return
-                          setSelectedCAIds(prev => prev.includes(ca.id) ? prev.filter(id => id !== ca.id) : [...prev, ca.id])
-                        }}
-                        disabled={ca.alreadyInTruststore}
-                        className="w-4 h-4 rounded border-border text-accent-primary shrink-0"
-                      />
-                      <ShieldCheck size={16} className={ca.is_root ? 'text-accent-primary shrink-0' : 'text-status-info shrink-0'} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate">{ca.descr || ca.common_name}</div>
-                        {ca.organization && <div className="text-xs text-text-tertiary truncate">{ca.organization}</div>}
-                      </div>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
-                        {ca.is_root ? 'Root' : 'Inter'}
-                      </span>
-                      {ca.alreadyInTruststore && (
-                        <CheckCircle size={16} weight="fill" className="text-status-success shrink-0" title={t('trustStore.alreadyInTruststore')} />
-                      )}
-                    </label>
-                  ))}
-                </div>
+                ))}
               </div>
             </>
           )}
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => closeModal('add')}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={handleAddFromCAs} disabled={adding || selectedCAIds.length === 0}>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={() => closeModal('add')}>{t('common.cancel')}</button>
+            <button type="button" className="btn primary" data-write="" onClick={handleAddFromCAs} disabled={adding || selectedCAIds.length === 0 || undefined}>
               {adding ? t('trustStore.adding') : t('trustStore.addSelected', { count: selectedCAIds.length })}
-            </Button>
+            </button>
           </div>
-        </div>
-      </Modal>
+        </AtelierDialog>
+      )}
 
-      {/* Sync from System Modal */}
-      <Modal
-        open={modals.sync}
-        onClose={() => closeModal('sync')}
-        title={t('trustStore.syncTitle')}
-      >
-        <form onSubmit={(e) => { e.preventDefault(); handleSyncFromSystem() }} className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">{t('trustStore.syncDescription')}</p>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">{t('trustStore.syncLimitLabel')}</label>
-            <Input
-              type="number"
-              min={1}
-              max={1000}
-              value={syncLimit}
-              onChange={(e) => setSyncLimit(e.target.value)}
-            />
-            <p className="text-xs text-text-tertiary">{t('trustStore.syncLimitHelp')}</p>
-          </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => closeModal('sync')}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" disabled={syncing}>
-              <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? t('trustStore.syncing') : t('trustStore.sync')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {/* Sync from the system store: how many CAs to take at most */}
+      {modals.sync && (
+        <AtelierDialog title={t('trustStore.syncTitle')} subtitle={t('trustStore.syncDescription')} size="narrow" onClose={() => closeModal('sync')} testId="truststore-sync-dialog">
+          <form onSubmit={(e) => { e.preventDefault(); handleSyncFromSystem() }}>
+            <div className="form-fields">
+              <Input id="truststore-sync-limit" label={t('trustStore.syncLimitLabel')} type="number" min={1} max={1000} short value={syncLimit}
+                onChange={(e) => setSyncLimit(e.target.value)} helperText={t('trustStore.syncLimitHelp')} data-autofocus="" />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={() => closeModal('sync')}>{t('common.cancel')}</button>
+              <button type="submit" className="btn primary" disabled={syncing || undefined}><Icon name="refresh" />{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</button>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
 
       {/* Smart Import Modal */}
       <SmartImportModal

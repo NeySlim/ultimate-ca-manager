@@ -29,8 +29,7 @@ describe('HSM provider', () => {
     await new Promise(r => setTimeout(r, 20))
     expect(onSave).not.toHaveBeenCalled()
 
-    // The modal renders in a portal
-    const token = document.querySelector('input[autocomplete="off"]')
+    const token = screen.getByLabelText('hsm.openbaoConfig.token')
     fireEvent.change(token, { target: { value: 'typed' } })
     expect(screen.queryByText(MESSAGE)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
@@ -101,7 +100,8 @@ describe('DNS provider', () => {
     const onSubmit = vi.fn()
     const { container } = render(<DnsProviderForm provider={PROVIDER} providerTypes={TYPES}
                                                   onSubmit={onSubmit} onCancel={() => {}} />)
-    const [server, key] = container.querySelectorAll('input[autocomplete="off"], input[autocomplete="new-password"]')
+    const server = screen.getByLabelText('Server URL')
+    const key = screen.getByLabelText('API Key')
     fireEvent.change(server, { target: { value: 'https://pdns.attacker.example' } })
     expect(screen.getByText(MESSAGE)).toBeInTheDocument()
     submit(container)

@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import { Button } from './Button'
 import { Badge } from './Badge'
-import { Modal } from './Modal'
+import { AtelierDialog } from './atelier/AtelierDialog'
 import { apiClient as api } from '../services'
 import { useNotification } from '../contexts/NotificationContext'
 import { formatDate } from '../lib/utils'
@@ -785,32 +785,22 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
 }
 
 /**
- * SmartImport Modal - wraps widget in a modal
+ * SmartImport Modal: the widget in the mockup's wide modal(). The widget keeps the product's own
+ * drawing (.atl-out): the mockup has no import screen, and the operations page shows it inline.
  */
 export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
   const { t } = useTranslation()
+  if (!isOpen) return null
   const handleComplete = (result) => {
     onImportComplete?.(result)
     onClose()
   }
-  
   return (
-    <Modal
-      open={isOpen}
-      onClose={onClose}
-      title={t('import.smartImport')}
-      size="lg"
-    >
-      <div className="p-4">
-        {/* Key forces remount when modal opens, resetting all state */}
-        <SmartImportWidget 
-          key={isOpen ? 'open' : 'closed'}
-          onImportComplete={handleComplete}
-          onCancel={onClose}
-          compact
-        />
+    <AtelierDialog title={t('import.smartImport')} size="wide" onClose={onClose} testId="smart-import-dialog">
+      <div className="atl-out">
+        <SmartImportWidget onImportComplete={handleComplete} onCancel={onClose} compact />
       </div>
-    </Modal>
+    </AtelierDialog>
   )
 }
 
