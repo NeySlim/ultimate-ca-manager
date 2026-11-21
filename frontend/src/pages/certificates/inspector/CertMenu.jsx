@@ -6,11 +6,11 @@
 import { useTranslation } from 'react-i18next'
 import { AtelierDialog, Icon } from '../../../components/atelier'
 
-/** items: [{ id, icon, label, onClick, danger?, write? }], already filtered by right and state. */
-export function CertMenu({ name, items, revoked, onClose }) {
+/** items: [{ id, icon, label, onClick, danger?, write? }], already filtered by right and state; `title` names another object's menu. */
+export function CertMenu({ title, name, items, revoked, onClose }) {
   const { t } = useTranslation()
   return (
-    <AtelierDialog title={t('inspector.cert.actionsTitle')} size="narrow" onClose={onClose} testId="inspector-actions-dialog">
+    <AtelierDialog title={title || t('inspector.cert.actionsTitle')} size="narrow" onClose={onClose} testId="inspector-actions-dialog">
       <p className="muted" style={{ marginBottom: 20 }}>{name}</p>
       <div className="columns-list">
         {items.map((a) => (

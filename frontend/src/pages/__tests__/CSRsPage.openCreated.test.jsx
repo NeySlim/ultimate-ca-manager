@@ -113,6 +113,7 @@ vi.mock('../../components/SmartImport', () => ({
 }))
 
 import CSRsPage from '../CSRsPage'
+import { openRow } from '../../test/atelierRows'
 
 const PENDING_CSR = { id: 11, common_name: 'pending.example.com', cn: 'pending.example.com', has_private_key: false }
 
@@ -171,19 +172,20 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
   const openSignModal = async () => {
     renderPage()
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    fireEvent.click(await screen.findByText('pending.example.com'))
+    await openRow('pending.example.com')
     fireEvent.click(await screen.findByText('csrs.sign'))
     await screen.findByText('csrs.signCSRDescription')
   }
 
 
+  // The sign dialog (on a phone the dock is a dialog too)
+  const signDialog = () => screen.getAllByRole('dialog').find((d) => within(d).queryByText('csrs.signCSRDescription'))
   const clickSignSubmit = () => {
-    const dialog = screen.getByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'common.signCSR' }))
+    fireEvent.click(within(signDialog()).getByRole('button', { name: 'common.signCSR' }))
   }
 
   const selectCA = async (user) => {
-    const dialog = screen.getByRole('dialog')
+    const dialog = signDialog()
     const trigger = dialog.querySelectorAll('[role="combobox"]')[0]
     await user.click(trigger)
     await user.click(await screen.findByRole('option', { name: 'CA 1' }))
@@ -207,7 +209,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     await selectCA(user)
 
     // Second combobox in the modal is the cert-type Select
-    const typeTrigger = screen.getByRole('dialog').querySelectorAll('[role="combobox"]')[1]
+    const typeTrigger = signDialog().querySelectorAll('[role="combobox"]')[1]
     await user.click(typeTrigger)
     await user.click(await screen.findByRole('option', { name: 'certificates.certTypes.intermediateCA' }))
 
@@ -248,7 +250,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     await openSignModal()
     await selectCA(user)
 
-    const dialog = screen.getByRole('dialog')
+    const dialog = signDialog()
     fireEvent.click(within(dialog).getByText('certificates.addSan'))
     fireEvent.change(within(dialog).getByPlaceholderText('admin@example.com'), {
       target: { value: 'jane@example.com' },
@@ -263,7 +265,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     await openSignModal()
     await selectCA(user)
 
-    const dialog = screen.getByRole('dialog')
+    const dialog = signDialog()
     fireEvent.click(within(dialog).getByText('certificates.addSan'))
     fireEvent.change(within(dialog).getByPlaceholderText('admin@example.com'), {
       target: { value: 'https://not-an-email.example' },
@@ -276,7 +278,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
   const openMscaSignModal = async () => {
     renderPage()
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    fireEvent.click(await screen.findByText('pending.example.com'))
+    await openRow('pending.example.com')
     fireEvent.click(await screen.findByText('csrs.sign'))
     fireEvent.click(await screen.findByText('msca.signMicrosoft'))
   }
@@ -291,11 +293,11 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     ] })
 
     await openMscaSignModal()
-    const connTrigger = screen.getByRole('dialog').querySelectorAll('[role="combobox"]')[0]
+    const connTrigger = signDialog().querySelectorAll('[role="combobox"]')[0]
     await user.click(connTrigger)
     await user.click(await screen.findByRole('option', { name: /MSCA1/ }))
 
-    await waitFor(() => expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'common.signCSR' })).not.toBeDisabled())
+    await waitFor(() => expect(within(signDialog()).getByRole('button', { name: 'common.signCSR' })).not.toBeDisabled())
     clickSignSubmit()
 
     await waitFor(() => expect(signCSR).toHaveBeenCalled())
@@ -311,11 +313,11 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     ] })
 
     await openMscaSignModal()
-    const connTrigger = screen.getByRole('dialog').querySelectorAll('[role="combobox"]')[0]
+    const connTrigger = signDialog().querySelectorAll('[role="combobox"]')[0]
     await user.click(connTrigger)
     await user.click(await screen.findByRole('option', { name: /MSCA1/ }))
 
-    await waitFor(() => expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'common.signCSR' })).not.toBeDisabled())
+    await waitFor(() => expect(within(signDialog()).getByRole('button', { name: 'common.signCSR' })).not.toBeDisabled())
     clickSignSubmit()
 
     await waitFor(() => expect(signCSR).toHaveBeenCalled())
@@ -363,9 +365,8 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     sign.mockResolvedValue({ data: { id: 401 } })
     renderPage()
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    // Mobile shows a tab menu first; "pending" opens the CSR list pane
-    fireEvent.click((await screen.findAllByText('common.pending')).at(-1))
-    fireEvent.click(await screen.findByText('pending.example.com'))
+    // The phone record opens the dock over the page
+    await openRow('pending.example.com')
     fireEvent.click(await screen.findByText('csrs.sign'))
     await screen.findByText('csrs.signCSRDescription')
     await selectCA(user)

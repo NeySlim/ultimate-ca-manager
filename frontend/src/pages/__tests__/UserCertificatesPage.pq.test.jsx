@@ -1,9 +1,10 @@
 /**
- * A user certificate with a post-quantum key: its export dialog greys out
- * PKCS#12 and JKS, and the mobile panel offers no PKCS#12 shortcut.
+ * A user certificate with a post-quantum key: the export dialog of its dock greys out
+ * PKCS#12 and JKS, on a computer as on a phone; an RSA key keeps them.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 
 const serviceMocks = vi.hoisted(() => ({
   getAll: vi.fn(), getStats: vi.fn(), getById: vi.fn(), export: vi.fn(), revoke: vi.fn(), delete: vi.fn(),
@@ -30,6 +31,9 @@ vi.mock('react-i18next', () => {
 })
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
+  useMobile: () => ({ isMobile: layout.isMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
+}))
+vi.mock('../../contexts/MobileContext', () => ({
   useMobile: () => ({ isMobile: layout.isMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 vi.mock('../../contexts/InspectorContext', () => ({
@@ -60,14 +64,19 @@ function serve(keyAlgorithm) {
   serviceMocks.getById.mockResolvedValue({ data: row(keyAlgorithm) })
 }
 
+const openExport = async () => {
+  render(<MemoryRouter><UserCertificatesPage /></MemoryRouter>)
+  fireEvent.click((await screen.findAllByRole('button', { name: 'pq-user@example.test' }))[0])
+  fireEvent.click(await screen.findByRole('button', { name: 'common.export' }))
+  await screen.findByText('PEM')
+}
+
 describe('user certificate with a post-quantum key', () => {
   beforeEach(() => { layout.isMobile = false })
 
   it('greys out PKCS#12 and JKS in the export dialog', async () => {
     serve('ML-DSA-65')
-    render(<UserCertificatesPage />)
-    fireEvent.click(await screen.findByTitle('common.export'))
-    await screen.findByText('PEM')
+    await openExport()
     expect(formatButton('PKCS#12')).toBeDisabled()
     expect(formatButton('JKS')).toBeDisabled()
     expect(formatButton('PEM')).toBeEnabled()
@@ -76,12 +85,10 @@ describe('user certificate with a post-quantum key', () => {
   it.each([
     ['ML-DSA-65', false],
     ['RSA', true],
-  ])('mobile panel for a %s key offers the PKCS#12 shortcut: %s', async (keyAlgorithm, offered) => {
+  ])('on a phone, a %s key offers PKCS#12: %s', async (keyAlgorithm, offered) => {
     layout.isMobile = true
     serve(keyAlgorithm)
-    render(<UserCertificatesPage />)
-    fireEvent.click((await screen.findAllByText('pq-user@example.test'))[0])
-    await screen.findByText('userCertificates.actions.exportPEM')
-    expect(!!screen.queryByText('userCertificates.actions.exportPKCS12')).toBe(offered)
+    await openExport()
+    expect(formatButton('PKCS#12').disabled).toBe(!offered)
   })
 })

@@ -115,7 +115,7 @@ describe('locale file guards', () => {
   const SAME_AS_ENGLISH = new Set([
   "ACL", "ACME", "AD", "AES", "API", "AWS CloudHSM", "Active Directory", "Active Directory, OpenLDAP",
   "Atelier", "Aurore", "Azure AD, Google, GitHub, OIDC", "Azure Key Vault", "Base DN", "Bind DN",
-  "Brainpool (RFC 5639)", "CA/Browser Forum", "CRL/OCSP", "CSR", "CSR PEM", "CT", "Common Criteria EAL 4+",
+  "Brainpool (RFC 5639)", "CA/Browser Forum", "CRL/OCSP", "CSR", "CSR PEM", "CSR-{{id}}", "CT", "Common Criteria EAL 4+",
   "DNS", "ECDSA P-256", "ECDSA P-384", "ECDSA P-521", "EST", "ETSI (EN 319 412)", "Ed25519", "Ed448",
   "EdDSA", "Entity ID", "GitHub", "Gmail", "Google Cloud KMS", "Google Workspace", "HSM",
   "HSTS (Strict Transport Security)", "HTML", "HTTP API", "HTTPS", "ID", "ISO 8601", "Intune",

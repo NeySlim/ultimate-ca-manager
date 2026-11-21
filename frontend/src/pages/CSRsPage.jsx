@@ -1,42 +1,43 @@
 /**
- * CSRs (Certificate Signing Requests) Page - With Pending/History Tabs
+ * CSRs: the mockup's csr module, a simplePage() list (Sujet, Demandeur, Clé, Déposée, État) with its
+ * one-object dock, on the server's two paged lists (pending, signed) as the state chips. What the
+ * product has more (generate, import, search and sort on the server, sign locally or through a
+ * Microsoft CA, the key, re-key, the PEM) takes the page head, the toolbar, the dock actions and
+ * its « ⋯ » menu, and a further dock tab.
  */
 import { showNotices } from '../lib/notices'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { 
-  FileText, Upload, SignIn, Trash, Download, 
-  Clock, Key, UploadSimple, CheckCircle, Warning,
-  ClockCounterClockwise, Certificate, Stamp, ClipboardText,
-  Plus, X, GlobeSimple, At, ArrowsClockwise
-} from '@phosphor-icons/react'
+import { FileText, SignIn, UploadSimple, ClipboardText, Plus, X, Certificate } from '@phosphor-icons/react'
 import {
-  Badge, Button, Modal, Input, Select, HelpCard, FileUpload, Textarea,
-  KeyIndicator, EkuMultiSelect
+  Button, Modal, Input, Select, FileUpload, Textarea, EkuMultiSelect
 } from '../components'
+import {
+  Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, LoadError, LoadCause,
+} from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
-import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { csrsService, casService, templatesService, mscaService, ekuService, certificatesService } from '../services'
+import { csrsService, casService, mscaService, ekuService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
-import { useMobile } from '../contexts/MobileContext'
-import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
+import { extractData, cn, downloadBlob } from '../lib/utils'
 import { getSanValidationError, sanRowsToPayload } from '../lib/sanValidate'
-import { daysSinceExpiry, expiryVariant, hasExpiry } from '../lib/expiry'
 import { VALIDITY } from '../constants/config'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { soleImported } from '../lib/importResult'
-import { CSRPanel } from '../components/detail/CSRPanel'
 import {
   CSR_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
-  groupedOptions, isUsable, keyAlgorithmLabel, listAlgorithms,
+  groupedOptions, isUsable, listAlgorithms,
 } from '../lib/keyAlgorithms'
+import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { issueWithSubjectOverride } from '../lib/uniqueSubject'
+import { dateOf } from './admin/adminDates'
+import { PemPanel } from './certificates/inspector/PemPanel'
+import { CertMenu } from './certificates/inspector/CertMenu'
 
 const DEFAULT_CSR_KEY_TYPE = findAlgorithm(CSR_LABELS[0]).csr
 
@@ -45,8 +46,8 @@ const csrKeyRow = (csr) => algorithmForKeyType(csr.key_type)
   || algorithmForKeyType([csr.key_algorithm, csr.key_size].filter(Boolean).join(' '))
 
 export default function CSRsPage() {
-  const { t } = useTranslation()
-  const { isMobile } = useMobile()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const navigate = useNavigate()
   const openEntity = useOpenEntity()
   const { showSuccess, showError, showInfo, showConfirm, showWarning } = useNotification()
@@ -57,12 +58,6 @@ export default function CSRsPage() {
   const canReadCertificates = hasPermission('read:certificates')
   const [searchParams, setSearchParams] = useSearchParams()
   const { modals, open: openModal, close: closeModal } = useModals(['upload', 'sign', 'generate'])
-  
-  // Tab definitions (inside component for translations)
-  const TABS = [
-    { id: 'pending', label: t('common.pending'), icon: Warning },
-    { id: 'history', label: t('common.history'), icon: ClockCounterClockwise }
-  ]
   
   // Tab state
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'pending')
@@ -79,6 +74,7 @@ export default function CSRsPage() {
   // Server-side sort; null = the API's default, newest first
   const [sort, setSort] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [cas, setCAs] = useState([])
   
   // Selection & modals
@@ -215,6 +211,7 @@ export default function CSRsPage() {
         searchValue ? fetchActive({ page: 1, per_page: 1 }) : null,
       ])
       if (seq !== listSeq.current) return
+      setLoadError(null)
       const filteredTotal = totalOf(activeRes)
       const activeAll = activeAllRes ? totalOf(activeAllRes) : filteredTotal
       const otherAll = totalOf(otherRes)
@@ -227,6 +224,7 @@ export default function CSRsPage() {
       if (page > lastPage) setPage(lastPage)
     } catch (error) {
       if (seq !== listSeq.current) return
+      setLoadError(error)
       showErrorRef.current(error.message || tRef.current('messages.errors.loadFailed.csrs'))
     } finally {
       if (seq === listSeq.current) setLoading(false)
@@ -309,7 +307,7 @@ export default function CSRsPage() {
   }, [selectedCsrId, activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCheckMscaStatus = async () => {
-    if (!mscaRequest) return
+    if (!mscaRequest || checkingMsca) return
     const csrId = selectedCsrId
     setCheckingMsca(true)
     try {
@@ -676,356 +674,8 @@ export default function CSRsPage() {
     setShowRekeyChoice(true)
   }
 
-  // Current data: the active tab's page, as the API returned it
-  const currentData = rows
-
-  // Stats
-  const stats = useMemo(() => [
-    { icon: Warning, label: t('common.pending'), value: pendingTotal, variant: 'warning' },
-    { icon: CheckCircle, label: t('csrs.signed'), value: historyTotal, variant: 'success' },
-    { icon: FileText, label: t('common.total'), value: pendingTotal + historyTotal, variant: 'primary' }
-  ], [pendingTotal, historyTotal, t])
-
-  // Pending table columns
-  const pendingColumns = useMemo(() => [
-    {
-      key: 'cn',
-      header: t('common.commonName'),
-      priority: 1,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
-            <FileText size={14} weight="duotone" />
-          </div>
-          <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
-          <KeyIndicator hasKey={row.has_private_key} size={14} />
-        </div>
-      ),
-      mobileRender: (val, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
-              <FileText size={14} weight="duotone" />
-            </div>
-            <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
-            <KeyIndicator hasKey={row.has_private_key} size={12} />
-          </div>
-          <Badge variant="warning" size="sm" dot>{t('common.pending')}</Badge>
-        </div>
-      )
-    },
-    {
-      key: 'organization',
-      header: t('common.organization'),
-      sortable: false, // not a stored column: the server cannot order by it
-      priority: 3,
-      hideOnMobile: true,
-      render: (val) => <span className="text-sm text-text-secondary">{val || '—'}</span>
-    },
-    {
-      key: 'created_at',
-      header: t('common.created'),
-      priority: 2,
-      render: (val) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">
-          {formatDate(val, 'short')}
-        </span>
-      )
-    },
-    {
-      key: 'key_type',
-      header: t('common.key'),
-      sortable: false, // key_algo is only stored once the request is signed
-      priority: 4,
-      hideOnMobile: true,
-      render: (val, row) => (
-        <span className="text-xs font-mono text-text-secondary">
-          {keyAlgorithmLabel(row.key_algorithm, t, row.security_level) || '—'} {row.key_size ? `(${row.key_size})` : ''}
-        </span>
-      )
-    }
-  ], [t])
-
-  // History table columns
-  const historyColumns = useMemo(() => [
-    {
-      key: 'cn',
-      header: t('common.commonName'),
-      priority: 1,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
-            <Certificate size={14} weight="duotone" />
-          </div>
-          <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
-          <KeyIndicator hasKey={row.has_private_key} size={14} />
-          {row.source === 'acme' && (
-            <Badge variant="info" size="sm">ACME</Badge>
-          )}
-          {row.source === 'scep' && (
-            <Badge variant="purple" size="sm">SCEP</Badge>
-          )}
-        </div>
-      ),
-      mobileRender: (val, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
-              <Certificate size={14} weight="duotone" />
-            </div>
-            <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
-            <KeyIndicator hasKey={row.has_private_key} size={12} />
-          </div>
-          <Badge variant="success" size="sm" dot>{t('csrs.signed')}</Badge>
-        </div>
-      )
-    },
-    {
-      key: 'signed_by',
-      header: t('common.signedBy'),
-      sortable: false, // resolved from the CA table per row
-      priority: 2,
-      hideOnMobile: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <Stamp size={14} className="text-accent-primary" />
-          <span className="text-sm text-text-primary truncate">{val || row.issuer_name || '—'}</span>
-        </div>
-      ),
-      mobileRender: (val, row) => (
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">CA:</span>
-          <span className="text-text-secondary truncate">{val || row.issuer_name || '—'}</span>
-        </div>
-      )
-    },
-    {
-      key: 'signed_at',
-      header: t('csrs.signed'),
-      priority: 3,
-      render: (val, row) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">
-          {formatDate(val || row.valid_from, 'short')}
-        </span>
-      )
-    },
-    {
-      key: 'valid_to',
-      header: t('common.expires'),
-      priority: 4,
-      hideOnMobile: true,
-      render: (val, row) => {
-        const days = row.days_remaining
-        if (!hasExpiry(days)) return <span className="text-text-tertiary">—</span>
-        return (
-          <Badge variant={expiryVariant(days)} size="sm">
-            {days <= 0
-              ? t('details.expiredDaysAgo', { count: daysSinceExpiry(days) })
-              : t('csrs.daysRemaining', { days })}
-          </Badge>
-        )
-      }
-    }
-  ], [t])
-
-  // Row actions for pending
-  const pendingRowActions = useCallback((row) => [
-    { label: t('csrs.downloadCSR'), icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'csr'}.csr`) },
-    ...(canExportKey && row.has_private_key ? [
-      { label: t('csrs.downloadKey'), icon: Key, onClick: () => handleDownloadKey(row) }
-    ] : []),
-    ...(canWrite('csrs') ? [
-      { label: t('csrs.sign'), icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }},
-      { label: t('csrs.rekey'), icon: ArrowsClockwise, onClick: () => handleRekey(row) }
-    ] : []),
-    ...(canDelete('csrs') ? [
-      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
-    ] : [])
-  ], [canWrite, canDelete, canExportKey, t])
-
-  // Row actions for history
-  const historyRowActions = useCallback((row) => [
-    ...(canReadCertificates ? [
-      { label: t('common.downloadCertificate'), icon: Download, onClick: () => handleDownloadCertificate(row) }
-    ] : []),
-    { label: t('csrs.downloadCSR'), icon: FileText, onClick: () => handleDownload(row.id, `${row.cn || 'csr'}.csr`) },
-    { label: t('common.viewInCertificates'), icon: Certificate, onClick: () => navigate(`/certificates?id=${row.id}`) },
-    ...(canWrite('csrs') && canReadCertificates ? [
-      { label: t('csrs.signAgain'), icon: SignIn, onClick: () => handleSignAgain(row) }
-    ] : []),
-    ...(canWrite('csrs') ? [
-      { label: t('csrs.rekey'), icon: ArrowsClockwise, onClick: () => handleRekey(row) }
-    ] : [])
-  ], [canWrite, canReadCertificates, t])
-
-  // Help content
-  const helpContent = (
-    <div className="space-y-4">
-      {/* Quick Stats */}
-      <div className="visual-section">
-        <div className="visual-section-header">
-          <FileText size={16} className="status-primary-text" />
-          {t('csrs.csrStatistics')}
-        </div>
-        <div className="visual-section-body">
-          <div className="quick-info-grid">
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-warning">{pendingTotal}</div>
-              <div className="help-stat-label">{t('common.pending')}</div>
-            </div>
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-success">{historyTotal}</div>
-              <div className="help-stat-label">{t('csrs.signed')}</div>
-            </div>
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-primary">{pendingTotal + historyTotal}</div>
-              <div className="help-stat-label">{t('common.total')}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <HelpCard title={t('common.aboutCSRs')} variant="info">
-        {t('csrs.aboutCSRsDescription')}
-      </HelpCard>
-      <HelpCard title={t('common.status')} variant="info">
-        <div className="space-y-1.5 mt-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm" dot>{t('common.pending')}</Badge>
-            <span className="text-xs">{t('csrs.pendingDescription')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm" dot>{t('csrs.signed')}</Badge>
-            <span className="text-xs">{t('csrs.signedDescription')}</span>
-          </div>
-        </div>
-      </HelpCard>
-      <HelpCard title={t('csrs.workflow')} variant="tip">
-        {t('csrs.workflowSteps')}
-      </HelpCard>
-    </div>
-  )
-
-  // Tabs with counts
-  const tabsWithCounts = TABS.map(tab => ({
-    ...tab,
-    count: tab.id === 'pending' ? pendingTotal : historyTotal
-  }))
-
-  return (
+  const dialogs = (
     <>
-      <ResponsiveLayout
-        title={t('common.csrs')}
-        subtitle={t('csrs.pendingSubtitle', { pending: pendingTotal, signed: historyTotal })}
-        icon={FileText}
-        stats={stats}
-        helpPageKey="csrs"
-        tabs={tabsWithCounts}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        tabLayout="sidebar"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <FileText size={24} className="text-text-tertiary" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('csrs.selectCSR')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedCSR}
-        onSlideOverClose={() => setSelectedCSR(null)}
-        slideOverTitle={activeTab === 'pending' ? t('common.csrDetails') : t('common.certificateDetails')}
-        slideOverContent={selectedCSR && (
-          activeTab === 'pending' ? (
-            <CSRDetailsPanel 
-              csr={selectedCSR}
-              canWrite={canWrite}
-              canDelete={canDelete}
-              onSign={() => openModal('sign')}
-              onCheckMsca={mscaRequest ? handleCheckMscaStatus : undefined}
-              checkingMsca={checkingMsca}
-              onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'csr'}.csr`)}
-              onDownloadKey={canExportKey && selectedCSR.has_private_key ? () => handleDownloadKey(selectedCSR) : undefined}
-              onDelete={() => handleDelete(selectedCSR.id)}
-              onUploadKey={() => setShowKeyModal(true)}
-              onRekey={canWrite('csrs') ? () => handleRekey(selectedCSR) : undefined}
-              t={t}
-            />
-          ) : (
-            <SignedCSRDetailsPanel 
-              cert={selectedCSR}
-              onDownload={canReadCertificates ? () => handleDownloadCertificate(selectedCSR) : undefined}
-              onDownloadCSR={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'csr'}.csr`)}
-              onSignAgain={canWrite('csrs') && canReadCertificates ? () => handleSignAgain(selectedCSR) : undefined}
-              onRekey={canWrite('csrs') ? () => handleRekey(selectedCSR) : undefined}
-              t={t}
-            />
-          )
-        )}
-      >
-        <ResponsiveDataTable
-          data={currentData.map(item => ({
-            ...item,
-            cn: item.common_name || item.cn || item.subject || t('common.unnamed')
-          }))}
-          columns={activeTab === 'pending' ? pendingColumns : historyColumns}
-          loading={loading}
-          selectedId={selectedCSR?.id}
-          onRowClick={(item) => item ? loadCSRDetails(item) : setSelectedCSR(null)}
-          searchable
-          searchPlaceholder={activeTab === 'pending' ? t('csrs.searchPending') : t('csrs.searchSigned')}
-          // Searched server-side across every page: no searchKeys, so the
-          // table does not filter the returned page a second time
-          externalSearch={searchInput}
-          onSearchChange={setSearchInput}
-          columnStorageKey={`ucm-csrs-${activeTab}-columns`}
-          densityStorageKey="ucm-csrs-density"
-          toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
-            isMobile ? (
-              <div className="flex gap-2">
-                <Button type="button" size="lg" onClick={() => openModal('generate')} className="w-11 h-11 p-0">
-                  <Plus size={22} weight="bold" />
-                </Button>
-                <Button type="button" size="lg" variant="secondary" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
-                  <UploadSimple size={22} weight="bold" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button type="button" size="sm" onClick={() => openModal('generate')}>
-                  <Plus size={14} weight="bold" />
-                  {t('csrs.generateCSR')}
-                </Button>
-                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
-                  <UploadSimple size={14} weight="bold" />
-                  {t('common.import')}
-                </Button>
-              </div>
-            )
-          )}
-          sortable
-          onSortChange={handleSortChange}
-          pagination={{
-            page,
-            total: listTotal,
-            perPage,
-            onChange: setPage,
-            onPerPageChange: (v) => { setPerPage(v); setPage(1) },
-          }}
-          emptyIcon={activeTab === 'pending' ? Warning : CheckCircle}
-          emptyTitle={activeTab === 'pending' ? t('csrs.noPendingCSRs') : t('csrs.noSignedCertificates')}
-          emptyDescription={activeTab === 'pending' 
-            ? t('csrs.uploadToStart') 
-            : t('csrs.signToSee')}
-          emptyAction={activeTab === 'pending' && canWrite('csrs') && (
-            <Button type="button" onClick={() => setShowImportModal(true)}>
-              <UploadSimple size={16} /> {t('csrs.importCSR')}
-            </Button>
-          )}
-        />
-      </ResponsiveLayout>
-
       {/* Upload CSR Modal */}
       <Modal
         open={modals.upload}
@@ -1503,11 +1153,160 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
       </Modal>
     </>
   )
-}
 
-// =============================================================================
-// CSR DETAILS PANEL (for pending CSRs)
-// =============================================================================
+  // The open request in the dock: what the list row holds, then its detail once read
+  const [section, setSection] = useState('overview')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const openCSR = (row) => {
+    if (row.id !== selectedCSR?.id) setSection('overview')
+    loadCSRDetails(row)
+  }
+  const signed = activeTab === 'history'
+  const csrName = (row) => t('csrs.module.name', { id: row.id })
+  const csrSubject = (row) => row.common_name || row.cn || row.subject || t('common.unnamed')
+  const csrRequester = (row) => row.requester || row.created_by || '—'
+  const csrKey = (row) => certificateKeyLabel(row) || '—'
+  const csrDate = (row) => dateOf(row.created_at, locale) || '—'
+  const csrPill = (row) => (row.status === 'Signed' || (signed && row.status !== 'Pending')
+    ? <Pill label={t('csrs.states.signed')} tone="good" />
+    : <Pill label={t('csrs.states.pending')} tone="warn" />)
+  const sortState = sort ? { key: sort.key, asc: sort.direction === 'asc' } : null
+  const onSort = (key) => handleSortChange(sort?.key === key
+    ? (sort.direction === 'asc' ? { key, direction: 'desc' } : null)
+    : { key, direction: 'asc' })
+  const pages = Math.max(1, Math.ceil(listTotal / perPage))
+  const first = listTotal ? (page - 1) * perPage + 1 : 0
+  const last = Math.min(listTotal, page * perPage)
+  const narrowed = Boolean(searchValue)
+  const write = canWrite('csrs')
+
+  const open = selectedCSR
+  const openSigned = open && (open.status === 'Signed' || signed)
+  const summary = open && (openSigned
+    ? t('csrs.module.signedSummary', { ca: open.signed_by || open.issuer_name || '—', date: dateOf(open.signed_at || open.valid_from, locale) || '—' })
+    : (open.descr || t('csrs.module.pendingSummary')))
+  const sans = open ? (open.sans?.length ? open.sans : (open.san_combined ? open.san_combined.split(',').map((s) => s.trim()).filter(Boolean) : [])) : []
+  const menuItems = open ? [
+    !openSigned && canExportKey && open.has_private_key && { id: 'key', icon: 'key', label: t('csrs.downloadKey'), onClick: () => handleDownloadKey(open) },
+    !openSigned && write && !open.has_private_key && { id: 'upload-key', icon: 'upload', label: t('csrs.uploadKey'), write: true, onClick: () => setShowKeyModal(true) },
+    !openSigned && canWrite('certificates') && mscaRequest && { id: 'msca', icon: 'refresh', label: t('msca.checkStatus'), write: true, onClick: handleCheckMscaStatus },
+    openSigned && { id: 'csr', icon: 'file', label: t('csrs.downloadCSR'), onClick: () => handleDownload(open.id, `${open.cn || 'csr'}.csr`) },
+    openSigned && canReadCertificates && { id: 'view', icon: 'cert', label: t('common.viewCertificate'), onClick: () => navigate(`/certificates?id=${open.id}`) },
+    openSigned && write && canReadCertificates && { id: 'sign-again', icon: 'stamp', label: t('csrs.signAgain'), write: true, onClick: () => handleSignAgain(open) },
+    write && { id: 'rekey', icon: 'refresh', label: t('csrs.rekey'), write: true, onClick: () => handleRekey(open) },
+    !openSigned && canDelete('csrs') && { id: 'delete', icon: 'close', label: t('common.delete'), danger: true, write: true, onClick: () => handleDelete(open.id) },
+  ].filter(Boolean) : []
+
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('common.csrs') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: csrName(open), icon: 'file' }]} onClose={() => setSelectedCSR(null)}>
+      <DockBody icon="file" title={csrName(open)} badge={csrPill(open)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: csrName(open) })}
+        sections={[['overview', t('atelier.overview')], ...(openSigned ? [] : [['pem', 'PEM']])]}
+        actions={<>
+          {openSigned ? (
+            canReadCertificates && <Btn icon="download" id="csr-download-cert" onClick={() => handleDownloadCertificate(open)}>{t('common.downloadCertificate')}</Btn>
+          ) : (
+            <>
+              <Btn icon="download" id="csr-download" onClick={() => handleDownload(open.id, `${open.cn || 'csr'}.csr`)}>{t('common.download')}</Btn>
+              {write && <Btn tone="primary" icon="stamp" id="csr-sign" onClick={() => openModal('sign')}>{t('csrs.sign')}</Btn>}
+            </>
+          )}
+          {menuItems.length > 0 && (
+            <IconBtn quiet icon="more" title={false} label={t('csrs.module.moreActions', { name: csrName(open) })} data-csr-menu={open.id} onClick={() => setMenuOpen(true)} />
+          )}
+        </>}>
+        {section === 'overview' && (
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('csrs.module.subject'), csrSubject(open)],
+                [t('csrs.module.requester'), csrRequester(open)],
+                [t('csrs.module.key'), csrKey(open)],
+                [t('csrs.module.submitted'), csrDate(open)],
+                [t('atelier.state'), csrPill(open)],
+                openSigned && [t('common.signedBy'), open.signed_by || open.issuer_name || '—'],
+                openSigned && [t('common.expires'), dateOf(open.valid_to, locale) || '—'],
+                openSigned && open.serial_number && [t('common.serial'), <span key="serial" className="mono">{serialHex(open.serial_number)}</span>],
+              ]} />
+            </Section>
+            <Section title={t('atelier.summary')}><p className="summary">{summary}</p></Section>
+            <Section title={t('common.subject')}>
+              <Props items={[
+                [t('common.organization'), open.organization || '—'],
+                [t('common.orgUnit'), open.organizational_unit || '—'],
+                [t('common.country'), open.country || '—'],
+                [t('common.state'), open.state || '—'],
+                [t('common.locality'), open.locality || '—'],
+                [t('common.email'), open.email || '—'],
+                [t('common.signature'), open.signature_algorithm || '—'],
+              ]} />
+            </Section>
+            <Section title={t('common.subjectAltNames')}>
+              {sans.length ? <ul className="record-list">{sans.map((s) => <li key={s}><div className="rl-main"><span className="mono">{s}</span></div></li>)}</ul>
+                : <p className="muted small">{t('csrs.module.noSans')}</p>}
+            </Section>
+          </div>
+        )}
+        {section === 'pem' && <PemPanel cert={open} />}
+      </DockBody>
+    </Dock>
+  )
+
+  const pendingEmpty = !signed
+  const emptyBlock = narrowed ? (
+    <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setSearchInput('')} />
+  ) : (
+    <EmptyBlock id="csrs" icon="file" title={pendingEmpty ? t('csrs.noPendingCSRs') : t('csrs.noSignedCertificates')}
+      text={pendingEmpty ? t('csrs.uploadToStart') : t('csrs.signToSee')}
+      action={pendingEmpty && write ? { label: t('csrs.importCSR'), icon: 'upload', onClick: () => setShowImportModal(true), write: true } : undefined} />
+  )
+
+  return (
+    <Zone dock={dock} testId="csrs-zone" after={<>
+      {menuOpen && open && <CertMenu title={t('csrs.module.actionsTitle')} name={csrName(open)} items={menuItems} onClose={() => setMenuOpen(false)} />}
+      {dialogs}
+    </>}>
+      <PageHead title={t('common.csrs')} total={t('csrs.module.unit', { count: pendingTotal + historyTotal })} intent={t('shell.moduleDesc.csrs')}
+        actions={write && <>
+          <Btn icon="upload" id="csr-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
+          <Btn tone="primary" icon="plus" id="csr-generate" onClick={() => openModal('generate')}>{t('csrs.generateCSR')}</Btn>
+        </>} />
+      <ListView label={t('common.csrs')} caption={t('csrs.module.caption')} icon="file" rows={rows} loading={loading}
+        filters={{
+          views: [
+            { id: 'pending', label: t('csrs.states.pending'), count: pendingTotal },
+            { id: 'history', label: t('csrs.states.signed'), count: historyTotal },
+          ],
+          active: activeTab, onChange: handleTabChange, label: t('csrs.module.filterByState'),
+        }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="csr-search" name="q" label={signed ? t('csrs.searchSigned') : t('csrs.searchPending')}
+              placeholder={signed ? t('csrs.searchSigned') : t('csrs.searchPending')} value={searchInput} onChange={setSearchInput} />
+          </Toolbar>
+        )}
+        title={csrName} status={csrPill} openedId={open?.id} onOpen={openCSR}
+        sort={sortState} onSort={onSort}
+        columns={[
+          { id: 'subject', label: t('csrs.module.subject'), cell: csrSubject, grow: true, sort: 'cn' },
+          { id: 'requester', label: t('csrs.module.requester'), cell: csrRequester },
+          { id: 'key', label: t('csrs.module.key'), cell: csrKey },
+          { id: 'submitted', label: t('csrs.module.submitted'), cell: csrDate, sort: 'created_at' },
+          { status: true },
+        ]}
+        error={loadError && (
+          <LoadError id="csrs" title={t('messages.errors.loadFailed.csrs')} onRetry={loadLists}
+            cause={<LoadCause error={{ status: loadError.status, request: loadError.status && `GET /api/v2/${signed ? 'csrs/history' : 'csrs'}`, message: loadError.message }} />} />
+        )}
+        empty={emptyBlock}
+        footer={{
+          range: t('csrs.module.range', { start: first, end: last, count: listTotal }),
+          pagination: { page, pages, perPage, onPage: setPage, onPerPage: (v) => { setPerPage(v); setPage(1) } },
+        }} />
+    </Zone>
+  )
+}
 
 const SAN_PLACEHOLDERS = {
   DNS: 'example.com', IP: '10.0.0.1', Email: 'admin@example.com',
@@ -1546,89 +1345,5 @@ function SanRows({ rows, onChange, types, allowEmpty = false, t }) {
         <Plus size={14} /> {t('certificates.addSan')}
       </Button>
     </div>
-  )
-}
-
-function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onCheckMsca, checkingMsca, onDownload, onDownloadKey, onDelete, onUploadKey, onRekey, t }) {
-  return (
-    <CSRPanel csr={csr}>
-      {/* Actions */}
-      <div className="flex gap-2 flex-wrap">
-        <Button type="button" size="sm" variant="secondary" onClick={onDownload}>
-          <Download size={14} /> {t('common.download')}
-        </Button>
-        {onDownloadKey && (
-          <Button type="button" size="sm" variant="secondary" onClick={onDownloadKey}>
-            <Key size={14} /> {t('csrs.downloadKey')}
-          </Button>
-        )}
-        {canWrite('csrs') && !csr.has_private_key && (
-          <Button type="button" size="sm" variant="secondary" onClick={onUploadKey}>
-            <UploadSimple size={14} /> {t('csrs.uploadKey')}
-          </Button>
-        )}
-        {canWrite('csrs') && (
-          <Button type="button" size="sm" onClick={onSign}>
-            <SignIn size={14} /> {t('csrs.sign')}
-          </Button>
-        )}
-        {canWrite('certificates') && onCheckMsca && (
-          <Button type="button" size="sm" variant="secondary" onClick={onCheckMsca} disabled={checkingMsca}>
-            <ArrowsClockwise size={14} /> {t('msca.checkStatus')}
-          </Button>
-        )}
-        {canWrite('csrs') && onRekey && (
-          <Button type="button" size="sm" variant="secondary" onClick={onRekey}>
-            <ArrowsClockwise size={14} /> {t('csrs.rekey')}
-          </Button>
-        )}
-        {canDelete('csrs') && (
-          <Button type="button" size="sm" variant="danger" onClick={onDelete}>
-            <Trash size={14} />
-          </Button>
-        )}
-      </div>
-    </CSRPanel>
-  )
-}
-
-// =============================================================================
-// SIGNED CSR DETAILS PANEL (for history)
-// =============================================================================
-
-function SignedCSRDetailsPanel({ cert, onDownload, onDownloadCSR, onSignAgain, onRekey, t }) {
-  const navigate = useNavigate()
-  return (
-    <CSRPanel csr={cert} variant="signed">
-      {/* Actions */}
-      <div className="flex gap-2 flex-wrap">
-        {onDownload && (
-          <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
-            <Download size={14} /> {t('common.downloadCertificate')}
-          </Button>
-        )}
-        <Button type="button" size="sm" variant="secondary" onClick={onDownloadCSR}>
-          <FileText size={14} /> {t('csrs.downloadCSR')}
-        </Button>
-        {onSignAgain && (
-          <Button type="button" size="sm" variant="secondary" onClick={onSignAgain}>
-            <SignIn size={14} /> {t('csrs.signAgain')}
-          </Button>
-        )}
-        <Button 
-          type="button"
-          size="sm" 
-          variant="secondary"
-          onClick={() => navigate(`/certificates?id=${cert.id}`)}
-        >
-          <Certificate size={14} /> {t('common.viewCertificate')}
-        </Button>
-        {onRekey && (
-          <Button type="button" size="sm" variant="secondary" onClick={onRekey}>
-            <ArrowsClockwise size={14} /> {t('csrs.rekey')}
-          </Button>
-        )}
-      </div>
-    </CSRPanel>
   )
 }

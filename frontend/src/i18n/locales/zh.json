@@ -1636,7 +1636,29 @@
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
-    "keyCurveNistP521": "NIST P-521 (ECDSA)"
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "states": {
+      "pending": "待处理",
+      "signed": "已签名"
+    },
+    "module": {
+      "name": "CSR-{{id}}",
+      "unit_one": "{{count, number}} 个请求",
+      "unit_other": "{{count, number}} 个请求",
+      "range_one": "{{start}}–{{end}} / 共 {{count, number}} 个请求",
+      "range_other": "{{start}}–{{end}} / 共 {{count, number}} 个请求",
+      "caption": "签名请求。激活名称以打开其详情。",
+      "filterByState": "按状态筛选",
+      "subject": "主题",
+      "requester": "申请人",
+      "key": "密钥",
+      "submitted": "提交时间",
+      "pendingSummary": "等待签名。",
+      "signedSummary": "由 {{ca}} 于 {{date}} 签名。",
+      "noSans": "无备用名称。",
+      "moreActions": "{{name}} 的其他操作",
+      "actionsTitle": "请求操作"
+    }
   },
   "templates": {
     "template": "模板",
@@ -1793,7 +1815,37 @@
     "activate": "激活",
     "activated": "模板已激活",
     "deactivated": "模板已停用",
-    "deactivateTooltip": "已停用的模板不会出现在签发证书表单中，也不会提供给 Windows 自动注册。系统模板可以停用，但不能编辑：请复制一份来修改。"
+    "deactivateTooltip": "已停用的模板不会出现在签发证书表单中，也不会提供给 Windows 自动注册。系统模板可以停用，但不能编辑：请复制一份来修改。",
+    "module": {
+      "states": {
+        "active": "启用",
+        "inactive": "停用"
+      },
+      "validity": "{{count, number}} 天",
+      "defaultKey": "默认密钥",
+      "uses": "使用次数",
+      "markers": "标记",
+      "noDescription": "无描述。",
+      "preview": "详细预览",
+      "duplicate": "复制",
+      "moreActions": "{{name}} 的其他操作",
+      "actionsTitle": "模板操作",
+      "sections": {
+        "subject": "主题",
+        "extensions": "扩展",
+        "rules": "主题规则"
+      },
+      "sanTypes": "SAN 类型",
+      "none": "无",
+      "unit_one": "{{count, number}} 个模板",
+      "unit_other": "{{count, number}} 个模板",
+      "range_one": "{{shown}} / 共 {{count, number}} 个模板",
+      "range_other": "{{shown}} / 共 {{count, number}} 个模板",
+      "caption": "模板。激活名称以打开其详情。",
+      "filterByState": "按状态筛选",
+      "usesCount_one": "{{count, number}} 个证书",
+      "usesCount_other": "{{count, number}} 个证书"
+    }
   },
   "users": {
     "securityKeys": {
@@ -2943,7 +2995,30 @@
     "allStatuses": "所有状态",
     "expiringSoon": "即将过期",
     "trustStoreExpiring": "信任存储即将过期",
-    "trustStoreExpiringDesc": "{{count}}个受信任的证书将在{{days}}天内过期"
+    "trustStoreExpiringDesc": "{{count}}个受信任的证书将在{{days}}天内过期",
+    "module": {
+      "states": {
+        "valid": "有效",
+        "expiring": "即将过期",
+        "expired": "已过期"
+      },
+      "subject": "主题",
+      "usage": "用途",
+      "expires": "到期",
+      "sections": {
+        "details": "详情"
+      },
+      "noNotes": "无备注。",
+      "unit_one": "{{count, number}} 个信任锚",
+      "unit_other": "{{count, number}} 个信任锚",
+      "range_one": "{{shown}} / 共 {{count, number}} 个信任锚",
+      "range_other": "{{shown}} / 共 {{count, number}} 个信任锚",
+      "selected_one": "已选择 {{count, number}} 个信任锚",
+      "selected_other": "已选择 {{count, number}} 个信任锚",
+      "caption": "Trust Store。激活名称以打开其详情。",
+      "filterByState": "按状态筛选",
+      "filterByType": "按类型筛选"
+    }
   },
   "importExport": {
     "subtitle": "传输证书和 CA",
@@ -6370,7 +6445,27 @@
     "deleteDescription": "确定要永久删除 {{name}} 吗？此操作无法撤消。",
     "deleteSuccess": "证书删除成功",
     "deleteFailed": "证书删除失败",
-    "exportError": "证书导出失败"
+    "exportError": "证书导出失败",
+    "module": {
+      "description": "描述",
+      "expires": "到期",
+      "usage": "有效期与使用",
+      "inspect": "查看证书",
+      "moreActions": "{{name}} 的其他操作",
+      "actionsTitle": "证书操作",
+      "exportList": "导出列表",
+      "exportScope_one": "{{count, number}} 个证书，按当前搜索和筛选（最多 10,000 个）。",
+      "exportScope_other": "{{count, number}} 个证书，按当前搜索和筛选（最多 10,000 个）。",
+      "format_csv": "每个证书一行",
+      "format_json": "结构化数据",
+      "unit_one": "{{count, number}} 个证书",
+      "unit_other": "{{count, number}} 个证书",
+      "range_one": "{{start}}–{{end}} / 共 {{count, number}} 个证书",
+      "range_other": "{{start}}–{{end}} / 共 {{count, number}} 个证书",
+      "caption": "用户证书。激活名称以打开其详情。",
+      "filterByState": "按状态筛选",
+      "orphan": "无证书"
+    }
   },
   "est": {
     "title": "EST协议",

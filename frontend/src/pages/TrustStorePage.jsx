@@ -1,37 +1,45 @@
 /**
- * Trust Store Management Page
- * Manage trusted CA certificates for chain validation
- * Uses ResponsiveLayout for unified UI
+ * Trust Store: the mockup's truststore module, a simplePage() list (Sujet, Usage, Expiration, État)
+ * with its one-object dock, on the server's trust anchors; the usage is the anchor's description.
+ * What the product has more (its type, search and type filter, sort, the selection and its bulk
+ * deletion, the bundle export, the system sync, import, adding managed CAs, export and deletion,
+ * the technical details and the PEM) takes the page head, the toolbar, the batch bar, the dock
+ * actions and further dock tabs.
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
-import { 
-  ShieldCheck, Plus, Trash, Download, Certificate, 
-  CheckCircle, Warning, UploadSimple, ArrowsClockwise
-} from '@phosphor-icons/react'
+import { ShieldCheck, CheckCircle, ArrowsClockwise } from '@phosphor-icons/react'
+import { Button, Input, Modal } from '../components'
 import {
-  Button, Input, Badge, Modal, Textarea, HelpCard,
-  FormSelect
-} from '../components'
+  Zone, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Props,
+  LoadError, LoadCause, EmptyBlock, NoMatch,
+} from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
-import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
-import { formatDate, cn, downloadBlob, warnSkippedExport, daysRemaining } from '../lib/utils'
+import { cn, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
-import { TRUST_STORE_EXPIRY_WINDOW_DAYS, expiryBucket, trustStoreExpiryStatus } from '../lib/expiry'
+import { trustStoreExpiryStatus } from '../lib/expiry'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import { TrustCertPanel } from '../components/detail/TrustCertPanel'
+import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
+import { dateOf, dateTimeOf } from './admin/adminDates'
+import { PemPanel } from './certificates/inspector/PemPanel'
+
+// The anchor types the server stores (purpose), in the order of the type filter
+const PURPOSES = ['root_ca', 'intermediate_ca', 'client_auth', 'code_signing', 'system', 'custom']
+const PURPOSE_LABELS = {
+  root_ca: 'common.rootCA', intermediate_ca: 'common.intermediate', client_auth: 'trustStore.clientAuth',
+  code_signing: 'common.codeSigning', system: 'common.system', custom: 'common.custom',
+}
 
 export default function TrustStorePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
-  const { isMobile } = useMobile()
   const openEntity = useOpenEntity()
   const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
@@ -39,15 +47,19 @@ export default function TrustStorePage() {
   
   const [loading, setLoading] = useState(true)
   const [certificates, setCertificates] = useState([])
-  const [certStats, setCertStats] = useState({ total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
+  const [loadError, setLoadError] = useState(null)
   const [selectedCert, setSelectedCert] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncLimit, setSyncLimit] = useState(500)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [filterPurpose, setFilterPurpose] = usePersistedState('ucm-filter-truststore-purpose', [])
-  const [filterExpiryStatus, setFilterExpiryStatus] = usePersistedState('ucm-filter-truststore-expiry', [])
+  // The search, the type and state filters (kept), the sort and the open dock tab
+  const [query, setQuery] = useState('')
+  const [purpose, setPurpose] = usePersistedState('ucm-truststore-type', '')
+  const [state, setState] = usePersistedState('ucm-truststore-state', '')
+  const [sort, setSort] = useState({ key: 'name', asc: true })
+  const [section, setSection] = useState('overview')
   
   // Add from managed CAs modal state
   const [managedCAs, setManagedCAs] = useState([])
@@ -59,11 +71,9 @@ export default function TrustStorePage() {
   // re-subscribing on every render.
   const loadCertificates = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
-      const [certsRes, statsRes] = await Promise.all([
-        truststoreService.getAll(),
-        truststoreService.getStats()
-      ])
+      const certsRes = await truststoreService.getAll()
       const rawCerts = certsRes.data || []
       // Same buckets as the export's expiry filter (api/v2/truststore)
       const enrichedCerts = rawCerts.map(c => ({
@@ -71,8 +81,8 @@ export default function TrustStorePage() {
         _expiry_status: trustStoreExpiryStatus(c.not_after)
       }))
       setCertificates(enrichedCerts)
-      setCertStats(statsRes.data || { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
     } catch (error) {
+      setLoadError(error)
       showError(error.message || t('messages.errors.loadFailed.truststore'))
     } finally {
       setLoading(false)
@@ -94,47 +104,41 @@ export default function TrustStorePage() {
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [loadCertificates])
 
+  // The search and the type filter, then the state chip and the sort
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return certificates.filter((c) => (!purpose || c.purpose === purpose)
+      && (!q || [c.name, c.subject, c.issuer, c.purpose, c.description].some((v) => String(v || '').toLowerCase().includes(q))))
+  }, [certificates, purpose, query])
   const filteredCertificates = useMemo(() => {
-    let result = certificates
-    if (filterPurpose.length > 0) {
-      result = result.filter(c => filterPurpose.includes(c.purpose))
-    }
-    if (filterExpiryStatus.length > 0) {
-      result = result.filter(c => filterExpiryStatus.includes(c._expiry_status))
-    }
-    return result
-  }, [certificates, filterPurpose, filterExpiryStatus])
+    const value = { name: (c) => String(c.name || '').toLowerCase(), not_after: (c) => c.not_after || '' }[sort.key]
+    return searched.filter((c) => !state || (c._expiry_status || 'valid') === state).sort((a, b) => {
+      const va = value(a)
+      const vb = value(b)
+      return (va < vb ? -1 : va > vb ? 1 : 0) * (sort.asc ? 1 : -1)
+    })
+  }, [searched, state, sort])
 
+  // The list row holds the anchor; its detail completes it once read
   const handleSelectCert = async (cert) => {
-    // Desktop: inspector
-    if (!isMobile) {
-      openEntity('truststore', cert.id)
-      return
-    }
-    // Mobile: slide-over
+    if (cert.id !== selectedCert?.id) setSection('overview')
+    if (cert.name) setSelectedCert(cert)
     try {
       const response = await truststoreService.getById(cert.id)
-      setSelectedCert(response.data || cert)
-    } catch (error) {
-      setSelectedCert(cert)
+      setSelectedCert((prev) => ({ ...(prev?.id === cert.id ? prev : {}), ...(response.data || cert) }))
+    } catch {
+      if (!cert.name) setSelectedCert(null)
     }
   }
 
-  // Deep-link: auto-select cert from URL param /truststore/:id
+  // Deep-link: /truststore/:id opens that anchor, even one the filters hide
   useEffect(() => {
-    // The row may be filtered out of the list: the detail is fetched by id
     if (urlCertId && !loading) {
       const id = parseInt(urlCertId, 10)
-      if (!isNaN(id)) {
-        if (!isMobile) {
-          openEntity('truststore', id)
-        } else {
-          handleSelectCert({ id })
-        }
-        navigate('/truststore', { replace: true })
-      }
+      if (!isNaN(id)) handleSelectCert(certificates.find((c) => c.id === id) || { id })
+      navigate('/truststore', { replace: true })
     }
-  }, [urlCertId, loading])
+  }, [urlCertId, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadManagedCAs = async () => {
     setLoadingCAs(true)
@@ -150,13 +154,6 @@ export default function TrustStorePage() {
       setLoadingCAs(false)
     }
   }
-
-  const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.purpose) setFilterPurpose(Array.isArray(filters.purpose) ? filters.purpose : [filters.purpose])
-    else setFilterPurpose([])
-    if (filters._expiry_status) setFilterExpiryStatus(Array.isArray(filters._expiry_status) ? filters._expiry_status : [filters._expiry_status])
-    else setFilterExpiryStatus([])
-  }, [])
 
   const handleOpenAddModal = () => {
     setSelectedCAIds([])
@@ -280,7 +277,7 @@ export default function TrustStorePage() {
 
   const handleExportBundle = async (format = 'pem') => {
     try {
-      const response = await truststoreService.exportBundle(format, filterPurpose.length > 0 ? filterPurpose : 'all', filterExpiryStatus)
+      const response = await truststoreService.exportBundle(format, purpose ? [purpose] : 'all', state ? [state] : [])
       const blob = response instanceof Blob ? response : response?.data instanceof Blob ? response.data : new Blob([response?.data || response], { type: 'application/x-pem-file' })
       downloadBlob(blob, `truststore-bundle.${format}`)
       showSuccess(t('trustStore.bundleExported'))
@@ -290,253 +287,8 @@ export default function TrustStorePage() {
     }
   }
 
-  // Stats - from backend API
-  const stats = useMemo(() => [
-    { icon: ShieldCheck, label: t('common.rootCA'), value: certStats.root_ca, variant: 'success' },
-    { icon: Certificate, label: t('common.intermediate'), value: certStats.intermediate_ca, variant: 'primary' },
-    { icon: Warning, label: t('common.expired'), value: certStats.expired, variant: 'danger' },
-    { icon: CheckCircle, label: t('common.total'), value: certStats.total, variant: 'default' }
-  ], [certStats, t])
-
-  // Toolbar actions - next to search bar
-  const toolbarActions = (
-    <div className="flex gap-2">
-      {certificates.length > 0 && (
-        <Button type="button" size="sm" variant="ghost" onClick={() => handleExportBundle('pem')} title={t('trustStore.exportBundle')} aria-label={t('trustStore.exportBundle')}>
-          <Download size={14} />
-          <span className="hidden sm:inline">{t('trustStore.exportBundle')}</span>
-        </Button>
-      )}
-      {canWrite('truststore') && (
-        <>
-          <Button type="button" size="sm" variant="secondary" onClick={() => openModal('sync')} disabled={syncing}>
-            <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</span>
-          </Button>
-          <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
-            <UploadSimple size={14} />
-            <span className="hidden sm:inline">{t('common.import')}</span>
-          </Button>
-          <Button type="button" size="sm" onClick={handleOpenAddModal}>
-            <Plus size={14} />
-            <span className="hidden sm:inline">{t('trustStore.add')}</span>
-          </Button>
-        </>
-      )}
-    </div>
-  )
-
-  // Columns
-  const columns = useMemo(() => [
-    {
-      key: 'name',
-      header: t('common.certificate'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
-            <Certificate size={14} weight="duotone" />
-          </div>
-          <span className="font-medium truncate">{val}</span>
-        </div>
-      ),
-      mobileRender: (val, row) => {
-        const bucket = expiryBucket(daysRemaining(row.not_after), TRUST_STORE_EXPIRY_WINDOW_DAYS)
-        const isExpired = bucket === 'expired'
-        const isExpiringSoon = bucket === 'expiring'
-        return (
-          <div className="flex items-center justify-between gap-2 w-full">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className={cn(
-                "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-                isExpired ? 'icon-bg-red' : isExpiringSoon ? 'icon-bg-orange' : 'icon-bg-emerald'
-              )}>
-                <Certificate size={14} weight="duotone" />
-              </div>
-              <span className="font-medium truncate">{val}</span>
-            </div>
-            <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot>
-              {row.purpose?.replace('_', ' ') || t('common.custom')}
-            </Badge>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'purpose',
-      header: t('common.purpose'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (val) => {
-        const variants = {
-          root_ca: 'amber',
-          intermediate_ca: 'primary',
-          client_auth: 'violet',
-          code_signing: 'orange',
-          system: 'teal',
-          custom: 'secondary'
-        }
-        return <Badge variant={variants[val] || 'secondary'} size="sm" dot>{val?.replace('_', ' ')}</Badge>
-      }
-    },
-    {
-      key: 'not_after',
-      header: t('common.expires'),
-      priority: 2,
-      mono: true,
-      render: (val) => {
-        if (!val) return <span className="text-text-tertiary">—</span>
-        const bucket = expiryBucket(daysRemaining(val), TRUST_STORE_EXPIRY_WINDOW_DAYS)
-        const isExpired = bucket === 'expired'
-        const isExpiringSoon = bucket === 'expiring'
-        return (
-          <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot pulse={isExpired || isExpiringSoon}>
-            {formatDate(val)}
-          </Badge>
-        )
-      },
-      mobileRender: (val) => {
-        if (!val) return null
-        return (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-tertiary">{t('common.expires')}:</span>
-            <span className="text-text-secondary">{formatDate(val)}</span>
-          </div>
-        )
-      }
-    }
-  ], [t])
-
-  // Row actions
-  const rowActions = (row) => [
-    { label: t('common.export'), icon: Download, onClick: () => handleExport(row) },
-    ...(canDelete('truststore') ? [
-      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
-    ] : [])
-  ]
-
-  // Detail panel content: the shared panel, with this page's own actions
-  const detailContent = selectedCert && (
-    <TrustCertPanel cert={selectedCert}>
-      <div className="flex gap-2 flex-wrap">
-        <Button type="button" size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
-          <Download size={14} /> {t('common.export')}
-        </Button>
-        {canDelete('truststore') && (
-          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
-            <Trash size={14} /> {t('common.delete')}
-          </Button>
-        )}
-      </div>
-    </TrustCertPanel>
-  )
-
-  // Help content
-  const helpContent = (
-    <div className="space-y-3">
-      <HelpCard variant="info" title={t('common.aboutTrustStore')}>
-        {t('trustStore.aboutTrustStoreDesc')}
-      </HelpCard>
-      
-      <HelpCard variant="tip" title={t('common.bestPractices')}>
-        {t('trustStore.bestPracticesDesc')}
-      </HelpCard>
-
-      <HelpCard variant="warning" title={t('common.securityNote')}>
-        {t('trustStore.securityNoteDesc')}
-      </HelpCard>
-    </div>
-  )
-
-  return (
+  const dialogs = (
     <>
-      <ResponsiveLayout
-        title={t('common.trustStore')}
-        subtitle={t('trustStore.subtitle', { count: certificates.length })}
-        icon={ShieldCheck}
-        stats={stats}
-        helpPageKey="truststore"
-        splitView={isMobile}
-        splitEmptyContent={isMobile ? (
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <Certificate size={24} className="text-text-tertiary" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('trustStore.selectToView')}</p>
-          </div>
-        ) : undefined}
-        slideOverOpen={isMobile && !!selectedCert}
-        slideOverTitle={selectedCert?.name || t('common.certificate')}
-        slideOverContent={isMobile ? detailContent : null}
-        onSlideOverClose={() => setSelectedCert(null)}
-      >
-        <ResponsiveDataTable
-          data={filteredCertificates}
-          columns={columns}
-          loading={loading}
-          onRowClick={handleSelectCert}
-          selectedId={selectedCert?.id}
-          multiSelect={canDelete('truststore')}
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-          bulkActions={
-            <Button type="button" size="sm" variant="danger" onClick={handleBulkDelete} disabled={bulkDeleting}>
-              <Trash size={14} /> {t('trustStore.deleteSelected')}
-            </Button>
-          }
-          searchable
-          searchPlaceholder={t('common.searchCertificates')}
-          searchKeys={['name', 'subject', 'issuer', 'purpose']}
-          toolbarFilters={[
-            {
-              key: 'purpose',
-              label: t('common.type'),
-              type: 'multiSelect',
-              value: filterPurpose,
-              onChange: setFilterPurpose,
-              placeholder: t('trustStore.allPurposes'),
-              options: [
-                { value: 'root_ca', label: t('common.rootCA') },
-                { value: 'intermediate_ca', label: t('common.intermediate') },
-                { value: 'client_auth', label: t('trustStore.clientAuth') },
-                { value: 'code_signing', label: t('common.codeSigning') },
-                { value: 'system', label: t('common.system') },
-                { value: 'custom', label: t('common.custom') }
-              ]
-            },
-            {
-              key: '_expiry_status',
-              label: t('common.status'),
-              type: 'multiSelect',
-              value: filterExpiryStatus,
-              onChange: setFilterExpiryStatus,
-              placeholder: t('trustStore.allStatuses'),
-              options: [
-                { value: 'valid', label: t('common.valid') },
-                { value: 'expiring', label: t('trustStore.expiringSoon') },
-                { value: 'expired', label: t('common.expired') }
-              ]
-            }
-          ]}
-          filterPresetsKey="ucm-truststore-presets"
-          densityStorageKey="ucm-truststore-density"
-          onApplyFilterPreset={handleApplyFilterPreset}
-          toolbarActions={toolbarActions}
-          sortable
-          defaultSort={{ key: 'name', direction: 'asc' }}
-          pagination={true}
-          emptyIcon={ShieldCheck}
-          emptyTitle={t('trustStore.noCertificates')}
-          emptyDescription={t('trustStore.addCertificatesForChain')}
-          emptyAction={canWrite('truststore') && (
-            <Button type="button" onClick={handleOpenAddModal}>
-              <Plus size={16} /> {t('trustStore.addCertificate')}
-            </Button>
-          )}
-        />
-      </ResponsiveLayout>
-
       {/* Add from Managed CAs Modal */}
       <Modal
         open={modals.add}
@@ -653,5 +405,134 @@ export default function TrustStorePage() {
         }}
       />
     </>
+  )
+
+  // ============= LIST =============
+
+  const tsState = (c) => c._expiry_status || 'valid'
+  const TONES = { valid: 'good', expiring: 'warn', expired: 'bad' }
+  const tsPill = (c) => <Pill label={t(`trustStore.module.states.${tsState(c)}`)} tone={TONES[tsState(c)] || 'muted'} />
+  const tsUsage = (c) => c.description || '—'
+  const tsType = (c) => (PURPOSES.includes(c.purpose) ? t(PURPOSE_LABELS[c.purpose]) : (c.purpose || '—'))
+  const tsExpires = (c) => dateOf(c.not_after, locale) || '—'
+  const present = ['valid', 'expiring', 'expired'].filter((s) => certificates.some((c) => tsState(c) === s))
+  const active = present.includes(state) ? state : ''
+  const views = [
+    { id: '', label: t('common.all'), count: searched.length },
+    ...present.map((s) => ({ id: s, label: t(`trustStore.module.states.${s}`), count: searched.filter((c) => tsState(c) === s).length })),
+  ]
+  const rows = filteredCertificates
+  const narrowed = Boolean(query.trim() || purpose || active)
+  const write = canWrite('truststore')
+  const add = write ? { label: t('trustStore.addCertificate'), icon: 'plus', onClick: handleOpenAddModal, primary: true } : undefined
+  const selection = canDelete('truststore') ? {
+    selected: selectedIds,
+    onToggle: (id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }),
+    onTogglePage: (on) => setSelectedIds(on ? new Set(rows.map((c) => c.id)) : new Set()),
+  } : undefined
+  const ticked = rows.filter((c) => selectedIds.has(c.id)).length
+
+  // ============= DOCK =============
+
+  const open = selectedCert
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('shell.moduleLabel.truststore') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.name, icon: 'anchor' }]} onClose={() => setSelectedCert(null)}>
+      <DockBody icon="anchor" title={open.name} badge={tsPill(open)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: open.name })}
+        sections={[['overview', t('atelier.overview')], ['details', t('trustStore.module.sections.details')], ['pem', 'PEM']]}
+        actions={<>
+          <Btn icon="download" id="truststore-export" onClick={() => handleExport(open)}>{t('common.export')}</Btn>
+          {canDelete('truststore') && <Btn tone="danger" icon="block" id="truststore-delete" onClick={() => handleDelete(open)}>{t('common.delete')}</Btn>}
+        </>}>
+        {section === 'overview' && (
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('trustStore.module.subject'), open.subject || '—'],
+                [t('trustStore.module.usage'), tsUsage(open)],
+                [t('common.type'), tsType(open)],
+                [t('trustStore.module.expires'), tsExpires(open)],
+                [t('atelier.state'), tsPill(open)],
+              ]} />
+            </Section>
+            <Section title={t('atelier.summary')}><p className="summary">{open.notes || t('trustStore.module.noNotes')}</p></Section>
+          </div>
+        )}
+        {section === 'details' && (
+          <div className="module-detail">
+            <Section title={t('common.technicalDetails')}>
+              <Props items={[
+                [t('common.issuer'), <span key="issuer" className="mono">{open.issuer || '—'}</span>],
+                [t('common.serialNumber'), open.serial_number ? <span key="serial" className="mono">{serialHex(open.serial_number)}</span> : '—'],
+                [t('common.keyType'), certificateKeyLabel(open) || '—'],
+                [t('common.issuerSignatureAlgorithm'), open.signature_algorithm || '—'],
+                [t('common.validFrom'), dateOf(open.not_before, locale) || '—'],
+                [t('common.validUntil'), tsExpires(open)],
+              ]} />
+            </Section>
+            <Section title={t('common.fingerprints')}>
+              <Props items={[
+                ['SHA-256', <span key="sha256" className="mono">{open.fingerprint_sha256 || '—'}</span>],
+                ['SHA-1', <span key="sha1" className="mono">{open.fingerprint_sha1 || '—'}</span>],
+              ]} />
+            </Section>
+            <Section title={t('details.metadata')}>
+              <Props items={[
+                [t('details.addedAt'), dateTimeOf(open.added_at, locale) || '—'],
+                [t('details.addedBy'), open.added_by || '—'],
+              ]} />
+            </Section>
+          </div>
+        )}
+        {section === 'pem' && <PemPanel cert={{ pem: open.certificate_pem }} />}
+      </DockBody>
+    </Dock>
+  )
+
+  return (
+    <Zone dock={dock} testId="truststore-zone" after={dialogs}>
+      <PageHead title={t('shell.moduleLabel.truststore')} total={t('trustStore.module.unit', { count: certificates.length })} intent={t('shell.moduleDesc.truststore')}
+        actions={<>
+          {certificates.length > 0 && <Btn icon="download" id="truststore-bundle" onClick={() => handleExportBundle('pem')}>{t('trustStore.exportBundle')}</Btn>}
+          {write && <Btn icon="refresh" id="truststore-sync" write disabled={syncing || undefined} onClick={() => openModal('sync')}>{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</Btn>}
+          {write && <Btn icon="upload" id="truststore-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
+          {write && <Btn tone="primary" icon="plus" id="truststore-add" onClick={handleOpenAddModal}>{t('trustStore.add')}</Btn>}
+        </>} />
+      <ListView label={t('shell.moduleLabel.truststore')} caption={t('trustStore.module.caption')} icon="anchor" rows={rows} loading={loading}
+        filters={{ views, active, onChange: setState, label: t('trustStore.module.filterByState') }}
+        toolbar={<>
+          <Toolbar>
+            <SearchField id="truststore-search" name="q" label={t('common.searchCertificates')} placeholder={t('common.searchCertificates')} value={query} onChange={setQuery} />
+            <FilterSelect id="truststore-type" label={t('trustStore.module.filterByType')} value={purpose} onChange={setPurpose}
+              options={[{ value: '', label: t('trustStore.allPurposes') }, ...PURPOSES.map((p) => ({ value: p, label: t(PURPOSE_LABELS[p]) }))]} />
+          </Toolbar>
+          {ticked > 0 && (
+            <BatchBar count={t('trustStore.module.selected', { count: ticked })} onClear={() => setSelectedIds(new Set())}>
+              <Btn tone="danger" icon="block" id="truststore-bulk-delete" disabled={bulkDeleting || undefined} onClick={handleBulkDelete}>{t('trustStore.deleteSelected')}</Btn>
+            </BatchBar>
+          )}
+        </>}
+        title={(c) => c.name || '—'} status={tsPill} openedId={open?.id} onOpen={handleSelectCert} selection={selection}
+        sort={sort} onSort={(key) => setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))} nameSort="name"
+        columns={[
+          { id: 'subject', label: t('trustStore.module.subject'), cell: (c) => c.subject || '—', grow: true },
+          { id: 'usage', label: t('trustStore.module.usage'), cell: tsUsage },
+          { id: 'type', label: t('common.type'), cell: tsType },
+          { id: 'expires', label: t('trustStore.module.expires'), cell: tsExpires, sort: 'not_after' },
+          { status: true },
+        ]}
+        error={loadError && (
+          <LoadError id="truststore" title={t('messages.errors.loadFailed.truststore')} onRetry={loadCertificates}
+            cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/truststore', message: loadError.message }} />} />
+        )}
+        empty={narrowed && certificates.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+            onReset={() => { setQuery(''); setPurpose(''); setState('') }} />
+        ) : (
+          <EmptyBlock id="truststore" icon="anchor" title={t('trustStore.noCertificates')} text={t('trustStore.addCertificatesForChain')} action={add} />
+        )}
+        footer={{ range: t('trustStore.module.range', { shown: rows.length, count: certificates.length }) }} />
+    </Zone>
   )
 }

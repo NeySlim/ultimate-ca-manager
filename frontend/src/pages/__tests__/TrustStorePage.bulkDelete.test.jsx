@@ -69,31 +69,13 @@ vi.mock('../../components', () => ({
   CompactField: () => null,
   FormSelect: () => null,
 }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ data = [], multiSelect, selectedIds, onSelectionChange, bulkActions, toolbarFilters = [] }) => (
-    <div>
-      <button onClick={() => toolbarFilters[0].onChange(['custom'])}>only-custom</button>
-      {multiSelect && data.map((row) => (
-        <input
-          key={row.id} type="checkbox" aria-label={`select-${row.id}`}
-          checked={selectedIds?.has(row.id) || false}
-          onChange={() => {
-            const next = new Set(selectedIds)
-            if (next.has(row.id)) next.delete(row.id); else next.add(row.id)
-            onSelectionChange(next)
-          }}
-        />
-      ))}
-      {multiSelect && selectedIds?.size > 0 && bulkActions}
-    </div>
-  ),
-}))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
 import TrustStorePage from '../TrustStorePage'
 
 const renderPage = () => render(<MemoryRouter><TrustStorePage /></MemoryRouter>)
+// A row's checkbox, once the rows are drawn
+const box = async (id) => { await screen.findByText('Old root'); return document.querySelector(`[data-select="${id}"]`) }
 
 describe('TrustStorePage bulk removal (#388)', () => {
   beforeEach(() => {
@@ -107,8 +89,8 @@ describe('TrustStorePage bulk removal (#388)', () => {
 
   it('removes the selected rows in one request', async () => {
     renderPage()
-    fireEvent.click(await screen.findByLabelText('select-1'))
-    fireEvent.click(screen.getByLabelText('select-2'))
+    fireEvent.click(await box(1))
+    fireEvent.click(await box(2))
     fireEvent.click(screen.getByText('trustStore.deleteSelected'))
     await waitFor(() => expect(bulkDelete).toHaveBeenCalledWith([1, 2]))
     expect(confirm).toHaveBeenCalledWith('trustStore.confirmBulkRemove:2', expect.anything())
@@ -119,17 +101,17 @@ describe('TrustStorePage bulk removal (#388)', () => {
   it('reports the rows the server could not remove', async () => {
     bulkDelete.mockResolvedValue({ data: { success: [1], failed: [{ id: 2, error: 'Not found' }] } })
     renderPage()
-    fireEvent.click(await screen.findByLabelText('select-1'))
-    fireEvent.click(screen.getByLabelText('select-2'))
+    fireEvent.click(await box(1))
+    fireEvent.click(await box(2))
     fireEvent.click(screen.getByText('trustStore.deleteSelected'))
     await waitFor(() => expect(showError).toHaveBeenCalledWith('trustStore.bulkRemoveFailed:1'))
   })
 
   it('never removes a selected row the filters now hide', async () => {
     renderPage()
-    fireEvent.click(await screen.findByLabelText('select-1'))
-    fireEvent.click(screen.getByLabelText('select-3'))
-    fireEvent.click(screen.getByText('only-custom'))
+    fireEvent.click(await box(1))
+    fireEvent.click(await box(3))
+    fireEvent.change(screen.getByRole('combobox', { name: 'trustStore.module.filterByType' }), { target: { value: 'custom' } })
     fireEvent.click(screen.getByText('trustStore.deleteSelected'))
     await waitFor(() => expect(bulkDelete).toHaveBeenCalledWith([3]))
   })
@@ -137,7 +119,7 @@ describe('TrustStorePage bulk removal (#388)', () => {
   it('does nothing when the confirmation is declined', async () => {
     confirm.mockResolvedValue(false)
     renderPage()
-    fireEvent.click(await screen.findByLabelText('select-1'))
+    fireEvent.click(await box(1))
     fireEvent.click(screen.getByText('trustStore.deleteSelected'))
     await waitFor(() => expect(confirm).toHaveBeenCalled())
     expect(bulkDelete).not.toHaveBeenCalled()
@@ -147,6 +129,7 @@ describe('TrustStorePage bulk removal (#388)', () => {
     mockCanDelete = false
     renderPage()
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    expect(screen.queryByLabelText('select-1')).toBeNull()
+    await screen.findByText('Old root')
+    expect(document.querySelector('[data-select]')).toBeNull()
   })
 })

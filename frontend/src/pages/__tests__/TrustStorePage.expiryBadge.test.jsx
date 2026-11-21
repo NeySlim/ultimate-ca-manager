@@ -1,5 +1,5 @@
 /**
- * TrustStorePage expiry badges: the column and the mobile row follow the shared
+ * TrustStorePage expiry states: the state pill of each phone record follows the shared
  * day count (lib/utils daysRemaining) and the trust store 90-day window, so an entry
  * 12 hours or 60 days from its end is not green.
  */
@@ -58,30 +58,16 @@ vi.mock('../../services', () => ({
   },
   casService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
 }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ data, columns }) => (
-    <div>{data.map(row => columns.map(col => (
-      <div key={`${row.id}-${col.key}`}>
-        <div data-testid={`${col.key}-${row.id}`}>{col.render ? col.render(row[col.key], row) : null}</div>
-        {col.mobileRender && <div data-testid={`mobile-${col.key}-${row.id}`}>{col.mobileRender(row[col.key], row)}</div>}
-      </div>
-    )))}</div>
-  ),
-}))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
-vi.mock('../../components', async () => {
-  const actual = await vi.importActual('../../components')
-  return { ...actual, Badge: ({ variant, children }) => <span data-variant={variant}>{children}</span> }
-})
 
 import TrustStorePage from '../TrustStorePage'
 
 const HOUR = 3600 * 1000
 const at = (ms) => new Date(Date.now() + ms).toISOString()
-const variantOf = (testid) => screen.getByTestId(testid).querySelector('[data-variant]').getAttribute('data-variant')
+// The tone of the state pill on the record that shows this name
+const toneOf = (name) => screen.getByText(name).closest('article').querySelector('.row-status .badge').className.replace('badge', '').trim()
 
-describe('TrustStorePage expiry badges', () => {
+describe('TrustStorePage expiry states', () => {
   it('colours each entry from its remaining days', async () => {
     store.rows = [
       { id: 1, name: 'half-day', purpose: 'root_ca', not_after: at(12 * HOUR) },
@@ -90,15 +76,12 @@ describe('TrustStorePage expiry badges', () => {
       { id: 4, name: 'two-months', purpose: 'root_ca', not_after: at(60 * 24 * HOUR) },
     ]
     render(<MemoryRouter><TrustStorePage /></MemoryRouter>)
-    await screen.findByTestId('not_after-1')
-    expect(variantOf('not_after-1')).toBe('orange')
-    expect(variantOf('mobile-name-1')).toBe('orange')
-    expect(variantOf('not_after-2')).toBe('danger')
-    expect(variantOf('mobile-name-2')).toBe('danger')
-    expect(variantOf('not_after-3')).toBe('success')
-    expect(variantOf('mobile-name-3')).toBe('success')
+    await screen.findByText('half-day')
+    expect(toneOf('half-day')).toBe('warn')
+    expect(toneOf('gone')).toBe('bad')
+    expect(toneOf('later')).toBe('good')
     // The trust store's window is 90 days, the one its filter and the server use
-    expect(variantOf('not_after-4')).toBe('orange')
-    expect(variantOf('mobile-name-4')).toBe('orange')
+    expect(toneOf('two-months')).toBe('warn')
+    expect(screen.getByText('two-months').closest('article')).toHaveTextContent(en.trustStore.module.states.expiring)
   })
 })

@@ -3,7 +3,7 @@
  * still pending, denied, signed elsewhere, or an error.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 beforeAll(() => {
@@ -103,13 +103,19 @@ vi.mock('../../services', () => ({
 }))
 
 import CSRsPage from '../CSRsPage'
+import { openRow } from '../../test/atelierRows'
 
 const CSR = { id: 11, common_name: 'pending.example.com', cn: 'pending.example.com', has_private_key: false }
+
+// The check sits in the dock's « ⋯ » menu once the Microsoft CA request is known
+const openMenu = async () => fireEvent.click(await screen.findByRole('button', { name: 'csrs.module.moreActions' }))
 
 async function openCSR() {
   render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /></MemoryRouter>)
   await waitFor(() => expect(getAll).toHaveBeenCalled())
-  fireEvent.click(await screen.findByText('pending.example.com'))
+  await openRow('pending.example.com')
+  await waitFor(() => expect(getPendingRequests).toHaveBeenCalled())
+  await openMenu()
   return screen.findByText('msca.checkStatus')
 }
 
@@ -151,7 +157,9 @@ describe('CSRsPage Microsoft CA status check', () => {
     fireEvent.click(await openCSR())
     await waitFor(() => expect(showInfo).toHaveBeenCalledWith('msca.checkSuperseded'))
     expect(openEntity).not.toHaveBeenCalled()
-    await waitFor(() => expect(screen.queryByText('msca.checkStatus')).toBeNull())
+    await openMenu()
+    await screen.findByText('csrs.rekey')
+    expect(screen.queryByText('msca.checkStatus')).toBeNull()
   })
 
   it('reports an error', async () => {
@@ -164,8 +172,10 @@ describe('CSRsPage Microsoft CA status check', () => {
     mockWritable = (r) => r === 'csrs'
     render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /></MemoryRouter>)
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    fireEvent.click(await screen.findByText('pending.example.com'))
+    await openRow('pending.example.com')
     await screen.findByText('csrs.sign')
+    await openMenu()
+    await screen.findByText('csrs.rekey')
     expect(screen.queryByText('msca.checkStatus')).toBeNull()
     expect(getPendingRequests).not.toHaveBeenCalled()
   })
@@ -174,9 +184,11 @@ describe('CSRsPage Microsoft CA status check', () => {
     getPendingRequests.mockResolvedValue({ data: [{ id: 6, msca_id: 2, csr_id: 99, status: 'pending' }] })
     render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /></MemoryRouter>)
     await waitFor(() => expect(getAll).toHaveBeenCalled())
-    fireEvent.click(await screen.findByText('pending.example.com'))
+    await openRow('pending.example.com')
     await screen.findByText('csrs.sign')
     await waitFor(() => expect(getPendingRequests).toHaveBeenCalled())
+    await openMenu()
+    await screen.findByText('csrs.rekey')
     expect(screen.queryByText('msca.checkStatus')).toBeNull()
   })
 })

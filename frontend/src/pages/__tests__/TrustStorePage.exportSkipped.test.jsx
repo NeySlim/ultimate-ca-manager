@@ -71,28 +71,6 @@ vi.mock('../../components', () => ({
   CompactField: () => null,
   FormSelect: () => null,
 }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ data = [], multiSelect, selectedIds, onSelectionChange, bulkActions, toolbarFilters = [], toolbarActions }) => (
-    <div>
-      {toolbarActions}
-      <button onClick={() => toolbarFilters[0].onChange(['custom'])}>only-custom</button>
-      <button onClick={() => toolbarFilters[1].onChange(['expired'])}>only-expired</button>
-      {multiSelect && data.map((row) => (
-        <input
-          key={row.id} type="checkbox" aria-label={`select-${row.id}`}
-          checked={selectedIds?.has(row.id) || false}
-          onChange={() => {
-            const next = new Set(selectedIds)
-            if (next.has(row.id)) next.delete(row.id); else next.add(row.id)
-            onSelectionChange(next)
-          }}
-        />
-      ))}
-      {multiSelect && selectedIds?.size > 0 && bulkActions}
-    </div>
-  ),
-}))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
 import TrustStorePage from '../TrustStorePage'
@@ -118,7 +96,7 @@ describe('TrustStorePage bundle export', () => {
   it('warns that unreadable entries were not exported', async () => {
     exportBundle.mockReset().mockResolvedValue(bundle(2))
     renderPage()
-    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    fireEvent.click(await screen.findByRole('button', { name: 'trustStore.exportBundle' }))
     await waitFor(() => expect(showWarning).toHaveBeenCalledWith('export.skippedUnreadable:2'))
     expect(showSuccess).toHaveBeenCalledWith('trustStore.bundleExported')
   })
@@ -126,7 +104,7 @@ describe('TrustStorePage bundle export', () => {
   it('says nothing more when every entry was exported', async () => {
     exportBundle.mockReset().mockResolvedValue(bundle(0))
     renderPage()
-    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    fireEvent.click(await screen.findByRole('button', { name: 'trustStore.exportBundle' }))
     await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('trustStore.bundleExported'))
     expect(showWarning).not.toHaveBeenCalled()
   })
@@ -134,23 +112,24 @@ describe('TrustStorePage bundle export', () => {
   it('exports the purposes the filter shows', async () => {
     exportBundle.mockReset().mockResolvedValue(bundle(0))
     renderPage()
-    fireEvent.click(await screen.findByText('only-custom'))
-    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    fireEvent.change(await screen.findByRole('combobox', { name: 'trustStore.module.filterByType' }), { target: { value: 'custom' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'trustStore.exportBundle' }))
     await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', ['custom'], []))
   })
 
   it('exports everything with no filter', async () => {
     exportBundle.mockReset().mockResolvedValue(bundle(0))
     renderPage()
-    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    fireEvent.click(await screen.findByRole('button', { name: 'trustStore.exportBundle' }))
     await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', 'all', []))
   })
 
   it('exports the expiry states the filter shows', async () => {
     exportBundle.mockReset().mockResolvedValue(bundle(0))
     renderPage()
-    fireEvent.click(await screen.findByText('only-expired'))
-    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    await screen.findByText('Old root')
+    fireEvent.click(document.querySelector('[data-status="expired"]'))
+    fireEvent.click(await screen.findByRole('button', { name: 'trustStore.exportBundle' }))
     await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', 'all', ['expired']))
   })
 })

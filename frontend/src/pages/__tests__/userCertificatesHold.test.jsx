@@ -2,8 +2,9 @@
  * A user certificate on hold can still be revoked for good (RFC 5280 §5.2.4):
  * its row keeps the Revoke action; one revoked for good loses it.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 
 const serviceMocks = vi.hoisted(() => ({
   getAll: vi.fn(),
@@ -84,8 +85,11 @@ describe('Revoke on a revoked user certificate', () => {
     const row = { ...ROW, ...state }
     serviceMocks.getAll.mockResolvedValue({ data: { items: [row], total: 1 } })
     serviceMocks.getById.mockResolvedValue({ data: row })
-    render(<UserCertificatesPage />)
-    await screen.findByTitle('common.export')
-    await waitFor(() => expect(!!screen.queryByTitle('userCertificates.actions.revoke')).toBe(offered))
+    render(<MemoryRouter><UserCertificatesPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: ROW.name }))
+    // Revocation sits in the dock's « ⋯ » menu
+    fireEvent.click(await screen.findByRole('button', { name: 'userCertificates.module.moreActions' }))
+    await screen.findByTestId('inspector-actions-dialog')
+    expect(!!screen.queryByRole('button', { name: 'userCertificates.actions.revoke' })).toBe(offered)
   })
 })

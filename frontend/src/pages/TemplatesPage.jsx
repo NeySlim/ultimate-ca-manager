@@ -1,27 +1,27 @@
 /**
- * TemplatesPage - Certificate template management
- * Pattern: ResponsiveLayout + ResponsiveDataTable + Modal actions
- * 
- * DESKTOP: Dense table with hover rows, inline slide-over details
- * MOBILE: Card-style list with full-screen details
+ * Templates: the mockup's templates module, a simplePage() list (here Source, Validité, Clé par
+ * défaut, Utilisations, État) with its one-object dock. What the product has more (search, the
+ * source filter, sort, create, import, edit, duplicate, activate, export, delete, the preview and
+ * the subject, extensions and enrollment of a template) takes the page head, the toolbar, the dock
+ * actions with their « ⋯ » menu, and further dock tabs.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  FileText, Plus, Copy, Trash, Download, FileArrowUp, PencilSimple,
-  Certificate, ShieldCheck, Clock, Eye, Key, Globe, Warning, EyeSlash
-} from '@phosphor-icons/react'
+import { FileArrowUp, Warning } from '@phosphor-icons/react'
 import {
-  ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
-  LoadingSpinner, TemplatePreviewModal,
-  CompactSection, CompactGrid, CompactField, CompactHeader
+  Button, Modal, Input, Select, Textarea, LoadingSpinner, TemplatePreviewModal,
 } from '../components'
+import {
+  Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Props,
+  LoadError, LoadCause, EmptyBlock, NoMatch,
+} from '../components/atelier'
 import { templatesService } from '../services'
-import { useNotification, useMobile } from '../contexts'
+import { useNotification } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
-import { formatDate , downloadBlob} from '../lib/utils'
+import { downloadBlob } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 import { KEY_ALGORITHMS, isUsable, groupedOptions } from '../lib/keyAlgorithms'
+import { keyLabel } from '../lib/certificateDetail'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
@@ -32,22 +32,27 @@ import {
 import { customExtensionsPayload, rowsFromStored, truncateHex } from '../lib/customExtensions'
 import { CustomExtensionsEditor } from '../components/CustomExtensionsEditor'
 import { CN_PATTERN_VARIABLES, cnPatternNonUnique, cnPatternSource } from '../lib/cnPattern'
-const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
+import { CertMenu } from './certificates/inspector/CertMenu'
 
 export default function TemplatesPage() {
   const { t } = useTranslation()
-  const { isMobile } = useMobile()
   const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const fileRef = useRef(null)
   
   // Hook: CRUD state
   const loadFn = useCallback(async () => {
-    const res = await templatesService.getAll()
-    return res.data || []
+    setLoadError(null)
+    try {
+      const res = await templatesService.getAll()
+      return res.data || []
+    } catch (error) {
+      setLoadError(error)
+      throw error
+    }
   }, [])
   const {
-    items: templates, setItems: setTemplates,
+    items: templates,
     loading,
     selectedItem: selectedTemplate, setSelectedItem: setSelectedTemplate,
     showModal: showTemplateModal, setShowModal: setShowTemplateModal,
@@ -59,27 +64,19 @@ export default function TemplatesPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
 
-  // Pagination
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
-
-  // Filters
-  const [filterSource, setFilterSource] = usePersistedState('ucm-filter-templates-source', [])
+  // List: the search, the source and state filters (kept), the sort, the open tab and the menu
+  const [query, setQuery] = useState('')
+  const [source, setSource] = usePersistedState('ucm-templates-source', '')
+  const [state, setState] = usePersistedState('ucm-templates-state', '')
+  const [sort, setSort] = useState({ key: 'name', asc: true })
+  const [section, setSection] = useState('overview')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [loadError, setLoadError] = useState(null)
 
   // Import state
   const [importFile, setImportFile] = useState(null)
   const [importJson, setImportJson] = useState('')
   const [importing, setImporting] = useState(false)
-  const [showSystem, setShowSystem] = useState(() => {
-    try {
-      return localStorage.getItem(SHOW_SYSTEM_KEY) !== 'false'
-    } catch { return true }
-  })
-
-  const setShowSystemPersisted = useCallback((next) => {
-    setShowSystem(next)
-    try { localStorage.setItem(SHOW_SYSTEM_KEY, String(next)) } catch { /* private mode */ }
-  }, [])
 
   // ============= ACTIONS =============
   
@@ -196,480 +193,8 @@ export default function TemplatesPage() {
     }
   }
 
-  // ============= FILTERED DATA =============
-  
-  // Hiding system templates when nothing else exists would leave an empty
-  // table that looks broken, so the toggle is forced on and disabled there.
-  // The stored preference is deliberately left untouched by that override.
-  const hasCustomTemplates = useMemo(() => templates.some(t => !t.is_system), [templates])
-  const systemVisible = showSystem || !hasCustomTemplates
-
-  // Switching the toggle off while a system template is open would leave the
-  // panel showing a row that is no longer in the list.
-  useEffect(() => {
-    if (!systemVisible && selectedTemplate?.is_system) setSelectedTemplate(null)
-  }, [systemVisible, selectedTemplate, setSelectedTemplate])
-
-  const filteredTemplates = useMemo(() => {
-    let result = templates.map(t => ({
-      ...t,
-      source: t.is_system ? 'system' : 'custom'
-    }))
-    if (!systemVisible) {
-      result = result.filter(t => !t.is_system)
-    }
-    if (filterSource.length > 0) {
-      result = result.filter(t => filterSource.includes(t.source))
-    }
-    return result
-  }, [templates, filterSource, systemVisible])
-
-  // ============= STATS =============
-  
-  const stats = useMemo(() => {
-    const systemTemplates = templates.filter(t => t.is_system).length
-    return [
-      { icon: ShieldCheck, label: t('templates.systemTemplates'), value: systemTemplates, variant: 'violet' },
-      { icon: Certificate, label: t('templates.customTemplates'), value: templates.length - systemTemplates, variant: 'primary' },
-      { icon: FileText, label: t('common.total'), value: templates.length, variant: 'default' }
-    ]
-  }, [templates, t])
-
-  // ============= COLUMNS =============
-  
-  const columns = useMemo(() => [
-    {
-      key: 'name',
-      header: t('templates.template'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => {
-        const iconClass = row.is_system ? 'icon-bg-violet' : 'icon-bg-blue'
-        return (
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
-              {row.is_system ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
-            </div>
-            <span className="font-medium truncate">{val || t('common.unnamed')}</span>
-            {row.is_active === false && (
-              <Badge variant="secondary" size="sm" title={t('templates.deactivateTooltip')}>
-                {t('common.inactive')}
-              </Badge>
-            )}
-            {row.ad_derived_subject && (
-              <Badge variant="violet" size="sm" title={t('templates.adDerivedBadgeTooltip')}>
-                {t('templates.adDerivedBadge')}
-              </Badge>
-            )}
-            {row.autoenroll_enabled && (
-              <Badge variant="cyan" size="sm" title={t('templates.autoenrollBadgeTooltip')}>
-                {t('templates.autoenrollBadge')}
-              </Badge>
-            )}
-            {row.allowed_ad_group && (
-              <Badge variant="amber" size="sm" title={t('templates.enrollAclBadgeTooltip', { group: row.allowed_ad_group })}>
-                {t('templates.enrollAclBadge')}
-              </Badge>
-            )}
-            {Object.keys(row.pinned_subject_fields || {}).length > 0 && (
-              <Badge variant="amber" size="sm" title={t('templates.pinnedSubjectBadgeTooltip')}>
-                {t('templates.pinnedSubjectBadge')}
-              </Badge>
-            )}
-          </div>
-        )
-      },
-      mobileRender: (val, row) => {
-        const iconClass = row.is_system ? 'icon-bg-violet' : 'icon-bg-blue'
-        return (
-          <div className="flex items-center justify-between gap-2 w-full">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
-                {row.is_system ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
-              </div>
-              <span className="font-medium truncate">{val || t('common.unnamed')}</span>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {row.is_active === false && (
-                <Badge variant="secondary" size="sm" title={t('templates.deactivateTooltip')}>
-                  {t('common.inactive')}
-                </Badge>
-              )}
-              {row.ad_derived_subject && (
-                <Badge variant="violet" size="sm" title={t('templates.adDerivedBadgeTooltip')}>
-                  {t('templates.adDerivedBadge')}
-                </Badge>
-              )}
-              {row.autoenroll_enabled && (
-                <Badge variant="cyan" size="sm" title={t('templates.autoenrollBadgeTooltip')}>
-                  {t('templates.autoenrollBadge')}
-                </Badge>
-              )}
-              <Badge variant={row.is_system ? 'violet' : 'primary'} size="sm" dot>
-                {row.is_system ? t('templates.system') : t('templates.custom')}
-              </Badge>
-            </div>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'source',
-      header: t('templates.source'),
-      priority: 2,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge variant={val === 'system' ? 'violet' : 'primary'} size="sm" dot>
-          {val === 'system' ? t('templates.system') : t('templates.custom')}
-        </Badge>
-      )
-    },
-    {
-      key: 'validity_days',
-      header: t('common.validity'),
-      priority: 3,
-      hideOnMobile: true,
-      sortable: true,
-      mono: true,
-      render: (val) => (
-        <span className="text-sm text-text-secondary">
-          {t('templates.validityDays', { count: val || 365 })}
-        </span>
-      ),
-      mobileRender: (val) => (
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">{t('common.validity')}:</span>
-          <span className="text-text-secondary">{val || 365}d</span>
-        </div>
-      )
-    },
-    {
-      key: 'usage_count',
-      header: t('common.used'),
-      hideOnMobile: true,
-      sortable: true,
-      render: (val) => (
-        <Badge variant="outline" size="sm">
-          {t('templates.certsIssued', { count: val || 0 })}
-        </Badge>
-      )
-    },
-    {
-      key: 'description',
-      header: t('common.description'),
-      hideOnMobile: true,
-      render: (val) => (
-        <span className="text-xs text-text-secondary truncate max-w-[200px]">
-          {val || '—'}
-        </span>
-      )
-    }
-  ], [t])
-
-  // ============= FILTER PRESETS =============
-
-  const handleApplyFilterPreset = useCallback((filters) => {
-    // A preset saved before the column became Source carries filters.type,
-    // whose values ('certificate', 'ca') match no row. Applying it clears the
-    // filter rather than emptying the table.
-    if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
-    else setFilterSource([])
-  }, [setFilterSource])
-
-  // ============= DETAIL PANEL =============
-  
-  const detailContent = selectedTemplate && (
-    <div className="p-3 space-y-4">
-      <CompactHeader
-        icon={FileText}
-        iconClass={selectedTemplate.is_system ? "icon-bg-violet" : "bg-accent-primary-op20"}
-        title={selectedTemplate.name}
-        subtitle={t('templates.certificatesIssued', { count: selectedTemplate.usage_count || 0 })}
-        badge={
-          <div className="flex items-center gap-1.5">
-            <Badge variant={selectedTemplate.is_system ? 'violet' : 'primary'} size="sm">
-              {selectedTemplate.is_system ? t('templates.system') : t('templates.custom')}
-            </Badge>
-            {selectedTemplate.ad_derived_subject && (
-              <Badge variant="violet" size="sm" title={t('templates.adDerivedBadgeTooltip')}>
-                {t('templates.adDerivedBadge')}
-              </Badge>
-            )}
-            {selectedTemplate.autoenroll_enabled && (
-              <Badge variant="cyan" size="sm" title={t('templates.autoenrollBadgeTooltip')}>
-                {t('templates.autoenrollBadge')}
-              </Badge>
-            )}
-            {selectedTemplate.allowed_ad_group && (
-              <Badge variant="amber" size="sm" title={t('templates.enrollAclBadgeTooltip', { group: selectedTemplate.allowed_ad_group })}>
-                {t('templates.enrollAclBadge')}
-              </Badge>
-            )}
-            {Object.keys(selectedTemplate.pinned_subject_fields || {}).length > 0 && (
-              <Badge variant="amber" size="sm" title={t('templates.pinnedSubjectBadgeTooltip')}>
-                {t('templates.pinnedSubjectBadge')}
-              </Badge>
-            )}
-          </div>
-        }
-      />
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="secondary" onClick={() => setShowPreviewModal(true)}>
-          <Eye size={14} /> {t('common.details')}
-        </Button>
-        {canWrite('templates') && (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={selectedTemplate.is_system}
-              title={selectedTemplate.is_system ? t('templates.systemNotEditable') : undefined}
-              onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}
-            >
-              <PencilSimple size={14} /> {t('common.edit')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(selectedTemplate)}>
-              <Copy size={14} /> {t('common.copy')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleToggleActive(selectedTemplate)}
-              title={selectedTemplate.is_active === false ? undefined : t('templates.deactivateTooltip')}>
-              {selectedTemplate.is_active === false
-                ? <><Eye size={14} /> {t('templates.activate')}</>
-                : <><EyeSlash size={14} /> {t('common.deactivate')}</>}
-            </Button>
-          </>
-        )}
-        <Button type="button" size="sm" variant="secondary" onClick={() => handleExportTemplate(selectedTemplate)}>
-          <Download size={14} /> {t('common.export')}
-        </Button>
-        {canDelete('templates') && (
-          <Button
-            type="button"
-            size="sm"
-            variant="danger"
-            disabled={selectedTemplate.is_system}
-            title={selectedTemplate.is_system ? t('templates.systemNotDeletable') : undefined}
-            onClick={() => handleDeleteTemplate(selectedTemplate)}
-          >
-            <Trash size={14} /> {t('common.delete')}
-          </Button>
-        )}
-      </div>
-
-      <CompactSection title={t('templates.basicInfo')} icon={Globe}>
-        <CompactGrid columns={1}>
-          <CompactField autoIcon="name" label={t('common.name')} value={selectedTemplate.name} />
-          <CompactField autoIcon="type" label={t('templates.source')} value={selectedTemplate.is_system ? t('templates.systemDescription') : t('templates.customDescription')} />
-          <CompactField autoIcon="description" label={t('common.description')} value={selectedTemplate.description || '—'} />
-        </CompactGrid>
-      </CompactSection>
-
-      <CompactSection title={t('templates.keySettings')} icon={Key}>
-        <CompactGrid columns={2}>
-          <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedTemplate.key_type || '—'} />
-          <CompactField autoIcon="signature" label={t('common.digest')} value={selectedTemplate.digest || '—'} />
-        </CompactGrid>
-      </CompactSection>
-
-      <CompactSection title={t('common.validityPeriod')} icon={Clock}>
-        <CompactGrid columns={2}>
-          <CompactField autoIcon="default" label={t('common.default')} value={t('templates.validityDays', { count: selectedTemplate.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS })} />
-        </CompactGrid>
-      </CompactSection>
-
-      <CompactSection title={t('templates.subjectTemplate')} icon={Certificate} collapsible>
-        <CompactGrid columns={2}>
-          <CompactField autoIcon="country" label={t('templates.country')} value={selectedTemplate.dn_template?.C || '—'} />
-          <CompactField autoIcon="state" label={t('templates.state')} value={selectedTemplate.dn_template?.ST || '—'} />
-          <CompactField autoIcon="locality" label={t('common.locality')} value={selectedTemplate.dn_template?.L || '—'} />
-          <CompactField autoIcon="organization" label={t('templates.organization')} value={selectedTemplate.dn_template?.O || '—'} />
-          <CompactField autoIcon="commonName" label={t('templates.commonName')} value={selectedTemplate.dn_template?.CN || '—'} />
-          <CompactField autoIcon="email" label={t('common.email')} value={selectedTemplate.dn_template?.emailAddress || '—'} />
-          <CompactField autoIcon="default" label={t('templates.adDerivedSubject')} value={selectedTemplate.ad_derived_subject ? t('common.enabled') : t('common.disabled')} />
-          <CompactField autoIcon="commonName" label={t('templates.cnPattern')} value={selectedTemplate.subject_cn_pattern
-            ? `${selectedTemplate.subject_cn_pattern}${selectedTemplate.subject_cn_keep_path ? ` (${t('templates.cnPatternKeepPath')})` : ''}`
-            : '—'} />
-          <CompactField autoIcon="default" label={t('templates.enforceSanTypes')} value={selectedTemplate.enforce_san_types ? t('common.enabled') : t('common.disabled')} />
-        </CompactGrid>
-      </CompactSection>
-
-      <CompactSection title={t('templates.enrollment')} icon={ShieldCheck}>
-        <CompactGrid columns={2}>
-          <CompactField autoIcon="default" label={t('templates.autoenrollEnabled')} value={selectedTemplate.autoenroll_enabled ? t('common.enabled') : t('common.disabled')} />
-          <CompactField autoIcon="default" label={t('templates.allowedAdGroup')} value={selectedTemplate.allowed_ad_group || t('templates.allowedAdGroupUnset')} />
-          <CompactField
-            autoIcon="default"
-            label={t('templates.pinnedSubjectFields')}
-            value={
-              Object.entries(selectedTemplate.pinned_subject_fields || {}).length > 0
-                ? Object.entries(selectedTemplate.pinned_subject_fields).map(([k, v]) => `${k}=${v}`).join(', ')
-                : t('templates.pinnedSubjectFieldsUnset')
-            }
-          />
-        </CompactGrid>
-      </CompactSection>
-
-      {(selectedTemplate.extensions_template?.key_usage?.length > 0 || selectedTemplate.extensions_template?.extended_key_usage?.length > 0) && (
-        <CompactSection title={t('common.keyUsage')} icon={ShieldCheck} collapsible defaultOpen={false}>
-          <div className="space-y-3">
-            {selectedTemplate.extensions_template?.key_usage?.length > 0 && (
-              <div className="space-y-1">
-                <div className="text-xs font-semibold text-text-primary">
-                  {t('details.ext.keyUsage')}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {selectedTemplate.extensions_template.key_usage.map(usage => (
-                    <Badge key={usage} variant="primary" size="sm">{usage}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedTemplate.extensions_template?.extended_key_usage?.length > 0 && (
-              <div className="space-y-1">
-                <div className="text-xs font-semibold text-text-primary">
-                  {t('details.ext.extKeyUsage')}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {selectedTemplate.extensions_template.extended_key_usage.map(usage => (
-                    <Badge key={usage} variant="teal" size="sm">{usage}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </CompactSection>
-      )}
-
-      {(selectedTemplate.extensions_template?.qc_statements || selectedTemplate.extensions_template?.certificate_policies?.length > 0) && (
-        <CompactSection title={t('templates.qc.title')} icon={ShieldCheck} collapsible defaultOpen={false}>
-          <div className="space-y-2">
-            {selectedTemplate.extensions_template.qc_statements && (
-              <div className="flex flex-wrap gap-1">
-                {Object.keys(selectedTemplate.extensions_template.qc_statements).map(k => (
-                  <Badge key={k} variant="teal" size="sm">{k}</Badge>
-                ))}
-              </div>
-            )}
-            {selectedTemplate.extensions_template.certificate_policies?.map(oid => (
-              <div key={oid} className="text-2xs font-mono text-text-secondary">{oid}</div>
-            ))}
-          </div>
-        </CompactSection>
-      )}
-
-      {(selectedTemplate.custom_extensions?.length > 0 || selectedTemplate.custom_extensions_error) && (
-        <CompactSection title={t('customExtensions.title')} icon={ShieldCheck} collapsible defaultOpen={false}>
-          <div className="space-y-1">
-            <StoredExtensionsError error={selectedTemplate.custom_extensions_error} />
-            {selectedTemplate.custom_extensions.map(e => (
-              <div key={e.oid} className="flex flex-wrap items-center gap-2 text-2xs font-mono text-text-secondary">
-                <span>{e.oid}</span>
-                {e.critical && <Badge variant="danger" size="sm">{t('customExtensions.critical')}</Badge>}
-                <span className="break-all" title={e.value}>{truncateHex(e.value)}</span>
-              </div>
-            ))}
-          </div>
-        </CompactSection>
-      )}
-    </div>
-  )
-
-  // ============= RENDER =============
-
-  return (
+  const dialogs = (
     <>
-      <ResponsiveLayout
-        title={t('common.templates')}
-        subtitle={t('templates.subtitle', { count: templates.length })}
-        icon={FileText}
-        stats={stats}
-        helpPageKey="templates"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <FileText size={24} className="text-text-tertiary" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('templates.selectTemplate')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedTemplate}
-        slideOverTitle={selectedTemplate?.name || t('common.details')}
-        slideOverContent={detailContent}
-        slideOverWidth="lg"
-        onSlideOverClose={() => setSelectedTemplate(null)}
-      >
-        <ResponsiveDataTable
-          data={filteredTemplates}
-          columns={columns}
-          loading={loading}
-          onRowClick={setSelectedTemplate}
-          selectedId={selectedTemplate?.id}
-          searchable
-          searchPlaceholder={t('templates.searchPlaceholder')}
-          searchKeys={['name', 'description', 'source']}
-          toolbarFilters={[
-            {
-              key: 'showSystem',
-              type: 'toggle',
-              label: t('templates.showSystem'),
-              value: systemVisible,
-              onChange: setShowSystemPersisted,
-              disabled: !hasCustomTemplates,
-              disabledReason: t('templates.showSystemForced'),
-            },
-            {
-              key: 'source',
-              type: 'multiSelect',
-              label: t('templates.source'),
-              value: filterSource,
-              onChange: setFilterSource,
-              placeholder: t('templates.allSources'),
-              options: [
-                { value: 'system', label: t('templates.system') },
-                { value: 'custom', label: t('templates.custom') }
-              ]
-            }
-          ]}
-          filterPresetsKey="ucm-templates-presets"
-          densityStorageKey="ucm-templates-density"
-          onApplyFilterPreset={handleApplyFilterPreset}
-          toolbarActions={canWrite('templates') && (
-            isMobile ? (
-              <Button type="button" size="lg" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }} className="w-11 h-11 p-0">
-                <Plus size={22} weight="bold" />
-              </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button type="button" size="sm" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
-                  <Plus size={14} weight="bold" />
-                  {t('templates.new')}
-                </Button>
-                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)} data-write>
-                  <FileArrowUp size={14} />
-                  {t('common.import')}
-                </Button>
-              </div>
-            )
-          )}
-          sortable
-          defaultSort={{ key: 'name', direction: 'asc' }}
-          pagination={true}
-          emptyIcon={FileText}
-          emptyTitle={t('templates.noTemplates')}
-          emptyDescription={t('templates.noTemplatesDescription')}
-          emptyAction={canWrite('templates') && (
-            <Button type="button" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
-              <Plus size={16} /> {t('templates.createTemplate')}
-            </Button>
-          )}
-        />
-      </ResponsiveLayout>
-
       {/* Template Modal */}
       <Modal
         open={showTemplateModal}
@@ -741,6 +266,207 @@ export default function TemplatesPage() {
         template={selectedTemplate}
       />
     </>
+  )
+
+  // ============= LIST =============
+
+  const tplState = (tpl) => (tpl.is_active === false ? 'inactive' : 'active')
+  const tplPill = (tpl) => (tplState(tpl) === 'active'
+    ? <Pill label={t('templates.module.states.active')} tone="good" />
+    : <Pill label={t('templates.module.states.inactive')} tone="muted" />)
+  const tplSource = (tpl) => (tpl.is_system ? t('templates.system') : t('templates.custom'))
+  const tplValidity = (tpl) => t('templates.module.validity', { count: tpl.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS })
+  const tplKey = (tpl) => keyLabel(tpl.key_type) || '—'
+  const tplUses = (tpl) => t('templates.module.usesCount', { count: tpl.usage_count || 0 })
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return templates.filter((tpl) => (!source || (source === 'system') === !!tpl.is_system)
+      && (!q || [tpl.name, tpl.description, tplSource(tpl)].some((v) => String(v || '').toLowerCase().includes(q))))
+  }, [templates, source, query]) // eslint-disable-line react-hooks/exhaustive-deps
+  const present = ['active', 'inactive'].filter((s) => templates.some((tpl) => tplState(tpl) === s))
+  const active = present.includes(state) ? state : ''
+  const rows = useMemo(() => {
+    const list = searched.filter((tpl) => !active || tplState(tpl) === active)
+    const value = { name: (x) => String(x.name || '').toLowerCase(), validity_days: (x) => x.validity_days || 0, usage_count: (x) => x.usage_count || 0 }[sort.key]
+    return [...list].sort((a, b) => {
+      const va = value(a)
+      const vb = value(b)
+      return (va < vb ? -1 : va > vb ? 1 : 0) * (sort.asc ? 1 : -1)
+    })
+  }, [searched, active, sort])
+  const views = [
+    { id: '', label: t('common.all'), count: searched.length },
+    ...present.map((s) => ({ id: s, label: t(`templates.module.states.${s}`), count: searched.filter((tpl) => tplState(tpl) === s).length })),
+  ]
+  const narrowed = Boolean(query.trim() || source || active)
+  const write = canWrite('templates')
+  const create = write ? { label: t('templates.createTemplate'), icon: 'plus', onClick: () => { setEditingTemplate(null); setShowTemplateModal(true) }, primary: true } : undefined
+
+  // An open system template leaves the dock when the system templates are filtered out
+  useEffect(() => {
+    if (selectedTemplate && source === 'custom' && selectedTemplate.is_system) setSelectedTemplate(null)
+  }, [source, selectedTemplate, setSelectedTemplate])
+
+  // ============= DOCK =============
+
+  const open = selectedTemplate ? (templates.find((x) => x.id === selectedTemplate.id) ? { ...templates.find((x) => x.id === selectedTemplate.id), ...selectedTemplate } : selectedTemplate) : null
+  const openTemplate = (tpl) => {
+    if (tpl.id !== selectedTemplate?.id) setSection('overview')
+    setSelectedTemplate(tpl)
+  }
+  const ext = open?.extensions_template || {}
+  const pinned = Object.entries(open?.pinned_subject_fields || {})
+  const onOff = (v) => (v ? t('common.enabled') : t('common.disabled'))
+  const markers = open ? [
+    open.ad_derived_subject && t('templates.adDerivedBadge'),
+    open.autoenroll_enabled && t('templates.autoenrollBadge'),
+    open.allowed_ad_group && t('templates.enrollAclBadge'),
+    pinned.length > 0 && t('templates.pinnedSubjectBadge'),
+  ].filter(Boolean) : []
+  const menuItems = open ? [
+    { id: 'preview', icon: 'eye', label: t('templates.module.preview'), onClick: () => setShowPreviewModal(true) },
+    write && { id: 'duplicate', icon: 'copy', label: t('templates.module.duplicate'), write: true, onClick: () => handleDuplicateTemplate(open) },
+    write && { id: 'toggle', icon: open.is_active === false ? 'check' : 'block', label: open.is_active === false ? t('templates.activate') : t('common.deactivate'), write: true, onClick: () => handleToggleActive(open) },
+    canDelete('templates') && !open.is_system && { id: 'delete', icon: 'close', label: t('common.delete'), danger: true, write: true, onClick: () => handleDeleteTemplate(open) },
+  ].filter(Boolean) : []
+  const list = (items, empty) => (items?.length
+    ? <ul className="record-list">{items.map((x) => <li key={x}><div className="rl-main"><span className="mono">{x}</span></div></li>)}</ul>
+    : <p className="muted small">{empty}</p>)
+
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('common.templates') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.name, icon: 'template' }]} onClose={() => setSelectedTemplate(null)}>
+      <DockBody icon="template" title={open.name} badge={tplPill(open)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: open.name })}
+        sections={[['overview', t('atelier.overview')], ['subject', t('templates.module.sections.subject')], ['extensions', t('templates.module.sections.extensions')], ['enrollment', t('templates.enrollment')]]}
+        actions={<>
+          <Btn icon="download" id="template-export" onClick={() => handleExportTemplate(open)}>{t('common.export')}</Btn>
+          {write && (
+            <Btn icon="settings" id="template-edit" write disabled={open.is_system || undefined}
+              title={open.is_system ? t('templates.systemNotEditable') : undefined}
+              onClick={() => { setEditingTemplate(open); setShowTemplateModal(true) }}>{t('common.edit')}</Btn>
+          )}
+          <IconBtn quiet icon="more" title={false} label={t('templates.module.moreActions', { name: open.name })} data-template-menu={open.id} onClick={() => setMenuOpen(true)} />
+        </>}>
+        {section === 'overview' && (
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('templates.source'), tplSource(open)],
+                [t('common.validity'), tplValidity(open)],
+                [t('templates.module.defaultKey'), tplKey(open)],
+                [t('common.digest'), open.digest || '—'],
+                [t('templates.module.uses'), tplUses(open)],
+                [t('atelier.state'), tplPill(open)],
+                markers.length > 0 && [t('templates.module.markers'), markers.join(', ')],
+              ]} />
+            </Section>
+            <Section title={t('atelier.summary')}><p className="summary">{open.description || t('templates.module.noDescription')}</p></Section>
+          </div>
+        )}
+        {section === 'subject' && (
+          <div className="module-detail">
+            <Section title={t('templates.subjectTemplate')}>
+              <Props items={[
+                [t('templates.commonName'), open.dn_template?.CN || '—'],
+                [t('templates.organization'), open.dn_template?.O || '—'],
+                [t('common.orgUnit'), open.dn_template?.OU || '—'],
+                [t('templates.country'), open.dn_template?.C || '—'],
+                [t('templates.state'), open.dn_template?.ST || '—'],
+                [t('common.locality'), open.dn_template?.L || '—'],
+                [t('common.email'), open.dn_template?.emailAddress || '—'],
+              ]} />
+            </Section>
+            <Section title={t('templates.module.sections.rules')}>
+              <Props items={[
+                [t('templates.adDerivedSubject'), onOff(open.ad_derived_subject)],
+                [t('templates.cnPattern'), open.subject_cn_pattern
+                  ? `${open.subject_cn_pattern}${open.subject_cn_keep_path ? ` (${t('templates.cnPatternKeepPath')})` : ''}` : '—'],
+                [t('templates.enforceSanTypes'), onOff(open.enforce_san_types)],
+                [t('templates.module.sanTypes'), (ext.san_types || []).join(', ') || '—'],
+              ]} />
+            </Section>
+          </div>
+        )}
+        {section === 'extensions' && (
+          <div className="module-detail">
+            <Section title={t('details.ext.keyUsage')}>{list(ext.key_usage, t('templates.module.none'))}</Section>
+            <Section title={t('details.ext.extKeyUsage')}>{list(ext.extended_key_usage, t('templates.module.none'))}</Section>
+            {(ext.qc_statements || ext.certificate_policies?.length > 0) && (
+              <Section title={t('templates.qc.title')}>{list([...Object.keys(ext.qc_statements || {}), ...(ext.certificate_policies || [])], t('templates.module.none'))}</Section>
+            )}
+            {(open.custom_extensions?.length > 0 || open.custom_extensions_error) && (
+              <Section title={t('customExtensions.title')}>
+                <StoredExtensionsError error={open.custom_extensions_error} />
+                <ul className="record-list">
+                  {(open.custom_extensions || []).map((e) => (
+                    <li key={e.oid}>
+                      <div className="rl-main"><strong className="mono">{e.oid}</strong><span className="rl-meta mono" title={e.value}>{truncateHex(e.value)}</span></div>
+                      {e.critical && <Pill label={t('customExtensions.critical')} tone="warn" icon="warning" />}
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
+          </div>
+        )}
+        {section === 'enrollment' && (
+          <div className="module-detail">
+            <Section title={t('templates.enrollment')}>
+              <Props items={[
+                [t('templates.autoenrollEnabled'), onOff(open.autoenroll_enabled)],
+                [t('templates.allowedAdGroup'), open.allowed_ad_group || t('templates.allowedAdGroupUnset')],
+                [t('templates.pinnedSubjectFields'), pinned.length ? pinned.map(([k, v]) => `${k}=${v}`).join(', ') : t('templates.pinnedSubjectFieldsUnset')],
+              ]} />
+            </Section>
+          </div>
+        )}
+      </DockBody>
+    </Dock>
+  )
+
+  // ============= RENDER =============
+
+  return (
+    <Zone dock={dock} testId="templates-zone" after={<>
+      {menuOpen && open && <CertMenu title={t('templates.module.actionsTitle')} name={open.name} items={menuItems} onClose={() => setMenuOpen(false)} />}
+      {dialogs}
+    </>}>
+      <PageHead title={t('common.templates')} total={t('templates.module.unit', { count: templates.length })} intent={t('shell.moduleDesc.templates')}
+        actions={write && <>
+          <Btn icon="upload" id="template-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
+          <Btn tone="primary" icon="plus" id="template-new" onClick={create.onClick}>{create.label}</Btn>
+        </>} />
+      <ListView label={t('common.templates')} caption={t('templates.module.caption')} icon="template" rows={rows} loading={loading}
+        filters={{ views, active, onChange: setState, label: t('templates.module.filterByState') }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="template-search" name="q" label={t('templates.searchPlaceholder')} placeholder={t('templates.searchPlaceholder')} value={query} onChange={setQuery} />
+            <FilterSelect id="template-source" label={t('templates.source')} value={source} onChange={setSource}
+              options={[{ value: '', label: t('templates.allSources') }, { value: 'system', label: t('templates.system') }, { value: 'custom', label: t('templates.custom') }]} />
+          </Toolbar>
+        )}
+        title={(tpl) => tpl.name || t('common.unnamed')} status={tplPill} openedId={open?.id} onOpen={openTemplate}
+        sort={sort} onSort={(key) => setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))} nameSort="name"
+        columns={[
+          { id: 'source', label: t('templates.source'), cell: tplSource, grow: true },
+          { id: 'validity', label: t('common.validity'), cell: tplValidity, sort: 'validity_days' },
+          { id: 'key', label: t('templates.module.defaultKey'), cell: tplKey },
+          { id: 'uses', label: t('templates.module.uses'), cell: tplUses, sort: 'usage_count' },
+          { status: true },
+        ]}
+        error={loadError && (
+          <LoadError id="templates" title={t('messages.errors.loadFailed.templates')} onRetry={loadData}
+            cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/templates', message: loadError.message }} />} />
+        )}
+        empty={narrowed && templates.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+            onReset={() => { setQuery(''); setSource(''); setState('') }} />
+        ) : (
+          <EmptyBlock id="templates" icon="template" title={t('templates.noTemplates')} text={t('templates.noTemplatesDescription')} action={create} />
+        )}
+        footer={{ range: t('templates.module.range', { shown: rows.length, count: templates.length }) }} />
+    </Zone>
   )
 }
 

@@ -19,14 +19,15 @@ import { TableFooter } from './TableFooter'
  * @param {Array<{id, label, cell(row), grow?, muted?} | {status: true}>} p.columns
  * @param {{range, note?, pagination?}} p.footer
  * @param {import('react').ReactNode} [p.error]  a LoadError in place of the table
+ * @param {{key, asc}} [p.sort]  with onSort, the columns naming a `sort` key sort the list (the server's order)
  */
-export function ListView({ filters, label, caption, icon, rows, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions }) {
+export function ListView({ filters, label, caption, icon, rows, rowKey, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions, sort, onSort, nameSort }) {
   const { t } = useTranslation()
   const cols = [
-    { id: 'name', label: t('atelier.name'), entity: true, icon: () => icon, cell: title, skeleton: { base: 55, spread: 35 } },
+    { id: 'name', label: t('atelier.name'), entity: true, icon: () => icon, cell: title, sort: nameSort, skeleton: { base: 55, spread: 35 } },
     ...columns.map((c, i) => (c.status
-      ? { id: 'status', label: t('atelier.state'), cell: status, skeleton: { width: '74px', kind: 'pill' } }
-      : { id: c.id || `col-${i}`, label: c.label, cell: c.cell, grow: !!c.grow, tone: c.muted ? 'muted' : undefined, fit: c.fit, title: c.title })),
+      ? { id: 'status', label: t('atelier.state'), cell: status, sort: c.sort, skeleton: { width: '74px', kind: 'pill' } }
+      : { id: c.id || `col-${i}`, label: c.label, cell: c.cell, grow: !!c.grow, tone: c.muted ? 'muted' : undefined, fit: c.fit, title: c.title, sort: c.sort })),
   ]
   const card = (row) => ({
     meta: columns.filter((c) => !c.status).slice(0, 3).map((c) => c.cell(row)),
@@ -39,7 +40,7 @@ export function ListView({ filters, label, caption, icon, rows, title, status, c
         {toolbar}
         {error || (
           <DataTable kind="module" scrollId="module-scroll" label={t('atelier.tableOf', { name: label })} caption={caption}
-            columns={cols} rows={rows} rowLabel={title} onOpen={onOpen} openedId={openedId} loading={loading} empty={empty}
+            columns={cols} rows={rows} rowKey={rowKey} rowLabel={title} sort={sort} onSort={onSort} onOpen={onOpen} openedId={openedId} loading={loading} empty={empty}
             openLabel={(row) => t('atelier.openDetail', { name: title(row) })} card={card} selection={selection} rowActions={rowActions}
             footer={footer && <TableFooter {...footer} />} />
         )}

@@ -81,10 +81,16 @@ vi.mock('../../services', () => ({
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
 import CSRsPage from '../CSRsPage'
+import { openRow } from '../../test/atelierRows'
 
+// The certificate download is a dock action; the request, sign again and re-key are in its « ⋯ » menu
 const openSigned = async () => {
   render(<MemoryRouter initialEntries={['/csrs?tab=history']}><CSRsPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText('signed.example.com'))
+  await openRow('signed.example.com')
+  await screen.findByRole('button', { name: 'csrs.module.moreActions' })
+}
+const openMenu = async () => {
+  fireEvent.click(screen.getByRole('button', { name: 'csrs.module.moreActions' }))
   await screen.findByText('csrs.downloadCSR')
 }
 
@@ -104,6 +110,7 @@ describe('CSRsPage history: downloads', () => {
 
   it('the request itself stays downloadable', async () => {
     await openSigned()
+    await openMenu()
     fireEvent.click(screen.getByRole('button', { name: /csrs\.downloadCSR/ }))
     await waitFor(() => expect(csrDownload).toHaveBeenCalledWith(42))
     expect(certExport).not.toHaveBeenCalled()
@@ -113,6 +120,7 @@ describe('CSRsPage history: downloads', () => {
     mockCanWrite = true
     resubmit.mockReset().mockResolvedValue({ data: { id: 77 } })
     await openSigned()
+    await openMenu()
     fireEvent.click(screen.getByRole('button', { name: /csrs\.signAgain/ }))
     await waitFor(() => expect(resubmit).toHaveBeenCalledWith(42))
     mockCanWrite = false
@@ -120,6 +128,7 @@ describe('CSRsPage history: downloads', () => {
 
   it('offers no "Sign again" without write:csrs', async () => {
     await openSigned()
+    await openMenu()
     expect(screen.queryByRole('button', { name: /csrs\.signAgain/ })).toBeNull()
   })
 

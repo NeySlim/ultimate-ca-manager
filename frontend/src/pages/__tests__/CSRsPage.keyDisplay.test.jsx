@@ -3,7 +3,7 @@
  * panels, and never shows a request whose key has no name as RSA.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import en from '../../i18n/locales/en.json'
 
@@ -74,7 +74,8 @@ vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null })
 
 import CSRsPage from '../CSRsPage'
 
-const LEVEL_LABEL = 'ML-DSA-65 (level 3)'
+// The key reads as the Certificates zone names it: the algorithm, never a post-quantum level (the mockup shows none)
+const PQ_LABEL = 'ML-DSA-65'
 const PQ = { id: 5, cn: 'pq.example.com', common_name: 'pq.example.com', key_algorithm: 'ML-DSA-65', security_level: 3 }
 const UNNAMED = { id: 6, cn: 'nokey.example.com', common_name: 'nokey.example.com', key_algorithm: null }
 
@@ -83,17 +84,17 @@ const openRow = async (tab, row) => {
   rows.history = tab === 'history' ? [row] : []
   render(<MemoryRouter initialEntries={[`/csrs?tab=${tab}`]}><CSRsPage /></MemoryRouter>)
   const name = await screen.findByText(row.cn)
-  const listed = screen.queryAllByText(LEVEL_LABEL).length
-  fireEvent.click(name)
-  await screen.findByText(en.common.keyInformation)
+  const listed = screen.queryAllByText(PQ_LABEL).length
+  fireEvent.click(within(name.closest('tr')).getAllByRole('button')[0])
+  await screen.findByText(en.atelier.properties)
   return listed
 }
 
 describe('CSRsPage key display', () => {
-  it('names a pending ML-DSA request with its level in the list, the stats and the key section', async () => {
+  it('names a pending ML-DSA request in the list and in the dock', async () => {
     const listed = await openRow('pending', PQ)
     expect(listed).toBe(1)
-    expect(screen.getAllByText(LEVEL_LABEL)).toHaveLength(3)
+    expect(screen.getAllByText(PQ_LABEL)).toHaveLength(2)
   })
 
   it('shows a pending request with an unnamed key as a dash, never RSA', async () => {
@@ -101,9 +102,9 @@ describe('CSRsPage key display', () => {
     expect(screen.queryByText(/\bRSA\b/)).toBeNull()
   })
 
-  it('names a signed ML-DSA certificate with its level', async () => {
+  it('names a signed ML-DSA certificate in the list and in the dock', async () => {
     await openRow('history', PQ)
-    expect(screen.getAllByText(LEVEL_LABEL).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(PQ_LABEL)).toHaveLength(2)
   })
 
   it('shows a signed certificate with an unnamed key as a dash, never RSA', async () => {
