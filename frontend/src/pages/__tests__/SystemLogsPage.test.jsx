@@ -1,13 +1,12 @@
 /**
- * SystemLogsPage — every filter reaches the server rather than being applied in
- * the browser, so a filter never hides lines that were simply never fetched.
- * The component list and the counts are built from everything read, not from
- * what survived the filters, so narrowing can neither empty the list it came
- * from nor appear to change how many errors the server had. A deployment with
- * no log file says so instead of looking like an empty log.
+ * SystemLogsPage, drawn with the mockup's list gabarit (as the Activity page): every filter reaches
+ * the server rather than being applied in the browser, so a filter never hides lines that were
+ * simply never fetched. The component list and the counts are built from everything read, not
+ * from what survived the filters. A deployment with no log file says so instead of looking like
+ * an empty log.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   getApplicationLog: vi.fn(),
@@ -16,7 +15,9 @@ const mocks = vi.hoisted(() => ({
   writeText: vi.fn(() => Promise.resolve()),
 }))
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }))
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key, p) => (p ? `${key} ${JSON.stringify(p)}` : key), i18n: { language: 'en' } }),
+}))
 vi.mock('../../services', () => ({
   systemService: { getApplicationLog: mocks.getApplicationLog },
 }))
@@ -24,90 +25,8 @@ vi.mock('../../contexts', () => ({
   useNotification: () => ({ showError: mocks.showError, showSuccess: mocks.showSuccess }),
 }))
 vi.mock('../../lib/utils', () => ({ extractData: (r) => r?.data ?? r }))
-
-// Both layout pieces have their own tests. Here they only surface what the page
-// hands them, so each control can be driven by the label the page gave it.
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ title, stats = [], slideOverOpen, slideOverContent, children }) => (
-    <div>
-      <h1>{title}</h1>
-      <ul aria-label="stats">
-        {stats.map((s) => <li key={s.label}>{`${s.label}=${s.value}`}</li>)}
-      </ul>
-      {children}
-      {slideOverOpen && <aside aria-label="slideover">{slideOverContent}</aside>}
-    </div>
-  ),
-  ResponsiveDataTable: ({
-    data = [], columns = [], externalSearch, onSearchChange, searchPlaceholder,
-    toolbarActions, emptyState,
-    multiSelect, selectedIds, onSelectionChange, bulkActions,
-  }) => (
-    <div>
-      <input
-        aria-label={searchPlaceholder}
-        value={externalSearch ?? ''}
-        onChange={(e) => onSearchChange?.(e.target.value)}
-      />
-      <div>{toolbarActions}</div>
-      {multiSelect && (
-        <div>
-          {data.map((row) => (
-            <input
-              key={row.id}
-              type="checkbox"
-              aria-label={`select-${row.id}`}
-              checked={selectedIds?.has(row.id) || false}
-              onChange={(e) => {
-                const next = new Set(selectedIds)
-                if (e.target.checked) next.add(row.id)
-                else next.delete(row.id)
-                onSelectionChange(next)
-              }}
-            />
-          ))}
-          {selectedIds?.size > 0 && bulkActions}
-        </div>
-      )}
-      {data.length === 0 ? (
-        <p>{emptyState?.title}</p>
-      ) : (
-        <table>
-          <thead><tr>{columns.map((c) => <th key={c.key}>{c.header}</th>)}</tr></thead>
-          <tbody>
-            {data.map((row) => (
-              <tr key={row.id}>
-                {columns.map((c) => <td key={c.key}>{c.render(row[c.key], row)}</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  ),
-}))
-
-vi.mock('../../components', () => ({
-  Badge: ({ children }) => <span>{children}</span>,
-  Button: ({ children, loading: _loading, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label || props.placeholder} {...props} />,
-  Select: ({ label, options = [], value, onChange, disabled }) => (
-    <select
-      aria-label={label}
-      value={value ?? ''}
-      disabled={disabled}
-      onChange={(e) => onChange?.(e.target.value)}
-    >
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  ),
-}))
-
-vi.mock('../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label, checked, onChange }) => (
-    <input type="checkbox" aria-label={label} checked={checked} onChange={(e) => onChange(e.target.checked)} />
-  ),
-}))
+const screenSize = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => screenSize }))
 
 import SystemLogsPage from '../SystemLogsPage'
 
@@ -136,21 +55,24 @@ const BASE = { source: 'app', level: 'INFO', lines: 200 }
 describe('SystemLogsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    screenSize.isMobile = false
     Object.assign(navigator, { clipboard: { writeText: mocks.writeText } })
   })
   afterEach(() => vi.useRealTimers())
 
   it('heads the table with the column names', async () => {
     await renderPage()
-    expect([...document.querySelectorAll('th')].map((h) => h.textContent))
+    // the first column holds the page's checkbox
+    expect([...document.querySelectorAll('th')].slice(1).map((h) => h.textContent))
       .toEqual(['logs.time', 'logs.levelShort', 'logs.component', 'logs.message'])
   })
 
   it('renders each record as a row with its parts in their own cells', async () => {
     await renderPage()
     const row = (await screen.findByText('failInfo=1')).closest('tr')
-    expect([...row.querySelectorAll('td')].map((c) => c.textContent.trim()))
+    expect([...row.querySelectorAll('td')].slice(1).map((c) => c.textContent.trim()))
       .toEqual(['2026-09-19 13:41:36', 'WARNING', 'services.scep', 'failInfo=1'])
+    expect(row.querySelector('.badge.warn')).toBeTruthy()
   })
 
   it('keeps a record that carries no level, and invents none for it', async () => {
@@ -160,16 +82,17 @@ describe('SystemLogsPage', () => {
     })
     const row = (await screen.findByText('GET /api 200')).closest('tr')
     expect(row).toBeTruthy()                                   // shown, not dropped
-    expect(row.querySelectorAll('td')[1].textContent).toBe('')  // and no badge
+    expect(row.querySelectorAll('td')[2].textContent).toBe('')  // and no badge
   })
 
   it('summarises what the filters matched, not the page of it on screen', async () => {
     await renderPage()
-    const stats = [...screen.getByLabelText('stats').children].map((li) => li.textContent)
-    expect(stats).toContain('common.total=1193')
-    expect(stats).toContain('logs.errors=6')        // ERROR + CRITICAL
-    expect(stats).toContain('logs.warnings=13')
-    expect(stats).toContain('logs.components=2')
+    const stats = [...document.querySelector('.audit-summary').children].map((s) => s.textContent)
+    expect(stats).toContain('logs.matched {"count":1193}')
+    expect(stats).toContain('logs.errorCount {"count":"6"}')        // ERROR + CRITICAL
+    expect(stats).toContain('logs.warningCount {"count":"13"}')
+    expect(stats).toContain('logs.componentCount {"count":"2"}')
+    expect(document.querySelector('.page-head .total').textContent).toBe('logs.unit {"count":1193}')
   })
 
   it('asks the server for the application log, INFO and 200 lines by default', async () => {
@@ -310,7 +233,7 @@ describe('SystemLogsPage', () => {
     await waitFor(() => expect(mocks.getApplicationLog)
       .toHaveBeenLastCalledWith({ ...BASE, since: '2026-09-19T12:30' }))
 
-    fireEvent.click(screen.getByLabelText('logs.follow'))
+    fireEvent.click(screen.getByRole('button', { name: 'logs.follow' }))
     await waitFor(() => expect(mocks.getApplicationLog).toHaveBeenLastCalledWith(BASE))
   })
 
@@ -319,12 +242,12 @@ describe('SystemLogsPage', () => {
     await renderPage()
     const before = mocks.getApplicationLog.mock.calls.length
 
-    fireEvent.click(screen.getByLabelText('logs.follow'))
+    fireEvent.click(screen.getByRole('button', { name: 'logs.follow' }))
     await vi.advanceTimersByTimeAsync(11000)
     const polled = mocks.getApplicationLog.mock.calls.length
     expect(polled).toBeGreaterThan(before)
 
-    fireEvent.click(screen.getByLabelText('logs.follow'))
+    fireEvent.click(screen.getByRole('button', { name: 'logs.follow' }))
     await vi.advanceTimersByTimeAsync(11000)
     expect(mocks.getApplicationLog.mock.calls.length).toBe(polled)
   })
@@ -333,7 +256,7 @@ describe('SystemLogsPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     await renderPage()
     mocks.getApplicationLog.mockRejectedValue(new Error('network'))
-    fireEvent.click(screen.getByLabelText('logs.follow'))
+    fireEvent.click(screen.getByRole('button', { name: 'logs.follow' }))
     await vi.advanceTimersByTimeAsync(6000)
     expect(screen.getByText('failInfo=1')).toBeInTheDocument()
     expect(mocks.showError).not.toHaveBeenCalled()
@@ -342,7 +265,7 @@ describe('SystemLogsPage', () => {
   it('lists the newest line first, so page one is the recent one', async () => {
     await renderPage()
     const first = document.querySelector('tbody tr')
-    expect(first.querySelectorAll('td')[0].textContent).toBe('2026-09-19 13:41:37')
+    expect(first.querySelectorAll('td')[1].textContent).toBe('2026-09-19 13:41:37')
   })
 
   it("copies every line as the file writes it, newest first as shown", async () => {
@@ -362,7 +285,7 @@ describe('SystemLogsPage', () => {
     await renderPage()
     expect(screen.queryByText('logs.copySelected')).toBeNull()
 
-    fireEvent.click(screen.getByLabelText('select-0'))
+    fireEvent.click(document.querySelector('input[data-select="0"]'))
     fireEvent.click(screen.getByText('logs.copySelected'))
     await waitFor(() => expect(mocks.writeText).toHaveBeenCalled())
     expect(mocks.writeText.mock.calls[0][0])
@@ -422,7 +345,7 @@ describe('SystemLogsPage', () => {
 
   it('forgets the ticked rows when the data underneath them changes', async () => {
     await renderPage()
-    fireEvent.click(screen.getByLabelText('select-0'))
+    fireEvent.click(document.querySelector('input[data-select="0"]'))
     expect(screen.getByText('logs.copySelected')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('logs.level'), { target: { value: 'ERROR' } })
@@ -442,5 +365,42 @@ describe('SystemLogsPage', () => {
     expect(mocks.writeText.mock.calls[0][0]).toBe(
       '10.0.0.2 - - [19/Sep/2026:13:41:37 +0200] "GET /x HTTP/1.1" 404\n'
       + '10.0.0.1 - - [19/Sep/2026:13:41:36 +0200] "GET / HTTP/1.1" 200')
+  })
+  it('switches live logs on and off as a pressed button', async () => {
+    await renderPage()
+    const live = screen.getByRole('button', { name: 'logs.follow' })
+    expect(live).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(live)
+    expect(live).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('logs.following')).toBeInTheDocument()
+  })
+
+  it('shows each filter of the panel as a chip that removes it', async () => {
+    await renderPage()
+    fireEvent.click(screen.getByText('logs.filters'))
+    fireEvent.change(await screen.findByLabelText('logs.component'), { target: { value: 'services.scep' } })
+    await waitFor(() => expect(mocks.getApplicationLog)
+      .toHaveBeenLastCalledWith({ ...BASE, component: 'services.scep' }))
+    fireEvent.click(screen.getByRole('button', { name: 'common.done' }))
+
+    const chips = screen.getByRole('group', { name: 'table.activeFilters' })
+    expect(chips).toHaveTextContent('logs.chipComponent {"component":"services.scep"}')
+    fireEvent.click(within(chips).getByRole('button', { name: /table\.removeFilter/ }))
+    await waitFor(() => expect(mocks.getApplicationLog).toHaveBeenLastCalledWith(BASE))
+    expect(screen.queryByRole('group', { name: 'table.activeFilters' })).toBeNull()
+  })
+
+  it('draws a card per line on a phone, the level and the time on it', async () => {
+    screenSize.isMobile = true
+    await renderPage()
+    const cards = await waitFor(() => {
+      const found = document.querySelectorAll('#logs-records .mobile-record')
+      expect(found).toHaveLength(2)
+      return found
+    })
+    expect(document.querySelector('table')).toBeNull()
+    expect(cards[0]).toHaveTextContent('log read')
+    expect(cards[0]).toHaveTextContent('2026-09-19 13:41:37')
+    expect(cards[1].querySelector('.badge.warn')).toHaveTextContent('WARNING')
   })
 })

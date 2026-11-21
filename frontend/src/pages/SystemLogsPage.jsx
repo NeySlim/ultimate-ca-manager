@@ -1,15 +1,15 @@
 /**
- * System Logs Page - Migrated to ResponsiveLayout
- * The server's own application log: filter by source, component, level and time
+ * Journaux système: the server's own application log, drawn with the mockup's list gabarit as
+ * the Activity page is (page head, toolbar, applied filters, summary, the journal table, cards on
+ * a phone). Every filter is the server's: source, component, level, line count, time window,
+ * search and exclusion; the lines are copied as the file wrote them.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Stack, ArrowsClockwise, Copy, Warning, XCircle, Database, Cube, FunnelSimple
-} from '@phosphor-icons/react'
-import { Badge, Button, Input, Select } from '../components'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
+  Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ToolsDivider, AppliedFilters,
+  BatchBar, DataTable, TableFooter, EmptyBlock, NoMatch, AtelierDialog,
+} from '../components/atelier'
 import { useNotification } from '../contexts'
 import { systemService } from '../services'
 import { extractData } from '../lib/utils'
@@ -17,10 +17,8 @@ import { extractData } from '../lib/utils'
 const LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
 const LINE_COUNTS = [100, 200, 500, 1000, 2000, 5000]
 const FOLLOW_INTERVAL_MS = 5000
-// The same pause SearchBar uses elsewhere. Every read costs the server a two
-// megabyte tail, a redaction pass and a parse, on the one worker that also
-// answers ACME, SCEP and OCSP, so a word typed into either box is one request
-// rather than one per character.
+// Every read costs the server a two megabyte tail, a redaction pass and a parse, on the worker
+// that also answers ACME, SCEP and OCSP: a word typed is one request, not one per character.
 const TYPING_PAUSE_MS = 300
 
 const SOURCE_LABELS = {
@@ -30,8 +28,16 @@ const SOURCE_LABELS = {
   journal: 'logs.sourceJournal',
 }
 
-// What was typed, once the typing stopped. The box itself stays on the raw
-// value, so the field never lags behind the keyboard.
+// A level's tone and icon: the colour is never the only signal
+const LEVEL_TONE = {
+  DEBUG: { tone: 'muted', icon: 'code' },
+  INFO: { tone: '', icon: 'activity' },
+  WARNING: { tone: 'warn', icon: 'warning' },
+  ERROR: { tone: 'bad', icon: 'warning' },
+  CRITICAL: { tone: 'bad', icon: 'block' },
+}
+
+// What was typed, once the typing stopped; the box itself stays on the raw value
 function useSettled(value, delay = TYPING_PAUSE_MS) {
   const [settled, setSettled] = useState(value)
   useEffect(() => {
@@ -41,16 +47,11 @@ function useSettled(value, delay = TYPING_PAUSE_MS) {
   return settled
 }
 
-const LEVEL_VARIANT = {
-  DEBUG: 'gray',
-  INFO: 'info',
-  WARNING: 'warning',
-  ERROR: 'danger',
-  CRITICAL: 'danger',
-}
+const levelPill = (level) => (level ? <Pill label={level} tone={LEVEL_TONE[level]?.tone} icon={LEVEL_TONE[level]?.icon} /> : null)
 
 export default function SystemLogsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || undefined
   const { showError, showSuccess } = useNotification()
   const [source, setSource] = useState('app')
   const [component, setComponent] = useState('')
@@ -69,8 +70,7 @@ export default function SystemLogsPage() {
   const query = useSettled(search)
   const omit = useSettled(exclude)
 
-  // Only the newest request may fill the page: a slow read of one source must
-  // not land over the filters chosen since, and a poll never stacks on a read.
+  // Only the newest request may fill the page, and a poll never stacks on a read
   const sequence = useRef(0)
   const inFlight = useRef(false)
   const load = useCallback(async (quiet = false) => {
@@ -102,114 +102,34 @@ export default function SystemLogsPage() {
 
   useEffect(() => { load() }, [source, component, level, lines, query, since, until, omit])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live mode polls rather than streaming: a log line pushed over the event bus
-  // is itself logged by the push, which is a loop the interval cannot make.
+  // Live mode polls rather than streaming: a line pushed over the event bus is itself logged by the push
   useEffect(() => {
     if (!follow) return undefined
     const id = setInterval(() => load(true), FOLLOW_INTERVAL_MS)
     return () => clearInterval(id)
   }, [follow, load])
 
-  // The server returns the tail oldest-first, as the file is written. The table
-  // paginates, so that would put the newest lines on the last page and open on
-  // the oldest — reversed here, page one is the most recent.
+  // The server returns the tail oldest-first; reversed, the newest line comes first
   const rows = useMemo(
     () => (result?.lines || []).map((line, index) => ({ id: index, ...line })).reverse(),
     [result],
   )
 
-  // Source and component were one nested control until the component list grew
-  // to every subsystem UCM has: the three other logs then sat below thirty
-  // entries, where nobody found them. Two plain selects, both in the panel.
-  const sourceOptions = useMemo(
-    () => (result?.available_sources || ['app']).map((s) => ({
-      value: s, label: t(SOURCE_LABELS[s] || s),
-    })),
-    [result, t],
-  )
+  const sourceOptions = (result?.available_sources || ['app']).map((s) => ({ value: s, label: t(SOURCE_LABELS[s] || s) }))
+  const componentOptions = [
+    { value: '', label: t('logs.allComponents') },
+    ...(result?.components || []).map((c) => ({ value: c, label: c })),
+  ]
 
-  const componentOptions = useMemo(
-    () => [
-      { value: '', label: t('logs.allComponents') },
-      ...(result?.components || []).map((c) => ({ value: c, label: c })),
-    ],
-    [result, t],
-  )
+  // A window into the past and a tail of the present are opposite requests: following clears the window
+  const toggleFollow = () => {
+    const on = !follow
+    setFollow(on)
+    if (on) { setSince(''); setUntil(''); setShowFilters(false) }
+  }
+  const clearPanel = () => { setSource('app'); setComponent(''); setSince(''); setUntil(''); setExclude('') }
 
-  const filtered = source !== 'app' || component || since || until || exclude
-
-  const headerStats = useMemo(() => {
-    const levels = result?.levels || {}
-    return [
-      { icon: Database, label: t('common.total'), value: result?.matched || 0, variant: 'default' },
-      {
-        icon: XCircle,
-        label: t('logs.errors'),
-        value: (levels.ERROR || 0) + (levels.CRITICAL || 0),
-        variant: 'danger',
-      },
-      { icon: Warning, label: t('logs.warnings'), value: levels.WARNING || 0, variant: 'warning' },
-      {
-        icon: Cube,
-        label: t('logs.components'),
-        value: (result?.components || []).length,
-        variant: 'info',
-      },
-    ]
-  }, [result, t])
-
-  const columns = useMemo(() => [
-    {
-      key: 'ts',
-      header: t('logs.time'),
-      priority: 1,
-      render: (value) => (
-        <span className="font-mono text-xs text-text-secondary whitespace-nowrap">{value || ''}</span>
-      ),
-      mobileRender: (value, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <span className="font-mono text-xs text-text-secondary">{value || ''}</span>
-          {row.level && <Badge variant={LEVEL_VARIANT[row.level]} size="sm">{row.level}</Badge>}
-        </div>
-      ),
-    },
-    {
-      key: 'level',
-      header: t('logs.levelShort'),
-      priority: 2,
-      // A line whose format carries no level gets no badge. A placeholder in
-      // its place reads as a level of its own, which is the one thing the
-      // reader must not conclude from a line nobody could parse.
-      render: (value) => (
-        value ? <Badge variant={LEVEL_VARIANT[value]} size="sm">{value}</Badge> : null
-      ),
-    },
-    {
-      key: 'logger',
-      header: t('logs.component'),
-      priority: 3,
-      render: (value) => (
-        <span className="font-mono text-xs text-text-secondary">{value || ''}</span>
-      ),
-    },
-    {
-      key: 'message',
-      header: t('logs.message'),
-      priority: 1,
-      render: (value) => (
-        <span className="font-mono text-xs text-text-primary whitespace-pre-wrap break-words">{value}</span>
-      ),
-      mobileRender: (value, row) => (
-        <div className="space-y-1">
-          <span className="font-mono text-xs text-text-tertiary">{row.logger || ''}</span>
-          <p className="font-mono text-xs text-text-primary break-words">{value}</p>
-        </div>
-      ),
-    },
-  ], [t])
-
-  // Copied as the log wrote it, whatever the source: the server keeps each
-  // record's raw line, so a pasted line parses back on this same page.
+  // Copied as the log wrote it, whatever the source, so a pasted line parses back here
   const copy = (subset) => {
     const text = subset
       .map((l) => l.raw ?? [l.ts, l.logger && `[${l.logger}]`, l.level, l.message].filter(Boolean).join(' '))
@@ -220,166 +140,130 @@ export default function SystemLogsPage() {
     )
   }
 
-  const toolbarActions = (
-    <>
-      <div className="w-32">
-        <Select
-          label={t('logs.level')}
-          value={level}
-          onChange={setLevel}
-          options={LEVELS.map((l) => ({ value: l, label: l }))}
-        />
-      </div>
-      <div className="w-32">
-        <Select
-          label={t('logs.lines')}
-          value={lines}
-          onChange={setLines}
-          options={LINE_COUNTS.map((n) => ({
-            value: String(n), label: t('logs.linesOpt', { count: n }),
-          }))}
-        />
-      </div>
-      <ToggleSwitch
-        checked={follow}
-        onChange={(on) => {
-          // A window into the past and a tail of the present are opposite
-          // requests; following one clears the other rather than leaving an
-          // empty pane that reads as nothing being logged.
-          setFollow(on)
-          if (on) { setSince(''); setUntil(''); setShowFilters(false) }
-        }}
-        label={t('logs.follow')}
-        size="sm"
-      />
-      <Button
-        type="button"
-        variant={filtered ? 'primary' : 'secondary'}
-        size="sm"
-        onClick={() => setShowFilters(true)}
-      >
-        <FunnelSimple size={14} /> {t('logs.filters')}
-      </Button>
-      <Button type="button" variant="secondary" size="sm" onClick={() => load()} loading={loading}>
-        <ArrowsClockwise size={14} />
-      </Button>
-      <Button type="button" variant="ghost" size="sm" onClick={() => copy(rows)}>
-        <Copy size={14} /> <span className="hidden sm:inline">{t('logs.copyAll')}</span>
-      </Button>
-    </>
+  // The filters the toolbar does not show, one chip each
+  const chips = []
+  if (source !== 'app') chips.push({ key: 'source', label: t('logs.chipSource', { source: t(SOURCE_LABELS[source] || source) }), onRemove: () => setSource('app') })
+  if (component) chips.push({ key: 'component', label: t('logs.chipComponent', { component }), onRemove: () => setComponent('') })
+  if (since) chips.push({ key: 'since', label: t('logs.chipFrom', { date: since.replace('T', ' ') }), onRemove: () => setSince('') })
+  if (until) chips.push({ key: 'until', label: t('logs.chipTo', { date: until.replace('T', ' ') }), onRemove: () => setUntil('') })
+  if (exclude) chips.push({ key: 'exclude', label: t('logs.chipExclude', { text: exclude }), onRemove: () => setExclude('') })
+
+  const levels = result?.levels || {}
+  const matched = result?.matched || 0
+  const firstRead = loading && !result
+  const narrowed = Boolean(search || chips.length)
+  const fmt = (n) => Number(n).toLocaleString(locale)
+
+  const empty = result && !result.exists ? (
+    <EmptyBlock id="logs" icon="activity" title={t('logs.unavailable')} />
+  ) : (
+    <NoMatch icon="search" title={t('logs.empty')} text={t('common.tryAdjustFilters')} resetLabel={t('table.clearFilters')}
+      onReset={narrowed ? () => { setSearch(''); clearPanel() } : undefined} />
   )
 
-  const filterContent = (
-    <div className="p-4 space-y-4">
-      <Select
-        label={t('logs.source')}
-        value={source}
-        onChange={(v) => { setSource(v); if (v !== 'app') setComponent('') }}
-        options={sourceOptions}
-      />
-      <Select
-        label={t('logs.component')}
-        value={component}
-        onChange={setComponent}
-        disabled={source !== 'app'}
-        options={componentOptions}
-      />
-      <Input
-        type="datetime-local"
-        label={t('logs.from')}
-        value={since}
-        disabled={follow}
-        onChange={(e) => setSince(e.target.value)}
-      />
-      <Input
-        type="datetime-local"
-        label={t('logs.to')}
-        value={until}
-        disabled={follow}
-        onChange={(e) => setUntil(e.target.value)}
-      />
-      <p className="text-xs text-text-tertiary">{t('logs.serverTime')}</p>
-      {/* Search and Exclude are substrings, not patterns: one gevent worker
-          answers every protocol this server speaks, and a pattern from the
-          browser is unbounded work over thousands of records. */}
-      <Input
-        label={t('logs.exclude')}
-        placeholder={t('logs.exclude')}
-        value={exclude}
-        onChange={(e) => setExclude(e.target.value)}
-      />
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        onClick={() => {
-          setSource('app'); setComponent('')
-          setSince(''); setUntil(''); setExclude('')
-        }}
-      >
-        {t('common.clear')}
-      </Button>
-    </div>
-  )
+  // Short columns fit their content (adjust.css); the message takes the rest and wraps
+  const columns = [
+    { id: 'ts', label: t('logs.time'), fit: true, tone: ['mono', 'muted'], cell: (l) => l.ts || '', skeleton: { width: '130px' } },
+    // A line whose format carries no level gets no badge: a placeholder would read as a level of its own
+    { id: 'level', label: t('logs.levelShort'), fit: true, cell: (l) => levelPill(l.level), skeleton: { width: '70px', kind: 'pill' } },
+    { id: 'logger', label: t('logs.component'), fit: true, tone: ['mono', 'muted', 'small'], cell: (l) => l.logger || '', skeleton: { width: '110px' } },
+    { id: 'message', label: t('logs.message'), tone: 'mono', cell: (l) => <span className="log-message">{l.message}</span>, skeleton: { base: 50, spread: 40 } },
+  ]
+  const card = (l) => ({
+    title: <span className="log-message mono">{l.message}</span>,
+    meta: [l.logger && <span key="logger" className="mono">{l.logger}</span>],
+    status: levelPill(l.level),
+    end: l.ts || '',
+  })
+
+  const footNote = result ? [
+    result.path ? `${t('logs.readingFrom')} ${result.path}` : null,
+    `${t('logs.serverTime')}${result.timezone?.name || result.timezone?.offset ? ` (${[result.timezone.name, result.timezone.offset].filter(Boolean).join(' ')})` : ''}`,
+    result.truncated ? t('logs.showing', { shown: rows.length, matched }) : null,
+    result.scan_truncated ? t('logs.scanCap') : null,
+  ].filter(Boolean).join(' · ') : ''
+
+  const selection = {
+    selected: selectedIds,
+    onToggle: (id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }),
+    onTogglePage: (on) => setSelectedIds(on ? new Set(rows.map((r) => r.id)) : new Set()),
+  }
 
   return (
-    <ResponsiveLayout
-      title={t('common.systemLogs')}
-      icon={Stack}
-      subtitle={t('logs.subtitle')}
-      stats={headerStats}
-      helpPageKey="systemLogs"
-      slideOverOpen={showFilters}
-      onSlideOverClose={() => setShowFilters(false)}
-      slideOverTitle={t('logs.filters')}
-      slideOverContent={filterContent}
-      slideOverWidth="narrow"
-    >
-      <div className="flex flex-col h-full min-h-0">
-        <ResponsiveDataTable
-          data={rows}
-          columns={columns}
-          keyField="id"
-          loading={loading}
-          searchable
-          externalSearch={search}
-          onSearchChange={setSearch}
-          searchPlaceholder={t('logs.searchPlaceholder')}
-          densityStorageKey="ucm-system-logs-density"
-          toolbarActions={toolbarActions}
-          multiSelect
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-          bulkActions={
-            <Button
-              type="button" variant="secondary" size="sm"
-              onClick={() => copy(rows.filter((r) => selectedIds.has(r.id)))}
-            >
-              <Copy size={14} /> {t('logs.copySelected')}
-            </Button>
-          }
-          emptyState={{
-            icon: Stack,
-            title: result && !result.exists ? t('logs.unavailable') : t('logs.empty'),
-            description: result && !result.exists ? '' : t('common.tryAdjustFilters'),
-          }}
-        />
-        {result && (
-          <p className="px-4 py-2 text-xs text-text-tertiary border-t border-border break-all">
-            {result.path && (
-              <>{t('logs.readingFrom')} <code className="font-mono">{result.path}</code>{' · '}</>
-            )}
-            {t('logs.serverTime')}
-            {result.timezone?.name || result.timezone?.offset
-              ? ` (${[result.timezone.name, result.timezone.offset].filter(Boolean).join(' ')})`
-              : ''}
-            {result.truncated
-              ? ` · ${t('logs.showing', { shown: rows.length, matched: result.matched })}`
-              : ''}
-            {result.scan_truncated ? ` · ${t('logs.scanCap')}` : ''}
-          </p>
-        )}
+    <Zone testId="logs-page" after={showFilters && (
+      <AtelierDialog title={t('logs.filters')} subtitle={t('logs.filtersIntent')} size="narrow" onClose={() => setShowFilters(false)} returnTo="logs-filters">
+        <div className="form-fields">
+          <div className="field">
+            <label htmlFor="log-source">{t('logs.source')}</label>
+            <select id="log-source" value={source} onChange={(e) => { setSource(e.target.value); if (e.target.value !== 'app') setComponent('') }}>
+              {sourceOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="log-component">{t('logs.component')}</label>
+            <select id="log-component" value={component} disabled={source !== 'app'} onChange={(e) => setComponent(e.target.value)}>
+              {componentOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="log-from">{t('logs.from')}</label>
+            <input id="log-from" type="datetime-local" value={since} disabled={follow} aria-describedby="hint-log-time" onChange={(e) => setSince(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="log-to">{t('logs.to')}</label>
+            <input id="log-to" type="datetime-local" value={until} disabled={follow} aria-describedby="hint-log-time" onChange={(e) => setUntil(e.target.value)} />
+          </div>
+          <p className="field full muted small" id="hint-log-time">{t('logs.serverTime')}</p>
+          {/* Search and exclusion are substrings, not patterns: a pattern from the browser is unbounded work */}
+          <div className="field full">
+            <label htmlFor="log-exclude">{t('logs.exclude')}</label>
+            <input id="log-exclude" value={exclude} autoComplete="off" spellCheck={false} aria-describedby="hint-log-exclude" onChange={(e) => setExclude(e.target.value)} />
+            <small id="hint-log-exclude">{t('logs.excludeHint')}</small>
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" data-action="reset-filters" onClick={clearPanel}>{t('common.clear')}</button>
+          <button type="button" className="btn primary" data-action="close-modal" onClick={() => setShowFilters(false)}>{t('common.done')}</button>
+        </div>
+      </AtelierDialog>
+    )}>
+      <PageHead title={t('logs.title')} total={result ? t('logs.unit', { count: matched }) : ''} intent={t('logs.subtitle')} />
+
+      <Toolbar>
+        <SearchField id="log-search" name="logSearch" label={t('logs.searchPlaceholder')} placeholder={t('logs.searchPlaceholder')} value={search} onChange={setSearch} />
+        <FilterSelect id="log-level" label={t('logs.level')} value={level} onChange={setLevel} options={LEVELS.map((l) => ({ value: l, label: l }))} />
+        <FilterSelect id="log-lines" label={t('logs.lines')} value={lines} onChange={setLines}
+          options={LINE_COUNTS.map((n) => ({ value: String(n), label: t('logs.linesOpt', { count: n }) }))} />
+        <ToolsDivider />
+        <Btn icon="filter" id="logs-filters" data-action="filters" title={t('logs.filters')} onClick={() => setShowFilters(true)}><span>{t('logs.filters')}</span></Btn>
+        <button type="button" className="btn" id="logs-follow" data-action="follow" aria-pressed={follow} title={t('logs.follow')} onClick={toggleFollow}>
+          <Icon name="activity" /><span>{t('logs.follow')}</span>
+        </button>
+        {/* In the toolbar rather than the head: on a phone the head keeps only a primary action, the toolbar keeps its tools */}
+        <Btn icon="copy" data-action="copy-all" title={t('logs.copyAll')} disabled={!rows.length || undefined} onClick={() => copy(rows)}><span>{t('logs.copyAll')}</span></Btn>
+        <IconBtn icon="refresh" data-action="refresh" label={t('logs.refresh')} disabled={loading || undefined} onClick={() => load()} />
+      </Toolbar>
+
+      <AppliedFilters chips={chips} onClearAll={clearPanel} />
+
+      {selectedIds.size > 0 && (
+        <BatchBar count={t('logs.selected', { count: selectedIds.size })} onClear={() => setSelectedIds(new Set())}>
+          <Btn icon="copy" data-action="copy-selected" onClick={() => copy(rows.filter((r) => selectedIds.has(r.id)))}>{t('logs.copySelected')}</Btn>
+        </BatchBar>
+      )}
+
+      <div className="audit-summary" aria-live="polite">
+        <span>{firstRead ? '' : t('logs.matched', { count: matched })}</span>
+        {result && <span>{t('logs.errorCount', { count: fmt((levels.ERROR || 0) + (levels.CRITICAL || 0)) })}</span>}
+        {result && <span>{t('logs.warningCount', { count: fmt(levels.WARNING || 0) })}</span>}
+        {result && <span>{t('logs.componentCount', { count: fmt((result.components || []).length) })}</span>}
+        {follow && <span role="status">{t('logs.following')}</span>}
       </div>
-    </ResponsiveLayout>
+
+      <DataTable kind="audit" scrollId="logs-scroll" recordsId="logs-records" label={t('logs.regionLabel')} caption={t('logs.caption')}
+        columns={columns} rows={firstRead ? [] : rows} rowKey={(l) => l.id} rowLabel={(l) => `${l.ts || ''} ${l.message || ''}`.trim()}
+        loading={firstRead} empty={empty} card={card} selection={selection}
+        footer={result && <TableFooter range={t('logs.range', { count: rows.length })} note={footNote} />} />
+    </Zone>
   )
 }

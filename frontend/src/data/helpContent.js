@@ -1084,6 +1084,7 @@ export const helpContent = {
         items: [
           'Polls every five seconds; the newest line is the first row',
           'Clears the date window, which asks the opposite question',
+          'The Live logs button stays pressed while it polls',
         ]
       },
     ],

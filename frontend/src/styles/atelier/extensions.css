@@ -7,3 +7,5 @@
 .atl th>.col-resize:hover{background:var(--line)}
 /* The mockup's #app wraps the zone's stage so that its rules on #app.dock-right apply; it draws no box. */
 .atl #app.zone-app{display:contents}
+/* A log line is shown as the file wrote it: its spacing kept, a long token broken rather than widening the table. */
+.atl .log-message{white-space:pre-wrap;overflow-wrap:anywhere}
