@@ -104,9 +104,12 @@ test.describe('sign-in and session', () => {
   test('the server keeps the lock: the API refuses it, a new tab shows the lock screen, the password unlocks', async ({ api, signIn }) => {
     const user = await createUser(api, 'viewer')
     const { page } = await signIn(user.username, user.password)
+    // The account button is drawn before the session check answers: the lock waits for it
+    const checked = page.waitForResponse(r => r.url().endsWith('/api/v2/auth/verify'))
     await page.goto('/certificates')
-    await expect(page.getByRole('button', { name: /^Account: / })).toBeVisible()
-    await page.locator('body').press('Alt+Shift+L')
+    await checked
+    await page.getByRole('button', { name: /^Account: / }).click()
+    await page.getByRole('button', { name: 'Lock', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
 
     const refused = await page.request.get('/api/v2/certificates')
@@ -139,9 +142,12 @@ test.describe('sign-in and session', () => {
       if (body?.data?.locked) body.data.locked.methods = []
       await route.fulfill({ response, json: body })
     })
+    // The account button is drawn before the session check answers: the lock waits for it
+    const checked = page.waitForResponse(r => r.url().endsWith('/api/v2/auth/verify'))
     await page.goto('/certificates')
-    await expect(page.getByRole('button', { name: /^Account: / })).toBeVisible()
-    await page.locator('body').press('Alt+Shift+L')
+    await checked
+    await page.getByRole('button', { name: /^Account: / }).click()
+    await page.getByRole('button', { name: 'Lock', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
     await expect(page.getByText('no password, certificate or passkey', { exact: false })).toBeVisible()
     await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0)
