@@ -168,7 +168,7 @@
     "newPassword": "新密码",
     "confirmPassword": "确认密码",
     "emailAddress": "电子邮件地址",
-    "key": "Key",
+    "key": "密钥",
     "viewInCertificates": "在证书中查看",
     "connected": "已连接",
     "disconnected": "已断开",
@@ -238,7 +238,7 @@
     "orgUnit": "组织单位 (OU)",
     "state": "省/州 (ST)",
     "locality": "地区 (L)",
-    "email": "Email",
+    "email": "电子邮件",
     "viewCertificate": "查看证书",
     "aboutCSRs": "关于 CSR",
     "serial": "序列号",
@@ -478,11 +478,11 @@
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
-    "searchLabel": "Search for a command or a certificate",
-    "subtitle": "Certificates, authorities and console navigation",
+    "searchLabel": "搜索命令或证书",
+    "subtitle": "证书、颁发机构和控制台导航",
     "noCommandsFound": "未找到命令",
-    "acmeAccount": "ACME account",
-    "scepProfile": "SCEP profile",
+    "acmeAccount": "ACME 账户",
+    "scepProfile": "SCEP 配置文件",
     "favorites": "收藏",
     "recent": "最近",
     "searchSections": {
@@ -492,7 +492,7 @@
       "templates": "模板",
       "csrs": "CSR"
     },
-    "pageHelp": "Help for this page"
+    "pageHelp": "本页帮助"
   },
   "operations": {
     "title": "操作",
@@ -653,7 +653,7 @@
     "healthy": "正常",
     "websocket": "WebSocket",
     "api": "API",
-    "sub": "Sub",
+    "sub": "下级",
     "orders": "订单",
     "widgetStatistics": "统计",
     "widgetSystemStatus": "系统状态",
@@ -923,7 +923,7 @@
     "listLabel": "证书列表",
     "uploadKey": "上传私钥",
     "listNote": "已打开的证书仍可在检查器中查看。",
-    "listNoteCloseOnNav": "Open certificates close when you change page (setting in My Account).",
+    "listNoteCloseOnNav": "切换页面时会关闭已打开的证书（可在“我的账户”中设置）。",
     "loadFailed": "无法加载证书",
     "loadFailedCause": "原因：{{message}}。其他视图和检查器仍可使用。",
     "viewLog": "查看日志",
@@ -1678,7 +1678,7 @@
     "enrollment": "注册",
     "autoenrollEnabled": "允许自动注册",
     "autoenrollEnabledDescription": "在证书注册策略中将此模板公布为 autoEnroll=true，使经 GPO/Kerberos 身份验证的客户端在登录时自动请求它，无需用户操作。默认关闭 -- 与真实 ADCS 相同，即使不启用此项，模板仍可手动注册（MMC“申请新证书”、certreq），因为“注册”和“自动注册”是各自独立的权限。",
-    "autoenrollBadge": "Auto",
+    "autoenrollBadge": "自动",
     "allowedAdGroup": "将注册限制为 AD 组",
     "allowedAdGroupDescription": "只有属于此 Active Directory 组(包括嵌套成员)的主体才能通过 Kerberos 身份验证端点为此模板注册。输入组名或完整 DN。留空则允许任何已通过身份验证的主体注册,与真实 ADCS 的默认行为一致。不会在 UsernamePassword 端点上强制执行,因为该端点没有可检查的按请求身份。",
     "allowedAdGroupPlaceholder": "例如 VPN-Enroll 或 CN=VPN-Enroll,OU=Groups,DC=example,DC=com",
@@ -2005,15 +2005,15 @@
     "caption": "组。激活名称以打开其详情。",
     "search": "名称、描述…",
     "manageMembers": "管理成员",
-    "resource": "Resource",
+    "resource": "资源",
     "actions": {
-      "read": "Read",
-      "write": "Write",
-      "delete": "Delete",
-      "export": "Export",
-      "admin": "Administer"
+      "read": "读取",
+      "write": "写入",
+      "delete": "删除",
+      "export": "导出",
+      "admin": "管理"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}：{{resource}}"
   },
   "acme": {
     "title": "ACME协议",
@@ -2355,7 +2355,7 @@
       "expiresPlaceholder": "留空表示永不过期",
       "expiresHelp": "可选。此日期之后凭据将无法使用。",
       "generate": "生成",
-      "requiredTitle": "强制使用 External Account Binding",
+      "requiredTitle": "强制使用外部账户绑定",
       "requiredDescription": "启用后，每个 newAccount 请求都必须包含有效的 EAB。directory 中会通告 externalAccountRequired=true。",
       "requiredUpdated": "EAB 要求已更新",
       "requiredUpdateFailed": "更新 EAB 要求失败",
@@ -2374,7 +2374,7 @@
       "statusRevoked": "已吊销",
       "statusExpired": "已过期",
       "totalCount": "{{count}} 个凭据",
-      "search": "Search credentials",
+      "search": "搜索凭据",
       "created": "创建时间",
       "usedAt": "使用时间",
       "boundTo": "已绑定账户",
@@ -3054,7 +3054,7 @@
     "reattachFailed": "无法重新绑定部署",
     "kind_http": "HTTP API",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Reload command:"
+    "reloadCommandIs": "重新加载命令："
   },
   "crlDeploy": {
     "title": "CRL 部署",
@@ -3441,7 +3441,7 @@
     "upToDateTitle": "已是最新",
     "installUpdate": "安装更新",
     "installUpdateConfirm": "安装更新 v{{version}}？\n\n服务将重新启动，您可能需要重新登录。",
-    "installUpdateConfirmHa": "Install update v{{version}}?\n\nThis starts a rolling update: the nodes update one at a time. It is refused, and nothing is installed, if the release needs every node stopped for its migrations.",
+    "installUpdateConfirmHa": "安装更新 v{{version}}？\n\n这将开始滚动更新：节点逐个更新。如果该版本的迁移需要停止所有节点，更新会被拒绝，且不会安装任何内容。",
     "prerelease": "预发布",
     "viewReleaseNotes": "查看发行说明",
     "includePreReleaseVersions": "包含预发布版本",
@@ -4256,7 +4256,7 @@
           "remedy": "对于必须保持在 FIPS 范围内的密钥，请优先选择 PKCS#11、Azure Key Vault 或 OpenBao 提供商。"
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "title": "FIPS 模式拒绝的 HSM 密钥（长度为奇数或不在 2048 到 16384 位范围内的 RSA、P-256/P-384/P-521 以外的曲线、Ed25519、Ed448、ML-DSA、ChaCha20-Poly1305、未知类型）",
           "remedy": "请将它们替换为 RSA 2048+、ECDSA P-256/P-384/P-521 或 AES 密钥；在 FIPS 模式下，这些类型的 OpenBao 和 Vault Transit 密钥将不再列出。"
         },
         "dns_tsig_hmac_md5": {
@@ -4397,9 +4397,9 @@
       "ct": "证书透明度已修改",
       "ctDetail": "CT 设置已保存。"
     },
-    "templateHtmlSource": "HTML source",
-    "templateFormat": "Template format",
-    "templateVariablesLead": "Variables: "
+    "templateHtmlSource": "HTML 源码",
+    "templateFormat": "模板格式",
+    "templateVariablesLead": "变量："
   },
   "account": {
     "profile": "个人资料",
@@ -4610,9 +4610,9 @@
     "caption": "角色。激活名称以打开其详情。",
     "filterByType": "按类型筛选",
     "allOf": "全部 {{name}}",
-    "permissionOf": "{{resource}}: {{actions}}",
-    "anyResource": "All resources",
-    "anyAction": "every action"
+    "permissionOf": "{{resource}}：{{actions}}",
+    "anyResource": "所有资源",
+    "anyAction": "所有操作"
   },
   "hsm": {
     "pkcs11Unavailable": "此主机上 PKCS#11 依赖项不可用",
@@ -4914,8 +4914,8 @@
     "oidcRoleTenants": "角色受认可的租户",
     "oidcRoleTenantsHelp": "角色映射读取其应用角色和组的已接受租户，每行一个。认可某个租户的角色，即允许其管理员分配 UCM 角色。有角色映射规则时，其他已接受租户的用户会被拒绝；没有规则时，每个已接受租户都获得默认角色。",
     "oidcRoleTenantsNoneWarning": "角色映射有规则，但没有任何租户的角色受认可：通过此提供商的所有登录都将被拒绝。",
-    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
-    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
+    "githubNotOidc": "GitHub 不是 OpenID Connect 提供商：它不签发 ID 令牌，因此无法验证其签名。账户通过其数字 GitHub id 识别。",
+    "tenantPlaceholderHint": "请将 URL 和颁发者中的 {tenant} 替换为您的目录（租户）ID。",
     "defaultRoleNone": "无：拒绝没有匹配规则的用户",
     "provisioningRulesNotice": "已设置角色映射规则：没有任何规则匹配的用户在登录时会被拒绝。",
     "provisioningNoRulesNotice": "没有角色映射规则：此提供方认证的所有用户都可以登录，新账户获得 {{role}} 角色。",
@@ -4996,14 +4996,14 @@
     "quickHelp": "快速帮助",
     "guide": "指南",
     "tableOfContents": "目录",
-    "back": "Back to the console",
-    "views": "Help view",
-    "searchLabel": "Search the guide",
-    "searchPlaceholder": "Word, section…",
-    "noMatch": "No section of the guide contains this text.",
-    "overview": "Overview",
-    "term": "{{term}}: ",
-    "contentsLead": "Contents: "
+    "back": "返回控制台",
+    "views": "帮助视图",
+    "searchLabel": "搜索指南",
+    "searchPlaceholder": "词语、章节…",
+    "noMatch": "指南中没有包含此文本的章节。",
+    "overview": "概览",
+    "term": "{{term}}：",
+    "contentsLead": "目录："
   },
   "time": {
     "today": "今天",
@@ -5243,7 +5243,7 @@
     "privateKeysMatched": "个私钥匹配",
     "importMore": "导入更多",
     "allFormats": "所有格式: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
-    "dropFileHere": "Drop a file here or",
+    "dropFileHere": "将文件拖放到此处，或",
     "filePassword": "此文件的解密密码",
     "useGlobalPassword": "对所有文件使用相同密码",
     "typeCaCertificate": "CA证书",
@@ -5259,7 +5259,7 @@
     "crossSkipped_other": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留",
     "unverifiableParentsTitle": "需在 CA 页面确认的父 CA",
     "unverifiableParent": "{{ca}} 未关联父 CA：可能的父 CA 为 {{parent}}，此处无法验证其签名（{{algorithm}}）",
-    "filePasswordFor": "Password of {{name}}"
+    "filePasswordFor": "{{name}} 的密码"
   },
   "webhooks": {
     "eventLabels": {
@@ -6473,8 +6473,8 @@
     "views": {
       "list": "注册端点"
     },
-    "emptyTitle": "No EST endpoint configured",
-    "emptyText": "EST enrols devices over HTTPS with a client certificate; it needs an issuing CA."
+    "emptyTitle": "未配置 EST 端点",
+    "emptyText": "EST 通过 HTTPS 使用客户端证书注册设备，需要一个签发 CA。"
   },
   "discovery": {
     "adHocScan": "临时扫描",
@@ -7015,7 +7015,7 @@
     "certLoaded": "证书已加载",
     "keyLoaded": "私钥已加载",
     "noCertsWithKey": "未找到包含私钥的证书",
-    "source": "Certificate source"
+    "source": "证书来源"
   },
   "commands": {
     "actions": {
@@ -7118,8 +7118,8 @@
       "list": "服务",
       "config": "配置"
     },
-    "emptyTitle": "No time-stamping service",
-    "emptyText": "A time-stamping service relies on an issuing CA and a time-stamping policy."
+    "emptyTitle": "没有时间戳服务",
+    "emptyText": "时间戳服务依赖于签发 CA 和时间戳策略。"
   },
   "sshCas": {
     "title": "SSH 证书颁发机构",
@@ -7535,7 +7535,7 @@
     "sourceApp": "应用程序",
     "sourceAccess": "访问",
     "sourceError": "错误",
-    "sourceJournal": "Journal",
+    "sourceJournal": "日志",
     "component": "组件",
     "allComponents": "所有组件",
     "follow": "实时日志",
@@ -7900,7 +7900,7 @@
           "action": "选择协议"
         }
       },
-      "open": "Open the setup assistant"
+      "open": "打开设置向导"
     },
     "offline": {
       "title": "离线。",
@@ -7919,7 +7919,7 @@
       "all": "所有卡片",
       "short": "预设",
       "allHint": "所有卡片，按初始顺序",
-      "rowLabel": "Presets"
+      "rowLabel": "预设"
     },
     "cards": {
       "queue": "待处理",
@@ -7937,8 +7937,8 @@
       "empty": "没有可显示的内容。",
       "partial": "此卡片的部分内容无法加载。",
       "partialForbidden": "您无权访问此卡片的部分内容。",
-      "forbiddenTitle": "No access",
-      "errorTitle": "Could not load “{{name}}”"
+      "forbiddenTitle": "无权访问",
+      "errorTitle": "无法加载“{{name}}”"
     },
     "queue": {
       "sub": "按紧急程度排序：严重项优先，然后按期限；只需关注的事项排在最后。",
@@ -7975,14 +7975,14 @@
         "deploy": "部署"
       },
       "less": "收起",
-      "again": "Retry",
-      "emptyTitle": "Nothing to handle",
-      "emptyType": "No row of type “{{name}}”.",
-      "seeAll": "See the whole queue",
-      "watchShow_one": "Show the {{count}} row to watch",
-      "watchShow_other": "Show the {{count}} rows to watch",
-      "watchHide_one": "Hide the {{count}} row to watch",
-      "watchHide_other": "Hide the {{count}} rows to watch"
+      "again": "重试",
+      "emptyTitle": "没有待处理的事项",
+      "emptyType": "没有“{{name}}”类型的行。",
+      "seeAll": "查看整个队列",
+      "watchShow_one": "显示 {{count}} 项需关注",
+      "watchShow_other": "显示 {{count}} 项需关注",
+      "watchHide_one": "隐藏 {{count}} 项需关注",
+      "watchHide_other": "隐藏 {{count}} 项需关注"
     },
     "kind": {
       "acme_order_failed": "ACME 订单失败",
@@ -8002,20 +8002,20 @@
       "truststore_expiring": "信任存储中的证书即将到期或已到期"
     },
     "compliance": {
-      "rsa_below_3072": "Weak keys",
+      "rsa_below_3072": "弱密钥",
       "weak_signature_hash": "弱签名哈希",
-      "server_lifetime_over_398_days": "Validity > 398 d",
+      "server_lifetime_over_398_days": "有效期超过 398 天",
       "incomplete_chain": "证书链不完整",
-      "no_private_key": "No private key in UCM",
+      "no_private_key": "UCM 中无私钥",
       "byAlgorithm": "密钥算法",
       "unknownAlgo": "未知",
-      "sub": "Over the {{count}} active certificates. A tile that has a list opens it, filtered.",
-      "algoLabel": "{{name}}: {{count}} certificates",
+      "sub": "基于 {{count}} 个有效证书。带列表的方块可点击打开，并已筛选。",
+      "algoLabel": "{{name}}：{{count}} 个证书",
       "sub_rsa_below_3072": "RSA < 3072",
-      "sub_weak_signature_hash": "Obsolete signature",
-      "sub_server_lifetime_over_398_days": "TLS server certificates",
-      "sub_incomplete_chain": "Intermediate missing",
-      "sub_no_private_key": "External CSR or import"
+      "sub_weak_signature_hash": "过时的签名",
+      "sub_server_lifetime_over_398_days": "TLS 服务器证书",
+      "sub_incomplete_chain": "缺少中间证书",
+      "sub_no_private_key": "外部 CSR 或导入"
     },
     "health": {
       "acme": "ACME",
@@ -8081,13 +8081,13 @@
       "alerts_other": "{{count}} 行报告问题。",
       "seeQueue": "查看待处理",
       "allFine": "没有任何行报告问题。",
-      "failLink_one": "{{count}} {{name}} failure over {{span}}: see the orders to retry in To handle",
-      "failLink_other": "{{count}} {{name}} failures over {{span}}: see the orders to retry in To handle",
-      "taskCount_one": "{{count}} task",
-      "taskCount_other": "{{count}} tasks",
-      "lastRun": "last run {{when}}",
-      "runs_one": "<strong>{{count}}</strong> success",
-      "runs_other": "<strong>{{count}}</strong> successes"
+      "failLink_one": "{{span}}内有 {{count}} 次 {{name}} 失败：请在“待处理”中查看需重试的订单",
+      "failLink_other": "{{span}}内有 {{count}} 次 {{name}} 失败：请在“待处理”中查看需重试的订单",
+      "taskCount_one": "{{count}} 个任务",
+      "taskCount_other": "{{count}} 个任务",
+      "lastRun": "上次运行 {{when}}",
+      "runs_one": "<strong>{{count}}</strong> 次成功",
+      "runs_other": "<strong>{{count}}</strong> 次成功"
     },
     "filter": {
       "status": "状态",
@@ -8125,21 +8125,21 @@
       "ocspOff": "OCSP 已禁用",
       "offline": "离线",
       "crossSigned": "交叉签名",
-      "sub": "{{authorities}} under {{roots}}. CRL, OCSP and issuances over 7 days.",
+      "sub": "{{roots}}下的{{authorities}}。CRL、OCSP 和 7 天内的签发。",
       "explore": "浏览",
       "branch": "分支 {{name}}",
       "bounded": "已显示 {{total}} 个颁发机构中的 {{shown}} 个，最活跃的树优先。",
       "below_one": "其下还有 {{count}} 个",
       "below_other": "其下还有 {{count}} 个",
-      "active": ", active",
-      "issued_one": "{{count}} issuance in 7 d",
-      "issued_other": "{{count}} issuances in 7 d",
-      "authorities_one": "{{count}} authority",
-      "authorities_other": "{{count}} authorities",
-      "roots_one": "{{count}} root",
-      "roots_other": "{{count}} roots",
-      "emptyTitle": "No certificate authority",
-      "emptyText": "Create an offline root or import an existing CA, then an issuing CA under that root."
+      "active": "，活跃",
+      "issued_one": "7 天内签发 {{count}} 次",
+      "issued_other": "7 天内签发 {{count}} 次",
+      "authorities_one": "{{count}} 个颁发机构",
+      "authorities_other": "{{count}} 个颁发机构",
+      "roots_one": "{{count}} 个根",
+      "roots_other": "{{count}} 个根",
+      "emptyTitle": "没有证书颁发机构",
+      "emptyText": "请创建离线根，或导入现有 CA，然后在该根下创建签发 CA。"
     },
     "horizon": {
       "expiring": "即将到期",
@@ -8150,10 +8150,10 @@
       "sub": "接下来到期的证书，最近的在前。",
       "elapsed": "有效期已过 {{percent}}%",
       "state": {
-        "valid": "Valid",
-        "expiring": "To renew",
-        "expired": "Expired",
-        "revoked": "Revoked"
+        "valid": "有效",
+        "expiring": "待续期",
+        "expired": "已过期",
+        "revoked": "已吊销"
       }
     },
     "activity": {
@@ -8182,18 +8182,18 @@
       "down": "下移 {{name}}",
       "hide": "隐藏卡片",
       "hidden": "{{name}} 已隐藏。“卡片”按钮可重新显示它。",
-      "listLabel": "Cards, in the order of the page",
-      "queueShown": "To handle card shown again."
+      "listLabel": "卡片，按页面顺序",
+      "queueShown": "“待处理”卡片已重新显示。"
     },
     "metrics": {
-      "queueSub": "{{act}}, {{watch}} to watch",
+      "queueSub": "{{act}}，{{watch}}需关注",
       "failures": "今日失败",
       "failuresSub": "ACME、SCEP 和 EST，UTC 日",
-      "certificates": "Certificates",
-      "inventory": "Full inventory",
-      "interventions_one": "{{count}} intervention",
-      "interventions_other": "{{count}} interventions",
-      "toCheck": "To check"
+      "certificates": "证书",
+      "inventory": "完整清单",
+      "interventions_one": "{{count}} 项待处理",
+      "interventions_other": "{{count}} 项待处理",
+      "toCheck": "待检查"
     },
     "cause": {
       "acme_order_failed": "过去 7 天内有 ACME 订单以无效结束",
@@ -8224,8 +8224,8 @@
       "alt_other": "{{count}} 天内的证书活动：签发 {{issued}}，吊销 {{revoked}}，过期 {{expired}}。",
       "keys": "图表：左右方向键可逐日读取"
     },
-    "clockToday": "today at {{time}}",
-    "allHiddenTitle": "Every card is hidden"
+    "clockToday": "今天 {{time}}",
+    "allHiddenTitle": "所有卡片均已隐藏"
   },
   "sectioned": {
     "flagModified": "已修改",
@@ -8310,32 +8310,32 @@
     "sectionsOf": "部分：{{name}}"
   },
   "guide": {
-    "title": "Guide",
-    "tabTitle": "{{chapter}} · Guide · UCM",
-    "tocLabel": "Contents of the guide",
-    "general": "General",
-    "jumpChapter": "Chapter",
-    "openPage": "Open the page",
-    "pagerLabel": "Other chapters",
-    "previous": "Previous chapter",
-    "next": "Next chapter",
-    "printChapter": "Print the chapter",
-    "printAll": "Print the whole guide",
-    "print": "Print",
-    "wholeGuide": "Whole guide",
-    "skip": "Skip to the chapter",
-    "openInTab": "Open in a new tab",
-    "onThisPage": "On this page",
-    "breadcrumbLabel": "Breadcrumb",
-    "paletteEntry": "Guide",
-    "paletteHint": "Opens in a new tab",
-    "searchLabel": "Search the whole guide",
-    "searchPlaceholder": "Search the guide…",
-    "searchLoading": "Loading the guide…",
-    "results_one": "{{count}} result",
-    "results_other": "{{count}} results",
-    "resultsShown": "The first {{shown}} are listed.",
-    "noResults": "No results. Try another word.",
-    "resultsLabel": "Results in the guide"
+    "title": "指南",
+    "tabTitle": "{{chapter}} · 指南 · UCM",
+    "tocLabel": "指南目录",
+    "general": "概述",
+    "jumpChapter": "章节",
+    "openPage": "打开页面",
+    "pagerLabel": "其他章节",
+    "previous": "上一章",
+    "next": "下一章",
+    "printChapter": "打印本章",
+    "printAll": "打印整本指南",
+    "print": "打印",
+    "wholeGuide": "整本指南",
+    "skip": "跳到章节",
+    "openInTab": "在新标签页中打开",
+    "onThisPage": "本页内容",
+    "breadcrumbLabel": "面包屑导航",
+    "paletteEntry": "指南",
+    "paletteHint": "在新标签页中打开",
+    "searchLabel": "搜索整本指南",
+    "searchPlaceholder": "搜索指南…",
+    "searchLoading": "正在加载指南…",
+    "results_one": "{{count}} 条结果",
+    "results_other": "{{count}} 条结果",
+    "resultsShown": "仅列出前 {{shown}} 条。",
+    "noResults": "没有结果。请尝试其他词语。",
+    "resultsLabel": "指南中的结果"
   }
 }
