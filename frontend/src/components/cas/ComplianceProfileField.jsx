@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SideField, SideAction } from './SideField'
+import { FactRow, RowAction } from '../atelier/Detail'
 import { AtelierDialog, Icon } from '../atelier'
 import { Select } from '../atelier/Form'
 import PreflightReport from '../PreflightReport'
@@ -31,12 +31,9 @@ export function ComplianceProfileField({ ca, canWrite = false, canAttach = false
   const current = COMPLIANCE_PROFILE_NAMES.includes(ca.compliance_profile) ? ca.compliance_profile : ''
 
   return (
-    <SideField label={t('cas.complianceProfile')}>
-      <span>{current ? profileLabel(current, profiles) : t('cas.complianceProfileNone')}</span>
-      {canWrite && !ca.revoked && (
-        <ProfileActions ca={ca} current={current} profiles={profiles} canAttach={canAttach} onChanged={onChanged} />
-      )}
-    </SideField>
+    <FactRow product label={t('cas.complianceProfile')}
+      {...(current ? { value: profileLabel(current, profiles) } : { absent: t('cas.complianceProfileNone') })}
+      action={canWrite && !ca.revoked ? <ProfileActions ca={ca} current={current} profiles={profiles} canAttach={canAttach} onChanged={onChanged} /> : null} />
   )
 }
 
@@ -68,14 +65,14 @@ function ProfileActions({ ca, current, profiles, canAttach, onChanged }) {
   return (
     <>
       {canAttach && (
-        <SideAction onClick={() => setDialog(true)}>
+        <RowAction onClick={() => setDialog(true)}>
           {t(current ? 'cas.compliance.change' : 'cas.compliance.attach')}
-        </SideAction>
+        </RowAction>
       )}
       {current && (
-        <SideAction onClick={handleRemove}>
+        <RowAction onClick={handleRemove}>
           {t('cas.compliance.remove')}
-        </SideAction>
+        </RowAction>
       )}
       {dialog && (
         <AttachProfileDialog

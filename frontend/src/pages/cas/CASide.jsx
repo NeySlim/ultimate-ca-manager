@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Icon, AtelierDialog } from '../../components/atelier'
+import { Icon, AtelierDialog, Facts, FactsGroup } from '../../components/atelier'
 import { usePermission } from '../../hooks'
 import { useEntityActions } from '../../hooks/useEntityActions'
 import { casService, certificatesService, crlService } from '../../services'
@@ -15,6 +15,7 @@ import { useNotification } from '../../contexts'
 import { extractData, formatDate } from '../../lib/utils'
 import { holdsNoKey, needsKeyImport } from '../../lib/caSelection'
 import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
+import { signatureHashName } from '../../lib/signatureName'
 import { SignatureSchemeField } from '../../components/cas/SignatureSchemeField'
 import { ComplianceProfileField } from '../../components/cas/ComplianceProfileField'
 import { IssuanceVisibilityField } from '../../components/cas/IssuanceVisibilityField'
@@ -109,6 +110,8 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
   const crlEligible = !ca.pending && (ca.offline || !ca.has_private_key)
   const storage = ca.uses_hsm ? 'hsm' : ca.offline ? 'offline' : ca.has_private_key ? 'software' : 'none'
   const menu = actions.filter((a) => a.visible && a.inBar !== false)
+  const signature = ca.signature_algorithm || ca.hash_algorithm
+  const serial = ca.serial_number || ca.serial
   const pick = (id) => onPick?.(id)
 
   const downloadChain = async () => {
@@ -165,103 +168,89 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
         </p>
       )}
 
-      <section className="ca-side-section">
-        <h3 className="section-title">{t('cas.side.identity')}</h3>
-        <dl className="props">
-          <dt>{t('cas.side.typeLevel')}</dt>
-          <dd>{t(root ? 'cas.side.root' : 'cas.side.intermediate')} · {t('cas.tree.level', { level })}</dd>
-          <dt>{t('cas.side.issuer')}</dt>
-          <dd>
-            {parent ? <button type="button" className="text-link" data-ca-pick={parent.id} onClick={() => pick(parent.id)}>{nameOfCA(parent)}</button>
-              : root ? t('cas.side.selfSigned') : (ca.issuer || '—')}
-            {crossFrom.map((c) => (
-              <span key={c.id}><br /><span className="muted">{t('cas.side.crossIssuedBy', { name: nameOfCA(c) })}</span></span>
-            ))}
-          </dd>
-          <dt>{t('cas.side.expiry')}</dt>
-          <dd>{ca.valid_to ? formatDate(ca.valid_to, { time: false }) : '—'}</dd>
-          <dt>pathLen</dt>
-          <dd>{ca.path_length ?? t('cas.side.pathLenNone')}</dd>
-          <Extra k={t('cas.side.subject')} v={ca.subject || '—'} mono />
-          <Extra k={t('cas.side.serial')} v={ca.serial_number || ca.serial || '—'} mono />
-          <Extra k={t('cas.side.validFrom')} v={ca.valid_from ? formatDate(ca.valid_from, { time: false }) : '—'} />
-        </dl>
-      </section>
-
-      <section className="ca-side-section">
-        <h3 className="section-title">{t('cas.side.key')}</h3>
-        <dl className="props">
-          <dt>{t('cas.side.algorithm')}</dt>
-          <dd>{keyAlgorithmLabel(ca.key_type, t, ca.security_level) || '—'}</dd>
-          <dt>{t('cas.side.storage')}</dt>
-          <dd>
-            {t(`cas.side.storageKinds.${storage}`)}
-            {ca.uses_hsm && (ca.hsm_provider_name || ca.hsm_key_label) && (
-              <><br /><span className="muted">{[ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ')}</span></>
-            )}
-          </dd>
-          <Extra k={t('cas.side.signature')} v={ca.signature_algorithm || ca.hash_algorithm || '—'} />
-          <SignatureSchemeField ca={ca} canWrite={canWrite('cas')} onChanged={setDetail} />
-        </dl>
-      </section>
-
-      <section className="ca-side-section">
-        <h3 className="section-title">{t('cas.side.issuance')}</h3>
-        <dl className="props">
-          <dt>{t('cas.side.issued')}</dt>
-          <dd>{ca.certs || 0}</dd>
-          {readCerts && <><dt>{t('cas.side.revokedOf')}</dt><dd>{revoked === undefined ? '…' : revoked === null ? '—' : revoked}</dd></>}
-          <dt>{t('cas.side.subAuthorities')}</dt>
-          <dd>
-            {kids.length ? (
-              <ul className="link-list">
-                {kids.map((k) => <li key={k.id}><button type="button" className="text-link" data-ca-pick={k.id} onClick={() => pick(k.id)}>{nameOfCA(k)}</button></li>)}
-              </ul>
-            ) : t('cas.side.none')}
-          </dd>
-          {crossTo.length > 0 && (
-            <>
-              <dt>{t('cas.side.crossIssued')}</dt>
-              <dd>
-                <ul className="link-list">
-                  {crossTo.map((k) => <li key={k.id}><button type="button" className="text-link" data-ca-pick={k.id} onClick={() => pick(k.id)}>{nameOfCA(k)}</button></li>)}
-                </ul>
-              </dd>
-            </>
-          )}
-          <IssuanceVisibilityField ca={ca} canWrite={canWrite('cas')} onChanged={setDetail} />
-          <UniqueSubjectField ca={ca} canWrite={canWrite('cas')} onChanged={setDetail} />
-          <ComplianceProfileField ca={ca} canWrite={canWrite('cas')} canAttach={canWrite('cas') && hasPermission('admin:system')} onChanged={setDetail} />
-        </dl>
-      </section>
-
-      {readCrl && (
+      {/* The sections of the mockup share one term column, so their values line up */}
+      <FactsGroup>
         <section className="ca-side-section">
-          <h3 className="section-title">{t('cas.side.revocation')}</h3>
-          <dl className="props">
-            <dt>{t('cas.side.crlPublished')}</dt>
-            <dd>{crl === undefined ? '…' : crl ? formatDate(crl.this_update) : t('cas.crlNone')}</dd>
-            <dt>{t('cas.side.crlNext')}</dt>
-            <dd>{crl?.next_update ? formatDate(crl.next_update) : '—'}</dd>
-            <dt>{t('cas.side.crlNumber')}</dt>
-            <dd className="mono">{crl?.crl_number ?? '—'}</dd>
-            <dt>{t('cas.side.ocsp')}</dt>
-            <dd>{ocspActive
-              ? <span className="badge good"><Icon name="check" />{t('cas.side.ocspActive')}</span>
-              : <span className="badge muted"><Icon name="block" />{t('cas.side.ocspInactive')}</span>}</dd>
-            {crl && <Extra k={t('cas.crlEntries')} v={<>{crl.revoked_count ?? 0}{crl.is_external && <span className="muted"> · {t('cas.crlExternal')}</span>}</>} />}
-            {ca.cdp_enabled && ca.cdp_url && <Extra k={t('cas.side.cdp')} v={ca.cdp_url} mono />}
-            {ca.ocsp_enabled && ca.ocsp_url && <Extra k={t('cas.side.ocspUrl')} v={ca.ocsp_url} mono />}
-          </dl>
-          {crlDue && <p className="notice warn crl-due"><Icon name="warning" /><span>{t('cas.side.crlDue')}</span></p>}
-          {crl?.is_stale && !crlDue && <p className="notice warn"><Icon name="warning" /><span>{t('cas.crlStaleWarning')}</span></p>}
-          {crlEligible && canWrite('crl') && (
-            <div className="ca-side-tools">
-              <button type="button" className="btn" data-write="" onClick={() => setCrlUpload(true)}><Icon name="upload" />{t('cas.uploadCrl')}</button>
-            </div>
-          )}
+          <h3 className="section-title">{t('cas.side.identity')}</h3>
+          <Facts items={[
+            [t('cas.side.typeLevel'), `${t(root ? 'cas.side.root' : 'cas.side.intermediate')} · ${t('cas.tree.level', { level })}`],
+            [t('cas.side.issuer'), (
+              <>
+                {parent ? <button type="button" className="text-link" data-ca-pick={parent.id} onClick={() => pick(parent.id)}>{nameOfCA(parent)}</button>
+                  : root ? t('cas.side.selfSigned') : (ca.issuer || '—')}
+                {crossFrom.map((c) => <span key={c.id} className="sub">{t('cas.side.crossIssuedBy', { name: nameOfCA(c) })}</span>)}
+              </>
+            )],
+            [t('cas.side.expiry'), ca.valid_to ? formatDate(ca.valid_to, { time: false }) : '—'],
+            ['pathLen', ca.path_length ?? t('cas.side.pathLenNone')],
+            { label: t('cas.side.subject'), value: ca.subject || '—', long: true, product: true },
+            serial ? { label: t('cas.side.serial'), value: serial, kind: 'hex', long: serial.length > 23, product: true } : { label: t('cas.side.serial'), value: '—', product: true },
+            { label: t('cas.side.validFrom'), value: ca.valid_from ? formatDate(ca.valid_from, { time: false }) : '—', product: true },
+          ]} />
         </section>
-      )}
+
+        <section className="ca-side-section">
+          <h3 className="section-title">{t('cas.side.key')}</h3>
+          <Facts items={[
+            [t('cas.side.algorithm'), keyAlgorithmLabel(ca.key_type, t, ca.security_level) || '—'],
+            {
+              label: t('cas.side.storage'), value: t(`cas.side.storageKinds.${storage}`),
+              sub: ca.uses_hsm && (ca.hsm_provider_name || ca.hsm_key_label) ? [ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ') : undefined,
+            },
+            // Named by its hash, as a certificate's signature is
+            { label: t('cas.side.signature'), value: signature ? signatureHashName(signature) : '—', product: true },
+          ]}>
+            <SignatureSchemeField ca={ca} canWrite={canWrite('cas')} onChanged={setDetail} />
+          </Facts>
+        </section>
+
+        <section className="ca-side-section">
+          <h3 className="section-title">{t('cas.side.issuance')}</h3>
+          <Facts items={[
+            [t('cas.side.issued'), ca.certs || 0],
+            readCerts && [t('cas.side.revokedOf'), revoked === undefined ? '…' : revoked === null ? '—' : revoked],
+            kids.length
+              ? [t('cas.side.subAuthorities'), (
+                <ul className="link-list">
+                  {kids.map((k) => <li key={k.id}><button type="button" className="text-link" data-ca-pick={k.id} onClick={() => pick(k.id)}>{nameOfCA(k)}</button></li>)}
+                </ul>
+              )]
+              : { label: t('cas.side.subAuthorities'), absent: t('cas.side.none') },
+            crossTo.length > 0 && [t('cas.side.crossIssued'), (
+              <ul className="link-list">
+                {crossTo.map((k) => <li key={k.id}><button type="button" className="text-link" data-ca-pick={k.id} onClick={() => pick(k.id)}>{nameOfCA(k)}</button></li>)}
+              </ul>
+            )],
+          ]}>
+            <IssuanceVisibilityField ca={ca} canWrite={canWrite('cas')} onChanged={setDetail} />
+            <UniqueSubjectField ca={ca} canWrite={canWrite('cas')} onChanged={setDetail} />
+            <ComplianceProfileField ca={ca} canWrite={canWrite('cas')} canAttach={canWrite('cas') && hasPermission('admin:system')} onChanged={setDetail} />
+          </Facts>
+        </section>
+
+        {readCrl && (
+          <section className="ca-side-section">
+            <h3 className="section-title">{t('cas.side.revocation')}</h3>
+            <Facts items={[
+              crl === undefined ? [t('cas.side.crlPublished'), '…']
+                : crl ? [t('cas.side.crlPublished'), formatDate(crl.this_update)] : { label: t('cas.side.crlPublished'), absent: t('cas.crlNone') },
+              [t('cas.side.crlNext'), crl?.next_update ? formatDate(crl.next_update) : '—'],
+              [t('cas.side.crlNumber'), crl?.crl_number ?? '—'],
+              { label: t('cas.side.ocsp'), state: ocspActive ? ['good', t('cas.side.ocspActive')] : ['muted', t('cas.side.ocspInactive')] },
+              crl && { label: t('cas.crlEntries'), value: <>{crl.revoked_count ?? 0}{crl.is_external && <span className="muted"> · {t('cas.crlExternal')}</span>}</>, product: true },
+              ca.cdp_enabled && ca.cdp_url && { label: t('cas.side.cdp'), value: ca.cdp_url, kind: 'url', long: true, wide: true, product: true },
+              ca.ocsp_enabled && ca.ocsp_url && { label: t('cas.side.ocspUrl'), value: ca.ocsp_url, kind: 'url', long: true, wide: true, product: true },
+            ]} />
+            {crlDue && <p className="notice warn crl-due"><Icon name="warning" /><span>{t('cas.side.crlDue')}</span></p>}
+            {crl?.is_stale && !crlDue && <p className="notice warn"><Icon name="warning" /><span>{t('cas.crlStaleWarning')}</span></p>}
+            {crlEligible && canWrite('crl') && (
+              <div className="ca-side-tools">
+                <button type="button" className="btn" data-write="" onClick={() => setCrlUpload(true)}><Icon name="upload" />{t('cas.uploadCrl')}</button>
+              </div>
+            )}
+          </section>
+        )}
+      </FactsGroup>
 
       <div className="ca-actions">
         {readCerts && (
@@ -300,11 +289,6 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
       {modals}
     </aside>
   )
-}
-
-/** A row the mockup's caSide() does not have (`data-product`, declared to the comparator). */
-function Extra({ k, v, mono = false }) {
-  return <><dt data-product="">{k}</dt><dd data-product="" className={mono ? 'mono' : undefined}>{v}</dd></>
 }
 
 /** « Actions de l'autorité », the mockup's certMenu(): the authority's name, then one button per action. */

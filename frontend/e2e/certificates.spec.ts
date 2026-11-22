@@ -122,3 +122,22 @@ test('the PEM exported from the inspector is the certificate', async ({ page, ap
   expect(file).toContain('-----BEGIN CERTIFICATE-----')
   expect(pemBody(file.split('-----END CERTIFICATE-----')[0])).toEqual(pemBody(cert.pem))
 })
+
+test('a fingerprint of « More details » copies whole, as the API gives it', async ({ page, api }) => {
+  const ca = await createCA(api)
+  const cert = await issueCert(api, ca.id)
+  const full = await api.get(`/certificates/${cert.id}`)
+  expect(full.thumbprint_sha256).toMatch(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/)
+  const panel = await openInInspector(page, cert.common_name)
+  await page.evaluate(() => {
+    const copied: string[] = []
+    ;(window as any).__copied = copied
+    navigator.clipboard.writeText = (text: string) => { copied.push(text); return Promise.resolve() }
+  })
+  await panel.getByRole('button', { name: 'More details' }).click()
+  const digest = panel.locator('.row', { has: page.locator('dt', { hasText: /^SHA-256$/ }) })
+  // Four lines of eight bytes, each ending after a colon, none cut inside a byte
+  await expect(digest.locator('.val.hex > .line')).toHaveCount(4)
+  await digest.getByRole('button', { name: 'Copy SHA-256' }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).__copied)).toEqual([full.thumbprint_sha256])
+})

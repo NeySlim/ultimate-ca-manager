@@ -5,7 +5,7 @@
  */
 import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Icon } from '../../../components/atelier'
+import { Icon, Facts } from '../../../components/atelier'
 import { Breakable } from '../../../components/atelier/Breakable'
 import { formatDate, extractCN } from '../../../lib/utils'
 import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex, certTypeLabel, originLabel, complianceReasonLabel } from '../../../lib/certificateDetail'
@@ -146,19 +146,23 @@ function Identity({ cert, onOpenRelated }) {
   const relatedId = cert.related_certificate_id ?? null
   const otherRole = { classical: 'certificates.hybrid.rolePq', pq: 'certificates.hybrid.roleClassical' }[cert.hybrid_role]
   const grade = cert.compliance?.grade
-  const none = <span className="muted">{t('inspector.cert.none')}</span>
+  const none = t('inspector.cert.none')
+  const serial = serialHex(cert.serial_number)
   return (
     <section>
       <h3 className="section-title">{t('inspector.cert.identity')}</h3>
-      <Props items={[
-        [t('common.description'), cert.descr && cert.descr !== cert.common_name ? cert.descr : none],
-        [t('inspector.cert.altName'), sans.length ? sans.map((s, i) => <Fragment key={i}>{i > 0 && <br />}<Breakable text={s} /></Fragment>) : none],
+      <Facts items={[
+        cert.descr && cert.descr !== cert.common_name ? [t('common.description'), cert.descr] : { label: t('common.description'), absent: none },
+        sans.length
+          ? { label: t('inspector.cert.altName'), value: sans.map((s, i) => <Fragment key={i}>{i > 0 && <br />}<Breakable text={s} /></Fragment>) }
+          : { label: t('inspector.cert.altName'), absent: none },
         [t('common.keyAlgorithm'), certificateKeyLabel(cert, t) || '—'],
         [t('inspector.cert.signature'), <>{sig || '—'}{weakSig && <> <span className="warn"><Icon name="warning" />{t('inspector.cert.obsolete')}</span></>}</>],
         [t('inspector.cert.origin'), [sourceLabel(sourceOf(cert), t), template].filter(Boolean).join(' / ')],
-        [t('inspector.cert.serial'), <Breakable text={serialHex(cert.serial_number) || '—'} />, 'mono'],
+        // A serial longer than a short value goes under its term in a narrow panel
+        serial ? { label: t('inspector.cert.serial'), value: serial, kind: 'hex', long: serial.length > 23 } : [t('inspector.cert.serial'), '—'],
         // The product's own facts, after the mockup's
-        [t('common.privateKey'), cert.has_private_key ? t('inspector.cert.keyHeld') : <span className="muted">{t('inspector.cert.keyNotHeld')}</span>],
+        cert.has_private_key ? [t('common.privateKey'), t('inspector.cert.keyHeld')] : { label: t('common.privateKey'), absent: t('inspector.cert.keyNotHeld') },
         relatedId != null && [t('certificates.hybrid.relatedCertificate'), (
           <a className="text-link" href={`/certificates/${relatedId}`} aria-label={t('certificates.hybrid.openRelated', { id: relatedId })}
             onClick={onOpenRelated ? (e) => { e.preventDefault(); onOpenRelated(relatedId) } : undefined}>
@@ -200,9 +204,9 @@ function MoreDetails({ cert }) {
         </section>
         <section>
           <h3 className="section-title">{t('common.fingerprints')}</h3>
-          <Props items={[
-            row('SHA-1', cert.thumbprint_sha1, true),
-            row('SHA-256', cert.thumbprint_sha256, true),
+          <Facts items={[
+            cert.thumbprint_sha1 && { label: 'SHA-1', value: cert.thumbprint_sha1, kind: 'hex', long: true },
+            cert.thumbprint_sha256 && { label: 'SHA-256', value: cert.thumbprint_sha256, kind: 'hex', long: true },
             row(t('certificates.ctScts'), scts.length ? scts.map((s) => s.log_url || '?').join(', ') : t('certificates.ctNoScts')),
           ]} />
         </section>

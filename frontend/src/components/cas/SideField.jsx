@@ -1,14 +1,7 @@
 import { useState } from 'react'
 import { Icon } from '../atelier/Icon'
 
-/**
- * A row of the CA side panel (`dl.props` of the mockup's caSide()): the label, then the value and,
- * after it, the action that changes it as a text link. `data-product` marks a row the mockup does not have.
- */
-export function SideField({ label, children }) {
-  return <><dt data-product="">{label}</dt><dd data-product="">{children}</dd></>
-}
-
+/** The action of a notice of the CA side panel, a text link after its sentence (a row's action is Detail.jsx's RowAction). */
 export function SideAction({ children, ...rest }) {
   return <>{' '}<button type="button" className="text-link" data-write="" {...rest}>{children}</button></>
 }

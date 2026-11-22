@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../atelier/Icon'
+import { Facts } from '../atelier/Detail'
 import { useAuth } from '../../contexts/AuthContext'
 import { languages } from '../../i18n'
 import { chooseLanguage } from '../../lib/chooseLanguage'
@@ -110,8 +111,9 @@ export function UserMenu({ can }) {
   const via = facts?.method && facts.method !== 'session' ? facts.method : authMethod
   const methodName = !via || via === 'session' ? null : METHOD_KEYS[via] ? t(METHOD_KEYS[via]) : via
   const method = methodName && facts?.provider ? t('shell.userCard.methodVia', { method: methodName, provider: facts.provider }) : methodName
+  const mfaOn = !!(facts?.mfa?.enabled && facts.mfa.methods?.length)
   const factors = facts?.mfa
-    ? (facts.mfa.enabled && facts.mfa.methods?.length
+    ? (mfaOn
       ? t('shell.userCard.mfaOn', { methods: facts.mfa.methods.map(m => (FACTOR_KEYS[m] ? t(FACTOR_KEYS[m]) : m)).join(', ') })
       : t('shell.userCard.mfaOff'))
     : null
@@ -145,18 +147,17 @@ export function UserMenu({ can }) {
             </span>
           </p>
           {(email || method || factors || minutes || endsAt) ? (
-            <dl className="props user-facts">
-              {email && <><dt>{t('common.email')}</dt><dd>{email}</dd></>}
-              {method && <><dt>{t('shell.userCard.signIn')}</dt><dd>{method}</dd></>}
-              {factors && <><dt>{t('shell.userCard.mfa')}</dt><dd>{factors}</dd></>}
-              {(minutes || endsAt) ? (
-                <>
-                  <dt>{t('shell.userCard.session')}</dt>
-                  {minutes ? <dd>{t('shell.userCard.lockIn', { minutes })}</dd> : null}
-                  {endsAt ? <dd>{t('shell.userCard.endsAt', { date: endsAt })}</dd> : null}
-                </>
-              ) : null}
-            </dl>
+            <Facts className="user-facts" items={[
+              email && [t('common.email'), email],
+              method && [t('shell.userCard.signIn'), method],
+              // Second factors off: a neutral state, no policy here says it should be on
+              factors && { label: t('shell.userCard.mfa'), ...(mfaOn ? { value: factors } : { state: ['muted', factors] }) },
+              (minutes || endsAt) && {
+                label: t('shell.userCard.session'), long: true,
+                value: minutes ? t('shell.userCard.lockIn', { minutes }) : t('shell.userCard.endsAt', { date: endsAt }),
+                sub: minutes && endsAt ? t('shell.userCard.endsAt', { date: endsAt }) : undefined,
+              },
+            ]} />
           ) : null}
         </div>
         {/* On a phone the bar has no room for the language menu: it moves here (adjust.css) */}

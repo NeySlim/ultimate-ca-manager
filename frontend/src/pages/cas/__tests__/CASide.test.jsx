@@ -62,7 +62,8 @@ function renderSide(id = 2, { cas = family(), ocsp = { enabled: true }, crossLin
   )
   return { onPick, onIssue, ...utils }
 }
-const row = (label) => screen.getByText(label, { selector: 'dt' }).nextElementSibling
+// A fact's row (its value, its action, its help), or the value of a plain dl.props pair
+const row = (label) => { const dt = screen.getByText(label, { selector: 'dt' }); return dt.closest('.row') || dt.nextElementSibling }
 
 beforeEach(() => {
   granted = new Set(['*'])
@@ -80,7 +81,7 @@ describe('CASide: the mockup caSide()', () => {
     const aside = container.querySelector('aside.panel.ca-side')
     expect(aside).toHaveAttribute('aria-labelledby', 'ca-side-title')
     expect(aside.querySelector('header.ca-side-head h2#ca-side-title')).toHaveTextContent('Issuing')
-    expect([...aside.querySelectorAll(':scope > section.ca-side-section > h3.section-title')].map((h) => h.textContent).slice(0, 4))
+    expect([...aside.querySelectorAll(':scope > .kvg > section.ca-side-section > h3.section-title')].map((h) => h.textContent).slice(0, 4))
       .toEqual(['cas.side.identity', 'cas.side.key', 'cas.side.issuance', 'cas.side.revocation'])
     expect(row('cas.side.typeLevel')).toHaveTextContent('cas.side.intermediate · cas.tree.level 2')
     expect(row('pathLen')).toHaveTextContent('cas.side.pathLenNone')
@@ -227,6 +228,40 @@ describe('CASide: actions', () => {
     granted = new Set(['read:cas', 'write:cas'])
     renderSide(2)
     expect(menu().querySelector('[data-action="delete"]')).toBeNull()
+  })
+})
+
+describe('CASide: facts of the panel (KV)', () => {
+  it('names the signature by its hash, as a certificate\'s, and the sections share one term column', async () => {
+    api.getById.mockImplementation((id) => Promise.resolve({ data: { ...family().find((c) => c.id === id), signature_algorithm: 'sha256WithRSAEncryption' } }))
+    const { container } = renderSide(2)
+    await waitFor(() => expect(row('cas.side.signature').querySelector('dd.v')).toHaveTextContent(/^SHA-256$/))
+    expect(container.querySelectorAll('.ca-side > .kvg > section.ca-side-section > dl.kv')).toHaveLength(4)
+  })
+
+  it('puts each switch apart from its value, folds the help, writes an absence and a state apart from a value', () => {
+    renderSide(2)
+    const pickers = row('cas.issuancePickers')
+    expect(pickers.querySelector('dd.v')).toHaveTextContent(/^cas.issuanceListedState$/)
+    expect(within(pickers.querySelector('dd.act')).getByRole('button', { name: 'cas.hideFromIssuance' })).toHaveAttribute('data-write', '')
+    const unique = row('cas.uniqueSubject')
+    expect(unique.querySelector('dd.v .badge.muted')).toHaveTextContent('cas.uniqueSubjectNotEnforced')
+    expect(unique.querySelector('dd.help')).not.toBeVisible()
+    expect(row('cas.complianceProfile').querySelector('dd.absent')).toHaveTextContent('cas.complianceProfileNone')
+    expect(row('cas.side.ocsp').querySelector('dd.v .badge.muted')).toHaveTextContent('cas.side.ocspInactive')
+  })
+
+  it('copies the distribution point whole from its chip', async () => {
+    const url = 'http://pki.example.org/cdp/7c1e2a40-55b3-4d9e-a1f6-0b8d3e9f2c11.crl'
+    api.getById.mockImplementation((id) => Promise.resolve({ data: { ...family().find((c) => c.id === id), cdp_enabled: true, cdp_url: url } }))
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    renderSide(2)
+    const cdp = await waitFor(() => row('cas.side.cdp'))
+    expect(cdp).toHaveClass('long', 'wide')
+    fireEvent.click(within(cdp).getByRole('button', { name: 'protocols.copyValue cas.side.cdp' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(url))
   })
 })
 

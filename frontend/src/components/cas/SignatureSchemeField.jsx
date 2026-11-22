@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SideField, SideAction } from './SideField'
+import { FactRow, RowAction } from '../atelier/Detail'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
@@ -18,10 +18,8 @@ export function SignatureSchemeField({ ca, canWrite = false, onChanged }) {
   const pssPossible = ca.has_private_key && (!ca.uses_hsm || PSS_HSM_TYPES.includes(ca.hsm_provider_type))
 
   return (
-    <SideField label={t('cas.signatureScheme')}>
-      <span>{t(isPss ? 'cas.signatureSchemePss' : 'cas.signatureSchemePkcs1v15')}</span>
-      {canWrite && !ca.revoked && (isPss || pssPossible) && <SchemeSwitch ca={ca} isPss={isPss} onChanged={onChanged} />}
-    </SideField>
+    <FactRow product label={t('cas.signatureScheme')} value={t(isPss ? 'cas.signatureSchemePss' : 'cas.signatureSchemePkcs1v15')}
+      action={canWrite && !ca.revoked && (isPss || pssPossible) ? <SchemeSwitch ca={ca} isPss={isPss} onChanged={onChanged} /> : null} />
   )
 }
 
@@ -51,8 +49,8 @@ function SchemeSwitch({ ca, isPss, onChanged }) {
   }
 
   return (
-    <SideAction onClick={handleSwitch} disabled={switching}>
+    <RowAction onClick={handleSwitch} disabled={switching}>
       {action}
-    </SideAction>
+    </RowAction>
   )
 }
