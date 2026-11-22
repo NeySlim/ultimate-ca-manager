@@ -35,10 +35,12 @@ vi.mock('../../hooks', async () => {
 const getAll = vi.fn()
 const del = vi.fn()
 const managed = vi.hoisted(() => ({ cas: [] }))
+// The anchors a test lists instead of ROWS, read back by the dock
+const listed = vi.hoisted(() => ({ rows: null }))
 vi.mock('../../services', () => ({
   truststoreService: {
     getAll: (...a) => getAll(...a),
-    getById: (id) => Promise.resolve({ data: ROWS.find((r) => r.id === id) }),
+    getById: (id) => Promise.resolve({ data: (listed.rows || ROWS).find((r) => r.id === id) }),
     delete: (...a) => del(...a),
   },
   casService: { getAll: () => Promise.resolve({ data: managed.cas }) },
@@ -60,6 +62,7 @@ const renderPage = () => render(<MemoryRouter><TrustStorePage /></MemoryRouter>)
 beforeEach(() => {
   perms.write = true; perms.del = true
   mobile.isMobile = false
+  listed.rows = null
   getAll.mockReset().mockResolvedValue({ data: ROWS })
   del.mockReset().mockResolvedValue({})
   notify.showConfirm.mockClear()
@@ -144,6 +147,36 @@ describe('Trust anchor dock', () => {
     expect(dock.querySelector('.code-preview')).toHaveTextContent('BEGIN CERTIFICATE')
     fireEvent.click(dock.querySelector('#truststore-delete'))
     await waitFor(() => expect(del).toHaveBeenCalledWith(1))
+  })
+
+  // KV-3: the dock's rows are typed (a DN long, a serial and a digest as hex chips copied whole, a missing value absent)
+  it('types the rows of the overview and the details', async () => {
+    const sha256 = 'cecddc905099d8dadfc5b1d209b737cbe2c18cfb2c10c0ff0bcf0d3286fc1aa2'
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    listed.rows = [{ ...ROWS[0], fingerprint_sha256: sha256, fingerprint_sha1: '', added_by: null }]
+    getAll.mockResolvedValue({ data: listed.rows })
+    const { container } = renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Bank Root' }))
+    const dock = await waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
+    const row = (label) => within(dock).getByText(label, { selector: 'dt' }).closest('.row')
+    expect(dock.querySelector('dl.props')).toBeNull()
+    expect(row('Subject')).toHaveClass('long')
+    expect(row('State').querySelector('dd.v .badge')).toBeTruthy()
+    fireEvent.click(within(dock).getByRole('tab', { name: 'Details' }))
+    expect(dock.querySelector('dl.props')).toBeNull()
+    expect(row('Issuer')).toHaveClass('long', 'wide')
+    expect(row('Issuer').querySelector('.mono')).toBeNull()
+    expect(row('Serial Number').querySelector('dd.v .code-value.hex')).toHaveTextContent('0A:0B')
+    // the stored digest in pairs of the certificate's form, 4 lines of 8 bytes, copied whole
+    const digest = row('SHA-256')
+    expect(digest.querySelectorAll('dd.v .code-value.hex .line')).toHaveLength(4)
+    fireEvent.click(within(digest).getByRole('button', { name: 'Copy SHA-256' }))
+    const paired = sha256.toUpperCase().match(/../g).join(':')
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(paired))
+    expect(row('SHA-1').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(row('Added By').querySelector('dd.absent')).toHaveTextContent('—')
   })
 
   it('offers no deletion without delete:truststore', async () => {
