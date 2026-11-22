@@ -11,7 +11,7 @@ import {
   opnsenseService, casService, certificatesService,
   csrsService, templatesService, usersService
 } from '../services'
-import { REVOCATION_REASONS } from '../components/RevokeCertificateModal'
+import { REVOCATION_REASONS } from '../lib/revocationReasons'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, extractCN, downloadBlob, warnSkippedExport } from '../lib/utils'

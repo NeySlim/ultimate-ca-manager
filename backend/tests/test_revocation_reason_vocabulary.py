@@ -3,8 +3,8 @@ each other.
 
 Four copies of this list existed. Two agreed, and neither of those was
 checked against anything: `utils/revocation_reasons.REVOCATION_REASONS` and
-the `REVOCATION_REASONS` array in
-`frontend/src/components/RevokeCertificateModal.jsx`, byte for byte the same
+the `REVOCATION_REASONS` array of the revoke dialog (now
+`frontend/src/lib/revocationReasons.js`), byte for byte the same
 and nothing holding them there. The third, `docs/openapi.yaml`, had six
 names, spelled `cACompromise` as `caCompromise`, and was missing
 `certificateHold`, `privilegeWithdrawn` and `aACompromise` -- so a client
@@ -30,8 +30,10 @@ from utils.revocation_reasons import (REASON_FLAGS, REVOCATION_REASONS,
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODAL = os.path.join(_REPO, 'frontend', 'src', 'components',
-                     'RevokeCertificateModal.jsx')
+FRONTEND_SRC = os.path.join(_REPO, 'frontend', 'src')
+# The browser's one list: the revoke dialog and the operations page both import it
+BROWSER_LIST = os.path.join(FRONTEND_SRC, 'lib', 'revocationReasons.js')
+_DECLARATION = re.compile(r'export const REVOCATION_REASONS\s*=\s*\[(.*?)\]', re.S)
 
 # RFC 5280 §5.3.1, CRLReason ::= ENUMERATED { ... }. Value 7 is not used.
 RFC_5280_CRL_REASONS = {
@@ -84,13 +86,24 @@ class TestTheListIsTheStandardsList:
 
 class TestTheBrowserHasTheSameList:
     def _browser_list(self):
-        assert os.path.exists(MODAL), MODAL
-        source = open(MODAL, encoding='utf-8').read()
-        match = re.search(
-            r'export const REVOCATION_REASONS\s*=\s*\[(.*?)\]',
-            source, re.S)
-        assert match, 'no REVOCATION_REASONS array in the revoke dialog'
+        assert os.path.exists(BROWSER_LIST), BROWSER_LIST
+        source = open(BROWSER_LIST, encoding='utf-8').read()
+        match = _DECLARATION.search(source)
+        assert match, 'no REVOCATION_REASONS array in the browser list'
         return re.findall(r"'([^']+)'", match.group(1))
+
+    def test_the_browser_declares_it_once(self):
+        """No second copy, whatever its name: a quoted code that only RFC 5280 spells this way."""
+        quoted = re.compile(r"""['"`](?:aACompromise|cessationOfOperation|privilegeWithdrawn)['"`]""")
+        holders = []
+        for root, dirs, files in os.walk(FRONTEND_SRC):
+            dirs[:] = [d for d in dirs if d not in ('__tests__', 'node_modules')]
+            for name in files:
+                if name.endswith(('.js', '.jsx', '.ts', '.tsx')):
+                    path = os.path.join(root, name)
+                    if quoted.search(open(path, encoding='utf-8').read()):
+                        holders.append(os.path.relpath(path, FRONTEND_SRC))
+        assert holders == [os.path.relpath(BROWSER_LIST, FRONTEND_SRC)], holders
 
     def test_same_names_in_the_same_order(self):
         assert self._browser_list() == list(REVOCATION_REASONS), (

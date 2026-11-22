@@ -125,3 +125,4 @@ tests/test_truststore_export_purpose.py
 tests/test_discovery_export_filters.py
 tests/test_like_search_literal.py
 tests/test_search_protocol_objects.py
+tests/test_guide_prerender_route.py
