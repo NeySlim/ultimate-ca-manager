@@ -180,7 +180,7 @@ function MoreDetails({ cert }) {
   const scts = cert.ct_scts || []
   const id = `more-details-${cert.id}`
   return (
-    <div className="advanced">
+    <div className={open ? 'advanced open' : 'advanced'}>
       <button type="button" className="advanced-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
         <Icon name={open ? 'down' : 'right'} /><span>{t('inspector.cert.moreDetails')}</span><small>{t('inspector.cert.moreDetailsHint')}</small>
       </button>

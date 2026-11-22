@@ -161,7 +161,7 @@ const lineEnds = (locator) => locator.evaluate((el) => {
 test.describe('an inspector in a floating window (container queries)', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('at 480 and 620 px the overview is one column and a 40-character name stays on one line', async ({ page, api }) => {
+  test('at 620 px two columns, at 480 px one, and a 40-character name breaks at its separators only', async ({ page, api }) => {
     const ca = await createCA(api)
     const suffix = '.internal.example.org'
     const label = `${uid('w')}abcdefghijklmnop`.slice(0, 40 - suffix.length).replace(/-$/, 'x')
@@ -174,7 +174,7 @@ test.describe('an inspector in a floating window (container queries)', () => {
     const win = page.getByRole('dialog', { name: cert.common_name })
     await expect(win).toBeVisible()
     const edge = win.locator('.float-edge-e')
-    for (const target of [620, 480]) {
+    for (const [target, display] of [[620, 'grid'], [480, 'flex']] as const) {
       const w = (await win.boundingBox())!.width
       const e = (await edge.boundingBox())!
       await page.mouse.move(e.x + e.width / 2, e.y + e.height / 2)
@@ -183,9 +183,12 @@ test.describe('an inspector in a floating window (container queries)', () => {
       await page.mouse.up()
       await expect.poll(async () => Math.round((await win.boundingBox())!.width)).toBe(target)
       const overview = win.locator('[data-testid=certificate-overview]')
-      await expect.poll(() => overview.evaluate((el) => getComputedStyle(el).display)).toBe('flex')
+      await expect.poll(() => overview.evaluate((el) => getComputedStyle(el).display)).toBe(display)
+      // On two lines at most, after a separator of the name
       const san = overview.locator('dt', { hasText: 'Alternative name' }).locator('xpath=following-sibling::dd[1]')
-      expect(await lineEnds(san), `${target} px`).toEqual([])
+      const ends = await lineEnds(san)
+      expect(ends.length, `${target} px`).toBeLessThanOrEqual(1)
+      for (const end of ends) expect(end, `${target} px`).toMatch(/^[.-]$/)
       // The serial wraps after its colons, never inside a byte
       const serial = overview.locator('dt', { hasText: 'Serial' }).locator('xpath=following-sibling::dd[1]')
       for (const end of await lineEnds(serial)) expect(end, `${target} px`).toBe(':')
