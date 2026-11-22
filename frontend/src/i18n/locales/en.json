@@ -1557,7 +1557,6 @@
         "noKey": "UCM does not hold its private key: this authority cannot issue."
       },
       "extensions": "X.509 extensions",
-      "copyValue": "Copy {{name}}",
       "show": "Show {{name}}"
     },
     "pageActions": "Page actions"

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Icon } from '../atelier/Icon'
+import { FactRow, Facts } from '../atelier/Detail'
 import { SideFold } from './SideField'
 import { casService } from '../../services'
 import { extractData, formatDate } from '../../lib/utils'
@@ -23,16 +24,16 @@ function CertList({ section, t }) {
   )
 }
 
+// A typed row: its count and its list in the value, under its sentence of a term when the panel is narrow
 function Block({ title, section, t, children }) {
   return (
-    <>
-      <dt data-testid="chain-usage-block">{title}</dt>
-      <dd>
+    <FactRow data-testid="chain-usage-block" label={title} long value={(
+      <>
         <span className="counter">{section.count}</span>
         {children}
         {section.truncated && <p className="small muted">{t('chainUsage.truncated', { count: section.items.length })}</p>}
-      </dd>
-    </>
+      </>
+    )} />
   )
 }
 
@@ -81,7 +82,7 @@ export function ChainUsageSection({ ca }) {
       )}
       {usage && (
         <>
-          <dl className="props">
+          <Facts>
             <Block title={t('chainUsage.issued')} section={issued} t={t}>
               <CertList section={issued} t={t} />
             </Block>
@@ -123,7 +124,7 @@ export function ChainUsageSection({ ca }) {
                 </ul>
               </Block>
             )}
-          </dl>
+          </Facts>
           <p className="small muted ca-fold-note">{t('chainUsage.note')}</p>
         </>
       )}

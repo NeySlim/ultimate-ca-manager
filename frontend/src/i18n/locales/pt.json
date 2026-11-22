@@ -1557,7 +1557,6 @@
         "noKey": "O UCM não possui a respectiva chave privada: esta autoridade não pode emitir."
       },
       "extensions": "Extensões X.509",
-      "copyValue": "Copiar {{name}}",
       "show": "Mostrar {{name}}"
     },
     "pageActions": "Ações da página"

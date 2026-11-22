@@ -1557,7 +1557,6 @@
         "noKey": "UCM besitzt ihren privaten Schlüssel nicht: Diese CA kann nicht ausstellen."
       },
       "extensions": "X.509-Erweiterungen",
-      "copyValue": "{{name}} kopieren",
       "show": "{{name}} anzeigen"
     },
     "pageActions": "Seitenaktionen"

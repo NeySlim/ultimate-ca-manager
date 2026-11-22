@@ -1557,7 +1557,6 @@
         "noKey": "UCMが秘密鍵を保持していないため、この認証局は発行できません。"
       },
       "extensions": "X.509拡張",
-      "copyValue": "{{name}} をコピー",
       "show": "{{name}} を表示"
     },
     "pageActions": "ページの操作"

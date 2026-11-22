@@ -1392,7 +1392,6 @@
         "noKey": "UCM ne détient pas sa clé privée : cette autorité ne peut pas émettre."
       },
       "extensions": "Extensions X.509",
-      "copyValue": "Copier {{name}}",
       "show": "Afficher {{name}}"
     },
     "pageActions": "Actions de la page"
