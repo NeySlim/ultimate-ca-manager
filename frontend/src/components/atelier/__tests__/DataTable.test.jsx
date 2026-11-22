@@ -28,10 +28,10 @@ beforeEach(() => { size.isMobile = false; localStorage.clear() })
 
 describe('the table', () => {
   it('draws the mockup table of its kind', () => {
-    const { container, rerender } = render(<DataTable kind="certificates" scrollId="cert-scroll" label="Tableau" caption="Cap" columns={columns} rows={rows} rowLabel={(r) => r.name} />)
+    const { container, rerender } = render(<DataTable kind="certificates" scrollId="cert-scroll" label="Tableau" caption="Cap" columns={columns} rows={rows} rowLabel={(r) => r.name} onOpen={() => {}} />)
     expect(container.querySelector('.table-container > #cert-scroll.table-scroll[role=region][tabindex="0"]')).toHaveAttribute('aria-label', 'Tableau')
     expect(container.querySelector('table.cert-table caption.sr-only')).toHaveTextContent('Cap')
-    expect([...container.querySelectorAll('thead th')].map((th) => th.className)).toEqual(['col-name fit', 'col-description', 'col-ca fit'])
+    expect([...container.querySelectorAll('thead th')].map((th) => th.className)).toEqual(['col-name fit', 'col-description', 'col-ca fit', 'fit'])
     expect(container.querySelector('tbody td.entity-cell > .entity-line > button.entity-name')).toHaveTextContent('vpn.example.com')
     expect(container.querySelector('tbody td.description-cell.muted')).toHaveAttribute('title', 'desc')
     rerender(<DataTable kind="module" columns={columns} rows={rows} rowLabel={(r) => r.name} onOpen={() => {}} />)
@@ -43,6 +43,15 @@ describe('the table', () => {
     expect(container.querySelector('.table-container').style.marginBottom).toBe('20px')
     expect(container.querySelector('tbody td > button.resource')).toHaveTextContent('vpn.example.com')
     expect(container.querySelector('tbody td > button.icon-btn.quiet')).not.toBeNull()
+  })
+  it('a name with nothing to open names the row without a button, its whole text in a title', () => {
+    const { container } = render(<DataTable kind="module" columns={[{ ...columns[0], kind: 'entity', priority: 1, extra: () => <i className="mark" /> }]}
+      rows={rows} rowLabel={(r) => r.name} />)
+    const name = container.querySelector('tbody tr:first-child td.entity-cell > .entity-line > .entity-name')
+    expect(name.tagName).toBe('SPAN')
+    expect(name.querySelector('.entity-label')).toHaveAttribute('title', 'vpn.example.com')
+    expect(container.querySelector('tbody .entity-line > i.mark')).not.toBeNull()
+    expect(container.querySelector('tbody button')).toBeNull()
   })
   it('sorts by a column: aria-sort on every sortable header, the arrow on the sorted one, both arrows on the others', () => {
     const onSort = vi.fn()

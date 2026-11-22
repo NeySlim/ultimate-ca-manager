@@ -238,11 +238,15 @@ export function DataTable({
     if (col.resource) {
       return <button type="button" className="resource" data-open={rowKey(row)} disabled={locked || undefined} onClick={(e) => { e.stopPropagation(); onOpen?.(row) }}>{name}</button>
     }
+    const label = <>{col.icon && <Icon name={col.icon(row)} />}<span className="entity-label" title={typeof name === 'string' ? name : undefined}>{name}</span></>
+    // A list with nothing to open (a task, an archive) names its row without a button
     return (
       <span className="entity-line">
-        <button type="button" className="entity-name" data-open={rowKey(row)} disabled={locked || undefined} onClick={(e) => { e.stopPropagation(); onOpen?.(row) }}>
-          {col.icon && <Icon name={col.icon(row)} />}<span className="entity-label" title={typeof name === 'string' ? name : undefined}>{name}</span>
-        </button>
+        {onOpen ? (
+          <button type="button" className="entity-name" data-open={rowKey(row)} disabled={locked || undefined} onClick={(e) => { e.stopPropagation(); onOpen(row) }}>
+            {label}
+          </button>
+        ) : <span className="entity-name">{label}</span>}
         {col.extra?.(row)}
       </span>
     )

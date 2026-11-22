@@ -145,6 +145,29 @@ describe('the sort kept in the address', () => {
     expect(sortOf('Nom')).toBe('ascending')
   })
 
+  it('two lists on one page keep their sorts apart under their own scope, and leave the page number alone', () => {
+    function Two() {
+      const a = useSortParam(DEFAULT, ['name', 'ca', 'certs'], { scope: 'tasks' })
+      const b = useSortParam({ key: 'certs', asc: false }, ['name', 'certs'], { scope: 'backup' })
+      return (
+        <>
+          <DataTable columns={columns} rows={rows} sort={a.sort} onSort={a.onSort} />
+          <output data-testid="b">{`${b.sort.key}:${b.sort.asc}`}</output>
+          <button type="button" onClick={() => b.onSort('name')}>b-name</button>
+        </>
+      )
+    }
+    at('/settings?tab=x&page=2&backup-sort=name&backup-order=desc', <Two />)
+    expect(sortOf('Nom')).toBe('ascending')
+    expect(screen.getByTestId('b')).toHaveTextContent('name:false')
+    fireEvent.click(screen.getByRole('button', { name: 'Émetteur' }))
+    expect(loc()).toBe('?tab=x&page=2&backup-sort=name&backup-order=desc&tasks-sort=ca&tasks-order=asc')
+    fireEvent.click(screen.getByText('b-name'))
+    expect(loc()).toBe('?tab=x&page=2&tasks-sort=ca&tasks-order=asc&backup-sort=name&backup-order=asc')
+    expect(screen.getByTestId('b')).toHaveTextContent('name:true')
+    expect(sortOf('Émetteur')).toBe('ascending')
+  })
+
   it('a default sort descending is read and written as such', () => {
     at('/list', <List initial={{ key: 'certs', asc: false }} />)
     expect(sortOf('Certificats')).toBe('descending')
