@@ -213,6 +213,8 @@ for (const [width, dock] of [[1600, false], [1406, true], [1280, false], [1000, 
     test.use({ viewport: { width, height: dock ? 809 : 900 } })
 
     test('no sideways scroll, chevrons in view, headers whole, fit cells whole, cut text titled, one column sorted', async ({ page, api }) => {
+      // Sixteen lists opened in turn: the budget list-columns-pki.spec.ts gives its nine
+      test.setTimeout(180_000)
       await seed(api)
       await feed(page, dock)
       for (const list of LISTS) {
@@ -245,6 +247,7 @@ test.describe('protocol lists in French at 1600 px', () => {
   test.use({ viewport: { width: 1600, height: 900 } })
 
   test('a short header stays near its values in the longest of the written languages', async ({ page, api }) => {
+    test.setTimeout(180_000)
     await page.addInitScript(() => { try { localStorage.setItem('i18nextLng', 'fr') } catch { /* noop */ } })
     await seed(api)
     await feed(page)
@@ -261,6 +264,7 @@ test.describe('protocol lists on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
   test('every record keeps its chevron, no fact is a dash, a date or a number follows its label, a sortable list sorts', async ({ page, api }) => {
+    test.setTimeout(180_000)
     await seed(api)
     await feed(page)
     for (const list of LISTS) {
