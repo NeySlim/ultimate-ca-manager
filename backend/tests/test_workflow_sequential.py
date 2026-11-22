@@ -8,7 +8,9 @@ import pytest
 
 from tests.workflow_support import evaluate, github_context, load, render
 
-LINE_BRANCH = 'sextant'
+LINE_BRANCH = 'dev'
+# Frozen at the last 3.0 release candidate once merged into dev: it must start nothing any more
+RETIRED_BRANCH = 'sextant'
 
 
 def _job():
@@ -59,7 +61,8 @@ def _random_step():
     ('push', f'refs/heads/{LINE_BRANCH}', False),
     ('schedule', 'refs/heads/main', True),
     ('push', 'refs/heads/test', False),
-    ('workflow_dispatch', 'refs/heads/dev', False),
+    ('workflow_dispatch', 'refs/heads/feature/x', False),
+    ('workflow_dispatch', f'refs/heads/{RETIRED_BRANCH}', False),
 ])
 def test_the_random_order_report_follows_the_same_runs(event, ref, runs):
     step = _random_step()
@@ -112,6 +115,13 @@ def test_one_sequential_run_at_a_time_on_the_line_branch_and_it_finishes():
                              _job_concurrency(ref, 'b2', 'workflow_dispatch'))
     # Same group: the newest waits and replaces an older waiting one; the running one is never cancelled
     assert g1 == g2 and cancel is False
+
+
+def test_a_manual_run_of_the_retired_branch_gets_one_group_per_commit():
+    ref = f'refs/heads/{RETIRED_BRANCH}'
+    (g1, _), (g2, _) = (_job_concurrency(ref, 'a1', 'workflow_dispatch'),
+                        _job_concurrency(ref, 'b2', 'workflow_dispatch'))
+    assert g1 != g2
 
 
 @pytest.mark.parametrize('ref', ['refs/heads/test', 'refs/heads/main'])

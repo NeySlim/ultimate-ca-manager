@@ -22,7 +22,8 @@ def _runs(event, ref):
 
 
 @pytest.mark.parametrize('event,ref,expected', [
-    ('push', 'refs/heads/sextant', True),
+    ('push', 'refs/heads/dev', True),
+    ('push', 'refs/heads/sextant', False),
     ('pull_request', 'refs/pull/12/merge', True),
     ('workflow_dispatch', 'refs/heads/feature/x', True),
     ('push', 'refs/heads/feature/x', False),
@@ -34,7 +35,8 @@ def test_the_job_runs_on_integration_pushes_pull_requests_and_by_hand(event, ref
 
 def test_the_workflow_is_triggered_by_those_events():
     on = triggers(load('tests.yml'))
-    assert 'sextant' in on['push']['branches']
+    assert 'dev' in on['push']['branches']
+    assert 'sextant' not in on['push']['branches']  # frozen once merged into dev
     assert 'pull_request' in on and 'workflow_dispatch' in on
 
 
