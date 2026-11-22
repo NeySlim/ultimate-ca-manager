@@ -107,6 +107,29 @@ test('a detached window stays when the page changes and keeps its place after a 
   expect(Math.round((await box(win)).y)).toBe(Math.round(placed.y))
 })
 
+test('an authority and a request detach from their pages into windows of their own', async ({ page, api }) => {
+  const ca = await createCA(api)
+  await page.goto(`/cas/${ca.id}`)
+  await page.getByTestId('ca-side').getByRole('button', { name: 'Detach into a window' }).click()
+  const caWin = page.getByRole('dialog', { name: ca.common_name })
+  await expect(caWin.getByRole('heading', { name: ca.common_name, level: 2 }).last()).toBeVisible()
+  await expect(caWin.getByTestId('ca-side')).toContainText('Self-signed')
+
+  const cn = `${uid('csr')}.example.com`
+  const csr = await api.post('/csrs', { cn, key_type: 'RSA 2048' })
+  await page.goto('/csrs')
+  await page.getByRole('main').getByRole('row').filter({ hasText: cn }).locator('.entity-name').click()
+  await expect(page.locator('#inspector').getByText(cn).first()).toBeVisible()
+  await page.locator('#inspector').getByRole('button', { name: 'Detach into a window' }).click()
+  // The request leaves the dock for its window, which shows the same sections
+  await expect(page.locator('#inspector')).toHaveCount(0)
+  const csrWin = page.locator(`[data-detached="csr:${csr.id}"]`)
+  await expect(csrWin.getByRole('tab', { name: 'Details' })).toBeVisible()
+  await expect(csrWin).toContainText(cn)
+  // Both stay open together
+  await expect(page.locator('[data-detached]')).toHaveCount(2)
+})
+
 test('three certificates compared side by side, then only their differences', async ({ page, api }) => {
   const ca = await createCA(api)
   const tag = uid('cmp')
