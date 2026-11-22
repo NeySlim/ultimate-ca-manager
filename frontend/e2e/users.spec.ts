@@ -72,3 +72,51 @@ test('a custom role created on screen is stored', async ({ page, api }) => {
   await expect(page.getByRole('main').getByText(name).first()).toBeVisible()
   expect(JSON.stringify(await api.get('/rbac/roles'))).toContain(name)
 })
+
+test.describe('a phone of 360 px', () => {
+  test.use({ viewport: { width: 360, height: 800 } })
+
+  test('a user\'s profile cuts no word, mutes what is missing, folds the role\'s explanation', async ({ page, api }) => {
+    const user = await createUser(api, 'operator')
+    await page.goto(`/users?item=${user.id}`)
+    const panel = page.locator('#inspector .detail-panel')
+    await expect(panel.locator('dl.kv')).toHaveCount(2)
+    await expect(panel.locator('dl.props')).toHaveCount(0)
+    const row = (term: string) => panel.locator('dl.kv > .row', { has: page.locator('dt', { hasText: term }) })
+    // Never signed in: a muted absence; the second factor off: a neutral state
+    await expect(row('Last access').locator('dd.absent')).toHaveText('Never')
+    await expect(row('Two-factor authentication').locator('dd.v .badge.muted')).toHaveText('Disabled')
+    // Every word of a term or a value on one line
+    const cut = await panel.evaluate((el) => {
+      const out: string[] = []
+      for (const cell of el.querySelectorAll('dl.kv > .row > :is(dt, dd.v, dd.absent)')) {
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const text = node.textContent || ''
+          for (const m of text.matchAll(/\S+/g)) {
+            const range = document.createRange()
+            range.setStart(node, m.index!)
+            range.setEnd(node, m.index! + m[0].length)
+            if (new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size > 1) out.push(m[0])
+          }
+        }
+      }
+      return out
+    })
+    expect(cut).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
+    // The role alone in its value, its explanation folded, then unfolded on the whole width of the block
+    await expect(row('Role').locator('dd.v')).toHaveText('Operator')
+    const tip = panel.getByRole('button', { name: 'Help: Role' })
+    await expect(tip).toHaveAttribute('aria-expanded', 'false')
+    const help = panel.locator(`[id="${await tip.getAttribute('aria-controls')}"]`)
+    await expect(help).toBeHidden()
+    await tip.click()
+    await expect(help).toHaveText('Issue, renew and revoke; neither accounts nor access control.')
+    const block = (await row('Role').locator('xpath=..').boundingBox())!
+    expect(Math.abs((await help.boundingBox())!.x - block.x)).toBeLessThanOrEqual(1)
+    // Security: each factor a state, the exemption included
+    await page.locator('#inspector').getByRole('tab', { name: 'Security' }).click()
+    await expect(row('2FA exempt').locator('dd.v .badge.muted')).toHaveText('No')
+  })
+})

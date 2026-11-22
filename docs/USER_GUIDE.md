@@ -263,6 +263,8 @@ Open **Modules** > **Administration** > **Users** (administrators).
 
 The **Groups** tab defines groups of users: a group grants permissions to every member on top of their own role. A user's source (local, LDAP, OAuth2 or SAML) is shown next to the account.
 
+In an account's **Profile**, what its role allows folds behind the help button after **Role**; the second factor, TOTP and an exemption from 2FA read as states, and an account that never signed in reads *Never*.
+
 | Role | Permissions |
 |------|-------------|
 | **Admin** | Full access |

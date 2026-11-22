@@ -187,10 +187,24 @@ describe('AccountPage sections', () => {
   it('reads the activity of the account as lines of terms and values, as the mockup props', async () => {
     open()
     const profile = await screen.findByRole('region', { name: 'account.profile' })
-    const props = profile.querySelector('dl.props')
-    expect(props).not.toBeNull()
-    expect(within(props).getByText('account.totalLogins').tagName).toBe('DT')
+    const kv = profile.querySelector('dl.kv')
+    expect(kv).not.toBeNull()
+    expect(profile.querySelector('dl.props')).toBeNull()
+    expect(within(kv).getByText('account.totalLogins').tagName).toBe('DT')
     expect(within(profile).getByLabelText('common.username')).toHaveValue('alice')
+  })
+
+  it('mutes the activity the server does not report and writes the status as a state', async () => {
+    open()
+    const profile = await screen.findByRole('region', { name: 'account.profile' })
+    const kv = profile.querySelector('dl.kv')
+    const dd = (term) => within(kv).getByText(term, { selector: 'dt' }).closest('div.row').querySelector('dd')
+    expect(dd('account.accountCreated')).toHaveClass('absent')
+    expect(dd('account.accountCreated')).toHaveTextContent('—')
+    expect(dd('common.lastLogin')).toHaveClass('absent')
+    expect(dd('account.totalLogins')).toHaveClass('v')
+    expect(dd('account.totalLogins')).toHaveTextContent(/^0$/)
+    expect(dd('common.status').querySelector('.badge')).not.toBeNull()
   })
 
   it('lists the API keys one per line with the revoke action named', async () => {

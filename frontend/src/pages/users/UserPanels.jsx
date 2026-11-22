@@ -7,11 +7,13 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Icon, Btn, Pill, Section, Props, RecordList, RecordRow, PermissionGrid } from '../../components/atelier'
+import { Icon, Btn, Pill, Section, Facts, RecordList, RecordRow, PermissionGrid } from '../../components/atelier'
 import { rolesService, groupsService } from '../../services'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
-import { YesNo } from '../admin/YesNo'
 import { ROLE_KEYS, ssoRowsOf, sourceText, grants } from './userFacts'
+
+// Characters of one unbroken word that still fit the value column of a 360 px panel
+const LONG_WORD = 22
 
 export function UserState({ user }) {
   const { t } = useTranslation()
@@ -22,22 +24,27 @@ export function UserProfile({ user: u, self, canWrite, sso }) {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
   const role = t(ROLE_KEYS[u.role] || 'common.viewer')
+  const created = dateOf(u.created_at, locale)
   return (
     <div className="module-detail">
       <Section title={t('users.identity')}>
-        <Props items={[
-          [t('users.login'), <span key="login" className="mono">{u.username}</span>],
-          [t('users.email'), u.email || '—'],
+        {/* A login or an address too long for the value column goes under its term in a narrow panel */}
+        <Facts items={[
+          { label: t('users.login'), value: <span className="mono">{u.username}</span>, long: String(u.username || '').length > LONG_WORD },
+          u.email ? { label: t('users.email'), value: u.email, long: u.email.length > LONG_WORD } : { label: t('users.email'), absent: '—' },
           [t('users.source'), sourceText(t, u)],
-          [t('atelier.state'), <UserState key="state" user={u} />],
-          [t('common.created'), dateOf(u.created_at, locale) || '—'],
+          { label: t('atelier.state'), value: <UserState user={u} /> },
+          created ? [t('common.created'), created] : { label: t('common.created'), absent: '—' },
         ]} />
       </Section>
       <Section title={t('users.access')}>
-        <Props items={[
-          [t('common.role'), <>{role}<br /><span className="muted">{u.custom_role_name ? t('users.customRoleOf', { name: u.custom_role_name }) : t(`users.roleDesc.${ROLE_KEYS[u.role] ? u.role : 'viewer'}`)}</span></>],
-          [t('users.twoFactor'), <YesNo key="mfa" value={u.two_factor_enabled} />],
-          [t('users.lastSeen'), u.last_login ? dateTimeOf(u.last_login, locale) : t('common.never')],
+        {/* The role's explanation folds behind its help; a custom role is a second fact of the value */}
+        <Facts items={[
+          u.custom_role_name
+            ? { label: t('common.role'), value: role, sub: t('users.customRoleOf', { name: u.custom_role_name }) }
+            : { label: t('common.role'), value: role, help: t(`users.roleDesc.${ROLE_KEYS[u.role] ? u.role : 'viewer'}`) },
+          { label: t('users.twoFactor'), state: u.two_factor_enabled ? ['good', t('common.enabled')] : ['muted', t('common.disabled')] },
+          u.last_login ? [t('users.lastSeen'), dateTimeOf(u.last_login, locale)] : { label: t('users.lastSeen'), absent: t('common.never') },
         ]} />
         {self && <p className="notice"><Icon name="help" /><span>{t('users.selfNotice')}</span></p>}
       </Section>

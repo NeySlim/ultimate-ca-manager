@@ -13,7 +13,7 @@ import { MemberTransferModal } from '../components'
 import {
   Modal as AtelierModal, Input as FieldInput, Select as FieldSelect, ToggleSwitch as FieldToggle, Textarea as FieldTextarea,
   Zone, Icon, Btn, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, RecordList, RecordRow,
-  SimpleOverview, EmptyBlock, NoMatch, AtelierDialog, PermissionGrid, useClientList, useSortParam,
+  Facts, EmptyBlock, NoMatch, AtelierDialog, PermissionGrid, useClientList, useSortParam,
 } from '../components/atelier'
 import { MtlsCertificateDialog } from '../components/mtls/MtlsCertificateDialog'
 import { validityDays } from '../components/mtls/validity'
@@ -739,12 +739,17 @@ export default function UsersGroupsPage() {
           {canDelete('users') && <Btn tone="danger" icon="block" id="group-delete" onClick={() => handleDeleteGroup(selectedGroup)}>{t('common.delete')}</Btn>}
         </>}>
         {(section === 'overview' || !groupSections.some(([id]) => id === section)) && (
-          <SimpleOverview properties={[
-            [t('common.name'), selectedGroup.name],
-            [t('common.description'), selectedGroup.description || '—'],
-            [t('groups.members'), t('groups.memberCount', { count: selectedGroup.members?.length ?? selectedGroup.member_count ?? 0 })],
-            [t('common.created'), dateOf(selectedGroup.created_at, locale) || '—'],
-          ]} />
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Facts items={[
+                [t('common.name'), selectedGroup.name],
+                selectedGroup.description ? { label: t('common.description'), value: selectedGroup.description, long: true }
+                  : { label: t('common.description'), absent: '—' },
+                [t('groups.members'), t('groups.memberCount', { count: selectedGroup.members?.length ?? selectedGroup.member_count ?? 0 })],
+                dateOf(selectedGroup.created_at, locale) ? [t('common.created'), dateOf(selectedGroup.created_at, locale)] : { label: t('common.created'), absent: '—' },
+              ]} />
+            </Section>
+          </div>
         )}
         {section === 'members' && (
           <div className="module-detail">
