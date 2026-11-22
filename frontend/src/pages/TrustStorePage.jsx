@@ -443,7 +443,7 @@ export default function TrustStorePage() {
             <Section title={t('common.technicalDetails')}>
               <Facts items={[
                 fact(t('common.issuer'), open.issuer, { long: true }),
-                fact(t('common.serialNumber'), serialHex(open.serial_number), { kind: 'hex' }),
+                fact(t('common.serialNumber'), serialHex(open.serial_number), { kind: 'hex', long: serialHex(open.serial_number).length > 23 }),
                 fact(t('common.keyType'), certificateKeyLabel(open)),
                 fact(t('common.issuerSignatureAlgorithm'), open.signature_algorithm),
                 fact(t('common.validFrom'), dateOf(open.not_before, locale)),
@@ -452,8 +452,8 @@ export default function TrustStorePage() {
             </Section>
             <Section title={t('common.fingerprints')}>
               <Facts items={[
-                fact('SHA-256', digestHex(open.fingerprint_sha256), { kind: 'hex' }),
-                fact('SHA-1', digestHex(open.fingerprint_sha1), { kind: 'hex' }),
+                fact('SHA-256', digestHex(open.fingerprint_sha256), { kind: 'hex', long: true }),
+                fact('SHA-1', digestHex(open.fingerprint_sha1), { kind: 'hex', long: true }),
               ]} />
             </Section>
             <Section title={t('details.metadata')}>

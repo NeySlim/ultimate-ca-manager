@@ -40,6 +40,8 @@ export function ApprovalRequestPanel({ req }) {
   const state = stateOf(req, t)
   const target = s.certificate_id || req.certificate_id
   const signing = s.csr || req.request_type === 'csr'
+  // A subject goes under its term in a narrow panel only when it is a long one
+  const subjectText = req.request_type === 'csr' ? `CN=${s.cn}` : s.cn
   // The authority reads as the mockup's text, and still opens the CA
   const caText = ca?.name ? <>{ca.name} <span className="muted">· {t('cas.tree.level', { level: ca.level })}</span></> : `#${caId}`
   return (
@@ -60,7 +62,7 @@ export function ApprovalRequestPanel({ req }) {
       </Section>
       <Section title={signing ? t('approvals.work.detail.csr') : t('approvals.work.detail.object')}>
         <Facts items={[
-          s.cn && { label: t('approvals.work.detail.subject'), value: req.request_type === 'csr' ? `CN=${s.cn}` : s.cn, long: true },
+          s.cn && { label: t('approvals.work.detail.subject'), value: subjectText, long: subjectText.length > 24 },
           caId && [t('approvals.work.detail.ca'), <button type="button" className="text-link" onClick={() => openEntity('ca', caId)}>{caText}</button>],
           s.validity_days && [t('approvals.work.detail.validity'), t('approvals.work.detail.days', { count: s.validity_days })],
           s.extra_san?.length > 0 && [t('approvals.work.detail.extraSan'),
@@ -68,7 +70,7 @@ export function ApprovalRequestPanel({ req }) {
           s.csr_id && [t('approvals.work.detail.csrId'), `#${s.csr_id}`],
           target && [t('approvals.certificateId'), <button type="button" className="text-link" onClick={() => openEntity('certificate', target)}>#{target}</button>],
           // Written as the certificate's inspector writes it, so the two read alike
-          s.serial_number && { label: t('approvals.summarySerial'), value: serialHex(s.serial_number), kind: 'hex' },
+          s.serial_number && { label: t('approvals.summarySerial'), value: serialHex(s.serial_number), kind: 'hex', long: serialHex(s.serial_number).length > 23 },
           s.reason && [t('revocation.reasonLabel'), t(`revocation.reasons.${s.reason}`, s.reason)],
           s.invalidity_at && [t('approvals.summaryInvalidity'), formatDate(s.invalidity_at)],
           s.trigger === 'auto' && [t('approvals.summaryTrigger'), t('approvals.triggerScheduler')],

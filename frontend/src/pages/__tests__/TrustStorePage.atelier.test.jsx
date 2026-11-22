@@ -163,6 +163,7 @@ describe('Trust anchor dock', () => {
     // A plain digest from the API is written in octets, as a certificate's, and copied so
     const sha = row('SHA-256')
     expect(sha.querySelector('.code-value.hex')).toHaveTextContent('AB:CD')
+    expect(sha).toHaveClass('long')
     fireEvent.click(within(sha).getByRole('button'))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('AB:CD'))
     expect(row('SHA-1').querySelector('dd.absent')).toHaveTextContent('—')

@@ -91,7 +91,7 @@ describe('ApprovalDetail', () => {
     expect(asked).toHaveClass('long')
     expect(decided.querySelector('dd.absent')).toHaveTextContent('Aucun')
     expect(rows('Identité du protocole')[0].querySelector('dd.absent')).toHaveTextContent('—')
-    expect(rows('Sujet')[0]).toHaveClass('long')
+    expect(rows('Sujet')[0]).not.toHaveClass('long')
     // The serial as the certificate shows it, copied whole
     const [serial] = rows('Numéro de série')
     expect(serial.querySelector('.code-value.hex')).toHaveTextContent('04:D2')

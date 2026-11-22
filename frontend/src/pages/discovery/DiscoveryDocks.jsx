@@ -144,7 +144,7 @@ export function FoundDock({ cert, onClose, actions }) {
               cert.ucm_certificate_id && [t('discovery.found.inInventory'),
                 <button type="button" className="text-link" onClick={() => openEntity('certificate', cert.ucm_certificate_id)}>#{cert.ucm_certificate_id}</button>],
               !failed && (cert.serial_number
-                ? { label: t('common.serialNumber'), value: serialHex(cert.serial_number), kind: 'hex' }
+                ? { label: t('common.serialNumber'), value: serialHex(cert.serial_number), kind: 'hex', long: serialHex(cert.serial_number).length > 23 }
                 : { label: t('common.serialNumber'), absent: '—' }),
               !failed && moment(t('common.notBefore'), cert.not_before),
               !failed && [t('common.notAfter'), <>{when(cert.not_after)}{cert.is_expired ? <> · <span className="bad">{t('common.expired')}</span></>
@@ -173,8 +173,8 @@ export function FoundDock({ cert, onClose, actions }) {
           {!failed && (c.fingerprint_sha256 || c.fingerprint_sha1) && (
             <Section title={t('common.fingerprint')}>
               <Facts items={[
-                c.fingerprint_sha256 && { label: 'SHA-256', value: digestHex(c.fingerprint_sha256), kind: 'hex' },
-                c.fingerprint_sha1 && { label: 'SHA-1', value: digestHex(c.fingerprint_sha1), kind: 'hex' },
+                c.fingerprint_sha256 && { label: 'SHA-256', value: digestHex(c.fingerprint_sha256), kind: 'hex', long: true },
+                c.fingerprint_sha1 && { label: 'SHA-1', value: digestHex(c.fingerprint_sha1), kind: 'hex', long: true },
               ]} />
             </Section>
           )}
