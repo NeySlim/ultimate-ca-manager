@@ -217,6 +217,77 @@ test('three certificates compared side by side, then only their differences', as
   expect(await box(win)).toEqual(placed)
 })
 
+test('two certificates compared: an identical line merged, the name one has alone marked, then only the differences', async ({ page, api }) => {
+  const ca = await createCA(api)
+  const tag = uid('cmp2')
+  const shared = `${tag}-shared.example.com`
+  const extra = `${tag}-extra.example.com`
+  const a = await issueCert(api, ca.id, { cn: `${tag}-a.example.com`, san_dns: [`${tag}-a.example.com`, shared, extra] })
+  const b = await issueCert(api, ca.id, { cn: `${tag}-b.example.com`, san_dns: [`${tag}-b.example.com`, shared] })
+  await page.goto('/certificates')
+  await page.getByRole('main').getByRole('searchbox').fill(tag)
+  for (const c of [a, b]) await page.getByRole('checkbox', { name: `Select ${c.common_name}`, exact: true }).check()
+  await page.locator('.batchbar').getByRole('button', { name: 'Compare' }).click()
+  const win = page.getByRole('dialog', { name: 'Compare 2 certificates' })
+  const table = win.locator('table.compare-table')
+  await expect(table).toBeVisible()
+  // One issuer: a single cell across both certificates, marked identical
+  const issuer = table.locator('tr[data-row="issuer"]')
+  await expect(issuer.locator('td')).toHaveCount(1)
+  await expect(issuer.locator('td')).toHaveAttribute('colspan', '2')
+  await expect(issuer).toContainText('Identical')
+  // Each one's own names marked, the first one's extra name among them; the shared name plain on both sides
+  const san = table.locator('tr[data-row="san"]')
+  await expect(san).toHaveClass(/different/)
+  const [first, second] = [san.locator('td').nth(0), san.locator('td').nth(1)]
+  await expect(first.locator('li.only')).toHaveText([`DNS: ${a.common_name} (not in every certificate)`, `DNS: ${extra} (not in every certificate)`])
+  await expect(second.locator('li.only')).toHaveText([`DNS: ${b.common_name} (not in every certificate)`])
+  for (const cell of [first, second]) await expect(cell.locator('li.common')).toHaveText([`DNS: ${shared}`])
+  // No full selection ground: a differing line is drawn by the stroke on its label
+  const ground = await table.locator('tr[data-row="san"]').evaluate((tr) => getComputedStyle(tr).backgroundColor)
+  expect(ground).toBe('rgba(0, 0, 0, 0)')
+  const differing = await table.locator('tbody tr.different').count()
+  const total = await table.locator('tbody tr').count()
+  await expect(win.locator('.compare-sum')).toContainText(`${differing} differences among ${total} properties`)
+  await win.getByRole('checkbox', { name: 'Show only the differences' }).check()
+  await expect(table.locator('tbody tr')).toHaveCount(differing)
+  await expect(table.locator('tbody td[colspan]')).toHaveCount(0)
+  await expect(table.locator('tr[data-row="san"] li.only')).toHaveCount(3)
+})
+
+test('four certificates compared on a phone: the dialog scrolls the columns under their labels', async ({ page, api }) => {
+  const ca = await createCA(api)
+  const tag = uid('cmp4')
+  const certs = []
+  for (const s of ['a', 'b', 'c', 'd']) certs.push(await issueCert(api, ca.id, { cn: `${tag}-${s}.example.com`, san_dns: [`${tag}-${s}.example.com`, `${tag}-common.example.com`] }))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/certificates')
+  await page.getByRole('main').getByRole('searchbox').fill(tag)
+  for (const c of certs) await page.getByRole('checkbox', { name: `Select ${c.common_name}`, exact: true }).check()
+  await page.locator('.batchbar').getByRole('button', { name: 'Compare' }).click()
+  const dialog = page.getByTestId('compare-dialog')
+  const table = dialog.locator('table.compare-table')
+  await expect(table).toBeVisible()
+  await expect(table.locator('thead th')).toHaveText(['Property', ...certs.map((c) => c.common_name)])
+  // The issuer across the four, once
+  await expect(table.locator('tr[data-row="issuer"] td')).toHaveAttribute('colspan', '4')
+  // Each certificate's own name marked, the name common to the four plain
+  const san = table.locator('tr[data-row="san"]')
+  await expect(san.locator('li.only')).toHaveCount(4)
+  await expect(san.locator('li.common')).toHaveCount(4)
+  // The columns keep a readable width and scroll; the labels stay in view
+  const scroll = dialog.locator('.compare-scroll')
+  const widths = await table.locator('thead th').evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().width))
+  for (const w of widths.slice(1)) expect(w).toBeGreaterThanOrEqual(149)
+  await scroll.evaluate((el) => { el.scrollLeft = el.scrollWidth })
+  const label = await box(table.locator('tr[data-row="san"] th'))
+  const frame = await box(scroll)
+  expect(Math.round(label.x)).toBe(Math.round(frame.x))
+  await dialog.getByRole('checkbox', { name: 'Show only the differences' }).check()
+  await expect(table.locator('tr[data-row="issuer"]')).toHaveCount(0)
+  await expect(table.locator('tbody tr:not(.different)')).toHaveCount(0)
+})
+
 test('the status bar sums up a pending approval and an entry of the queue, each a way to its page', async ({ page, api }) => {
   void api
   // The shared instance keeps its approvals empty for the other tests: the two reads answer here

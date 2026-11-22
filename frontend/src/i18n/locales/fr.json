@@ -2386,10 +2386,10 @@
   "compare": {
     "title": "Comparer les certificats",
     "field": "Champ",
-    "differences_one": "{{count}} différence",
-    "differences_other": "{{count}} différences",
-    "differences": "{{count}} différences",
-    "lead": "Les propriétés différentes sont mises en évidence.",
+    "differences_one": "{{count}} différence sur {{total}} propriétés",
+    "differences_other": "{{count}} différences sur {{total}} propriétés",
+    "differences": "{{count}} différences sur {{total}} propriétés",
+    "lead": "Les lignes identiques sont fusionnées ; dans une liste, « + » marque ce qu’un autre certificat n’a pas.",
     "property": "Propriété",
     "close": "Fermer la comparaison",
     "countTitle_one": "Comparer {{count}} certificat",
@@ -2399,7 +2399,9 @@
     "onlyDifferences": "Ne montrer que les différences",
     "noDifference": "Aucune ligne ne diffère entre ces certificats.",
     "differs": "diffère",
-    "loadFailed": "Un certificat de la comparaison n’a pas pu être lu."
+    "loadFailed": "Un certificat de la comparaison n’a pas pu être lu.",
+    "identical": "Identique",
+    "notInAll": "absent d’un autre certificat"
   },
   "crlOcsp": {
     "crl": "Liste de révocation de certificats",

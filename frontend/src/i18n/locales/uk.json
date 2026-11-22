@@ -5384,12 +5384,12 @@
   "compare": {
     "title": "Порівняння сертифікатів",
     "field": "Поле",
-    "differences_one": "{{count}} відмінність",
-    "differences_few": "{{count}} відмінності",
-    "differences_many": "{{count}} відмінностей",
-    "differences_other": "{{count}} відмінностей",
-    "differences": "{{count}} відмінностей",
-    "lead": "Властивості, що відрізняються, виділено.",
+    "differences_one": "{{count}} difference among {{total}} properties",
+    "differences_few": "{{count}} differences among {{total}} properties",
+    "differences_many": "{{count}} differences among {{total}} properties",
+    "differences_other": "{{count}} differences among {{total}} properties",
+    "differences": "{{count}} differences among {{total}} properties",
+    "lead": "Identical lines are merged; in a list, “+” marks what another certificate lacks.",
     "property": "Властивість",
     "close": "Закрити порівняння",
     "countTitle_one": "Compare {{count}} certificate",
@@ -5401,7 +5401,9 @@
     "differs": "differs",
     "loadFailed": "A certificate of the comparison could not be read.",
     "countTitle_few": "Compare {{count}} certificates",
-    "countTitle_many": "Compare {{count}} certificates"
+    "countTitle_many": "Compare {{count}} certificates",
+    "identical": "Identical",
+    "notInAll": "not in every certificate"
   },
   "members": {
     "manageMembers": "Керування учасниками",

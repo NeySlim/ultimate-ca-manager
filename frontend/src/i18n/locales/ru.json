@@ -5384,12 +5384,12 @@
   "compare": {
     "title": "Сравнение сертификатов",
     "field": "Поле",
-    "differences_one": "{{count}} различие",
-    "differences_few": "{{count}} различия",
-    "differences_many": "{{count}} различий",
-    "differences_other": "{{count}} различия",
-    "differences": "Различий: {{count}}",
-    "lead": "Различающиеся свойства выделены.",
+    "differences_one": "Различий: {{count}} из {{total}} свойств",
+    "differences_few": "Различий: {{count}} из {{total}} свойств",
+    "differences_many": "Различий: {{count}} из {{total}} свойств",
+    "differences_other": "Различий: {{count}} из {{total}} свойств",
+    "differences": "Различий: {{count}} из {{total}} свойств",
+    "lead": "Одинаковые строки объединены; в списке «+» отмечает то, чего нет у другого сертификата.",
     "property": "Свойство",
     "close": "Закрыть сравнение",
     "countTitle_one": "Сравнить {{count}} сертификат",
@@ -5401,7 +5401,9 @@
     "onlyDifferences": "Показывать только различия",
     "noDifference": "Эти сертификаты ни в одной строке не различаются.",
     "differs": "различается",
-    "loadFailed": "Не удалось прочитать один из сравниваемых сертификатов."
+    "loadFailed": "Не удалось прочитать один из сравниваемых сертификатов.",
+    "identical": "Совпадает",
+    "notInAll": "нет у другого сертификата"
   },
   "members": {
     "manageMembers": "Управление участниками",

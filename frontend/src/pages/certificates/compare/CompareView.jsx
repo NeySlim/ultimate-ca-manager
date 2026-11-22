@@ -1,15 +1,18 @@
 /**
  * Two to four certificates side by side, the mockup's compare-table: a column per certificate, the
- * same lines for all, those that differ marked (.different) and announced, and the option to show
- * only them. Each certificate is read as the inspector reads it.
+ * same lines for all. An identical line is merged across them; one that differs is marked (.different)
+ * and announced, a list element one has alone marked too. Each certificate is read as the inspector reads it.
  */
-import { Fragment, useEffect, useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SkeletonPanel } from '../../../components/atelier/Skeleton'
+import { Breakable } from '../../../components/atelier/Breakable'
+import { Icon } from '../../../components/atelier/Icon'
+import { Pill } from '../../../components/atelier/Pill'
 import { certificatesService } from '../../../services'
 import { entityTitle } from '../../../lib/entityDetail'
 import { extractData } from '../../../lib/utils'
-import { compareRows } from './compareRows'
+import { ABSENT, compareRows } from './compareRows'
 import '../../../styles/atelier/detached.css'
 
 /** The certificates of `ids`, in that order; null while one is missing, false when one failed. */
@@ -27,7 +30,25 @@ export function useCertificates(ids) {
   return certs
 }
 
-const multiline = (value) => value.split('\n').map((line, i) => <Fragment key={i}>{i > 0 && <br />}{line}</Fragment>)
+const MONO = /^(sha|serial)/
+
+/** A cell's value: a single one breaks after its separators; a list one element per line, each marked when `marked`. */
+function Value({ row, index, marked }) {
+  const { t } = useTranslation()
+  if (!row.list) return <Breakable text={row.values[index]} />
+  const items = row.items[index]
+  if (!items.length) return <span className="absent">{ABSENT}</span>
+  return (
+    <ul className="compare-items">
+      {items.map(({ value, common }, i) => (
+        <li key={i} className={marked ? (common ? 'common' : 'only') : undefined}>
+          <span><Breakable text={value} /></span>
+          {marked && !common && <span className="sr-only"> ({t('compare.notInAll')})</span>}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 export function CompareTable({ certs }) {
   const { t } = useTranslation()
@@ -39,14 +60,17 @@ export function CompareTable({ certs }) {
   return (
     <div className="compare-view" data-testid="compare-view">
       <div className="compare-options">
-        <p className="muted small" aria-live="polite">{t('compare.lead')} {t('compare.differences', { count: differing })}</p>
+        <p className="compare-sum" aria-live="polite">
+          <Pill tone={differing ? 'warn' : 'good'} label={t('compare.differences', { count: differing, total: rows.length })} />
+          <span className="muted">{t('compare.lead')}</span>
+        </p>
         <label className="checkbox-line" htmlFor={toggleId}>
           <input type="checkbox" id={toggleId} data-action="compare-only" checked={only} onChange={(e) => setOnly(e.target.checked)} />
           {t('compare.onlyDifferences')}
         </label>
       </div>
       <div className="compare-scroll">
-        <table className="compare-table">
+        <table className="compare-table" style={{ '--compare-cols': certs.length }}>
           <thead>
             <tr>
               <th scope="col">{t('compare.property')}</th>
@@ -54,12 +78,27 @@ export function CompareTable({ certs }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
-              <tr key={r.key} className={r.differs ? 'different' : undefined} data-row={r.key}>
-                <th scope="row">{r.label}{r.differs && <span className="sr-only"> ({t('compare.differs')})</span>}</th>
-                {r.values.map((v, i) => <td key={certs[i].id} className={/^(sha|serial)/.test(r.key) ? 'mono' : undefined}>{multiline(v)}</td>)}
-              </tr>
-            ))}
+            {shown.map((r) => {
+              const mono = MONO.test(r.key) ? 'mono' : undefined
+              // Identical for all: one cell across the certificates, read once
+              if (!r.differs) {
+                return (
+                  <tr key={r.key} className="same" data-row={r.key}>
+                    <th scope="row">{r.label}</th>
+                    <td colSpan={certs.length} className={mono}>
+                      <span className="eq"><Icon name="equal" />{t('compare.identical')}</span>
+                      <Value row={r} index={0} />
+                    </td>
+                  </tr>
+                )
+              }
+              return (
+                <tr key={r.key} className="different" data-row={r.key}>
+                  <th scope="row">{r.label}<span className="sr-only"> ({t('compare.differs')})</span></th>
+                  {certs.map((c, i) => <td key={c.id} className={mono}><Value row={r} index={i} marked={r.byElement} /></td>)}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         {shown.length === 0 && <p className="muted small" data-testid="compare-none">{t('compare.noDifference')}</p>}
