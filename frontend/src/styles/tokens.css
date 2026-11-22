@@ -1,7 +1,8 @@
 /*
  * Theme tokens: 18 colours + 3 extras (grad-a, grad-b, glow) + 3 constants (ink, paper, scrim), the shadow
  * tint (shade), the Aurore glows, focus halo and frame tints (glow-rose, glow-b, halo, frame-b, frame-shade;
- * transparent elsewhere), the Aurore tints of the module icons by family (fam-*; transparent elsewhere), one block
+ * transparent elsewhere), the Aurore tints of the module icons by family (fam-*; transparent elsewhere), the
+ * chart tokens (s0 retreat grey, s1-s3 series by mode, grid, h0-h4 one-hue heat ramp), one block
  * per family x mode, selected by data-theme / data-mode on <html>.
  * Bare :root is the fallback (Atelier, dark). Changing a value here means
  * updating tokens.baseline.json in the same commit.
@@ -44,6 +45,16 @@
   --fam-protocols: transparent;
   --fam-governance: transparent;
   --fam-admin: transparent;
+  --s0: var(--control);
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --grid: color-mix(in srgb, var(--line) 55%, var(--panel));
+  --h0: color-mix(in srgb, var(--text) 8%, var(--panel));
+  --h1: color-mix(in srgb, var(--accent) 24%, var(--panel));
+  --h2: color-mix(in srgb, var(--accent) 46%, var(--panel));
+  --h3: color-mix(in srgb, var(--accent) 70%, var(--panel));
+  --h4: var(--accent);
 }
 
 :root[data-theme="atelier"][data-mode="light"] {
@@ -82,6 +93,16 @@
   --fam-protocols: transparent;
   --fam-governance: transparent;
   --fam-admin: transparent;
+  --s0: var(--control);
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --grid: color-mix(in srgb, var(--line) 55%, var(--panel));
+  --h0: color-mix(in srgb, var(--text) 8%, var(--panel));
+  --h1: color-mix(in srgb, var(--accent) 24%, var(--panel));
+  --h2: color-mix(in srgb, var(--accent) 46%, var(--panel));
+  --h3: color-mix(in srgb, var(--accent) 70%, var(--panel));
+  --h4: var(--accent);
 }
 
 :root[data-theme="aurore"][data-mode="dark"] {
@@ -120,6 +141,16 @@
   --fam-protocols: #5fd0ec;
   --fam-governance: #f59ac8;
   --fam-admin: #f2b77c;
+  --s0: var(--control);
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --grid: color-mix(in srgb, var(--line) 55%, var(--panel));
+  --h0: color-mix(in srgb, var(--text) 8%, var(--panel));
+  --h1: color-mix(in srgb, var(--accent) 24%, var(--panel));
+  --h2: color-mix(in srgb, var(--accent) 46%, var(--panel));
+  --h3: color-mix(in srgb, var(--accent) 70%, var(--panel));
+  --h4: var(--accent);
 }
 
 :root[data-theme="aurore"][data-mode="light"] {
@@ -158,6 +189,16 @@
   --fam-protocols: #0a6d8c;
   --fam-governance: #a62c6c;
   --fam-admin: #8a4b0f;
+  --s0: var(--control);
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --grid: color-mix(in srgb, var(--line) 55%, var(--panel));
+  --h0: color-mix(in srgb, var(--text) 8%, var(--panel));
+  --h1: color-mix(in srgb, var(--accent) 24%, var(--panel));
+  --h2: color-mix(in srgb, var(--accent) 46%, var(--panel));
+  --h3: color-mix(in srgb, var(--accent) 70%, var(--panel));
+  --h4: var(--accent);
 }
 
 /*

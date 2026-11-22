@@ -12,6 +12,7 @@ export const TOKEN_NAMES = [
   'good', 'goodbg', 'warn', 'warn-fill', 'warnbg', 'bad', 'badbg', 'grad-a', 'grad-b', 'glow',
   'on-accent', 'ink', 'paper', 'scrim', 'shade', 'glow-rose', 'glow-b', 'halo', 'frame-b', 'frame-shade',
   'fam-pki', 'fam-protocols', 'fam-governance', 'fam-admin',
+  's0', 's1', 's2', 's3', 'grid', 'h0', 'h1', 'h2', 'h3', 'h4',
 ]
 // Compatibility aliases resolved against each palette (defined in the shared :root block).
 export const ALIAS_NAMES = ['text-tertiary']
@@ -40,7 +41,7 @@ export function splitArgs(s) {
 
 export function resolve(value, decls) {
   const v = value.trim()
-  const ref = v.match(/^var\(--([a-z-]+)\)$/)
+  const ref = v.match(/^var\(--([a-z0-9-]+)\)$/)
   if (ref) return resolve(decls[ref[1]], decls)
   if (v.startsWith('color-mix(')) {
     const [space, a, b] = splitArgs(v.slice(v.indexOf('(') + 1, v.lastIndexOf(')')))
@@ -64,7 +65,7 @@ function aliasesByMode(css, into = { dark: {}, light: {} }) {
       const mode = sel.match(/data-mode="([a-z]+)"/)?.[1]
       for (const m of MODES) if (!mode || mode === m) modes.add(m)
     }
-    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) {
+    for (const d of block[2].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
       for (const m of modes) into[m][d[1]] = d[2].trim()
     }
   }
@@ -78,7 +79,7 @@ export function paletteDecls(rootCss = '', css = fs.readFileSync(TOKENS_CSS, 'ut
   const out = {}
   for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     const decls = {}
-    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) decls[d[1]] = d[2].trim()
+    for (const d of block[2].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) decls[d[1]] = d[2].trim()
     for (const sel of block[1].split(',')) {
       const m = sel.match(/data-theme="([a-z]+)"\]\[data-mode="([a-z]+)"/)
       if (m) out[`${m[1]}-${m[2]}`] = { ...shared[m[2]], ...decls }
@@ -93,7 +94,7 @@ export function parseTokens(css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
   for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     const selectors = block[1]
     const decls = {}
-    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) decls[d[1]] = d[2].trim()
+    for (const d of block[2].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) decls[d[1]] = d[2].trim()
     if (!decls.bg) continue
     for (const sel of selectors.split(',')) {
       const m = sel.match(/data-theme="([a-z]+)"\]\[data-mode="([a-z]+)"/)

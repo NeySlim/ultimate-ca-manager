@@ -34,7 +34,17 @@
     "fam-protocols": "transparent",
     "fam-governance": "transparent",
     "fam-admin": "transparent",
-    "text-tertiary": "#adbdd2"
+    "text-tertiary": "#adbdd2",
+    "s0": "#7289a5",
+    "s1": "#3987e5",
+    "s2": "#d95926",
+    "s3": "#199e70",
+    "grid": "#2a384a",
+    "h0": "#29313d",
+    "h1": "#32455f",
+    "h2": "#4b668e",
+    "h3": "#658bc0",
+    "h4": "#86b8ff"
   },
   "atelier-light": {
     "bg": "#e8edf4",
@@ -71,7 +81,17 @@
     "fam-protocols": "transparent",
     "fam-governance": "transparent",
     "fam-admin": "transparent",
-    "text-tertiary": "#475a72"
+    "text-tertiary": "#475a72",
+    "s0": "#677d98",
+    "s1": "#2a78d6",
+    "s2": "#eb6834",
+    "s3": "#1baf7a",
+    "grid": "#d8e0ea",
+    "h0": "#eceeef",
+    "h1": "#c9d6ef",
+    "h2": "#97b1e0",
+    "h3": "#6188d0",
+    "h4": "#1d55bc"
   },
   "aurore-dark": {
     "bg": "#0b0e17",
@@ -108,7 +128,17 @@
     "fam-protocols": "#5fd0ec",
     "fam-governance": "#f59ac8",
     "fam-admin": "#f2b77c",
-    "text-tertiary": "#a3acc9"
+    "text-tertiary": "#a3acc9",
+    "s0": "#6d77a3",
+    "s1": "#3987e5",
+    "s2": "#d95926",
+    "s3": "#199e70",
+    "grid": "#1d243a",
+    "h0": "#25293a",
+    "h1": "#363d5c",
+    "h2": "#56608b",
+    "h3": "#7985bf",
+    "h4": "#a5b4ff"
   },
   "aurore-light": {
     "bg": "#f4f5fb",
@@ -145,6 +175,16 @@
     "fam-protocols": "#0a6d8c",
     "fam-governance": "#a62c6c",
     "fam-admin": "#8a4b0f",
-    "text-tertiary": "#4a5372"
+    "text-tertiary": "#4a5372",
+    "s0": "#717ba3",
+    "s1": "#2a78d6",
+    "s2": "#eb6834",
+    "s3": "#1baf7a",
+    "grid": "#e7eaf3",
+    "h0": "#ededf0",
+    "h1": "#cfd2ef",
+    "h2": "#a3a8e1",
+    "h3": "#737bd1",
+    "h4": "#3742bd"
   }
 }

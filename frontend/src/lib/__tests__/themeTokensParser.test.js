@@ -9,6 +9,8 @@ const palette = (family, mode) => `
   --bad: #101010; --badbg: #101010; --grad-a: #101010; --grad-b: #101010; --glow: x; --on-accent: #ffffff;
   --ink: #000000; --paper: #ffffff; --scrim: var(--ink); --shade: #000000; --glow-rose: transparent; --glow-b: transparent; --halo: transparent; --frame-b: transparent; --frame-shade: transparent;
   --fam-pki: transparent; --fam-protocols: transparent; --fam-governance: transparent; --fam-admin: transparent;
+  --s0: #101010; --s1: #101010; --s2: #101010; --s3: #101010; --grid: #101010;
+  --h0: #101010; --h1: #101010; --h2: #101010; --h3: #101010; --h4: #101010;
 }`
 
 describe('parseTokens alias blocks', () => {

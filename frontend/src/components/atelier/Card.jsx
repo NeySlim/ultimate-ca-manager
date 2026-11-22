@@ -7,15 +7,18 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
 
-/** id: the card (card-<id>, the mockup's per-card rules); onHide, onCustomize: the two items of its menu. */
-export function Card({ id, title, count, sub, tools, onHide, onCustomize, children }) {
+/**
+ * id: the card (card-<id>, the mockup's per-card rules); onHide, onCustomize: the two items of its menu;
+ * onTable: a third item between them, the card's figures as a table and back (tableShown says which).
+ */
+export function Card({ id, title, count, sub, tools, onHide, onCustomize, onTable, tableShown = false, children }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const wrap = useRef(null)
   const button = useRef(null)
   useEffect(() => {
     if (!open) return undefined
-    wrap.current?.querySelector(`#card-hide-${id}`)?.focus()
+    wrap.current?.querySelector('.card-menu button')?.focus()
     const away = (e) => { if (!wrap.current?.contains(e.target)) setOpen(false) }
     const key = (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('dialog[open]')) return
@@ -27,7 +30,7 @@ export function Card({ id, title, count, sub, tools, onHide, onCustomize, childr
     document.addEventListener('keydown', key)
     return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key) }
   }, [open, id])
-  const menu = onHide || onCustomize
+  const menu = onHide || onCustomize || onTable
   return (
     <section className={`panel dash-card card-${id}`} id={`card-${id}`} data-card={id} aria-labelledby={`card-${id}-title`}>
       <header className="panel-heading">
@@ -46,6 +49,11 @@ export function Card({ id, title, count, sub, tools, onHide, onCustomize, childr
               </button>
               <div className="card-menu" id={`card-menu-${id}`} hidden={!open}>
                 {onHide && <button type="button" id={`card-hide-${id}`} data-card-hide={id} onClick={() => { setOpen(false); onHide() }}><Icon name="hide" />{t('atelier.hideCard')}</button>}
+                {onTable && (
+                  <button type="button" data-card-table={id} onClick={() => { setOpen(false); onTable() }}>
+                    <Icon name={tableShown ? 'chart' : 'rows'} />{t(tableShown ? 'atelier.chartView' : 'atelier.tableView')}
+                  </button>
+                )}
                 {onCustomize && <button type="button" data-action="dash-cards" onClick={() => { setOpen(false); onCustomize() }}><Icon name="cards" />{t('atelier.customizeCards')}</button>}
               </div>
             </div>
