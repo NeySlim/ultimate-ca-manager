@@ -178,10 +178,21 @@ export function ViewSwitch({ id, label, value, onChange, options = [], groups = 
     return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('focusout', out) }
   }, [menu])
 
+  // The focus follows the view shown once its tab is back in the row: the page may set the value later
+  const focusNext = useRef(null)
   const show = (v) => {
+    focusNext.current = v
     onChange(v)
-    requestAnimationFrame(() => document.getElementById(tabId(v))?.focus())
   }
+  useEffect(() => {
+    const v = focusNext.current
+    if (v === null || v !== value) return
+    const tab = document.getElementById(tabId(v))
+    if (tab && !tab.hasAttribute('data-overflow')) {
+      focusNext.current = null
+      tab.focus()
+    }
+  })
   const onKey = (e) => {
     const n = values.length
     const i = values.indexOf(value)
