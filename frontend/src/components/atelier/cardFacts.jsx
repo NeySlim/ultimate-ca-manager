@@ -3,6 +3,9 @@ import { columnKind } from './columnShare'
 
 const absent = (v) => v === null || v === undefined || v === false || v === '' || v === '—'
 
+/** A value that does not read alone (a date, a number, a yes or no) after its column's label (G9). */
+export const labelledFact = (label, value) => <><span className="fact-label">{label}</span> {value}</>
+
 /**
  * The facts of a phone record (R5): the columns of priority 2, then 3, three at most (a list without priorities: its
  * first three); a date, a number or a yes or no (`labelled`, a number column) after its column's label (span.fact-label,
@@ -16,5 +19,5 @@ export function cardFacts(cols, row) {
       .sort((a, b) => a.c.priority - b.c.priority || a.i - b.i).map(({ c }) => c)
     : data
   return picked.map((c) => [c, c.cell(row)]).filter(([, v]) => !absent(v)).slice(0, 3)
-    .map(([c, v]) => (c.labelled || c.kind === 'number' ? <><span className="fact-label">{c.label}</span> {v}</> : v))
+    .map(([c, v]) => (c.labelled || c.kind === 'number' ? labelledFact(c.label, v) : v))
 }
