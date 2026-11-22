@@ -50,7 +50,7 @@ def _child(script, tmp_path, timeout=240):
     out = subprocess.run([sys.executable, '-c', script], cwd=BACKEND, env=env, capture_output=True,
                          text=True, timeout=timeout)
     assert out.returncode == 0, (out.stdout + out.stderr)[-4000:]
-    line = next(l for l in out.stdout.splitlines() if l.startswith('RESULT '))
+    line = next(x for x in out.stdout.splitlines() if x.startswith('RESULT '))
     return json.loads(line[len('RESULT '):])
 
 
@@ -171,9 +171,15 @@ WORKER = textwrap.dedent('''
             time.sleep(0.01)
         login = json.dumps({'username': 'admin', 'password': 'Not-The-Password-1'}).encode()
         write = gevent.spawn(call, 'POST', '/api/v2/auth/login', login)
-        time.sleep(0.3)
-        reads = [call('GET', '/health/ready') for _ in range(3)] + [call('GET', '/health/live')]
-        result = {'write': write.get(), 'reads': reads}
+        # Reads all along the write's wait: a stopped worker shows as a gap between two of them
+        reads, ticks = [], []
+        while not write.ready():
+            ticks.append(time.monotonic())
+            reads.append(call('GET', '/health/ready' if len(reads) % 2 else '/health/live'))
+            time.sleep(0.05)
+        ticks.append(time.monotonic())
+        gap = max(b - a for a, b in zip(ticks, ticks[1:]))
+        result = {'write': write.get(), 'reads': reads, 'gap': gap}
         holder.wait()
         os.remove(ready)
         return result
@@ -191,16 +197,17 @@ def served(tmp_path_factory):
     out = subprocess.run([sys.executable, '-c', WORKER, _HOLDER], cwd=BACKEND, env=env,
                          capture_output=True, text=True, timeout=300)
     assert out.returncode == 0, (out.stdout + out.stderr)[-4000:]
-    line = next(l for l in out.stdout.splitlines() if l.startswith('RESULT '))
+    line = next(x for x in out.stdout.splitlines() if x.startswith('RESULT '))
     return json.loads(line[len('RESULT '):])
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize('case', ['short', 'long'])
 def test_the_worker_serves_reads_while_a_request_waits_for_another_writer(served, case):
-    reads = served[case]['reads']
-    assert all(r['status'] == 200 for r in reads), reads
-    assert max(r['took'] for r in reads) < 0.5, f'the worker stopped while a write waited: {reads}'
+    reads, gap = served[case]['reads'], served[case]['gap']
+    assert len(reads) >= 10 and all(r['status'] == 200 for r in reads), reads
+    assert gap < 0.5 and max(r['took'] for r in reads) < 0.5, \
+        f'the worker stopped for {gap:.1f}s while a write waited: {reads}'
 
 
 @pytest.mark.slow
