@@ -106,3 +106,35 @@ test.describe('a phone of 360 px', () => {
     expect(Math.abs(h.x - block.x)).toBeLessThanOrEqual(1)
   })
 })
+
+test.describe('the folded details of an authority', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } })
+
+  test('are typed rows: a fingerprint copied whole, a key identifier in its chip, its OID under it', async ({ page, api }) => {
+    const root = await createCA(api)
+    const full = await api.get(`/cas/${root.id}`)
+    expect(full.thumbprint_sha256).toMatch(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/)
+    await page.goto(`/cas?authority=${root.id}`)
+    const side = page.getByRole('main').locator('aside.ca-side')
+    await expect(side.locator('.kvg dl.kv').first()).toBeVisible()
+    await page.evaluate(() => {
+      const copied: string[] = []
+      ;(window as any).__copied = copied
+      navigator.clipboard.writeText = (text: string) => { copied.push(text); return Promise.resolve() }
+    })
+    // By the keyboard: a toast of another test's activity may cover the bottom of the panel
+    for (const id of ['ca-extensions', 'ca-fingerprints', 'ca-metadata']) await side.getByTestId(id).locator('.advanced-toggle').press('Enter')
+    await expect(side.getByTestId('ca-metadata').locator('dl.kv')).toBeVisible()
+    await expect(side.locator('dl.props')).toHaveCount(0)
+    const row = (fold: string, label: RegExp) => side.getByTestId(fold).locator('.row', { has: page.locator('dt', { hasText: label }) })
+    const digest = row('ca-fingerprints', /^SHA-256$/)
+    await expect(digest.locator('.val.hex > .line')).toHaveCount(4)
+    await digest.getByRole('button', { name: 'Copy SHA-256' }).press('Enter')
+    await expect.poll(() => page.evaluate(() => (window as any).__copied)).toEqual([full.thumbprint_sha256])
+    const ski = row('ca-extensions', /^Subject Key Identifier$/)
+    await expect(ski.locator('dd.v .code-value.hex')).toBeVisible()
+    await expect(ski.locator('dd.v > .sub')).toHaveText('2.5.29.14')
+    // No button of the panel sits in a value outside a chip
+    await expect(side.locator('dl.kv dd.v button:not(.cp):not(.text-link)')).toHaveCount(0)
+  })
+})

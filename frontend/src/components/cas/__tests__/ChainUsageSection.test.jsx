@@ -169,4 +169,25 @@ describe('ChainUsageSection', () => {
     await open()
     await waitFor(() => expect(mocks.getChainUsage).toHaveBeenCalledTimes(2))
   })
+
+  // KV-3: a block is a typed row, its count and its list in the value, under its term when narrow
+  it('draws each block as a row of Facts, its count and its list in the value', async () => {
+    mocks.getChainUsage.mockResolvedValue(usage({ issued: section({ count: 1, items: [cert] }) }))
+    const { container } = renderIt()
+    await open()
+    await screen.findAllByRole('link', { name: 'web.example' })
+    expect(container.querySelector('dl.props')).toBeNull()
+    const blocks = screen.getAllByTestId('chain-usage-block')
+    expect(blocks).toHaveLength(5)
+    for (const b of blocks) {
+      expect(b.matches('dl.kv > div.row')).toBe(true)
+      expect([...b.children].map((c) => c.tagName)).toEqual(['DT', 'DD'])
+    }
+    // its terms are sentences: the value goes under its term when narrow, a bare count too
+    expect(blocks.map((b) => b.classList.contains('long'))).toEqual([true, true, true, true, true])
+    const issued = blocks[0]
+    expect(issued.querySelector('dt')).toHaveTextContent(/^chainUsage.issued$/)
+    expect(issued.querySelector('dd.v > .counter')).toHaveTextContent('1')
+    expect(issued.querySelector('dd.v .link-list a')).toHaveAttribute('href', '/certificates/5')
+  })
 })

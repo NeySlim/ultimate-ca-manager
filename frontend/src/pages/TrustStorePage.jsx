@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Input } from '../components/atelier/Form'
 import {
-  Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Props,
+  Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Facts,
   LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
@@ -28,6 +28,14 @@ import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
 import { dateOf, dateTimeOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
+
+// A fact of the dock, or the dash of absence when the anchor has no such value
+const fact = (label, value) => (value ? { label, value } : { label, absent: '—' })
+// A stored digest (bare hex) in the pairs of a certificate's fingerprint, as the CA panel shows one
+const digestPairs = (value) => {
+  const hex = String(value || '').replace(/[:\s]/g, '').toUpperCase()
+  return /^(?:[0-9A-F]{2})+$/.test(hex) ? hex.match(/../g).join(':') : value
+}
 
 // A managed CA is a root when its certificate is self-issued, as the CA page reads it (CASide)
 const isRootCa = (ca) => Boolean(ca && (ca.type === 'root' || ca.is_root))
@@ -424,11 +432,11 @@ export default function TrustStorePage() {
         {section === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
-                [t('trustStore.module.subject'), open.subject || '—'],
-                [t('trustStore.module.usage'), tsUsage(open)],
+              <Facts items={[
+                { ...fact(t('trustStore.module.subject'), open.subject), long: true },
+                { ...fact(t('trustStore.module.usage'), open.description), long: true },
                 [t('common.type'), tsType(open)],
-                [t('trustStore.module.expires'), tsExpires(open)],
+                fact(t('trustStore.module.expires'), dateOf(open.not_after, locale)),
                 [t('atelier.state'), tsPill(open)],
               ]} />
             </Section>
@@ -438,25 +446,26 @@ export default function TrustStorePage() {
         {section === 'details' && (
           <div className="module-detail">
             <Section title={t('common.technicalDetails')}>
-              <Props items={[
-                [t('common.issuer'), <span key="issuer" className="mono">{open.issuer || '—'}</span>],
-                [t('common.serialNumber'), open.serial_number ? <span key="serial" className="mono">{serialHex(open.serial_number)}</span> : '—'],
-                [t('common.keyType'), certificateKeyLabel(open) || '—'],
-                [t('common.issuerSignatureAlgorithm'), open.signature_algorithm || '—'],
-                [t('common.validFrom'), dateOf(open.not_before, locale) || '—'],
-                [t('common.validUntil'), tsExpires(open)],
+              <Facts items={[
+                { ...fact(t('common.issuer'), open.issuer), long: true, wide: true },
+                // a serial of more than 8 bytes goes under its term when narrow, as the CA panel's
+                { ...fact(t('common.serialNumber'), serialHex(open.serial_number)), kind: 'hex', long: serialHex(open.serial_number).length > 23 },
+                fact(t('common.keyType'), certificateKeyLabel(open)),
+                fact(t('common.issuerSignatureAlgorithm'), open.signature_algorithm),
+                fact(t('common.validFrom'), dateOf(open.not_before, locale)),
+                fact(t('common.validUntil'), dateOf(open.not_after, locale)),
               ]} />
             </Section>
             <Section title={t('common.fingerprints')}>
-              <Props items={[
-                ['SHA-256', <span key="sha256" className="mono">{open.fingerprint_sha256 || '—'}</span>],
-                ['SHA-1', <span key="sha1" className="mono">{open.fingerprint_sha1 || '—'}</span>],
+              <Facts items={[
+                { ...fact('SHA-256', digestPairs(open.fingerprint_sha256)), kind: 'hex', long: true },
+                { ...fact('SHA-1', digestPairs(open.fingerprint_sha1)), kind: 'hex', long: true },
               ]} />
             </Section>
             <Section title={t('details.metadata')}>
-              <Props items={[
-                [t('details.addedAt'), dateTimeOf(open.added_at, locale) || '—'],
-                [t('details.addedBy'), open.added_by || '—'],
+              <Facts items={[
+                fact(t('details.addedAt'), dateTimeOf(open.added_at, locale)),
+                fact(t('details.addedBy'), open.added_by),
               ]} />
             </Section>
           </div>

@@ -1568,7 +1568,6 @@
         "noKey": "UCM 未持有其私钥：该机构不能签发。"
       },
       "extensions": "X.509 扩展",
-      "copyValue": "复制 {{name}}",
       "show": "显示 {{name}}"
     },
     "pageActions": "页面操作"
