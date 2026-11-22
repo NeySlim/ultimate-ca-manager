@@ -1,5 +1,6 @@
 import { test, expect, createCA, issueCert, createUser } from './support/fixtures'
 import { PALETTES, usePalette, expectPalette, boxes } from './support/themes'
+import { freezeApi, type Frozen } from './support/frozen'
 
 // Aurore set apart from Atelier by its accents only: a change of theme moves no box of the Certificates zone,
 // and the focus ring glows in Aurore alone (the overview's boxes: overview.spec.ts)
@@ -14,8 +15,11 @@ test('a change of theme moves nothing in the Certificates zone, its inspector op
   const cert = await issueCert(api, (await createCA(api)).id)
   const user = await createUser(api, 'viewer')
   const measured: Record<string, Record<string, number[][]>> = {}
+  // The view counters and the expiry count follow what other tests issue: every palette reads the first one's answers
+  const kept: Frozen = new Map()
   for (const [family, mode] of PALETTES) {
     const { page } = await signIn(user.username, user.password)
+    await freezeApi(page.context(), kept)
     await usePalette(page, family, mode)
     await page.goto('/certificates')
     await expectPalette(page, family, mode)
