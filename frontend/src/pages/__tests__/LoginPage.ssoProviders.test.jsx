@@ -98,9 +98,10 @@ describe('LoginPage — SSO provider loading', () => {
 
     // The listener is set once the failure is known: going online before then changes nothing, so the event repeats
     await waitFor(() => {
-      act(() => { window.dispatchEvent(new Event('online')) })
-      expect(screen.getByText(/^Company SSO · /)).toBeInTheDocument()
+      if (services.getSsoProviders.mock.calls.length < 2) act(() => { window.dispatchEvent(new Event('online')) })
+      expect(services.getSsoProviders).toHaveBeenCalledTimes(2)
     })
+    expect(await screen.findByText(/^Company SSO · /)).toBeInTheDocument()
     expect(services.getSsoProviders).toHaveBeenCalledTimes(2)
   })
 
