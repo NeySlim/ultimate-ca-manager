@@ -115,7 +115,7 @@ describe('the ACME history list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'common.expires' }))
     await waitFor(() => expect(acmeService.getHistory.mock.calls.at(-1)[0]).toMatchObject({ page: 1, sort_by: 'valid_to', sort_order: 'asc' }))
     // A change of view drops the sort of the one left (T9)
-    fireEvent.change(screen.getByRole('combobox', { name: 'protocols.view' }), { target: { value: 'accounts' } })
+    fireEvent.click(screen.getByRole('tab', { name: /^acme\.views\.accounts/ }))
     expect(at.where()).toBe('/acme')
   })
 })

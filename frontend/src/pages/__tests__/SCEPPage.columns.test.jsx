@@ -117,7 +117,7 @@ describe('the SCEP lists', () => {
     await screen.findByRole('button', { name: 'beta' })
     expect(scep.getRequests.mock.calls.at(-1)[0]).toMatchObject({ sort_by: 'status', sort_order: 'desc' })
     expect(sortedHeaders(at.container)).toEqual([['atelier.state', 'descending']])
-    fireEvent.change(screen.getByRole('combobox', { name: 'protocols.view' }), { target: { value: 'intune' } })
+    fireEvent.click(screen.getByRole('tab', { name: 'scep.intuneApps' }))
     expect(at.where()).toBe('/scep-config?tab=intune')
   })
 
