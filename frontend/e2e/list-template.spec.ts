@@ -2,8 +2,10 @@ import { test, expect, createCA, issueCert, uid } from './support/fixtures'
 
 // The list template measured where jsdom cannot (COLONNES-SPEC G1, G2): on Certificates, the authorities' list
 // and CRL / OCSP, no horizontal scroll at any desktop width, the chevron always in view, the folded columns said
-// in the footer, one column taking the room left, numbers at the right, header separators and sort signs readable
-// in the four themes, the sort from the keyboard and kept by a reload, the phone's sort and records.
+// in the footer, one column taking the room left, no free text cut while the sum fits (R1), numbers at the right and
+// apart from a date, header separators and sort signs readable in the four themes as painted at scale 1 (R3), the sort
+// button over its whole cell (R4), the sorted column in weight 600 (R5), the open row under the sticky header (G6), a
+// ticked list's names readable (R7), the sort from the keyboard and kept by a reload, the phone's sort and records.
 
 const LISTS = [
   { name: 'certificates', url: '/certificates', region: '#cert-scroll' },
@@ -89,6 +91,24 @@ test.describe('the columns at 1600 px', () => {
     await open(page, LISTS[0])
     expect(Math.round(await page.locator('#cert-scroll thead th:first-child').evaluate((th) => th.getBoundingClientRect().width))).toBe(40)
   })
+
+  test('no ceiling: a long name and a long issuer stay whole while the sum fits (R1); a number keeps 28 px from a date (G10)', async ({ page, api }) => {
+    // An issuer wider than the former ceiling of 280 px
+    const ca = await createCA(api, { commonName: `Issuing Authority West ${uid('ca')}` })
+    // 58 characters (a CN has 64 at most), wider than the former ceiling of 360 px
+    const cn = `${uid('long-service-name-west')}.internal.example.com`
+    await issueCert(api, ca.id, { cn })
+    await open(page, LISTS[0])
+    await page.getByRole('main').getByRole('searchbox').fill(cn)
+    await expect(page.locator('#cert-scroll tbody tr')).toHaveCount(1)
+    const cut = () => page.locator('#cert-scroll tbody').evaluate((tbody) => [...tbody.querySelectorAll('td.text-cell, .entity-label')]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent))
+    await expect.poll(cut).toEqual([])
+    await open(page, LISTS[1])
+    const certs = page.locator('#ca-list-scroll thead th.num')
+    expect(await certs.locator('button').evaluate((b) => getComputedStyle(b).paddingRight)).toBe('28px')
+    expect(await page.locator('#ca-list-scroll tbody tr:first-child td.num').evaluate((td) => getComputedStyle(td).paddingRight)).toBe('28px')
+  })
 })
 
 test.describe('row actions under 1250 px', () => {
@@ -120,14 +140,48 @@ function contrast(a: string, b: string) {
   return (x + 0.05) / (y + 0.05)
 }
 
+// The most contrasted pixel of each box and how many pixels reach 3:1, against the header's own pixel above it, read
+// on a screenshot at scale 1: what a screen paints, not the colour computed (R3)
+async function painted(page, boxes: { x: number, y: number, width: number, height: number, top: number }[]) {
+  const shot = (await page.screenshot({ scale: 'css' })).toString('base64')
+  return page.evaluate(async ({ b64, boxes: bs }) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const cv = document.createElement('canvas')
+    cv.width = img.width
+    cv.height = img.height
+    const cx = cv.getContext('2d', { willReadFrequently: true })!
+    cx.drawImage(img, 0, 0)
+    const at = (x: number, y: number) => [...cx.getImageData(x, y, 1, 1).data].slice(0, 3)
+    const lum = (c: number[]) => c.map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0)
+    const ratio = (a: number[], b: number[]) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
+    return bs.map((b) => {
+      const bg = at(Math.round(b.x + b.width / 2), Math.round(b.top + 2))
+      let max = 0
+      let strong = 0
+      for (let x = Math.floor(b.x); x <= Math.ceil(b.x + b.width); x += 1) {
+        for (let y = Math.floor(b.y); y <= Math.ceil(b.y + b.height); y += 1) {
+          const r = ratio(at(x, y), bg)
+          max = Math.max(max, r)
+          if (r >= 3) strong += 1
+        }
+      }
+      return { max, strong }
+    })
+  }, { b64: shot, boxes })
+}
+
 test.describe('the headers in the four themes', () => {
-  test.use({ viewport: { width: 1600, height: 1000 } })
+  test.use({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })
 
   for (const [family, mode] of [['atelier', 'dark'], ['atelier', 'light'], ['aurore', 'dark'], ['aurore', 'light']]) {
-    test(`${family} ${mode}: separators and sort signs read at 3:1, the sorted arrow at 4.5:1`, async ({ page, api }) => {
+    test(`${family} ${mode}: separators read at 3:1, sort signs painted at 3:1, the sorted arrow at 4.5:1`, async ({ page, api }) => {
       await createCA(api)
       await open(page, LISTS[2])
       await page.evaluate(([f, m]) => { document.documentElement.setAttribute('data-theme', f); document.documentElement.setAttribute('data-mode', m) }, [family, mode])
+      await page.mouse.move(0, 0)
       const read = await page.locator('#module-scroll thead').evaluate((thead) => {
         const bg = (el: Element | null): string => {
           for (; el; el = el.parentElement) {
@@ -155,9 +209,20 @@ test.describe('the headers in the four themes', () => {
         expect(contrast(color, read.background)).toBeGreaterThanOrEqual(3)
       }
       expect(read.idle).toHaveLength(read.sortable - 1)
-      for (const c of read.idle) expect(contrast(c, read.background)).toBeGreaterThanOrEqual(3)
       expect(read.sorted).toHaveLength(1)
       expect(contrast(read.sorted[0], read.background)).toBeGreaterThanOrEqual(4.5)
+      // As painted: each sign has at least 6 pixels at 3:1, the arrow a pixel at 4.5:1
+      const boxes = (selector: string) => page.locator(selector).evaluateAll((all) => all.map((svg) => {
+        const r = svg.getBoundingClientRect()
+        return { x: r.x, y: r.y, width: r.width, height: r.height, top: svg.closest('th')!.getBoundingClientRect().top }
+      }))
+      const idle = await painted(page, await boxes('#module-scroll thead svg.sort-idle'))
+      for (const p of idle) {
+        expect(p.strong).toBeGreaterThanOrEqual(6)
+        expect(p.max).toBeGreaterThanOrEqual(3)
+      }
+      const [arrow] = await painted(page, await boxes('#module-scroll thead th[aria-sort] svg.sort-arrow'))
+      expect(arrow.max).toBeGreaterThanOrEqual(4.5)
     })
   }
 })
@@ -171,21 +236,96 @@ test.describe('the sort', () => {
     await open(page, LISTS[2])
     const head = (name: string) => page.locator('#module-scroll thead th').filter({ hasText: name })
     await expect(head('Next Update')).toHaveAttribute('aria-sort', 'ascending')
-    const button = head('Published').getByRole('button')
+    const button = head('Publication').getByRole('button')
     await button.focus()
     await page.keyboard.press('Enter')
-    await expect(head('Published')).toHaveAttribute('aria-sort', 'ascending')
+    await expect(head('Publication')).toHaveAttribute('aria-sort', 'ascending')
     await expect(button).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect(head('Published')).toHaveAttribute('aria-sort', 'descending')
+    await expect(head('Publication')).toHaveAttribute('aria-sort', 'descending')
     await expect(page).toHaveURL(/[?&]sort=published&order=desc/)
-    const first = await page.locator('#module-scroll tbody tr:first-child .entity-name').textContent()
+    // The same order after a reload: the authorities other tests create meanwhile may come in, never reorder these
+    const names = () => page.locator('#module-scroll tbody tr .entity-name').allTextContents()
+    const before = await names()
     await page.reload()
-    await expect(head('Published')).toHaveAttribute('aria-sort', 'descending')
-    await expect(page.locator('#module-scroll tbody tr:first-child .entity-name')).toHaveText(first!)
+    await expect(head('Publication')).toHaveAttribute('aria-sort', 'descending')
+    await expect(page.locator('#module-scroll tbody tr .entity-name').first()).toBeVisible()
+    const kept = (await names()).filter((n) => before.includes(n))
+    expect(kept.length).toBeGreaterThan(1)
+    expect(kept).toEqual(before.slice(0, kept.length))
     // The change is said to a screen reader
     await head('Name').getByRole('button').click()
     await expect(page.locator('.atl .table-container [aria-live=polite]')).toHaveText('Sorted by Name, ascending order')
+  })
+})
+
+test.describe('the sort button and the sorted column', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } })
+
+  test('fills its cell, answers the pointer and the keyboard, says what a click does; the sorted label in weight 600', async ({ page, api }) => {
+    await createCA(api)
+    await open(page, LISTS[2])
+    const head = (name: string) => page.locator('#module-scroll thead th').filter({ hasText: name })
+    // The button is the cell (R4): same box, and a click at the cell's right sorts
+    const boxes = await page.locator('#module-scroll thead th:has(> button[data-sort])').evaluateAll((ths) => ths.map((th) => {
+      const a = th.getBoundingClientRect()
+      const b = th.querySelector(':scope > button')!.getBoundingClientRect()
+      return [Math.round(a.left - b.left), Math.round(a.right - b.right), Math.round(a.height - b.height)]
+    }))
+    expect(boxes.length).toBeGreaterThan(3)
+    for (const d of boxes) expect(d.map(Math.abs).every((v) => v <= 1)).toBe(true)
+    await expect(head('Publication').getByRole('button')).toHaveAttribute('title', 'Sort by Publication')
+    await expect(head('Next Update').getByRole('button')).toHaveAttribute('title', 'Sorted by Next Update, ascending order. Click to reverse')
+    // The sorted column in weight 600 (R5), the others 400
+    expect(await head('Next Update').evaluate((th) => getComputedStyle(th.querySelector('button')!).fontWeight)).toBe('600')
+    expect(await head('Publication').evaluate((th) => getComputedStyle(th.querySelector('button')!).fontWeight)).toBe('400')
+    // Hover turns the label and its sign to the text colour, the sorted column's
+    const text = await head('Next Update').evaluate((th) => getComputedStyle(th).color)
+    const colours = () => head('Publication').evaluate((th) => [getComputedStyle(th.querySelector('button')!).color, getComputedStyle(th.querySelector('svg')!).color])
+    expect((await colours())[0]).not.toBe(text)
+    await head('Publication').hover({ position: { x: 20, y: 17 } })
+    expect(await colours()).toEqual([text, text])
+    // The keyboard's ring stays inside the 34 px header (G7)
+    await page.mouse.move(0, 0)
+    await head('Name').getByRole('button').focus()
+    await page.keyboard.press('Tab')
+    const ring = await page.evaluate(() => { const b = document.activeElement as HTMLElement; return [b.matches(':focus-visible'), getComputedStyle(b).outlineOffset, b.closest('th') !== null] })
+    expect(ring).toEqual([true, '-2px', true])
+    const cell = (await head('Publication').boundingBox())!
+    await page.mouse.click(cell.x + cell.width - 16, cell.y + cell.height / 2)
+    await expect(head('Publication')).toHaveAttribute('aria-sort', 'ascending')
+  })
+})
+
+test.describe('the open row and a selection', () => {
+  test.use({ viewport: { width: 1000, height: 800 } })
+
+  test('the open row brought back into view stops under the sticky header (G6)', async ({ page, api }) => {
+    for (let i = 0; i < 14; i += 1) await createCA(api)
+    await open(page, LISTS[2])
+    await page.locator('#module-scroll tbody tr').nth(1).locator('button.entity-name').click()
+    await expect(page.locator('#module-scroll tbody tr.opened')).toHaveCount(1)
+    const region = page.locator('#module-scroll')
+    // Scrolled until the open row is above the region, then the window narrows: the list brings it back
+    await region.evaluate((el) => { el.scrollTop = el.scrollHeight })
+    await page.setViewportSize({ width: 980, height: 800 })
+    await expect.poll(() => region.evaluate((el) => {
+      const row = el.querySelector('tbody tr.opened')!.getBoundingClientRect()
+      const head = el.querySelector('thead')!.getBoundingClientRect()
+      const box = el.getBoundingClientRect()
+      return row.top >= head.bottom - 1 && row.bottom <= box.bottom + 1
+    })).toBe(true)
+  })
+
+  test('while rows are ticked the names do not open but stay readable (R7)', async ({ page, api }) => {
+    const ca = await createCA(api)
+    await issueCert(api, ca.id)
+    await issueCert(api, ca.id)
+    await open(page, LISTS[0])
+    await page.locator('#cert-scroll tbody tr').first().locator('input[type=checkbox]').check()
+    const name = page.locator('#cert-scroll tbody tr').nth(1).locator('button.entity-name')
+    await expect(name).toBeDisabled()
+    expect(await name.evaluate((b) => [getComputedStyle(b).opacity, getComputedStyle(b).cursor])).toEqual(['1', 'default'])
   })
 })
 
@@ -209,12 +349,17 @@ test.describe('on a phone', () => {
     const facts = await records.locator('.row-meta > span').allTextContents()
     expect(facts.filter((f) => f.trim() === '—')).toEqual([])
     expect(await records.first().locator('.row-meta > span').first().textContent()).toMatch(/^Next Update \S/)
+    // The fact's label is muted beside its value (G9)
+    const fact = records.first().locator('.row-meta > span').first()
+    expect(await fact.evaluate((s) => getComputedStyle(s).color)).not.toBe(await fact.locator('.fact-label').evaluate((l) => getComputedStyle(l).color))
     const select = page.getByRole('combobox', { name: 'Sort by' })
     await expect(select).toHaveValue('next')
     await select.selectOption('name')
     const names = await records.locator('.entity-name').allTextContents()
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true })))
-    await page.getByRole('button', { name: 'Reverse the order' }).click()
+    // The reverse button shows the direction and says it (G8)
+    await page.getByRole('button', { name: 'Ascending order, reverse' }).click()
     await expect(page).toHaveURL(/sort=name&order=desc/)
+    await expect(page.getByRole('button', { name: 'Descending order, reverse' })).toBeVisible()
   })
 })
