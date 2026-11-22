@@ -1,5 +1,5 @@
 /**
- * Overview aggregates (GET /dashboard/queue, health, compliance, issuance).
+ * Overview aggregates (GET /dashboard/queue, health, compliance, issuance, expirations, revocation).
  */
 import { apiClient, buildQueryString } from './apiClient'
 import { WATCH_KINDS } from '../lib/overviewQueue'
@@ -31,5 +31,22 @@ export const overviewService = {
   },
   getIssuance(days = 30) {
     return apiClient.get(`/dashboard/issuance${buildQueryString({ days })}`)
+  },
+  /** Expirations per UTC day from today over `days` (1-365): total, manual, automatic, signers, CAs. */
+  getExpirations(days = 90) {
+    return apiClient.get(`/dashboard/expirations${buildQueryString({ days })}`)
+  },
+  /** Active CAs by CRL state, and at most `limit` CAs with a distribution point, the ones to publish first. */
+  getRevocation(limit = 10) {
+    return apiClient.get(`/dashboard/revocation${buildQueryString({ limit })}`)
+  },
+  /**
+   * The certificate list query for the expirations of the UTC days `from` to `to` included (YYYY-MM-DD), on the
+   * population of `filter_hint`: the list counts what the days of /dashboard/expirations count.
+   */
+  expirationQuery(filterHint, from, to = from) {
+    const next = new Date(`${to}T00:00:00Z`)
+    next.setUTCDate(next.getUTCDate() + 1)
+    return { status: filterHint?.status ?? ['valid', 'expiring'], expires_from: from, expires_to: next.toISOString().slice(0, 10) }
   },
 }

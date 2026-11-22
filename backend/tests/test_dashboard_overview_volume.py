@@ -12,7 +12,9 @@ from utils.datetime_utils import utc_now
 # Constant whatever the table sizes; the health overview's three setting witnesses cost one statement each
 BUDGET = 14
 ROUTES = ('/api/v2/dashboard/queue', '/api/v2/dashboard/health?days=30',
-          '/api/v2/dashboard/compliance', '/api/v2/dashboard/issuance?days=90')
+          '/api/v2/dashboard/compliance', '/api/v2/dashboard/issuance?days=90',
+          '/api/v2/dashboard/expirations?days=365', '/api/v2/dashboard/revocation?limit=100',
+          '/api/v2/certificates/compliance')
 MARK = 'dashboard-volume'
 
 
@@ -74,7 +76,8 @@ def many_certificates(app, empty_counts):
 
 
 @pytest.mark.parametrize('name, args', [
-    ('work_queue', (100,)), ('protocol_health', (30,)), ('compliance_summary', ()), ('issuance', (90,))])
+    ('work_queue', (100,)), ('protocol_health', (30,)), ('compliance_summary', ()), ('issuance', (90,)),
+    ('revocation_coverage', (100,)), ('compliance_score', ())])
 def test_each_aggregate_stays_within_the_budget(app, many_certificates, name, args):
     from services import dashboard_aggregates
     with app.app_context():
