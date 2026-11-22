@@ -161,7 +161,8 @@ export function TrendCard() {
           ))}
         </ul>
         <Chart trend={trend} labels={labels} lang={lang} alt={alt} hint={t('overview.trend.keys')} />
-        <table className="sr-only">
+        {/* A table ignores overflow: the hidden box is a div, or its cells widen the page on a phone */}
+        <div className="sr-only"><table>
           <caption>{alt}</caption>
           <thead>
             <tr><th scope="col">{t('overview.trend.day')}</th>{SERIES.map((s) => <th key={s} scope="col">{labels[s]}</th>)}</tr>
@@ -171,7 +172,7 @@ export function TrendCard() {
               <tr key={d.date}><th scope="row">{d.date}</th>{SERIES.map((s) => <td key={s}>{value(d[s])}</td>)}</tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </OverviewCard>
   )
