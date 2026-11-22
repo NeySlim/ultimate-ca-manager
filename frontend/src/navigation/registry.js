@@ -156,6 +156,9 @@ const GLYPHS = {
 }
 export const glyphOf = (mod) => GLYPHS[mod?.id] || 'cert'
 
+// The family of a module, its console group: Aurore tints its icon by it (data-family); none outside the groups
+export const familyOf = (mod) => mod?.group || undefined
+
 /** Label of a module in the Modules menu and the bar. */
 export const menuLabelKey = (mod) => mod.menuKey || mod.labelKey
 

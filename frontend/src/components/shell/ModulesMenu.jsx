@@ -8,7 +8,7 @@ import { useEffect, useLayoutEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Icon } from '../atelier/Icon'
-import { glyphOf, menuGroupsFor, menuLabelKey } from '../../navigation/registry'
+import { familyOf, glyphOf, menuGroupsFor, menuLabelKey } from '../../navigation/registry'
 import { canPinModule, MAX_PINS, FIXED_IDS } from './pins'
 import { moveFocus } from './useDisclosure'
 
@@ -100,7 +100,7 @@ export function ModulesMenu({ menu, can, pins, onTogglePin, activeId, onOpenHelp
                 const label = t(menuLabelKey(m))
                 return (
                   <li key={m.id} className={`menu-item${current ? ' current' : ''}`}>
-                    <Link to={m.path} id={`menu-${m.id}`} data-module={m.id} aria-current={current ? 'page' : undefined}>
+                    <Link to={m.path} id={`menu-${m.id}`} data-module={m.id} data-family={familyOf(m)} aria-current={current ? 'page' : undefined}>
                       <Icon name={glyphOf(m)} />
                       <span>
                         <strong>{label}</strong>

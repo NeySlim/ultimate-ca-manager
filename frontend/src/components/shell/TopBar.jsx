@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Icon } from '../atelier/Icon'
 import { markSrc } from '../atelier/icons'
-import { glyphOf, isVisible, moduleById } from '../../navigation/registry'
+import { familyOf, glyphOf, isVisible, moduleById } from '../../navigation/registry'
 import { FIXED_IDS } from './pins'
 import { ModulesButton, ModulesMenu } from './ModulesMenu'
 import { PinnedModules } from './PinnedModules'
@@ -46,6 +46,7 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
               to={m.path}
               data-nav={m.id}
               data-module={m.id}
+              data-family={familyOf(m)}
               className={active ? 'active' : undefined}
               aria-current={active ? 'page' : undefined}
               onClick={badged ? dismiss : undefined}
