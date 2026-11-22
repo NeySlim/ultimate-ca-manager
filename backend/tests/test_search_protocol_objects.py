@@ -71,3 +71,37 @@ def test_protocol_objects_hidden_without_their_read_permission(viewer_client, ob
 def test_short_query_lists_the_new_groups_empty(auth_client):
     data = _search(auth_client, 'p')
     assert data['acme_accounts'] == [] and data['scep_profiles'] == []
+
+
+@pytest.mark.parametrize('granted, shown, hidden', [
+    ('read:acme', 'acme_accounts', 'scep_profiles'),
+    ('read:scep', 'scep_profiles', 'acme_accounts'),
+])
+def test_a_custom_role_reads_the_protocol_it_is_granted(app, auth_client, create_user, objects,
+                                                        granted, shown, hidden):
+    """The palette's gates are grantable scopes: a custom role holding one sees that group only."""
+    from models import User
+    from models.rbac import CustomRole
+    username = f'pal_{granted.split(":")[1]}_{uuid.uuid4().hex[:6]}'
+    create_user(username=username, role='viewer')
+    r = auth_client.post('/api/v2/rbac/roles', data=json.dumps({'name': username, 'permissions': [granted]}),
+                         content_type='application/json')
+    assert r.status_code == 200, r.data
+    role_id = r.get_json()['data']['id']
+    try:
+        with app.app_context():
+            user_id = User.query.filter_by(username=username).first().id
+        r = auth_client.put(f'/api/v2/users/{user_id}', data=json.dumps({'custom_role_id': role_id}),
+                            content_type='application/json')
+        assert r.status_code == 200, r.data
+        client = app.test_client()
+        r = client.post('/api/v2/auth/login', data=json.dumps({'username': username, 'password': 'TestPass123!'}),
+                        content_type='application/json')
+        assert r.status_code == 200, r.data
+        data = _search(client, 'pal')
+        assert data[shown] and data[hidden] == []
+    finally:
+        with app.app_context():
+            User.query.filter_by(username=username).update({'custom_role_id': None}, synchronize_session=False)
+            CustomRole.query.filter_by(id=role_id).delete(synchronize_session=False)
+            db.session.commit()
