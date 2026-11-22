@@ -28,7 +28,7 @@ from services.cert.related_pair import revocation_partner
 from services.mtls_enrollment import remove_enrolment
 from services.acme.upstream_revocation import (
     propagate_acme_revocation, revocation_answer, with_related_answer)
-from utils.pagination import parse_request_pagination
+from utils.pagination import parse_request_pagination, parse_request_sort
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.export_password import validate_export_password
 from utils.cert_status import (USER_CERTIFICATE_STATUS_FILTERS,
@@ -144,6 +144,21 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
     return result
 
 
+# The rank a status sorts by: the most urgent first, an orphan last
+_STATUS_RANK = {'expired': 0, 'expiring': 1, 'valid': 2, 'revoked': 3, 'orphan': 4}
+
+_SORT_COLUMNS = {
+    'created_at': AuthCertificate.created_at,
+    'name': AuthCertificate.name,
+    'valid_until': AuthCertificate.valid_until,
+    'last_used_at': AuthCertificate.last_used_at,
+    # The owner's login, read per row in the ORDER BY (no join, same count)
+    'owner': db.select(User.username).where(User.id == AuthCertificate.user_id).scalar_subquery(),
+    # Computed from the bound certificate: ordered in the route
+    'status': None,
+}
+
+
 @bp.route('', methods=['GET'])
 @require_auth(['read:user_certificates'])
 def list_user_certificates():
@@ -162,8 +177,7 @@ def list_user_certificates():
                 unknown_status, USER_CERTIFICATE_STATUS_FILTERS), 400)
     user_filter = request.args.get('user_id', type=int)
     search = request.args.get('search', '').strip()
-    sort_by = request.args.get('sort_by', 'created_at')
-    sort_order = request.args.get('sort_order', 'desc')
+    sort = parse_request_sort(_SORT_COLUMNS, ('created_at', 'desc'), tiebreak=AuthCertificate.id)
 
     # Base query
     query = AuthCertificate.query
@@ -186,30 +200,20 @@ def list_user_certificates():
             )
         )
 
-    # Sorting
-    sort_col_map = {
-        'created_at': AuthCertificate.created_at,
-        'name': AuthCertificate.name,
-        'valid_until': AuthCertificate.valid_until,
-        'last_used_at': AuthCertificate.last_used_at,
-    }
-    sort_col = sort_col_map.get(sort_by, AuthCertificate.created_at)
-    # Absent values last in both directions, whichever engine; the primary key
-    # breaks ties so the page boundary does not depend on the plan.
-    if sort_order == 'asc':
-        query = query.order_by(sort_col.asc().nulls_last(), AuthCertificate.id.asc())
-    else:
-        query = query.order_by(sort_col.desc().nulls_last(), AuthCertificate.id.desc())
+    query = query.order_by(*sort.clauses)
 
-    if status_filters:
+    if status_filters or sort.key == 'status':
         # The status is computed from the bound certificate, so the filter
-        # runs before the page is cut: total and pages are those of the match.
+        # and its sort run before the page is cut: total and pages are those of the match.
         now = utc_now()
         matched = []
         for ac in query.all():
             cert = _get_certificate_for_auth_cert(ac)
-            if _cert_status(cert, now) in status_filters:
+            if not status_filters or _cert_status(cert, now) in status_filters:
                 matched.append((ac, cert))
+        if sort.key == 'status':
+            # Stable sort over the id order the query gave: ties keep it in both directions
+            matched.sort(key=lambda pair: _STATUS_RANK[_cert_status(pair[1], now)], reverse=sort.descending)
         total = len(matched)
         pages = (total + per_page - 1) // per_page
         window = matched[(page - 1) * per_page:page * per_page]

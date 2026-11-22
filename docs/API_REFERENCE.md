@@ -79,6 +79,14 @@ All API responses follow this structure:
 }
 ```
 
+### Sorting
+
+The lists that page on the server sort with `sort_by` (a key the list names) and `sort_order` (`asc` or `desc`; an empty value takes the list's default). Text is compared without regard to ASCII letter case, byte by byte otherwise, the same on SQLite and PostgreSQL; rows with no value in the sorted column come last in both directions; ties are broken by `id` in the same direction, so two pages never share a row. A key or direction the list does not know answers `400`, with the keys it accepts in `details.allowed_sort_by`:
+
+```json
+{ "status": 400, "detail": "Unknown sort_by 'size'; allowed: created_at, name", "details": { "allowed_sort_by": ["created_at", "name"] } }
+```
+
 ---
 
 ## Authentication
@@ -890,6 +898,8 @@ GET /api/v2/certificates?search=example.com
 | `status` | string | Filter, repeatable: `valid`, `expiring`, `expired`, `revoked`, `orphan`, `archived` |
 | `ca_id` | integer | Filter by issuing CA |
 | `search` | string | Search in CN, SANs |
+| `sort_by` | string | `subject` (default; the CN, else the description), `subject_cn`, `descr`, `issuer`, `valid_to`, `valid_from`, `created_at`, `serial_number`, `key_algo`, `source` (none reads `manual`), `revoked`, `status` (revoked, expired, expiring, valid), `compliance_grade`; see [Sorting](#sorting) |
+| `sort_order` | string | `asc` (default) or `desc` |
 | `page` | integer | Page number (default: 1) |
 | `per_page` | integer | Items per page (default: 50, max: 100) |
 
@@ -1248,7 +1258,7 @@ GET /api/v2/user-certificates?status=valid&page=1&per_page=50
 |-------|------|-------------|
 | status | string | Filter by status: `valid`, `expiring`, `expired`, `revoked` (repeatable; `valid` does not include `expiring`). Applied before paging: `total` and `pages` count the matching rows only; an unknown value answers `400` |
 | search | string | Name, subject or serial contains |
-| sort_by | string | `created_at` (default), `name`, `valid_until`, `last_used_at` |
+| sort_by | string | `created_at` (default), `name`, `valid_until`, `last_used_at`, `owner` (login), `status` (expired, expiring, valid, revoked, then a certificate no longer found); see [Sorting](#sorting) |
 | sort_order | string | `asc` or `desc` (default); rows with no value in the sorted column come last in both directions |
 | page | int | Page number (default: 1) |
 | per_page | int | Items per page (default: 25) |
@@ -1367,6 +1377,7 @@ DELETE /api/v2/user-certificates/{id}
 GET /api/v2/csrs
 GET /api/v2/csrs?status=pending&page=1&per_page=50
 ```
+Both CSR lists (this one and the [history](#csr-history-signed-csrs)) take `search` and sort by `sort_by`: `created_at` (default, with `sort_order` `desc`), `id`, `cn`, `requester`, `key_type`, `signed_at`, `valid_to`; see [Sorting](#sorting).
 
 ### Generate CSR
 ```http
@@ -1817,15 +1828,16 @@ GET /api/v2/acme/stats
 
 ### List ACME Accounts
 ```http
-GET /api/v2/acme/accounts
+GET /api/v2/acme/accounts?page=1&per_page=100&sort_by=created_at&sort_order=desc
 ```
+`data` is the list of accounts; `meta` carries `total`, `page` and `per_page` (default 100, 100 at most). `sort_by`: `created_at` (default, newest first), `account_id`, `status` (valid, deactivated, revoked), `contact`, `orders` (the number of orders); see [Sorting](#sorting).
 
 ### List ACME Orders
 ```http
 GET /api/v2/acme/orders
 GET /api/v2/acme/orders/{order_pk}
 ```
-The second form reads one local order (`read:acme`), whatever its age; 404 when it does not exist.
+The list filters on `status` and `domain`, pages with `page` and `per_page` (default 50) and sorts by `sort_by`: `created_at` (default, newest first), `expires`, `status` (pending, ready, processing, valid, invalid), `account`, `domain`; see [Sorting](#sorting). The second form reads one local order (`read:acme`), whatever its age; 404 when it does not exist.
 
 ### ACME Proxy Upstream Account
 The proxy's upstream account is a CA account of the [ACME Client](#acme-client-lets-encrypt) (`acme_account_id`, or the one selected as proxy account).
@@ -1891,7 +1903,7 @@ GET /api/v2/acme/eab-required
 PATCH /api/v2/acme/eab-required
 PUT /api/v2/acme/eab-required
 ```
-Reads need `read:acme`, writes `write:acme`, `DELETE` `delete:acme`. `POST` body: optional `label` (255 characters at most), `expires_in_days` (a positive integer, `400` otherwise) and `allowed_domains` (a list of patterns, `["*"]` for any); the response carries the credential and, once only, its `hmac_key`. `PATCH` changes `allowed_domains` (never `null`) and `notes`. `DELETE` revokes an active credential (and its DNS UPDATE keys); a credential already revoked or used is deleted for good (`204`). The list holds at most 200, newest first, and never shows an `hmac_key`. `eab-required` reads or sets `{"eab_required": true}` (`PATCH` and `PUT` are the same route).
+Reads need `read:acme`, writes `write:acme`, `DELETE` `delete:acme`. `POST` body: optional `label` (255 characters at most), `expires_in_days` (a positive integer, `400` otherwise) and `allowed_domains` (a list of patterns, `["*"]` for any); the response carries the credential and, once only, its `hmac_key`. `PATCH` changes `allowed_domains` (never `null`) and `notes`. `DELETE` revokes an active credential (and its DNS UPDATE keys); a credential already revoked or used is deleted for good (`204`). The list never shows an `hmac_key`; it pages with `page` and `per_page` (default 200, 200 at most), `meta` carries `total`, and it sorts by `sort_by`: `created_at` (default, newest first), `label`, `kid`, `status`, `expires_at`, `used_at` (see [Sorting](#sorting)). `eab-required` reads or sets `{"eab_required": true}` (`PATCH` and `PUT` are the same route).
 
 ---
 
@@ -1938,7 +1950,7 @@ GET /api/v2/scep/requests
 GET /api/v2/scep/requests?status=pending&search=host&page=2&per_page=50
 GET /api/v2/scep/requests/{request_id}
 ```
-The list is newest first and paged: `page` and `per_page` (default 50, 100 at most), `meta` carries `total` and `total_pages`; `status` (repeatable: `pending`, `approved` or `rejected`, `400` for any other value) and `search` (subject, transaction ID or client address) filter before the page is cut. The last form reads any one request (`read:scep`), 404 when it does not exist.
+The list is newest first and paged: `page` and `per_page` (default 50, 100 at most), `meta` carries `total` and `total_pages`; `sort_by` takes `created_at` (default), `status` (pending, approved, rejected), `subject`, `transaction_id` or `client_ip` (see [Sorting](#sorting)); `status` (repeatable: `pending`, `approved` or `rejected`, `400` for any other value) and `search` (subject, transaction ID or client address) filter before the page is cut. The last form reads any one request (`read:scep`), 404 when it does not exist.
 
 ### Approve Request
 ```http
@@ -2050,7 +2062,7 @@ GET /api/v2/windows-profiles/settings
 PATCH /api/v2/windows-profiles/settings
 ```
 
-- `q` matches the name or the realm; `ca` a refid of the issuing, policy or a former renewal CA; `state` one of `complete`, `keytab_missing`, `connector_failing` (the connector's last probe says down) and `disabled`, else 400. Each profile carries its `state`, its connector's name, health and realm, and its `template_ids`; the detail (`GET /{id}`) adds `keytab_entries` (principal, realm, kvno, enctype). `per_page` is capped at 200; `meta` carries `total`, `page`, `per_page`, `total_pages`.
+- `q` matches the name or the realm; `ca` a refid of the issuing, policy or a former renewal CA; `state` one of `complete`, `keytab_missing`, `connector_failing` (the connector's last probe says down) and `disabled`, else 400. Each profile carries its `state`, its connector's name, health and realm, and its `template_ids`; the detail (`GET /{id}`) adds `keytab_entries` (principal, realm, kvno, enctype). `per_page` is capped at 200; `meta` carries `total`, `page`, `per_page`, `total_pages`. `sort_by`: `name` (default, ascending), `realm`, `created_at`, `status` (connector failing, keytab missing, complete, disabled); see [Sorting](#sorting).
 - `PUT` and `PATCH` are the same partial update: only the fields sent change.
 - Each profile carries `policy_id` (the MS-XCEP policy identifier) and `policy_oid_root` (the root of its template OIDs, `<policy_oid_root>.1.<template id>`). Both are read-only: set at creation (at random, or the values 2.254 served for the default profile of an upgraded installation), never changed by a change of CA, and ignored in a `POST`, `PUT` or `PATCH` body. A replacing restore puts back the archived values; a merge keeps those of a profile that already exists.
 - Writable fields: `name`, `realm` (upper-cased; refused when another profile holds it or the keytab does not name it; `null` clears it, an empty or blank string is a 400), `enabled` and `is_default` (JSON booleans, else 400; `is_default` is accepted at creation only, for the first default profile), `connector_id` (an integer or `null`) (its base DN domain must equal the realm), `issuing_ca_refid` (a string; must be able to sign), `policy_ca_refid` (a string; no EdDSA key), `validity_days`, `xcep_username`, `xcep_password`, `wstep_username`, `wstep_password`, `allowed_ad_group`, `pinned_subject_fields`, `template_ids` (the templates offered; empty: those of the CA), `renewal_ca_refids` (see below).
@@ -2175,7 +2187,7 @@ POST /api/v2/ssh/certificates/{cert_id}/revoke
 DELETE /api/v2/ssh/certificates/{cert_id}
 GET /api/v2/ssh/stats
 ```
-- The list is paginated and sorted by `sort_by` (`id`, `key_id`, `cert_type`, `serial`, `valid_from`, `valid_to` or `created_at`) and `sort_order` (`asc` or `desc`); an unknown `sort_by` sorts by `created_at` and an unknown `sort_order` is `desc`; ties are broken by `id` in the same direction. `status`, `type` and `ca_id` may be repeated, an unknown `status` answers `400`.
+- The list is paginated and sorted by `sort_by` (`id`, `key_id`, `cert_type`, `serial`, `valid_from`, `valid_to` or `created_at`) and `sort_order` (`asc` or `desc`); `created_at` descending by default; `ca` (the CA's name) and `status` (expired, expiring within 7 days, valid, revoked) sort too, and an unknown key or direction answers `400` (see [Sorting](#sorting)). `status`, `type` and `ca_id` may be repeated, an unknown `status` answers `400`.
 - `POST` signs a public key (`write:ssh`, `201`). Body: `ca_id` and `public_key` (required), `cert_type` (`user` by default, or `host`), `principals` (a list or a comma-separated string, at least one, no comma inside a name, 64 at most), `validity_seconds` (an integer from 60 to ten years), or a range `valid_from` and `valid_to` (ISO 8601, UTC when no offset is given; `valid_to` alone starts now; `valid_from` may lie at most five minutes in the past; the range lasts 60 seconds to ten years and ends at most ten years from now; a range beyond the CA's `max_ttl` is refused; not combined with `validity_seconds`), `key_id`, `extensions`, `critical_options`, `descr`. As an exception kept for existing scripts, a `validity_seconds` above the CA's `max_ttl` is capped to it without an error: the `valid_to` returned shows the end applied. `400` for any invalid field or a CA policy refusal.
 - `POST /generate` takes the same fields without `public_key`, plus `key_type`: UCM creates the key pair and returns the certificate with the `private_key` once. Both answer `409` when the serial they take is held by another certificate of the CA even after its counter was moved past its certificates; try again.
 - `POST /import` stores an existing certificate: `certificate` (required), optional `descr` and `ssh_ca_id`; `201`.
@@ -2248,7 +2260,7 @@ GET /api/v2/discovery/export?format=csv&profile_id=1&status=new&search=example
 GET /api/v2/discovery/stats?profile_id=1
 POST /api/v2/discovery/bulk-resolve-dns
 ```
-- The list returns `items` and `total`; `limit` defaults to 50 (200 at most), `status` may be repeated.
+- The list returns `items` and `total`; it pages with `limit` (default 50, 200 at most) and `offset`, or with `page` and `per_page` when either is given. `status` may be repeated. `sort_by`: `last_seen` (default, most recent first), `first_seen`, `not_after`, `target`, `issuer`, `subject`, `status` (error, unmanaged, managed); see [Sorting](#sorting).
 - `GET /{disc_id}` adds the parsed `extensions`, key and signature details and the SHA-1 and SHA-256 fingerprints; `404` when unknown. `DELETE /{disc_id}` answers `204`.
 - `DELETE /api/v2/discovery` (`admin:system`) deletes every record, or those of `profile_id`, and returns `deleted`.
 - `export` returns CSV (default) or JSON (`format=json`) as a download, for the same `profile_id`, `status` and `search` filters as the list (10 000 rows at most).
@@ -2290,7 +2302,7 @@ Opens a request (`201`). `reason` is required and at most 2000 characters; `400`
 GET /api/v2/key-recovery?status=pending
 GET /api/v2/key-recovery/{id}
 ```
-The list returns `requests` (newest first, the latest 500) and `dual_control`, whether the approver must differ from the requester. `GET /{id}` reads one request whatever its age.
+The list returns `requests` and `dual_control`, whether the approver must differ from the requester; it pages with `page` and `per_page` (default 500, 500 at most), `meta` carries `total`, and it sorts by `sort_by`: `id` (default, newest first), `requested_at`, `status` (pending, approved, recovered, rejected, cancelled), `cert_cn`, `requested_by` (see [Sorting](#sorting)). `GET /{id}` reads one request whatever its age.
 
 ```http
 POST /api/v2/key-recovery/{id}/approve
@@ -2790,6 +2802,8 @@ GET /api/v2/audit/logs?success=false&date_from=2026-01-01
 | `date_from` | string | Start date (ISO format) |
 | `date_to` | string | End date (ISO format) |
 | `search` | string | Search in details |
+| `sort_by` | string | `timestamp`, the only key (the filters do the rest) |
+| `sort_order` | string | `desc` (default) or `asc`; see [Sorting](#sorting) |
 
 **Response:**
 ```json

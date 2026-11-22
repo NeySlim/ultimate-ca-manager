@@ -1307,6 +1307,13 @@ def create_app(config_name=None):
             return _json_error(400, 'Bad request')
         return e
     
+    from utils.pagination import InvalidSort
+
+    @app.errorhandler(InvalidSort)
+    def handle_invalid_sort(e):
+        from utils.response import error_response
+        return error_response(str(e), 400, details={'allowed_sort_by': e.allowed})
+
     @app.errorhandler(404)
     def handle_404(e):
         if request.path.startswith('/api/'):

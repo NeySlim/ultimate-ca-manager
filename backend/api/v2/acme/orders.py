@@ -6,7 +6,7 @@ from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge,
 from models.acme_models import AcmeClientOrder, DnsProvider
 from models.acme_client_account import AcmeClientAccount
 from auth.unified import require_auth
-from utils.pagination import parse_request_pagination
+from utils.pagination import parse_request_pagination, parse_request_sort, rank_of
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_isoformat
 
@@ -75,6 +75,19 @@ def _order_row(order):
     }
 
 
+# An order's states in the order RFC 8555 7.1.6 walks them, invalid last
+ORDER_STATES = ('pending', 'ready', 'processing', 'valid', 'invalid')
+
+_ORDER_SORT = {
+    'created_at': AcmeOrder.created_at,
+    'expires': AcmeOrder.expires,
+    'status': rank_of(AcmeOrder.status, ORDER_STATES),
+    'account': AcmeOrder.account_id,
+    # The stored JSON identifier list: orders by its first identifier
+    'domain': AcmeOrder.identifiers,
+}
+
+
 @bp.route('/api/v2/acme/orders', methods=['GET'])
 @require_auth(['read:acme'])
 def list_acme_orders():
@@ -82,6 +95,7 @@ def list_acme_orders():
     status = request.args.get('status')
     domain = (request.args.get('domain') or '').strip()
     page, per_page = parse_request_pagination(default_per_page=50)
+    sort = parse_request_sort(_ORDER_SORT, ('created_at', 'desc'), tiebreak=AcmeOrder.id)
     query = AcmeOrder.query
     if status:
         query = query.filter_by(status=status)
@@ -89,7 +103,7 @@ def list_acme_orders():
         query = query.filter(AcmeOrder.identifiers.contains(domain))
 
     total = query.count()
-    orders = (query.order_by(AcmeOrder.created_at.desc())
+    orders = (query.order_by(*sort.clauses)
               .offset((page - 1) * per_page).limit(per_page).all())
 
     data = [_order_row(order) for order in orders]
@@ -266,6 +280,10 @@ def _history_issuer_name(source, caref, issuer, external_sources):
     return ca.common_name if ca else None
 
 
+_HISTORY_SORT = {'common_name': Certificate.subject_cn, 'valid_to': Certificate.valid_to,
+                 'created_at': Certificate.created_at, 'source': Certificate.source}
+
+
 @bp.route('/api/v2/acme/history', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_history():
@@ -284,6 +302,7 @@ def get_acme_history():
     # through, and a negative LIMIT means no limit on SQLite and an error on
     # PostgreSQL.
     page, per_page = parse_request_pagination(default_per_page=50)
+    sort = parse_request_sort(_HISTORY_SORT, ('created_at', 'desc'), tiebreak=Certificate.id)
     source_filter = request.args.get('source', 'all')
 
     # ``letsencrypt`` is retained for legacy rows. New certificates from any
@@ -333,14 +352,7 @@ def get_acme_history():
             Certificate.serial_number.ilike(pattern, escape='\\'),
             Certificate.issuer.ilike(pattern, escape='\\')))
 
-    sort_columns = {'common_name': Certificate.subject_cn, 'valid_to': Certificate.valid_to,
-                    'created_at': Certificate.created_at, 'source': Certificate.source}
-    sort_col = sort_columns.get(request.args.get('sort_by', 'created_at'), Certificate.created_at)
-    # Absent values last in both directions, the same on both engines
-    if request.args.get('sort_order') == 'asc':
-        query = query.order_by(sort_col.asc().nulls_last(), Certificate.id.asc())
-    else:
-        query = query.order_by(sort_col.desc().nulls_last(), Certificate.id.desc())
+    query = query.order_by(*sort.clauses)
     total = query.count()
     certs = query.offset((page - 1) * per_page).limit(per_page).all()
 

@@ -114,11 +114,11 @@ class TestHistoryPaging:
                         sort_order='desc', per_page=100)
         assert [row['id'] for row in body['data']] == signed_batch['ids'][::-1]
 
-    def test_unknown_sort_key_falls_back(self, auth_client, signed_batch):
+    def test_unknown_sort_key_is_refused(self, auth_client, signed_batch):
         tag = signed_batch['tag']
-        body = _history(auth_client, search=f'paging-{tag}', sort_by='prv',
-                        sort_order='asc', per_page=100)
-        assert {row['id'] for row in body['data']} == set(signed_batch['ids'])
+        r = auth_client.get(f'{CSRS}/history?search=paging-{tag}&sort_by=prv&sort_order=asc')
+        assert r.status_code == 400, r.data
+        assert 'prv' in _json(r)['detail'] and 'cn' in _json(r)['details']['allowed_sort_by']
 
     def test_overlong_search_is_accepted_and_bounded(self, auth_client, signed_batch):
         body = _history(auth_client, search='x' * 5000)

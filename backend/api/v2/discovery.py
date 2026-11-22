@@ -8,7 +8,7 @@ import logging
 from flask import Blueprint, request, current_app, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
-from utils.pagination import parse_request_limit
+from utils.pagination import parse_request_limit, parse_request_pagination, parse_request_sort, rank_of
 
 logger = logging.getLogger(__name__)
 
@@ -313,9 +313,25 @@ def get_run(run_id):
 @bp.route('/api/v2/discovery', methods=['GET'])
 @require_auth(['read:certificates'])
 def list_discovered():
-    """List discovered certificates with pagination and filtering."""
-    limit = parse_request_limit(50, 200)
-    offset = _safe_int(request.args.get('offset', 0), 0, lo=0)
+    """List discovered certificates, paged by ``page``/``per_page`` or ``limit``/``offset``,
+    sorted by ``sort_by``/``sort_order`` (last seen first by default)."""
+    from models.discovered_certificate import DiscoveredCertificate as D
+    sort = parse_request_sort({
+        'last_seen': D.last_seen,
+        'first_seen': D.first_seen,
+        'not_after': D.not_after,
+        'target': D.target,
+        'issuer': D.issuer,
+        'subject': D.subject,
+        # The worst first: a scan error, then what UCM does not manage
+        'status': rank_of(D.status, ('error', 'unmanaged', 'managed')),
+    }, ('last_seen', 'desc'), tiebreak=D.id)
+    if 'page' in request.args or 'per_page' in request.args:
+        page, limit = parse_request_pagination(default_per_page=50, max_per_page=200)
+        offset = (page - 1) * limit
+    else:
+        limit = parse_request_limit(50, 200)
+        offset = _safe_int(request.args.get('offset', 0), 0, lo=0)
     profile_id = request.args.get('profile_id', type=int)
     status_list = request.args.getlist('status')
     search = request.args.get('search', '').strip()
@@ -323,7 +339,7 @@ def list_discovered():
     items, total = svc.get_all(limit=limit, offset=offset,
                                profile_id=profile_id,
                                status=status_list if status_list else None,
-                               search=search or None)
+                               search=search or None, order_by=sort.clauses)
     return success_response(data={'items': items, 'total': total})
 
 

@@ -11,12 +11,12 @@ from flask import Blueprint, request, g, Response
 from auth.unified import require_auth
 from fips_mode import FipsRestricted
 from utils.response import success_response, error_response, created_response, no_content_response
-from utils.pagination import parse_request_pagination
+from utils.pagination import parse_request_pagination, parse_request_sort
 from services.ssh_cert_service import SSHCertificateService
 from services.ssh_cert.signing import MAX_VALIDITY_SECONDS, SSHSerialConflict
 from services.ssh_ca_service import normalize_key_type
 from services.audit_service import AuditService
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, case, select
 from models.ssh import SSHCertificate, SSHCertificateAuthority
 from utils.datetime_utils import utc_now
 from utils.cert_status import (SSH_CERTIFICATE_STATUS_FILTERS,
@@ -173,6 +173,17 @@ def _listed(names):
     """'a', 'a and b', 'a, b and c'."""
     return names[0] if len(names) == 1 else ', '.join(names[:-1]) + ' and ' + names[-1]
 
+def _status_order(descending):
+    """Expired, expiring (7 days, as the filter), valid, revoked: the rank, not the label."""
+    now = utc_now()
+    rank = case(
+        (SSHCertificate.revoked == True, 3),  # noqa: E712
+        (SSHCertificate.valid_to <= now, 0),
+        (SSHCertificate.valid_to <= now + timedelta(days=7), 1),
+        else_=2)
+    return [rank.desc() if descending else rank.asc()]
+
+
 _SORT_COLUMNS = {
     'id': SSHCertificate.id,
     'key_id': SSHCertificate.key_id,
@@ -181,6 +192,10 @@ _SORT_COLUMNS = {
     'valid_from': SSHCertificate.valid_from,
     'valid_to': SSHCertificate.valid_to,
     'created_at': SSHCertificate.created_at,
+    # The CA's name as the list shows it, read per row in the ORDER BY (no join, same count)
+    'ca': select(SSHCertificateAuthority.descr)
+          .where(SSHCertificateAuthority.id == SSHCertificate.ssh_ca_id).scalar_subquery(),
+    'status': _status_order,
 }
 
 
@@ -189,6 +204,7 @@ _SORT_COLUMNS = {
 def list_ssh_certificates():
     """List SSH certificates with filtering and pagination."""
     page, per_page = parse_request_pagination(default_per_page=20)
+    _sort = parse_request_sort(_SORT_COLUMNS, ('created_at', 'desc'), tiebreak=SSHCertificate.id)
     search = request.args.get('search', '').strip()
     statuses, unknown_status = normalize_status_filters(
         request.args.getlist('status'), SSH_CERTIFICATE_STATUS_FILTERS)
@@ -236,12 +252,7 @@ def list_ssh_certificates():
             )
         )
 
-    # An unknown column or direction gives the default order, as on the other lists
-    sort_col = _SORT_COLUMNS.get(request.args.get('sort_by', ''), SSHCertificate.created_at)
-    if request.args.get('sort_order', 'desc').lower() == 'asc':
-        query = query.order_by(sort_col.asc(), SSHCertificate.id.asc())
-    else:
-        query = query.order_by(sort_col.desc(), SSHCertificate.id.desc())
+    query = query.order_by(*_sort.clauses)
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     shared = SSHCertificate.shared_serials()
 
