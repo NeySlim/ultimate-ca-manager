@@ -157,13 +157,18 @@ test.describe('on a phone', () => {
 test.describe('at 1000 px', () => {
   test.use({ viewport: { width: 1000, height: 1000 } })
 
-  test('the overview takes two columns and leaves the chain out, as the mockup', async ({ page, api }) => {
+  test('the overview takes two columns, the chain under the validity and the identity beside both', async ({ page, api }) => {
     const cert = await issueCert(api, (await createCA(api)).id)
     await openListOn(page, cert.common_name)
     await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
     const overview = page.getByTestId('certificate-overview')
     await expect(overview).toBeVisible()
     expect(await overview.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2)
-    await expect(overview.locator('.overview-chain')).toBeHidden()
+    const [validity, identity, chain] = await Promise.all([1, 2, 3].map(n => box(overview.locator(`:scope > section:nth-child(${n})`))))
+    await expect(overview.locator('.overview-chain')).toBeVisible()
+    expect(Math.abs(chain.x - validity.x)).toBeLessThanOrEqual(EPS)
+    expect(chain.y).toBeGreaterThanOrEqual(validity.y + validity.height)
+    expect(identity.x).toBeGreaterThanOrEqual(chain.x + chain.width)
+    expect(Math.abs(identity.y - validity.y)).toBeLessThanOrEqual(EPS)
   })
 })

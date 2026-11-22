@@ -212,7 +212,7 @@ describe('a certificate in the inspector (inspector, certMenu)', () => {
     expect(overview.querySelector('.validity-head strong')).toHaveClass('warn')
     expect(overview.querySelector('.mini-notice')).toHaveTextContent('inspector.cert.renewSoon:20')
     expect(overview.querySelector('dl.props dd.mono')).toHaveTextContent('0A:0B')
-    expect([...overview.querySelectorAll('.chain-mini li')].map((li) => li.textContent)).toEqual(['Root CA', 'Issuing CA', 'web.example.com'])
+    expect([...overview.querySelectorAll('.chain-mini li .chain-name')].map((n) => n.textContent)).toEqual(['Root CA', 'Issuing CA', 'web.example.com'])
     fireEvent.click(tabs[1])
     expect(dock().querySelectorAll('.chain-box')).toHaveLength(3)
     expect(dock().querySelector('.chain-box.selected .badge.warn')).not.toBeNull()
