@@ -9,8 +9,8 @@ const themeFamilies = {
     name: 'Atelier',
     nameKey: 'settings.themeFamilies.atelier',
     swatch: {
-      dark: { surface: '#233143', accent: '#94bfff' },
-      light: { surface: '#eaf0f6', accent: '#245bb1' },
+      dark: { surface: '#202c3c', accent: '#86b8ff' },
+      light: { surface: '#e6edf6', accent: '#1d55bc' },
     },
   },
   aurore: {
