@@ -113,7 +113,7 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
         <div className="module-detail">
           <Section title={t('acme.orderInfo')}>
             <Facts items={[
-              [t('acme.domains'), opened.domain], factRow(t('acme.account'), opened.account),
+              [t('acme.domains'), opened.domain], copyRow(t('acme.account'), opened.account, undefined, { long: true }),
               factRow(t('acme.challengeType'), opened.method), [t('atelier.state'), pill(opened)],
               factRow(t('common.expires'), dateOf(opened.expires, locale)), factRow(t('common.created'), dateTimeOf(opened.created_at, locale)),
               opened.order_id && copyRow(t('acme.orderId'), opened.order_id, undefined, { long: true }),

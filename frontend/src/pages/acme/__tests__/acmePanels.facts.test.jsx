@@ -146,7 +146,7 @@ describe('a DNS provider', () => {
 describe('a certificate in the ACME history', () => {
   it('shows its serial in hex lines that copy whole', async () => {
     const serial = '4A:3F:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD'
-    const cert = { id: 3, common_name: 'www.example.com', serial, issuer: 'CA', source: 'acme', created_at: null, order: { order_id: 'ord-42' } }
+    const cert = { id: 3, common_name: 'www.example.com', serial, issuer: 'CA', source: 'acme', created_at: null, order: { order_id: 'ord-42', account: 'fgeSTw8MQ2MupnH4VlzNNBlJ3hbaEDIbmVjr6xYv' } }
     render(<WithDockSlot><HistoryTab history={[cert]} total={1} page={1} perPage={25} onPageChange={noop} onPerPageChange={noop} search="" onSearchChange={noop}
       caOptions={[]} filterStatus={[]} onFilterStatusChange={noop} onFilterCAChange={noop} onFilterSourceChange={noop} selectedCert={cert} onSelectCert={noop} /></WithDockSlot>)
     const hex = row('common.serialNumber').querySelector('.code-value.hex')
@@ -154,6 +154,7 @@ describe('a certificate in the ACME history', () => {
     fireEvent.click(hex.querySelector('.cp'))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(serial))
     expect(row('acme.orderId').querySelector('.code-value')).toHaveTextContent('ord-42')
+    expect(row('acme.account').querySelector('.code-value')).toHaveTextContent('fgeSTw8MQ2MupnH4VlzNNBlJ3hbaEDIbmVjr6xYv')
     expect(row('common.issued').querySelector('dd')).toHaveClass('absent')
   })
 })

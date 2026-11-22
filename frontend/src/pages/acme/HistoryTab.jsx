@@ -76,7 +76,7 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
             <Facts items={[
               factRow(t('acme.method'), cert.challenge_type?.toUpperCase()), factRow(t('acme.provider'), cert.dns_provider),
               factRow(t('acme.environment'), cert.environment ? environment(cert) : null),
-              cert.order?.account && [t('acme.account'), cert.order.account],
+              cert.order?.account && copyRow(t('acme.account'), cert.order.account, undefined, { long: true }),
               cert.order?.status && [t('acme.orderStatus'), cert.order.status],
               cert.order?.order_id && copyRow(t('acme.orderId'), cert.order.order_id, undefined, { long: true }),
             ]} />

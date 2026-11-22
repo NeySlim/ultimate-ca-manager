@@ -165,5 +165,8 @@ describe('LocalOrdersTab dock', () => {
     const id = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === 'acme.orderId')
     fireEvent.click(id.querySelector('dd.v').querySelector('.code-value .cp'))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('ord-0123456789'))
+    // The account is an identifier too: a chip, never a plain value cut anywhere
+    const account = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === 'acme.account')
+    expect(account.querySelector('dd.v').querySelector('.code-value')).toHaveTextContent('acct')
   })
 })
