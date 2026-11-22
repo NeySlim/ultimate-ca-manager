@@ -25,14 +25,14 @@ export const helpContent = {
         title: 'Cards',
         icon: ListChecks,
         items: [
-          { label: 'Figures', text: 'Certificates (the full inventory), the items to handle (interventions, and those to watch), the expired certificates, and the ACME, SCEP and EST failures of the current UTC day; the second shows the To handle card, the last shows it on its ACME rows' },
+          { label: 'Figures', text: 'Certificates (the inventory, its issuances per day over 30 days and the active ones), the items to handle (split into critical, to do and to watch), the certificates expiring within 30 days (those already expired under it), and the ACME, SCEP and EST failures of the current UTC day (14 days in columns and the gap with yesterday); pointing at a figure or focusing it shows its details; the second shows the To handle card, the last shows it on its ACME rows' },
           { label: 'First steps', text: 'On an empty instance, an administrator sees three steps above the figures (a root CA, an issuing CA, a protocol), each leading to its screen; Later folds them into one line that keeps the progress, Resume brings them back' },
           { label: 'To handle', text: 'The interventions by urgency, critical first, six shown and Show the others for the rest; each row gives the name and its type, the cause, a short delay with the exact date under it, and a button: Renew, Retry or Publish now where UCM can act, Review, View the CA or Open otherwise. Chips filter by type with their totals, and what only needs watching is folded apart' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the last operation, the successes and failures of today and of the period, and a curve per day; ACME failures open To handle on ACME. Then the TSA signer, the scheduler and, with the right to read settings, email, webhooks and auto-renewal, each with its state' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the last operation, 30 days of bars, successes rising and failures dropping, and the success rate; ACME failures open To handle on ACME. Then, as pills, the TSA signer, the scheduler and, with the right to read settings, email, webhooks and auto-renewal, each with its state' },
           { label: 'Hierarchy', text: 'At most ten authorities, one column per root: each root with its offline mark, CRL and cross-signing, each authority below with its CRL, OCSP and its issuances over 7 days; each authority opens its page, Explore opens them all' },
           { label: 'Expiry horizon', text: 'The six certificates that expire next, each with its delay coloured by urgency and a bar for the validity already spent, then the valid, to renew, expired and revoked certificates, each opening its list' },
-          { label: 'Compliance', text: 'Live certificates by key algorithm, then five checks (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key), each saying what it counts and opening its list when there is one' },
-          { label: 'Latest operations', text: 'The five most recent operations, each with the icon of its type, who did it and when; with the audit permission, the operation opens the audit log searched on it and See all opens the whole trail' },
+          { label: 'Compliance', text: 'The average score as a ring with its grade and the grades A+ to F, then one gauge per rule (RSA keys of at least 3072 bits, server validity of 398 days at most, safe signature hash, complete chain, private key kept in UCM) with its conforming share and count; a rule opens the list of its gaps' },
+          { label: 'Latest operations', text: 'The latest operations on a timeline grouped by day, each with the icon of its family, who did it and when; successive sign-ins of one user fold into one line; with the audit permission, an operation opens the audit log searched on it and See all opens the whole trail' },
           { label: 'Certificate activity', text: 'Certificates issued, revoked and expired per day over 7, 15 or 30 days, as curves with their totals; the left and right arrow keys read the chart day by day' },
         ]
       },
@@ -41,6 +41,7 @@ export const helpContent = {
       'Pick the Operator or Manager preset in the header, or open Cards to show, hide and reorder the cards; the layout is saved with your account and follows you across browsers',
       'The menu of a card hides it or opens the Cards dialog; a hidden To handle card comes back when a figure or another card asks for it',
       'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
+      'The menu of a card with a chart shows its figures as a table, which Download as CSV saves; on a chart, the arrow keys read one day at a time and Escape closes the tooltip',
     ],
     related: ['Certificates', 'CAs', 'Settings']
   },
