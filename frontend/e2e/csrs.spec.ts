@@ -36,3 +36,17 @@ test('a CSR imported on screen is signed by a CA', async ({ page, api }) => {
     return list.find(c => c.common_name === cn)?.issuer
   }).toBe(`CN=${ca.common_name}`)
 })
+
+test('a request\'s details grey what it lacks and name its signature by its hash', async ({ page, api }) => {
+  const cn = `${uid('csr')}.example.com`
+  await api.post('/csrs', { cn, key_type: 'RSA 2048' })
+  await page.goto('/csrs')
+  await page.getByRole('main').getByRole('searchbox').fill(cn)
+  await page.getByRole('main').getByRole('row').filter({ hasText: cn }).locator('.entity-name').click()
+  const panel = page.locator('#inspector')
+  await panel.getByRole('tab', { name: 'Details' }).click()
+  const row = (label: string) => panel.locator('dl.kv > .row', { has: page.locator('dt', { hasText: new RegExp(`^${label}$`) }) })
+  await expect(row('Organization').locator('dd.absent')).toHaveText('—')
+  await expect(row('Signature').locator('dd.v')).toHaveText('SHA-256')
+  await expect(panel.locator('dl.props')).toHaveCount(0)
+})
