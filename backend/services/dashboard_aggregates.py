@@ -755,6 +755,12 @@ def certificate_list_conditions(args, dialect, now=None):
             raise ValueError(f'{name} must be between 0 and {maximum}')
         return value
 
+    def moment(name):
+        try:
+            return to_naive_utc(datetime.fromisoformat(args.get(name)))
+        except (TypeError, ValueError):
+            raise ValueError(f'{name} must be an ISO 8601 date or date and time') from None
+
     def flag(name):
         raw = args.get(name)
         if raw is None:
@@ -784,6 +790,11 @@ def certificate_list_conditions(args, dialect, now=None):
         conditions.append(weak_hash_condition(args.getlist('sig_hash')))
     if 'lifetime_over_days' in args:
         conditions.append(lifetime_over_condition(dialect, number('lifetime_over_days', MAX_LIFETIME_DAYS_FILTER)))
+    # Half-open interval in UTC, so consecutive days or weeks never share a certificate
+    if 'expires_from' in args:
+        conditions.append(Certificate.valid_to >= moment('expires_from'))
+    if 'expires_to' in args:
+        conditions.append(Certificate.valid_to < moment('expires_to'))
     if 'renewal' in args:
         kinds = args.getlist('renewal')
         bad = [k for k in kinds if k not in RENEWAL_KINDS]
