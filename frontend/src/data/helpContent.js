@@ -65,7 +65,7 @@ export const helpContent = {
         title: 'Search and shortcuts',
         icon: Stack,
         items: [
-          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to any page of the menu you may open (listed under its menu name, its menu group as the hint), run an action (Issue New Certificate opens its form), or find a certificate, an authority, a user, a template, an ACME account or a SCEP profile. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result. An object found opens in the detail of its page' },
+          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to any page of the menu you may open (listed under its menu name, its menu group as the hint), run an action (Issue New Certificate opens its form), open a tab of the ACME, SCEP, EST and TSA pages by typing its name (ACME: DNS providers), or find a certificate, an authority, a user, a template, an ACME account or a SCEP profile. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result. An object found opens in the detail of its page' },
           { label: 'Address', text: 'The object open in a page\'s detail dock and its section are part of the address: a reload or a shared link reopens them, and the browser\'s Back closes the dock' },
           { label: 'Help', text: 'Press ? outside a text field, or select the help button of the bar, to open the help of the current page; on a narrow screen, where the bar has no help button, search Help for this page' },
           { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },
@@ -588,7 +588,7 @@ export const helpContent = {
     overview: 'SCEP enables network devices (routers, switches, firewalls) and MDM solutions to automatically request and obtain certificates. Devices authenticate using a challenge password.',
     sections: [
       {
-        title: 'Views',
+        title: 'Tabs',
         icon: ListChecks,
         items: [
           { label: 'Requests', text: 'Pending, approved and rejected SCEP enrollment requests, filtered by the state chips, searched and paged by the server; a request opens its detail with Approve and Reject' },
@@ -645,7 +645,7 @@ export const helpContent = {
     overview: 'EST (RFC 7030) provides secure certificate enrollment over HTTPS with mutual TLS (mTLS) or HTTP Basic authentication. Ideal for modern enterprise environments requiring standards-based enrollment with strong transport security.',
     sections: [
       {
-        title: 'Views',
+        title: 'Tabs',
         icon: ListChecks,
         items: [
           { label: 'Enrollment endpoints', text: 'The default endpoint and one per CA label (/.well-known/est/<label>/), with Authority, Authentication (client certificate, or client certificate or password once HTTP Basic credentials are saved) and State. An endpoint opens its detail with its five URLs and the enrollment totals' },
@@ -696,7 +696,7 @@ export const helpContent = {
     overview: 'TSA (RFC 3161) provides trusted timestamps that prove a document or hash existed at a specific point in time. Used for code signing, legal compliance, and audit trails.',
     sections: [
       {
-        title: 'Views',
+        title: 'Tabs',
         icon: ListChecks,
         items: [
           { label: 'Services', text: 'The time-stamping service with its Authority, Hash (the digests a request may carry), Policy and State. Its detail gives the signer, the /tsa URL, the request totals and the OpenSSL usage' },
@@ -748,12 +748,12 @@ export const helpContent = {
     overview: 'UCM supports two ACME modes: ACME client for public certificates from any RFC 8555-compliant CA (Let\'s Encrypt, ZeroSSL, HARICA, etc.), and Local ACME server for internal PKI automation with multi-CA domain mapping.',
     sections: [
       {
-        title: 'Views',
+        title: 'Tabs',
         icon: ListChecks,
         items: [
           { label: 'Accounts', text: 'The page opens on the server accounts: chips by state, Contact, Created, State and Orders. An account opens its detail on Account, Orders and Challenges, with Disable the account… (final, RFC 8555 §7.3.6) and Delete' },
           { label: 'Copy the directory URL', text: 'In the page head: the directory URL ACME clients point at' },
-          { label: 'View', text: 'The View menu of the page head reaches the server orders, domains, EAB credentials and settings, the client settings, orders, upstream CAs, DNS providers and domains, and the issued certificates. The address keeps the view (?tab=)' },
+          { label: 'Tabs', text: 'The tabs under the page head reach the views, in three groups set apart: the local ACME server (accounts, orders, domains, EAB credentials, settings), the client (settings, orders, upstream CAs, DNS providers, domains) and the issued certificates. A tab counts what its view lists; the arrow keys move from tab to tab, and the command palette finds each view by its name. A narrow window scrolls the row of tabs. The address keeps the view (?tab=)' },
           { label: 'Client settings', text: 'One form saved in one request, the server bounds checked first (renewal from 1 to 60 days, DNS waits, TLS-ALPN port)' },
         ]
       },

@@ -5,11 +5,11 @@ export default {
     overview: 'UCM prend en charge deux modes ACME : client ACME pour les certificats publics depuis toute AC conforme RFC 8555 (Let’s Encrypt, ZeroSSL, HARICA, etc.), et serveur ACME local pour l’automatisation PKI interne avec mappage multi-AC de domaines.',
     sections: [
       {
-        title: 'Vues',
+        title: 'Onglets',
         items: [
           { label: 'Comptes', text: 'La page s’ouvre sur les comptes du serveur : puces par état, Contact, Créé le, État et Commandes. Un compte ouvre son détail sur Compte, Commandes et Défis, avec Désactiver le compte… (définitif, RFC 8555, §7.3.6) et Supprimer' },
           { label: 'Copier l’URL du répertoire', text: 'Dans l’en-tête de la page : l’URL du répertoire que visent les clients ACME' },
-          { label: 'Vue', text: 'Le menu Vue de l’en-tête mène aux commandes, domaines, identifiants EAB et réglages du serveur, aux réglages, commandes, AC amont, fournisseurs DNS et domaines du client, et aux certificats émis. L’adresse garde la vue (?tab=)' },
+          { label: 'Onglets', text: 'Les onglets sous l’en-tête mènent aux vues, en trois groupes séparés : le serveur ACME local (comptes, commandes, domaines, identifiants EAB, réglages), le client (réglages, commandes, AC amont, fournisseurs DNS, domaines) et les certificats émis. Un onglet compte ce que sa vue liste ; les flèches du clavier passent d’un onglet à l’autre, et la palette de commandes trouve chaque vue par son nom. Dans une fenêtre étroite, la rangée d’onglets défile. L’adresse garde la vue (?tab=)' },
           { label: 'Réglages du client', text: 'Un formulaire enregistré en une seule requête, les bornes du serveur vérifiées avant (renouvellement de 1 à 60 jours, attentes DNS, port TLS-ALPN)' },
         ]
       },

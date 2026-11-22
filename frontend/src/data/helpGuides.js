@@ -864,7 +864,7 @@ Enable CA Issuers per CA in the **AIA CA Issuers** section of that CA's panel on
 
 The Simple Certificate Enrollment Protocol (SCEP) enables network devices: routers, switches, firewalls, MDM-managed endpoints, to automatically request and obtain certificates.
 
-## Views
+## Tabs
 
 ### Requests
 View all SCEP enrollment requests:
