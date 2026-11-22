@@ -153,7 +153,7 @@ Click **Create Template** to make one, or open a template and click **Copy** in 
 
 ### Trust Store
 
-Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. The list shows each entry's subject, its description as its usage, its type and its expiry, and a name opens its detail under the list. **Sync** imports the operating system's trusted CAs, **Export** in the detail downloads one certificate, and **Export Bundle** at the top of the page downloads all of them as one PEM file. An entry that contains a private key is refused: the trust store keeps certificates only. When the bundle or another export leaves out unreadable entries, a warning gives their number.
+Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. The list shows each entry's subject, its description as its usage, its type and its expiry, and a name opens its detail under the list. **Sync** imports the operating system's trusted CAs, **Export** in the detail downloads one certificate, and **Export Bundle** at the top of the page downloads all of them as one PEM file. An entry that contains a private key is refused: the trust store keeps certificates only. When the bundle or another export leaves out unreadable entries, a warning gives their number. The **Details** of an entry show its serial number and fingerprints in chips that copy them whole, in octets as a certificate's.
 
 ### User Certificates
 

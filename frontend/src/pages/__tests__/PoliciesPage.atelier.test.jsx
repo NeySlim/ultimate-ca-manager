@@ -97,6 +97,11 @@ describe('PoliciesPage on the mockup module list', () => {
     expect(value('policies.allowedKeyTypes')).toHaveTextContent('RSA-3072')
     expect(value('policies.allowedDigests')).toHaveTextContent('policies.anyDigest')
     expect(value('policies.minApprovers')).toHaveTextContent('2')
+    // Its state in a pill, a rule it does not set in grey
+    expect(dock.querySelector('dl.props')).toBeNull()
+    expect(value('atelier.state').querySelector('.badge')).toHaveTextContent('policies.state.applied')
+    expect(value('policies.allowedDigests')).toHaveClass('absent')
+    expect(value('policies.allowedKeyTypes')).toHaveClass('v')
     fireEvent.click(within(dock).getByRole('button', { name: 'policies.disable' }))
     await waitFor(() => expect(svc.toggle).toHaveBeenCalledWith(1))
     fireEvent.click(within(dock).getByRole('button', { name: 'policies.deletePolicy…' }))

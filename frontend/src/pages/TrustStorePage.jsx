@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Input } from '../components/atelier/Form'
 import {
-  Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Props,
+  Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Facts,
   LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
@@ -25,6 +25,7 @@ import { trustStoreExpiryStatus } from '../lib/expiry'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
+import { digestHex } from '../lib/digestHex'
 import { dateOf, dateTimeOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
@@ -376,6 +377,8 @@ export default function TrustStorePage() {
   const tsUsage = (c) => c.description || '—'
   const tsType = (c) => (PURPOSES.includes(c.purpose) ? t(PURPOSE_LABELS[c.purpose]) : (c.purpose || '—'))
   const tsExpires = (c) => dateOf(c.not_after, locale) || '—'
+  // A row of the dock: its value, or the absence in grey
+  const fact = (label, value, row = {}) => (value ? { label, value, ...row } : { label, absent: '—' })
   const present = ['valid', 'expiring', 'expired'].filter((s) => certificates.some((c) => tsState(c) === s))
   const active = present.includes(state) ? state : ''
   const views = [
@@ -424,12 +427,12 @@ export default function TrustStorePage() {
         {section === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
-                [t('trustStore.module.subject'), open.subject || '—'],
-                [t('trustStore.module.usage'), tsUsage(open)],
+              <Facts items={[
+                fact(t('trustStore.module.subject'), open.subject, { long: true }),
+                fact(t('trustStore.module.usage'), open.description),
                 [t('common.type'), tsType(open)],
-                [t('trustStore.module.expires'), tsExpires(open)],
-                [t('atelier.state'), tsPill(open)],
+                fact(t('trustStore.module.expires'), dateOf(open.not_after, locale)),
+                { label: t('atelier.state'), state: [TONES[tsState(open)] || 'muted', t(`trustStore.module.states.${tsState(open)}`)] },
               ]} />
             </Section>
             <Section title={t('atelier.summary')}><p className="summary">{open.notes || t('trustStore.module.noNotes')}</p></Section>
@@ -438,25 +441,25 @@ export default function TrustStorePage() {
         {section === 'details' && (
           <div className="module-detail">
             <Section title={t('common.technicalDetails')}>
-              <Props items={[
-                [t('common.issuer'), <span key="issuer" className="mono">{open.issuer || '—'}</span>],
-                [t('common.serialNumber'), open.serial_number ? <span key="serial" className="mono">{serialHex(open.serial_number)}</span> : '—'],
-                [t('common.keyType'), certificateKeyLabel(open) || '—'],
-                [t('common.issuerSignatureAlgorithm'), open.signature_algorithm || '—'],
-                [t('common.validFrom'), dateOf(open.not_before, locale) || '—'],
-                [t('common.validUntil'), tsExpires(open)],
+              <Facts items={[
+                fact(t('common.issuer'), open.issuer, { long: true }),
+                fact(t('common.serialNumber'), serialHex(open.serial_number), { kind: 'hex' }),
+                fact(t('common.keyType'), certificateKeyLabel(open)),
+                fact(t('common.issuerSignatureAlgorithm'), open.signature_algorithm),
+                fact(t('common.validFrom'), dateOf(open.not_before, locale)),
+                fact(t('common.validUntil'), dateOf(open.not_after, locale)),
               ]} />
             </Section>
             <Section title={t('common.fingerprints')}>
-              <Props items={[
-                ['SHA-256', <span key="sha256" className="mono">{open.fingerprint_sha256 || '—'}</span>],
-                ['SHA-1', <span key="sha1" className="mono">{open.fingerprint_sha1 || '—'}</span>],
+              <Facts items={[
+                fact('SHA-256', digestHex(open.fingerprint_sha256), { kind: 'hex' }),
+                fact('SHA-1', digestHex(open.fingerprint_sha1), { kind: 'hex' }),
               ]} />
             </Section>
             <Section title={t('details.metadata')}>
-              <Props items={[
-                [t('details.addedAt'), dateTimeOf(open.added_at, locale) || '—'],
-                [t('details.addedBy'), open.added_by || '—'],
+              <Facts items={[
+                fact(t('details.addedAt'), dateTimeOf(open.added_at, locale)),
+                fact(t('details.addedBy'), open.added_by),
               ]} />
             </Section>
           </div>

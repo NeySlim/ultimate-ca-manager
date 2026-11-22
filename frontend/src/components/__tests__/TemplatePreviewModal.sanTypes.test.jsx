@@ -30,6 +30,15 @@ describe('TemplatePreviewModal SAN types', () => {
     expect(screen.getByText(/DNS: server\.example\.com/)).toBeInTheDocument()
   })
 
+  it('lists the sample in rows of facts, the alternative names on a long row', () => {
+    preview({ san_types: ['dns'] })
+    const dialog = screen.getByTestId('template-preview-dialog')
+    expect(dialog.querySelector('dl.props')).toBeNull()
+    const row = (term) => screen.getByText(term, { selector: 'dt' }).closest('.row')
+    expect(row('common.subjectAltNames')).toHaveClass('long')
+    expect(row('templates.template').querySelector('dd.v')).toHaveTextContent('T')
+  })
+
   it('says every type is allowed when none is checked', () => {
     preview({ san_types: [] })
     expect(screen.getByText('templates.sanTypesAny')).toBeInTheDocument()

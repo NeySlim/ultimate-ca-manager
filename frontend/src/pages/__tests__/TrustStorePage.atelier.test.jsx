@@ -52,7 +52,7 @@ import TrustStorePage from '../TrustStorePage'
 const ROWS = [
   { id: 1, name: 'Bank Root', subject: 'CN=Bank Root,O=Bank', description: 'Chain of the bank client', purpose: 'root_ca',
     not_after: '2035-03-14T00:00:00Z', notes: 'Completes the imported chain', issuer: 'CN=Bank Root,O=Bank', serial_number: '0A0B',
-    key_type: 'RSA 4096', signature_algorithm: 'SHA256-RSA', fingerprint_sha256: 'AB:CD', certificate_pem: '-----BEGIN CERTIFICATE-----' },
+    key_type: 'RSA 4096', signature_algorithm: 'SHA256-RSA', fingerprint_sha256: 'abcd', certificate_pem: '-----BEGIN CERTIFICATE-----' },
   { id: 2, name: 'Old proxy', subject: 'CN=Old proxy', description: '', purpose: 'custom', not_after: '2020-09-01T00:00:00Z' },
 ]
 const renderPage = () => render(<MemoryRouter><TrustStorePage /></MemoryRouter>)
@@ -144,6 +144,29 @@ describe('Trust anchor dock', () => {
     expect(dock.querySelector('.code-preview')).toHaveTextContent('BEGIN CERTIFICATE')
     fireEvent.click(dock.querySelector('#truststore-delete'))
     await waitFor(() => expect(del).toHaveBeenCalledWith(1))
+  })
+
+  it('types the anchor facts: names long, serial and digests copyable in octets, what is missing in grey', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    const { container } = renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Bank Root' }))
+    const dock = await waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
+    const row = (term) => within(dock).getByText(term, { selector: 'dt' }).closest('.row')
+    expect(dock.querySelector('dl.props')).toBeNull()
+    expect(row('Subject')).toHaveClass('long')
+    expect(row('State').querySelector('dd.v .badge.good')).toHaveTextContent('Valid')
+    fireEvent.click(within(dock).getByRole('tab', { name: 'Details' }))
+    expect(row('Issuer')).toHaveClass('long')
+    expect(row('Serial Number').querySelector('.code-value.hex')).toHaveTextContent('0A:0B')
+    // A plain digest from the API is written in octets, as a certificate's, and copied so
+    const sha = row('SHA-256')
+    expect(sha.querySelector('.code-value.hex')).toHaveTextContent('AB:CD')
+    fireEvent.click(within(sha).getByRole('button'))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('AB:CD'))
+    expect(row('SHA-1').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(row('Added By').querySelector('dd.absent')).toHaveTextContent('—')
   })
 
   it('offers no deletion without delete:truststore', async () => {
