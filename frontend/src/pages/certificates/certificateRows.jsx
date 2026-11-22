@@ -49,7 +49,7 @@ export function certificateColumns(t) {
       } },
     { id: 'pair', label: t('certificates.hybrid.column'), kind: 'fit', priority: 3, defaultHidden: true, tone: 'muted', skeleton: { width: '40px' },
       cell: (r) => (r.related_certificate_id == null ? '—' : <span title={t(roleKey(r))}>{t('certificates.hybrid.linked')}</span>) },
-    { id: 'created', label: t('common.created'), sort: 'created', kind: 'fit', priority: 3, defaultHidden: true, tone: ['small', 'muted'], skeleton: { width: '70px' },
+    { id: 'created', label: t('certificates.creationColumn'), sort: 'created', kind: 'fit', priority: 3, defaultHidden: true, tone: ['small', 'muted'], skeleton: { width: '70px' },
       cell: (r) => formatDate(r.created_at, { time: false }) },
   ]
 }

@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ToolsDivider, AppliedFilters,
-  BatchBar, DataTable, TableFooter, EmptyBlock, NoMatch, AtelierDialog,
+  BatchBar, DataTable, TableFooter, EmptyBlock, NoMatch, AtelierDialog, useSortParam,
 } from '../components/atelier'
 import { useNotification } from '../contexts'
 import { systemService } from '../services'
@@ -49,8 +49,9 @@ function useSettled(value, delay = TYPING_PAUSE_MS) {
 
 const levelPill = (level) => (level ? <Pill label={level} tone={LEVEL_TONE[level]?.tone} icon={LEVEL_TONE[level]?.icon} /> : null)
 
-// The file's lines, newest first: the time shows its arrow, and nothing else sorts (T7)
+// The file's lines sort by their time only, the newest first by default, kept in the address (R6)
 const NEWEST_FIRST = { key: 'time', asc: false }
+const TIME_KEYS = ['time']
 
 export default function SystemLogsPage() {
   const { t, i18n } = useTranslation()
@@ -112,11 +113,12 @@ export default function SystemLogsPage() {
     return () => clearInterval(id)
   }, [follow, load])
 
-  // The server returns the tail oldest-first; reversed, the newest line comes first
-  const rows = useMemo(
-    () => (result?.lines || []).map((line, index) => ({ id: index, ...line })).reverse(),
-    [result],
-  )
+  // The server returns the tail oldest-first: the file's order is the time's, reversed for the newest first
+  const { sort, onSort } = useSortParam(NEWEST_FIRST, TIME_KEYS)
+  const rows = useMemo(() => {
+    const lines = (result?.lines || []).map((line, index) => ({ id: index, ...line }))
+    return sort.asc ? lines : lines.reverse()
+  }, [result, sort.asc])
 
   const sourceOptions = (result?.available_sources || ['app']).map((s) => ({ value: s, label: t(SOURCE_LABELS[s] || s) }))
   const componentOptions = [
@@ -265,7 +267,7 @@ export default function SystemLogsPage() {
 
       <DataTable kind="audit" scrollId="logs-scroll" recordsId="logs-records" label={t('logs.regionLabel')} caption={t('logs.caption')}
         columns={columns} rows={firstRead ? [] : rows} rowKey={(l) => l.id} rowLabel={(l) => `${l.ts || ''} ${l.message || ''}`.trim()}
-        loading={firstRead} empty={empty} card={card} selection={selection} sort={NEWEST_FIRST}
+        loading={firstRead} empty={empty} card={card} selection={selection} sort={sort} onSort={onSort}
         footer={result && <TableFooter range={t('logs.range', { count: rows.length })} note={footNote} />} />
     </Zone>
   )
