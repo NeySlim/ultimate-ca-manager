@@ -51,8 +51,9 @@
 /* The live connection's error tone, beside the mockup's good and warn tones of the bar's state links */
 :root .statusbar .ha-link.bad { color: var(--bad); }
 
-/* Aurore family, the mockup's body rules: a drifting glow behind the console, one layer (indigo, a touch of rose, cyan);
-   at each spot's peak text keeps 7:1 and muted text 4.5:1 (atelierContrast.test.js) */
+/* Aurore family, the mockup's body rules: a drifting aurora behind the console, one layer: a band along the top
+   (indigo, cyan, rose) and one down the right edge, sized in percent of the layer; at its worst point text keeps
+   7:1 and muted text 4.5:1, bare or through the glass surfaces (atelierContrast.test.js) */
 :root[data-theme="aurore"] body { isolation: isolate; }
 :root[data-theme="aurore"] body::before {
   content: '';
@@ -61,17 +62,19 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 40%, transparent), transparent 60%),
-    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
-    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
+    radial-gradient(38% 32% at 22% 14%, color-mix(in srgb, var(--grad-a) 40%, transparent), transparent 80%),
+    radial-gradient(32% 28% at 50% 12%, var(--glow-b), transparent 80%),
+    radial-gradient(30% 32% at 80% 14%, var(--glow-rose), transparent 80%),
+    radial-gradient(16% 46% at 92% 58%, color-mix(in srgb, var(--grad-a) 40%, transparent), transparent 85%);
   animation: shell-aurore-drift 90s ease-in-out infinite alternate;
   will-change: transform;
 }
 :root[data-theme="aurore"][data-mode="light"] body::before {
   background:
-    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 20%, transparent), transparent 60%),
-    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
-    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
+    radial-gradient(38% 32% at 22% 14%, color-mix(in srgb, var(--grad-a) 20%, transparent), transparent 80%),
+    radial-gradient(32% 28% at 50% 12%, var(--glow-b), transparent 80%),
+    radial-gradient(30% 32% at 80% 14%, var(--glow-rose), transparent 80%),
+    radial-gradient(16% 46% at 92% 58%, color-mix(in srgb, var(--grad-a) 20%, transparent), transparent 85%);
 }
 @keyframes shell-aurore-drift {
   from { transform: translate3d(-2%, -1.5%, 0) scale(1); }

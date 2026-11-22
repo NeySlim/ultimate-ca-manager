@@ -10,6 +10,8 @@ import fs from 'fs'
 import path from 'path'
 import { parseRules, splitSelectors, declarations } from './atelierCopy'
 import { GROUPS } from '../../navigation/registry'
+import { parseTokens, contrast } from '../../lib/__tests__/themeTokensParser'
+import { glowSpots, glowAt, viewportToLayer, hex } from './auroreGlow'
 
 const read = (file) => fs.readFileSync(path.resolve(__dirname, file), 'utf8')
 const ADJUST = parseRules(read('../atelier/adjust.css'))
@@ -28,12 +30,22 @@ function applies(sel, family, mode) {
   const m = quals.match(/\[data-mode="(\w+)"\]/)
   return !m || m[1] === mode
 }
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
 const rulesFor = (family, mode, rules = ADJUST) => rules.flatMap((r) => splitSelectors(r.sel)
   .filter((s) => applies(s, family, mode)).map((sel) => ({ sel, decls: declarations(r.body), media: r.media })))
 const matching = (family, mode, re) => rulesFor(family, mode).filter((r) => re.test(r.sel))
 // The value a property ends with across the matching rules, in source order (one specificity per test)
 const value = (rules, prop) => rules.flatMap((r) => r.decls).filter(([p]) => p === prop).map(([, v]) => v).pop()
 const GRADIENT = 'linear-gradient(90deg,var(--grad-a),var(--grad-b))'
+const TOKENS = parseTokens()
+// Hue in degrees of an rgb colour
+function hue([r, g, b]) {
+  const max = Math.max(r, g, b)
+  const d = max - Math.min(r, g, b)
+  if (!d) return 0
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return (h * 60 + 360) % 360
+}
 
 describe('Aurore set apart from Atelier', () => {
   for (const [family, mode] of PALETTES) {
@@ -43,9 +55,10 @@ describe('Aurore set apart from Atelier', () => {
         const tab = matching(family, mode, /\.view-btn\.active$/)
         if (!aurore) return expect(tab).toEqual([])
         expect(value(tab, 'border-bottom-color')).toBe('transparent')
-        // border-box: the gradient takes the 2 px of the transparent border, where the accent rule was drawn
-        expect(value(tab, 'background')).toBe(`${GRADIENT} left bottom/100% 2px no-repeat border-box`)
-        expect(value(tab, 'box-shadow')).toBe(mode === 'dark' ? '0 10px 14px -12px var(--grad-b)' : 'none')
+        // border-box: a 3 px gradient over the 2 px of the transparent border and one of the padding, a reflection above it
+        expect(value(tab, 'background')).toMatch(new RegExp(`^${esc(GRADIENT)} left bottom/100% 3px no-repeat border-box,linear-gradient\\(0deg,color-mix\\(in srgb,var\\(--grad-[ab]\\) \\d+%,transparent\\),transparent \\d+px\\) border-box$`))
+        if (mode === 'dark') expect(value(tab, 'box-shadow')).toMatch(/var\(--grad-b\)$/)
+        else expect(value(tab, 'box-shadow')).toBe('none')
       })
 
       it(aurore ? 'underlines the sorted column with the gradient, over the header\'s raised ground' : 'leaves the sorted column to its weight and colour', () => {
@@ -53,7 +66,7 @@ describe('Aurore set apart from Atelier', () => {
           .filter((r) => r.decls.some(([p]) => p.startsWith('background')))
         if (!aurore) return expect(sorted).toEqual([])
         expect(value(sorted, 'background-image')).toBe(GRADIENT)
-        expect(value(sorted, 'background-size')).toBe('100% 2px')
+        expect(value(sorted, 'background-size')).toBe('100% 3px')
         expect(value(sorted, 'background-position')).toBe('left bottom')
         expect(value(sorted, 'background-repeat')).toBe('no-repeat')
         // the colour stays the header's: the raised ground of the row shows through
@@ -65,9 +78,23 @@ describe('Aurore set apart from Atelier', () => {
         const row = matching(family, mode, /\.work-row\.opened$/)
         if (!aurore) return expect(row).toEqual([])
         expect(value(row, 'box-shadow')).toBe('none')
-        expect(value(row, 'background')).toBe('linear-gradient(180deg,var(--grad-a),var(--grad-b)) left/2px 100% no-repeat,var(--selected)')
-        // the open table row's edge is the mockup's own (maquette.css)
-        expect(MAQUETTE.some((r) => /tbody tr\.opened td:first-child:before$/.test(r.sel) && r.body.includes('linear-gradient(180deg,var(--grad-a),var(--grad-b))'))).toBe(true)
+        // a 3 px edge over the open table row's tint (the accent fading into the selection)
+        const tint = value(matching(family, mode, /tbody tr\.opened$/), 'background')
+        expect(tint).toMatch(/^linear-gradient\(90deg,color-mix\(in srgb,var\(--grad-a\) \d+%,var\(--selected\)\),var\(--selected\) \d+%\)$/)
+        expect(value(row, 'background')).toBe(`linear-gradient(180deg,var(--grad-a),var(--grad-b)) left/3px 100% no-repeat,${tint}`)
+        const edge = matching(family, mode, /tbody tr\.opened td:first-child:before$/)
+        expect(value(edge, 'width')).toBe('3px')
+      })
+
+      it(aurore ? 'underlines the inspector\'s tab and tops the dock\'s tab with a 3 px gradient' : 'keeps the accent rules of the inspector and the dock', () => {
+        const tabs = matching(family, mode, /\.detail-tabs button\[aria-selected=true\]$/)
+        const dock = matching(family, mode, /\.open-tab\.active$/)
+        const bar = matching(family, mode, /\.main-nav \.active:after$/)
+        if (!aurore) return expect([...tabs, ...dock, ...bar]).toEqual([])
+        expect(value(tabs, 'background')).toMatch(new RegExp(`^${esc(GRADIENT)} left bottom/100% 3px no-repeat`))
+        expect(value(dock, 'background')).toMatch(new RegExp(`^${esc(GRADIENT)} left top/100% 3px no-repeat`))
+        expect(value(bar, 'height')).toBe('3px')
+        expect(value(bar, 'background')).toBe(GRADIENT)
       })
 
       it(aurore ? 'adds a --glow to the focus ring and keeps the outline' : 'draws the focus ring without a glow', () => {
@@ -148,5 +175,61 @@ describe('Aurore set apart from Atelier', () => {
     expect(SHELL.some((r) => /body::after/.test(r.sel))).toBe(false)
     for (const r of ADJUST) expect(r.body, r.sel).not.toMatch(/backdrop-filter|radial-gradient/)
     expect(SHELL.some((r) => /prefers-reduced-transparency:\s*reduce/.test(r.media) && r.sel.includes('body::before') && /display:\s*none/.test(r.body))).toBe(true)
+  })
+
+  it('spreads an aurora along the top of the page and down its right edge, indigo to cyan to rose', () => {
+    for (const mode of ['dark', 'light']) {
+      const t = TOKENS[`aurore-${mode}`]
+      const spots = glowSpots(t, mode)
+      const toLayer = viewportToLayer(mode)
+      const at = (x, y) => glowAt(spots, t.bg, toLayer(x), toLayer(y))
+      const lift = (c) => contrast(hex(c), t.bg)
+      // the band, just under the bar, from one side of the window to the other
+      const min = mode === 'dark' ? 1.15 : 1.08
+      for (let x = 5; x <= 95; x += 5) expect(lift(at(x, 10)), `${mode} band at ${x}%`).toBeGreaterThanOrEqual(min)
+      // its hues: indigo on the left, cyan in the middle, rose or violet on the right
+      expect(hue(at(10, 8)), `${mode} left`).toBeGreaterThanOrEqual(220)
+      expect(hue(at(10, 8)), `${mode} left`).toBeLessThanOrEqual(245)
+      expect(hue(at(45, 8)), `${mode} middle`).toBeLessThanOrEqual(215)
+      expect(hue(at(88, 8)), `${mode} right`).toBeGreaterThanOrEqual(260)
+      // the edge, down the right side
+      for (let y = 45; y <= 70; y += 5) expect(lift(at(98, y)), `${mode} edge at ${y}%`).toBeGreaterThanOrEqual(mode === 'dark' ? 1.12 : 1.07)
+      // and the page stays the page at its centre
+      expect(lift(at(45, 70)), `${mode} centre`).toBeLessThan(1.05)
+    }
+  })
+
+  it('lays its surfaces in a tinted glass that lets the aurora through, with a coloured shadow and no filter', () => {
+    for (const mode of ['dark', 'light']) {
+      const surfaces = rulesFor('aurore', mode).filter((r) => /:is\(\.panel,\.table-container,\.inspector,\.tile,\.hier-card,\.ca-card\)/.test(r.sel) && !/:hover$/.test(r.sel))
+      const surf = value(surfaces, '--surf')
+      const alpha = Number(surf.match(/^color-mix\(in srgb,var\(--panel\) (\d+)%,transparent\)$/)[1])
+      expect(alpha, mode).toBeGreaterThanOrEqual(60)
+      expect(alpha, mode).toBeLessThanOrEqual(85)
+      expect(value(surfaces, 'background'), mode).toMatch(/var\(--surf\) padding-box$/)
+      expect(value(surfaces, 'box-shadow'), mode).toMatch(/color-mix\(in srgb,var\(--grad-a\) \d+%,transparent\)/)
+      // the inspector covers the page on a phone: opaque there
+      const phone = rulesFor('aurore', mode).filter((r) => /max-width:\s*800px/.test(r.media) && /\.inspector/.test(r.sel))
+      expect(value(phone, '--surf'), mode).toBe('var(--panel)')
+    }
+  })
+
+  it('draws the bars\' edge in a full gradient that glows', () => {
+    const edge = rulesFor('aurore', 'dark').filter((r) => /:is\(\.masthead,\.statusbar\):after$/.test(r.sel))
+    const bg = value(edge, 'background')
+    for (const token of ['--grad-a', '--grad-b', '--fam-governance']) expect(bg).toContain(`var(${token})`)
+    expect(value(edge, 'box-shadow')).toMatch(/^0 0 \d+px/)
+  })
+
+  it('turns only the plain key figures to the accent and cyan, a warning, failure or success figure keeps its tone', () => {
+    const plain = rulesFor('aurore', 'dark').filter((r) => r.decls.some(([p]) => p === '--fig-b') && !/\.value\.(warn|bad|good)|\.tile-value\.(warn|bad|good)|strong\.warn/.test(r.sel))
+    expect(value(plain, '--fig-b')).toBe('var(--fam-protocols)')
+    // the stylesheets of the zones may load before or after this one: the rule excludes the tones instead of ranking below them
+    for (const r of plain) expect(r.sel, r.sel).toMatch(/:not\(\.warn,\.bad,\.good\):not\(\.tile-value:is\(\.warn,\.bad,\.good\) \*\)$/)
+  })
+
+  it('draws the health sparkline even though the product defines no #paint-neutral gradient', () => {
+    const line = rulesFor('aurore', 'dark').filter((r) => /\.spark-line/.test(r.sel))
+    expect(value(line, 'stroke')).toMatch(/^url\(#paint-neutral\) var\(--[a-z-]+\)$/)
   })
 })

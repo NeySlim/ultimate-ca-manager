@@ -142,12 +142,12 @@
 :root:not([data-theme|=aurore]) .atl .badge.good{background-color:var(--goodbg)}
 :root:not([data-theme|=aurore]) .atl .badge.warn{background-color:var(--warnbg)}
 :root:not([data-theme|=aurore]) .atl .badge.bad{background-color:var(--badbg)}
-/* Aurore: the gradient under the active page or protocol tab, in the 2 px of its transparent border (border-box). */
-:root[data-theme|=aurore] .atl .view-btn.active{border-bottom-color:transparent;background:linear-gradient(90deg,var(--grad-a),var(--grad-b)) left bottom/100% 2px no-repeat border-box;box-shadow:0 10px 14px -12px var(--grad-b)}
+/* Aurore: a 3 px gradient under the active page or protocol tab (its 2 px transparent border and 1 px of padding), a reflection above. */
+:root[data-theme|=aurore] .atl .view-btn.active{border-bottom-color:transparent;background:linear-gradient(90deg,var(--grad-a),var(--grad-b)) left bottom/100% 3px no-repeat border-box,linear-gradient(0deg,color-mix(in srgb,var(--grad-a) 16%,transparent),transparent 14px) border-box;box-shadow:0 10px 16px -10px var(--grad-b)}
 /* Aurore: the gradient under the sorted column's header, over the header row's raised ground and rule. */
-:root[data-theme|=aurore] .atl .table-container th:is([aria-sort=ascending],[aria-sort=descending]){background-image:linear-gradient(90deg,var(--grad-a),var(--grad-b));background-size:100% 2px;background-position:left bottom;background-repeat:no-repeat;background-origin:border-box}
-/* Aurore: the open work row edged with the gradient, as the open table row (maquette.css). */
-:root[data-theme|=aurore] .atl .work-row.opened{box-shadow:none;background:linear-gradient(180deg,var(--grad-a),var(--grad-b)) left/2px 100% no-repeat,var(--selected)}
+:root[data-theme|=aurore] .atl .table-container th:is([aria-sort=ascending],[aria-sort=descending]){background-image:linear-gradient(90deg,var(--grad-a),var(--grad-b));background-size:100% 3px;background-position:left bottom;background-repeat:no-repeat;background-origin:border-box}
+/* Aurore: the open work row edged and tinted as the open table row (below). */
+:root[data-theme|=aurore] .atl .work-row.opened{box-shadow:none;background:linear-gradient(180deg,var(--grad-a),var(--grad-b)) left/3px 100% no-repeat,linear-gradient(90deg,color-mix(in srgb,var(--grad-a) 12%,var(--selected)),var(--selected) 70%)}
 /* Aurore: the focus ring keeps its outline and halo and gains a glow; a field in error keeps its red ring. */
 :root[data-theme|=aurore] .atl :focus-visible:not([aria-invalid=true]){box-shadow:0 0 0 5px var(--halo),0 0 18px 2px var(--glow)}
 /* Aurore: the module icons tinted by family (data-family) in the bar, the Modules menu and the palette, 3:1 on every ground. */
@@ -161,3 +161,47 @@
 /* Aurore clair: no glow under the active tab, a smaller one around the focus ring. */
 :root[data-theme="aurore"][data-mode="light"] .atl .view-btn.active{box-shadow:none}
 :root[data-theme="aurore"][data-mode="light"] .atl :focus-visible:not([aria-invalid=true]){box-shadow:0 0 0 4px var(--halo),0 0 10px 1px var(--glow)}
+
+/* Aurore made plain at a glance: these rules amend the mockup's Aurore block, which loads after this sheet, so their root
+   carries [data-mode][data-theme] (one attribute more than its light rules); no box moves (e2e/theme-geometry.spec.ts). */
+/* Glass surfaces: the panels, the table and the dock let the aurora through (no backdrop filter, they repeat); text 7:1 and
+   muted text 4.5:1 over the worst point of the glow (atelierContrast.test.js); a bright edge, a coloured shadow. */
+:root[data-theme|=aurore][data-mode][data-theme] .atl :is(.panel,.table-container,.inspector,.tile,.hier-card,.ca-card):not(.state-revoked):not(.active){--surf:color-mix(in srgb,var(--panel) 66%,transparent);border-color:color-mix(in srgb,var(--grad-a) 62%,transparent) color-mix(in srgb,var(--grad-b) 40%,transparent) color-mix(in srgb,var(--grad-b) 26%,transparent) color-mix(in srgb,var(--grad-a) 46%,transparent);background:var(--surf) padding-box;box-shadow:inset 0 1px 0 color-mix(in srgb,var(--grad-b) 28%,transparent),0 22px 48px -30px var(--frame-shade),0 16px 40px -26px color-mix(in srgb,var(--grad-a) 50%,transparent)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl :is(a.tile,.hier-card,.ca-card,.dash-card):not(.state-revoked):not(.active):hover{--surf:color-mix(in srgb,var(--hover) 80%,transparent);border-color:color-mix(in srgb,var(--grad-a) 85%,transparent) color-mix(in srgb,var(--grad-b) 60%,transparent) color-mix(in srgb,var(--grad-b) 40%,transparent) color-mix(in srgb,var(--grad-a) 65%,transparent)}
+/* The inspector covers the page on a phone: opaque there. */
+@media(max-width:800px){:root[data-theme|=aurore][data-mode][data-theme] .atl .inspector:not(.state-revoked):not(.active){--surf:var(--panel)}}
+/* The bars: a lighter glass over the band of light, edged with the full gradient, which glows. */
+:root[data-theme|=aurore][data-mode][data-theme] .atl :is(.masthead,.statusbar):before{background:color-mix(in srgb,var(--bg) 52%,transparent)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl :is(.masthead,.statusbar):after{background:linear-gradient(90deg,transparent,var(--grad-a) 12%,var(--grad-b) 50%,var(--fam-governance) 88%,transparent);box-shadow:0 0 10px color-mix(in srgb,var(--grad-b) 55%,transparent)}
+/* Tabs: 3 px gradients with a reflection, on the inspector's tabs, the dock's open tab and the page link of the bar. */
+:root[data-theme|=aurore][data-mode][data-theme] .atl .detail-tabs button[aria-selected=true]{background:linear-gradient(90deg,var(--grad-a),var(--grad-b)) left bottom/100% 3px no-repeat border-box,linear-gradient(0deg,color-mix(in srgb,var(--grad-a) 14%,transparent),transparent 12px) border-box}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .open-tab.active{background:linear-gradient(90deg,var(--grad-a),var(--grad-b)) left top/100% 3px no-repeat,linear-gradient(180deg,color-mix(in srgb,var(--grad-a) 14%,transparent),transparent 14px),var(--panel)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .main-nav .active:after{height:3px;background:linear-gradient(90deg,var(--grad-a),var(--grad-b));box-shadow:0 0 12px color-mix(in srgb,var(--grad-b) 60%,transparent)}
+/* Rows: hovered and open rows tinted from the accent; the open row's edge 3 px wide and glowing. */
+:root[data-theme|=aurore][data-mode][data-theme] .atl tbody tr:not(.opened):not(.checked):hover,:root[data-theme|=aurore][data-mode][data-theme] .atl .queue-row:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--grad-a) 20%,transparent),transparent 70%)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl tbody tr.opened{background:linear-gradient(90deg,color-mix(in srgb,var(--grad-a) 12%,var(--selected)),var(--selected) 70%)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl tbody tr.opened td:first-child:before{width:3px;box-shadow:0 0 10px color-mix(in srgb,var(--grad-a) 70%,transparent)}
+/* The primary button: a reflection on its upper half when hovered, a brighter coloured glow (the focus ring keeps its own). */
+:root[data-theme|=aurore][data-mode][data-theme] .atl .btn.primary:hover:not(:disabled){background:linear-gradient(180deg,color-mix(in srgb,var(--paper) 16%,transparent),transparent 45%),linear-gradient(135deg,var(--grad-a),var(--grad-b))}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .btn.primary:not(:focus-visible){box-shadow:inset 0 1px 0 color-mix(in srgb,var(--paper) 30%,transparent),0 0 0 1px var(--glow),0 8px 24px -8px var(--glow)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .btn.primary:hover:not(:disabled):not(:focus-visible){box-shadow:inset 0 1px 0 color-mix(in srgb,var(--paper) 45%,transparent),0 0 0 1px var(--glow),0 10px 30px -6px var(--grad-a)}
+/* Pills and counters in frank colours with a slight glow; the tab counters keep the page's ground under their tint. */
+:root[data-theme|=aurore][data-mode][data-theme] .atl :is(.chip:not(.filter-chip),.badge,.counter,.queue-kind){background:color-mix(in srgb,currentColor 20%,transparent);border-color:color-mix(in srgb,currentColor 55%,transparent);box-shadow:0 0 10px -3px color-mix(in srgb,currentColor 55%,transparent)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .views .counter{background:color-mix(in srgb,currentColor 20%,var(--bg))}
+/* The brand word and the avatar in the gradient (the word 3:1 as large text over the bar's glass). */
+:root[data-theme|=aurore][data-mode][data-theme] .atl .brand strong{color:var(--accent);background:linear-gradient(90deg,var(--accent),var(--fam-protocols),var(--fam-governance));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .avatar{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));border-color:transparent;color:var(--on-accent)}
+/* Data: plain key figures from the accent to cyan (dark; the light ground keeps the mockup's; a toned figure keeps its tone
+   whatever the order the sheets load in), the horizon's fills and the
+   sparkline glowing; the product draws no #paint-neutral gradient, so the sparkline falls back on --grad-b. */
+:root[data-theme|=aurore][data-mode="dark"] .atl :is(.metric .value,.tile-value strong,.validity-head strong):not(.warn,.bad,.good):not(.tile-value:is(.warn,.bad,.good) *){--fig-a:var(--accent);--fig-b:var(--fam-protocols)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl :is(.horizon-seg.auto,.swatch.auto){background-image:linear-gradient(90deg,var(--grad-a),var(--grad-b))}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .horizon-seg{box-shadow:0 0 8px -2px color-mix(in srgb,var(--grad-b) 60%,transparent)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl :is(.spark-line,.spark-dot:not(.last)){stroke:url(#paint-neutral) var(--grad-b)}
+:root[data-theme|=aurore][data-mode][data-theme] .atl .spark{filter:drop-shadow(0 0 4px color-mix(in srgb,var(--grad-b) 50%,transparent))}
+/* Aurore clair: the same in pastel, softer edges, a whiter glass on the bars. */
+:root[data-theme|=aurore][data-mode="light"][data-theme] .atl :is(.panel,.table-container,.inspector,.tile,.hier-card,.ca-card):not(.state-revoked):not(.active){border-color:color-mix(in srgb,var(--grad-a) 42%,transparent) color-mix(in srgb,var(--grad-b) 30%,transparent) color-mix(in srgb,var(--grad-b) 20%,transparent) color-mix(in srgb,var(--grad-a) 32%,transparent)}
+:root[data-theme|=aurore][data-mode="light"][data-theme] .atl :is(.masthead,.statusbar):before{background:color-mix(in srgb,var(--panel) 58%,transparent)}
+:root[data-theme|=aurore][data-mode="light"][data-theme] .atl tbody tr:not(.opened):not(.checked):hover,:root[data-theme|=aurore][data-mode="light"][data-theme] .atl .queue-row:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--grad-a) 12%,transparent),transparent 70%)}
+:root[data-theme|=aurore][data-mode="light"][data-theme] .atl :is(.chip:not(.filter-chip),.badge,.counter,.queue-kind){background:color-mix(in srgb,currentColor 14%,transparent)}
+:root[data-theme|=aurore][data-mode="light"][data-theme] .atl .views .counter{background:color-mix(in srgb,currentColor 14%,var(--bg))}
