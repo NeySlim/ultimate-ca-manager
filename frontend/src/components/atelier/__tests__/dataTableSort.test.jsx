@@ -56,6 +56,13 @@ describe('the headers', () => {
     expect(sep).not.toHaveAttribute('role')
   })
 
+  it('no separator before a column of buttons at the end: the last labelled column closes the row (M4)', () => {
+    const run = { id: 'run', label: <span className="sr-only">Actions</span>, kind: 'fit', priority: 1, cell: () => 'x' }
+    const { container } = render(<DataTable columns={[...columns, run]} rows={rows} columnWidths={{}} onColumnWidth={() => {}} />)
+    expect([...container.querySelectorAll('thead th')].map((th) => th.querySelectorAll(':scope > .col-sep').length)).toEqual([1, 1, 1, 0, 0])
+    expect(container.querySelectorAll('thead th')[4].querySelector('[role=separator]')).toBeNull()
+  })
+
   it('in a list whose widths are set by hand, the grip is the separator', () => {
     const { container } = render(<DataTable columns={columns} rows={rows} columnWidths={{}} onColumnWidth={() => {}} />)
     const grips = [...container.querySelectorAll('thead th > .col-resize')]
@@ -224,6 +231,13 @@ describe('on a phone', () => {
     expect(document.querySelectorAll('article.mobile-record')).toHaveLength(2)
   })
 
+  it('the toolbar names the columns by their whole label, the headers\' short one aside (E6)', () => {
+    const cols = columns.map((c) => (c.id === 'certs' ? { ...c, label: 'Certs', labelFull: 'Certificats émis' } : c))
+    render(<DataTable columns={cols} rows={rows} card={card} sort={DEFAULT} onSort={() => {}} />)
+    expect([...screen.getByRole('combobox', { name: 'table.sortBy' }).options].map((o) => o.textContent)).toEqual([
+      'table.sortByColumn {"column":"Nom"}', 'table.sortByColumn {"column":"Émetteur"}', 'table.sortByColumn {"column":"Certificats émis"}'])
+  })
+
   it('a list that does not sort has no such toolbar', () => {
     render(<DataTable columns={columns.map(({ sort: _sort, ...c }) => c)} rows={rows} card={card} />)
     expect(screen.queryByRole('combobox')).toBeNull()
@@ -241,6 +255,10 @@ describe('on a phone', () => {
     const facts = cardFacts(cols, {})
     const { container } = render(<div>{facts.map((f, i) => <span key={i}>{f}</span>)}</div>)
     expect([...container.querySelectorAll('div > span')].map((s) => s.textContent)).toEqual(['Prochaine mise à jour 26 nov. 2026', 'n° 9', 'Publiée 19 nov. 2026'])
+    // A short header's whole label names the fact (E6)
+    const short = cardFacts(cols.map((c) => (c.id === 'next' ? { ...c, label: 'Échéance' , labelFull: 'Prochaine mise à jour' } : c)), {})
+    const { container: other } = render(<div>{short.map((f, i) => <span key={i}>{f}</span>)}</div>)
+    expect(other.querySelector('.fact-label')).toHaveTextContent('Prochaine mise à jour')
     // The column's name in its own span, muted beside its value (G9)
     expect([...container.querySelectorAll('.fact-label')].map((s) => s.textContent)).toEqual(['Prochaine mise à jour', 'Publiée'])
   })

@@ -216,6 +216,50 @@ describe('the column handles (C2)', () => {
     expect(onWidth).not.toHaveBeenCalled()
   })
 
+  it('the handle\'s zone straddles the line: its other half, in the next header, drags and resets the same column and never sorts (E1)', () => {
+    const onWidth = vi.fn()
+    const onSort = vi.fn()
+    const { container } = render(<DataTable columns={columns} rows={rows} selection={sel([])} onOpen={() => {}} sort={{ key: 'name', asc: true }} onSort={onSort}
+      columnWidths={{ ca: 180 }} onColumnWidth={onWidth} />)
+    const lead = (i) => head(container, i).querySelector(':scope > .col-resize-lead')
+    // None in the checkbox's header nor in the first data header; then one after each handle, the actions' header included
+    expect([0, 1, 2, 3, 4].map((i) => Boolean(lead(i)))).toEqual([false, false, true, true, true])
+    expect(lead(2)).toHaveAttribute('aria-hidden', 'true')
+    expect(lead(2)).not.toHaveAttribute('tabindex')
+    // Pressed right of the name's line, in the description's header: the description's sort is not touched, the name widens
+    fireEvent.pointerDown(lead(2), { clientX: 100, button: 0 })
+    fireEvent.pointerMove(window, { clientX: 400 })
+    expect(head(container, 1).style.width).toBe('364px')
+    expect(grip(container, 1)).toHaveClass('dragging')
+    fireEvent.pointerUp(window)
+    fireEvent.click(lead(2))
+    expect(onWidth).toHaveBeenCalledWith('name', 364)
+    expect(onSort).not.toHaveBeenCalled()
+    // A double click there puts the column before it back to automatic
+    fireEvent.doubleClick(lead(4))
+    expect(onWidth).toHaveBeenLastCalledWith('ca', null)
+  })
+
+  it('a gesture that ends on the automatic width sets nothing: no width kept, no Réinitialiser les colonnes (E8)', () => {
+    const onWidth = vi.fn()
+    const { container } = render(<DataTable columns={columns} rows={rows} columnWidths={{}} onColumnWidth={onWidth} />)
+    // A column at its narrowest pushed further left, by the pointer then by the keyboard
+    fireEvent.pointerDown(grip(container, 2), { clientX: 100, button: 0 })
+    fireEvent.pointerMove(window, { clientX: 40 })
+    fireEvent.pointerUp(window)
+    const g = grip(container, 2)
+    fireEvent.keyDown(g, { key: 'ArrowLeft' })
+    fireEvent.keyDown(g, { key: 'Enter' })
+    fireEvent.keyDown(g, { key: 'Home' })
+    fireEvent.blur(g)
+    expect(onWidth).not.toHaveBeenCalled()
+    expect(container.querySelector('[data-action=reset-columns]')).toBeNull()
+    // A real change is kept
+    fireEvent.keyDown(g, { key: 'ArrowRight' })
+    fireEvent.keyDown(g, { key: 'Enter' })
+    expect(onWidth).toHaveBeenCalledWith('ca', 80)
+  })
+
   it('answers the keyboard: arrows by 16 px, Shift by 64, Escape cancels, Enter keeps, Delete goes back to automatic', () => {
     const onWidth = vi.fn()
     const { container } = render(<DataTable columns={columns} rows={rows} columnWidths={{ ca: 180 }} onColumnWidth={onWidth} />)
@@ -382,11 +426,14 @@ describe('the list section', () => {
     view()
     expect(screen.getByRole('columnheader', { name: 'Conformité' })).toBeInTheDocument()
   })
-  it('Réinitialiser les colonnes in the Colonnes dialog clears the widths and the hidden columns; not in the footer', async () => {
+  it('Réinitialiser les colonnes: in the footer the widths (E7), in the Colonnes dialog the widths and the hidden columns', async () => {
     localStorage.setItem('t-list-widths', JSON.stringify({ ca: 222 }))
     localStorage.setItem('t-list-columns', JSON.stringify({ hidden: ['description'] }))
     const { container } = view({ footer: <TableFooter range="1–2 sur 2" /> })
     expect(screen.getByRole('columnheader', { name: 'Émetteur' }).style.width).toBe('222px')
+    expect(screen.queryByRole('columnheader', { name: 'Description' })).toBeNull()
+    fireEvent.click(container.querySelector('.table-footer [data-action=reset-columns]'))
+    expect(screen.getByRole('columnheader', { name: 'Émetteur' }).style.width).toBe('')
     expect(screen.queryByRole('columnheader', { name: 'Description' })).toBeNull()
     expect(container.querySelector('.table-footer [data-action=reset-columns]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'table.columns' }))

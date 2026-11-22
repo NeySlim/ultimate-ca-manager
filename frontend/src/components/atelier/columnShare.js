@@ -63,8 +63,9 @@ export function foldOrder(columns, sortKey) {
 
 /**
  * One state of the list (these columns shown) at one level of floors, the need first (R1, R2): every column starts at
- * its natural width, no ceiling; short of room the growing text gives way down to its floor, then the name and the
- * texts together, in proportion to what each has above its comfort floor; at the 'hard' level, then above its hard floor.
+ * its natural width, no ceiling; short of room the growing text gives way first, down to its comfort floor (its hard
+ * floor at the 'hard' level, R8), then the name and the texts together, in proportion to what each has above its
+ * comfort floor; at the 'hard' level, then above its hard floor.
  */
 function share(shown, measures, room, level, wide, fixed = {}) {
   // A column set by hand does not absorb while another can: the growing one, else the name
@@ -84,7 +85,8 @@ function share(shown, measures, room, level, wide, fixed = {}) {
     } else if (kind === 'text') {
       // A text never grows to reach a floor: a short one keeps its own width
       hard = Math.min(natural, Math.max(c.id === absorber ? BOUNDS.growMin : BOUNDS.textMin, header))
-      comfort = c.id === absorber ? hard : Math.max(hard, Math.min(natural, BOUNDS.textComfort))
+      // The growing text keeps the comfort of any text while a column of priority 3 or 4 can fold (R8)
+      comfort = Math.max(hard, Math.min(natural, BOUNDS.textComfort))
     }
     span[c.id] = { natural, need, hard, comfort, kind }
     // A width set by hand is a fixed need, never under the column's hard floor (C2)
@@ -97,7 +99,7 @@ function share(shown, measures, room, level, wide, fixed = {}) {
   let over = Object.values(widths).reduce((a, b) => a + b, 0) - room
   const growText = shown.find((c) => c.id === absorber && span[c.id].kind === 'text')
   if (over > 0 && growText) {
-    const take = Math.min(over, widths[growText.id] - span[growText.id].hard)
+    const take = Math.max(0, Math.min(over, widths[growText.id] - span[growText.id][level === 'hard' ? 'hard' : 'comfort']))
     widths[growText.id] -= take
     over -= take
   }

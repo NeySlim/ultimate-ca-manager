@@ -14,17 +14,22 @@ import { FoldedColumns, ColumnsReset } from './foldedColumns'
  * @param {{page, pages, perPage, sizes, onPage, onPerPage, perPageLabel, jump}} [pagination]
  */
 export function TableFooter({ range, note, pagination }) {
-  const { t } = useTranslation()
-  // The columns the list folded for want of room: their number after the range, their names in its title (R3)
-  const folded = useContext(FoldedColumns)
   return (
     <footer className="table-footer">
       <span id={pagination?.jump ? 'page-range' : undefined}>{range}</span>
-      {folded && <span className="folded-note" title={folded.join(', ')}>{t('table.foldedColumns', { count: folded.length })}</span>}
+      <FoldedNote />
       <ResetColumns />
       {pagination ? <PageControls {...pagination} /> : note !== undefined && <span>{note}</span>}
     </footer>
   )
+}
+
+/** The columns the list folded for want of room: their number, their whole names in its title (R3, E6). */
+export function FoldedNote() {
+  const { t } = useTranslation()
+  const folded = useContext(FoldedColumns)
+  if (!folded) return null
+  return <span className="folded-note" title={folded.join(', ')}>{t('table.foldedColumns', { count: folded.length })}</span>
 }
 
 /** The widths set by hand back to automatic, offered by the list while one is set (DataTable, C2). */
