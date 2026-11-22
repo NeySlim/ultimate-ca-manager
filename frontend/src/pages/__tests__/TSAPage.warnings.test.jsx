@@ -128,7 +128,7 @@ describe('TSAPage warnings and stats', () => {
   it('shows the total the stats API returns in the service detail', async () => {
     config.current = DEDICATED
     render(<MemoryRouter><TSAPage /></MemoryRouter>)
-    fireEvent.click(await screen.findByText('tsa.serviceName', { selector: '.entity-name' }))
+    fireEvent.click(await screen.findByText('tsa.serviceName', { selector: '.entity-name .entity-label' }))
     expect(await screen.findByText('tsa.summaryTotals:17')).toBeInTheDocument()
   })
 })

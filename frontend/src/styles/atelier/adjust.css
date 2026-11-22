@@ -11,6 +11,15 @@
    at 320 px, a shared one takes its share and no more. */
 :root .ui-table :is(th,td).fit{max-width:320px}
 :root .ui-table :is(th,td).share{max-width:0}
+/* In a list, free text short of room ends in an ellipsis, its whole text in a title (DataTable): a cell's text never
+   runs under its neighbour. The name keeps its marks (the key, the pair) beside it as it gives way. */
+:root .atl .table-container td.text-cell{overflow:hidden;text-overflow:ellipsis}
+:root .atl .table-container .entity-line{display:flex;align-items:center;min-width:0}
+:root .atl .table-container .entity-line>.entity-name{min-width:0;flex:0 1 auto}
+:root .atl .table-container .entity-line>:not(.entity-name){flex-shrink:0}
+:root .atl .table-container .entity-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* A growing column's header keeps its whole label: the copied ceiling stays on its cells only. */
+:root .atl .table-container th.col-description{max-width:none}
 
 /* On a phone a row that opens a detail is a record (the mockup's mobile list): the whole record
    opens it, and its chevron stays on screen at the right, a 44 px target. */
