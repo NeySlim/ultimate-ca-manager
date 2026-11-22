@@ -41,9 +41,10 @@ class QueryMixin:
         return {'total': len(certs), 'updated': updated}
 
     def get_all(self, limit: int = 200, offset: int = 0,
-                profile_id: int = None, status=None, search: str = None) -> Tuple[List[Dict], int]:
+                profile_id: int = None, status=None, search: str = None,
+                order_by=None) -> Tuple[List[Dict], int]:
         """Return discovered certificates with pagination. Returns (items, total).
-        status can be str or list[str] for multi-select.
+        status can be str or list[str] for multi-select; *order_by* defaults to last seen first.
         """
         query = DiscoveredCertificate.query
         if profile_id:
@@ -63,8 +64,8 @@ class QueryMixin:
                 DiscoveredCertificate.serial_number.ilike(pattern, escape='\\'),
             ))
         total = query.count()
-        rows = query.order_by(DiscoveredCertificate.last_seen.desc()
-                              ).offset(offset).limit(limit).all()
+        order_by = order_by or [DiscoveredCertificate.last_seen.desc(), DiscoveredCertificate.id.desc()]
+        rows = query.order_by(*order_by).offset(offset).limit(limit).all()
         return [r.to_dict() for r in rows], total
 
     def get_stats(self, profile_id: int = None) -> Dict:

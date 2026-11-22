@@ -4,8 +4,12 @@ Simple pagination for SQLAlchemy queries
 """
 
 import math
+from collections import namedtuple
 from datetime import datetime
 from flask import request
+from sqlalchemy import String, case
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.functions import FunctionElement
 
 
 def paginate(query, page=1, per_page=20):
@@ -108,3 +112,84 @@ def parse_date_filter(from_arg='date_from', to_arg='date_to'):
         except (ValueError, AttributeError):
             pass
     return date_from, date_to
+
+
+class InvalidSort(ValueError):
+    """A ``sort_by`` or ``sort_order`` the list does not know: answered 400 with the allowed keys."""
+
+    def __init__(self, message, allowed):
+        super().__init__(message)
+        self.allowed = list(allowed)
+
+
+class folded_text(FunctionElement):
+    """A text sort value folded to ASCII lower case and compared byte by byte, on both engines."""
+    type = String()
+    name = 'folded_text'
+    inherit_cache = True
+
+
+@compiles(folded_text)
+def _folded_text_sqlite(element, compiler, **kw):
+    # SQLite's lower() folds ASCII only and BINARY compares UTF-8 bytes
+    return 'lower(%s)' % compiler.process(element.clauses, **kw)
+
+
+@compiles(folded_text, 'postgresql')
+def _folded_text_pg(element, compiler, **kw):
+    # Under "C" lower() folds ASCII only and the comparison is bytewise: SQLite's result exactly
+    return 'lower((%s) COLLATE "C") COLLATE "C"' % compiler.process(element.clauses, **kw)
+
+
+def rank_of(column, order):
+    """SQL rank of *column* among the values *order* lists; any other value ranks after them."""
+    return case({value: index for index, value in enumerate(order)}, value=column, else_=len(order))
+
+
+def _never_null(expression):
+    """True for a mapped column declared NOT NULL (or a primary key)."""
+    columns = getattr(getattr(expression, 'property', None), 'columns', None)
+    column = columns[0] if columns else expression
+    return getattr(column, 'primary_key', False) or getattr(column, 'nullable', True) is False
+
+
+def _ordering(expression, descending):
+    """``expression`` in the requested direction, text folded, absent values last."""
+    if isinstance(expression.type, String):
+        expression = folded_text(expression)
+        clause = expression.desc() if descending else expression.asc()
+        return clause.nulls_last()
+    clause = expression.desc() if descending else expression.asc()
+    return clause if _never_null(expression) else clause.nulls_last()
+
+
+Sort = namedtuple('Sort', 'key descending clauses')
+
+
+def parse_request_sort(allowed, default, tiebreak=None):
+    """The ORDER BY a list asks for with ``sort_by`` and ``sort_order``.
+
+    *allowed* maps each key to an expression, a tuple of expressions, a
+    callable ``f(descending) -> [clauses]`` or None (the route orders that key
+    itself). *default* is ``(key, 'asc'|'desc')``; *tiebreak* (the primary key)
+    ends every ORDER BY in the same direction, so pages never share a row.
+    A key or direction the list does not know raises :class:`InvalidSort`.
+    """
+    key = (request.args.get('sort_by') or '').strip() or default[0]
+    order = (request.args.get('sort_order') or '').strip().lower() or default[1]
+    keys = sorted(allowed)
+    if key not in allowed:
+        raise InvalidSort(f"Unknown sort_by '{key[:64]}'; allowed: {', '.join(keys)}", keys)
+    if order not in ('asc', 'desc'):
+        raise InvalidSort(f"Unknown sort_order '{order[:16]}'; allowed: asc, desc", keys)
+    descending = order == 'desc'
+    spec = allowed[key]
+    if spec is None:
+        clauses = []
+    elif callable(spec) and not hasattr(spec, 'type'):
+        clauses = list(spec(descending))
+    else:
+        clauses = [_ordering(expr, descending) for expr in (spec if isinstance(spec, tuple) else (spec,))]
+    if tiebreak is not None:
+        clauses.append(tiebreak.desc() if descending else tiebreak.asc())
+    return Sort(key, descending, clauses)

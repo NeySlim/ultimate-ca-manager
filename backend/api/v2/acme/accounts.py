@@ -13,6 +13,7 @@ from utils.response import success_response, error_response
 from utils.issuance_defaults import DEFAULT_ACME_ACCOUNT_KEY_TYPE
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
+from utils.pagination import parse_request_pagination, parse_request_sort, rank_of
 from services.acme.acme_client_service import CERT_KEY_TYPES
 from services.acme.jwk_thumbprint import jwk_thumbprint
 from utils import key_algorithms
@@ -71,15 +72,35 @@ def _jwk_key_label(jwk_text):
     return None
 
 
+# RFC 8555 7.1.6: valid, then the two terminal states
+ACCOUNT_STATES = ('valid', 'deactivated', 'revoked')
+
+_ACCOUNT_SORT = {
+    'created_at': AcmeAccount.created_at,
+    'account_id': AcmeAccount.account_id,
+    'status': rank_of(AcmeAccount.status, ACCOUNT_STATES),
+    # The stored JSON contact list: orders by its first address
+    'contact': AcmeAccount.contact,
+    # Counted per row in the ORDER BY (no join, same statement count)
+    'orders': db.select(db.func.count(AcmeOrder.id))
+              .where(AcmeOrder.account_id == AcmeAccount.account_id).scalar_subquery(),
+}
+
+
 @bp.route('/api/v2/acme/accounts', methods=['GET'])
 @require_auth(['read:acme'])
 def list_acme_accounts():
-    """List ACME accounts"""
-    accounts = AcmeAccount.query.order_by(AcmeAccount.created_at.desc()).limit(100).all()
+    """ACME accounts, a page at a time (100 by default, the former ceiling), with their total."""
+    page, per_page = parse_request_pagination(default_per_page=100, max_per_page=100)
+    sort = parse_request_sort(_ACCOUNT_SORT, ('created_at', 'desc'), tiebreak=AcmeAccount.id)
+    query = AcmeAccount.query
+    total = query.count()
+    accounts = query.order_by(*sort.clauses).offset((page - 1) * per_page).limit(per_page).all()
 
     # One grouped count rather than one query per account.
     order_counts = dict(
         db.session.query(AcmeOrder.account_id, db.func.count(AcmeOrder.id))
+        .filter(AcmeOrder.account_id.in_([acc.account_id for acc in accounts]))
         .group_by(AcmeOrder.account_id)
         .all()
     )
@@ -98,7 +119,7 @@ def list_acme_accounts():
             'created_at': utc_isoformat(acc.created_at)
         })
 
-    return success_response(data=data)
+    return success_response(data=data, meta={'total': total, 'page': page, 'per_page': per_page})
 
 
 @bp.route('/api/v2/acme/accounts', methods=['POST'])

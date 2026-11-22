@@ -48,5 +48,7 @@ def test_the_default_is_newest_first(auth_client, ca_id):
 
 @pytest.mark.parametrize('params', [{'sort_by': 'nonsense'}, {'sort_by': 'key_id; DROP TABLE x'},
                                     {'sort_order': 'sideways'}])
-def test_an_unknown_value_falls_back_to_the_default(auth_client, ca_id, params):
-    assert _key_ids(_list(auth_client, ca_id, **params)) == list(reversed(KEY_IDS))
+def test_an_unknown_value_is_refused(auth_client, ca_id, params):
+    r = auth_client.get('/api/v2/ssh/certificates', query_string={'ca_id': ca_id, **params})
+    assert r.status_code == 400, r.data
+    assert 'key_id' in r.get_json()['details']['allowed_sort_by']

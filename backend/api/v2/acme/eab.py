@@ -14,6 +14,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, no_content_response
 from utils.db_transaction import safe_commit
 from utils.randomness import csp_bytes
+from utils.pagination import parse_request_pagination, parse_request_sort
 from services.acme.dns_update.keys import invalidate_keys
 
 from . import bp, logger
@@ -57,6 +58,16 @@ def set_eab_required():
     return success_response(data={'eab_required': value})
 
 
+_EAB_SORT = {
+    'created_at': AcmeEabCredential.created_at,
+    'label': AcmeEabCredential.label,
+    'kid': AcmeEabCredential.kid,
+    'status': AcmeEabCredential.status,
+    'expires_at': AcmeEabCredential.expires_at,
+    'used_at': AcmeEabCredential.used_at,
+}
+
+
 @bp.route('/api/v2/acme/eab-credentials', methods=['GET'])
 @require_auth(['read:acme'])
 def list_eab_credentials():
@@ -64,12 +75,17 @@ def list_eab_credentials():
 
     HMAC keys are NEVER returned here — only on the create endpoint, once.
     """
+    # A page at a time, 200 by default (the former ceiling); meta.total says what is left
+    page, per_page = parse_request_pagination(default_per_page=200, max_per_page=200)
+    sort = parse_request_sort(_EAB_SORT, ('created_at', 'desc'), tiebreak=AcmeEabCredential.id)
     status_filter = request.args.get('status')
     q = AcmeEabCredential.query
     if status_filter:
         q = q.filter_by(status=status_filter)
-    creds = q.order_by(AcmeEabCredential.created_at.desc()).limit(200).all()
-    return success_response(data=[c.to_dict() for c in creds])
+    total = q.count()
+    creds = q.order_by(*sort.clauses).offset((page - 1) * per_page).limit(per_page).all()
+    return success_response(data=[c.to_dict() for c in creds],
+                            meta={'total': total, 'page': page, 'per_page': per_page})
 
 
 @bp.route('/api/v2/acme/eab-credentials', methods=['POST'])

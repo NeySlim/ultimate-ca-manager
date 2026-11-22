@@ -17,7 +17,7 @@ from utils.response import success_response, error_response, created_response, n
 from utils import notices as notices_mod
 from utils.export_password import validate_export_password
 from utils.export_options import FORMAT, PASSWORD, read_export_options
-from utils.pagination import parse_request_pagination
+from utils.pagination import parse_request_pagination, parse_request_sort
 from utils.dn_validation import validate_dn_field
 from utils.san_parse import is_valid_san_email
 from utils.request_names import RequestRejected
@@ -109,23 +109,19 @@ _SORT_COLUMNS = {
     # A generated request stores no subject_cn, an imported one only with a CN
     'cn': func.coalesce(Certificate.subject_cn, Certificate.descr),
     'created_at': Certificate.created_at,
+    'id': Certificate.id,
     'key_type': Certificate.key_algo,
+    'requester': Certificate.created_by,
     'signed_at': Certificate.valid_from,
     'valid_to': Certificate.valid_to,
 }
 
 
 def _apply_request_sort(query):
-    """Order a CSR listing by the ``sort_by``/``sort_order`` arguments.
-
-    Unknown keys fall back to newest first. The id breaks ties in the same
-    direction, so a row never appears on two pages (or on none) when the
-    sorted values are equal.
-    """
-    column = _SORT_COLUMNS.get(request.args.get('sort_by', ''), Certificate.created_at)
-    if request.args.get('sort_order', 'desc') == 'asc':
-        return query.order_by(column.asc(), Certificate.id.asc())
-    return query.order_by(column.desc(), Certificate.id.desc())
+    """Order a CSR listing by ``sort_by``/``sort_order``, newest first by default;
+    the id ends the order so a row never appears on two pages."""
+    sort = parse_request_sort(_SORT_COLUMNS, ('created_at', 'desc'), tiebreak=Certificate.id)
+    return query.order_by(*sort.clauses)
 
 
 @bp.route('/api/v2/csrs', methods=['GET'])

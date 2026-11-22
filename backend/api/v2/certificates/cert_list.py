@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from auth.unified import require_auth
 from utils.response import success_response
 from utils.serial_format import serial_search_forms
-from utils.pagination import parse_request_pagination
+from utils.pagination import parse_request_pagination, parse_request_sort
 from models import Certificate, CA, db
 from models.windows_profile import profile_names_of
 from utils.cert_status import (
@@ -36,6 +36,54 @@ def key_level_order(column):
     return case(*[(column.ilike(spelling), level) for spelling, level in key_algo_sort_levels()], else_=0)
 
 
+def _status_order(descending):
+    """Revoked, expired, expiring, valid (reversed for desc), then subject and id ascending."""
+    now = utc_now()
+    rank = case(
+        (Certificate.revoked == True, 1),  # noqa: E712
+        (Certificate.valid_to <= now, 2),
+        (Certificate.valid_to <= now + timedelta(days=30), 3),
+        else_=4)
+    return [rank.desc() if descending else rank.asc(), Certificate.subject.asc(), Certificate.id.asc()]
+
+
+def _compliance_order(descending):
+    """SQL approximation of the compliance score (key strength 0-30 plus validity 0-25),
+    then the post-quantum level, then the name and id ascending."""
+    now = utc_now()
+    score = key_strength_order(Certificate.key_algo) + case(
+        (Certificate.revoked == True, 0),  # noqa: E712
+        (Certificate.valid_to <= now, 0),
+        (Certificate.valid_to <= now + timedelta(days=30), 15),
+        else_=25)
+    level = key_level_order(Certificate.key_algo)
+    name = func.coalesce(Certificate.subject_cn, Certificate.descr)
+    if descending:
+        return [score.desc(), level.desc(), name.asc(), Certificate.id.asc()]
+    return [score.asc(), level.asc(), name.asc(), Certificate.id.asc()]
+
+
+def _sort_columns():
+    """The keys the list sorts on; a generated request may hold no subject_cn, hence the descr."""
+    name = func.coalesce(Certificate.subject_cn, Certificate.descr)
+    return {
+        'subject': name,
+        'subject_cn': name,
+        'issuer': Certificate.issuer,
+        'valid_to': Certificate.valid_to,
+        'valid_from': Certificate.valid_from,
+        'created_at': Certificate.created_at,
+        'serial_number': Certificate.serial_number,
+        'revoked': Certificate.revoked,
+        'descr': Certificate.descr,
+        'key_algo': Certificate.key_algo,
+        # A legacy row without a source is a manual one, as the source filter reads it
+        'source': func.coalesce(Certificate.source, 'manual'),
+        'status': _status_order,
+        'compliance_grade': _compliance_order,
+    }
+
+
 @bp.route('/api/v2/certificates', methods=['GET'])
 @require_auth(['read:certificates'])
 def list_certificates():
@@ -53,26 +101,8 @@ def list_certificates():
     source_list = request.args.getlist('source')  # supports multi-select: ?source=msca&source=acme
     search = request.args.get('search', '').strip()
     template_modified = request.args.get('template_modified', '').lower() in ('1', 'true', 'yes')
-    sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
-    sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
-
-    # Whitelist of allowed sort columns
-    # Use COALESCE for subject_cn to fallback to descr if CN not populated
-    _cn_sort = func.coalesce(Certificate.subject_cn, Certificate.descr)
-    ALLOWED_SORT_COLUMNS = {
-        'subject': _cn_sort,
-        'subject_cn': _cn_sort,
-        'issuer': Certificate.issuer,
-        'valid_to': Certificate.valid_to,
-        'valid_from': Certificate.valid_from,
-        'created_at': Certificate.created_at,
-        'serial_number': Certificate.serial_number,
-        'revoked': Certificate.revoked,
-        'descr': Certificate.descr,
-        'key_algo': Certificate.key_algo,
-        'status': 'special',  # Handled separately with CASE
-        'compliance_grade': 'special_compliance'  # Handled separately
-    }
+    # Read before the query: an unknown key or direction is a 400 (InvalidSort)
+    sort = parse_request_sort(_sort_columns(), ('subject', 'asc'), tiebreak=Certificate.id)
 
     # The same set the counters above the list are computed from
     query = issued_certificates()
@@ -159,62 +189,7 @@ def list_certificates():
             )
         )
 
-    # Apply sorting BEFORE pagination (use whitelist)
-    sort_column = ALLOWED_SORT_COLUMNS.get(sort_by, Certificate.subject)
-
-    if sort_by == 'status':
-        # Special handling: sort by computed status (revoked > expired > expiring > valid)
-        # Then alphabetically by subject within each group
-        now = utc_now()
-        expiry_threshold = now + timedelta(days=30)
-
-        # Status priority: 1=revoked, 2=expired, 3=expiring, 4=valid
-        status_order = case(
-            (Certificate.revoked == True, 1),
-            (Certificate.valid_to <= now, 2),
-            (Certificate.valid_to <= expiry_threshold, 3),
-            else_=4
-        )
-
-        if sort_order == 'desc':
-            query = query.order_by(status_order.desc(), Certificate.subject.asc(), Certificate.id.asc())
-        else:
-            query = query.order_by(status_order.asc(), Certificate.subject.asc(), Certificate.id.asc())
-    elif sort_by == 'compliance_grade':
-        # Approximate compliance score in SQL for sorting:
-        # Key strength: RSA 4096/EC = best, RSA 2048 = good, RSA 1024 = bad
-        # Validity: revoked/expired = worst, expiring = medium, valid = best
-        # This gives a rough sort order consistent with the computed score
-        now = utc_now()
-        expiry_threshold = now + timedelta(days=30)
-
-        compliance_order = (
-            # Key strength component (0-30)
-            key_strength_order(Certificate.key_algo) +
-            # Validity component (0-25)
-            case(
-                (Certificate.revoked == True, 0),
-                (Certificate.valid_to <= now, 0),
-                (Certificate.valid_to <= expiry_threshold, 15),
-                else_=25
-            )
-        )
-
-        level_order = key_level_order(Certificate.key_algo)
-        if sort_order == 'desc':
-            query = query.order_by(compliance_order.desc(), level_order.desc(), _cn_sort.asc(), Certificate.id.asc())
-        else:
-            query = query.order_by(compliance_order.asc(), level_order.asc(), _cn_sort.asc(), Certificate.id.asc())
-    elif sort_column not in ('special', 'special_compliance'):
-        # Tie-break on the primary key. Every sortable column here has
-        # duplicates — `revoked` has two distinct values for the whole table —
-        # and an ORDER BY that does not settle ties leaves the row order to the
-        # plan: SQLite and PostgreSQL then hand out different pages, and a row
-        # can show up twice or not at all while paging.
-        if sort_order == 'desc':
-            query = query.order_by(sort_column.desc(), Certificate.id.desc())
-        else:
-            query = query.order_by(sort_column.asc(), Certificate.id.asc())
+    query = query.order_by(*sort.clauses)
 
     # Paginate
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)

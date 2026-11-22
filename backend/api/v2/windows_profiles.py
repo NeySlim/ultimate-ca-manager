@@ -19,7 +19,7 @@ from services.audit_service import AuditService
 from services.ad_connector import lookup
 from services.deletion_blockers import first_blocker, windows_profile_deletion_blockers
 from utils.db_transaction import safe_commit
-from utils.pagination import parse_request_pagination
+from utils.pagination import parse_request_pagination, parse_request_sort
 from utils.response import error_response, success_response
 from utils.signing_ca import signing_ca_problem, xcep_ca_problem
 from utils.validity import (MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS, coerce_validity_days,
@@ -492,6 +492,18 @@ def _audit(action, profile, details):
                             details=details, success=True)
 
 
+def _state_order(descending):
+    """The state as _state() reads it, ranked: failing connector, keytab missing, complete, disabled."""
+    P = WindowsEnrollmentProfile
+    failing = _failing_connector_ids()
+    rank = db.case(
+        (P.enabled.is_(False), 3),
+        (db.or_(P.keytab.is_(None), P.keytab == ''), 1),
+        (P.connector_id.in_(failing or [0]), 0),
+        else_=2)
+    return [rank.desc() if descending else rank.asc()]
+
+
 @bp.route('/api/v2/windows-profiles', methods=['GET'])
 @require_auth(['read:xcep'])
 def list_windows_profiles():
@@ -499,6 +511,12 @@ def list_windows_profiles():
     policy or a former renewal CA, ``state`` one of complete, keytab_missing, connector_failing, disabled."""
     page, per_page = parse_request_pagination(default_per_page=25, max_per_page=MAX_PER_PAGE)
     P = WindowsEnrollmentProfile
+    sort = parse_request_sort({
+        'name': P.name,
+        'realm': P.realm,
+        'created_at': P.created_at,
+        'status': _state_order,
+    }, ('name', 'asc'), tiebreak=P.id)
     query = P.query
     q = (request.args.get('q') or '').strip()
     if q:
@@ -523,7 +541,7 @@ def list_windows_profiles():
             query = query.filter(P.enabled.is_(True), P.keytab.is_not(None))
             if failing:
                 query = query.filter(db.or_(P.connector_id.is_(None), P.connector_id.not_in(failing)))
-    query = query.order_by(P.name, P.id)
+    query = query.order_by(*sort.clauses)
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     return success_response(
         data=_render_page(pagination.items),

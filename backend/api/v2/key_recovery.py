@@ -37,8 +37,9 @@ from utils.db_transaction import safe_commit
 from utils.sanitize import content_disposition
 from models import db, Certificate, CA, KeyRecoveryRequest
 from models.key_recovery import (
-    STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_RECOVERED,
+    STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_RECOVERED, STATUS_CANCELLED,
 )
+from utils.pagination import parse_request_pagination, parse_request_sort, rank_of
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -138,25 +139,41 @@ def request_key_recovery(cert_id):
     return created_response(data=req.to_dict(), message='Key recovery request created')
 
 
+# Waiting on someone first, then what can still happen, then the closed outcomes
+_STATES = (STATUS_PENDING, STATUS_APPROVED, STATUS_RECOVERED, STATUS_REJECTED, STATUS_CANCELLED)
+
+_SORT = {
+    'id': KeyRecoveryRequest.id,
+    'requested_at': KeyRecoveryRequest.requested_at,
+    'status': rank_of(KeyRecoveryRequest.status, _STATES),
+    'cert_cn': KeyRecoveryRequest.cert_cn,
+    'requested_by': KeyRecoveryRequest.requested_by,
+}
+
+
 @bp.route('/api/v2/key-recovery', methods=['GET'])
 @require_auth(['read:key_recovery'])
 def list_key_recovery():
-    """List recovery requests, newest first; optional ?status= filter."""
+    """Recovery requests, newest first, a page at a time (500 by default, the former
+    ceiling) with their total in meta; optional ?status= filter."""
+    page, per_page = parse_request_pagination(default_per_page=500, max_per_page=500)
+    sort = parse_request_sort(_SORT, ('id', 'desc'), tiebreak=KeyRecoveryRequest.id)
     q = KeyRecoveryRequest.query
     status = request.args.get('status')
     if status:
         q = q.filter_by(status=status)
-    rows = q.order_by(KeyRecoveryRequest.id.desc()).limit(500).all()
+    total = q.count()
+    rows = q.order_by(*sort.clauses).offset((page - 1) * per_page).limit(per_page).all()
     return success_response(data={
         'requests': [r.to_dict() for r in rows],
         'dual_control': _dual_control_enabled(),
-    })
+    }, meta={'total': total, 'page': page, 'per_page': per_page})
 
 
 @bp.route('/api/v2/key-recovery/<int:rid>', methods=['GET'])
 @require_auth(['read:key_recovery'])
 def get_key_recovery(rid):
-    """One recovery request, whatever its age (the list holds only the latest 500)."""
+    """One recovery request, whatever its age (the list is paged)."""
     req = db.session.get(KeyRecoveryRequest, rid)
     if not req:
         return error_response('Recovery request not found', 404)

@@ -8,7 +8,8 @@ from services.audit_service import AuditService
 from services import jobs
 from services.jobs import audit_verify
 from api.v2.system.jobs import busy_response, started_response, suspended_response
-from utils.pagination import parse_date_filter, parse_request_pagination, parse_request_limit
+from utils.pagination import parse_date_filter, parse_request_pagination, parse_request_limit, parse_request_sort
+from models import AuditLog
 from utils.response import success_response, error_response
 from datetime import datetime
 import json
@@ -17,6 +18,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('audit_v2', __name__)
+
+
+def _timestamp_order(descending):
+    # Every row is stamped on insert: no NULLS clause, which would keep PostgreSQL off the index
+    return [AuditLog.timestamp.desc() if descending else AuditLog.timestamp.asc()]
 
 
 @bp.route('/api/v2/audit/logs', methods=['GET'])
@@ -36,7 +42,10 @@ def get_logs():
         date_from: Filter from date (ISO format)
         date_to: Filter to date (ISO format)
         search: Search in username, action, details
+        sort_by: timestamp (the only key: the filters do the rest); sort_order: desc (default) or asc
     """
+    # Outside the try below: an unknown key is the client's 400, not a 500
+    sort = parse_request_sort({'timestamp': _timestamp_order}, ('timestamp', 'desc'), tiebreak=AuditLog.id)
     try:
         # Parse query params (support multi-select: ?action=create&action=delete)
         # `min(..., 100)` bounded this from above only. A negative page size
@@ -71,7 +80,8 @@ def get_logs():
             success=success,
             date_from=date_from,
             date_to=date_to,
-            search=search
+            search=search,
+            order_by=sort.clauses,
         )
         
         return success_response(

@@ -81,12 +81,14 @@ class AuditQueryMixin:
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
         search: Optional[str] = None,
-        category: Optional[str] = None
+        category: Optional[str] = None,
+        order_by=None,
     ) -> tuple:
+        """*order_by* defaults to the newest first, the id settling equal timestamps."""
         query = AuditQueryMixin._filtered_query(
             username=username, action=action, resource_type=resource_type, success=success,
             date_from=date_from, date_to=date_to, search=search, category=category)
-        query = query.order_by(AuditLog.timestamp.desc())
+        query = query.order_by(*(order_by or (AuditLog.timestamp.desc(), AuditLog.id.desc())))
 
         total = query.count()
         total_pages = (total + per_page - 1) // per_page

@@ -143,9 +143,16 @@ def update_scep_config():
 @bp.route('/api/v2/scep/requests', methods=['GET'])
 @require_auth(['read:scep'])
 def list_scep_requests():
-    """List SCEP certificate requests, newest first, paged."""
-    from utils.pagination import parse_request_pagination, paginate
+    """List SCEP certificate requests, newest first by default, paged and sorted."""
+    from utils.pagination import parse_request_pagination, paginate, parse_request_sort, rank_of
     page, per_page = parse_request_pagination(default_per_page=50)
+    sort = parse_request_sort({
+        'created_at': SCEPRequest.created_at,
+        'status': rank_of(SCEPRequest.status, ('pending', 'approved', 'rejected')),
+        'subject': SCEPRequest.subject,
+        'transaction_id': SCEPRequest.transaction_id,
+        'client_ip': SCEPRequest.client_ip,
+    }, ('created_at', 'desc'), tiebreak=SCEPRequest.id)
     from utils.cert_status import (
         SCEP_REQUEST_STATUS_FILTERS, normalize_status_filters, unknown_status_message)
     statuses, unknown = normalize_status_filters(
@@ -165,7 +172,7 @@ def list_scep_requests():
             SCEPRequest.transaction_id.ilike(pattern, escape='\\'),
             SCEPRequest.client_ip.ilike(pattern, escape='\\')))
 
-    query = query.order_by(SCEPRequest.created_at.desc(), SCEPRequest.id.desc())
+    query = query.order_by(*sort.clauses)
     result = paginate(query, page, per_page)
     return success_response(data=[req.to_dict() for req in result['items']], meta=result['meta'])
 
