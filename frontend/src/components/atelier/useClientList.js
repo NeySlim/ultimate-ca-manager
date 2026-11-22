@@ -24,17 +24,21 @@ export function compareValues(a, b, asc, collator) {
  * @param {object} o
  * @param {Record<string, (row) => any>} o.sorts  each sortable column's key and the value it sorts by
  * @param {{key, asc}|null} [o.initial]  null keeps the API's order until a header is clicked
+ * @param {{sort, onSort}} [o.sortParam]  the sort kept in the address (useSortParam), in place of the list's own
  * @param {number} [o.perPage]
  * @param {string} [o.resetKey]  the filters: a change goes back to page one
  * @returns {{ rows, sort, onSort, total, start, end, paged, pagination, counts }}  pagination only past the smallest page size
  */
-export function useClientList(rows, { sorts = {}, initial = null, perPage: firstPerPage = 25, sizes = PAGE_SIZES, resetKey = '' } = {}) {
+export function useClientList(rows, { sorts = {}, initial = null, perPage: firstPerPage = 25, sizes = PAGE_SIZES, resetKey = '', sortParam } = {}) {
   const { i18n } = useTranslation()
-  const [sort, setSort] = useState(initial)
+  const [own, setSort] = useState(initial)
+  const sort = sortParam ? sortParam.sort : own
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(firstPerPage)
-  const [mark, setMark] = useState(resetKey)
-  if (mark !== resetKey) { setMark(resetKey); setPage(1) }
+  // A sort read from the address (Back, a shared link) goes back to page one as a click does
+  const reset = `${resetKey}|${sortParam ? `${sort?.key}:${sort?.asc}` : ''}`
+  const [mark, setMark] = useState(reset)
+  if (mark !== reset) { setMark(reset); setPage(1) }
 
   const language = i18n?.language
   const sorted = useMemo(() => {
@@ -53,7 +57,7 @@ export function useClientList(rows, { sorts = {}, initial = null, perPage: first
   return {
     rows: shown,
     sort,
-    onSort: (key) => { setSort((s) => ({ key, asc: s?.key === key ? !s.asc : true })); setPage(1) },
+    onSort: (key) => { if (sortParam) sortParam.onSort(key); else setSort((s) => ({ key, asc: s?.key === key ? !s.asc : true })); setPage(1) },
     total,
     start: total ? (paged ? (current - 1) * perPage + 1 : 1) : 0,
     end: paged ? Math.min(current * perPage, total) : total,

@@ -6,6 +6,7 @@
 import { useTranslation } from 'react-i18next'
 
 import { skWidth, barOf } from './helpers'
+import { columnKind } from './columnShare'
 
 /** kind: 'box' | 'pill' | 'thin' | 'num' | 'figure' */
 export function Bar({ width, kind }) {
@@ -23,7 +24,7 @@ export function SkeletonRows({ columns, rows = 12, check = false, actions = fals
     <tr key={`sk-${i}`} className="sk-row" aria-hidden={i > 0 ? 'true' : undefined}>
       {check && <td><Bar width="16px" kind="box" /></td>}
       {columns.map((c, k) => (
-        <td key={c.id} className={c.entity ? 'entity-cell' : undefined}>
+        <td key={c.id} className={columnKind(c) === 'entity' ? 'entity-cell' : undefined}>
           {i === 0 && k === 0 && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}
           {c.skeleton !== null && <Bar width={barOf(c.skeleton || { base: 45, spread: 40 }, i)} kind={c.skeleton?.kind} />}
         </td>

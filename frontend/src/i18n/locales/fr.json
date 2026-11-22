@@ -5564,7 +5564,16 @@
     "perPageLabel": "Lignes par page",
     "results_one": "{{count, number}} résultat",
     "results_other": "{{count, number}} résultats",
-    "searching": "Recherche en cours…"
+    "searching": "Recherche en cours…",
+    "sortHint": "Les en-têtes à bouton trient la liste.",
+    "sortedBy": "Trié par {{column}}, {{order}}",
+    "sortAscending": "ordre croissant",
+    "sortDescending": "ordre décroissant",
+    "sortBy": "Trier par",
+    "sortByColumn": "Trier par {{column}}",
+    "reverseSort": "Inverser l’ordre",
+    "foldedColumns_one": "{{count}} colonne repliée",
+    "foldedColumns_other": "{{count}} colonnes repliées"
   },
   "reconnect": {
     "countdown": "Le service redémarre...",
