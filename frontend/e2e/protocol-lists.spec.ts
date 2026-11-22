@@ -304,7 +304,7 @@ test.describe('the sort of a protocol list', () => {
     await expect(head('ACME Directory URL')).toHaveAttribute('aria-sort', 'ascending')
     await expect(page.locator(`${REGION} tbody tr .entity-name`)).toHaveCount(3)
     expect(await names()).toEqual(['Actalis', "Let's Encrypt", 'ZeroSSL'])
-    await page.getByLabel('View', { exact: true }).selectOption('accounts')
+    await page.getByRole('tab', { name: /^Accounts/ }).click()
     await expect(page).toHaveURL(/\/acme$/)
     await expect(head('Created')).toHaveAttribute('aria-sort', 'descending')
   })
