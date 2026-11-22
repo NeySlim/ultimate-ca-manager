@@ -92,6 +92,19 @@ describe('LoginPage lock screen', () => {
     expect(readLock()).toBeNull()
   })
 
+  it('says why the screen is locked: by hand, or after inactivity', async () => {
+    saveLock({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password', reason: 'manual' })
+    const { unmount } = renderAt('/login')
+    expect(await screen.findByRole('heading', { name: 'auth.page.lockedTitle' })).toBeInTheDocument()
+    expect(screen.getByText('auth.page.lockedLeadManual')).toBeInTheDocument()
+    expect(screen.queryByText('auth.page.lockedLead')).toBeNull()
+    unmount()
+    saveLock({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password', reason: 'idle' })
+    renderAt('/login')
+    expect(await screen.findByText('auth.page.lockedLead')).toBeInTheDocument()
+    expect(screen.queryByText('auth.page.lockedLeadManual')).toBeNull()
+  })
+
   it('names an empty password beside its field, and sends nothing', async () => {
     renderAt('/login')
     fireEvent.click(await screen.findByRole('button', { name: 'auth.page.unlock' }))

@@ -627,6 +627,7 @@
       "refused": "Nome utente o password non corretti. Dopo diversi errori si applica un ritardo.",
       "lockedTitle": "Sessione bloccata",
       "lockedLead": "La sessione è scaduta per inattività. Accedi di nuovo per tornare alla pagina in cui eri.",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "Sblocca",
       "switchAccount": "Accedi con un altro account",
       "skipToContent": "Vai al contenuto",
@@ -636,6 +637,7 @@
       "retryIn": "Prossimo tentativo possibile tra {{seconds}} s.",
       "canRetry": "Puoi riprovare.",
       "lockedAnnounce": "Sessione scaduta: lo schermo è bloccato, la pagina corrente viene mantenuta.",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "Accesso effettuato: {{name}}, {{role}}.",
       "signedInNoRole": "Accesso effettuato: {{name}}.",
       "signedOut": "Sei disconnesso. Le tue preferenze di visualizzazione vengono mantenute."
@@ -7732,6 +7734,7 @@
     "accountLabel": "Account: {{name}}, {{role}}",
     "accountLabelName": "Account: {{name}}",
     "signOut": "Esci",
+    "lock": "Lock",
     "method": {
       "password": "password",
       "mtls": "certificato client",
@@ -7739,6 +7742,9 @@
       "session": "sessione del browser",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "{{count}} certificato in scadenza o scaduto",
     "expiringCount_other": "{{count}} certificati in scadenza o scaduti",
@@ -7949,7 +7955,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

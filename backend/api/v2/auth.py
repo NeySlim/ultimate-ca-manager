@@ -83,6 +83,28 @@ def logout():
     return success_response(message='Logout successful')
 
 
+@bp.route('/api/v2/auth/lock', methods=['POST'])
+@require_auth(session_only=True)
+def lock():
+    """Close the session behind the lock screen, by hand or after inactivity.
+
+    The session ends here exactly as on sign-out, on every node of a shared store;
+    unlocking is a new sign-in. Only the audit tells the two locks apart.
+    """
+    from flask import g
+    data = request.get_json(silent=True) or {}
+    reason = 'inactivity' if isinstance(data, dict) and data.get('reason') == 'idle' else 'manual'
+    username = session.get('username') or g.current_user.username
+    try:
+        from services.audit_service import AuditService
+        AuditService.log_auth('session_locked', username=username, user_id=g.user_id,
+                              details=f'Session locked by {username} ({reason})')
+    except Exception as e:
+        logger.warning(f"Non-blocking: failed to audit-log the lock of {username}: {e}", exc_info=True)
+    session.clear()
+    return success_response(message='Session locked')
+
+
 @bp.route('/api/v2/auth/verify', methods=['GET'])
 def verify():
     """
@@ -129,26 +151,58 @@ def verify():
     # session restore too, not only on the login response. The narrower user
     # block is the one /verify has always returned.
     from auth.session_payload import auth_session_payload
+    from auth.twofa_enforcement import second_factor_methods
 
+    auth_method, auth_provider = _signed_in_with()
+    factors = second_factor_methods(g.current_user)
     return success_response(
         data=auth_session_payload(
             g.current_user,
             permissions=g.permissions,
-            auth_method=g.auth_method,
+            auth_method=auth_method,
             csrf_token=csrf_token,
             user_block={
                 'id': g.current_user.id,
                 'username': g.current_user.username,
                 'email': g.current_user.email,
+                'full_name': g.current_user.full_name,
                 'role': g.current_user.role
             },
             authenticated=True,
             user_id=g.user_id,
             must_enroll_2fa=must_enroll_2fa,
             session_timeout=session_timeout,
+            auth_provider=auth_provider,
+            mfa={'enabled': bool(factors), 'methods': factors},
+            session=_session_deadlines(session_timeout),
             preferences=g.current_user.get_preferences(),
         )
     )
+
+
+def _signed_in_with():
+    """(method, provider display name) the session was opened with, as its login kept them;
+    another credential (an API key) is reported as itself."""
+    from flask import g
+    if g.auth_method != 'session':
+        return g.auth_method, None
+    return session.get('auth_method') or 'session', session.get('auth_provider')
+
+
+def _session_deadlines(idle_timeout):
+    """The inactivity timeout and the absolute end (login time + maximum lifetime) of a session."""
+    from datetime import timedelta
+    from flask import g
+    from utils.datetime_utils import utc_isoformat
+    if g.auth_method != 'session':
+        return {'idle_timeout_s': None, 'expires_at': None}
+    expires_at = None
+    try:
+        started = datetime.fromisoformat(session.get('login_time') or '')
+        expires_at = utc_isoformat(started + timedelta(seconds=AuthManager._get_session_max_lifetime()))
+    except (TypeError, ValueError):
+        pass
+    return {'idle_timeout_s': idle_timeout, 'expires_at': expires_at}
 
 
 # ============================================================================

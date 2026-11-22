@@ -627,6 +627,7 @@
       "refused": "Benutzername oder Passwort falsch. Nach mehreren Fehlversuchen gilt eine Wartezeit.",
       "lockedTitle": "Sitzung gesperrt",
       "lockedLead": "Ihre Sitzung ist wegen Inaktivität abgelaufen. Melden Sie sich erneut an, um zur vorherigen Seite zurückzukehren.",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "Entsperren",
       "switchAccount": "Mit einem anderen Konto anmelden",
       "skipToContent": "Zum Inhalt springen",
@@ -636,6 +637,7 @@
       "retryIn": "Nächster Versuch möglich in {{seconds}} s.",
       "canRetry": "Sie können es erneut versuchen.",
       "lockedAnnounce": "Sitzung abgelaufen: Der Bildschirm ist gesperrt, die aktuelle Seite bleibt erhalten.",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "Angemeldet: {{name}}, {{role}}.",
       "signedInNoRole": "Angemeldet: {{name}}.",
       "signedOut": "Sie sind abgemeldet. Ihre Anzeigeeinstellungen bleiben erhalten."
@@ -7732,6 +7734,7 @@
     "accountLabel": "Konto: {{name}}, {{role}}",
     "accountLabelName": "Konto: {{name}}",
     "signOut": "Abmelden",
+    "lock": "Lock",
     "method": {
       "password": "Passwort",
       "mtls": "Clientzertifikat",
@@ -7739,6 +7742,9 @@
       "session": "Browsersitzung",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "{{count}} Zertifikat läuft ab oder ist abgelaufen",
     "expiringCount_other": "{{count}} Zertifikate laufen ab oder sind abgelaufen",
@@ -7949,7 +7955,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

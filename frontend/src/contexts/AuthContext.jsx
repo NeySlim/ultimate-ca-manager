@@ -5,12 +5,12 @@
  * This enables mTLS auto-login: the middleware creates the session
  * during the TLS handshake, and checkSession() picks it up.
  */
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { authService } from '../services/auth.service'
 import { accountService } from '../services/account.service'
 import { apiClient } from '../services/apiClient'
 import { setAppTimezone } from '../stores/timezoneStore'
-import { saveLock, markJustLocked, markSignedOut } from '../lib/sessionLock'
+import { saveLock, markJustLocked, markSignedOut, announceLock, listenForLocks } from '../lib/sessionLock'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
@@ -195,11 +195,16 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Inactivity lock: the console goes at once, the server session is closed after
-  // (it may not answer), and the account is kept for the lock screen.
-  const lock = () => {
+  // The lock, by hand ('manual') or after inactivity ('idle'): the console goes at once, the
+  // account is kept for the lock screen, the server session is closed after (it may not answer)
+  // and the other tabs of this browser, which share the session, lock too.
+  const current = useRef({ user: null, authMethod: null })
+  current.current = { user, authMethod }
+
+  const lockHere = useCallback((reason) => {
+    const { user: who, authMethod: via } = current.current
     // A custom role is kept by its name; a built-in one by its code, named on the lock screen
-    saveLock({ username: user?.username, name: user?.full_name, role: user?.custom_role_name || user?.role, method: authMethod })
+    saveLock({ username: who?.username, name: who?.full_name, role: who?.custom_role_name || who?.role, method: via, reason })
     markJustLocked()
     setUser(null)
     setIsAuthenticated(false)
@@ -209,8 +214,18 @@ export function AuthProvider({ children }) {
     setForcePasswordChange(false)
     setMustEnroll2fa(false)
     setPrefsAuthenticated(false)
-    authService.logout().catch(() => {})
+  }, [])
+
+  const lock = (reason = 'idle') => {
+    const username = current.current.user?.username
+    lockHere(reason)
+    announceLock(username, reason)
+    authService.lock(reason).catch(() => {})
   }
+
+  useEffect(() => listenForLocks(({ username, reason }) => {
+    if (current.current.user?.username === username) lockHere(reason)
+  }), [lockHere])
 
   const clearForcePasswordChange = () => setForcePasswordChange(false)
 

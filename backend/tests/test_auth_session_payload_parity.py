@@ -160,11 +160,11 @@ class TestPreservedContract:
         assert _login(client).status_code == 200
         data = client.get('/api/v2/auth/verify').get_json()['data']
         for field in ('authenticated', 'user_id', 'must_enroll_2fa',
-                      'session_timeout', 'preferences'):
+                      'session_timeout', 'preferences', 'auth_provider', 'mfa', 'session'):
             assert field in data, f'/verify lost {field}'
         # /verify returns a narrower user block than login does, plus the
-        # email a reloaded page needs (#386).
-        assert set(data['user']) == {'id', 'username', 'email', 'role'}
+        # email (#386) and full name a reloaded page needs.
+        assert set(data['user']) == {'id', 'username', 'email', 'full_name', 'role'}
 
     def test_login_keeps_the_wide_user_block(self, app):
         client = app.test_client()

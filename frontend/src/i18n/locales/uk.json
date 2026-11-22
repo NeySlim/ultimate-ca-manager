@@ -629,6 +629,7 @@
       "refused": "Неправильне ім'я користувача або пароль. Після кількох невдалих спроб діє затримка.",
       "lockedTitle": "Сеанс заблоковано",
       "lockedLead": "Ваш сеанс завершився через бездіяльність. Увійдіть знову, щоб повернутися на сторінку, де ви були.",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "Розблокувати",
       "switchAccount": "Увійти з іншим обліковим записом",
       "skipToContent": "Перейти до вмісту",
@@ -640,6 +641,7 @@
       "retryIn": "Наступна спроба можлива через {{seconds}} с.",
       "canRetry": "Можна спробувати ще раз.",
       "lockedAnnounce": "Сеанс завершився: екран заблоковано, поточна сторінка збережена.",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "Вхід виконано: {{name}}, {{role}}.",
       "signedInNoRole": "Вхід виконано: {{name}}.",
       "signedOut": "Ви вийшли із системи. Ваші налаштування відображення збережено."
@@ -8052,6 +8054,7 @@
     "accountLabel": "Обліковий запис: {{name}}, {{role}}",
     "accountLabelName": "Обліковий запис: {{name}}",
     "signOut": "Вийти",
+    "lock": "Lock",
     "method": {
       "password": "пароль",
       "mtls": "клієнтський сертифікат",
@@ -8059,6 +8062,9 @@
       "session": "сеанс браузера",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "{{count}} сертифікат закінчується або прострочений",
     "expiringCount_few": "{{count}} сертифікати закінчуються або прострочені",
@@ -8297,7 +8303,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

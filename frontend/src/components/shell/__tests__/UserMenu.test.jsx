@@ -1,4 +1,5 @@
-/** Account menu: the account card and its facts, My account, Settings for who may see it, Sign out apart; the language on a phone. */
+/** Account menu: the account card and the session's facts read from the server, My account, Settings for who may see it,
+ * Lock and Sign out apart (Lock also by Alt+Shift+L); the language on a phone. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -6,6 +7,7 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { ROLES, canFor } from './shellTestUtils'
 
 const logout = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+const lock = vi.hoisted(() => vi.fn())
 const getCurrentUser = vi.hoisted(() => vi.fn())
 const auth = vi.hoisted(() => ({ method: 'password', user: null }))
 const i18n = vi.hoisted(() => ({ language: 'fr-FR', changeLanguage: vi.fn() }))
@@ -16,7 +18,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: auth.user, logout, authMethod: auth.method }),
+  useAuth: () => ({ user: auth.user, logout, lock, authMethod: auth.method }),
 }))
 vi.mock('../../../stores/userPreferencesStore', async (importOriginal) => ({ ...(await importOriginal()), persistPreference }))
 vi.mock('../../../services/auth.service', () => ({ authService: { getCurrentUser } }))
@@ -93,9 +95,10 @@ describe('UserMenu', () => {
     await user.click(trigger())
     const menu = document.getElementById('user-menu')
     const items = [...menu.querySelectorAll('a, button')].map(el => el.textContent)
-    expect(items).toEqual(['common.account', 'shell.signOut'])
-    // Sign out stands apart
-    expect(screen.getByRole('separator').nextElementSibling).toHaveAttribute('id', 'user-logout')
+    expect(items).toEqual(['common.account', 'shell.lock', 'shell.signOut'])
+    // Lock and Sign out stand apart
+    expect(screen.getByRole('separator').nextElementSibling).toHaveAttribute('id', 'user-lock')
+    expect(document.getElementById('user-lock').nextElementSibling).toHaveAttribute('id', 'user-logout')
   })
 
   it('puts Settings between My account and Sign out for who may see it, with the module glyph', async () => {
@@ -103,20 +106,22 @@ describe('UserMenu', () => {
     await user.click(trigger())
     const menu = document.getElementById('user-menu')
     const items = [...menu.querySelectorAll('a, button')]
-    expect(items.map(el => el.textContent)).toEqual(['common.account', 'common.settings', 'shell.signOut'])
+    expect(items.map(el => el.textContent)).toEqual(['common.account', 'common.settings', 'shell.lock', 'shell.signOut'])
     expect(items[1]).toHaveClass('pop-item')
     expect(items[1].querySelector('svg.icon')).not.toBeNull()
   })
 
-  it('goes to Settings and closes, the keyboard walking the three items', async () => {
+  it('goes to Settings and closes, the keyboard walking the four items', async () => {
     const user = setup(canFor(ROLES.admin))
     await user.click(trigger())
     expect(screen.getByRole('button', { name: 'common.account' })).toHaveFocus()
     await user.keyboard('{ArrowDown}')
     expect(screen.getByRole('button', { name: 'common.settings' })).toHaveFocus()
     await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('button', { name: 'shell.lock' })).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
     expect(screen.getByRole('button', { name: 'shell.signOut' })).toHaveFocus()
-    await user.keyboard('{ArrowUp}')
+    await user.keyboard('{ArrowUp}{ArrowUp}')
     await user.keyboard('{Enter}')
     expect(screen.getByTestId('where')).toHaveTextContent('/settings')
     expect(trigger()).toHaveAttribute('aria-expanded', 'false')
@@ -157,5 +162,66 @@ describe('UserMenu', () => {
     await user.click(screen.getByRole('button', { name: 'common.account' }))
     expect(screen.getByTestId('where')).toHaveTextContent('/account')
     expect(trigger()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('after a reload, names the real method and its provider, the second factors and both deadlines', async () => {
+    auth.method = 'session'
+    getCurrentUser.mockResolvedValue({ data: {
+      auth_method: 'sso', auth_provider: 'Company SSO', session_timeout: 1800,
+      mfa: { enabled: true, methods: ['totp', 'webauthn'] },
+      session: { idle_timeout_s: 900, expires_at: '2026-11-23T08:00:00Z' },
+    } })
+    const user = setup()
+    await user.click(trigger())
+    const facts = document.querySelector('.user-id > dl.props')
+    await waitFor(() => expect([...facts.querySelectorAll('dt')].map(dt => dt.textContent))
+      .toEqual(['shell.userCard.signIn', 'shell.userCard.mfa', 'shell.userCard.session']))
+    const values = [...facts.querySelectorAll('dd')].map(dd => dd.textContent)
+    expect(values.slice(0, 3)).toEqual([
+      'shell.userCard.methodVia|shell.method.sso,Company SSO',
+      'shell.userCard.mfaOn|shell.mfaMethod.totp, shell.method.webauthn',
+      'shell.userCard.lockIn|15',
+    ])
+    expect(values[3]).toMatch(/^shell\.userCard\.endsAt\|.*2026/)
+  })
+
+  it('says the second factor is off, and reads the facts again at each opening', async () => {
+    getCurrentUser.mockResolvedValue({ data: { auth_method: 'password', mfa: { enabled: false, methods: [] }, session_timeout: 1800 } })
+    const user = setup()
+    await user.click(trigger())
+    expect(await screen.findByText('shell.userCard.mfaOff')).toBeVisible()
+    await user.keyboard('{Escape}')
+    getCurrentUser.mockResolvedValue({ data: { auth_method: 'password', mfa: { enabled: true, methods: ['totp'] }, session_timeout: 1800 } })
+    await user.click(trigger())
+    expect(await screen.findByText('shell.userCard.mfaOn|shell.mfaMethod.totp')).toBeVisible()
+    expect(getCurrentUser).toHaveBeenCalledTimes(2)
+  })
+
+  it('locks the session from the menu, by hand', async () => {
+    const user = setup()
+    await user.click(trigger())
+    const entry = screen.getByRole('button', { name: 'shell.lock' })
+    expect(entry).toHaveAttribute('aria-keyshortcuts', 'Alt+Shift+L')
+    await user.click(entry)
+    expect(lock).toHaveBeenCalledWith('manual')
+    expect(logout).not.toHaveBeenCalled()
+  })
+
+  it('locks on Alt+Shift+L outside a text field, the menu closed', async () => {
+    const user = setup()
+    await user.keyboard('{Alt>}{Shift>}L{/Shift}{/Alt}')
+    expect(lock).toHaveBeenCalledWith('manual')
+  })
+
+  it('leaves Alt+Shift+L to a text field, and other combinations alone', async () => {
+    const user = setup()
+    const field = document.createElement('input')
+    document.body.appendChild(field)
+    field.focus()
+    await user.keyboard('{Alt>}{Shift>}L{/Shift}{/Alt}')
+    field.remove()
+    await user.keyboard('{Control>}{Shift>}L{/Shift}{/Control}')
+    await user.keyboard('{Alt>}L{/Alt}')
+    expect(lock).not.toHaveBeenCalled()
   })
 })

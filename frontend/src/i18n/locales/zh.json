@@ -627,6 +627,7 @@
       "refused": "用户名或密码错误。多次失败后将需要等待。",
       "lockedTitle": "会话已锁定",
       "lockedLead": "您的会话因长时间未操作已过期。请重新登录以返回之前所在的页面。",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "解锁",
       "switchAccount": "使用其他账户登录",
       "skipToContent": "跳到内容",
@@ -636,6 +637,7 @@
       "retryIn": "{{seconds}} 秒后可再次尝试。",
       "canRetry": "现在可以重试。",
       "lockedAnnounce": "会话已过期：屏幕已锁定，当前页面已保留。",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "已登录：{{name}}，{{role}}。",
       "signedInNoRole": "已登录：{{name}}。",
       "signedOut": "您已退出登录。您的显示偏好已保留。"
@@ -7732,6 +7734,7 @@
     "accountLabel": "账户：{{name}}，{{role}}",
     "accountLabelName": "账户：{{name}}",
     "signOut": "退出登录",
+    "lock": "Lock",
     "method": {
       "password": "密码",
       "mtls": "客户端证书",
@@ -7739,6 +7742,9 @@
       "session": "浏览器会话",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "{{count}} 张证书即将到期或已过期",
     "expiringCount_other": "{{count}} 张证书即将到期或已过期",
@@ -7949,7 +7955,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

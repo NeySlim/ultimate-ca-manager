@@ -24,6 +24,7 @@ ENROLL_ALLOWED_PATHS = frozenset({
     '/api/v2/webauthn/register/options',
     '/api/v2/webauthn/register/verify',
     '/api/v2/auth/logout',
+    '/api/v2/auth/lock',
 })
 
 # Auth methods that are themselves a strong second factor — never additionally

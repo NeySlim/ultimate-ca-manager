@@ -36,6 +36,50 @@ test.describe('sign-in and session', () => {
     expect(await api.status('GET', '/certificates')).toBe(401)
   })
 
+  test('Lock in the account menu locks the session, says so, and the password unlocks back to the page', async ({ api, signIn }) => {
+    const user = await createUser(api, 'viewer')
+    const { page } = await signIn(user.username, user.password)
+    await page.goto('/certificates')
+    // After a reload the card still knows the session from the server
+    await page.reload()
+    const account = page.getByRole('button', { name: /^Account: / })
+    await account.click()
+    const card = page.locator('#user-menu .user-facts')
+    await expect(card).toContainText('Sign-in')
+    await expect(card).toContainText('password')
+    await expect(card).toContainText('Two-factor')
+    await expect(card).toContainText('Off')
+    await expect(card).toContainText(/Locks after \d+ min of inactivity/)
+    await expect(card).toContainText(/Ends /)
+
+    await page.getByRole('button', { name: 'Lock', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    await expect(page.getByText('You locked the session.', { exact: false })).toBeVisible()
+    await expect(page.getByText('expired after inactivity', { exact: false })).toHaveCount(0)
+    expect((await (await page.request.get('/api/v2/auth/verify')).json()).data.authenticated).toBe(false)
+
+    await page.getByLabel('Password', { exact: true }).fill(user.password)
+    await page.getByRole('button', { name: 'Unlock' }).click()
+    await expect(page).toHaveURL(url => url.pathname === '/certificates')
+    expect((await (await page.request.get('/api/v2/auth/verify')).json()).data.authenticated).toBe(true)
+  })
+
+  test('Alt+Shift+L locks every tab of the session', async ({ api, signIn }) => {
+    const user = await createUser(api, 'viewer')
+    const { page } = await signIn(user.username, user.password)
+    await page.goto('/certificates')
+    await expect(page.getByRole('button', { name: /^Account: / })).toBeVisible()
+    const other = await page.context().newPage()
+    await other.goto('/')
+    await expect(other.getByRole('button', { name: /^Account: / })).toBeVisible()
+
+    await page.bringToFront()
+    await page.locator('body').press('Alt+Shift+L')
+    await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    await expect(other.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    await expect(other.getByText('You locked the session.', { exact: false })).toBeVisible()
+  })
+
   test('a session ended by the server sends the next action back to the sign-in page', async ({ api, signIn, request }) => {
     const user = await createUser(api, 'viewer')
     const { page } = await signIn(user.username, user.password)

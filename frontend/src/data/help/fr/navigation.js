@@ -27,7 +27,7 @@ export default {
       {
         title: 'Menu du compte',
         items: [
-          { label: 'Compte', text: 'Vos initiales à côté de votre nom, votre rôle et votre identifiant, puis ce que la console sait de votre session : e-mail, méthode de connexion et verrouillage après inactivité ; puis Mon compte, Paramètres (pour qui peut les ouvrir) et, à part, Se déconnecter ; au téléphone, la langue aussi. La langue se choisit par le bouton globe de la barre du haut, dans Mon compte et sur la page de connexion ; les Paramètres sont aussi dans le menu Modules et la recherche' },
+          { label: 'Compte', text: 'Vos initiales à côté de votre nom, votre rôle et votre identifiant, puis ce que le serveur sait de votre session, relu à chaque ouverture du menu : e-mail, méthode de connexion (avec le fournisseur SSO ou LDAP), double authentification active ou non et ses méthodes, verrouillage après inactivité et fin de la session ; puis Mon compte, Paramètres (pour qui peut les ouvrir) et, à part, Verrouiller et Se déconnecter ; au téléphone, la langue aussi. La langue se choisit par le bouton globe de la barre du haut, dans Mon compte et sur la page de connexion ; les Paramètres sont aussi dans le menu Modules et la recherche' },
         ]
       },
       {
@@ -35,6 +35,7 @@ export default {
         items: [
           { label: 'Avertissement', text: 'Cinq minutes avant la fin du délai d’inactivité, un bandeau affiche le temps restant ; Prolonger garde la session et dit pour combien de temps, toute autre activité ne la prolonge plus' },
           { label: 'Verrouillage', text: 'À la fin, la session se ferme et l’écran se verrouille : rien de la console ne reste ouvert derrière' },
+          { label: 'Verrouiller maintenant', text: 'Verrouiller, dans le menu du compte, ou Alt+Maj+L (Option+Maj+L sur Mac) hors d’un champ de texte, ferme aussitôt la session et verrouille l’écran, qui dit que la session a été verrouillée et non qu’elle a expiré ; tous les onglets du navigateur se verrouillent avec lui. Le déverrouillage est celui de l’inactivité, avec la même méthode de connexion' },
           { label: 'Retour', text: 'Reconnectez-vous avec le même compte pour revenir à la page où vous étiez ; Se connecter avec un autre compte repart de zéro' },
         ]
       },

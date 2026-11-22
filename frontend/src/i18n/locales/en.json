@@ -627,6 +627,7 @@
       "refused": "Incorrect username or password. After several failures, a delay applies.",
       "lockedTitle": "Session locked",
       "lockedLead": "Your session expired after inactivity. Sign in again to return to the page you were on.",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "Unlock",
       "switchAccount": "Sign in with another account",
       "skipToContent": "Skip to content",
@@ -636,6 +637,7 @@
       "retryIn": "Next attempt possible in {{seconds}} s.",
       "canRetry": "You can try again.",
       "lockedAnnounce": "Session expired: the screen is locked, the current page is kept.",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "Signed in: {{name}}, {{role}}.",
       "signedInNoRole": "Signed in: {{name}}.",
       "signedOut": "You are signed out. Your display preferences are kept."
@@ -7732,6 +7734,7 @@
     "accountLabel": "Account: {{name}}, {{role}}",
     "accountLabelName": "Account: {{name}}",
     "signOut": "Sign out",
+    "lock": "Lock",
     "method": {
       "password": "password",
       "mtls": "client certificate",
@@ -7739,6 +7742,9 @@
       "session": "browser session",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "{{count}} certificate expiring or expired",
     "expiringCount_other": "{{count}} certificates expiring or expired",
@@ -7949,7 +7955,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

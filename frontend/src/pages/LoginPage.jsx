@@ -4,8 +4,9 @@
  * AuthContext.checkSession() runs on mount (mTLS auto-login lands in the console
  * at once). Otherwise the page goes: init → form (username and password, or one of
  * the other doors: SSO, LDAP, client certificate, security key) → 2fa when asked.
- * A session locked after inactivity (lib/sessionLock) shows the same form for the
- * same account, read-only username, and returns to ?next= once signed in again.
+ * A session locked by hand or after inactivity (lib/sessionLock) shows the same form for
+ * the same account, read-only username, says which lock it was, and returns to ?next= once
+ * signed in again.
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -68,7 +69,7 @@ export default function LoginPage() {
   const codeRef = useRef(null)
   const titleRef = useRef(null)
 
-  // The account of a session locked after inactivity: unlocked by the same account only
+  // The account of a locked session (by hand or after inactivity): unlocked by the same account only
   const [locked, setLocked] = useState(readLock)
   const lockedRef = useRef(locked)
   lockedRef.current = locked
@@ -313,7 +314,7 @@ export default function LoginPage() {
     if (opening) {
       if (arrivedLocked.current) {
         titleRef.current?.focus()
-        setAnnounce(t('auth.page.lockedAnnounce'))
+        setAnnounce(t(lockedRef.current?.reason === 'manual' ? 'auth.page.lockedAnnounceManual' : 'auth.page.lockedAnnounce'))
       } else if (arrivedSignedOut.current) {
         titleRef.current?.focus()
         showSuccess(t('auth.page.signedOut'))
@@ -812,7 +813,7 @@ export default function LoginPage() {
   )
 
   const title = locked ? t('auth.page.lockedTitle') : step === '2fa' ? t('auth.twoFactorTitle') : t('auth.page.signInTitle')
-  let lead = locked ? t('auth.page.lockedLead') : t('auth.page.lead')
+  let lead = locked ? t(locked.reason === 'manual' ? 'auth.page.lockedLeadManual' : 'auth.page.lockedLead') : t('auth.page.lead')
   let body
 
   if (ssoCompleting) {

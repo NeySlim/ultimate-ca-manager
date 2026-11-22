@@ -246,6 +246,7 @@ def ldap_login():
         session['pending_2fa_user_id'] = user.id
         session['pending_2fa_username'] = user.username
         session['pending_2fa_method'] = 'ldap'
+        session['pending_2fa_provider'] = provider.display_name or provider.name
         session.permanent = True
         AuditService.log_action(
             action='login_2fa_required',
@@ -269,6 +270,7 @@ def ldap_login():
     session['username'] = user.username
     session['role'] = user.role
     session['auth_method'] = 'ldap'
+    session['auth_provider'] = provider.display_name or provider.name
     session['login_time'] = _ldap_now.isoformat()
     session['last_activity'] = _ldap_now.isoformat()
     session.permanent = True
