@@ -7748,7 +7748,6 @@
     "haLate_other": "{{count}} ノードが遅延",
     "approvalsPending_one": "承認待ち {{count}} 件",
     "approvalsPending_other": "承認待ち {{count}} 件",
-    "approvalsNone": "承認待ちはありません",
     "theme": {
       "menu": "テーマ",
       "label": "テーマ: {{theme}}",

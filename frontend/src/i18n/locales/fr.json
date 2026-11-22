@@ -7748,7 +7748,6 @@
     "haLate_other": "{{count}} nœuds en retard",
     "approvalsPending_one": "{{count}} approbation en attente",
     "approvalsPending_other": "{{count}} approbations en attente",
-    "approvalsNone": "Aucune approbation en attente",
     "theme": {
       "menu": "Thème",
       "label": "Thème : {{theme}}",

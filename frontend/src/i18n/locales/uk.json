@@ -8078,7 +8078,6 @@
     "approvalsPending_few": "{{count}} схвалення очікують",
     "approvalsPending_many": "{{count}} схвалень очікують",
     "approvalsPending_other": "{{count}} схвалення очікують",
-    "approvalsNone": "Немає схвалень, що очікують",
     "theme": {
       "menu": "Тема",
       "label": "Тема: {{theme}}",

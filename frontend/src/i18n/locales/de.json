@@ -7748,7 +7748,6 @@
     "haLate_other": "{{count}} Knoten im Rückstand",
     "approvalsPending_one": "{{count}} Genehmigung ausstehend",
     "approvalsPending_other": "{{count}} Genehmigungen ausstehend",
-    "approvalsNone": "Keine Genehmigung ausstehend",
     "theme": {
       "menu": "Design",
       "label": "Design: {{theme}}",

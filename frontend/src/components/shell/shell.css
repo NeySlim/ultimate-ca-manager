@@ -93,3 +93,11 @@
 :root .session-banner.kofi-card .kofi-button { background: var(--kofi-coral-strong); border-color: var(--kofi-coral-strong); color: var(--paper); }
 :root .session-banner.kofi-card .kofi-button:hover { background: var(--kofi-coral-hover); filter: none; }
 @media (max-width: 800px) { :root .session-banner.kofi-card:not(.kofi-inline) { left: 16px; right: 16px; bottom: 12px; width: auto; } }
+
+/* The activity summary of the bar, the product's addition: each part has the look of the mockup's approvals link */
+:root .statusbar .status-activity { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; min-width: 0; }
+:root .statusbar .status-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border-radius: 3px; color: var(--accent); font-weight: 500; font-size: 12px; white-space: nowrap; }
+:root .statusbar .status-link .icon { width: 14px; height: 14px; }
+:root .statusbar .status-link.calm { color: var(--muted); font-weight: 400; }
+/* The list of the detached windows opens upwards, above the bar */
+:root .statusbar .detached-menu { top: auto; bottom: calc(100% + 8px); }

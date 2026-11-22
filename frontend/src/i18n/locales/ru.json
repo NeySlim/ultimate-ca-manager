@@ -8078,7 +8078,6 @@
     "approvalsPending_few": "{{count}} одобрения ожидают",
     "approvalsPending_many": "{{count}} одобрений ожидают",
     "approvalsPending_other": "{{count}} одобрения ожидают",
-    "approvalsNone": "Нет ожидающих одобрений",
     "theme": {
       "menu": "Тема",
       "label": "Тема: {{theme}}",
