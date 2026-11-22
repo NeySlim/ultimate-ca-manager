@@ -6,7 +6,7 @@ vi.mock('@playwright/test', async (importOriginal) => ({
   ...(await importOriginal()),
   request: {
     newContext: vi.fn(async () => ({
-      post: async (url) => { calls.push(['POST', url]); return { ok: () => true, status: () => 200, json: async () => ({ data: { csrf_token: 't' } }) } },
+      post: async (url) => { calls.push(['POST', url]); return { ok: () => true, status: () => 200, headers: () => ({ 'content-type': 'application/json' }), json: async () => ({ data: { csrf_token: 't' } }) } },
       fetch: async (url, opts) => {
         calls.push([opts.method, url])
         return { ok: () => true, status: () => 200, headers: () => ({ 'content-type': 'application/json' }), json: async () => ({ data: {} }) }

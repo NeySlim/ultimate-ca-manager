@@ -143,6 +143,20 @@ describe('the console takes the drawn chapter over', () => {
     expect(container.querySelector(`.guide-onpage a[href="#${id}"]`).getAttribute('aria-current')).toBe('true')
   })
 
+  it('searches the words typed in the drawn field before it took the page over, and keeps them', async () => {
+    await drawn('en', 'navigation')
+    const field = container.querySelector('#guide-search')
+    field.focus()
+    field.value = 'REVOCATION crl'
+    expect(await takeOverServedGuide(container, window.location)).toBe(true)
+    await hydrate()
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)) })
+    expect(errors).not.toHaveBeenCalled()
+    expect(container.querySelector('#guide-search')).toBe(field)
+    expect(field.value).toBe('REVOCATION crl')
+    expect(container.querySelectorAll('#guide-results .guide-result').length).toBeGreaterThan(0)
+  })
+
   it.each([
     ['another language', async () => { await i18n.changeLanguage('de') }, '/guide/cas'],
     ['a query', async () => {}, '/guide/cas?q=crl'],

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import type { APIRequestContext } from '@playwright/test'
+import type { APIRequestContext, APIResponse } from '@playwright/test'
 import { strongPassword } from './password'
 
 export const ADMIN_USER = 'admin'
@@ -12,27 +12,58 @@ export class ApiError extends Error {
   }
 }
 
+/** The server's answer to a write that met another one on SQLite (backend utils/sqlite_wait.BUSY_MESSAGE). */
+export const BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
+
+export type Backoff = { delays: readonly number[], sleep: (ms: number) => Promise<void> }
+/** Five more attempts at most, the waits doubling, each one no longer than the answer's Retry-After. */
+export const BUSY_BACKOFF: Backoff = { delays: [250, 500, 1000, 2000, 4000], sleep: (ms) => new Promise((r) => setTimeout(r, ms)) }
+
+type Read = { status: number, ok: boolean, body: any, headers: Record<string, string> }
+
+async function read(r: APIResponse): Promise<Read> {
+  const type = r.headers()['content-type'] || ''
+  const body = type.includes('json') ? await r.json() : await r.text()
+  return { status: r.status(), ok: r.ok(), body, headers: r.headers() }
+}
+
+/** Only the busy answer of the server is sent again ("retry shortly"); any other 503 (restore, CRL) is the test's. */
+export function isBusy(r: { status: number, body: unknown }) {
+  return r.status === 503 && !!r.body && typeof r.body === 'object' && (r.body as { detail?: unknown }).detail === BUSY_MESSAGE
+}
+
+async function untilNotBusy(what: string, send: () => Promise<APIResponse>, backoff: Backoff): Promise<Read> {
+  let r = await read(await send())
+  for (const delay of backoff.delays) {
+    if (!isBusy(r)) break
+    const after = Number(r.headers['retry-after'])
+    const wait = Number.isFinite(after) && after >= 0 ? Math.min(delay, after * 1000) : delay
+    console.log(`E2E busy: ${what} answered 503 busy, sent again in ${wait} ms`)
+    await backoff.sleep(wait)
+    r = await read(await send())
+  }
+  return r
+}
+
 /** The JSON API with the session of the page it was opened from (cookies are shared). */
 export class Api {
-  constructor(private request: APIRequestContext, private csrf: string) {}
+  constructor(private request: APIRequestContext, private csrf: string, private backoff: Backoff = BUSY_BACKOFF) {}
 
-  static async login(request: APIRequestContext, username: string, password: string): Promise<Api> {
-    const r = await request.post('/api/v2/auth/login', { data: { username, password } })
-    const body = await r.json().catch(() => ({}))
-    if (!r.ok()) throw new ApiError(r.status(), body, `login ${username}`)
-    return new Api(request, body?.data?.csrf_token || '')
+  static async login(request: APIRequestContext, username: string, password: string, backoff: Backoff = BUSY_BACKOFF): Promise<Api> {
+    const r = await untilNotBusy(`login ${username}`, () => request.post('/api/v2/auth/login', { data: { username, password } }), backoff)
+    const body = r.body && typeof r.body === 'object' ? r.body as { data?: { csrf_token?: string } } : {}
+    if (!r.ok) throw new ApiError(r.status, r.body, `login ${username}`)
+    return new Api(request, body?.data?.csrf_token || '', backoff)
   }
 
   async call(method: string, path: string, data?: unknown, okOnly = true) {
-    const r = await this.request.fetch(`/api/v2${path}`, {
+    const r = await untilNotBusy(`${method} ${path}`, () => this.request.fetch(`/api/v2${path}`, {
       method,
       headers: { 'X-CSRF-Token': this.csrf },
       ...(data === undefined ? {} : { data }),
-    })
-    const type = r.headers()['content-type'] || ''
-    const body = type.includes('json') ? await r.json() : await r.text()
-    if (okOnly && !r.ok()) throw new ApiError(r.status(), body, `${method} ${path}`)
-    return { status: r.status(), body, headers: r.headers() }
+    }), this.backoff)
+    if (okOnly && !r.ok) throw new ApiError(r.status, r.body, `${method} ${path}`)
+    return { status: r.status, body: r.body, headers: r.headers }
   }
 
   async get(path: string) { return (await this.call('GET', path)).body?.data }

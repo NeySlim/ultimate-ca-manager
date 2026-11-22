@@ -105,10 +105,15 @@ async function footerReachedByScrolling(page, api, height: number) {
   const main = page.getByRole('main')
   const next = main.locator('.table-footer').getByRole('button', { name: 'Next page' })
   await expect(next).toBeAttached()
+  await expect(main.locator('.sk-row, .sk-record')).toHaveCount(0)
   await page.mouse.move(195, height / 2)
-  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 500)
   const bar = (await box(page.getByRole('contentinfo'))).y
-  await expect.poll(async () => { const b = await box(next); return b.y >= 0 && b.y + b.height <= bar }).toBe(true)
+  // The list is read again as other tests issue certificates: the wheel goes on until the pagination shows
+  await expect.poll(async () => {
+    await page.mouse.wheel(0, 1000)
+    const b = await box(next)
+    return b.y >= 0 && b.y + b.height <= bar
+  }).toBe(true)
 }
 
 for (const [w, h] of [[390, 844], [800, 1000]]) {

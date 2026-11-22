@@ -1,6 +1,7 @@
 import { test, expect, createCA, issueCert, type Api } from './support/fixtures'
 import type { Page } from '@playwright/test'
 import { PALETTES, usePalette, expectPalette, boxes } from './support/themes'
+import { freezeApi, type Frozen } from './support/frozen'
 
 const CARDS = [
   'To handle', 'Automation health', 'Hierarchy', 'Expiry horizon', 'Compliance', 'Latest operations', 'Certificate activity',
@@ -141,8 +142,11 @@ test('a change of theme moves nothing on the overview', async ({ page, api }) =>
   await page.setViewportSize({ width: 1600, height: 1000 })
   await withDefaultLayout(api, async () => {
     const measured: Record<string, Record<string, number[][]>> = {}
+    // The scheduler writes beside this project too: every palette reads the first one's answers
+    const kept: Frozen = new Map()
     for (const [family, mode] of PALETTES) {
       await page.unrouteAll({ behavior: 'ignoreErrors' })
+      await freezeApi(page, kept)
       await usePalette(page, family, mode)
       await page.goto('/')
       await expectPalette(page, family, mode)

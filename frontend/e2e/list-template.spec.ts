@@ -1,4 +1,5 @@
 import { test, expect, createCA, issueCert, uid } from './support/fixtures'
+import { freezeApi } from './support/frozen'
 
 // The list template measured where jsdom cannot (COLONNES-SPEC G1, G2): on Certificates, the authorities' list
 // and CRL / OCSP, no horizontal scroll at any desktop width, the chevron always in view, the folded columns said
@@ -371,7 +372,11 @@ test.describe('the column handles (C2)', () => {
 
   test('drag, keyboard, double-click, kept after a reload, reset from the footer; never a sideways scroll', async ({ page, api }) => {
     await createCA(api)
+    // The widths follow the rows: read once, as other tests create authorities, and measured once laid out
+    await freezeApi(page)
     await open(page, LISTS[2])
+    await expect(page.locator('#module-scroll tbody tr.sk-row')).toHaveCount(0)
+    await expect(page.locator('#module-scroll table.measuring')).toHaveCount(0)
     // The second data column, a fitted one: the name absorbs the room left
     const th = page.locator('#module-scroll thead th:has(> [role=separator])').nth(1)
     const grip = th.locator(':scope > [role=separator]')
@@ -384,8 +389,12 @@ test.describe('the column handles (C2)', () => {
     const box = (await grip.boundingBox())!
     expect(Math.round(box.width)).toBe(12)
     expect(await grip.evaluate((g) => getComputedStyle(g).cursor)).toBe('col-resize')
-    await page.mouse.move(box.x + 6, box.y + box.height / 2)
-    await expect.poll(line).toEqual(['2px', `${Math.round(box.height)}px`])
+    // The pointer is brought onto the handle where it is drawn now
+    await expect.poll(async () => {
+      const at = (await grip.boundingBox())!
+      await page.mouse.move(at.x + 6, at.y + at.height / 2)
+      return line()
+    }).toEqual(['2px', `${Math.round(box.height)}px`])
 
     // Drag 80 px to the right
     const drag = async (dx: number) => {
