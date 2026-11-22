@@ -18,6 +18,9 @@
 :root .atl .table-container .entity-line>.entity-name{min-width:0;flex:0 1 auto}
 :root .atl .table-container .entity-line>:not(.entity-name){flex-shrink:0}
 :root .atl .table-container .entity-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* A group of badges (the mockup's .ca-badges, a block) keeps its own line under the name, as in the flow. */
+:root .atl .table-container .entity-line:has(>.ca-badges){flex-wrap:wrap}
+:root .atl .table-container .entity-line>.ca-badges{flex-basis:100%}
 /* A growing column's header keeps its whole label: the copied ceiling stays on its cells only. */
 :root .atl .table-container th.col-description{max-width:none}
 

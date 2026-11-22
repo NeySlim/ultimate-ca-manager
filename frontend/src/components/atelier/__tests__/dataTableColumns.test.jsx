@@ -34,7 +34,16 @@ const widthOf = (th) => {
   return Number.isNaN(cap) ? NATURAL[id] : Math.min(NATURAL[id], cap)
 }
 const saved = {}
+// The name's line (its button and its marks) and its button alone
+const marks = { line: 0, button: 0 }
 beforeAll(() => {
+  // No padding in the cells: jsdom's own 1 px would add to the name's floor
+  saved.style = document.head.appendChild(Object.assign(document.createElement('style'), { textContent: 'td, th { padding: 0 }' }))
+  saved.offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get() { return this.classList?.contains('entity-name') ? marks.button : 0 },
+  })
   saved.client = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
   saved.scroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth')
   saved.rect = HTMLElement.prototype.getBoundingClientRect
@@ -47,6 +56,7 @@ beforeAll(() => {
     configurable: true,
     get() {
       if (this.classList?.contains('description-cell')) return GROW_TEXT
+      if (this.classList?.contains('entity-line')) return marks.line
       if (!this.classList?.contains('table-scroll')) return 0
       return Math.max(room.width, [...this.querySelectorAll('thead th')].reduce((sum, th) => sum + widthOf(th), 0))
     },
@@ -58,13 +68,14 @@ beforeAll(() => {
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
 })
 afterAll(() => {
-  for (const [name, d] of [['clientWidth', saved.client], ['scrollWidth', saved.scroll]]) {
+  for (const [name, d] of [['clientWidth', saved.client], ['scrollWidth', saved.scroll], ['offsetWidth', saved.offset]]) {
     if (d) Object.defineProperty(HTMLElement.prototype, name, d); else delete HTMLElement.prototype[name]
   }
   HTMLElement.prototype.getBoundingClientRect = saved.rect
+  saved.style.remove()
   global.ResizeObserver = saved.RO
 })
-beforeEach(() => { room.width = 1000 })
+beforeEach(() => { room.width = 1000; marks.line = 0; marks.button = 0 })
 
 const rows = [{ id: 1, name: 'a-long-name.example.com', ca: 'UCM Production Intermediate CA' }, { id: 2, name: 'b.example.com', ca: 'UCM Root' }]
 const columns = [
@@ -131,6 +142,13 @@ describe('a list short of room', () => {
     expect(cap(container, 'expiry')).toBe('')
   })
 
+  it('a name that also takes the room left (the Authorities list) gives way as well', () => {
+    room.width = 800
+    const { container } = render(<div id="app" className="dock-right">{table({ columns: [{ ...columns[0], grow: true }, ...columns.slice(1)] })}</div>)
+    expect(cap(container, 'name')).toBe('230px')
+    expect(cap(container, 'ca')).toBe('230px')
+  })
+
   it('beside the right dock, folds a column only once the free text is at its floor, then gives the room back', () => {
     // At the floor: 2 × 120 + 80 + 130 + 90 + 40 = 580 > 500: the key folds, and the free text gives way again from its natural width
     room.width = 500
@@ -145,6 +163,16 @@ describe('a list short of room', () => {
     const { container } = render(<div id="app">{table()}</div>)
     expect(heads(container)).toEqual(['name', 'status', 'ca', 'expiry', 'key', '·'])
     expect(cap(container, 'name')).toBe(`${CEDE_FLOOR}px`)
+    expect(cap(container, 'ca')).toBe(`${CEDE_FLOOR}px`)
+  })
+
+  it('the name keeps room for its marks besides the floor of its text', () => {
+    // Its marks take 150 px of its 300: it stops at 270 while the issuer goes down to the floor
+    room.width = 500
+    marks.line = 300
+    marks.button = 150
+    const { container } = render(<div id="app">{table()}</div>)
+    expect(cap(container, 'name')).toBe('270px')
     expect(cap(container, 'ca')).toBe(`${CEDE_FLOOR}px`)
   })
 

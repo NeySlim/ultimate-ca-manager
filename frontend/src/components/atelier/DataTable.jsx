@@ -83,7 +83,7 @@ function useFittedColumns(scrollRef, columns, texts, lead, rowsKey, active) {
     // Short of room: the table overflows, or a growing description keeps less than the floor its text asks for
     let over = el.scrollWidth - el.clientWidth
     shown.forEach((c, i) => {
-      if (!c.grow || !heads[lead + i]) return
+      if (!c.grow || c.entity || !heads[lead + i]) return
       const text = Math.max(0, ...rowsShown.map((tr) => tr.children[lead + i].scrollWidth))
       over = Math.max(over, Math.min(CEDE_FLOOR, text) - heads[lead + i].getBoundingClientRect().width)
     })
@@ -96,7 +96,19 @@ function useFittedColumns(scrollRef, columns, texts, lead, rowsKey, active) {
       shown.forEach((c, i) => {
         if (!texts.includes(c.id) || !heads[lead + i]) return
         widths[c.id] = heads[lead + i].getBoundingClientRect().width
-        floors[c.id] = cells[lead + i] ? parseFloat(getComputedStyle(cells[lead + i]).minWidth) || 0 : 0
+        const cs = cells[lead + i] ? getComputedStyle(cells[lead + i]) : null
+        floors[c.id] = cs ? parseFloat(cs.minWidth) || 0 : 0
+        // A name keeps its marks whole beside the floor of its own text
+        if (c.entity && cs) {
+          const marks = Math.max(0, ...rowsShown.map((tr) => {
+            const line = tr.children[lead + i].querySelector('.entity-line')
+            if (!line) return 0
+            // On one line the marks follow the name; a group of badges under it is as wide as its widest
+            const others = [...line.children].filter((el) => !el.classList.contains('entity-name')).map((el) => el.offsetWidth)
+            return Math.max(line.scrollWidth - (line.querySelector('.entity-name')?.offsetWidth || 0), ...others)
+          }))
+          floors[c.id] = Math.max(floors[c.id], marks + CEDE_FLOOR + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0))
+        }
       })
       const next = cedeWidths(widths, over, floors)
       if (next) { setCaps(next); return }
@@ -135,8 +147,8 @@ export function DataTable({
   const chevronLabel = (row) => (openLabel ? openLabel(row) : t('table.openRow', { name: rowLabel(row) }))
   const firstRead = loading && !rows.length
   const scrollRef = useRef(null)
-  // The free text that gives way when short of room (the growing description shortens itself in CSS)
-  const texts = k.share ? allColumns.filter((c) => freeText(c) && !c.grow).map((c) => c.id) : []
+  // The free text that gives way when short of room (a growing description shortens itself in CSS, a growing name does not)
+  const texts = k.share ? allColumns.filter((c) => freeText(c) && (c.entity || !c.grow)).map((c) => c.id) : []
   const { folded, caps } = useFittedColumns(scrollRef, allColumns, texts, selection ? 1 : 0, rows.map(rowKey).join(','), !(isMobile && card))
   const columns = folded.size ? allColumns.filter((c) => !folded.has(c.id)) : allColumns
   // A free-text cell stops at its ceiling or at the width set by hand, an ellipsis after it; any other column holds its content
