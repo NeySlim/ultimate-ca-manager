@@ -15,6 +15,7 @@
  */
 
 import { loginUrl } from '../navigation/safeNext'
+import { adoptSharedLock } from '../lib/sessionLock'
 
 const API_BASE_URL = '/api/v2'
 
@@ -248,6 +249,8 @@ class APIClient {
             && !window.location.pathname?.includes('/login')) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
           loginRedirectPending = true
+          // A lock made in another tab of this account opens its lock screen, not the sign-in page
+          adoptSharedLock()
           const { pathname = '/', search = '', hash = '' } = window.location
           window.location.href = loginUrl(pathname, search, hash)
         }

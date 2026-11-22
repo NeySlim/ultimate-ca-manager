@@ -1,6 +1,6 @@
 /** The locked account is kept for this tab only, and a broken storage never throws; the lock reaches the other tabs. */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { saveLock, readLock, clearLock, announceLock, listenForLocks } from '../sessionLock'
+import { saveLock, readLock, clearLock, announceLock, listenForLocks, shareLock, readSharedLock, clearSharedLock, setTabAccount, adoptSharedLock } from '../sessionLock'
 
 describe('sessionLock', () => {
   beforeEach(() => { sessionStorage.clear(); localStorage.clear() })
@@ -61,5 +61,37 @@ describe('sessionLock', () => {
     await vi.waitFor(() => expect(heard).toEqual([{ username: 'bob', reason: 'manual' }]))
     other.close()
     stop()
+  })
+
+  describe('the lock shared with the tabs that missed its message', () => {
+    beforeEach(() => setTabAccount(null))
+
+    it('keeps the account name and the reason only, across tabs', () => {
+      shareLock({ username: 'alice', name: 'Alice Martin', role: 'admin', method: 'password', reason: 'manual' })
+      expect(readSharedLock()).toEqual({ username: 'alice', reason: 'manual' })
+      expect(sessionStorage.length).toBe(0)
+      clearSharedLock()
+      expect(readSharedLock()).toBeNull()
+    })
+
+    it('is taken by a tab signed in as the same account, with its own account for the lock screen', () => {
+      shareLock({ username: 'alice', reason: 'manual' })
+      setTabAccount({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'webauthn' })
+      expect(adoptSharedLock()).toBe(true)
+      expect(readLock()).toEqual({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'webauthn', reason: 'manual' })
+    })
+
+    it('is left by a tab of another account, or of no account', () => {
+      shareLock({ username: 'alice', reason: 'manual' })
+      expect(adoptSharedLock()).toBe(false)
+      setTabAccount({ username: 'bob' })
+      expect(adoptSharedLock()).toBe(false)
+      expect(readLock()).toBeNull()
+    })
+
+    it('reads a damaged value as no lock', () => {
+      localStorage.setItem('ucm_session_lock_shared', '{not json')
+      expect(readSharedLock()).toBeNull()
+    })
   })
 })

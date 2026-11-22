@@ -4,6 +4,7 @@
  */
 const KEY = 'ucm_locked_session'
 const CHANNEL = 'ucm-session-lock'
+const SHARED_KEY = 'ucm_session_lock_shared'
 
 export function saveLock(account) {
   if (!account?.username) return
@@ -29,6 +30,48 @@ export function readLock() {
 
 export function clearLock() {
   try { sessionStorage.removeItem(KEY) } catch { /* noop */ }
+}
+
+// The lock as its tab made it, for the tabs that miss its message (loading, frozen, no channel):
+// only the account name and the reason leave the tab; the tabs of that account take it once
+// they find the session gone. A sign-in or a sign-out removes it.
+export function shareLock(account) {
+  if (!account?.username) return
+  try {
+    localStorage.setItem(SHARED_KEY, JSON.stringify({
+      username: String(account.username),
+      reason: account.reason === 'manual' ? 'manual' : 'idle',
+    }))
+  } catch { /* the other tabs then show the sign-in page */ }
+}
+
+export function readSharedLock() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SHARED_KEY) || 'null')
+    if (!value || typeof value.username !== 'string' || !value.username) return null
+    return { username: value.username, reason: value.reason === 'manual' ? 'manual' : 'idle' }
+  } catch {
+    return null
+  }
+}
+
+export function clearSharedLock() {
+  try { localStorage.removeItem(SHARED_KEY) } catch { /* noop */ }
+}
+
+// The account this tab is signed in as, set by the auth context, for a request refused outside it
+let tabAccount = null
+
+export function setTabAccount(account) {
+  tabAccount = account?.username ? { ...account, username: String(account.username) } : null
+}
+
+/** Keeps the lock screen of this tab's account when its lock was made in another tab. */
+export function adoptSharedLock() {
+  const shared = readSharedLock()
+  if (!shared || !tabAccount || shared.username !== tabAccount.username) return false
+  saveLock({ ...tabAccount, reason: shared.reason })
+  return true
 }
 
 // The tabs of a browser share one session: a lock in one closes it for all, and tells the others
