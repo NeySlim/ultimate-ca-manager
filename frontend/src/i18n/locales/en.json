@@ -474,7 +474,9 @@
       "active": "Active",
       "revoked": "Revoked"
     },
-    "chooseFile": "Choose a file…"
+    "chooseFile": "Choose a file…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificate, page or action…",

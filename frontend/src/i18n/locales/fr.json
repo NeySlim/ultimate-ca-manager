@@ -2377,7 +2377,9 @@
       "active": "Actif",
       "revoked": "Révoqué"
     },
-    "chooseFile": "Choisir un fichier…"
+    "chooseFile": "Choisir un fichier…",
+    "more": "Plus",
+    "otherViews": "Autres vues"
   },
   "compare": {
     "title": "Comparer les certificats",

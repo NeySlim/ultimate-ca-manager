@@ -476,7 +476,9 @@
       "revoked": "Відкликано"
     },
     "duplicateKey": "Інший рядок вище вже використовує \"{{key}}\": зберегти можна лише один із них",
-    "chooseFile": "Виберіть файл…"
+    "chooseFile": "Виберіть файл…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",

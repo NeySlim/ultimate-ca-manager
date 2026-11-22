@@ -1,7 +1,7 @@
 import { test, expect } from './support/fixtures'
 
-// The views of a protocol page are tabs under its head, the row scrolling on its own when narrower
-// than its tabs; the settings table of contents scrolls on its own when taller than the page
+// The views of a protocol page are tabs under its head, those past the room in a « More » menu at the
+// end of the row (never a scroll); the settings table of contents scrolls on its own when taller than the page
 const EPS = 1
 type Box = { x: number; y: number; width: number; height: number }
 const box = async (locator): Promise<Box> => {
@@ -31,8 +31,9 @@ test.describe('the views of a protocol page', () => {
     await dns.press('ArrowRight')
     await expect(page).toHaveURL(/\/acme\?tab=domains$/)
     await expect(tabs.getByRole('tab', { name: /^Client domains/ })).toBeFocused()
-    // At 1600 px every tab of the eleven shows: the row does not scroll
-    expect(await tabs.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+    // At 1600 px every tab of the eleven shows: no « More »
+    await expect(tabs.getByRole('tab')).toHaveCount(11)
+    await expect(page.getByRole('button', { name: 'More', exact: true })).toHaveCount(0)
   })
 
   test('SCEP: a view is reached by its tab and kept in the address', async ({ page, api }) => {
@@ -49,28 +50,36 @@ for (const [width, height] of [[1000, 800], [390, 844]]) {
   test.describe(`${width} px`, () => {
     test.use({ viewport: { width, height } })
 
-    test('the row of ACME views keeps to the page and its last tab is reached', async ({ page, api }) => {
+    test('the ACME views past the room go into « More », the row never scrolls, the shown one stays in it', async ({ page, api }) => {
       await page.goto('/acme')
       const tabs = page.getByRole('tablist', { name: 'View' })
-      const t = await box(tabs)
+      const t = await box(page.locator('.page-views'))
       const head = await box(page.locator('.page-head'))
       expect(t.x).toBeGreaterThanOrEqual(head.x - EPS)
       expect(t.x + t.width).toBeLessThanOrEqual(head.x + head.width + EPS)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-      // The row overflows: a shadow marks the hidden end
-      expect(await tabs.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
-      await expect(page.locator('.page-views')).toHaveAttribute('data-more-end', '')
+      expect(await tabs.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+      const shown = await tabs.getByRole('tab').count()
+      expect(shown).toBeLessThan(11)
+      const more = page.getByRole('button', { name: 'More', exact: true })
+      const m = await box(more)
+      expect(m.x + m.width).toBeLessThanOrEqual(t.x + t.width + EPS)
+      expect(await reachable(more)).toBe(true)
+      // The menu holds the others, counters with them; the last view taken from it comes into the row
+      await more.click()
+      const menu = page.getByRole('menu', { name: 'Other views' })
+      await expect(menu.getByRole('menuitem')).toHaveCount(11 - shown)
+      await expect(menu.getByRole('menuitem', { name: /^Issued certificates/ }).locator('.counter')).toBeVisible()
+      await menu.getByRole('menuitem', { name: /^Issued certificates/ }).click()
+      await expect(page).toHaveURL(/\/acme\?tab=history/)
       const last = tabs.getByRole('tab', { name: /^Issued certificates/ })
-      await last.focus()
-      await expect(page).toHaveURL(/\/acme$/)
-      await last.press('Enter')
-      await expect(page).toHaveURL(/\/acme\?tab=history$/)
-      // The shown tab is brought into the row, clear of its edge
-      await expect.poll(async () => {
-        const l = await box(last)
-        return l.x + l.width <= t.x + t.width + EPS && l.x >= t.x - EPS
-      }).toBe(true)
-      await expect(page.locator('.page-views')).toHaveAttribute('data-more-start', '')
+      await expect(last).toHaveAttribute('aria-selected', 'true')
+      await expect(last).toBeFocused()
+      expect(await reachable(last)).toBe(true)
+      // From the keyboard the arrows walk every view, the menu ones included
+      await last.press('ArrowRight')
+      await expect(page).toHaveURL(/\/acme\?tab=accounts/)
+      await expect(tabs.getByRole('tab', { name: /^Accounts/ })).toBeFocused()
     })
   })
 }

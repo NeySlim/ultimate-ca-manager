@@ -474,7 +474,9 @@
       "revoked": "失効済み"
     },
     "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません",
-    "chooseFile": "ファイルを選択…"
+    "chooseFile": "ファイルを選択…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",

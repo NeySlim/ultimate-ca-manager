@@ -474,7 +474,9 @@
       "revoked": "Revogado"
     },
     "duplicateKey": "Outra linha acima já usa \"{{key}}\": só uma delas pode ser salva",
-    "chooseFile": "Escolher um arquivo…"
+    "chooseFile": "Escolher um arquivo…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Pesquisar comandos, certificados, CAs, usuários...",

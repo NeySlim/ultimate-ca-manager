@@ -474,7 +474,9 @@
       "revoked": "Widerrufen"
     },
     "duplicateKey": "Eine weitere Zeile oberhalb verwendet bereits „{{key}}“: Nur eine davon kann gespeichert werden",
-    "chooseFile": "Datei auswählen…"
+    "chooseFile": "Datei auswählen…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",

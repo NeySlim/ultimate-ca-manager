@@ -137,17 +137,19 @@
 /* Protocol pages: a form inside a dock section keeps the mockup's 12 px rhythm around it (the mockup's docks hold no form). */
 .atl .module-detail .dock-form{margin:12px 0}
 /*
- * The views of a protocol page: the mockup's .view-btn row under the page head (as its .filters-row),
- * scrolling on its own when wider than the page, a shadow of the page's background on the hidden edge.
+ * The views of a protocol page: the mockup's .view-btn row under the page head (as its .filters-row);
+ * the tabs past the room leave the row for a « More » menu at its end (ViewSwitch), never a scroll.
  */
-.atl .page-views{position:relative;border-bottom:1px solid var(--line);margin-bottom:13px;flex-shrink:0;min-width:0}
-.atl .page-views-row{position:relative;display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--control) transparent}
+.atl .page-views{position:relative;display:flex;align-items:center;border-bottom:1px solid var(--line);margin-bottom:13px;flex-shrink:0;min-width:0}
+.atl .page-views-row{position:relative;display:flex;align-items:center;gap:5px;flex:0 1 auto;min-width:0;overflow:hidden}
 .atl .page-views-row .view-btn:first-child{padding-left:2px}
 .atl .page-views-row .tools-divider{flex-shrink:0}
-.atl .page-views::before,.atl .page-views::after{content:'';position:absolute;top:0;bottom:0;width:24px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:1}
-.atl .page-views::before{left:0;background:linear-gradient(to right,var(--bg),transparent)}
-.atl .page-views::after{right:0;background:linear-gradient(to left,var(--bg),transparent)}
-.atl .page-views[data-more-start]::before,.atl .page-views[data-more-end]::after{opacity:1}
+/* A tab or divider past the room keeps its width for the measure, out of the row, the reading and the pointer */
+.atl .page-views-row>[data-overflow]{position:absolute;top:0;left:0;visibility:hidden;pointer-events:none}
+.atl .views-more{flex:none;margin-left:5px}
+.atl .views-more-btn .icon{width:12px;height:12px}
+.atl .views-more-btn[aria-expanded=true]{color:var(--text)}
+.atl .views-menu .tabs-menu-open .counter{margin-left:8px}
 .atl .view-panel{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
 @media(max-width:800px){.atl .page-views{margin-bottom:12px}.atl .view-panel{display:block}}
 /* ACME server profiles: one row of six controls (name, description, validity, digest, template, remove); one column on a phone. */

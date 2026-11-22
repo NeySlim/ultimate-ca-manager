@@ -474,7 +474,9 @@
       "revoked": "Revocato"
     },
     "duplicateKey": "Un'altra riga qui sopra usa già \"{{key}}\": solo una delle due può essere salvata",
-    "chooseFile": "Scegli un file…"
+    "chooseFile": "Scegli un file…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",

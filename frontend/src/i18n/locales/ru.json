@@ -476,7 +476,9 @@
       "active": "Активно",
       "revoked": "Отозван"
     },
-    "chooseFile": "Выбрать файл…"
+    "chooseFile": "Выбрать файл…",
+    "more": "Ещё",
+    "otherViews": "Другие разделы"
   },
   "commandPalette": {
     "searchPlaceholder": "Поиск команд, сертификатов, ЦС, пользователей...",
