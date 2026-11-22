@@ -5,7 +5,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ListView, Toolbar, IconBtn, Pill, EmptyBlock, NoMatch, useClientList } from '../../components/atelier'
+import { ListView, Toolbar, IconBtn, Pill, EmptyBlock, NoMatch, useClientList, useSortParam } from '../../components/atelier'
 import { stateLabel } from '../../lib/stateLabel'
 import { dateOf } from '../admin/adminDates'
 import { Notice } from '../protocols/atelierParts'
@@ -14,6 +14,9 @@ import OrderDetailPanel from './OrderDetailPanel'
 
 const ORDER_STATUSES = ['pending', 'processing', 'validating', 'ready', 'valid', 'issued', 'invalid']
 const TONES = { valid: 'good', issued: 'good', ready: 'good', pending: 'warn', processing: 'warn', validating: 'warn', invalid: 'bad' }
+// The newest order first (T4), kept in the address (T9)
+const NEWEST = { key: 'created', asc: false }
+const SORT_KEYS = ['name', 'account', 'env', 'method', 'created', 'failures', 'state']
 
 export default function LetsEncryptOrdersTab({
   clientOrders = [], partial = null, selectedClientOrder, onSelectOrder, onRefresh, onCheckOrderStatus, onVerifyChallenge, onFinalizeOrder,
@@ -30,8 +33,10 @@ export default function LetsEncryptOrdersTab({
   const env = (o) => t(o.environment === 'production' ? 'acme.production' : 'acme.staging')
   const account = (o) => o.acme_client_account_label || o.account_email || (o.account_short_id ? `${o.account_short_id}…` : '—')
   // The page reads every order of the client (up to its cap): sorted and paged here
+  const sortParam = useSortParam(NEWEST, SORT_KEYS)
   const list = useClientList(visibleOrders, {
     resetKey: status,
+    sortParam,
     sorts: {
       name, account: (o) => (account(o) === '—' ? null : account(o)), env, method: (o) => o.challenge_type,
       created: (o) => o.created_at && Date.parse(o.created_at), failures: (o) => o.renewal_failures || 0,
@@ -50,12 +55,13 @@ export default function LetsEncryptOrdersTab({
         toolbar={<Toolbar><IconBtn icon="refresh" label={t('common.refresh')} onClick={onRefresh} /></Toolbar>}
         title={name} status={pill} openedId={selectedClientOrder?.id} onOpen={onSelectOrder}
         columns={[
-          { id: 'account', label: t('acme.accountOrCa'), cell: account, grow: true, sort: 'account' },
-          { id: 'env', label: t('acme.environment'), cell: env, sort: 'env' },
-          { id: 'method', label: t('acme.method'), cell: (o) => o.challenge_type?.toUpperCase() || t('common.unknown'), sort: 'method' },
-          { id: 'created', label: t('common.created'), cell: (o) => dateOf(o.created_at, locale) || '—', sort: 'created' },
-          { id: 'failures', label: t('acme.renewalFailuresLabel'), cell: (o) => (o.renewal_failures > 0
-            ? <span className="warn" title={o.error_message || ''}>{t('acme.renewalFailures', { count: o.renewal_failures })}</span> : '—'), sort: 'failures' },
+          { id: 'account', label: t('acme.accountOrCa'), cell: account, kind: 'text', priority: 2, sort: 'account' },
+          { id: 'env', label: t('acme.environment'), cell: env, kind: 'fit', priority: 3, sort: 'env' },
+          { id: 'method', label: t('acme.method'), cell: (o) => o.challenge_type?.toUpperCase() || t('common.unknown'), kind: 'fit', priority: 3, sort: 'method' },
+          { id: 'created', label: t('common.created'), cell: (o) => dateOf(o.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created' },
+          // A count under a short header, the whole name in its title (L8); the last error on a failing row
+          { id: 'failures', label: t('acme.columns.failures'), labelFull: t('acme.renewalFailuresLabel'), kind: 'number', priority: 3, sort: 'failures',
+            cell: (o) => (o.renewal_failures > 0 ? <span className="warn" title={o.error_message || undefined}>{o.renewal_failures}</span> : '0') },
           { status: true, sort: 'state' },
         ]}
         empty={clientOrders.length ? (

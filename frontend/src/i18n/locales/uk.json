@@ -2496,7 +2496,8 @@
       "domainsSaveFailed": "Не вдалося зберегти дозволені домени",
       "deleteFailed": "Не вдалося видалити облікові дані EAB",
       "caption": "Облікові дані EAB. Активуйте назву, щоб відкрити її деталі.",
-      "noNotes": "Без примітки."
+      "noNotes": "Без примітки.",
+      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
     },
     "termsOfServiceTitlePlaceholder": "Умови надання послуг (залиште порожнім для приховування)",
     "termsOfServiceBodyPlaceholder": "Напишіть свої умови тут...\n\nПідтримує: **жирний**, *курсив*, [посилання](url), - списки\n\nВикористовуйте порожні рядки для абзаців.",
@@ -2764,7 +2765,13 @@
     "emptyAccountsTitle": "Немає облікового запису ACME",
     "emptyAccountsText": "Клієнти ACME (certbot, cert-manager, acme.sh) самі створюють свій обліковий запис через каталог: скопіюйте його URL у їхню конфігурацію.",
     "termsOfServiceTitle": "Заголовок",
-    "termsOfServiceBody": "Текст"
+    "termsOfServiceBody": "Текст",
+    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "columns": {
+      "failures": "Failures",
+      "wildcard": "Wildcard",
+      "orders": "Orders"
+    }
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -2895,7 +2902,8 @@
     "columns": {
       "ca": "ЦС",
       "template": "Шаблон",
-      "profile": "Профіль"
+      "profile": "Профіль",
+      "lastTest": "Last test"
     },
     "tabs": {
       "profile": "Профіль"
@@ -3044,7 +3052,8 @@
     "columns": {
       "published": "Опубліковано",
       "publication": "Publication",
-      "crlNumber": "CRL number"
+      "crlNumber": "CRL number",
+      "nextUpdate": "Next update"
     },
     "tabs": {
       "publication": "Публікація"
@@ -6742,7 +6751,8 @@
     "caption": "EST. Активуйте назву, щоб відкрити її деталі.",
     "defaultEndpoint": "Кінцева точка за замовчуванням",
     "columns": {
-      "auth": "Автентифікація"
+      "auth": "Автентифікація",
+      "authShort": "Authentication"
     },
     "auth": {
       "cert": "Сертифікат клієнта",

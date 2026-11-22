@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fetchAllPages, fetchPages } from '../fetchAllPages'
+import { fetchAllPages, fetchListing, fetchPages } from '../fetchAllPages'
 
 const pageOf = (page, perPage, total) => ({
   data: Array.from({ length: Math.max(0, Math.min(perPage, total - (page - 1) * perPage)) }, (_, i) => ({ id: (page - 1) * perPage + i + 1 })),
@@ -88,5 +88,24 @@ describe('fetchPages', () => {
     const getPage = vi.fn(({ page, per_page }) =>
       page === 2 ? Promise.reject(rateLimited(0)) : Promise.resolve(pageOf(page, per_page, 250)))
     await expect(fetchAllPages(getPage, { wait: () => Promise.resolve() })).rejects.toThrow()
+  })
+})
+
+describe('fetchListing', () => {
+  it('reads every row and says nothing when the listing is whole', async () => {
+    const getPage = vi.fn(({ page, per_page }) => Promise.resolve(pageOf(page, per_page, 230)))
+    const { rows, partial } = await fetchListing(getPage, { perPage: 100, max: 5000 })
+    expect(rows).toHaveLength(230)
+    expect(partial).toBeNull()
+  })
+
+  it('says the listing is partial past its cap, with the total the server holds', async () => {
+    const getPage = vi.fn(({ page, per_page }) => Promise.resolve(pageOf(page, per_page, 450)))
+    expect(await fetchListing(getPage, { perPage: 100, max: 300 })).toMatchObject({ partial: { loaded: 300, total: 450 } })
+  })
+
+  it('says the listing is partial when a page fails', async () => {
+    const getPage = vi.fn(({ page, per_page }) => (page === 2 ? Promise.reject(new Error('gone')) : Promise.resolve(pageOf(page, per_page, 250))))
+    expect(await fetchListing(getPage, { perPage: 100, attempts: 1 })).toMatchObject({ partial: { loaded: 150, total: 250 } })
   })
 })

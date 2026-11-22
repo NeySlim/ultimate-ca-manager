@@ -536,7 +536,8 @@
       "domainsSaveFailed": "Échec de l’enregistrement des domaines autorisés",
       "deleteFailed": "Échec de la suppression du justificatif EAB",
       "caption": "Identifiants EAB. Activez un nom pour ouvrir son détail.",
-      "noNotes": "Aucune note."
+      "noNotes": "Aucune note.",
+      "listPartial": "Liste partielle : {{loaded}} identifiants chargés sur {{total}}. Actualisez pour réessayer."
     },
     "termsOfServiceTitlePlaceholder": "Titre des CGU (laisser vide pour masquer)",
     "termsOfServiceBodyPlaceholder": "Rédigez vos conditions ici...\n\nSupporte : **gras**, *italique*, [liens](url), - listes\n\nUtilisez des lignes vides pour les paragraphes.",
@@ -790,7 +791,13 @@
     "emptyAccountsTitle": "Aucun compte ACME",
     "emptyAccountsText": "Les clients ACME (certbot, cert-manager, acme.sh) créent leur compte eux-mêmes auprès du répertoire : copiez son URL dans leur configuration.",
     "termsOfServiceTitle": "Titre",
-    "termsOfServiceBody": "Texte"
+    "termsOfServiceBody": "Texte",
+    "accountsListPartial": "Liste partielle : {{loaded}} comptes chargés sur {{total}}. Actualisez pour réessayer.",
+    "columns": {
+      "failures": "Échecs",
+      "wildcard": "Générique",
+      "orders": "Cdes"
+    }
   },
   "audit": {
     "event": "Événement",
@@ -2491,7 +2498,8 @@
     "columns": {
       "published": "Publiée",
       "publication": "Publication",
-      "crlNumber": "Numéro de CRL"
+      "crlNumber": "Numéro de CRL",
+      "nextUpdate": "Échéance"
     },
     "tabs": {
       "publication": "Publication"
@@ -3428,7 +3436,8 @@
     "columns": {
       "ca": "Autorité",
       "template": "Modèle",
-      "profile": "Profil"
+      "profile": "Profil",
+      "lastTest": "Dernier test"
     },
     "tabs": {
       "profile": "Profil"
@@ -6472,7 +6481,8 @@
     "caption": "EST. Activez un nom pour ouvrir son détail.",
     "defaultEndpoint": "Point par défaut",
     "columns": {
-      "auth": "Authentification"
+      "auth": "Authentification",
+      "authShort": "Authentification"
     },
     "auth": {
       "cert": "Certificat client",

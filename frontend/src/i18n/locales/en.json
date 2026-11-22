@@ -2408,7 +2408,8 @@
       "domainsSaveFailed": "Failed to save allowed domains",
       "deleteFailed": "Failed to delete EAB credential",
       "caption": "EAB credentials. Activate a name to open its detail.",
-      "noNotes": "No note."
+      "noNotes": "No note.",
+      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
     },
     "termsOfServiceTitlePlaceholder": "Terms of Service (leave empty to hide)",
     "termsOfServiceBodyPlaceholder": "Write your terms here...\n\nSupports: **bold**, *italic*, [links](url), - lists\n\nUse double empty lines for paragraphs.",
@@ -2662,7 +2663,13 @@
     "emptyAccountsTitle": "No ACME account",
     "emptyAccountsText": "ACME clients (certbot, cert-manager, acme.sh) create their account themselves with the directory: copy its URL into their configuration.",
     "termsOfServiceTitle": "Title",
-    "termsOfServiceBody": "Text"
+    "termsOfServiceBody": "Text",
+    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "columns": {
+      "failures": "Failures",
+      "wildcard": "Wildcard",
+      "orders": "Orders"
+    }
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -2783,7 +2790,8 @@
     "columns": {
       "ca": "Authority",
       "template": "Template",
-      "profile": "Profile"
+      "profile": "Profile",
+      "lastTest": "Last test"
     },
     "tabs": {
       "profile": "Profile"
@@ -2926,7 +2934,8 @@
     "columns": {
       "published": "Published",
       "publication": "Publication",
-      "crlNumber": "CRL number"
+      "crlNumber": "CRL number",
+      "nextUpdate": "Next update"
     },
     "tabs": {
       "publication": "Publication"
@@ -6472,7 +6481,8 @@
     "caption": "EST. Activate a name to open its detail.",
     "defaultEndpoint": "Default endpoint",
     "columns": {
-      "auth": "Authentication"
+      "auth": "Authentication",
+      "authShort": "Authentication"
     },
     "auth": {
       "cert": "Client certificate",

@@ -2408,7 +2408,8 @@
       "domainsSaveFailed": "許可ドメインの保存に失敗しました",
       "deleteFailed": "EAB資格の削除に失敗しました",
       "caption": "EAB認証情報。名前を操作すると詳細が開きます。",
-      "noNotes": "メモなし。"
+      "noNotes": "メモなし。",
+      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
     },
     "termsOfServiceTitlePlaceholder": "利用規約（空白で非表示）",
     "termsOfServiceBodyPlaceholder": "ここに規約を入力...\n\n対応：**太字**, *斜体*, [リンク](url), - リスト\n\n段落には空行を使用。",
@@ -2662,7 +2663,13 @@
     "emptyAccountsTitle": "ACMEアカウントがありません",
     "emptyAccountsText": "ACMEクライアント（certbot、cert-manager、acme.sh）は、ディレクトリを使って自分でアカウントを作成します。そのURLをクライアントの設定にコピーしてください。",
     "termsOfServiceTitle": "タイトル",
-    "termsOfServiceBody": "本文"
+    "termsOfServiceBody": "本文",
+    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "columns": {
+      "failures": "Failures",
+      "wildcard": "Wildcard",
+      "orders": "Orders"
+    }
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -2783,7 +2790,8 @@
     "columns": {
       "ca": "認証局",
       "template": "テンプレート",
-      "profile": "プロファイル"
+      "profile": "プロファイル",
+      "lastTest": "Last test"
     },
     "tabs": {
       "profile": "プロファイル"
@@ -2926,7 +2934,8 @@
     "columns": {
       "published": "公開日時",
       "publication": "Publication",
-      "crlNumber": "CRL number"
+      "crlNumber": "CRL number",
+      "nextUpdate": "Next update"
     },
     "tabs": {
       "publication": "公開"
@@ -6472,7 +6481,8 @@
     "caption": "EST。名前を操作すると詳細が開きます。",
     "defaultEndpoint": "既定のエンドポイント",
     "columns": {
-      "auth": "認証"
+      "auth": "認証",
+      "authShort": "Authentication"
     },
     "auth": {
       "cert": "クライアント証明書",

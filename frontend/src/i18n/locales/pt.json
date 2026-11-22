@@ -2408,7 +2408,8 @@
       "domainsSaveFailed": "Falha ao salvar os domínios permitidos",
       "deleteFailed": "Falha ao excluir credencial EAB",
       "caption": "Credenciais EAB. Ative um nome para abrir o respectivo detalhe.",
-      "noNotes": "Sem nota."
+      "noNotes": "Sem nota.",
+      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
     },
     "termsOfServiceTitlePlaceholder": "Termos de Serviço (deixe vazio para ocultar)",
     "termsOfServiceBodyPlaceholder": "Escreva seus termos aqui...\n\nSuporta: **negrito**, *itálico*, [links](url), - listas\n\nUse linhas vazias para parágrafos.",
@@ -2662,7 +2663,13 @@
     "emptyAccountsTitle": "Nenhuma conta ACME",
     "emptyAccountsText": "Os clientes ACME (certbot, cert-manager, acme.sh) criam eles próprios a conta a partir do diretório: copie o respectivo URL para a configuração.",
     "termsOfServiceTitle": "Título",
-    "termsOfServiceBody": "Texto"
+    "termsOfServiceBody": "Texto",
+    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "columns": {
+      "failures": "Failures",
+      "wildcard": "Wildcard",
+      "orders": "Orders"
+    }
   },
   "scep": {
     "title": "Protocolo SCEP",
@@ -2783,7 +2790,8 @@
     "columns": {
       "ca": "Autoridade",
       "template": "Modelo",
-      "profile": "Perfil"
+      "profile": "Perfil",
+      "lastTest": "Last test"
     },
     "tabs": {
       "profile": "Perfil"
@@ -2926,7 +2934,8 @@
     "columns": {
       "published": "Publicada",
       "publication": "Publication",
-      "crlNumber": "CRL number"
+      "crlNumber": "CRL number",
+      "nextUpdate": "Next update"
     },
     "tabs": {
       "publication": "Publicação"
@@ -6472,7 +6481,8 @@
     "caption": "EST. Ative um nome para abrir o respectivo detalhe.",
     "defaultEndpoint": "Endpoint predefinido",
     "columns": {
-      "auth": "Autenticação"
+      "auth": "Autenticação",
+      "authShort": "Authentication"
     },
     "auth": {
       "cert": "Certificado de cliente",

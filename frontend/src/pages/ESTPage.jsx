@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
   Zone, Btn, IconBtn, Icon, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
-  LoadError, LoadCause,
+  LoadError, LoadCause, useClientList, useSortParam,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { estService, casService } from '../services'
@@ -41,6 +41,10 @@ const draftOf = (c) => ({
 })
 
 const DEFAULT_ITEM = 'default'
+// The endpoints by name (T4), the sort kept in the address of the list view (T9)
+const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'ca', 'auth', 'state']
+const NO_KEYS = []
 
 export default function ESTPage() {
   const { t } = useTranslation()
@@ -144,6 +148,8 @@ export default function ESTPage() {
     })),
   ]), [config, cas, loading, loadError, t]) // eslint-disable-line react-hooks/exhaustive-deps
   const open = openId === null ? null : endpoints.find((e) => e.id === openId) || null
+  const sortParam = useSortParam(BY_NAME, view === 'list' ? SORT_KEYS : NO_KEYS)
+  const list = useClientList(endpoints, { sortParam, sorts: { name: (r) => r.name, ca: (r) => (r.ca === '—' ? null : r.ca), auth: () => auth, state: () => state } })
   const pill = () => <Pill label={t(state === 'active' ? 'common.active' : 'common.disabled')} tone={state === 'active' ? 'good' : 'muted'} />
 
   // activeKey is the row's data-open (the default endpoint's is ''), so the focus finds the row back
@@ -248,14 +254,14 @@ export default function ESTPage() {
   ]
 
   const listView = (
-    <ListView label="EST" caption={t('est.caption')} icon="plug" rows={endpoints} loading={loading}
+    <ListView label="EST" caption={t('est.caption')} icon="plug" list={list} nameSort="name" loading={loading}
       filters={{ views: [{ id: '', label: t('common.all'), count: endpoints.length }, ...(endpoints.length ? [{ id: state, label: t(state === 'active' ? 'common.active' : 'common.disabled'), count: endpoints.length }] : [])], active: '', onChange: () => {}, label: t('tsa.filterByState'),
         aside: t('est.aside', { total: stats.total || 0, failed: stats.failed || 0 }) }}
       title={(r) => r.name} status={pill} openedId={open ? (open.id || '') : null} onOpen={(r) => setOpenId(r.id)}
       columns={[
-        { id: 'ca', label: t('tsa.columns.ca'), cell: (r) => r.ca, grow: true },
-        { id: 'auth', label: t('est.columns.auth'), cell: () => auth },
-        { status: true },
+        { id: 'ca', label: t('tsa.columns.ca'), cell: (r) => r.ca, kind: 'text', priority: 2, sort: 'ca' },
+        { id: 'auth', label: t('est.columns.authShort'), labelFull: t('est.columns.auth'), cell: () => auth, kind: 'fit', priority: 3, sort: 'auth' },
+        { status: true, sort: 'state' },
       ]}
       error={loadError && (
         <LoadError id="est" journal={auditPath} title={t('messages.errors.loadFailed.est')} onRetry={() => { setLoading(true); loadData() }}
@@ -263,7 +269,7 @@ export default function ESTPage() {
       )}
       empty={<SetupEmptyBlock id="est" icon="plug" title={t('est.emptyTitle')} text={t('est.emptyText')}
         action={canEdit ? { label: t('tsa.configure'), icon: 'settings', onClick: () => setView('config') } : undefined} />}
-      footer={{ range: t('est.range', { shown: endpoints.length, count: endpoints.length }) }} />
+      footer={{ range: t('est.range', list.counts(endpoints.length)) }} />
   )
 
   return (

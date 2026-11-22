@@ -156,7 +156,8 @@ describe('EabTab list', () => {
   it('searches, sorts from the headers and pages by 25', async () => {
     mocks.list.mockResolvedValue({ data: many() })
     const { container } = renderTab()
-    await screen.findByRole('button', { name: 'cred-1' })
+    // The newest credential first
+    await screen.findByRole('button', { name: 'cred-30' })
     const footer = container.querySelector('footer.table-footer')
     const bodyRows = () => container.querySelectorAll('tbody tr')
     expect(bodyRows()).toHaveLength(25)

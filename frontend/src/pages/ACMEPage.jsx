@@ -12,7 +12,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { Modal } from '../components/atelier/Form'
-import { Zone, Icon, Btn, IconBtn, Pill, RecordList, RecordRow, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause, useClientList } from '../components/atelier'
+import { Zone, Icon, Btn, IconBtn, Pill, RecordList, RecordRow, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause, useClientList, useSortParam } from '../components/atelier'
 import { acmeService, casService, certificatesService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
@@ -20,7 +20,7 @@ import { useLinkedId } from '../hooks/useLinkedId'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { stateLabel } from '../lib/stateLabel'
 import { downloadBlob, publicBaseUrl } from '../lib/utils'
-import { fetchPages } from '../lib/fetchAllPages'
+import { fetchPages, fetchListing } from '../lib/fetchAllPages'
 import { dateOf } from './admin/adminDates'
 import AccountDock from './acme/AccountDetailPanel'
 import LetsEncryptTab from './acme/LetsEncryptTab'
@@ -39,12 +39,20 @@ import { effectiveDnsUpdatePort, settingsAfterPortSave } from './acme/dnsUpdateP
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
-import { ViewSwitch } from './protocols/atelierParts'
+import { Notice, ViewSwitch } from './protocols/atelierParts'
 import { DockSlot, DockSlotProvider, SlotDock } from './protocols/dockSlot'
 import { ACCOUNT_TONES, accountLabel, accountContact } from './protocols/protocolStates'
 
 // The order list pages by 100 rows; the tab shows and filters all of them
 const CLIENT_ORDERS_MAX = 5000
+// The accounts too: every page is read (100 a page), so the list sorts and searches them all
+const ACCOUNTS_MAX = 5000
+
+// The default sorts (COLONNES-SPEC T4, E16): the newest account, the latest certificate first
+const NEWEST_ACCOUNT = { key: 'created', asc: false }
+const ACCOUNT_SORT_KEYS = ['name', 'contact', 'created', 'state', 'orders']
+const LATEST_ISSUED = { key: 'created_at', asc: false }
+const HISTORY_SORT_KEYS = ['common_name', 'source', 'valid_to', 'created_at', 'status']
 
 // The views keep the former tab names of /acme?tab=…: the accounts (the mockup's list) open first
 const SERVER_VIEWS = ['accounts', 'localorders', 'localdomains', 'eab', 'config']
@@ -63,6 +71,7 @@ export default function ACMEPage() {
 
   // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
+  const [accountsPartial, setAccountsPartial] = useState(null)
   const [orders, setOrders] = useState([])
   const [challenges, setChallenges] = useState([])
   const [acmeSettings, setAcmeSettings] = useState({})
@@ -142,7 +151,14 @@ export default function ACMEPage() {
   const [historyTotal, setHistoryTotal] = useState(0)
   const [historyCAs, setHistoryCAs] = useState([])
   const [historySearch, setHistorySearch] = useState('')
-  const [historySort, setHistorySort] = useState(null)
+  // The sort of each list lives in the address of its own view only (T9)
+  const accountSort = useSortParam(NEWEST_ACCOUNT, activeTab === 'accounts' ? ACCOUNT_SORT_KEYS : NONE)
+  const historySortParam = useSortParam(LATEST_ISSUED, activeTab === 'history' ? HISTORY_SORT_KEYS : NONE)
+  const historySort = historySortParam.sort
+  // A sort read from the address (a click, Back, a shared link) goes back to page one
+  const historySortMark = `${historySort.key}:${historySort.asc}`
+  const [historyMarked, setHistoryMarked] = useState(historySortMark)
+  if (historyMarked !== historySortMark) { setHistoryMarked(historySortMark); setHistoryPage(1) }
 
   // EAB: only the required flag stays in the page; the credentials live in EabTab
   const [eabRequired, setEabRequired] = useState(false)
@@ -222,10 +238,8 @@ export default function ACMEPage() {
     if (historyFilterCA) params.ca = historyFilterCA
     if (historyFilterSource) params.source = historyFilterSource
     if (historySearch) params.search = historySearch
-    if (historySort) {
-      params.sort_by = historySort.key
-      params.sort_order = historySort.direction
-    }
+    params.sort_by = historySort.key
+    params.sort_order = historySort.asc ? 'asc' : 'desc'
     return params
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(historyFilterStatus), historyFilterCA, historyFilterSource, historySearch, historySort])
@@ -260,7 +274,7 @@ export default function ACMEPage() {
     setLoadError(null)
     try {
       const [accountsRes, settingsRes, casRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes, caAccountsRes] = await Promise.all([
-        acmeService.getAccounts(),
+        fetchListing((page) => acmeService.getAccounts(page), { max: ACCOUNTS_MAX }).then(({ rows, partial }) => ({ data: rows, partial })),
         acmeService.getSettings(),
         casService.getAll(),
         fetchPages((page) => acmeService.getClientOrders(undefined, undefined, page), { max: CLIENT_ORDERS_MAX })
@@ -274,7 +288,8 @@ export default function ACMEPage() {
         acmeService.getEabRequired().catch(() => ({ data: { eab_required: false } })),
         acmeService.getCaAccounts().catch(() => ({ data: [] }))
       ])
-      setAccounts(accountsRes.data || accountsRes.accounts || [])
+      setAccounts(accountsRes.data || [])
+      setAccountsPartial(accountsRes.partial)
       setAcmeSettings(settingsRes.data || settingsRes || {})
       setServerSaved(settingsRes.data || settingsRes || {})
       setSavedProfiles((settingsRes.data || settingsRes || {}).profiles || {})
@@ -926,9 +941,10 @@ export default function ACMEPage() {
     return accounts.filter((a) => !q || [accountContact(a), a.account_id, a.key_type].some((v) => String(v || '').toLowerCase().includes(q)))
   }, [accounts, searchQuery])
   const shownAccounts = searchedAccounts.filter((a) => !accountState || a.status === accountState)
-  // The API sends the accounts whole (no page nor sort parameter): sorted and paged here
+  // Every page of the server is read (or the list says it is partial): sorted and paged here
   const accountList = useClientList(shownAccounts, {
     resetKey: `${searchQuery}|${accountState}`,
+    sortParam: accountSort,
     sorts: {
       name: accountLabel, contact: accountContact, created: (a) => a.created_at && Date.parse(a.created_at),
       state: (a) => (accountStates.includes(a.status) ? accountStates.indexOf(a.status) : null), orders: (a) => a.orders_count ?? 0,
@@ -938,7 +954,8 @@ export default function ACMEPage() {
   const acmePublicBase = publicBaseUrl(acmeSettings.acme_public_base_url, '/acme')
   const directoryUrl = `${acmePublicBase}/directory`
 
-  const accountsView = (
+  const accountsView = (<>
+    {accountsPartial && <Notice tone="warn" role="status">{t('acme.accountsListPartial', accountsPartial)}</Notice>}
     <ListView label="ACME" caption={t('acme.accountsCaption')} icon="refresh" list={accountList} nameSort="name" loading={loading}
       filters={{
         views: [{ id: '', label: t('common.all'), count: searchedAccounts.length },
@@ -957,10 +974,12 @@ export default function ACMEPage() {
           cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/acme/accounts', message: loadError.message }} />} />
       )}
       columns={[
-        { id: 'contact', label: t('acme.contact'), cell: (a) => accountContact(a) || <span className="muted">{t('acme.noContact')}</span>, grow: true, sort: 'contact' },
-        { id: 'created', label: t('acme.createdOn'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true, sort: 'created' },
+        { id: 'contact', label: t('acme.contact'), cell: (a) => accountContact(a) || <span className="muted">{t('acme.noContact')}</span>, kind: 'text', priority: 4,
+          title: (a) => accountContact(a) || undefined, sort: 'contact' },
+        { id: 'created', label: t('acme.createdOn'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true, kind: 'fit', priority: 2, labelled: true, sort: 'created' },
         { status: true, sort: 'state' },
-        { id: 'orders', label: t('acme.orders'), cell: (a) => String(a.orders_count ?? 0), sort: 'orders' },
+        // A count of one or two digits: an abbreviated header where the noun is long, the noun in its title (L8)
+        { id: 'orders', label: t('acme.columns.orders'), labelFull: t('acme.orders'), cell: (a) => String(a.orders_count ?? 0), kind: 'number', priority: 3, sort: 'orders' },
       ]}
       empty={accounts.length ? (
         <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setSearchQuery(''); setAccountState('') }} />
@@ -969,7 +988,7 @@ export default function ACMEPage() {
           action={{ label: t('acme.copyDirectory'), icon: 'copy', onClick: async () => { if (await copy(directoryUrl)) showSuccess(t('common.copied')) } }} />
       )}
       footer={{ range: t('acme.accountsRange', accountList.counts(accounts.length)) }} />
-  )
+  </>)
 
   const views = {
     accounts: <>{accountsView}<SlotDock>{selectedAccount && (
@@ -1024,7 +1043,7 @@ export default function ACMEPage() {
     history: (
       <HistoryTab history={history} total={historyTotal} loading={historyLoading} page={historyPage} perPage={historyPerPage} onPageChange={setHistoryPage}
         onPerPageChange={(v) => { setHistoryPerPage(v); setHistoryPage(1) }} search={historySearch}
-        onSearchChange={(v) => { setHistorySearch(v); setHistoryPage(1) }} sort={historySort} onSortChange={(next) => { setHistorySort(next); setHistoryPage(1) }}
+        onSearchChange={(v) => { setHistorySearch(v); setHistoryPage(1) }} sort={historySort} onSort={historySortParam.onSort}
         caOptions={historyCAs} exportLoader={exportHistory} filterStatus={historyFilterStatus}
         onFilterStatusChange={(v) => { setHistoryFilterStatus(v); setHistoryPage(1) }} filterCA={historyFilterCA}
         onFilterCAChange={(v) => { setHistoryFilterCA(v); setHistoryPage(1) }} filterSource={historyFilterSource}

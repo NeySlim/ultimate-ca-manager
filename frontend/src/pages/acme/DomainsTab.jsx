@@ -4,12 +4,13 @@
  * row and in the dock, each behind its right.
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill, useClientList } from '../../components/atelier'
+import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { YesNo } from '../protocols/atelierParts'
 
 const BY_DOMAIN = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'provider', 'ca', 'wildcard', 'state']
 
 export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTest, canWrite, canDelete }) {
   const { t } = useTranslation()
@@ -22,9 +23,10 @@ export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTes
     ...(canWrite ? [{ icon: 'settings', label: t('common.edit'), onClick: () => onEdit(d), write: true }] : []),
     ...(canDelete ? [{ icon: 'close', label: t('common.delete'), onClick: () => onDelete(d), write: true }] : []),
   ]
-  // The API sends every domain: sorted and paged here
+  // The API sends every domain: sorted and paged here, the sort kept in the address
+  const sortParam = useSortParam(BY_DOMAIN, SORT_KEYS)
   const list = useClientList(acmeDomains, {
-    initial: BY_DOMAIN,
+    sortParam,
     sorts: {
       name: (d) => d.domain, provider: (d) => d.dns_provider_name || d.dns_provider_type, ca: (d) => d.issuing_ca_name || t('acme.defaultCA'),
       wildcard: (d) => (d.is_wildcard_allowed ? 0 : 1), state: (d) => (d.auto_approve ? 0 : 1),
@@ -59,9 +61,10 @@ export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTes
       <ListView label={t('acme.domains')} caption={t('acme.domainsCaption')} icon="globe" list={list} nameSort="name"
         title={(d) => d.domain} status={approval} openedId={openId} onOpen={(d) => setOpenId(d.id)}
         columns={[
-          { id: 'provider', label: t('acme.provider'), cell: (d) => d.dns_provider_name || d.dns_provider_type || '—', grow: true, sort: 'provider' },
-          { id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), sort: 'ca' },
-          { id: 'wildcard', label: t('acme.wildcard'), cell: (d) => t(d.is_wildcard_allowed ? 'common.yes' : 'common.no'), sort: 'wildcard' },
+          { id: 'provider', label: t('acme.provider'), cell: (d) => d.dns_provider_name || d.dns_provider_type || '—', kind: 'text', priority: 2, sort: 'provider' },
+          { id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), kind: 'text', priority: 3, sort: 'ca' },
+          { id: 'wildcard', label: t('acme.columns.wildcard'), labelFull: t('acme.wildcard'), cell: (d) => t(d.is_wildcard_allowed ? 'common.yes' : 'common.no'),
+            kind: 'fit', priority: 3, labelled: true, sort: 'wildcard' },
           { status: true, sort: 'state' },
         ]}
         rowActions={actions}

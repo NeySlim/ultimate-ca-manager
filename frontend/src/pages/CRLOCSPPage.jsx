@@ -622,7 +622,7 @@ export default function CRLOCSPPage() {
         columns={[
           { id: 'number', label: t('crlOcsp.columns.crlNumber'), cell: crlNumber, kind: 'fit', priority: 3, labelled: true, sort: 'number' },
           { id: 'published', label: t('crlOcsp.columns.publication'), cell: published, kind: 'fit', priority: 3, labelled: true, sort: 'published' },
-          { id: 'next', label: t('crlOcsp.nextUpdate'), cell: next, kind: 'fit', priority: 2, labelled: true, sort: 'next' },
+          { id: 'next', label: t('crlOcsp.columns.nextUpdate'), labelFull: t('crlOcsp.nextUpdate'), cell: next, kind: 'fit', priority: 2, labelled: true, sort: 'next' },
           { id: 'ocsp', label: 'OCSP', cell: ocsp, kind: 'fit', priority: 3, sort: 'ocsp' },
           { status: true, sort: 'state' },
         ]}

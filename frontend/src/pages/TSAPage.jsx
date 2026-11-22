@@ -274,9 +274,10 @@ openssl ts -reply -in response.tsr -text`}</pre>
       filters={{ views: [{ id: '', label: t('common.all'), count: service.length }, ...(row ? [{ id: row.state, label: t(row.state === 'active' ? 'common.active' : 'common.disabled'), count: 1 }] : [])], active: '', onChange: () => {}, label: t('tsa.filterByState') }}
       title={(r) => r.name} status={pill} openedId={opened ? row?.id : null} onOpen={() => setOpened(true)}
       columns={[
-        { id: 'ca', label: t('tsa.columns.ca'), cell: (r) => r.ca, grow: true },
-        { id: 'digest', label: t('tsa.columns.digest'), cell: () => DIGESTS },
-        { id: 'policy', label: t('tsa.columns.policy'), cell: (r) => r.policy },
+        // One row by construction: no sort (T1); the name takes the room left
+        { id: 'ca', label: t('tsa.columns.ca'), cell: (r) => r.ca, kind: 'text', priority: 2 },
+        { id: 'digest', label: t('tsa.columns.digest'), cell: () => DIGESTS, kind: 'fit', priority: 3 },
+        { id: 'policy', label: t('tsa.columns.policy'), cell: (r) => r.policy, kind: 'fit', priority: 3, labelled: true },
         { status: true },
       ]}
       error={loadError && (

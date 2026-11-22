@@ -2496,7 +2496,8 @@
       "domainsSaveFailed": "Не удалось сохранить разрешённые домены",
       "deleteFailed": "Не удалось удалить учётные данные EAB",
       "caption": "Учётные данные EAB. Активируйте имя, чтобы открыть подробности.",
-      "noNotes": "Нет заметки."
+      "noNotes": "Нет заметки.",
+      "listPartial": "Список неполный: загружено {{loaded}} из {{total}} учётных данных. Обновите страницу, чтобы повторить."
     },
     "termsOfServiceTitlePlaceholder": "Условия использования (оставьте пустым, чтобы скрыть)",
     "termsOfServiceBodyPlaceholder": "Напишите здесь условия...\n\nПоддерживается: **жирный**, *курсив*, [ссылки](url), - списки\n\nДля абзацев используйте две пустые строки.",
@@ -2764,7 +2765,13 @@
     "emptyAccountsTitle": "Нет учётных записей ACME",
     "emptyAccountsText": "Клиенты ACME (certbot, cert-manager, acme.sh) сами создают учётную запись в каталоге: скопируйте его URL в их конфигурацию.",
     "termsOfServiceTitle": "Заголовок",
-    "termsOfServiceBody": "Текст"
+    "termsOfServiceBody": "Текст",
+    "accountsListPartial": "Список неполный: загружено {{loaded}} из {{total}} учётных записей. Обновите страницу, чтобы повторить.",
+    "columns": {
+      "failures": "Сбои",
+      "wildcard": "Подстановка",
+      "orders": "Заказы"
+    }
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -2895,7 +2902,8 @@
     "columns": {
       "ca": "Центр",
       "template": "Шаблон",
-      "profile": "Профиль"
+      "profile": "Профиль",
+      "lastTest": "Последний тест"
     },
     "tabs": {
       "profile": "Профиль"
@@ -3044,7 +3052,8 @@
     "columns": {
       "published": "Опубликована",
       "publication": "Публикация",
-      "crlNumber": "Номер CRL"
+      "crlNumber": "Номер CRL",
+      "nextUpdate": "Срок обновления"
     },
     "tabs": {
       "publication": "Публикация"
@@ -6742,7 +6751,8 @@
     "caption": "EST. Активируйте имя, чтобы открыть подробности.",
     "defaultEndpoint": "Точка по умолчанию",
     "columns": {
-      "auth": "Аутентификация"
+      "auth": "Аутентификация",
+      "authShort": "Аутентификация"
     },
     "auth": {
       "cert": "Клиентский сертификат",

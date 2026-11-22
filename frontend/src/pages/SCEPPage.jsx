@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
   Zone, Btn, Pill, PageHead, Toolbar, SearchField, IconBtn, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
-  LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, Icon,
+  LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, Icon, useClientList, useSortParam,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { scepService, casService, templatesService } from '../services'
@@ -43,6 +43,14 @@ const configDraft = (c) => ({
 })
 
 const NONE = []
+// The default sort of each view (T4): a name ascending, the newest request first; each view keeps its own in the address (T9)
+const BY_NAME = { key: 'name', asc: true }
+const NEWEST = { key: 'created_at', asc: false }
+const PROFILE_SORT_KEYS = ['name', 'ca', 'template', 'intune', 'state']
+// The requests are paged by the server, so sorted by it (T2): its keys
+const REQUEST_SORT_KEYS = ['subject', 'transaction_id', 'created_at', 'status']
+const CHALLENGE_SORT_KEYS = ['name', 'subject', 'state']
+const APP_SORT_KEYS = ['name', 'tenant', 'client', 'test', 'state']
 
 export default function SCEPPage() {
   const { t, i18n } = useTranslation()
@@ -79,6 +87,14 @@ export default function SCEPPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [rejecting, setRejecting] = useState(null)
+  const profileSort = useSortParam(BY_NAME, view === 'profiles' ? PROFILE_SORT_KEYS : NONE)
+  const requestSort = useSortParam(NEWEST, view === 'requests' ? REQUEST_SORT_KEYS : NONE)
+  const challengeSort = useSortParam(BY_NAME, view === 'challenges' ? CHALLENGE_SORT_KEYS : NONE)
+  const appSort = useSortParam(BY_NAME, view === 'intune' ? APP_SORT_KEYS : NONE)
+  // A sort read from the address (a click, Back, a shared link) goes back to page one
+  const requestMark = `${requestSort.sort.key}:${requestSort.sort.asc}`
+  const [requestMarked, setRequestMarked] = useState(requestMark)
+  if (requestMarked !== requestMark) { setRequestMarked(requestMark); setPage(1) }
   const [rejectReason, setRejectReason] = useState('')
   // The challenge of each CA (the CA-wide endpoint), read when its view opens
   const [challenges, setChallenges] = useState(null)
@@ -130,7 +146,7 @@ export default function SCEPPage() {
   const loadRequests = useCallback(async () => {
     const seq = ++requestSeq.current
     try {
-      const params = { page, per_page: perPage }
+      const params = { page, per_page: perPage, sort_by: requestSort.sort.key, sort_order: requestSort.sort.asc ? 'asc' : 'desc' }
       if (searchQuery) params.search = searchQuery
       if (statusFilter) params.status = [statusFilter]
       const res = await scepService.getRequests(params)
@@ -142,7 +158,7 @@ export default function SCEPPage() {
     } finally {
       if (seq === requestSeq.current) setRequestsLoading(false)
     }
-  }, [page, perPage, searchQuery, statusFilter])
+  }, [page, perPage, searchQuery, statusFilter, requestSort.sort])
   const notifyRef = useRef(() => {})
   notifyRef.current = (message) => showError(message || t('messages.errors.loadFailed.scep'))
   const loadRequestsRef = useRef(loadRequests)
@@ -217,6 +233,13 @@ export default function SCEPPage() {
   ]
   const activeFilter = profileFilters.find((f) => f[0] === profileState) || profileFilters[0]
   const shownProfiles = profiles.filter(activeFilter[2])
+  const profileList = useClientList(shownProfiles, {
+    resetKey: profileState, sortParam: profileSort,
+    sorts: {
+      name: (p) => p.name, ca: (p) => p.ca_name || caName(p.ca_refid), template: (p) => p.template_name || null,
+      intune: (p) => (p.intune_enabled ? 0 : 1), state: (p) => (p.enabled ? 0 : 1),
+    },
+  })
   const opened = openProfile != null ? profiles.find((p) => p.id === openProfile) : null
   const yesNo = (v) => t(v ? 'common.yes' : 'common.no')
   const challengeText = (p) => (p.intune_enabled ? t('scep.challengeIntune') : p.challenge_set ? t('scep.challengeHidden') : t('scep.challengeNone'))
@@ -548,14 +571,14 @@ crypto ca enroll UCM-CA`}</pre>
       cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/scep/config', message: loadError.message }} />} />
   )
   const profilesView = (
-    <ListView label="SCEP" caption={t('scep.caption')} icon="globe" rows={shownProfiles} loading={loading}
+    <ListView label="SCEP" caption={t('scep.caption')} icon="globe" list={profileList} nameSort="name" loading={loading}
       filters={{ views: profileFilters.map(([id, label, test]) => ({ id, label, count: profiles.filter(test).length })), active: activeFilter[0], onChange: setProfileState, label: t('scep.filterByState') }}
       title={(p) => p.name} status={profilePill} openedId={openProfile} onOpen={(p) => setOpenProfile(p.id)}
       columns={[
-        { id: 'ca', label: t('scep.columns.ca'), cell: (p) => p.ca_name || caName(p.ca_refid) },
-        { id: 'template', label: t('scep.columns.template'), cell: (p) => p.template_name || t('scep.noTemplate') },
-        { id: 'intune', label: 'Intune', cell: (p) => yesNo(p.intune_enabled) },
-        { status: true },
+        { id: 'ca', label: t('scep.columns.ca'), cell: (p) => p.ca_name || caName(p.ca_refid), kind: 'text', priority: 2, sort: 'ca' },
+        { id: 'template', label: t('scep.columns.template'), cell: (p) => p.template_name || t('scep.noTemplate'), kind: 'text', priority: 3, sort: 'template' },
+        { id: 'intune', label: 'Intune', cell: (p) => yesNo(p.intune_enabled), kind: 'fit', priority: 3, labelled: true, sort: 'intune' },
+        { status: true, sort: 'state' },
       ]}
       error={loadErr}
       empty={profiles.length ? (
@@ -564,7 +587,7 @@ crypto ca enroll UCM-CA`}</pre>
         <SetupEmptyBlock id="scep" icon="globe" title={t('scep.noProfiles')} text={t('scep.emptyProfilesText')}
           action={canEdit ? { label: t('scep.newProfile'), icon: 'plus', onClick: () => setProfileForm({ profile: null }), primary: true } : undefined} />
       )}
-      footer={{ range: t('scep.range', { shown: shownProfiles.length, count: profiles.length }) }} />
+      footer={{ range: t('scep.range', profileList.counts(profiles.length)) }} />
   )
 
   const requestViews = [
@@ -575,8 +598,9 @@ crypto ca enroll UCM-CA`}</pre>
   ]
   const pages = Math.max(1, Math.ceil(totalRequests / perPage))
   const start = totalRequests ? (page - 1) * perPage + 1 : 0
+  // The rows wait for the profiles and authorities their cells name: the columns are measured on the first rows drawn
   const requestsView = (
-    <ListView label={t('scep.requests')} caption={t('scep.requestsCaption')} icon="globe" rows={requests} loading={requestsLoading}
+    <ListView label={t('scep.requests')} caption={t('scep.requestsCaption')} icon="globe" rows={loading ? NONE : requests} loading={requestsLoading || loading}
       filters={{ views: requestViews, active: statusFilter, onChange: (v) => { setStatusFilter(v); setPage(1) }, label: t('scep.filterByState') }}
       toolbar={(
         <Toolbar>
@@ -586,12 +610,15 @@ crypto ca enroll UCM-CA`}</pre>
         </Toolbar>
       )}
       title={requestName} status={requestPill} openedId={req?.id} onOpen={setOpenRequest}
+      nameSort="subject" sort={requestSort.sort} onSort={requestSort.onSort}
       columns={[
-        { id: 'tx', label: t('scep.transactionId'), cell: (r) => <span className="mono">{r.transaction_id}</span>, grow: true },
-        { id: 'profile', label: t('scep.columns.profile'), cell: (r) => (r.profile_id ? profileOf(r.profile_id)?.name || `#${r.profile_id}` : t('scep.caWide')) },
-        { id: 'ca', label: t('scep.columns.ca'), cell: (r) => caName(r.ca_refid) },
-        { id: 'created', label: t('scep.requested'), cell: (r) => dateTimeOf(r.created_at, locale) || '—' },
-        { status: true },
+        // The name takes the room left; the transaction id, a long identifier, folds first with its whole value in its title
+        { id: 'tx', label: t('scep.transactionId'), cell: (r) => <span className="mono">{r.transaction_id}</span>, kind: 'text', priority: 4,
+          title: (r) => r.transaction_id || undefined, sort: 'transaction_id' },
+        { id: 'profile', label: t('scep.columns.profile'), cell: (r) => (r.profile_id ? profileOf(r.profile_id)?.name || `#${r.profile_id}` : t('scep.caWide')), kind: 'text', priority: 3 },
+        { id: 'ca', label: t('scep.columns.ca'), cell: (r) => caName(r.ca_refid), kind: 'text', priority: 3 },
+        { id: 'created', label: t('scep.requested'), cell: (r) => dateTimeOf(r.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
+        { status: true, sort: 'status' },
       ]}
       empty={searchQuery || statusFilter ? (
         <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setSearchQuery(''); setStatusFilter(''); setPage(1) }} />
@@ -602,31 +629,44 @@ crypto ca enroll UCM-CA`}</pre>
       }} />
   )
 
+  const challengeList = useClientList(challenges || NONE, {
+    sortParam: challengeSort,
+    sorts: { name: (c) => c.name || c.subject, subject: (c) => c.subject || null, state: (c) => (c.scep_challenge ? 0 : 1) },
+  })
+  const appList = useClientList(apps || NONE, {
+    sortParam: appSort,
+    sorts: {
+      name: (a) => a.name, tenant: (a) => a.tenant_id, client: (a) => a.client_id,
+      test: (a) => (a.last_test_at ? Date.parse(a.last_test_at) : null), state: (a) => a.profile_count || 0,
+    },
+  })
   const challengesView = (
     <>
       {!config.enabled && !loading && <Notice tone="warn" id="scep-disabled">{t('scep.scepDisabledDesc')}</Notice>}
-      <ListView label={t('common.challenges')} caption={t('scep.challengesCaption')} icon="key" rows={challenges || []} loading={loading || challenges === null}
+      <ListView label={t('common.challenges')} caption={t('scep.challengesCaption')} icon="key" list={challengeList} nameSort="name" loading={loading || challenges === null}
         title={(c) => c.name || c.subject} status={(c) => <Pill label={t(c.scep_challenge ? 'scep.challengeSet' : 'scep.noChallengeSet')} tone={c.scep_challenge ? 'good' : 'muted'} />}
         openedId={openCa} onOpen={(c) => setOpenCa(c.id)}
-        columns={[{ id: 'subject', label: t('common.subject'), cell: (c) => c.subject, grow: true, muted: true }, { status: true }]}
+        columns={[{ id: 'subject', label: t('common.subject'), cell: (c) => c.subject, grow: true, muted: true, kind: 'text', priority: 4, sort: 'subject' }, { status: true, sort: 'state' }]}
         empty={<EmptyBlock id="scep-cas" icon="key" title={t('scep.noCasAvailable')} text={t('scep.noCasAvailableDesc')} />}
-        footer={{ range: t('crlOcsp.range', { shown: (challenges || []).length, count: (challenges || []).length }) }} />
+        footer={{ range: t('crlOcsp.range', challengeList.counts((challenges || []).length)) }} />
     </>
   )
 
   const intuneView = (
-    <ListView label={t('scep.intuneApps')} caption={t('scep.intuneCaption')} icon="server" rows={apps || []} loading={apps === null}
+    <ListView label={t('scep.intuneApps')} caption={t('scep.intuneCaption')} icon="server" list={appList} nameSort="name" loading={apps === null}
       title={(a) => a.name} status={(a) => <Pill label={a.profile_count > 0 ? t('scep.intuneAppUsedBy', { count: a.profile_count }) : t('scep.intuneAppNotUsed')} tone={a.profile_count > 0 ? 'good' : 'muted'} />}
       openedId={openApp} onOpen={(a) => setOpenApp(a.id)}
       columns={[
-        { id: 'tenant', label: t('scep.intuneTenantId'), cell: (a) => <span className="mono">{a.tenant_id}</span>, grow: true },
-        { id: 'client', label: t('scep.intuneClientId'), cell: (a) => <span className="mono">{a.client_id}</span> },
-        { id: 'test', label: t('scep.intuneAppLastTest'), cell: (a) => (a.last_test_at ? dateTimeOf(a.last_test_at, locale) : t('scep.intuneAppNeverTested')) },
-        { status: true },
+        // Two identifiers of Microsoft Entra: they fold first, their whole value in their title
+        { id: 'tenant', label: t('scep.intuneTenantId'), cell: (a) => <span className="mono">{a.tenant_id}</span>, kind: 'text', priority: 4, title: (a) => a.tenant_id, sort: 'tenant' },
+        { id: 'client', label: t('scep.intuneClientId'), cell: (a) => <span className="mono">{a.client_id}</span>, kind: 'text', priority: 4, title: (a) => a.client_id, sort: 'client' },
+        { id: 'test', label: t('scep.columns.lastTest'), labelFull: t('scep.intuneAppLastTest'), kind: 'fit', priority: 3, labelled: true, sort: 'test',
+          cell: (a) => (a.last_test_at ? dateTimeOf(a.last_test_at, locale) : t('scep.intuneAppNeverTested')) },
+        { status: true, sort: 'state' },
       ]}
       empty={<EmptyBlock id="scep-intune" icon="server" title={t('scep.noIntuneApps')} text={t('scep.noIntuneAppsDesc')}
         action={canEdit ? { label: t('scep.newIntuneApp'), icon: 'plus', onClick: () => setAppForm({ app: null }), primary: true } : undefined} />}
-      footer={{ range: t('scep.intuneRange', { shown: (apps || []).length, count: (apps || []).length }) }} />
+      footer={{ range: t('scep.intuneRange', appList.counts((apps || []).length)) }} />
   )
 
   const configView = loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? loadErr : (

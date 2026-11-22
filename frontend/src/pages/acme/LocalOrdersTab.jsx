@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, IconBtn, Pill, ListView, Toolbar, Dock, DockBody, Section, Props, EmptyBlock } from '../../components/atelier'
+import { Btn, IconBtn, Pill, ListView, Toolbar, Dock, DockBody, Section, Props, EmptyBlock, useSortParam } from '../../components/atelier'
 import { useDockSelection, asId } from '../../components/atelier/useDockParam'
 import { apiClient } from '../../services'
 import { buildQueryString } from '../../services/apiClient'
@@ -19,6 +19,9 @@ import { SlotDock } from '../protocols/dockSlot'
 const TONES = { valid: 'good', ready: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
 const STATES = ['pending', 'ready', 'processing', 'valid', 'invalid']
 const PER_PAGE = 50
+// Paged by the server, so sorted by it (T2): its keys, the newest order first (T4)
+const NEWEST = { key: 'created_at', asc: false }
+const SORT_KEYS = ['domain', 'account', 'expires', 'created_at', 'status']
 
 export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   const { t, i18n } = useTranslation()
@@ -31,6 +34,11 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
+  const { sort, onSort } = useSortParam(NEWEST, SORT_KEYS)
+  // A sort read from the address (a click, Back, a shared link) goes back to page one
+  const sortMark = `${sort.key}:${sort.asc}`
+  const [marked, setMarked] = useState(sortMark)
+  if (marked !== sortMark) { setMarked(sortMark); setPage(1) }
   // The open order lives in the URL (`item`); one off the page (a link, a reload) is read by id
   const loadOrder = useCallback((id) => apiClient.get(`/acme/orders/${asId(id)}`).then((res) => res?.data), [])
   const orderSel = useDockSelection(items, { ready: !loading, load: loadOrder })
@@ -40,7 +48,7 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   const load = useCallback(async (p = page, s = status) => {
     setLoading(true)
     try {
-      const qs = buildQueryString({ page: p, per_page: PER_PAGE, status: s || undefined })
+      const qs = buildQueryString({ page: p, per_page: PER_PAGE, status: s || undefined, sort_by: sort.key, sort_order: sort.asc ? 'asc' : 'desc' })
       const response = await apiClient.get(`/acme/orders${qs}`)
       const data = response?.data || response || {}
       const nextMeta = data.meta || { page: p, per_page: PER_PAGE, total: 0 }
@@ -56,9 +64,9 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
     } finally {
       setLoading(false)
     }
-  }, [page, status, showError, t])
+  }, [page, status, sort, showError, t])
 
-  useEffect(() => { load(page, status) }, [page, status]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(page, status) }, [page, status, sort]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (linkedOrder) setOpened(linkedOrder) }, [linkedOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (row) => {
@@ -130,13 +138,14 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
             {canDeleteOrders && <Btn icon="close" id="acme-orders-purge" onClick={handlePurge}>{t('acme.purgeLocalOrders')}</Btn>}
           </Toolbar>
         )}
-        title={(o) => o.domain} status={pill} openedId={opened?.id} onOpen={setOpened}
+        title={(o) => o.domain} status={pill} openedId={opened?.id} onOpen={setOpened} nameSort="domain" sort={sort} onSort={onSort}
         columns={[
-          { id: 'account', label: t('acme.account'), cell: (o) => <span className="mono">{o.account}</span>, grow: true, muted: true },
-          { id: 'method', label: t('acme.challengeType'), cell: (o) => o.method || '—' },
-          { id: 'expires', label: t('common.expires'), cell: (o) => dateOf(o.expires, locale) || '—' },
-          { id: 'created', label: t('common.created'), cell: (o) => dateTimeOf(o.created_at, locale) || '—' },
-          { status: true },
+          { id: 'account', label: t('acme.account'), cell: (o) => <span className="mono">{o.account}</span>, kind: 'text', priority: 4, muted: true,
+            title: (o) => o.account || undefined, sort: 'account' },
+          { id: 'method', label: t('acme.method'), cell: (o) => o.method || '—', kind: 'fit', priority: 3 },
+          { id: 'expires', label: t('common.expires'), cell: (o) => dateOf(o.expires, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'expires' },
+          { id: 'created', label: t('common.created'), cell: (o) => dateTimeOf(o.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
+          { status: true, sort: 'status' },
         ]}
         rowActions={canDeleteOrders ? () => [{ icon: 'close', label: t('common.delete'), onClick: handleDelete, write: true }] : undefined}
         empty={<EmptyBlock id="acme-orders" icon="refresh" title={t('acme.noLocalOrders')} text={t('acme.noLocalOrdersDesc')} />}

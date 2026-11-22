@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, SecretInput, Select, Textarea, ToggleSwitch, Modal } from '../../components/atelier/Form'
-import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock } from '../../components/atelier'
+import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { Copyable, YesNo } from '../protocols/atelierParts'
@@ -26,6 +26,9 @@ const EMPTY_FORM = {
 
 // The proxy answers only when it is enabled and has a slug.
 const proxyIsOn = (acct) => !!(acct.proxy_enabled && acct.proxy_slug)
+
+const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'directory', 'email', 'default', 'proxy', 'state']
 
 /**
  * Multi-CA account manager for the ACME client. Lists every external ACME
@@ -126,6 +129,15 @@ export default function CaAccountsManager({
   useEffect(() => { if (createSignal) openCreate() }, [createSignal])
 
   const open = accounts.find((a) => a.id === openId)
+  // The API sends every upstream CA: sorted and paged here, the sort kept in the address
+  const sortParam = useSortParam(BY_NAME, SORT_KEYS)
+  const list = useClientList(accounts, {
+    sortParam,
+    sorts: {
+      name: (a) => a.label, directory: (a) => a.directory_url, email: (a) => a.email || null, default: (a) => (a.is_default ? 0 : 1),
+      proxy: (a) => (proxyIsOn(a) ? a.proxy_slug : null), state: (a) => (a.is_registered ? 0 : 1),
+    },
+  })
   const pill = (a) => <Pill label={t(a.is_registered ? 'acme.registered' : 'acme.notRegistered')} tone={a.is_registered ? 'good' : 'warn'} />
   const proxyUrl = (a) => `${proxyPublicBase || '/acme/proxy'}/${a.proxy_slug}/directory`
   const sections = [['overview', t('atelier.overview')], ...(proxyIsOn(open || {}) || open?.dns_update_key_count > 0 ? [['dnsupdate', t('acme.dnsUpdate.title')]] : [])]
@@ -179,18 +191,20 @@ export default function CaAccountsManager({
 
   return (
     <>
-      <ListView label={t('acme.certificateAuthorities')} caption={t('acme.upstreamCaption')} icon="server" rows={accounts}
+      <ListView label={t('acme.certificateAuthorities')} caption={t('acme.upstreamCaption')} icon="server" list={list} nameSort="name"
         title={(a) => a.label} status={pill} openedId={openId} onOpen={(a) => { if (a.id !== openId) setSection('overview'); setOpenId(a.id) }}
         columns={[
-          { id: 'directory', label: t('acme.directoryUrl'), cell: (a) => <span className="mono">{a.directory_url}</span>, grow: true, muted: true },
-          { id: 'email', label: t('acme.contactEmail'), cell: (a) => a.email || '—' },
-          { id: 'default', label: t('common.default'), cell: (a) => t(a.is_default ? 'common.yes' : 'common.no') },
-          { id: 'proxy', label: t('acme.proxy'), cell: (a) => (proxyIsOn(a) ? a.proxy_slug : '—') },
-          { status: true },
+          // The directory takes the room left and gives it back first, its whole URL in its title
+          { id: 'directory', label: t('acme.directoryUrl'), cell: (a) => <span className="mono">{a.directory_url}</span>, grow: true, muted: true,
+            kind: 'text', priority: 3, title: (a) => a.directory_url || undefined, sort: 'directory' },
+          { id: 'email', label: t('acme.contactEmail'), cell: (a) => a.email || '—', kind: 'text', priority: 4, sort: 'email' },
+          { id: 'default', label: t('common.default'), cell: (a) => t(a.is_default ? 'common.yes' : 'common.no'), kind: 'fit', priority: 3, labelled: true, sort: 'default' },
+          { id: 'proxy', label: t('acme.proxy'), cell: (a) => (proxyIsOn(a) ? a.proxy_slug : '—'), kind: 'fit', priority: 3, sort: 'proxy' },
+          { status: true, sort: 'state' },
         ]}
         empty={<EmptyBlock id="acme-upstream" icon="server" title={t('acme.noCaAccounts')} text={t('acme.certificateAuthoritiesDesc')}
           action={canWrite ? { label: t('acme.addCertificateAuthority'), icon: 'plus', onClick: openCreate, primary: true } : undefined} />}
-        footer={{ range: t('acme.upstreamRange', { count: accounts.length }) }} />
+        footer={{ range: list.paged ? t('table.range', { start: list.start, end: list.end, total: list.total }) : t('acme.upstreamRange', { count: list.total }) }} />
       <SlotDock>{dock}</SlotDock>
       <Modal open={showForm} onClose={closeForm} title={editingId ? t('acme.editCertificateAuthority') : t('acme.addCertificateAuthority')} size="lg" testId="acme-upstream-dialog">
         <form onSubmit={submit}>
