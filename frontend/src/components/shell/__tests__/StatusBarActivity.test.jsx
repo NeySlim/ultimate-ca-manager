@@ -19,6 +19,7 @@ vi.mock('../../../services/jobs.service', () => ({ default: { list: api.list } }
 import { StatusBar } from '../StatusBar'
 import { DetachedContext } from '../../detached/useDetached'
 import { canFor } from './shellTestUtils'
+import { openPanel, openedPanel } from '../openPanel'
 
 const health = () => vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'ok', version: '3.0.0', ha: false }) })
 const bar = (perms, detached = null) => render(
@@ -102,6 +103,19 @@ describe('status bar activity', () => {
     expect(within(menu).getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Comparer 2', 'vpn'])
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'vpn' }))
     expect(front).toHaveBeenCalledWith('certificate:7', { focus: true })
+  })
+
+  it('is one of the shell panels: opening it closes the open one, opening another closes it', async () => {
+    const detached = { available: true, front: vi.fn(), windows: [{ key: 'certificate:7', kind: 'certificate', title: 'vpn' }] }
+    bar(['read:certificates'], detached)
+    const button = await screen.findByRole('button', { name: 'shell.activity.windows|1' })
+    act(() => openPanel('another'))
+    fireEvent.click(button)
+    expect(openedPanel()).not.toBe('another')
+    expect(document.getElementById('detached-menu').hidden).toBe(false)
+    act(() => openPanel('another'))
+    expect(document.getElementById('detached-menu').hidden).toBe(true)
+    expect(button).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('lists no window where none can be drawn (a phone)', async () => {
