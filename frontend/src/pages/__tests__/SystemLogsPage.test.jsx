@@ -67,6 +67,14 @@ describe('SystemLogsPage', () => {
       .toEqual(['logs.time', 'logs.levelShort', 'logs.component', 'logs.message'])
   })
 
+  it('shows the newest-first order on the time, an arrow without a button; nothing else sorts', async () => {
+    await renderPage()
+    const heads = [...document.querySelectorAll('th')].slice(1)
+    expect(heads.map((h) => h.getAttribute('aria-sort'))).toEqual(['descending', null, null, null])
+    expect(heads[0].querySelector('svg')).not.toBeNull()
+    expect(document.querySelector('thead button')).toBeNull()
+  })
+
   it('renders each record as a row with its parts in their own cells', async () => {
     await renderPage()
     const row = (await screen.findByText('failInfo=1')).closest('tr')

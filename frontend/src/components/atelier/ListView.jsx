@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { StateFilters } from './StateFilters'
 import { DataTable } from './DataTable'
 import { TableFooter } from './TableFooter'
+import { cardFacts } from './cardFacts'
 
 /**
  * @param {object} p
@@ -16,8 +17,8 @@ import { TableFooter } from './TableFooter'
  * @param {string} p.icon  the module's icon, before each name
  * @param {(row) => string} p.title
  * @param {(row) => import('react').ReactNode} p.status
- * @param {Array<{id, label, cell(row), grow?, muted?, fold?} | {status: true}>} p.columns  beside the right dock the state stays and the
- *   others fold from the last one (DataTable)
+ * @param {Array<{id, label, cell(row), kind?, priority?, grow?, sort?, labelled?, labelFull?, muted?} | {status: true}>} p.columns  the column
+ *   contract of DataTable (or its old flags fit, fold); the state is priority 1
  * @param {{range, note?, pagination?}} p.footer
  * @param {import('react').ReactNode} [p.error]  a LoadError in place of the table
  * @param {{key, asc}} [p.sort]  with onSort, the columns naming a `sort` key sort the list (the server's order); nameSort for the name
@@ -30,16 +31,18 @@ export function ListView({ filters, label, caption, icon, rows: allRows, rowKey,
   const sort = list ? list.sort : serverSort
   const onSort = list ? list.onSort : serverOnSort
   const foot = footer && (list?.pagination && !footer.pagination ? { ...footer, pagination: list.pagination } : footer)
+  // A list that declares the column contract (priority) gives the state priority 1; otherwise the old flag keeps it
+  const migrated = columns.some((c) => c.priority !== undefined)
   const cols = [
     { id: 'name', label: t('atelier.name'), entity: true, icon: () => icon, cell: title, sort: nameSort, extra: nameExtra, skeleton: { base: 55, spread: 35 } },
     ...columns.map((c, i) => (c.status
-      ? { id: 'status', label: t('atelier.state'), cell: status, sort: c.sort, fold: c.fold ?? false, skeleton: { width: '74px', kind: 'pill' } }
-      : { id: c.id || `col-${i}`, label: c.label, cell: c.cell, grow: !!c.grow, tone: c.muted ? 'muted' : undefined, fit: c.fit, title: c.title, sort: c.sort, fold: c.fold })),
+      ? { id: 'status', label: t('atelier.state'), cell: status, sort: c.sort, ...(migrated ? { kind: 'fit', priority: 1 } : { fold: c.fold ?? false }), skeleton: { width: '74px', kind: 'pill' } }
+      : {
+        id: c.id || `col-${i}`, label: c.label, labelFull: c.labelFull, cell: c.cell, grow: !!c.grow, tone: c.muted ? 'muted' : undefined, fit: c.fit, title: c.title,
+        sort: c.sort, fold: c.fold, kind: c.kind, priority: c.priority, labelled: c.labelled,
+      })),
   ]
-  const card = (row) => ({
-    meta: columns.filter((c) => !c.status).slice(0, 3).map((c) => c.cell(row)),
-    status: columns.some((c) => c.status) ? status(row) : undefined,
-  })
+  const card = (row) => ({ meta: cardFacts(cols, row), status: columns.some((c) => c.status) ? status(row) : undefined })
   return (
     <>
       {filters && <StateFilters {...filters} busy={loading && !rows?.length} />}

@@ -24,6 +24,35 @@
 /* A growing column's header keeps its whole label: the copied ceiling stays on its cells only. */
 :root .atl .table-container th.col-description{max-width:none}
 
+/* The columns of the lists (DataTable, columnShare.js, COLONNES-SPEC). While DataTable measures, one render never
+   painted, every column takes its natural width; then one column takes the room left, the others are fitted. */
+:root .atl .table-container table.measuring{width:max-content}
+:root .atl .table-container table.measuring :is(td.description-cell,th.col-description){width:auto;max-width:none}
+/* A number reads at the right of its column, digits aligned, its header too (L9). */
+:root .atl .table-container :is(th,td).num{text-align:right;font-variant-numeric:tabular-nums}
+/* The checkbox column is 40 px in every list, module lists and journals included (D2). */
+:root .atl .table-container :is(th,td).check-col{width:40px;min-width:40px;padding:0 6px}
+/* A separator between two data headers, 1 by 16 px at rest; the grip that sets a width shows 2 px of accent (H1). */
+:root .atl{--col-sep:color-mix(in srgb,var(--control) 80%,var(--text))}
+:root .atl .table-container th:has(>.col-sep,>.col-resize){position:relative}
+:root .atl .table-container th>.col-sep:not(.col-resize){position:absolute;top:0;bottom:0;right:0;width:1px;pointer-events:none}
+:root .atl .table-container th>:is(.col-sep,.col-resize):before{content:'';position:absolute;right:0;top:calc(50% - 8px);width:1px;height:16px}
+:root .atl .table-container th>.col-sep:before{background:var(--col-sep)}
+:root .atl .table-container th>.col-resize:hover{background:none}
+:root .atl .table-container th>.col-resize:is(:hover,:active):before{top:0;height:100%;width:2px;background:var(--accent)}
+/* The sorted column says so in the text colour, label and arrow (E3); a sortable one shows both arrows (T5, E2). */
+:root .atl .table-container th:is([aria-sort=ascending],[aria-sort=descending]){color:var(--text)}
+:root .atl .table-container th .sort-idle{color:var(--col-sep)}
+/* A sorted header without a button (the system journal's time) draws its arrow as a button would (T7). */
+:root .atl .table-container th>.icon{width:12px;height:12px;margin-left:8px}
+/* The chevron and every row action stay at any width (E8): the copied rule hiding a row's first button was written
+   for the Certificates' Export, the one action that gives way short of room (data-spare). */
+:root .atl .table-container .table-actions .icon-btn:first-child,:root .atl #app .table-container .table-actions .icon-btn:first-child{display:inline-flex}
+@media(max-width:1250px){:root .atl .table-container td .table-actions .icon-btn[data-spare],:root .atl #app .table-container td .table-actions .icon-btn[data-spare]{display:none}}
+:root .atl #app.dock-right .table-container td .table-actions .icon-btn[data-spare]{display:none}
+/* The number of folded columns follows the range in the footer (R3). */
+:root .atl .table-footer .folded-note{margin-right:auto}
+
 /* On a phone a row that opens a detail is a record (the mockup's mobile list): the whole record
    opens it, and its chevron stays on screen at the right, a 44 px target. */
 :root .atl .mobile-record.opens{cursor:pointer}

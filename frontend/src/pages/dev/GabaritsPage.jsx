@@ -37,15 +37,15 @@ function Certificates({ state }) {
     )
   }
   const columns = [
-    { id: 'name', label: 'Nom commun', sort: 'name', entity: true, always: true, icon: () => 'cert', cell: (r) => r.name, skeleton: { base: 55, spread: 35 },
+    { id: 'name', label: 'Nom commun', sort: 'name', kind: 'entity', priority: 1, always: true, icon: () => 'cert', cell: (r) => r.name, skeleton: { base: 55, spread: 35 },
       extra: (r) => r.key && <span className="key-presence" role="img" title="Clé privée présente dans UCM" aria-label="Clé privée présente dans UCM"><Icon name="key" /></span> },
-    { id: 'description', label: 'Description', grow: true, tone: 'muted', cell: (r) => r.description, title: (r) => r.description, skeleton: { base: 45, spread: 40 } },
-    { id: 'status', label: 'État', always: true, cell: (r) => <Pill label={r.status} tone={r.tone} />, skeleton: { width: '74px', kind: 'pill' } },
-    { id: 'ca', label: 'Émetteur', sort: 'ca', tone: 'muted', cell: (r) => r.ca, skeleton: { base: 50, spread: 40 } },
-    { id: 'source', label: 'Source', sort: 'source', cell: (r) => <span className="source-label"><Icon name={r.sourceIcon} />{r.source}</span>, skeleton: { width: '52px' } },
-    { id: 'expiry', label: 'Expiration', sort: 'days', cell: (r) => <span className={r.warn ? 'expiry-cell warn' : 'expiry-cell'}>{r.expiry}<span className={`remaining ${r.remainingTone}`}>{r.remaining}</span></span>, skeleton: { width: '92px' } },
-    { id: 'key', label: 'Algorithme de clé', tone: ['small', 'muted'], cell: (r) => r.alg, skeleton: { width: '70px' } },
-    { id: 'grade', label: 'Conformité', defaultHidden: true, cell: () => <span className="grade good">A</span>, skeleton: { width: '20px' } },
+    { id: 'description', label: 'Description', kind: 'text', priority: 4, grow: true, tone: 'muted', cell: (r) => r.description, title: (r) => r.description, skeleton: { base: 45, spread: 40 } },
+    { id: 'status', label: 'État', kind: 'fit', priority: 1, always: true, cell: (r) => <Pill label={r.status} tone={r.tone} />, skeleton: { width: '74px', kind: 'pill' } },
+    { id: 'ca', label: 'Émetteur', sort: 'ca', kind: 'text', priority: 2, tone: 'muted', cell: (r) => r.ca, skeleton: { base: 50, spread: 40 } },
+    { id: 'source', label: 'Source', sort: 'source', kind: 'fit', priority: 3, cell: (r) => <span className="source-label"><Icon name={r.sourceIcon} />{r.source}</span>, skeleton: { width: '52px' } },
+    { id: 'expiry', label: 'Expiration', sort: 'days', kind: 'fit', priority: 2, cell: (r) => <span className={r.warn ? 'expiry-cell warn' : 'expiry-cell'}>{r.expiry}<span className={`remaining ${r.remainingTone}`}>{r.remaining}</span></span>, skeleton: { width: '92px' } },
+    { id: 'key', label: 'Algorithme de clé', kind: 'fit', priority: 3, tone: ['small', 'muted'], cell: (r) => r.alg, skeleton: { width: '70px' } },
+    { id: 'grade', label: 'Conformité', kind: 'fit', priority: 3, defaultHidden: true, cell: () => <span className="grade good">A</span>, skeleton: { width: '20px' } },
   ]
   const n = selected.size
   return (
@@ -64,7 +64,7 @@ function Certificates({ state }) {
       <TableView label="Liste des certificats" tableLabel="Tableau des certificats" kind="certificates" scrollId="cert-scroll" caption="Certificats fictifs. Activez un nom pour ouvrir son inspecteur."
         columns={columns} rows={state === 'loading' ? [] : rows} loading={state === 'loading'} rowLabel={(r) => r.name} onOpen={() => {}}
         openedId={state ? undefined : rows.find((r) => r.name === 'vpn.example.com')?.id} busy={state === 'loading'}
-        rowActions={() => [{ icon: 'download', label: 'Exporter', onClick: () => {} }]} sort={{ key: 'days', asc: true }} onSort={() => {}}
+        rowActions={() => [{ icon: 'download', label: 'Exporter', spare: true, onClick: () => {} }]} sort={{ key: 'days', asc: true }} onSort={() => {}}
         selection={{ selected, onToggle: (id) => setSelected((s) => { const x = new Set(s); if (x.has(id)) x.delete(id); else x.add(id); return x }), onTogglePage: (on) => setSelected(on ? new Set(rows.map((r) => r.id)) : new Set()) }}
         search={<>
           <SearchField id="search" name="q" label="Rechercher un certificat" placeholder={C.placeholder} value="" onChange={() => {}} />

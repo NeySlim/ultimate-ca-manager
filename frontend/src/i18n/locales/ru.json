@@ -5792,7 +5792,18 @@
     "results_few": "{{count, number}} результата",
     "results_many": "{{count, number}} результатов",
     "results_other": "{{count, number}} результата",
-    "searching": "Идёт поиск…"
+    "searching": "Идёт поиск…",
+    "sortHint": "Заголовки с кнопкой сортируют список.",
+    "sortedBy": "Сортировка: {{column}}, {{order}}",
+    "sortAscending": "по возрастанию",
+    "sortDescending": "по убыванию",
+    "sortBy": "Сортировать по",
+    "sortByColumn": "Сортировать: {{column}}",
+    "reverseSort": "Обратный порядок",
+    "foldedColumns_one": "{{count}} столбец свёрнут",
+    "foldedColumns_few": "{{count}} столбца свёрнуто",
+    "foldedColumns_many": "{{count}} столбцов свёрнуто",
+    "foldedColumns_other": "{{count}} столбца свёрнуто"
   },
   "policies": {
     "title": "Политики сертификатов",

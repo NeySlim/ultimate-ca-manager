@@ -1,20 +1,26 @@
 /**
  * The mockup's tableFooter() and pageJump(): the range in words, then the page size, previous,
  * the page (« 2 / 5 », or a field to jump to a page and « Aller » when the server pages a large
- * list), next. Without `pagination` the footer only says the range and a note.
+ * list), next. Without `pagination` the footer only says the range and a note. Under a list short of room, the
+ * number of columns it folded follows the range.
  */
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
+import { FoldedColumns } from './foldedColumns'
 
 /**
  * @param {string} range  « 1–25 sur 276 certificats »
  * @param {{page, pages, perPage, sizes, onPage, onPerPage, perPageLabel, jump}} [pagination]
  */
 export function TableFooter({ range, note, pagination }) {
+  const { t } = useTranslation()
+  // The columns the list folded for want of room: their number after the range, their names in its title (R3)
+  const folded = useContext(FoldedColumns)
   return (
     <footer className="table-footer">
       <span id={pagination?.jump ? 'page-range' : undefined}>{range}</span>
+      {folded && <span className="folded-note" title={folded.join(', ')}>{t('table.foldedColumns', { count: folded.length })}</span>}
       {pagination ? <PageControls {...pagination} /> : note !== undefined && <span>{note}</span>}
     </footer>
   )

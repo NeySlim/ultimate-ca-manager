@@ -5564,7 +5564,16 @@
     "perPageLabel": "Filas por página",
     "results_one": "{{count, number}} resultado",
     "results_other": "{{count, number}} resultados",
-    "searching": "Buscando…"
+    "searching": "Buscando…",
+    "sortHint": "Headers with a button sort the list.",
+    "sortedBy": "Sorted by {{column}}, {{order}}",
+    "sortAscending": "ascending order",
+    "sortDescending": "descending order",
+    "sortBy": "Sort by",
+    "sortByColumn": "Sort by {{column}}",
+    "reverseSort": "Reverse the order",
+    "foldedColumns_one": "{{count}} column folded",
+    "foldedColumns_other": "{{count}} columns folded"
   },
   "reconnect": {
     "countdown": "El servicio se está reiniciando...",
