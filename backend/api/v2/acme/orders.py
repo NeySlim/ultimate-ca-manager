@@ -280,8 +280,10 @@ def _history_issuer_name(source, caref, issuer, external_sources):
     return ca.common_name if ca else None
 
 
+# status: valid before revoked in ascending order; a NULL flag reads as valid, as the status filter reads it
 _HISTORY_SORT = {'common_name': Certificate.subject_cn, 'valid_to': Certificate.valid_to,
-                 'created_at': Certificate.created_at, 'source': Certificate.source}
+                 'created_at': Certificate.created_at, 'source': Certificate.source,
+                 'status': db.func.coalesce(Certificate.revoked, db.false())}
 
 
 @bp.route('/api/v2/acme/history', methods=['GET'])
@@ -296,7 +298,7 @@ def get_acme_history():
         status: 'valid' or 'revoked' (repeatable)
         ca: issuer name as listed in meta.cas
         search: common name, serial number or issuer contains
-        sort_by: common_name, valid_to, source or created_at (default); sort_order: asc or desc (default)
+        sort_by: common_name, valid_to, source, status or created_at (default); sort_order: asc or desc (default)
     """
     # Bounded from both ends: `min(..., 100)` let a negative page size
     # through, and a negative LIMIT means no limit on SQLite and an error on
