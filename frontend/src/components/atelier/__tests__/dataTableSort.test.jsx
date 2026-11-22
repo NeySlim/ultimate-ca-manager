@@ -57,11 +57,18 @@ describe('the headers', () => {
     expect(container.querySelectorAll('thead th > .col-sep:not(.col-resize)')).toHaveLength(0)
   })
 
-  it('a sortable column shows both arrows, the sorted one its direction, a column that does not sort neither', () => {
+  it('a sortable column shows its solid sign, the sorted one an arrow with its shaft, a column that does not sort neither', () => {
     render(<DataTable columns={columns} rows={rows} sort={{ key: 'certs', asc: false }} onSort={() => {}} />)
     const head = (name) => screen.getByRole('columnheader', { name })
-    expect(head('Émetteur').querySelector('button[data-sort=ca] svg.sort-idle')).toHaveAttribute('aria-hidden', 'true')
-    expect(head('Certificats').querySelector('button svg')).not.toHaveClass('sort-idle')
+    const idle = head('Émetteur').querySelector('button[data-sort=ca] svg.sort-idle')
+    expect(idle).toHaveAttribute('aria-hidden', 'true')
+    // A glyph painted solid, not a stroke of 0.8 px (R3)
+    expect([idle.getAttribute('fill'), idle.getAttribute('stroke')]).toEqual(['currentColor', 'none'])
+    const arrow = head('Certificats').querySelector('button svg')
+    expect(arrow).toHaveClass('sort-arrow')
+    expect(arrow).not.toHaveClass('sort-idle')
+    // Descending: a shaft down and its head, not a chevron (R5)
+    expect(arrow.querySelector('path').getAttribute('d')).toBe('M12 5v14m-6-6 6 6 6-6')
     expect(head('Note').querySelector('button, svg')).toBeNull()
     expect(head('Note')).not.toHaveAttribute('aria-sort')
   })
@@ -76,12 +83,19 @@ describe('the headers', () => {
     expect(screen.getByRole('columnheader', { name: 'Message' })).not.toHaveAttribute('aria-sort')
   })
 
-  it('a short label names the whole one in its title and its accessible name', () => {
+  it('a short label names the whole one in its accessible name and in the title that says the click', () => {
     render(<DataTable columns={[columns[0], { id: 'next', label: 'Proch. MàJ', labelFull: 'Prochaine mise à jour', kind: 'fit', priority: 2, sort: 'next', cell: () => 'x' }]}
       rows={rows} sort={DEFAULT} onSort={() => {}} />)
     const button = screen.getByRole('button', { name: 'Prochaine mise à jour' })
-    expect(button).toHaveAttribute('title', 'Prochaine mise à jour')
+    expect(button).toHaveAttribute('title', 'table.sortByColumn {"column":"Prochaine mise à jour"}')
     expect(button).toHaveTextContent('Proch. MàJ')
+  })
+
+  it('each sort button says what a click does: sort by its column, or reverse the sort it shows (R4)', () => {
+    render(<DataTable columns={columns} rows={rows} sort={{ key: 'name', asc: true }} onSort={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Émetteur' })).toHaveAttribute('title', 'table.sortByColumn {"column":"Émetteur"}')
+    expect(screen.getByRole('button', { name: 'Nom' }))
+      .toHaveAttribute('title', 'table.sortedByReverse {"column":"Nom","order":"table.sortAscending"}')
   })
 })
 
@@ -170,8 +184,13 @@ describe('on a phone', () => {
     expect(select.closest('.toolbar')).toHaveClass('mobile-sort')
     fireEvent.change(select, { target: { value: 'certs' } })
     expect(loc()).toBe('?sort=certs&order=asc')
-    fireEvent.click(screen.getByRole('button', { name: 'table.reverseSort' }))
+    // The button shows the direction with an arrow and says it, and that a click reverses it (G8)
+    const reverse = screen.getByRole('button', { name: 'table.ascendingReverse' })
+    expect(reverse).toHaveAttribute('title', 'table.ascendingReverse')
+    expect(reverse.querySelector('svg.sort-arrow path').getAttribute('d')).toBe('M12 19V5m-6 6 6-6 6 6')
+    fireEvent.click(reverse)
     expect(loc()).toBe('?sort=certs&order=desc')
+    expect(screen.getByRole('button', { name: 'table.descendingReverse' }).querySelector('svg.sort-arrow')).not.toBeNull()
     // The records follow the rows given, sorted by the list
     expect(document.querySelectorAll('article.mobile-record')).toHaveLength(2)
   })
@@ -192,7 +211,9 @@ describe('on a phone', () => {
     ]
     const facts = cardFacts(cols, {})
     const { container } = render(<div>{facts.map((f, i) => <span key={i}>{f}</span>)}</div>)
-    expect([...container.querySelectorAll('span')].map((s) => s.textContent)).toEqual(['Prochaine mise à jour 26 nov. 2026', 'n° 9', 'Publiée 19 nov. 2026'])
+    expect([...container.querySelectorAll('div > span')].map((s) => s.textContent)).toEqual(['Prochaine mise à jour 26 nov. 2026', 'n° 9', 'Publiée 19 nov. 2026'])
+    // The column's name in its own span, muted beside its value (G9)
+    expect([...container.querySelectorAll('.fact-label')].map((s) => s.textContent)).toEqual(['Prochaine mise à jour', 'Publiée'])
   })
 
   it('a module list draws those facts in its records', () => {

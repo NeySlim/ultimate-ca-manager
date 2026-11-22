@@ -6,7 +6,7 @@
 import { useMemo } from 'react'
 import { DataTable, TableFooter, useClientList, useSortParam } from '../../components/atelier'
 import { formatDate } from '../../lib/utils'
-import { caState, nameOfCA } from './caTree'
+import { caMarks, caState, nameOfCA } from './caTree'
 import { CAStatePill, CAMarks } from './CAState'
 
 const STATE_ORDER = { active: 0, expiring: 1, pending: 2, expired: 3, revoked: 4 }
@@ -46,12 +46,13 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, r
   const columns = [
     { id: 'name', label: t('common.name'), sort: 'name', kind: 'entity', priority: 1, grow: true, title: (r) => r.subject || r.label,
       icon: (r) => (r.type === 'root' ? 'shield' : 'branch'), cell: (r) => r.label,
-      extra: (r) => <span className="ca-badges"><CAMarks ca={r} t={t} orphan={r.orphan} /></span> },
+      // No box for a CA without a badge: an empty group would still count in the name's floor (G5)
+      extra: (r) => (caMarks(r, t, { orphan: r.orphan }).length ? <span className="ca-badges"><CAMarks ca={r} t={t} orphan={r.orphan} /></span> : null) },
     { id: 'type', label: t('common.type'), sort: 'type', kind: 'fit', priority: 3, tone: 'muted', cell: (r) => r.type_label },
     { id: 'state', label: t('common.status'), sort: 'state', kind: 'fit', priority: 1, cell: (r) => <CAStatePill ca={r} t={t} /> },
     { id: 'parent', label: t('cas.parentCA'), sort: 'parent', kind: 'text', priority: 2, tone: 'muted', cell: (r) => r.parent_name || '—' },
     { id: 'certs', label: t('common.certificates'), sort: 'certs', kind: 'number', priority: 3, cell: (r) => r.certs },
-    { id: 'expiry', label: t('common.expires'), sort: 'expiry', kind: 'fit', priority: 2, cell: (r) => (r.valid_to && r.state !== 'pending' ? formatDate(r.valid_to, { time: false }) : '—') },
+    { id: 'expiry', label: t('certificates.expiry'), sort: 'expiry', kind: 'fit', priority: 2, cell: (r) => (r.valid_to && r.state !== 'pending' ? formatDate(r.valid_to, { time: false }) : '—') },
     { id: 'algorithm', label: t('common.algorithm'), sort: 'algorithm', kind: 'fit', priority: 3, tone: ['muted', 'small'], cell: (r) => r.algorithm || '—' },
   ]
 
@@ -73,7 +74,7 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, r
       rowActions={(r) => (r.state === 'pending' ? [] : [{ icon: 'download', label: t('cas.downloadCertificate'), onClick: () => onDownload?.(r) }])}
       card={(r) => ({
         meta: [r.type_label, r.parent_name, t('cas.certificateCount', { count: r.certs }), r.algorithm,
-          <span key="marks" className="ca-badges"><CAMarks ca={r} t={t} orphan={r.orphan} /></span>],
+          caMarks(r, t, { orphan: r.orphan }).length > 0 && <span key="marks" className="ca-badges"><CAMarks ca={r} t={t} orphan={r.orphan} /></span>],
         status: <CAStatePill ca={r} t={t} />,
         end: r.valid_to && r.state !== 'pending' ? formatDate(r.valid_to, { time: false }) : undefined,
       })}

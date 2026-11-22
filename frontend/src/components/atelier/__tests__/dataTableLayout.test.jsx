@@ -84,15 +84,20 @@ describe('one column takes the room left', () => {
     expect(container.querySelector('table')).not.toHaveClass('measuring')
   })
 
-  it('bounds a name to 360 px and a text that does not grow to 280 px, an ellipsis and its title after them', () => {
+  it('bounds no name nor text while the sum fits (R1); short of room, an ellipsis and its title after them', () => {
     const before = { ...NATURAL }
     Object.assign(NATURAL, { name: 520, ca: 410 })
     try {
+      room.width = 2000
       const { container } = render(table())
-      expect(cellOf(container, 'name').style.maxWidth).toBe('360px')
-      expect(cellOf(container, 'ca').style.maxWidth).toBe('280px')
+      expect(cellOf(container, 'name').style.maxWidth).toBe('')
+      expect(cellOf(container, 'ca').style.maxWidth).toBe('')
       expect(cellOf(container, 'ca')).toHaveClass('text-cell')
       expect(cellOf(container, 'ca')).toHaveAttribute('title', 'UCM Production Intermediate CA')
+      // 1360 of room: the description at 64, the name and the issuer share the last 4 px above their comfort
+      resize(1400)
+      expect(parseFloat(cellOf(container, 'name').style.maxWidth)).toBeCloseTo(518.04, 1)
+      expect(parseFloat(cellOf(container, 'ca').style.maxWidth)).toBeCloseTo(407.96, 1)
       expect(cellOf(container, 'expiry').style.maxWidth).toBe('')
     } finally { Object.assign(NATURAL, before) }
   })
@@ -107,14 +112,14 @@ describe('one column takes the room left', () => {
 
 describe('short of room, at any desktop width', () => {
   it('folds by priority, the description first, then the priority 3 columns from the right, and says how many', () => {
-    // Floors: 200 + 64 + 80 + 96 + 70 + 130 + 90 = 730 in 560 (600 less the actions): three columns fold
+    // 560 of room (600 less the actions): at their comfort (280, 160) the columns still ask too much until the
+    // description and the priority 3 columns are gone; then the name and the issuer share the shortfall
     room.width = 600
     const { container } = render(table())
     expect(heads(container)).toEqual(['name', 'status', 'ca', 'expiry', '·'])
-    // Without the description, the name takes the room left; the issuer gave way first, then the name
     expect(headOf(container, 'name')).not.toHaveClass('fit')
-    expect(cellOf(container, 'ca').style.maxWidth).toBe('96px')
-    expect(cellOf(container, 'name').style.maxWidth).toBe('254px')
+    expect(cellOf(container, 'ca').style.maxWidth).toBe('120px')
+    expect(cellOf(container, 'name').style.maxWidth).toBe('230px')
     const note = container.querySelector('.table-footer .folded-note')
     expect(note).toHaveTextContent('table.foldedColumns {"count":3}')
     expect(note).toHaveAttribute('title', 'Description, Source, Clé')
@@ -128,8 +133,8 @@ describe('short of room, at any desktop width', () => {
     resize(1400)
     expect(heads(container)).toEqual(['name', 'description', 'status', 'ca', 'source', 'expiry', 'key', '·'])
     expect(container.querySelector('.folded-note')).toBeNull()
-    // 700 of room: the floors ask 730, the description folds alone
-    resize(740)
+    // 810 of room: at comfort the columns ask 910 with the description, 810 without: it folds alone
+    resize(850)
     expect(heads(container)).toEqual(['name', 'status', 'ca', 'source', 'expiry', 'key', '·'])
     expect(container.querySelector('.folded-note')).toHaveTextContent('{"count":1}')
   })
@@ -141,7 +146,7 @@ describe('short of room, at any desktop width', () => {
   })
 
   it('a page not yet migrated folds by its fold rank, else from the right, never the name nor fold: false', () => {
-    room.width = 460
+    room.width = 520
     const plain = [
       { id: 'name', label: 'Nom', entity: true, cell: (r) => r.name },
       { id: 'a', label: 'A', cell: () => 'a' },
@@ -149,7 +154,7 @@ describe('short of room, at any desktop width', () => {
       { id: 'status', label: 'État', cell: () => 's', fold: false },
       { id: 'c', label: 'C', cell: () => 'c' },
     ]
-    // 200 + 100 + 100 + 80 + 100 in 420: c then b fold
+    // 300 + 100 + 100 + 80 + 100 in 480, the name at its comfort 280 at most: c then b fold
     const { container } = render(table({ columns: plain }))
     expect(heads(container)).toEqual(['name', 'a', 'status', '·'])
   })
@@ -173,6 +178,39 @@ describe('short of room, at any desktop width', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('checkbox', { name: 'Description' })).toBeChecked()
     expect(within(dialog).getByRole('checkbox', { name: 'Clé' })).toBeChecked()
+  })
+})
+
+describe('a name with badges under it (the authorities, G5)', () => {
+  // A group of badges spans the cell (adjust.css): its box is the cell's, 535 px; its badges are 90 and 70 px
+  const WIDTH = { 'ca-badges': 535, chip: 0, 'entity-name': 262 }
+  beforeAll(() => {
+    saved.offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      get() { return Number(this.dataset?.w) || WIDTH[[...this.classList].find((c) => c in WIDTH)] || 0 },
+    })
+  })
+  afterAll(() => {
+    if (saved.offset) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', saved.offset); else delete HTMLElement.prototype.offsetWidth
+  })
+
+  it('counts the widest badge, not the group\'s box, and nothing for an empty group: the name gives way to 200 before a column folds', () => {
+    const before = { ...NATURAL }
+    Object.assign(NATURAL, { name: 560, status: 300, expiry: 340 })
+    try {
+      room.width = 880
+      const badges = (r) => <span className="ca-badges">{r.id === 1 && <><span className="chip" data-w="90">Racine</span><span className="chip" data-w="70">PQ</span></>}</span>
+      const cas = [
+        { id: 'name', label: 'Nom', kind: 'entity', priority: 1, grow: true, cell: (r) => r.name, extra: badges },
+        { id: 'status', label: 'État', kind: 'fit', priority: 1, cell: () => 'Active' },
+        { id: 'expiry', label: 'Expire', kind: 'fit', priority: 2, cell: () => '2036' },
+      ]
+      const { container } = render(table({ columns: cas }))
+      // 1200 asked in 840: the name gives 280 down to its comfort, then 80 down to 200; the expiry stays
+      expect(heads(container)).toEqual(['name', 'status', 'expiry', '·'])
+      expect(cellOf(container, 'name').style.maxWidth).toBe('200px')
+    } finally { Object.assign(NATURAL, before) }
   })
 })
 

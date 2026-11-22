@@ -889,6 +889,7 @@
     "selectedOnPage_other": "本页已选择 {{count}} 个证书",
     "exportSelected": "导出",
     "complianceColumn": "合规性",
+    "creationColumn": "Creation date",
     "archivedMark": "已归档：已被续期或重新注册取代，保留作为历史记录",
     "sourceAcmeRenewal": "ACME 续期",
     "sourceIssued": "已签发",
@@ -2923,7 +2924,9 @@
     "ocspActive": "已启用",
     "ocspInactive": "未启用",
     "columns": {
-      "published": "发布时间"
+      "published": "发布时间",
+      "publication": "Publication",
+      "crlNumber": "CRL number"
     },
     "tabs": {
       "publication": "发布"
@@ -5567,11 +5570,13 @@
     "searching": "正在搜索…",
     "sortHint": "Headers with a button sort the list.",
     "sortedBy": "Sorted by {{column}}, {{order}}",
+    "sortedByReverse": "Sorted by {{column}}, {{order}}. Click to reverse",
     "sortAscending": "ascending order",
     "sortDescending": "descending order",
     "sortBy": "Sort by",
     "sortByColumn": "Sort by {{column}}",
-    "reverseSort": "Reverse the order",
+    "ascendingReverse": "Ascending order, reverse",
+    "descendingReverse": "Descending order, reverse",
     "foldedColumns_one": "{{count}} column folded",
     "foldedColumns_other": "{{count}} columns folded"
   },

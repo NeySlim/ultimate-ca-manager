@@ -122,7 +122,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     const column = certificateColumns((key) => key).find(col => col.id === 'created')
     expect(column).toBeDefined()
     expect(column.sort).toBe('created')
-    expect(column.label).toBe('common.created')
+    expect(column.label).toBe('certificates.creationColumn')
   })
 
   it('opens the certificate it has just issued', async () => {

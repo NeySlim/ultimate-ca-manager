@@ -11,7 +11,6 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { useTranslation } from 'react-i18next'
 import { useMobile } from '../../contexts/MobileContext'
 import { Icon } from './Icon'
-import { IconBtn } from './Btn'
 import { FilterSelect } from './Toolbar'
 import { SkeletonRows, SkeletonCards } from './Skeleton'
 import { columnKind, checkColumns, layoutColumns, NAME_TEXT_FLOOR } from './columnShare'
@@ -43,12 +42,23 @@ function cellClass(col, kind) {
 
 const px = (v) => parseFloat(v) || 0
 
-/** The width a header's label asks for: its sort button, else its text and arrow, plus the cell's side padding. */
+/**
+ * The width a header's label asks for: its text and arrow, plus the side padding of the cell and of its sort button,
+ * which fills the cell (R4): the button's own box is the column's, not its label's.
+ */
 function headerWidth(th) {
   const cs = getComputedStyle(th)
-  const pad = px(cs.paddingLeft) + px(cs.paddingRight)
+  let pad = px(cs.paddingLeft) + px(cs.paddingRight)
   const button = th.querySelector(':scope > button')
-  if (button) return button.getBoundingClientRect().width + pad
+  if (button) {
+    const bs = getComputedStyle(button)
+    pad += px(bs.paddingLeft) + px(bs.paddingRight)
+    try {
+      const range = document.createRange()
+      range.selectNodeContents(button)
+      return (range.getBoundingClientRect?.().width || 0) + pad
+    } catch { return pad /* jsdom has no layout */ }
+  }
   let w = 0
   for (const node of th.childNodes) {
     if (node.nodeType === 1 && node.matches('.col-sep, .col-resize')) continue
@@ -61,17 +71,28 @@ function headerWidth(th) {
   return w + pad
 }
 
-/** A name's floor: its marks beside it whole, NAME_TEXT_FLOOR of its own text, the cell's padding. */
+/**
+ * A name's floor: its marks beside it whole and NAME_TEXT_FLOOR of its own text, or the widest badge of a group
+ * under it (.ca-badges, whose box spans the cell: its content counts, an empty group nothing), plus the cell's padding.
+ */
 function nameFloor(rows, index) {
   return Math.max(0, ...rows.map((tr) => {
     const td = tr.children[index]
     const line = td?.querySelector('.entity-line')
     if (!line) return 0
-    // On one line the marks follow the name; a group of badges under it is as wide as its widest
-    const others = [...line.children].filter((el) => !el.classList.contains('entity-name')).map((el) => el.offsetWidth)
-    const marks = Math.max(line.scrollWidth - (line.querySelector('.entity-name')?.offsetWidth || 0), ...others)
+    let beside = 0
+    let under = 0
+    for (const el of line.children) {
+      if (el.classList.contains('entity-name')) continue
+      if (el.classList.contains('ca-badges')) under = Math.max(under, ...[...el.children].map((b) => b.offsetWidth))
+      else {
+        const ms = getComputedStyle(el)
+        beside += el.offsetWidth + px(ms.marginLeft) + px(ms.marginRight)
+      }
+    }
+    const gap = px(getComputedStyle(line).columnGap) * [...line.children].filter((el) => !el.classList.contains('ca-badges')).slice(1).length
     const cs = getComputedStyle(td)
-    return marks + NAME_TEXT_FLOOR + px(cs.paddingLeft) + px(cs.paddingRight)
+    return Math.max(beside + gap + NAME_TEXT_FLOOR, under) + px(cs.paddingLeft) + px(cs.paddingRight)
   }))
 }
 
@@ -122,11 +143,20 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
   return { measuring, folded: layout.folded, caps: layout.caps }
 }
 
-/** The arrows of a sortable column that is not the sorted one: up and down, the separator's colour (T5). */
+/** The sign of a sortable column that is not the sorted one: two solid triangles in the label's colour (R3). */
 function SortIdle() {
   return (
-    <svg className="icon sort-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m8 9 4-4 4 4M8 15l4 4 4-4" />
+    <svg className="icon sort-idle" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+      <path d="M12 4l5 6H7zM12 20l-5-6h10z" />
+    </svg>
+  )
+}
+
+/** The direction of a sort: an arrow with its shaft, not a chevron, which reads as a menu (R5, G8). */
+export function SortArrow({ asc }) {
+  return (
+    <svg className="icon sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={asc ? 'M12 19V5m-6 6 6-6 6 6' : 'M12 5v14m-6-6 6 6 6-6'} />
     </svg>
   )
 }
@@ -240,8 +270,10 @@ export function DataTable({
         <div className="toolbar mobile-sort">
           <FilterSelect id={scrollId ? `${scrollId}-sort` : undefined} label={t('table.sortBy')} value={sort?.key || ''} onChange={(v) => onSort(v)}
             options={[...(sort?.key ? [] : [{ value: '', label: t('table.sortBy') }]), ...sortables.map((c) => ({ value: c.sort, label: t('table.sortByColumn', { column: plainLabel(c) }) }))]} />
-          <IconBtn icon={sort?.asc === false ? 'down' : 'up'} label={t('table.reverseSort')} data-action="reverse-sort" disabled={!sort?.key || undefined}
-            onClick={() => onSort(sort.key)} />
+          <button type="button" className="icon-btn" data-action="reverse-sort" disabled={!sort?.key || undefined} onClick={() => onSort(sort.key)}
+            aria-label={t(sort?.asc === false ? 'table.descendingReverse' : 'table.ascendingReverse')} title={t(sort?.asc === false ? 'table.descendingReverse' : 'table.ascendingReverse')}>
+            <SortArrow asc={sort?.asc !== false} />
+          </button>
         </div>
       )}
       <div className={k.container} style={k.style} aria-busy={firstRead || undefined}>
@@ -346,15 +378,19 @@ function HeaderCell({ col, className, sort, onSort, width, onWidth, last }) {
     window.addEventListener('pointerup', up)
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
   }, [dragging, onWidth, col.id])
-  const arrow = sorted ? <Icon name={sort.asc ? 'up' : 'down'} /> : button ? <SortIdle /> : null
+  const arrow = sorted ? <SortArrow asc={sort.asc} /> : button ? <SortIdle /> : null
   // A number's arrow comes first, so that its label ends on the digits' right edge (L9)
   const content = columnKind(col) === 'number' ? <>{arrow}{col.label}</> : <>{col.label}{arrow}</>
   const full = col.labelFull ? { title: col.labelFull, 'aria-label': col.labelFull } : {}
+  // The button says what a click does: sort by the column, or reverse the sort it shows (R4)
+  const does = sorted
+    ? t('table.sortedByReverse', { column: col.labelFull || plainLabel(col), order: t(sort.asc ? 'table.sortAscending' : 'table.sortDescending') })
+    : t('table.sortByColumn', { column: col.labelFull || plainLabel(col) })
   const grip = onWidth && col.resizable !== false
   return (
     <th scope="col" className={className} aria-sort={button ? (sorted ? SORT[sort.asc] : 'none') : sorted ? SORT[sort.asc] : undefined}
       style={width ? { width, minWidth: width } : undefined} {...(button ? {} : full)}>
-      {button ? <button type="button" data-sort={col.sort} onClick={() => onSort(col.sort)} {...full}>{content}</button> : content}
+      {button ? <button type="button" data-sort={col.sort} onClick={() => onSort(col.sort)} {...full} title={does}>{content}</button> : content}
       {grip ? (
         <span className={join('col-resize', !last && 'col-sep')} role="presentation" title={t('atelier.resizeColumn')} onPointerDown={down}
           onDoubleClick={(e) => { e.stopPropagation(); onWidth(col.id, null) }} />

@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 const mocks = vi.hoisted(() => ({
   getApplicationLog: vi.fn(),
@@ -30,6 +31,12 @@ vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => screenSize }))
 
 import SystemLogsPage from '../SystemLogsPage'
 
+function Loc() {
+  return <output data-testid="loc">{useLocation().search}</output>
+}
+// The page keeps its sort in the address (R6): it lives under a router
+const page = (url = '/logs') => <MemoryRouter initialEntries={[url]}><SystemLogsPage /><Loc /></MemoryRouter>
+
 const LINES = [
   { ts: '2026-09-19 13:41:36', logger: 'services.scep', level: 'WARNING', message: 'failInfo=1' },
   { ts: '2026-09-19 13:41:37', logger: 'api.v2', level: 'INFO', message: 'log read' },
@@ -42,11 +49,11 @@ const DEFAULT_DATA = {
   timezone: { name: 'CEST', offset: '+02:00' },
 }
 
-async function renderPage(data = DEFAULT_DATA) {
+async function renderPage(data = DEFAULT_DATA, url) {
   // A fresh object per call, as a real fetch gives: one shared reference makes
   // React bail out of the re-render and hides the effects under test.
   mocks.getApplicationLog.mockImplementation(async () => ({ data: { ...data } }))
-  render(<SystemLogsPage />)
+  render(page(url))
   await waitFor(() => expect(mocks.getApplicationLog).toHaveBeenCalled())
 }
 
@@ -67,12 +74,29 @@ describe('SystemLogsPage', () => {
       .toEqual(['logs.time', 'logs.levelShort', 'logs.component', 'logs.message'])
   })
 
-  it('shows the newest-first order on the time, an arrow without a button; nothing else sorts', async () => {
+  it('sorts by the time in two states, the newest first by default, kept in the address; nothing else sorts (R6)', async () => {
     await renderPage()
     const heads = [...document.querySelectorAll('th')].slice(1)
     expect(heads.map((h) => h.getAttribute('aria-sort'))).toEqual(['descending', null, null, null])
-    expect(heads[0].querySelector('svg')).not.toBeNull()
-    expect(document.querySelector('thead button')).toBeNull()
+    expect([...document.querySelectorAll('thead button[data-sort]')].map((b) => b.dataset.sort)).toEqual(['time'])
+    const messages = () => [...document.querySelectorAll('tbody tr')].map((tr) => tr.lastElementChild.textContent)
+    await waitFor(() => expect(messages()).toEqual(['log read', 'failInfo=1']))
+    fireEvent.click(document.querySelector('thead button[data-sort=time]'))
+    expect(heads[0]).toHaveAttribute('aria-sort', 'ascending')
+    expect(messages()).toEqual(['failInfo=1', 'log read'])
+    expect(screen.getByTestId('loc')).toHaveTextContent('?sort=time&order=asc')
+    fireEvent.click(document.querySelector('thead button[data-sort=time]'))
+    expect(messages()).toEqual(['log read', 'failInfo=1'])
+    expect(screen.getByTestId('loc')).toHaveTextContent('')
+  })
+
+  it('an address that asks the oldest first opens so, and copies in that order', async () => {
+    await renderPage(DEFAULT_DATA, '/logs?sort=time&order=asc')
+    await screen.findByText('failInfo=1')
+    expect(document.querySelector('thead th[aria-sort=ascending] button[data-sort=time]')).not.toBeNull()
+    fireEvent.click(document.querySelector('[data-action="copy-all"]'))
+    await waitFor(() => expect(mocks.writeText).toHaveBeenCalled())
+    expect(mocks.writeText.mock.calls[0][0].indexOf('failInfo=1')).toBeLessThan(mocks.writeText.mock.calls[0][0].indexOf('log read'))
   })
 
   it('renders each record as a row with its parts in their own cells', async () => {
@@ -328,7 +352,7 @@ describe('SystemLogsPage', () => {
 
   it('reports a failed manual read instead of rendering a blank page', async () => {
     mocks.getApplicationLog.mockRejectedValue(new Error('boom'))
-    render(<SystemLogsPage />)
+    render(page())
     await waitFor(() => expect(mocks.showError).toHaveBeenCalledWith('logs.unavailable'))
   })
 

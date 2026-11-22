@@ -48,7 +48,7 @@ test.describe('desktop', () => {
     expect(Math.abs(foot!.y + foot!.height - (frame!.y + frame!.height))).toBeLessThanOrEqual(1)
     await footer.getByRole('button', { name: 'Next page' }).click()
     await expect(footer).toContainText('2 /')
-    const header = zone.getByRole('columnheader', { name: 'CRL', exact: true })
+    const header = zone.getByRole('columnheader', { name: 'CRL number', exact: true })
     await header.getByRole('button').click()
     await expect(header).toHaveAttribute('aria-sort', 'ascending')
     await expect(footer).toContainText('1 /')

@@ -63,8 +63,8 @@ describe('the fold order', () => {
   })
 })
 
-describe('the layout of the columns', () => {
-  // A name, a growing description, a state, an issuer (text), a source, an expiry, a key: natural widths in px
+describe('the layout of the columns: the need first (R1, R2)', () => {
+  // A name, a growing description, a state, an issuer (text), an owner (text), a source, an expiry: natural widths in px
   const columns = [
     col('name', { kind: 'entity', priority: 1 }),
     col('description', { kind: 'text', priority: 4, grow: true }),
@@ -77,94 +77,177 @@ describe('the layout of the columns', () => {
   const natural = { name: 300, description: 400, status: 80, ca: 240, owner: 150, source: 70, expiry: 130 }
   const measures = Object.fromEntries(Object.entries(natural).map(([id, n]) => [id, { natural: n, header: 50 }]))
   const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0)
+  const near = (out, expected) => Object.entries(expected).forEach(([id, w]) => expect(out.widths[id], id).toBeCloseTo(w, 1))
 
-  it('all fits: the fixed columns at their natural width, free text bounded, the growing one takes the rest', () => {
+  it('all fits: every column gets its need, the growing one the rest, no ceiling anywhere', () => {
     const out = layoutColumns(columns, measures, 2000)
     expect(out.folded).toEqual([])
     expect(out.absorber).toBe('description')
-    expect(out.widths).toMatchObject({ name: 300, status: 80, ca: 240, owner: 150, source: 70, expiry: 130 })
-    // Nothing to bound: no ceiling, the growing column has none either
+    expect(out.widths).toMatchObject({ name: 300, status: 80, ca: 240, owner: 150, source: 70, expiry: 130, description: 1030 })
     expect(out.caps).toEqual({})
   })
 
-  it('bounds the free text that does not grow: a name to 360, a text to [96, 280]', () => {
+  it('a long name or text is never bounded while the sum fits, a short text keeps its own width', () => {
     const out = layoutColumns(columns, { ...measures, name: { natural: 520 }, ca: { natural: 410 }, owner: { natural: 40 } }, 3000)
-    expect(out.caps.name).toEqual({ max: BOUNDS.entityMax })
-    expect(out.caps.ca).toEqual({ max: BOUNDS.textMax })
-    expect(out.caps.owner).toEqual({ min: BOUNDS.textMin })
+    expect(out.widths).toMatchObject({ name: 520, ca: 410, owner: 40 })
+    expect(out.caps).toEqual({})
+    expect(BOUNDS).not.toHaveProperty('entityMax')
+    expect(BOUNDS).not.toHaveProperty('textMax')
   })
 
-  it('short of room, the growing column gives way first, down to its minimum', () => {
-    // 300 + 400 + 80 + 240 + 150 + 70 + 130 = 1370; 1200 of room: the description gives 170
+  it('short of room, the growing text gives way first, down to its floor', () => {
+    // 1370 needed in 1200: the description gives 170
     const out = layoutColumns(columns, measures, 1200)
     expect(out.folded).toEqual([])
     expect(out.widths.description).toBe(230)
     expect(out.caps).toEqual({})
   })
 
-  it('then the texts, the least important first, down to 96 each, then the name down to 200', () => {
-    // Description at 64: 1034 needed. 1000 of room: the owner (priority 3) gives 34 first
-    let out = layoutColumns(columns, measures, 1000)
-    expect(out.widths).toMatchObject({ description: 64, owner: 116, ca: 240, name: 300 })
-    expect(out.caps).toEqual({ owner: { max: 116 } })
-    // 850: the owner at 96, the issuer (priority 2) gives the rest
-    out = layoutColumns(columns, measures, 850)
-    expect(out.widths).toMatchObject({ description: 64, owner: 96, ca: 110, name: 300 })
-    // 760: both texts at 96, the name gives way down to 224
-    out = layoutColumns(columns, measures, 760)
+  it('then the name and the texts give way together, in proportion to what each has above its comfort floor', () => {
+    // Description at 64: 1034 needed in 1000. Above comfort: the name 20 (280), the issuer 80 (160), the owner none (150 < 160)
+    const out = layoutColumns(columns, measures, 1000)
     expect(out.folded).toEqual([])
-    expect(out.widths).toMatchObject({ owner: 96, ca: 96, name: 224 })
-    expect(out.caps.name).toEqual({ max: 224 })
-    expect(sum(out.widths)).toBe(760)
+    near(out, { description: 64, name: 293.2, ca: 212.8, owner: 150 })
+    expect(out.caps.name.max).toBeCloseTo(293.2, 1)
+    expect(out.caps.ca.max).toBeCloseTo(212.8, 1)
+    expect(out.caps.owner).toBeUndefined()
   })
 
-  it('then folds by priority, the free text whole again at each fold', () => {
-    // At their floors the columns need 200 + 64 + 80 + 96 + 96 + 70 + 130 = 736: 700 folds the description (priority 4)
-    let out = layoutColumns(columns, measures, 700)
+  it('rather than go under comfort, a column of priority 4 folds, then those of priority 3, right to left', () => {
+    // At comfort the columns need 934: in 900 the description folds and the name absorbs
+    let out = layoutColumns(columns, measures, 900)
     expect(out.folded).toEqual(['description'])
-    // Without a growing column the name takes the room left; the texts give way before it
     expect(out.absorber).toBe('name')
-    expect(out.widths).toMatchObject({ owner: 96, ca: 96, name: 228 })
-    // 560: the source and the owner (priority 3, right to left) fold, every width computed again from its natural one
-    out = layoutColumns(columns, measures, 560)
+    near(out, { name: 286, ca: 184 })
+    out = layoutColumns(columns, measures, 800)
+    expect(out.folded).toEqual(['description', 'source'])
+    near(out, { name: 280, ca: 160 })
+    // Each fold computes the widths again from the needs: the owner gone, the name and the issuer get room back
+    out = layoutColumns(columns, measures, 700)
     expect(out.folded).toEqual(['description', 'source', 'owner'])
-    expect(out.widths).toMatchObject({ ca: 96, name: 254 })
+    near(out, { name: 290, ca: 200 })
+  })
+
+  it('under comfort only once nothing but priority 2 is left to fold, down to the hard floors, then priority 2 folds', () => {
+    // 650 at comfort in 600: the expiry (priority 2) stays, the name and the issuer share the last 50 above 200 and 96
+    let out = layoutColumns(columns, measures, 600)
+    expect(out.folded).toEqual(['description', 'source', 'owner'])
+    near(out, { name: 252.22, ca: 137.78 })
+    expect(sum(out.widths)).toBeCloseTo(600, 1)
+    // 506 at the hard floors in 480: the expiry folds, the rightmost priority 2
+    out = layoutColumns(columns, measures, 480)
+    expect(out.folded).toEqual(['description', 'source', 'owner', 'expiry'])
+    near(out, { name: 257.78, ca: 142.22 })
   })
 
   it('never folds the sorted column: the next one goes in its place', () => {
     const out = layoutColumns(columns, measures, 480, { sortKey: 'days' })
     expect(out.folded).toEqual(['description', 'source', 'owner', 'ca'])
-    expect(Object.keys(out.widths)).toContain('expiry')
+    expect(out.widths).toMatchObject({ expiry: 130, name: 270 })
   })
 
-  it('keeps a header whole: no column narrower than its label', () => {
-    const out = layoutColumns(columns, { ...measures, owner: { natural: 150, header: 130 } }, 850)
-    expect(out.widths.owner).toBe(130)
-  })
-
-  it('keeps a name wider than 200 when its marks ask for it (floor)', () => {
-    const out = layoutColumns(columns, { ...measures, name: { natural: 300, floor: 220 } }, 760)
-    expect(out.widths.name).toBe(224)
-    expect(layoutColumns(columns, { ...measures, name: { natural: 300, floor: 230 } }, 760).folded).toEqual(['description'])
+  it('keeps a header whole and a name\'s marks beside it: their floors', () => {
+    const two = [col('name', { kind: 'entity', priority: 1 }), col('owner', { kind: 'text', priority: 2 })]
+    expect(layoutColumns(two, { name: { natural: 300 }, owner: { natural: 150, header: 130 } }, 330).widths).toEqual({ name: 200, owner: 130 })
+    // A name whose marks ask 220
+    const marked = { name: { natural: 300, floor: 220 }, owner: { natural: 150, header: 130 } }
+    expect(layoutColumns(two, marked, 350)).toMatchObject({ folded: [], widths: { name: 220, owner: 130 } })
+    expect(layoutColumns(two, marked, 340).folded).toEqual(['owner'])
   })
 
   it('a name 250 px at least on a window of 1800 px and more', () => {
-    const out = layoutColumns(columns, measures, 556, { wide: true })
-    expect(out.folded).toHaveLength(3)
-    expect(out.widths.name).toBe(BOUNDS.entityMinWide)
+    const two = [col('name', { kind: 'entity', priority: 1 }), col('owner', { kind: 'text', priority: 2 })]
+    const m = { name: { natural: 300 }, owner: { natural: 150, header: 130 } }
+    expect(layoutColumns(two, m, 350).folded).toEqual([])
+    const out = layoutColumns(two, m, 350, { wide: true })
+    expect(out.folded).toEqual(['owner'])
+    // Alone, the name takes the whole room
+    expect(out.widths.name).toBe(350)
   })
 
-  it('a list whose name grows (the authorities) shrinks the name first, then folds', () => {
+  it('a list whose name grows (the authorities): the name absorbs, gives way down to comfort, then the columns fold', () => {
     const cas = [col('name', { kind: 'entity', priority: 1, grow: true }), col('type', { kind: 'fit', priority: 3 }), col('certs', { kind: 'number', priority: 3 })]
     const m = { name: { natural: 500 }, type: { natural: 100 }, certs: { natural: 90 } }
     expect(layoutColumns(cas, m, 1000)).toMatchObject({ folded: [], absorber: 'name', caps: {} })
     expect(layoutColumns(cas, m, 600)).toMatchObject({ folded: [], caps: { name: { max: 410 } } })
-    expect(layoutColumns(cas, m, 350)).toMatchObject({ folded: ['certs'], caps: { name: { max: 250 } } })
+    expect(layoutColumns(cas, m, 350)).toMatchObject({ folded: ['certs', 'type'], caps: { name: { max: 350 } } })
   })
 
   it('when nothing more can fold, every column stays at its floor', () => {
     const out = layoutColumns(columns, measures, 100)
     expect(out.folded).toEqual(['description', 'source', 'owner', 'expiry', 'ca'])
     expect(out.widths).toMatchObject({ name: 200 })
+  })
+})
+
+describe('the data of the maintainer\'s capture (Certificates, long names, empty descriptions)', () => {
+  // Natural widths read on the capture: 14 px of side padding at 1600 and 1920, 10 px at 1000 and beside the dock
+  const certs = [
+    col('name', { kind: 'entity', priority: 1 }),
+    col('description', { kind: 'text', priority: 4, grow: true }),
+    col('status', { kind: 'fit', priority: 1 }),
+    col('ca', { kind: 'text', priority: 2 }),
+    col('source', { kind: 'fit', priority: 3 }),
+    col('expiry', { kind: 'fit', priority: 2, sort: 'days' }),
+    col('key', { kind: 'fit', priority: 3, sort: 'key' }),
+  ]
+  const wide = { name: 427, description: 110, status: 81, ca: 301, source: 106, expiry: 162, key: 143 }
+  const narrow = { name: 419, description: 102, status: 73, ca: 293, source: 98, expiry: 150, key: 135 }
+  const of = (n) => Object.fromEntries(Object.entries(n).map(([id, w]) => [id, { natural: w, header: id === 'description' ? w : 60 }]))
+  // The region less the checkbox (40) and the actions (83, or 47 with the Export hidden)
+  const sorted = { sortKey: 'days' }
+
+  it('at 1600 and 1920 nothing is cut: the name and the issuer whole, the empty description takes the rest', () => {
+    let out = layoutColumns(certs, of(wide), 1550 - 40 - 83, sorted)
+    expect(out).toMatchObject({ folded: [], caps: {}, widths: { name: 427, ca: 301, description: 207 } })
+    out = layoutColumns(certs, of(wide), 1850 - 40 - 83, sorted)
+    expect(out).toMatchObject({ folded: [], caps: {}, widths: { name: 427, ca: 301, description: 507 } })
+  })
+
+  it('at 1406 beside the dock: the name about 296, the issuer about 176, the source kept', () => {
+    const out = layoutColumns(certs, of(narrow), 880 - 40 - 47, sorted)
+    expect(out.folded).toEqual(['description', 'key'])
+    expect(out.widths.name).toBeCloseTo(296, 0)
+    expect(out.widths.ca).toBeCloseTo(176, 0)
+    expect(out.widths).toHaveProperty('source', 98)
+  })
+
+  it('at 1000: the key algorithm folds, the name about 336, the issuer about 214', () => {
+    const out = layoutColumns(certs, of({ ...narrow, expiry: 154 }), 962 - 40 - 47, sorted)
+    expect(out.folded).toEqual(['description', 'key'])
+    expect(out.widths.name).toBeCloseTo(336, 0)
+    expect(out.widths.ca).toBeCloseTo(214, 0)
+  })
+})
+
+describe('the two invariants of the layout, on random lists', () => {
+  // A small deterministic generator: the same lists at every run
+  let seed = 7
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+  const pick = (a) => a[Math.floor(rand() * a.length)]
+  const comfort = (c, m) => (c.kind === 'entity' ? Math.min(m.natural, BOUNDS.nameComfort) : Math.min(m.natural, BOUNDS.textComfort))
+
+  it('no cell is cut while another column has 16 px more than it needs; no priority 1 or 2 under comfort beside a 3 or a 4', () => {
+    for (let n = 0; n < 400; n += 1) {
+      const cols = [col('name', { kind: 'entity', priority: 1 })]
+      const m = { name: { natural: 200 + Math.round(rand() * 400), header: 60 } }
+      const count = 2 + Math.floor(rand() * 6)
+      for (let i = 0; i < count; i += 1) {
+        const kind = pick(['text', 'text', 'fit', 'number'])
+        const id = `c${i}`
+        cols.push(col(id, { kind, priority: pick([1, 2, 2, 3, 3, 4]), ...(kind === 'text' && i === 0 && rand() < 0.5 ? { grow: true } : {}) }))
+        m[id] = { natural: 40 + Math.round(rand() * (kind === 'text' ? 360 : 140)), header: 40 }
+      }
+      const room = 300 + Math.round(rand() * 1500)
+      const out = layoutColumns(cols, m, room)
+      const shown = cols.filter((c) => !out.folded.includes(c.id))
+      const need = (c) => Math.max(m[c.id].natural, c.kind === 'entity' ? BOUNDS.entityMin : 0)
+      const cut = shown.filter((c) => out.widths[c.id] < need(c) - 0.5)
+      const spare = shown.filter((c) => out.widths[c.id] > need(c) + 16 && c.id !== out.absorber)
+      if (cut.length) expect(spare.map((c) => c.id), `list ${n}`).toEqual([])
+      const under = shown.filter((c) => (c.priority <= 2) && ['entity', 'text'].includes(c.kind) && !c.grow && out.widths[c.id] < comfort(c, m[c.id]) - 0.5)
+      const low = shown.filter((c) => c.priority >= 3)
+      if (under.length) expect(low.map((c) => c.id), `list ${n}`).toEqual([])
+    }
   })
 })

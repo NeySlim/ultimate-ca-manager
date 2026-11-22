@@ -85,6 +85,9 @@ test('the search finds sections over the whole guide and marks the words in the 
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/guide\/[^?]+\?q=REVOCATION%20crl/)
   await expect(page.locator('#guide-article mark.guide-hit').first()).toBeVisible()
+  // The chapter gives the focus to the section opened (or its title) once its text is in, after the marks show:
+  // typing before that lands in a field the focus then leaves, and Escape reaches the heading instead of the search
+  await expect.poll(() => page.evaluate(() => document.getElementById('guide-article')!.contains(document.activeElement))).toBe(true)
   await field.fill('zzqqxx nothing')
   await expect(page.locator('.guide-results')).toContainText('No results. Try another word.')
   await page.keyboard.press('Escape')

@@ -889,6 +889,7 @@
     "selectedOnPage_other": "このページで {{count}} 件の証明書を選択中",
     "exportSelected": "エクスポート",
     "complianceColumn": "コンプライアンス",
+    "creationColumn": "Creation date",
     "archivedMark": "アーカイブ済み: 更新または再登録で置き換えられ、履歴として保持されています",
     "sourceAcmeRenewal": "ACME更新",
     "sourceIssued": "発行済み",
@@ -2923,7 +2924,9 @@
     "ocspActive": "有効",
     "ocspInactive": "無効",
     "columns": {
-      "published": "公開日時"
+      "published": "公開日時",
+      "publication": "Publication",
+      "crlNumber": "CRL number"
     },
     "tabs": {
       "publication": "公開"
@@ -5567,11 +5570,13 @@
     "searching": "検索中…",
     "sortHint": "Headers with a button sort the list.",
     "sortedBy": "Sorted by {{column}}, {{order}}",
+    "sortedByReverse": "Sorted by {{column}}, {{order}}. Click to reverse",
     "sortAscending": "ascending order",
     "sortDescending": "descending order",
     "sortBy": "Sort by",
     "sortByColumn": "Sort by {{column}}",
-    "reverseSort": "Reverse the order",
+    "ascendingReverse": "Ascending order, reverse",
+    "descendingReverse": "Descending order, reverse",
     "foldedColumns_one": "{{count}} column folded",
     "foldedColumns_other": "{{count}} columns folded"
   },
