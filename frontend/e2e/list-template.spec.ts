@@ -385,7 +385,7 @@ test.describe('the column handles (C2)', () => {
     expect(Math.round(box.width)).toBe(12)
     expect(await grip.evaluate((g) => getComputedStyle(g).cursor)).toBe('col-resize')
     await page.mouse.move(box.x + 6, box.y + box.height / 2)
-    expect(await line()).toEqual(['2px', `${Math.round(box.height)}px`])
+    await expect.poll(line).toEqual(['2px', `${Math.round(box.height)}px`])
 
     // Drag 80 px to the right
     const drag = async (dx: number) => {
