@@ -102,6 +102,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The certificate comparison reads at a glance.** An identical line is merged into one cell marked *Identical*, a differing one is drawn by a stroke beside its label instead of a full highlight, and in a list (names, usages, extensions) a "+" marks the element not every certificate has; the summary counts the differences among the properties.
 - **SQLite runs in WAL, and a request waiting for another writer no longer stops the others.** The database switches to write-ahead logging at its first start, so reads never wait for a write; a write that meets another one waits up to 5 seconds without holding the web worker, then answers 503 with `Retry-After`.
 - **The compliance score covers the active certificates.** `GET /api/v2/certificates/compliance` scores, in SQL, the certificates `/dashboard/compliance` counts (issued, not revoked, not archived, not expired; expired ones were included), and both name that `population`; `/dashboard/compliance` adds the average score, the grade distribution and `compliant`, the certificates under no counter.
 - **A list row opens its object from anywhere on it.** A click on a row opens it in the inspector as its name did, except on its checkbox, its buttons or at the end of a text selection, and nothing opens while rows are ticked.
