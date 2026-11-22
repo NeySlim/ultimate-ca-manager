@@ -19,7 +19,7 @@ import { acceptedJob } from '../services/jobs.service'
 import auditService from '../services/audit.service'
 import { downloadBlob } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
-import { typeOf, typeIcon, presentTypes, effectiveActions, actionLabel } from './activity/activityTypes'
+import { TYPES, typeOf, typeIcon, presentTypes, effectiveActions, actionLabel } from './activity/activityTypes'
 import { rowTime, eventDate } from './activity/activityDates'
 import { EventDialog } from './activity/EventDialog'
 import { ExportDialog, ActionsDialog, CleanupDialog } from './activity/JournalDialogs'
@@ -30,6 +30,8 @@ const PAGE_SIZES = [10, 25, 50, 100]
 const NEWEST_FIRST = { key: 'timestamp', asc: false }
 const TIME_KEYS = ['timestamp']
 const PRESETS_KEY = 'ucm-audit-presets'
+// The filters an overview link may carry in the address
+const LINK_KEYS = ['type', 'success', 'date_from', 'date_to']
 
 function readPresets() {
   try { const saved = localStorage.getItem(PRESETS_KEY); return saved ? JSON.parse(saved) : [] } catch { return [] }
@@ -69,6 +71,21 @@ export default function AuditLogsPage() {
   const [filterDateFrom, setFilterDateFrom] = usePersistedState('ucm-filter-audit-datefrom', '')
   const [filterDateTo, setFilterDateTo] = usePersistedState('ucm-filter-audit-dateto', '')
   const [presets, setPresets] = useState(readPresets)
+  // A link of the overview opens the journal on one UTC day's failures of one type: it sets these filters, the others go
+  const linked = useRef(null)
+  useEffect(() => {
+    const q = new URLSearchParams(location.search)
+    if (!LINK_KEYS.some((k) => q.has(k)) || linked.current === location.search) return
+    linked.current = location.search
+    const day = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : '')
+    setFilterType(TYPES.some((x) => x.key === q.get('type')) ? q.get('type') : '')
+    setFilterSuccess(['true', 'false'].includes(q.get('success')) ? q.get('success') : '')
+    setFilterDateFrom(day(q.get('date_from')))
+    setFilterDateTo(day(q.get('date_to')))
+    setFilterUsername('')
+    setFilterAction([])
+    setPage(1)
+  }, [location.search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [dialog, setDialog] = useState(null)
   const [cleanupLoading, setCleanupLoading] = useState(false)
@@ -87,7 +104,8 @@ export default function AuditLogsPage() {
     action: sentActions && sentActions.length ? sentActions : undefined,
     success: filterSuccess !== '' ? filterSuccess : undefined,
     date_from: filterDateFrom || undefined,
-    date_to: filterDateTo || undefined,
+    // The last day chosen is included: the server reads a bare date as its midnight
+    date_to: filterDateTo ? `${filterDateTo}T23:59:59.999999` : undefined,
   }), [search, filterUsername, sentActions, filterSuccess, filterDateFrom, filterDateTo])
   // A type whose actions do not meet the chosen ones selects nothing: nothing is read
   const impossible = Array.isArray(sentActions) && sentActions.length === 0 && (Boolean(filterType) || chosenActions.length > 0)
