@@ -3520,7 +3520,6 @@
     "backupScheduleGroup": "Pianificazione",
     "backupFrequencyOff": "Disattivato, sconsigliato",
     "backupSize": "Dimensione",
-    "backupSort": "Ordine dei backup",
     "diskHigh": "Disco quasi pieno",
     "restoreChooseFile": "Scegli un file di backup",
     "restoreTooLarge": "File troppo grande: {{size}} al massimo.",
@@ -3651,12 +3650,6 @@
     "backupCopySha256": "Copia lo SHA-256 completo",
     "backupSharedStoreNote": "In alta disponibilità gli archivi sono conservati nel database PostgreSQL, letto da ogni nodo: andranno persi insieme a quel database. Scarica quelli che vuoi conservare in un luogo esterno al cluster e fai il backup di PostgreSQL con i suoi strumenti.",
     "backupSearchPlaceholder": "Cerca backup…",
-    "backupSortNewest": "Più recenti prima",
-    "backupSortOldest": "Più vecchi prima",
-    "backupSortLargest": "Più grandi prima",
-    "backupSortSmallest": "Più piccoli prima",
-    "backupSortNameAsc": "Nome (A→Z)",
-    "backupSortNameDesc": "Nome (Z→A)",
     "backupSelectAll": "Seleziona tutto",
     "backupDeleteSelected": "Elimina selezionati ({{count}})",
     "backupNoMatch": "Nessun backup corrisponde",
@@ -4615,7 +4608,11 @@
     "allOf": "Tutto di {{name}}",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "Tutte le risorse",
-    "anyAction": "ogni azione"
+    "anyAction": "ogni azione",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "Dipendenze PKCS#11 non disponibili su questo host",
@@ -6676,7 +6673,8 @@
         "running": "In esecuzione",
         "completed": "Completata",
         "failed": "Non riuscita"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "Intervallo",
@@ -7011,7 +7009,8 @@
     "deleteRefused_one": "{{count}} profilo di iscrizione Windows usa questo connettore. Fallo prima puntare a un altro connettore:",
     "deleteRefused_other": "{{count}} profili di iscrizione Windows usano questo connettore. Falli prima puntare a un altro connettore:",
     "deleteRefusedMore_one": "e {{count}} altro",
-    "deleteRefusedMore_other": "e altri {{count}}"
+    "deleteRefusedMore_other": "e altri {{count}}",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "Incolla",
@@ -7410,7 +7409,8 @@
       "deploy_delivery": "Distribuzioni dei certificati",
       "ad_connector_health": "Stato di Active Directory",
       "session_cleanup": "Pulizia delle sessioni"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "Analizza",

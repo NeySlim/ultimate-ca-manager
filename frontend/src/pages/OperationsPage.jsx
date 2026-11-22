@@ -22,8 +22,10 @@ import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import {
   Zone, PageHead, Btn, Icon, Pill, RecordList, RecordRow, StateFilters, TableView, SearchField, FilterSelect, BatchBar,
-  TableFooter, EmptyBlock, AtelierDialog,
+  TableFooter, EmptyBlock, AtelierDialog, useSortParam,
 } from '../components/atelier'
+import { compareValues } from '../components/atelier/useClientList'
+import { cardFacts } from '../components/atelier/cardFacts'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsTest } from '../components/atelier/SettingsView'
 import { ConfirmModal, Input, NumberInput, Notice, SecretInput, Select, ToggleSwitch } from '../components/atelier/Form'
 import { useSectionParam } from '../components/atelier/useSectionParam'
@@ -41,52 +43,69 @@ const TYPE_ICONS = { certificates: 'cert', cas: 'shield', csrs: 'file', template
 
 const certName = (row, t) => row.cn || row.common_name || extractCN(row.subject) || row.descr || t('common.certificate')
 const certStatus = (row) => (row.revoked ? 'revoked' : row.status || 'unknown')
+// The server's order of the states (cert_list._status_order): the worst first
+const CERT_RANK = ['revoked', 'expired', 'expiring', 'valid', 'unknown']
+// The lists the server pages: each column's sort key there
+const SERVER_SORT = {
+  certificates: { name: 'subject', status: 'status', issuer: 'issuer', valid_to: 'valid_to' },
+  csrs: { name: 'cn', created_at: 'created_at' },
+}
+// Every resource by its name (T4)
+const BY_NAME = { key: 'name', asc: true }
 const STATUS = {
   valid: ['good', 'common.valid'], expiring: ['warn', 'common.expiring'], expired: ['bad', 'common.expired'],
   revoked: ['bad', 'common.revoked'], unknown: ['muted', 'common.status'],
 }
 
-/** The columns of each resource: { id, label, cell, value (sort), grow, fit }. */
+/**
+ * The columns of each resource in the column contract (kind, priority, sort), with the value a list held whole
+ * (or the selection alone) sorts by; certificates and CSRs sort by the server's keys (SERVER_SORT).
+ */
 function useColumns(t) {
   return useMemo(() => {
     const status = (row) => { const [tone, key] = STATUS[certStatus(row)] || STATUS.unknown; return <Pill tone={tone} label={t(key)} /> }
     const date = (key) => (row) => formatDate(row[key])
+    const time = (key) => (r) => (r[key] ? Date.parse(r[key]) : null)
     const name = (row) => row.descr || extractCN(row.subject) || '—'
-    // Every column sorts the rows shown, as the former table did
-    const sortable = (cols) => cols.map((c) => ({ ...c, sort: c.id }))
+    const subject = (r) => extractCN(r.subject) || r.subject || '—'
+    const issuer = (r) => extractCN(r.issuer) || r.issuer_name || '—'
     const all = {
       certificates: [
-        { id: 'cn', label: t('common.commonName'), grow: true, value: (r) => certName(r, t),
-          cell: (r) => <span className="row-actions"><span>{certName(r, t)}</span>{r.has_private_key && <span title={t('common.hasKey')}><Icon name="key" /></span>}</span> },
-        { id: 'status', label: t('common.status'), fit: true, value: certStatus, cell: status },
-        { id: 'issuer', label: t('common.issuer'), value: (r) => extractCN(r.issuer) || r.issuer_name || '', cell: (r) => extractCN(r.issuer) || r.issuer_name || '—' },
-        { id: 'valid_to', label: t('common.expires'), fit: true, value: (r) => r.valid_to || '', cell: date('valid_to') },
+        { id: 'name', label: t('common.commonName'), kind: 'entity', priority: 1, value: (r) => certName(r, t), cell: (r) => certName(r, t),
+          extra: (r) => r.has_private_key && <span className="key-presence" title={t('common.hasKey')}><Icon name="key" /></span> },
+        { id: 'status', label: t('common.status'), kind: 'fit', priority: 1, value: (r) => CERT_RANK.indexOf(certStatus(r)), cell: status },
+        { id: 'issuer', label: t('common.issuer'), kind: 'text', priority: 2, value: (r) => extractCN(r.issuer) || r.issuer_name || null, cell: issuer },
+        { id: 'valid_to', label: t('common.expires'), kind: 'fit', priority: 2, labelled: true, value: time('valid_to'), cell: date('valid_to') },
       ],
       cas: [
-        { id: 'descr', label: t('common.name'), grow: true, value: name, cell: name },
-        { id: 'subject', label: t('common.subject'), value: (r) => extractCN(r.subject) || r.subject || '', cell: (r) => extractCN(r.subject) || r.subject || '—' },
-        { id: 'valid_to', label: t('common.expires'), fit: true, value: (r) => r.valid_to || '', cell: date('valid_to') },
+        { id: 'name', label: t('common.name'), kind: 'entity', priority: 1, value: name, cell: name },
+        { id: 'subject', label: t('common.subject'), kind: 'text', priority: 4, value: (r) => extractCN(r.subject) || r.subject || null, cell: subject },
+        { id: 'valid_to', label: t('common.expires'), kind: 'fit', priority: 2, labelled: true, value: time('valid_to'), cell: date('valid_to') },
       ],
       csrs: [
-        { id: 'descr', label: t('common.name'), grow: true, value: name, cell: name },
-        { id: 'subject', label: t('common.subject'), value: (r) => extractCN(r.subject) || r.subject || '', cell: (r) => extractCN(r.subject) || r.subject || '—' },
-        { id: 'created_at', label: t('common.created'), fit: true, value: (r) => r.created_at || '', cell: date('created_at') },
+        { id: 'name', label: t('common.name'), kind: 'entity', priority: 1, value: name, cell: name },
+        { id: 'subject', label: t('common.subject'), kind: 'text', priority: 4, value: (r) => extractCN(r.subject) || r.subject || null, cell: subject },
+        { id: 'created_at', label: t('common.created'), kind: 'fit', priority: 2, labelled: true, value: time('created_at'), cell: date('created_at') },
       ],
       templates: [
-        { id: 'name', label: t('common.name'), grow: true, value: (r) => r.name || '', cell: (r) => r.name || '—' },
-        { id: 'key_type', label: t('common.keyType'), fit: true, value: (r) => r.key_type || '', cell: (r) => r.key_type || '—' },
-        { id: 'validity_days', label: t('common.validity'), fit: true, value: (r) => Number(r.validity_days) || 0,
+        { id: 'name', label: t('common.name'), kind: 'entity', priority: 1, value: (r) => r.name || null, cell: (r) => r.name || '—' },
+        { id: 'key_type', label: t('common.keyType'), kind: 'fit', priority: 3, value: (r) => r.key_type || null, cell: (r) => r.key_type || '—' },
+        { id: 'validity_days', label: t('common.validity'), kind: 'fit', priority: 3, labelled: true, value: (r) => Number(r.validity_days) || null,
           cell: (r) => (r.validity_days ? `${r.validity_days} ${t('common.days')}` : '—') },
       ],
       users: [
-        { id: 'username', label: t('common.user'), grow: true, value: (r) => r.username || '', cell: (r) => r.username || '—' },
-        { id: 'email', label: t('common.email'), value: (r) => r.email || '', cell: (r) => r.email || '—' },
-        { id: 'role', label: t('common.role'), fit: true, value: (r) => r.role || '', cell: (r) => t(ROLE_KEYS[r.role] || ROLE_KEYS.viewer) },
-        { id: 'active', label: t('common.status'), fit: true, value: (r) => (r.active ? 1 : 0),
+        { id: 'name', label: t('common.user'), kind: 'entity', priority: 1, value: (r) => r.username || null, cell: (r) => r.username || '—' },
+        { id: 'email', label: t('common.email'), kind: 'text', priority: 4, value: (r) => r.email || null, cell: (r) => r.email || '—' },
+        { id: 'role', label: t('common.role'), kind: 'fit', priority: 2, value: (r) => t(ROLE_KEYS[r.role] || ROLE_KEYS.viewer), cell: (r) => t(ROLE_KEYS[r.role] || ROLE_KEYS.viewer) },
+        { id: 'status', label: t('common.status'), kind: 'fit', priority: 1, value: (r) => (r.active ? 0 : 1),
           cell: (r) => <Pill tone={r.active ? 'good' : 'warn'} label={r.active ? t('common.active') : t('common.disabled')} /> },
       ],
     }
-    return Object.fromEntries(Object.entries(all).map(([type, cols]) => [type, sortable(cols)]))
+    // A list the server pages sorts by the columns it knows; one held whole by every column
+    return Object.fromEntries(Object.entries(all).map(([type, cols]) => [type, cols.map((c) => {
+      const sortable = SERVER_SORT[type] ? c.id in SERVER_SORT[type] : true
+      return sortable ? { ...c, sort: c.id } : c
+    })]))
   }, [t])
 }
 
@@ -99,7 +118,7 @@ function rowName(type, row, t) {
 }
 
 export default function OperationsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const { isAdmin } = usePermission()
   const openEntity = useOpenEntity()
@@ -152,7 +171,12 @@ export default function OperationsPage() {
   const [bulkPage, setBulkPage] = useState(1)
   const [bulkPerPage, setBulkPerPage] = useState(25)
   const [bulkTotal, setBulkTotal] = useState(0)
-  const [sort, setSort] = useState(null)
+  const COLUMNS_NOW = COLUMNS[bulkResourceType]
+  const { sort, onSort, setSort } = useSortParam(BY_NAME, COLUMNS_NOW.filter((c) => c.sort).map((c) => c.sort))
+  // A new order starts from the first page, the selection kept (T3)
+  const order = `${sort.key}:${sort.asc}`
+  const [orderMark, setOrderMark] = useState(order)
+  if (orderMark !== order) { setOrderMark(order); setBulkPage(1) }
   // Items selected on other pages, kept so the selection view can still render
   // them after the page they were loaded with is replaced
   const seenItemsRef = useRef(new Map())
@@ -184,7 +208,7 @@ export default function OperationsPage() {
   // Server-side query inputs — the key is constant for client-paged resource
   // types so their full-list fetch only re-runs on type/tab changes
   const bulkQueryKey = serverPaged
-    ? [bulkPage, bulkPerPage, bulkSearch, statusFilter, caFilter].join('|')
+    ? [bulkPage, bulkPerPage, bulkSearch, statusFilter, caFilter, order].join('|')
     : ''
 
   // Load bulk data when resource type or the server-side query changes
@@ -222,13 +246,19 @@ export default function OperationsPage() {
     } catch { /* non-critical */ }
   }
 
+  // The page the server cuts is in the server's order: never sorted again here (T2)
+  const serverOrder = (type) => {
+    const key = SERVER_SORT[type][sort.key] ? sort.key : BY_NAME.key
+    return { sort_by: SERVER_SORT[type][key], sort_order: key === sort.key && !sort.asc ? 'desc' : 'asc' }
+  }
+
   const loadBulkData = async () => {
     setBulkLoading(true)
     try {
       let response
       switch (bulkResourceType) {
         case 'certificates': {
-          const params = { page: bulkPage, per_page: bulkPerPage }
+          const params = { page: bulkPage, per_page: bulkPerPage, ...serverOrder('certificates') }
           if (bulkSearch) params.search = bulkSearch
           if (statusFilter) params.status = statusFilter
           if (caFilter) params.ca_id = caFilter
@@ -239,7 +269,7 @@ export default function OperationsPage() {
           response = await casService.getAll()
           break
         case 'csrs': {
-          const params = { page: bulkPage, per_page: bulkPerPage }
+          const params = { page: bulkPage, per_page: bulkPerPage, ...serverOrder('csrs') }
           if (bulkSearch) params.search = bulkSearch
           response = await csrsService.getAll(params)
           break
@@ -507,7 +537,7 @@ export default function OperationsPage() {
   const chooseType = (type) => {
     setBulkResourceType(type)
     try { localStorage.setItem(TYPE_KEY, type) } catch { /* private mode */ }
-    setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch(''); setBulkPage(1); setSort(null); setSelectionOnly(false)
+    setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch(''); setBulkPage(1); setSort(BY_NAME); setSelectionOnly(false)
     seenItemsRef.current.clear()
   }
 
@@ -615,12 +645,10 @@ export default function OperationsPage() {
   // CAs, templates and users come whole: searched, sorted and paged here; certificates and CSRs by the server
   const searched = serverPaged || !bulkSearch ? bulkData : bulkData.filter((row) => SEARCH_KEYS.some((k) => String(row[k] ?? '').toLowerCase().includes(bulkSearch.toLowerCase())))
   const listed = selectionOnly ? basketItems.filter((row) => selectedIds.has(row.id)) : searched
-  const sortCol = sort && columns.find((c) => c.id === sort.key)
-  const sorted = sortCol ? [...listed].sort((a, b) => {
-    const x = sortCol.value(a); const y = sortCol.value(b)
-    const order = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
-    return sort.asc ? order : -order
-  }) : listed
+  // A list held whole, or the selection alone, sorts here; a page the server cut keeps the server's order (T2)
+  const sortCol = (!serverPaged || selectionOnly) && columns.find((c) => c.sort === sort.key)
+  const collator = new Intl.Collator(i18n?.language || undefined, { numeric: true, sensitivity: 'base' })
+  const sorted = sortCol ? [...listed].sort((a, b) => compareValues(sortCol.value(a), sortCol.value(b), sort.asc, collator)) : listed
   const localPages = !serverPaged && !selectionOnly
   const total = selectionOnly ? sorted.length : serverPaged ? bulkTotal : sorted.length
   const pages = Math.max(1, Math.ceil(total / bulkPerPage))
@@ -672,9 +700,9 @@ export default function OperationsPage() {
         )}
         columns={columns} rows={rows} rowKey={(r) => r.id} rowLabel={(r) => rowName(bulkResourceType, r, t)}
         selection={{ selected: selectedIds, onToggle: toggle, onTogglePage: togglePage }}
-        sort={sort} onSort={(key) => setSort((prev) => (prev?.key === key ? { key, asc: !prev.asc } : { key, asc: true }))}
+        sort={sort} onSort={onSort}
         loading={bulkLoading}
-        card={(r) => ({ description: columns[1]?.cell(r), meta: columns.slice(2).map((c) => c.cell(r)) })}
+        card={(r) => ({ meta: cardFacts(columns, r), status: columns.find((c) => c.id === 'status')?.cell(r) })}
         empty={<EmptyBlock id="operations" icon={TYPE_ICONS[bulkResourceType]} title={t('operations.noData')} text={t('operations.noDataDesc')} />}
         footer={(
           <TableFooter range={total ? t('table.range', { start, end, total }) : ''}

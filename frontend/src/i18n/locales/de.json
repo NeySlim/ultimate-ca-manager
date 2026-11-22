@@ -3520,7 +3520,6 @@
     "backupScheduleGroup": "Zeitplan",
     "backupFrequencyOff": "Aus, nicht empfohlen",
     "backupSize": "Größe",
-    "backupSort": "Reihenfolge der Sicherungen",
     "diskHigh": "Datenträger fast voll",
     "restoreChooseFile": "Sicherungsdatei auswählen",
     "restoreTooLarge": "Datei zu groß: höchstens {{size}}.",
@@ -3651,12 +3650,6 @@
     "backupCopySha256": "Vollständigen SHA-256 kopieren",
     "backupSharedStoreNote": "Bei Hochverfügbarkeit liegen die Archive in der PostgreSQL-Datenbank, die jeder Knoten liest: Sie gehen mit dieser Datenbank verloren. Laden Sie die Archive, die Sie behalten, an einen Ort außerhalb des Clusters herunter und sichern Sie PostgreSQL mit seinen eigenen Werkzeugen.",
     "backupSearchPlaceholder": "Backups suchen…",
-    "backupSortNewest": "Neueste zuerst",
-    "backupSortOldest": "Älteste zuerst",
-    "backupSortLargest": "Größte zuerst",
-    "backupSortSmallest": "Kleinste zuerst",
-    "backupSortNameAsc": "Name (A→Z)",
-    "backupSortNameDesc": "Name (Z→A)",
     "backupSelectAll": "Alle auswählen",
     "backupDeleteSelected": "Ausgewählte löschen ({{count}})",
     "backupNoMatch": "Keine Backups gefunden",
@@ -4615,7 +4608,11 @@
     "allOf": "Alle von {{name}}",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "Alle Ressourcen",
-    "anyAction": "jede Aktion"
+    "anyAction": "jede Aktion",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "PKCS#11-Abhängigkeiten auf diesem Host nicht verfügbar",
@@ -6676,7 +6673,8 @@
         "running": "Läuft",
         "completed": "Abgeschlossen",
         "failed": "Fehlgeschlagen"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "Bereich",
@@ -7011,7 +7009,8 @@
     "deleteRefused_one": "{{count}} Windows-Registrierungsprofil verwendet diesen Connector. Weisen Sie es zuerst einem anderen Connector zu:",
     "deleteRefused_other": "{{count}} Windows-Registrierungsprofile verwenden diesen Connector. Weisen Sie sie zuerst einem anderen Connector zu:",
     "deleteRefusedMore_one": "und {{count}} weiteres",
-    "deleteRefusedMore_other": "und {{count}} weitere"
+    "deleteRefusedMore_other": "und {{count}} weitere",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "Einfügen",
@@ -7410,7 +7409,8 @@
       "deploy_delivery": "Zertifikatsbereitstellungen",
       "ad_connector_health": "Active-Directory-Status",
       "session_cleanup": "Sitzungsbereinigung"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "Prüfen",

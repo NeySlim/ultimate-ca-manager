@@ -2,7 +2,10 @@
  * The connector list: health, the domain SID read, and a deletion refused with the profiles that use it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
+// The lists keep their sort in the address
+const render = (ui, options) => rtlRender(ui, { wrapper: MemoryRouter, ...options })
 
 const mocks = vi.hoisted(() => ({
   t: (key, opts) => (opts ? `${key}|${Object.entries(opts).map(([k, v]) => `${k}=${v}`).join('|')}` : key),
@@ -97,6 +100,28 @@ describe('AdConnectorSection', () => {
     fireEvent.click(screen.getAllByTitle('common.delete')[0])
     await screen.findByTestId('refusal-profiles')
     expect(screen.queryByText(/deleteRefusedMore/)).not.toBeInTheDocument()
+  })
+
+  it('opens by name, sorts every data column from its header, the order in the address under its own scope (T1, T4, T9)', async () => {
+    mocks.list.mockResolvedValue({ data: [{ ...CONNECTORS[1], last_test_at: '2026-11-20T10:00:00Z' }, CONNECTORS[0]] })
+    const at = { search: '' }
+    function Where() { at.search = useLocation().search; return null }
+    render(<><AdConnectorSection hasPermission={() => true} /><Where /></>)
+    await screen.findByText('forest-a')
+    const names = () => [...document.querySelectorAll('tbody tr .entity-label')].map((n) => n.textContent)
+    expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(names()).toEqual(['forest-a', 'forest-b'])
+    const sortable = screen.getAllByRole('columnheader').filter((h) => h.querySelector('button[data-sort]')).map((h) => h.textContent)
+    expect(sortable).toEqual(['atelier.name', 'adConnector.realm', 'adConnector.servers', 'adConnector.domainSid', 'adConnector.lastTest', 'atelier.state'])
+    // A connector never tested sorts last whichever the direction
+    fireEvent.click(screen.getByRole('button', { name: 'adConnector.lastTest' }))
+    expect(names()).toEqual(['forest-b', 'forest-a'])
+    fireEvent.click(screen.getByRole('button', { name: 'adConnector.lastTest' }))
+    expect(names()).toEqual(['forest-b', 'forest-a'])
+    fireEvent.click(screen.getByRole('button', { name: 'adConnector.realm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'adConnector.realm' }))
+    expect(names()).toEqual(['forest-b', 'forest-a'])
+    expect(at.search).toBe('?ad-sort=realm&ad-order=desc')
   })
 
   it('offers no writing to a user who cannot write connectors', async () => {

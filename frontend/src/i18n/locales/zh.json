@@ -3520,7 +3520,6 @@
     "backupScheduleGroup": "计划",
     "backupFrequencyOff": "已关闭，不推荐",
     "backupSize": "大小",
-    "backupSort": "备份排序",
     "diskHigh": "磁盘即将满",
     "restoreChooseFile": "选择备份文件",
     "restoreTooLarge": "文件过大：最多 {{size}}。",
@@ -3651,12 +3650,6 @@
     "backupCopySha256": "复制完整 SHA-256",
     "backupSharedStoreNote": "在高可用模式下，归档保存在所有节点共同读取的 PostgreSQL 数据库中：数据库丢失时归档也会丢失。请将需要保留的归档下载到集群之外的位置，并使用 PostgreSQL 自带的工具备份 PostgreSQL。",
     "backupSearchPlaceholder": "搜索备份…",
-    "backupSortNewest": "最新优先",
-    "backupSortOldest": "最旧优先",
-    "backupSortLargest": "最大优先",
-    "backupSortSmallest": "最小优先",
-    "backupSortNameAsc": "名称 (A→Z)",
-    "backupSortNameDesc": "名称 (Z→A)",
     "backupSelectAll": "全选",
     "backupDeleteSelected": "删除所选 ({{count}})",
     "backupNoMatch": "没有匹配的备份",
@@ -4615,7 +4608,11 @@
     "allOf": "全部 {{name}}",
     "permissionOf": "{{resource}}：{{actions}}",
     "anyResource": "所有资源",
-    "anyAction": "所有操作"
+    "anyAction": "所有操作",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "此主机上 PKCS#11 依赖项不可用",
@@ -6676,7 +6673,8 @@
         "running": "进行中",
         "completed": "已完成",
         "failed": "失败"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "范围",
@@ -7011,7 +7009,8 @@
     "deleteRefused_one": "{{count}} 个 Windows 注册配置文件正在使用此连接器。请先将其指向其他连接器：",
     "deleteRefused_other": "{{count}} 个 Windows 注册配置文件正在使用此连接器。请先将它们指向其他连接器：",
     "deleteRefusedMore_one": "以及另外 {{count}} 个",
-    "deleteRefusedMore_other": "以及另外 {{count}} 个"
+    "deleteRefusedMore_other": "以及另外 {{count}} 个",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "粘贴",
@@ -7410,7 +7409,8 @@
       "deploy_delivery": "证书部署",
       "ad_connector_health": "Active Directory 健康状况",
       "session_cleanup": "会话清理"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "检查",

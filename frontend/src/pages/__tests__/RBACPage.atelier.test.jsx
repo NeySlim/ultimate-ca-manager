@@ -42,6 +42,9 @@ const ROLES = [
   { id: 2, name: 'Cert Team', description: '', is_system: false, user_count: 4, permissions: ['read:certificates'], all_permissions: ['read:certificates'] },
 ]
 const page = () => render(<MemoryRouter><RBACPage /></MemoryRouter>)
+const names = () => [...document.querySelectorAll('tbody .entity-label')].map((b) => b.textContent)
+const sortedHeads = () => screen.getAllByRole('columnheader').filter((h) => /ending/.test(h.getAttribute('aria-sort') || '')).map((h) => [h.textContent, h.getAttribute('aria-sort')])
+const sortableHeads = () => screen.getAllByRole('columnheader').filter((h) => h.querySelector('button[data-sort]')).map((h) => h.textContent)
 const dock = () => document.querySelector('aside#inspector')
 
 beforeEach(() => {
@@ -58,7 +61,7 @@ describe('the role list', () => {
     await screen.findByRole('button', { name: 'Cert Team' })
     expect(container.querySelector('.page-head .total')).toHaveTextContent('rbac.unit {"count":2}')
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent))
-      .toEqual(['atelier.name', 'common.description', 'rbac.inheritsFrom', 'common.permissions', 'common.users', 'atelier.state', 'common.actions'])
+      .toEqual(['atelier.name', 'common.description', 'rbac.inheritsFrom', 'rbac.columns.permissions', 'rbac.columns.users', 'atelier.state', 'common.actions'])
     fireEvent.click(within(screen.getByRole('group', { name: 'rbac.filterByType' })).getByRole('button', { name: /common\.custom/ }))
     expect(screen.queryByRole('button', { name: 'Viewer' })).toBeNull()
     expect(container.querySelector('footer.table-footer')).toHaveTextContent('rbac.range {"shown":1,"count":2}')
@@ -144,5 +147,26 @@ describe('the role dock in the URL', () => {
     expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Cert Team')
     fireEvent.click(screen.getByRole('button', { name: 'Viewer' }))
     expect(r.where()).toBe('/rbac?item=1')
+  })
+
+  it('opens by name, sorts every column from its header, keeps the sort in the address and reads it back (T1, T4, T9)', async () => {
+    const r = renderAtUrl(<RBACPage />, '/rbac')
+    await screen.findByRole('button', { name: 'Cert Team' })
+    expect(sortedHeads()).toEqual([['atelier.name', 'ascending']])
+    expect(names()).toEqual(['Cert Team', 'Viewer'])
+    expect(sortableHeads()).toEqual(['atelier.name', 'common.description', 'rbac.inheritsFrom', 'rbac.columns.permissions', 'rbac.columns.users', 'atelier.state'])
+    // The counts are numbers at the right, under short labels that name the whole one
+    expect(screen.getByRole('button', { name: 'common.permissions' })).toHaveTextContent('rbac.columns.permissions')
+    expect(screen.getByRole('button', { name: 'common.users' }).closest('th')).toHaveClass('num')
+    fireEvent.click(screen.getByRole('button', { name: 'common.users' }))
+    expect(names()).toEqual(['Cert Team', 'Viewer'])
+    fireEvent.click(screen.getByRole('button', { name: 'common.users' }))
+    expect(names()).toEqual(['Viewer', 'Cert Team'])
+    expect(r.where()).toBe('/rbac?sort=users&order=desc')
+    r.unmount()
+    renderAtUrl(<RBACPage />, '/rbac?sort=permissions&order=desc')
+    await screen.findByRole('button', { name: 'Cert Team' })
+    expect(sortedHeads()).toEqual([['rbac.columns.permissions', 'descending']])
+    expect(names()).toEqual(['Viewer', 'Cert Team'])
   })
 })

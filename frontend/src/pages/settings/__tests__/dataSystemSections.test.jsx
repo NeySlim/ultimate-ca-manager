@@ -109,12 +109,18 @@ describe('Backup: the restore file', () => {
 })
 
 describe('Backup: the archives in the module table', () => {
-  it('sorts by its headers, the server order kept in the query', () => {
+  it('sorts by its headers alone, the server order kept in the query: a new column ascending, the sorted one reversed (T3)', () => {
     const p = backup({ backups: archives, backupQuery: { sort: 'created_desc' } })
+    expect(screen.getByRole('columnheader', { name: /common.created/ })).toHaveAttribute('aria-sort', 'descending')
     fireEvent.click(screen.getByRole('button', { name: /common.created/ }))
     expect(p.updateBackupQuery).toHaveBeenLastCalledWith({ sort: 'created_asc' })
     fireEvent.click(screen.getByRole('button', { name: /settings.backupSize/ }))
-    expect(p.updateBackupQuery).toHaveBeenLastCalledWith({ sort: 'size_desc' })
+    expect(p.updateBackupQuery).toHaveBeenLastCalledWith({ sort: 'size_asc' })
+    // One sort control for one list: no select beside the headers
+    expect(document.querySelector('#backup-sort')).toBeNull()
+    // The size is a number, at the right; the archive names its row, its whole name in a title
+    expect(screen.getByRole('columnheader', { name: /settings.backupSize/ })).toHaveClass('num')
+    expect(screen.getByText('a.ucmbkp')).toHaveAttribute('title', 'a.ucmbkp')
   })
 
   it('selects for the bulk delete and clears the selection from its bar', () => {

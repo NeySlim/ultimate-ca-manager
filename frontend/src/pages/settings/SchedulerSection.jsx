@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Pill, Notice, DataTable, SkeletonPanel } from '../../components/atelier'
+import { Btn, Pill, Notice, DataTable, SkeletonPanel, useClientList, useSortParam } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { useNotification } from '../../contexts'
 import { systemService } from '../../services'
@@ -8,6 +8,11 @@ import { useRefocusAfter } from '../../hooks/useRefocus'
 import { compactRun } from '../../lib/relativeTime'
 
 const POLL_MS = 15000
+// The tasks by name (T4), the sort kept in the address under this list's own scope (the settings stack their sections)
+const BY_TASK = { key: 'task', asc: true }
+const SORT_KEYS = ['task', 'note', 'status', 'schedule', 'last', 'next', 'duration', 'runs']
+const STATE_RANK = ['warning', 'skipped', 'ok']
+const time = (iso) => (iso ? Date.parse(iso) : null)
 
 // The interval in words: whole days, hours or minutes when it divides, else seconds
 function humanizeInterval(seconds, t) {
@@ -125,17 +130,31 @@ export default function SchedulerSection({ hasPermission }) {
   const run = (task) => (
     <RunButton busy={!!running[task.name]} onRun={() => handleRun(task.name, taskLabel(t, task))}>{t('scheduler.runNow')}</RunButton>
   )
+  const stateOf = (task) => (task.last_error || task.last_status === 'warning' ? 'warning' : task.last_status === 'skipped' ? 'skipped' : 'ok')
+  const noteText = (task) => task.last_error || (task.last_status === 'warning' ? task.last_reason : null)
+    || (task.last_status === 'skipped' ? t('scheduler.skipped', { reason: skipReason(t, task.last_reason) }) : null)
+  const sortParam = useSortParam(BY_TASK, SORT_KEYS, { scope: 'tasks' })
+  const list = useClientList(tasks, {
+    sortParam,
+    sizes: [1000],
+    sorts: {
+      task: (task) => taskLabel(t, task), note: noteText, status: (task) => STATE_RANK.indexOf(stateOf(task)),
+      schedule: (task) => task.interval || null, last: (task) => time(task.last_run), next: (task) => time(task.next_run),
+      duration: (task) => task.last_duration_ms ?? null, runs: (task) => task.run_count ?? null,
+    },
+  })
+  // The task names the row (nothing opens); what its last run said is the free text that takes the room left
   const columns = [
-    { id: 'task', label: t('scheduler.colTask'), grow: true, cell: (task) => (
-      <span className="task-cell"><strong>{taskLabel(t, task)}</strong>{note(task) && <span className="rl-meta">{note(task)}</span>}</span>
-    ) },
-    { id: 'status', label: t('atelier.state'), fit: true, cell: status },
-    { id: 'schedule', label: t('scheduler.colSchedule'), fit: true, tone: 'muted', cell: (task) => humanizeInterval(task.interval, t) },
-    { id: 'last', label: t('scheduler.colLastRun'), fit: true, tone: 'muted', cell: (task) => compactRun(task.last_run, t) || '—' },
-    { id: 'next', label: t('scheduler.colNextRun'), fit: true, tone: 'muted', cell: (task) => compactRun(task.next_run, t) || '—' },
-    { id: 'duration', label: t('scheduler.colDuration'), fit: true, tone: 'muted', cell: (task) => fmtDuration(task.last_duration_ms, i18n?.language) },
-    { id: 'runs', label: t('scheduler.colRuns'), fit: true, tone: 'muted', cell: (task) => task.run_count },
-    ...(canRun ? [{ id: 'run', label: <span className="sr-only">{t('common.actions')}</span>, fit: true, cell: run }] : []),
+    { id: 'task', label: t('scheduler.colTask'), kind: 'entity', priority: 1, sort: 'task', cell: (task) => taskLabel(t, task) },
+    { id: 'note', label: t('scheduler.colNote'), kind: 'text', priority: 4, grow: true, tone: 'muted', sort: 'note', cell: (task) => note(task) || '—',
+      title: (task) => noteText(task) || undefined },
+    { id: 'status', label: t('atelier.state'), kind: 'fit', priority: 1, sort: 'status', cell: status },
+    { id: 'schedule', label: t('scheduler.colSchedule'), kind: 'fit', priority: 4, sort: 'schedule', tone: 'muted', cell: (task) => humanizeInterval(task.interval, t) },
+    { id: 'last', label: t('scheduler.colLastRun'), kind: 'fit', priority: 3, sort: 'last', tone: 'muted', cell: (task) => compactRun(task.last_run, t) || '—' },
+    { id: 'next', label: t('scheduler.colNextRun'), kind: 'fit', priority: 2, sort: 'next', tone: 'muted', cell: (task) => compactRun(task.next_run, t) || '—' },
+    { id: 'duration', label: t('scheduler.colDuration'), kind: 'number', priority: 4, sort: 'duration', tone: 'muted', cell: (task) => fmtDuration(task.last_duration_ms, i18n?.language) },
+    { id: 'runs', label: t('scheduler.colRuns'), kind: 'number', priority: 4, sort: 'runs', tone: 'muted', cell: (task) => task.run_count },
+    ...(canRun ? [{ id: 'run', label: <span className="sr-only">{t('common.actions')}</span>, kind: 'fit', priority: 1, cell: run }] : []),
   ]
   const labelled = (key, value) => `${t(key)}${t('work.sep')}${value}`
 
@@ -152,7 +171,7 @@ export default function SchedulerSection({ hasPermission }) {
           <SkeletonPanel label={t('common.loading')} />
         ) : (
           <DataTable kind="module" scrollId="scheduler-scroll" recordsId="scheduler-records" label={t('scheduler.tasksTitle')}
-            columns={columns} rows={tasks} rowKey={(task) => task.name} rowLabel={(task) => taskLabel(t, task)}
+            columns={columns} rows={list.rows} rowKey={(task) => task.name} rowLabel={(task) => taskLabel(t, task)} sort={list.sort} onSort={list.onSort}
             empty={<div className="empty"><p>{t('scheduler.noTasks')}</p></div>}
             card={(task) => ({
               description: note(task),

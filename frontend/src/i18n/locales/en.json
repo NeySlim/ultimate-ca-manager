@@ -3520,7 +3520,6 @@
     "backupScheduleGroup": "Schedule",
     "backupFrequencyOff": "Off, not recommended",
     "backupSize": "Size",
-    "backupSort": "Order of the backups",
     "diskHigh": "Disk almost full",
     "restoreChooseFile": "Choose a backup file",
     "restoreTooLarge": "File too large: {{size}} at most.",
@@ -3651,12 +3650,6 @@
     "backupCopySha256": "Copy the full SHA-256",
     "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "Search backups…",
-    "backupSortNewest": "Newest first",
-    "backupSortOldest": "Oldest first",
-    "backupSortLargest": "Largest first",
-    "backupSortSmallest": "Smallest first",
-    "backupSortNameAsc": "Name (A→Z)",
-    "backupSortNameDesc": "Name (Z→A)",
     "backupSelectAll": "Select all",
     "backupDeleteSelected": "Delete selected ({{count}})",
     "backupNoMatch": "No backups match your search",
@@ -4615,7 +4608,11 @@
     "allOf": "All of {{name}}",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "All resources",
-    "anyAction": "every action"
+    "anyAction": "every action",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "PKCS#11 dependencies not available on this host",
@@ -6676,7 +6673,8 @@
         "running": "Running",
         "completed": "Completed",
         "failed": "Failed"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "Range",
@@ -7011,7 +7009,8 @@
     "deleteRefused_one": "{{count}} Windows enrollment profile uses this connector. Point it at another connector first:",
     "deleteRefused_other": "{{count}} Windows enrollment profiles use this connector. Point them at another connector first:",
     "deleteRefusedMore_one": "and {{count}} more",
-    "deleteRefusedMore_other": "and {{count}} more"
+    "deleteRefusedMore_other": "and {{count}} more",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "Paste",
@@ -7410,7 +7409,8 @@
       "deploy_delivery": "Certificate deployments",
       "ad_connector_health": "Active Directory health",
       "session_cleanup": "Session cleanup"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "Lint",

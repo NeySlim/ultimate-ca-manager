@@ -227,7 +227,7 @@ describe('DiscoveryPage found certificates and history (the product views)', () 
     expect(container.querySelector('tbody tr')).toHaveTextContent('Réseau A')
     for (const name of ['atelier.name', 'discovery.targetsScanned', 'atelier.state']) {
       fireEvent.click(screen.getByRole('button', { name }))
-      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+      expect(screen.getByRole('button', { name }).closest('th')).toHaveAttribute('aria-sort', 'ascending')
     }
   })
 
@@ -270,5 +270,51 @@ describe('the discovery dock in the URL', () => {
     expect(r.where()).toBe('/discovery?item=1')
     fireEvent.click(r.container.querySelector('[data-view="history"]'))
     await waitFor(() => expect(r.where()).toBe('/discovery?tab=history'))
+  })
+})
+
+describe('DiscoveryPage sorts each view (T1, T2, T4, T9)', () => {
+  const sorted = () => screen.getAllByRole('columnheader').filter((h) => /ending/.test(h.getAttribute('aria-sort') || '')).map((h) => h.getAttribute('aria-sort'))
+
+  it('asks the server for the certificates found in the nearest expiry first, and shows its page as it came', async () => {
+    const r = renderAtUrl(<DiscoveryPage />, '/discovery?tab=discovered')
+    await screen.findByRole('button', { name: 'intranet.example.com' })
+    expect(svc.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0, sort_by: 'not_after', sort_order: 'asc' }))
+    expect(screen.getByRole('button', { name: 'common.expires' }).closest('th')).toHaveAttribute('aria-sort', 'ascending')
+    expect(sorted()).toEqual(['ascending'])
+    expect(screen.getAllByRole('columnheader').filter((h) => h.querySelector('button[data-sort]')).map((h) => h.textContent))
+      .toEqual(['atelier.name', 'discovery.host', 'common.issuer', 'common.expires', 'atelier.state'])
+    // A header asks the server again from the first page; the rows stay the server's order
+    svc.getAll.mockResolvedValue({ data: { items: [FOUND[1], FOUND[0]], total: 2 } })
+    fireEvent.click(screen.getByRole('button', { name: 'common.issuer' }))
+    await waitFor(() => expect(svc.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0, sort_by: 'issuer', sort_order: 'asc' })))
+    await waitFor(() => expect(names()).toEqual(['192.0.2.11:443', 'intranet.example.com']))
+    fireEvent.click(screen.getByRole('button', { name: 'common.issuer' }))
+    await waitFor(() => expect(svc.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'issuer', sort_order: 'desc' })))
+    expect(names()).toEqual(['192.0.2.11:443', 'intranet.example.com'])
+    expect(r.where()).toBe('/discovery?tab=discovered&sort=issuer&order=desc')
+  })
+
+  it('reads the sort of the certificates found from the address, and a change of view drops it', async () => {
+    renderAtUrl(<DiscoveryPage />, '/discovery?tab=discovered&sort=state&order=desc')
+    await screen.findByRole('button', { name: 'intranet.example.com' })
+    expect(svc.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'status', sort_order: 'desc' }))
+    expect(screen.getByRole('button', { name: 'atelier.state' }).closest('th')).toHaveAttribute('aria-sort', 'descending')
+    fireEvent.click(screen.getAllByRole('button', { name: 'discovery.views.history' })[0])
+    expect(await screen.findByRole('button', { name: 'discovery.startedAt' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'discovery.startedAt' }).closest('th')).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('keeps the sort of the analyses and of the history in the address and reads it back', async () => {
+    const r = renderAtUrl(<DiscoveryPage />, '/discovery')
+    await screen.findByRole('button', { name: 'Réseau A' })
+    fireEvent.click(screen.getByRole('button', { name: 'discovery.form.range' }))
+    expect(r.where()).toBe('/discovery?sort=range&order=asc')
+    r.unmount()
+    renderAtUrl(<DiscoveryPage />, '/discovery?tab=history&sort=found&order=desc')
+    await screen.findByRole('button', { name: 'discovery.certsFound' })
+    expect(screen.getByRole('button', { name: 'discovery.certsFound' }).closest('th')).toHaveAttribute('aria-sort', 'descending')
+    expect(sorted()).toEqual(['descending'])
+    expect(document.querySelector('tbody tr')).toHaveTextContent('14')
   })
 })

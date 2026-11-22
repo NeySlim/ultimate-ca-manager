@@ -3520,7 +3520,6 @@
     "backupScheduleGroup": "スケジュール",
     "backupFrequencyOff": "オフ（非推奨）",
     "backupSize": "サイズ",
-    "backupSort": "バックアップの並び順",
     "diskHigh": "ディスクの空きがほとんどありません",
     "restoreChooseFile": "バックアップファイルを選択",
     "restoreTooLarge": "ファイルが大きすぎます。最大 {{size}} です。",
@@ -3651,12 +3650,6 @@
     "backupCopySha256": "SHA-256 全体をコピー",
     "backupSharedStoreNote": "高可用性では、アーカイブは全ノードが読み取る PostgreSQL データベースに保存されるため、そのデータベースとともに失われます。保管するものはクラスターの外にダウンロードし、PostgreSQL は専用のツールでバックアップしてください。",
     "backupSearchPlaceholder": "バックアップを検索…",
-    "backupSortNewest": "新しい順",
-    "backupSortOldest": "古い順",
-    "backupSortLargest": "大きい順",
-    "backupSortSmallest": "小さい順",
-    "backupSortNameAsc": "名前 (A→Z)",
-    "backupSortNameDesc": "名前 (Z→A)",
     "backupSelectAll": "すべて選択",
     "backupDeleteSelected": "選択を削除 ({{count}})",
     "backupNoMatch": "一致するバックアップがありません",
@@ -4615,7 +4608,11 @@
     "allOf": "{{name}} のすべて",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "すべてのリソース",
-    "anyAction": "すべての操作"
+    "anyAction": "すべての操作",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "このホストで PKCS#11 の依存関係が利用できません",
@@ -6676,7 +6673,8 @@
         "running": "実行中",
         "completed": "完了",
         "failed": "失敗"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "範囲",
@@ -7011,7 +7009,8 @@
     "deleteRefused_one": "{{count}} 件の Windows 登録プロファイルがこのコネクターを使用しています。先に別のコネクターに切り替えてください:",
     "deleteRefused_other": "{{count}} 件の Windows 登録プロファイルがこのコネクターを使用しています。先に別のコネクターに切り替えてください:",
     "deleteRefusedMore_one": "ほか {{count}} 件",
-    "deleteRefusedMore_other": "ほか {{count}} 件"
+    "deleteRefusedMore_other": "ほか {{count}} 件",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "貼り付け",
@@ -7410,7 +7409,8 @@
       "deploy_delivery": "証明書のデプロイ",
       "ad_connector_health": "Active Directoryの状態",
       "session_cleanup": "セッションのクリーンアップ"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "検査",

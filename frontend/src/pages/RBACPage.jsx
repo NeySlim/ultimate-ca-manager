@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { Input, FormModal, Select } from '../components/atelier/Form'
 import {
   Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props,
-  EmptyBlock, NoMatch, LoadError, LoadCause, PermissionGrid,
+  EmptyBlock, NoMatch, LoadError, LoadCause, PermissionGrid, useClientList, useSortParam,
 } from '../components/atelier'
 import { useNotification } from '../contexts'
 import { useModals, usePersistedState } from '../hooks'
@@ -27,6 +27,9 @@ function CategoryBox({ label, all, some, disabled, onChange }) {
 }
 
 const ROLE_SECTIONS = ['overview', 'permissions']
+// Named configuration: by name (T4), kept in the address
+const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'description', 'inherits', 'permissions', 'users', 'state']
 
 export default function RBACPage() {
   const { t } = useTranslation()
@@ -160,6 +163,15 @@ export default function RBACPage() {
   const narrowed = Boolean(query.trim() || kind)
   const create = { label: t('rbac.createRole'), icon: 'plus', onClick: () => openModal('create'), primary: true }
   const parentOf = (r) => (r.inherits_from ? (r.parent_name || `#${r.inherits_from}`) : '—')
+  const sortParam = useSortParam(BY_NAME, SORT_KEYS)
+  const list = useClientList(rows, {
+    sortParam,
+    resetKey: `${query}|${kind}`,
+    sorts: {
+      name: (r) => r.name, description: (r) => r.description, inherits: (r) => (r.inherits_from ? parentOf(r) : null),
+      permissions: (r) => r.all_permissions?.length ?? 0, users: (r) => r.user_count || 0, state: (r) => (r.is_system ? 0 : 1),
+    },
+  })
 
   const role = selectedRole
   const direct = role ? appliedPermissions(role.permissions, grantable) : []
@@ -269,7 +281,7 @@ export default function RBACPage() {
     )}>
       <PageHead title={t('common.rbac')} total={t('rbac.unit', { count: roles.length })} intent={t('shell.moduleDesc.rbac')}
         actions={<Btn tone="primary" icon="plus" id="rbac-new" onClick={create.onClick}>{create.label}</Btn>} />
-      <ListView label={t('common.rbac')} caption={t('rbac.caption')} icon="shield" rows={rows} loading={loading}
+      <ListView label={t('common.rbac')} caption={t('rbac.caption')} icon="shield" list={list} nameSort="name" loading={loading}
         filters={{ views, active: kind, onChange: setKind, label: t('rbac.filterByType') }}
         toolbar={(
           <Toolbar>
@@ -278,11 +290,11 @@ export default function RBACPage() {
         )}
         title={(r) => r.name} status={pill} openedId={role?.id} onOpen={(r) => { setSection('overview'); selectRole(r) }}
         columns={[
-          { id: 'description', label: t('common.description'), cell: (r) => r.description || '—', grow: true, muted: true },
-          { id: 'inherits', label: t('rbac.inheritsFrom'), cell: parentOf },
-          { id: 'permissions', label: t('common.permissions'), cell: (r) => String(r.all_permissions?.length ?? 0) },
-          { id: 'users', label: t('common.users'), cell: (r) => String(r.user_count || 0) },
-          { status: true },
+          { id: 'description', label: t('common.description'), cell: (r) => r.description || '—', kind: 'text', priority: 4, grow: true, muted: true, sort: 'description' },
+          { id: 'inherits', label: t('rbac.inheritsFrom'), cell: parentOf, kind: 'text', priority: 3, sort: 'inherits' },
+          { id: 'permissions', label: t('rbac.columns.permissions'), labelFull: t('common.permissions'), cell: (r) => r.all_permissions?.length ?? 0, kind: 'number', priority: 3, sort: 'permissions' },
+          { id: 'users', label: t('rbac.columns.users'), labelFull: t('common.users'), cell: (r) => r.user_count || 0, kind: 'number', priority: 3, sort: 'users' },
+          { status: true, sort: 'state' },
         ]}
         error={loadError && (
           <LoadError id="rbac" title={t('messages.errors.loadFailed.roles')} onRetry={() => { setLoading(true); loadRoles() }}
@@ -294,7 +306,7 @@ export default function RBACPage() {
         ) : (
           <EmptyBlock id="rbac" icon="shield" title={t('rbac.noRoles')} text={t('rbac.noRolesDescription')} action={create} />
         )}
-        footer={{ range: t('rbac.range', { shown: rows.length, count: roles.length }) }} />
+        footer={{ range: t('rbac.range', list.counts(roles.length)) }} />
     </Zone>
   )
 }

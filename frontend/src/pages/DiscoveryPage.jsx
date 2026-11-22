@@ -10,7 +10,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, Icon, PageHead, Toolbar, SearchField, FilterSelect, ListView, LoadError, LoadCause, EmptyBlock, NoMatch,
-  useClientList,
+  useClientList, useSortParam,
 } from '../components/atelier'
 import { discoveryService } from '../services'
 import { useNotification } from '../contexts'
@@ -31,8 +31,14 @@ const pageOf = (res) => {
   return Array.isArray(data) ? { items: data, total: data.length } : { items: data?.items ?? [], total: data?.total ?? data?.items?.length ?? 0 }
 }
 
+// Each view's default sort (T4), kept in the address; a change of view drops it
 const BY_NAME = { key: 'name', asc: true }
 const LATEST_FIRST = { key: 'started', asc: false }
+const EXPIRY_FIRST = { key: 'expires', asc: true }
+const SCAN_SORT_KEYS = ['name', 'range', 'found', 'last', 'state']
+const RUN_SORT_KEYS = ['name', 'started', 'found', 'targets', 'duration', 'state']
+// The certificates found are paged by the server: each column's key there
+const FOUND_SORT = { name: 'subject', host: 'target', issuer: 'issuer', expires: 'not_after', state: 'status' }
 
 export default function DiscoveryPage() {
   const { t } = useTranslation()
@@ -69,6 +75,13 @@ export default function DiscoveryPage() {
   const [profileFilter, setProfileFilter] = useState('')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
+  const scanSort = useSortParam(BY_NAME, SCAN_SORT_KEYS)
+  const runSort = useSortParam(LATEST_FIRST, RUN_SORT_KEYS)
+  const foundSort = useSortParam(EXPIRY_FIRST, Object.keys(FOUND_SORT))
+  // A new sort of the server's pages starts from the first one, whether a header or Back set it
+  const foundOrder = `${foundSort.sort.key}:${foundSort.sort.asc}`
+  const [foundMark, setFoundMark] = useState(foundOrder)
+  if (foundMark !== foundOrder) { setFoundMark(foundOrder); setPage(1) }
 
   const loadProfiles = useCallback(async () => {
     const [p, r] = await Promise.all([discoveryService.getProfiles(), discoveryService.getRuns({ limit: 200 })])
@@ -76,13 +89,16 @@ export default function DiscoveryPage() {
     setRuns(pageOf(r).items)
   }, [])
   const loadFound = useCallback(async () => {
-    const params = { limit: perPage, offset: (page - 1) * perPage, search: query.trim() || undefined }
+    const params = {
+      limit: perPage, offset: (page - 1) * perPage, search: query.trim() || undefined,
+      sort_by: FOUND_SORT[foundSort.sort.key], sort_order: foundSort.sort.asc ? 'asc' : 'desc',
+    }
     if (foundView) params.status = [foundView]
     if (profileFilter) params.profile_id = profileFilter
     const [res, st] = await Promise.all([discoveryService.getAll(params), discoveryService.getStats(profileFilter || null).catch(() => null)])
     setFound(pageOf(res))
     if (st) setStats(st.data ?? st)
-  }, [page, perPage, query, foundView, profileFilter])
+  }, [page, perPage, query, foundView, profileFilter, foundSort.sort])
   const loadAll = useCallback(async () => {
     setLoadError(null)
     try {
@@ -179,7 +195,7 @@ export default function DiscoveryPage() {
   const scanRows = scanSearched.filter((p) => !scanActive || stateOfScan(p) === scanActive)
   const scanStates = Object.keys(SCAN_TONES)
   const scanList = useClientList(scanRows, {
-    initial: BY_NAME,
+    sortParam: scanSort,
     resetKey: `${q}|${scanActive}`,
     sorts: {
       name: (p) => p.name, range: (p) => facts.range(p),
@@ -199,7 +215,7 @@ export default function DiscoveryPage() {
   // The page reads the last 200 runs (the API has no search nor state filter): sorted and paged here
   const runStates = Object.keys(RUN_TONES)
   const runList = useClientList(runRows, {
-    initial: LATEST_FIRST,
+    sortParam: runSort,
     resetKey: `${q}|${runActive}|${profileFilter}`,
     sorts: {
       name: (r) => runTitle(r, t), started: (r) => r.started_at && Date.parse(r.started_at), found: (r) => r.certs_found ?? 0,
@@ -287,9 +303,9 @@ export default function DiscoveryPage() {
           toolbar={<Toolbar>{search('scan-search', t('discovery.searchProfiles'))}</Toolbar>}
           title={(p) => p.name} status={(p) => <ScanPill state={stateOfScan(p)} />} openedId={openedId} onOpen={open('profiles')}
           columns={[
-            { id: 'range', label: t('discovery.form.range'), cell: (p) => facts.range(p), grow: true, sort: 'range' },
-            { id: 'found', label: t('discovery.scans.found'), cell: (p) => facts.found(p, last.get(p.id)), sort: 'found' },
-            { id: 'last', label: t('discovery.scans.last'), cell: (p) => facts.last(p, last.get(p.id)), sort: 'last' },
+            { id: 'range', label: t('discovery.form.range'), cell: (p) => facts.range(p), kind: 'text', priority: 4, grow: true, sort: 'range' },
+            { id: 'found', label: t('discovery.scans.found'), cell: (p) => facts.found(p, last.get(p.id)), kind: 'fit', priority: 3, labelled: true, sort: 'found' },
+            { id: 'last', label: t('discovery.scans.last'), cell: (p) => facts.last(p, last.get(p.id)), kind: 'fit', priority: 2, labelled: true, sort: 'last' },
             { status: true, sort: 'state' },
           ]}
           error={error}
@@ -301,6 +317,7 @@ export default function DiscoveryPage() {
 
       {view === 'discovered' && (
         <ListView label={t('discovery.views.discovered')} caption={t('discovery.found.caption')} icon="cert" rows={found.items} loading={loading}
+          sort={foundSort.sort} onSort={foundSort.onSort} nameSort="name"
           filters={{ views: [
             { id: '', label: t('common.all'), count: stats.total ?? found.total },
             { id: 'managed', label: t('discovery.found.state.managed'), count: stats.managed ?? 0 },
@@ -323,10 +340,11 @@ export default function DiscoveryPage() {
             canRemove && { icon: 'block', label: t('common.delete'), onClick: (x) => setDialog({ kind: 'removeFound', item: x }) },
           ].filter(Boolean)}
           columns={[
-            { id: 'host', label: t('discovery.host'), cell: (c) => <span className="mono">{c.target}:{c.port || 443}</span> },
-            { id: 'issuer', label: t('common.issuer'), cell: (c) => (c.status === 'error' ? c.scan_error : cnOf(c.issuer) || c.issuer || '—'), grow: true, muted: true },
-            { id: 'expires', label: t('common.expires'), cell: (c) => (c.not_after ? formatDate(c.not_after) : '—'), fit: true },
-            { status: true },
+            { id: 'host', label: t('discovery.host'), cell: (c) => <span className="mono">{c.target}:{c.port || 443}</span>, title: (c) => `${c.target}:${c.port || 443}`,
+              kind: 'text', priority: 3, sort: 'host' },
+            { id: 'issuer', label: t('common.issuer'), cell: (c) => (c.status === 'error' ? c.scan_error : cnOf(c.issuer) || c.issuer || '—'), kind: 'text', priority: 4, grow: true, muted: true, sort: 'issuer' },
+            { id: 'expires', label: t('common.expires'), cell: (c) => (c.not_after ? formatDate(c.not_after) : '—'), kind: 'fit', priority: 2, labelled: true, sort: 'expires' },
+            { status: true, sort: 'state' },
           ]}
           error={error}
           empty={query.trim() || foundView || profileFilter ? noMatch : (
@@ -351,10 +369,10 @@ export default function DiscoveryPage() {
           )}
           title={(r) => runTitle(r, t)} status={(r) => <RunPill run={r} />} openedId={openedId} onOpen={open('history')}
           columns={[
-            { id: 'started', label: t('discovery.startedAt'), cell: (r) => (r.started_at ? formatDate(r.started_at, { time: true }) : '—'), sort: 'started' },
-            { id: 'found', label: t('discovery.certsFound'), cell: (r) => r.certs_found ?? 0, fit: true, sort: 'found' },
-            { id: 'targets', label: t('discovery.targetsScanned'), cell: (r) => r.targets_scanned ?? '—', fit: true, sort: 'targets' },
-            { id: 'duration', label: t('discovery.duration'), cell: (r) => durationLabel(r.duration_seconds) || '—', grow: true, muted: true, sort: 'duration' },
+            { id: 'started', label: t('discovery.startedAt'), cell: (r) => (r.started_at ? formatDate(r.started_at, { time: true }) : '—'), kind: 'fit', priority: 2, labelled: true, sort: 'started' },
+            { id: 'found', label: t('discovery.scans.found'), labelFull: t('discovery.certsFound'), cell: (r) => r.certs_found ?? 0, kind: 'number', priority: 3, sort: 'found' },
+            { id: 'targets', label: t('discovery.runs.targets'), labelFull: t('discovery.targetsScanned'), cell: (r) => r.targets_scanned ?? '—', kind: 'number', priority: 3, sort: 'targets' },
+            { id: 'duration', label: t('discovery.duration'), cell: (r) => durationLabel(r.duration_seconds) || '—', kind: 'fit', priority: 3, labelled: true, muted: true, sort: 'duration' },
             { status: true, sort: 'state' },
           ]}
           error={error}

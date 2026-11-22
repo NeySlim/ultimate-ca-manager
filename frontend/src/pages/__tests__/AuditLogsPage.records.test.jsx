@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 const notify = vi.hoisted(() => ({
   showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showInfo: vi.fn(),
@@ -164,5 +164,38 @@ describe('the table on a wider screen', () => {
     expect(container.querySelector('.mobile-list')).not.toBeInTheDocument()
     const fit = within(screen.getByRole('table')).getAllByRole('columnheader').map((th) => th.classList.contains('fit'))
     expect(fit).toEqual([true, false, false, true, true, true])
+  })
+})
+
+describe('the journal sorted by its time, by the server (T2, T7, T9)', () => {
+  const at = { search: '' }
+  function Where() { at.search = useLocation().search; return null }
+  const pageAt = (url) => render(<MemoryRouter initialEntries={[url]}><AuditLogsPage /><Where /></MemoryRouter>)
+  const listCalls = () => auditService.getLogs.mock.calls.map(([p]) => p).filter((p) => p.per_page !== 1)
+
+  it('reads the newest first, and the time alone reverses it from the first page, the server\'s order shown as it came', async () => {
+    screenSize.isMobile = false
+    pageAt('/audit')
+    await screen.findByText('device-05.example.com')
+    expect(listCalls().pop()).toMatchObject({ page: 1, sort_by: 'timestamp', sort_order: 'desc' })
+    const time = screen.getByRole('columnheader', { name: 'audit.colTime' })
+    expect(time).toHaveAttribute('aria-sort', 'descending')
+    // The other columns do not sort: the filters do that work
+    expect(screen.getAllByRole('columnheader').filter((h) => h.querySelector('button[data-sort]'))).toEqual([time])
+    fireEvent.click(within(document.querySelector('footer.table-footer')).getByRole('button', { name: 'table.nextPage' }))
+    await waitFor(() => expect(listCalls().pop()).toMatchObject({ page: 2, sort_order: 'desc' }))
+    rows = [...rows].reverse()
+    fireEvent.click(within(time).getByRole('button'))
+    await waitFor(() => expect(listCalls().pop()).toMatchObject({ page: 1, sort_by: 'timestamp', sort_order: 'asc' }))
+    expect(at.search).toBe('?sort=timestamp&order=asc')
+    await waitFor(() => expect([...document.querySelectorAll('tbody tr td:nth-child(4)')].map((td) => td.textContent)).toEqual(['bob', 'alice']))
+  })
+
+  it('opens in the order the address names', async () => {
+    screenSize.isMobile = false
+    pageAt('/audit?sort=timestamp&order=asc')
+    await screen.findByText('device-05.example.com')
+    expect(listCalls().pop()).toMatchObject({ sort_by: 'timestamp', sort_order: 'asc' })
+    expect(screen.getByRole('columnheader', { name: 'audit.colTime' })).toHaveAttribute('aria-sort', 'ascending')
   })
 })

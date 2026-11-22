@@ -3520,7 +3520,6 @@
     "backupScheduleGroup": "Agendamento",
     "backupFrequencyOff": "Desativado, não recomendado",
     "backupSize": "Tamanho",
-    "backupSort": "Ordem dos backups",
     "diskHigh": "Disco quase cheio",
     "restoreChooseFile": "Escolher um arquivo de backup",
     "restoreTooLarge": "Arquivo demasiado grande: {{size}} no máximo.",
@@ -3651,12 +3650,6 @@
     "backupCopySha256": "Copiar o SHA-256 completo",
     "backupSharedStoreNote": "Em alta disponibilidade, os arquivos ficam no banco de dados PostgreSQL, lida por todos os nós: perdem-se com esse banco de dados. Baixe os que quer manter para um local fora do cluster e faça o backup do PostgreSQL com as suas próprias ferramentas.",
     "backupSearchPlaceholder": "Pesquisar backups…",
-    "backupSortNewest": "Mais recentes primeiro",
-    "backupSortOldest": "Mais antigos primeiro",
-    "backupSortLargest": "Maiores primeiro",
-    "backupSortSmallest": "Menores primeiro",
-    "backupSortNameAsc": "Nome (A→Z)",
-    "backupSortNameDesc": "Nome (Z→A)",
     "backupSelectAll": "Selecionar tudo",
     "backupDeleteSelected": "Excluir selecionados ({{count}})",
     "backupNoMatch": "Nenhum backup corresponde",
@@ -4615,7 +4608,11 @@
     "allOf": "Tudo de {{name}}",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "Todos os recursos",
-    "anyAction": "todas as ações"
+    "anyAction": "todas as ações",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "Dependências PKCS#11 indisponíveis neste host",
@@ -6676,7 +6673,8 @@
         "running": "Em execução",
         "completed": "Concluída",
         "failed": "Falhada"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "Intervalo",
@@ -7011,7 +7009,8 @@
     "deleteRefused_one": "{{count}} perfil de inscrição Windows usa este conector. Aponte-o primeiro para outro conector:",
     "deleteRefused_other": "{{count}} perfis de inscrição Windows usam este conector. Aponte-os primeiro para outro conector:",
     "deleteRefusedMore_one": "e mais {{count}}",
-    "deleteRefusedMore_other": "e mais {{count}}"
+    "deleteRefusedMore_other": "e mais {{count}}",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "Colar",
@@ -7410,7 +7409,8 @@
       "deploy_delivery": "Implementações de certificados",
       "ad_connector_health": "Estado do Active Directory",
       "session_cleanup": "Limpeza de sessões"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "Analisar",

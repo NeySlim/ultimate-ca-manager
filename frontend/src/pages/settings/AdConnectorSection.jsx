@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, ListView, Toolbar, SearchField, EmptyBlock, NoMatch, Pill, RecordList, RecordRow } from '../../components/atelier'
+import { Btn, ListView, Toolbar, SearchField, EmptyBlock, NoMatch, Pill, RecordList, RecordRow, useClientList, useSortParam } from '../../components/atelier'
 import { Modal, Notice } from '../../components/atelier/Form'
 import { adConnectorsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { formatDate } from '../../lib/utils'
 import AdConnectorForm from './AdConnectorForm'
+
+// The connectors by name (T4), the sort in the address under this list's scope (the settings stack their sections)
+const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'realm', 'servers', 'sid', 'test', 'state']
 
 // The probe's verdict next to the enabled switch: only while lookups still act on it, which the
 // server decides (health_fresh), so a wrong browser clock cannot hide or keep the badge.
@@ -107,6 +111,17 @@ export default function AdConnectorSection({ hasPermission }) {
   // The search reads the name and the realm, as the product's table did
   const needle = search.trim().toLowerCase()
   const shown = needle ? connectors.filter(c => [c.name, c.realm].some(v => (v || '').toLowerCase().includes(needle))) : connectors
+  const sortParam = useSortParam(BY_NAME, SORT_KEYS, { scope: 'ad' })
+  const list = useClientList(shown, {
+    sortParam,
+    resetKey: needle,
+    // No footer here: every connector on one page
+    sizes: [1000],
+    sorts: {
+      name: (r) => r.name, realm: (r) => r.realm || null, servers: (r) => r.servers?.[0] || null, sid: (r) => r.domain_sid || null,
+      test: (r) => (r.last_test_at ? Date.parse(r.last_test_at) : null), state: (r) => (r.enabled ? 0 : 1),
+    },
+  })
   const servers = (row) => {
     const list = row.servers || []
     if (!list.length) return '—'
@@ -142,7 +157,7 @@ export default function AdConnectorSection({ hasPermission }) {
     <>
       <Notice><strong>{t('adConnector.helpTitle')}</strong>{' '}{t('adConnector.helpDescription')}</Notice>
 
-      <ListView label={t('adConnector.title')} icon="globe" rows={shown} loading={loading}
+      <ListView label={t('adConnector.title')} icon="globe" list={list} nameSort="name" loading={loading}
         title={(row) => row.name} status={state}
         openedId={editing?.id} onOpen={canWrite ? setEditing : undefined}
         toolbar={(
@@ -151,13 +166,13 @@ export default function AdConnectorSection({ hasPermission }) {
           </Toolbar>
         )}
         columns={[
-          { id: 'realm', label: t('adConnector.realm'), cell: (row) => row.realm || t('adConnector.noRealm') },
-          { id: 'servers', label: t('adConnector.servers'), cell: servers, grow: true },
+          { id: 'realm', label: t('adConnector.realm'), cell: (row) => row.realm || t('adConnector.noRealm'), kind: 'text', priority: 2, sort: 'realm' },
+          { id: 'servers', label: t('adConnector.servers'), cell: servers, kind: 'text', priority: 4, grow: true, sort: 'servers' },
           { id: 'sid', label: t('adConnector.domainSid'), cell: (row) => (row.domain_sid
             ? <span className="mono" data-testid="domain-sid">{row.domain_sid}</span>
-            : <span className="muted">{t('adConnector.domainSidUnknown')}</span>) },
-          { id: 'test', label: t('adConnector.testConnection'), cell: lastTest },
-          { status: true },
+            : <span className="muted">{t('adConnector.domainSidUnknown')}</span>), title: (row) => row.domain_sid || undefined, kind: 'text', priority: 4, sort: 'sid' },
+          { id: 'test', label: t('adConnector.lastTest'), cell: lastTest, kind: 'fit', priority: 3, labelled: true, sort: 'test' },
+          { status: true, sort: 'state' },
         ]}
         rowActions={rowActions}
         empty={connectors.length ? (
