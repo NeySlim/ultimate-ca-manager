@@ -1254,7 +1254,7 @@ GET /api/v2/certificates/compliance
 POST /api/v2/certificates/{cert_id}/submit-ct
 POST /api/v2/certificates/export
 ```
-- Reads need `read:certificates`. `lint` checks one stored certificate against `profile` (`rfc5280` by default, `cabf` or `etsi`; `400` for another); `422` when the certificate cannot be linted. `lint/status` reports which linters are available and the accepted `profiles`. `compliance` returns aggregate compliance statistics (score and grade) across all certificates.
+- Reads need `read:certificates`. `lint` checks one stored certificate against `profile` (`rfc5280` by default, `cabf` or `etsi`; `400` for another); `422` when the certificate cannot be linted. `lint/status` reports which linters are available and the accepted `profiles`. `compliance` returns `average_score`, the grade `distribution` (`A+` to `F`) and `total` over the active certificates, named in `population` as on `/dashboard/compliance`, scored in SQL from the stored key, signature hash, SANs and dates.
 - `submit-ct` (`write:certificates`) submits the certificate to the configured Certificate Transparency logs and returns the `logs` that accepted it with their `timestamp`. `400` when CT is not enabled in the [settings](#certificate-transparency), no valid log is configured, the certificate has no PEM, or no log accepted it.
 - `POST /certificates/export` is the body form of `GET /certificates/export`: `format` (`pem` or `p7b`, else `400`), `password` and `include_chain`; `404` when there is nothing to export. The bulk export carries public certificates only, so `password` and `legacy` are ignored there, and `include_chain` is checked as a boolean (`400` otherwise) but adds nothing.
 
@@ -2737,6 +2737,8 @@ GET /api/v2/dashboard/queue?kind=crl_due&kind=crl_missing
 GET /api/v2/dashboard/health?days=7
 GET /api/v2/dashboard/compliance
 GET /api/v2/dashboard/issuance?days=7
+GET /api/v2/dashboard/expirations?days=90
+GET /api/v2/dashboard/revocation?limit=10
 ```
 Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
@@ -2765,7 +2767,43 @@ Certificates counted are issued, not revoked, not archived and not expired. A ce
 
 `href_hint` carries the object in the query (`request`, `order`, `ca`) and the tab (`tab`) the page reads; `contracts/queue_links.json` lists them. `GET /api/v2/key-recovery/{id}` (`read:key_recovery`) reads one recovery request like the two reads above.
 
-`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled, with the `state`, `alert` and `severity` of the table below. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `smtp`, `webhooks` and `auto_renewal` are present only for a caller holding `read:settings`, with a `state` and no series: `smtp` is `not_configured`, `disabled`, `incomplete` (port or From address missing) or `ready`; `webhooks` is `not_configured`, `none_active` or `active` (`count`); `auto_renewal` is `enabled` or `disabled`; a witness whose read fails is `unavailable`, with `alert` true. `alert` is true for `disabled` and `incomplete` mail and for `none_active`, never for a setting that is simply not configured. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled, with the `state`, `alert` and `severity` of the table below. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `smtp`, `webhooks` and `auto_renewal` are present only for a caller holding `read:settings`, with a `state` and no series: `smtp` is `not_configured`, `disabled`, `incomplete` (port or From address missing) or `ready`; `webhooks` is `not_configured`, `none_active` or `active` (`count`); `auto_renewal` is `enabled` or `disabled`; a witness whose read fails is `unavailable`, with `alert` true. `alert` is true for `disabled` and `incomplete` mail and for `none_active`, never for a setting that is simply not configured. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `population` names the set counted, the one `GET /api/v2/certificates/compliance` scores: `{"definition": "active", "criteria": ["issued", "not_revoked", "not_archived", "not_expired"], "filter_hint": {"live": "true"}, "count": 211}`. `compliant` counts its certificates under none of the five counters. `score` is `{average, grade, distribution}`: the average compliance score (0 to 100, rounded), its grade (null on an empty set) and the number of certificates per grade `A+` to `F`, the figures of `/certificates/compliance`.
+
+`issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source. `flow` counts issuances and in-place renewals together per UTC day and source group: `groups` maps `acme` (`acme`, `acme_client`, `letsencrypt`), `scep`, `est`, `wstep` and `import` to their sources, `manual` taking every other source, unset included; `periods` holds `{date, acme, scep, est, wstep, import, manual, total}` per day, `by_group` and `total` the window, and `previous` (`from`, `to`, `by_group`, `total`) the `days` days before it, where a certificate renewed in both periods counts in the later one only.
+
+```json
+"flow": {
+  "groups": {"acme": ["acme", "acme_client", "letsencrypt"], "scep": ["scep"], "est": ["est"], "wstep": ["wstep"], "import": ["import"], "manual": null},
+  "periods": [{"date": "2026-11-22", "acme": 4, "scep": 1, "est": 0, "wstep": 0, "import": 0, "manual": 2, "total": 7}],
+  "by_group": {"acme": 121, "scep": 30, "est": 12, "wstep": 0, "import": 3, "manual": 18},
+  "total": 184,
+  "previous": {"from": "2026-09-24", "to": "2026-10-23", "by_group": {"acme": 98, "scep": 25, "est": 10, "wstep": 0, "import": 1, "manual": 17}, "total": 151}
+}
+```
+
+`expirations` (`days` 1 to 365, 90 by default) counts, per UTC day from today to `days` - 1 days ahead, the issued certificates not revoked that expire that day, today from now on (archived ones included: the list's `valid` and `expiring` statuses together). Each `periods` entry is `{date, total, manual, automatic, signers, cas, infrastructure}`: `automatic` counts the sources in `automatic_sources` (`acme`, `letsencrypt`, `scep`, `est`, `wstep`, `acme_client`), `manual` the rest; `signers` the dedicated TSA signer and delegated OCSP responders among them; `cas` the active CAs (not revoked, not expired, holding their certificate) expiring that day, which are not certificates and not in `total`; `infrastructure` is true when `signers` or `cas` is. The top level repeats `days`, `from`, `to`, `after` (the instant counted from), the totals, and a `filter_hint` that reproduces the window in the certificate list; one day or week is the same `status` with `expires_from` set to its first day and `expires_to` to the day after its last.
+
+```json
+{
+  "days": 90, "from": "2026-11-22", "to": "2027-02-19", "after": "2026-11-22T14:03:00.120000Z",
+  "total": 64, "manual": 40, "automatic": 24, "cas": 1, "signers": 0,
+  "automatic_sources": ["acme", "letsencrypt", "scep", "est", "wstep", "acme_client"],
+  "filter_hint": {"status": ["valid", "expiring"], "expires_to": "2027-02-20"},
+  "periods": [{"date": "2026-12-14", "total": 10, "manual": 8, "automatic": 2, "signers": 0, "cas": 0, "infrastructure": false}]
+}
+```
+
+`revocation` sorts the active CAs (not revoked, not expired, holding their certificate) by their newest full CRL, as the queue's `crl_due` and `crl_missing` read it: `current` (next update ahead), `stale` (next update past), `missing` (distribution point, no CRL) and `no_cdp` (no distribution point), which add up to `total`; `ocsp_enabled` counts those with OCSP, `to_publish` is `stale` plus `missing`. `items` lists at most `limit` (10 by default, 100 at most) CAs with a distribution point, missing first, then stale by oldest next update, then current by next update: `{ca_id, name, state, next_update, ocsp_enabled, offline, can_publish, href_hint}`, `can_publish` false for an offline CA or one without a key.
+
+```json
+{
+  "total": 136, "current": 126, "stale": 2, "missing": 1, "no_cdp": 7, "ocsp_enabled": 3, "to_publish": 3,
+  "items": [{"ca_id": 12, "name": "Intermediate Tests", "state": "missing", "next_update": null, "ocsp_enabled": false,
+             "offline": false, "can_publish": true, "href_hint": "/crl-ocsp?ca=12"}]
+}
+```
+
+The tiles of CAs and HSM modules need no route of their own: `GET /api/v2/cas` gives each CA's validity, key (`uses_hsm`, `hsm_provider_id`, `hsm_provider_name`), `offline`, `ocsp_enabled` and `cdp_enabled`, `GET /api/v2/crl` its CRL's `next_update` and `is_stale`, `issuance?days=30` its activity per day, and `GET /api/v2/hsm/providers` each module's `status`, `last_tested_at` and `key_count`.
 
 | `tsa` state | meaning | `alert` | `severity` |
 |-------------|---------|---------|------------|
@@ -2789,6 +2827,7 @@ Certificates counted are issued, not revoked, not archived and not expired. A ce
 | `server=true`, `lifetime_over_days=N` | server certificate (type or `web_server` template), lifetime of more than N days, N from 0 to 100000 |
 | `no_key=true`, `incomplete_chain=true` | no stored private key; issuing CA unknown to this instance |
 | `renewal` (repeatable) | one of `manual_renewal_due`, `client_renewal_overdue`, `auto_renewal_blocked`, `renewal_declined`: the rows of that `queue` kind. `queue` returns `filter_hints` with this parameter for each |
+| `expires_from`, `expires_to` | expiry from `expires_from` (included) to `expires_to` (excluded), each an ISO 8601 date (`2026-12-14`, midnight UTC) or date and time (an offset is converted to UTC) |
 
 ### Get Stats Overview
 ```http
