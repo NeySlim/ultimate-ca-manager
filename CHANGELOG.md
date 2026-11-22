@@ -102,6 +102,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **SQLite runs in WAL, and a request waiting for another writer no longer stops the others.** The database switches to write-ahead logging at its first start, so reads never wait for a write; a write that meets another one waits up to 5 seconds without holding the web worker, then answers 503 with `Retry-After`.
 - **The compliance score covers the active certificates.** `GET /api/v2/certificates/compliance` scores, in SQL, the certificates `/dashboard/compliance` counts (issued, not revoked, not archived, not expired; expired ones were included), and both name that `population`; `/dashboard/compliance` adds the average score, the grade distribution and `compliant`, the certificates under no counter.
 - **A list row opens its object from anywhere on it.** A click on a row opens it in the inspector as its name did, except on its checkbox, its buttons or at the end of a text selection, and nothing opens while rows are ticked.
 - **Views past the room go into a More menu.** The tabs of a protocol page that do not fit leave the row for a More menu at its end, with their counts, instead of a row scrolling sideways; the view shown always stays in the row.
@@ -467,6 +468,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- SQLite: `ucm.db-wal` and `ucm.db-shm` now sit beside `ucm.db`, and the last writes may be only in `ucm.db-wal`: a copy by hand takes `ucm.db` and `ucm.db-wal` together, and neither is ever deleted (see UPGRADE.md).
 - Exports that can return a private key answer `400` to an option they do not list, to an option outside the query string of a GET or the JSON object body of a POST, and to a GET asking for a certificate's key; send a POST with a JSON body. A GET of a user certificate no longer includes its key (see UPGRADE.md).
 - Microsoft CA: a Kerberos connection whose keytab path lies inside the UCM data folder stops authenticating; move that keytab elsewhere and save the new path (see UPGRADE.md).
 - FIPS image: the module becomes the OpenSSL FIPS Provider 3.5.9 (certificate #5586) without any step; TLS 1.2 peers without Extended Master Secret are refused in both directions (see UPGRADE.md).

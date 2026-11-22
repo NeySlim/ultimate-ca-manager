@@ -334,6 +334,9 @@ def _dump_sqlite(url, path: Path, reasons: list, details: dict) -> bool:
                                          timeout=_SQLITE_SNAPSHOT_TIMEOUT)
         target = sqlite3.connect(str(path))
         _sqlite_backup(source, target)
+        # A WAL source gives a WAL copy, which a read would grow -wal and -shm files beside:
+        # the snapshot is one self-contained file
+        target.execute("PRAGMA journal_mode=DELETE")
         return True
     except Exception as e:
         reasons.append(f"the SQLite online backup failed: {_short_err(str(e))}")

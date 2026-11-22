@@ -371,9 +371,12 @@ Backups, retention and restores take the same lock, so an archive never holds ha
 **Via command line (SQLite):**
 ```bash
 sudo systemctl stop ucm
-sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+sudo cp -p /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+# Writes not yet in ucm.db are in ucm.db-wal: it belongs to the copy when it exists
+sudo test ! -e /opt/ucm/data/ucm.db-wal || sudo cp -p /opt/ucm/data/ucm.db-wal ~/ucm-backup-$(date +%Y%m%d).db-wal
 sudo systemctl start ucm
 ```
+The database runs in WAL mode: the last writes can be in `ucm.db-wal` only, so a copy of `ucm.db` alone may lack them. To put a copy back, stop UCM, remove `ucm.db-wal` and `ucm.db-shm`, then copy the `.db` file and its `-wal`, if any, as `ucm.db` and `ucm.db-wal`. Never delete `ucm.db-wal` or `ucm.db-shm` otherwise.
 On PostgreSQL, use `pg_dump` instead. A copy of the database is not a `.ucmbkp` archive and the restore action does not read it: the private keys stay under this installation's key-encryption key.
 
 ### Restoring Backups
@@ -484,7 +487,7 @@ The migration is **bidirectional** (SQLite ↔ PostgreSQL) and:
 
 ### SQLite Database
 
-Location: `/opt/ucm/data/ucm.db`
+Location: `/opt/ucm/data/ucm.db`, in WAL mode: `ucm.db-wal` (writes not yet folded into the file) and `ucm.db-shm` sit beside it. UCM switches a database to WAL at its first start. Keep it on a local filesystem: SQLite's WAL does not work over a network filesystem (https://www.sqlite.org/wal.html).
 
 **Optimize.** **Settings > Database > Optimize Database** runs `VACUUM`, then `ANALYZE` with `PRAGMA analysis_limit = 1000`: SQLite reads about 1,000 rows of each index, so the write lock it holds stays short on a large database. SQLite never refreshes these statistics on its own. The `sqlite_statistics` task (Settings > Scheduler, "Database statistics") runs every hour under the same limit. From SQLite 3.46 it runs `PRAGMA optimize`, which analyzes only the tables that grew or shrank tenfold, or that have no statistics yet; with an older SQLite library (for example on RHEL 9 or Ubuntu 24.04) it runs the bounded `ANALYZE` on every table. Each connection loads the statistics when it opens and is reopened hourly. The task does not exist on PostgreSQL, whose autovacuum keeps its statistics; there **Optimize Database** runs `VACUUM ANALYZE`.
 

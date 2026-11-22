@@ -25,7 +25,8 @@ find "$BACKEND" -type d \
 # tree. Nothing under version control matches these, and the container image
 # ignores the same shapes, so the three package formats agree.
 find "$BACKEND" -type f \
-     \( -name '*.log' -o -name '*.db' -o -name '*.db-journal' -o -name .coverage \) \
+     \( -name '*.log' -o -name '*.db' -o -name '*.db-journal' -o -name '*.db-wal' \
+        -o -name '*.db-shm' -o -name .coverage \) \
      -delete
 
 # Configuration belongs to the installed system, not to the package, at any
