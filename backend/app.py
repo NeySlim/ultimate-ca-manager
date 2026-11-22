@@ -258,6 +258,11 @@ def create_app(config_name=None):
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
+    # SQLite in WAL from the application's first connection (a no-op on PostgreSQL)
+    from utils import sqlite_journal
+    with app.app_context():
+        for _engine in db.engines.values():
+            sqlite_journal.attach(_engine)
 
     # Write cert/CA files to disk immediately after any INSERT so they are
     # available without waiting for the next service restart.
@@ -1403,7 +1408,7 @@ def init_database(app):
     from datetime import datetime
     from sqlalchemy.exc import IntegrityError, OperationalError
     from sqlalchemy import inspect
-    import sqlite3
+    from utils import sqlite_journal
     
     # Verify all tables exist, create if missing
     inspector = inspect(db.engine)
@@ -1422,7 +1427,7 @@ def init_database(app):
     # Auto-detect and add missing columns (SQLAlchemy create_all doesn't add new columns to existing tables)
     def add_missing_columns():
         """Automatically add missing columns to existing tables"""
-        conn = sqlite3.connect(app.config['DATABASE_PATH'])
+        conn = sqlite_journal.connect(app.config['DATABASE_PATH'])
         cursor = conn.cursor()
         
         # Define expected columns for tables that may need migration
@@ -1522,7 +1527,7 @@ def init_database(app):
     
     def create_missing_tables():
         """Create tables that SQLAlchemy might miss"""
-        conn = sqlite3.connect(app.config['DATABASE_PATH'])
+        conn = sqlite_journal.connect(app.config['DATABASE_PATH'])
         cursor = conn.cursor()
         
         # Get existing tables
