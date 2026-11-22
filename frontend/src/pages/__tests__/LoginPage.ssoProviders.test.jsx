@@ -96,9 +96,11 @@ describe('LoginPage — SSO provider loading', () => {
     expect(await screen.findByText('auth.page.lead')).toBeInTheDocument()
     expect(screen.queryByText(/^Company SSO · /)).not.toBeInTheDocument()
 
-    await act(async () => { window.dispatchEvent(new Event('online')) })
-
-    expect(await screen.findByText(/^Company SSO · /)).toBeInTheDocument()
+    // The listener is set once the failure is known: going online before then changes nothing, so the event repeats
+    await waitFor(() => {
+      act(() => { window.dispatchEvent(new Event('online')) })
+      expect(screen.getByText(/^Company SSO · /)).toBeInTheDocument()
+    })
     expect(services.getSsoProviders).toHaveBeenCalledTimes(2)
   })
 
