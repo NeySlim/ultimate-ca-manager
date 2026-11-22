@@ -17,8 +17,8 @@ This guide covers upgrading UCM to newer versions across different installation 
 ### Using Docker Compose
 
 ```bash
-# 1. Backup current data
-docker-compose exec ucm cp /opt/ucm/data/ucm.db /opt/ucm/data/backups/manual-backup-$(date +%Y%m%d).db
+# 1. Backup current data (SQLite's online backup: consistent while UCM runs, WAL included)
+docker-compose exec ucm python3 -c "import sqlite3, sys; d = sqlite3.connect(sys.argv[2]); sqlite3.connect(sys.argv[1]).backup(d); d.execute('PRAGMA journal_mode=DELETE')" /opt/ucm/data/ucm.db /opt/ucm/data/backups/manual-backup-$(date +%Y%m%d).db
 
 # 2. Pull new image
 docker-compose pull
@@ -37,8 +37,9 @@ docker-compose logs -f ucm
 # 1. Stop container
 docker stop ucm
 
-# 2. Backup data
+# 2. Backup data: the database and, when there is one, its WAL (writes not yet in ucm.db)
 docker cp ucm:/opt/ucm/data/ucm.db ./backup-$(date +%Y%m%d).db
+docker cp ucm:/opt/ucm/data/ucm.db-wal ./backup-$(date +%Y%m%d).db-wal 2>/dev/null || true
 
 # 3. Remove old container
 docker rm ucm
@@ -93,7 +94,9 @@ sudo apt-get install -f
 
 ```bash
 sudo systemctl stop ucm
-sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+sudo cp -p /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+# Writes not yet in ucm.db are in ucm.db-wal: it belongs to the copy when it exists
+sudo test ! -e /opt/ucm/data/ucm.db-wal || sudo cp -p /opt/ucm/data/ucm.db-wal ~/ucm-backup-$(date +%Y%m%d).db-wal
 sudo cp /etc/ucm/ucm.env ~/ucm-config-backup.env
 sudo systemctl start ucm
 ```
@@ -103,8 +106,10 @@ sudo systemctl start ucm
 ```bash
 sudo systemctl stop ucm
 
-# Restore the database from the manual backup taken above
-sudo cp ~/ucm-backup-YYYYMMDD.db /opt/ucm/data/ucm.db
+# Restore the database from the manual backup taken above, never beside another WAL
+sudo rm -f /opt/ucm/data/ucm.db-wal /opt/ucm/data/ucm.db-shm
+sudo cp -p ~/ucm-backup-YYYYMMDD.db /opt/ucm/data/ucm.db
+sudo test ! -e ~/ucm-backup-YYYYMMDD.db-wal || sudo cp -p ~/ucm-backup-YYYYMMDD.db-wal /opt/ucm/data/ucm.db-wal
 
 # Reinstall previous version
 sudo dpkg -i ucm_<previous-version>_all.deb
@@ -132,7 +137,9 @@ sudo dnf upgrade ./ucm-VERSION-1.noarch.rpm
 
 ```bash
 sudo systemctl stop ucm
-sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+sudo cp -p /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+# Writes not yet in ucm.db are in ucm.db-wal: it belongs to the copy when it exists
+sudo test ! -e /opt/ucm/data/ucm.db-wal || sudo cp -p /opt/ucm/data/ucm.db-wal ~/ucm-backup-$(date +%Y%m%d).db-wal
 sudo systemctl start ucm
 ```
 
@@ -147,7 +154,9 @@ sudo systemctl start ucm
 sudo systemctl stop ucm
 
 # 2. Backup database
-sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+sudo cp -p /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+# Writes not yet in ucm.db are in ucm.db-wal: it belongs to the copy when it exists
+sudo test ! -e /opt/ucm/data/ucm.db-wal || sudo cp -p /opt/ucm/data/ucm.db-wal ~/ucm-backup-$(date +%Y%m%d).db-wal
 
 # 3. Pull updates
 cd /opt/ucm
@@ -196,6 +205,7 @@ Database migrations run automatically at startup.
 - **An older UCM removed with its data left in place is archived, not upgraded.** After an RPM removal, or a DEB removed or purged, no UCM package is installed and the 3.0 package installs as new. Before it writes its configuration, it asks the 3.0 migration runner whether it starts on the SQLite database left there. When it does not, the package moves everything that installation left, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (readable by root only, outside every path UCM serves, writes or backs up): the contents of `/opt/ucm/data` and `/etc/ucm`, and the database file with its `-wal` when `DATABASE_PATH` placed it elsewhere. It then sets up a new, empty UCM and starts it; `UCM_FIPS_BUILD=1`, when the archived `ucm.env` set it, is written into the new one, and the output says so; when a retry had built the Python environment while that `ucm.env` was still in the archive, the environment is built again against the system OpenSSL. The installation output and `/var/log/ucm/leftover-archive.log` say what was found and where it went. Every item is renamed, never copied or removed: one that cannot be renamed out of its filesystem (another filesystem, a bind mount, overlayfs) goes into a `.ucm-archive-<UTC date and time>/` directory beside it, readable by root only, and a directory that cannot be renamed at all stays where it is while its contents move the same way. The output lists each such directory, and the archive's `README.txt` lists each one with what it holds; UCM never uses or removes them, and `apt purge ucm` leaves them in place: it removes the rest of `/etc/ucm`, `/var/lib/ucm` and `/var/log/ucm` and names what it kept. `README.txt` in the archive gives the way back: install 2.254 in place of 3.0, stop it, put the archived data and configuration back, start it once, then install 3.0 again. Data that 3.0 starts on (left by 2.254 or later) is kept and used as before. A database whose registry names migrations 3.0 does not know (written by a later release) is not archived either: that is a downgrade, the service refuses to start, and the output says to reinstall the release that wrote it. A database it cannot read, or a PostgreSQL database it refuses, is left where it is, the output says so (the SQLite file, or `postgresql` without its address), and the service then refuses to start as described above. In these cases where nothing is archived, the installation does not end on its `UCM INSTALLED` banner. If a move fails, the installation stops there: what was moved is put back (the output says whether all of it could be), nothing else is written, and the service is not started. Once the cause is fixed, `dpkg --configure -a` or `dnf reinstall ucm` retries, first putting back whatever could not be. On EL9, dnf reports that failure as a warning (`%post(...) scriptlet failed`) and still ends with `Complete!` and exit code 0: `systemctl is-active ucm` then answers `inactive`, and `/var/log/ucm/leftover-archive.log` holds the reason.
 - **Docker: the move to 3.x is asked for.** The 3.x image started on a database last started by 2.254 (SQLite, at the data path or at a path from before 2.70, or PostgreSQL through `DATABASE_URL`, every HA node included) stops before writing anything, with exit code 78 and this message in `docker logs`: `This database was last started by UCM 2.254 and this image is UCM 3: starting it would upgrade the database to the new major version, which 2.254 cannot start afterwards. Nothing was changed.`, followed by how to accept and how to stay on 2.x. Back up the volume (and run `pg_dump` on PostgreSQL), then set `UCM_ACCEPT_MAJOR_UPGRADE=3` and start again; any other value is refused the same way. To stay on 2.x, run the image tag `2` or an exact `2.254.N` on the same volume, which nothing has changed. A fresh volume, or one 3.x already started, starts with or without the variable, and so does an accepted upgrade that stopped partway (see *When an upgrade stops partway*): it resumes, the consent having been given for that database, and 2.254 must not be started on it (see *Going back to 2.254 with that copy*); a database older than 2.254 keeps the refusal above. The Helm chart sets the variable itself (`majorUpgrade.accept`, `true` by default), a `helm upgrade` to the 3.x chart being that consent. The DEB and RPM packages do not ask: installing the package is the consent.
 - **Docker has no package step.** The 3.0 image starts and refuses a database older than 2.254 as described above; it never archives a volume, since starting a newer image on it is an upgrade. A container that still mounts its volume at a path used by images before 2.70 (`/opt/ucm/backend/data` or `/app/backend/data`) has those files copied into `/opt/ucm/data` at startup, as before; a database carried over that way is checked the same way.
+- **SQLite runs in WAL.** At its first start 3.0 switches the SQLite database to write-ahead logging: reads no longer wait for a write, and `ucm.db-wal` and `ucm.db-shm` sit beside `ucm.db`. The last writes can be in `ucm.db-wal` only, UCM stopped or not: a copy by hand takes `ucm.db` and, when it exists, `ucm.db-wal` (as `<copy>-wal`), as the commands of this guide do; a copy put back first removes the `ucm.db-wal` and `ucm.db-shm` beside it. Never delete `ucm.db-wal` or `ucm.db-shm` otherwise: the writes the log holds are lost. A write that meets another one waits up to 5 seconds, without stopping the other requests, then answers `503` with `Retry-After: 5`. Keep the database on a local filesystem: SQLite's WAL does not work over a network filesystem (https://www.sqlite.org/wal.html).
 - **A copy of the SQLite database before the upgrade.** At its first start on a 2.254 SQLite database, before changing anything, 3.0 copies it next to itself as `ucm.db.2.254-before-3.0` (`/opt/ucm/data/` for the packages and the image, so the Docker data volume keeps it), mode 0600 and with the owner of the database. The copy goes through SQLite's online backup, so it includes what the WAL holds, and is checked (integrity, the 2.254 migration registry, the row count of every table). It takes about the size of the database: the start checks that this size plus 8 MB is free. When the copy cannot be taken or checked, the start stops, the database is left as it was and the log says why, how much space is needed and where. UCM never deletes the copy and it is not listed among the backup archives: remove it yourself once 3.0 suits you.
 - **When an upgrade stops partway.** Once the copy is checked, and before the first upgrade step, 3.0 records in the database that the upgrade has started (a table named `_upgrade_from_2_254_started`, which the copy does not hold and which a completed upgrade removes). A start that finds this record does not copy the database again, since it is no longer the 2.254 one: it keeps the existing copy and says `kept the copy taken by an earlier start` in the log, or, when that copy is missing or fails its check, says that no copy of the 2.254 database exists, makes none, and resumes the upgrade. A start on a database without the record (the copy put back, or a 2.254 database that was never upgraded) takes a fresh copy that replaces the previous one. The `dry-run` and `status` commands of `migration_runner.py` say which of these applies, and where the copy is, without writing anything.
 - **Going back to 2.254 with that copy.** Stop UCM, put the copy back in place of the database, remove the `-wal` and `-shm` files left by 3.0, then reinstall the 2.254 package or start the 2.254 image on the same volume. Everything written by 3.0 since the upgrade is lost. Do the same after an upgrade that failed: put the copy back before starting 2.254, never start 2.254 on the half-upgraded database, because the steps already applied have changed tables that 2.254 reads and writes. If 2.254 was started on it anyway, the next 3.0 start keeps the original copy, and what 2.254 wrote in between is not in that copy. On a package installation:
@@ -454,7 +464,8 @@ sudo dnf install -y ucm     # RHEL
 
 # 3. Database corruption
 sudo systemctl stop ucm
-sudo cp /opt/ucm/data/backups/ucm-pre-upgrade-*.db /opt/ucm/data/ucm.db
+sudo rm -f /opt/ucm/data/ucm.db-wal /opt/ucm/data/ucm.db-shm
+sudo cp -p /opt/ucm/data/backups/ucm-pre-upgrade-*.db /opt/ucm/data/ucm.db
 sudo systemctl start ucm
 ```
 

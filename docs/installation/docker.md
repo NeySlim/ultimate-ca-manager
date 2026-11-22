@@ -190,6 +190,8 @@ The container runs as UID 1000 and cannot change the owner of a bind-mounted dir
 ```
 ucm-data/
 ├── ucm.db # SQLite database (omitted when DATABASE_URL points to PostgreSQL)
+├── ucm.db-wal # Its write-ahead log: writes not yet in ucm.db, never to delete
+├── ucm.db-shm # Its WAL index
 ├── https_cert.pem # HTTPS certificate
 ├── https_key.pem # HTTPS private key
 ├── cas/ # Certificate Authority files
@@ -313,16 +315,7 @@ docker restart ucm
 
 ### Database Locked
 
-```bash
-# Stop container
-docker stop ucm
-
-# Remove lock file
-docker run --rm -v ucm-data:/data alpine rm -f /data/ucm.db-journal
-
-# Restart
-docker start ucm
-```
+A write that meets another write waits up to 5 seconds, then answers `503` with `Retry-After`: retry it. Never delete `ucm.db-wal`, `ucm.db-shm` or `ucm.db-journal` to clear a lock: they hold writes not yet in `ucm.db`, and the database loses them or is corrupted. A lock that outlives a restart of the container comes from another process holding the file (a `sqlite3` shell, a second container on the same volume): stop it. The volume must be on a local filesystem: SQLite's WAL does not work over a network filesystem (https://www.sqlite.org/wal.html).
 
 ### Health Check Failing
 

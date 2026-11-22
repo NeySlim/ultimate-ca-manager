@@ -27,7 +27,7 @@ helm install ucm oci://ghcr.io/neyslim/charts/ucm --version 3.0.0 \
 - Kubernetes 1.23+
 - Helm 3.8+ (uses `lookup` to persist generated secrets across upgrades)
 - For the account that runs `helm`: on every render, `get` on `secrets` in the release namespace, since the chart's `lookup` reads its Secret back to keep the generated keys; with `ha.enabled`, also `get` on `serviceaccounts` and `persistentvolumeclaims` in the release namespace. Without one of them the render stops with Kubernetes' `forbidden` error
-- A default StorageClass providing **ReadWriteOnce** volumes
+- A default StorageClass providing **ReadWriteOnce** volumes, on a local or block filesystem when the database is SQLite: SQLite's WAL does not work over a network filesystem such as NFS (https://www.sqlite.org/wal.html)
 
 ## One instance, or several with `ha.enabled`
 
