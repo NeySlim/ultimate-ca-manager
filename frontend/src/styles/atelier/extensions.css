@@ -434,3 +434,6 @@
 /* Printed: a table unrolls whole. */
 .atl .guide-body .compare-scroll{overflow:visible;max-height:none}
 }
+/* The journal's resource takes the room left and ends in an ellipsis rather than scroll the region (R1); its title holds it whole */
+.atl .audit-table td.audit-resource{max-width:1px;width:100%;overflow:hidden}
+.atl .audit-table td.audit-resource>.resource{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}

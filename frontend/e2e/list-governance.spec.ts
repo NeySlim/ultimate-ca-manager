@@ -24,8 +24,12 @@ const LISTS = [
 async function seed(api) {
   const ca = await createCA(api, { commonName: `Regional Issuing Authority for the West ${uid('ca')}` })
   await issueCert(api, ca.id, { cn: `${uid('a-long-service-name')}.internal.example.com` })
+  // A journal entry whose resource is as long as a name may be: 64 characters
+  await issueCert(api, ca.id, { cn: `${uid('svc')}.the-longest-internal-subdomain.example.com`.padEnd(64, 'x').slice(0, 64) })
   await createUser(api, 'operator')
   await api.post('/groups', { name: uid('group'), description: 'The operators of the issuing authorities of the western region, on call' })
+  // A journal entry whose resource is as long as a group name may be: 100 characters
+  await api.post('/groups', { name: `${uid('group')}-operators-of-the-issuing-authorities-of-the-western-region-on-call`.padEnd(100, 'x').slice(0, 100) })
   await api.post('/policies', { name: uid('policy'), operations: ['issuance'], priority: 20, ca_id: ca.id, requires_approval: false })
 }
 

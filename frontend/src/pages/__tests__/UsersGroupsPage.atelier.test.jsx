@@ -131,6 +131,7 @@ describe('the account list', () => {
     expect(names()[0]).toBe('Administrateur')
   })
 
+  // Thirty-three rows sorted fourteen times: well over a second under a full parallel run
   it('sorts its seven columns from their headers, on the pages it keeps', async () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ id: 100 + i, username: `u${String(i).padStart(2, '0')}`, email: `u${i}@example.com`, role: 'viewer', active: true, sso_identities: [] }))
     m.getAll.mockResolvedValue({ data: [ME, CHLOE, OLD, ...many] })
@@ -167,7 +168,7 @@ describe('the account list', () => {
     fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'example.com' } })
     expect(footer).toHaveTextContent('users.pageRange {"start":1,"end":25,"count":32}')
-  })
+  }, 15000)
 
   it("words the head's main action as a short verb, named in full", async () => {
     page()

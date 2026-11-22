@@ -148,11 +148,10 @@ test('the scheduler lists its tasks in the mockup module table, a mockup button 
   const rows = page.locator('#set-sec-scheduler .module-table tbody tr')
   await expect(rows.first()).toBeVisible()
   const run = rows.first().getByRole('button', { name: 'Run now' })
-  // The mockup's .btn: 32 px
-  expect(Math.abs((await box(run)).height - 32)).toBeLessThanOrEqual(EPS)
-  // A row with what its last run said under the task name grows, a plain one stays at the button's height
-  const heights = await rows.evaluateAll((els) => els.filter((el) => !el.querySelector('.rl-meta')).map((el) => el.getBoundingClientRect().height))
-  expect(Math.min(...heights)).toBeLessThanOrEqual(39 + EPS)
+  // The mockup's .btn, at the height of the row's icon buttons (27 px), so that every row keeps the 36 px density (D1)
+  expect(Math.abs((await box(run)).height - 27)).toBeLessThanOrEqual(EPS)
+  const heights = await rows.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))
+  expect(Math.max(...heights)).toBeLessThanOrEqual(36 + EPS)
 })
 
 test('groups of a frame stand 20 px apart', async ({ page, api }) => {

@@ -303,7 +303,8 @@ export default function AuditLogsPage() {
   const columns = [
     { id: 'time', label: t('audit.colTime'), fit: true, sort: 'timestamp', tone: ['mono', 'muted'], cell: (e) => rowTime(e.timestamp, locale), skeleton: { width: '64px' } },
     { id: 'operation', label: t('audit.colOperation'), cell: (e) => <span className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action)}</span>, skeleton: { base: 45, spread: 35 } },
-    { id: 'resource', label: t('audit.colResource'), resource: true, cell: resourceOf, skeleton: { base: 50, spread: 40 } },
+    // The resource takes the room left and gives way by an ellipsis, its whole text in a title (audit-resource, R1, L6)
+    { id: 'resource', label: t('audit.colResource'), resource: true, tone: 'audit-resource', title: resourceOf, cell: resourceOf, skeleton: { base: 50, spread: 40 } },
     { id: 'user', label: t('audit.colUser'), fit: true, tone: ['muted', 'small'], cell: (e) => e.username || t('common.system'), skeleton: { width: '70px' } },
     { id: 'result', label: t('audit.colResult'), fit: true, cell: badgeOf, skeleton: { width: '74px', kind: 'pill' } },
   ]
