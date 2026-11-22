@@ -10,9 +10,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
-  Zone, Btn, IconBtn, Icon, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props,
+  Zone, Btn, IconBtn, Icon, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Facts,
   LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, useSortParam,
 } from '../components/atelier'
+import { Breakable } from '../components/atelier/Breakable'
 import { userCertificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState } from '../hooks'
@@ -231,6 +232,12 @@ export default function UserCertificatesPage() {
     : !STATES[row.status] ? <Pill label={t('common.status')} tone="muted" />
     : <Pill label={t(STATES[row.status].key)} tone={STATES[row.status].tone} icon={STATES[row.status].icon} />)
   const ucExpires = (row) => dateOf(row.valid_to || row.valid_until, locale) || '—'
+  // A value the enrolment has, else the absence in grey; a DN wraps after its separators, a serial or a fingerprint is a chip copied whole
+  const fact = (label, value) => (value ? { label, value } : { label, absent: '—' })
+  const dn = (value) => value && <Breakable text={value} />
+  // A digest longer than a short value goes under its term in a narrow panel
+  const code = (label, value) => (value ? { label, value, kind: 'hex', long: value.length > 23 } : { label, absent: '—' })
+  const expiry = (row) => dateOf(row.valid_to || row.valid_until, locale)
   const views = [
     { id: '', label: t('common.all'), count: certStats.total || 0 },
     ...Object.keys(STATES).map((s) => ({ id: s, label: t(`certificates.views.${s}`), count: certStats[s] || 0 })),
@@ -264,25 +271,25 @@ export default function UserCertificatesPage() {
         </>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('userCertificates.module.description'), open.description || '—'],
-              [t('userCertificates.detail.owner'), open.owner || '—'],
-              [t('userCertificates.module.expires'), ucExpires(open)],
+            <Facts items={[
+              fact(t('userCertificates.module.description'), open.description),
+              fact(t('userCertificates.detail.owner'), open.owner),
+              fact(t('userCertificates.module.expires'), expiry(open)),
               [t('atelier.state'), ucPill(open)],
-              [t('userCertificates.detail.subject'), <span key="subject" className="mono">{open.cert_subject || open.subject || '—'}</span>],
-              [t('userCertificates.detail.issuer'), <span key="issuer" className="mono">{open.cert_issuer || open.issuer || '—'}</span>],
-              [t('userCertificates.detail.serial'), <span key="serial" className="mono">{serialHex(open.serial_number || open.cert_serial) || '—'}</span>],
-              [t('userCertificates.detail.fingerprint'), <span key="fp" className="mono">{open.cert_fingerprint || '—'}</span>],
-              [t('common.keyType'), certificateKeyLabel(open) || '—'],
+              { ...fact(t('userCertificates.detail.subject'), dn(open.cert_subject || open.subject)), long: true },
+              { ...fact(t('userCertificates.detail.issuer'), dn(open.cert_issuer || open.issuer)), long: true },
+              code(t('userCertificates.detail.serial'), serialHex(open.serial_number || open.cert_serial)),
+              code(t('userCertificates.detail.fingerprint'), open.cert_fingerprint),
+              fact(t('common.keyType'), certificateKeyLabel(open)),
             ]} />
           </Section>
           <Section title={t('userCertificates.module.usage')}>
-            <Props items={[
-              [t('userCertificates.detail.validFrom'), dateOf(open.valid_from, locale) || '—'],
-              [t('userCertificates.detail.validTo'), ucExpires(open)],
-              [t('userCertificates.detail.lastUsed'), open.last_used_at ? dateTimeOf(open.last_used_at, locale) : t('common.never')],
-              [t('userCertificates.detail.created'), dateTimeOf(open.created_at, locale) || '—'],
-              [t('userCertificates.detail.privateKey'), open.has_private_key ? t('common.yes') : t('common.no')],
+            <Facts items={[
+              fact(t('userCertificates.detail.validFrom'), dateOf(open.valid_from, locale)),
+              fact(t('userCertificates.detail.validTo'), expiry(open)),
+              open.last_used_at ? [t('userCertificates.detail.lastUsed'), dateTimeOf(open.last_used_at, locale)] : { label: t('userCertificates.detail.lastUsed'), absent: t('common.never') },
+              fact(t('userCertificates.detail.created'), dateTimeOf(open.created_at, locale)),
+              open.has_private_key ? [t('userCertificates.detail.privateKey'), t('common.yes')] : { label: t('userCertificates.detail.privateKey'), absent: t('common.no') },
             ]} />
           </Section>
         </div>
