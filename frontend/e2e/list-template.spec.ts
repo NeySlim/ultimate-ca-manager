@@ -140,10 +140,24 @@ function contrast(a: string, b: string) {
   return (x + 0.05) / (y + 0.05)
 }
 
-// The most contrasted pixel of each box and how many pixels reach 3:1, against the header's own pixel above it, read
-// on a screenshot at scale 1: what a screen paints, not the colour computed (R3)
-async function painted(page, boxes: { x: number, y: number, width: number, height: number, top: number }[]) {
-  const shot = (await page.screenshot({ scale: 'css' })).toString('base64')
+// The most contrasted pixel of each icon and how many pixels reach 3:1, against the header's own pixel above it, read
+// on a screenshot at scale 1: what a screen paints, not the colour computed (R3). The icons are measured before and
+// after the screenshot: a list that lays out again meanwhile (another test's authority arriving) is shot again.
+async function painted(page, selector: string) {
+  const measure = () => page.locator(selector).evaluateAll((all) => all.map((svg) => {
+    const r = svg.getBoundingClientRect()
+    return { x: r.x, y: r.y, width: r.width, height: r.height, top: svg.closest('th')!.getBoundingClientRect().top }
+  }))
+  let boxes = await measure()
+  let shot = ''
+  for (let i = 0; i < 10; i += 1) {
+    shot = (await page.screenshot({ scale: 'css' })).toString('base64')
+    const after = await measure()
+    if (JSON.stringify(after) === JSON.stringify(boxes)) break
+    boxes = after
+    shot = ''
+  }
+  expect(shot, 'the header held still for a screenshot').not.toBe('')
   return page.evaluate(async ({ b64, boxes: bs }) => {
     const img = new Image()
     img.src = `data:image/png;base64,${b64}`
@@ -168,7 +182,7 @@ async function painted(page, boxes: { x: number, y: number, width: number, heigh
           if (r >= 3) strong += 1
         }
       }
-      return { max, strong }
+      return { max, strong, bg, box: [b.x, b.y, b.width, b.height].map(Math.round) }
     })
   }, { b64: shot, boxes })
 }
@@ -212,16 +226,12 @@ test.describe('the headers in the four themes', () => {
       expect(read.sorted).toHaveLength(1)
       expect(contrast(read.sorted[0], read.background)).toBeGreaterThanOrEqual(4.5)
       // As painted: each sign has at least 6 pixels at 3:1, the arrow a pixel at 4.5:1
-      const boxes = (selector: string) => page.locator(selector).evaluateAll((all) => all.map((svg) => {
-        const r = svg.getBoundingClientRect()
-        return { x: r.x, y: r.y, width: r.width, height: r.height, top: svg.closest('th')!.getBoundingClientRect().top }
-      }))
-      const idle = await painted(page, await boxes('#module-scroll thead svg.sort-idle'))
+      const idle = await painted(page, '#module-scroll thead svg.sort-idle')
       for (const p of idle) {
-        expect(p.strong).toBeGreaterThanOrEqual(6)
-        expect(p.max).toBeGreaterThanOrEqual(3)
+        expect(p.strong, JSON.stringify(p)).toBeGreaterThanOrEqual(6)
+        expect(p.max, JSON.stringify(p)).toBeGreaterThanOrEqual(3)
       }
-      const [arrow] = await painted(page, await boxes('#module-scroll thead th[aria-sort] svg.sort-arrow'))
+      const [arrow] = await painted(page, '#module-scroll thead th[aria-sort] svg.sort-arrow')
       expect(arrow.max).toBeGreaterThanOrEqual(4.5)
     })
   }
