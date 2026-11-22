@@ -170,9 +170,22 @@ describe('the detail of an entry', () => {
     renderPage()
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'device-05.example.com' }))
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'audit.copyIp' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'protocols.copyValue {"name":"audit.ipAddress"}' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('192.0.2.10'))
-    expect(await within(dialog()).findByRole('button', { name: 'audit.ipCopied' })).toBeInTheDocument()
+  })
+
+  it('types the facts of an entry: its result a pill, its address copyable in its value, the client a long row', async () => {
+    renderPage()
+    await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'device-05.example.com' }))
+    const d = dialog()
+    expect(d.querySelector('dl.props')).toBeNull()
+    const row = (term) => within(d).getByText(term, { selector: 'dt' }).closest('.row')
+    expect(row('audit.colResult').querySelector('dd.v .badge.good')).toHaveTextContent('audit.badgeOk')
+    expect(row('audit.ipAddress').querySelector('dd.v .code-value')).toHaveTextContent('192.0.2.10')
+    expect(row('audit.client')).toHaveClass('long')
+    // Nothing but the value's own copy button in the column of values
+    expect([...d.querySelectorAll('dl.kv dd.v button')].every((b) => b.closest('.code-value'))).toBe(true)
   })
 
   it('offers no inspection without the right to read certificates', async () => {
