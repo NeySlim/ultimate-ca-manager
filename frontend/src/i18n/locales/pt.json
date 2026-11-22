@@ -889,6 +889,7 @@
     "selectedOnPage_other": "{{count}} certificados selecionados nesta página",
     "exportSelected": "Exportar",
     "complianceColumn": "Conformidade",
+    "creationColumn": "Creation date",
     "archivedMark": "Arquivado: substituído por uma renovação ou nova inscrição, mantido para o histórico",
     "sourceAcmeRenewal": "Renovação ACME",
     "sourceIssued": "Emitido",
@@ -2923,7 +2924,9 @@
     "ocspActive": "Ativo",
     "ocspInactive": "Inativo",
     "columns": {
-      "published": "Publicada"
+      "published": "Publicada",
+      "publication": "Publication",
+      "crlNumber": "CRL number"
     },
     "tabs": {
       "publication": "Publicação"
@@ -5567,11 +5570,13 @@
     "searching": "A pesquisar…",
     "sortHint": "Headers with a button sort the list.",
     "sortedBy": "Sorted by {{column}}, {{order}}",
+    "sortedByReverse": "Sorted by {{column}}, {{order}}. Click to reverse",
     "sortAscending": "ascending order",
     "sortDescending": "descending order",
     "sortBy": "Sort by",
     "sortByColumn": "Sort by {{column}}",
-    "reverseSort": "Reverse the order",
+    "ascendingReverse": "Ascending order, reverse",
+    "descendingReverse": "Descending order, reverse",
     "foldedColumns_one": "{{count}} column folded",
     "foldedColumns_other": "{{count}} columns folded"
   },

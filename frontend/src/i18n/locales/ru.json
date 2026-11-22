@@ -901,6 +901,7 @@
     "selectedOnPage_other": "{{count}} сертификата выбрано на этой странице",
     "exportSelected": "Экспорт",
     "complianceColumn": "Соответствие",
+    "creationColumn": "Дата создания",
     "archivedMark": "В архиве: заменён при продлении или повторной регистрации, хранится для истории",
     "sourceAcmeRenewal": "Продление ACME",
     "sourceIssued": "Выпущен",
@@ -3041,7 +3042,9 @@
     "ocspActive": "Активен",
     "ocspInactive": "Неактивен",
     "columns": {
-      "published": "Опубликована"
+      "published": "Опубликована",
+      "publication": "Публикация",
+      "crlNumber": "Номер CRL"
     },
     "tabs": {
       "publication": "Публикация"
@@ -5795,11 +5798,13 @@
     "searching": "Идёт поиск…",
     "sortHint": "Заголовки с кнопкой сортируют список.",
     "sortedBy": "Сортировка: {{column}}, {{order}}",
+    "sortedByReverse": "Сортировка: {{column}}, {{order}}. Нажмите, чтобы изменить порядок",
     "sortAscending": "по возрастанию",
     "sortDescending": "по убыванию",
     "sortBy": "Сортировать по",
     "sortByColumn": "Сортировать: {{column}}",
-    "reverseSort": "Обратный порядок",
+    "ascendingReverse": "По возрастанию, изменить порядок",
+    "descendingReverse": "По убыванию, изменить порядок",
     "foldedColumns_one": "{{count}} столбец свёрнут",
     "foldedColumns_few": "{{count}} столбца свёрнуто",
     "foldedColumns_many": "{{count}} столбцов свёрнуто",

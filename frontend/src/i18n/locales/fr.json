@@ -1598,6 +1598,7 @@
     "selectedOnPage_other": "{{count}} certificats sélectionnés sur cette page",
     "exportSelected": "Exporter",
     "complianceColumn": "Conformité",
+    "creationColumn": "Date de création",
     "archivedMark": "Archivé : remplacé par un renouvellement ou un ré-enrôlement, conservé pour l’historique",
     "sourceAcmeRenewal": "Renouvellement ACME",
     "sourceIssued": "Émis",
@@ -2488,7 +2489,9 @@
     "ocspActive": "Actif",
     "ocspInactive": "Inactif",
     "columns": {
-      "published": "Publiée"
+      "published": "Publiée",
+      "publication": "Publication",
+      "crlNumber": "Numéro de CRL"
     },
     "tabs": {
       "publication": "Publication"
@@ -5567,11 +5570,13 @@
     "searching": "Recherche en cours…",
     "sortHint": "Les en-têtes à bouton trient la liste.",
     "sortedBy": "Trié par {{column}}, {{order}}",
+    "sortedByReverse": "Trié par {{column}}, {{order}}. Cliquer pour inverser",
     "sortAscending": "ordre croissant",
     "sortDescending": "ordre décroissant",
     "sortBy": "Trier par",
     "sortByColumn": "Trier par {{column}}",
-    "reverseSort": "Inverser l’ordre",
+    "ascendingReverse": "Ordre croissant, inverser",
+    "descendingReverse": "Ordre décroissant, inverser",
     "foldedColumns_one": "{{count}} colonne repliée",
     "foldedColumns_other": "{{count}} colonnes repliées"
   },

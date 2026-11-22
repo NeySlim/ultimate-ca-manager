@@ -901,6 +901,7 @@
     "selectedOnPage_other": "Вибрано {{count}} сертифікатів на цій сторінці",
     "exportSelected": "Експортувати",
     "complianceColumn": "Відповідність",
+    "creationColumn": "Creation date",
     "archivedMark": "В архіві: замінено оновленням або повторною реєстрацією, збережено для історії",
     "sourceAcmeRenewal": "Оновлення ACME",
     "sourceIssued": "Видано",
@@ -3041,7 +3042,9 @@
     "ocspActive": "Активний",
     "ocspInactive": "Неактивний",
     "columns": {
-      "published": "Опубліковано"
+      "published": "Опубліковано",
+      "publication": "Publication",
+      "crlNumber": "CRL number"
     },
     "tabs": {
       "publication": "Публікація"
@@ -5795,11 +5798,13 @@
     "searching": "Пошук…",
     "sortHint": "Headers with a button sort the list.",
     "sortedBy": "Sorted by {{column}}, {{order}}",
+    "sortedByReverse": "Sorted by {{column}}, {{order}}. Click to reverse",
     "sortAscending": "ascending order",
     "sortDescending": "descending order",
     "sortBy": "Sort by",
     "sortByColumn": "Sort by {{column}}",
-    "reverseSort": "Reverse the order",
+    "ascendingReverse": "Ascending order, reverse",
+    "descendingReverse": "Descending order, reverse",
     "foldedColumns_one": "{{count}} column folded",
     "foldedColumns_few": "{{count}} columns folded",
     "foldedColumns_many": "{{count}} columns folded",
