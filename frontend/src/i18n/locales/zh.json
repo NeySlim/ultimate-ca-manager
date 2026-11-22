@@ -7997,7 +7997,9 @@
       "horizon": "到期视野",
       "compliance": "合规性",
       "activity": "最新操作",
-      "trend": "证书活动"
+      "issuance": "Issuances by source",
+      "authorities": "Authorities and HSM",
+      "revocation": "Revocation coverage"
     },
     "state": {
       "loading": "加载中...",
@@ -8051,7 +8053,9 @@
       "watchShow_one": "显示 {{count}} 项需关注",
       "watchShow_other": "显示 {{count}} 项需关注",
       "watchHide_one": "隐藏 {{count}} 项需关注",
-      "watchHide_other": "隐藏 {{count}} 项需关注"
+      "watchHide_other": "隐藏 {{count}} 项需关注",
+      "countdown_one": "{{count}} day left of 30",
+      "countdown_other": "{{count}} days left of 30"
     },
     "kind": {
       "acme_order_failed": "ACME 订单失败",
@@ -8213,7 +8217,8 @@
       "tableCaption_one": "Operations per UTC day, over {{count}} day",
       "tableCaption_other": "Operations per UTC day, over {{count}} days",
       "okOf": "{{name}} successes",
-      "failedOf": "{{name}} failures"
+      "failedOf": "{{name}} failures",
+      "seeActivity": "Opens Activity on this day’s failures"
     },
     "filter": {
       "status": "状态",
@@ -8228,7 +8233,9 @@
       "incomplete_chain": "证书链不完整",
       "renewal": "续期",
       "weak_key": "合规性",
-      "ca_id": "证书颁发机构"
+      "ca_id": "证书颁发机构",
+      "expires": "Expiry",
+      "created": "Created"
     },
     "filterValue": {
       "true": "是",
@@ -8242,7 +8249,10 @@
       "revoked": "已吊销",
       "orphan": "孤立",
       "archived": "已归档",
-      "weakKey": "弱密钥，{{algo}} < {{bits}}"
+      "weakKey": "弱密钥，{{algo}} < {{bits}}",
+      "range": "{{from}} to {{to}}",
+      "since": "from {{date}}",
+      "until": "until {{date}}"
     },
     "hierarchy": {
       "crlOn": "CRL 已启用",
@@ -8268,19 +8278,51 @@
       "emptyText": "请创建离线根，或导入现有 CA，然后在该根下创建签发 CA。"
     },
     "horizon": {
-      "expiring": "即将到期",
       "expired": "已过期",
-      "soonest": "最先到期",
-      "tsaSigner": "TSA 签名者",
-      "ocspResponder": "OCSP 响应器",
-      "sub": "接下来到期的证书，最近的在前。",
-      "elapsed": "有效期已过 {{percent}}%",
-      "state": {
-        "valid": "有效",
-        "expiring": "待续期",
-        "expired": "已过期",
-        "revoked": "已吊销"
-      }
+      "subWindow_one": "{{count}} certificate not revoked expires by {{date}}, by week and by day. A cell opens the list of its day.",
+      "subWindow_other": "{{count}} certificates not revoked expire by {{date}}, by week and by day. A cell opens the list of its day.",
+      "quiet": "Nothing expires by {{date}}.",
+      "period": "Horizon shown",
+      "year": "1 y",
+      "week": "Week of {{date}}",
+      "weekCol": "Week",
+      "weekAlt_one": "{{name}}: {{count}} expiry, {{manual}} manual, {{automatic}} automatic",
+      "weekAlt_other": "{{name}}: {{count}} expiries, {{manual}} manual, {{automatic}} automatic",
+      "dayAlt_one": "{{date}}: {{count}} expiry",
+      "dayAlt_other": "{{date}}: {{count}} expiries",
+      "withCas_one": "including {{count}} authority",
+      "withCas_other": "including {{count}} authorities",
+      "withSigners_one": "including {{count}} signer",
+      "withSigners_other": "including {{count}} signers",
+      "total": "Total",
+      "manual": "Manual",
+      "automatic": "Automatic",
+      "cas": "Authorities",
+      "signers": "Signers",
+      "weeksLabel": "Expiries per week",
+      "daysLabel": "Expiries per day, one cell per day",
+      "openDay": "Click to see these certificates",
+      "openWeek": "Opens the list of the week",
+      "nothingDay": "Nothing expires that day",
+      "nothing": "Nothing expires over the period.",
+      "legendManual": "Manual: import, manual issuance",
+      "legendAutomatic": "Automatic: ACME, SCEP, EST",
+      "legendInfra": "An authority or a signer expires that day",
+      "less": "Less",
+      "more": "More",
+      "inDays_one": "in {{count}} day",
+      "inDays_other": "in {{count}} days",
+      "toRenew_one": "{{count}} to renew by hand",
+      "toRenew_other": "{{count}} to renew by hand",
+      "automaticCount_one": "{{count}} automatic",
+      "automaticCount_other": "{{count}} automatic",
+      "casCount_one": "{{count}} authority expires",
+      "casCount_other": "{{count}} authorities expire",
+      "listLabel": "First certificates of the period",
+      "open_one": "Open {{count}} in Certificates",
+      "open_other": "Open the {{count}} in Certificates",
+      "tableCaption_one": "Expiries per week, {{count}} week",
+      "tableCaption_other": "Expiries per week, {{count}} weeks"
     },
     "activity": {
       "all": "查看全部",
@@ -8290,7 +8332,14 @@
       "yesterday": "Yesterday",
       "folded_one": "{{count}} sign-in by {{user}}",
       "folded_other": "{{count}} sign-ins by {{user}}",
-      "span": "{{from}} to {{to}}"
+      "span": "{{from}} to {{to}}",
+      "filter": {
+        "all": "All",
+        "pki": "PKI",
+        "access": "Access"
+      },
+      "filterLabel": "Filter the operations",
+      "noneOfKind": "No recent operation under « {{name}} »."
     },
     "link": {
       "handled": "项目 #{{id}} 不再需要处理（状态：{{status}}）。",
@@ -8359,7 +8408,10 @@
         "failures_one": "Protocol failures, {{count}} day",
         "failures_other": "Protocol failures, {{count}} days",
         "openFailures": "Opens To handle, filtered on the failures"
-      }
+      },
+      "expiryPeak": "peak of {{count}} on {{date}}",
+      "expiryAlt_one": "Expirations per week over {{count}} week: {{total}}",
+      "expiryAlt_other": "Expirations per week over {{count}} weeks: {{total}}"
     },
     "cause": {
       "acme_order_failed": "过去 7 天内有 ACME 订单以无效结束",
@@ -8379,21 +8431,98 @@
       "truststore_expiring": "信任存储中需要更换的信任锚"
     },
     "trend": {
-      "sub_one": "最近 {{count}} 天内每天签发、吊销和过期的证书。",
-      "sub_other": "最近 {{count}} 天内每天签发、吊销和过期的证书。",
       "period": "显示的周期",
       "short": "{{count}} 天",
-      "day": "日期",
-      "quiet_one": "最近 {{count}} 天内没有证书被签发、吊销或过期。",
-      "quiet_other": "最近 {{count}} 天内没有证书被签发、吊销或过期。",
-      "alt_one": "{{count}} 天内的证书活动：签发 {{issued}}，吊销 {{revoked}}，过期 {{expired}}。",
-      "alt_other": "{{count}} 天内的证书活动：签发 {{issued}}，吊销 {{revoked}}，过期 {{expired}}。",
-      "keys": "图表：左右方向键可逐日读取"
+      "day": "日期"
     },
     "clockToday": "今天 {{time}}",
     "allHiddenTitle": "所有卡片均已隐藏",
     "viz": {
       "downloadCsv": "Download as CSV"
+    },
+    "flow": {
+      "series": {
+        "acme": "ACME",
+        "scep": "SCEP",
+        "est": "EST",
+        "wstep": "WSTEP",
+        "import": "Import",
+        "manual": "Manual"
+      },
+      "sub_one": "Certificates issued per UTC day over the last day ({{count}}), renewals included.",
+      "sub_other": "Certificates issued per UTC day over the last {{count}} days, renewals included.",
+      "quiet_one": "No issuance over the last day ({{count}}).",
+      "quiet_other": "No issuance over the last {{count}} days.",
+      "issuances_one": "<0>{{count}}</0> <1>issuance</1>",
+      "issuances_other": "<0>{{count}}</0> <1>issuances</1>",
+      "vsPrevious_one": "against the previous day ({{count}})",
+      "vsPrevious_other": "against the previous {{count}} days",
+      "automatic": "{{pct}} % automatic",
+      "alt_one": "Issuances per day and source over {{count}} day, peak {{max}} on {{date}}",
+      "alt_other": "Issuances per day and source over {{count}} days, peak {{max}} on {{date}}",
+      "openDay": "Opens the certificates created that day",
+      "tableCaption_one": "Issuances per day and source, {{count}} day",
+      "tableCaption_other": "Issuances per day and source, {{count}} days"
+    },
+    "tiles": {
+      "state": {
+        "revoked": "Revoked",
+        "expired": "Expired",
+        "crlStale": "CRL overdue",
+        "crlMissing": "CRL never published",
+        "expiresIn_one": "Expires in {{count}} d",
+        "expiresIn_other": "Expires in {{count}} d",
+        "pending": "Pending",
+        "offline": "Offline, healthy",
+        "inService": "In service",
+        "reachable": "Reachable",
+        "hsmError": "In error",
+        "disconnected": "Disconnected",
+        "untested": "Never tested",
+        "unknown": "State unknown"
+      },
+      "sub": "{{authorities}} and {{modules}}. A tile opens its record.",
+      "modules_one": "{{count}} HSM module",
+      "modules_other": "{{count}} HSM modules",
+      "explore": "Explore the hierarchy",
+      "hsmKey": "HSM · {{name}}",
+      "softwareKey": "Software key",
+      "noKey": "No key in UCM",
+      "elapsed": "Validity spent",
+      "left": "{{when}} left",
+      "elapsedAlt": "{{pct}} % of the validity spent, {{when}} left",
+      "crlWhen": "CRL {{when}}",
+      "crlCurrent": "CRL up to date",
+      "crlStale": "CRL overdue",
+      "crlStaleSince_one": "CRL overdue for {{count}} d",
+      "crlStaleSince_other": "CRL overdue for {{count}} d",
+      "crlMissing": "CRL never published",
+      "crlOff": "No CRL",
+      "activityAlt_one": "{{count}} issuance over 7 days",
+      "activityAlt_other": "{{count}} issuances over 7 days",
+      "noActivity": "No issuance",
+      "keys": "Keys held",
+      "served": "Authorities served",
+      "tested": "Tested {{when}}",
+      "neverTested": "Never tested",
+      "test": "Test",
+      "testDone": "{{name}}: test passed"
+    },
+    "revocation": {
+      "part": {
+        "current": "CRL up to date",
+        "toPublish": "CRL overdue or missing",
+        "noCdp": "No distribution point"
+      },
+      "sub": "What the active authorities publish for their certificates.",
+      "headline_one": "of the {{count}} active authority publishes a current CRL",
+      "headline_other": "of the {{count}} active authorities publish a current CRL",
+      "cas": "Authorities",
+      "partCol": "Part",
+      "tableCaption_one": "Revocation coverage, {{count}} active authority",
+      "tableCaption_other": "Revocation coverage, {{count}} active authorities",
+      "nextIn": "Next CRL {{when}}",
+      "publish": "Publish"
     }
   },
   "sectioned": {

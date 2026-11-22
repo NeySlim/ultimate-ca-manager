@@ -4,30 +4,6 @@
  */
 /* The mockup's #app wraps the zone's stage so that its rules on #app.dock-right apply; it draws no box. */
 .atl #app.zone-app{display:contents}
-/* Overview: the certificate activity card (absent from the mockup) takes a line of its own; its chart and tooltip. */
-.atl .card-trend{flex-basis:100%}
-.atl .trend-chart{position:relative;margin-top:12px}
-.atl .trend-chart>svg{display:block;width:100%;overflow:visible}
-.atl .trend-grid{stroke:var(--line);stroke-width:1}
-.atl .trend-axis{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
-.atl .trend-series{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-.atl .trend-area{stroke:none;opacity:.1}
-.atl .trend-dot{stroke:var(--panel);stroke-width:2}
-.atl .card-trend [data-series=issued]{--series:var(--accent)}
-.atl .card-trend [data-series=revoked]{--series:var(--muted)}
-.atl .card-trend [data-series=expired]{--series:var(--bad)}
-.atl .trend-series{stroke:var(--series)}
-.atl .trend-area,.atl .trend-dot{fill:var(--series)}
-.atl .trend-cross{stroke:var(--control);stroke-width:1}
-.atl .trend-tip{position:absolute;top:0;z-index:2;min-width:130px;padding:7px 9px;border:1px solid var(--control);border-radius:4px;background:var(--panel);box-shadow:0 8px 24px color-mix(in srgb,var(--ink) 30%,transparent);font-size:12px;pointer-events:none}
-.atl .trend-tip strong{display:block;margin-bottom:3px;font-weight:500}
-.atl .trend-tip span{display:flex;align-items:center;gap:6px}
-.atl .trend-tip b{margin-left:auto;padding-left:10px;font-weight:500;font-variant-numeric:tabular-nums}
-.atl .trend-key{width:18px;height:10px}
-.atl .trend-key line{stroke:var(--series);stroke-width:2;stroke-linecap:round}
-.atl .card-trend .horizon-legend strong{font-weight:500;color:var(--text);font-variant-numeric:tabular-nums}
-/* Overview: the soonest expiries of the horizon card, above its status list (the mockup's gap under its bars). */
-.atl .card-horizon .algo-list+.status-list{margin-top:20px}
 /* A dialog of the mockup drawn outside a zone carries the scope without a box of its own. */
 .atl.atl-island{display:contents}
 /*

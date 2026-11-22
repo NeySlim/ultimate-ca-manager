@@ -4,7 +4,8 @@ import { PALETTES, usePalette, expectPalette, boxes } from './support/themes'
 import { freezeApi, type Frozen } from './support/frozen'
 
 const CARDS = [
-  'To handle', 'Automation health', 'Hierarchy', 'Expiry horizon', 'Compliance', 'Latest operations', 'Certificate activity',
+  'To handle', 'Automation health', 'Issuances by source', 'Expiry horizon', 'Compliance', 'Revocation coverage',
+  'Hierarchy', 'Latest operations', 'Authorities and HSM',
 ]
 
 test('the overview cards load their data', async ({ page, api }) => {
@@ -39,7 +40,7 @@ test('a queue entry opens the object it names', async ({ page, api }) => {
   await expect(page.getByRole('complementary', { name: ca.common_name })).toBeVisible()
 })
 
-const DEFAULT_ORDER = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity', 'trend']
+const DEFAULT_ORDER = ['queue', 'health', 'issuance', 'horizon', 'compliance', 'revocation', 'hierarchy', 'activity', 'authorities']
 const shownOrder = (page: Page) => page.locator('.dash-cards > .dash-card').evaluateAll(cards => cards.map(c => c.getAttribute('data-card')))
 
 /** Runs `body` on the default layout, then puts the administrator's own preference back. */
@@ -73,10 +74,14 @@ test('the cards follow the mockup widths: the queue on its own line, then pairs 
     })
     const { cards, width } = boxes
     expect(Math.abs(cards.queue.w - width)).toBeLessThanOrEqual(1)
-    // Health beside hierarchy, the narrower first; reading order is the saved order
-    expect(cards.health.y).toBe(cards.hierarchy.y)
-    expect(cards.health.w).toBeLessThan(cards.hierarchy.w)
-    expect(cards.trend.w).toBeGreaterThan(width - 1)
+    // Pairs of unequal width, the horizon and the tiles on their own line; reading order is the saved order
+    for (const [a, b] of [['health', 'issuance'], ['compliance', 'revocation'], ['hierarchy', 'activity']]) {
+      expect(cards[a].y, `${a} beside ${b}`).toBe(cards[b].y)
+      expect(cards[a].w + cards[b].w).toBeGreaterThan(width - 30)
+    }
+    expect(cards.health.w).toBeLessThan(cards.issuance.w)
+    expect(cards.revocation.w).toBeLessThan(cards.compliance.w)
+    for (const id of ['horizon', 'authorities']) expect(cards[id].w, id).toBeGreaterThan(width - 1)
     expect(await shownOrder(page)).toEqual(DEFAULT_ORDER)
   })
 })
@@ -109,7 +114,7 @@ test('a card moves in the Cards dialog, keeps the focus, and the order survives 
     await expect(dialog).toBeVisible()
     const put = saved()
     await dialog.getByRole('button', { name: 'Move Automation health down' }).click()
-    const after = ['queue', 'hierarchy', 'health', 'horizon', 'compliance', 'activity', 'trend']
+    const after = ['queue', 'issuance', 'health', 'horizon', 'compliance', 'revocation', 'hierarchy', 'activity', 'authorities']
     await expect.poll(() => shownOrder(page)).toEqual(after)
     await expect(dialog.getByRole('button', { name: 'Move Automation health down' })).toBeFocused()
     await put

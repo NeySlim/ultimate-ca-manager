@@ -16,7 +16,7 @@ import { certificatesService, casService } from '../services'
 import { useNotification, useInspector } from '../contexts'
 import { usePermission, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
 import { extractCN, certificateNames, downloadBlob, warnSkippedExport, exportToCSV, exportToJSON } from '../lib/utils'
-import { CERT_STATUSES, OVERVIEW_FILTER_KEYS, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
+import { CERT_STATUSES, INTERVALS, OVERVIEW_FILTER_KEYS, intervalDays, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { fetchPages } from '../lib/fetchAllPages'
 import { useSetup, setupPending, openSetupAction } from '../components/shell/useSetup'
 import { SetupWizardView } from '../components/overview/SetupWizard'
@@ -44,6 +44,12 @@ const EXPORT_MAX = 10000
 const PRESETS_KEY = 'ucm-certs-presets'
 // One chip for the two filters of the weak-key link
 const WEAK_KEY = 'weak_key'
+const INTERVAL_KEYS = Object.values(INTERVALS).flat()
+
+/** A UTC day of an interval chip, in the interface's language. */
+function chipDay(date, lang) {
+  try { return new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)) } catch { return date }
+}
 const SEARCH_WAIT = 300
 
 // The row as the table shows it; the exports use the same one
@@ -345,8 +351,18 @@ export default function CertificatesPage() {
     const byKey = {}
     for (const [key, value] of urlFilters) (byKey[key] = byKey[key] || []).push(value)
     const out = []
+    // An interval of the overview's calendars reads as one chip: its first and last day included
+    for (const [name, [fromKey, toKey]] of Object.entries(INTERVALS)) {
+      if (!byKey[fromKey] && !byKey[toKey]) continue
+      const { from, last } = intervalDays(byKey[fromKey]?.[0], byKey[toKey]?.[0])
+      const day = (d) => chipDay(d, i18n.language || 'en')
+      let value
+      if (from && last) value = from === last ? day(from) : t('overview.filterValue.range', { from: day(from), to: day(last) })
+      else value = from ? t('overview.filterValue.since', { date: day(from) }) : t('overview.filterValue.until', { date: day(last) })
+      out.push({ key: `interval-${name}`, label: t('table.filterChip', { label: t(`overview.filter.${name}`), value }), remove: [`interval-${name}`] })
+    }
     for (const [key, values] of Object.entries(byKey)) {
-      if (key === 'live' || key === 'key_bits_below') continue
+      if (key === 'live' || key === 'key_bits_below' || INTERVAL_KEYS.includes(key)) continue
       if (key === 'key_algo_prefix' && byKey.key_bits_below) {
         out.push({ key: WEAK_KEY, label: `${t('overview.filter.weak_key')} : ${t('overview.filterValue.weakKey', { algo: values[0], bits: byKey.key_bits_below[0] })}`, remove: [WEAK_KEY] })
         continue
@@ -364,10 +380,12 @@ export default function CertificatesPage() {
       out.unshift({ key: 'view', label: t('table.filterChip', { label: t('certificates.state'), value: viewStatus.map((v) => t(`overview.filterValue.${v}`, { defaultValue: v })).join(', ') }), remove: ['view'] })
     }
     return out
-  }, [urlFilters, linkView, viewStatus, savedTemplate, cas, t])
+  }, [urlFilters, linkView, viewStatus, savedTemplate, cas, t, i18n.language])
   const removeUrlFilter = useCallback(([key, value]) => {
     if (key === 'template') { setFilterTemplate([]); return }
     const cur = withoutFilter(pending.current.search, 'page')
+    const interval = INTERVALS[String(key).replace(/^interval-/, '')]
+    if (String(key).startsWith('interval-') && interval) { goSearch(withoutFilter(withoutFilter(cur, interval[0]), interval[1])); return }
     goSearch(key === WEAK_KEY
       ? withoutFilter(withoutFilter(cur, 'key_algo_prefix'), 'key_bits_below')
       : withoutFilter(cur, key, value))

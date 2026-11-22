@@ -33,3 +33,14 @@ export function queueSplit(data) {
   const watch = Math.max(0, ofKind - critical)
   return { total, watch, act: total === null ? null : Math.max(0, total - watch) }
 }
+
+export const DAY_MS = 86400000
+// The countdown bar measures what is left of the last 30 days before a deadline still to come
+export const COUNTDOWN_DAYS = 30
+
+/** Share of the countdown left (1 a month ahead or more, 0 at the deadline); null once it is past. */
+export function countdownShare(at, now = Date.now()) {
+  if (!Number.isFinite(at) || at <= now) return null
+  return Math.min(1, (at - now) / (COUNTDOWN_DAYS * DAY_MS))
+}
+

@@ -189,3 +189,153 @@
 /* To handle: a 3 px rail by gravity, the gravity still written in the row */
 .atl .queue-row[data-tier=critical]{box-shadow:inset 3px 0 0 var(--bad)}
 .atl .queue-row[data-tier=warning]{box-shadow:inset 3px 0 0 var(--warn-fill)}
+
+/* Expiry horizon (maquette-2): weekly columns over a calendar of the same weeks, the side list of the day chosen */
+.atl .hz{display:grid;grid-template-columns:minmax(0,1fr) 330px}
+.atl .hz-main{min-width:0;padding:16px 19px}
+.atl .hz-side{min-width:0;padding:16px 19px;border-left:1px solid var(--line)}
+.atl .cal{display:grid;grid-template-columns:28px repeat(var(--weeks,13),minmax(0,1fr));gap:4px;align-items:end}
+.atl .cal[data-weeks="52"]{column-gap:2px}
+.atl .cal :is(.wk-row,.day-grid,.day-row){display:contents}
+.atl .cal .mon{height:18px;overflow:visible;font-size:12px;color:var(--muted);white-space:nowrap}
+.atl .cal .dow{display:flex;align-items:center;height:24px;font-size:12px;color:var(--muted);grid-column:1}
+.atl .cal .axis{grid-column:1;display:flex;flex-direction:column;justify-content:space-between;height:96px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.atl .cal .gap{grid-column:1/-1;height:6px}
+.atl .wk{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px;height:96px;padding:0;border:0;border-bottom:1px solid var(--line);border-radius:4px 4px 0 0;background:none;color:inherit;cursor:pointer;min-width:0}
+.atl .wk:hover,.atl .wk[aria-pressed=true]{background:color-mix(in srgb,var(--text) 6%,transparent)}
+.atl .wk i{display:block;width:min(24px,70%)}
+.atl .wk b{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+/* Manual and automatic differ by colour and by the manual hatching: never by colour alone */
+.atl .card-horizon .auto{background:var(--s0);border-radius:4px 4px 0 0}
+.atl .card-horizon .manual{background:repeating-linear-gradient(135deg,var(--warn-fill) 0 4px,color-mix(in srgb,var(--warn-fill) 62%,var(--panel)) 4px 6px)}
+.atl .wk .manual:first-of-type{border-radius:4px 4px 0 0}
+.atl .day{position:relative;display:block;width:100%;height:24px;min-width:0;padding:0;border:0;border-radius:3px;background:var(--h0);cursor:pointer}
+.atl .cal[data-weeks="52"] .day{height:14px;border-radius:2px}
+.atl .day.out{background:none;cursor:default}
+.atl :is(.day,.scale i)[data-l="1"]{background:var(--h1)}
+.atl :is(.day,.scale i)[data-l="2"]{background:var(--h2)}
+.atl :is(.day,.scale i)[data-l="3"]{background:var(--h3)}
+.atl :is(.day,.scale i)[data-l="4"]{background:var(--h4)}
+.atl .scale i[data-l="0"]{background:var(--h0)}
+.atl .day:hover,.atl .day[aria-pressed=true]{outline:2px solid var(--text);outline-offset:1px}
+.atl .day:focus-visible,.atl .wk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.atl .card-horizon .mark{position:absolute;right:3px;top:3px;width:8px;height:8px;border:2px solid var(--warn-fill);border-radius:1px;background:var(--panel);transform:rotate(45deg)}
+.atl .cal[data-weeks="52"] .mark{right:1px;top:1px;width:6px;height:6px;border-width:1.5px}
+.atl .day.today::after{content:'';position:absolute;left:3px;right:3px;bottom:2px;height:2px;border-radius:1px;background:var(--text)}
+:root[data-theme|=aurore] .atl .day{border-radius:5px}
+:root[data-theme|=aurore] .atl .day[data-l="2"]{background:linear-gradient(135deg,color-mix(in srgb,var(--grad-a) 55%,var(--panel)),color-mix(in srgb,var(--grad-b) 45%,var(--panel)))}
+:root[data-theme|=aurore] .atl .day[data-l="3"]{background:linear-gradient(135deg,color-mix(in srgb,var(--grad-a) 85%,var(--panel)),color-mix(in srgb,var(--grad-b) 70%,var(--panel)))}
+:root[data-theme|=aurore] .atl .day[data-l="4"]{background:linear-gradient(135deg,var(--accent),var(--grad-b));box-shadow:0 0 12px var(--glow),0 0 22px var(--glow-b)}
+:root[data-theme|=aurore] .atl .wk .auto{background:linear-gradient(0deg,var(--grad-a),var(--grad-b))}
+.atl .cal-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.atl .card-horizon .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;padding:0;list-style:none;font-size:12px;color:var(--muted)}
+.atl .card-horizon .legend li{display:inline-flex;align-items:center;gap:6px}
+.atl .swatch.diamond{width:8px;height:8px;border:2px solid var(--warn-fill);background:var(--panel);transform:rotate(45deg)}
+.atl .scale{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.atl .scale i{display:inline-block;width:16px;height:12px;border-radius:2px}
+.atl .side-head .fig{font-size:30px;font-weight:500;letter-spacing:-1px;line-height:1}
+.atl .side-head p{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.atl .side-head p b{color:var(--text);font-weight:600}
+.atl .side-chips{display:flex;flex-wrap:wrap;gap:6px}
+.atl .side-chips .chip{display:inline-flex;align-items:center;gap:5px}
+.atl .side-chips .mark{position:static;display:inline-block;width:7px;height:7px;transform:rotate(45deg)}
+.atl .side-list{margin:12px 0 0;padding:0;list-style:none}
+.atl .side-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding:8px 0;border-top:1px solid var(--line);font-size:12px}
+.atl .side-list a{overflow:hidden;font-size:13px;font-weight:500;color:var(--text);text-overflow:ellipsis;white-space:nowrap}
+.atl .side-list small{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.atl .side-open{margin:10px 0 0}
+@media(max-width:900px){.atl .hz{grid-template-columns:minmax(0,1fr)}.atl .hz-side{border-left:0;border-top:1px solid var(--line)}}
+@media(max-width:560px){.atl .cal{column-gap:2px}.atl .hz-main,.atl .hz-side{padding:14px}.atl .cal .mon{font-size:11px}}
+
+/* Issuances by source (maquette-3): stacked columns per day, one axis, the peak labelled; hatching tells
+   WSTEP from EST and import from manual, which share their colour */
+.atl .flow-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:10px;font-size:12px}
+.atl .flow-head .fig{font-size:30px;font-weight:500;letter-spacing:-1px;line-height:1}
+.atl .flow-frame{display:block;border-radius:3px}
+.atl .flow-frame:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.atl .flow{display:block;width:100%;overflow:visible}
+.atl .flow text{font:12px 'IBM Plex Sans',sans-serif;fill:var(--muted);font-variant-numeric:tabular-nums}
+.atl .flow .gridline{stroke:var(--grid);stroke-width:1}
+.atl .flow .axisline{stroke:var(--line);stroke-width:1}
+.atl .flow .cross{stroke:var(--control);stroke-width:1}
+.atl .flow .lab{fill:var(--text);font-weight:600}
+.atl .flow .hit{fill:transparent}
+.atl .flow .col{cursor:pointer}
+.atl .flow .col.on .hit{fill:color-mix(in srgb,var(--text) 6%,transparent)}
+.atl .flow .hatch-line{stroke:var(--panel);stroke-width:2}
+:root[data-theme|=aurore] .atl .flow .col1{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--s1) 45%,transparent))}
+.atl .flow-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:8px 0 0;padding:0;list-style:none;font-size:12px;color:var(--muted)}
+.atl .flow-legend li{display:inline-flex;align-items:center;gap:6px}
+.atl .flow-legend b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
+.atl .flow-legend .swatch{background:var(--swatch)}
+.atl .flow-legend .swatch.hatch{background:repeating-linear-gradient(135deg,var(--swatch) 0 3px,var(--panel) 3px 5px)}
+
+/* Authorities and HSM as tiles (maquette-3): state in a word, validity spent in a gauge, CRL, OCSP, activity */
+.atl .card-authorities{container-type:inline-size}
+.atl .atiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.atl .atile{display:grid;align-content:start;gap:9px;min-width:0;padding:13px 14px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:inherit;text-decoration:none}
+.atl a.atile:hover,.atl a.atile:focus-visible{background:var(--hover)}
+:root[data-theme|=aurore] .atl .atile{--surf:color-mix(in srgb,var(--panel) 66%,transparent);border-color:transparent;background:linear-gradient(var(--surf),var(--surf)) padding-box,linear-gradient(135deg,color-mix(in srgb,var(--grad-a) 62%,transparent),color-mix(in srgb,var(--grad-b) 30%,transparent) 60%,color-mix(in srgb,var(--text) 8%,transparent)) border-box}
+:root[data-theme|=aurore] .atl a.atile:is(:hover,:focus-visible){--surf:color-mix(in srgb,var(--hover) 80%,transparent)}
+.atl .atile-top{display:flex;align-items:center;gap:8px;min-width:0}
+.atl .atile-top>.icon{width:14px;height:14px;color:var(--muted);flex-shrink:0}
+.atl .atile-top b{flex:1;min-width:0;overflow:hidden;font-size:13px;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
+.atl .atile-top b a{color:inherit}
+.atl .atile .chip{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.atl .atile .chip .icon{width:12px;height:12px}
+.atl .atile-meta{display:flex;flex-wrap:wrap;gap:6px}
+.atl .life{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;font-size:12px;color:var(--muted)}
+.atl .life b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
+.atl .life b.warn{color:var(--warn)}
+.atl .life .track{grid-column:1/-1;height:6px;overflow:hidden;border-radius:3px;background:color-mix(in srgb,var(--tone) 15%,var(--panel))}
+.atl .life .track i{display:block;height:100%;border-radius:3px;background:var(--tone)}
+:root[data-theme|=aurore] .atl .life .track i{background:linear-gradient(90deg,var(--grad-a),var(--grad-b))}
+:root[data-theme|=aurore] .atl .life .track.late i{background:linear-gradient(90deg,var(--warn-fill),color-mix(in srgb,var(--warn-fill) 60%,var(--text)))}
+.atl .atile-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.atl .atile-foot>span{display:inline-flex;align-items:center;gap:5px}
+.atl .atile-foot .icon{width:13px;height:13px}
+.atl .atile-foot .bad{color:var(--bad)}
+.atl .atile-foot .text-link{padding:0;border:0;background:none;cursor:pointer}
+@container (max-width:900px){.atl .atiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container (max-width:560px){.atl .atiles{grid-template-columns:minmax(0,1fr)}}
+
+/* Revocation coverage (maquette-1): the share in figures, a tall bar in three parts, the authorities to publish */
+.atl .rev-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:12px;font-size:12px}
+.atl .rev-head .fig{font-size:30px;font-weight:500;letter-spacing:-1px;line-height:1}
+.atl .cover{display:flex;gap:2px;height:28px;margin:4px 0 8px}
+.atl .cover i{display:flex;align-items:center;min-width:6px;padding:0 8px;overflow:hidden;border-radius:4px;color:var(--panel);font-size:12px;font-style:normal;font-weight:600}
+.atl .cover i:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.atl .cover-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;padding:0;list-style:none;font-size:12px;color:var(--muted)}
+.atl .cover-legend li{display:inline-flex;align-items:center;gap:6px}
+.atl .cover-legend b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
+.atl .rev-list{margin:12px 0 0;padding:0;list-style:none}
+.atl .rev-list li{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:12px}
+.atl .rev-list li>span:first-child{display:inline-flex}
+.atl .rev-list .icon{width:14px;height:14px}
+.atl .rev-list a{display:block;color:var(--text)}
+.atl .rev-list b{display:block;overflow:hidden;font-size:13px;font-weight:500;text-overflow:ellipsis;white-space:nowrap}
+.atl .rev-list .text-link{padding:0;border:0;background:none;cursor:pointer}
+.atl .rev-list .bad{color:var(--bad)}
+
+/* The widths of the cards of the second lot on a wide screen; under 1000 px every card takes the line (maquette.css) */
+@media(min-width:1001px){
+  .atl :is(.card-horizon,.card-authorities){flex-basis:100%}
+  .atl .card-issuance{flex-basis:calc(56% - 10px)}
+  .atl .card-compliance{flex-basis:calc(62% - 10px)}
+  .atl .card-revocation{flex-basis:calc(38% - 10px)}
+}
+/* A state chip of the second lot's cards says its tone in its text colour too (the mockup's chip.good/warn/bad) */
+.atl :is(.card-horizon,.card-authorities) .chip.good{color:var(--good)}
+.atl :is(.card-horizon,.card-authorities) .chip.warn{color:var(--warn)}
+.atl :is(.card-horizon,.card-authorities) .chip.bad{color:var(--bad)}
+:root[data-theme|=aurore] .atl :is(.card-horizon,.card-authorities) .chip:is(.good,.warn,.bad){border-radius:999px;background:color-mix(in srgb,currentColor 14%,transparent);border:1px solid color-mix(in srgb,currentColor 35%,transparent)}
+/* To handle: the countdown of a deadline still to come, a thin bar that empties over its last 30 days */
+.atl .queue-due .countdown{--tone:var(--s0);display:block;width:64px;height:3px;margin-top:5px;overflow:hidden;border-radius:2px;background:color-mix(in srgb,var(--tone) 15%,var(--panel))}
+.atl .queue-due .countdown i{display:block;height:100%;border-radius:2px;background:var(--tone)}
+.atl .queue-due .countdown[data-tone=warn]{--tone:var(--warn-fill)}
+.atl .queue-due .countdown[data-tone=bad]{--tone:var(--bad)}
+/* The scheduler's pill beats three times when a reload brings a newer run; still with motion reduced */
+@keyframes svc-ping{from{transform:scale(1);opacity:.6}to{transform:scale(2.6);opacity:0}}
+.atl .svc .pulse{position:relative}
+.atl .svc .pulse.live::after{content:'';position:absolute;inset:0;border-radius:50%;background:currentColor;animation:svc-ping 1.8s ease-out 3}
+@media(prefers-reduced-motion:reduce){.atl .svc .pulse.live::after{animation:none;opacity:0}}

@@ -1,99 +1,156 @@
-/** Expiry horizon: the soonest expiries as the mockup's rows (name, delay, validity spent), then the states. */
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, configure } from '@testing-library/react'
+/** Expiry horizon (maquette-2): weekly columns on a calendar of UTC days, the side list of the day or week picked. */
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, configure, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k, o) => (typeof o === 'string' ? o : (o?.defaultValue ?? k)) }) }))
-const api = vi.hoisted(() => ({ getStats: vi.fn(), getNext: vi.fn() }))
-vi.mock('../../../services', () => ({
-  dashboardService: { getNextExpirations: api.getNext, getStats: api.getStats },
+vi.mock('react-i18next', () => ({
+  Trans: ({ i18nKey }) => i18nKey,
+  useTranslation: () => ({ t: (k, o) => (o && typeof o === 'object' && 'count' in o ? `${k}:${o.count}` : k), i18n: { language: 'en' } }),
 }))
+const api = vi.hoisted(() => ({ getExpirations: vi.fn(), getAll: vi.fn() }))
+vi.mock('../../../services', async () => {
+  const { overviewService } = await vi.importActual('../../../services/overview.service')
+  return {
+    overviewService: { getExpirations: api.getExpirations, expirationQuery: overviewService.expirationQuery },
+    certificatesService: { getAll: api.getAll },
+  }
+})
 vi.mock('../../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({ connectionState: 'connected' }),
   ConnectionState: { CONNECTED: 'connected', DISCONNECTED: 'disconnected', CONNECTING: 'connecting', ERROR: 'error' },
 }))
-
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: () => true }) }))
 
 import { HorizonCard } from '..'
+import { horizonDays } from '../../../lib/overviewHorizon'
 
-// A loaded machine slows the first render past the default second
 configure({ asyncUtilTimeout: 5000 })
 
-const cert = (id, over) => ({ id, common_name: `cert-${id}`, valid_to: '2027-01-01T00:00:00Z', ...over })
+const FROM = '2026-11-25' // a Wednesday: Monday and Tuesday of the first week are outside the window
+const days = (count) => Array.from({ length: count }, (_, i) => new Date(Date.parse(`${FROM}T00:00:00Z`) + i * 86400000).toISOString().slice(0, 10))
+const period = (date, manual = 0, automatic = 0, over = {}) => ({ date, total: manual + automatic, manual, automatic, signers: 0, cas: 0, infrastructure: false, ...over })
 
-const rows = () => [...document.querySelectorAll('#card-horizon .algo-list > li')]
+function answer() {
+  const list = days(horizonDays(3, FROM)).map((d) => period(d))
+  list[0] = period(FROM, 1, 0) // Wednesday, today
+  list[6] = period('2026-12-01', 3, 2) // Tuesday of the second week
+  list[12] = period('2026-12-07', 0, 1, { cas: 1, infrastructure: true }) // Monday of the third week
+  const total = list.reduce((s, p) => s + p.total, 0)
+  return { data: { days: list.length, from: FROM, to: list.at(-1).date, total, periods: list,
+    automatic_sources: ['acme'], filter_hint: { status: ['valid', 'expiring'], expires_to: '2026-12-14' } } }
+}
 
-describe('expiry horizon markers', () => {
-  it('marks the TSA signer and the OCSP responder, and only them', async () => {
-    api.getStats.mockResolvedValue({ data: { total_certificates: 3, expiring_soon: 3, expired: 0 } })
-    api.getNext.mockResolvedValue({ data: [
-      cert(1, { is_tsa_signer: true }), cert(2, { is_ocsp_responder: true }), cert(3, {}),
-    ] })
-    render(<MemoryRouter><HorizonCard /></MemoryRouter>)
-    await screen.findByText('cert-1')
-    const text = (i) => rows()[i].textContent
-    expect(text(0)).toContain('overview.horizon.tsaSigner')
-    expect(text(0)).not.toContain('overview.horizon.ocspResponder')
-    expect(text(1)).toContain('overview.horizon.ocspResponder')
-    expect(text(2)).not.toMatch(/tsaSigner|ocspResponder/)
+const card = () => document.getElementById('card-horizon')
+const weeks = () => [...card().querySelectorAll('button.wk')]
+const day = (date) => card().querySelector(`button.day[data-date="${date}"]`)
+const side = () => screen.getByTestId('horizon-side')
+
+beforeEach(() => {
+  api.getExpirations.mockReset().mockResolvedValue(answer())
+  api.getAll.mockReset().mockResolvedValue({ data: [{ id: 4, common_name: 'web.example.com', source: 'manual', issuer: 'CN=Issuing' }] })
+})
+
+const show = async () => {
+  render(<MemoryRouter><HorizonCard /></MemoryRouter>)
+  await waitFor(() => expect(weeks().length).toBeGreaterThan(0))
+}
+
+describe('expiry horizon: the calendar', () => {
+  it('asks the days that end on the Sunday of the thirteenth week', async () => {
+    await show()
+    const today = new Date().toISOString().slice(0, 10)
+    expect(api.getExpirations).toHaveBeenCalledWith(horizonDays(13, today))
+  })
+
+  it('lays the window out in Monday-first UTC weeks, one column and seven cells each, the days before today blank', async () => {
+    await show()
+    expect(weeks().map((w) => w.dataset.week)).toEqual(['2026-11-23', '2026-11-30', '2026-12-07'])
+    expect(card().querySelectorAll('.day.out')).toHaveLength(2)
+    expect(card().querySelectorAll('button.day')).toHaveLength(19)
+    expect(day('2026-11-24')).toBeNull()
+  })
+
+  it('sums each week of its days, manual under automatic, the busiest week labelled', async () => {
+    await show()
+    const [, second] = weeks()
+    expect(second.getAttribute('aria-label')).toBe('overview.horizon.weekAlt:5')
+    expect(second.querySelector('b').textContent).toBe('5')
+    expect([...second.querySelectorAll('i')].map((i) => i.className)).toEqual(['auto', 'manual'])
+    expect(weeks()[0].querySelector('b')).toBeNull()
+  })
+
+  it('shades each day on five steps of the busiest day and marks the day an authority expires', async () => {
+    await show()
+    expect(day('2026-12-01').dataset.l).toBe('4')
+    expect(day(FROM).dataset.l).toBe('1')
+    expect(day('2026-11-26').dataset.l).toBe('0')
+    expect(day('2026-12-07').querySelector('.mark')).not.toBeNull()
+    expect(day('2026-12-01').querySelector('.mark')).toBeNull()
   })
 })
 
-describe('expiry horizon rows', () => {
-  const DAY = 86400000
-  const at = (days) => new Date(Date.now() + days * DAY).toISOString()
-  const soon = (id, left, lifetime) => ({ id, common_name: `cert-${id}`, valid_from: at(left - lifetime), valid_to: at(left) })
-
-  it('each row gives its delay and a bar as long as the validity spent, the delay coloured by urgency', async () => {
-    api.getStats.mockResolvedValue({ data: { total_certificates: 3, expiring_soon: 2, expired: 0 } })
-    api.getNext.mockResolvedValue({ data: [soon(1, -1, 100), soon(2, 5, 100), soon(3, 200, 400)] })
-    render(<MemoryRouter><HorizonCard /></MemoryRouter>)
-    await screen.findByText('cert-1')
-    const items = rows()
-    expect(items.map((li) => li.getAttribute('data-urgency'))).toEqual(['bad', 'warn', 'good'])
-    expect(items.map((li) => li.querySelector('.algo-bar > span').style.width)).toEqual(['100%', '95%', '50%'])
-    expect(items.map((li) => li.querySelector('.algo-row strong').className)).toEqual(['bad', 'warn', ''])
-    expect(items.map((li) => li.querySelector('.algo-row strong').textContent)).toEqual(['time.compact.overdueDays', 'time.compact.inDays', 'time.compact.inDays'])
-    for (const li of items) {
-      expect(li.querySelector('a.algo-row').getAttribute('href')).toMatch(/^\/certificates\/\d$/)
-      expect(li.querySelector('.algo-bar').getAttribute('aria-label')).toBe('overview.horizon.elapsed')
-    }
+describe('expiry horizon: a day or a week opens its list', () => {
+  it('starts on the busiest day and opens Certificates on exactly that UTC day', async () => {
+    await show()
+    expect(day('2026-12-01').getAttribute('aria-pressed')).toBe('true')
+    const link = await within(side()).findByRole('link', { name: /overview\.horizon\.open/ })
+    expect(link.getAttribute('href')).toBe('/certificates?status=valid&status=expiring&expires_from=2026-12-01&expires_to=2026-12-02')
+    expect(api.getAll).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: ['valid', 'expiring'], expires_from: '2026-12-01', expires_to: '2026-12-02', per_page: 5, sort_by: 'valid_to',
+    }))
+    expect(side().querySelector('.fig').textContent).toBe('5')
   })
 
-  it('a row without its start date has its delay and no bar; one without an end date has neither', async () => {
-    api.getStats.mockResolvedValue({ data: { total_certificates: 2, expiring_soon: 0, expired: 0 } })
-    api.getNext.mockResolvedValue({ data: [{ id: 1, common_name: 'a', valid_to: at(40) }, { id: 2, common_name: 'b', valid_to: null }] })
-    render(<MemoryRouter><HorizonCard /></MemoryRouter>)
-    await screen.findByText('a')
-    const items = rows()
-    expect(items[0].querySelector('strong').textContent).toBe('time.compact.inDays')
-    expect(items[0].querySelector('.algo-bar')).toBeNull()
-    expect(items[1].querySelector('strong').textContent).toBe('–')
-    expect(items[1].querySelector('.algo-bar')).toBeNull()
+  it('a week of the first column starts today, not on its Monday, and ends after its Sunday', async () => {
+    await show()
+    fireEvent.click(weeks()[0])
+    const link = await within(side()).findByRole('link', { name: /overview\.horizon\.open/ })
+    expect(link.getAttribute('href')).toBe('/certificates?status=valid&status=expiring&expires_from=2026-11-25&expires_to=2026-11-30')
   })
 
-  it('lists six rows at most and links to the whole list', async () => {
-    api.getStats.mockResolvedValue({ data: { total_certificates: 20, expiring_soon: 9, expired: 0 } })
-    api.getNext.mockResolvedValue({ data: Array.from({ length: 9 }, (_, i) => soon(i + 1, 10 + i, 90)) })
-    render(<MemoryRouter><HorizonCard /></MemoryRouter>)
-    await screen.findByText('cert-1')
-    expect(rows()).toHaveLength(6)
-    expect(api.getNext).toHaveBeenCalledWith(6)
-    expect(screen.getByText('common.viewAll').closest('a').getAttribute('href')).toBe('/certificates?status=expiring')
+  it('a day picked replaces the week, and a day without expiry offers no list', async () => {
+    await show()
+    fireEvent.click(day('2026-11-26'))
+    await waitFor(() => expect(day('2026-11-26').getAttribute('aria-pressed')).toBe('true'))
+    expect(side().querySelector('.fig').textContent).toBe('0')
+    expect(within(side()).queryByRole('link', { name: /overview\.horizon\.open/ })).toBeNull()
   })
 })
 
-describe('expiry horizon states', () => {
-  it('gives the four states of the mockup, each with its dot, figure and list', async () => {
-    api.getStats.mockResolvedValue({ data: { total_certificates: 20, valid: 12, expiring_soon: 3, expired: 4, revoked: 1 } })
-    api.getNext.mockResolvedValue({ data: [] })
+describe('expiry horizon: keyboard', () => {
+  it('keeps one tab stop, moves a day up and down and a week left and right, and shows the tooltip on focus', async () => {
+    await show()
+    const stops = [...card().querySelectorAll('button.day')].filter((b) => b.tabIndex === 0)
+    expect(stops.map((b) => b.dataset.date)).toEqual(['2026-12-01'])
+    day('2026-12-01').focus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('overview.horizon.total')
+    fireEvent.keyDown(day('2026-12-01'), { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(day('2026-12-08'))
+    fireEvent.keyDown(day('2026-12-08'), { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(day('2026-12-07'))
+    fireEvent.keyDown(day('2026-12-07'), { key: 'Home' })
+    expect(document.activeElement).toBe(day(FROM))
+    // Back past today stays where it is: those days are outside the window
+    fireEvent.keyDown(day(FROM), { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(day(FROM))
+    fireEvent.keyDown(day(FROM), { key: 'Escape' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+})
+
+describe('expiry horizon: horizon and table', () => {
+  it('asks five or fifty-two weeks for 30 days or a year', async () => {
+    await show()
+    const today = new Date().toISOString().slice(0, 10)
+    fireEvent.click(screen.getByRole('button', { name: 'overview.horizon.year' }))
+    await waitFor(() => expect(api.getExpirations).toHaveBeenLastCalledWith(horizonDays(52, today)))
+    fireEvent.click(screen.getByRole('button', { name: 'overview.trend.short:30' }))
+    await waitFor(() => expect(api.getExpirations).toHaveBeenLastCalledWith(horizonDays(5, today)))
+  })
+
+  it('says in one line that nothing expires', async () => {
+    api.getExpirations.mockResolvedValue({ data: { ...answer().data, total: 0, periods: days(10).map((d) => period(d)) } })
     render(<MemoryRouter><HorizonCard /></MemoryRouter>)
-    await screen.findByText('overview.horizon.state.valid')
-    const states = [...document.querySelectorAll('#card-horizon .status-list > div')]
-    expect(states.map((d) => [d.querySelector('.dot').className, d.querySelector('strong').textContent, d.querySelector('a').getAttribute('href')])).toEqual([
-      ['dot good', '12', '/certificates?status=valid'], ['dot warn', '3', '/certificates?status=expiring'],
-      ['dot bad', '4', '/certificates?status=expired'], ['dot muted', '1', '/certificates?status=revoked'],
-    ])
+    expect(await screen.findByText('overview.horizon.quiet')).toBeTruthy()
   })
 })

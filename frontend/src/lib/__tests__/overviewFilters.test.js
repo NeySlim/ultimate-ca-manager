@@ -34,9 +34,14 @@ describe('overview layout', () => {
     expect(layout.hidden).toEqual(['queue'])
   })
   it('a card id of an earlier layout is dropped, hidden or not', () => {
-    const layout = normalizeLayout({ order: ['issuance', 'queue'], hidden: ['expiry', 'authorities', 'health'] })
+    const layout = normalizeLayout({ order: ['expiry', 'queue'], hidden: ['expiry', 'legacy', 'health'] })
     expect(layout.order).toEqual(['queue', ...CARD_IDS.filter((id) => id !== 'queue')])
     expect(layout.hidden).toEqual(['health'])
+  })
+  it('keeps the place and the visibility of the certificate activity under its new card, issuances by source', () => {
+    const layout = normalizeLayout({ order: ['trend', 'queue'], hidden: ['trend'] })
+    expect(layout.order.slice(0, 2)).toEqual(['issuance', 'queue'])
+    expect(layout.hidden).toEqual(['issuance'])
   })
   it('a preset shows its cards only', () => {
     expect(visibleCards(presetLayout('manager', null)).sort()).toEqual(['activity', 'compliance', 'hierarchy', 'horizon'])

@@ -94,7 +94,7 @@ for (const [name, width, height] of [['1000 px', 1000, 900], ['a phone', 390, 84
     await page.setViewportSize({ width, height })
     await defaultLayout(page)
     await page.goto('/')
-    for (const region of ['Automation health', 'Compliance', 'Latest operations']) {
+    for (const region of ['Automation health', 'Compliance', 'Latest operations', 'Expiry horizon', 'Issuances by source', 'Authorities and HSM', 'Revocation coverage']) {
       await expect(page.getByRole('region', { name: region })).toBeVisible()
       await expect(page.getByRole('region', { name: region }).locator('.sk-body')).toHaveCount(0)
     }
@@ -110,7 +110,7 @@ for (const [name, width, height] of [['1000 px', 1000, 900], ['a phone', 390, 84
           .slice(0, 8).map(el => `${el.tagName.toLowerCase()}.${String(el.className).split(' ').join('.')} in ${el.closest('[data-card], .metric-strip, header, nav')?.className ?? 'page'}`),
         view: scroller ? scroller.scrollWidth - scroller.clientWidth : 0,
         // No widget wider than its card
-        wide: [...document.querySelectorAll('.metric-strip .metric, .dash-card .mirror, .dash-card .meter, .dash-card .tl-row')]
+        wide: [...document.querySelectorAll('.metric-strip .metric, .dash-card .mirror, .dash-card .meter, .dash-card .tl-row, .dash-card .cal, .dash-card .flow, .dash-card .atile, .dash-card .cover')]
           .filter(el => { const card = el.closest('.dash-card, .metric-strip')!.getBoundingClientRect(); const r = el.getBoundingClientRect(); return r.right > card.right + 1 })
           .map(el => el.className),
       }
@@ -120,3 +120,42 @@ for (const [name, width, height] of [['1000 px', 1000, 900], ['a phone', 390, 84
     expect(overflow.wide).toEqual([])
   })
 }
+
+test('a day of the expiry horizon opens the list of exactly its certificates, and reads from the keyboard', async ({ page, api }) => {
+  const ca = await createCA(api)
+  const cert = await issueCert(api, ca.id, { validity_days: 20 })
+  const day = new Date(cert.valid_to).toISOString().slice(0, 10)
+  const week = new Date(Date.parse(`${day}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10)
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await defaultLayout(page)
+  await page.goto('/')
+  const card = page.getByRole('region', { name: 'Expiry horizon' })
+  const cell = card.locator(`button.day[data-date="${day}"]`)
+  await expect(cell).toBeVisible()
+
+  // The keyboard: the tooltip of the day on focus, a week further with the right arrow, Escape closing it
+  await cell.focus()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+  await page.keyboard.press('ArrowRight')
+  await expect(card.locator(`button.day[data-date="${week}"]`)).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('tooltip')).toHaveCount(0)
+
+  await cell.click()
+  await expect(cell).toHaveAttribute('aria-pressed', 'true')
+  const side = card.getByTestId('horizon-side')
+  await expect(side.locator('.side-list a').first()).toBeVisible()
+  const count = Number((await side.locator('.fig').textContent())?.trim())
+  expect(count).toBeGreaterThanOrEqual(1)
+  const listed = page.waitForResponse(r => r.request().method() === 'GET' && /\/api\/v2\/certificates\?/.test(r.url())
+    && r.url().includes(`expires_from=${day}`) && !r.url().includes('per_page=5'))
+  await side.getByRole('link', { name: /in Certificates$/ }).click()
+  await expect(page).toHaveURL(new RegExp(`/certificates\\?.*expires_from=${day}`))
+  const body = await (await listed).json()
+  expect(body.meta.total).toBe(count)
+  // One chip for the interval, its x removing both bounds
+  const chip = page.locator('#clear-interval-expires')
+  await expect(chip).toBeVisible()
+  await chip.click()
+  await expect(page).not.toHaveURL(/expires_(from|to)=/)
+})

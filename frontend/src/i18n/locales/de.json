@@ -7997,7 +7997,9 @@
       "horizon": "Ablaufhorizont",
       "compliance": "Compliance",
       "activity": "Letzte Vorgänge",
-      "trend": "Zertifikatsaktivität"
+      "issuance": "Issuances by source",
+      "authorities": "Authorities and HSM",
+      "revocation": "Revocation coverage"
     },
     "state": {
       "loading": "Wird geladen...",
@@ -8051,7 +8053,9 @@
       "watchShow_one": "Die {{count}} zu beobachtende Zeile anzeigen",
       "watchShow_other": "Die {{count}} zu beobachtenden Zeilen anzeigen",
       "watchHide_one": "Die {{count}} zu beobachtende Zeile ausblenden",
-      "watchHide_other": "Die {{count}} zu beobachtenden Zeilen ausblenden"
+      "watchHide_other": "Die {{count}} zu beobachtenden Zeilen ausblenden",
+      "countdown_one": "{{count}} day left of 30",
+      "countdown_other": "{{count}} days left of 30"
     },
     "kind": {
       "acme_order_failed": "ACME-Bestellung fehlgeschlagen",
@@ -8213,7 +8217,8 @@
       "tableCaption_one": "Operations per UTC day, over {{count}} day",
       "tableCaption_other": "Operations per UTC day, over {{count}} days",
       "okOf": "{{name}} successes",
-      "failedOf": "{{name}} failures"
+      "failedOf": "{{name}} failures",
+      "seeActivity": "Opens Activity on this day’s failures"
     },
     "filter": {
       "status": "Status",
@@ -8228,7 +8233,9 @@
       "incomplete_chain": "Unvollständige Kette",
       "renewal": "Erneuerung",
       "weak_key": "Compliance",
-      "ca_id": "CA"
+      "ca_id": "CA",
+      "expires": "Expiry",
+      "created": "Created"
     },
     "filterValue": {
       "true": "ja",
@@ -8242,7 +8249,10 @@
       "revoked": "Widerrufen",
       "orphan": "Verwaist",
       "archived": "Archiviert",
-      "weakKey": "Schwacher Schlüssel, {{algo}} < {{bits}}"
+      "weakKey": "Schwacher Schlüssel, {{algo}} < {{bits}}",
+      "range": "{{from}} to {{to}}",
+      "since": "from {{date}}",
+      "until": "until {{date}}"
     },
     "hierarchy": {
       "crlOn": "CRL an",
@@ -8268,19 +8278,51 @@
       "emptyText": "Erstellen Sie eine Offline-Root-CA oder importieren Sie eine vorhandene CA, dann eine ausstellende CA unter dieser Root-CA."
     },
     "horizon": {
-      "expiring": "Läuft ab",
       "expired": "Abgelaufen",
-      "soonest": "Läuft als Nächstes ab",
-      "tsaSigner": "TSA-Signierer",
-      "ocspResponder": "OCSP-Responder",
-      "sub": "Die als Nächstes ablaufenden Zertifikate, die am frühesten ablaufenden zuerst.",
-      "elapsed": "{{percent}} % der Gültigkeit verstrichen",
-      "state": {
-        "valid": "Gültig",
-        "expiring": "Zu erneuern",
-        "expired": "Abgelaufen",
-        "revoked": "Widerrufen"
-      }
+      "subWindow_one": "{{count}} certificate not revoked expires by {{date}}, by week and by day. A cell opens the list of its day.",
+      "subWindow_other": "{{count}} certificates not revoked expire by {{date}}, by week and by day. A cell opens the list of its day.",
+      "quiet": "Nothing expires by {{date}}.",
+      "period": "Horizon shown",
+      "year": "1 y",
+      "week": "Week of {{date}}",
+      "weekCol": "Week",
+      "weekAlt_one": "{{name}}: {{count}} expiry, {{manual}} manual, {{automatic}} automatic",
+      "weekAlt_other": "{{name}}: {{count}} expiries, {{manual}} manual, {{automatic}} automatic",
+      "dayAlt_one": "{{date}}: {{count}} expiry",
+      "dayAlt_other": "{{date}}: {{count}} expiries",
+      "withCas_one": "including {{count}} authority",
+      "withCas_other": "including {{count}} authorities",
+      "withSigners_one": "including {{count}} signer",
+      "withSigners_other": "including {{count}} signers",
+      "total": "Total",
+      "manual": "Manual",
+      "automatic": "Automatic",
+      "cas": "Authorities",
+      "signers": "Signers",
+      "weeksLabel": "Expiries per week",
+      "daysLabel": "Expiries per day, one cell per day",
+      "openDay": "Click to see these certificates",
+      "openWeek": "Opens the list of the week",
+      "nothingDay": "Nothing expires that day",
+      "nothing": "Nothing expires over the period.",
+      "legendManual": "Manual: import, manual issuance",
+      "legendAutomatic": "Automatic: ACME, SCEP, EST",
+      "legendInfra": "An authority or a signer expires that day",
+      "less": "Less",
+      "more": "More",
+      "inDays_one": "in {{count}} day",
+      "inDays_other": "in {{count}} days",
+      "toRenew_one": "{{count}} to renew by hand",
+      "toRenew_other": "{{count}} to renew by hand",
+      "automaticCount_one": "{{count}} automatic",
+      "automaticCount_other": "{{count}} automatic",
+      "casCount_one": "{{count}} authority expires",
+      "casCount_other": "{{count}} authorities expire",
+      "listLabel": "First certificates of the period",
+      "open_one": "Open {{count}} in Certificates",
+      "open_other": "Open the {{count}} in Certificates",
+      "tableCaption_one": "Expiries per week, {{count}} week",
+      "tableCaption_other": "Expiries per week, {{count}} weeks"
     },
     "activity": {
       "all": "Alle anzeigen",
@@ -8290,7 +8332,14 @@
       "yesterday": "Yesterday",
       "folded_one": "{{count}} sign-in by {{user}}",
       "folded_other": "{{count}} sign-ins by {{user}}",
-      "span": "{{from}} to {{to}}"
+      "span": "{{from}} to {{to}}",
+      "filter": {
+        "all": "All",
+        "pki": "PKI",
+        "access": "Access"
+      },
+      "filterLabel": "Filter the operations",
+      "noneOfKind": "No recent operation under « {{name}} »."
     },
     "link": {
       "handled": "Eintrag #{{id}} erwartet keine Aktion mehr (Status: {{status}}).",
@@ -8359,7 +8408,10 @@
         "failures_one": "Protocol failures, {{count}} day",
         "failures_other": "Protocol failures, {{count}} days",
         "openFailures": "Opens To handle, filtered on the failures"
-      }
+      },
+      "expiryPeak": "peak of {{count}} on {{date}}",
+      "expiryAlt_one": "Expirations per week over {{count}} week: {{total}}",
+      "expiryAlt_other": "Expirations per week over {{count}} weeks: {{total}}"
     },
     "cause": {
       "acme_order_failed": "Eine ACME-Bestellung ist in den letzten 7 Tagen ungültig geendet",
@@ -8379,21 +8431,98 @@
       "truststore_expiring": "Ein Vertrauensanker ist im Vertrauensspeicher zu ersetzen"
     },
     "trend": {
-      "sub_one": "Pro Tag ausgestellte, widerrufene und abgelaufene Zertifikate, letzter {{count}} Tag.",
-      "sub_other": "Pro Tag ausgestellte, widerrufene und abgelaufene Zertifikate, letzte {{count}} Tage.",
       "period": "Angezeigter Zeitraum",
       "short": "{{count}} T",
-      "day": "Tag",
-      "quiet_one": "In den letzten {{count}} Tag wurde kein Zertifikat ausgestellt, widerrufen oder ist abgelaufen.",
-      "quiet_other": "In den letzten {{count}} Tagen wurde kein Zertifikat ausgestellt, widerrufen oder ist abgelaufen.",
-      "alt_one": "Zertifikatsaktivität über {{count}} Tag: {{issued}} ausgestellt, {{revoked}} widerrufen, {{expired}} abgelaufen.",
-      "alt_other": "Zertifikatsaktivität über {{count}} Tage: {{issued}} ausgestellt, {{revoked}} widerrufen, {{expired}} abgelaufen.",
-      "keys": "Diagramm: Mit den Pfeiltasten links und rechts lesen Sie es Tag für Tag"
+      "day": "Tag"
     },
     "clockToday": "heute um {{time}}",
     "allHiddenTitle": "Alle Karten sind ausgeblendet",
     "viz": {
       "downloadCsv": "Download as CSV"
+    },
+    "flow": {
+      "series": {
+        "acme": "ACME",
+        "scep": "SCEP",
+        "est": "EST",
+        "wstep": "WSTEP",
+        "import": "Import",
+        "manual": "Manual"
+      },
+      "sub_one": "Certificates issued per UTC day over the last day ({{count}}), renewals included.",
+      "sub_other": "Certificates issued per UTC day over the last {{count}} days, renewals included.",
+      "quiet_one": "No issuance over the last day ({{count}}).",
+      "quiet_other": "No issuance over the last {{count}} days.",
+      "issuances_one": "<0>{{count}}</0> <1>issuance</1>",
+      "issuances_other": "<0>{{count}}</0> <1>issuances</1>",
+      "vsPrevious_one": "against the previous day ({{count}})",
+      "vsPrevious_other": "against the previous {{count}} days",
+      "automatic": "{{pct}} % automatic",
+      "alt_one": "Issuances per day and source over {{count}} day, peak {{max}} on {{date}}",
+      "alt_other": "Issuances per day and source over {{count}} days, peak {{max}} on {{date}}",
+      "openDay": "Opens the certificates created that day",
+      "tableCaption_one": "Issuances per day and source, {{count}} day",
+      "tableCaption_other": "Issuances per day and source, {{count}} days"
+    },
+    "tiles": {
+      "state": {
+        "revoked": "Revoked",
+        "expired": "Expired",
+        "crlStale": "CRL overdue",
+        "crlMissing": "CRL never published",
+        "expiresIn_one": "Expires in {{count}} d",
+        "expiresIn_other": "Expires in {{count}} d",
+        "pending": "Pending",
+        "offline": "Offline, healthy",
+        "inService": "In service",
+        "reachable": "Reachable",
+        "hsmError": "In error",
+        "disconnected": "Disconnected",
+        "untested": "Never tested",
+        "unknown": "State unknown"
+      },
+      "sub": "{{authorities}} and {{modules}}. A tile opens its record.",
+      "modules_one": "{{count}} HSM module",
+      "modules_other": "{{count}} HSM modules",
+      "explore": "Explore the hierarchy",
+      "hsmKey": "HSM · {{name}}",
+      "softwareKey": "Software key",
+      "noKey": "No key in UCM",
+      "elapsed": "Validity spent",
+      "left": "{{when}} left",
+      "elapsedAlt": "{{pct}} % of the validity spent, {{when}} left",
+      "crlWhen": "CRL {{when}}",
+      "crlCurrent": "CRL up to date",
+      "crlStale": "CRL overdue",
+      "crlStaleSince_one": "CRL overdue for {{count}} d",
+      "crlStaleSince_other": "CRL overdue for {{count}} d",
+      "crlMissing": "CRL never published",
+      "crlOff": "No CRL",
+      "activityAlt_one": "{{count}} issuance over 7 days",
+      "activityAlt_other": "{{count}} issuances over 7 days",
+      "noActivity": "No issuance",
+      "keys": "Keys held",
+      "served": "Authorities served",
+      "tested": "Tested {{when}}",
+      "neverTested": "Never tested",
+      "test": "Test",
+      "testDone": "{{name}}: test passed"
+    },
+    "revocation": {
+      "part": {
+        "current": "CRL up to date",
+        "toPublish": "CRL overdue or missing",
+        "noCdp": "No distribution point"
+      },
+      "sub": "What the active authorities publish for their certificates.",
+      "headline_one": "of the {{count}} active authority publishes a current CRL",
+      "headline_other": "of the {{count}} active authorities publish a current CRL",
+      "cas": "Authorities",
+      "partCol": "Part",
+      "tableCaption_one": "Revocation coverage, {{count}} active authority",
+      "tableCaption_other": "Revocation coverage, {{count}} active authorities",
+      "nextIn": "Next CRL {{when}}",
+      "publish": "Publish"
     }
   },
   "sectioned": {

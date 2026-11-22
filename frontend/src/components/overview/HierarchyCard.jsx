@@ -84,7 +84,8 @@ export function HierarchyCard() {
     ? page.share('issuance', () => overviewService.getIssuance(ISSUANCE_DAYS)) : overviewService.getIssuance(ISSUANCE_DAYS))
   const state = useCardData(async () => {
     const { got, missing } = await settle(
-      { cas: () => casService.getAll(), issuance },
+      // The authority tiles read the same list: one request for both
+      { cas: () => (page?.share ? page.share('cas', () => casService.getAll()) : casService.getAll()), issuance },
       (g) => Boolean(g.cas) || g.issuance?.data?.by_ca?.length > 0)
     return { data: { cas: got.cas?.data, issuance: got.issuance?.data, missing }, meta: got.cas?.meta }
   }, ['ca', 'certificate'])

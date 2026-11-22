@@ -10,15 +10,17 @@ import { MemoryRouter } from 'react-router-dom'
 vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(), getCertStats: vi.fn(),
-  getCas: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), getStats: vi.fn(), getTrend: vi.fn(), getStatus: vi.fn(),
-  getScores: vi.fn(),
+  getCas: vi.fn(), getActivity: vi.fn(), getStats: vi.fn(), getStatus: vi.fn(),
+  getExpirations: vi.fn(), getRevocation: vi.fn(), getCrls: vi.fn(), getProviders: vi.fn(),
 }))
 vi.mock('../../services', () => ({
-  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
-  certificatesService: { getStats: api.getCertStats, getComplianceStats: api.getScores },
+  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance,
+    getExpirations: api.getExpirations, getRevocation: api.getRevocation, expirationQuery: () => ({}) },
+  certificatesService: { getStats: api.getCertStats, getAll: vi.fn(() => Promise.resolve({ data: [] })) },
   casService: { getAll: api.getCas },
-  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity, getStats: api.getStats,
-    getCertificateTrend: api.getTrend, getSystemStatus: api.getStatus },
+  crlService: { getAll: api.getCrls },
+  hsmService: { getProviders: api.getProviders },
+  dashboardService: { getActivityLog: api.getActivity, getStats: api.getStats, getSystemStatus: api.getStatus },
 }))
 vi.mock('../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({ connectionState: 'connected' }),
@@ -37,8 +39,8 @@ vi.mock('../../stores/userPreferencesStore', () => ({
 import OverviewPage from '../OverviewPage'
 
 const calls = () => Object.fromEntries(Object.entries(api).map(([name, fn]) => [name, fn.mock.calls.length]))
-// No card reads the certificates' own counters any more: the horizon shares the dashboard's
-const ONCE = { ...Object.fromEntries(Object.keys(api).map((name) => [name, 1])), getCertStats: 0 }
+// No card reads the certificates' own counters any more; the strip's 30 days of expiries and the horizon's weeks are two windows
+const ONCE = { ...Object.fromEntries(Object.keys(api).map((name) => [name, 1])), getCertStats: 0, getExpirations: 2 }
 const metric = (id) => document.querySelector(`[data-metric="${id}"]`)
 const value = (id) => metric(id).querySelector('.value').textContent
 
@@ -48,14 +50,15 @@ beforeEach(() => {
   api.getQueue.mockResolvedValue({ data: { items: [{ kind: 'manual_renewal_due', tier: 'warning', id: 1, label: 'cert-one', href_hint: '/certificates/1' }], counts: { manual_renewal_due: 1 }, total: 1 } })
   api.getHealth.mockResolvedValue({ data: { days: 7, protocols: { acme: { periods: [{ date: 'd', ok: 1, failed: 2 }], last_status: 'ok' } } } })
   api.getCompliance.mockResolvedValue({ data: { total: 1, counters: {}, by_key_algorithm: [] } })
-  api.getScores.mockResolvedValue({ data: { average_score: 90, distribution: { A: 1 }, total: 1 } })
   api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
   api.getCertStats.mockResolvedValue({ data: { total: 4, expiring: 1, expired: 1 } })
   api.getCas.mockResolvedValue({ data: [{ id: 1, refid: 'r', descr: 'Root' }], meta: { total: 1 } })
-  api.getNext.mockResolvedValue({ data: [] })
   api.getActivity.mockResolvedValue({ data: { activity: [{ action: 'create', message: 'made', user: 'u', timestamp: null }] } })
   api.getStats.mockResolvedValue({ data: { total_certificates: 4, total_cas: 1, valid: 2, expiring_soon: 1, expired: 1, revoked: 0 } })
-  api.getTrend.mockResolvedValue({ data: { trend: [{ date: '2026-11-19', issued: 1, revoked: 0, expired: 0 }] } })
+  api.getExpirations.mockResolvedValue({ data: { from: '2026-11-22', total: 0, periods: [{ date: '2026-11-22', total: 0 }] } })
+  api.getRevocation.mockResolvedValue({ data: { total: 1, current: 1, items: [] } })
+  api.getCrls.mockResolvedValue({ data: [] })
+  api.getProviders.mockResolvedValue({ data: [] })
   api.getStatus.mockResolvedValue({ data: {} })
 })
 
@@ -73,8 +76,8 @@ describe('requests of the overview', () => {
     expect(value('queue')).toBe('1')
     expect(screen.getByText('cert-one')).toBeTruthy()
     expect(value('certificates')).toBe('4')
-    expect(screen.getByText('overview.horizon.state.valid').parentElement.querySelector('strong').textContent).toBe('2')
-    // The strip and the hierarchy read one issuance window, the strip and the health card one health window
+    expect(document.getElementById('card-horizon')).not.toBeNull()
+    // The strip, the hierarchy, the flow and the tiles read one issuance window, the strip and the health card one health window
     expect(api.getIssuance).toHaveBeenCalledWith(30)
     expect(api.getHealth).toHaveBeenCalledWith(30)
   })
@@ -85,7 +88,7 @@ describe('requests of the overview', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'overview.refresh' })) })
     await waitFor(() => expect(api.getActivity).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(api.getQueue).toHaveBeenCalledTimes(2))
-    expect(calls()).toEqual({ ...Object.fromEntries(Object.keys(api).map((name) => [name, 2])), getStatus: 1, getCertStats: 0 })
+    expect(calls()).toEqual({ ...Object.fromEntries(Object.keys(api).map((name) => [name, 2])), getStatus: 1, getCertStats: 0, getExpirations: 4 })
   })
 
   it('with the queue and health cards hidden, the strip still gets its figures, once', async () => {

@@ -9,11 +9,14 @@ import { Bar, Icon, skWidth } from '../atelier'
 import { dashboardService, overviewService } from '../../services'
 import { queueSplit } from '../../lib/overviewQueue'
 import { HEALTH_DAYS, ISSUANCE_DAYS, failuresPerDay, issuedPerDay, seriesStats } from '../../lib/overviewViz'
+import { expiryCalendar } from '../../lib/overviewHorizon'
 import { num, useCardData, useLang } from './shared'
 import { MiniBars, SplitBar, Spark, useChartTip } from './viz'
 
 const count = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const FAIL_DAYS = 14
+// The third figure's columns: the expirations of the next 30 UTC days, one column per week
+const EXPIRY_DAYS = 30
 const PROTOCOLS = ['acme', 'scep', 'est']
 const SERIES_COLOR = { acme: 'var(--s1)', scep: 'var(--s2)', est: 'var(--s3)' }
 
@@ -68,6 +71,7 @@ export function MetricStrip({ showQueue }) {
   const queueState = useCardData(() => overviewService.getQueue(), ['certificate', 'ca', 'truststore'], 'queue')
   const healthState = useCardData(() => overviewService.getHealth(HEALTH_DAYS), ['certificate'], 'health')
   const issuanceState = useCardData(() => overviewService.getIssuance(ISSUANCE_DAYS), ['certificate', 'ca'], 'issuance')
+  const expiryState = useCardData(() => overviewService.getExpirations(EXPIRY_DAYS), ['certificate', 'ca'], 'expirations-30')
   const stats = statsState.data || {}
   const first = (s) => s.status === 'loading' && !s.data
 
@@ -98,6 +102,12 @@ export function MetricStrip({ showQueue }) {
   // Expiring within the window: the stock already expired goes under it
   const expiring = count(stats.expiring_soon)
   const expired = count(stats.expired)
+  const expiryWeeks = expiryCalendar(expiryState.data?.periods, expiryState.data?.from)
+  const expiryPeak = expiryWeeks.flatMap((w) => w.days).reduce((best, d) => (!d.out && d.total > (best?.total || 0) ? d : best), null)
+  const expirySub = [
+    expiryPeak ? t('overview.metrics.expiryPeak', { count: expiryPeak.total, date: dayLabel(expiryPeak.date, lang) }) : null,
+    expired === null ? t('overview.metrics.toCheck') : t('overview.metrics.alreadyExpired', { count: expired }),
+  ].filter(Boolean).join(' · ')
 
   // Failures today: the three protocols, 14 days in columns, the gap with yesterday
   const protocols = healthState.data?.protocols
@@ -128,7 +138,9 @@ export function MetricStrip({ showQueue }) {
     },
     expiring: expiring !== null && {
       title: t('overview.metrics.expiring'),
-      rows: [{ label: t('overview.metrics.expiring'), value: expiring }, ...(expired === null ? [] : [{ label: t('overview.horizon.expired'), value: expired }])],
+      rows: expiryWeeks.length > 0
+        ? expiryWeeks.map((w) => ({ label: t('overview.horizon.week', { date: dayLabel(w.from, lang) }), value: w.total }))
+        : [{ label: t('overview.metrics.expiring'), value: expiring }, ...(expired === null ? [] : [{ label: t('overview.horizon.expired'), value: expired }])],
       hint: t('overview.metrics.tip.openList'),
     },
     failures: failStats && {
@@ -149,7 +161,11 @@ export function MetricStrip({ showQueue }) {
         chart={queue.total > 0 && <SplitBar parts={queueParts} label={queueParts.map((p) => p.label).join(', ')} />}
         sub={queueSub} href="#card-queue" onClick={queue.total === null || !showQueue ? null : () => showQueue('')} tip={bind('queue')} />
       <Metric id="expiring" index={2} loading={first(statsState)} value={expiring} label={t('overview.metrics.expiring')}
-        sub={expired === null ? t('overview.metrics.toCheck') : t('overview.metrics.alreadyExpired', { count: expired })}
+        chart={expiryWeeks.length > 0 && (
+          <MiniBars values={expiryWeeks.map((w) => w.total)} w={84} tone="var(--warn-fill)"
+            label={t('overview.metrics.expiryAlt', { count: expiryWeeks.length, total: expiryWeeks.reduce((a, w) => a + w.total, 0) })} />
+        )}
+        sub={expirySub}
         to={expiring === null ? null : '/certificates?status=expiring'} tip={bind('expiring')} />
       <Metric id="failures" index={3} loading={first(healthState)} value={failures} label={t('overview.metrics.failures')}
         tone={failures > 0 ? 'bad' : ''}

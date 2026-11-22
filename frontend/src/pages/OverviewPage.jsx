@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Btn, Icon, IconBtn, PageHead, Zone } from '../components/atelier'
 import {
-  ActivityCard, CardsDialog, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, MetricStrip, QueueCard, TrendCard,
+  ActivityCard, AuthoritiesCard, CardsDialog, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, IssuanceCard, MetricStrip,
+  QueueCard, RevocationCard,
 } from '../components/overview'
 import { OverviewContext } from '../components/overview/shared'
 import { KeyEncryptionBanner } from '../components/overview/KeyEncryptionBanner'
@@ -22,7 +23,8 @@ import { normalizeLayout, presetActive, presetLayout, setCardHidden, visibleCard
 
 const CARDS = {
   queue: QueueCard, health: HealthCard, hierarchy: HierarchyCard, horizon: HorizonCard,
-  compliance: ComplianceCard, activity: ActivityCard, trend: TrendCard,
+  compliance: ComplianceCard, activity: ActivityCard, issuance: IssuanceCard, authorities: AuthoritiesCard,
+  revocation: RevocationCard,
 }
 const HEAD_PRESETS = ['operator', 'manager']
 

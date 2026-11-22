@@ -7,8 +7,9 @@ import {
 const SIX = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity']
 
 describe('stored layout', () => {
-  it('the six cards of the mockup in its order, then the trend; its presets as its dashPresets', () => {
-    expect(CARD_IDS).toEqual([...SIX, 'trend'])
+  it('the six cards of the mockup and the widgets of the study, two per line where they pair; its presets as its dashPresets', () => {
+    expect(CARD_IDS).toEqual(['queue', 'health', 'issuance', 'horizon', 'compliance', 'revocation', 'hierarchy', 'activity', 'authorities'])
+    for (const id of SIX) expect(CARD_IDS).toContain(id)
     expect(PRESETS.operator).toEqual(['queue', 'health', 'hierarchy', 'horizon'])
     expect(PRESETS.manager).toEqual(['compliance', 'horizon', 'hierarchy', 'activity'])
     expect(PRESETS.all).toEqual(CARD_IDS)
@@ -17,10 +18,10 @@ describe('stored layout', () => {
   it('a layout saved before keeps its order and hidden cards; a card that is gone is dropped, a new one comes after', () => {
     const stored = { order: ['activity', 'states', 'queue', 'horizon', 'health', 'hierarchy', 'compliance'], hidden: ['health', 'states'], queueShowAll: true }
     const layout = normalizeLayout(stored)
-    expect(layout.order).toEqual(['activity', 'queue', 'horizon', 'health', 'hierarchy', 'compliance', 'trend'])
+    expect(layout.order).toEqual(['activity', 'queue', 'horizon', 'health', 'hierarchy', 'compliance', 'issuance', 'revocation', 'authorities'])
     expect(layout.hidden).toEqual(['health'])
     expect(layout.queueShowAll).toBe(true)
-    expect(visibleCards(layout)).toEqual(['activity', 'queue', 'horizon', 'hierarchy', 'compliance', 'trend'])
+    expect(visibleCards(layout)).toEqual(['activity', 'queue', 'horizon', 'hierarchy', 'compliance', 'issuance', 'revocation', 'authorities'])
   })
 
   it('drops unknown and duplicate ids, and reads garbage as the default', () => {
