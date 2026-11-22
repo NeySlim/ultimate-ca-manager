@@ -193,7 +193,7 @@ test.describe('the panels of the bar', () => {
 test.describe('the account menu', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('opens on the account card: the avatar beside the name, the facts, Sign out apart', async ({ page, api }) => {
+  test('opens on the account card: the avatar beside the name, the facts, Lock and Sign out apart', async ({ page, api }) => {
     await page.goto('/certificates')
     await page.locator('#user-button').click()
     const menu = page.locator('#user-menu')
@@ -206,7 +206,8 @@ test.describe('the account menu', () => {
     expect(n.y).toBeLessThan(a.y + a.height)
     await expect(menu.locator('dl.user-facts dt').first()).toBeVisible()
     await expect(menu.getByRole('separator')).toBeVisible()
-    expect(await menu.locator('[role="separator"] + #user-logout').count()).toBe(1)
+    // Lock and Sign out sit apart, after the separator
+    expect(await menu.locator('[role="separator"] + #user-lock + #user-logout').count()).toBe(1)
   })
 })
 
