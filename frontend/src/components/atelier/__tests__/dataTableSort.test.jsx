@@ -188,7 +188,7 @@ describe('on a phone', () => {
       { id: 'published', label: 'Publiée', kind: 'fit', priority: 3, labelled: true, cell: () => '19 nov. 2026' },
       { id: 'next', label: 'Prochaine mise à jour', kind: 'fit', priority: 2, labelled: true, cell: () => '26 nov. 2026' },
       { id: 'ocsp', label: 'OCSP', kind: 'fit', priority: 4, cell: () => 'Actif' },
-      { id: 'certs', label: 'Certificats', kind: 'number', priority: 3, cell: () => '—' },
+      { id: 'certs', label: 'Certificats', kind: 'number', priority: 2, cell: () => '—' },
     ]
     const facts = cardFacts(cols, {})
     const { container } = render(<div>{facts.map((f, i) => <span key={i}>{f}</span>)}</div>)
