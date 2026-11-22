@@ -1,7 +1,7 @@
 /**
- * The mockup's healthCard() over GET /dashboard/health: one row per protocol with its last
- * operation, today and the whole period in figures and its curve, then the services that only
- * report a state, and the summary under them.
+ * Automation health over GET /dashboard/health (maquette-3): one row per protocol with its last
+ * operation, 30 days of mirror bars (successes up, failures down) and its success rate, then the
+ * services that only report a state as compact pills, and the summary under them.
  */
 import { useContext } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
@@ -13,7 +13,9 @@ import { isVisible, moduleForPath } from '../../navigation/registry'
 import { formatDate } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
 import { clockOf } from '../../lib/overviewTime'
+import { HEALTH_DAYS, successRate } from '../../lib/overviewViz'
 import { OverviewCard, OverviewContext, num, useCardData, useLang } from './shared'
+import { MirrorBars } from './viz'
 
 // Protocols with a daily series, then the services that only report a state
 const SERIES = ['acme', 'scep', 'est']
@@ -26,6 +28,7 @@ const ROW_LINKS = {
   webhooks: '/settings?tab=webhooks', auto_renewal: '/settings?tab=autoRenewal',
 }
 const TONE_ICON = { good: 'check', warn: 'warning', bad: 'warning' }
+const SERIES_COLOR = { acme: 'var(--s1)', scep: 'var(--s2)', est: 'var(--s3)' }
 
 /** The row's link, only when the navigation guard of its page lets this user in. */
 function rowLink(name, can) {
@@ -36,6 +39,7 @@ function rowLink(name, can) {
 
 const count = (v) => Number(v) || 0
 const sum = (periods, key) => periods.reduce((total, p) => total + count(p[key]), 0)
+const periodsOf = (p) => (Array.isArray(p?.periods) ? p.periods : [])
 
 /** What the line says and whether it is an alert: the signer's state, the scheduler's failures, else the last status. */
 function summary(name, p, t) {
@@ -55,6 +59,8 @@ function summary(name, p, t) {
     if (p.stale) return { text: t('overview.health.stale'), alert: true }
     if (failed > 0) return { text: t('overview.health.tasksFailed', { count: failed }), alert: true }
     if (warned > 0) return { text: t('overview.health.tasksWarning', { count: warned }), alert: false, caution: true }
+    // Published, no task failed or warned: the scheduler is fine whatever its last task did (skipped)
+    if (count(p.tasks) > 0) return { text: stateLabel(t, p.last_status), alert: false, state: 'ok' }
   }
   return { text: stateLabel(t, p.last_status), alert: p.last_status === 'failed', state: p.last_status }
 }
@@ -72,38 +78,16 @@ function StateBadge({ info }) {
   return <span className={tone ? `badge ${tone}` : 'badge'} data-tone={tone || 'neutral'}><Icon name={TONE_ICON[tone] || 'block'} />{info.text}</span>
 }
 
-/** The mockup's sparkline(): one point per day, successes above the baseline, failures as ticks below it. */
-function Sparkline({ id, periods, label }) {
-  const w = 140
-  const h = 40
-  const top = 5
-  const base = 27
-  const ok = periods.map((p) => count(p.ok))
-  const failed = periods.map((p) => count(p.failed))
-  const peak = Math.max(1, ...ok)
-  const peakFailed = Math.max(1, ...failed)
-  const step = periods.length > 1 ? (w - 10) / (periods.length - 1) : 0
-  const x = (i) => (5 + i * step).toFixed(1)
-  const y = (n) => (base - 3 - (n / peak) * (base - 3 - top)).toFixed(1)
-  return (
-    <svg className="spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-labelledby={`spark-${id}`}>
-      <title id={`spark-${id}`}>{label}</title>
-      <line className="spark-base" x1="0" x2={w} y1={base} y2={base} vectorEffect="non-scaling-stroke" />
-      {failed.map((n, i) => n > 0 && (
-        <line key={`f${periods[i].date}`} className="spark-fail" x1={x(i)} x2={x(i)} y1={base + 3}
-          y2={(base + 4 + (n / peakFailed) * (h - base - 5)).toFixed(1)} vectorEffect="non-scaling-stroke" />
-      ))}
-      <polyline className="spark-line" points={ok.map((n, i) => `${x(i)},${y(n)}`).join(' ')} vectorEffect="non-scaling-stroke" />
-      {ok.map((n, i) => (
-        <line key={periods[i].date} className={`spark-dot ${i === ok.length - 1 ? 'last' : ''}`}
-          x1={x(i)} x2={x(i)} y1={y(n)} y2={y(n)} vectorEffect="non-scaling-stroke" />
-      ))}
-    </svg>
-  )
+/** A day of a protocol series, as its tooltip and its table row write it. */
+function dayOf(date, lang) {
+  const at = new Date(`${date}T00:00:00Z`)
+  if (Number.isNaN(at.getTime())) return date
+  try { return new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(at) } catch { return date }
 }
 
-/** The mockup's healthStat(): the span, the successes, the failures (a link to the queue for ACME). */
-function Stat({ span, ok, failed, onFailures, label, t }) {
+/** The success rate and the period's figures (maquette-3), ACME failures leading to the queue. */
+function Rate({ ok, failed, onFailures, label, lang, t }) {
+  const rate = successRate(ok, failed)
   let failure = <span className="muted">{t('overview.health.failures', { count: 0 })}</span>
   if (failed > 0) {
     failure = onFailures
@@ -111,8 +95,10 @@ function Stat({ span, ok, failed, onFailures, label, t }) {
       : <span className="bad"><Icon name="warning" />{t('overview.health.failures', { count: failed })}</span>
   }
   return (
-    <div className="health-stat">
-      <span className="health-span">{span}</span>
+    <div className="health-rate">
+      <b className={failed > 0 ? 'warn' : undefined} data-rate={rate ?? ''}>
+        {rate === null ? '–' : t('overview.health.rate', { rate: rate.toLocaleString(lang) })}
+      </b>
       <span className="health-values"><span><Trans i18nKey="overview.health.runs" count={ok} components={{ strong: <strong /> }} /></span>{failure}</span>
     </div>
   )
@@ -124,13 +110,14 @@ export function HealthCard() {
   const page = useContext(OverviewContext)
   const { isAdmin, hasPermission } = usePermission()
   const can = { isAdmin, hasPermission }
-  const state = useCardData(() => overviewService.getHealth(), ['certificate'], 'health')
+  const state = useCardData(() => overviewService.getHealth(HEALTH_DAYS), ['certificate'], 'health')
   const protocols = state.data?.protocols || {}
   const series = SERIES.filter((p) => protocols[p])
   const services = SERVICES.filter((p) => protocols[p])
   const infos = Object.fromEntries([...series, ...services].map((name) => [name, summary(name, protocols[name], t)]))
   const alerts = Object.values(infos).filter((i) => i.alert).length
-  const acmeToday = count((protocols.acme?.periods || []).at(-1)?.failed)
+  // The queue lists the ACME orders failed in the last 7 days
+  const acmeRecent = sum(periodsOf(protocols.acme).slice(-7), 'failed')
   const lastRun = protocols.scheduler?.last_operation_at
   const days = state.data?.days
   const toQueue = page?.showQueue ? () => page.showQueue('acme') : null
@@ -138,78 +125,113 @@ export function HealthCard() {
   const name = (id) => {
     const link = rowLink(id, can)
     const label = t(`overview.health.${id}`)
-    return <strong>{link ? <Link to={link}>{label}</Link> : label}</strong>
+    return link ? <Link to={link}>{label}</Link> : label
   }
   const rowProps = (id) => {
     const info = infos[id]
     return { 'data-protocol': id, 'data-alert': info.alert ? 'true' : 'false',
       'data-severity': info.alert ? (info.warning ? 'warning' : 'critical') : undefined }
   }
+  // The table view: one row per day, successes and failures of each protocol
+  const withSeries = series.filter((id) => periodsOf(protocols[id]).length > 0)
+  const table = () => {
+    const dates = periodsOf(protocols[withSeries[0]]).map((p) => p.date)
+    return [{
+      caption: t('overview.health.tableCaption', { count: dates.length }),
+      columns: [t('overview.trend.day'), ...withSeries.flatMap((id) => [
+        t('overview.health.okOf', { name: t(`overview.health.${id}`) }), t('overview.health.failedOf', { name: t(`overview.health.${id}`) })])],
+      rows: dates.map((date, i) => [date, ...withSeries.flatMap((id) => {
+        const d = periodsOf(protocols[id])[i]
+        return [count(d?.ok), count(d?.failed)]
+      })]),
+    }]
+  }
 
   return (
     <OverviewCard id="health" state={state} route="GET /api/v2/dashboard/health"
       empty={state.status === 'ready' && series.length + services.length === 0}
+      table={withSeries.length > 0 ? table : undefined}
       sub={[
-        lastRun ? t('overview.health.subScheduler', { when: clockOf(lastRun, t, lang) }) : null,
         typeof days === 'number' ? t('overview.health.sub', { count: days }) : null,
+        lastRun ? t('overview.health.subScheduler', { when: clockOf(lastRun, t, lang) }) : null,
       ].filter(Boolean).join(' ')}>
-      <ul className="health-list panel-content">
-        {series.map((id) => {
-          const p = protocols[id]
-          const periods = Array.isArray(p.periods) ? p.periods : []
-          const today = periods.at(-1)
-          const label = t(`overview.health.${id}`)
-          return (
-            <li key={id} className="health-row" {...rowProps(id)}>
-              <div className="health-name">
-                {name(id)}
-                <small title={p.last_operation_at ? formatDate(p.last_operation_at, { time: true }) : undefined}>
-                  {p.last_operation_at
-                    ? t('overview.health.lastOperation', { when: clockOf(p.last_operation_at, t, lang) })
-                    : t('overview.health.idle', { count: periods.length || days || 7 })}
-                </small>
-                {/* A good state stays silent, as in the mockup; a failure or an unknown state is said */}
-                {toneOf(infos[id]) !== 'good' && <StateBadge info={infos[id]} />}
-              </div>
-              {periods.length > 0 && (
-                <div className="health-stats">
-                  <Stat span={t('overview.health.today')} ok={count(today?.ok)} failed={count(today?.failed)} t={t}
-                    onFailures={id === 'acme' ? toQueue : null} label={t('overview.health.failLink', { count: count(today?.failed), name: label, span: t('overview.health.today') })} />
-                  <Stat span={t('overview.days', { count: periods.length })} ok={sum(periods, 'ok')} failed={sum(periods, 'failed')} t={t}
-                    onFailures={id === 'acme' ? toQueue : null} label={t('overview.health.failLink', { count: sum(periods, 'failed'), name: label, span: t('overview.days', { count: periods.length }) })} />
-                </div>
-              )}
-              {periods.length > 0 && (
-                <Sparkline id={id} periods={periods} label={t('overview.health.sparkAlt', {
-                  name: label, ok: periods.map((d) => count(d.ok)).join(', '), failed: periods.map((d) => count(d.failed)).join(', '),
-                })} />
-              )}
-            </li>
-          )
-        })}
-        {services.map((id) => {
-          const p = protocols[id]
-          return (
-            <li key={id} className="health-row" {...rowProps(id)}>
-              <div className="health-name">
-                {name(id)}
-                {id === 'scheduler' && (
-                  <small title={p.last_operation_at ? formatDate(p.last_operation_at, { time: true }) : undefined}>
-                    {t('overview.health.taskCount', { count: num(p.tasks) })}
-                    {p.last_operation_at ? `, ${t('overview.health.lastRun', { when: clockOf(p.last_operation_at, t, lang) })}` : ''}
-                  </small>
-                )}
-              </div>
-              <div className="health-stats"><StateBadge info={infos[id]} /></div>
-            </li>
-          )
-        })}
-      </ul>
+      <div className="panel-content health-body">
+        {series.length > 0 && (
+          <ul className="health-list">
+            {series.map((id) => {
+              const p = protocols[id]
+              const periods = periodsOf(p)
+              const label = t(`overview.health.${id}`)
+              const ok = periods.map((d) => count(d.ok))
+              const failed = periods.map((d) => count(d.failed))
+              const okSum = sum(periods, 'ok')
+              const failSum = sum(periods, 'failed')
+              const span = t('overview.days', { count: periods.length })
+              return (
+                <li key={id} className="health-row proto" {...rowProps(id)}>
+                  <div className="health-name">
+                    <h3><i className="series-key" style={{ background: SERIES_COLOR[id] }} aria-hidden="true" /><strong>{name(id)}</strong>
+                      {/* A good state stays silent, as in the mockup; a failure or an unknown state is said */}
+                      {toneOf(infos[id]) !== 'good' && <StateBadge info={infos[id]} />}
+                    </h3>
+                    <small title={p.last_operation_at ? formatDate(p.last_operation_at, { time: true }) : undefined}>
+                      {p.last_operation_at
+                        ? t('overview.health.lastOperation', { when: clockOf(p.last_operation_at, t, lang) })
+                        : t('overview.health.idle', { count: periods.length || days || HEALTH_DAYS })}
+                    </small>
+                  </div>
+                  {periods.length > 0 && (
+                    <MirrorBars ok={ok} failed={failed} color={SERIES_COLOR[id]}
+                      label={t('overview.health.mirrorAlt', { name: label, count: periods.length, ok: okSum, failed: failSum })}
+                      tipModel={(i) => ({
+                        title: dayOf(periods[i].date, lang),
+                        rows: [
+                          { label: t('overview.health.ok'), value: ok[i], color: SERIES_COLOR[id] },
+                          { label: t('overview.health.failed'), value: failed[i], color: 'var(--bad)' },
+                        ],
+                        hint: id === 'acme' && failed[i] > 0 && toQueue ? t('overview.health.seeQueue') : null,
+                      })}
+                      onPick={id === 'acme' && toQueue ? () => toQueue() : undefined} />
+                  )}
+                  {periods.length > 0 && (
+                    <Rate ok={okSum} failed={failSum} lang={lang} t={t} onFailures={id === 'acme' ? toQueue : null}
+                      label={t('overview.health.failLink', { count: failSum, name: label, span })} />
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {services.length > 0 && (
+          <ul className="services">
+            {services.map((id) => {
+              const p = protocols[id]
+              const info = infos[id]
+              const tone = toneOf(info)
+              let text = info.text
+              // The scheduler's tasks and last run, unless a problem says more
+              if (id === 'scheduler' && !info.alert && !info.caution) {
+                text = [t('overview.health.taskCount', { count: num(p.tasks) }),
+                  p.last_operation_at ? t('overview.health.lastRun', { when: clockOf(p.last_operation_at, t, lang) }) : null].filter(Boolean).join(', ')
+              }
+              return (
+                <li key={id} className="health-row svc" data-tone={tone || 'neutral'} {...rowProps(id)}
+                  title={id === 'scheduler' && p.last_operation_at ? formatDate(p.last_operation_at, { time: true }) : undefined}>
+                  <i className="pulse" aria-hidden="true" />
+                  <strong>{name(id)}</strong>
+                  <span className="svc-state">{text}</span>
+                  <Icon name={TONE_ICON[tone] || 'block'} />
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
       {alerts > 0 ? (
         <p className="health-foot">
           <Icon name="warning" />
           <span>{t('overview.health.alerts', { count: alerts })}</span>
-          {acmeToday > 0 && toQueue && (
+          {acmeRecent > 0 && toQueue && (
             <button type="button" className="text-link" onClick={toQueue}>{t('overview.health.seeQueue')} <Icon name="right" /></button>
           )}
         </p>

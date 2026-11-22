@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dashboardService } from '../../services'
 import { monotonePath, niceMax, tickIndexes } from '../../lib/overviewChart'
-import { Icon } from '../atelier'
 import { OverviewCard, useCardData, useLang } from './shared'
+import { EmptyLine } from './viz'
 
 const TREND_PERIODS = [7, 15, 30]
 const SERIES = ['issued', 'revoked', 'expired']
@@ -142,7 +142,7 @@ export function TrendCard() {
     <OverviewCard id="trend" state={state} route="GET /api/v2/dashboard/certificate-trend"
       sub={t('overview.trend.sub', { count: days })}
       empty={state.status === 'ready' && quiet && (
-        <div className="queue-empty"><Icon name="check" /><h3>{t('overview.state.empty')}</h3><p>{t('overview.trend.quiet', { count: days })}</p></div>
+        <div className="panel-content"><EmptyLine text={t('overview.trend.quiet', { count: days })} /></div>
       )}
       tools={(
         <div className="segmented" role="group" aria-label={t('overview.trend.period')}>

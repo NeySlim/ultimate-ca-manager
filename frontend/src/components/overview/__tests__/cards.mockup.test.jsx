@@ -10,11 +10,11 @@ vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslatio
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
   getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
-  getDashStats: vi.fn(), getTrend: vi.fn(),
+  getDashStats: vi.fn(), getTrend: vi.fn(), getScores: vi.fn(),
 }))
 vi.mock('../../../services', () => ({
   overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
-  certificatesService: { getStats: api.getStats },
+  certificatesService: { getStats: api.getStats, getComplianceStats: api.getScores },
   casService: { getAll: api.getAll },
   dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity,
     getStats: api.getDashStats, getCertificateTrend: api.getTrend },
@@ -36,6 +36,7 @@ const queue = (n, total = n) => ({ data: { items: Array.from({ length: n }, (_, 
 beforeEach(() => {
   vi.clearAllMocks()
   api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
+  api.getScores.mockResolvedValue({ data: { average_score: 78, distribution: { 'A+': 1, A: 2, B: 3, C: 0, D: 0, F: 0 }, total: 6 } })
   api.getNext.mockResolvedValue({ data: [] })
   api.can.mockReturnValue(true)
 })
@@ -120,7 +121,7 @@ describe('empty state is not the error state', () => {
     ['horizon', HorizonCard, api.getDashStats, { total_certificates: 0 }, 'overview.state.empty'],
     ['compliance', ComplianceCard, api.getCompliance, { total: 0, counters: {}, by_key_algorithm: [] }, 'overview.state.empty'],
     ['activity', ActivityCard, api.getActivity, { activity: [] }, 'overview.state.empty'],
-    ['trend', TrendCard, api.getTrend, { trend: [] }, 'overview.state.empty'],
+    ['trend', TrendCard, api.getTrend, { trend: [] }, 'overview.trend.quiet'],
   ]
   it.each(cards)('%s says "nothing" for an empty answer and offers a retry for a failure, never both', async (id, Card, fetcher, empty, emptyText) => {
     fetcher.mockResolvedValueOnce({ data: empty, meta: { total: 0 } })
