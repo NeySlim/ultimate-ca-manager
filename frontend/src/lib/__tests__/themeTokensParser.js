@@ -11,6 +11,7 @@ export const TOKEN_NAMES = [
   'bg', 'panel', 'raised', 'hover', 'text', 'muted', 'line', 'control', 'accent', 'selected',
   'good', 'goodbg', 'warn', 'warn-fill', 'warnbg', 'bad', 'badbg', 'grad-a', 'grad-b', 'glow',
   'on-accent', 'ink', 'paper', 'scrim', 'shade', 'glow-rose', 'glow-b', 'halo', 'frame-b', 'frame-shade',
+  'fam-pki', 'fam-protocols', 'fam-governance', 'fam-admin',
 ]
 // Compatibility aliases resolved against each palette (defined in the shared :root block).
 export const ALIAS_NAMES = ['text-tertiary']

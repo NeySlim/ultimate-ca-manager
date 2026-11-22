@@ -30,6 +30,10 @@
     "halo": "transparent",
     "frame-b": "transparent",
     "frame-shade": "transparent",
+    "fam-pki": "transparent",
+    "fam-protocols": "transparent",
+    "fam-governance": "transparent",
+    "fam-admin": "transparent",
     "text-tertiary": "#adbdd2"
   },
   "atelier-light": {
@@ -63,6 +67,10 @@
     "halo": "transparent",
     "frame-b": "transparent",
     "frame-shade": "transparent",
+    "fam-pki": "transparent",
+    "fam-protocols": "transparent",
+    "fam-governance": "transparent",
+    "fam-admin": "transparent",
     "text-tertiary": "#475a72"
   },
   "aurore-dark": {
@@ -91,11 +99,15 @@
     "paper": "#ffffff",
     "scrim": "#070e19",
     "shade": "#000000",
-    "glow-rose": "rgba(236, 72, 153, 0.10)",
-    "glow-b": "rgba(95, 167, 220, 0.22)",
+    "glow-rose": "rgba(236, 72, 153, 0.16)",
+    "glow-b": "rgba(95, 167, 220, 0.28)",
     "halo": "rgba(107, 120, 224, 0.25)",
     "frame-b": "rgba(95, 167, 220, 0.25)",
     "frame-shade": "rgba(0, 0, 0, 0.80)",
+    "fam-pki": "#8f9dff",
+    "fam-protocols": "#5fd0ec",
+    "fam-governance": "#f59ac8",
+    "fam-admin": "#f2b77c",
     "text-tertiary": "#a3acc9"
   },
   "aurore-light": {
@@ -124,11 +136,15 @@
     "paper": "#ffffff",
     "scrim": "#070e19",
     "shade": "#1e2864",
-    "glow-rose": "rgba(219, 39, 119, 0.06)",
-    "glow-b": "rgba(34, 170, 220, 0.14)",
+    "glow-rose": "rgba(219, 39, 119, 0.10)",
+    "glow-b": "rgba(34, 170, 220, 0.20)",
     "halo": "rgba(107, 120, 224, 0.25)",
     "frame-b": "rgba(34, 170, 220, 0.24)",
     "frame-shade": "rgba(40, 50, 120, 0.35)",
+    "fam-pki": "#3742bd",
+    "fam-protocols": "#0a6d8c",
+    "fam-governance": "#a62c6c",
+    "fam-admin": "#8a4b0f",
     "text-tertiary": "#4a5372"
   }
 }

@@ -1,5 +1,6 @@
 import { test, expect, createCA, issueCert, type Api } from './support/fixtures'
 import type { Page } from '@playwright/test'
+import { PALETTES, usePalette, expectPalette, boxes } from './support/themes'
 
 const CARDS = [
   'To handle', 'Automation health', 'Hierarchy', 'Expiry horizon', 'Compliance', 'Latest operations', 'Certificate activity',
@@ -130,5 +131,27 @@ test('a head preset shows its cards and reads as pressed', async ({ page, api })
     await put
     await expect.poll(() => shownOrder(page)).toEqual(['compliance', 'horizon', 'hierarchy', 'activity'])
     await expect(manager).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+// Aurore set apart from Atelier by its accents only (e2e/theme-geometry.spec.ts): the overview's boxes do not move
+const OVERVIEW_BOXES = ['.masthead', '.metric', '.dash-card', '.panel-heading', '.tile', '.badge', '.chip', '.counter', '.queue-row', '.health-row']
+
+test('a change of theme moves nothing on the overview', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await withDefaultLayout(api, async () => {
+    const measured: Record<string, Record<string, number[][]>> = {}
+    for (const [family, mode] of PALETTES) {
+      await page.unrouteAll({ behavior: 'ignoreErrors' })
+      await usePalette(page, family, mode)
+      await page.goto('/')
+      await expectPalette(page, family, mode)
+      await expect(page.locator('.dash-cards > .dash-card')).toHaveCount(DEFAULT_ORDER.length)
+      for (const name of CARDS) await expect(page.getByRole('region', { name }).locator('.sk-body')).toHaveCount(0)
+      measured[`${family}-${mode}`] = await boxes(page, OVERVIEW_BOXES)
+    }
+    const reference = measured['atelier-dark']
+    for (const s of ['.metric', '.dash-card', '.tile', '.badge', '.counter']) expect(reference[s].length, s).toBeGreaterThan(0)
+    for (const [key, got] of Object.entries(measured)) expect(got, key).toEqual(reference)
   })
 })
