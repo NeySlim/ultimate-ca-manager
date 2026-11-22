@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
   Zone, Btn, IconBtn, Icon, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props,
-  LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog,
+  LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, useSortParam,
 } from '../components/atelier'
 import { userCertificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -34,7 +34,9 @@ import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 // The states the server filters on, in the order of the chips (a certificate's states, as the Certificates zone draws them)
 const STATES = { valid: CERT_STATES.valid, expiring: CERT_STATES.expiring, expired: CERT_STATES.expired, revoked: CERT_STATES.revoked }
-const SERVER_SORT_KEYS = { name: 'name', valid_to: 'valid_until' }
+// The nearest expiry first (T4); a header's key is the server's
+const BY_EXPIRY = { key: 'valid_until', asc: true }
+const SORT_KEYS = ['name', 'owner', 'valid_until', 'status']
 const EXPORT_MAX = 10000
 const MENU_ICONS = { lint: 'policy', keyRecovery: 'key' }
 
@@ -83,8 +85,11 @@ export default function UserCertificatesPage() {
   const [total, setTotal] = useState(0)
   const [state, setState] = usePersistedState('ucm-usercerts-state', '')
   const [searchValue, setSearchValue] = useState('')
-  // The server sorts the whole list; null keeps its default (newest first)
-  const [sort, setSort] = useState(null)
+  // The server sorts the whole list; the sort lives in the address (T9), a new one back on page one
+  const { sort, onSort } = useSortParam(BY_EXPIRY, SORT_KEYS)
+  const sortMark = `${sort.key}:${sort.asc}`
+  const [sortSeen, setSortSeen] = useState(sortMark)
+  if (sortSeen !== sortMark) { setSortSeen(sortMark); setPage(1) }
   // The open enrolment and its section live in the URL (`item`, `section`); its detail is read below,
   // so an id off the list's page still opens
   const certDock = useDockSelection(certificates, { ready: false, sections: USER_CERT_SECTIONS })
@@ -101,10 +106,8 @@ export default function UserCertificatesPage() {
   const filterParams = useCallback((params) => {
     if (STATES[state]) params.status = [state]
     if (searchValue) params.search = searchValue
-    if (sort) {
-      params.sort_by = sort.by
-      params.sort_order = sort.order
-    }
+    params.sort_by = sort.key
+    params.sort_order = sort.asc ? 'asc' : 'desc'
     return params
   }, [state, searchValue, sort])
 
@@ -234,12 +237,6 @@ export default function UserCertificatesPage() {
   ]
   const active = STATES[state] ? state : ''
   const chooseState = (s) => { setState(s); setPage(1) }
-  const sortState = sort ? { key: Object.keys(SERVER_SORT_KEYS).find((k) => SERVER_SORT_KEYS[k] === sort.by), asc: sort.order === 'asc' } : null
-  const onSort = (key) => {
-    const by = SERVER_SORT_KEYS[key]
-    setSort((s) => (s?.by === by ? (s.order === 'asc' ? { by, order: 'desc' } : null) : { by, order: 'asc' }))
-    setPage(1)
-  }
   const pages = Math.max(1, Math.ceil(total / perPage))
   const first = total ? (page - 1) * perPage + 1 : 0
   const last = Math.min(total, page * perPage)
@@ -331,12 +328,12 @@ export default function UserCertificatesPage() {
           </Toolbar>
         )}
         title={userCertName} status={ucPill} openedId={open?.id} onOpen={openCert}
-        sort={sortState} onSort={onSort} nameSort="name"
+        sort={sort} onSort={onSort} nameSort="name"
         columns={[
-          { id: 'description', label: t('userCertificates.module.description'), cell: (r) => r.description || '—', grow: true },
-          { id: 'owner', label: t('userCertificates.columns.owner'), cell: (r) => r.owner || '—' },
-          { id: 'expires', label: t('userCertificates.module.expires'), cell: ucExpires, sort: 'valid_to' },
-          { status: true },
+          { id: 'description', label: t('userCertificates.module.description'), cell: (r) => r.description || '—', kind: 'text', grow: true, priority: 4 },
+          { id: 'owner', label: t('userCertificates.columns.owner'), cell: (r) => r.owner || '—', kind: 'text', priority: 3, sort: 'owner' },
+          { id: 'expires', label: t('userCertificates.module.expires'), cell: ucExpires, kind: 'fit', priority: 2, labelled: true, sort: 'valid_until' },
+          { status: true, sort: 'status' },
         ]}
         error={loadError && (
           <LoadError id="user-certificates" title={t('messages.errors.loadFailed.certificates')} onRetry={loadData} journal={hasPermission?.('read:audit') ? '/audit' : undefined}

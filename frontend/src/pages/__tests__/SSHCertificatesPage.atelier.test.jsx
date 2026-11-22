@@ -71,10 +71,12 @@ describe('the SSH certificate list', () => {
     await waitFor(() => expect(lastParams()).toMatchObject({ type: ['host'] }))
     fireEvent.change(await screen.findByRole('combobox', { name: 'sshCertificates.caName' }), { target: { value: '4' } })
     await waitFor(() => expect(lastParams()).toMatchObject({ ca_id: ['4'] }))
-    fireEvent.click(screen.getByRole('button', { name: 'sshCertificates.validTo' }))
-    await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'asc' }))
-    fireEvent.click(screen.getByRole('button', { name: 'sshCertificates.validTo' }))
+    // The nearest expiry first by default: a click reverses it
+    expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'asc' })
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.expiry' }))
     await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'desc' }))
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.expiry' }))
+    await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'asc' }))
   })
 
   it('links to the SSH authorities at their registered address', async () => {
@@ -83,10 +85,11 @@ describe('the SSH certificate list', () => {
     expect(screen.getByRole('link', { name: 'sshCas.title' })).toHaveAttribute('href', '/ssh/cas')
   })
 
-  it('shortens a long principal list in its cell', async () => {
+  it('keeps a long principal list whole in its cell and its title, the ellipsis shortening it (L6)', async () => {
     page()
     const row = (await screen.findByRole('button', { name: 'alice' })).closest('tr')
-    expect(within(row).getByText('ops, dba +1')).toBeInTheDocument()
+    const cell = within(row).getByText('ops, dba, web').closest('td')
+    expect(cell).toHaveAttribute('title', 'ops, dba, web')
   })
 })
 

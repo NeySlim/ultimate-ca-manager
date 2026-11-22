@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
-  Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, AtelierDialog, Notice,
+  Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, AtelierDialog, Notice, useSortParam,
 } from '../components/atelier'
 import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification } from '../contexts'
@@ -47,8 +47,9 @@ const DEFAULT_EXTENSIONS = [
   'permit-user-rc',
 ]
 
-// The columns the server sorts (the others ask nothing of it)
-const SORTS = { name: 'key_id', type: 'cert_type', expires: 'valid_to' }
+// The columns the server sorts, by its keys (the principals ask nothing of it); the nearest expiry first (T4)
+const SORTS = { name: 'key_id', type: 'cert_type', expires: 'valid_to', ca: 'ca', status: 'status' }
+const BY_EXPIRY = { key: 'valid_to', asc: true }
 
 // ============= STATUS HELPER =============
 
@@ -97,8 +98,13 @@ export default function SSHCertificatesPage() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
   const [total, setTotal] = useState(0)
-  const [sortBy, setSortBy] = useState('id')
-  const [sortOrder, setSortOrder] = useState('desc')
+  // The sort lives in the address (T9); a new one, clicked or read back, starts on page one
+  const { sort, onSort } = useSortParam(BY_EXPIRY, Object.values(SORTS))
+  const sortBy = sort.key
+  const sortOrder = sort.asc ? 'asc' : 'desc'
+  const sortMark = `${sortBy}:${sortOrder}`
+  const [sortSeen, setSortSeen] = useState(sortMark)
+  if (sortSeen !== sortMark) { setSortSeen(sortMark); setPage(1) }
 
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-ssh-certs-state', '')
   const [filterType, setFilterType] = usePersistedState('ucm-ssh-certs-type', '')
@@ -258,22 +264,12 @@ export default function SSHCertificatesPage() {
     }
   }
 
-  // A header click sorts by that column, again reverses it
-  const handleSort = (key) => {
-    setPage(1)
-    if (sortBy === key) setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
-    else { setSortBy(key); setSortOrder('asc') }
-  }
-
   // ============= LIST =============
 
   const typeLabel = (c) => (c.cert_type === 'host' ? t('sshCertificates.typeHost') : t('sshCertificates.typeUser'))
   const statusPill = (c) => { const s = getStatus(c, t); return <Pill label={s.label} tone={s.tone} icon={s.icon} /> }
-  const principalsCell = (c) => {
-    const list = listOf(c.principals)
-    if (!list.length) return '—'
-    return list.length > 2 ? `${list.slice(0, 2).join(', ')} +${list.length - 2}` : list.join(', ')
-  }
+  // Every principal, whole in the DOM: short of room the cell ends in an ellipsis, the list in its title (L6)
+  const principalsCell = (c) => listOf(c.principals).join(', ') || '—'
   const views = [
     { id: '', label: t('common.all'), count: certStats.total || 0 },
     { id: 'valid', label: t('sshCertificates.statusValid'), count: certStats.valid || 0 },
@@ -403,14 +399,14 @@ export default function SSHCertificatesPage() {
           </Toolbar>
         )}
         title={(c) => c.key_id || t('common.unnamed')} status={statusPill} openedId={open?.id} onOpen={openCert}
-        sort={{ key: sortBy, asc: sortOrder === 'asc' }} onSort={handleSort} nameSort={SORTS.name}
+        sort={sort} onSort={onSort} nameSort={SORTS.name}
         nameExtra={(c) => (c.serial_shared_with?.length > 0 ? <> <Pill label={t('sshCertificates.serialShared')} tone="warn" icon="warning" /></> : null)}
         columns={[
-          { id: 'type', label: t('sshCertificates.certType'), cell: typeLabel, sort: SORTS.type },
-          { id: 'principals', label: t('sshCertificates.principals'), cell: principalsCell, grow: true },
-          { id: 'expires', label: t('sshCertificates.validTo'), cell: (c) => (c.valid_to ? formatDate(c.valid_to) : '—'), fit: true, sort: SORTS.expires },
-          { id: 'ca', label: t('sshCertificates.caName'), cell: (c) => c.ca_name || '—', muted: true },
-          { status: true },
+          { id: 'type', label: t('sshCertificates.certType'), cell: typeLabel, kind: 'fit', priority: 3, sort: SORTS.type },
+          { id: 'principals', label: t('sshCertificates.principals'), cell: principalsCell, kind: 'text', grow: true, priority: 4 },
+          { id: 'expires', label: t('certificates.expiry'), cell: (c) => (c.valid_to ? formatDate(c.valid_to) : '—'), kind: 'fit', priority: 2, labelled: true, sort: SORTS.expires },
+          { id: 'ca', label: t('sshCertificates.caName'), cell: (c) => c.ca_name || '—', kind: 'text', priority: 3, muted: true, sort: SORTS.ca },
+          { status: true, sort: SORTS.status },
         ]}
         rowActions={(c) => [
           { icon: 'download', label: t('common.export'), onClick: handleExport },
