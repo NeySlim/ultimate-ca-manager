@@ -94,6 +94,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **One sort contract for the server-paged lists.** Every server-paged list sorts by `sort_by` and `sort_order` with text compared alike on SQLite and PostgreSQL, absent values last and ties settled by `id`, and an unknown key now answers `400` with the keys allowed instead of falling back in silence; the audit log, local ACME orders, SCEP requests, discovered certificates and Windows profiles gain the sort (see docs/API_REFERENCE.md, Sorting).
+- **ACME accounts, EAB credentials and key recovery requests are paged.** The three lists, capped at 100, 200 and 500 rows without saying so, take `page`, `per_page` and `sort_by` and give their `total` in `meta`; their default page is the former cap.
 - **The setup assistant on the certificate list.** The certificate list shows the overview's Initial setup assistant in place of the former card, and while its steps remain the empty certificate list and the empty Authorities page offer *Open the setup assistant*.
 - **Empty modules lead to the setup assistant.** While the first-run steps remain, the empty Activity, SCEP, CRL / OCSP, TSA and EST lists offer *Open the setup assistant*; a TSA or EST service with no CA and off shows what it needs and *Configure* instead of a disabled row.
 - **Several open certificates survive a reload.** The certificates open in the inspector are kept in the address (`open`, beside `item` for the one shown), so a reload or a shared link reopens all of them; a link with `item` alone still opens its certificate.
