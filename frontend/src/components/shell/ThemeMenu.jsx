@@ -1,7 +1,7 @@
 /**
  * Theme menu, the mockup's themeMenu(): a menu button and its radio items (System, Dark, Light,
- * Aurore dark, Aurore light), the current one checked; a choice closes the menu and gives the
- * focus back to the button. These five are the product's themes. Shared with the sign-in pages.
+ * Aurore system, Aurore dark, Aurore light), the current one checked; a choice closes the menu and
+ * gives the focus back to the button. Each family can follow the system. Shared with the sign-in pages.
  */
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -13,6 +13,7 @@ const CHOICES = [
   { id: 'system', family: 'atelier', mode: 'system', labelKey: 'shell.theme.system', icon: 'monitor' },
   { id: 'dark', family: 'atelier', mode: 'dark', labelKey: 'shell.theme.dark', icon: 'moon' },
   { id: 'light', family: 'atelier', mode: 'light', labelKey: 'shell.theme.light', icon: 'sun' },
+  { id: 'aurore-system', family: 'aurore', mode: 'system', labelKey: 'shell.theme.auroreSystem', icon: 'sparkles' },
   { id: 'aurore', family: 'aurore', mode: 'dark', labelKey: 'shell.theme.aurore', icon: 'sparkles' },
   { id: 'aurore-light', family: 'aurore', mode: 'light', labelKey: 'shell.theme.auroreLight', icon: 'sparkles' },
 ]
@@ -28,8 +29,8 @@ export function ThemeMenu() {
 
   const modeName = t(resolvedMode === 'light' ? 'shell.theme.light' : 'shell.theme.dark')
   const current = CHOICES.find(c => c.family === themeFamily && c.mode === mode)
-  const currentName = current?.id === 'system'
-    ? `${t('shell.theme.system')} (${modeName.toLowerCase()})`
+  const currentName = current?.mode === 'system'
+    ? `${t(current.labelKey)} (${modeName.toLowerCase()})`
     : t(current?.labelKey || 'shell.theme.menu')
   // The button shows the applied theme: sparkles for Aurore, otherwise the resolved mode
   const buttonIcon = themeFamily === 'aurore' ? 'sparkles' : resolvedMode === 'light' ? 'sun' : 'moon'
@@ -96,7 +97,7 @@ export function ThemeMenu() {
                 <Icon name={icon} />
                 <span className="pop-label">
                   {t(labelKey)}
-                  {id === 'system' && <small>{t('shell.theme.systemNow', { mode: modeName.toLowerCase() })}</small>}
+                  {choiceMode === 'system' && <small>{t('shell.theme.systemNow', { mode: modeName.toLowerCase() })}</small>}
                 </span>
                 <span className="pop-check"><Icon name="check" /></span>
               </button>

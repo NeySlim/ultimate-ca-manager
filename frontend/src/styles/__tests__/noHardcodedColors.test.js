@@ -32,7 +32,7 @@ export const EXCEPTIONS = [
   { file: 'components/ProviderIcons.jsx', all: true, reason: 'third-party brand colours' },
   {
     file: 'contexts/ThemeContext.jsx',
-    values: ['#233143', '#94bfff', '#eaf0f6', '#245bb1', '#1a2036', '#a5b4ff', '#eef0f8', '#3742bd'],
+    values: ['#202c3c', '#86b8ff', '#e6edf6', '#1d55bc', '#1a2036', '#a5b4ff', '#eef0f8', '#3742bd'],
     reason: 'theme picker swatches show a theme other than the active one',
   },
   { file: 'components/atelier/icons.js', values: ['#e66c20'], reason: 'the mockup\'s brand mark, verbatim (an image of the mark)' },

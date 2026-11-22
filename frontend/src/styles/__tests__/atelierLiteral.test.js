@@ -29,6 +29,11 @@ const NOT_COPIES = new Set(['scope.css', 'adjust.css', 'extensions.css'])
 const MARKUP_VARS = ['--chain-cols', '--weeks']
 // The document's own decoration in Aurore; the product's shell draws its own (components/shell)
 const DECORATION = [':root[data-theme|=aurore] body::before', ':root[data-theme=aurore-light] body::before']
+// The maintainer's contrast pass: Atelier's colours depart from the mockup's, each value pinned by
+// tokens.baseline.json and measured by atelierContrast.test.js; Aurore keeps the mockup's
+const RECOLOURED = ['--bg', '--panel', '--raised', '--hover', '--text', '--muted', '--line', '--control', '--accent',
+  '--selected', '--good', '--goodbg', '--warn', '--warn-fill', '--warnbg', '--bad', '--badbg']
+const DEVIATIONS = { dark: RECOLOURED, light: RECOLOURED.filter((k) => k !== '--panel'), aurore: [], 'aurore-light': [] }
 
 const read = (file) => fs.readFileSync(file, 'utf8')
 const copies = fs.readdirSync(COPIES).filter((f) => f.endsWith('.css') && !NOT_COPIES.has(f))
@@ -106,10 +111,16 @@ describe('the Atelier mockup, copied literally', () => {
     const atBody = { ...atRoot, ...cascade(documentRules, ['', ...mock.map((r) => `${r} `)], 'body') }
     const inProduct = cascade(tokens, product)
 
-    it(`${theme}: every variable of the mockup's root is in tokens.css with the same value`, () => {
+    it(`${theme}: every variable of the mockup's root is in tokens.css, with the same value unless recoloured`, () => {
       const vars = Object.entries(atRoot).filter(([k]) => k.startsWith('--'))
       expect(vars.length).toBeGreaterThan(15)
-      for (const [k, v] of vars) expect(sameValue(inProduct[k] ?? 'missing'), `${theme} ${k}`).toBe(sameValue(v))
+      for (const [k, v] of vars) {
+        const ours = sameValue(inProduct[k] ?? 'missing')
+        // a recoloured variable that came back to the mockup's value leaves the list
+        if (DEVIATIONS[theme].includes(k)) expect(ours, `${theme} ${k}`).not.toBe(sameValue(v))
+        else expect(ours, `${theme} ${k}`).toBe(sameValue(v))
+      }
+      expect(DEVIATIONS[theme].filter((k) => !(k in atRoot))).toEqual([])
     })
 
     it(`${theme}: what the mockup's document passes down reaches .atl unchanged`, () => {

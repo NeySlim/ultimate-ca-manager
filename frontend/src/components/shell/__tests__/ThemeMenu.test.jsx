@@ -17,7 +17,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({
     ...theme.value, setThemeFamily: theme.setThemeFamily, setMode: theme.setMode,
-    // A family the context might still list never reaches the menu: the mockup's five choices only
+    // A family the context might still list never reaches the menu: the six choices only
     themes: [{ id: 'atelier', nameKey: 'themes.atelier', accent: 'x' }, { id: 'aurore', nameKey: 'themes.aurore', accent: 'y' }, { id: 'purple', nameKey: 'themes.purple', accent: 'z' }],
   }),
 }))
@@ -46,17 +46,18 @@ beforeEach(() => {
 })
 
 describe('ThemeMenu', () => {
-  it('offers the five choices of the mockup and nothing else', async () => {
+  it('offers the mockup\'s five choices and Aurore following the system, nothing else', async () => {
     const user = setup()
     await user.click(trigger())
     const menu = screen.getByRole('menu')
     const names = within(menu).getAllByRole('menuitemradio').map(b => b.textContent)
     expect(names).toEqual(['shell.theme.system' + 'shell.theme.systemNow|shell.theme.dark', 'shell.theme.dark',
-      'shell.theme.light', 'shell.theme.aurore', 'shell.theme.auroreLight'])
+      'shell.theme.light', 'shell.theme.auroreSystem' + 'shell.theme.systemNow|shell.theme.dark',
+      'shell.theme.aurore', 'shell.theme.auroreLight'])
     expect(within(menu).queryByRole('group')).toBeNull()
     expect(within(menu).queryByRole('separator')).toBeNull()
     // The mockup's list: one item per choice, each holding its radio button
-    expect([...menu.children].map(c => `${c.tagName}:${c.getAttribute('role')}:${c.firstElementChild.getAttribute('role')}`)).toEqual(Array(5).fill('LI:none:menuitemradio'))
+    expect([...menu.children].map(c => `${c.tagName}:${c.getAttribute('role')}:${c.firstElementChild.getAttribute('role')}`)).toEqual(Array(6).fill('LI:none:menuitemradio'))
   })
 
   it('applies family and mode together, closes, and gives the focus back to the button', async () => {
@@ -68,9 +69,28 @@ describe('ThemeMenu', () => {
     expect(screen.queryByRole('menu')).toBeNull()
     expect(trigger()).toHaveFocus()
     await user.click(trigger())
-    await user.click(screen.getByRole('menuitemradio', { name: /shell\.theme\.system/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: /^shell\.theme\.system/ }))
     expect(theme.setThemeFamily).toHaveBeenLastCalledWith('atelier')
     expect(theme.setMode).toHaveBeenLastCalledWith('system')
+  })
+
+  it('follows the system in the Aurore family too', async () => {
+    const user = setup()
+    await user.click(trigger())
+    await user.click(screen.getByRole('menuitemradio', { name: /shell\.theme\.auroreSystem/ }))
+    expect(theme.setThemeFamily).toHaveBeenLastCalledWith('aurore')
+    expect(theme.setMode).toHaveBeenLastCalledWith('system')
+  })
+
+  it('checks Aurore system, not System, when Aurore follows the system, and names it on the button', async () => {
+    theme.value = { themeFamily: 'aurore', mode: 'system', resolvedMode: 'light' }
+    const user = setup()
+    expect(trigger()).toHaveAccessibleName('shell.theme.label|shell.theme.auroreSystem (shell.theme.light)')
+    expect(drawn(trigger().querySelector('svg'))).toBe(drawnOf('sparkles'))
+    await user.click(trigger())
+    const checked = screen.getAllByRole('menuitemradio').filter(b => b.getAttribute('aria-checked') === 'true')
+    expect(checked.map(b => b.getAttribute('data-theme-choice'))).toEqual(['aurore-system'])
+    expect(checked[0]).toHaveFocus()
   })
 
   it('checks the current choice and focuses it on open', async () => {
@@ -79,7 +99,7 @@ describe('ThemeMenu', () => {
     await user.click(trigger())
     const dark = screen.getByRole('menuitemradio', { name: 'shell.theme.dark' })
     expect(dark).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('menuitemradio', { name: /shell\.theme\.system/ })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('menuitemradio', { name: /^shell\.theme\.system/ })).toHaveAttribute('aria-checked', 'false')
     expect(dark).toHaveFocus()
   })
 
