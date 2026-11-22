@@ -78,7 +78,8 @@ for (const [width, height] of [[1000, 800], [390, 844]]) {
       expect(await reachable(last)).toBe(true)
       // From the keyboard the arrows walk every view, the menu ones included
       await last.press('ArrowRight')
-      await expect(page).toHaveURL(/\/acme\?tab=accounts/)
+      // The first view is the page's own address
+      await expect(page).toHaveURL(/\/acme$/)
       await expect(tabs.getByRole('tab', { name: /^Accounts/ })).toBeFocused()
     })
   })
