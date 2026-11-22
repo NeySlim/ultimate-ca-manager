@@ -69,6 +69,21 @@ describe('the role list', () => {
 })
 
 describe('the role dock', () => {
+  it('reads the properties as typed rows: the type a state, no parent muted, the counts plain', async () => {
+    page()
+    fireEvent.click(await screen.findByRole('button', { name: 'Cert Team' }))
+    const kv = dock().querySelector('dl.kv')
+    expect(kv).not.toBeNull()
+    expect(dock().querySelector('dl.props')).toBeNull()
+    const row = (term) => within(kv).getByText(term, { selector: 'dt' }).closest('div.row')
+    expect(row('common.type').querySelector('dd.v .badge.good')).toHaveTextContent('common.custom')
+    const parent = row('rbac.inheritsFrom').querySelector('dd')
+    expect(parent).toHaveClass('absent')
+    expect(parent).toHaveTextContent('—')
+    expect(row('common.users').querySelector('dd.v')).toHaveTextContent('rbac.userCount {"count":4}')
+    expect(row('common.permissions').querySelector('dd.v')).toHaveTextContent(/^1\/3$/)
+  })
+
   it('reads a system role without any action', async () => {
     page()
     fireEvent.click(await screen.findByRole('button', { name: 'Viewer' }))

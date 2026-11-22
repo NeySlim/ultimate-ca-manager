@@ -19,7 +19,7 @@ import { apiKeyScopePermissions, apiKeyScopeLabel } from '../lib/apiKeyScopes'
 import { describePermissions } from '../lib/rbacPermissions'
 import { useUnloadGuard } from '../hooks/useSaveParts'
 import { keepDraft, readDraft } from '../lib/draftMemory'
-import { Zone, PageHead, Btn, IconBtn, Pill, Props, RecordList, RecordRow, SkeletonPanel, AtelierDialog } from '../components/atelier'
+import { Zone, PageHead, Btn, IconBtn, Pill, Facts, RecordList, RecordRow, SkeletonPanel, AtelierDialog } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsSaveBar } from '../components/atelier/SettingsView'
 import { Field, FormModal, Input, NumberInput, Notice, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import { useSectionParam } from '../components/atelier/useSectionParam'
@@ -575,11 +575,11 @@ export default function AccountPage() {
           label={t('account.closeInspectorOnNav')} description={t('account.closeInspectorOnNavHint')} />
       </SettingsGroup>
       <SettingsGroup legend={t('account.accountActivity')} grid={false}>
-        <Props items={[
-          [t('account.accountCreated'), accountData.created_at ? formatDate(accountData.created_at) : '—'],
-          [t('common.lastLogin'), accountData.last_login ? formatDate(accountData.last_login, true) : '—'],
+        <Facts items={[
+          accountData.created_at ? [t('account.accountCreated'), formatDate(accountData.created_at)] : { label: t('account.accountCreated'), absent: '—' },
+          accountData.last_login ? [t('common.lastLogin'), formatDate(accountData.last_login, true)] : { label: t('common.lastLogin'), absent: '—' },
           [t('account.totalLogins'), accountData.login_count || 0],
-          [t('common.status'), <Pill tone={accountData.active ? 'good' : 'bad'} label={accountData.active ? t('common.active') : t('common.inactive')} />],
+          { label: t('common.status'), state: accountData.active ? ['good', t('common.active')] : ['bad', t('common.inactive')] },
         ]} />
       </SettingsGroup>
     </>

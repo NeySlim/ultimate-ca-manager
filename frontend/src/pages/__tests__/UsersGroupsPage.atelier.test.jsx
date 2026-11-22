@@ -314,6 +314,19 @@ describe('the groups view', () => {
     expect(dockOf(container).textContent).not.toMatch(/(read|write|delete):/)
   })
 
+  it('reads a group\'s overview as typed rows: its description long, a missing date muted', async () => {
+    const { container } = page('/users?tab=groups')
+    fireEvent.click(await screen.findByRole('button', { name: 'pki-ops' }))
+    await waitFor(() => expect(m.groupById).toHaveBeenCalledWith(3))
+    const kv = await waitFor(() => { const dl = dockOf(container).querySelector('dl.kv'); expect(dl).not.toBeNull(); return dl })
+    expect(dockOf(container).querySelector('dl.props')).toBeNull()
+    const row = (term) => within(kv).getByText(term, { selector: 'dt' }).closest('div.row')
+    expect(row('common.description')).toHaveClass('long')
+    expect(row('common.description').querySelector('dd.v')).toHaveTextContent('Exploitation')
+    expect(row('groups.members').querySelector('dd.v')).toHaveTextContent('groups.memberCount {"count":1}')
+    expect(row('common.created').querySelector('dd')).toHaveClass('absent')
+  })
+
   it('opens on the groups from the address', async () => {
     page('/users?tab=groups')
     expect(await screen.findByRole('button', { name: 'pki-ops' })).toBeTruthy()

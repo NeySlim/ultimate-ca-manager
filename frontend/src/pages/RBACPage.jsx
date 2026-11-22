@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, FormModal, Select } from '../components/atelier/Form'
 import {
-  Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props,
+  Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Facts,
   EmptyBlock, NoMatch, LoadError, LoadCause, PermissionGrid, useClientList, useSortParam,
 } from '../components/atelier'
 import { useNotification } from '../contexts'
@@ -192,9 +192,9 @@ export default function RBACPage() {
         {section === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
-                [t('common.type'), pill(role)],
-                [t('rbac.inheritsFrom'), parentOf(role)],
+              <Facts items={[
+                { label: t('common.type'), value: pill(role) },
+                role.inherits_from ? [t('rbac.inheritsFrom'), parentOf(role)] : { label: t('rbac.inheritsFrom'), absent: '—' },
                 [t('common.users'), t('rbac.userCount', { count: role.user_count || 0 })],
                 [t('common.permissions'), `${direct.length}/${grantable.length}`],
               ]} />
