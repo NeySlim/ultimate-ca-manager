@@ -27,6 +27,7 @@ import { useThemeColor } from '../lib/themeColor'
 import { BANNER_SLOT } from '../lib/sessionBannerSlot'
 import { NOTIF_SLOT } from './shell/NotificationBell'
 import { ShellBannersContext } from './shell/bannersSlot'
+import { usePanel, openedPanel } from './shell/openPanel'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -37,10 +38,14 @@ export function AppShell() {
   // The shell's own messages (refused pin, network back), in the app's message area
   const messages = useNotification()
   const notice = (text) => messages?.showInfo?.(text)
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  // The open help: { key } requested by the shell itself (navigation help, else the page's), { returnTo } the
-  // id that takes the focus back; null when closed
-  const [help, setHelp] = useState(null)
+  // The palette and the help are panels of the shell: opening one closes the bar's menu or panel open
+  const [commandPaletteOpen, setCommandPaletteOpen] = usePanel('palette')
+  // The help asked: { key } requested by the shell itself (navigation help, else the page's), { returnTo } the
+  // id that takes the focus back
+  const [helpOpen, setHelpOpen] = usePanel('help')
+  const [helpAsk, setHelpAsk] = useState({})
+  const help = helpOpen ? helpAsk : null
+  const setHelp = (ask) => { if (ask) setHelpAsk(ask); setHelpOpen(!!ask) }
   // Cluster nodes, read from the service status (read:settings), from the bar or the HA banner
   const [nodesOpen, setNodesOpen] = useState(false)
   const ha = haState(useHealth())
@@ -117,7 +122,7 @@ export function AppShell() {
     const handleHelpKey = (e) => {
       if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) && !e.target.isContentEditable) {
         e.preventDefault()
-        setHelp(prev => (prev ? null : {}))
+        setHelp(openedPanel() === 'help' ? null : {})
       }
     }
     window.addEventListener('keydown', handleHelpKey)

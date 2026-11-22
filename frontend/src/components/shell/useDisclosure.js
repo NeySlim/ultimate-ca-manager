@@ -1,15 +1,16 @@
 /**
- * Open state shared by the shell's popovers: closes on Escape (focus back to
- * the button), on a click outside, when focus leaves, and on a route change.
- * `{ light: false }` keeps a panel open on a click outside or a focus leaving it. `partRef` marks a
- * panel drawn apart from the root (the mockup's Modules menu follows the bar's links): inside too.
+ * Open state of the shell's popovers, one open at a time (openPanel.js): closes on Escape (focus back
+ * to the button), on a click outside, when focus leaves, on a route change and when another panel opens.
+ * `{ light: false }` keeps a side panel open when the focus leaves it. `partRef` marks a panel drawn apart
+ * from the root (the Modules menu after the bar's links, the notifications in their slot): inside too.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
+import { usePanel } from './openPanel'
 
 export function useDisclosure({ light = true } = {}) {
   const { pathname } = useLocation()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = usePanel(useId())
   const rootRef = useRef(null)
   const buttonRef = useRef(null)
   const partRef = useRef(null)
@@ -18,16 +19,16 @@ export function useDisclosure({ light = true } = {}) {
   const close = useCallback((restoreFocus = false) => {
     setOpen(false)
     if (restoreFocus) buttonRef.current?.focus()
-  }, [])
+  }, [setOpen])
 
-  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => { setOpen(false) }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!open || !light) return undefined
+    if (!open) return undefined
     const onDown = (e) => { if (!inside(e.target)) setOpen(false) }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [open, light])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onKeyDown = (e) => {
     if (open && e.key === 'Escape') {
