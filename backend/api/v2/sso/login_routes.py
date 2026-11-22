@@ -608,6 +608,8 @@ def _open_sso_session(provider, identity, next_url, error_url):
     session['username'] = user.username
     session['role'] = user.role
     session['auth_method'] = 'sso'
+    # The account menu names the provider by its display name, never by its id
+    session['auth_provider'] = provider.display_name or provider.name
     if identity.session_index:
         session['saml_session_index'] = identity.session_index
     session['login_time'] = now.isoformat()

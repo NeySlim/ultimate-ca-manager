@@ -537,11 +537,15 @@ def _complete_2fa_login(user, auth_method, details):
     from auth.permissions import get_effective_permissions
     from services.audit_service import AuditService
 
+    # The directory that checked the password, named in the account menu (LDAP)
+    provider = session.get('pending_2fa_provider')
     now = utc_now()
     begin_session(user)
     session['user_id'] = user.id
     session['username'] = user.username
     session['auth_method'] = auth_method
+    if provider:
+        session['auth_provider'] = provider
     session['login_time'] = now.isoformat()
     session['last_activity'] = now.isoformat()
     session.permanent = True

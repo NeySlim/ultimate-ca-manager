@@ -6,7 +6,7 @@ from flask import session
 
 from auth.twofa_enforcement import ENROLL_ALLOWED_PATHS, ENROLL_SESSION_KEY, PROMPT_READABLE_PATHS
 
-_ALLOWED_PATHS = frozenset({'/api/v2/account/password', '/api/v2/auth/logout'})
+_ALLOWED_PATHS = frozenset({'/api/v2/account/password', '/api/v2/auth/logout', '/api/v2/auth/lock'})
 
 
 def password_change_allows(path, method='GET') -> bool:

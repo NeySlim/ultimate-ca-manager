@@ -220,11 +220,39 @@ Public. Kept for older clients: it delegates to `POST /api/v2/auth/login/passwor
 ```http
 GET /api/v2/auth/verify
 ```
+Public: answers `{"authenticated": false}` without a valid session or key. Signed in, it returns the session payload of the login responses with, besides:
+
+```json
+{
+  "data": {
+    "authenticated": true,
+    "user": { "id": 3, "username": "alice", "email": "alice@example.com", "full_name": "Alice Martin", "role": "operator" },
+    "auth_method": "sso",
+    "auth_provider": "Company SSO",
+    "mfa": { "enabled": true, "methods": ["totp", "webauthn"] },
+    "session": { "idle_timeout_s": 1800, "expires_at": "2026-11-23T08:00:00Z" },
+    "session_timeout": 1800
+  }
+}
+```
+`auth_method` is how the session was opened, kept from its login: `password` (with or without a second factor), `mtls` (certificate login), `certificate` (certificate auto-login), `webauthn`, `sso` (OIDC or SAML) or `ldap`; a call with an API key says `api_key`. `auth_provider` is the display name of the SSO or LDAP provider, else `null`. `mfa.methods` lists the second factors a password sign-in asks for (`totp`, `webauthn`). `session.idle_timeout_s` is the inactivity timeout and `session.expires_at` the end of the session's maximum lifetime, both `null` for an API key.
 
 ### Logout
 ```http
 POST /api/v2/auth/logout
 ```
+
+### Lock Session
+```http
+POST /api/v2/auth/lock
+Content-Type: application/json
+X-CSRF-Token: <token>
+
+{
+  "reason": "manual"
+}
+```
+Closes the caller's session as a sign-out does, on every node of a shared session store; unlocking is a new sign-in. Needs an interactive session and its CSRF token (an API key gets 403). `reason` is `manual` (the default) or `idle` (the console's inactivity lock); the audit records `session_locked` with it.
 
 ### Forgot Password
 ```http
