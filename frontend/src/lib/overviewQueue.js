@@ -13,7 +13,7 @@ export const GROUP_OF = Object.fromEntries(
   Object.entries(QUEUE_GROUPS).flatMap(([group, kinds]) => kinds.map((kind) => [kind, group])))
 
 // Nothing to do today: the client renews on its own, or the expiry is still far
-const WATCH_KINDS = ['client_renewal_overdue', 'ca_expiring', 'truststore_expiring']
+export const WATCH_KINDS = ['client_renewal_overdue', 'ca_expiring', 'truststore_expiring']
 /** Kinds whose date is when it happened, not a deadline. */
 export const SINCE_KINDS = ['acme_order_failed', 'acme_client_renewal_failed', 'scep_request_pending', 'key_recovery_pending']
 
