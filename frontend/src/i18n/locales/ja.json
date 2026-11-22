@@ -7752,7 +7752,9 @@
       "dark": "ダーク",
       "light": "ライト",
       "aurore": "オーロラ（ダーク）",
-      "auroreLight": "オーロラ（ライト）"
+      "auroreLight": "オーロラ（ライト）",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "通知",

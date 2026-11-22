@@ -7752,7 +7752,9 @@
       "dark": "Oscuro",
       "light": "Claro",
       "aurore": "Aurore oscuro",
-      "auroreLight": "Aurore claro"
+      "auroreLight": "Aurore claro",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "Notificaciones",

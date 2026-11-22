@@ -7752,7 +7752,9 @@
       "dark": "深色",
       "light": "浅色",
       "aurore": "极光深色",
-      "auroreLight": "极光浅色"
+      "auroreLight": "极光浅色",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "通知",

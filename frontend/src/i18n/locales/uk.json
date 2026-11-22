@@ -8080,7 +8080,9 @@
       "dark": "Темна",
       "light": "Світла",
       "aurore": "Aurore темна",
-      "auroreLight": "Aurore світла"
+      "auroreLight": "Aurore світла",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "Сповіщення",
