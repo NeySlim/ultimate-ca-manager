@@ -52,6 +52,7 @@ export default {
           { label: "Tâches", text: "Vérifications d’expiration, rafraîchissement CRL, livraison webhooks, sauvegardes planifiées, renouvellement auto, etc." },
           { label: "Exécuter", text: "Déclencher n’importe quelle tâche à la demande" },
           { label: "Visibilité", text: "État en toutes lettres (réussie, en échec, sautée), dernière exécution, dernière durée et nombre d’exécutions par tâche ; sur un téléphone chaque tâche est une carte avec son bouton Exécuter" },
+          { label: "Inspecteur", text: "Une tâche s’ouvre depuis sa ligne dans l’inspecteur, qui montre toutes les colonnes de la liste, y compris celles qu’une fenêtre étroite replie, et son bouton Exécuter" },
           { label: "Processus du planificateur (v2.251)", text: "Les tâches s’exécutent dans un processus de planification dédié, lancé avec le service et relancé en quelques secondes après un plantage ou un rechargement : une tâche longue ne retarde ni les requêtes ni les workers. Il occupe environ 150 Mo de mémoire" },
           { label: "Statut périmé (v2.251)", text: "Quand le processus du planificateur n’a pas donné signe de vie depuis un moment, l’onglet avertit que le statut affiché peut être obsolète" },
           { label: "Tâches longues (v2.251)", text: "Exécuter attend jusqu’à 30 secondes le résultat. Une tâche encore en cours est alors signalée comme démarrée et toujours en cours, et son résultat apparaît à un rafraîchissement ultérieur" },

@@ -170,7 +170,7 @@ describe('the CRL / OCSP list', () => {
     const { container } = page()
     await screen.findAllByRole('button', { name: 'Services CA' })
     const facts = [...container.querySelectorAll('article.mobile-record')[2].querySelectorAll('.row-meta > span')].map((s) => s.textContent)
-    expect(facts[0]).toMatch(/^crlOcsp\.columns\.nextUpdate /)
+    expect(facts[0]).toMatch(/^crlOcsp\.nextUpdate /)
     // The CRL number named by its column (G9)
     expect(facts[1]).toBe('crlOcsp.columns.crlNumber 1842')
     expect(facts[2]).toMatch(/^crlOcsp\.columns\.publication /)

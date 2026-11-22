@@ -796,7 +796,7 @@
     "columns": {
       "failures": "Échecs",
       "wildcard": "Générique",
-      "orders": "Cdes"
+      "orders": "Commandes"
     }
   },
   "audit": {
@@ -5588,6 +5588,12 @@
     "sortDescending": "ordre décroissant",
     "sortBy": "Trier par",
     "sortByColumn": "Trier par {{column}}",
+    "fullCreated": "Date de création",
+    "fullExpires": "Date d’expiration",
+    "fullIssued": "Date d’émission",
+    "fullRequested": "Date de demande",
+    "fullSubmitted": "Date de dépôt",
+    "fullStarted": "Date de début",
     "ascendingReverse": "Ordre croissant, inverser",
     "descendingReverse": "Ordre décroissant, inverser",
     "foldedColumns_one": "{{count}} colonne repliée",
@@ -7723,11 +7729,8 @@
     "escapeKey": "Échap",
     "searchPlaceholder": "Rechercher…",
     "navigate": "Naviguer",
-    "signedInWith": "Connexion par {{method}}.",
     "accountLabel": "Compte : {{name}}, {{role}}",
     "accountLabelName": "Compte : {{name}}",
-    "lockAfter_one": "Verrouillage après {{count}} min d’inactivité.",
-    "lockAfter_other": "Verrouillage après {{count}} min d’inactivité.",
     "signOut": "Se déconnecter",
     "method": {
       "password": "mot de passe",
@@ -7759,8 +7762,6 @@
       "systemNow": "{{mode}} actuellement",
       "dark": "Sombre",
       "light": "Clair",
-      "aurore": "Aurore sombre",
-      "auroreLight": "Aurore clair",
       "family": "Thème",
       "mode": "Mode"
     },

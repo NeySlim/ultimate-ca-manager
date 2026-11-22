@@ -17,7 +17,7 @@ import { SkeletonRows, SkeletonCards } from './Skeleton'
 import { columnKind, checkColumns, layoutColumns, columnBounds, NAME_TEXT_FLOOR, RESIZE } from './columnShare'
 import { FoldedColumns, ColumnsReset } from './foldedColumns'
 import { useColumnWidths, cleanWidths } from './columnWidths'
-import { ResetColumns } from './TableFooter'
+import { ResetColumns, FoldedNote } from './TableFooter'
 
 // `share`: one column takes the room left, the others their content's width within their bounds (columnShare.js)
 const KINDS = {
@@ -109,14 +109,18 @@ function nameFloor(rows, index) {
 /**
  * The layout of the columns at any desktop width: a measuring render (every column at its natural width,
  * table.measuring), then the decision of layoutColumns (ceilings, the absorbing column, the folded ones, the widths
- * set by hand it holds), both before the browser paints. The region's width, the columns, the rows or the sort
- * changing measure again; a width set by hand only decides again. Without measures (a journal) the widths set by
- * hand hold as they are.
+ * set by hand it holds), both before the browser paints. The region's width, the columns, the rows, the sort or the
+ * language changing measure again; a width set by hand only decides again. Without measures (a journal) the widths
+ * set by hand hold as they are.
  */
-function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, active, observe, fixed }) {
+function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, active, observe, fixed, lang }) {
   const [layout, setLayout] = useState(null)
   const [width, setWidth] = useState(0)
-  const key = `${columns.map((c) => c.id).join(',')}|${rowsKey}|${width}|${sortKey ?? ''}`
+  const base = `${columns.map((c) => c.id).join(',')}|${rowsKey}|${width}|${sortKey ?? ''}|${lang ?? ''}`
+  // A content that changes under the same key (a state, a cell resolved later) and overflows measures once more (E3)
+  const [again, setAgain] = useState(null)
+  const [, setGrown] = useState(0)
+  const key = again === base ? `${base}|again` : base
   const measuring = active && layout?.key !== key
   useEffect(() => {
     const el = scrollRef.current
@@ -127,8 +131,19 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
       el.querySelector('tbody tr.opened')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
     })
     observer.observe(el)
-    return () => observer.disconnect()
+    // The table growing past its region without a render of the list renders it, to be checked below
+    const table = el.querySelector('table')
+    const grows = new ResizeObserver(() => { if (el.scrollWidth > el.clientWidth + 1) setGrown((n) => n + 1) })
+    if (table) grows.observe(table)
+    return () => { observer.disconnect(); grows.disconnect() }
   }, [observe, scrollRef])
+  // Reads the region after each render; measures again at most once per key
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!active || measuring || again === base || !layout?.measures || !el) return
+    if (el.scrollWidth > el.clientWidth + 1) setAgain(base)
+  })
   useLayoutEffect(() => {
     if (!measuring) return
     const el = scrollRef.current
@@ -151,10 +166,12 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
     setLayout({ key, measures, room: el.clientWidth - sides, wide: window.innerWidth >= 1800 })
   }, [measuring, key]) // eslint-disable-line react-hooks/exhaustive-deps -- the key names everything the measure reads
   const shown = (ids) => Object.fromEntries(Object.entries(fixed).filter(([id]) => ids.includes(id)))
-  if (measuring) return { measuring, width, folded: [], caps: {}, held: {} }
-  if (!active || !layout?.measures) return { measuring, width, folded: [], caps: {}, held: shown(columns.map((c) => c.id)) }
+  // The widths set by hand give way only once the layout measured again finds no room for them
+  const settled = !active || !layout?.measures || again === base
+  if (measuring) return { measuring, width, folded: [], caps: {}, held: {}, settled }
+  if (!active || !layout?.measures) return { measuring, width, folded: [], caps: {}, held: shown(columns.map((c) => c.id)), settled }
   const out = layoutColumns(columns, layout.measures, layout.room, { sortKey, wide: layout.wide, fixed })
-  return { measuring, width, folded: out.folded, caps: out.caps, held: out.fixed, widths: out.widths, absorber: out.absorber, measures: layout.measures, wide: layout.wide }
+  return { measuring, width, folded: out.folded, caps: out.caps, held: out.fixed, widths: out.widths, absorber: out.absorber, measures: layout.measures, wide: layout.wide, settled }
 }
 
 /** The sign of a sortable column that is not the sorted one: two solid triangles in the label's colour (R3). */
@@ -176,6 +193,10 @@ export function SortArrow({ asc }) {
 }
 
 const plainLabel = (col) => (typeof col.label === 'string' ? col.label : col.labelFull || col.id)
+/** A column's name where there is room for it: its whole label, else its header's (E6). */
+const fullLabel = (col) => col.labelFull || plainLabel(col)
+/** A data column shows its label: a column labelled for screen readers only is an action, without a separator (M4). */
+const labelled = (col) => typeof col.label === 'string' || Boolean(col.labelFull)
 
 /**
  * @param {object} p
@@ -193,9 +214,9 @@ const plainLabel = (col) => (typeof col.label === 'string' ? col.label : col.lab
 export function DataTable({
   kind = 'certificates', scrollId, label, caption, columns: allColumns, rows = [], rowKey = (r) => r.id, rowLabel = (r) => String(r.id),
   onOpen, openLabel, openedId, rowOpens = true, selection, rowActions, sort, onSort, loading = false, skeletonRows = 12,
-  empty, card, footer, actionsLabel, columnWidths, onColumnWidth, widthsKey, footerReset = true, recordsId,
+  empty, card, footer, actionsLabel, columnWidths, onColumnWidth, widthsKey, recordsId,
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { isMobile } = useMobile()
   if (!import.meta.env.PROD) checkColumns(allColumns)
   const k = KINDS[kind] || KINDS.certificates
@@ -220,9 +241,9 @@ export function DataTable({
   const [draft, setDraft] = useState(null)
   const live = draft ? { ...widths, [draft.id]: draft.w } : widths
   const liveKey = Object.entries(live).sort().join(';')
-  const { measuring, width: regionWidth, folded, caps, held: laid, widths: laidWidths, absorber: laidAbsorber, measures, wide } = useColumnLayout(scrollRef, allColumns, {
+  const { measuring, width: regionWidth, folded, caps, held: laid, widths: laidWidths, absorber: laidAbsorber, measures, wide, settled } = useColumnLayout(scrollRef, allColumns, {
     lead: selection ? 1 : 0, trail: hasActions ? 1 : 0, rowsKey: rows.map(rowKey).join(','), sortKey: sort?.key, active: Boolean(k.share && !cards),
-    observe: !cards, fixed: live,
+    observe: !cards, fixed: live, lang: i18n?.language,
   })
   // A width set by hand never makes the region scroll sideways: past the room it is ignored for this render (R1)
   const [dropped, setDropped] = useState(null)
@@ -232,11 +253,11 @@ export function DataTable({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const el = scrollRef.current
-    if (!el || measuring || dropped === guard || !Object.keys(laid).length) return
+    if (!el || measuring || !settled || dropped === guard || !Object.keys(laid).length) return
     if (el.scrollWidth > el.clientWidth + 1) setDropped(guard)
   })
   const columns = folded.length ? allColumns.filter((c) => !folded.includes(c.id)) : allColumns
-  const foldedLabels = allColumns.filter((c) => folded.includes(c.id)).map(plainLabel)
+  const foldedLabels = allColumns.filter((c) => folded.includes(c.id)).map(fullLabel)
   // The one column that takes the room left: the growing one, else the name (L7), unless set by hand
   const absorber = laidAbsorber || (columns.find((c) => c.grow) || columns.find((c) => columnKind(c) === 'entity'))?.id
   const sortable = Boolean(onSort) && allColumns.some((c) => c.sort)
@@ -246,12 +267,18 @@ export function DataTable({
     else clearOwnWidths()
     scrollRef.current?.focus()
   }
-  const reset = !cards && footerReset && Object.keys(widths).length ? resetWidths : null
+  const reset = !cards && Object.keys(widths).length ? resetWidths : null
+  // Each handle's gestures by its column, so that the half of its zone in the next header starts the same drag (E1)
+  const grips = useRef({})
   const resize = cards ? null : {
     draft: (id, w) => setDraft({ id, w }),
     commit: (id, w) => { setDraft(null); (controlled ? onColumnWidth : setOwnWidth)(id, w) },
     cancel: () => setDraft(null),
+    grips: grips.current,
   }
+  // The last data column draws no separator, nor do the columns of buttons after it (M4)
+  const lastLabelled = columns.reduce((at, c, i) => (labelled(c) ? i : at), -1)
+  const gripOf = (c) => (resize && c && c.resizable !== false && labelled(c) ? c.id : undefined)
 
   // A free-text cell stops at its ceiling or at the width set by hand, an ellipsis after it; any other column holds its content
   const cellStyle = (c) => {
@@ -278,7 +305,7 @@ export function DataTable({
     lastSort.current = sort
     if (!sort || !before || (before.key === sort.key && before.asc === sort.asc)) return
     const col = allColumns.find((c) => c.sort === sort.key)
-    if (col) setAnnounce(t('table.sortedBy', { column: plainLabel(col), order: t(sort.asc ? 'table.sortAscending' : 'table.sortDescending') }))
+    if (col) setAnnounce(t('table.sortedBy', { column: fullLabel(col), order: t(sort.asc ? 'table.sortAscending' : 'table.sortDescending') }))
   }, [sort?.key, sort?.asc]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openButton = (row, col) => {
@@ -322,7 +349,7 @@ export function DataTable({
         // On a phone the headers are gone: the same sort from a select and a button that reverses it (R5)
         <div className="toolbar mobile-sort">
           <FilterSelect id={scrollId ? `${scrollId}-sort` : undefined} label={t('table.sortBy')} value={sort?.key || ''} onChange={(v) => onSort(v)}
-            options={[...(sort?.key ? [] : [{ value: '', label: t('table.sortBy') }]), ...sortables.map((c) => ({ value: c.sort, label: t('table.sortByColumn', { column: plainLabel(c) }) }))]} />
+            options={[...(sort?.key ? [] : [{ value: '', label: t('table.sortBy') }]), ...sortables.map((c) => ({ value: c.sort, label: t('table.sortByColumn', { column: fullLabel(c) }) }))]} />
           <button type="button" className="icon-btn" data-action="reverse-sort" disabled={!sort?.key || undefined} onClick={() => onSort(sort.key)}
             aria-label={t(sort?.asc === false ? 'table.descendingReverse' : 'table.ascendingReverse')} title={t(sort?.asc === false ? 'table.descendingReverse' : 'table.ascendingReverse')}>
             <SortArrow asc={sort?.asc !== false} />
@@ -353,12 +380,17 @@ export function DataTable({
                     </th>
                   )}
                   {columns.map((c, i) => (
-                    <HeaderCell key={c.id} col={c} sort={sort} onSort={onSort} last={i === columns.length - 1}
+                    <HeaderCell key={c.id} col={c} sort={sort} onSort={onSort} last={i >= lastLabelled} lead={gripOf(columns[i - 1])}
                       className={join(k.th(c), (k.share ? c.id !== absorber : c.fit) && 'fit', columnKind(c) === 'number' && 'num')}
                       width={measuring ? undefined : held[c.id]} requested={live[c.id]} auto={laidWidths?.[c.id]} resize={resize}
                       bounds={columnBounds(c, measures?.[c.id], { wide, absorber: Boolean(c.grow) })} />
                   ))}
-                  {hasActions && <th scope="col" className={kind === 'audit' || k.share ? 'fit' : undefined}><span className="sr-only">{actionsLabel || t('common.actions')}</span></th>}
+                  {hasActions && (
+                    <th scope="col" className={kind === 'audit' || k.share ? 'fit' : undefined}>
+                      <span className="sr-only">{actionsLabel || t('common.actions')}</span>
+                      <GripLead id={gripOf(columns[columns.length - 1])} resize={resize} />
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -403,8 +435,8 @@ export function DataTable({
             </table>
           </div>
         )}
-        {/* A list without a footer gets one for Réinitialiser les colonnes while a width is set */}
-        {footer || (reset && <footer className="table-footer"><ResetColumns /></footer>)}
+        {/* A list without a footer gets one while it folds columns (R3) or a width is set */}
+        {footer || ((reset || foldedLabels.length > 0) && <footer className="table-footer"><FoldedNote /><ResetColumns /></footer>)}
       </div>
     </ColumnsReset.Provider>
     </FoldedColumns.Provider>
@@ -416,7 +448,20 @@ export function DataTable({
  * otherwise); without onSort the sorted column only shows its arrow. A separator before the next header, which is
  * the handle that sets the column's width (C2): drag, double-click for the automatic width, or from the keyboard.
  */
-function HeaderCell({ col, className, sort, onSort, last, width, requested, auto, bounds, resize }) {
+/**
+ * The half of a handle's zone that lies in the next header (E1): 12 px at its left, on the margin of its label,
+ * that starts the same drag and double-click as the handle; hidden from the keyboard and screen readers.
+ */
+function GripLead({ id, resize }) {
+  if (!id || !resize) return null
+  const grip = () => resize.grips[id]
+  return (
+    <span className="col-resize-lead" aria-hidden="true" onPointerDown={(e) => grip()?.down(e)}
+      onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => grip()?.reset(e)} />
+  )
+}
+
+function HeaderCell({ col, className, sort, onSort, last, lead, width, requested, auto, bounds, resize }) {
   const { t } = useTranslation()
   const labelId = useId()
   const thRef = useRef(null)
@@ -438,14 +483,20 @@ function HeaderCell({ col, className, sort, onSort, last, width, requested, auto
   act.current = resize
   const drag = useRef(null)
   const pending = useRef(null)
+  const pendingFrom = useRef(null)
   const [dragging, setDragging] = useState(false)
+  // The automatic width a gesture starts from: a drag or the arrows that end on it set nothing (E8)
+  const autoWidth = requested === undefined ? Math.round(now) : null
+  const keep = (w, from) => (w === from ? resize.cancel() : resize.commit(col.id, w))
   const down = (e) => {
     if (e.button !== undefined && e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
-    drag.current = { x: e.clientX, w: now, bounds, moved: null }
+    drag.current = { x: e.clientX, w: now, bounds, moved: null, from: autoWidth }
     setDragging(true)
   }
+  const reset = (e) => { e.stopPropagation(); pending.current = null; resize.commit(col.id, null) }
+  if (grip) resize.grips[col.id] = { down, reset }
   useEffect(() => {
     if (!dragging) return undefined
     const move = (e) => {
@@ -455,7 +506,8 @@ function HeaderCell({ col, className, sort, onSort, last, width, requested, auto
     }
     const up = () => {
       setDragging(false)
-      if (drag.current.moved !== null) act.current.commit(col.id, drag.current.moved)
+      const d = drag.current
+      if (d.moved !== null && d.moved !== d.from) act.current.commit(col.id, d.moved)
       else act.current.cancel()
     }
     const key = (e) => {
@@ -484,11 +536,12 @@ function HeaderCell({ col, className, sort, onSort, last, width, requested, auto
     const to = toward ? now + toward * (e.shiftKey ? RESIZE.bigStep : RESIZE.step) : { Home: bounds.min, End: bounds.max }[e.key]
     if (to !== undefined) {
       e.preventDefault()
+      if (pending.current === null) pendingFrom.current = autoWidth
       pending.current = clamp(to)
       resize.draft(col.id, pending.current)
     } else if (e.key === 'Enter' && pending.current !== null) {
       e.preventDefault()
-      resize.commit(col.id, pending.current)
+      keep(pending.current, pendingFrom.current)
       pending.current = null
     } else if (e.key === 'Escape' && pending.current !== null) {
       e.preventDefault()
@@ -503,7 +556,7 @@ function HeaderCell({ col, className, sort, onSort, last, width, requested, auto
   }
   const blur = () => {
     if (pending.current === null) return
-    resize.commit(col.id, pending.current)
+    keep(pending.current, pendingFrom.current)
     pending.current = null
   }
   const arrow = sorted ? <SortArrow asc={sort.asc} /> : button ? <SortIdle /> : null
@@ -512,8 +565,8 @@ function HeaderCell({ col, className, sort, onSort, last, width, requested, auto
   const full = col.labelFull ? { title: col.labelFull, 'aria-label': col.labelFull } : {}
   // The button says what a click does: sort by the column, or reverse the sort it shows (R4)
   const does = sorted
-    ? t('table.sortedByReverse', { column: col.labelFull || plainLabel(col), order: t(sort.asc ? 'table.sortAscending' : 'table.sortDescending') })
-    : t('table.sortByColumn', { column: col.labelFull || plainLabel(col) })
+    ? t('table.sortedByReverse', { column: fullLabel(col), order: t(sort.asc ? 'table.sortAscending' : 'table.sortDescending') })
+    : t('table.sortByColumn', { column: fullLabel(col) })
   // The header is named by its label alone, not by its handle's name too
   const named = !grip ? {} : button ? { 'aria-labelledby': labelId } : { 'aria-label': col.labelFull || col.label }
   return (
@@ -522,10 +575,11 @@ function HeaderCell({ col, className, sort, onSort, last, width, requested, auto
       {button ? <button type="button" id={grip ? labelId : undefined} data-sort={col.sort} onClick={() => onSort(col.sort)} {...full} title={does}>{content}</button> : content}
       {grip ? (
         <span className={join('col-resize', !last && 'col-sep', dragging && 'dragging')} role="separator" aria-orientation="vertical" tabIndex={0}
-          aria-label={t('table.resizeColumn', { column: col.labelFull || plainLabel(col) })} aria-valuenow={clamp(now)} aria-valuemin={bounds.min}
+          aria-label={t('table.resizeColumn', { column: fullLabel(col) })} aria-valuenow={clamp(now)} aria-valuemin={bounds.min}
           aria-valuemax={bounds.max} title={t('atelier.resizeColumn')} onPointerDown={down} onKeyDown={keyDown} onBlur={blur}
-          onDoubleClick={(e) => { e.stopPropagation(); pending.current = null; resize.commit(col.id, null) }} />
+          onDoubleClick={reset} />
       ) : !last && <span className="col-sep" aria-hidden="true" />}
+      <GripLead id={lead} resize={resize} />
     </th>
   )
 }

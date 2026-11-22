@@ -31,11 +31,10 @@ describe('shell counters', () => {
     expect(t('shell.haLate', { count: 2 })).toBe('2 nœuds en retard')
     expect(t('shell.expiringCount', { count: 1 })).toBe('1 certificat expire ou a expiré')
     expect(t('shell.approvalsPending', { count: 2 })).toBe('2 approbations en attente')
-    expect(t('shell.lockAfter', { count: 30 })).toBe('Verrouillage après 30 min d’inactivité.')
   })
 
   it('ukrainian carries the few and many forms for every counter', () => {
-    for (const k of ['expiringCount', 'approvalsPending', 'lockAfter', 'haNodes', 'haLate']) {
+    for (const k of ['expiringCount', 'approvalsPending', 'haNodes', 'haLate']) {
       for (const f of ['one', 'few', 'many', 'other']) expect(uk.shell[`${k}_${f}`]).toBeTruthy()
     }
   })

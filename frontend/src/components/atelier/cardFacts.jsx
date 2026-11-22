@@ -8,7 +8,7 @@ export const labelledFact = (label, value) => <><span className="fact-label">{la
 
 /**
  * The facts of a phone record (R5): the columns of priority 2, then 3, three at most (a list without priorities: its
- * first three); a date, a number or a yes or no (`labelled`, a number column) after its column's label (span.fact-label,
+ * first three); a date, a number or a yes or no (`labelled`, a number column) after its column's whole label (span.fact-label,
  * adjust.css: muted beside its value, G9); nothing absent.
  */
 export function cardFacts(cols, row) {
@@ -19,5 +19,5 @@ export function cardFacts(cols, row) {
       .sort((a, b) => a.c.priority - b.c.priority || a.i - b.i).map(({ c }) => c)
     : data
   return picked.map((c) => [c, c.cell(row)]).filter(([, v]) => !absent(v)).slice(0, 3)
-    .map(([c, v]) => (c.labelled || c.kind === 'number' ? labelledFact(c.label, v) : v))
+    .map(([c, v]) => (c.labelled || c.kind === 'number' ? labelledFact(c.labelFull || c.label, v) : v))
 }

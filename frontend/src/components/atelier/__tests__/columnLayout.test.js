@@ -104,13 +104,37 @@ describe('the layout of the columns: the need first (R1, R2)', () => {
   })
 
   it('then the name and the texts give way together, in proportion to what each has above its comfort floor', () => {
-    // Description at 64: 1034 needed in 1000. Above comfort: the name 20 (280), the issuer 80 (160), the owner none (150 < 160)
-    const out = layoutColumns(columns, measures, 1000)
+    // Description at its comfort, 160: 1130 needed in 1100. Above comfort: the name 20 (280), the issuer 80 (160), the owner none (150 < 160)
+    const out = layoutColumns(columns, measures, 1100)
     expect(out.folded).toEqual([])
-    near(out, { description: 64, name: 293.2, ca: 212.8, owner: 150 })
-    expect(out.caps.name.max).toBeCloseTo(293.2, 1)
-    expect(out.caps.ca.max).toBeCloseTo(212.8, 1)
+    near(out, { description: 160, name: 294, ca: 216, owner: 150 })
+    expect(out.caps.name.max).toBeCloseTo(294, 1)
+    expect(out.caps.ca.max).toBeCloseTo(216, 1)
     expect(out.caps.owner).toBeUndefined()
+  })
+
+  it('the growing text keeps its comfort while a column of priority 3 or 4 can fold: rather than 64 px, it folds (R8)', () => {
+    // At comfort the columns need 1030 in 1000: the description (priority 4) folds, the name takes the room left
+    const out = layoutColumns(columns, measures, 1000)
+    expect(out.folded).toEqual(['description'])
+    expect(out.absorber).toBe('name')
+    near(out, { name: 330, ca: 240, owner: 150 })
+    // A growing text of priority 2 stays: the columns of priority 3 fold first, then it goes down to 64 before the name
+    const kept = columns.map((c) => (c.id === 'description' ? { ...c, priority: 2 } : c))
+    const tight = layoutColumns(kept, measures, 1000)
+    expect(tight.folded).toEqual(['source'])
+    near(tight, { description: 160, name: 288, ca: 192 })
+    // Only priority 2 left to fold: the growing text goes first, down to its hard floor
+    const hard = layoutColumns(kept, measures, 800)
+    expect(hard.folded).toEqual(['source', 'owner'])
+    near(hard, { description: 64, name: 297.2, ca: 228.8 })
+  })
+
+  it('a short growing text never grows to reach its comfort: under 160 px of need it keeps its need', () => {
+    const short = { ...measures, description: { natural: 120, header: 50 } }
+    expect(layoutColumns(columns, short, 1060).folded).toEqual([])
+    expect(layoutColumns(columns, short, 1080).widths.description).toBe(120)
+    expect(layoutColumns(columns, short, 980).folded).toEqual(['description'])
   })
 
   it('rather than go under comfort, a column of priority 4 folds, then those of priority 3, right to left', () => {
@@ -199,11 +223,12 @@ describe('a width set by hand (C2): a fixed need, never at the cost of the folds
     expect(out.fixed).toEqual({ ca: 400, source: 120 })
     expect(out.widths).toMatchObject({ ca: 400, source: 120, name: 300, description: 820 })
     expect(out.caps.ca).toEqual({ min: 400, max: 400 })
-    // Short of room the name gives way, the issuer set by hand does not
-    const tight = layoutColumns(columns, measures, 1180, { fixed: { ca: 400 } })
+    // Short of room the description goes to its comfort, then the name gives way, the issuer set by hand does not
+    const tight = layoutColumns(columns, measures, 1280, { fixed: { ca: 400 } })
     expect(tight.folded).toEqual([])
     expect(tight.widths.ca).toBe(400)
-    expect(tight.widths.name).toBeCloseTo(286, 1)
+    expect(tight.widths.description).toBe(160)
+    expect(tight.widths.name).toBeCloseTo(290, 1)
   })
 
   it('a widened column does not stop the folds: they come first, in their declared order', () => {

@@ -60,6 +60,7 @@ import { SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard } f
 import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Pill, SkeletonPanel, jumpTo } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsSaveBar } from '../components/atelier/SettingsView'
+import { DockSlot, DockSlotProvider } from './protocols/dockSlot'
 import SettingsHistory from './settings/SettingsHistory'
 import { fieldProblems, fieldSection } from './settings/fieldChecks'
 import { changedLabels } from './settings/fieldLabels'
@@ -2260,7 +2261,9 @@ export default function SettingsPage() {
       {reconnecting && (
         <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
       )}
-      <Zone testId="settings-page">
+      {/* A section's inspector (the scheduler's tasks) is drawn where the zone draws its dock */}
+      <DockSlotProvider>
+      <Zone testId="settings-page" dock={<DockSlot />}>
         {head}
         <SavePartsContext.Provider value={parts.api}>
           <SettingsLayout
@@ -2298,6 +2301,7 @@ export default function SettingsPage() {
           </SettingsLayout>
         </SavePartsContext.Provider>
       </Zone>
+      </DockSlotProvider>
 
       {/* Backup: the password, then the running backup, then its archive to download */}
       {showBackupModal && (

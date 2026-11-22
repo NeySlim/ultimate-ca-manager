@@ -6,6 +6,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from '../../../components/atelier'
+import { Breakable } from '../../../components/atelier/Breakable'
 import { formatDate, extractCN } from '../../../lib/utils'
 import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex, certTypeLabel, originLabel, complianceReasonLabel } from '../../../lib/certificateDetail'
 import { compactAgo } from '../../../lib/relativeTime'
@@ -129,11 +130,11 @@ function Identity({ cert, onOpenRelated }) {
       <h3 className="section-title">{t('inspector.cert.identity')}</h3>
       <Props items={[
         [t('common.description'), cert.descr && cert.descr !== cert.common_name ? cert.descr : none],
-        [t('inspector.cert.altName'), sans.length ? sans.map((s, i) => <Fragment key={i}>{i > 0 && <br />}{s}</Fragment>) : none],
+        [t('inspector.cert.altName'), sans.length ? sans.map((s, i) => <Fragment key={i}>{i > 0 && <br />}<Breakable text={s} /></Fragment>) : none],
         [t('common.keyAlgorithm'), certificateKeyLabel(cert, t) || '—'],
         [t('inspector.cert.signature'), <>{sig || '—'}{weakSig && <> <span className="warn"><Icon name="warning" />{t('inspector.cert.obsolete')}</span></>}</>],
         [t('inspector.cert.origin'), [sourceLabel(sourceOf(cert), t), template].filter(Boolean).join(' / ')],
-        [t('inspector.cert.serial'), serialHex(cert.serial_number) || '—', 'mono'],
+        [t('inspector.cert.serial'), <Breakable text={serialHex(cert.serial_number) || '—'} />, 'mono'],
         // The product's own facts, after the mockup's
         [t('common.privateKey'), cert.has_private_key ? t('inspector.cert.keyHeld') : <span className="muted">{t('inspector.cert.keyNotHeld')}</span>],
         relatedId != null && [t('certificates.hybrid.relatedCertificate'), (
@@ -151,7 +152,8 @@ function Identity({ cert, onOpenRelated }) {
 function MoreDetails({ cert }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const row = (label, value, mono) => (value ? [label, value, mono ? 'mono' : undefined] : null)
+  // A long identifier wraps after its separators (a DN, a digest), never letter by letter while it can
+  const row = (label, value, mono) => (value ? [label, typeof value === 'string' ? <Breakable text={value} /> : value, mono ? 'mono' : undefined] : null)
   const breakdown = Object.entries(cert.compliance?.breakdown || {}).filter(([, v]) => v && v.score !== undefined)
   const scts = cert.ct_scts || []
   const id = `more-details-${cert.id}`

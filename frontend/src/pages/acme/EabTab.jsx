@@ -284,7 +284,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
           { id: 'kid', label: t('acme.eab.kid'), cell: (c) => <span className="mono">{c.kid}</span>, kind: 'text', priority: 4, title: (c) => c.kid, sort: 'kid' },
           { id: 'domains', label: t('acme.eab.allowedDomains'), cell: (c) => <span data-testid={`eab-domains-${c.id}`}>{domainsText(c)}</span>, grow: true,
             kind: 'text', priority: 3, title: domainsText, sort: 'domains' },
-          { id: 'created', label: t('acme.eab.created'), cell: (c) => dateOf(c.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created' },
+          { id: 'created', label: t('acme.eab.created'), labelFull: t('table.fullCreated'), cell: (c) => dateOf(c.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created' },
           { status: true, sort: 'state' },
         ]}
         rowActions={canDelete ? (c) => [removeAction(c)] : undefined}

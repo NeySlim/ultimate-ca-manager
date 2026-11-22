@@ -25,8 +25,9 @@ import { cardFacts } from './cardFacts'
  * @param {ReturnType<import('./useClientList').useClientList>} [p.list]  a list sorted and paged in memory: its rows, sort and
  *   pagination take the place of rows, sort, onSort and footer.pagination
  * @param {string} [p.storageKey]  where the widths set by hand are kept; by default a key of the page and its columns
+ * @param {string} [p.scrollId]  the region's id, its own where several lists share a page (the settings)
  */
-export function ListView({ filters, label, caption, icon, rows: allRows, rowKey, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions, sort: serverSort, onSort: serverOnSort, nameSort, nameExtra, list, storageKey }) {
+export function ListView({ filters, label, caption, icon, rows: allRows, rowKey, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions, sort: serverSort, onSort: serverOnSort, nameSort, nameExtra, list, storageKey, scrollId = 'module-scroll' }) {
   const { t } = useTranslation()
   const rows = list ? list.rows : allRows
   const sort = list ? list.sort : serverSort
@@ -50,7 +51,7 @@ export function ListView({ filters, label, caption, icon, rows: allRows, rowKey,
       <section className="table-workspace module-workspace" aria-label={label}>
         {toolbar}
         {error || (
-          <DataTable kind="module" scrollId="module-scroll" label={t('atelier.tableOf', { name: label })} caption={caption}
+          <DataTable kind="module" scrollId={scrollId} label={t('atelier.tableOf', { name: label })} caption={caption}
             columns={cols} rows={rows} rowKey={rowKey} rowLabel={title} sort={sort} onSort={onSort} onOpen={onOpen} openedId={openedId} loading={loading} empty={empty}
             openLabel={(row) => t('atelier.openDetail', { name: title(row) })} card={card} selection={selection} rowActions={rowActions}
             footer={foot && <TableFooter {...foot} />} widthsKey={storageKey} />

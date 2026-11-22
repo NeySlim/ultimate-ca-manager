@@ -147,6 +147,8 @@ describe('the SCEP lists', () => {
     mobile.isMobile = true
     const at = renderAtUrl(<SCEPPage />, '/scep-config?tab=requests')
     await screen.findAllByRole('button', { name: 'beta' })
-    expect(recordFacts(at.container)[0][0]).toMatch(/^scep\.requested /)
+    expect(recordFacts(at.container)[0][0]).toMatch(/^table\.fullRequested /)
+    // The profile named by its column, never a bare « #2 » (E11)
+    expect(recordFacts(at.container)[0][1]).toMatch(/^scep\.columns\.profile /)
   })
 })

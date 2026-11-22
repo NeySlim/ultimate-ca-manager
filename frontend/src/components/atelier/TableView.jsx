@@ -62,9 +62,8 @@ export function TableView({
       </Toolbar>
       {applied}
       {batch}
-      {/* With the Colonnes dialog, Réinitialiser les colonnes is there, not in the footer (C2) */}
-      <DataTable label={tableLabel} columns={shown} {...(storageKey ? { columnWidths: widths, onColumnWidth: setWidth } : {})}
-        footerReset={!columnsDialog} {...table} />
+      {/* Réinitialiser les colonnes is in the footer, the Colonnes dialog keeps its own (E7) */}
+      <DataTable label={tableLabel} columns={shown} {...(storageKey ? { columnWidths: widths, onColumnWidth: setWidth } : {})} {...table} />
       <div className="table-caption">
         <span>{captionNote}</span>
         <span>{t('table.rowsNote', { px: comfortable ? 44 : 36, count })}</span>

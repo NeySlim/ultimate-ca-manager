@@ -9,8 +9,9 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import { render, act, screen, fireEvent, within } from '@testing-library/react'
 
+const lang = vi.hoisted(() => ({ value: 'fr' }))
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), i18n: { language: 'fr' } }),
+  useTranslation: () => ({ t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), i18n: { language: lang.value } }),
 }))
 vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: false }) }))
 
@@ -54,7 +55,7 @@ afterAll(() => {
   HTMLElement.prototype.scrollIntoView = saved.scroll
   global.ResizeObserver = saved.RO
 })
-beforeEach(() => { room.width = 1400; observers.clear() })
+beforeEach(() => { room.width = 1400; observers.clear(); lang.value = 'fr' })
 
 const resize = (w) => act(() => { room.width = w; for (const o of [...observers]) o.cb([]) })
 const heads = (c) => [...c.querySelectorAll('thead th')].map((th) => idOf(th) || '·')
@@ -94,10 +95,10 @@ describe('one column takes the room left', () => {
       expect(cellOf(container, 'ca').style.maxWidth).toBe('')
       expect(cellOf(container, 'ca')).toHaveClass('text-cell')
       expect(cellOf(container, 'ca')).toHaveAttribute('title', 'UCM Production Intermediate CA')
-      // 1360 of room: the description at 64, the name and the issuer share the last 4 px above their comfort
+      // 1360 of room: the description at its comfort, 160 (R8), the name and the issuer share the last 100 px above theirs
       resize(1400)
-      expect(parseFloat(cellOf(container, 'name').style.maxWidth)).toBeCloseTo(518.04, 1)
-      expect(parseFloat(cellOf(container, 'ca').style.maxWidth)).toBeCloseTo(407.96, 1)
+      expect(parseFloat(cellOf(container, 'name').style.maxWidth)).toBeCloseTo(471.02, 1)
+      expect(parseFloat(cellOf(container, 'ca').style.maxWidth)).toBeCloseTo(358.98, 1)
       expect(cellOf(container, 'expiry').style.maxWidth).toBe('')
     } finally { Object.assign(NATURAL, before) }
   })
@@ -178,6 +179,61 @@ describe('short of room, at any desktop width', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('checkbox', { name: 'Description' })).toBeChecked()
     expect(within(dialog).getByRole('checkbox', { name: 'Clé' })).toBeChecked()
+  })
+})
+
+describe('measured again when the content changes under the same rows (E3)', () => {
+  // The key column's content grows (a longer label, a state that becomes « Révoqué ») without a new row nor width
+  const grown = (body) => {
+    const before = NATURAL.key
+    try { return body(() => { NATURAL.key = 300 }) } finally { NATURAL.key = before }
+  }
+
+  it('a change of language measures the columns again: the longer words fold one more column', () => grown((grow) => {
+    room.width = 850
+    const { container, rerender } = render(table())
+    expect(heads(container)).toEqual(['name', 'status', 'ca', 'source', 'expiry', 'key', '·'])
+    grow()
+    lang.value = 'de'
+    rerender(table())
+    expect(heads(container)).toEqual(['name', 'status', 'ca', 'source', 'expiry', '·'])
+    expect(container.querySelector('.folded-note')).toHaveTextContent('{"count":2}')
+  }))
+
+  it('a region that overflows after a render measures once more, once per key, and settles', () => grown((grow) => {
+    room.width = 850
+    const saved = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth')
+    const over = { on: false }
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() { return this.classList?.contains('table-scroll') && over.on ? room.width + 60 : 0 },
+    })
+    try {
+      const { container, rerender } = render(table())
+      expect(heads(container)).toEqual(['name', 'status', 'ca', 'source', 'expiry', 'key', '·'])
+      grow()
+      over.on = true
+      rerender(table({ rows: [...rows] }))
+      expect(heads(container)).toEqual(['name', 'status', 'ca', 'source', 'expiry', '·'])
+      // Still too wide for the test's region: no further measure, no loop
+      rerender(table({ rows: [...rows] }))
+      expect(heads(container)).toEqual(['name', 'status', 'ca', 'source', 'expiry', '·'])
+    } finally {
+      if (saved) Object.defineProperty(HTMLElement.prototype, 'scrollWidth', saved); else delete HTMLElement.prototype.scrollWidth
+    }
+  }))
+})
+
+describe('a list without a footer of its own (M2)', () => {
+  it('gets one that says how many columns it folded, and their whole names', () => {
+    room.width = 850
+    const cols = columns.map((c) => (c.id === 'description' ? { ...c, labelFull: 'Description du certificat' } : c))
+    const { container } = render(table({ columns: cols, footer: undefined, kind: 'module' }))
+    const note = container.querySelector('.table-container > footer.table-footer > .folded-note')
+    expect(note).toHaveTextContent('table.foldedColumns {"count":1}')
+    expect(note).toHaveAttribute('title', 'Description du certificat')
+    resize(1400)
+    expect(container.querySelector('.table-footer')).toBeNull()
   })
 })
 

@@ -34,14 +34,20 @@
 :root .atl .table-container :is(th,td).check-col{width:40px;min-width:40px;padding:0 6px}
 /* A separator between two data headers, 1 by 16 px at rest; the grip that sets a width shows 2 px of accent (H1). */
 :root .atl{--col-sep:color-mix(in srgb,var(--control) 80%,var(--text))}
-:root .atl .table-container th:has(>.col-sep,>.col-resize){position:relative}
+:root .atl .table-container th:has(>.col-sep,>.col-resize,>.col-resize-lead){position:relative}
 :root .atl .table-container th>.col-sep:not(.col-resize){position:absolute;top:0;bottom:0;right:0;width:1px;pointer-events:none}
 :root .atl .table-container th>:is(.col-sep,.col-resize):before{content:'';position:absolute;right:0;top:calc(50% - 8px);width:1px;height:16px}
 :root .atl .table-container th>.col-sep:before{background:var(--col-sep)}
 /* The separator is the handle that sets a column's width (C2): the same line at rest, 12 px to grab at the right of its
    header (inside it, so that it neither clips nor widens anything), the accent on hover, focus and drag. */
 :root .atl .table-container th>.col-resize{position:absolute;top:0;bottom:0;right:0;width:12px;z-index:1;cursor:col-resize;touch-action:none;background:none;outline:none}
-:root .atl .table-container th>.col-resize:is(:hover,:focus-visible,.dragging):before{top:0;height:100%;width:2px;background:var(--accent)}
+:root .atl .table-container th>.col-resize:is(:hover,:focus-visible,.dragging):before,:root .atl .table-container th:has(+th>.col-resize-lead:hover)>.col-resize:before{top:0;height:100%;width:2px;background:var(--accent)}
+/* The other half of the zone, 12 px in the next header over its label's margin: 24 px across the line (E1, WCAG 2.5.8). */
+:root .atl .table-container th>.col-resize-lead{position:absolute;top:0;bottom:0;left:0;width:12px;z-index:1;cursor:col-resize;touch-action:none}
+@media(max-width:1100px){:root .atl .table-container th>:is(.col-resize,.col-resize-lead){width:10px}}
+:root .atl #app.dock-right .table-container th>:is(.col-resize,.col-resize-lead){width:10px}
+/* The keyboard focus of a handle reads apart from its hover: a ring inside the header around the line (E8). */
+:root .atl .table-container th>.col-resize:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 :root body.col-resizing,:root body.col-resizing *{cursor:col-resize!important;user-select:none}
 /* Réinitialiser les colonnes sits after the range and the folded columns, the page controls at the right. */
 :root .atl .table-footer .folded-note:has(+.reset-columns){margin-right:0}
@@ -61,6 +67,10 @@
 :root .atl .table-container th.num>button[data-sort]{justify-content:flex-end}
 @media(max-width:1100px){:root .atl .table-container .cert-table th>button[data-sort]{padding:0 10px}}
 :root .atl #app.dock-right .table-container .cert-table th>button[data-sort]{padding:0 10px}
+/* The first header of a module list or a journal starts on its cells' text: 14 and 16 px at every width (M1). */
+@media(max-width:1100px){:root .atl .table-container .module-table th:first-child:not(.check-col)>button[data-sort]{padding-left:14px}}
+:root .atl #app.dock-right .table-container .module-table th:first-child:not(.check-col)>button[data-sort]{padding-left:14px}
+:root .atl .table-container .audit-table th:first-child>button[data-sort]{padding-left:16px}
 :root .atl .table-container th>button[data-sort]:is(:hover,:focus-visible){color:var(--text);background-color:transparent}
 :root .atl .table-container th>button:focus-visible{outline-offset:-2px}
 /* A number at the right keeps 28 px from the data column after it, a date reads apart from it (G10). */

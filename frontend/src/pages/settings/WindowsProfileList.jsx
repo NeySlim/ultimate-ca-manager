@@ -101,7 +101,7 @@ export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, re
 
   return (
     <>
-      <ListView label={t('xcepWstep.profilesTitle')} icon="monitor" rows={rows} loading={loading} sort={sort} onSort={onSort} nameSort="name"
+      <ListView label={t('xcepWstep.profilesTitle')} icon="monitor" rows={rows} loading={loading} sort={sort} onSort={onSort} nameSort="name" scrollId="windows-profiles-scroll"
         title={(row) => row.name} status={(row) => <Pill tone={STATE_TONE[row.state] || 'muted'} label={t(`xcepWstep.state.${row.state}`)} />}
         nameExtra={(row) => (
           <>

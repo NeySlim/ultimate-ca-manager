@@ -111,8 +111,8 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
           { id: 'issuer', label: t('common.issuer'), cell: (r) => r.issuer || t('common.unknown'), kind: 'text', priority: 2 },
           { id: 'source', label: t('common.source'), cell: sourceLabel, kind: 'fit', priority: 3, sort: 'source' },
           { id: 'method', label: t('acme.method'), cell: (r) => r.challenge_type?.toUpperCase() || '—', kind: 'fit', priority: 3 },
-          { id: 'expires', label: t('common.expires'), cell: (r) => dateOf(r.valid_to, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'valid_to' },
-          { id: 'issued', label: t('common.issued'), cell: (r) => dateOf(r.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
+          { id: 'expires', label: t('common.expires'), labelFull: t('table.fullExpires'), cell: (r) => dateOf(r.valid_to, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'valid_to' },
+          { id: 'issued', label: t('common.issued'), labelFull: t('table.fullIssued'), cell: (r) => dateOf(r.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
           { status: true, sort: 'status' },
         ]}
         empty={narrowed ? (

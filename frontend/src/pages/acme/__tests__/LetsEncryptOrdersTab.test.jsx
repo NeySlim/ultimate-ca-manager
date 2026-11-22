@@ -56,7 +56,7 @@ describe('LetsEncryptOrdersTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
     fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
     expect(bodyRows()[0]).toHaveTextContent('h39.example.com')
-    for (const name of ['acme.accountOrCa', 'acme.environment', 'acme.method', 'common.created', 'atelier.state']) {
+    for (const name of ['acme.accountOrCa', 'acme.environment', 'acme.method', 'table.fullCreated', 'atelier.state']) {
       fireEvent.click(screen.getByRole('button', { name }))
       expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
     }

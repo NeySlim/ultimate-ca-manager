@@ -75,17 +75,17 @@ function useColumns(t) {
           extra: (r) => r.has_private_key && <span className="key-presence" title={t('common.hasKey')}><Icon name="key" /></span> },
         { id: 'status', label: t('common.status'), kind: 'fit', priority: 1, value: (r) => CERT_RANK.indexOf(certStatus(r)), cell: status },
         { id: 'issuer', label: t('common.issuer'), kind: 'text', priority: 2, value: (r) => extractCN(r.issuer) || r.issuer_name || null, cell: issuer },
-        { id: 'valid_to', label: t('common.expires'), kind: 'fit', priority: 2, labelled: true, value: time('valid_to'), cell: date('valid_to') },
+        { id: 'valid_to', label: t('common.expires'), labelFull: t('table.fullExpires'), kind: 'fit', priority: 2, labelled: true, value: time('valid_to'), cell: date('valid_to') },
       ],
       cas: [
         { id: 'name', label: t('common.name'), kind: 'entity', priority: 1, value: name, cell: name },
         { id: 'subject', label: t('common.subject'), kind: 'text', priority: 4, value: (r) => extractCN(r.subject) || r.subject || null, cell: subject },
-        { id: 'valid_to', label: t('common.expires'), kind: 'fit', priority: 2, labelled: true, value: time('valid_to'), cell: date('valid_to') },
+        { id: 'valid_to', label: t('common.expires'), labelFull: t('table.fullExpires'), kind: 'fit', priority: 2, labelled: true, value: time('valid_to'), cell: date('valid_to') },
       ],
       csrs: [
         { id: 'name', label: t('common.name'), kind: 'entity', priority: 1, value: name, cell: name },
         { id: 'subject', label: t('common.subject'), kind: 'text', priority: 4, value: (r) => extractCN(r.subject) || r.subject || null, cell: subject },
-        { id: 'created_at', label: t('common.created'), kind: 'fit', priority: 2, labelled: true, value: time('created_at'), cell: date('created_at') },
+        { id: 'created_at', label: t('common.created'), labelFull: t('table.fullCreated'), kind: 'fit', priority: 2, labelled: true, value: time('created_at'), cell: date('created_at') },
       ],
       templates: [
         { id: 'name', label: t('common.name'), kind: 'entity', priority: 1, value: (r) => r.name || null, cell: (r) => r.name || '—' },

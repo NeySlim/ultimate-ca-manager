@@ -70,6 +70,8 @@ describe('WindowsProfileList', () => {
     expect(mocks.list).toHaveBeenCalledWith({ page: 1, per_page: 25, ...BY_NAME })
     expect(screen.queryByText('profile-026')).not.toBeInTheDocument()
     expect(screen.getAllByText(/^profile-\d{3}$/)).toHaveLength(25)
+    // Its own region among the settings' lists (E12)
+    expect(screen.getByText('profile-001').closest('.table-scroll')).toHaveAttribute('id', 'windows-profiles-scroll')
   })
 
   it('sends the search to the server', async () => {

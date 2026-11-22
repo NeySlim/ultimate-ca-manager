@@ -111,8 +111,8 @@ describe('Backup: the restore file', () => {
 describe('Backup: the archives in the module table', () => {
   it('sorts by its headers alone, the server order kept in the query: a new column ascending, the sorted one reversed (T3)', () => {
     const p = backup({ backups: archives, backupQuery: { sort: 'created_desc' } })
-    expect(screen.getByRole('columnheader', { name: /common.created/ })).toHaveAttribute('aria-sort', 'descending')
-    fireEvent.click(screen.getByRole('button', { name: /common.created/ }))
+    expect(screen.getByRole('columnheader', { name: /table.fullCreated/ })).toHaveAttribute('aria-sort', 'descending')
+    fireEvent.click(screen.getByRole('button', { name: /table.fullCreated/ }))
     expect(p.updateBackupQuery).toHaveBeenLastCalledWith({ sort: 'created_asc' })
     fireEvent.click(screen.getByRole('button', { name: /settings.backupSize/ }))
     expect(p.updateBackupQuery).toHaveBeenLastCalledWith({ sort: 'size_asc' })
@@ -145,6 +145,8 @@ describe('Backup: the archives in the module table', () => {
     mocks.mobile.isMobile = true
     const p = backup({ backups: archives })
     const card = screen.getByText('a.ucmbkp').closest('.mobile-record')
+    // Its date and its size named by their columns (M3)
+    expect([...card.querySelectorAll('.row-meta .fact-label')].map((l) => l.textContent)).toEqual(['table.fullCreated', 'settings.backupSize'])
     fireEvent.click(within(card).getByTitle('common.download'))
     expect(p.handleDownloadBackup).toHaveBeenCalledWith('a.ucmbkp')
     fireEvent.click(within(card).getByTitle('common.delete'))

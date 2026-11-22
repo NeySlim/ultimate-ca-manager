@@ -1002,7 +1002,7 @@ export default function CSRsPage() {
           { id: 'subject', label: t('csrs.module.subject'), cell: csrSubject, kind: 'text', grow: true, priority: 2, sort: 'cn' },
           { id: 'requester', label: t('csrs.module.requester'), cell: csrRequester, kind: 'text', priority: 3, sort: 'requester' },
           { id: 'key', label: t('csrs.module.key'), cell: csrKey, kind: 'fit', priority: 3, sort: 'key_type' },
-          { id: 'submitted', label: t('csrs.module.submitted'), cell: csrDate, kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
+          { id: 'submitted', label: t('csrs.module.submitted'), labelFull: t('table.fullSubmitted'), cell: csrDate, kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
           { status: true },
         ]}
         error={loadError && (
