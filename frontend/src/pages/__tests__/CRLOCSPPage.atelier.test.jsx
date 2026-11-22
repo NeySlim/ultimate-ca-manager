@@ -20,7 +20,9 @@ const notify = vi.hoisted(() => ({
   showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(), showConfirm: vi.fn().mockResolvedValue(true),
 }))
 const perms = vi.hoisted(() => ({ crl: true, cas: true }))
-vi.mock('../../contexts', () => ({ useNotification: () => notify, useMobile: () => ({ isMobile: false }) }))
+const mobile = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('../../contexts', () => ({ useNotification: () => notify, useMobile: () => mobile }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => mobile }))
 vi.mock('../../hooks', async () => {
   const persisted = await vi.importActual('../../hooks/usePersistedState')
   return {
@@ -55,6 +57,7 @@ import { crlState } from '../protocols/protocolStates'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mobile.isMobile = false
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   localStorage.clear()
@@ -142,6 +145,33 @@ describe('the CRL / OCSP list', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'old' } })
     expect(within(footer).queryByRole('button', { name: 'table.nextPage' })).toBeNull()
     expect(footer).toHaveTextContent('crlOcsp.range {"shown":1,"count":34}')
+  })
+
+  it('opens on the nearest next update, keeps the sort in the address, and reads it back', async () => {
+    const at = renderAtUrl(<CRLOCSPPage />, '/crl-ocsp')
+    await screen.findByRole('button', { name: 'Services CA' })
+    const sorted = () => screen.getAllByRole('columnheader').filter((h) => /ending/.test(h.getAttribute('aria-sort') || ''))
+    expect(sorted().map((h) => [h.textContent, h.getAttribute('aria-sort')])).toEqual([['crlOcsp.nextUpdate', 'ascending']])
+    // Old CA's CRL is overdue (1 Nov), Internal CA's is due tomorrow: the nearest first, the CA without a CRL last
+    expect([...at.container.querySelectorAll('tbody tr .entity-name')].map((n) => n.textContent)).toEqual(['Old CA', 'Internal CA', 'Services CA', 'New CA'])
+    fireEvent.click(screen.getByRole('button', { name: 'crlOcsp.columns.published' }))
+    expect(at.where()).toBe('/crl-ocsp?sort=published&order=asc')
+    at.unmount()
+    const again = renderAtUrl(<CRLOCSPPage />, '/crl-ocsp?sort=number&order=desc')
+    await screen.findByRole('button', { name: 'Services CA' })
+    expect(screen.getByRole('columnheader', { name: 'CRL' })).toHaveAttribute('aria-sort', 'descending')
+    expect(again.container.querySelector('tbody tr')).toHaveTextContent('crlOcsp.numberOf {"number":1842}')
+  })
+
+  it('draws the facts of a record by priority, the dates after their label', async () => {
+    mobile.isMobile = true
+    const { container } = page()
+    await screen.findAllByRole('button', { name: 'Services CA' })
+    const facts = [...container.querySelectorAll('article.mobile-record')[2].querySelectorAll('.row-meta > span')].map((s) => s.textContent)
+    expect(facts[0]).toMatch(/^crlOcsp\.nextUpdate /)
+    expect(facts[1]).toBe('crlOcsp.numberOf {"number":1842}')
+    expect(facts[2]).toMatch(/^crlOcsp\.columns\.published /)
+    expect(screen.getByRole('combobox', { name: 'table.sortBy' })).toHaveValue('next')
   })
 
   it('computes the state on the CRL dates (M12), never on the publish cadence', () => {

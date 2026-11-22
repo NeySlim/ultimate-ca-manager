@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
-  Section, Props, RecordList, RecordRow, LoadError, LoadCause, NoMatch, useClientList,
+  Section, Props, RecordList, RecordRow, LoadError, LoadCause, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { CRLDeploySection } from '../components/CRLDeploySection'
@@ -33,6 +33,8 @@ const DELTA = [1, 2, 4, 8, 12, 24]
 const URL_FIELDS = { cdp: 'cdp_urls', ocsp: 'ocsp_urls', aia: 'aia_ca_issuers_urls' }
 
 const CRL_SECTIONS = ['overview', 'publication', 'ocsp', 'distribution']
+const NEXT_FIRST = { key: 'next', asc: true }
+const CRL_SORT_KEYS = ['name', 'number', 'published', 'next', 'ocsp', 'state']
 
 export default function CRLOCSPPage() {
   const { t, i18n } = useTranslation()
@@ -351,8 +353,11 @@ export default function CRLOCSPPage() {
   const present = STATE_ORDER.filter((s) => rows.some((r) => stateOf(r) === s))
   const active = present.includes(state) ? state : ''
   const shown = searched.filter((r) => !active || stateOf(r) === active)
+  // The nearest next update first (E16), kept in the address
+  const sortParam = useSortParam(NEXT_FIRST, CRL_SORT_KEYS)
   const list = useClientList(shown, {
     resetKey: `${query}|${active}`,
+    sortParam,
     sorts: {
       name, number: (r) => (r.has_crl ? r.crl_number : null), published: (r) => r.crl_updated && Date.parse(r.crl_updated),
       next: (r) => r.crl_next_update && Date.parse(r.crl_next_update), ocsp: (r) => (r.ocsp_enabled ? 0 : 1), state: (r) => STATE_ORDER.indexOf(stateOf(r)),
@@ -613,10 +618,10 @@ export default function CRLOCSPPage() {
         )}
         title={name} status={pill} openedId={openId} onOpen={openCa}
         columns={[
-          { id: 'number', label: 'CRL', cell: number, grow: true, sort: 'number' },
-          { id: 'published', label: t('crlOcsp.columns.published'), cell: published, sort: 'published' },
-          { id: 'next', label: t('crlOcsp.nextUpdate'), cell: next, sort: 'next' },
-          { id: 'ocsp', label: 'OCSP', cell: ocsp, sort: 'ocsp' },
+          { id: 'number', label: 'CRL', cell: number, kind: 'fit', priority: 3, sort: 'number' },
+          { id: 'published', label: t('crlOcsp.columns.published'), cell: published, kind: 'fit', priority: 3, labelled: true, sort: 'published' },
+          { id: 'next', label: t('crlOcsp.nextUpdate'), cell: next, kind: 'fit', priority: 2, labelled: true, sort: 'next' },
+          { id: 'ocsp', label: 'OCSP', cell: ocsp, kind: 'fit', priority: 3, sort: 'ocsp' },
           { status: true, sort: 'state' },
         ]}
         error={loadError && (

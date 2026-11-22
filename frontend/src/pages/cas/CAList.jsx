@@ -4,7 +4,7 @@
  * action per row and the chevron that shows the authority beside the list. On a phone each one is a record.
  */
 import { useMemo } from 'react'
-import { DataTable, TableFooter, useClientList } from '../../components/atelier'
+import { DataTable, TableFooter, useClientList, useSortParam } from '../../components/atelier'
 import { formatDate } from '../../lib/utils'
 import { caState, nameOfCA } from './caTree'
 import { CAStatePill, CAMarks } from './CAState'
@@ -20,6 +20,7 @@ const SORTERS = {
   algorithm: (r) => r.algorithm,
 }
 const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = Object.keys(SORTERS)
 
 /** resetKey: the search and the view, whose change goes back to page one. */
 export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, resetKey, t }) {
@@ -38,18 +39,20 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, r
     // Equal values keep the order of the ids, as before the sort
     return list.sort((a, b) => a.id - b.id)
   }, [cas, allCAs, t])
-  const list = useClientList(all, { sorts: SORTERS, initial: BY_NAME, resetKey })
+  // The sort lives in the address (?sort=&order=), the name ascending by default
+  const sortParam = useSortParam(BY_NAME, SORT_KEYS)
+  const list = useClientList(all, { sorts: SORTERS, sortParam, resetKey })
 
   const columns = [
-    { id: 'name', label: t('common.name'), sort: 'name', entity: true, grow: true, title: (r) => r.subject || r.label,
+    { id: 'name', label: t('common.name'), sort: 'name', kind: 'entity', priority: 1, grow: true, title: (r) => r.subject || r.label,
       icon: (r) => (r.type === 'root' ? 'shield' : 'branch'), cell: (r) => r.label,
       extra: (r) => <span className="ca-badges"><CAMarks ca={r} t={t} orphan={r.orphan} /></span> },
-    { id: 'type', label: t('common.type'), sort: 'type', tone: 'muted', fit: true, cell: (r) => r.type_label },
-    { id: 'state', label: t('common.status'), sort: 'state', fit: true, cell: (r) => <CAStatePill ca={r} t={t} /> },
-    { id: 'parent', label: t('cas.parentCA'), sort: 'parent', tone: 'muted', cell: (r) => r.parent_name || '—' },
-    { id: 'certs', label: t('common.certificates'), sort: 'certs', fit: true, cell: (r) => r.certs },
-    { id: 'expiry', label: t('common.expires'), sort: 'expiry', fit: true, cell: (r) => (r.valid_to && r.state !== 'pending' ? formatDate(r.valid_to, { time: false }) : '—') },
-    { id: 'algorithm', label: t('common.algorithm'), sort: 'algorithm', tone: ['muted', 'small'], fit: true, cell: (r) => r.algorithm || '—' },
+    { id: 'type', label: t('common.type'), sort: 'type', kind: 'fit', priority: 3, tone: 'muted', cell: (r) => r.type_label },
+    { id: 'state', label: t('common.status'), sort: 'state', kind: 'fit', priority: 1, cell: (r) => <CAStatePill ca={r} t={t} /> },
+    { id: 'parent', label: t('cas.parentCA'), sort: 'parent', kind: 'text', priority: 2, tone: 'muted', cell: (r) => r.parent_name || '—' },
+    { id: 'certs', label: t('common.certificates'), sort: 'certs', kind: 'number', priority: 3, cell: (r) => r.certs },
+    { id: 'expiry', label: t('common.expires'), sort: 'expiry', kind: 'fit', priority: 2, cell: (r) => (r.valid_to && r.state !== 'pending' ? formatDate(r.valid_to, { time: false }) : '—') },
+    { id: 'algorithm', label: t('common.algorithm'), sort: 'algorithm', kind: 'fit', priority: 3, tone: ['muted', 'small'], cell: (r) => r.algorithm || '—' },
   ]
 
   return (

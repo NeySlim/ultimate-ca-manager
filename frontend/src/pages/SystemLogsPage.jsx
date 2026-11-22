@@ -49,6 +49,9 @@ function useSettled(value, delay = TYPING_PAUSE_MS) {
 
 const levelPill = (level) => (level ? <Pill label={level} tone={LEVEL_TONE[level]?.tone} icon={LEVEL_TONE[level]?.icon} /> : null)
 
+// The file's lines, newest first: the time shows its arrow, and nothing else sorts (T7)
+const NEWEST_FIRST = { key: 'time', asc: false }
+
 export default function SystemLogsPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || undefined
@@ -163,7 +166,7 @@ export default function SystemLogsPage() {
 
   // Short columns fit their content (adjust.css); the message takes the rest and wraps
   const columns = [
-    { id: 'ts', label: t('logs.time'), fit: true, tone: ['mono', 'muted'], cell: (l) => l.ts || '', skeleton: { width: '130px' } },
+    { id: 'ts', label: t('logs.time'), sort: 'time', fit: true, tone: ['mono', 'muted'], cell: (l) => l.ts || '', skeleton: { width: '130px' } },
     // A line whose format carries no level gets no badge: a placeholder would read as a level of its own
     { id: 'level', label: t('logs.levelShort'), fit: true, cell: (l) => levelPill(l.level), skeleton: { width: '70px', kind: 'pill' } },
     { id: 'logger', label: t('logs.component'), fit: true, tone: ['mono', 'muted', 'small'], cell: (l) => l.logger || '', skeleton: { width: '110px' } },
@@ -262,7 +265,7 @@ export default function SystemLogsPage() {
 
       <DataTable kind="audit" scrollId="logs-scroll" recordsId="logs-records" label={t('logs.regionLabel')} caption={t('logs.caption')}
         columns={columns} rows={firstRead ? [] : rows} rowKey={(l) => l.id} rowLabel={(l) => `${l.ts || ''} ${l.message || ''}`.trim()}
-        loading={firstRead} empty={empty} card={card} selection={selection}
+        loading={firstRead} empty={empty} card={card} selection={selection} sort={NEWEST_FIRST}
         footer={result && <TableFooter range={t('logs.range', { count: rows.length })} note={footNote} />} />
     </Zone>
   )

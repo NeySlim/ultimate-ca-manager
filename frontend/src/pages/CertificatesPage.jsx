@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Zone, PageHead, Btn, IconBtn, TextLink, StateFilters, TableView, SearchField, FilterSelect, AppliedFilters, BatchBar,
-  TableFooter, LoadError, LoadCause, EmptyBlock, NoMatch,
+  TableFooter, LoadError, LoadCause, EmptyBlock, NoMatch, useSortParam,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService } from '../services'
@@ -59,6 +59,9 @@ function normalizeCertificate(cert) {
 function readPresets() {
   try { const saved = localStorage.getItem(PRESETS_KEY); return saved ? JSON.parse(saved) : [] } catch { return [] }
 }
+
+const DEFAULT_SORT = { key: 'days', asc: true }
+const SORT_KEYS = Object.keys(SORT_FIELDS)
 
 export default function CertificatesPage() {
   const { t, i18n } = useTranslation()
@@ -119,15 +122,8 @@ export default function CertificatesPage() {
   const [savedPerPage, setPerPage] = usePersistedState('ucm-certs-per-page', PAGE_SIZES[0])
   const perPage = PAGE_SIZES.includes(savedPerPage) ? savedPerPage : PAGE_SIZES[0]
   const [total, setTotal] = useState(0)
-  // The nearest expiry first, as the mockup opens; only another order is written
-  const sortKey = SORT_FIELDS[query.get('sort')] ? query.get('sort') : 'days'
-  const sortAsc = query.get('order') !== 'desc'
-  const sort = useMemo(() => ({ key: sortKey, asc: sortAsc }), [sortKey, sortAsc])
-  const setSort = useCallback((next) => {
-    const s = typeof next === 'function' ? next(sort) : next
-    const plain = s.key === 'days' && s.asc
-    patchList({ sort: plain ? '' : s.key, order: plain ? '' : (s.asc ? 'asc' : 'desc') })
-  }, [sort, patchList])
+  // The nearest expiry first, as the mockup opens; only another order is written, and it goes back to page one
+  const { sort, onSort } = useSortParam(DEFAULT_SORT, SORT_KEYS)
 
   // The URL is the filters' only state, as the mockup's: a bare address shows the whole list
   const urlCA = query.getAll('ca').join(',')
@@ -290,7 +286,6 @@ export default function CertificatesPage() {
   // Several statuses at once (a link, an older preset) are no single tab: none is pressed
   const activeView = activeStatus.length === 0 ? '' : activeStatus.length === 1 ? activeStatus[0] : null
 
-  const onSort = (key) => { setPage(1); setSort((s) => ({ key, asc: s.key === key ? !s.asc : true })) }
 
   const onSearch = (v) => {
     setTyped(v)
@@ -522,7 +517,7 @@ export default function CertificatesPage() {
       <TableView label={t('certificates.listLabel')} tableLabel={t('certificates.tableLabel')} kind="certificates" scrollId="cert-scroll"
         caption={t('certificates.caption')} columns={columns} rows={rows} loading={busy} busy={busy || undefined}
         rowLabel={(r) => r.cn} onOpen={handleSelectCert} openedId={dockedId}
-        rowActions={() => [{ icon: 'download', label: t('export.title'), onClick: (r) => setExportRowCert(r) }]}
+        rowActions={() => [{ icon: 'download', label: t('export.title'), spare: true, onClick: (r) => setExportRowCert(r) }]}
         sort={sort} onSort={onSort} storageKey="ucm-certs-table"
         selection={{
           selected: selectAll ? new Set(rows.map((r) => r.id)) : selectedIds,
