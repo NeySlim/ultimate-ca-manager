@@ -15,6 +15,8 @@ import { sourceLabel, sourceOf, SOURCE_LABEL_KEYS } from '../certificateSources'
 import { usePermission } from '../../../hooks'
 import { acmeService } from '../../../services/acme.service'
 import { CertDeploySection } from '../../../components/deploy/CertDeploySection'
+import { CertBadge } from '../CertBadge'
+import { stateOf } from '../certState'
 
 const GRADE_TONES = { 'A+': 'good', A: 'good', B: 'good', C: 'warn', D: 'warn', F: 'bad' }
 const ACME_CLIENT_SOURCES = ['acme_client', 'letsencrypt']
@@ -48,23 +50,43 @@ const Props = ({ items }) => (
   <dl className="props">{items.filter(Boolean).map(([k, v, cls]) => [<dt key={`${k}-t`}>{k}</dt>, <dd key={`${k}-d`} className={cls}>{v}</dd>])}</dl>
 )
 
-/** The chain as a small tree, anchor first, the certificate last (the mockup's miniChain()). */
+// The role of a node in small under its name; the anchor of a trust store says where it is held
+const ROLE_KEYS = { root: 'inspector.cert.chainRoleRoot', anchor: 'inspector.cert.chainRoleRoot', intermediate: 'inspector.cert.chainRoleIntermediate' }
+const LAPSED = ['expired', 'revoked']
+
+/**
+ * The chain as a vertical tree, anchor first, the certificate last as the current node (the mockup's
+ * miniChain()): each node its role in small, the product's authorities clickable, a lapsed certificate its state.
+ */
 function MiniChain({ cert, title, openCa }) {
   const { t } = useTranslation()
   const nodes = chainNodes(cert)
   const issuer = cert.issuer_name || extractCN(cert.issuer)
   const shown = nodes.length ? nodes : (issuer ? [{ name: issuer, role: 'intermediate', issuing: true }] : [])
+  const role = (n) => [t(ROLE_KEYS[n.role]), n.role === 'anchor' && t('inspector.cert.trustStore')].filter(Boolean).join(' · ')
   return (
     <ol className="chain-mini">
       {shown.map((n, i) => (
-        <li key={`${n.name}-${i}`}>
-          <Icon name={n.role === 'intermediate' ? 'branch' : 'shield'} />
-          {openCa && n.type !== 'trust_store' && n.role === 'intermediate'
-            ? <button type="button" className="text-link" data-ca-go={n.name} onClick={() => openCa(n.name, { issuing: n.issuing })}>{n.name}</button>
-            : <>{n.name}{n.role === 'anchor' && <> <span className="muted small">{t('inspector.cert.trustStore')}</span></>}</>}
+        <li key={`${n.name}-${i}`} className="chain-node" data-role={n.role}>
+          <span className="chain-mark"><Icon name={n.role === 'intermediate' ? 'branch' : 'shield'} /></span>
+          <span className="chain-label">
+            {openCa && n.type !== 'trust_store' && n.role === 'intermediate'
+              ? <button type="button" className="text-link chain-name" data-ca-go={n.name} onClick={() => openCa(n.name, { issuing: n.issuing })}>{n.name}</button>
+              : <span className="chain-name">{n.name}</span>}
+            <span className="chain-meta"><small className="chain-role">{role(n)}</small></span>
+          </span>
         </li>
       ))}
-      <li className="leaf"><Icon name="cert" /><span>{title}</span></li>
+      <li className="chain-node leaf current" aria-current="true">
+        <span className="chain-mark"><Icon name="cert" /></span>
+        <span className="chain-label">
+          <span className="chain-name">{title}</span>
+          <span className="chain-meta">
+            <small className="chain-role">{t('inspector.cert.chainRoleCurrent')}</small>
+            {LAPSED.includes(stateOf(cert)) && <CertBadge cert={cert} t={t} />}
+          </span>
+        </span>
+      </li>
     </ol>
   )
 }

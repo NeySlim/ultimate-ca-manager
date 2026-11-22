@@ -457,3 +457,20 @@
 .atl .detail-panel{container-type:inline-size}
 @container (max-width:960px){.atl .detail-overview{gap:20px;grid-template-columns:1fr 1.2fr}.atl .detail-overview>section+section{padding-left:20px}.atl .detail-overview .overview-chain{display:none}}
 @container (max-width:740px){.atl .detail-overview{display:flex;flex-direction:column;gap:20px;height:auto}.atl .detail-overview>section+section{border-left:0;border-top:1px solid var(--line);padding:18px 0 0}.atl .detail-overview .overview-chain{display:block}.atl .extensions{grid-template-columns:1fr;gap:12px}}
+/* Aperçu: the chain of trust as a vertical tree (the mockup's miniChain()), one continuous link through the centres of
+   the nodes' marks, each node's role in small after its name, the certificate as the current node, not as a link. */
+.atl .chain-mini{gap:0}
+.atl .chain-mini .chain-node{display:grid;grid-template-columns:23px minmax(0,1fr);align-items:start;gap:10px;padding:0 0 10px}
+.atl .chain-mini .chain-node:last-child{padding:0}
+.atl .chain-mini .chain-node:not(:last-child)::after{content:'';position:absolute;left:11px;top:11px;bottom:-11px;width:1px;background:var(--control)}
+.atl .chain-mini .chain-mark{position:relative;z-index:1;display:grid;place-items:center;width:23px;height:23px;border:1px solid var(--control);border-radius:4px;background:var(--panel)}
+.atl .chain-mini .chain-mark .icon{width:13px;height:13px;color:var(--muted)}
+.atl .chain-mini .chain-label{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-width:0;min-height:23px}
+.atl .chain-mini .chain-name{color:var(--text);overflow-wrap:anywhere;text-align:left}
+.atl .chain-mini .chain-name.text-link{padding:0;color:var(--accent)}
+.atl .chain-mini .chain-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.atl .chain-mini .chain-role{font-size:12px;color:var(--muted)}
+.atl .chain-mini .chain-node.current{color:var(--text)}
+.atl .chain-mini .current .chain-mark{border-color:var(--accent);background:var(--selected)}
+.atl .chain-mini .current .chain-mark .icon{color:var(--accent)}
+.atl .chain-mini .current .chain-name{font-weight:500}
