@@ -173,7 +173,7 @@ Open **Modules** > **PKI** > **Certificate Tools**:
 
 ## Protocols
 
-In the details of ACME, SCEP, EST, TSA, CRL & OCSP and HSM, a URL, a path, an identifier (order, EAB key, SCEP transaction) or a serial number sits in a chip with a copy button, as described in [Copying a value](#certificates); a rule such as *Wildcard* or *Auto-approve* shows as a pill, and **Edit email** of an ACME account sits apart from the contact.
+In the details of ACME, SCEP, EST, TSA, CRL & OCSP and HSM, a URL, a path, an identifier (order, EAB key, SCEP transaction) or a serial number sits in a chip with a copy button, as described in [Copying a value](#certificates); a rule such as *Wildcard* or *Auto-approve* shows as a pill, and **Edit e-mail** of an ACME account sits apart from the contact.
 
 ### ACME
 
