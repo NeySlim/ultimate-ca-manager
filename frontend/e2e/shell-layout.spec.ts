@@ -58,23 +58,29 @@ test('the expiry count sits on its own link: no other link covered, the link kee
       await expect(badge).toBeVisible()
       const own = nav.locator(':scope > a[data-module="certificates"]')
       await expect(own).toContainText(/certificates? expir/)
-      const b = await box(badge)
-      // It covers neither the icon of its own link nor its label
-      // The label is the link's bare text, as the mockup's: measured as a range
-      const label = await own.evaluate((a) => {
+      // Measured in one go once the fonts are in, and asked again until the bar holds still: the count and the
+      // labels settle as the page loads, and other tests change the count meanwhile
+      await page.evaluate(() => document.fonts.ready)
+      await expect.poll(() => own.evaluate((a) => {
+        const nav = a.parentElement!
+        const rect = (e: Element) => { const { x, y, width, height } = e.getBoundingClientRect(); return { x, y, width, height } }
+        const badge = a.querySelector('.nav-count')
+        if (!badge) return ['no count']
+        const b = rect(badge)
         const r = document.createRange()
-        const text = [...a.childNodes].find(n => n.nodeType === 3 && n.textContent.trim())
-        r.selectNodeContents(text)
-        const { x, y, width, height } = r.getBoundingClientRect()
-        return { x, y, width, height }
-      })
-      expect(apart(b, label), `${path} at ${width}: label`).toBe(true)
-      const icon = own.locator('svg')
-      if (await icon.isVisible()) expect(apart(b, await box(icon)), `${path} at ${width}: icon`).toBe(true)
-      // A link folded away at this width (a pin another test set) covers nothing
-      for (const link of await nav.locator(':scope > a:not([data-module="certificates"]):visible').all()) {
-        expect(apart(b, await box(link)), `${path} at ${width}: ${await link.getAttribute('data-module')}`).toBe(true)
-      }
+        r.selectNodeContents([...a.childNodes].find(n => n.nodeType === 3 && n.textContent!.trim())!)
+        const near = (o: { x: number, y: number, width: number, height: number }) => !(b.x + b.width <= o.x + 0.5 || o.x + o.width <= b.x + 0.5 || b.y + b.height <= o.y + 0.5 || o.y + o.height <= b.y + 0.5)
+        const covered: string[] = []
+        if (near(rect(r))) covered.push('label')
+        const icon = a.querySelector('svg')
+        if (icon && icon.getBoundingClientRect().width && near(rect(icon))) covered.push('icon')
+        // A link folded away at this width (a pin another test set) covers nothing
+        for (const link of nav.querySelectorAll(':scope > a:not([data-module="certificates"])')) {
+          const l = rect(link)
+          if (l.width && l.height && getComputedStyle(link).visibility !== 'hidden' && near(l)) covered.push(link.getAttribute('data-module')!)
+        }
+        return covered
+      }), `${path} at ${width}`).toEqual([])
       // The count adds no tab stop and is not clipped by its own pill
       await expect(nav.locator('button.nav-count')).toHaveCount(0)
       expect(await badge.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
