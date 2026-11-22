@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { Btn, IconBtn, Pill, Notice, DataTable, TableFooter, Toolbar, SearchField, BatchBar } from '../../components/atelier'
 import { Field, NumberInput, Select } from '../../components/atelier/Form'
 import { SettingsGroup, FieldError } from '../../components/atelier/SettingsView'
+import { cardFacts, labelledFact } from '../../components/atelier/cardFacts'
 import { PasswordMeter } from '../../components/auth/PasswordMeter'
 import AdminLockLabel from './AdminLockLabel'
 import { useClipboard } from '../../hooks/useClipboard'
@@ -92,7 +93,7 @@ export default function BackupSection({
   const columns = [
     { id: 'name', label: t('common.name'), sort: 'name', kind: 'entity', priority: 1, cell: (b) => b.filename, extra: digest },
     { id: 'size', label: t('settings.backupSize'), sort: 'size', kind: 'number', priority: 3, tone: 'muted', cell: shownSize },
-    { id: 'created', label: t('common.created'), sort: 'created', kind: 'fit', priority: 2, labelled: true, tone: 'muted', cell: created },
+    { id: 'created', label: t('common.created'), labelFull: t('table.fullCreated'), sort: 'created', kind: 'fit', priority: 2, labelled: true, tone: 'muted', cell: created },
     ...(sharedStore || backups.some((b) => b.node) ? [{ id: 'node', label: t('settings.backupNode'), kind: 'fit', priority: 4, labelled: true, tone: 'muted', cell: (b) => b.node || '—' }] : []),
     { id: 'actions', label: <span className="sr-only">{t('common.actions')}</span>, kind: 'fit', priority: 1, cell: actions },
   ]
@@ -212,7 +213,8 @@ export default function BackupSection({
           } : undefined}
           card={(b) => ({
             description: digest(b),
-            meta: [shownSize(b), created(b), b.node && `${t('settings.backupNode')}${t('work.sep')}${b.node}`],
+            // Each fact after its column's label, as every list's records (M3)
+            meta: [...cardFacts(columns, b), b.node && labelledFact(t('settings.backupNode'), b.node)],
             end: actions(b),
           })}
           empty={(

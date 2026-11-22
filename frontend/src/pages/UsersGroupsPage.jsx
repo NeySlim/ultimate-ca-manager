@@ -935,8 +935,9 @@ export default function UsersGroupsPage() {
             filters={{ views, active: USER_VIEWS[userView] ? userView : '', onChange: setUserView, label: t('users.filterByState') }}
             title={userName} status={(u) => <UserState user={u} />} openedId={selectedUser?.id} onOpen={openUser}
             columns={[
-              { id: 'login', label: t('users.login'), cell: (u) => <span className="mono">{u.username}</span>, title: (u) => u.username, kind: 'text', priority: 3, sort: 'login' },
-              { id: 'email', label: t('users.email'), cell: (u) => u.email || '—', kind: 'text', priority: 4, grow: true, muted: true, sort: 'email' },
+              { id: 'login', label: t('users.login'), cell: (u) => <span className="mono">{u.username}</span>, title: (u) => u.username, kind: 'text', priority: 4, sort: 'login' },
+              // The e-mail, rarely the name again, stays longer than the login (E2 bis)
+              { id: 'email', label: t('users.email'), cell: (u) => u.email || '—', kind: 'text', priority: 3, grow: true, muted: true, sort: 'email' },
               { id: 'source', label: t('users.source'), cell: (u) => (isSso(u) ? t('users.views.sso') : t('users.authSource.local')), kind: 'fit', priority: 3, sort: 'source' },
               { id: 'role', label: t('common.role'), cell: roleLabel, kind: 'fit', priority: 2, sort: 'role' },
               { status: true, sort: 'state' },

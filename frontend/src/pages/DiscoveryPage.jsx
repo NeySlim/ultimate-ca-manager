@@ -304,7 +304,7 @@ export default function DiscoveryPage() {
           title={(p) => p.name} status={(p) => <ScanPill state={stateOfScan(p)} />} openedId={openedId} onOpen={open('profiles')}
           columns={[
             { id: 'range', label: t('discovery.form.range'), cell: (p) => facts.range(p), kind: 'text', priority: 4, grow: true, sort: 'range' },
-            { id: 'found', label: t('discovery.scans.found'), cell: (p) => facts.found(p, last.get(p.id)), kind: 'fit', priority: 3, labelled: true, sort: 'found' },
+            { id: 'found', label: t('discovery.scans.found'), labelFull: t('discovery.certsFound'), cell: (p) => facts.found(p, last.get(p.id)), kind: 'fit', priority: 3, labelled: true, sort: 'found' },
             { id: 'last', label: t('discovery.scans.last'), cell: (p) => facts.last(p, last.get(p.id)), kind: 'fit', priority: 2, labelled: true, sort: 'last' },
             { status: true, sort: 'state' },
           ]}
@@ -343,7 +343,7 @@ export default function DiscoveryPage() {
             { id: 'host', label: t('discovery.host'), cell: (c) => <span className="mono">{c.target}:{c.port || 443}</span>, title: (c) => `${c.target}:${c.port || 443}`,
               kind: 'text', priority: 3, sort: 'host' },
             { id: 'issuer', label: t('common.issuer'), cell: (c) => (c.status === 'error' ? c.scan_error : cnOf(c.issuer) || c.issuer || '—'), kind: 'text', priority: 4, grow: true, muted: true, sort: 'issuer' },
-            { id: 'expires', label: t('common.expires'), cell: (c) => (c.not_after ? formatDate(c.not_after) : '—'), kind: 'fit', priority: 2, labelled: true, sort: 'expires' },
+            { id: 'expires', label: t('common.expires'), labelFull: t('table.fullExpires'), cell: (c) => (c.not_after ? formatDate(c.not_after) : '—'), kind: 'fit', priority: 2, labelled: true, sort: 'expires' },
             { status: true, sort: 'state' },
           ]}
           error={error}
@@ -369,7 +369,7 @@ export default function DiscoveryPage() {
           )}
           title={(r) => runTitle(r, t)} status={(r) => <RunPill run={r} />} openedId={openedId} onOpen={open('history')}
           columns={[
-            { id: 'started', label: t('discovery.startedAt'), cell: (r) => (r.started_at ? formatDate(r.started_at, { time: true }) : '—'), kind: 'fit', priority: 2, labelled: true, sort: 'started' },
+            { id: 'started', label: t('discovery.startedAt'), labelFull: t('table.fullStarted'), cell: (r) => (r.started_at ? formatDate(r.started_at, { time: true }) : '—'), kind: 'fit', priority: 2, labelled: true, sort: 'started' },
             { id: 'found', label: t('discovery.scans.found'), labelFull: t('discovery.certsFound'), cell: (r) => r.certs_found ?? 0, kind: 'number', priority: 3, sort: 'found' },
             { id: 'targets', label: t('discovery.runs.targets'), labelFull: t('discovery.targetsScanned'), cell: (r) => r.targets_scanned ?? '—', kind: 'number', priority: 3, sort: 'targets' },
             { id: 'duration', label: t('discovery.duration'), cell: (r) => durationLabel(r.duration_seconds) || '—', kind: 'fit', priority: 3, labelled: true, muted: true, sort: 'duration' },

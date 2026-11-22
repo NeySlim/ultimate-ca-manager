@@ -170,7 +170,7 @@ describe('EabTab list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
     fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
     expect(bodyRows()[0]).toHaveTextContent('acme.eab.statusRevoked')
-    for (const name of ['atelier.name', 'acme.eab.allowedDomains', 'acme.eab.created']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    for (const name of ['atelier.name', 'acme.eab.allowedDomains', 'table.fullCreated']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
     // The search reads the key id; the chips count what it kept
     fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     fireEvent.change(screen.getByRole('searchbox', { name: 'acme.eab.search' }), { target: { value: 'cred' } })

@@ -58,7 +58,7 @@ export default function LetsEncryptOrdersTab({
           { id: 'account', label: t('acme.accountOrCa'), cell: account, kind: 'text', priority: 2, sort: 'account' },
           { id: 'env', label: t('acme.environment'), cell: env, kind: 'fit', priority: 3, sort: 'env' },
           { id: 'method', label: t('acme.method'), cell: (o) => o.challenge_type?.toUpperCase() || t('common.unknown'), kind: 'fit', priority: 3, sort: 'method' },
-          { id: 'created', label: t('common.created'), cell: (o) => dateOf(o.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created' },
+          { id: 'created', label: t('common.created'), labelFull: t('table.fullCreated'), cell: (o) => dateOf(o.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created' },
           // A count under a short header, the whole name in its title (L8); the last error on a failing row
           { id: 'failures', label: t('acme.columns.failures'), labelFull: t('acme.renewalFailuresLabel'), kind: 'number', priority: 3, sort: 'failures',
             cell: (o) => (o.renewal_failures > 0 ? <span className="warn" title={o.error_message || undefined}>{o.renewal_failures}</span> : '0') },

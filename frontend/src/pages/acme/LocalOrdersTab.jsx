@@ -143,8 +143,8 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
           { id: 'account', label: t('acme.account'), cell: (o) => <span className="mono">{o.account}</span>, kind: 'text', priority: 4, muted: true,
             title: (o) => o.account || undefined, sort: 'account' },
           { id: 'method', label: t('acme.method'), cell: (o) => o.method || '—', kind: 'fit', priority: 3 },
-          { id: 'expires', label: t('common.expires'), cell: (o) => dateOf(o.expires, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'expires' },
-          { id: 'created', label: t('common.created'), cell: (o) => dateTimeOf(o.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
+          { id: 'expires', label: t('common.expires'), labelFull: t('table.fullExpires'), cell: (o) => dateOf(o.expires, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'expires' },
+          { id: 'created', label: t('common.created'), labelFull: t('table.fullCreated'), cell: (o) => dateTimeOf(o.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
           { status: true, sort: 'status' },
         ]}
         rowActions={canDeleteOrders ? () => [{ icon: 'close', label: t('common.delete'), onClick: handleDelete, write: true }] : undefined}

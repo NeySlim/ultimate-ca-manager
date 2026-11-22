@@ -61,6 +61,8 @@ describe('AdConnectorSection', () => {
     expect(screen.getByText('adConnector.domainSidUnknown')).toBeInTheDocument()
     expect(screen.getByText('adConnector.healthStateDown')).toBeInTheDocument()
     expect(screen.getByText('adConnector.healthStateUp')).toBeInTheDocument()
+    // Its own region among the settings' lists (E12)
+    expect(screen.getByText('forest-a').closest('.table-scroll')).toHaveAttribute('id', 'ad-connectors-scroll')
   })
 
   it('names the profiles that use a connector whose deletion is refused', async () => {

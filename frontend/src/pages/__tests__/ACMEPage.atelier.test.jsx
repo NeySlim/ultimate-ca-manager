@@ -92,7 +92,7 @@ describe('the ACME accounts', () => {
     fireEvent.click(screen.getByRole('button', { name: 'acme.orders' }))
     expect(screen.getByRole('button', { name: 'acme.orders' }).closest('th')).toHaveAttribute('aria-sort', 'descending')
     expect(bodyRows()[0]).toHaveTextContent('a29@example.com')
-    fireEvent.click(screen.getByRole('button', { name: 'acme.createdOn' }))
+    fireEvent.click(screen.getByRole('button', { name: 'table.fullCreated' }))
     expect(bodyRows()[0]).toHaveTextContent('ops@example.com')
     fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
     fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))

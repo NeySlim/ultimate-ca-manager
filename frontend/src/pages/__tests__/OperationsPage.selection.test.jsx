@@ -123,8 +123,8 @@ describe('OperationsPage bulk list', () => {
     await waitFor(() => expect(names()).toEqual(['first.example', 'second.example']))
     expect(at.search).toBe('?tab=bulk&sort=status&order=asc')
     expect(screen.getByRole('group', { name: 'table.selection' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'common.expires' }))
-    fireEvent.click(screen.getByRole('button', { name: 'common.expires' }))
+    fireEvent.click(screen.getByRole('button', { name: 'table.fullExpires' }))
+    fireEvent.click(screen.getByRole('button', { name: 'table.fullExpires' }))
     await waitFor(() => expect(pages().pop()).toMatchObject({ page: 1, sort_by: 'valid_to', sort_order: 'desc' }))
     // Another resource starts by its name again
     fireEvent.click(screen.getByRole('button', { name: /common\.csrsShort/ }))

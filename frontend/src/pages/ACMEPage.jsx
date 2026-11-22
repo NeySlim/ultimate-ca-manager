@@ -976,7 +976,7 @@ export default function ACMEPage() {
       columns={[
         { id: 'contact', label: t('acme.contact'), cell: (a) => accountContact(a) || <span className="muted">{t('acme.noContact')}</span>, kind: 'text', priority: 4,
           title: (a) => accountContact(a) || undefined, sort: 'contact' },
-        { id: 'created', label: t('acme.createdOn'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true, kind: 'fit', priority: 2, labelled: true, sort: 'created' },
+        { id: 'created', label: t('acme.createdOn'), labelFull: t('table.fullCreated'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true, kind: 'fit', priority: 2, labelled: true, sort: 'created' },
         { status: true, sort: 'state' },
         // A count of one or two digits: an abbreviated header where the noun is long, the noun in its title (L8)
         { id: 'orders', label: t('acme.columns.orders'), labelFull: t('acme.orders'), cell: (a) => String(a.orders_count ?? 0), kind: 'number', priority: 3, sort: 'orders' },

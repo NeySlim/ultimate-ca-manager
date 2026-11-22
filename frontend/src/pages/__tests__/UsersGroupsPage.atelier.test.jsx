@@ -21,6 +21,8 @@ const stable = vi.hoisted(() => ({
   i18n: { t: (k, o) => (o ? `${k} ${JSON.stringify(o)}` : k), i18n: { language: 'fr', changeLanguage: () => {}, on: () => {}, off: () => {} } },
   notify: { showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showInfo: vi.fn(), showConfirm: vi.fn(), showPrompt: vi.fn() },
 }))
+const phone = vi.hoisted(() => ({ on: false }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: phone.on }) }))
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false }),
@@ -72,6 +74,7 @@ const dockOf = (container) => container.querySelector('aside#inspector')
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  phone.on = false
   m.write = true
   m.del = true
   m.getAll.mockResolvedValue({ data: [ME, CHLOE, OLD] })
@@ -129,6 +132,15 @@ describe('the account list', () => {
     expect(sorted()).toEqual([['users.lastSeen', 'descending']])
     // Never seen sorts last whichever the direction
     expect(names()[0]).toBe('Administrateur')
+  })
+
+  it('keeps the e-mail before the login: the login folds first, the e-mail is a fact of a phone record (E2 bis)', async () => {
+    phone.on = true
+    page()
+    const name = await screen.findByRole('button', { name: 'Administrateur' })
+    const facts = [...name.closest('.mobile-record').querySelectorAll('.row-meta > span')].map((s) => s.textContent)
+    expect(facts).toContain('admin@example.com')
+    expect(facts).not.toContain('admin')
   })
 
   // Thirty-three rows sorted fourteen times: well over a second under a full parallel run

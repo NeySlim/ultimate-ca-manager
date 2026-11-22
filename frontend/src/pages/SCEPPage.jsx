@@ -615,9 +615,9 @@ crypto ca enroll UCM-CA`}</pre>
         // The name takes the room left; the transaction id, a long identifier, folds first with its whole value in its title
         { id: 'tx', label: t('scep.transactionId'), cell: (r) => <span className="mono">{r.transaction_id}</span>, kind: 'text', priority: 4,
           title: (r) => r.transaction_id || undefined, sort: 'transaction_id' },
-        { id: 'profile', label: t('scep.columns.profile'), cell: (r) => (r.profile_id ? profileOf(r.profile_id)?.name || `#${r.profile_id}` : t('scep.caWide')), kind: 'text', priority: 3 },
+        { id: 'profile', label: t('scep.columns.profile'), cell: (r) => (r.profile_id ? profileOf(r.profile_id)?.name || `#${r.profile_id}` : t('scep.caWide')), kind: 'text', priority: 3, labelled: true },
         { id: 'ca', label: t('scep.columns.ca'), cell: (r) => caName(r.ca_refid), kind: 'text', priority: 3 },
-        { id: 'created', label: t('scep.requested'), cell: (r) => dateTimeOf(r.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
+        { id: 'created', label: t('scep.requested'), labelFull: t('table.fullRequested'), cell: (r) => dateTimeOf(r.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
         { status: true, sort: 'status' },
       ]}
       empty={searchQuery || statusFilter ? (

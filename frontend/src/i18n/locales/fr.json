@@ -796,7 +796,7 @@
     "columns": {
       "failures": "Échecs",
       "wildcard": "Générique",
-      "orders": "Cdes"
+      "orders": "Commandes"
     }
   },
   "audit": {
@@ -5588,6 +5588,12 @@
     "sortDescending": "ordre décroissant",
     "sortBy": "Trier par",
     "sortByColumn": "Trier par {{column}}",
+    "fullCreated": "Date de création",
+    "fullExpires": "Date d’expiration",
+    "fullIssued": "Date d’émission",
+    "fullRequested": "Date de demande",
+    "fullSubmitted": "Date de dépôt",
+    "fullStarted": "Date de début",
     "ascendingReverse": "Ordre croissant, inverser",
     "descendingReverse": "Ordre décroissant, inverser",
     "foldedColumns_one": "{{count}} colonne repliée",

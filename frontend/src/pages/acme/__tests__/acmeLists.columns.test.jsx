@@ -85,8 +85,8 @@ describe('the local orders of the ACME server', () => {
     const view = at(<LocalOrdersTab />, '/acme?tab=localorders')
     await screen.findAllByRole('button', { name: 'c.example.com' })
     const [facts] = recordFacts(view.container)
-    expect(facts[0]).toMatch(/^common\.expires /)
-    expect(facts[1]).toMatch(/^common\.created /)
+    expect(facts[0]).toMatch(/^table\.fullExpires /)
+    expect(facts[1]).toMatch(/^table\.fullCreated /)
   })
 })
 
@@ -161,7 +161,7 @@ describe('the domains, providers and upstream CAs of the ACME client, the domain
   it('names a yes or no on a phone record', () => {
     mocks.mobile.isMobile = true
     const view = at(<DomainsTab acmeDomains={DOMAINS} onAdd={noop} onEdit={noop} onDelete={noop} onTest={noop} canWrite canDelete />, '/acme?tab=domains')
-    expect(recordFacts(view.container)[0]).toEqual(['route53', 'A CA', 'acme.columns.wildcard common.no'])
+    expect(recordFacts(view.container)[0]).toEqual(['route53', 'A CA', 'acme.wildcard common.no'])
   })
 })
 
