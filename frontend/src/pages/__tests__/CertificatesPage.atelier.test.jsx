@@ -312,14 +312,16 @@ describe('CertificatesPage: the rows', () => {
     expect(within(row('late.example.com')).getByRole('img', { name: 'certificates.orphanDescription' })).toBeInTheDocument()
   })
 
-  it('opens a certificate from its name or its chevron, not from the rest of the row', async () => {
+  it('opens a certificate from its name, its chevron or anywhere else on its row', async () => {
     await mount()
     fireEvent.click(within(row('web.example.com')).getByRole('button', { name: /^web\.example\.com/ }))
     expect(state.openEntity).toHaveBeenCalledWith('certificate', 7)
     state.openEntity.mockClear()
     fireEvent.click(row('soon.example.com').querySelector('td.description-cell'))
-    expect(state.openEntity).not.toHaveBeenCalled()
+    expect(state.openEntity).toHaveBeenCalledWith('certificate', 8)
+    state.openEntity.mockClear()
     fireEvent.click(within(row('soon.example.com')).getByRole('button', { name: 'table.openRow:soon.example.com' }))
+    expect(state.openEntity).toHaveBeenCalledTimes(1)
     expect(state.openEntity).toHaveBeenCalledWith('certificate', 8)
   })
 
