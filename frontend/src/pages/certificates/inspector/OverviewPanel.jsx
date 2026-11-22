@@ -5,7 +5,7 @@
  */
 import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Icon, Facts } from '../../../components/atelier'
+import { Icon, Facts, CodeValue } from '../../../components/atelier'
 import { Breakable } from '../../../components/atelier/Breakable'
 import { formatDate, extractCN } from '../../../lib/utils'
 import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex, certTypeLabel, originLabel, complianceReasonLabel } from '../../../lib/certificateDetail'
@@ -45,10 +45,6 @@ function useAcmeFailure(cert) {
   }, [wanted, cert?.id, cert?.renewed_at]) // eslint-disable-line react-hooks/exhaustive-deps
   return wanted ? failure : null
 }
-
-const Props = ({ items }) => (
-  <dl className="props">{items.filter(Boolean).map(([k, v, cls]) => [<dt key={`${k}-t`}>{k}</dt>, <dd key={`${k}-d`} className={cls}>{v}</dd>])}</dl>
-)
 
 // The role of a node in small under its name; the anchor of a trust store says where it is held
 const ROLE_KEYS = { root: 'inspector.cert.chainRoleRoot', anchor: 'inspector.cert.chainRoleRoot', intermediate: 'inspector.cert.chainRoleIntermediate' }
@@ -117,17 +113,12 @@ function Validity({ cert }) {
       {revoked ? <p className="mini-notice">{t('inspector.cert.revokedNotice')}</p>
         : f.short ? <p className="mini-notice"><Icon name="clock" />{t('inspector.cert.renewSoon', { count: f.days })}</p> : null}
       {failure && (
-        <dl className="props last-failure" data-testid="acme-last-failure">
-          <dt>{t('inspector.cert.lastFailure')}</dt>
-          <dd>
-            <strong>{failure.error_message}</strong>
-            <br />
-            <span className="muted">
-              {[t('inspector.cert.order', { id: failure.id }), failure.primary_domain, failure.challenge_type?.toUpperCase(),
-                failure.last_error_at && compactAgo(failure.last_error_at, t)].filter(Boolean).join(' · ')}
-            </span>
-          </dd>
-        </dl>
+        // The error is a sentence: a long row, the order, its domain and its age under it
+        <Facts className="last-failure" data-testid="acme-last-failure" items={[{
+          label: t('inspector.cert.lastFailure'), long: true, value: failure.error_message,
+          sub: [t('inspector.cert.order', { id: failure.id }), failure.primary_domain, failure.challenge_type?.toUpperCase(),
+            failure.last_error_at && compactAgo(failure.last_error_at, t)].filter(Boolean).join(' · '),
+        }]} />
       )}
     </section>
   )
@@ -178,8 +169,10 @@ function Identity({ cert, onOpenRelated }) {
 function MoreDetails({ cert }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  // A long identifier wraps after its separators (a DN, a digest), never letter by letter while it can
-  const row = (label, value, mono) => (value ? [label, typeof value === 'string' ? <Breakable text={value} /> : value, mono ? 'mono' : undefined] : null)
+  // A fact the certificate has, else no row; a DN wraps after its separators on a long row
+  const row = (label, value) => (value ? [label, value] : null)
+  const dn = (label, value) => (value ? { label, value: <Breakable text={value} />, long: true } : null)
+  const ref = (label, value) => (value ? { label, value, kind: 'hex' } : null)
   const breakdown = Object.entries(cert.compliance?.breakdown || {}).filter(([, v]) => v && v.score !== undefined)
   const scts = cert.ct_scts || []
   const id = `more-details-${cert.id}`
@@ -191,9 +184,9 @@ function MoreDetails({ cert }) {
       <div className="advanced-panel" id={id} hidden={!open}>
         <section>
           <h3 className="section-title">{t('common.subject')}</h3>
-          <Props items={[
-            row(t('details.subjectDN'), cert.subject),
-            row(t('details.issuerDN'), cert.issuer),
+          <Facts items={[
+            dn(t('details.subjectDN'), cert.subject),
+            dn(t('details.issuerDN'), cert.issuer),
             row(t('details.certType'), certTypeLabel(cert.cert_type, t)),
             row(t('certificates.windowsProfile'), cert.windows_profile_id != null ? (cert.windows_profile_name || `#${cert.windows_profile_id}`) : null),
             row(t('common.validFrom'), cert.valid_from && formatDate(cert.valid_from, { time: true })),
@@ -207,23 +200,28 @@ function MoreDetails({ cert }) {
           <Facts items={[
             cert.thumbprint_sha1 && { label: 'SHA-1', value: cert.thumbprint_sha1, kind: 'hex', long: true },
             cert.thumbprint_sha256 && { label: 'SHA-256', value: cert.thumbprint_sha256, kind: 'hex', long: true },
-            row(t('certificates.ctScts'), scts.length ? scts.map((s) => s.log_url || '?').join(', ') : t('certificates.ctNoScts')),
+            // Each CT log a URL copied whole; none submitted, a grey sentence
+            scts.length
+              ? { label: t('certificates.ctScts'), long: true, value: scts.map((s, i) => (
+                <Fragment key={i}>{i > 0 && <br />}{s.log_url ? <CodeValue value={s.log_url} kind="url" label={t('certificates.ctScts')} /> : '?'}</Fragment>
+              )) }
+              : { label: t('certificates.ctScts'), absent: t('certificates.ctNoScts') },
           ]} />
         </section>
         {breakdown.length > 0 && (
           <section>
             <h3 className="section-title">{t('compliance.title')}</h3>
-            <Props items={breakdown.map(([key, item]) => [t(`compliance.criteria.${key}`), `${item.score}/${item.max} · ${complianceReasonLabel(item.reason, t)}`])} />
+            <Facts items={breakdown.map(([key, item]) => ({ label: t(`compliance.criteria.${key}`), value: `${item.score}/${item.max}`, sub: complianceReasonLabel(item.reason, t) }))} />
           </section>
         )}
         <section>
           <h3 className="section-title">{t('details.metadata')}</h3>
-          <Props items={[
+          <Facts items={[
             row(t('common.created'), cert.created_at && formatDate(cert.created_at)),
             row(t('details.createdBy'), originLabel(cert.created_by, SOURCES, t)),
             row(t('details.importedFrom'), originLabel(cert.imported_from, SOURCES, t)),
-            row(t('details.referenceId'), cert.refid, true),
-            row(t('details.caReference'), cert.caref, true),
+            ref(t('details.referenceId'), cert.refid),
+            ref(t('details.caReference'), cert.caref),
           ]} />
         </section>
         {/* Deployment targets: the product's own section, drawn as the others */}
