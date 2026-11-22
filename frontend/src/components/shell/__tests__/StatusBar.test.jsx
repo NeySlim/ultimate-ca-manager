@@ -35,9 +35,11 @@ describe('StatusBar', () => {
     const link = await screen.findByRole('link', { name: 'shell.approvalsPending|2' })
     expect(link).toHaveAttribute('href', '/approvals')
     unmount()
+    // None pending: the activity is calm, and says it in one phrase instead
     getStats.mockResolvedValue({ data: { pending: 0 } })
     render(<MemoryRouter><StatusBar can={canFor(['read:approvals'])} /></MemoryRouter>)
-    expect(await screen.findByRole('link', { name: 'shell.approvalsNone' })).toHaveAttribute('href', '/approvals')
+    expect(await screen.findByText('shell.activity.calm')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
   })
 
   it('has no approvals link without read:approvals, and does not ask', async () => {

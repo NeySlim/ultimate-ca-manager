@@ -23,7 +23,7 @@ const stable = vi.hoisted(() => ({
   },
 }))
 const state = vi.hoisted(() => ({ mobile: false, write: true, opened: [], activeKey: null, openEntity: null, setup: { visible: false } }))
-const svc = vi.hoisted(() => ({ getAll: vi.fn(), getStats: vi.fn(), bulkExport: vi.fn(), cas: vi.fn() }))
+const svc = vi.hoisted(() => ({ getAll: vi.fn(), getStats: vi.fn(), bulkExport: vi.fn(), cas: vi.fn(), getById: vi.fn() }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => stable.i18n,
@@ -54,7 +54,7 @@ vi.mock('../../hooks/useOpenEntity', () => ({ useOpenEntity: () => (...a) => sta
 vi.mock('../../services', () => ({
   certificatesService: {
     getAll: (...a) => svc.getAll(...a), getStats: (...a) => svc.getStats(...a), bulkExport: (...a) => svc.bulkExport(...a),
-    export: vi.fn(), getById: vi.fn().mockResolvedValue({ data: {} }),
+    export: vi.fn(), getById: (...a) => svc.getById(...a),
   },
   casService: { getAll: (...a) => svc.cas(...a) },
   truststoreService: { addFromCA: vi.fn() },
@@ -67,6 +67,7 @@ vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual
 vi.mock('../certificates/dialogs/ExportDialog', () => ({ ExportDialog: ({ open, entityName }) => (open ? <div data-testid="export-open">{entityName}</div> : null) }))
 
 import CertificatesPage from '../CertificatesPage'
+import { DetachedContext } from '../../components/detached/useDetached'
 
 const NOW = new Date('2026-11-08T12:00:00Z')
 const DAY = 86400000
@@ -80,6 +81,7 @@ const SOON = { ...WEB, id: 8, cn: 'soon.example.com', common_name: 'soon.example
 const LATE = { ...WEB, id: 9, cn: 'late.example.com', common_name: 'late.example.com', status: 'expired', valid_to: at(-4.5), caref: 'gone' }
 const GONE = { ...WEB, id: 10, cn: 'gone.example.com', common_name: 'gone.example.com', status: 'revoked', revoked: true, valid_to: at(-4.5), related_certificate_id: 7, hybrid_role: 'pq' }
 const ROWS = [WEB, SOON, LATE, GONE]
+const FIFTH = { ...WEB, id: 11, cn: 'fifth.example.com', common_name: 'fifth.example.com' }
 
 const Where = () => <output data-testid="where">{useLocation().search}</output>
 const mount = async (url = '/certificates', rows = ROWS, total = 276) => {
@@ -112,6 +114,8 @@ beforeEach(() => {
   Object.assign(state, { mobile: false, write: true, opened: [], activeKey: null, openEntity: vi.fn(), setup: { visible: false } })
   svc.getAll.mockReset()
   svc.bulkExport.mockReset()
+  svc.getById.mockReset()
+  svc.getById.mockImplementation((id) => Promise.resolve({ data: [...ROWS, FIFTH].find((c) => c.id === id) || {} }))
   svc.getStats.mockReset()
   svc.getStats.mockResolvedValue({ data: { valid: 250, expiring: 20, expired: 4, revoked: 2, total: 1234, sources: ['acme', 'manual'] } })
   svc.cas.mockReset()
@@ -358,20 +362,52 @@ describe('CertificatesPage: the selection (batchbar, largeBatch)', () => {
     expect(within(row('soon.example.com')).getByRole('button', { name: /^soon\.example\.com/ })).not.toBeDisabled()
   })
 
-  it('compares exactly two: the dialog lists the mockup properties, the different ones marked', async () => {
+  it('compares two to four: the lines of every certificate side by side, those that differ marked', async () => {
     await mount()
     tick('web.example.com')
     const compare = () => within(zone().querySelector('.batchbar')).getByRole('button', { name: 'common.compare' })
     expect(compare()).toBeDisabled()
     tick('soon.example.com')
+    expect(compare()).not.toBeDisabled()
+    tick('late.example.com')
+    expect(compare()).not.toBeDisabled()
+    // Outside the shell (a phone) no window opens: the mockup's dialog shows the comparison
     fireEvent.click(compare())
     const dialog = await screen.findByTestId('compare-dialog')
-    const rows = [...dialog.querySelectorAll('tbody tr')]
-    expect(rows.map((r) => r.querySelector('th').textContent)).toEqual(['certificates.state', 'common.description', 'compare.authority', 'common.keyAlgorithm', 'certificates.expiry', 'certificates.source', 'certificates.template', 'SAN', 'common.privateKey'])
-    expect(rows[0]).toHaveClass('different')
-    expect(rows[2]).not.toHaveClass('different')
-    tick('late.example.com')
+    expect(within(dialog).getByRole('heading', { name: 'compare.countTitle:3' })).toBeInTheDocument()
+    await within(dialog).findByTestId('compare-view')
+    expect([...dialog.querySelectorAll('thead th')].map((th) => th.textContent)).toEqual(['compare.property', 'web.example.com', 'soon.example.com', 'late.example.com'])
+    const rows = () => [...dialog.querySelectorAll('tbody tr')]
+    expect(rows().map((r) => r.dataset.row).slice(0, 9)).toEqual(['subject', 'issuer', 'validity', 'key', 'san', 'usages', 'sha1', 'sha256', 'serial'])
+    const line = (key) => dialog.querySelector(`tr[data-row="${key}"]`)
+    expect(line('validity')).toHaveClass('different')
+    expect(line('issuer')).not.toHaveClass('different')
+    // Only the differences: the equal lines leave
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'compare.onlyDifferences' }))
+    expect(line('issuer')).toBeNull()
+    expect(line('validity')).not.toBeNull()
+    expect(svc.getById.mock.calls.map(([id]) => id)).toEqual([7, 8, 9])
+  })
+
+  it('offers no comparison beyond four ticked certificates', async () => {
+    await mount('/certificates', [...ROWS, FIFTH])
+    for (const c of [...ROWS, FIFTH].slice(0, 4)) tick(c.cn)
+    const compare = () => within(zone().querySelector('.batchbar')).getByRole('button', { name: 'common.compare' })
+    expect(compare()).not.toBeDisabled()
+    tick('fifth.example.com')
     expect(compare()).toBeDisabled()
+  })
+
+  it('opens the comparison in a detached window where the shell offers one', async () => {
+    const open = vi.fn()
+    svc.getAll.mockResolvedValue({ data: ROWS, meta: { total: 4 } })
+    render(<MemoryRouter initialEntries={['/certificates']}><DetachedContext.Provider value={{ available: true, open }}><CertificatesPage /></DetachedContext.Provider></MemoryRouter>)
+    await screen.findAllByText('web.example.com')
+    tick('web.example.com')
+    tick('late.example.com')
+    fireEvent.click(within(zone().querySelector('.batchbar')).getByRole('button', { name: 'common.compare' }))
+    expect(open).toHaveBeenCalledWith('compare', [7, 9])
+    expect(screen.queryByTestId('compare-dialog')).toBeNull()
   })
 
   it('offers every result once the page is ticked, and exports them by the bulk dialog', async () => {

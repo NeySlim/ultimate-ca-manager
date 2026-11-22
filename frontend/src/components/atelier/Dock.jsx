@@ -28,7 +28,8 @@ const BEHIND = '.skip, .masthead, .shell-banners, .statusbar, .page-content'
 const MODAL = 'dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"]'
 
 /** The section tabs and the panel of the active object. */
-export function DockBody({ icon, title, badge, actions, sections, section, onSection, sectionsLabel, busy = false, children }) {
+/** idPrefix: set where the body is shown twice (a detached window beside the dock), so its ids stay unique. */
+export function DockBody({ icon, title, badge, actions, sections, section, onSection, sectionsLabel, busy = false, idPrefix = '', children }) {
   const ref = useRef(null)
   const ids = sections.map(([v]) => v)
   const onKey = (e) => {
@@ -38,7 +39,7 @@ export function DockBody({ icon, title, badge, actions, sections, section, onSec
     if (to === undefined) return
     e.preventDefault()
     onSection(ids[to])
-    requestAnimationFrame(() => ref.current?.querySelector(`#tab-${ids[to]}`)?.focus())
+    requestAnimationFrame(() => ref.current?.querySelector(`#${idPrefix}tab-${ids[to]}`)?.focus())
   }
   return (
     <div className="dock-body">
@@ -48,13 +49,13 @@ export function DockBody({ icon, title, badge, actions, sections, section, onSec
       </header>
       <div ref={ref} className="detail-tabs" role="tablist" aria-label={sectionsLabel}>
         {sections.map(([value, label]) => (
-          <button key={value} type="button" role="tab" id={`tab-${value}`} data-detail-tab={value} aria-selected={section === value}
-            aria-controls="detail-panel" tabIndex={section === value ? 0 : -1} onClick={() => onSection(value)} onKeyDown={onKey}>
+          <button key={value} type="button" role="tab" id={`${idPrefix}tab-${value}`} data-detail-tab={value} aria-selected={section === value}
+            aria-controls={`${idPrefix}detail-panel`} tabIndex={section === value ? 0 : -1} onClick={() => onSection(value)} onKeyDown={onKey}>
             {label}
           </button>
         ))}
       </div>
-      <div className="detail-panel" id="detail-panel" role="tabpanel" aria-labelledby={`tab-${section}`} tabIndex={0} aria-busy={busy || undefined}>
+      <div className="detail-panel" id={`${idPrefix}detail-panel`} role="tabpanel" aria-labelledby={`${idPrefix}tab-${section}`} tabIndex={0} aria-busy={busy || undefined}>
         {children}
       </div>
     </div>
@@ -167,9 +168,10 @@ function OpenTabs({ tabs, activeKey, onSelect, onClose, label, moreTitle, hidden
  * @param {Array<{key, title, icon, badge?}>} p.tabs  with `onCloseTab` they are closable tabs; else the one open object's label
  * @param {string} p.activeKey
  * @param {() => void} p.onClose
+ * @param {() => void} [p.onDetach]  opens the active object in a detached window (a tool of the bar)
  * @param {import('react').ReactNode} p.children  a DockBody
  */
-export function Dock({ label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTab, onClose, children }) {
+export function Dock({ label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTab, onClose, onDetach, children }) {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const setZoneRight = useContext(DockSideContext)
@@ -340,6 +342,11 @@ export function Dock({ label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTa
             <button type="button" className="icon-btn collapse-button" data-action="dock-collapse" aria-expanded={!folded}
               aria-label={t(folded ? 'inspector.expand' : 'inspector.collapse')} onClick={() => setCollapsed(!collapsed)}>
               <Icon name={folded ? 'up' : 'minimize'} />
+            </button>
+          )}
+          {onDetach && !isMobile && (
+            <button type="button" className="icon-btn" data-action="dock-detach" aria-label={t('inspector.detach')} title={t('inspector.detach')} onClick={onDetach}>
+              <Icon name="layers" />
             </button>
           )}
           <button type="button" className="icon-btn" data-action="close-dock" aria-label={t('inspector.close')} onClick={() => close.current?.()}>

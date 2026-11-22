@@ -10,6 +10,7 @@ import { pageOf } from '../../../lib/pageOf'
 import { Dock } from '../../../components/atelier'
 import { useDockParam, asId } from '../../../components/atelier/useDockParam'
 import { useInspector } from '../../../contexts'
+import { useDetached } from '../../../components/detached/useDetached'
 import { certificatesService } from '../../../services'
 import { entityTitle } from '../../../lib/entityDetail'
 import { extractData } from '../../../lib/utils'
@@ -24,6 +25,7 @@ const urlList = (ids) => (ids.length > 1 ? ids : [])
 export function CertificateInspector() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const detached = useDetached()
   const { opened = [], activeKey, setActiveKey, openEntity, closeEntity, closeAll, setEntityData } = useInspector()
   // The active certificate and its section live in the URL (`item`, `section`), as every dock's object, and the open ones in `open`
   const { item, section, list, setSection, setList, open: openInUrl, close: closeInUrl } = useDockParam({ sections: SECTIONS, list: true })
@@ -85,7 +87,9 @@ export function CertificateInspector() {
     <Dock label={t('inspector.regionCertificate')} tabsLabel={t('inspector.certificatesLabel')}
       tabs={opened.map((o) => ({ key: tabKey(o), title: o.data ? entityTitle('certificate', o.data, t) : '…', icon: 'cert' }))}
       activeKey={tabKey(entry)} onSelectTab={(k) => setActiveKey(byTab[k]?.key)} onCloseTab={(k) => closeEntity(byTab[k]?.key)}
-      onClose={() => closeAll({ refocus: true })}>
+      onClose={() => closeAll({ refocus: true })}
+      // Detached, the certificate leaves the dock for a window of its own
+      onDetach={detached?.available ? () => { detached.open('certificate', [entry.entityId]); closeEntity(entry.key) } : undefined}>
       <CertificateBody key={entry.key} entry={entry} onOpenCa={onOpenCa} section={section} onSection={setSection} />
     </Dock>
   )

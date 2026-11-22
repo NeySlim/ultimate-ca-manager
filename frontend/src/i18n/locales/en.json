@@ -5181,13 +5181,17 @@
     "differences_one": "{{count}} difference",
     "differences_other": "{{count}} differences",
     "differences": "{{count}} differences",
-    "twoTitle": "Compare two certificates",
     "lead": "The properties that differ are highlighted.",
     "property": "Property",
-    "authority": "Authority",
-    "keyHeld": "Present",
-    "keyAbsent": "Absent",
-    "close": "Close the comparison"
+    "close": "Close the comparison",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read."
   },
   "members": {
     "manageMembers": "Manage Members",
@@ -5515,7 +5519,8 @@
       "noAudit": "Your role cannot read the audit log: only the dates of the certificate's record are shown.",
       "auditFailed": "The audit log could not be read: only the dates of the certificate's record are shown.",
       "scope": "Audit log entries among the latest {{count}} operations on certificates, and the dates of the certificate's record."
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "No matching results",
@@ -7743,7 +7748,6 @@
     "haLate_other": "{{count}} nodes late",
     "approvalsPending_one": "{{count}} approval pending",
     "approvalsPending_other": "{{count}} approvals pending",
-    "approvalsNone": "No approval pending",
     "theme": {
       "menu": "Theme",
       "label": "Theme: {{theme}}",
@@ -7935,6 +7939,21 @@
       "text": "Browsing continues with the data already loaded; actions are suspended and will resume by themselves when the network returns.",
       "said": "Offline: browsing continues, actions are suspended.",
       "back": "Connection restored: actions are available again."
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      }
     }
   },
   "overview": {
@@ -8365,5 +8384,10 @@
     "resultsShown": "The first {{shown}} are listed.",
     "noResults": "No results. Try another word.",
     "resultsLabel": "Results in the guide"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

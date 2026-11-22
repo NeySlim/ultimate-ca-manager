@@ -35,8 +35,11 @@ const MENU_ICONS = { lint: 'policy', uploadKey: 'upload', rename: 'file', unhold
 const MENU_ORDER = ['lint', 'uploadKey', 'rename']
 const menuRank = (id) => (MENU_ORDER.includes(id) ? MENU_ORDER.indexOf(id) : MENU_ORDER.length)
 
-/** entry: the inspector's { key, entityId, data }, whose data names its tab; the section is the dock's. */
-export function CertificateBody({ entry, onOpenCa, section, onSection: setSection }) {
+/**
+ * entry: the inspector's { key, entityId, data }, whose data names its tab; the section is the dock's.
+ * In a detached window: idPrefix keeps its ids apart from the dock's, onDone closes it after a deletion.
+ */
+export function CertificateBody({ entry, onOpenCa, section, onSection: setSection, idPrefix, onDone }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { closeEntity, openEntity, setEntityData } = useInspector()
@@ -65,7 +68,7 @@ export function CertificateBody({ entry, onOpenCa, section, onSection: setSectio
   const title = cert ? entityTitle('certificate', cert, t) : ''
 
   const { actions, modals } = useEntityActions({
-    type: 'certificate', entity: cert, entityId, onChanged: setCert, onClose: () => closeEntity(key), onOpenEntity: openEntity, dialogs: DIALOGS,
+    type: 'certificate', entity: cert, entityId, onChanged: setCert, onClose: () => (onDone ? onDone() : closeEntity(key)), onOpenEntity: openEntity, dialogs: DIALOGS,
   })
   const openCa = useOpenCa(cert, onOpenCa)
   const trust = useAddIssuerToTrustStore(cert, setCert)
@@ -73,7 +76,7 @@ export function CertificateBody({ entry, onOpenCa, section, onSection: setSectio
   if (loading || !cert) {
     return (
       <div className="dock-body">
-        <div className="detail-panel" id="detail-panel" aria-busy={loading || undefined}>
+        <div className="detail-panel" id={`${idPrefix || ''}detail-panel`} aria-busy={loading || undefined}>
           {loading ? <SkeletonPanel label={t('common.loading')} /> : <p className="muted small">{failed ? t('inspector.loadFailed') : t('common.notFound', 'Not found')}</p>}
         </div>
       </div>
@@ -119,7 +122,8 @@ export function CertificateBody({ entry, onOpenCa, section, onSection: setSectio
             <IconBtn quiet icon="more" title={false} label={t('inspector.moreActions', { name: title })} data-cert-menu={cert.id} onClick={() => setMenu(true)} />
           </>
         )}
-        sections={SECTIONS.map((s) => [s, t(`inspector.sections.${s}`)])} section={section} onSection={setSection} sectionsLabel={t('inspector.certificateSections')}>
+        sections={SECTIONS.map((s) => [s, t(`inspector.sections.${s}`)])} section={section} onSection={setSection} sectionsLabel={t('inspector.certificateSections')}
+        idPrefix={idPrefix}>
         {section === 'overview' && <OverviewPanel cert={cert} title={title} openCa={openCa} onOpenRelated={(id) => openEntity('certificate', id)} />}
         {section === 'chain' && <ChainPanel cert={cert} title={title} openCa={openCa} onChanged={setCert} />}
         {section === 'extensions' && <ExtensionsPanel cert={cert} />}

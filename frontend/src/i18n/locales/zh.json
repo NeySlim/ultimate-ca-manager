@@ -5181,13 +5181,17 @@
     "differences_one": "{{count}} 个差异",
     "differences_other": "{{count}} 个差异",
     "differences": "{{count}}处差异",
-    "twoTitle": "比较两个证书",
     "lead": "不同的属性已突出显示。",
     "property": "属性",
-    "authority": "颁发机构",
-    "keyHeld": "存在",
-    "keyAbsent": "不存在",
-    "close": "关闭比较"
+    "close": "关闭比较",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read."
   },
   "members": {
     "manageMembers": "管理成员",
@@ -5515,7 +5519,8 @@
       "noAudit": "您的角色无法读取审计日志：仅显示证书记录中的日期。",
       "auditFailed": "无法读取审计日志：仅显示证书记录中的日期。",
       "scope": "最近 {{count}} 次证书操作中的审计日志条目，以及证书记录中的日期。"
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "没有匹配的结果",
@@ -7743,7 +7748,6 @@
     "haLate_other": "{{count}} 个节点滞后",
     "approvalsPending_one": "{{count}} 项审批待处理",
     "approvalsPending_other": "{{count}} 项审批待处理",
-    "approvalsNone": "没有待处理的审批",
     "theme": {
       "menu": "主题",
       "label": "主题：{{theme}}",
@@ -7935,6 +7939,21 @@
       "text": "可继续浏览已加载的数据；操作已暂停，网络恢复后将自动恢复。",
       "said": "离线：可继续浏览，操作已暂停。",
       "back": "连接已恢复：操作重新可用。"
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      }
     }
   },
   "overview": {
@@ -8365,5 +8384,10 @@
     "resultsShown": "仅列出前 {{shown}} 条。",
     "noResults": "没有结果。请尝试其他词语。",
     "resultsLabel": "指南中的结果"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

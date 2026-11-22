@@ -5181,13 +5181,17 @@
     "differences_one": "{{count}} diferença",
     "differences_other": "{{count}} diferenças",
     "differences": "{{count}} diferenças",
-    "twoTitle": "Comparar dois certificados",
     "lead": "As propriedades que diferem são realçadas.",
     "property": "Propriedade",
-    "authority": "Autoridade",
-    "keyHeld": "Presente",
-    "keyAbsent": "Ausente",
-    "close": "Fechar a comparação"
+    "close": "Fechar a comparação",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read."
   },
   "members": {
     "manageMembers": "Gerenciar membros",
@@ -5515,7 +5519,8 @@
       "noAudit": "A sua função não pode ler o registo de auditoria: apenas são apresentadas as datas do registo do certificado.",
       "auditFailed": "Não foi possível ler o registo de auditoria: apenas são apresentadas as datas do registo do certificado.",
       "scope": "Entradas do registo de auditoria entre as últimas {{count}} operações sobre certificados e as datas do registo do certificado."
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "Sem resultados correspondentes",
@@ -7743,7 +7748,6 @@
     "haLate_other": "{{count}} nós em atraso",
     "approvalsPending_one": "{{count}} aprovação pendente",
     "approvalsPending_other": "{{count}} aprovações pendentes",
-    "approvalsNone": "Nenhuma aprovação pendente",
     "theme": {
       "menu": "Tema",
       "label": "Tema: {{theme}}",
@@ -7935,6 +7939,21 @@
       "text": "A consulta continua com os dados já carregados; as ações estão suspensas e serão retomadas sozinhas quando a rede voltar.",
       "said": "Sem conexão: a consulta continua, as ações estão suspensas.",
       "back": "Conexão restabelecida: as ações estão de novo disponíveis."
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      }
     }
   },
   "overview": {
@@ -8365,5 +8384,10 @@
     "resultsShown": "Os primeiros {{shown}} estão listados.",
     "noResults": "Sem resultados. Experimente outra palavra.",
     "resultsLabel": "Resultados no guia"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

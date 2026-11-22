@@ -5181,13 +5181,17 @@
     "differences_one": "{{count}} differenza",
     "differences_other": "{{count}} differenze",
     "differences": "{{count}} differenze",
-    "twoTitle": "Confronta due certificati",
     "lead": "Le proprietà che differiscono sono evidenziate.",
     "property": "Proprietà",
-    "authority": "Autorità",
-    "keyHeld": "Presente",
-    "keyAbsent": "Assente",
-    "close": "Chiudi il confronto"
+    "close": "Chiudi il confronto",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read."
   },
   "members": {
     "manageMembers": "Gestisci Membri",
@@ -5515,7 +5519,8 @@
       "noAudit": "Il tuo ruolo non può leggere il log di audit: vengono mostrate solo le date del record del certificato.",
       "auditFailed": "Impossibile leggere il log di audit: vengono mostrate solo le date del record del certificato.",
       "scope": "Voci del log di audit tra le ultime {{count}} operazioni sui certificati, e le date del record del certificato."
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "Nessun risultato corrispondente",
@@ -7743,7 +7748,6 @@
     "haLate_other": "{{count}} nodi in ritardo",
     "approvalsPending_one": "{{count}} approvazione in attesa",
     "approvalsPending_other": "{{count}} approvazioni in attesa",
-    "approvalsNone": "Nessuna approvazione in attesa",
     "theme": {
       "menu": "Tema",
       "label": "Tema: {{theme}}",
@@ -7935,6 +7939,21 @@
       "text": "La consultazione continua con i dati già caricati; le azioni sono sospese e riprenderanno da sole al ritorno della rete.",
       "said": "Offline: la consultazione continua, le azioni sono sospese.",
       "back": "Connessione ristabilita: le azioni sono di nuovo disponibili."
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      }
     }
   },
   "overview": {
@@ -8365,5 +8384,10 @@
     "resultsShown": "Sono elencati i primi {{shown}}.",
     "noResults": "Nessun risultato. Prova un'altra parola.",
     "resultsLabel": "Risultati nella guida"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

@@ -23,8 +23,8 @@ const MOCKUP_SHA256 = {
   'style.css': '176c01929728433d0ed1e8d0c445c0b20870091c6c9ee148f6335dcc26358d92',
   'icons.js': 'aa622666fa1d339a56f9fb19473a9e8a910dfe3f6678ce09fc7b7350cd90180f',
 }
-// Not copies: the scope rules, the maintainer's deviations, what the product adds
-const NOT_COPIES = new Set(['scope.css', 'adjust.css', 'extensions.css'])
+// Not copies: the scope rules, the maintainer's deviations, what the product adds (the detached windows apart)
+const NOT_COPIES = new Set(['scope.css', 'adjust.css', 'extensions.css', 'detached.css'])
 // Variables the mockup's markup sets in a style attribute (app.js), not its stylesheet
 const MARKUP_VARS = ['--chain-cols', '--weeks']
 // The document's own decoration in Aurore; the product's shell draws its own (components/shell)

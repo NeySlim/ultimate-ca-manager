@@ -5385,13 +5385,19 @@
     "differences_many": "{{count}} відмінностей",
     "differences_other": "{{count}} відмінностей",
     "differences": "{{count}} відмінностей",
-    "twoTitle": "Порівняти два сертифікати",
     "lead": "Властивості, що відрізняються, виділено.",
     "property": "Властивість",
-    "authority": "ЦС",
-    "keyHeld": "Є",
-    "keyAbsent": "Немає",
-    "close": "Закрити порівняння"
+    "close": "Закрити порівняння",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read.",
+    "countTitle_few": "Compare {{count}} certificates",
+    "countTitle_many": "Compare {{count}} certificates"
   },
   "members": {
     "manageMembers": "Керування учасниками",
@@ -5737,7 +5743,8 @@
       "noAudit": "Ваша роль не може читати журнал аудиту: показано лише дати запису сертифіката.",
       "auditFailed": "Не вдалося прочитати журнал аудиту: показано лише дати запису сертифіката.",
       "scope": "Записи журналу аудиту серед останніх {{count}} операцій із сертифікатами та дати запису сертифіката."
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "Немає відповідних результатів",
@@ -8071,7 +8078,6 @@
     "approvalsPending_few": "{{count}} схвалення очікують",
     "approvalsPending_many": "{{count}} схвалень очікують",
     "approvalsPending_other": "{{count}} схвалення очікують",
-    "approvalsNone": "Немає схвалень, що очікують",
     "theme": {
       "menu": "Тема",
       "label": "Тема: {{theme}}",
@@ -8283,6 +8289,25 @@
       "text": "Перегляд триває з уже завантаженими даними; дії призупинено, вони відновляться самі, коли повернеться мережа.",
       "said": "Немає мережі: перегляд триває, дії призупинено.",
       "back": "З’єднання відновлено: дії знову доступні."
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      },
+      "queue_few": "{{count}} to act on",
+      "queue_many": "{{count}} to act on",
+      "windows_few": "{{count}} windows",
+      "windows_many": "{{count}} windows"
     }
   },
   "overview": {
@@ -8783,5 +8808,10 @@
     "resultsShown": "Показано перші {{shown}}.",
     "noResults": "Нічого не знайдено. Спробуйте інше слово.",
     "resultsLabel": "Результати в посібнику"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

@@ -19,6 +19,8 @@ import { downloadExport } from '../lib/exportDownload'
 import { HierarchyTree } from './cas/HierarchyTree'
 import { CAList } from './cas/CAList'
 import { CASide } from './cas/CASide'
+import { useCrossLinks } from './cas/useCrossLinks'
+import { useDetached } from '../components/detached/useDetached'
 import { ManageTemplatePinsModal } from '../components/cas/ManageTemplatePinsModal'
 import { ChainRepairBar } from './cas/ChainRepairBar'
 import { CreateCAModal } from './cas/CreateCAModal'
@@ -37,8 +39,6 @@ const storedViewMode = () => {
     return VIEW_MODES.includes(mode) ? mode : 'tree'
   } catch { return 'tree' }
 }
-// Cross-certificate issuers are read per authority: only the first holders are asked
-const CROSS_LINK_HOLDERS = 12
 const REQUEST = 'GET /api/v2/cas'
 
 /** No authority yet: while the first-run steps remain, the way to the assistant, else Create a CA (the mockup's emptyAction). */
@@ -58,6 +58,7 @@ export default function CAsPage() {
   const navigate = useNavigate()
   const { isMobile } = useMobile()
   const openEntity = useOpenEntity()
+  const detached = useDetached()
   const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete, canRead } = usePermission()
   const { muteToasts } = useWebSocket()
@@ -90,7 +91,6 @@ export default function CAsPage() {
   const [crossFindings, setCrossFindings] = useState([])
   const [restoreFinding, setRestoreFinding] = useState(null)
   // { from, to } authority ids: `from` issued a cross-certificate to `to`
-  const [crossLinks, setCrossLinks] = useState([])
 
   const [viewMode, setViewMode] = useState(storedViewMode)
   useEffect(() => {
@@ -205,28 +205,7 @@ export default function CAsPage() {
   }
 
   // Who cross-certified whom, for the links of the tree and the side panel
-  const crossKey = cas.filter((c) => c.cross_certificate_count > 0).map((c) => `${c.id}:${c.cross_certificate_count}`).join(',')
-  useEffect(() => {
-    const holders = cas.filter((c) => c.cross_certificate_count > 0).slice(0, CROSS_LINK_HOLDERS)
-    if (holders.length === 0) { setCrossLinks([]); return undefined }
-    let live = true
-    const byRef = new Map(cas.map((c) => [c.refid, c.id]))
-    Promise.all(holders.map((ca) => casService.getCrossCertificates(ca.id)
-      .then((res) => (res.data || []).map((x) => ({ from: byRef.get(x.issuer_caref), to: ca.id })))
-      .catch(() => [])))
-      .then((lists) => {
-        if (!live) return
-        const seen = new Set()
-        setCrossLinks(lists.flat().filter((l) => {
-          const key = `${l.from}-${l.to}`
-          if (l.from === undefined || l.from === l.to || seen.has(key)) return false
-          seen.add(key)
-          return true
-        }))
-      })
-    return () => { live = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crossKey])
+  const crossLinks = useCrossLinks(cas)
 
   // State filters: the counters cover every authority, whatever the search
   const counts = useMemo(() => viewCounts(cas), [cas])
@@ -324,6 +303,7 @@ export default function CAsPage() {
           )}
           {selected && (
             <CASide key={selected.id} asideRef={sideRef} ca={selected} cas={cas} forest={allForest} crossLinks={crossLinks} ocsp={ocsp}
+                onDetach={detached?.available ? () => detached.open('ca', [selected.id]) : undefined}
                 onPick={pick} onIssue={(ca) => setIssueCA(ca)}
                 onCleared={() => {
                   const next = new URLSearchParams(window.location.search)

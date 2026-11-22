@@ -2385,13 +2385,17 @@
     "differences_one": "{{count}} différence",
     "differences_other": "{{count}} différences",
     "differences": "{{count}} différences",
-    "twoTitle": "Comparer deux certificats",
     "lead": "Les propriétés différentes sont mises en évidence.",
     "property": "Propriété",
-    "authority": "Autorité",
-    "keyHeld": "Présente",
-    "keyAbsent": "Absente",
-    "close": "Fermer la comparaison"
+    "close": "Fermer la comparaison",
+    "countTitle_one": "Comparer {{count}} certificat",
+    "countTitle_other": "Comparer {{count}} certificats",
+    "key": "Algorithme et taille de clé",
+    "usages": "Usages de la clé",
+    "onlyDifferences": "Ne montrer que les différences",
+    "noDifference": "Aucune ligne ne diffère entre ces certificats.",
+    "differs": "diffère",
+    "loadFailed": "Un certificat de la comparaison n’a pas pu être lu."
   },
   "crlOcsp": {
     "crl": "Liste de révocation de certificats",
@@ -5515,7 +5519,8 @@
       "noAudit": "Votre rôle ne peut pas lire le journal d’audit : seules les dates de la fiche du certificat sont affichées.",
       "auditFailed": "Le journal d’audit n’a pas pu être lu : seules les dates de la fiche du certificat sont affichées.",
       "scope": "Entrées du journal d’audit parmi les {{count}} dernières opérations sur les certificats, et dates de la fiche du certificat."
-    }
+    },
+    "detach": "Détacher dans une fenêtre"
   },
   "table": {
     "noResults": "Aucun résultat",
@@ -7743,7 +7748,6 @@
     "haLate_other": "{{count}} nœuds en retard",
     "approvalsPending_one": "{{count}} approbation en attente",
     "approvalsPending_other": "{{count}} approbations en attente",
-    "approvalsNone": "Aucune approbation en attente",
     "theme": {
       "menu": "Thème",
       "label": "Thème : {{theme}}",
@@ -7935,6 +7939,21 @@
       "text": "La consultation continue avec les données déjà chargées ; les actions sont suspendues et reprendront d’elles-mêmes au retour du réseau.",
       "said": "Hors ligne : la consultation continue, les actions sont suspendues.",
       "back": "Connexion rétablie : les actions sont de nouveau disponibles."
+    },
+    "activity": {
+      "label": "Activité",
+      "calm": "Rien en attente",
+      "queue_one": "{{count}} à traiter",
+      "queue_other": "{{count}} à traiter",
+      "windows_one": "{{count}} fenêtre",
+      "windows_other": "{{count}} fenêtres",
+      "windowsLabel": "Fenêtres détachées",
+      "jobs": {
+        "backup": "Sauvegarde en cours",
+        "restore": "Restauration en cours",
+        "audit_verify": "Vérification du journal en cours",
+        "other": "Tâche de fond en cours"
+      }
     }
   },
   "overview": {
@@ -8365,5 +8384,10 @@
     "resultsShown": "Les {{shown}} premiers sont listés.",
     "noResults": "Aucun résultat. Essayez un autre mot.",
     "resultsLabel": "Résultats dans le guide"
+  },
+  "detached": {
+    "moveHandle": "Déplacer ou redimensionner la fenêtre",
+    "moveHint": "Les flèches déplacent la fenêtre, Maj et les flèches la redimensionnent",
+    "close": "Fermer la fenêtre {{name}}"
   }
 }
