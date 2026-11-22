@@ -5584,7 +5584,9 @@
     "ascendingReverse": "Ordre croissant, inverser",
     "descendingReverse": "Ordre décroissant, inverser",
     "foldedColumns_one": "{{count}} colonne repliée",
-    "foldedColumns_other": "{{count}} colonnes repliées"
+    "foldedColumns_other": "{{count}} colonnes repliées",
+    "resizeColumn": "Redimensionner la colonne {{column}}",
+    "resetColumns": "Réinitialiser les colonnes"
   },
   "reconnect": {
     "countdown": "Le service redémarre...",

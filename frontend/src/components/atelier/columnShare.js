@@ -66,8 +66,10 @@ export function foldOrder(columns, sortKey) {
  * its natural width, no ceiling; short of room the growing text gives way down to its floor, then the name and the
  * texts together, in proportion to what each has above its comfort floor; at the 'hard' level, then above its hard floor.
  */
-function share(shown, measures, room, level, wide) {
-  const absorber = (shown.find((c) => c.grow) || shown.find((c) => columnKind(c) === 'entity'))?.id ?? null
+function share(shown, measures, room, level, wide, fixed = {}) {
+  // A column set by hand does not absorb while another can: the growing one, else the name
+  const pick = (list) => (list.find((c) => c.grow) || list.find((c) => columnKind(c) === 'entity'))?.id
+  const absorber = pick(shown.filter((c) => !fixed[c.id])) ?? pick(shown) ?? null
   const span = {}
   for (const c of shown) {
     const { natural = 0, header = 0, floor = 0 } = measures[c.id] || {}
@@ -85,6 +87,11 @@ function share(shown, measures, room, level, wide) {
       comfort = c.id === absorber ? hard : Math.max(hard, Math.min(natural, BOUNDS.textComfort))
     }
     span[c.id] = { natural, need, hard, comfort, kind }
+    // A width set by hand is a fixed need, never under the column's hard floor (C2)
+    if (fixed[c.id]) {
+      const w = Math.max(fixed[c.id], hard)
+      span[c.id] = { natural, need: w, hard: w, comfort: w, kind, fixed: w }
+    }
   }
   const widths = Object.fromEntries(shown.map((c) => [c.id, span[c.id].need]))
   let over = Object.values(widths).reduce((a, b) => a + b, 0) - room
@@ -108,28 +115,68 @@ function share(shown, measures, room, level, wide) {
   if (over < 0 && absorber) widths[absorber] -= over
   // A ceiling where a free text is under its natural width, a minimum where it is over; the growing text needs neither
   const caps = {}
+  const held = {}
   for (const c of shown) {
-    const { natural, kind } = span[c.id]
+    const { natural, kind, fixed: w } = span[c.id]
+    if (w && c.id === absorber) {
+      if (kind === 'entity' || kind === 'text') caps[c.id] = { min: w }
+      continue
+    }
+    if (w) {
+      held[c.id] = w
+      if (kind === 'entity' || kind === 'text') caps[c.id] = { min: w, max: w }
+      continue
+    }
     if ((kind !== 'entity' && kind !== 'text') || (c.id === absorber && kind === 'text')) continue
     if (widths[c.id] < natural - 0.01) caps[c.id] = { max: widths[c.id] }
     else if (widths[c.id] > natural + 0.01 && c.id !== absorber) caps[c.id] = { min: widths[c.id] }
   }
-  return { fits: over <= 0.5, widths, caps, absorber }
+  return { fits: over <= 0.5, widths, caps, absorber, fixed: held }
 }
 
 /**
  * The layout of a list in `room` px (its region less the checkbox and the actions), from each column's measures
  * ({ natural, header, floor }): the fewest folds, in foldOrder, with which the columns fit. No column of priority 1
  * or 2 goes under its comfort floor while a column of priority 3 or 4 can still fold (R2).
- * @returns {{ folded: string[], widths: Record<string, number>, caps: Record<string, {min?, max?}>, absorber: string|null }}
+ * `fixed`: the widths set by hand ({ id: px }).
+ * @returns {{ folded: string[], widths: Record<string, number>, caps: Record<string, {min?, max?}>, absorber: string|null,
+ *   fixed: Record<string, number>, fits: boolean }}  `fixed`: the widths set by hand this layout holds
  */
-export function layoutColumns(columns, measures, room, { sortKey, wide = false } = {}) {
+export function layoutColumns(columns, measures, room, { sortKey, wide = false, fixed = {} } = {}) {
   const order = foldOrder(columns, sortKey)
-  for (let k = 0; ; k += 1) {
-    const folded = order.slice(0, k)
-    const next = columns.find((c) => c.id === order[k])
-    const level = next && (columnPriority(next) ?? 4) > 2 ? 'comfort' : 'hard'
-    const out = share(columns.filter((c) => !folded.includes(c.id)), measures, room, level, wide)
-    if (out.fits || k >= order.length) return { folded, ...out }
+  const run = (set) => {
+    for (let k = 0; ; k += 1) {
+      const folded = order.slice(0, k)
+      const next = columns.find((c) => c.id === order[k])
+      const level = next && (columnPriority(next) ?? 4) > 2 ? 'comfort' : 'hard'
+      const out = share(columns.filter((c) => !folded.includes(c.id)), measures, room, level, wide, set)
+      if (out.fits || k >= order.length) return { folded, ...out }
+    }
   }
+  // Widths set by hand hold while the columns fit, other columns folding first; when only folding a column set by
+  // hand would make room, the widths are ignored for this render (C2)
+  const set = Object.fromEntries(Object.entries(fixed || {}).filter(([id, w]) => w > 0 && columns.some((c) => c.id === id)))
+  const plain = run({})
+  if (Object.keys(set).length) {
+    const out = run(set)
+    if (out.fits && out.folded.every((id) => !set[id] || plain.folded.includes(id))) return out
+  }
+  return plain
+}
+
+// A handle's bounds and steps (C2): 64 to 640 px, by 16, by 64 with Shift
+export const RESIZE = { min: 64, max: 640, step: 16, bigStep: 64 }
+
+/**
+ * The narrowest and widest a handle sets a column: the hard floor of its kind (a name 200, 250 on a wide window,
+ * a text 96 or its header, the growing one 64; a fitted column its content), 640 unless its content is wider.
+ */
+export function columnBounds(col, measure, { wide = false, absorber = false } = {}) {
+  if (!measure) return { min: RESIZE.min, max: RESIZE.max }
+  const { natural = 0, header = 0, floor = 0 } = measure
+  const kind = columnKind(col)
+  let min = natural || RESIZE.min
+  if (kind === 'entity') min = Math.max(wide ? BOUNDS.entityMinWide : BOUNDS.entityMin, header, floor)
+  else if (kind === 'text') min = Math.min(natural || Infinity, Math.max(absorber ? BOUNDS.growMin : BOUNDS.textMin, header))
+  return { min: Math.ceil(min), max: Math.max(RESIZE.max, Math.ceil(natural)) }
 }

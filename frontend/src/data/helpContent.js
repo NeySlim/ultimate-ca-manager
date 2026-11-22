@@ -69,6 +69,7 @@ export const helpContent = {
           { label: 'Address', text: 'The object open in a page\'s detail dock and its section are part of the address: a reload or a shared link reopens them, and the browser\'s Back closes the dock' },
           { label: 'Help', text: 'Press ? outside a text field, or select the help button of the bar, to open the help of the current page; on a narrow screen, where the bar has no help button, search Help for this page' },
           { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },
+          { label: 'Column widths', text: 'In a list, drag the line between two column headers, or focus it with Tab and use Left and Right Arrow (Shift for larger steps, Escape to cancel), to set a column\'s width; a double-click or Delete returns it to its automatic width, the width is kept in this browser for each list, and Reset columns, in the footer of the list or in the Columns dialog of the certificates, clears them all' },
           { label: 'Guide', text: 'Open in a new tab, at the top of the help, opens the whole guide on the chapter of the page, beside the console; Guide in the search does the same. The guide lists every chapter at the left and the sections of the chapter read under On this page, searches all of them, and prints a chapter or the whole guide' },
         ]
       },

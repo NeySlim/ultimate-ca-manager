@@ -4,7 +4,7 @@
  * gives them from their natural widths. No DOM: DataTable measures, these decide.
  */
 import { describe, it, expect } from 'vitest'
-import { columnKind, columnPriority, columnErrors, checkColumns, foldOrder, layoutColumns, BOUNDS } from '../columnShare'
+import { columnKind, columnPriority, columnErrors, checkColumns, foldOrder, layoutColumns, columnBounds, BOUNDS, RESIZE } from '../columnShare'
 
 const col = (id, extra = {}) => ({ id, label: id, cell: () => id, ...extra })
 
@@ -177,6 +177,72 @@ describe('the layout of the columns: the need first (R1, R2)', () => {
     const out = layoutColumns(columns, measures, 100)
     expect(out.folded).toEqual(['description', 'source', 'owner', 'expiry', 'ca'])
     expect(out.widths).toMatchObject({ name: 200 })
+  })
+})
+
+describe('a width set by hand (C2): a fixed need, never at the cost of the folds nor of the room', () => {
+  const columns = [
+    col('name', { kind: 'entity', priority: 1 }),
+    col('description', { kind: 'text', priority: 4, grow: true }),
+    col('status', { kind: 'fit', priority: 1 }),
+    col('ca', { kind: 'text', priority: 2 }),
+    col('owner', { kind: 'text', priority: 3 }),
+    col('source', { kind: 'fit', priority: 3 }),
+    col('expiry', { kind: 'fit', priority: 2, sort: 'days' }),
+  ]
+  const natural = { name: 300, description: 400, status: 80, ca: 240, owner: 150, source: 70, expiry: 130 }
+  const measures = Object.fromEntries(Object.entries(natural).map(([id, n]) => [id, { natural: n, header: 50 }]))
+
+  it('keeps the width while it fits: the column neither gives way nor grows, the absorbing one takes the rest', () => {
+    const out = layoutColumns(columns, measures, 2000, { fixed: { ca: 400, source: 120 } })
+    expect(out.folded).toEqual([])
+    expect(out.fixed).toEqual({ ca: 400, source: 120 })
+    expect(out.widths).toMatchObject({ ca: 400, source: 120, name: 300, description: 820 })
+    expect(out.caps.ca).toEqual({ min: 400, max: 400 })
+    // Short of room the name gives way, the issuer set by hand does not
+    const tight = layoutColumns(columns, measures, 1180, { fixed: { ca: 400 } })
+    expect(tight.folded).toEqual([])
+    expect(tight.widths.ca).toBe(400)
+    expect(tight.widths.name).toBeCloseTo(286, 1)
+  })
+
+  it('a widened column does not stop the folds: they come first, in their declared order', () => {
+    const without = layoutColumns(columns, measures, 900)
+    const widened = layoutColumns(columns, measures, 900, { fixed: { ca: 420 } })
+    expect(without.folded).toEqual(['description'])
+    expect(widened.folded).toEqual(foldOrder(columns).slice(0, widened.folded.length))
+    expect(widened.folded.length).toBeGreaterThan(without.folded.length)
+    expect(widened.fixed).toEqual({ ca: 420 })
+    expect(Object.values(widened.widths).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(900.5)
+  })
+
+  it('when only folding the column set by hand would make room, its width is ignored for this render', () => {
+    const out = layoutColumns(columns, measures, 560, { fixed: { ca: 600 } })
+    expect(out.fixed).toEqual({})
+    expect(out).toMatchObject({ folded: layoutColumns(columns, measures, 560).folded, widths: layoutColumns(columns, measures, 560).widths })
+  })
+
+  it('never below a hard floor: a name at 200, a fitted column at its content', () => {
+    const out = layoutColumns(columns, measures, 2000, { fixed: { name: 120, status: 30 } })
+    expect(out.fixed).toMatchObject({ name: 200, status: 80 })
+  })
+
+  it('a growing column set by hand hands the rest of the room to the name', () => {
+    const out = layoutColumns(columns, measures, 2000, { fixed: { description: 300 } })
+    expect(out.absorber).toBe('name')
+    expect(out.widths.description).toBe(300)
+    expect(out.widths.name).toBe(2000 - 300 - 80 - 240 - 150 - 70 - 130)
+  })
+
+  it('a handle\'s bounds: the hard floors of the spec, 640 at most unless the content is wider', () => {
+    expect(RESIZE).toEqual({ min: 64, max: 640, step: 16, bigStep: 64 })
+    expect(columnBounds(col('n', { kind: 'entity' }), { natural: 300, header: 60 })).toEqual({ min: 200, max: 640 })
+    expect(columnBounds(col('n', { kind: 'entity' }), { natural: 900, header: 60 }, { wide: true })).toEqual({ min: 250, max: 900 })
+    expect(columnBounds(col('t', { kind: 'text' }), { natural: 300, header: 120 })).toEqual({ min: 120, max: 640 })
+    expect(columnBounds(col('t', { kind: 'text' }), { natural: 50, header: 40 })).toEqual({ min: 50, max: 640 })
+    expect(columnBounds(col('d', { kind: 'text', grow: true }), { natural: 300, header: 40 }, { absorber: true })).toEqual({ min: 64, max: 640 })
+    expect(columnBounds(col('f', { kind: 'fit' }), { natural: 130 })).toEqual({ min: 130, max: 640 })
+    expect(columnBounds(col('f', { kind: 'fit' }))).toEqual({ min: 64, max: 640 })
   })
 })
 

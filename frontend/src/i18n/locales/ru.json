@@ -5814,7 +5814,9 @@
     "foldedColumns_one": "{{count}} столбец свёрнут",
     "foldedColumns_few": "{{count}} столбца свёрнуто",
     "foldedColumns_many": "{{count}} столбцов свёрнуто",
-    "foldedColumns_other": "{{count}} столбца свёрнуто"
+    "foldedColumns_other": "{{count}} столбца свёрнуто",
+    "resizeColumn": "Изменить ширину столбца {{column}}",
+    "resetColumns": "Сбросить столбцы"
   },
   "policies": {
     "title": "Политики сертификатов",

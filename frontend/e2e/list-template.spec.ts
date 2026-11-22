@@ -302,9 +302,11 @@ test.describe('the sort button and the sorted column', () => {
     expect((await colours())[0]).not.toBe(text)
     await head('Publication').hover({ position: { x: 20, y: 17 } })
     expect(await colours()).toEqual([text, text])
-    // The keyboard's ring stays inside the 34 px header (G7)
+    // The keyboard's ring stays inside the 34 px header (G7); Tab passes the column's handle (C2) before the next header
     await page.mouse.move(0, 0)
     await head('Name').getByRole('button').focus()
+    await page.keyboard.press('Tab')
+    expect(await page.evaluate(() => document.activeElement!.getAttribute('role'))).toBe('separator')
     await page.keyboard.press('Tab')
     const ring = await page.evaluate(() => { const b = document.activeElement as HTMLElement; return [b.matches(':focus-visible'), getComputedStyle(b).outlineOffset, b.closest('th') !== null] })
     expect(ring).toEqual([true, '-2px', true])
@@ -343,6 +345,136 @@ test.describe('the open row and a selection', () => {
     const name = page.locator('#cert-scroll tbody tr').nth(1).locator('button.entity-name')
     await expect(name).toBeDisabled()
     expect(await name.evaluate((b) => [getComputedStyle(b).opacity, getComputedStyle(b).cursor])).toEqual(['1', 'default'])
+  })
+})
+
+// The certificates read the dock at the right; the shared account's preference is never written
+async function dockRight(page) {
+  const right = { position: 'right', height: 278, width: 460 }
+  await page.route('**/api/v2/account/preferences', async (route) => {
+    if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' })
+    const response = await route.fetch()
+    const body = await response.json()
+    body.data = { ...(body.data || {}), inspector: right }
+    return route.fulfill({ response, json: body })
+  })
+  await page.route('**/api/v2/auth/verify', async (route) => {
+    const response = await route.fetch()
+    const body = await response.json()
+    if (body?.data) body.data.preferences = { ...(body.data.preferences || {}), inspector: right }
+    return route.fulfill({ response, json: body })
+  })
+}
+
+test.describe('the column handles (C2)', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } })
+
+  test('drag, keyboard, double-click, kept after a reload, reset from the footer; never a sideways scroll', async ({ page, api }) => {
+    await createCA(api)
+    await open(page, LISTS[2])
+    // The second data column, a fitted one: the name absorbs the room left
+    const th = page.locator('#module-scroll thead th:has(> [role=separator])').nth(1)
+    const grip = th.locator(':scope > [role=separator]')
+    const width = () => th.evaluate((el) => Math.round(el.getBoundingClientRect().width))
+    const near = (expected: number) => async () => Math.abs((await width()) - expected) <= 1
+    const auto = await width()
+    // The handle is the separator: the same 1 by 16 line at rest, 12 px to grab, the accent across the header on hover
+    const line = () => grip.evaluate((g) => { const b = getComputedStyle(g, '::before'); return [b.width, b.height] })
+    expect(await line()).toEqual(['1px', '16px'])
+    const box = (await grip.boundingBox())!
+    expect(Math.round(box.width)).toBe(12)
+    expect(await grip.evaluate((g) => getComputedStyle(g).cursor)).toBe('col-resize')
+    await page.mouse.move(box.x + 6, box.y + box.height / 2)
+    expect(await line()).toEqual(['2px', `${Math.round(box.height)}px`])
+
+    // Drag 80 px to the right
+    const drag = async (dx: number) => {
+      const b = (await grip.boundingBox())!
+      await page.mouse.move(b.x + 6, b.y + b.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(b.x + 6 + dx / 2, b.y + b.height / 2, { steps: 4 })
+      await page.mouse.move(b.x + 6 + dx, b.y + b.height / 2, { steps: 4 })
+      await page.mouse.up()
+    }
+    await drag(80)
+    await expect.poll(near(auto + 80)).toBe(true)
+    const g = await geometry(page, '#module-scroll')
+    expect([g.over <= 1, g.page <= 0]).toEqual([true, true])
+    // Kept after a reload, under the list's own key
+    await page.reload()
+    await expect(page.locator('#module-scroll tbody tr').first()).toBeVisible()
+    await expect.poll(near(auto + 80)).toBe(true)
+
+    // The keyboard: 16 px a step, 64 with Shift, Escape gives the width back, Enter keeps; the accent while focused
+    await page.mouse.move(0, 0)
+    await grip.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect.poll(near(auto + 96)).toBe(true)
+    await expect(grip).toHaveAttribute('aria-valuenow', String(auto + 96))
+    expect((await line())[0]).toBe('2px')
+    await page.keyboard.press('Shift+ArrowRight')
+    await expect.poll(near(auto + 160)).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect.poll(near(auto + 80)).toBe(true)
+    await page.keyboard.press('ArrowLeft')
+    await page.keyboard.press('Enter')
+    await expect.poll(near(auto + 64)).toBe(true)
+
+    // A double-click gives the column its automatic width back
+    await page.mouse.move(0, 0)
+    await grip.dblclick()
+    await expect.poll(near(auto)).toBe(true)
+    await expect(page.locator('.atl .table-footer [data-action=reset-columns]')).toHaveCount(0)
+
+    // Réinitialiser les colonnes, in the footer while a width is set, clears them all
+    await drag(60)
+    await expect.poll(near(auto + 60)).toBe(true)
+    await page.locator('.atl .table-footer [data-action=reset-columns]').click()
+    await expect.poll(near(auto)).toBe(true)
+    await expect(page.locator('.atl .table-footer [data-action=reset-columns]')).toHaveCount(0)
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('ucm-widths:')))).toEqual([])
+
+    // A widened column never makes the list scroll sideways, at any desktop width
+    await drag(300)
+    for (const w of [1280, 1000]) {
+      await page.setViewportSize({ width: w, height: 900 })
+      await expect.poll(() => geometry(page, '#module-scroll').then((r) => r.over)).toBeLessThanOrEqual(1)
+      expect((await geometry(page, '#module-scroll')).page).toBeLessThanOrEqual(0)
+    }
+  })
+
+  test('beside the dock, a widened issuer keeps its width while other columns fold first; the Columns dialog resets it', async ({ page, api }) => {
+    const ca = await createCA(api, { commonName: `Production Intermediate Authority ${uid('ca')}` })
+    const cert = await issueCert(api, ca.id)
+    await page.setViewportSize({ width: 1406, height: 809 })
+    await dockRight(page)
+    await page.goto('/certificates')
+    await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
+    await expect(page.locator('#cert-scroll tbody tr')).toHaveCount(1)
+    await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
+    await expect(page.locator('.atl #app')).toHaveClass(/dock-right/)
+    const folded = async () => {
+      const note = page.locator('.atl .table-footer .folded-note')
+      return (await note.count()) ? (await note.getAttribute('title'))!.split(', ') : []
+    }
+    const before = await folded()
+    const issuer = page.locator('#cert-scroll thead th.col-ca')
+    await page.evaluate(() => localStorage.setItem('ucm-certs-table-widths', JSON.stringify({ ca: 320 })))
+    await page.reload()
+    await expect(page.locator('.atl #app')).toHaveClass(/dock-right/)
+    await expect(page.locator('#cert-scroll tbody tr').first()).toBeVisible()
+    await expect.poll(() => issuer.evaluate((el) => Math.round(el.getBoundingClientRect().width))).toBe(320)
+    // The columns that folded without it are still folded, more may be, never the issuer
+    const after = await folded()
+    expect(after).toEqual(expect.arrayContaining(before))
+    expect(after.length).toBeGreaterThanOrEqual(before.length)
+    const g = await geometry(page, '#cert-scroll')
+    expect([g.over <= 1, g.page <= 0, g.lost]).toEqual([true, true, 0])
+    // The Columns dialog of the certificates resets the widths and the hidden columns
+    await page.getByRole('main').getByRole('button', { name: 'Columns' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Reset columns' }).click()
+    await expect.poll(() => issuer.evaluate((el) => Math.round(el.getBoundingClientRect().width))).not.toBe(320)
+    expect(await page.evaluate(() => localStorage.getItem('ucm-certs-table-widths'))).toBeNull()
   })
 })
 

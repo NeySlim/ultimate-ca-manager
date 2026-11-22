@@ -181,6 +181,42 @@ describe('short of room, at any desktop width', () => {
   })
 })
 
+describe('a width set by hand beside the folds (C2)', () => {
+  const widened = (props = {}) => table({ columnWidths: { ca: 400 }, onColumnWidth: () => {}, ...props })
+
+  it('holds while it fits: the header and the cells at 400 px, the description takes the rest', () => {
+    const { container } = render(widened())
+    expect(heads(container)).toEqual(['name', 'description', 'status', 'ca', 'source', 'expiry', 'key', '·'])
+    expect(headOf(container, 'ca').style.width).toBe('400px')
+    expect(cellOf(container, 'ca').style.maxWidth).toBe('400px')
+    expect(cellOf(container, 'ca').style.minWidth).toBe('400px')
+    expect(headOf(container, 'description')).not.toHaveClass('fit')
+  })
+
+  it('the columns still fold beside it, in their order, and the footer says so; out of room it is ignored', () => {
+    room.width = 900
+    const { container } = render(widened())
+    // 860 of room: the description, the key and the source fold before the name gives way to its hard floor
+    expect(heads(container)).toEqual(['name', 'status', 'ca', 'expiry', '·'])
+    expect(headOf(container, 'ca').style.width).toBe('400px')
+    expect(container.querySelector('.folded-note')).toHaveTextContent('{"count":3}')
+    // Only folding the issuer itself would make room: its width is ignored for this render, the layout is the plain one
+    resize(560)
+    expect(heads(container)).toEqual(['name', 'status', 'ca', 'expiry', '·'])
+    expect(headOf(container, 'ca').style.width).toBe('')
+    resize(1400)
+    expect(headOf(container, 'ca').style.width).toBe('400px')
+  })
+
+  it('a handle is bounded by its column: a name at 200, a fitted column at its content, 640 at most', () => {
+    const { container } = render(widened())
+    const bounds = (id) => ['aria-valuemin', 'aria-valuemax', 'aria-valuenow'].map((a) => headOf(container, id).querySelector('[role=separator]').getAttribute(a))
+    expect(bounds('name')).toEqual(['200', '640', '300'])
+    expect(bounds('source')).toEqual(['70', '640', '70'])
+    expect(bounds('ca')).toEqual(['96', '640', '400'])
+  })
+})
+
 describe('a name with badges under it (the authorities, G5)', () => {
   // A group of badges spans the cell (adjust.css): its box is the cell's, 535 px; its badges are 90 and 70 px
   const WIDTH = { 'ca-badges': 535, chip: 0, 'entity-name': 262 }
