@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, IconBtn, Pill, ListView, Toolbar, Dock, DockBody, Section, Props, EmptyBlock, useSortParam } from '../../components/atelier'
+import { Btn, IconBtn, Pill, ListView, Toolbar, Dock, DockBody, Section, Facts, EmptyBlock, useSortParam } from '../../components/atelier'
 import { useDockSelection, asId } from '../../components/atelier/useDockParam'
 import { apiClient } from '../../services'
 import { buildQueryString } from '../../services/apiClient'
@@ -13,7 +13,7 @@ import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { stateLabel } from '../../lib/stateLabel'
 import { dateTimeOf, dateOf } from '../admin/adminDates'
-import { Copyable } from '../protocols/atelierParts'
+import { copyRow, factRow } from '../protocols/factRows'
 import { SlotDock } from '../protocols/dockSlot'
 
 const TONES = { valid: 'good', ready: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
@@ -112,11 +112,11 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
         actions={canDeleteOrders && <Btn icon="close" id="acme-order-delete" onClick={() => handleDelete(opened)}>{t('common.delete')}</Btn>}>
         <div className="module-detail">
           <Section title={t('acme.orderInfo')}>
-            <Props items={[
-              [t('acme.domains'), opened.domain], [t('acme.account'), <span key="a" className="mono">{opened.account}</span>],
-              [t('acme.challengeType'), opened.method || '—'], [t('atelier.state'), pill(opened)],
-              [t('common.expires'), dateOf(opened.expires, locale) || '—'], [t('common.created'), dateTimeOf(opened.created_at, locale) || '—'],
-              opened.order_id && [t('acme.orderId'), <Copyable key="o" value={opened.order_id} label={t('acme.orderId')} />],
+            <Facts items={[
+              [t('acme.domains'), opened.domain], factRow(t('acme.account'), opened.account),
+              factRow(t('acme.challengeType'), opened.method), [t('atelier.state'), pill(opened)],
+              factRow(t('common.expires'), dateOf(opened.expires, locale)), factRow(t('common.created'), dateTimeOf(opened.created_at, locale)),
+              opened.order_id && copyRow(t('acme.orderId'), opened.order_id, undefined, { long: true }),
             ]} />
           </Section>
         </div>

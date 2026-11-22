@@ -251,3 +251,31 @@ describe('nothing configured yet (the mockup\'s emptyBlock)', () => {
     expect(document.getElementById('empty-est')).toBeNull()
   })
 })
+
+// KV-3: the docks as typed rows, the URLs and the policy in chips that copy them whole
+const factRow = (term) => {
+  const found = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === term)
+  if (!found) throw new Error(`no row ${term}`)
+  return found
+}
+
+describe('the TSA and EST docks as facts', () => {
+  it('shows the TSA URL and its policy in chips, the signer as a long row', async () => {
+    at('/tsa-config', TSAPage)
+    fireEvent.click(await screen.findByRole('button', { name: 'tsa.serviceName' }))
+    await screen.findByRole('complementary', { name: /atelier.detailOf/ })
+    expect(factRow('URL').querySelector('.code-value.url .val').getAttribute('title')).toMatch(/\/tsa$/)
+    expect(factRow('tsa.columns.policy').querySelector('dd.v .code-value')).toHaveTextContent('1.3.6.1.4.1.55555.1')
+    expect(factRow('tsa.signingCert')).toHaveClass('long')
+  })
+
+  it('shows every EST operation URL in a chip, whole in its title', async () => {
+    at('/est-config', ESTPage)
+    fireEvent.click(await screen.findByRole('button', { name: 'iot' }))
+    await screen.findByRole('complementary', { name: /atelier.detailOf/ })
+    const enroll = factRow('est.simpleenroll')
+    expect(enroll).toHaveClass('long')
+    expect(enroll.querySelector('.code-value.url .val').getAttribute('title')).toMatch(/\/\.well-known\/est\/iot\/simpleenroll$/)
+    expect(document.querySelectorAll('dl.kv .code-value.url')).toHaveLength(5)
+  })
+})

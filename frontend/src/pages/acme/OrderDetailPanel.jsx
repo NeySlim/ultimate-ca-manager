@@ -4,11 +4,12 @@
  * check, finalize, view, download, renew, automatic renewal, delete).
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, Dock, DockBody, Section, Props, Pill } from '../../components/atelier'
+import { Btn, Dock, DockBody, Section, Facts, Pill } from '../../components/atelier'
 import { downloadBlob } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
 import { dateTimeOf } from '../admin/adminDates'
-import { Copyable, Notice } from '../protocols/atelierParts'
+import { Notice } from '../protocols/atelierParts'
+import { copyRow, factRow } from '../protocols/factRows'
 import { http01Url } from '../protocols/protocolStates'
 
 const ORDER_TONES = { valid: 'good', issued: 'good', ready: 'good', pending: 'warn', processing: 'warn', validating: 'warn', invalid: 'bad' }
@@ -41,16 +42,19 @@ export default function OrderDetailPanel({ order, onClose, onDownloadCert, onVie
         </>}>
         <div className="module-detail">
           <Section title={t('acme.orderInfo')}>
-            <Props items={[
-              [t('acme.domains'), (order.domains || []).join(', ') || name],
+            <Facts items={[
+              { label: t('acme.domains'), value: (order.domains || []).join(', ') || name, long: (order.domains || []).length > 1 },
               [t('acme.environment'), t(order.environment === 'production' ? 'acme.production' : 'acme.staging')],
-              [t('acme.method'), order.challenge_type?.toUpperCase() || '—'],
+              factRow(t('acme.method'), order.challenge_type?.toUpperCase()),
               [t('acme.provider'), order.dns_provider_name || t('acme.manualDns')],
               order.is_proxy_order && (order.account_email || order.account_short_id) && [t('acme.account'), order.account_email || `${order.account_short_id}…`],
               [t('atelier.state'), pill],
-              [t('common.created'), dateTimeOf(order.created_at, locale) || '—'],
+              factRow(t('common.created'), dateTimeOf(order.created_at, locale)),
               order.expires_at && [t('common.expires'), dateTimeOf(order.expires_at, locale)],
-              order.renewal_failures > 0 && [t('acme.renewalFailuresLabel'), `${t('acme.renewalFailures', { count: order.renewal_failures })}${order.last_error_at ? ` · ${t('acme.renewalLastFailure', { date: dateTimeOf(order.last_error_at, locale) })}` : ''}`],
+              order.renewal_failures > 0 && {
+                label: t('acme.renewalFailuresLabel'), value: t('acme.renewalFailures', { count: order.renewal_failures }),
+                sub: order.last_error_at ? t('acme.renewalLastFailure', { date: dateTimeOf(order.last_error_at, locale) }) : undefined,
+              },
             ]} />
             {order.error_message && <Notice tone="bad" role="alert">{order.error_message}</Notice>}
             {order.renewal_retry_daily && <Notice tone="warn">{t('acme.renewalRetryDaily')}</Notice>}
@@ -67,15 +71,15 @@ export default function OrderDetailPanel({ order, onClose, onDownloadCert, onVie
               {order.challenge_type === 'http-01' && <p className="muted small">{t('acme.http01Hint')}</p>}
               {Object.entries(order.challenges).map(([domain, data]) => (
                 <div key={domain} className="acme-challenge">
-                  <Props items={[
+                  <Facts items={[
                     [t('acme.domain'), domain],
                     ...(order.challenge_type === 'dns-01' ? [
-                      [t('acme.dnsRecordName'), <Copyable key="n" value={data.dns_txt_name || data.record_name} label={t('acme.dnsRecordName')} />],
-                      [t('acme.dnsRecordValue'), <Copyable key="v" value={data.dns_txt_value || data.record_value} label={t('acme.dnsRecordValue')} />],
+                      copyRow(t('acme.dnsRecordName'), data.dns_txt_name || data.record_name, undefined, { long: true }),
+                      copyRow(t('acme.dnsRecordValue'), data.dns_txt_value || data.record_value, undefined, { long: true }),
                     ] : []),
                     ...(order.challenge_type === 'http-01' && data.token && data.key_authorization ? [
-                      [t('acme.http01Url'), <Copyable key="u" url value={http01Url(domain, data)} label={t('acme.http01Url')} />],
-                      [t('acme.http01FileContent'), <Copyable key="c" value={data.key_authorization} label={t('acme.http01FileContent')} />],
+                      copyRow(t('acme.http01Url'), http01Url(domain, data), 'url'),
+                      copyRow(t('acme.http01FileContent'), data.key_authorization, undefined, { long: true }),
                     ] : []),
                   ]} />
                   {order.challenge_type === 'http-01' && data.token && data.key_authorization && (

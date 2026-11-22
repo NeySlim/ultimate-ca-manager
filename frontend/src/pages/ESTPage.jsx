@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Zone, Btn, IconBtn, Icon, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
+  Zone, Btn, IconBtn, Icon, Pill, PageHead, ListView, Dock, DockBody, Section, Facts, SettingsView, SkeletonPanel,
   LoadError, LoadCause, useClientList, useSortParam,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
@@ -18,7 +18,8 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useDockParam } from '../components/atelier/useDockParam'
 import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
-import { Copyable, Notice, ViewSwitch } from './protocols/atelierParts'
+import { Notice, ViewSwitch } from './protocols/atelierParts'
+import { copyRow, factRow } from './protocols/factRows'
 import { repeatedRows } from './protocols/protocolStates'
 
 const ENDPOINTS = ['cacerts', 'simpleenroll', 'simplereenroll', 'csrattrs', 'serverkeygen']
@@ -161,14 +162,14 @@ export default function ESTPage() {
         actions={canEdit && <Btn icon="settings" id="est-configure" onClick={() => setView('config')}>{t('tsa.configure')}</Btn>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('tsa.columns.ca'), open.ca], [t('est.columns.auth'), auth], [t('atelier.state'), pill()],
+            <Facts items={[
+              factRow(t('tsa.columns.ca'), open.ca === '—' ? null : open.ca), [t('est.columns.auth'), auth], [t('atelier.state'), pill()],
               [t('est.validityDays'), String(config.validity_days || 365)],
             ]} />
             {!config.enabled && <Notice tone="warn">{t('est.estDisabledDesc')}</Notice>}
           </Section>
           <Section title={t('est.endpoints')}>
-            <Props items={ENDPOINTS.map((ep) => [t(`est.${ep}`), <Copyable key={ep} url value={`${baseUrl}${open.path}/${ep}`} label={t(`est.${ep}`)} />])} />
+            <Facts items={ENDPOINTS.map((ep) => copyRow(t(`est.${ep}`), `${baseUrl}${open.path}/${ep}`, 'url'))} />
           </Section>
           <Section title={t('atelier.summary')}>
             <p className="summary">{stats.total > 0

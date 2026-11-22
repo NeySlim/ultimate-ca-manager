@@ -153,3 +153,17 @@ describe('LocalOrdersTab in the URL', () => {
     expect(mocks.get).toHaveBeenCalledWith('/acme/orders/99')
   })
 })
+
+describe('LocalOrdersTab dock', () => {
+  it('shows the order id in a chip that copies it whole', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    mocks.get.mockResolvedValue(response([{ ...order, order_id: 'ord-0123456789' }], 1, 1))
+    render(<MemoryRouter initialEntries={['/acme?tab=localorders&item=7']}><WithDockSlot><LocalOrdersTab /></WithDockSlot></MemoryRouter>)
+    await screen.findByRole('heading', { level: 2, name: 'example.com' })
+    const id = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === 'acme.orderId')
+    fireEvent.click(id.querySelector('dd.v').querySelector('.code-value .cp'))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('ord-0123456789'))
+  })
+})

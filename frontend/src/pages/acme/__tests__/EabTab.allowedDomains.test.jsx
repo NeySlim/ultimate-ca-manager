@@ -184,3 +184,15 @@ describe('EabTab list', () => {
     expect(bodyRows()).toHaveLength(25)
   })
 })
+
+describe('EabTab dock', () => {
+  it('shows the key identifier in a chip and the domains as a long row', async () => {
+    mocks.list.mockResolvedValue({ data: [cred(5, ['a.example.com'])] })
+    renderTab()
+    fireEvent.click(await screen.findByRole('button', { name: 'cred-5' }))
+    const domains = await screen.findByTestId('eab-dock-domains-5')
+    expect(domains.closest('div.row')).toHaveClass('long')
+    const kid = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === 'acme.eab.kid')
+    expect(kid.querySelector('dd.v .code-value')).toHaveTextContent('kid-5')
+  })
+})

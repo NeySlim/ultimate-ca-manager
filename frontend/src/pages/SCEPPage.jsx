@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Zone, Btn, Pill, PageHead, Toolbar, SearchField, IconBtn, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
+  Zone, Btn, Pill, PageHead, Toolbar, SearchField, IconBtn, ListView, Dock, DockBody, Section, Facts, SettingsView, SkeletonPanel,
   LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, Icon, useClientList, useSortParam,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
@@ -24,7 +24,8 @@ import { stateLabel } from '../lib/stateLabel'
 import { scepPickerCas, unlistedScepPickerCas } from '../lib/caSelection'
 import { extractData } from '../lib/utils'
 import { dateTimeOf } from './admin/adminDates'
-import { Copyable, Notice, ViewSwitch, YesNo } from './protocols/atelierParts'
+import { Notice, ViewSwitch } from './protocols/atelierParts'
+import { copyRow, factRow, yesNoState } from './protocols/factRows'
 import { parseDN } from './protocols/protocolStates'
 import ScepProfileForm from './scep/ScepProfileForm'
 import IntuneAppForm from './scep/IntuneAppForm'
@@ -434,8 +435,8 @@ export default function SCEPPage() {
       children: (
         <fieldset className="settings-group">
           <legend>{t('scep.supportedOperations')}</legend>
-          <Props items={[
-            [t('scep.scepURL'), <Copyable key="u" url value={`${baseUrl}/scep/pkiclient.exe`} label={t('scep.scepURL')} />],
+          <Facts items={[
+            copyRow(t('scep.scepURL'), `${baseUrl}/scep/pkiclient.exe`, 'url'),
             [t('scep.supportedOperations'), ['GetCACaps', 'GetCACert', 'GetCACertChain', 'PKIOperation'].join(', ')],
           ]} />
           <h3 className="section-title scep-example-title">{t('scep.ciscoExample')}</h3>
@@ -468,18 +469,18 @@ crypto ca enroll UCM-CA`}</pre>
         </>}>
         <div className="module-detail">
           <Section title={t('scep.sections.enrollment')}>
-            <Props items={[
-              [t('scep.enrollmentUrl'), <span key="u" className="mono url">{profileUrl(opened)}</span>],
-              [t('scep.challenge'), challengeText(opened)],
+            <Facts items={[
+              copyRow(t('scep.enrollmentUrl'), profileUrl(opened), 'url'),
+              opened.intune_enabled || opened.challenge_set ? [t('scep.challenge'), challengeText(opened)] : { label: t('scep.challenge'), absent: challengeText(opened) },
             ]} />
             <CopyUrlButton url={profileUrl(opened)} copy={copy} />
           </Section>
           <Section title={t('scep.sections.issuance')}>
-            <Props items={[
+            <Facts items={[
               [t('scep.columns.ca'), opened.ca_name || caName(opened.ca_refid)],
-              [t('scep.columns.template'), opened.template_name || t('scep.noTemplate')],
-              ['Intune', <YesNo key="i" value={opened.intune_enabled} />],
-              [t('scep.autoApprove'), <YesNo key="a" value={opened.auto_approve} />],
+              factRow(t('scep.columns.template'), opened.template_name, t('scep.noTemplate')),
+              { label: 'Intune', state: yesNoState(t, opened.intune_enabled) },
+              { label: t('scep.autoApprove'), state: yesNoState(t, opened.auto_approve) },
               [t('atelier.state'), profilePill(opened)],
             ]} />
             {opened.description && <Notice>{opened.description}</Notice>}
@@ -501,16 +502,16 @@ crypto ca enroll UCM-CA`}</pre>
         </>}>
         <div className="module-detail">
           <Section title={t('common.requestDetails')}>
-            <Props items={[
-              [t('scep.transactionId'), <Copyable key="tx" value={req.transaction_id} label={t('scep.transactionId')} />],
-              [t('common.subject'), <span key="s" className="mono">{req.subject || '—'}</span>],
+            <Facts items={[
+              copyRow(t('scep.transactionId'), req.transaction_id, undefined, { long: true }),
+              factRow(t('common.subject'), req.subject, '—', { long: true }),
               req.profile_id && [t('scep.columns.profile'), profileOf(req.profile_id)?.name || `#${req.profile_id}`],
               [t('scep.columns.ca'), caName(req.ca_refid)],
-              req.client_ip && [t('scep.clientIp'), <span key="ip" className="mono">{req.client_ip}</span>],
+              req.client_ip && [t('scep.clientIp'), req.client_ip],
               [t('atelier.state'), requestPill(req)],
-              [t('common.created'), dateTimeOf(req.created_at, locale) || '—'],
-              req.approved_at && [t('scep.approvedAt'), `${dateTimeOf(req.approved_at, locale)}${req.approved_by ? ` · ${req.approved_by}` : ''}`],
-              req.rejection_reason && [t('scep.rejectionReason'), req.rejection_reason],
+              factRow(t('common.created'), dateTimeOf(req.created_at, locale)),
+              req.approved_at && { label: t('scep.approvedAt'), value: dateTimeOf(req.approved_at, locale), sub: req.approved_by || undefined },
+              req.rejection_reason && { label: t('scep.rejectionReason'), value: req.rejection_reason, long: true },
             ]} />
           </Section>
           {req.csr_pem && <Section title={t('common.csrContent')}><pre className="code-preview">{req.csr_pem}</pre></Section>}
@@ -528,9 +529,9 @@ crypto ca enroll UCM-CA`}</pre>
         actions={canEdit && <Btn icon="refresh" id="scep-ca-regenerate" write onClick={() => regenerateCaChallenge(caOpen)}>{t('scep.regenerate')}</Btn>}>
         <div className="module-detail">
           <Section title={t('scep.challenge')}>
-            <Props items={[
-              [t('common.subject'), <span key="s" className="mono">{caOpen.subject || '—'}</span>],
-              [t('scep.challenge'), caOpen.scep_challenge ? <Copyable key="c" value={caOpen.scep_challenge} label={t('scep.challenge')} /> : t('scep.noChallengeSet')],
+            <Facts items={[
+              factRow(t('common.subject'), caOpen.subject, '—', { long: true }),
+              caOpen.scep_challenge ? copyRow(t('scep.challenge'), caOpen.scep_challenge) : { label: t('scep.challenge'), absent: t('scep.noChallengeSet') },
             ]} />
             {!config.enabled && <Notice tone="warn">{t('scep.scepDisabledDesc')}</Notice>}
           </Section>
@@ -551,11 +552,15 @@ crypto ca enroll UCM-CA`}</pre>
         </>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('scep.intuneTenantId'), <span key="t" className="mono">{appOpen.tenant_id}</span>],
-              [t('scep.intuneClientId'), <span key="c" className="mono">{appOpen.client_id}</span>],
-              [t('scep.intuneAppLastTest'), appOpen.last_test_at ? `${dateTimeOf(appOpen.last_test_at, locale)} (${appOpen.last_test_result})` : t('scep.intuneAppNeverTested')],
-              [t('scep.profiles'), appOpen.profile_names?.length ? appOpen.profile_names.join(', ') : t('scep.intuneAppNotUsed')],
+            <Facts items={[
+              copyRow(t('scep.intuneTenantId'), appOpen.tenant_id, undefined, { long: true }),
+              copyRow(t('scep.intuneClientId'), appOpen.client_id, undefined, { long: true }),
+              appOpen.last_test_at
+                ? { label: t('scep.intuneAppLastTest'), value: dateTimeOf(appOpen.last_test_at, locale), sub: appOpen.last_test_result || undefined }
+                : { label: t('scep.intuneAppLastTest'), absent: t('scep.intuneAppNeverTested') },
+              appOpen.profile_names?.length
+                ? { label: t('scep.profiles'), value: appOpen.profile_names.join(', '), long: appOpen.profile_names.length > 2 }
+                : { label: t('scep.profiles'), absent: t('scep.intuneAppNotUsed') },
             ]} />
           </Section>
         </div>

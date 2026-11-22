@@ -5,14 +5,15 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, SettingsView, Props } from '../../components/atelier'
+import { Btn, SettingsView, Facts } from '../../components/atelier'
 import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { publicBaseUrl } from '../../lib/utils'
 import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms, isBrainpool } from '../../lib/keyAlgorithms'
 import { useKeyPlatform } from '../../lib/policyAlgorithms'
 import DnsUpdatePortField from './DnsUpdatePortField'
-import { Copyable, Field, Notice } from '../protocols/atelierParts'
+import { Field, Notice } from '../protocols/atelierParts'
+import { copyRow } from '../protocols/factRows'
 
 // Bounds of the integer settings, as the server checks them
 const BOUNDS = { renewal_days: [1, 60, 30], dns_propagation_timeout: [0, 3600, 120], dns_propagation_delay: [0, 300, 10], tls_alpn_port: [1, 65535, 443] }
@@ -165,10 +166,10 @@ export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWri
               <div className="copy-url"><Btn icon="key" write disabled={(!proxyEmail && !selected?.email) || undefined} onClick={() => onRegisterProxy(proxyEmail)}>{t('acme.registerAccount')}</Btn></div>
             </div>
           )}
-          <Props items={[
-            [t('acme.proxyPathUrl'), <Copyable key="d" url value={proxyDirectoryUrl} label={t('acme.proxyPathUrl')} />],
-            !selected?.proxy_enabled && [t('acme.proxyDefaultUrl'), <Copyable key="p" url value={`${publicProxyBase}/directory`} label={t('acme.proxyDefaultUrl')} />],
-            ...enabledProxyAccounts.map((a) => [a.label, <Copyable key={a.id} url value={`${publicProxyBase}/${a.proxy_slug}/directory`} label={a.label} />]),
+          <Facts items={[
+            copyRow(t('acme.proxyPathUrl'), proxyDirectoryUrl, 'url'),
+            !selected?.proxy_enabled && copyRow(t('acme.proxyDefaultUrl'), `${publicProxyBase}/directory`, 'url'),
+            ...enabledProxyAccounts.map((a) => copyRow(a.label, `${publicProxyBase}/${a.proxy_slug}/directory`, 'url', { key: a.id })),
           ]} />
           <h3 className="section-title acme-usage-title">{t('acme.proxyUsage')}</h3>
           <pre className="code-preview">{`certbot certonly \\

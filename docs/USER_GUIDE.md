@@ -173,6 +173,8 @@ Open **Modules** > **PKI** > **Certificate Tools**:
 
 ## Protocols
 
+In the details of ACME, SCEP, EST, TSA, CRL & OCSP and HSM, a URL, a path, an identifier (order, EAB key, SCEP transaction) or a serial number sits in a chip with a copy button, as described in [Copying a value](#certificates); a rule such as *Wildcard* or *Auto-approve* shows as a pill, and **Edit email** of an ACME account sits apart from the contact.
+
 ### ACME
 
 Open **Modules** > **Protocols** > **ACME**. The page opens on the accounts of the local ACME server: a state chip per state, the contact, creation date, state and number of orders of each account. An account opens its detail (**Account**, **Orders**, **Challenges**), with **Disable the account…**, which is final (RFC 8555 §7.3.6). **Copy the directory URL** gives the URL clients use, `https://your-server:8443/acme/directory`.

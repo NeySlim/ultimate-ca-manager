@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Zone, Icon, Btn, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
+  Zone, Icon, Btn, Pill, PageHead, ListView, Dock, DockBody, Section, Facts, SettingsView, SkeletonPanel,
   LoadError, LoadCause,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
@@ -24,7 +24,8 @@ import { TSA_LABELS, findAlgorithm, groupedOptions, listAlgorithms } from '../li
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { dateTimeOf } from './admin/adminDates'
-import { Copyable, Notice, ViewSwitch } from './protocols/atelierParts'
+import { Notice, ViewSwitch } from './protocols/atelierParts'
+import { copyRow, factRow } from './protocols/factRows'
 
 // OpenSSL's example policy OID, assigned to no one
 const DEFAULT_POLICY_OID = '1.2.3.4.1'
@@ -182,11 +183,11 @@ export default function TSAPage() {
         actions={canEdit && <Btn icon="settings" id="tsa-configure" onClick={() => setView('config')}>{t('tsa.configure')}</Btn>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('tsa.columns.ca'), row.ca], [t('tsa.columns.digest'), DIGESTS], [t('tsa.columns.policy'), <span key="p" className="mono">{row.policy}</span>],
-              [t('atelier.state'), pill(row)], [t('tsa.signingCert'), signerText],
+            <Facts items={[
+              factRow(t('tsa.columns.ca'), row.ca === '—' ? null : row.ca), [t('tsa.columns.digest'), DIGESTS], copyRow(t('tsa.columns.policy'), row.policy),
+              [t('atelier.state'), pill(row)], { label: t('tsa.signingCert'), value: signerText, long: true },
               config.signer?.not_after && [t('tsa.signerExpires'), dateTimeOf(config.signer.not_after, locale)],
-              ['URL', <Copyable key="u" url value={`${baseUrl}/tsa`} label={t('tsa.endpoint')} />],
+              copyRow('URL', `${baseUrl}/tsa`, 'url', { copyLabel: t('tsa.endpoint') }),
             ]} />
             {!config.enabled && <Notice tone="warn">{t('tsa.tsaDisabledDesc')}</Notice>}
             {signerWarning(saved.require_dedicated_cert) && <Notice tone="warn" role="alert">{t(signerWarning(saved.require_dedicated_cert))}</Notice>}

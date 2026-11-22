@@ -6,13 +6,14 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Dock, DockBody, Section, Props, RecordList, RecordRow, Pill, TextLink, AtelierDialog, Icon } from '../../components/atelier'
+import { Btn, Dock, DockBody, Section, Facts, RowAction, RecordList, RecordRow, Pill, AtelierDialog, Icon } from '../../components/atelier'
 import { apiClient } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { stateLabel } from '../../lib/stateLabel'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
-import { Copyable, Notice } from '../protocols/atelierParts'
+import { Notice } from '../protocols/atelierParts'
+import { copyRow, factRow } from '../protocols/factRows'
 import { ACCOUNT_TONES, accountLabel, accountContact } from '../protocols/protocolStates'
 
 const ORDER_TONES = { valid: 'good', ready: 'good', issued: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
@@ -71,26 +72,26 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
         {section === 'account' && (
           <div className="module-detail">
             <Section title={t('acme.tabs.account')}>
-              <Props items={[
-                [t('acme.identifier'), <Copyable key="id" value={account.account_id} label={t('acme.accountId')} />],
-                [t('acme.contact'), (
-                  <>{currentEmail ? `mailto:${currentEmail}` : t('acme.noContact')}
-                    {canWrite && <>{' '}<TextLink id="acme-edit-email" onClick={() => { setEmailDraft(currentEmail); setEditing(true) }}>{t('acme.editEmail')}</TextLink></>}
-                  </>
-                )],
-                [t('acme.accountKey'), account.key_type || '—'],
-                [t('acme.createdOn'), dateOf(account.created_at, locale) || '—'],
+              <Facts items={[
+                copyRow(t('acme.identifier'), account.account_id, undefined, { copyLabel: t('acme.accountId'), long: true }),
+                {
+                  ...factRow(t('acme.contact'), currentEmail && `mailto:${currentEmail}`, t('acme.noContact')),
+                  action: canWrite && <RowAction id="acme-edit-email" onClick={() => { setEmailDraft(currentEmail); setEditing(true) }}>{t('acme.editEmail')}</RowAction>,
+                },
+                factRow(t('acme.accountKey'), account.key_type),
+                factRow(t('acme.createdOn'), dateOf(account.created_at, locale)),
                 [t('acme.termsOfService'), t(account.terms_of_service_agreed || account.tos_agreed ? 'acme.accepted' : 'acme.notAccepted')],
               ]} />
             </Section>
             <Section title={t('atelier.state')}>
-              <Props items={[
+              <Facts items={[
                 [t('atelier.state'), pill(account.status)],
                 [t('acme.orders'), failing ? t('acme.ordersFailing', { count: orders.length, failing }) : String(orders.length)],
-                [t('acme.lastOrder'), last ? (
-                  <>{t('acme.orderLine', { id: String(last.order_id || last.id).slice(0, 12) })} · <span className={ORDER_TONES[String(last.status).toLowerCase()] || 'muted'}>{stateLabel(t, last.status)}</span><br />
-                    <span className="muted">{last.domain}, {dateTimeOf(last.created_at, locale)}</span></>
-                ) : t('acme.noneOrder')],
+                last ? {
+                  label: t('acme.lastOrder'),
+                  value: <>{t('acme.orderLine', { id: String(last.order_id || last.id).slice(0, 12) })} · <span className={ORDER_TONES[String(last.status).toLowerCase()] || 'muted'}>{stateLabel(t, last.status)}</span></>,
+                  sub: `${last.domain}, ${dateTimeOf(last.created_at, locale)}`,
+                } : { label: t('acme.lastOrder'), absent: t('acme.noneOrder') },
               ]} />
               {account.status !== 'valid' && <Notice>{t('acme.deactivationFinal')}</Notice>}
             </Section>
@@ -116,7 +117,7 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
       {confirming && (
         <AtelierDialog size="narrow" title={t('acme.disableTitle')} onClose={() => setConfirming(false)} returnTo="acme-disable">
           <div className="notice warn"><Icon name="warning" /><span>{t('acme.disableWarning', { name })}</span></div>
-          <Props items={[[t('acme.tabs.account'), <span key="n" className="mono">{name}</span>], [t('acme.contact'), currentEmail || '—'], [t('acme.accountKey'), account.key_type || '—']]} />
+          <Facts items={[[t('acme.tabs.account'), name], factRow(t('acme.contact'), currentEmail), factRow(t('acme.accountKey'), account.key_type)]} />
           <div className="modal-actions">
             <Btn onClick={() => setConfirming(false)}>{t('common.cancel')}</Btn>
             <Btn tone="danger" icon="block" id="acme-disable-confirm" onClick={async () => { setConfirming(false); await onDeactivate(account.id) }}>

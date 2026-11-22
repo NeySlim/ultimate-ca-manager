@@ -1,8 +1,7 @@
 /**
- * Small pieces the protocol pages draw with the mockup's classes: a copyable value (mono value and
- * the quiet copy button of the HSM configuration), a field (the mockup's .field: label, control,
- * hint), a checkbox line, a list of URLs with copy and remove, and the views of a module that holds
- * more than the mockup's list (a row of tabs under the page head).
+ * Small pieces the protocol pages draw with the mockup's classes: a field (the mockup's .field: label,
+ * control, hint), a checkbox line, a list of URLs with copy and remove, and the views of a module that
+ * holds more than the mockup's list (a row of tabs under the page head).
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,21 +10,6 @@ import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
 import { splitByWidth } from '../../components/inspector/tabFit'
 import { useToolbarMenu } from '../../components/list/useToolbarMenu'
-
-/** A value in mono, then the quiet copy button; « — » when there is none. */
-export function Copyable({ value, label, url = false }) {
-  const { t } = useTranslation()
-  const { copy } = useClipboard()
-  const { showSuccess } = useNotification()
-  if (!value) return '—'
-  return (
-    <>
-      <span className={url ? 'mono url' : 'mono'}>{value}</span>{' '}
-      <IconBtn quiet icon="copy" label={t('protocols.copyValue', { name: label })}
-        onClick={async () => { if (await copy(value)) showSuccess(t('common.copied')) }} />
-    </>
-  )
-}
 
 /**
  * The mockup's form field: label, control (children get `id` and `aria-describedby`), hint, error.
@@ -259,12 +243,4 @@ export function ViewSwitch({ id, label, value, onChange, options = [], groups = 
       <div className="view-panel" role="tabpanel" id={panelId} aria-labelledby={tabId(value)}>{children}</div>
     </>
   )
-}
-
-/** The mockup's yesNo(): a check and Oui, or a block sign and Non, in a flag. */
-export function YesNo({ value }) {
-  const { t } = useTranslation()
-  return value
-    ? <span className="flag"><Icon name="check" />{t('common.yes')}</span>
-    : <span className="flag muted"><Icon name="block" />{t('common.no')}</span>
 }

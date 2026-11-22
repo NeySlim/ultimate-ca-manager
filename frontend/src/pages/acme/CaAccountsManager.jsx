@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, SecretInput, Select, Textarea, ToggleSwitch, Modal } from '../../components/atelier/Form'
-import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, useClientList, useSortParam } from '../../components/atelier'
+import { Btn, Pill, ListView, Dock, DockBody, Section, Facts, EmptyBlock, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
-import { Copyable, YesNo } from '../protocols/atelierParts'
+import { copyRow, factRow } from '../protocols/factRows'
 import DnsUpdateKeysPanel from './DnsUpdateKeysPanel'
 
 const EMPTY_FORM = {
@@ -158,23 +158,23 @@ export default function CaAccountsManager({
         {shown === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
-                [t('acme.directoryUrl'), <Copyable key="d" url value={open.directory_url} label={t('acme.directoryUrl')} />],
-                [t('acme.contactEmail'), open.email || '—'],
-                [t('acme.accountKeyType'), open.account_key_algorithm || '—'],
-                [t('common.default'), <YesNo key="def" value={open.is_default} />],
-                ['EAB', open.eab_kid ? <span key="e" className="mono">{open.eab_kid}</span> : t('common.no')],
+              <Facts items={[
+                copyRow(t('acme.directoryUrl'), open.directory_url, 'url'),
+                factRow(t('acme.contactEmail'), open.email),
+                factRow(t('acme.accountKeyType'), open.account_key_algorithm),
+                [t('common.default'), t(open.is_default ? 'common.yes' : 'common.no')],
+                open.eab_kid ? copyRow('EAB', open.eab_kid, undefined, { long: true }) : { label: 'EAB', absent: t('common.no') },
                 open.environment && open.environment !== 'custom' && [t('acme.environment'), open.environment],
-                open.account_url && [t('acme.accountUrl'), <span key="u" className="mono url">{open.account_url}</span>],
+                open.account_url && copyRow(t('acme.accountUrl'), open.account_url, 'url'),
               ]} />
             </Section>
             <Section title={t('acme.caTimingSettings')}>
-              <Props items={[
+              <Facts items={[
                 [t('acme.caOrderPollTimeout'), String(open.order_poll_timeout_sec ?? 180)],
                 [t('acme.caOrderPollInterval'), String(open.order_poll_interval_sec ?? 3)],
                 [t('acme.caHttpTimeout'), String(open.http_timeout_sec ?? 60)],
                 open.preferred_chain && [t('acme.preferredChain'), open.preferred_chain],
-                proxyIsOn(open) && [t('acme.proxySlug'), <Copyable key="p" url value={proxyUrl(open)} label={t('acme.proxySlug')} />],
+                proxyIsOn(open) && copyRow(t('acme.proxySlug'), proxyUrl(open), 'url'),
               ]} />
             </Section>
           </div>
