@@ -7723,11 +7723,8 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "Suchen…",
     "navigate": "Navigieren",
-    "signedInWith": "Angemeldet mit {{method}}.",
     "accountLabel": "Konto: {{name}}, {{role}}",
     "accountLabelName": "Konto: {{name}}",
-    "lockAfter_one": "Sperre nach {{count}} Min. Inaktivität.",
-    "lockAfter_other": "Sperre nach {{count}} Min. Inaktivität.",
     "signOut": "Abmelden",
     "method": {
       "password": "Passwort",
@@ -7759,8 +7756,6 @@
       "systemNow": "derzeit {{mode}}",
       "dark": "Dunkel",
       "light": "Hell",
-      "aurore": "Aurore dunkel",
-      "auroreLight": "Aurore hell",
       "family": "Theme",
       "mode": "Mode"
     },

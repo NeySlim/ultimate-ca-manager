@@ -7723,11 +7723,8 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "搜索…",
     "navigate": "导航",
-    "signedInWith": "通过{{method}}登录。",
     "accountLabel": "账户：{{name}}，{{role}}",
     "accountLabelName": "账户：{{name}}",
-    "lockAfter_one": "闲置 {{count}} 分钟后锁定。",
-    "lockAfter_other": "闲置 {{count}} 分钟后锁定。",
     "signOut": "退出登录",
     "method": {
       "password": "密码",
@@ -7759,8 +7756,6 @@
       "systemNow": "当前为{{mode}}",
       "dark": "深色",
       "light": "浅色",
-      "aurore": "极光深色",
-      "auroreLight": "极光浅色",
       "family": "Theme",
       "mode": "Mode"
     },

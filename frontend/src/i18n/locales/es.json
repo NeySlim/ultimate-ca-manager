@@ -7723,11 +7723,8 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "Buscar…",
     "navigate": "Navegar",
-    "signedInWith": "Sesión iniciada con {{method}}",
     "accountLabel": "Cuenta: {{name}}, {{role}}",
     "accountLabelName": "Cuenta: {{name}}",
-    "lockAfter_one": "Bloqueo tras {{count}} min de inactividad.",
-    "lockAfter_other": "Bloqueo tras {{count}} min de inactividad.",
     "signOut": "Cerrar sesión",
     "method": {
       "password": "contraseña",
@@ -7759,8 +7756,6 @@
       "systemNow": "{{mode}} actualmente",
       "dark": "Oscuro",
       "light": "Claro",
-      "aurore": "Aurore oscuro",
-      "auroreLight": "Aurore claro",
       "family": "Theme",
       "mode": "Mode"
     },

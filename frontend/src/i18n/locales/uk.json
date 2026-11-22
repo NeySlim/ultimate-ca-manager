@@ -8043,13 +8043,8 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "Пошук…",
     "navigate": "Перейти",
-    "signedInWith": "Вхід виконано через: {{method}}",
     "accountLabel": "Обліковий запис: {{name}}, {{role}}",
     "accountLabelName": "Обліковий запис: {{name}}",
-    "lockAfter_one": "Блокування після {{count}} хв бездіяльності.",
-    "lockAfter_few": "Блокування після {{count}} хв бездіяльності.",
-    "lockAfter_many": "Блокування після {{count}} хв бездіяльності.",
-    "lockAfter_other": "Блокування після {{count}} хв бездіяльності.",
     "signOut": "Вийти",
     "method": {
       "password": "пароль",
@@ -8089,8 +8084,6 @@
       "systemNow": "Зараз: {{mode}}",
       "dark": "Темна",
       "light": "Світла",
-      "aurore": "Aurore темна",
-      "auroreLight": "Aurore світла",
       "family": "Theme",
       "mode": "Mode"
     },

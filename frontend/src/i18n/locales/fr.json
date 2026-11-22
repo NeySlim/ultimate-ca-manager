@@ -7723,11 +7723,8 @@
     "escapeKey": "Échap",
     "searchPlaceholder": "Rechercher…",
     "navigate": "Naviguer",
-    "signedInWith": "Connexion par {{method}}.",
     "accountLabel": "Compte : {{name}}, {{role}}",
     "accountLabelName": "Compte : {{name}}",
-    "lockAfter_one": "Verrouillage après {{count}} min d’inactivité.",
-    "lockAfter_other": "Verrouillage après {{count}} min d’inactivité.",
     "signOut": "Se déconnecter",
     "method": {
       "password": "mot de passe",
@@ -7759,8 +7756,6 @@
       "systemNow": "{{mode}} actuellement",
       "dark": "Sombre",
       "light": "Clair",
-      "aurore": "Aurore sombre",
-      "auroreLight": "Aurore clair",
       "family": "Thème",
       "mode": "Mode"
     },

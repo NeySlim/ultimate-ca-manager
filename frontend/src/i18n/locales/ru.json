@@ -8043,13 +8043,8 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "Поиск…",
     "navigate": "Перейти",
-    "signedInWith": "Вход выполнен: {{method}}.",
     "accountLabel": "Учётная запись: {{name}}, {{role}}",
     "accountLabelName": "Учётная запись: {{name}}",
-    "lockAfter_one": "Блокировка после {{count}} мин бездействия.",
-    "lockAfter_few": "Блокировка после {{count}} мин бездействия.",
-    "lockAfter_many": "Блокировка после {{count}} мин бездействия.",
-    "lockAfter_other": "Блокировка после {{count}} мин бездействия.",
     "signOut": "Выйти",
     "method": {
       "password": "пароль",
@@ -8089,8 +8084,6 @@
       "systemNow": "сейчас {{mode}}",
       "dark": "Тёмная",
       "light": "Светлая",
-      "aurore": "Аврора тёмная",
-      "auroreLight": "Аврора светлая",
       "family": "Тема",
       "mode": "Режим"
     },
