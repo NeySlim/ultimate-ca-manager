@@ -107,6 +107,62 @@ test('a detached window stays when the page changes and keeps its place after a 
   expect(Math.round((await box(win)).y)).toBe(Math.round(placed.y))
 })
 
+// Maximized: the work area under the masthead and over the status bar, inside the stage's margins (24 px here)
+async function expectMaximized(page, win) {
+  const view = page.viewportSize()!
+  const main = await box(page.locator('.shell-main'))
+  const bar = await box(page.locator('footer.statusbar'))
+  const r = await box(win)
+  expect(Math.round(r.x)).toBe(24)
+  expect(Math.round(r.y)).toBe(Math.round(main.y) + 24)
+  expect(Math.round(r.x + r.width)).toBe(view.width - 24)
+  expect(Math.round(r.y + r.height)).toBe(Math.round(bar.y) - 24)
+}
+
+for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 700 }]) {
+  test(`at ${size.width} x ${size.height} a window maximizes into the work area and restores to the pixel`, async ({ page, api }) => {
+    await page.setViewportSize(size)
+    const cert = await issueCert(api, (await createCA(api)).id)
+    await page.goto('/certificates')
+    await openInInspector(page, cert.common_name)
+    await page.locator('#inspector').getByRole('button', { name: 'Detach into a window' }).click()
+    const win = page.getByRole('dialog', { name: cert.common_name })
+    await expect(win).toBeVisible()
+
+    // The move handle, apart from the maximize button: the keyboard and the mouse move the window
+    const handle = win.getByRole('button', { name: 'Move or resize the window' })
+    const opened = await box(win)
+    await handle.focus()
+    await page.keyboard.press('ArrowRight')
+    expect(Math.round((await box(win)).x - opened.x)).toBe(20)
+    const h = await box(handle)
+    await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(h.x + h.width / 2 + 40, h.y + h.height / 2 + 30, { steps: 5 })
+    await page.mouse.up()
+    const placed = await box(win)
+    expect(Math.round(placed.x - opened.x)).toBe(60)
+    expect(Math.round(placed.y - opened.y)).toBe(30)
+
+    await win.getByRole('button', { name: 'Maximize the window' }).click()
+    await expectMaximized(page, win)
+    await win.getByRole('button', { name: 'Restore the window' }).click()
+    expect(await box(win)).toEqual(placed)
+
+    // A double-click on the title bar does the same, and a drag of a maximized window moves nothing
+    await win.locator('.float-title h2').dblclick()
+    await expectMaximized(page, win)
+    const t = await box(win.locator('.float-title h2'))
+    await page.mouse.move(t.x + 5, t.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(t.x + 105, t.y + 85, { steps: 5 })
+    await page.mouse.up()
+    await expectMaximized(page, win)
+    await win.locator('.float-title h2').dblclick()
+    expect(await box(win)).toEqual(placed)
+  })
+}
+
 test('an authority and a request detach from their pages into windows of their own', async ({ page, api }) => {
   const ca = await createCA(api)
   await page.goto(`/cas/${ca.id}`)
@@ -153,6 +209,12 @@ test('three certificates compared side by side, then only their differences', as
   await expect(table.locator('tr[data-row="issuer"]')).toHaveCount(0)
   await expect(table.locator('tr[data-row="subject"]')).toBeVisible()
   await expect(table.locator('tbody tr:not(.different)')).toHaveCount(0)
+  // The comparison maximizes as the other windows do
+  const placed = await box(win)
+  await win.getByRole('button', { name: 'Maximize the window' }).click()
+  await expectMaximized(page, win)
+  await win.getByRole('button', { name: 'Restore the window' }).click()
+  expect(await box(win)).toEqual(placed)
 })
 
 test('the status bar sums up a pending approval and an entry of the queue, each a way to its page', async ({ page, api }) => {

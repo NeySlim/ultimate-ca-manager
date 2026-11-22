@@ -8410,6 +8410,8 @@
   "detached": {
     "moveHandle": "Déplacer ou redimensionner la fenêtre",
     "moveHint": "Les flèches déplacent la fenêtre, Maj et les flèches la redimensionnent",
+    "maximize": "Maximize the window",
+    "restore": "Restore the window",
     "close": "Fermer la fenêtre {{name}}"
   }
 }

@@ -1,11 +1,14 @@
 /* The detached windows, a product addition: the mockup's dialog frame (panel, control border, 8 px corners, shadow) without its backdrop, its glass in Aurore. */
 .atl .float-window{position:fixed;display:flex;flex-direction:column;background:var(--panel);color:var(--text);border:1px solid var(--control);border-radius:8px;box-shadow:0 24px 100px color-mix(in srgb,var(--ink) 47%,transparent);overflow:hidden;overscroll-behavior:contain}
-/* The title bar: the mockup's modal-head, tighter, and the grip of the move. */
-.atl .float-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px 8px 18px;border-bottom:1px solid var(--line);cursor:move;user-select:none;flex-shrink:0;touch-action:none}
-.atl .float-title{display:flex;align-items:center;gap:9px;min-width:0}
+/* The title bar: the mockup's modal-head, tighter; the move handle at its start, the window's tools at its end. */
+.atl .float-head{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:move;user-select:none;flex-shrink:0;touch-action:none}
+.atl .float-title{flex:1;display:flex;align-items:center;gap:9px;min-width:0}
 .atl .float-title h2{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .atl .float-tools{display:flex;align-items:center;gap:2px;flex-shrink:0}
 .atl .float-handle{cursor:move;touch-action:none}
+/* Maximized: nothing to drag, the handle keeps its room unseen so the title does not jump. */
+.atl .float-window.maximized .float-head{cursor:default}
+.atl .float-window.maximized .float-handle{visibility:hidden}
 /* The body: a dock body inside scrolls in its panel, anything else in the window. */
 .atl .float-body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;scrollbar-width:thin}
 .atl .float-body>.ca-side{border:0;border-radius:0;max-height:none}
