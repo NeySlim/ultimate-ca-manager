@@ -52,6 +52,8 @@
 .atl .row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
 /* A row's own icon buttons in a table cell stay on one line; a card without its checkbox drops the indent of its description */
 .atl .module-table td .row-actions{flex-wrap:nowrap;gap:1px}
+/* A row's own buttons keep the row at its density (36 px, D1), as the icons of .table-actions do */
+.atl .module-table td .btn,.atl .module-table td .row-actions>.icon-btn{min-height:27px;padding-top:0;padding-bottom:0}
 .atl .mobile-record:not(:has(.check-hit)) .row-description{margin-left:0}
 .atl .result-icon.warn{background:var(--warnbg);color:var(--warn)}
 @media(max-width:800px){.atl .subject-grid{grid-template-columns:1fr}.atl .subject-grid .field.wide{grid-column:auto}.atl .ext-row:not(.fixed){grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:"oid remove" "value value" "critical critical"}.atl .ext-row .ext-critical{grid-area:critical}}
