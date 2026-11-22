@@ -17,7 +17,7 @@ import { SlotDock } from '../protocols/dockSlot'
 const EXPORT_PAGE_SIZE = 100
 const EXPORT_MAX_ROWS = 10000
 
-export default function HistoryTab({ history, total, page, perPage, onPageChange, onPerPageChange, search, onSearchChange, sort, onSortChange,
+export default function HistoryTab({ history, total, page, perPage, onPageChange, onPerPageChange, search, onSearchChange, sort, onSort,
   caOptions, exportLoader, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert, loading }) {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
@@ -105,15 +105,15 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
           </Toolbar>
         )}
         title={(r) => r.common_name} status={pill} openedId={cert?.id} onOpen={onSelectCert}
-        nameSort="common_name" sort={sort ? { key: sort.key, asc: sort.direction === 'asc' } : { key: 'created_at', asc: false }}
-        onSort={(key) => onSortChange({ key, direction: sort?.key === key && sort.direction === 'asc' ? 'desc' : 'asc' })}
+        nameSort="common_name" sort={sort} onSort={onSort}
         columns={[
-          { id: 'issuer', label: t('common.issuer'), cell: (r) => r.issuer || t('common.unknown'), grow: true },
-          { id: 'source', label: t('common.source'), cell: sourceLabel, sort: 'source' },
-          { id: 'method', label: t('acme.method'), cell: (r) => r.challenge_type?.toUpperCase() || '—' },
-          { id: 'expires', label: t('common.expires'), cell: (r) => dateOf(r.valid_to, locale) || '—', sort: 'valid_to' },
-          { id: 'issued', label: t('common.issued'), cell: (r) => dateOf(r.created_at, locale) || '—', sort: 'created_at' },
-          { status: true },
+          // The name takes the room left; the issuer gives way with it, in proportion (R2)
+          { id: 'issuer', label: t('common.issuer'), cell: (r) => r.issuer || t('common.unknown'), kind: 'text', priority: 2 },
+          { id: 'source', label: t('common.source'), cell: sourceLabel, kind: 'fit', priority: 3, sort: 'source' },
+          { id: 'method', label: t('acme.method'), cell: (r) => r.challenge_type?.toUpperCase() || '—', kind: 'fit', priority: 3 },
+          { id: 'expires', label: t('common.expires'), cell: (r) => dateOf(r.valid_to, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'valid_to' },
+          { id: 'issued', label: t('common.issued'), cell: (r) => dateOf(r.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
+          { status: true, sort: 'status' },
         ]}
         empty={narrowed ? (
           <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}

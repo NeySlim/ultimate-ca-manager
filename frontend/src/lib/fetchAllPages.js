@@ -43,3 +43,12 @@ export async function fetchAllPages(getPage, options) {
   if (!complete) throw new Error('Some pages of the listing could not be loaded')
   return rows
 }
+
+// Every row of a listing the page sorts and searches in memory, up to `max`; `partial` ({ loaded, total })
+// when a page failed or the server holds more than `max`, so the list can say it is not whole
+export async function fetchListing(getPage, options) {
+  let held = 0
+  const read = (query) => Promise.resolve(getPage(query)).then((res) => { held = Math.max(held, res?.meta?.total ?? 0); return res })
+  const { rows, complete } = await fetchPages(read, options)
+  return { rows, partial: complete && rows.length >= held ? null : { loaded: rows.length, total: Math.max(held, rows.length) } }
+}

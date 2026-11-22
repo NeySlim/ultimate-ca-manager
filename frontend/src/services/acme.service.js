@@ -18,8 +18,9 @@ export const acmeService = {
   },
 
   // Accounts (ACME Server accounts)
-  async getAccounts() {
-    return apiClient.get('/acme/accounts')
+  // A page of the accounts (page, per_page, sort_by, sort_order); meta.total says how many exist
+  async getAccounts(params = {}) {
+    return apiClient.get(`/acme/accounts${buildQueryString(params)}`)
   },
 
   async getAccountById(id) {
@@ -68,8 +69,9 @@ export const acmeService = {
     return apiClient.put('/acme/eab-required', { eab_required: !!value })
   },
 
-  async listEabCredentials(status) {
-    const qs = status ? buildQueryString({ status }) : ''
+  // A page of the credentials (page, per_page as fetchPages asks); meta.total says how many exist
+  async listEabCredentials(status, page = {}) {
+    const qs = buildQueryString({ status: status || undefined, ...page })
     return apiClient.get(`/acme/eab-credentials${qs}`)
   },
 

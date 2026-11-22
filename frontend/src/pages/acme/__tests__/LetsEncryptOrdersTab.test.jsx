@@ -86,7 +86,7 @@ describe('LetsEncryptOrdersTab', () => {
   it('shows failed renewals on the row with the last error in the tooltip', () => {
     const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', renewal_failures: 2, error_message: 'CA unreachable' }
     renderTab({ clientOrders: [order] })
-    expect(screen.getByText('acme.renewalFailures')).toHaveAttribute('title', 'CA unreachable')
+    expect(screen.getByTitle('CA unreachable')).toHaveTextContent(/^2$/)
   })
 
   it('says when renewal is down to once a day', () => {

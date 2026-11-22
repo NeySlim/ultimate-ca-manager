@@ -251,21 +251,22 @@ def user_certificates(app, create_cert):
 @pytest.fixture(scope='module')
 def acme_history(app):
     tag = _tag()
-    rows = [  # subject_cn, valid_to, created_at, source
-        ('b.example', D(2030, 1, 1), D(2024, 1, 1), 'acme'),
-        (None, None, D(2024, 1, 1), 'letsencrypt'),
-        ('B.example', D(2030, 1, 1), None, 'acme_client'),
-        ('a.example', D(2027, 1, 1), D(2023, 1, 1), 'acme'),
+    rows = [  # subject_cn, valid_to, created_at, source, revoked (NULL reads as valid)
+        ('b.example', D(2030, 1, 1), D(2024, 1, 1), 'acme', True),
+        (None, None, D(2024, 1, 1), 'letsencrypt', None),
+        ('B.example', D(2030, 1, 1), None, 'acme_client', False),
+        ('a.example', D(2027, 1, 1), D(2023, 1, 1), 'acme', True),
     ]
     ids = []
     with app.app_context():
-        for cn, vto, created, source in rows:
+        for cn, vto, created, source, revoked in rows:
             cert = Certificate(refid=str(uuid.uuid4()), subject=f'CN={cn}', subject_cn=cn, descr=tag,
-                               valid_to=vto, created_at=created, source=source, crt='Zm9v')
-            ids.append(_keep_nulls(cert, 'created_at'))
+                               valid_to=vto, created_at=created, source=source, revoked=revoked, crt='Zm9v')
+            ids.append(_keep_nulls(cert, 'created_at', 'revoked'))
         db.session.commit()
     values = _by_key(ids, {'common_name': [r[0] for r in rows], 'valid_to': [r[1] for r in rows],
-                           'created_at': [r[2] for r in rows], 'source': [r[3] for r in rows]})
+                           'created_at': [r[2] for r in rows], 'source': [r[3] for r in rows],
+                           'status': [bool(r[4]) for r in rows]})
     yield Seeded('/api/v2/acme/history', {'search': tag}, lambda b: b['data'], values, 2)
     with app.app_context():
         Certificate.query.filter(Certificate.id.in_(ids)).delete(synchronize_session=False)
@@ -511,7 +512,7 @@ ROUTES = {
     'csrs_history': ('cn', 'requester', 'created_at', 'key_type', 'signed_at', 'valid_to', 'id'),
     'ssh': ('id', 'key_id', 'cert_type', 'serial', 'valid_from', 'valid_to', 'created_at', 'ca', 'status'),
     'user_certificates': ('name', 'owner', 'created_at', 'valid_until', 'last_used_at', 'status'),
-    'acme_history': ('common_name', 'valid_to', 'created_at', 'source'),
+    'acme_history': ('common_name', 'valid_to', 'created_at', 'source', 'status'),
     'audit': ('timestamp',),
     'acme_orders': ('created_at', 'expires', 'status', 'account', 'domain'),
     'acme_accounts': ('created_at', 'account_id', 'status', 'contact', 'orders'),

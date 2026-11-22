@@ -119,7 +119,7 @@ describe.each([
     expect(names()[0]).toBe('d26.example.test')
     for (const name of sortable) {
       fireEvent.click(screen.getByRole('button', { name }))
-      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+      expect(screen.getByRole('button', { name }).closest('th')).toHaveAttribute('aria-sort', 'ascending')
     }
   })
 

@@ -2408,7 +2408,8 @@
       "domainsSaveFailed": "保存允许的域名失败",
       "deleteFailed": "删除 EAB 凭据失败",
       "caption": "EAB 凭据。激活名称以打开详情。",
-      "noNotes": "无备注。"
+      "noNotes": "无备注。",
+      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
     },
     "termsOfServiceTitlePlaceholder": "服务条款（留空隐藏）",
     "termsOfServiceBodyPlaceholder": "在此输入条款...\n\n支持：**加粗**, *斜体*, [链接](url), - 列表\n\n空行分隔段落。",
@@ -2662,7 +2663,13 @@
     "emptyAccountsTitle": "没有 ACME 账户",
     "emptyAccountsText": "ACME 客户端（certbot、cert-manager、acme.sh）会自行在目录中创建账户：请将目录 URL 复制到它们的配置中。",
     "termsOfServiceTitle": "标题",
-    "termsOfServiceBody": "正文"
+    "termsOfServiceBody": "正文",
+    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "columns": {
+      "failures": "Failures",
+      "wildcard": "Wildcard",
+      "orders": "Orders"
+    }
   },
   "scep": {
     "title": "SCEP协议",
@@ -2783,7 +2790,8 @@
     "columns": {
       "ca": "机构",
       "template": "模板",
-      "profile": "配置"
+      "profile": "配置",
+      "lastTest": "Last test"
     },
     "tabs": {
       "profile": "配置"
@@ -2926,7 +2934,8 @@
     "columns": {
       "published": "发布时间",
       "publication": "Publication",
-      "crlNumber": "CRL number"
+      "crlNumber": "CRL number",
+      "nextUpdate": "Next update"
     },
     "tabs": {
       "publication": "发布"
@@ -6472,7 +6481,8 @@
     "caption": "EST。激活名称以打开详情。",
     "defaultEndpoint": "默认端点",
     "columns": {
-      "auth": "认证"
+      "auth": "认证",
+      "authShort": "Authentication"
     },
     "auth": {
       "cert": "客户端证书",

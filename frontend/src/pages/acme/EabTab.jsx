@@ -1,14 +1,22 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, Modal, Textarea, ToggleSwitch } from '../../components/atelier/Form'
-import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, Toolbar, SearchField, useClientList } from '../../components/atelier'
+import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, Toolbar, SearchField, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
-import { Copyable } from '../protocols/atelierParts'
+import { Copyable, Notice } from '../protocols/atelierParts'
+import { fetchListing } from '../../lib/fetchAllPages'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
+
+// Every page is read (200 a page), so the list sorts and searches them all; the newest first (T4)
+const EAB_MAX = 5000
+// Every page of the server, so the search, the chips and the sort read the whole set
+const readCredentials = () => fetchListing((page) => acmeService.listEabCredentials(undefined, page), { perPage: 200, max: EAB_MAX })
+const NEWEST = { key: 'created', asc: false }
+const SORT_KEYS = ['name', 'kid', 'domains', 'created', 'state']
 
 // null (legacy, unrestricted) and any list holding '*' both mean all domains.
 const isUnrestricted = (domains) => domains == null || domains.includes('*')
@@ -40,6 +48,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
   const { copy } = useClipboard()
 
   const [eabCredentials, setEabCredentials] = useState([])
+  const [partial, setPartial] = useState(null)
   const [eabFilterStatus, setEabFilterStatus] = useState('')
   const [eabQuery, setEabQuery] = useState('')
   const [showLocalCreate, setShowLocalCreate] = useState(false)
@@ -58,16 +67,16 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
   const [editingNotesId, setEditingNotesId] = useState(null)
   const [editingNotesValue, setEditingNotesValue] = useState('')
 
-  useEffect(() => {
-    loadCredentials()
-  }, [])
-
-  const loadCredentials = () => {
-    acmeService.listEabCredentials()
-      .then(res => setEabCredentials(res.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+  const reload = async () => {
+    const { rows, partial: cut } = await readCredentials()
+    setEabCredentials(rows)
+    setPartial(cut)
   }
+
+  useEffect(() => {
+    readCredentials().then(({ rows, partial: cut }) => { setEabCredentials(rows); setPartial(cut) })
+      .catch(() => {}).finally(() => setLoading(false))
+  }, [])
 
   // The search reads the label, the key id, the domains, the notes and the bound account
   const searchedEabCredentials = useMemo(() => {
@@ -97,8 +106,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       setEabExpiresInDays('')
       setEabAllDomains(true)
       setEabDomainsText('')
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
+      await reload()
     } catch (error) {
       showError(error.message || t('acme.eab.createFailed'))
     }
@@ -117,8 +125,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     try {
       await acmeService.revokeEabCredential(cred.id)
       showSuccess(t('acme.eab.revokedSuccess'))
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
+      await reload()
     } catch (error) {
       showError(error.message || t('acme.eab.revokeFailed'))
     }
@@ -138,8 +145,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     try {
       await acmeService.deleteEabCredential(cred.id)
       showSuccess(t('acme.eab.deletedSuccess'))
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
+      await reload()
     } catch (error) {
       showError(error.message || t('acme.eab.deleteFailed'))
     }
@@ -160,8 +166,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     try {
       await acmeService.patchEabCredential(credId, { notes: editingNotesValue || null })
       showSuccess(t('acme.eab.notesSaved'))
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
+      await reload()
       setEditingNotesId(null)
       setEditingNotesValue('')
     } catch (error) {
@@ -191,8 +196,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       })
       showSuccess(t('acme.eab.domainsSaved'))
       closeEditingDomains()
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
+      await reload()
     } catch (error) {
       showError(error.message || t('acme.eab.domainsSaveFailed'))
     }
@@ -242,9 +246,11 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     </Dock>
   )
 
-  // The API sends the credentials whole (no page nor sort parameter): sorted and paged here
+  // Every page of the server is read (or the list says it is partial): sorted and paged here
+  const sortParam = useSortParam(NEWEST, SORT_KEYS)
   const list = useClientList(filteredEabCredentials, {
     resetKey: `${eabQuery}|${eabFilterStatus}`,
+    sortParam,
     sorts: {
       name: (c) => c.label, kid: (c) => c.kid, domains: (c) => (isUnrestricted(c.allowed_domains) ? '*' : (c.allowed_domains || []).join(', ')),
       created: (c) => c.created_at && Date.parse(c.created_at), state: (c) => ({ active: 0, used: 1, revoked: 2 })[c.status] ?? null,
@@ -253,6 +259,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
 
   return (
     <>
+      {partial && <Notice tone="warn" role="status">{t('acme.eab.listPartial', partial)}</Notice>}
       <ListView label="EAB" caption={t('acme.eab.caption')} icon="lock" list={list} nameSort="name" loading={loading}
         filters={{
           views: ['', 'active', 'used', 'revoked'].map((s) => ({
@@ -274,9 +281,10 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
         )}
         title={name} status={pill} openedId={openId} onOpen={(c) => setOpenId(c.id)}
         columns={[
-          { id: 'kid', label: t('acme.eab.kid'), cell: (c) => <span className="mono">{c.kid}</span>, sort: 'kid' },
-          { id: 'domains', label: t('acme.eab.allowedDomains'), cell: (c) => <span data-testid={`eab-domains-${c.id}`}>{domainsText(c)}</span>, grow: true, sort: 'domains' },
-          { id: 'created', label: t('acme.eab.created'), cell: (c) => dateOf(c.created_at, locale), sort: 'created' },
+          { id: 'kid', label: t('acme.eab.kid'), cell: (c) => <span className="mono">{c.kid}</span>, kind: 'text', priority: 4, title: (c) => c.kid, sort: 'kid' },
+          { id: 'domains', label: t('acme.eab.allowedDomains'), cell: (c) => <span data-testid={`eab-domains-${c.id}`}>{domainsText(c)}</span>, grow: true,
+            kind: 'text', priority: 3, title: domainsText, sort: 'domains' },
+          { id: 'created', label: t('acme.eab.created'), cell: (c) => dateOf(c.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created' },
           { status: true, sort: 'state' },
         ]}
         rowActions={canDelete ? (c) => [removeAction(c)] : undefined}
