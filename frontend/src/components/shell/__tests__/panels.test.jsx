@@ -87,8 +87,10 @@ const PANELS = {
   palette: { open: (u) => u.click(button('shell-search')), isOpen: () => screen.getByTestId('palette').dataset.open === 'true' },
 }
 const names = Object.keys(PANELS)
-const pairs = names.flatMap((a) => names.filter((b) => b !== a).map((b) => [a, b]))
 const POPOVERS = ['modules', 'language', 'theme', 'notifications', 'account']
+// The help and the palette are modal dialogs: the bar behind them is inert, only the other dialog follows them
+const MODALS = ['help', 'palette']
+const pairs = names.flatMap((a) => names.filter((b) => b !== a && !(MODALS.includes(a) && POPOVERS.includes(b))).map((b) => [a, b]))
 
 describe('the panels of the shell', () => {
   it.each(pairs)('opening %s then %s leaves only the second open', async (a, b) => {
