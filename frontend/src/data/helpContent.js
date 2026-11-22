@@ -77,7 +77,7 @@ export const helpContent = {
         title: 'Account menu',
         icon: Users,
         items: [
-          { label: 'Account', text: 'Your name, role and sign-in method with the inactivity lock, then My account, Settings (for who may open it) and Sign out; on a phone, the language as well. The language is chosen from the globe button of the top bar, on My account and on the sign-in page; Settings is also in the Modules menu and the search' },
+          { label: 'Account', text: 'Your initials beside your name, role and login, then what the console knows of your session: e-mail, sign-in method and inactivity lock; then My account, Settings (for who may open it) and, set apart, Sign out; on a phone, the language as well. The language is chosen from the globe button of the top bar, on My account and on the sign-in page; Settings is also in the Modules menu and the search' },
         ]
       },
       {
@@ -93,7 +93,7 @@ export const helpContent = {
         title: 'Theme menu',
         icon: Stack,
         items: [
-          { label: 'Choose', text: 'The theme button offers System, Dark, Light, Aurore dark and Aurore light, the current one checked; System follows your device, the icon shows the mode applied (sparkles for Aurore)' },
+          { label: 'Choose', text: 'The theme button offers two groups chosen apart: the theme, Atelier or Aurore, and the mode, System, Dark or Light, the current ones checked; System follows your device in either theme, the icon shows the mode applied (sparkles for Aurore)' },
           { label: 'Keyboard', text: 'Up Arrow and Down Arrow loop over the options; Escape or Tab closes the menu and returns to the button' },
           { label: 'Saved', text: 'The choice is the one under Settings, Appearance, and follows you to every browser' },
         ]
@@ -107,7 +107,7 @@ export const helpContent = {
           { label: 'Actions', text: 'A failed ACME renewal offers Retry and a CRL to publish offers Publish, for who may do it; the other items only open their page' },
           { label: 'Rights', text: 'You only see items from sources you may read; a source you have no right on shows nothing' },
           { label: 'Read', text: 'Mark an item or all of them read; the marks are saved with your preferences, and an item that resolves leaves the panel' },
-          { label: 'Keyboard', text: 'Escape closes the panel wherever the focus is and returns to the bell; a click outside leaves it open. After Mark read the focus stays on the line, after Mark all read it goes to the title' },
+          { label: 'Keyboard', text: 'Escape closes the panel wherever the focus is and returns to the bell; a click outside or another menu of the bar closes it too. One menu or panel of the bar is open at a time: opening another, the help or the search closes the one open. After Mark read the focus stays on the line, after Mark all read it goes to the title' },
           { label: 'Open', text: 'Open goes to the page of the item and marks it read; approvals are decided on their own page' },
           { label: 'Email', text: 'For who may read the settings, the foot says whether email notification is on and links to its settings' },
         ]
@@ -369,7 +369,7 @@ export const helpContent = {
     tips: [
       'Star ⭐ important certificates to add them to your favorites list',
       'The tabs above the list filter by state and count each one; the tab is part of the address, so a reload or a shared link keeps it. The search, the sort, the page and the CA, source and template filters are part of the address too; a bare address shows the whole list, the browser keeping no filter aside. The certificates open in the inspector are part of the address as well (item for the one shown, open when there are several), so a reload reopens each of them',
-      'Only the name and the chevron open a certificate in the inspector; a row keeps one action, Export. The inspector heading has Export and Renew; its ⋯ opens the Certificate actions dialog: copy the common name, view its activity in the audit log, revoke, then lint, key upload, rename, favorites, adding the issuing CA to the trust store, and delete. Tick rows to compare two certificates or to export them; while rows are ticked, names and row actions wait. Inspect the authority, in the chain, opens it on the Authorities page. Escape closes the inspector from anywhere on the page',
+      'A click anywhere on a row opens its certificate in the inspector, except on its checkbox or buttons or at the end of a text selection; from the keyboard the name and the chevron do it. A row keeps one action, Export. The inspector heading has Export and Renew; its ⋯ opens the Certificate actions dialog: copy the common name, view its activity in the audit log, revoke, then lint, key upload, rename, favorites, adding the issuing CA to the trust store, and delete. Tick rows to compare two certificates or to export them; while rows are ticked, names and row actions wait. Inspect the authority, in the chain, opens it on the Authorities page. Escape closes the inspector from anywhere on the page',
       'The Expiry column gives days below 60, then months, then years and months (45 d, 16 mo, 1 y 4 mo, 9 y, Expired); hover it for the exact date and time. The list shows 12 certificates a page by default (25, 50 or 100 on choice, remembered), with a page number field beyond 20 pages. Columns opens a dialog to choose the columns; the name and the state always show. Each column shows whole while the room allows; short of room the name and the long texts give way together, then the list folds its least needed columns, the description then the qualifiers, and its footer says how many; a folded column stays ticked in Columns. A header that sorts is a button across its cell with a sign of two small triangles, the sorted column reads in bold with an arrow, the order stays in the address, and on a phone a Sort by select and a button showing the direction stand for the headers. The density button switches the rows between 36 and 44 px, on every list of the interface. Under 800 px wide, each certificate is a record with its state and expiry date, and the inspector takes the whole screen; the page scrolls down to its pages. Below 1000 px wide the overview keeps two columns, the chain staying in its own tab',
       'Renewing keeps the same record (id, refid, creation date). Renew from the page generates a new key; the automatic renewal keeps the key. A certificate whose key UCM does not hold (SCEP, EST, WSTEP or ACME enrolment, import without the key) is refused (409): renew it through its protocol or sign a new request',
       'Need a non-standard EKU (Microsoft RDP, smartcard logon, document signing)? Add it via "Extra EKUs" instead of editing templates',
@@ -754,7 +754,7 @@ export const helpContent = {
         items: [
           { label: 'Accounts', text: 'The page opens on the server accounts: chips by state, Contact, Created, State and Orders. An account opens its detail on Account, Orders and Challenges, with Disable the account… (final, RFC 8555 §7.3.6) and Delete' },
           { label: 'Copy the directory URL', text: 'In the page head: the directory URL ACME clients point at' },
-          { label: 'Tabs', text: 'The tabs under the page head reach the views, in three groups set apart: the local ACME server (accounts, orders, domains, EAB credentials, settings), the client (settings, orders, upstream CAs, DNS providers, domains) and the issued certificates. A tab counts what its view lists; the arrow keys move from tab to tab, and the command palette finds each view by its name. A narrow window scrolls the row of tabs. The address keeps the view (?tab=)' },
+          { label: 'Tabs', text: 'The tabs under the page head reach the views, in three groups set apart: the local ACME server (accounts, orders, domains, EAB credentials, settings), the client (settings, orders, upstream CAs, DNS providers, domains) and the issued certificates. A tab counts what its view lists; the arrow keys move from tab to tab, and the command palette finds each view by its name. The tabs past the room go into More at the end of the row, with their counts; the view shown always stays in the row. The address keeps the view (?tab=)' },
           { label: 'Client settings', text: 'One form saved in one request, the server bounds checked first (renewal from 1 to 60 days, DNS waits, TLS-ALPN port)' },
         ]
       },

@@ -27,7 +27,7 @@ export default {
       {
         title: 'Menu du compte',
         items: [
-          { label: 'Compte', text: 'Votre nom, votre rôle et la méthode de connexion avec le verrouillage après inactivité, puis Mon compte, Paramètres (pour qui peut les ouvrir) et Se déconnecter ; au téléphone, la langue aussi. La langue se choisit par le bouton globe de la barre du haut, dans Mon compte et sur la page de connexion ; les Paramètres sont aussi dans le menu Modules et la recherche' },
+          { label: 'Compte', text: 'Vos initiales à côté de votre nom, votre rôle et votre identifiant, puis ce que la console sait de votre session : e-mail, méthode de connexion et verrouillage après inactivité ; puis Mon compte, Paramètres (pour qui peut les ouvrir) et, à part, Se déconnecter ; au téléphone, la langue aussi. La langue se choisit par le bouton globe de la barre du haut, dans Mon compte et sur la page de connexion ; les Paramètres sont aussi dans le menu Modules et la recherche' },
         ]
       },
       {
@@ -41,7 +41,7 @@ export default {
       {
         title: 'Menu du thème',
         items: [
-          { label: 'Choisir', text: 'Le bouton du thème propose Système, Sombre, Clair, Aurore sombre et Aurore clair, le choix courant coché ; Système suit votre appareil, l’icône montre le mode appliqué (des étincelles pour Aurore)' },
+          { label: 'Choisir', text: 'Le bouton du thème propose deux groupes choisis à part : le thème, Atelier ou Aurore, et le mode, Système, Sombre ou Clair, les choix courants cochés ; Système suit votre appareil dans l’un ou l’autre thème, l’icône montre le mode appliqué (des étincelles pour Aurore)' },
           { label: 'Clavier', text: 'Les flèches Haut et Bas parcourent les options en boucle ; Échap ou Tab ferme le menu et revient au bouton' },
           { label: 'Enregistré', text: 'Le choix est celui de Paramètres, Apparence, et vous suit dans tous les navigateurs' },
         ]
@@ -54,7 +54,7 @@ export default {
           { label: 'Actions', text: 'Un renouvellement ACME échoué propose Relancer et une CRL à publier propose Publier, pour qui peut le faire ; les autres éléments ouvrent seulement leur page' },
           { label: 'Droits', text: 'Vous ne voyez que les éléments des sources que vous pouvez lire ; une source sur laquelle vous n’avez aucun droit n’affiche rien' },
           { label: 'Lu', text: 'Marquez un élément ou tous comme lus ; les marques sont enregistrées avec vos préférences, et un élément résolu quitte le panneau' },
-          { label: 'Clavier', text: 'Échap ferme le panneau où que soit le focus et revient à la cloche ; un clic à l’extérieur le laisse ouvert. Après Marquer lu, le focus reste sur la ligne, après Tout marquer lu il va au titre' },
+          { label: 'Clavier', text: 'Échap ferme le panneau où que soit le focus et revient à la cloche ; un clic à l’extérieur ou un autre menu de la barre le ferme aussi. Un seul menu ou panneau de la barre est ouvert à la fois : en ouvrir un autre, l’aide ou la recherche ferme celui qui l’était. Après Marquer lu, le focus reste sur la ligne, après Tout marquer lu il va au titre' },
           { label: 'Ouvrir', text: 'Ouvrir mène à la page de l’élément et le marque lu ; les approbations se décident sur leur propre page' },
           { label: 'E-mail', text: 'Pour qui peut lire les paramètres, le pied du panneau dit si la notification par e-mail est activée et mène à ses réglages' },
         ]
