@@ -5,7 +5,7 @@ export default {
     overview: 'TSA（RFC 3161）提供可信时间戳，证明文档或哈希值在特定时间点存在。用于代码签名、法律合规和审计追踪。',
     sections: [
       {
-        title: '视图',
+        title: '选项卡',
         items: [
           { label: '服务', text: '时间戳服务及其机构、哈希（请求可携带的摘要）、策略和状态。其详情给出签名证书、/tsa URL、请求总数和 OpenSSL 用法' },
           { label: '配置', text: '在带保存栏的表单中启用 TSA、设置签名 CA、策略 OID、签名证书和严格模式；“生成签名证书”保留在其所在部分' },

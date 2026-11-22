@@ -5,7 +5,7 @@ export default {
     overview: 'SCEP permet aux appareils réseau (routeurs, commutateurs, pare-feu) et aux solutions MDM de demander et d’obtenir automatiquement des certificats. Les appareils s’authentifient à l’aide d’un mot de passe de défi.',
     sections: [
       {
-        title: 'Vues',
+        title: 'Onglets',
         items: [
           { label: 'Requêtes', text: 'Requêtes d’inscription SCEP en attente, approuvées et rejetées, filtrées par les puces d’état, recherchées et paginées par le serveur ; une requête ouvre son détail avec Approuver et Rejeter' },
           { label: 'Configuration', text: 'Paramètres du serveur SCEP dans un formulaire avec sa barre d’enregistrement : sélection d’AC, approbation automatique, validité du mot de passe de défi (une valeur hors des bornes du serveur est refusée avant l’enregistrement)' },
@@ -57,7 +57,7 @@ export default {
 
 Le protocole d’inscription de certificat simplifié (SCEP) permet aux appareils réseau : routeurs, commutateurs, pare-feu, terminaux gérés par MDM, de demander et d’obtenir automatiquement des certificats.
 
-## Vues
+## Onglets
 
 ### Requêtes
 Voir toutes les requêtes d’inscription SCEP :

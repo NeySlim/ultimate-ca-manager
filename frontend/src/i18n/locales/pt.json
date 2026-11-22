@@ -7040,7 +7040,8 @@
     "categories": {
       "navigation": "Navegação",
       "actions": "Ações"
-    }
+    },
+    "viewOf": "{{page}}: {{view}}"
   },
   "passwordStrength": {
     "weak": "Fraco",

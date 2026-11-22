@@ -5,7 +5,7 @@ export default {
     overview: 'TSA (RFC 3161) fournit des horodatages de confiance qui prouvent qu’un document ou un hash existait à un moment précis. Utilisé pour la signature de code, la conformité juridique et les pistes d’audit.',
     sections: [
       {
-        title: 'Vues',
+        title: 'Onglets',
         items: [
           { label: 'Services', text: 'Le service d’horodatage avec son Autorité, son Hachage (les empreintes qu’une demande peut porter), sa Politique et son État. Son détail donne le signataire, l’URL /tsa, les totaux de demandes et l’usage d’OpenSSL' },
           { label: 'Configuration', text: 'Activer TSA, AC de signature, OID de politique, certificat de signature et mode strict, dans un formulaire avec sa barre d’enregistrement ; Générer un certificat de signature reste dans sa section' },

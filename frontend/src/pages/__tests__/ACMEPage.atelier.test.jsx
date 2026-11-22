@@ -17,6 +17,7 @@ vi.mock('../../hooks/usePermission', () => ({
 vi.mock('../../hooks/useClipboard', () => ({ useClipboard: () => clip }))
 
 import ACMEPage from '../ACMEPage'
+import { paletteViews } from '../../navigation/registry'
 
 const ok = (data) => vi.fn().mockResolvedValue({ data })
 const ACCOUNTS = [
@@ -160,19 +161,51 @@ describe('the ACME accounts', () => {
   })
 })
 
-describe('the ACME page switch', () => {
+describe('the ACME views', () => {
+  it('shows its views as tabs under the head, grouped, the accounts counted', async () => {
+    at('/acme')
+    const list = await screen.findByRole('tablist', { name: 'protocols.view' })
+    expect(within(list).getAllByRole('tab').map((b) => b.id.replace('acme-view-tab-', ''))).toEqual([
+      'accounts', 'localorders', 'localdomains', 'eab', 'config', 'letsencrypt', 'letsencryptorders', 'upstream', 'dns', 'domains', 'history',
+    ])
+    await waitFor(() => expect(within(list).getByRole('tab', { name: /^acme\.views\.accounts/ })).toHaveTextContent('acme.views.accounts2'))
+    expect(within(list).getByRole('tab', { name: /^acme\.views\.dns/ })).toHaveAccessibleDescription('acme.groups.client')
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'acme-view-tab-accounts')
+    // The head keeps its actions only: no select left in it
+    expect(document.querySelector('.page-head select')).toBeNull()
+  })
+
   it('keeps the view in the address, the former tab names included', async () => {
     at('/acme')
-    fireEvent.change(await screen.findByRole('combobox', { name: 'protocols.view' }), { target: { value: 'history' } })
+    fireEvent.click(await screen.findByRole('tab', { name: /^acme\.views\.history/ }))
     expect(location.search).toBe('?tab=history')
     expect(await screen.findByRole('button', { name: 'table.exportData' })).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('combobox', { name: 'protocols.view' }), { target: { value: 'accounts' } })
+    fireEvent.click(screen.getByRole('tab', { name: /^acme\.views\.accounts/ }))
     expect(location.search).toBe('')
   })
 
   it('opens a view named by a former tab', async () => {
     at('/acme?tab=localdomains')
-    expect(await screen.findByRole('combobox', { name: 'protocols.view' })).toHaveValue('localdomains')
+    expect(await screen.findByRole('tab', { name: /^acme\.views\.localdomains/ })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('moves between its views with the arrows', async () => {
+    at('/acme?tab=domains')
+    const tab = await screen.findByRole('tab', { name: /^acme\.views\.domains/ })
+    fireEvent.keyDown(tab, { key: 'ArrowRight' })
+    expect(location.search).toBe('?tab=history')
+    fireEvent.keyDown(screen.getByRole('tab', { name: /^acme\.views\.history/ }), { key: 'Home' })
+    expect(location.search).toBe('')
+  })
+
+  it('the palette offers each view past the first, as the tabs name and order them', async () => {
+    at('/acme')
+    const tabs = within(await screen.findByRole('tablist', { name: 'protocols.view' })).getAllByRole('tab')
+    expect(paletteViews().filter((v) => v.path.startsWith('/acme?')).map((v) => [v.path, v.labelKey]))
+      .toEqual(tabs.slice(1).map((b) => {
+        const tab = b.id.replace('acme-view-tab-', '')
+        return [`/acme?tab=${tab}`, `acme.views.${tab}`]
+      }))
   })
 })
 
@@ -197,7 +230,7 @@ describe('the ACME docks in the URL', () => {
   it('a view change closes the dock', async () => {
     at('/acme?item=5')
     await screen.findByRole('complementary', { name: /atelier.detailOf/ })
-    fireEvent.change(document.getElementById('acme-view'), { target: { value: 'history' } })
+    fireEvent.click(screen.getByRole('tab', { name: /^acme\.views\.history/ }))
     await waitFor(() => expect(location.search).toBe('?tab=history'))
     expect(screen.queryByRole('complementary', { name: /atelier.detailOf/ })).toBeNull()
   })

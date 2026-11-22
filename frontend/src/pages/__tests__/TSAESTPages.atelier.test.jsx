@@ -41,6 +41,7 @@ vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual
 import { renderAtUrl } from '../../test/dockUrl'
 import TSAPage from '../TSAPage'
 import ESTPage from '../ESTPage'
+import { paletteViews } from '../../navigation/registry'
 
 const CAS = [
   { id: 1, refid: 'ca-1', name: 'Services CA', has_private_key: true },
@@ -155,6 +156,21 @@ describe('the EST page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
     await waitFor(() => expect(est.updateConfig).toHaveBeenCalledTimes(2))
     expect(est.updateConfig.mock.calls[1][0].password).toBe('s3cret')
+  })
+})
+
+describe('the EST and TSA views', () => {
+  it.each([['TSA', TSAPage, '/tsa-config', 'tsa'], ['EST', ESTPage, '/est-config', 'est']])('%s: a tab opens the configuration, kept in the address', async (name, Page, path, id) => {
+    const r = renderAtUrl(<Page />, path)
+    const list = await screen.findByRole('tablist', { name: 'protocols.view' })
+    const tabs = within(list).getAllByRole('tab')
+    expect(tabs.map((b) => b.id)).toEqual([`${id}-view-tab-list`, `${id}-view-tab-config`])
+    await waitFor(() => expect(tabs[0]).toHaveTextContent(/\d$/))
+    fireEvent.click(tabs[1])
+    await waitFor(() => expect(r.where()).toBe(`${path}?tab=config`))
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('navigation', { name: /protocols\.sectionsOf/ })).toBeInTheDocument()
+    expect(paletteViews().filter((v) => v.path.startsWith(`${path}?`)).map((v) => v.path)).toEqual([`${path}?tab=config`])
   })
 })
 

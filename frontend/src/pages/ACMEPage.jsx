@@ -1056,7 +1056,9 @@ export default function ACMEPage() {
     dns: w && <Btn tone="primary" icon="plus" onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>{t('common.addDnsProvider')}</Btn>,
     domains: w && <Btn tone="primary" icon="plus" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>{t('acme.addDomain')}</Btn>,
   }[activeTab]
-  const option = (v) => ({ value: v, label: t(`acme.views.${v}`) })
+  // A tab counts what its view lists, a bar while it is read
+  const counts = { accounts: accounts.length, localdomains: localDomains.length, letsencryptorders: clientOrders.length, upstream: caAccounts.length, dns: dnsProviders.length, domains: acmeDomains.length }
+  const option = (v) => ({ value: v, label: t(`acme.views.${v}`), count: v === 'history' ? (historyLoading ? null : historyTotal) : v in counts ? (loading ? null : counts[v]) : undefined })
 
   return (
     <DockSlotProvider>
@@ -1064,15 +1066,16 @@ export default function ACMEPage() {
         <PageHead title="ACME" total={totals[activeTab]} intent={t('shell.moduleDesc.acme')}
           actions={<>
             <Btn icon="copy" id="acme-copy-directory" onClick={async () => { if (await copy(directoryUrl)) showSuccess(t('common.copied')) }}>{t('acme.copyDirectory')}</Btn>
-            <ViewSwitch id="acme-view" label={t('protocols.view')} value={activeTab} onChange={setActiveTab}
-              groups={[
-                { label: t('acme.groups.localAcme'), options: SERVER_VIEWS.map(option) },
-                { label: t('acme.groups.client'), options: CLIENT_VIEWS.map(option) },
-                { label: t('acme.groups.history'), options: [option('history')] },
-              ]} />
             {create || null}
           </>} />
-        {views[activeTab]}
+        <ViewSwitch id="acme-view" label={t('protocols.view')} value={activeTab} onChange={setActiveTab}
+          groups={[
+            { label: t('acme.groups.localAcme'), options: SERVER_VIEWS.map(option) },
+            { label: t('acme.groups.client'), options: CLIENT_VIEWS.map(option) },
+            { label: t('acme.groups.history'), options: [option('history')] },
+          ]}>
+          {views[activeTab]}
+        </ViewSwitch>
       </Zone>
       {/* Create Account Modal */}
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('acme.createAccountTitle')} size="sm" testId="acme-account-dialog">

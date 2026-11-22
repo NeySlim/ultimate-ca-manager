@@ -5,7 +5,7 @@
  * when the sections hold forms of their own (a form cannot nest one), a `<form>` otherwise.
  * SettingsView draws the whole form from data, as the mockup's settingsFields does.
  */
-import { Component } from 'react'
+import { Component, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
 import { jumpTo } from './helpers'
@@ -159,6 +159,10 @@ export function SettingsSection({ section: s, values, errors, onChange }) {
   )
 }
 
+const TOC_MARGIN = 8
+const attrValue = (id) => String(id).replace(/["\\]/g, '\\$&')
+const reducedMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
 const plainClick = (e) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
 
 /**
@@ -167,8 +171,38 @@ const plainClick = (e) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shift
  */
 export function SettingsToc({ sections, flags = {}, current, label, onJump, hrefFor }) {
   const { t } = useTranslation()
+  const ref = useRef(null)
+  // Sticky at the top of the scroll area, never taller than what it shows: its last entries stay reachable
+  useEffect(() => {
+    const toc = ref.current
+    const view = toc?.closest('.scroll-view')
+    if (!view) return undefined
+    const fit = () => {
+      const pad = parseFloat(getComputedStyle(view).paddingBottom) || 0
+      toc.style.maxHeight = view.clientHeight ? `${view.clientHeight - pad}px` : ''
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit)
+    observer?.observe(view)
+    return () => { window.removeEventListener('resize', fit); observer?.disconnect() }
+  }, [])
+  // The entry shown stays in view inside the table of contents (its own scroll only, never the page's)
+  const first = useRef(true)
+  useEffect(() => {
+    const toc = ref.current
+    const link = current && toc?.querySelector(`[data-jump="${attrValue(current)}"]`)
+    const instant = first.current
+    first.current = false
+    if (!link || !toc.clientHeight) return
+    const top = link.offsetTop
+    const bottom = top + link.offsetHeight
+    const to = top < toc.scrollTop + TOC_MARGIN ? top - TOC_MARGIN
+      : bottom > toc.scrollTop + toc.clientHeight - TOC_MARGIN ? bottom - toc.clientHeight + TOC_MARGIN : null
+    if (to !== null) toc.scrollTo?.({ top: Math.max(0, to), behavior: instant || reducedMotion() ? 'auto' : 'smooth' })
+  }, [current, sections.length])
   return (
-    <nav className="settings-toc" id="settings-toc" aria-label={label}>
+    <nav className="settings-toc" id="settings-toc" aria-label={label} ref={ref}>
       <ul>
         {sections.map((s) => (
           <li key={s.id}>

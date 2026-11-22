@@ -5,7 +5,7 @@ export default {
     overview: 'EST (RFC 7030) fournit une inscription sécurisée de certificats via HTTPS avec TLS mutuel (mTLS) ou authentification HTTP Basic. Idéal pour les environnements d’entreprise modernes nécessitant une inscription basée sur des standards avec une forte sécurité de transport.',
     sections: [
       {
-        title: 'Vues',
+        title: 'Onglets',
         items: [
           { label: 'Points d’enrôlement', text: 'Le point par défaut et un par libellé d’AC (/.well-known/est/<libellé>/), avec Autorité, Authentification (certificat client, ou certificat client ou mot de passe dès que des identifiants HTTP Basic sont enregistrés) et État. Un point ouvre son détail avec ses cinq URL et les totaux d’enrôlement' },
           { label: 'Configuration', text: 'Activer EST, AC émettrice, validité, chaîne dans les réponses, libellés d’AC et identifiants HTTP Basic, dans un formulaire avec sa barre d’enregistrement ; un libellé répété bloque l’enregistrement' },

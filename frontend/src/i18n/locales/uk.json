@@ -7326,7 +7326,8 @@
     "categories": {
       "navigation": "Навігація",
       "actions": "Дії"
-    }
+    },
+    "viewOf": "{{page}}: {{view}}"
   },
   "passwordStrength": {
     "weak": "Слабкий",

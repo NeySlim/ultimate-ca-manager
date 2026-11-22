@@ -112,6 +112,44 @@ describe('settings table of contents', () => {
   })
 })
 
+describe('settings table of contents taller than the page', () => {
+  const many = Array.from({ length: 19 }, (_, i) => ({ id: `s${i}`, label: `Section ${i}`, icon: 'settings' }))
+  const layout = (current) => <SettingsLayout toc={<SettingsToc sections={many} label="Sections" current={current} />}><p>x</p></SettingsLayout>
+
+  it('keeps to the height the page shows, less the scroll area\'s bottom padding, and follows its resize', () => {
+    render(layout())
+    const view = document.getElementById('view-scroll')
+    const toc = document.getElementById('settings-toc')
+    view.style.paddingBottom = '24px'
+    Object.defineProperty(view, 'clientHeight', { configurable: true, value: 600 })
+    fireEvent(window, new Event('resize'))
+    expect(toc.style.maxHeight).toBe('576px')
+    Object.defineProperty(view, 'clientHeight', { configurable: true, value: 400 })
+    fireEvent(window, new Event('resize'))
+    expect(toc.style.maxHeight).toBe('376px')
+  })
+
+  it('scrolls itself to the entry shown when it lies past its edge, and leaves it when it is in view', () => {
+    const { rerender } = render(layout('s0'))
+    const toc = document.getElementById('settings-toc')
+    toc.scrollTo = vi.fn()
+    Object.defineProperty(toc, 'clientHeight', { configurable: true, value: 300 })
+    const link = (id) => toc.querySelector(`[data-jump="${id}"]`)
+    many.forEach((s, i) => {
+      Object.defineProperty(link(s.id), 'offsetTop', { configurable: true, value: i * 38 })
+      Object.defineProperty(link(s.id), 'offsetHeight', { configurable: true, value: 36 })
+    })
+    rerender(layout('s18'))
+    expect(toc.scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 18 * 38 + 36 - 300 + 8 }))
+    toc.scrollTop = 18 * 38 + 36 - 300 + 8
+    toc.scrollTo.mockClear()
+    rerender(layout('s17'))
+    expect(toc.scrollTo).not.toHaveBeenCalled()
+    rerender(layout('s1'))
+    expect(toc.scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 38 - 8 }))
+  })
+})
+
 describe('jumpTo', () => {
   it('lands a link quietly: the title holds the focus without its outline until it loses it', () => {
     render(<SettingsFrame id="email" label="SMTP"><button type="button">next</button></SettingsFrame>)

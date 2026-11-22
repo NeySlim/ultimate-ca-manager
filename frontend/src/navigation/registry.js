@@ -29,6 +29,7 @@ export const GROUPS = [
 const NAV = 'commands.categories.navigation'
 
 // Menu order within each group is the order of this list
+// palette.views: the views of a page past its first one, [?tab= value, label key], as its tabs name them
 const RAW_MODULES = [
   { id: 'dashboard', path: '/', paths: ['/dashboard'], labelKey: 'common.dashboard', barKey: 'shell.bar.dashboard', shortKey: 'common.dashboardShort', icon: House, group: null, guard: 'auth',
     palette: {} },
@@ -45,13 +46,17 @@ const RAW_MODULES = [
   { id: 'ssh-certificates', path: '/ssh/certificates', labelKey: 'common.sshCertificates', descKey: 'shell.moduleDesc.sshCertificates', icon: Certificate, group: 'admin', guard: { permission: 'read:ssh' }, pinnable: true,
     palette: { icon: Terminal } },
   { id: 'acme', path: '/acme', labelKey: 'common.acme', descKey: 'shell.moduleDesc.acme', shortKey: 'common.acmeShort', icon: ArrowClockwise, group: 'protocols', guard: { permission: 'read:acme' }, pinnable: true,
-    palette: {} },
+    palette: { views: [
+      ['localorders', 'acme.views.localorders'], ['localdomains', 'acme.views.localdomains'], ['eab', 'acme.views.eab'], ['config', 'acme.views.config'],
+      ['letsencrypt', 'acme.views.letsencrypt'], ['letsencryptorders', 'acme.views.letsencryptorders'], ['upstream', 'acme.views.upstream'],
+      ['dns', 'acme.views.dns'], ['domains', 'acme.views.domains'], ['history', 'acme.views.history'],
+    ] } },
   { id: 'scep', path: '/scep-config', labelKey: 'common.scep', descKey: 'shell.moduleDesc.scep', shortKey: 'common.scepShort', icon: Globe, group: 'protocols', guard: { permission: 'read:scep' }, pinnable: true,
-    palette: {} },
+    palette: { views: [['requests', 'scep.requests'], ['challenges', 'scep.views.challenges'], ['intune', 'scep.intuneApps'], ['config', 'common.config']] } },
   { id: 'est', path: '/est-config', labelKey: 'common.est', descKey: 'shell.moduleDesc.est', shortKey: 'common.estShort', icon: Plug, group: 'protocols', guard: { permission: 'read:est' }, pinnable: true,
-    palette: {} },
+    palette: { views: [['config', 'tsa.views.config']] } },
   { id: 'tsa', path: '/tsa-config', labelKey: 'common.tsa', descKey: 'shell.moduleDesc.tsa', icon: Stamp, group: 'protocols', guard: { permission: 'read:settings' }, pinnable: true,
-    palette: {} },
+    palette: { views: [['config', 'tsa.views.config']] } },
   { id: 'crl-ocsp', path: '/crl-ocsp', labelKey: 'common.crlOcsp', descKey: 'shell.moduleDesc.crlOcsp', menuKey: 'shell.moduleLabel.crlOcsp', shortKey: 'common.crlOcspShort', icon: FileX, group: 'protocols', guard: { permission: 'read:crl' }, pinnable: true,
     palette: {} },
   { id: 'truststore', path: '/truststore', paths: ['/truststore/:id'], labelKey: 'common.trustStore', descKey: 'shell.moduleDesc.truststore', menuKey: 'shell.moduleLabel.truststore', shortKey: 'common.trustStoreShort', icon: Anchor, group: 'pki', guard: { permission: 'read:truststore' }, pinnable: true,
@@ -215,4 +220,14 @@ export function paletteCommands(can) {
     return { id: a.id, labelKey: a.labelKey, icon, path: `${m.path}?${a.query}`, action: a.action, categoryKey: ACTION_CATEGORY }
   })
   return [...entries, ...actions]
+}
+
+/**
+ * The views of the pages that hold several (palette.views), each at its ?tab= address, offered by the
+ * palette on a search only: named « page: view » (pageKey, commands.viewOf), its menu group as the hint.
+ */
+export function paletteViews(can) {
+  return MODULES.filter(m => m.palette?.views && isVisible(m, can)).flatMap(m => m.palette.views.map(([tab, labelKey]) => ({
+    id: `${m.id}-${tab}`, labelKey, pageKey: menuLabelKey(m), path: `${m.path}?tab=${tab}`, categoryKey: groupLabelKey(m.group),
+  })))
 }

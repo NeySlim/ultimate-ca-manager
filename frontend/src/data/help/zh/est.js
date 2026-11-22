@@ -5,7 +5,7 @@ export default {
     overview: 'EST（RFC 7030）通过 HTTPS 提供安全的证书注册，支持双向 TLS（mTLS）或 HTTP Basic 认证。适用于需要基于标准的注册协议和强传输安全的现代企业环境。',
     sections: [
       {
-        title: '视图',
+        title: '选项卡',
         items: [
           { label: '注册端点', text: '默认端点以及每个 CA 标签一个端点（/.well-known/est/<标签>/），显示机构、认证（客户端证书；保存 HTTP Basic 凭据后为客户端证书或密码）和状态。端点打开其详情，含五个 URL 和注册总数' },
           { label: '配置', text: '在带保存栏的表单中启用 EST、设置签发 CA、有效期、响应中的证书链、CA 标签和 HTTP Basic 凭据；重复的标签会阻止保存' },
