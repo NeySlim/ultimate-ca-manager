@@ -33,6 +33,15 @@ export function GuideSearch({ lang }) {
     loadGuideIndex(lang).then(setIndex).catch(() => { asked.current = false })
   }
 
+  // Words typed in the field the server drew, before the console took the page over, are searched, not wiped
+  useEffect(() => {
+    const field = inputRef.current
+    if (!field?.value) return
+    setQuery(field.value)
+    setOpen(document.activeElement === field)
+    load()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // A click outside the search closes its results
   useEffect(() => {
     if (!open) return undefined
