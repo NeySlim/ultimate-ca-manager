@@ -7751,6 +7751,7 @@
       "systemNow": "derzeit {{mode}}",
       "dark": "Dunkel",
       "light": "Hell",
+      "auroreSystem": "Aurore System",
       "aurore": "Aurore dunkel",
       "auroreLight": "Aurore hell"
     },

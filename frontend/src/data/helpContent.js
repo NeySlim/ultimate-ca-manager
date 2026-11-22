@@ -93,7 +93,7 @@ export const helpContent = {
         title: 'Theme menu',
         icon: Stack,
         items: [
-          { label: 'Choose', text: 'The theme button offers System, Dark, Light, Aurore dark and Aurore light, the current one checked; System follows your device, the icon shows the mode applied (sparkles for Aurore)' },
+          { label: 'Choose', text: 'The theme button offers System, Dark, Light, Aurore system, Aurore dark and Aurore light, the current one checked; System and Aurore system follow your device, the icon shows the mode applied (sparkles for Aurore)' },
           { label: 'Keyboard', text: 'Up Arrow and Down Arrow loop over the options; Escape or Tab closes the menu and returns to the button' },
           { label: 'Saved', text: 'The choice is the one under Settings, Appearance, and follows you to every browser' },
         ]

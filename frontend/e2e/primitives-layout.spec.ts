@@ -50,7 +50,7 @@ test('the export dialog is the 760 px dialog with translated actions', async ({ 
   await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible()
 })
 
-test('the theme menu is 220 px and lists the five choices of the mockup', async ({ page, api }) => {
+test('the theme menu is 220 px and lists the five choices of the mockup and Aurore system', async ({ page, api }) => {
   await page.goto('/certificates')
   await page.getByRole('button', { name: /^Theme: / }).click()
   const menu = page.getByRole('menu', { name: 'Theme' })
@@ -58,13 +58,14 @@ test('the theme menu is 220 px and lists the five choices of the mockup', async 
   // The System line's two lines of text take the height of the mockup's font, once it is loaded
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
   near((await box(menu)).width, 220)
-  for (const name of ['System', 'Dark', 'Light', 'Aurore dark', 'Aurore light']) {
+  for (const name of ['System', 'Dark', 'Light', 'Aurore system', 'Aurore dark', 'Aurore light']) {
     await expect(menu.getByRole('menuitemradio', { name: new RegExp(`^${name}`) })).toBeVisible()
   }
   const item = await box(menu.getByRole('menuitemradio', { name: 'Dark', exact: true }))
   near(item.height, 36)
-  // Those five only, as the mockup: no other family below them, the mockup's 202 px
-  await expect(menu.getByRole('menuitemradio')).toHaveCount(5)
+  // The mockup's five and Aurore system, no other family: the mockup's 202 px plus one System-high line
+  await expect(menu.getByRole('menuitemradio')).toHaveCount(6)
   await expect(menu.getByRole('group')).toHaveCount(0)
-  near((await box(menu)).height, 202)
+  const system = await box(menu.getByRole('menuitemradio', { name: /^System/ }))
+  near((await box(menu)).height, 202 + system.height)
 })
