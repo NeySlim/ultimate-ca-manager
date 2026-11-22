@@ -16,6 +16,7 @@ from flask import Blueprint, request, jsonify, session, current_app, g
 from auth.unified import AuthManager
 from auth.session_payload import auth_session_payload
 from auth.session_start import begin_session
+from auth.session_lock import refuse_sign_in_while_locked
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils import trusted_proxy
@@ -169,8 +170,9 @@ def detect_auth_methods():
         'sso_providers': [],
     }
 
-    # If middleware already auto-logged in via cert, signal it
-    if session.get('user_id') and session.get('auth_method') == 'certificate':
+    # If middleware already auto-logged in via cert, signal it; a locked session is not signed in
+    from auth.session_lock import is_locked
+    if session.get('user_id') and session.get('auth_method') == 'certificate' and not is_locked():
         methods['mtls'] = True
         methods['mtls_status'] = 'auto_logged_in'
         methods['mtls_user'] = session.get('username')
@@ -245,6 +247,10 @@ def login_password():
     Returns session cookie + user info
     """
     from services.audit_service import AuditService
+
+    refused = refuse_sign_in_while_locked('Password')
+    if refused:
+        return refused
 
     data = request.json
 
@@ -478,42 +484,45 @@ def login_2fa():
     if not _reserve_2fa_attempt(TWO_FA, lockout_key):
         return too_many_attempts(TWO_FA, lockout_key)
 
-    # Verify TOTP code (a key-only account has none to check), once only
-    from auth.totp import consume_totp
-    totp_ok = bool(user.totp_confirmed and user.totp_secret) and consume_totp(user, code)
-    if totp_ok:
-        ok, _err = safe_commit(logger, "Failed to record the TOTP step")
-        if not ok:
-            return _err
-    else:
-        # Check recovery codes - atomic verify-and-consume to prevent
-        # double-spend (two parallel logins replaying the same code).
-        from utils.backup_codes import consume_code, count_remaining
-        if user.backup_codes and consume_code(user, code):
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Failed to consume backup code for {user.username}: {e}")
-                return error_response('Invalid verification code', 401)
-            recovery_used = True
-            logger.info(
-                "Recovery code used for %s, %d remaining",
-                user.username, count_remaining(user.backup_codes),
-            )
-        else:
-            AuditService.log_action(
-                action='login_2fa_failure',
-                resource_type='user',
-                resource_id=user.id,
-                details=f'Invalid 2FA code for {pending_username}',
-                success=False,
-                username=pending_username
-            )
-            return error_response('Invalid verification code', 401)
+    ok, err = check_second_factor_code(user, code)
+    if err:
+        return err
+    if not ok:
+        AuditService.log_action(
+            action='login_2fa_failure',
+            resource_type='user',
+            resource_id=user.id,
+            details=f'Invalid 2FA code for {pending_username}',
+            success=False,
+            username=pending_username
+        )
+        return error_response('Invalid verification code', 401)
 
     _clear_2fa_failures(TWO_FA, lockout_key)
     return _complete_2fa_login(user, auth_method, f'Login successful with 2FA for {user.username}')
+
+
+def check_second_factor_code(user, code):
+    """(True, None) once the TOTP code or a recovery code is spent, (False, None) for a wrong
+    one, (None, response) when spending it could not be recorded."""
+    # Verify TOTP code (a key-only account has none to check), once only
+    from auth.totp import consume_totp
+    if bool(user.totp_confirmed and user.totp_secret) and consume_totp(user, code):
+        ok, _err = safe_commit(logger, "Failed to record the TOTP step")
+        return (True, None) if ok else (None, _err)
+    # Check recovery codes - atomic verify-and-consume to prevent
+    # double-spend (two parallel logins replaying the same code).
+    from utils.backup_codes import consume_code, count_remaining
+    if not (user.backup_codes and consume_code(user, code)):
+        return False, None
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to consume backup code for {user.username}: {e}")
+        return None, error_response('Invalid verification code', 401)
+    logger.info("Recovery code used for %s, %d remaining", user.username, count_remaining(user.backup_codes))
+    return True, None
 
 
 def _pending_2fa_user():
@@ -636,17 +645,9 @@ def login_2fa_webauthn_verify():
     )
 
 
-@bp.route('/api/v2/auth/login/mtls', methods=['POST'])
-@limiter.limit("10/minute")
-def login_mtls():
-    """
-    mTLS (client certificate) login
-
-    Certificate must be presented in request (via reverse proxy headers or native TLS)
-
-    Returns session cookie + user info
-    """
-    # Extract certificate info
+def presented_certificate():
+    """(cert_info or None, error response or None): the client certificate of this request,
+    from the TLS stack or from a trusted proxy's headers only."""
     cert_info = None
     try:
         # Native gunicorn TLS - already validated against the configured CA.
@@ -678,8 +679,27 @@ def login_mtls():
                 cert_info = CertificateParser.extract_from_apache_headers(headers)
     except Exception as e:
         logger.error(f"Error extracting certificate: {e}")
-        return error_response('Failed to extract client certificate', 500)
+        return None, error_response('Failed to extract client certificate', 500)
+    return cert_info, None
 
+
+@bp.route('/api/v2/auth/login/mtls', methods=['POST'])
+@limiter.limit("10/minute")
+def login_mtls():
+    """
+    mTLS (client certificate) login
+
+    Certificate must be presented in request (via reverse proxy headers or native TLS)
+
+    Returns session cookie + user info
+    """
+    refused = refuse_sign_in_while_locked('Client certificate')
+    if refused:
+        return refused
+
+    cert_info, err = presented_certificate()
+    if err:
+        return err
     if not cert_info:
         return error_response('No client certificate presented', 401)
 
@@ -815,6 +835,10 @@ def webauthn_verify():
 
     Returns session cookie + user info
     """
+    refused = refuse_sign_in_while_locked('Passkey')
+    if refused:
+        return refused
+
     data = request.json
 
     if not data or not data.get('username') or not data.get('response'):

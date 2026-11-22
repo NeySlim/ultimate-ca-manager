@@ -74,6 +74,18 @@ export function adoptSharedLock() {
   return true
 }
 
+// The 401 of a session the server holds locked: the account it names gets its lock screen
+export const SESSION_LOCKED_PROBLEM = 'urn:ucm:problem:session-locked'
+
+/** Keeps the lock screen of the account a locked session's refusal names, with what this tab knew of it. */
+export function adoptServerLock(details) {
+  const username = typeof details?.username === 'string' ? details.username : ''
+  if (!username) return false
+  const known = tabAccount?.username === username ? tabAccount : {}
+  saveLock({ ...known, username, reason: details.reason === 'manual' ? 'manual' : 'idle' })
+  return true
+}
+
 // The tabs of a browser share one session: a lock in one closes it for all, and tells the others
 export function announceLock(username, reason) {
   if (!username || typeof BroadcastChannel === 'undefined') return

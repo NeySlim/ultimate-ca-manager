@@ -2,9 +2,9 @@
 
 ``GET /api/v2/auth/verify`` tells a reloaded page how the session was opened (each
 sign-in path keeps its method in the session), the provider's display name, the
-account's second factors and when the session ends. ``POST /api/v2/auth/lock`` closes
+account's second factors and when the session ends. ``POST /api/v2/auth/lock`` locks
 the session as the inactivity lock does: session and CSRF token required, audited, and
-the cookie refused afterwards on every node of a shared store.
+the cookie refused as locked afterwards on every node of a shared store.
 """
 import json
 import uuid
@@ -21,6 +21,7 @@ from utils.datetime_utils import utc_now
 
 PASSWORD = 'L0ck-And-Inf0-Pass!'
 AUTH_REQUIRED = 'urn:ucm:problem:authentication-required'
+SESSION_LOCKED = 'urn:ucm:problem:session-locked'
 
 
 def _post(c, url, body=None, headers=None):
@@ -342,8 +343,8 @@ def test_locking_is_audited_with_its_reason(app, make_user, reason, said):
         assert '<script>' not in row.details
 
 
-def test_a_locked_session_is_refused_as_an_expired_one(app, make_user):
-    """The cookie held before the lock opens nothing again: the gate's 401, as after inactivity."""
+def test_a_locked_session_is_refused_with_its_own_problem_type(app, make_user):
+    """The cookie held before the lock opens nothing: a 401 that says locked, not signed out."""
     user = make_user()
     c = _password_session(app, user)
     held = c.get_cookie('session').value
@@ -353,7 +354,7 @@ def test_a_locked_session_is_refused_as_an_expired_one(app, make_user):
     for client in (c, replay):
         r = client.get('/api/v2/account/profile')
         assert r.status_code == 401
-        assert r.get_json()['type'] == AUTH_REQUIRED
+        assert r.get_json()['type'] == SESSION_LOCKED
         assert _verify(client)['authenticated'] is False
 
 
@@ -376,7 +377,7 @@ def test_the_lock_reaches_a_session_held_to_a_first_step(app, make_user, held):
 
 
 def test_a_session_locked_on_one_node_is_refused_on_the_other(nodes, make_user):
-    """HA: the shared store forgets the locked session on every node."""
+    """HA: the shared store holds the lock on every node."""
     first, second = nodes
     user = make_user(first)
     c = _password_session(first, user)
@@ -387,4 +388,4 @@ def test_a_session_locked_on_one_node_is_refused_on_the_other(nodes, make_user):
     assert _post(c, '/api/v2/auth/lock').status_code == 200
     r = other.get('/api/v2/account/profile')
     assert r.status_code == 401
-    assert r.get_json()['type'] == AUTH_REQUIRED
+    assert r.get_json()['type'] == SESSION_LOCKED

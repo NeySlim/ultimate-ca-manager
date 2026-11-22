@@ -6,7 +6,8 @@
  * the other doors: SSO, LDAP, client certificate, security key) → 2fa when asked.
  * A session locked by hand or after inactivity (lib/sessionLock) shows the same form for
  * the same account, read-only username, says which lock it was, and returns to ?next= once
- * signed in again.
+ * signed in again. While the server holds it locked, the screen offers that account's own
+ * unlock methods together (password, client certificate, passkey) and nothing else opens it.
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,7 +19,7 @@ import { Icon } from '../components/atelier/Icon'
 import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { safeNext } from '../navigation/safeNext'
-import { readLock, clearLock, takeJustLocked, takeSignedOut } from '../lib/sessionLock'
+import { readLock, clearLock, takeJustLocked, takeSignedOut, SESSION_LOCKED_PROBLEM } from '../lib/sessionLock'
 import { roleLabel, roleInSentence } from '../lib/roleLabel'
 import { focusPageTitle } from '../lib/focusPageTitle'
 import {
@@ -34,6 +35,24 @@ const PROTOCOLS = { oauth2: 'OAuth 2.0', saml: 'SAML 2.0', ldap: 'LDAP' }
 
 const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
 const providerName = (p) => p.display_name || p.name
+
+// The server's lock of this session, once the lock this tab sent was answered: { methods, ... } or null.
+// A verify that still finds the session open is asked again a few times (another tab's lock in flight).
+const SERVER_LOCK_TRIES = 4
+const SERVER_LOCK_RETRY_MS = 400
+async function fetchServerLock(username) {
+  await authService.whenLocked?.()
+  for (let attempt = 0; attempt < SERVER_LOCK_TRIES; attempt += 1) {
+    const response = await authService.verifySession()
+    const data = response?.data || response
+    if (data?.locked?.username) return data.locked.username === username ? data.locked : null
+    if (data?.authenticated !== true) return null
+    await new Promise(resolve => setTimeout(resolve, SERVER_LOCK_RETRY_MS))
+  }
+  return null
+}
+
+const isLockedRefusal = (error) => error?.status === 401 && error?.data?.type === SESSION_LOCKED_PROBLEM
 
 const initialsOf = (name) => (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
@@ -73,6 +92,8 @@ export default function LoginPage() {
   const [locked, setLocked] = useState(readLock)
   const lockedRef = useRef(locked)
   lockedRef.current = locked
+  // The lock as the server holds it: the account's unlock methods; null when the session is gone
+  const [serverLock, setServerLock] = useState(null)
 
   // State machine: 'init' | 'form' | '2fa' | 'ldap'
   const [step, setStep] = useState('init')
@@ -150,6 +171,17 @@ export default function LoginPage() {
   useEffect(() => {
     if (!sessionChecked) return
 
+    // A lock the session check found on the server (a new tab of a locked session)
+    if (!lockedRef.current) {
+      const adopted = readLock()
+      if (adopted) {
+        lockedRef.current = adopted
+        setLocked(adopted)
+        setUsername(adopted.username)
+      }
+    }
+    const lockedAs = lockedRef.current?.username
+
     // Load saved username (the locked account wins)
     let lastUsername = ''
     try { lastUsername = localStorage.getItem(STORAGE_KEY) || '' } catch {}
@@ -166,8 +198,10 @@ export default function LoginPage() {
     // providers, and a failed /sso/available is retried by the effect below.
     Promise.allSettled([
       authService.getSsoProviders(),
-      authMethodsService.detectMethods(null)
-    ]).then(([ssoResult, methodsResult]) => {
+      authMethodsService.detectMethods(null),
+      lockedAs ? fetchServerLock(lockedAs) : Promise.resolve(null),
+    ]).then(([ssoResult, methodsResult, lockResult]) => {
+      if (lockResult.status === 'fulfilled' && lockResult.value) setServerLock(lockResult.value)
       // SSO providers
       let providers = []
       if (ssoResult.status === 'fulfilled') {
@@ -299,6 +333,7 @@ export default function LoginPage() {
         'sso_no_default_role': t('auth.ssoNoDefaultRole'),
         'sso_email_conflict': t('auth.ssoEmailConflict'),
         'saml_logout_rejected': t('auth.samlLogoutRejected'),
+        'session_locked': t('auth.page.ssoSessionLocked'),
       }
       setFormError(errorMessages[error] || t('auth.ssoError'))
     }
@@ -493,9 +528,106 @@ export default function LoginPage() {
       if (!userData.requires_2fa_enrollment) welcome(userData, username)
       finish(username)
     } catch (error) {
+      // The server locked the session meanwhile: the password goes to its unlock
+      const held = isLockedRefusal(error) && lockedRef.current
+        ? await fetchServerLock(lockedRef.current.username).catch(() => null) : null
+      if (held) {
+        setServerLock(held)
+        if (held.methods?.includes('password')) {
+          await unlockWithPassword(password)
+          return
+        }
+      }
       refuse(error, 'password', t('auth.page.refused'))
       if (!maintenanceRetry.current) setPassword('')  // kept while a maintenance is waited out
       setFocusNext('password')
+    } finally {
+      setLoading(false)
+      setStatusMessage('')
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // UNLOCK: the server holds the session; its own account's factors lift the lock
+  // ═══════════════════════════════════════════════════
+
+  const unlocked = async (userData) => {
+    const who = lockedRef.current?.username || username
+    await login(who, null, userData)
+    if (!userData.requires_2fa_enrollment) welcome(userData, who)
+    finish(who)
+  }
+
+  // The session ended meanwhile (signed out elsewhere, gone from the store): the plain lock screen
+  const lockLost = (error) => {
+    if (error?.status !== 401 || isLockedRefusal(error) || error?.data?.type === 'about:blank') return false
+    setServerLock(null)
+    return true
+  }
+
+  const unlockWithPassword = async (secret) => {
+    clearMaintenance()
+    setFormError('')
+    setLoading(true)
+    setStatusMessage(t('auth.signingIn'))
+    try {
+      const userData = await authMethodsService.unlockPassword(secret)
+      if (userData.requires_2fa) {
+        twoFactorFrom.current = 'unlock'
+        setRateLimit(null)
+        setStep('2fa')
+        setTwoFactorMethods(userData.methods || ['totp'])
+        setTotpCode('')
+        return
+      }
+      await unlocked(userData)
+    } catch (error) {
+      if (lockLost(error)) return
+      refuse(error, 'unlockPassword', t('auth.page.unlockRefused'))
+      if (!maintenanceRetry.current) setPassword('')
+      setFocusNext('password')
+    } finally {
+      setLoading(false)
+      setStatusMessage('')
+    }
+  }
+
+  const handleUnlockPassword = (e) => {
+    e.preventDefault()
+    if (waiting) return  // the server's wait first, as the disabled button says
+    if (missing([['password', password, t('auth.page.passwordMissing')]])) return
+    return unlockWithPassword(password)
+  }
+
+  const handleUnlockCertificate = async () => {
+    clearMaintenance()
+    setFormError('')
+    setLoading(true)
+    try {
+      await unlocked(await authMethodsService.unlockCertificate())
+    } catch (error) {
+      if (lockLost(error)) return
+      refuse(error, 'unlockCertificate', t('auth.page.unlockCertificateRefused'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUnlockPasskey = async () => {
+    clearMaintenance()
+    setFormError('')
+    setStatusMessage(t('auth.touchSecurityKey'))
+    setLoading(true)
+    try {
+      await unlocked(await authMethodsService.unlockPasskey())
+    } catch (error) {
+      if (lockLost(error)) return
+      if (noteRefusal(error, 'unlockPasskey', false)) return
+      if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
+        showInfo(t('auth.securityKeyCancelled'))
+      } else {
+        setFormError(t('auth.page.unlockPasskeyRefused'))
+      }
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -511,9 +643,10 @@ export default function LoginPage() {
     setFormError('')
     setLoading(true)
     try {
-      const userData = await authMethodsService.login2FA(totpCode)
+      const unlocking = twoFactorFrom.current === 'unlock'
+      const userData = unlocking ? await authMethodsService.unlock2FA(totpCode) : await authMethodsService.login2FA(totpCode)
       saveUsername(username)
-      saveTwoFactorMethod()
+      if (!unlocking) saveTwoFactorMethod()
       await login(username, password, userData)
       welcome(userData, username)
       finish(username)
@@ -532,9 +665,10 @@ export default function LoginPage() {
     setFormError('')
     setLoading(true)
     try {
-      const userData = await authMethodsService.login2FAWebAuthn()
+      const unlocking = twoFactorFrom.current === 'unlock'
+      const userData = unlocking ? await authMethodsService.unlock2FAWebAuthn() : await authMethodsService.login2FAWebAuthn()
       saveUsername(username)
-      saveTwoFactorMethod()
+      if (!unlocking) saveTwoFactorMethod()
       await login(username, password, userData)
       welcome(userData, username)
       finish(username)
@@ -576,6 +710,9 @@ export default function LoginPage() {
     webauthn: () => attemptWebAuthn(),
     key2fa: () => handle2FAWebAuthn(),
     mtls: () => handleMTLSLogin(),
+    unlockPassword: () => handleUnlockPassword(NO_EVENT),
+    unlockCertificate: () => handleUnlockCertificate(),
+    unlockPasskey: () => handleUnlockPasskey(),
   }
 
   const handleSSOLogin = (provider) => {
@@ -659,8 +796,13 @@ export default function LoginPage() {
     setStep(twoFactorFrom.current === 'ldap' && selectedLdapProvider && !lockedRef.current ? 'ldap' : 'form')
   }
 
-  // The lock screen gives way to the sign-in form; the page asked for stays in ?next=
+  // The lock screen gives way to the sign-in form; the page asked for stays in ?next=. A session
+  // the server holds locked is signed out first: no other account signs in over it.
   const handleSwitchAccount = () => {
+    if (serverLock) {
+      authService.logout?.().catch(() => {})
+      setServerLock(null)
+    }
     clearLock()
     setLocked(null)
     setUsername('')
@@ -704,8 +846,19 @@ export default function LoginPage() {
   const ldapButtons = ldapProviders.map(p => alt(`ldap-${p.id}`, 'server', t('auth.page.ldapButton'),
     `${providerName(p)} · LDAP`, () => handleSSOLogin(p)))
 
+  const held = locked && serverLock
+  const heldMethods = held ? serverLock.methods || [] : []
+  const unlockCertButton = alt('unlock-cert', 'key', t('auth.page.unlockCertificate'), t('auth.page.unlockCertificateDetail'), handleUnlockCertificate)
+  const unlockKeyButton = alt('unlock-key', 'chip', t('auth.page.unlockPasskey'),
+    loading && statusMessage === t('auth.touchSecurityKey') ? statusMessage : t('auth.page.unlockPasskeyDetail'), handleUnlockPasskey)
+
   let alternatives
-  if (locked) {
+  if (held) {
+    alternatives = [
+      ...(heldMethods.includes('certificate') ? [unlockCertButton] : []),
+      ...(heldMethods.includes('passkey') && keySupported ? [unlockKeyButton] : []),
+    ]
+  } else if (locked) {
     alternatives = [
       ...(lockedVia === 'sso' ? ssoButtons : []),
       ...((lockedVia === 'mtls' || lockedVia === 'certificate') && mtlsReady ? [mtlsButton] : []),
@@ -813,7 +966,8 @@ export default function LoginPage() {
   )
 
   const title = locked ? t('auth.page.lockedTitle') : step === '2fa' ? t('auth.twoFactorTitle') : t('auth.page.signInTitle')
-  let lead = locked ? t(locked.reason === 'manual' ? 'auth.page.lockedLeadManual' : 'auth.page.lockedLead') : t('auth.page.lead')
+  let lead = held ? t(locked.reason === 'manual' ? 'auth.page.lockedLeadManualHeld' : 'auth.page.lockedLeadHeld')
+    : locked ? t(locked.reason === 'manual' ? 'auth.page.lockedLeadManual' : 'auth.page.lockedLead') : t('auth.page.lead')
   let body
 
   if (ssoCompleting) {
@@ -878,6 +1032,20 @@ export default function LoginPage() {
         {maintenanceBlock}
         {signInForm(handleLDAPLogin, t('auth.page.submit'), 'right')}
         <button type="button" className="text-link auth-switch" onClick={handleBack} disabled={loading}>{t('common.back')}</button>
+      </>
+    )
+  } else if (held) {
+    const withPassword = heldMethods.includes('password')
+    body = (
+      <>
+        {lockedCard}
+        {maintenanceBlock}
+        {withPassword ? signInForm(handleUnlockPassword, t('auth.page.unlock'), 'lock') : errorBlock}
+        {!withPassword && waitLine}
+        {withPassword && alternatives.length > 0 && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
+        {alternatives}
+        {!withPassword && alternatives.length === 0 && <p className="auth-wait" id="login-no-unlock">{t('auth.page.noUnlockMethod')}</p>}
+        <button type="button" className="text-link auth-switch" onClick={handleSwitchAccount}>{t('auth.page.switchAccount')}</button>
       </>
     )
   } else {

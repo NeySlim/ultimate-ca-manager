@@ -4,6 +4,8 @@
  */
 import { apiClient } from './apiClient'
 
+let pendingLock = null
+
 export const authService = {
   async login(username, password) {
     const response = await apiClient.post('/auth/login', { username, password })
@@ -25,13 +27,22 @@ export const authService = {
     return response
   },
 
-  // Closes the session behind the lock screen; `reason` is 'manual' or 'idle', for the audit
-  async lock(reason) {
-    try {
-      return await apiClient.post('/auth/lock', { reason })
-    } finally {
-      apiClient.clearCsrfToken()
-    }
+  // Locks the session on the server, which keeps it until it is unlocked; `reason` is 'manual' or 'idle'
+  lock(reason) {
+    const request = (async () => {
+      try {
+        return await apiClient.post('/auth/lock', { reason })
+      } finally {
+        apiClient.clearCsrfToken()
+      }
+    })()
+    pendingLock = request.catch(() => {})
+    return request
+  },
+
+  // Settled once the lock this tab sent has been answered: the lock screen reads the server after it
+  whenLocked() {
+    return pendingLock || Promise.resolve()
   },
 
   async getCurrentUser() {

@@ -15,7 +15,7 @@
  */
 
 import { loginUrl } from '../navigation/safeNext'
-import { adoptSharedLock } from '../lib/sessionLock'
+import { adoptSharedLock, adoptServerLock, SESSION_LOCKED_PROBLEM } from '../lib/sessionLock'
 
 const API_BASE_URL = '/api/v2'
 
@@ -235,7 +235,19 @@ class APIClient {
         // Redirect to login on 401 (unless already on login page OR this is the login/verify request)
         const isLoginPage = window.location.pathname.includes('/login')
         const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/verify')
+          || endpoint.includes('/auth/unlock')
         if (response.status === 401 && signOutHeld) throw error
+
+        // The server holds this session locked: its account's lock screen, without a session check
+        if (response.status === 401 && data?.type === SESSION_LOCKED_PROBLEM) {
+          if (!isLoginPage && !loginRedirectPending && !window.location.pathname?.includes('/login')) {
+            loginRedirectPending = true
+            if (!adoptServerLock(data.details)) adoptSharedLock()
+            const { pathname = '/', search = '', hash = '' } = window.location
+            window.location.href = loginUrl(pathname, search, hash)
+          }
+          throw error
+        }
 
         // A 401 signs out only once the session is gone; the gate's refusal is sent again, once
         if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending

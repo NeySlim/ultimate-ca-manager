@@ -130,6 +130,10 @@ def process_client_certificate():
     # session there would keep a cookie's inactivity clock running from anywhere.
     if is_exempt_path(request.path) or _is_file_request(request.path):
         return
+    # A locked session is neither reopened nor replaced: only its own unlock lifts it
+    from auth.session_lock import is_locked
+    if is_locked():
+        return
     # A valid session of any method is kept (password/LDAP/WebAuthn never overwritten);
     # an expired one, certificate included, takes the expired-cookie path below
     if session.get('user_id'):

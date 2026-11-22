@@ -88,7 +88,12 @@ export function AuthProvider({ children }) {
 
       if (!userData.authenticated) {
         debug('ℹ️ Not authenticated')
-        const shared = lockedElsewhere()
+        // The server holds the session locked: the lock screen of the account it names
+        const held = userData.locked
+        if (held?.username) {
+          saveLock({ username: held.username, name: held.name, role: held.role, method: held.method, reason: held.reason })
+        }
+        const shared = held?.username ? null : lockedElsewhere()
         if (shared) {
           lockHere(shared.reason)
           return false

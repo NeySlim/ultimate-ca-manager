@@ -1,5 +1,5 @@
 CATEGORIES = {
-    'auth': ['login_success', 'login_failure', 'logout', 'session_locked', 'session_expired', 'mfa_enable', 'mfa_disable', 'password_change'],
+    'auth': ['login_success', 'login_failure', 'logout', 'session_locked', 'session_unlocked', 'session_unlock_failure', 'session_expired', 'mfa_enable', 'mfa_disable', 'password_change'],
     'users': ['user_create', 'user_update', 'user_delete', 'role_change', 'user_activate', 'user_deactivate'],
     'certificates': ['cert_issue', 'cert_revoke', 'cert_renew', 'cert_export', 'cert_delete'],
     'cas': ['ca_create', 'ca_update', 'ca_delete', 'ca_import', 'ca_export'],

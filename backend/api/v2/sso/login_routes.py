@@ -243,6 +243,14 @@ def _return_provider(provider_type):
     return login_provider('saml')
 
 
+def _refused_while_locked():
+    """An IdP may answer without asking anything: its return never replaces a locked session."""
+    from auth.session_lock import refuse_sign_in_while_locked
+    if refuse_sign_in_while_locked('SSO') is None:
+        return None
+    return redirect('/login?error=session_locked')
+
+
 @bp.route('/api/v2/sso/login/<provider_type>', methods=['GET'])
 def initiate_sso_login(provider_type):
     """
@@ -251,6 +259,9 @@ def initiate_sso_login(provider_type):
     For SAML: redirects to IdP SSO URL
     For LDAP: returns error (LDAP uses direct auth via /api/v2/sso/ldap/login)
     """
+    refused = _refused_while_locked()
+    if refused:
+        return refused
     if provider_type not in ('saml', 'oauth2'):
         return error_response("Use /api/v2/sso/ldap/login for LDAP authentication", 400)
 
@@ -642,6 +653,9 @@ def sso_callback(provider_type):
     Handle SSO callback from OAuth2/SAML providers.
     Creates or updates user and establishes session.
     """
+    refused = _refused_while_locked()
+    if refused:
+        return refused
     if provider_type not in ('saml', 'oauth2'):
         return redirect('/login?error=invalid_provider_type')
 

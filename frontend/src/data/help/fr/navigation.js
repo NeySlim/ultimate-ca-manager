@@ -34,9 +34,10 @@ export default {
         title: 'Session',
         items: [
           { label: 'Avertissement', text: 'Cinq minutes avant la fin du délai d’inactivité, un bandeau affiche le temps restant ; Prolonger garde la session et dit pour combien de temps, toute autre activité ne la prolonge plus' },
-          { label: 'Verrouillage', text: 'À la fin, la session se ferme et l’écran se verrouille : rien de la console ne reste ouvert derrière' },
-          { label: 'Verrouiller maintenant', text: 'Verrouiller, dans le menu du compte, ou Alt+Maj+L (Option+Maj+L sur Mac) hors d’un champ de texte, ferme aussitôt la session et verrouille l’écran, qui dit que la session a été verrouillée et non qu’elle a expiré ; tous les onglets du navigateur se verrouillent avec lui. Le déverrouillage est celui de l’inactivité, avec la même méthode de connexion' },
-          { label: 'Retour', text: 'Reconnectez-vous avec le même compte pour revenir à la page où vous étiez ; Se connecter avec un autre compte repart de zéro' },
+          { label: 'Verrouillage', text: 'À la fin, la session se verrouille : le serveur la garde pour votre seul compte et ne sert plus rien, et rien de la console ne reste ouvert derrière l’écran' },
+          { label: 'Verrouiller maintenant', text: 'Verrouiller, dans le menu du compte, ou Alt+Maj+L (Option+Maj+L sur Mac) hors d’un champ de texte, verrouille aussitôt la session et l’écran, qui dit que la session a été verrouillée et non qu’elle a expiré ; tous les onglets du navigateur se verrouillent avec lui' },
+          { label: 'Déverrouiller', text: 'L’écran verrouillé propose ensemble les moyens de votre compte : son mot de passe (puis son second facteur, comme à la connexion), Déverrouiller avec le certificat s’il a un certificat client, Déverrouiller avec une passkey s’il en a une. Rien d’autre ne rouvre la session : ni un certificat client présenté de lui-même par le navigateur, ni une connexion SSO' },
+          { label: 'Retour', text: 'Le déverrouillage ramène à la page où vous étiez ; Se connecter avec un autre compte déconnecte d’abord et repart de zéro. Une session terminée entre-temps demande de se reconnecter avec le même compte' },
         ]
       },
       {

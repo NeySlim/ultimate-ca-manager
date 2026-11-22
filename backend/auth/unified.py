@@ -186,6 +186,10 @@ class AuthManager:
         user_id = session.get('user_id')
         if not user_id:
             return None
+        # A locked session opens nothing, and stays as it is until unlocked or signed out
+        from auth.session_lock import is_locked
+        if is_locked():
+            return None
         
         user = db.session.get(User, user_id)
         if not user or not user.active:
@@ -369,6 +373,9 @@ def require_auth(permissions=None, session_only=False):
             if not auth_result:
                 from auth import restore_hold
                 restore_hold.forget()
+                from auth.session_lock import locked_refusal, locks_this_request
+                if locks_this_request():
+                    return locked_refusal()
                 from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
                 return error_response('Authentication required', 401,
                                       problem_type=AUTHENTICATION_REQUIRED_PROBLEM)

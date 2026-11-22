@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # Import all route blueprints
 from api.v2.auth import bp as auth_bp
 from api.v2.auth_methods import bp as auth_methods_bp  # Multi-method auth
+from api.v2 import auth_unlock  # noqa: F401  (unlock routes on auth_methods_bp)
 from api.v2.account import bp as account_bp
 # CAs: import package (creates bp) then all route modules
 from api.v2.cas import bp as cas_bp
