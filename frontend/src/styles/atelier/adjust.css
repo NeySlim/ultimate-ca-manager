@@ -38,12 +38,9 @@
 :root .atl .table-container th>.col-sep:not(.col-resize){position:absolute;top:0;bottom:0;right:0;width:1px;pointer-events:none}
 :root .atl .table-container th>:is(.col-sep,.col-resize):before{content:'';position:absolute;right:0;top:calc(50% - 8px);width:1px;height:16px}
 :root .atl .table-container th>.col-sep:before{background:var(--col-sep)}
-/* The separator is the handle that sets a column's width (C2): the same line at rest, 12 px to grab across the
-   boundary (inside the cell for the last column, so that it never widens the region), the accent on hover, focus and drag. */
-:root .atl .table-container th>.col-resize{position:absolute;top:0;bottom:0;right:-6px;width:12px;z-index:1;cursor:col-resize;touch-action:none;background:none;outline:none}
-:root .atl .table-container th>.col-resize:before{right:6px}
-:root .atl .table-container th>.col-resize:not(.col-sep){right:0}
-:root .atl .table-container th>.col-resize:not(.col-sep):before{right:0}
+/* The separator is the handle that sets a column's width (C2): the same line at rest, 12 px to grab at the right of its
+   header (inside it, so that it neither clips nor widens anything), the accent on hover, focus and drag. */
+:root .atl .table-container th>.col-resize{position:absolute;top:0;bottom:0;right:0;width:12px;z-index:1;cursor:col-resize;touch-action:none;background:none;outline:none}
 :root .atl .table-container th>.col-resize:is(:hover,:focus-visible,.dragging):before{top:0;height:100%;width:2px;background:var(--accent)}
 :root body.col-resizing,:root body.col-resizing *{cursor:col-resize!important;user-select:none}
 /* Réinitialiser les colonnes sits after the range and the folded columns, the page controls at the right. */
