@@ -7326,7 +7326,8 @@
     "categories": {
       "navigation": "Навигация",
       "actions": "Действия"
-    }
+    },
+    "viewOf": "{{page}}: {{view}}"
   },
   "passwordStrength": {
     "weak": "Слабый",

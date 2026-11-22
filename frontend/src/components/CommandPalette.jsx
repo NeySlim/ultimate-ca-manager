@@ -11,7 +11,7 @@ import { AtelierDialog } from './atelier/AtelierDialog'
 import { Icon } from './atelier/Icon'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
-import { glyphOf, moduleById, moduleForPath, paletteCommands } from '../navigation/registry'
+import { glyphOf, moduleById, moduleForPath, paletteCommands, paletteViews } from '../navigation/registry'
 
 // ACME accounts and SCEP profiles found by the search: [result group, hint, page, glyph]
 const PROTOCOL_OBJECTS = [
@@ -134,6 +134,9 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
     t(cmd.labelKey).toLowerCase().includes(lower) ||
     t(cmd.categoryKey).toLowerCase().includes(lower)
   )
+  // The views of the protocol pages (absent from the mockup): on a search only, matched on « page: view »
+  const viewName = (v) => t('commands.viewOf', { page: t(v.pageKey), view: t(v.labelKey) })
+  const filteredViews = !search ? [] : paletteViews(can).filter(v => viewName(v).toLowerCase().includes(lower))
   
   // Filter recent items based on search
   const filteredRecent = useMemo(() => {
@@ -203,6 +206,9 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
     ...filteredCommands.map(cmd => ({
       key: `cmd-${cmd.id}`, icon: cmd.action === 'new' || cmd.action === 'upload' ? 'plus' : glyphOf(moduleForPath(cmd.path.split('?')[0])),
       name: t(cmd.labelKey), hint: t(cmd.categoryKey), run: () => executeCommand(cmd),
+    })),
+    ...filteredViews.map(v => ({
+      key: `view-${v.id}`, icon: glyphOf(moduleForPath(v.path.split('?')[0])), name: viewName(v), hint: t(v.categoryKey), run: () => executeCommand(v),
     })),
     // The whole guide in a tab of its own (absent from the mockup), on the chapter of the current page
     ...(search && [t('guide.paletteEntry'), t('guide.paletteHint')].some(s => s.toLowerCase().includes(lower)) ? [{

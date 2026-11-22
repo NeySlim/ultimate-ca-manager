@@ -7040,7 +7040,8 @@
     "categories": {
       "navigation": "导航",
       "actions": "操作"
-    }
+    },
+    "viewOf": "{{page}}: {{view}}"
   },
   "passwordStrength": {
     "weak": "弱",

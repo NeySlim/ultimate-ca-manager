@@ -7040,7 +7040,8 @@
     "categories": {
       "navigation": "ナビゲーション",
       "actions": "アクション"
-    }
+    },
+    "viewOf": "{{page}}: {{view}}"
   },
   "passwordStrength": {
     "weak": "弱い",

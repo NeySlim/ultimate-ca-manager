@@ -42,7 +42,7 @@ import { Routes, Route } from 'react-router-dom'
 import { pages } from '../pages'
 import {
   MODULES, GROUPS, REDIRECTS, visibleModules, groupsFor,
-  moduleForPath, paletteCommands, isVisible, MAIN_IDS, menuGroupsFor, menuLabelKey, moduleById,
+  moduleForPath, paletteCommands, paletteViews, isVisible, MAIN_IDS, menuGroupsFor, menuLabelKey, moduleById,
 } from '../registry'
 import { PERMISSION_RESOURCES } from '../../lib/rbacPermissions'
 import * as Phosphor from '@phosphor-icons/react'
@@ -220,6 +220,7 @@ describe('labels (c)', () => {
     ...MODULES.flatMap(m => [m.labelKey, m.shortKey, m.barKey, m.descKey, m.menuKey]),
     ...GROUPS.map(g => g.labelKey),
     ...paletteCommands().flatMap(c => [c.labelKey, c.categoryKey]),
+    ...paletteViews().flatMap(c => [c.labelKey, c.pageKey, c.categoryKey]), 'commands.viewOf',
   ].filter(Boolean)
 
   it('every key exists in the ten locales', () => {
@@ -367,5 +368,27 @@ describe('palette', () => {
     expect(ids(makeCan(['read:certificates']))).not.toEqual(expect.arrayContaining(['logs']))
     expect(ids(makeCan(['read:certificates'])).some(id => ['groups', 'sso', 'logs', 'users'].includes(id))).toBe(false)
     expect(ids(adminCan)).toEqual(ids())
+  })
+
+  it('offers the views of the protocol pages, each at its ?tab= address, the page named, its menu group as the hint', () => {
+    expect(paletteViews().map(c => c.path)).toEqual([
+      '/acme?tab=localorders', '/acme?tab=localdomains', '/acme?tab=eab', '/acme?tab=config',
+      '/acme?tab=letsencrypt', '/acme?tab=letsencryptorders', '/acme?tab=upstream', '/acme?tab=dns', '/acme?tab=domains', '/acme?tab=history',
+      '/scep-config?tab=requests', '/scep-config?tab=challenges', '/scep-config?tab=intune', '/scep-config?tab=config',
+      '/est-config?tab=config', '/tsa-config?tab=config',
+    ])
+    const dns = paletteViews().find(c => c.path === '/acme?tab=dns')
+    expect(dns).toMatchObject({ labelKey: 'acme.views.dns', pageKey: 'common.acme', categoryKey: 'common.navProtocols' })
+    expect(new Set(paletteViews().map(c => c.id)).size).toBe(paletteViews().length)
+    // The paths are not pages of their own: the palette's page list stays the mockup's
+    expect(paletteCommands().some(c => c.path.includes('?tab=') && !c.path.startsWith('/users'))).toBe(false)
+  })
+
+  it('offers a view only to an account that may open its page', () => {
+    const pagesOf = (can) => [...new Set(paletteViews(can).map(c => c.path.split('?')[0]))]
+    expect(pagesOf(makeCan(['read:acme']))).toEqual(['/acme'])
+    expect(pagesOf(makeCan(['read:scep', 'read:est']))).toEqual(['/scep-config', '/est-config'])
+    expect(pagesOf(makeCan(['read:certificates']))).toEqual([])
+    expect(pagesOf(adminCan)).toEqual(['/acme', '/scep-config', '/est-config', '/tsa-config'])
   })
 })
