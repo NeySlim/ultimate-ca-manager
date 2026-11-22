@@ -41,13 +41,17 @@ export function helpLanguage(lang) {
 }
 
 const pages = {}
+const loaded = {}
 /** One translated page ({ helpContent, helpGuides }), or null when the language has no help or the page no file. */
 export function loadTranslatedPage(langKey, pageKey) {
   if (!langKey || !pageKey) return Promise.resolve(null)
   const at = `${langKey}/${pageKey}`
-  pages[at] ||= loadHelpPage(langKey, pageKey).then((m) => m.default).catch(() => { delete pages[at]; return null })
+  pages[at] ||= loadHelpPage(langKey, pageKey).then((m) => (loaded[at] = m.default)).catch(() => { delete pages[at]; return null })
   return pages[at]
 }
+
+/** A translated page already loaded, for a first render that must not wait; undefined until its load succeeds. */
+export const translatedPageNow = (langKey, pageKey) => loaded[`${langKey}/${pageKey}`]
 
 /** The translated pages of `keys` for a language: { key: page | null }. */
 export async function loadTranslatedPages(langKey, keys) {

@@ -6,6 +6,8 @@
  * The document scrolls, and the <article> holds the chapter's text alone, for the browsers' reader view.
  * /guide?print=all lays every chapter one after the other for the browser's PDF.
  * The page follows the console's language and theme; it has no picker of either.
+ * The server sends a chapter already drawn by these components (scripts/prerender-guide.js): the
+ * first render of a page it drew is the same, without what depends on the account's rights.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -14,40 +16,26 @@ import { Icon } from '../components/atelier/Icon'
 import { markSrc } from '../components/atelier/icons'
 import { Notice } from '../components/atelier/Form'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { GuideContent, QuickHelp, guideHeadings, mergeHelpContent, queryTerms } from '../components/help'
+import { GuideContent, QuickHelp, chapterText, guideHeadings, queryTerms } from '../components/help'
 import { GuideSearch } from '../components/help/GuideSearch'
-import { helpLanguage, loadTranslatedPage, loadTranslatedPages, useEnglishHelp } from '../data/helpData'
+import { helpLanguage, loadTranslatedPage, loadTranslatedPages, translatedPageNow, useEnglishHelp } from '../data/helpData'
 import { GUIDE_CHAPTERS, chapterOfAnchor, guideChapter, guideGroups, openPagePath } from '../navigation/guide'
 import { usePermission } from '../hooks/usePermission'
+import { useHydrated } from '../hooks/useHydrated'
+import { isServedPage } from '../lib/servedPage'
 
 const plainClick = (e) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
 const idOfHash = (hash) => { try { return decodeURIComponent((hash || '').slice(1)) } catch { return '' } }
 
 /**
- * A chapter's text in the reading language: { title, subtitle, quick, lang } or { title, markdown, english, lang };
- * lang is the language of the text shown, `en` where the translation has none.
- */
-function chapterText(key, english, page, lang) {
-  if (!english) return null
-  if (key === 'navigation') {
-    const quick = english.helpContent.navigation && mergeHelpContent(english.helpContent.navigation, page?.helpContent)
-    return quick && { title: quick.title, subtitle: quick.subtitle, quick, lang: lang && page?.helpContent ? lang : 'en' }
-  }
-  const en = english.helpGuides[key]
-  if (!en) return null
-  const tr = page?.helpGuides
-  return { title: tr?.title || en.title, markdown: tr?.content || en.content, english: en.content, lang: lang && tr?.content ? lang : 'en' }
-}
-
-/**
  * The tab's title while the page is open, the one before given back when it is left; og:title names the
- * chapter alone for a reader view, which does not cut the tab's title at its « · ».
+ * chapter alone for a reader view, which does not cut the tab's title at its « · » (the server's, when it drew the page).
  */
 function useTabTitle(title, chapterTitle) {
   const meta = useRef(null)
   useEffect(() => {
     const before = document.title
-    meta.current = document.createElement('meta')
+    meta.current = document.head.querySelector('meta[property="og:title"]') || document.createElement('meta')
     meta.current.setAttribute('property', 'og:title')
     document.head.appendChild(meta.current)
     return () => {
@@ -126,22 +114,31 @@ function GuideHead({ children, barRef }) {
 function GuideChapter({ chapter }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { hash, search } = useLocation()
+  const { hash, search, pathname } = useLocation()
   // The terms of the search that led here stay marked in the chapter
   const highlight = queryTerms(new URLSearchParams(search).get('q') || '')
   const { lang, englishNotice } = useHelpLanguage()
   const english = useEnglishHelp()
   const { isAdmin, hasPermission } = usePermission()
-  const [translated, setTranslated] = useState({ at: null, page: null })
-  const [active, setActive] = useState(idOfHash(hash) || null)
+  const hydrated = useHydrated()
+  // A translation already loaded is there at the first render: a page the server drew keeps its text
+  const [translated, setTranslated] = useState(() => {
+    const page = lang ? translatedPageNow(lang, chapter) : undefined
+    return page === undefined ? { at: null, page: null } : { at: `${lang}/${chapter}`, page }
+  })
+  // The section read is marked once the text is in (the server knows no anchor)
+  const [active, setActive] = useState(null)
   const barRef = useRef(null)
   const titleRef = useRef(null)
   const arrived = useRef(false)
+  // The chapter the server drew, until another one is opened
+  const served = useRef(isServedPage(pathname) ? chapter : null)
 
   useEffect(() => {
     if (!lang) return undefined
     let live = true
-    loadTranslatedPage(lang, chapter).then((page) => { if (live) setTranslated({ at: `${lang}/${chapter}`, page }) })
+    const at = `${lang}/${chapter}`
+    loadTranslatedPage(lang, chapter).then((page) => { if (live) setTranslated((cur) => (cur.at === at && cur.page === page ? cur : { at, page })) })
     return () => { live = false }
   }, [lang, chapter])
 
@@ -167,12 +164,16 @@ function GuideChapter({ chapter }) {
       target.focus({ preventScroll: true })
       setActive(id)
     } else {
-      window.scrollTo(0, 0)
+      // A page the server drew may have been scrolled before React took it over: it stays where it is
+      if (served.current !== chapter) {
+        served.current = null
+        window.scrollTo(0, 0)
+      }
       if (arrived.current) titleRef.current?.focus({ preventScroll: true })
       setActive(null)
     }
     arrived.current = true
-  }, [text, hash])
+  }, [text, hash, chapter])
 
   // The sections follow the reading: the last heading above the sticky bar's foot (and a line) is the current one
   useEffect(() => {
@@ -203,7 +204,8 @@ function GuideChapter({ chapter }) {
   const index = GUIDE_CHAPTERS.findIndex((c) => c.key === chapter)
   const previous = GUIDE_CHAPTERS[index - 1]
   const next = GUIDE_CHAPTERS[index + 1]
-  const page = openPagePath(current, { isAdmin, hasPermission })
+  // The account's rights: never in the page the server drew, added once React holds it
+  const page = hydrated ? openPagePath(current, { isAdmin, hasPermission }) : null
   const groups = guideGroups()
   const group = groups.find((g) => g.id === current.group)
 

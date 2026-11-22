@@ -4,9 +4,12 @@
  */
 import { lazy } from 'react'
 
-// Auto-reload on chunk load failure (stale cache after update)
+// Auto-reload on chunk load failure (stale cache after update).
+// preload() loads the page ahead; once it is in, the page renders at once, without suspending:
+// a page the server drew is taken over by a first render that holds it.
 export function lazyWithRetry(importFn) {
-  return lazy(() => importFn().catch(() => {
+  let module = null
+  const load = () => importFn().catch(() => {
     // Chunk failed to load (likely 404 after update): reload once
     const key = 'chunk_reload'
     if (!sessionStorage.getItem(key)) {
@@ -15,8 +18,15 @@ export function lazyWithRetry(importFn) {
     }
     sessionStorage.removeItem(key)
     return importFn()
-  }))
+  }).then((m) => (module = m))
+  // A thenable that answers at once: React.lazy resolves it in the same render
+  const Page = lazy(() => (module ? { then: (resolve) => resolve(module) } : load()))
+  Page.preload = load
+  return Page
 }
+
+// The whole guide in a tab of its own (/guide/:chapter), outside the console's frame
+export const GuidePage = lazyWithRetry(() => import('../pages/GuidePage'))
 
 export const pages = {
   dashboard: lazyWithRetry(() => import('../pages/OverviewPage')),

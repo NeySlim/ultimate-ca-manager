@@ -30,10 +30,21 @@ const normalizeFamily = (id) => (Object.prototype.hasOwnProperty.call(themeFamil
 
 const ThemeContext = createContext()
 
+// The saved choice read at the first render: a page the server drew is not repainted in another theme first
+function saved(key, fallback, check) {
+  try {
+    const value = localStorage.getItem(key)
+    return value && check(value) ? value : fallback
+  } catch {
+    return fallback
+  }
+}
+const systemMode = () => (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
+
 export function ThemeProvider({ children }) {
-  const [themeFamily, setThemeFamily] = useState('atelier')
-  const [mode, setMode] = useState('system')
-  const [resolvedMode, setResolvedMode] = useState('dark')
+  const [themeFamily, setThemeFamily] = useState(() => normalizeFamily(saved('ucm-theme-family', 'atelier', () => true)))
+  const [mode, setMode] = useState(() => saved('ucm-theme-mode', 'system', (v) => ['system', 'dark', 'light'].includes(v)))
+  const [resolvedMode, setResolvedMode] = useState(() => (mode === 'system' ? systemMode() : mode))
 
   // Listen to system preference changes
   useEffect(() => {

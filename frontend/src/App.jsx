@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, InspectorProvider, useAuth } from './contexts'
 import { WebSocketProvider } from './hooks/useWebSocket'
 import { MODULES, REDIRECTS } from './navigation/registry'
 import { loginUrl, safeNext } from './navigation/safeNext'
-import { pages, lazyWithRetry } from './navigation/pages'
+import { pages, lazyWithRetry, GuidePage } from './navigation/pages'
+import { isServedPage, servedAtBoot } from './lib/servedPage'
 import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, InspectorCloseOnNavigate } from './components'
 
 // Lazy load pages for code splitting (module pages are bound in navigation/pages.js)
@@ -16,7 +17,6 @@ const GABARITS = import.meta.env.DEV || import.meta.env.MODE === 'gabarits'
 const GabaritsPage = GABARITS ? lazyWithRetry(() => import('./pages/dev/GabaritsPage')) : null
 const SsoTestCompletePage = lazyWithRetry(() => import('./pages/SsoTestCompletePage'))
 const SsoTestLaunchPage = lazyWithRetry(() => import('./pages/SsoTestLaunchPage'))
-const GuidePage = lazyWithRetry(() => import('./pages/GuidePage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -36,10 +36,11 @@ function SignedIn() {
 function ProtectedRoute({ children }) {
   const { pathname, search, hash } = useLocation()
   const toLogin = loginUrl(pathname, search, hash)
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, sessionChecked } = useAuth()
   
   if (loading) {
-    return <PageLoader />
+    // The page the server drew for a valid session stays while the session is first checked
+    return !sessionChecked && isServedPage(pathname) ? children : <PageLoader />
   }
   
   return isAuthenticated ? children : <Navigate to={toLogin} replace />
@@ -94,13 +95,26 @@ export function moduleRoutes() {
   return routes
 }
 
+// The pages outside the console's frame, loaded on demand
+function Loading() {
+  return <Suspense fallback={<PageLoader />}><Outlet /></Suspense>
+}
+
+// A guide chapter the server drew is taken over with no Suspense boundary around it: React 18 leaves a
+// boundary dehydrated after the first pass and draws it again at the first context update. The page is
+// loaded before React takes over, so it never suspends.
+function GuideRoute() {
+  const page = <ProtectedRoute><GuidePage /></ProtectedRoute>
+  return servedAtBoot() ? page : <Suspense fallback={<PageLoader />}>{page}</Suspense>
+}
+
 export function AppRoutes() {
   const { isAuthenticated, loading, sessionChecked, forcePasswordChange, clearForcePasswordChange, mustEnroll2fa, checkSession, logout } = useAuth()
   const { pathname } = useLocation()
   const gated = isAuthenticated && (mustEnroll2fa || forcePasswordChange)
 
   return (
-    <Suspense fallback={<PageLoader />}>
+    <>
       {/* Global session warning (when logged in) */}
       {isAuthenticated && <SessionWarning onLogout={logout} />}
 
@@ -119,45 +133,48 @@ export function AppRoutes() {
           A login URL is left now, or a logout from the prompt would land back on it. */}
       {gated && pathname.startsWith('/login') && <Navigate to="/" replace />}
       {!gated && <Routes>
-        <Route 
-          path="/login" 
-          element={
-            loading ? <PageLoader /> :
-            isAuthenticated ? <SignedIn /> :
-            <LoginPage />
-          } 
-        />
-        <Route 
-          path="/login/sso-complete" 
-          element={<LoginPage />} 
-        />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        {/* An SSO sign-in test's landing: no application shell, whoever signed in at the IdP */}
-        <Route path="/sso-test-complete" element={<SsoTestCompletePage />} />
-        <Route path="/sso-test-launch" element={<SsoTestLaunchPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        
         {/* The whole guide, read in a tab of its own: signed in, outside the console's frame */}
-        <Route path="/guide" element={<ProtectedRoute><GuidePage /></ProtectedRoute>} />
-        <Route path="/guide/:chapter" element={<ProtectedRoute><GuidePage /></ProtectedRoute>} />
+        <Route path="/guide" element={<GuideRoute />} />
+        <Route path="/guide/:chapter" element={<GuideRoute />} />
 
-        <Route element={<AppShell />}>
-          {moduleRoutes()}
-          {/* The Atelier gabarits: accessible by URL only, not a module */}
-          {GabaritsPage && <Route path="/dev/gabarits" element={<ProtectedRoute><GabaritsPage /></ProtectedRoute>} />}
+        <Route element={<Loading />}>
+          <Route
+            path="/login"
+            element={
+              loading ? <PageLoader /> :
+              isAuthenticated ? <SignedIn /> :
+              <LoginPage />
+            }
+          />
+          <Route
+            path="/login/sso-complete"
+            element={<LoginPage />}
+          />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          {/* An SSO sign-in test's landing: no application shell, whoever signed in at the IdP */}
+          <Route path="/sso-test-complete" element={<SsoTestCompletePage />} />
+          <Route path="/sso-test-launch" element={<SsoTestLaunchPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+          <Route element={<AppShell />}>
+            {moduleRoutes()}
+            {/* The Atelier gabarits: accessible by URL only, not a module */}
+            {GabaritsPage && <Route path="/dev/gabarits" element={<ProtectedRoute><GabaritsPage /></ProtectedRoute>} />}
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-        
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>}
-    </Suspense>
+    </>
   )
 }
 
-export default function App() {
+// Router: BrowserRouter in the browser; the build draws the guide's chapters through a StaticRouter
+export default function App({ Router = BrowserRouter, location }) {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <BrowserRouter>
+        <Router location={location}>
           <AuthProvider>
             <NotificationProvider>
             <WebSocketProvider>
@@ -171,7 +188,7 @@ export default function App() {
             </WebSocketProvider>
             </NotificationProvider>
           </AuthProvider>
-        </BrowserRouter>
+        </Router>
       </ThemeProvider>
     </ErrorBoundary>
   )

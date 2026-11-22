@@ -7,9 +7,11 @@ import bundleModules from './scripts/bundle-modules.js'
 // Single source of truth: VERSION at repo root
 const appVersion = fs.readFileSync(path.resolve(__dirname, '../VERSION'), 'utf-8').trim()
 
-export default defineConfig({
+// The SSR build (scripts/prerender-guide.js) draws the guide at build time: it ships nothing,
+// so it neither records bundle-modules.json nor splits chunks
+export default defineConfig(({ isSsrBuild }) => ({
   // bundle-modules.json: the modules fused into dist/, read by scripts/ci/sbom.py
-  plugins: [react(), bundleModules({ root: __dirname, file: path.resolve(__dirname, 'bundle-modules.json') })],
+  plugins: isSsrBuild ? [react()] : [react(), bundleModules({ root: __dirname, file: path.resolve(__dirname, 'bundle-modules.json') })],
   // Per checkout: node_modules may be a link shared by several checkouts
   cacheDir: path.resolve(__dirname, '.vite'),
   define: {
@@ -33,7 +35,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
+    rollupOptions: isSsrBuild ? {} : {
       output: {
         manualChunks: {
           // Core React libraries
@@ -50,4 +52,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

@@ -168,4 +168,22 @@ describe('ThemeContext', () => {
     act(() => { mq.matches = true; onChange() })
     expect(attr('data-mode')).toBe('dark')
   })
+
+  // A page the server drew in the saved theme is never painted in another one first
+  it.each([
+    [{ 'ucm-theme-family': 'aurore', 'ucm-theme-mode': 'light' }, true, 'aurore', 'light'],
+    [{ 'ucm-theme-mode': 'system' }, false, 'atelier', 'light'],
+    [{}, true, 'atelier', 'dark'],
+  ])('applies the saved choice %o from the first write (system dark %s)', (stored, dark, family, mode) => {
+    for (const [k, v] of Object.entries(stored)) localStorage.setItem(k, v)
+    mockSystemDark(dark)
+    const writes = []
+    const set = vi.spyOn(document.documentElement, 'setAttribute').mockImplementation(function (name, value) {
+      writes.push(`${name}=${value}`)
+      return Element.prototype.setAttribute.call(this, name, value)
+    })
+    mount()
+    set.mockRestore()
+    expect(writes.filter((w) => w.startsWith('data-'))).toEqual([`data-theme=${family}`, `data-mode=${mode}`])
+  })
 })

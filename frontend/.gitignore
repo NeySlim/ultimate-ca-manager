@@ -3,3 +3,6 @@ playwright-report/
 test-results/
 e2e/.auth/
 dist
+
+# The guide drawn at build time: the SSR build, removed once the pages are written
+.ssr-guide/
