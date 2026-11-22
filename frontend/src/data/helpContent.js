@@ -125,6 +125,16 @@ export const helpContent = {
         ]
       },
       {
+        title: 'Status bar and detached windows',
+        icon: Stack,
+        items: [
+          { label: 'Activity', text: 'The middle of the status bar sums up what is going on, for what your role may read: the approvals waiting for a decision, a backup, a restore or an audit chain check running, the interventions of the overview\'s queue, and the detached windows. Each part leads to its page; when all of it is calm, the bar says Nothing pending. It is read again when data changes and once a minute' },
+          { label: 'Detach', text: 'Detach into a window, among the tools of the detail of a certificate, an authority or a request, opens it in a window over the page. Several windows stay open at once, across pages, until you close them or sign out; none open on a phone' },
+          { label: 'Move and resize', text: 'Drag the title bar to move a window, and an edge or a corner to resize it. With the keyboard, focus the move button of the title bar: the arrow keys move the window, Shift with the arrow keys resizes it. A window stays inside the browser window, and keeps its place and size for the session' },
+          { label: 'Front and close', text: 'The window you click or move the focus into comes in front; the list of windows in the status bar brings one back in front. The cross, or Escape while the focus is in the window, closes it' },
+        ]
+      },
+      {
         title: 'First run',
         icon: Stack,
         items: [
@@ -308,7 +318,8 @@ export const helpContent = {
           { label: 'Revocation at the ACME CA', text: 'Revoking a certificate obtained over ACME (by the client, or by the proxy under an upstream account UCM holds) also revokes it at that CA, whether it is revoked alone, in bulk, by an approved request, as a user certificate, with the enrolment or user it belongs to, as the related member of a pair, or by its key at UCM\'s own ACME server. If the CA does not confirm, the revocation is kept owed and sent again by the renewal task; a hold stays in UCM, ACME having none. If no account of UCM can speak for it, it stays local and a warning says to revoke it with the CA directly. The reason is sent when it is keyCompromise, affiliationChanged, superseded, cessationOfOperation or privilegeWithdrawn' },
           { label: 'Export', text: 'Choose PEM, DER, PKCS#7, PKCS#12, JKS or the private key alone; the formats that carry the key stay listed, greyed, when UCM does not hold it or you may not export keys. The dialog previews what the file will hold (chain, root CA, key) before the download' },
           { label: 'PKCS#12 compatibility mode (v2.222)', text: 'The export dialogs offer a 3DES/SHA-1 profile for importers that reject the default AES-256 archive as a wrong password: Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, old Java. Off by default, it protects the file less well' },
-          { label: 'Compare', text: 'Side-by-side comparison of two certificates: tick exactly two rows, then Compare in the selection bar. State, description, authority, key algorithm, expiry, source, template, alternative names and the private key held by UCM, the differing rows highlighted' },
+          { label: 'Compare', text: 'Side-by-side comparison of two to four certificates: tick them, then Compare in the selection bar. The comparison opens in a detached window (in a dialog on a phone), one column per certificate: subject, issuer, validity, key algorithm and size, alternative names, key usages, fingerprints, serial number and every other extension; the lines that differ are highlighted, and Show only the differences hides the others' },
+          { label: 'Detach', text: 'Detach into a window, in the toolbar of the inspector, moves the certificate to a window over the page, with its sections and actions; open several to look at them side by side. See Navigation for moving, resizing and closing the windows' },
           { label: 'Export the list', text: 'The export button of the toolbar and Export… of the selection bar open one dialog: the certificates in PEM, or their metadata (name, description, issuer, source, state, expiry, algorithm, serial, template) in CSV or JSON, never a private key. Once the whole page is ticked, Select all N results takes every result of the search and filters, 10,000 at most' },
           { label: 'Filters', text: 'The Filters button at the end of the toolbar holds the template filter (certificates modified from their template, shown as a removable chip once on) and the saved filters: the search, the state and the filters under a name, in this browser, applied again in one click' },
           { label: 'Other extensions (v2.251)', text: 'The certificate and CA details list the extensions UCM has no section for under Other extensions, with their OID, name when known, criticality and raw value. The issue form can add custom extensions on top of the template\'s' },

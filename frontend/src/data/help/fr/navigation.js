@@ -71,6 +71,15 @@ export default {
         ]
       },
       {
+        title: 'Barre d’état et fenêtres détachées',
+        items: [
+          { label: 'Activité', text: 'Le milieu de la barre d’état résume ce qui se passe, pour ce que votre rôle peut lire : les approbations qui attendent une décision, une sauvegarde, une restauration ou une vérification du journal en cours, les interventions de la file de la vue d’ensemble, et les fenêtres détachées. Chaque élément mène à sa page ; quand tout est calme, la barre affiche Rien en attente. Elle est relue à chaque changement de données et une fois par minute' },
+          { label: 'Détacher', text: 'Détacher dans une fenêtre, parmi les outils du détail d’un certificat, d’une autorité ou d’une demande, l’ouvre dans une fenêtre au-dessus de la page. Plusieurs fenêtres restent ouvertes à la fois, d’une page à l’autre, jusqu’à ce que vous les fermiez ou vous déconnectiez ; aucune ne s’ouvre au téléphone' },
+          { label: 'Déplacer et redimensionner', text: 'Faites glisser la barre de titre pour déplacer une fenêtre, et un bord ou un coin pour la redimensionner. Au clavier, atteignez le bouton de déplacement de la barre de titre : les flèches déplacent la fenêtre, Maj et les flèches la redimensionnent. Une fenêtre reste dans la fenêtre du navigateur, et garde sa place et sa taille pendant la session' },
+          { label: 'Premier plan et fermeture', text: 'La fenêtre que vous cliquez ou dans laquelle vous déplacez le focus passe devant ; la liste des fenêtres de la barre d’état en ramène une devant. La croix, ou Échap quand le focus est dans la fenêtre, la ferme' },
+        ]
+      },
+      {
         title: 'Premier lancement',
         items: [
           { label: 'Configuration initiale', text: 'Sur une instance sans AC ni certificat, les administrateurs voient l’assistant Configuration initiale sur la vue d’ensemble et sur la liste des certificats : une racine, une AC émettrice, un protocole. Tant que ses étapes restent à faire, la liste des certificats vide et la page Autorités vide proposent Ouvrir l’assistant de configuration' },

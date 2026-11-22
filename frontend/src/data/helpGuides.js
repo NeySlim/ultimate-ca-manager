@@ -393,7 +393,9 @@ Star ⭐ important certificates to bookmark them. Favorites are listed in the co
 
 ## Comparing Certificates
 
-Tick two certificates in the list and click **Compare** in the selection bar to see them side by side: state, description, authority, key algorithm, expiry, source, template, alternative names and whether UCM holds the private key, the rows that differ highlighted.
+Tick two to four certificates in the list and click **Compare** in the selection bar to see them side by side in a detached window (a dialog on a phone): subject, issuer, validity, key algorithm and size, alternative names, key usages, fingerprints, serial number and the other extensions, one column per certificate. The lines that differ are highlighted; **Show only the differences** hides the others.
+
+**Detach into a window**, among the tools of the inspector, opens the certificate in a window over the page with the same sections and actions. Several windows stay open at once, even on other pages: drag one by its title bar, resize it by an edge or a corner, or use its move button with the arrow keys (Shift and the arrow keys resize). The status bar lists the open windows to bring one back in front; the cross or Escape closes it.
 
 ## Filtering & Search
 
