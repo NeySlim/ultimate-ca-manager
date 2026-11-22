@@ -11,24 +11,30 @@ import { useTranslation } from 'react-i18next'
 import { useMobile } from '../../contexts/MobileContext'
 import { Icon } from './Icon'
 import { SkeletonRows, SkeletonCards } from './Skeleton'
+import { cedeWidths, CEDE_FLOOR } from './columnShare'
 
+// `share`: the fixed-format columns and the actions take their content's width, the free text shares the rest (adjust.css)
 const KINDS = {
-  certificates: { table: 'cert-table', container: 'table-container', th: (c) => `col-${c.id}`, actionsBox: true, chevronQuiet: false },
-  module: { table: 'cert-table module-table', container: 'table-container', th: (c) => (c.grow ? 'col-description' : ''), actionsBox: true, chevronQuiet: false },
+  certificates: { table: 'cert-table', container: 'table-container', th: (c) => `col-${c.id}`, actionsBox: true, chevronQuiet: false, share: true },
+  module: { table: 'cert-table module-table', container: 'table-container', th: (c) => (c.grow ? 'col-description' : ''), actionsBox: true, chevronQuiet: false, share: true },
   // The mockup's activity() sets the journal's bottom margin in a style attribute
   audit: { table: 'audit-table', container: 'table-container audit-container', th: () => '', actionsBox: false, chevronQuiet: true, style: { marginBottom: 20 } },
 }
 const SORT = { true: 'ascending', false: 'descending' }
 const join = (...c) => c.filter(Boolean).join(' ') || undefined
 
-/** The cell's class from its column: the entity, a growing description, a tone (muted, small, mono). A fitted column is
- * marked on its header only (adjust.css): every table of the mockup keeps its cells on one line. */
+/** Free text: the name, a growing description, or a column that names its whole text in `title`; it may end in an ellipsis. */
+const freeText = (col) => Boolean(col.entity || col.grow || (col.title && !col.fit))
+
+/** The cell's class from its column: the entity, a growing description, other free text, a tone (muted, small, mono). A fitted
+ * column is marked on its header only (adjust.css): every table of the mockup keeps its cells on one line. */
 function cellClass(col, kind) {
   if (col.entity) return 'entity-cell'
   const tones = [].concat(col.tone || [])
+  const text = KINDS[kind]?.share && !col.grow && freeText(col) && 'text-cell'
   if (kind === 'certificates' && col.grow) return join('description-cell', ...tones)
-  if (kind === 'module') return join(col.grow && 'description-cell', ...tones) || ''
-  return join(...tones)
+  if (kind === 'module') return join(col.grow && 'description-cell', text, ...tones) || ''
+  return join(text, ...tones)
 }
 
 /** The columns that may fold, first to go first: a column's `fold` rank (higher folds earlier), else its place
@@ -42,15 +48,18 @@ export function foldOrder(columns) {
 }
 
 /**
- * Beside the dock anchored at the right (#app.dock-right), the list folds its secondary columns one by one
- * until the table fits its region: no horizontal scroll, the actions and the chevron in view. The region
- * widening or the rows changing unfolds them all and measures again, before the browser paints.
+ * A table wider than its region, or whose description keeps less than CEDE_FLOOR of its text, first shortens its
+ * free text by an ellipsis (`texts`, cedeWidths); beside the dock
+ * anchored at the right (#app.dock-right) it then folds its secondary columns one by one, the free text whole again
+ * at each fold, until it fits: no horizontal scroll, the actions and the chevron in view. The region widening or
+ * the rows changing restores every column and measures again, before the browser paints.
  */
-function useFoldedColumns(scrollRef, columns, rowsKey, active) {
+function useFittedColumns(scrollRef, columns, texts, lead, rowsKey, active) {
   const [count, setCount] = useState(0)
+  const [caps, setCaps] = useState(null)
   const [width, setWidth] = useState(0)
   const order = foldOrder(columns)
-  const key = `${order.join(',')}|${rowsKey}|${width}`
+  const key = `${order.join(',')}|${texts.join(',')}|${rowsKey}|${width}`
   const measured = useRef(key)
   useEffect(() => {
     const el = scrollRef.current
@@ -62,13 +71,51 @@ function useFoldedColumns(scrollRef, columns, rowsKey, active) {
   useLayoutEffect(() => {
     const el = scrollRef.current
     const right = active && !!el?.closest('.dock-right')
-    if (!right || measured.current !== key) {
+    if (!active || !el || measured.current !== key) {
       measured.current = key
-      if (count) { setCount(0); return }
+      if (count || caps) { setCount(0); setCaps(null); return }
     }
-    if (right && count < order.length && el.scrollWidth > el.clientWidth + 1) setCount(count + 1)
+    if (!active || !el) return
+    if (!right && count) { setCount(0); setCaps(null); return }
+    const heads = [...(el.querySelector('thead tr')?.children || [])]
+    const rowsShown = [...el.querySelectorAll('tbody tr')].filter((tr) => tr.children.length === heads.length)
+    const shown = columns.filter((c) => !order.slice(0, count).includes(c.id))
+    // Short of room: the table overflows, or a growing description keeps less than the floor its text asks for
+    let over = el.scrollWidth - el.clientWidth
+    shown.forEach((c, i) => {
+      if (!c.grow || c.entity || !heads[lead + i]) return
+      const text = Math.max(0, ...rowsShown.map((tr) => tr.children[lead + i].scrollWidth))
+      over = Math.max(over, Math.min(CEDE_FLOOR, text) - heads[lead + i].getBoundingClientRect().width)
+    })
+    if (over <= 1) return
+    if (!caps) {
+      // The free text at its natural width (only the description takes the room left): its headers give its widths
+      const cells = rowsShown[0]?.children || []
+      const widths = {}
+      const floors = {}
+      shown.forEach((c, i) => {
+        if (!texts.includes(c.id) || !heads[lead + i]) return
+        widths[c.id] = heads[lead + i].getBoundingClientRect().width
+        const cs = cells[lead + i] ? getComputedStyle(cells[lead + i]) : null
+        floors[c.id] = cs ? parseFloat(cs.minWidth) || 0 : 0
+        // A name keeps its marks whole beside the floor of its own text
+        if (c.entity && cs) {
+          const marks = Math.max(0, ...rowsShown.map((tr) => {
+            const line = tr.children[lead + i].querySelector('.entity-line')
+            if (!line) return 0
+            // On one line the marks follow the name; a group of badges under it is as wide as its widest
+            const others = [...line.children].filter((el) => !el.classList.contains('entity-name')).map((el) => el.offsetWidth)
+            return Math.max(line.scrollWidth - (line.querySelector('.entity-name')?.offsetWidth || 0), ...others)
+          }))
+          floors[c.id] = Math.max(floors[c.id], marks + CEDE_FLOOR + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0))
+        }
+      })
+      const next = cedeWidths(widths, over, floors)
+      if (next) { setCaps(next); return }
+    }
+    if (right && count < order.length) { setCount(count + 1); setCaps(null) }
   })
-  return new Set(order.slice(0, count))
+  return { folded: new Set(order.slice(0, count)), caps: caps || {} }
 }
 
 /**
@@ -100,8 +147,16 @@ export function DataTable({
   const chevronLabel = (row) => (openLabel ? openLabel(row) : t('table.openRow', { name: rowLabel(row) }))
   const firstRead = loading && !rows.length
   const scrollRef = useRef(null)
-  const folded = useFoldedColumns(scrollRef, allColumns, rows.map(rowKey).join(','), !(isMobile && card))
+  // The free text that gives way when short of room (a growing description shortens itself in CSS, a growing name does not)
+  const texts = k.share ? allColumns.filter((c) => freeText(c) && (c.entity || !c.grow)).map((c) => c.id) : []
+  const { folded, caps } = useFittedColumns(scrollRef, allColumns, texts, selection ? 1 : 0, rows.map(rowKey).join(','), !(isMobile && card))
   const columns = folded.size ? allColumns.filter((c) => !folded.has(c.id)) : allColumns
+  // A free-text cell stops at its ceiling or at the width set by hand, an ellipsis after it; any other column holds its content
+  const ceiling = (c) => {
+    if (!freeText(c)) return undefined
+    const w = [columnWidths?.[c.id], caps[c.id]].filter(Boolean)
+    return w.length ? { maxWidth: Math.min(...w) } : undefined
+  }
   const colSpan = columns.length + (selection ? 1 : 0) + (hasActions ? 1 : 0)
 
   const openButton = (row, col) => {
@@ -110,12 +165,12 @@ export function DataTable({
       return <button type="button" className="resource" data-open={rowKey(row)} disabled={locked || undefined} onClick={(e) => { e.stopPropagation(); onOpen?.(row) }}>{name}</button>
     }
     return (
-      <>
+      <span className="entity-line">
         <button type="button" className="entity-name" data-open={rowKey(row)} disabled={locked || undefined} onClick={(e) => { e.stopPropagation(); onOpen?.(row) }}>
-          {col.icon && <Icon name={col.icon(row)} />}{name}
+          {col.icon && <Icon name={col.icon(row)} />}<span className="entity-label" title={typeof name === 'string' ? name : undefined}>{name}</span>
         </button>
         {col.extra?.(row)}
-      </>
+      </span>
     )
   }
 
@@ -156,10 +211,10 @@ export function DataTable({
                   </th>
                 )}
                 {columns.map((c) => (
-                  <HeaderCell key={c.id} col={c} className={join(k.th(c), c.fit && 'fit')} sort={sort} onSort={onSort}
+                  <HeaderCell key={c.id} col={c} className={join(k.th(c), (c.fit || (k.share && !freeText(c))) && 'fit')} sort={sort} onSort={onSort}
                     width={columnWidths?.[c.id]} onWidth={onColumnWidth} />
                 ))}
-                {hasActions && <th scope="col" className={kind === 'audit' ? 'fit' : undefined}><span className="sr-only">{actionsLabel || t('common.actions')}</span></th>}
+                {hasActions && <th scope="col" className={kind === 'audit' || k.share ? 'fit' : undefined}><span className="sr-only">{actionsLabel || t('common.actions')}</span></th>}
               </tr>
             </thead>
             <tbody>
@@ -179,12 +234,12 @@ export function DataTable({
                         </label>
                       </td>
                     )}
-                    {columns.map((c) => (
-                      <td key={c.id} className={cellClass(c, kind)} title={c.title?.(row) || undefined}
-                        style={columnWidths?.[c.id] ? { maxWidth: columnWidths[c.id] } : undefined}>
-                        {c.entity || c.resource ? openButton(row, c) : c.cell(row)}
-                      </td>
-                    ))}
+                    {columns.map((c) => {
+                      const content = c.entity || c.resource ? openButton(row, c) : c.cell(row)
+                      // Free text that may end in an ellipsis names its whole text: the column's title, else the text itself
+                      const tip = c.title ? c.title(row) : !c.entity && freeText(c) && typeof content === 'string' ? content : undefined
+                      return <td key={c.id} className={cellClass(c, kind)} title={tip || undefined} style={ceiling(c)}>{content}</td>
+                    })}
                     {hasActions && (
                       <td>
                         {k.actionsBox
@@ -228,7 +283,7 @@ function HeaderCell({ col, className, sort, onSort, width, onWidth }) {
   }, [dragging, onWidth, col.id])
   return (
     <th scope="col" className={className} aria-sort={col.sort ? (sorted ? SORT[sort.asc] : 'none') : undefined}
-      style={width ? { width, minWidth: width, maxWidth: width } : undefined}>
+      style={width ? { width, minWidth: width } : undefined}>
       {col.sort ? (
         <button type="button" data-sort={col.sort} onClick={() => onSort?.(col.sort)}>
           {col.label}{sorted && <Icon name={sort.asc ? 'up' : 'down'} />}
