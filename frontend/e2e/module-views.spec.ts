@@ -1,4 +1,5 @@
 import { test, expect } from './support/fixtures'
+import { freezeApi } from './support/frozen'
 
 // The views of a protocol page are tabs under its head, those past the room in a « More » menu at the
 // end of the row (never a scroll); the settings table of contents scrolls on its own when taller than the page
@@ -51,8 +52,12 @@ for (const [width, height] of [[1000, 800], [390, 844]]) {
     test.use({ viewport: { width, height } })
 
     test('the ACME views past the room go into « More », the row never scrolls, the shown one stays in it', async ({ page, api }) => {
+      // The counters widen the tabs: read once, as other tests add accounts and orders, and split once they are in
+      await freezeApi(page)
       await page.goto('/acme')
       const tabs = page.getByRole('tablist', { name: 'View' })
+      await expect(tabs.getByRole('tab').first().locator('.counter')).toBeVisible()
+      await expect(page.locator('.page-views .counter .sk')).toHaveCount(0)
       const t = await box(page.locator('.page-views'))
       const head = await box(page.locator('.page-head'))
       expect(t.x).toBeGreaterThanOrEqual(head.x - EPS)
