@@ -16,6 +16,23 @@ export const viewport = () => {
   return { w: window.innerWidth, h: Math.max(0, window.innerHeight - bar) }
 }
 
+/** The stage's side margin at a viewport width, as the mockup sets it (.stage padding). */
+export const stageMargin = (width) => (width >= 1800 ? 34 : width <= 1000 ? 18 : 24)
+
+/** The work area: the stage between the masthead and the status bar, the whole viewport without a shell. */
+export const workArea = () => {
+  const main = document.querySelector('.shell-app > .shell-main')?.getBoundingClientRect()
+  const view = viewport()
+  if (!main || main.height <= 0) return { x: 0, y: 0, w: view.w, h: view.h }
+  return { x: 0, y: Math.round(main.top), w: view.w, h: Math.max(0, view.h - Math.round(main.top)) }
+}
+
+/** A maximized window: the work area inside the stage's margins, the shell left uncovered. */
+export function maxRect(area, width) {
+  const m = stageMargin(width)
+  return { x: area.x + m, y: area.y + m, w: Math.max(0, area.w - 2 * m), h: Math.max(0, area.h - 2 * m) }
+}
+
 /** The rect moved and shrunk to fit the viewport: inside it whole, as large as it fits, never under the minimum. */
 export function clampRect(rect, view) {
   const w = clamp(Math.round(rect.w), MIN_W, view.w)

@@ -1,8 +1,8 @@
 /**
  * The detached windows of the console: objects (a certificate, an authority, a request) and
  * comparisons shown in floating windows over the pages, several at once, the last touched in
- * front. Their list, order and geometry last the browser session (sessionStorage); a window
- * reopened later takes back its place. None on a phone (800 px and under): the list stays, unseen.
+ * front. Their list, order, geometry and maximized state last the browser session (sessionStorage);
+ * a window reopened later takes back its place. None on a phone (800 px and under): the list stays, unseen.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMobile } from '../../contexts/MobileContext'
@@ -27,12 +27,17 @@ function raise(s, key) {
   return { ...s, windows: s.windows.map((x) => (x === w ? { ...x, z: top + 1 } : x)) }
 }
 
+// `maxed` marks the maximized windows; their `rects` stay the place a restore gives back
+const EMPTY = { windows: [], rects: {}, maxed: {} }
+
 function readStored() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(KEY) || 'null')
-    if (saved && Array.isArray(saved.windows) && saved.rects && typeof saved.rects === 'object') return saved
+    if (saved && Array.isArray(saved.windows) && saved.rects && typeof saved.rects === 'object') {
+      return { ...saved, maxed: saved.maxed && typeof saved.maxed === 'object' ? saved.maxed : {} }
+    }
   } catch { /* storage refused or garbled: start empty */ }
-  return { windows: [], rects: {} }
+  return EMPTY
 }
 
 export function DetachedProvider({ children }) {
@@ -51,7 +56,7 @@ export function DetachedProvider({ children }) {
   // Nothing stays open across a sign-out; the session still being checked at load is not one
   const wasSignedIn = useRef(signedIn)
   useEffect(() => {
-    if (wasSignedIn.current && !signedIn) setState({ windows: [], rects: {} })
+    if (wasSignedIn.current && !signedIn) setState(EMPTY)
     wasSignedIn.current = signedIn
   }, [signedIn])
 
@@ -73,7 +78,7 @@ export function DetachedProvider({ children }) {
       const view = viewport()
       if (s.windows.some((w) => w.key === key)) return raise(s, key)
       const rect = s.rects[key] ? clampRect(s.rects[key], view) : cascadeRect(s.windows.length, (SIZES[kind] || SIZES.default)(view), view)
-      return { windows: [...s.windows, { key, kind, ids: [].concat(ids), title, z: topZ(s.windows) + 1 }], rects: { ...s.rects, [key]: rect } }
+      return { ...s, windows: [...s.windows, { key, kind, ids: [].concat(ids), title, z: topZ(s.windows) + 1 }], rects: { ...s.rects, [key]: rect } }
     })
     setFocusKey(key)
     return key
@@ -97,6 +102,16 @@ export function DetachedProvider({ children }) {
     setState((s) => ({ ...s, rects: { ...s.rects, [key]: clampRect(rect, viewport()) } }))
   }, [])
 
+  // Maximized or restored, the window comes in front; its restored place is never touched
+  const toggleMax = useCallback((key) => {
+    setState((s) => {
+      const maxed = { ...s.maxed }
+      if (maxed[key]) delete maxed[key]
+      else maxed[key] = true
+      return raise({ ...s, maxed }, key)
+    })
+  }, [])
+
   const retitle = useCallback((key, title) => {
     setState((s) => (s.windows.some((w) => w.key === key && w.title !== title)
       ? { ...s, windows: s.windows.map((w) => (w.key === key ? { ...w, title } : w)) } : s))
@@ -109,9 +124,13 @@ export function DetachedProvider({ children }) {
       if (!w) return s
       const next = windowKey(w.kind, ids)
       if (s.windows.some((x) => x.key === next)) return raise({ ...s, windows: s.windows.filter((x) => x.key !== key) }, next)
+      const maxed = { ...s.maxed }
+      if (maxed[key]) maxed[next] = true
+      else delete maxed[next]
       return {
         windows: s.windows.map((x) => (x.key === key ? { ...x, key: next, ids: [].concat(ids), title: '' } : x)),
         rects: { ...s.rects, [next]: s.rects[key] },
+        maxed,
       }
     })
   }, [])
@@ -120,10 +139,11 @@ export function DetachedProvider({ children }) {
     available: !isMobile,
     windows: state.windows,
     rects: state.rects,
+    maxed: state.maxed,
     focusKey,
     clearFocus: () => setFocusKey(null),
-    open, close, front, place, retitle, replace,
-  }), [isMobile, state, focusKey, open, close, front, place, retitle, replace])
+    open, close, front, place, toggleMax, retitle, replace,
+  }), [isMobile, state, focusKey, open, close, front, place, toggleMax, retitle, replace])
 
   return <DetachedContext.Provider value={value}>{children}</DetachedContext.Provider>
 }

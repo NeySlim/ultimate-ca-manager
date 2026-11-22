@@ -35,7 +35,21 @@ const setup = () => render(<DetachedProvider><Grab /><DetachedLayer /></Detached
 const win = (name) => screen.getByRole('dialog', { name })
 const box = (el) => ({ x: parseInt(el.style.left, 10), y: parseInt(el.style.top, 10), w: parseInt(el.style.width, 10), h: parseInt(el.style.height, 10), z: Number(el.style.zIndex) })
 
+// The shell around the windows: the masthead's 62 px above the stage, the status bar's 25 px under it
+function shell() {
+  const app = document.createElement('div')
+  app.className = 'shell-app'
+  app.innerHTML = '<div class="shell-main"></div><footer class="statusbar"></footer>'
+  document.body.appendChild(app)
+  const at = (top, bottom) => () => ({ top, bottom, left: 0, right: window.innerWidth, x: 0, y: top, width: window.innerWidth, height: bottom - top })
+  app.querySelector('.shell-main').getBoundingClientRect = () => at(62, window.innerHeight - 25)()
+  app.querySelector('.statusbar').getBoundingClientRect = () => at(window.innerHeight - 25, window.innerHeight)()
+  return app
+}
+const maxButton = (w) => w.querySelector('[data-action="float-max"]')
+
 beforeEach(() => {
+  document.querySelectorAll('.shell-app').forEach((el) => el.remove())
   size.isMobile = false
   size.signedIn = true
   sessionStorage.clear()
@@ -146,6 +160,78 @@ describe('detached windows', () => {
     second.rerender(<DetachedProvider><Grab /><DetachedLayer /></DetachedProvider>)
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(api.windows).toEqual([])
+  })
+
+  it('maximizes into the work area by its button or a double-click on its title, and restores the exact place', async () => {
+    shell()
+    setup()
+    act(() => { api.open('certificate', [7]) })
+    const a = await screen.findByRole('dialog', { name: 'cert 7' })
+    fireEvent.keyDown(within(a).getByRole('button', { name: 'detached.moveHandle' }), { key: 'ArrowRight' })
+    const placed = box(win('cert 7'))
+    // Three drawings: the handle says move, the button says maximize, then restore
+    const drawn = (el) => el.querySelector('svg').innerHTML
+    const handleIcon = drawn(a.querySelector('.float-handle'))
+    const maxIcon = drawn(maxButton(a))
+    expect(handleIcon).not.toBe(maxIcon)
+    fireEvent.click(within(a).getByRole('button', { name: 'detached.maximize' }))
+    expect([handleIcon, maxIcon]).not.toContain(drawn(maxButton(win('cert 7'))))
+    // Under the masthead, above the status bar, inside the stage's 24 px margins at 1600 px
+    expect(box(win('cert 7'))).toMatchObject({ x: 24, y: 62 + 24, w: 1600 - 48, h: 1000 - 62 - 25 - 48 })
+    expect(win('cert 7')).toHaveClass('maximized')
+    // Maximized, it neither moves nor resizes: no edges, its title bar and its handle hold still
+    expect(win('cert 7').querySelector('[data-edge]')).toBeNull()
+    fireEvent.pointerDown(win('cert 7').querySelector('.float-title'), { clientX: 300, clientY: 100, button: 0 })
+    fireEvent.pointerMove(window, { clientX: 360, clientY: 160 })
+    fireEvent.pointerUp(window)
+    expect(box(win('cert 7'))).toMatchObject({ x: 24, y: 86 })
+    expect(win('cert 7').querySelector('.float-handle')).toBeDisabled()
+    fireEvent.click(within(win('cert 7')).getByRole('button', { name: 'detached.restore' }))
+    expect(box(win('cert 7'))).toEqual(placed)
+    expect(win('cert 7')).not.toHaveClass('maximized')
+
+    fireEvent.doubleClick(win('cert 7').querySelector('.float-title'))
+    expect(box(win('cert 7'))).toMatchObject({ x: 24, y: 86 })
+    // A double-click on a tool of the bar is the tool's own, not a toggle
+    fireEvent.doubleClick(maxButton(win('cert 7')))
+    expect(win('cert 7')).toHaveClass('maximized')
+    fireEvent.doubleClick(win('cert 7').querySelector('.float-head'))
+    expect(box(win('cert 7'))).toEqual(placed)
+  })
+
+  it('gives each window its own state, the one maximized in front, kept for the session and across a browser resize', async () => {
+    shell()
+    const first = setup()
+    act(() => { api.open('certificate', [7]); api.open('certificate', [8]) })
+    const a = await screen.findByRole('dialog', { name: 'cert 7' })
+    await screen.findByRole('dialog', { name: 'cert 8' })
+    const placed = box(a)
+    // The press itself would bring it in front: the keyboard does not press
+    act(() => { maxButton(a).click() })
+    expect(box(win('cert 7')).z).toBeGreaterThan(box(win('cert 8')).z)
+    expect(win('cert 8')).not.toHaveClass('maximized')
+    act(() => { window.innerWidth = 1200; window.innerHeight = 800; window.dispatchEvent(new Event('resize')) })
+    expect(box(win('cert 7'))).toMatchObject({ x: 24, y: 86, w: 1200 - 48, h: 800 - 62 - 25 - 48 })
+    first.unmount()
+    setup()
+    expect(await screen.findByRole('dialog', { name: 'cert 7' })).toHaveClass('maximized')
+    fireEvent.click(maxButton(win('cert 7')))
+    expect(box(win('cert 7'))).toMatchObject({ x: placed.x, y: placed.y, w: placed.w, h: placed.h })
+  })
+
+  it('keeps the state when its object is replaced, and gives the keyboard the maximize button once the handle sleeps', async () => {
+    shell()
+    setup()
+    act(() => { api.open('certificate', [7]) })
+    const a = await screen.findByRole('dialog', { name: 'cert 7' })
+    const handle = within(a).getByRole('button', { name: 'detached.moveHandle' })
+    handle.focus()
+    fireEvent.doubleClick(a.querySelector('.float-title'))
+    await vi.waitFor(() => expect(document.activeElement).toBe(maxButton(win('cert 7'))))
+    act(() => { api.replace('certificate:7', [9]) })
+    expect(await screen.findByRole('dialog', { name: 'cert 9' })).toHaveClass('maximized')
+    act(() => { document.body.focus(); api.front('certificate:9', { focus: true }) })
+    await vi.waitFor(() => expect(document.activeElement).toBe(maxButton(win('cert 9'))))
   })
 
   it('draws no window on a phone', () => {

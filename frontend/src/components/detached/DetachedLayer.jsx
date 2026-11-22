@@ -10,6 +10,7 @@ import { SkeletonPanel } from '../atelier/Skeleton'
 import { DetachedWindow } from './DetachedWindow'
 import { useDetached } from './useDetached'
 import { KIND_ICONS } from './kindIcons'
+import { maxRect, workArea } from './geometry'
 
 // The window's body for each kind, read when the first window of that kind opens
 export const KINDS = {
@@ -32,7 +33,9 @@ export function DetachedLayer() {
   const any = !!detached?.windows.length
   useEffect(() => { if (any) loadSheets().catch(() => {}) }, [any])
   if (!detached?.available || !any) return null
-  const { windows, rects, focusKey, clearFocus, close, front, place, retitle, replace } = detached
+  const { windows, rects, maxed = {}, focusKey, clearFocus, close, front, place, toggleMax, retitle, replace } = detached
+  // Read at each drawing: a browser resize redraws the layer (the provider clamps the rects)
+  const full = windows.some((w) => maxed[w.key]) ? maxRect(workArea(), window.innerWidth) : null
   // Drawn in the order they opened, stacked by their rank in front (z)
   const ranks = new Map([...windows].sort((a, b) => (a.z || 0) - (b.z || 0)).map((w, i) => [w.key, i]))
   const top = [...ranks.keys()].at(-1)
@@ -44,8 +47,10 @@ export function DetachedLayer() {
           if (!kind || !rects[w.key]) return null
           const { Body } = kind
           const prefix = `float-${w.key.replace(/[^a-z0-9]/gi, '-')}-`
+          const maximized = !!maxed[w.key]
           return (
-            <DetachedWindow key={w.key} wkey={w.key} icon={kind.icon} title={w.title || t('common.loading')} rect={rects[w.key]}
+            <DetachedWindow key={w.key} wkey={w.key} icon={kind.icon} title={w.title || t('common.loading')} rect={maximized ? full : rects[w.key]}
+              maximized={maximized} onToggleMax={() => toggleMax(w.key)}
               z={BASE_Z + ranks.get(w.key)} front={w.key === top} onPlace={(r) => place(w.key, r)} onFront={() => front(w.key)} onClose={() => close(w.key)}
               takeFocus={focusKey === w.key} onFocused={clearFocus}>
               <Suspense fallback={<SkeletonPanel label={t('common.loading')} />}>

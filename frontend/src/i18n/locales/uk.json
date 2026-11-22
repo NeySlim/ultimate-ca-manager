@@ -8980,6 +8980,8 @@
   "detached": {
     "moveHandle": "Move or resize the window",
     "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "maximize": "Maximize the window",
+    "restore": "Restore the window",
     "close": "Close the window {{name}}"
   }
 }

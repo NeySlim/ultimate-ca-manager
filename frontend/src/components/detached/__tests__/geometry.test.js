@@ -1,6 +1,6 @@
 /** The detached windows stay inside the visible area, never under their minimum size. */
 import { describe, it, expect } from 'vitest'
-import { MIN_H, MIN_W, STEP, cascadeRect, clampRect, keyRect, resizeRect } from '../geometry'
+import { MIN_H, MIN_W, STEP, cascadeRect, clampRect, keyRect, maxRect, resizeRect } from '../geometry'
 
 const view = { w: 1400, h: 900 }
 
@@ -37,5 +37,13 @@ describe('detached window geometry', () => {
     expect(keyRect(r, 'ArrowUp', true, view)).toEqual({ ...r, h: 400 - STEP })
     expect(keyRect({ ...r, x: 0 }, 'ArrowLeft', false, view).x).toBe(0)
     expect(keyRect(r, 'Enter', false, view)).toBeNull()
+  })
+
+  it('maximizes into the work area, inside the margins of the stage at that width', () => {
+    const area = { x: 0, y: 62, w: 1440, h: 813 }
+    expect(maxRect(area, 1440)).toEqual({ x: 24, y: 86, w: 1392, h: 765 })
+    // The stage's margins follow the mockup: 18 px up to 1000 px, 34 px from 1800 px
+    expect(maxRect({ x: 0, y: 62, w: 1000, h: 613 }, 1000)).toEqual({ x: 18, y: 80, w: 964, h: 577 })
+    expect(maxRect({ x: 0, y: 62, w: 1920, h: 993 }, 1920)).toEqual({ x: 34, y: 96, w: 1852, h: 925 })
   })
 })
