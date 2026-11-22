@@ -44,6 +44,7 @@ const AURORE_PAIRS = [
 const read = (file) => fs.readFileSync(path.resolve(__dirname, file), 'utf8')
 const MAQUETTE = parseRules(read('../atelier/maquette.css'))
 const ADJUST = parseRules(read('../atelier/adjust.css'))
+const DETACHED = parseRules(read('../atelier/detached.css'))
 function auroreRules(rules, mode) {
   return rules.flatMap((r) => splitSelectors(r.sel).map((sel) => ({ ...r, sel }))).filter((r) => {
     if (r.media || !/^:root\[data-theme(\|=aurore|="aurore")\]/.test(r.sel)) return false
@@ -193,6 +194,15 @@ describe('contrast of the palettes', () => {
             for (const g of bar) expect(worst(t[ref[1]], g), ref[1]).toBeGreaterThanOrEqual(3)
           })
         }
+        // the comparison: a line that differs on a light ground, its shared list elements muted, "+" in the accent
+        it('keeps text 7:1, muted text 4.5:1 and the accent 3:1 on a differing line of the comparison', () => {
+          const ground = valuesOf(DETACHED, /\.compare-view \.compare-table tr\.different td$/, 'background').pop()
+          expect(ground).toMatch(/^color-mix\(/)
+          const g = resolve(ground, t)
+          expect(contrast(t.text, g)).toBeGreaterThanOrEqual(7)
+          expect(contrast(t.muted, g)).toBeGreaterThanOrEqual(4.5)
+          expect(contrast(t.accent, g)).toBeGreaterThanOrEqual(3)
+        })
         it('tints the page and the raised surfaces instead of a neutral grey', () => {
           for (const s of ['bg', 'raised']) expect(saturation(t[s]), s).toBeGreaterThanOrEqual(0.25)
         })

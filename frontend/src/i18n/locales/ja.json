@@ -5182,10 +5182,10 @@
   "compare": {
     "title": "証明書の比較",
     "field": "フィールド",
-    "differences_one": "{{count}} 件の相違",
-    "differences_other": "{{count}} 件の相違",
-    "differences": "{{count}}件の差異",
-    "lead": "異なるプロパティを強調表示します。",
+    "differences_one": "{{count}} difference among {{total}} properties",
+    "differences_other": "{{count}} differences among {{total}} properties",
+    "differences": "{{count}} differences among {{total}} properties",
+    "lead": "Identical lines are merged; in a list, “+” marks what another certificate lacks.",
     "property": "プロパティ",
     "close": "比較を閉じる",
     "countTitle_one": "Compare {{count}} certificate",
@@ -5195,7 +5195,9 @@
     "onlyDifferences": "Show only the differences",
     "noDifference": "No line differs between these certificates.",
     "differs": "differs",
-    "loadFailed": "A certificate of the comparison could not be read."
+    "loadFailed": "A certificate of the comparison could not be read.",
+    "identical": "Identical",
+    "notInAll": "not in every certificate"
   },
   "members": {
     "manageMembers": "メンバーの管理",

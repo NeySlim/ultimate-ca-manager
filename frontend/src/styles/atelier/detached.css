@@ -26,6 +26,35 @@
 .atl .compare-view{display:flex;flex-direction:column;gap:12px;min-height:0}
 .atl .float-body .compare-scroll{max-height:none}
 .atl .compare-options{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+/* Ruled lines (KV direction 1): an identical line merged and muted, one that differs drawn by a 3 px stroke on its
+   label over a light ground, never the full selection; a list marks with "+" what not every certificate has. */
+.atl .compare-view{container-type:inline-size;--cmp-rule:color-mix(in srgb,var(--line) 70%,var(--panel));--cmp-label:168px;--cmp-col:180px}
+:root[data-theme|=aurore] .atl .compare-view{--cmp-rule:color-mix(in srgb,var(--grad-a) 24%,var(--panel))}
+@container (max-width:560px){.atl .compare-view .compare-table{--cmp-label:112px;--cmp-col:150px}}
+.atl .compare-sum{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:0;font-size:12px}
+.atl .compare-view .compare-table{table-layout:fixed;width:100%;min-width:calc(var(--cmp-label) + var(--compare-cols,2) * var(--cmp-col))}
+.atl .compare-view .compare-table :is(th,td){padding:9px 12px;border-bottom:1px solid var(--cmp-rule);vertical-align:top;text-align:left;height:auto}
+.atl .compare-view .compare-table thead th{border-bottom-color:var(--line);font-size:13px;font-weight:600;color:var(--text);overflow-wrap:break-word}
+.atl .compare-view .compare-table thead th:first-child{width:var(--cmp-label);font-size:12px;font-weight:500;color:var(--muted)}
+.atl .compare-view .compare-table tbody th{position:sticky;left:0;z-index:1;background:var(--panel);font-size:12px;font-weight:400;color:var(--muted);overflow-wrap:break-word}
+.atl .compare-view .compare-table thead th:first-child{position:sticky;left:0;z-index:3}
+.atl .compare-view .compare-table td{font-size:13px;font-weight:500;color:var(--text);line-height:1.4;overflow-wrap:break-word}
+.atl .compare-view .compare-table td.mono{font-size:12px;font-weight:400;overflow-wrap:anywhere}
+.atl .compare-view .compare-table tbody tr:last-child :is(th,td){border-bottom:0}
+.atl .compare-view .compare-table tr.different{background:none}
+.atl .compare-view .compare-table tr.different th{color:var(--text);font-weight:500;box-shadow:inset 3px 0 var(--accent)}
+:root[data-theme|=aurore] .atl .compare-view .compare-table tr.different th{box-shadow:none;background:linear-gradient(180deg,var(--grad-a),var(--grad-b)) left/3px 100% no-repeat,var(--panel)}
+.atl .compare-view .compare-table tr.different td{background:color-mix(in srgb,var(--selected) 45%,var(--panel))}
+.atl .compare-view .compare-table tr.same td{color:var(--muted);font-weight:400}
+.atl .compare-view .eq{display:inline-flex;align-items:center;gap:5px;margin-right:10px;font-size:12px;color:var(--muted);white-space:nowrap}
+.atl .compare-view .eq .icon{width:13px;height:13px}
+.atl .compare-view .compare-items{list-style:none;margin:0;padding:0}
+.atl .compare-view .compare-items li{padding:1px 0}
+.atl .compare-view tr.same .compare-items{display:inline-block;vertical-align:top}
+.atl .compare-view .compare-items li:is(.common,.only){position:relative;padding-left:14px}
+.atl .compare-view .compare-items li.common{color:var(--muted);font-weight:400}
+.atl .compare-view .compare-items li.only::before{content:'+';position:absolute;left:0;color:var(--accent);font-weight:600}
+.atl .compare-view .absent{color:var(--muted);font-weight:400}
 /* Aurore: the glass of its dialogs, its literals written as the theme's tokens. */
 :root[data-theme|=aurore] .atl .float-window{border-radius:10px;background:color-mix(in srgb,var(--panel) 78%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);border:1px solid color-mix(in srgb,var(--paper) 8%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--paper) 6%,transparent),0 24px 60px -20px color-mix(in srgb,var(--ink) 70%,transparent)}
 :root[data-theme="aurore"][data-mode="light"] .atl .float-window{background:color-mix(in srgb,var(--panel) 84%,transparent);border-color:color-mix(in srgb,var(--text) 14%,transparent);box-shadow:inset 0 1px 0 var(--paper),0 24px 60px -20px color-mix(in srgb,var(--text) 35%,transparent)}

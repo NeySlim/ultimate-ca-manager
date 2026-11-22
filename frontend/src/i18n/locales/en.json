@@ -5182,10 +5182,10 @@
   "compare": {
     "title": "Compare Certificates",
     "field": "Field",
-    "differences_one": "{{count}} difference",
-    "differences_other": "{{count}} differences",
-    "differences": "{{count}} differences",
-    "lead": "The properties that differ are highlighted.",
+    "differences_one": "{{count}} difference among {{total}} properties",
+    "differences_other": "{{count}} differences among {{total}} properties",
+    "differences": "{{count}} differences among {{total}} properties",
+    "lead": "Identical lines are merged; in a list, “+” marks what another certificate lacks.",
     "property": "Property",
     "close": "Close the comparison",
     "countTitle_one": "Compare {{count}} certificate",
@@ -5195,7 +5195,9 @@
     "onlyDifferences": "Show only the differences",
     "noDifference": "No line differs between these certificates.",
     "differs": "differs",
-    "loadFailed": "A certificate of the comparison could not be read."
+    "loadFailed": "A certificate of the comparison could not be read.",
+    "identical": "Identical",
+    "notInAll": "not in every certificate"
   },
   "members": {
     "manageMembers": "Manage Members",
