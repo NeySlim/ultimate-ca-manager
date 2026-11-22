@@ -233,7 +233,7 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
             <h3 className="section-title">{t('cas.side.revocation')}</h3>
             <Facts items={[
               crl === undefined ? [t('cas.side.crlPublished'), '…']
-                : crl ? [t('cas.side.crlPublished'), formatDate(crl.this_update)] : { label: t('cas.side.crlPublished'), absent: t('cas.crlNone') },
+                : crl ? [t('cas.side.crlPublished'), formatDate(crl.this_update)] : { label: t('cas.side.crlPublished'), absent: t('cas.crlNone'), long: true },
               [t('cas.side.crlNext'), crl?.next_update ? formatDate(crl.next_update) : '—'],
               [t('cas.side.crlNumber'), crl?.crl_number ?? '—'],
               { label: t('cas.side.ocsp'), state: ocspActive ? ['good', t('cas.side.ocspActive')] : ['muted', t('cas.side.ocspInactive')] },
