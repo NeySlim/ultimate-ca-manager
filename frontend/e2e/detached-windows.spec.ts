@@ -72,16 +72,22 @@ test('two certificates detached into windows move, come in front and close', asy
 
   // The status bar lists both and brings one back in front
   const bar = page.locator('footer.statusbar')
-  await bar.getByRole('button', { name: '2 windows' }).click()
-  await bar.getByRole('menuitem', { name: b.common_name }).click()
+  // By the keyboard (a message of another test may sit over the bar): the front window first
+  await bar.getByRole('button', { name: '2 windows' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(bar.getByRole('menuitem', { name: a.common_name })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(bar.getByRole('menuitem', { name: b.common_name })).toBeFocused()
+  await page.keyboard.press('Enter')
   expect(await z(winB)).toBeGreaterThan(await z(winA))
   await expect(winB.getByRole('button', { name: 'Move or resize the window' })).toBeFocused()
 
-  // Escape closes the window that has the focus, not the other, nor anything under it
-  await page.keyboard.press('Escape')
-  await expect(winB).toHaveCount(0)
-  await expect(winA).toBeVisible()
+  // The cross of the window behind closes it at the first press
   await winA.getByRole('button', { name: `Close the window ${a.common_name}` }).click()
+  await expect(winA).toHaveCount(0)
+  // Escape closes the window that has the focus
+  await winB.getByRole('button', { name: 'Move or resize the window' }).focus()
+  await page.keyboard.press('Escape')
   await expect(page.locator('[data-detached]')).toHaveCount(0)
 })
 
