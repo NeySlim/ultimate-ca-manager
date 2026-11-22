@@ -73,4 +73,17 @@ describe('the views of the protocol pages in the palette', () => {
     type('configuration')
     expect(results()).toEqual(['SCEP: Configuration · Protocols'])
   })
+
+  it('names the family of the module each page, view or record belongs to (Aurore tints its icon)', () => {
+    render(<CommandPalette open onOpenChange={vi.fn()} />)
+    const families = () => Object.fromEntries([...document.querySelectorAll('.command-result')]
+      .map((b) => [b.querySelector('.name').textContent, b.getAttribute('data-family')]))
+    type('dns prov')
+    expect(families()).toEqual({ 'ACME: DNS providers': 'protocols' })
+    type('')
+    const listed = families()
+    expect(listed.Certificates).toBe('pki')
+    expect(listed.ACME).toBe('protocols')
+    expect(Object.values(listed)).toEqual(expect.arrayContaining(['pki', 'protocols', 'governance', 'admin']))
+  })
 })

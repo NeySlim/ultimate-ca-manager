@@ -352,7 +352,7 @@ Pages that ask for your current password (password change, turning off the secur
 
 ## Themes
 
-The theme button in the top bar opens the theme menu, two groups picked apart: the theme, **Atelier** or **Aurore**, and the **Mode**, **System** (follows your OS light/dark preference), **Dark** or **Light**, the current choices checked. System follows the OS in either theme. An account set to a theme of an earlier version (Purple Night, Orange Sunset, Gray) opens in Atelier with its light, dark or system mode kept.
+The theme button in the top bar opens the theme menu, two groups picked apart: the theme, **Atelier** or **Aurore**, and the **Mode**, **System** (follows your OS light/dark preference), **Dark** or **Light**, the current choices checked. System follows the OS in either theme. An account set to a theme of an earlier version (Purple Night, Orange Sunset, Gray) opens in Atelier with its light, dark or system mode kept. Atelier is flat, its state pills on a tinted ground; Aurore adds a drifting glow, its gradient under the active tab, the sorted column and beside the open row, a glow around the focus ring and module icons coloured by family. Both place everything at the same spot.
 
 The choice is saved with your account and follows you to every browser.
 

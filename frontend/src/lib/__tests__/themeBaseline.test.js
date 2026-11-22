@@ -17,7 +17,7 @@ if (process.env.UPDATE_THEME_BASELINE) {
 const baseline = JSON.parse(fs.readFileSync(BASELINE, 'utf8'))
 
 describe('theme baseline', () => {
-  it('covers 4 palettes of 30 tokens and 1 alias', () => {
+  it('covers 4 palettes of 34 tokens and 1 alias', () => {
     expect(Object.keys(baseline)).toHaveLength(4)
     for (const palette of Object.values(baseline)) {
       expect(Object.keys(palette).sort()).toEqual([...TOKEN_NAMES, ...ALIAS_NAMES].sort())

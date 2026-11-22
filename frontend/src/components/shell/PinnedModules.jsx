@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Icon } from '../atelier/Icon'
-import { glyphOf, moduleById, menuLabelKey } from '../../navigation/registry'
+import { familyOf, glyphOf, moduleById, menuLabelKey } from '../../navigation/registry'
 
 export function PinnedModules({ pins, activeId }) {
   const { t } = useTranslation()
@@ -15,6 +15,7 @@ export function PinnedModules({ pins, activeId }) {
         key={id}
         to={mod.path}
         data-module={id}
+        data-family={familyOf(mod)}
         className={`pinned-link${active ? ' active' : ''}`}
         aria-current={active ? 'page' : undefined}
         title={label}

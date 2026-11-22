@@ -51,7 +51,8 @@
 /* The live connection's error tone, beside the mockup's good and warn tones of the bar's state links */
 :root .statusbar .ha-link.bad { color: var(--bad); }
 
-/* Aurore family, the mockup's body rules: a drifting glow behind the console */
+/* Aurore family, the mockup's body rules: a drifting glow behind the console, one layer (indigo, a touch of rose, cyan);
+   at each spot's peak text keeps 7:1 and muted text 4.5:1 (atelierContrast.test.js) */
 :root[data-theme="aurore"] body { isolation: isolate; }
 :root[data-theme="aurore"] body::before {
   content: '';
@@ -60,7 +61,7 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 36%, transparent), transparent 60%),
+    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 40%, transparent), transparent 60%),
     radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
     radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
   animation: shell-aurore-drift 90s ease-in-out infinite alternate;
@@ -68,7 +69,7 @@
 }
 :root[data-theme="aurore"][data-mode="light"] body::before {
   background:
-    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 16%, transparent), transparent 60%),
+    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 20%, transparent), transparent 60%),
     radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
     radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
 }

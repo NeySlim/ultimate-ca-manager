@@ -1,7 +1,7 @@
 /*
  * Theme tokens: 18 colours + 3 extras (grad-a, grad-b, glow) + 3 constants (ink, paper, scrim), the shadow
  * tint (shade), the Aurore glows, focus halo and frame tints (glow-rose, glow-b, halo, frame-b, frame-shade;
- * transparent elsewhere), one block
+ * transparent elsewhere), the Aurore tints of the module icons by family (fam-*; transparent elsewhere), one block
  * per family x mode, selected by data-theme / data-mode on <html>.
  * Bare :root is the fallback (Atelier, dark). Changing a value here means
  * updating tokens.baseline.json in the same commit.
@@ -40,6 +40,10 @@
   --halo: transparent;
   --frame-b: transparent;
   --frame-shade: transparent;
+  --fam-pki: transparent;
+  --fam-protocols: transparent;
+  --fam-governance: transparent;
+  --fam-admin: transparent;
 }
 
 :root[data-theme="atelier"][data-mode="light"] {
@@ -74,6 +78,10 @@
   --halo: transparent;
   --frame-b: transparent;
   --frame-shade: transparent;
+  --fam-pki: transparent;
+  --fam-protocols: transparent;
+  --fam-governance: transparent;
+  --fam-admin: transparent;
 }
 
 :root[data-theme="aurore"][data-mode="dark"] {
@@ -103,11 +111,15 @@
   --paper: #ffffff;
   --scrim: #070e19;
   --shade: #000000;
-  --glow-rose: rgba(236, 72, 153, 0.10);
-  --glow-b: rgba(95, 167, 220, 0.22);
+  --glow-rose: rgba(236, 72, 153, 0.16);
+  --glow-b: rgba(95, 167, 220, 0.28);
   --halo: rgba(107, 120, 224, 0.25);
   --frame-b: rgba(95, 167, 220, 0.25);
   --frame-shade: rgba(0, 0, 0, 0.80);
+  --fam-pki: #8f9dff;
+  --fam-protocols: #5fd0ec;
+  --fam-governance: #f59ac8;
+  --fam-admin: #f2b77c;
 }
 
 :root[data-theme="aurore"][data-mode="light"] {
@@ -137,11 +149,15 @@
   --paper: #ffffff;
   --scrim: #070e19;
   --shade: #1e2864;
-  --glow-rose: rgba(219, 39, 119, 0.06);
-  --glow-b: rgba(34, 170, 220, 0.14);
+  --glow-rose: rgba(219, 39, 119, 0.10);
+  --glow-b: rgba(34, 170, 220, 0.20);
   --halo: rgba(107, 120, 224, 0.25);
   --frame-b: rgba(34, 170, 220, 0.24);
   --frame-shade: rgba(40, 50, 120, 0.35);
+  --fam-pki: var(--accent);
+  --fam-protocols: #0a6d8c;
+  --fam-governance: #a62c6c;
+  --fam-admin: #8a4b0f;
 }
 
 /*

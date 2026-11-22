@@ -26,6 +26,7 @@ vi.mock('../../WebSocketIndicator', () => ({ WebSocketIndicator: () => <span dat
 vi.mock('../../../services', () => ({ certificatesService: { getStats } }))
 
 import { TopBar } from '../TopBar'
+import { GROUPS, moduleById } from '../../../navigation/registry'
 
 function Where() {
   return <output data-testid="where">{useLocation().pathname}</output>
@@ -69,6 +70,21 @@ describe('TopBar', () => {
     expect(order.slice(0, 6)).toEqual(['dashboard', 'certificates', 'cas', 'audit', 'users', 'reports'])
     const reports = within(nav).getAllByRole('link').find(a => a.getAttribute('data-module') === 'reports')
     expect(reports).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('names the family of every module link: the bar, the pins and the Modules menu (Aurore tints their icons)', () => {
+    setup({ pins: ['users', 'acme'] })
+    const links = [...document.querySelectorAll('a[data-module]')]
+    const families = Object.fromEntries(GROUPS.map(g => [g.id, 0]))
+    for (const a of links) {
+      const group = moduleById(a.getAttribute('data-module')).group
+      if (group) families[group] += 1
+      expect(a.getAttribute('data-family'), a.getAttribute('data-module')).toBe(group ?? null)
+    }
+    expect(Object.values(families).every(n => n > 0)).toBe(true)
+    expect(document.querySelector('.main-nav a[data-module="acme"]')).toHaveAttribute('data-family', 'protocols')
+    expect(document.querySelector('.main-nav a[data-module="cas"]')).toHaveAttribute('data-family', 'pki')
+    expect(document.querySelector('.main-nav a[data-module="dashboard"]')).not.toHaveAttribute('data-family')
   })
 
   it('names the main pages with the bar words, Activity leading to the audit journal', () => {

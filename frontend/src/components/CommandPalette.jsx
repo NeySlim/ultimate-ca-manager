@@ -11,13 +11,16 @@ import { AtelierDialog } from './atelier/AtelierDialog'
 import { Icon } from './atelier/Icon'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
-import { glyphOf, moduleById, moduleForPath, paletteCommands, paletteViews } from '../navigation/registry'
+import { familyOf, glyphOf, moduleById, moduleForPath, paletteCommands, paletteViews } from '../navigation/registry'
 
-// ACME accounts and SCEP profiles found by the search: [result group, hint, page, glyph]
+// ACME accounts and SCEP profiles found by the search: [result group, hint, page, glyph, family]
 const PROTOCOL_OBJECTS = [
-  ['acme_accounts', 'commandPalette.acmeAccount', moduleById('acme').path, glyphOf(moduleById('acme'))],
-  ['scep_profiles', 'commandPalette.scepProfile', moduleById('scep').path, glyphOf(moduleById('scep'))],
+  ['acme_accounts', 'commandPalette.acmeAccount', moduleById('acme').path, glyphOf(moduleById('acme')), familyOf(moduleById('acme'))],
+  ['scep_profiles', 'commandPalette.scepProfile', moduleById('scep').path, glyphOf(moduleById('scep')), familyOf(moduleById('scep'))],
 ]
+// The module of a record type, whose family tints the record's icon in Aurore
+const TYPE_MODULE = { certificates: 'certificates', certificate: 'certificates', cas: 'cas', ca: 'cas', users: 'users', user: 'users', csrs: 'csrs', csr: 'csrs', templates: 'templates', template: 'templates' }
+const typeFamily = (type) => familyOf(moduleById(TYPE_MODULE[type]))
 
 /**
  * `can` ({ isAdmin, hasPermission }) keeps the pages and actions the account may open; omitted, all of them.
@@ -187,28 +190,29 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
   ]
   const results = [
     ...SEARCHED.flatMap(([key, type, hint]) => (searchResults?.[key] || []).map(item => ({
-      key: `${type}-${item.id}`, icon: getTypeIcon(type), name: item.name, hint: hint(item) || t(`commandPalette.searchSections.${key === 'cas' ? 'certificateAuthorities' : key}`),
+      key: `${type}-${item.id}`, icon: getTypeIcon(type), family: typeFamily(type), name: item.name, hint: hint(item) || t(`commandPalette.searchSections.${key === 'cas' ? 'certificateAuthorities' : key}`),
       run: () => openItem(type, item.id),
     }))),
     // The mockup's module objects (M:741): named by their type, opened in their page's dock (`?item=`)
-    ...PROTOCOL_OBJECTS.flatMap(([key, hint, path, glyph]) => (searchResults?.[key] || []).map(item => ({
-      key: `${key}-${item.id}`, icon: glyph, name: item.name, hint: t(hint),
+    ...PROTOCOL_OBJECTS.flatMap(([key, hint, path, glyph, family]) => (searchResults?.[key] || []).map(item => ({
+      key: `${key}-${item.id}`, icon: glyph, family, name: item.name, hint: t(hint),
       run: () => { onOpenChange(false); navigate(`${path}?item=${encodeURIComponent(item.id)}`) },
     }))),
     ...filteredFavorites.map(item => ({
-      key: `fav-${item.type}-${item.id}`, icon: getTypeIcon(item.type), name: item.name, hint: item.subtitle || t('commandPalette.favorites'),
+      key: `fav-${item.type}-${item.id}`, icon: getTypeIcon(item.type), family: typeFamily(item.type), name: item.name, hint: item.subtitle || t('commandPalette.favorites'),
       run: () => openItem(item.type, item.id),
     })),
     ...filteredRecent.map(item => ({
-      key: `recent-${item.type}-${item.id}`, icon: getTypeIcon(item.type), name: item.name, hint: item.subtitle || t('commandPalette.recent'),
+      key: `recent-${item.type}-${item.id}`, icon: getTypeIcon(item.type), family: typeFamily(item.type), name: item.name, hint: item.subtitle || t('commandPalette.recent'),
       run: () => openItem(item.type, item.id),
     })),
     ...filteredCommands.map(cmd => ({
       key: `cmd-${cmd.id}`, icon: cmd.action === 'new' || cmd.action === 'upload' ? 'plus' : glyphOf(moduleForPath(cmd.path.split('?')[0])),
+      family: familyOf(moduleForPath(cmd.path.split('?')[0])),
       name: t(cmd.labelKey), hint: t(cmd.categoryKey), run: () => executeCommand(cmd),
     })),
     ...filteredViews.map(v => ({
-      key: `view-${v.id}`, icon: glyphOf(moduleForPath(v.path.split('?')[0])), name: viewName(v), hint: t(v.categoryKey), run: () => executeCommand(v),
+      key: `view-${v.id}`, icon: glyphOf(moduleForPath(v.path.split('?')[0])), family: familyOf(moduleForPath(v.path.split('?')[0])), name: viewName(v), hint: t(v.categoryKey), run: () => executeCommand(v),
     })),
     // The whole guide in a tab of its own (absent from the mockup), on the chapter of the current page
     ...(search && [t('guide.paletteEntry'), t('guide.paletteHint')].some(s => s.toLowerCase().includes(lower)) ? [{
@@ -259,7 +263,7 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
         </label>
         <div className="command-results" id="command-results" ref={listRef} aria-busy={isSearching || undefined} onKeyDown={onKeyDown}>
           {results.map(r => (
-            <button key={r.key} type="button" className="command-result" onClick={r.run}>
+            <button key={r.key} type="button" className="command-result" data-family={r.family} onClick={r.run}>
               <Icon name={r.icon} /><span className="name">{r.name}</span>{r.hint && <span className="hint">{r.hint}</span>}
             </button>
           ))}
