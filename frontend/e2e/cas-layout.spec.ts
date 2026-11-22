@@ -87,6 +87,21 @@ test.describe('a phone of 360 px', () => {
       return out
     })
     expect(cut).toEqual([])
+    // A URL cut in its middle holds on one line until it is opened
+    const urls = side.locator('.code-value > .val.mid:not(.open)')
+    expect(await urls.count()).toBeGreaterThan(0)
+    const lines = await urls.evaluateAll((els) => els.map((el) => {
+      // Lines = text rectangles whose tops differ by more than a few pixels
+      const tops: number[] = []
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        for (const r of range.getClientRects()) if (r.width > 0 && !tops.some((t) => Math.abs(t - r.top) < 4)) tops.push(r.top)
+      }
+      return tops.length
+    }))
+    expect(lines).toEqual(lines.map(() => 1))
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
     // The CA's signature is named by its hash, as a certificate's is
     await expect(side.locator('.row', { has: page.locator('dt', { hasText: /^Signature$/ }) }).locator('dd.v')).toHaveText(/^SHA-(256|384|512)$/)

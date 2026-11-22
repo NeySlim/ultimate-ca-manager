@@ -300,6 +300,8 @@
 :root .atl .code-value>.val.mid>.head{min-width:3ch;overflow:hidden;text-overflow:ellipsis}
 :root .atl .code-value>.val.mid>.tail{flex-shrink:0}
 :root .atl .code-value>.val.mid.open{display:block;white-space:normal}
+/* Closed, a URL cut in its middle keeps one line: its break points only serve once opened */
+:root .atl .code-value>.val.mid:not(.open) wbr{display:none}
 :root .atl .code-value>.cp{display:grid;place-items:center;width:24px;height:24px;margin:-2px 0;border-radius:4px;color:var(--muted);flex-shrink:0}
 :root .atl .code-value>.cp:hover{background:var(--hover);color:var(--text)}
 :root .atl .code-value>.cp .icon{width:14px;height:14px}
