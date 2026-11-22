@@ -13,6 +13,7 @@ import { EkuMultiSelect } from '../components'
 import { Input, Select, Textarea, ToggleSwitch, SegmentedField, SecretInput } from '../components/atelier/Form'
 import {
   Zone, AtelierDialog, Icon, FieldError, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, LoadError, LoadCause,
+  useSortParam,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
 import { csrsService, casService, mscaService, ekuService, certificatesService } from '../services'
@@ -47,6 +48,10 @@ const csrKeyRow = (csr) => algorithmForKeyType(csr.key_type)
 
 const CSR_SECTIONS = ['overview', 'details', 'pem']
 
+// The newest request first (T4); the keys the server sorts both lists on
+const CSR_SORT = { key: 'created_at', asc: false }
+const CSR_SORT_KEYS = ['id', 'cn', 'requester', 'key_type', 'created_at']
+
 export default function CSRsPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
@@ -73,8 +78,8 @@ export default function CSRsPage() {
   // What the search box shows, and the term actually sent (debounced)
   const [searchInput, setSearchInput] = useState('')
   const [searchValue, setSearchValue] = useState('')
-  // Server-side sort; null = the API's default, newest first
-  const [sort, setSort] = useState(null)
+  // The server sorts, the newest submitted first by default; the sort lives in the address, the tab's own (T4, T9)
+  const { sort, onSort: sortBy } = useSortParam(CSR_SORT, CSR_SORT_KEYS)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [cas, setCAs] = useState([])
@@ -178,6 +183,10 @@ export default function CSRsPage() {
   // Pagination state
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
+  // A new sort, clicked or read from the address (Back, a link), starts on page one
+  const sortMark = `${sort.key}:${sort.asc}`
+  const [sortSeen, setSortSeen] = useState(sortMark)
+  if (sortSeen !== sortMark) { setSortSeen(sortMark); setPage(1) }
 
   useEffect(() => {
     loadAux()
@@ -213,10 +222,8 @@ export default function CSRsPage() {
     const fetchOther = isPending ? fetchHistory : fetchPending
     const params = { page, per_page: perPage }
     if (searchValue) params.search = searchValue
-    if (sort) {
-      params.sort_by = sort.key
-      params.sort_order = sort.direction
-    }
+    params.sort_by = sort.key
+    params.sort_order = sort.asc ? 'asc' : 'desc'
     const totalOf = (res) => res?.meta?.total ?? (res?.data || []).length
     try {
       setLoading(true)
@@ -261,11 +268,6 @@ export default function CSRsPage() {
     }, 300)
     return () => clearTimeout(timer)
   }, [searchInput, searchValue])
-
-  const handleSortChange = useCallback((newSort) => {
-    setSort(newSort ? { key: newSort.key, direction: newSort.direction } : null)
-    setPage(1)
-  }, [])
 
   // CAs and MS CA connections for the sign dialog
   const loadAux = async () => {
@@ -918,10 +920,6 @@ export default function CSRsPage() {
   const csrPill = (row) => (row.status === 'Signed' || (signed && row.status !== 'Pending')
     ? <Pill label={t('csrs.states.signed')} tone="good" />
     : <Pill label={t('csrs.states.pending')} tone="warn" />)
-  const sortState = sort ? { key: sort.key, asc: sort.direction === 'asc' } : null
-  const onSort = (key) => handleSortChange(sort?.key === key
-    ? (sort.direction === 'asc' ? { key, direction: 'desc' } : null)
-    : { key, direction: 'asc' })
   const pages = Math.max(1, Math.ceil(listTotal / perPage))
   const first = listTotal ? (page - 1) * perPage + 1 : 0
   const last = Math.min(listTotal, page * perPage)
@@ -1040,12 +1038,13 @@ export default function CSRsPage() {
           </Toolbar>
         )}
         title={csrName} status={csrPill} openedId={open?.id} onOpen={openCSR}
-        sort={sortState} onSort={onSort}
+        sort={sort} onSort={sortBy} nameSort="id"
+        // The subject names the request (its name is a number): it takes the room left and folds last (L7, R2)
         columns={[
-          { id: 'subject', label: t('csrs.module.subject'), cell: csrSubject, grow: true, sort: 'cn' },
-          { id: 'requester', label: t('csrs.module.requester'), cell: csrRequester },
-          { id: 'key', label: t('csrs.module.key'), cell: csrKey },
-          { id: 'submitted', label: t('csrs.module.submitted'), cell: csrDate, sort: 'created_at' },
+          { id: 'subject', label: t('csrs.module.subject'), cell: csrSubject, kind: 'text', grow: true, priority: 2, sort: 'cn' },
+          { id: 'requester', label: t('csrs.module.requester'), cell: csrRequester, kind: 'text', priority: 3, sort: 'requester' },
+          { id: 'key', label: t('csrs.module.key'), cell: csrKey, kind: 'fit', priority: 3, sort: 'key_type' },
+          { id: 'submitted', label: t('csrs.module.submitted'), cell: csrDate, kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
           { status: true },
         ]}
         error={loadError && (

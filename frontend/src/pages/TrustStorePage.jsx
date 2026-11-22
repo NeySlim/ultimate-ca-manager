@@ -12,7 +12,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Input } from '../components/atelier/Form'
 import {
   Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Props,
-  LoadError, LoadCause, EmptyBlock, NoMatch, useClientList,
+  LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
 import { truststoreService, casService } from '../services'
@@ -34,6 +34,7 @@ const isRootCa = (ca) => Boolean(ca && (ca.type === 'root' || ca.is_root))
 
 // The anchor types the server stores (purpose), in the order of the type filter
 const BY_NAME = { key: 'name', asc: true }
+const TRUST_SORT_KEYS = ['name', 'subject', 'usage', 'type', 'not_after', 'state']
 const PURPOSES = ['root_ca', 'intermediate_ca', 'client_auth', 'code_signing', 'system', 'custom']
 const PURPOSE_LABELS = {
   root_ca: 'common.rootCA', intermediate_ca: 'common.intermediate', client_auth: 'trustStore.clientAuth',
@@ -382,9 +383,10 @@ export default function TrustStorePage() {
     ...present.map((s) => ({ id: s, label: t(`trustStore.module.states.${s}`), count: searched.filter((c) => tsState(c) === s).length })),
   ]
   const rows = filteredCertificates
-  // The API sends every anchor (no page nor sort parameter): sorted and paged here
+  // The API sends every anchor (no page nor sort parameter): sorted and paged here, the sort in the address (T9)
+  const sortParam = useSortParam(BY_NAME, TRUST_SORT_KEYS)
   const list = useClientList(rows, {
-    initial: BY_NAME,
+    sortParam,
     resetKey: `${query}|${purpose}|${state}`,
     sorts: {
       name: (c) => c.name, subject: (c) => c.subject, usage: (c) => c.description, type: tsType,
@@ -494,11 +496,12 @@ export default function TrustStorePage() {
         </>}
         title={(c) => c.name || '—'} status={tsPill} openedId={open?.id} onOpen={handleSelectCert} selection={selection}
         nameSort="name"
+        // The subject takes the room left; the two long texts fold first, the expiry last (L7, R2)
         columns={[
-          { id: 'subject', label: t('trustStore.module.subject'), cell: (c) => c.subject || '—', grow: true, sort: 'subject' },
-          { id: 'usage', label: t('trustStore.module.usage'), cell: tsUsage, sort: 'usage' },
-          { id: 'type', label: t('common.type'), cell: tsType, sort: 'type' },
-          { id: 'expires', label: t('trustStore.module.expires'), cell: tsExpires, sort: 'not_after' },
+          { id: 'subject', label: t('trustStore.module.subject'), cell: (c) => c.subject || '—', kind: 'text', grow: true, priority: 4, sort: 'subject' },
+          { id: 'usage', label: t('trustStore.module.usage'), cell: tsUsage, kind: 'text', priority: 4, sort: 'usage' },
+          { id: 'type', label: t('common.type'), cell: tsType, kind: 'fit', priority: 3, sort: 'type' },
+          { id: 'expires', label: t('trustStore.module.expires'), cell: tsExpires, kind: 'fit', priority: 2, labelled: true, sort: 'not_after' },
           { status: true, sort: 'state' },
         ]}
         error={loadError && (

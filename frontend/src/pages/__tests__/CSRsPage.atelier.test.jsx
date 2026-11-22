@@ -5,6 +5,8 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
+import { renderAtUrl } from '../../test/dockUrl'
+import { sortKeys, sortedHeaders, absorbing } from '../../test/listColumns'
 
 beforeAll(() => {
   global.ResizeObserver = global.ResizeObserver || class { observe() {} unobserve() {} disconnect() {} }
@@ -98,16 +100,46 @@ describe('CSRs list', () => {
     expect(getHistory).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, per_page: 25 }))
   })
 
-  it('sorts on the server by subject, then the other way, then the server\'s order', async () => {
+  it('opens on the newest submitted first, asked of the server, every column but the state sorting (T1, T4)', async () => {
     const { container } = renderAt()
     await screen.findByRole('button', { name: 'CSR-139' })
-    const subject = () => container.querySelector('[data-sort="cn"]')
+    expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'created_at', sort_order: 'desc', page: 1 }))
+    expect(sortedHeaders(container)).toEqual([['Submitted', 'descending']])
+    expect(sortKeys(container)).toEqual(['id', 'cn', 'requester', 'key_type', 'created_at'])
+    expect(absorbing(container)).toEqual(['Subject'])
+  })
+
+  it('sorts on the server in two states, back to page one, kept in the address (T3, T9)', async () => {
+    getAll.mockImplementation((p) => page([PENDING], p.per_page === 1 ? 1 : 60))
+    const at = renderAtUrl(<CSRsPage />, '/csrs')
+    await screen.findByRole('button', { name: 'CSR-139' })
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    await waitFor(() => expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })))
+    const subject = () => at.container.querySelector('[data-sort="cn"]')
     fireEvent.click(subject())
-    await waitFor(() => expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'cn', sort_order: 'asc' })))
+    await waitFor(() => expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'cn', sort_order: 'asc', page: 1 })))
+    expect(at.where()).toBe('/csrs?sort=cn&order=asc')
     fireEvent.click(subject())
     await waitFor(() => expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'cn', sort_order: 'desc' })))
     fireEvent.click(subject())
-    await waitFor(() => expect(getAll.mock.calls.at(-1)[0].sort_by).toBeUndefined())
+    await waitFor(() => expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'cn', sort_order: 'asc' })))
+    fireEvent.click(at.container.querySelector('[data-sort="requester"]'))
+    await waitFor(() => expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'requester', sort_order: 'asc' })))
+    // The other tab starts from its own default: the sort is the tab's
+    fireEvent.click(at.container.querySelector('[data-status="history"]'))
+    await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'created_at', sort_order: 'desc' })))
+    expect(at.where()).toBe('/csrs?tab=history')
+  })
+
+  it('reads the sort of a link, and falls back on the default for an unknown key (T9)', async () => {
+    const at = renderAtUrl(<CSRsPage />, '/csrs?sort=key_type&order=desc')
+    await screen.findByRole('button', { name: 'CSR-139' })
+    expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'key_type', sort_order: 'desc' }))
+    expect(sortedHeaders(at.container)).toEqual([['Key', 'descending']])
+    at.unmount()
+    renderAtUrl(<CSRsPage />, '/csrs?sort=nope&order=asc')
+    await screen.findByRole('button', { name: 'CSR-139' })
+    expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'created_at', sort_order: 'desc' }))
   })
 
   it('offers Import and Generate CSR only with write:csrs', async () => {
