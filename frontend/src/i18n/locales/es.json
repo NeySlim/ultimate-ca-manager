@@ -627,6 +627,7 @@
       "refused": "Nombre de usuario o contraseña incorrectos. Tras varios fallos se aplica un retraso.",
       "lockedTitle": "Sesión bloqueada",
       "lockedLead": "Su sesión ha caducado por inactividad. Vuelva a iniciar sesión para regresar a la página en la que estaba.",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "Desbloquear",
       "switchAccount": "Iniciar sesión con otra cuenta",
       "skipToContent": "Saltar al contenido",
@@ -636,6 +637,7 @@
       "retryIn": "Próximo intento posible en {{seconds}} s.",
       "canRetry": "Puede volver a intentarlo.",
       "lockedAnnounce": "Sesión expirada: la pantalla está bloqueada y se conserva la página actual.",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "Sesión iniciada: {{name}}, {{role}}.",
       "signedInNoRole": "Sesión iniciada: {{name}}.",
       "signedOut": "Ha cerrado la sesión. Se conservan sus preferencias de visualización."
@@ -7729,6 +7731,7 @@
     "lockAfter_one": "Bloqueo tras {{count}} min de inactividad.",
     "lockAfter_other": "Bloqueo tras {{count}} min de inactividad.",
     "signOut": "Cerrar sesión",
+    "lock": "Lock",
     "method": {
       "password": "contraseña",
       "mtls": "certificado de cliente",
@@ -7736,6 +7739,9 @@
       "session": "sesión del navegador",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "{{count}} certificado caduca o ha caducado",
     "expiringCount_other": "{{count}} certificados caducan o han caducado",
@@ -7948,7 +7954,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

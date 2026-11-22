@@ -77,7 +77,7 @@ export const helpContent = {
         title: 'Account menu',
         icon: Users,
         items: [
-          { label: 'Account', text: 'Your initials beside your name, role and login, then what the console knows of your session: e-mail, sign-in method and inactivity lock; then My account, Settings (for who may open it) and, set apart, Sign out; on a phone, the language as well. The language is chosen from the globe button of the top bar, on My account and on the sign-in page; Settings is also in the Modules menu and the search' },
+          { label: 'Account', text: 'Your initials beside your name, role and login, then what the server knows of your session, read again each time the menu opens: e-mail, sign-in method (with the SSO or LDAP provider), two-factor authentication on or off and its methods, inactivity lock and end of the session; then My account, Settings (for who may open it) and, set apart, Lock and Sign out; on a phone, the language as well. The language is chosen from the globe button of the top bar, on My account and on the sign-in page; Settings is also in the Modules menu and the search' },
         ]
       },
       {
@@ -86,6 +86,7 @@ export const helpContent = {
         items: [
           { label: 'Warning', text: 'Five minutes before the inactivity timeout, a banner shows the time left; Extend keeps the session and says for how long, other activity no longer does' },
           { label: 'Lock', text: 'At the end the session closes and the screen locks: nothing of the console stays open behind it' },
+          { label: 'Lock now', text: 'Lock in the account menu, or Alt+Shift+L (Option+Shift+L on a Mac) outside a text field, closes the session at once and locks the screen, which says the session was locked rather than expired; every tab of the browser locks with it. Unlock as after inactivity, with the same sign-in method' },
           { label: 'Return', text: 'Sign in again with the same account to come back to the page that was open; Sign in with another account starts afresh' },
         ]
       },

@@ -627,6 +627,7 @@
       "refused": "ユーザー名またはパスワードが正しくありません。失敗が続くと待機時間が発生します。",
       "lockedTitle": "セッションはロックされています",
       "lockedLead": "操作がなかったためセッションの有効期限が切れました。再度サインインすると、元のページに戻ります。",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "ロック解除",
       "switchAccount": "別のアカウントでサインイン",
       "skipToContent": "本文へスキップ",
@@ -636,6 +637,7 @@
       "retryIn": "{{seconds}}秒後に再試行できます。",
       "canRetry": "もう一度お試しください。",
       "lockedAnnounce": "セッションの有効期限が切れました。画面はロックされ、現在のページは保持されます。",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "サインインしました: {{name}}、{{role}}。",
       "signedInNoRole": "サインインしました: {{name}}。",
       "signedOut": "サインアウトしました。表示設定は保持されます。"
@@ -7729,6 +7731,7 @@
     "lockAfter_one": "{{count}} 分間操作がないとロックされます。",
     "lockAfter_other": "{{count}} 分間操作がないとロックされます。",
     "signOut": "サインアウト",
+    "lock": "Lock",
     "method": {
       "password": "パスワード",
       "mtls": "クライアント証明書",
@@ -7736,6 +7739,9 @@
       "session": "ブラウザセッション",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "期限切れ間近または期限切れの証明書が{{count}}件",
     "expiringCount_other": "期限切れ間近または期限切れの証明書が{{count}}件",
@@ -7948,7 +7954,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

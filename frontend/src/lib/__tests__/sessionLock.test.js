@@ -1,13 +1,13 @@
-/** The locked account is kept for this tab only, and a broken storage never throws. */
+/** The locked account is kept for this tab only, and a broken storage never throws; the lock reaches the other tabs. */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { saveLock, readLock, clearLock } from '../sessionLock'
+import { saveLock, readLock, clearLock, announceLock, listenForLocks } from '../sessionLock'
 
 describe('sessionLock', () => {
   beforeEach(() => { sessionStorage.clear(); localStorage.clear() })
 
   it('keeps the account in this tab, not across tabs', () => {
     saveLock({ username: 'alice', name: 'Alice Martin', role: 'admin', method: 'password', password: 'never' })
-    expect(readLock()).toEqual({ username: 'alice', name: 'Alice Martin', role: 'admin', method: 'password' })
+    expect(readLock()).toEqual({ username: 'alice', name: 'Alice Martin', role: 'admin', method: 'password', reason: 'idle' })
     expect(sessionStorage.getItem('ucm_locked_session')).not.toContain('never')
     expect(localStorage.length).toBe(0)
   })
@@ -31,5 +31,35 @@ describe('sessionLock', () => {
     const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
     expect(() => saveLock({ username: 'alice' })).not.toThrow()
     spy.mockRestore()
+  })
+
+  it('keeps why the session was locked: by hand, else after inactivity', () => {
+    saveLock({ username: 'alice', reason: 'manual' })
+    expect(readLock().reason).toBe('manual')
+    saveLock({ username: 'alice', reason: 'whatever' })
+    expect(readLock().reason).toBe('idle')
+  })
+
+  it('tells the other tabs of a lock, and stops listening when asked', async () => {
+    const heard = []
+    const stop = listenForLocks((message) => heard.push(message))
+    announceLock('alice', 'manual')
+    await vi.waitFor(() => expect(heard).toEqual([{ username: 'alice', reason: 'manual' }]))
+    stop()
+    announceLock('alice', 'idle')
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(heard).toHaveLength(1)
+  })
+
+  it('ignores a message that is not a lock', async () => {
+    const heard = []
+    const stop = listenForLocks((message) => heard.push(message))
+    const other = new BroadcastChannel('ucm-session-lock')
+    other.postMessage({ type: 'something' })
+    other.postMessage({ type: 'locked' })
+    other.postMessage({ type: 'locked', username: 'bob', reason: 'manual' })
+    await vi.waitFor(() => expect(heard).toEqual([{ username: 'bob', reason: 'manual' }]))
+    other.close()
+    stop()
   })
 })

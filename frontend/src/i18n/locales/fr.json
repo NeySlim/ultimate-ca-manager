@@ -1010,6 +1010,7 @@
       "refused": "Identifiant ou mot de passe incorrect. Après plusieurs échecs, un délai s’applique.",
       "lockedTitle": "Session verrouillée",
       "lockedLead": "Votre session a expiré après inactivité. Reconnectez-vous pour revenir à la page où vous étiez.",
+      "lockedLeadManual": "Vous avez verrouillé la session. Reconnectez-vous pour revenir à la page où vous étiez.",
       "unlock": "Déverrouiller",
       "switchAccount": "Se connecter avec un autre compte",
       "skipToContent": "Aller au contenu",
@@ -1019,6 +1020,7 @@
       "retryIn": "Nouvel essai possible dans {{seconds}} s.",
       "canRetry": "Vous pouvez réessayer.",
       "lockedAnnounce": "Session expirée : l’écran est verrouillé, la page en cours est conservée.",
+      "lockedAnnounceManual": "Session verrouillée : la page en cours est conservée.",
       "signedIn": "Connecté : {{name}}, {{role}}.",
       "signedInNoRole": "Connecté : {{name}}.",
       "signedOut": "Vous êtes déconnecté. Vos préférences d’affichage sont conservées."
@@ -7729,6 +7731,7 @@
     "lockAfter_one": "Verrouillage après {{count}} min d’inactivité.",
     "lockAfter_other": "Verrouillage après {{count}} min d’inactivité.",
     "signOut": "Se déconnecter",
+    "lock": "Verrouiller",
     "method": {
       "password": "mot de passe",
       "mtls": "certificat client",
@@ -7736,6 +7739,9 @@
       "session": "session du navigateur",
       "sso": "SSO",
       "ldap": "annuaire LDAP"
+    },
+    "mfaMethod": {
+      "totp": "application d’authentification"
     },
     "expiringCount_one": "{{count}} certificat expire ou a expiré",
     "expiringCount_other": "{{count}} certificats expirent ou ont expiré",
@@ -7948,7 +7954,12 @@
     "userCard": {
       "signIn": "Connexion",
       "session": "Session",
-      "lockIn": "Verrouillage après {{minutes}} min d’inactivité"
+      "lockIn": "Verrouillage après {{minutes}} min d’inactivité",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Double authentification",
+      "mfaOn": "Active : {{methods}}",
+      "mfaOff": "Inactive",
+      "endsAt": "Fin le {{date}}"
     },
     "activity": {
       "label": "Activité",

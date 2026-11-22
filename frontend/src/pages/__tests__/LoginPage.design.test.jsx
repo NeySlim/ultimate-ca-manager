@@ -202,6 +202,16 @@ describe('LoginPage, as designed', () => {
     expect(screen.getByText('auth.page.lockedAnnounce')).toBeInTheDocument()
   })
 
+  it('arriving from a lock made by hand, says the session was locked, not that it expired', async () => {
+    saveLock({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password', reason: 'manual' })
+    markJustLocked()
+    renderLogin('/login?next=%2Fcertificates')
+    const title = await screen.findByRole('heading', { name: 'auth.page.lockedTitle' })
+    await waitFor(() => expect(document.activeElement).toBe(title))
+    expect(screen.getByText('auth.page.lockedAnnounceManual')).toBeInTheDocument()
+    expect(screen.queryByText('auth.page.lockedAnnounce')).toBeNull()
+  })
+
   it('a lock screen opened by its address focuses nothing and says nothing', async () => {
     saveLock({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password' })
     renderLogin('/login?next=%2Fcertificates')

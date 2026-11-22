@@ -627,6 +627,7 @@
       "refused": "Nome de usuário ou senha incorretos. Após várias falhas, aplica-se um atraso.",
       "lockedTitle": "Sessão bloqueada",
       "lockedLead": "A sua sessão expirou por inatividade. Inicie sessão de novo para voltar à página onde estava.",
+      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
       "unlock": "Desbloquear",
       "switchAccount": "Fazer login com outra conta",
       "skipToContent": "Saltar para o conteúdo",
@@ -636,6 +637,7 @@
       "retryIn": "Próxima tentativa possível dentro de {{seconds}} s.",
       "canRetry": "Pode tentar novamente.",
       "lockedAnnounce": "Sessão expirada: o tela está bloqueado e a página atual é mantida.",
+      "lockedAnnounceManual": "Session locked: the current page is kept.",
       "signedIn": "Sessão iniciada: {{name}}, {{role}}.",
       "signedInNoRole": "Sessão iniciada: {{name}}.",
       "signedOut": "Terminou a sessão. As suas preferências de apresentação são mantidas."
@@ -7729,6 +7731,7 @@
     "lockAfter_one": "Bloqueio após {{count}} min de inatividade.",
     "lockAfter_other": "Bloqueio após {{count}} min de inatividade.",
     "signOut": "Sair",
+    "lock": "Lock",
     "method": {
       "password": "senha",
       "mtls": "certificado de cliente",
@@ -7736,6 +7739,9 @@
       "session": "sessão do navegador",
       "sso": "SSO",
       "ldap": "LDAP directory"
+    },
+    "mfaMethod": {
+      "totp": "authenticator app"
     },
     "expiringCount_one": "{{count}} certificado a expirar ou expirado",
     "expiringCount_other": "{{count}} certificados a expirar ou expirados",
@@ -7948,7 +7954,12 @@
     "userCard": {
       "signIn": "Sign-in",
       "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity"
+      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "methodVia": "{{method}} ({{provider}})",
+      "mfa": "Two-factor",
+      "mfaOn": "On: {{methods}}",
+      "mfaOff": "Off",
+      "endsAt": "Ends {{date}}"
     },
     "activity": {
       "label": "Activity",

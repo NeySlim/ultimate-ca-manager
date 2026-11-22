@@ -25,6 +25,15 @@ export const authService = {
     return response
   },
 
+  // Closes the session behind the lock screen; `reason` is 'manual' or 'idle', for the audit
+  async lock(reason) {
+    try {
+      return await apiClient.post('/auth/lock', { reason })
+    } finally {
+      apiClient.clearCsrfToken()
+    }
+  },
+
   async getCurrentUser() {
     const response = await apiClient.get('/auth/verify')
     
