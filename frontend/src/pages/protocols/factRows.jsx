@@ -1,4 +1,4 @@
-/** The typed rows the protocol docks give to Facts (KV-3): a value or its absence, a copyable chip, a yes or no rule. */
+/** The typed rows the protocol docks give to Facts: a value or its absence, a copyable chip, a yes or no rule. */
 import { CodeValue } from '../../components/atelier'
 
 const missing = (v) => v === null || v === undefined || v === ''
