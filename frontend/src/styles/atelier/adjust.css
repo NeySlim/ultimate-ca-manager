@@ -239,8 +239,8 @@
 :root .atl .field-hint .props>dd{border-top:0;padding-top:0;margin-bottom:0}
 /* A narrow panel: a technical value or a value with its help goes under its term, on the whole width. */
 @container (max-width:380px){
-  :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>p)){grid-column:1/-1;padding-bottom:0}
-  :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>p))+dd{grid-column:1/-1;border-top:0;padding-top:2px}
+  :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>.mono),:has(+dd>p)){grid-column:1/-1;padding-bottom:0}
+  :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>.mono),:has(+dd>p))+dd{grid-column:1/-1;border-top:0;padding-top:2px}
 }
 /* The panels a block of terms sizes itself on. */
 :root .atl :is(.ca-side,.user-id,.float-body,.modal-body){container-type:inline-size}
