@@ -1,12 +1,16 @@
 /**
- * SSHCertificatesPage: only the columns the server sorts offer a sort.
+ * SSHCertificatesPage: the columns the server sorts offer a sort, the nearest expiry first by default,
+ * the sort kept in the address; a phone record says its dates.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { renderAtUrl } from '../../test/dockUrl'
+import { sortKeys, sortedHeaders, absorbing, recordFacts } from '../../test/listColumns'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
 const stable = vi.hoisted(() => ({
+  mobile: false,
   i18n: {
     t: (key, opts) => (opts?.keyId ? `${key}:${opts.keyId}` : key),
     i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
@@ -25,8 +29,9 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
-  useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true, sidebarOpen: true, setSidebarOpen: vi.fn() }),
+  useMobile: () => ({ isMobile: stable.mobile, isTablet: false, isDesktop: !stable.mobile, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: stable.mobile }) }))
 
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual('../../hooks')
@@ -58,29 +63,58 @@ vi.mock('../../services', () => ({
 
 import SSHCertificatesPage from '../SSHCertificatesPage'
 
+const lastParams = () => getAll.mock.calls.at(-1)[0]
+
 describe('SSHCertificatesPage: sortable columns', () => {
   beforeEach(() => {
     window.localStorage.clear()
     vi.clearAllMocks()
+    stable.mobile = false
     getAll.mockResolvedValue({ data: [{ id: 1, key_id: 'c', cert_type: 'user', principals: ['a'], ca_name: 'CA',
       valid_to: '2030-01-01T00:00:00Z' }], meta: { total: 1 } })
     getStats.mockResolvedValue({ data: {} })
     casGetAll.mockResolvedValue({ data: [] })
   })
 
-  it.each(['sshCertificates.principals', 'sshCertificates.caName'])('%s asks no sort of the server', async (header) => {
-    render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
+  it('opens on the nearest expiry; every column the server sorts offers it, the principals do not (T1, T4)', async () => {
+    const { container } = render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
     await screen.findByText('c')
-    const th = screen.getAllByText(header).find((el) => el.closest('th'))
-    fireEvent.click(th)
-    await new Promise((r) => setTimeout(r, 30))
-    expect(getAll.mock.calls.map(([params]) => params?.sort_by)).not.toContain(header === 'sshCertificates.caName' ? 'ca_name' : 'principals')
+    expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'asc', page: 1 })
+    expect(sortedHeaders(container)).toEqual([['certificates.expiry', 'ascending']])
+    expect(sortKeys(container)).toEqual(['key_id', 'cert_type', 'valid_to', 'ca', 'status'])
+    expect(absorbing(container)).toEqual(['sshCertificates.principals'])
   })
 
-  it('key_id still sorts, from the name column', async () => {
+  it('keeps every principal in the cell and its title, an ellipsis shortening it (L6)', async () => {
+    getAll.mockResolvedValue({ data: [{ id: 1, key_id: 'c', cert_type: 'user', principals: ['alice', 'bob', 'carol', 'deploy'], ca_name: 'CA',
+      valid_to: '2030-01-01T00:00:00Z' }], meta: { total: 1 } })
+    render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
+    const cell = await screen.findByText('alice, bob, carol, deploy')
+    expect(cell.closest('td')).toHaveAttribute('title', 'alice, bob, carol, deploy')
+  })
+
+  it('sorts by the authority and the state on the server, back to page one, kept in the address (T2, T9)', async () => {
+    getAll.mockResolvedValue({ data: [{ id: 1, key_id: 'c', cert_type: 'user', principals: ['a'], ca_name: 'CA', valid_to: '2030-01-01T00:00:00Z' }], meta: { total: 60 } })
+    const at = renderAtUrl(<SSHCertificatesPage />, '/ssh/certificates')
+    await screen.findByText('c')
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    await waitFor(() => expect(lastParams()).toMatchObject({ page: 2 }))
+    fireEvent.click(at.container.querySelector('[data-sort="ca"]'))
+    await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'ca', sort_order: 'asc', page: 1 }))
+    expect(at.where()).toBe('/ssh/certificates?sort=ca&order=asc')
+    fireEvent.click(at.container.querySelector('[data-sort="status"]'))
+    await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'status', sort_order: 'asc' }))
+    at.unmount()
+    renderAtUrl(<SSHCertificatesPage />, '/ssh/certificates?sort=key_id&order=desc')
+    await screen.findByText('c')
+    expect(lastParams()).toMatchObject({ sort_by: 'key_id', sort_order: 'desc' })
+  })
+
+  it('draws a phone record by priority: the expiry after its label (R5)', async () => {
+    stable.mobile = true
     render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
     await screen.findByText('c')
-    fireEvent.click(screen.getAllByText('atelier.name').find((el) => el.closest('th')))
-    await waitFor(() => expect(getAll.mock.calls.map(([params]) => params?.sort_by)).toContain('key_id'))
+    const record = document.querySelector('article.mobile-record')
+    expect(recordFacts(record)[0]).toMatch(/^certificates\.expiry \S/)
   })
 })

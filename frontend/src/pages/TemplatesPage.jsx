@@ -11,7 +11,7 @@ import { TemplatePreviewModal } from '../components'
 import { Modal, Input, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Props,
-  LoadError, LoadCause, EmptyBlock, NoMatch, useClientList,
+  LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { useDockSelection } from '../components/atelier/useDockParam'
 import { templatesService } from '../services'
@@ -36,6 +36,7 @@ import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 const TEMPLATE_SECTIONS = ['overview', 'subject', 'extensions', 'enrollment']
 const BY_NAME = { key: 'name', asc: true }
+const TEMPLATE_SORT_KEYS = ['name', 'source', 'validity_days', 'key', 'usage_count', 'state']
 
 export default function TemplatesPage() {
   const { t } = useTranslation()
@@ -259,9 +260,10 @@ export default function TemplatesPage() {
   const present = ['active', 'inactive'].filter((s) => templates.some((tpl) => tplState(tpl) === s))
   const active = present.includes(state) ? state : ''
   const rows = useMemo(() => searched.filter((tpl) => !active || tplState(tpl) === active), [searched, active])
-  // The API sends every template: sorted and paged here
+  // The API sends every template: sorted and paged here, the sort in the address (T9)
+  const sortParam = useSortParam(BY_NAME, TEMPLATE_SORT_KEYS)
   const tplList = useClientList(rows, {
-    initial: BY_NAME,
+    sortParam,
     resetKey: `${query}|${source}|${active}`,
     sorts: {
       name: (x) => x.name, source: tplSource, validity_days: (x) => x.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
@@ -422,11 +424,12 @@ export default function TemplatesPage() {
         )}
         title={(tpl) => tpl.name || t('common.unnamed')} status={tplPill} openedId={open?.id} onOpen={openTemplate}
         nameSort="name"
+        // No long free text: the name takes the room left (L7)
         columns={[
-          { id: 'source', label: t('templates.source'), cell: tplSource, grow: true, sort: 'source' },
-          { id: 'validity', label: t('common.validity'), cell: tplValidity, sort: 'validity_days' },
-          { id: 'key', label: t('templates.module.defaultKey'), cell: tplKey, sort: 'key' },
-          { id: 'uses', label: t('templates.module.uses'), cell: tplUses, sort: 'usage_count' },
+          { id: 'source', label: t('templates.source'), cell: tplSource, kind: 'fit', priority: 3, sort: 'source' },
+          { id: 'validity', label: t('common.validity'), cell: tplValidity, kind: 'number', priority: 3, sort: 'validity_days' },
+          { id: 'key', label: t('common.key'), labelFull: t('templates.module.defaultKey'), cell: tplKey, kind: 'fit', priority: 3, sort: 'key' },
+          { id: 'uses', label: t('templates.module.uses'), cell: tplUses, kind: 'number', priority: 3, sort: 'usage_count' },
           { status: true, sort: 'state' },
         ]}
         error={loadError && (

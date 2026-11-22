@@ -4,6 +4,7 @@
  * columns (linked pair, creation date) come last, hidden by default.
  */
 import { Icon } from '../../components/atelier'
+import { cardFacts, labelledFact } from '../../components/atelier/cardFacts'
 import { CertBadge, ExpiryCell } from './CertBadge'
 import { GRADE_TONES, SOURCE_ICONS } from './certState'
 import { extractCN, formatDate } from '../../lib/utils'
@@ -38,10 +39,10 @@ export function certificateColumns(t) {
     { id: 'description', label: t('common.description'), sort: 'description', kind: 'text', priority: 4, grow: true, tone: 'muted', cell: (r) => r.subtitle || '',
       title: (r) => r.subtitle || '', skeleton: { base: 45, spread: 40 } },
     { id: 'status', label: t('certificates.state'), sort: 'status', kind: 'fit', priority: 1, always: true, cell: (r) => <CertBadge cert={r} t={t} />, skeleton: { width: '74px', kind: 'pill' } },
-    { id: 'ca', label: t('common.issuer'), sort: 'ca', kind: 'text', priority: 2, tone: 'muted', cell: (r) => issuerOf(r) || '—', title: (r) => issuerOf(r), skeleton: { base: 50, spread: 40 } },
-    { id: 'source', label: t('certificates.source'), kind: 'fit', priority: 3, cell: (r) => <span className="source-label"><Icon name={sourceIconOf(r)} />{sourceLabel(sourceOf(r), t)}</span>, skeleton: { width: '52px' } },
+    { id: 'ca', label: t('common.issuer'), sort: 'ca', kind: 'text', priority: 2, labelled: true, tone: 'muted', cell: (r) => issuerOf(r) || '—', title: (r) => issuerOf(r), skeleton: { base: 50, spread: 40 } },
+    { id: 'source', label: t('certificates.source'), sort: 'source', kind: 'fit', priority: 3, cell: (r) => <span className="source-label"><Icon name={sourceIconOf(r)} />{sourceLabel(sourceOf(r), t)}</span>, skeleton: { width: '52px' } },
     { id: 'expiry', label: t('certificates.expiry'), sort: 'days', kind: 'fit', priority: 2, cell: (r) => <ExpiryCell row={r} t={t} />, skeleton: { width: '92px' } },
-    { id: 'key', label: t('common.keyAlgorithm'), sort: 'key', kind: 'fit', priority: 3, tone: ['small', 'muted'], cell: (r) => certificateKeyLabel(r, t) || '—', skeleton: { width: '70px' } },
+    { id: 'key', label: t('common.key'), labelFull: t('common.keyAlgorithm'), sort: 'key', kind: 'fit', priority: 3, tone: ['small', 'muted'], cell: (r) => certificateKeyLabel(r, t) || '—', skeleton: { width: '70px' } },
     { id: 'grade', label: t('certificates.complianceColumn'), sort: 'grade', kind: 'fit', priority: 3, defaultHidden: true, skeleton: { width: '20px' },
       cell: (r) => {
         const grade = GRADE_TONES[r.compliance_grade] ? r.compliance_grade : 'F'
@@ -55,13 +56,19 @@ export function certificateColumns(t) {
 }
 
 // The header's order and the server's field
-export const SORT_FIELDS = { name: 'subject', description: 'descr', status: 'status', ca: 'issuer', days: 'valid_to', key: 'key_algo', grade: 'compliance_grade', created: 'created_at' }
+export const SORT_FIELDS = {
+  name: 'subject', description: 'descr', status: 'status', ca: 'issuer', source: 'source', days: 'valid_to', key: 'key_algo', grade: 'compliance_grade', created: 'created_at',
+}
 
-/** The phone record: description, issuer, source, the key note, then the state and the expiry date. */
+/**
+ * The phone record: the description, the facts of the columns by priority (the issuer after its label), the key
+ * note, then the state and the expiry date after its label, where the mockup puts it (R5).
+ */
 export function certificateCard(t) {
+  const facts = certificateColumns(t).filter((c) => c.id !== 'expiry')
   return (row) => ({
     description: row.subtitle || '',
-    meta: [issuerOf(row), sourceLabel(sourceOf(row), t)],
+    meta: cardFacts(facts, row),
     note: (row.has_private_key || row.isOrphan) && (
       <>
         {row.has_private_key && <span className="key-note"><Icon name="key" />{t('certificates.keyInUcm')}</span>}
@@ -69,6 +76,6 @@ export function certificateCard(t) {
       </>
     ),
     status: <CertBadge cert={row} t={t} />,
-    end: row.valid_to ? formatDate(row.valid_to, { time: false }) : undefined,
+    end: row.valid_to ? labelledFact(t('certificates.expiry'), formatDate(row.valid_to, { time: false })) : undefined,
   })
 }

@@ -76,7 +76,8 @@ export function TableView({
           <div className="columns-list">
             {columns.filter((c) => !c.always).map((c) => (
               <label key={c.id} className="checkbox-line">
-                <input type="checkbox" data-column={c.id} checked={!hiddenSet.has(c.id)} onChange={() => toggleColumn(c.id)} />{c.label}
+                {/* The dialog has room for a short header's whole label (L8) */}
+                <input type="checkbox" data-column={c.id} checked={!hiddenSet.has(c.id)} onChange={() => toggleColumn(c.id)} />{c.labelFull || c.label}
               </label>
             ))}
           </div>

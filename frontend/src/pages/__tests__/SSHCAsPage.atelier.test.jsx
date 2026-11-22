@@ -16,8 +16,9 @@ const stable = vi.hoisted(() => ({
   i18n: { t: (k) => k, i18n: { language: 'fr', changeLanguage: () => {}, on: () => {}, off: () => {} } },
   notify: { showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showInfo: vi.fn(), showConfirm: vi.fn().mockResolvedValue(false) },
 }))
-const m = vi.hoisted(() => ({ getAll: vi.fn(), write: true, del: true, copy: vi.fn() }))
-vi.mock('../../contexts', () => ({ useNotification: () => stable.notify, useMobile: () => ({ isMobile: false }) }))
+const m = vi.hoisted(() => ({ getAll: vi.fn(), write: true, del: true, copy: vi.fn(), mobile: false }))
+vi.mock('../../contexts', () => ({ useNotification: () => stable.notify, useMobile: () => ({ isMobile: m.mobile }) }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: m.mobile }) }))
 vi.mock('../../hooks', async () => {
   const crud = await vi.importActual('../../hooks/useCRUDPage')
   return {
@@ -33,6 +34,7 @@ vi.mock('../../services', () => ({
 }))
 
 import { renderAtUrl } from '../../test/dockUrl'
+import { sortKeys, sortedHeaders, absorbing, numberHeads, recordFacts } from '../../test/listColumns'
 import SSHCAsPage from '../SSHCAsPage'
 
 const USERS = { id: 1, refid: 'r-users', descr: 'Users CA', ca_type: 'user', key_type: 'ssh-ed25519', fingerprint: 'SHA256:aaa', cert_count: 7,
@@ -45,6 +47,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   m.write = true
   m.del = true
+  m.mobile = false
   m.getAll.mockResolvedValue({ data: [USERS, HOSTS] })
 })
 
@@ -53,7 +56,7 @@ describe('the SSH CA list', () => {
     page()
     await screen.findByRole('button', { name: 'Users CA' })
     expect([...document.querySelectorAll('.module-table thead th')].map((h) => h.textContent))
-      .toEqual(['atelier.name', 'sshCas.caType', 'sshCas.keyType', 'sshCas.stats.certificates', 'common.created', 'common.actions'])
+      .toEqual(['atelier.name', 'sshCas.caType', 'sshCas.keyType', 'sshCas.stats.certificates', 'certificates.creationColumn', 'common.actions'])
     const chips = screen.getByRole('group', { name: 'sshCas.filterByType' })
     expect([...chips.querySelectorAll('.view-btn')].map((b) => b.textContent)).toEqual(['common.all2', 'sshCas.typeUser1', 'sshCas.typeHost1'])
     // an HSM key says so beside its type
@@ -88,10 +91,39 @@ describe('the SSH CA list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'sshCas.stats.certificates' }))
     fireEvent.click(screen.getByRole('button', { name: 'sshCas.stats.certificates' }))
     expect(names()[0]).toBe('Host 30')
-    for (const name of ['sshCas.caType', 'sshCas.keyType', 'common.created']) {
+    for (const name of ['sshCas.caType', 'sshCas.keyType', 'certificates.creationColumn']) {
       fireEvent.click(screen.getByRole('button', { name }))
       expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
     }
+  })
+
+  it('opens on the name ascending, the name taking the room left, the count at the right (T1, T4, L7, L9)', async () => {
+    const { container } = page()
+    await screen.findByRole('button', { name: 'Users CA' })
+    expect(sortedHeaders(container)).toEqual([['atelier.name', 'ascending']])
+    expect(sortKeys(container)).toEqual(['name', 'type', 'key', 'certs', 'created'])
+    expect(absorbing(container)).toEqual(['atelier.name'])
+    expect(numberHeads(container)).toEqual(['sshCas.stats.certificates'])
+  })
+
+  it('keeps another sort in the address and reads it back (T9)', async () => {
+    const at = renderAtUrl(<SSHCAsPage />, '/ssh/cas')
+    await screen.findByRole('button', { name: 'Users CA' })
+    fireEvent.click(at.container.querySelector('[data-sort="certs"]'))
+    expect(at.where()).toBe('/ssh/cas?sort=certs&order=asc')
+    at.unmount()
+    const again = renderAtUrl(<SSHCAsPage />, '/ssh/cas?sort=certs&order=desc')
+    await screen.findByRole('button', { name: 'Users CA' })
+    expect(sortedHeaders(again.container)).toEqual([['sshCas.stats.certificates', 'descending']])
+    expect(again.container.querySelector('tbody .entity-name')).toHaveTextContent('Users CA')
+  })
+
+  it('draws a phone record whose count is said (R5)', async () => {
+    m.mobile = true
+    page()
+    await screen.findByRole('button', { name: 'Users CA' })
+    const record = [...document.querySelectorAll('article.mobile-record')].find((r) => r.textContent.includes('Users CA'))
+    expect(recordFacts(record)).toContain('sshCas.stats.certificates 7')
   })
 
   it('links to the SSH certificates at their registered address', async () => {

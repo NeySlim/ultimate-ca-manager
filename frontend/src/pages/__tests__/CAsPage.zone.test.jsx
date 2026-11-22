@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { sortKeys, sortedHeaders, absorbing, numberHeads, recordFacts } from '../../test/listColumns'
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { ca, smallHierarchy, largeInstallation } from '../cas/__tests__/caFixtures'
 
@@ -274,6 +275,36 @@ describe('CAsPage: list', () => {
     fireEvent.click(filter('roots'))
     expect(names()).toEqual(['Second Root', 'Example Root'])
     expect(document.querySelector('footer.table-footer')).toHaveTextContent('cas.range:2')
+  })
+
+  it('opens on the name ascending, keeps another sort in the address and reads it back (T4, T9)', async () => {
+    window.localStorage.setItem('ucm-ca-view-mode', 'list')
+    const view = renderAt('/cas')
+    const table = await screen.findByRole('table')
+    expect(sortedHeaders(table)).toEqual([['common.name', 'ascending']])
+    expect(sortKeys(table)).toEqual(['name', 'type', 'state', 'parent', 'certs', 'expiry', 'algorithm'])
+    expect(numberHeads(table)).toEqual(['common.certificates'])
+    expect(absorbing(table)).toEqual(['common.name'])
+    fireEvent.click(within(table).getByRole('button', { name: 'common.certificates' }))
+    expect(where()).toBe('/cas?sort=certs&order=asc')
+    view.unmount()
+    renderAt('/cas?sort=certs&order=desc')
+    const again = await screen.findByRole('table')
+    expect(sortedHeaders(again)).toEqual([['common.certificates', 'descending']])
+    expect(within(again).getAllByRole('button').filter((b) => b.classList.contains('entity-name'))[0]).toHaveTextContent('Services')
+  })
+
+  it('draws a phone record from its columns: facts by priority, numbers and dates after their label, nothing empty', async () => {
+    window.localStorage.setItem('ucm-ca-view-mode', 'list')
+    mobile.isMobile = true
+    renderAt()
+    const record = (name) => [...document.querySelectorAll('article.mobile-record')].find((r) => r.querySelector('.entity-name').textContent === name)
+    await waitFor(() => expect(record('Example Root')).toBeTruthy())
+    // A root has no parent nor algorithm here: its facts are its type and its certificate count, the count said
+    expect(recordFacts(record('Example Root'))).toEqual(['common.rootCA', 'common.certificates 0'])
+    expect(recordFacts(record('Services'))[0]).toBe('cas.parentCA Example Root')
+    expect(record('Services').querySelector('.remaining').querySelector('.fact-label')).toHaveTextContent('certificates.expiry')
+    expect(screen.getByRole('combobox', { name: 'table.sortBy' })).toHaveValue('name')
   })
 
   it('pages a long list by 25 under a footer, back to page one on a sort or a search', async () => {

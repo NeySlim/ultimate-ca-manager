@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
   Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, FormModal, Notice,
-  useClientList,
+  useClientList, useSortParam,
 } from '../components/atelier'
 import { sshCasService, hsmService } from '../services'
 import { useNotification } from '../contexts'
@@ -38,6 +38,7 @@ const DEFAULT_EXTENSIONS = [
 ]
 
 const BY_NAME = { key: 'name', asc: true }
+const SSH_CA_SORT_KEYS = ['name', 'type', 'key', 'certs', 'created']
 
 // An HSM key decides the SSH key type it signs with: 'EC-P384' -> 'ecdsa-p384', 'RSA-3072' -> 'rsa'.
 // Only RSA and NIST ECDSA: the HSM wrappers do not sign Ed25519, and OpenSSH has no Brainpool or ML-DSA type.
@@ -210,8 +211,10 @@ export default function SSHCAsPage() {
     { id: 'user', label: t('sshCas.typeUser'), count: searched.filter((ca) => ca.ca_type === 'user').length },
     { id: 'host', label: t('sshCas.typeHost'), count: searched.filter((ca) => ca.ca_type === 'host').length },
   ]
+  // Sorted in memory (the API sends every authority), the sort in the address (T9)
+  const sortParam = useSortParam(BY_NAME, SSH_CA_SORT_KEYS)
   const list = useClientList(shown, {
-    initial: BY_NAME,
+    sortParam,
     resetKey: `${query}|${typeView}`,
     sorts: { name: (ca) => ca.descr, type: typeLabel, key: (ca) => ca.key_type, certs: (ca) => ca.cert_count || 0, created: (ca) => ca.created_at && Date.parse(ca.created_at) },
   })
@@ -341,11 +344,12 @@ export default function SSHCAsPage() {
           </Toolbar>
         )}
         title={(ca) => ca.descr || t('common.unnamed')} status={() => null} openedId={open?.id} onOpen={openCA}
+        // No long free text: the name takes the room left (L7)
         columns={[
-          { id: 'type', label: t('sshCas.caType'), cell: typeLabel, sort: 'type' },
-          { id: 'key', label: t('sshCas.keyType'), cell: keyCell, grow: true, sort: 'key' },
-          { id: 'certs', label: t('sshCas.stats.certificates'), cell: (ca) => ca.cert_count || 0, fit: true, sort: 'certs' },
-          { id: 'created', label: t('common.created'), cell: (ca) => formatDate(ca.created_at), muted: true, fit: true, sort: 'created' },
+          { id: 'type', label: t('sshCas.caType'), cell: typeLabel, kind: 'fit', priority: 3, sort: 'type' },
+          { id: 'key', label: t('sshCas.keyType'), cell: keyCell, kind: 'fit', priority: 3, sort: 'key' },
+          { id: 'certs', label: t('sshCas.stats.certificates'), cell: (ca) => ca.cert_count || 0, kind: 'number', priority: 3, sort: 'certs' },
+          { id: 'created', label: t('certificates.creationColumn'), cell: (ca) => formatDate(ca.created_at), kind: 'fit', priority: 3, labelled: true, muted: true, sort: 'created' },
         ]}
         rowActions={(ca) => [
           ...(canWrite('ssh_cas') ? [{ icon: 'settings', label: t('common.edit'), write: true, onClick: openEdit }] : []),

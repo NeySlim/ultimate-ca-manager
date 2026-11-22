@@ -5,6 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
+import { renderAtUrl } from '../../test/dockUrl'
+import { sortKeys, sortedHeaders, absorbing, numberHeads } from '../../test/listColumns'
 
 vi.mock('react-i18next', async () => {
   const { enI18n } = await import('../../test/enT')
@@ -59,7 +61,8 @@ describe('Templates list', () => {
     const row = (await screen.findByRole('button', { name: 'Web Server' })).closest('tr')
     expect(container.querySelector('.page-head .total')).toHaveTextContent('2 templates')
     expect([...container.querySelectorAll('.views .view-btn')].map((b) => b.textContent)).toEqual(['All2', 'Active1', 'Inactive1'])
-    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent).slice(0, 6)).toEqual(['Name', 'Source', 'Validity', 'Default key', 'Uses', 'State'])
+    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent).slice(0, 6)).toEqual(['Name', 'Source', 'Validity', 'Key', 'Uses', 'State'])
+    expect(container.querySelector('[data-sort="key"]')).toHaveAttribute('aria-label', 'Default key')
     expect(row).toHaveTextContent('397 d')
     expect(row).toHaveTextContent('ECDSA P-256')
     expect(row).toHaveTextContent('1 certificate')
@@ -100,6 +103,27 @@ describe('Templates list', () => {
       expect(container.querySelector(`[data-sort="${key}"]`).closest('th')).toHaveAttribute('aria-sort', 'ascending')
     }
     expect(names()[0]).toBe('Web Server')
+  })
+
+  it('opens on the name ascending, the name taking the room left, the counts at the right (T4, L7, L9)', async () => {
+    const { container } = renderPage()
+    await screen.findByRole('button', { name: 'Web Server' })
+    expect(sortedHeaders(container)).toEqual([['Name', 'ascending']])
+    expect(sortKeys(container)).toEqual(['name', 'source', 'validity_days', 'key', 'usage_count', 'state'])
+    expect(absorbing(container)).toEqual(['Name'])
+    expect(numberHeads(container)).toEqual(['Validity', 'Uses'])
+  })
+
+  it('keeps another sort in the address and reads it back (T9)', async () => {
+    const at = renderAtUrl(<TemplatesPage />, '/templates')
+    await screen.findByRole('button', { name: 'Web Server' })
+    fireEvent.click(at.container.querySelector('[data-sort="validity_days"]'))
+    expect(at.where()).toBe('/templates?sort=validity_days&order=asc')
+    at.unmount()
+    const again = renderAtUrl(<TemplatesPage />, '/templates?sort=validity_days&order=desc')
+    await screen.findByRole('button', { name: 'Web Server' })
+    expect(sortedHeaders(again.container)).toEqual([['Validity', 'descending']])
+    expect(again.container.querySelector('tbody .entity-name')).toHaveTextContent('Web Server')
   })
 
   it('offers Import and Create Template only with write:templates', async () => {

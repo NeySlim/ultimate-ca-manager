@@ -12,16 +12,17 @@ vi.mock('react-i18next', async () => {
 })
 
 const perms = vi.hoisted(() => ({ write: true, del: true }))
+const mobile = vi.hoisted(() => ({ isMobile: false }))
 const notify = vi.hoisted(() => ({
   showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
   showConfirm: vi.fn().mockResolvedValue(true), showPrompt: vi.fn(),
 }))
 vi.mock('../../contexts', () => ({
   useNotification: () => notify,
-  useMobile: () => ({ isMobile: false }),
+  useMobile: () => mobile,
   useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [] }),
 }))
-vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: false }) }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => mobile }))
 vi.mock('../../hooks', async () => {
   const modals = await vi.importActual('../../hooks/useCommon')
   const { useState } = await vi.importActual('react')
@@ -45,6 +46,7 @@ vi.mock('../../services', () => ({
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
 import { renderAtUrl } from '../../test/dockUrl'
+import { sortKeys, sortedHeaders, absorbing, recordFacts } from '../../test/listColumns'
 import TrustStorePage from '../TrustStorePage'
 
 const ROWS = [
@@ -57,12 +59,44 @@ const renderPage = () => render(<MemoryRouter><TrustStorePage /></MemoryRouter>)
 
 beforeEach(() => {
   perms.write = true; perms.del = true
+  mobile.isMobile = false
   getAll.mockReset().mockResolvedValue({ data: ROWS })
   del.mockReset().mockResolvedValue({})
   notify.showConfirm.mockClear()
 })
 
 describe('Trust Store list', () => {
+  it('opens on the name ascending, the subject taking the room left, every column sorting (T1, T4, L7)', async () => {
+    const { container } = renderPage()
+    await screen.findByRole('button', { name: 'Bank Root' })
+    expect(sortedHeaders(container)).toEqual([['Name', 'ascending']])
+    expect(sortKeys(container)).toEqual(['name', 'subject', 'usage', 'type', 'not_after', 'state'])
+    expect(absorbing(container)).toEqual(['Subject'])
+  })
+
+  it('keeps another sort in the address and reads it back (T9)', async () => {
+    const at = renderAtUrl(<TrustStorePage />, '/truststore')
+    await screen.findByRole('button', { name: 'Bank Root' })
+    fireEvent.click(at.container.querySelector('[data-sort="not_after"]'))
+    expect(at.where()).toBe('/truststore?sort=not_after&order=asc')
+    at.unmount()
+    const again = renderAtUrl(<TrustStorePage />, '/truststore?sort=not_after&order=asc')
+    await screen.findByRole('button', { name: 'Bank Root' })
+    expect(sortedHeaders(again.container)).toEqual([['Expiry', 'ascending']])
+    expect(again.container.querySelector('tbody .entity-name')).toHaveTextContent('Old proxy')
+  })
+
+  it('draws a phone record by priority: the expiry after its label, then the type (R5)', async () => {
+    mobile.isMobile = true
+    const { container } = renderPage()
+    await screen.findByRole('button', { name: 'Bank Root' })
+    const record = [...container.querySelectorAll('article.mobile-record')].find((r) => r.textContent.includes('Bank Root'))
+    const facts = recordFacts(record)
+    expect(facts[0]).toMatch(/^Expiry \S/)
+    expect(facts[1]).toBe('Root CA')
+    expect(facts).toHaveLength(2)
+  })
+
   it('shows the subject, the description as the usage, the type, the expiry and the state', async () => {
     const { container } = renderPage()
     const row = (await screen.findByRole('button', { name: 'Bank Root' })).closest('tr')
