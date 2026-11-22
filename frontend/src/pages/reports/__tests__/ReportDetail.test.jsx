@@ -85,8 +85,8 @@ describe('ReportDock', () => {
     fireEvent.click(more())
     fireEvent.click(await screen.findByRole('button', { name: 'Envoyer un test…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Envoyer un test' })
-    expect(dialog).toHaveTextContent('Envoyer un rapport test « Certificats expirants » pour vérifier la livraison par courriel.')
-    expect(within(dialog).getByLabelText('Courriel du destinataire')).toBeInTheDocument()
+    expect(dialog).toHaveTextContent('Envoyer un rapport test « Certificats expirants » pour vérifier la livraison par e-mail.')
+    expect(within(dialog).getByLabelText('E-mail du destinataire')).toBeInTheDocument()
   })
 
   it('links to the certificates a report lists', () => {

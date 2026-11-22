@@ -274,7 +274,7 @@ En mode FIPS, réutiliser la clé d’un certificat source est refusé quand FIP
 ### Preflight (test à blanc)
 **Lancer le preflight** sur le formulaire de demande valide toute la requête contre le répertoire **staging** de Let’s Encrypt, sans consommer les limites de production :
 
-- Vérifie la syntaxe des domaines, l’email de contact, le compte ACME / EAB et la connectivité AC
+- Vérifie la syntaxe des domaines, l’e-mail de contact, le compte ACME / EAB et la connectivité AC
 - Le mode **Complet** crée un ordre staging et prévisualise les enregistrements TXT \`_acme-challenge\` exacts à publier
 - **Validation seule** vérifie configuration et connectivité sans créer d’ordre
 - Peut vérifier la propagation DNS des TXT une fois les enregistrements ajoutés
@@ -339,7 +339,7 @@ Le proxy ACME permet aux clients internes de demander des certificats à une AC 
 2. Faites défiler jusqu’à la section **Proxy ACME**
 3. Sélectionnez un **Compte AC en amont** dans **Autorités de certification (AC)** (Let’s Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
 4. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec l’AC en amont
-5. Enregistrez le compte amont si nécessaire (email + **Enregistrer le compte**)
+5. Enregistrez le compte amont si nécessaire (e-mail + **Enregistrer le compte**)
 6. UCM enregistre automatiquement un compte à la première requête proxy si ce n’est pas déjà fait
 
 ### Chemins proxy dédiés (multi-AC)
