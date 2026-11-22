@@ -1319,6 +1319,13 @@ def create_app(config_name=None):
         from utils.response import error_response
         return error_response(str(e), 400, details={'allowed_sort_by': e.allowed})
 
+    from auth.session_lock import SessionLocked
+
+    @app.errorhandler(SessionLocked)
+    def handle_session_locked(e):
+        from auth.session_lock import locked_refusal
+        return locked_refusal()
+
     @app.errorhandler(404)
     def handle_404(e):
         if request.path.startswith('/api/'):

@@ -23,14 +23,17 @@ def account_proof(user) -> str:
     return created.isoformat() if created else ''
 
 
-def begin_session(user):
+def begin_session(user, unlocking=False):
     """Empty session under a new identifier, bound to ``user``'s session version and
     to the epoch read as the request started, before its credentials were checked.
 
     Every login goes through here: an identifier planted before the login never
-    becomes an authenticated session.
+    becomes an authenticated session, and a locked session is replaced only by its unlock.
     """
     from auth.session_epoch import SESSION_KEY, request_epoch
+    from auth.session_lock import SessionLocked, is_locked
+    if is_locked() and not unlocking:
+        raise SessionLocked()
     session.clear()
     session['session_version'] = user.session_version or 0
     session[ACCOUNT_KEY] = account_proof(user)

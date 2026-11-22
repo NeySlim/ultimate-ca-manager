@@ -252,7 +252,28 @@ X-CSRF-Token: <token>
   "reason": "manual"
 }
 ```
-Closes the caller's session as a sign-out does, on every node of a shared session store; unlocking is a new sign-in. Needs an interactive session and its CSRF token (an API key gets 403). `reason` is `manual` (the default) or `idle` (the console's inactivity lock); the audit records `session_locked` with it.
+Locks the caller's session: it keeps its account, on every node of a shared session store, and serves nothing until that account unlocks it or signs out. Needs an interactive session and its CSRF token (an API key gets 403); locking a locked session again changes nothing. `reason` is `manual` (the default) or `idle` (the console's inactivity lock); the audit records `session_locked` with it.
+
+While the session is locked, every route that needs a session answers `401` with the problem type `urn:ucm:problem:session-locked` (not `authentication-required`) and `details.username` and `details.reason` (`manual` or `inactivity`). A client certificate presented, an SSO return (`/login?error=session_locked`) or any sign-in door (`401` locked) never reopens or replaces it; `POST /api/v2/auth/logout` still ends it, and an API key sent with the cookie is its own credential. `GET /api/v2/auth/verify` answers `authenticated: false` with a `locked` block (`username`, `name`, `role`, `method`, `reason`, and `methods`: the unlock methods of the account on this instance, among `password`, `certificate`, `passkey`) and the CSRF token the unlock needs.
+
+### Unlock Session
+```http
+POST /api/v2/auth/unlock/password
+X-CSRF-Token: <token>
+
+{
+  "password": "..."
+}
+```
+```http
+POST /api/v2/auth/unlock/2fa
+POST /api/v2/auth/unlock/2fa/webauthn/options
+POST /api/v2/auth/unlock/2fa/webauthn/verify
+POST /api/v2/auth/unlock/certificate
+POST /api/v2/auth/unlock/webauthn/options
+POST /api/v2/auth/unlock/webauthn/verify
+```
+Lifts the lock with a factor of the session's own account and opens a new session for it under a new identifier, answered like a sign-in (`user`, `permissions`, `auth_method`, `csrf_token`, and `requires_2fa_enrollment` when an enrolment is enforced). The password is checked locally, or at the account's LDAP directory for a session it opened or an account without a local password; when the account has a second factor the answer is `{"requires_2fa": true, "methods": [...]}` and the lock stays until `unlock/2fa` (TOTP or recovery code, body `{"code": "..."}`) or the security key (`unlock/2fa/webauthn/options`, then `verify` with `{"response": {...}}`). `unlock/certificate` takes the client certificate of the request, refused when it belongs to another account or mTLS is off (`400`). `unlock/webauthn/options` then `verify` (`{"response": {...}}`) take a passkey of the account. Password, second-factor and passkey attempts count against the same limits as at the sign-in (the account lockout; `429` with `Retry-After` for a second factor or a passkey), and every attempt is audited: `session_unlocked` with the method, `session_unlock_failure` with the method and the reason (a certificate or passkey of another account is named). `401` locked stays the answer of every other route until then; without a locked session the unlock routes answer `409` (session open) or `401`.
 
 ### Forgot Password
 ```http

@@ -27,7 +27,8 @@ _AT_START = 'session_epoch_at_start'
 
 # Every route that calls begin_session, and the few beside them that prepare a login;
 # the certificate middleware reads for itself.
-LOGIN_PATHS = ('/api/v2/auth/login', '/api/v2/sso/ldap/login', '/api/v2/sso/callback/')
+LOGIN_PATHS = ('/api/v2/auth/login', '/api/v2/sso/ldap/login', '/api/v2/sso/callback/',
+               '/api/v2/auth/unlock/')
 
 
 def opens_sessions(path) -> bool:

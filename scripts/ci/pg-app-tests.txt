@@ -30,6 +30,7 @@ tests/test_session_epoch_pg.py
 tests/test_redis_sessions_pg.py
 tests/test_factor_change_sessions.py
 tests/test_session_lock_and_info.py
+tests/test_session_lock_unlock.py
 tests/test_dashboard*.py
 tests/test_protocol_approval_*.py
 tests/test_approval_legacy_hex_serial.py

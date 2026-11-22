@@ -56,12 +56,20 @@ def login():
 
 
 @bp.route('/api/v2/auth/logout', methods=['POST'])
-@require_auth()
 def logout():
-    """
-    Logout endpoint
-    Clears session (for session-based auth)
-    """
+    """Sign out: clears the session, a locked one too (the lock screen's way to another account)."""
+    from auth.session_lock import locks_this_request
+    if locks_this_request():
+        return _sign_out()
+    return _logout_signed_in()
+
+
+@require_auth()
+def _logout_signed_in():
+    return _sign_out()
+
+
+def _sign_out():
     username = session.get('username', 'unknown')
     
     # Audit log
@@ -84,14 +92,19 @@ def logout():
 
 
 @bp.route('/api/v2/auth/lock', methods=['POST'])
-@require_auth(session_only=True)
 def lock():
-    """Close the session behind the lock screen, by hand or after inactivity.
+    """Lock the session, by hand or after inactivity: it keeps its account and serves nothing
+    until that account unlocks it (/auth/unlock/*), on every node of a shared store."""
+    from auth.session_lock import locks_this_request
+    if locks_this_request():
+        return success_response(message='Session locked')
+    return _lock_signed_in()
 
-    The session ends here exactly as on sign-out, on every node of a shared store;
-    unlocking is a new sign-in. Only the audit tells the two locks apart.
-    """
+
+@require_auth(session_only=True)
+def _lock_signed_in():
     from flask import g
+    from auth.session_lock import lock_session
     data = request.get_json(silent=True) or {}
     reason = 'inactivity' if isinstance(data, dict) and data.get('reason') == 'idle' else 'manual'
     username = session.get('username') or g.current_user.username
@@ -101,7 +114,7 @@ def lock():
                               details=f'Session locked by {username} ({reason})')
     except Exception as e:
         logger.warning(f"Non-blocking: failed to audit-log the lock of {username}: {e}", exc_info=True)
-    session.clear()
+    lock_session(reason)
     return success_response(message='Session locked')
 
 
@@ -123,6 +136,15 @@ def verify():
     auth_result = verify_request_auth()
     
     if not auth_result:
+        # A locked session: its account and unlock methods, and the CSRF token the unlock needs
+        from auth.session_lock import locked_summary, locks_this_request
+        if locks_this_request():
+            return success_response(data={
+                'authenticated': False,
+                'locked': locked_summary(),
+                'csrf_token': (CSRFProtection.generate_token(session['user_id'])
+                               if HAS_CSRF and session.get('user_id') else None),
+            })
         # Check for mTLS certificate error in request context (set by middleware)
         cert_error = getattr(g, 'cert_error', None)
         

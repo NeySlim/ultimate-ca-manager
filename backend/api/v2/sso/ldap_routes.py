@@ -50,6 +50,10 @@ def ldap_login():
     become an account oracle. tests/test_auth_failure_messages.py pins the
     wording of both doors and the order the reasons are decided in.
     """
+    from auth.session_lock import refuse_sign_in_while_locked
+    refused = refuse_sign_in_while_locked('LDAP')
+    if refused:
+        return refused
 
     data = request.get_json()
 
