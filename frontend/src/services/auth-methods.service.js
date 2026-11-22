@@ -92,6 +92,42 @@ class AuthMethodsService {
     return response.data
   }
 
+  // Unlock a locked session with a factor of its account (the server knows which account)
+  async unlockPassword(password) {
+    const response = await apiClient.post('/auth/unlock/password', { password })
+    return response.data
+  }
+
+  async unlock2FA(code) {
+    const response = await apiClient.post('/auth/unlock/2fa', { code })
+    return response.data
+  }
+
+  async unlock2FAWebAuthn() {
+    if (!this.isWebAuthnSupported()) {
+      throw new Error('WebAuthn not supported by this browser')
+    }
+    const { data } = await apiClient.post('/auth/unlock/2fa/webauthn/options', {})
+    const credentialData = await this.getAssertion(data.options)
+    const response = await apiClient.post('/auth/unlock/2fa/webauthn/verify', { response: credentialData })
+    return response.data
+  }
+
+  async unlockCertificate() {
+    const response = await apiClient.post('/auth/unlock/certificate', {})
+    return response.data
+  }
+
+  async unlockPasskey() {
+    if (!this.isWebAuthnSupported()) {
+      throw new Error('WebAuthn not supported by this browser')
+    }
+    const { data } = await apiClient.post('/auth/unlock/webauthn/options', {})
+    const credentialData = await this.getAssertion(data.options)
+    const response = await apiClient.post('/auth/unlock/webauthn/verify', { response: credentialData })
+    return response.data
+  }
+
   /**
    * Check if WebAuthn is supported by browser
    * @returns {boolean}

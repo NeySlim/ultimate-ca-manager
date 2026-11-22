@@ -101,6 +101,56 @@ test.describe('sign-in and session', () => {
     await expect(other).toHaveURL(url => url.pathname === '/login')
   })
 
+  test('the server keeps the lock: the API refuses it, a new tab shows the lock screen, the password unlocks', async ({ api, signIn }) => {
+    const user = await createUser(api, 'viewer')
+    const { page } = await signIn(user.username, user.password)
+    await page.goto('/certificates')
+    await expect(page.getByRole('button', { name: /^Account: / })).toBeVisible()
+    await page.locator('body').press('Alt+Shift+L')
+    await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+
+    const refused = await page.request.get('/api/v2/certificates')
+    expect(refused.status()).toBe(401)
+    expect((await refused.json()).type).toBe('urn:ucm:problem:session-locked')
+    const verify = (await (await page.request.get('/api/v2/auth/verify')).json()).data
+    expect(verify).toMatchObject({ authenticated: false, locked: { username: user.username, methods: ['password'] } })
+
+    // A tab opened afterwards knows nothing of the lock but what the server says
+    const other = await page.context().newPage()
+    await other.goto('/certificates')
+    await expect(other.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    await expect(other.getByText('You locked the session.', { exact: false })).toBeVisible()
+    await other.getByLabel('Password', { exact: true }).fill(`${user.password}-wrong`)
+    await other.getByRole('button', { name: 'Unlock' }).click()
+    await expect(other.getByText('Incorrect password', { exact: false })).toBeVisible()
+    await other.getByLabel('Password', { exact: true }).fill(user.password)
+    await other.getByRole('button', { name: 'Unlock' }).click()
+    await expect(other).toHaveURL(url => url.pathname === '/certificates')
+    expect((await (await other.request.get('/api/v2/auth/verify')).json()).data.authenticated).toBe(true)
+  })
+
+  test('the lock screen of an account without a password has no password field', async ({ api, signIn }) => {
+    const user = await createUser(api, 'viewer')
+    const { page } = await signIn(user.username, user.password)
+    // The server's answer for an account whose only factors are elsewhere (an SSO account)
+    await page.route('**/api/v2/auth/verify', async (route) => {
+      const response = await route.fetch()
+      const body = await response.json()
+      if (body?.data?.locked) body.data.locked.methods = []
+      await route.fulfill({ response, json: body })
+    })
+    await page.goto('/certificates')
+    await expect(page.getByRole('button', { name: /^Account: / })).toBeVisible()
+    await page.locator('body').press('Alt+Shift+L')
+    await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    await expect(page.getByText('no password, certificate or passkey', { exact: false })).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0)
+    // Signing out is the way left: the server ends the locked session
+    await page.getByRole('button', { name: 'Sign in with another account' }).click()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
+    await expect.poll(async () => (await (await page.request.get('/api/v2/auth/verify')).json()).data.locked ?? null).toBeNull()
+  })
+
   test('a session ended by the server sends the next action back to the sign-in page', async ({ api, signIn, request }) => {
     const user = await createUser(api, 'viewer')
     const { page } = await signIn(user.username, user.password)
