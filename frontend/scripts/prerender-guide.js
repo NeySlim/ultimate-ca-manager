@@ -48,6 +48,7 @@ async function main() {
       for (const chapter of CHAPTERS) {
         const drawn = await renderChapter(lang, chapter)
         if (!drawn.html.includes('id="guide-article"')) throw new Error(`guide prerender: ${lang}/${chapter} has no article`)
+        if (drawn.html.includes('guide-wait')) throw new Error(`guide prerender: ${lang}/${chapter} drew its loader, not its text`)
         const page = chapterPage(template, { lang, chapter, ...drawn })
         fs.writeFileSync(path.join(out, lang, `${chapter}.html`), page)
         bytes += Buffer.byteLength(page)

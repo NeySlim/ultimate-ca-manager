@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import logging
 import os
+import posixpath
 import re
 
 ui_bp = Blueprint('ui', __name__)
@@ -23,6 +24,8 @@ FRONTEND_DIR = _dist_dir if (_dist_dir / "index.html").exists() else _frontend_b
 PRERENDER_DIRNAME = 'guide-prerender'
 # The languages of the help; any other interface language reads the English one
 GUIDE_LANGUAGES = ('en', 'fr', 'ru', 'zh')
+# The interface's languages: the browser's choice among them, as the client makes it
+UI_LANGUAGES = ('en', 'fr', 'de', 'es', 'it', 'pt', 'uk', 'ru', 'zh', 'ja')
 _CHAPTER = re.compile(r'^[A-Za-z][A-Za-z0-9-]{0,63}$')
 _THEME_FAMILIES = ('atelier', 'aurore')
 _THEME_MODES = ('light', 'dark')
@@ -65,12 +68,13 @@ def _preferences(user):
 
 
 def _guide_language(prefs):
-    """The account's language, else the browser's among the help's, else English."""
+    """The account's language, else the browser's among the interface's; English when it has no help."""
     chosen = prefs.get('language')
     if isinstance(chosen, str) and chosen.strip():
         key = chosen.strip()[:2].lower()
-        return key if key in GUIDE_LANGUAGES else 'en'
-    return request.accept_languages.best_match(GUIDE_LANGUAGES) or 'en'
+    else:
+        key = request.accept_languages.best_match(UI_LANGUAGES) or 'en'
+    return key if key in GUIDE_LANGUAGES else 'en'
 
 
 def _theme_attributes(prefs):
@@ -154,7 +158,9 @@ def spa(path):
     # The guide's chapters: drawn in the page for a valid session, never served as files
     if path == 'guide' or path.startswith('guide/'):
         return _serve_guide(path[len('guide/'):] if path.startswith('guide/') else None)
-    if path == PRERENDER_DIRNAME or path.startswith(PRERENDER_DIRNAME + '/'):
+    # Compared once normalised: send_from_directory would resolve /./guide-prerender/… or /x/../guide-prerender/…
+    plain = posixpath.normpath('/' + path).lstrip('/')
+    if plain == PRERENDER_DIRNAME or plain.startswith(PRERENDER_DIRNAME + '/'):
         return _serve_index()
 
     # SPECIAL: Serve demo file if requested

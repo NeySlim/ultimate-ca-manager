@@ -151,7 +151,9 @@ def test_an_account_language_without_a_help_reads_english(app, dist, reader, cho
 @pytest.mark.parametrize('header, lang', [
     ('ru-RU,ru;q=0.9,en;q=0.5', 'ru'),
     ('zh-CN', 'zh'),
-    ('de-DE,de;q=0.9,fr;q=0.4', 'fr'),
+    ('fr-FR,fr;q=0.9', 'fr'),
+    # The client reads German, as the browser asks: English help, not the French further down the list
+    ('de-DE,de;q=0.9,fr;q=0.4', 'en'),
     ('de-DE,de;q=0.9', 'en'),
     ('', 'en'),
 ])
@@ -192,7 +194,8 @@ def test_a_language_whose_page_is_missing_gets_index_html(app, dist, reader):
 
 
 def test_the_drawn_pages_are_never_served_as_files(app, dist, reader):
-    for path in ('/guide-prerender/fr/cas.html', '/guide-prerender/en/acme.html', '/guide-prerender'):
+    for path in ('/guide-prerender/fr/cas.html', '/guide-prerender/en/acme.html', '/guide-prerender',
+                 '/./guide-prerender/en/cas.html', '/assets/../guide-prerender/en/cas.html', '/%2e/guide-prerender/fr/cas.html'):
         _undrawn(_signed_in(app, reader.id).get(path))
 
 
