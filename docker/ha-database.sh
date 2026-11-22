@@ -158,8 +158,16 @@ ucm_carry_old_data_paths() {
             [ -e "$item" ] || continue
             name=$(basename "$item")
             [ "$name" != cas ] || name=ca
+            # A database's -wal and -journal go with it, never beside another database
+            case $name in ucm.db-wal|ucm.db-shm|ucm.db-journal) continue ;; esac
             if [ ! -e "$data/$name" ]; then
                 echo -e "${YELLOW:-}   Migrating $(basename "$item") → $name...${NC:-}"
+                if [ "$name" = ucm.db ]; then
+                    rm -f "$data/ucm.db-wal" "$data/ucm.db-shm" "$data/ucm.db-journal"
+                    for sub in -wal -journal; do
+                        [ ! -e "$item$sub" ] || cp -a "$item$sub" "$data/$name$sub" 2>/dev/null || true
+                    done
+                fi
                 cp -a "$item" "$data/$name" 2>/dev/null || true
             elif [ -d "$item" ] && [ -d "$data/$name" ]; then
                 for sub in "$item"/*; do
@@ -177,17 +185,22 @@ ucm_carry_old_data_paths() {
 
 # The database itself says whether this start upgrades it: a migration of the image missing from
 # its registry, or the serial step left to run again. Read-only; any doubt counts as an upgrade.
-# A WAL database is not opened: a read-only open would create its -wal and -shm files.
+# A database whose -wal or -journal holds data is not opened (reading it would write); a WAL one
+# is read with immutable=1, since a read-only open would create its -wal and -shm files.
 ucm_sqlite_upgrade_possible() {
     python3 -I - "$UCM_DATABASE_PATH" "${UCM_MIGRATIONS_DIR:-/opt/ucm/backend/migrations}" <<'PY' 2>/dev/null && return 1
 import pathlib, sqlite3, sys
 path = pathlib.Path(sys.argv[1]).resolve()
 with open(path, "rb") as f:
     head = f.read(20)
-if head[:16] != b"SQLite format 3\0" or head[18:20] != b"\1\1":
+if head[:16] != b"SQLite format 3\0" or head[18:20] not in (b"\1\1", b"\2\2"):
     sys.exit(1)
+for suffix in ("-wal", "-journal"):
+    log = path.with_name(path.name + suffix)
+    if log.exists() and log.stat().st_size:
+        sys.exit(1)
 names = {p.stem for p in pathlib.Path(sys.argv[2]).glob("*.py") if not p.name.startswith("_")}
-db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+db = sqlite3.connect(path.as_uri() + ("?immutable=1" if head[18:20] == b"\2\2" else "?mode=ro"), uri=True)
 applied = {row[0] for row in db.execute("SELECT name FROM _migrations")}
 tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 pending = "system_config" in tables and db.execute(
@@ -240,6 +253,8 @@ ucm_sqlite_disk_room() {
     local db_dir bytes size_kb size_mb db_need=0 copy_need=0 db_df="" copy_df="" short=false shared_dir
     db_dir=$(dirname "$UCM_DATABASE_PATH")
     bytes=$(stat -c %s "$UCM_DATABASE_PATH" 2>/dev/null || wc -c < "$UCM_DATABASE_PATH")
+    # The writes still in the WAL are part of the database, and of its copy
+    bytes=$(( bytes + $(stat -c %s "$UCM_DATABASE_PATH-wal" 2>/dev/null || echo 0) ))
     size_kb=$(( (bytes + 1023) / 1024 ))
     size_mb=$(( (size_kb + 1023) / 1024 ))
     ucm_sqlite_upgrade_possible && db_need=$size_kb
@@ -299,12 +314,21 @@ ucm_sqlite_check_and_backup() {
             BACKUP_DIR="$UCM_SQLITE_BACKUP_DIR"
             BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
 
-            # Create backup
+            # Create backup: writes still in the WAL are copied with the file, then folded into it
             cp "$UCM_DATABASE_PATH" "$BACKUP_FILE"
+            if [ -s "$UCM_DATABASE_PATH-wal" ]; then
+                cp "$UCM_DATABASE_PATH-wal" "$BACKUP_FILE-wal"
+                python3 -I -c 'import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.execute("PRAGMA journal_mode=DELETE")
+c.close()' "$BACKUP_FILE" 2>/dev/null \
+                    || echo -e "${YELLOW:-}   The backup keeps its -wal file beside it: copy both together${NC:-}"
+            fi
             echo -e "${GREEN:-}✅ Database backup created${NC:-}"
 
             # Clean old backups
-            find "$BACKUP_DIR" -name "ucm-backup-*.db" -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
+            find "$BACKUP_DIR" \( -name "ucm-backup-*.db" -o -name "ucm-backup-*.db-wal" \) \
+                -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
         fi
     fi
 }

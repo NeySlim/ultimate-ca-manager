@@ -347,6 +347,7 @@ def test_the_check_creates_and_changes_nothing(tmp_path, case):
     import sqlite3
     import sys
     env = _env(tmp_path, 'false')
+    env['PATH'] = f'{pathlib.Path(sys.executable).parent}:/usr/bin:/bin'
     _database(tmp_path, NAMES)
     db = tmp_path / 'ucm.db'
     if case.startswith('wal'):
@@ -371,8 +372,61 @@ def test_the_check_creates_and_changes_nothing(tmp_path, case):
     before = _files(tmp_path)
     r = _run(_df(0) + _START, env, tmp_path)
     assert _files(tmp_path) == before
-    # neither case can be read without writing: both count as an upgrade
-    assert r.returncode != 0 and 'upgrading it needs' in r.stdout, r.stdout
+    if case == 'wal':
+        # 3.x runs in WAL: an empty log is read with immutable=1, the registry decides
+        assert r.returncode == 0, r.stdout + r.stderr
+    else:
+        # a log that holds data cannot be read without writing: it counts as an upgrade
+        assert r.returncode != 0 and 'upgrading it needs' in r.stdout, r.stdout
+
+
+def test_the_pre_start_copy_holds_the_commits_still_in_the_wal(tmp_path):
+    """A copy of the main file alone would miss them; the copy is one file, the live database
+    is left as it was."""
+    import sqlite3
+    from tests.test_sqlite_wal import wal_with_pending_commit
+    env = _env(tmp_path, 'true')
+    env['PATH'] = f'{pathlib.Path(sys.executable).parent}:/usr/bin:/bin'
+    live = tmp_path / 'live'
+    live.mkdir()
+    env['UCM_DATABASE_PATH'] = str(live / 'ucm.db')
+    wal_with_pending_commit(live / 'ucm.db')
+    before = _files(live)
+    backups = tmp_path / 'backups'
+    backups.mkdir()
+    r = _run(_df(10 ** 7) + f'UCM_SQLITE_BACKUP_DIR={backups}; ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _files(live) == before
+    copies = sorted(backups.iterdir())
+    assert len(copies) == 1 and copies[0].name.endswith('.db'), copies
+    conn = sqlite3.connect(copies[0])
+    assert sorted(v for (v,) in conn.execute('SELECT v FROM t')) == ['first', 'last']
+    assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+    conn.close()
+
+
+def test_a_database_carried_from_an_old_path_brings_its_wal_and_drops_a_stale_one(tmp_path):
+    """The -wal beside the old database holds its last commits; one already in the data (left
+    by another database) must not be read with it."""
+    import shutil
+    import sqlite3
+    from tests.test_sqlite_wal import wal_with_pending_commit
+    data, old, other = tmp_path / 'data', tmp_path / 'old', tmp_path / 'other'
+    for d in (data, old, other):
+        d.mkdir()
+    wal_with_pending_commit(old / 'ucm.db')
+    wal_with_pending_commit(other / 'ucm.db', 'foreign')
+    shutil.copyfile(other / 'ucm.db-wal', data / 'ucm.db-wal')
+    (data / 'ucm.db-shm').write_bytes(b'\0' * 32768)
+    env = {'DATA_PATH': str(data), 'UCM_OLD_DATA_PATHS': str(old),
+           'UCM_DATABASE_PATH': str(data / 'ucm.db')}
+    r = _run('ucm_carry_old_data_paths', env, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert sorted(p.name for p in data.iterdir()) == ['ucm.db', 'ucm.db-wal']
+    conn = sqlite3.connect(data / 'ucm.db')
+    assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+    assert sorted(v for (v,) in conn.execute('SELECT v FROM t')) == ['first', 'last']
+    conn.close()
 
 
 @pytest.mark.parametrize('python3', [
