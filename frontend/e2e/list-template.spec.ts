@@ -365,15 +365,19 @@ test.describe('on a phone', () => {
     // A date after its column's label, no fact reduced to a dash
     const facts = await records.locator('.row-meta > span').allTextContents()
     expect(facts.filter((f) => f.trim() === '—')).toEqual([])
-    expect(await records.first().locator('.row-meta > span').first().textContent()).toMatch(/^Next Update \S/)
+    expect(await records.first().locator('.row-meta > span').first().textContent()).toMatch(/^Next update \S/)
     // The fact's label is muted beside its value (G9)
     const fact = records.first().locator('.row-meta > span').first()
     expect(await fact.evaluate((s) => getComputedStyle(s).color)).not.toBe(await fact.locator('.fact-label').evaluate((l) => getComputedStyle(l).color))
     const select = page.getByRole('combobox', { name: 'Sort by' })
     await expect(select).toHaveValue('next')
     await select.selectOption('name')
-    const names = await records.locator('.entity-name').allTextContents()
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true })))
+    // The sort goes through the address: the records are read once it has applied
+    const byName = async () => {
+      const names = await records.locator('.entity-name').allTextContents()
+      return names.join('|') === [...names].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true })).join('|')
+    }
+    await expect.poll(byName).toBe(true)
     // The reverse button shows the direction and says it (G8)
     await page.getByRole('button', { name: 'Ascending order, reverse' }).click()
     await expect(page).toHaveURL(/sort=name&order=desc/)
