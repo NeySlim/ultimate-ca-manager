@@ -13,7 +13,7 @@
 Colors are **not** hardcoded. `ThemeContext.jsx` sets `data-theme` and
 `data-mode` on `<html>`; `styles/tokens.css` holds one block per
 `[data-theme][data-mode]` pair (bare `:root` = Atelier dark, the fallback).
-There are **2 theme families** × **2 modes**, the five choices of the theme menu (System, Dark, Light, Aurore dark, Aurore light):
+There are **2 theme families** × **2 modes**; the theme menu picks the family (Atelier, Aurore) and the mode (System, Dark, Light) apart, System resolving to dark or light in either family:
 
 | Family | `id` | Accent | Modes |
 |--------|------|--------|-------|
