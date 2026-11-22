@@ -269,14 +269,15 @@ export default function ESTPage() {
   return (
     <Zone dock={view === 'list' ? dock : null}>
       <PageHead title="EST" intent={t('shell.moduleDesc.est')}
-        total={view === 'config' ? t('protocols.sections', { count: sections.length }) : t('est.unit', { count: endpoints.length })}
-        actions={<ViewSwitch id="est-view" label={t('protocols.view')} value={view} onChange={setView}
-          options={[{ value: 'list', label: t('est.views.list') }, { value: 'config', label: t('tsa.views.config') }]} />} />
-      {view === 'list' ? listView : loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? listView : (
-        <SettingsView sections={sections} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
-          onReset={() => { setDraft(saved); setRows(toRows(config.labels)); setTried(false) }} saving={saving} failed={failed} announce={announce}
-          stateRef={stateRef} tocLabel={t('protocols.sectionsOf', { name: 'EST' })} />
-      )}
+        total={view === 'config' ? t('protocols.sections', { count: sections.length }) : t('est.unit', { count: endpoints.length })} />
+      <ViewSwitch id="est-view" label={t('protocols.view')} value={view} onChange={setView}
+        options={[{ value: 'list', label: t('est.views.list'), count: loading ? null : endpoints.length }, { value: 'config', label: t('tsa.views.config') }]}>
+        {view === 'list' ? listView : loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? listView : (
+          <SettingsView sections={sections} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
+            onReset={() => { setDraft(saved); setRows(toRows(config.labels)); setTried(false) }} saving={saving} failed={failed} announce={announce}
+            stateRef={stateRef} tocLabel={t('protocols.sectionsOf', { name: 'EST' })} />
+        )}
+      </ViewSwitch>
     </Zone>
   )
 }

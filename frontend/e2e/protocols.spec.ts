@@ -1,6 +1,6 @@
 import { test, expect, uid } from './support/fixtures'
 
-// The configuration of a protocol page is a view of its page switch, saved by the form's save bar
+// The configuration of a protocol page is one of its view tabs, saved by the form's save bar
 const save = (page) => page.locator('#settings-save').click()
 
 test('SCEP: a configuration saved on screen is read back', async ({ page, api }) => {
@@ -17,7 +17,7 @@ test('SCEP: a configuration saved on screen is read back', async ({ page, api })
 
 test('EST: a configuration saved on screen is read back', async ({ page, api }) => {
   await page.goto('/est-config')
-  await page.getByLabel('View', { exact: true }).selectOption('config')
+  await page.getByRole('tablist', { name: 'View' }).getByRole('tab', { name: 'Configuration' }).click()
   const enable = page.getByRole('checkbox', { name: /Enable EST Server/ })
   if (!(await enable.isChecked())) await enable.click()
   const user = uid('est').replace(/-/g, '')
@@ -31,7 +31,7 @@ test('EST: a configuration saved on screen is read back', async ({ page, api }) 
 
 test('ACME: a local server setting saved on screen is read back', async ({ page, api }) => {
   await page.goto('/acme')
-  await page.getByLabel('View', { exact: true }).selectOption('config')
+  await page.getByRole('tablist', { name: 'View' }).getByRole('tab', { name: 'Server settings' }).click()
   const issuer = `${uid('caa')}.example.com`
   await page.getByLabel('CAA issuer identifiers').fill(issuer)
   await save(page)

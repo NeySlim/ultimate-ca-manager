@@ -312,14 +312,15 @@ openssl ts -reply -in response.tsr -text`}</pre>
       </FormModal>
     )}>
       <PageHead title="TSA" intent={t('shell.moduleDesc.tsa')}
-        total={view === 'config' ? t('protocols.sections', { count: sections.length }) : t('tsa.unit', { count: service.length })}
-        actions={<ViewSwitch id="tsa-view" label={t('protocols.view')} value={view} onChange={setView}
-          options={[{ value: 'list', label: t('tsa.views.list') }, { value: 'config', label: t('tsa.views.config') }]} />} />
-      {view === 'list' ? listView : loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? listView : (
-        <SettingsView sections={sections} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
-          onReset={() => setDraft(saved)} saving={saving} failed={failed} announce={announce} stateRef={stateRef}
-          tocLabel={t('protocols.sectionsOf', { name: 'TSA' })} />
-      )}
+        total={view === 'config' ? t('protocols.sections', { count: sections.length }) : t('tsa.unit', { count: service.length })} />
+      <ViewSwitch id="tsa-view" label={t('protocols.view')} value={view} onChange={setView}
+        options={[{ value: 'list', label: t('tsa.views.list'), count: loading ? null : service.length }, { value: 'config', label: t('tsa.views.config') }]}>
+        {view === 'list' ? listView : loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? listView : (
+          <SettingsView sections={sections} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
+            onReset={() => setDraft(saved)} saving={saving} failed={failed} announce={announce} stateRef={stateRef}
+            tocLabel={t('protocols.sectionsOf', { name: 'TSA' })} />
+        )}
+      </ViewSwitch>
     </Zone>
   )
 }

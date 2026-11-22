@@ -694,16 +694,16 @@ crypto ca enroll UCM-CA`}</pre>
       )}
     </>}>
       <PageHead title="SCEP" total={totals[view]} intent={t('shell.moduleDesc.scep')}
-        actions={<>
-          <ViewSwitch id="scep-view" label={t('protocols.view')} value={view} onChange={setView}
-            options={[
-              { value: 'profiles', label: t('scep.profiles') }, { value: 'requests', label: t('scep.requests') },
-              { value: 'challenges', label: t('scep.views.challenges') }, { value: 'intune', label: t('scep.intuneApps') },
-              { value: 'config', label: t('common.config') },
-            ]} />
-          {create}
-        </>} />
-      {{ profiles: profilesView, requests: requestsView, challenges: challengesView, intune: intuneView, config: configView }[view]}
+        actions={create} />
+      <ViewSwitch id="scep-view" label={t('protocols.view')} value={view} onChange={setView}
+        options={[
+          { value: 'profiles', label: t('scep.profiles'), count: loading ? null : profiles.length },
+          { value: 'requests', label: t('scep.requests'), count: loading ? null : stats.total },
+          { value: 'challenges', label: t('scep.views.challenges') }, { value: 'intune', label: t('scep.intuneApps') },
+          { value: 'config', label: t('common.config') },
+        ]}>
+        {{ profiles: profilesView, requests: requestsView, challenges: challengesView, intune: intuneView, config: configView }[view]}
+      </ViewSwitch>
     </Zone>
   )
 }

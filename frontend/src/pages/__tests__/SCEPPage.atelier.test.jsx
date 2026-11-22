@@ -48,6 +48,7 @@ vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual
 
 import { renderAtUrl } from '../../test/dockUrl'
 import SCEPPage from '../SCEPPage'
+import { paletteViews } from '../../navigation/registry'
 
 const PROFILES = [
   { id: 1, name: 'Équipements réseau', url_slug: 'reseau', ca_refid: 'ca-3', ca_name: 'IoT CA', template_name: 'Équipement réseau', challenge_set: true, auto_approve: false, enabled: true, intune_enabled: false },
@@ -225,6 +226,28 @@ describe('the Intune registrations', () => {
     await waitFor(() => expect(scep.deleteIntuneApp).toHaveBeenCalledWith(7))
     expect(notify.showError).toHaveBeenCalledWith('Cannot delete: used by 2 SCEP profile(s): Windows, iOS')
     expect(notify.showConfirm).toHaveBeenCalledWith('scep.intuneAppDeleteConfirm {"name":"Corp Intune"}', expect.anything())
+  })
+})
+
+describe('the SCEP views', () => {
+  it('shows its views as tabs, the profiles and requests counted, the former tab names kept', async () => {
+    at('/scep-config?tab=challenge')
+    const list = await screen.findByRole('tablist', { name: 'protocols.view' })
+    const tabs = within(list).getAllByRole('tab')
+    expect(tabs.map((b) => b.id)).toEqual(['scep-view-tab-profiles', 'scep-view-tab-requests', 'scep-view-tab-challenges', 'scep-view-tab-intune', 'scep-view-tab-config'])
+    expect(within(list).getByRole('tab', { name: /^scep\.views\.challenges/ })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(tabs[0]).toHaveTextContent('scep.profiles2'))
+    expect(tabs[1]).toHaveTextContent('scep.requests3')
+    // The palette offers each view past the first, at its address
+    expect(paletteViews().filter((v) => v.path.startsWith('/scep-config?')).map((v) => v.path))
+      .toEqual(tabs.slice(1).map((b) => `/scep-config?tab=${b.id.replace('scep-view-tab-', '')}`))
+  })
+
+  it('a tab opens its view and keeps it in the address', async () => {
+    const r = renderAtUrl(<SCEPPage />, '/scep-config')
+    fireEvent.click(await screen.findByRole('tab', { name: /^common\.config/ }))
+    await waitFor(() => expect(r.where()).toBe('/scep-config?tab=config'))
+    expect(await screen.findByRole('navigation', { name: /protocols\.sectionsOf/ })).toBeInTheDocument()
   })
 })
 
