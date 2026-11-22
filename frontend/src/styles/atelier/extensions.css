@@ -452,3 +452,8 @@
 /* The journal's resource takes the room left and ends in an ellipsis rather than scroll the region (R1); its title holds it whole */
 .atl .audit-table td.audit-resource{max-width:1px;width:100%;overflow:hidden}
 .atl .audit-table td.audit-resource>.resource{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+/* An inspector lays its overview out by its own width, in the dock as in a floating window: three columns, two, then
+   one, at the widths the viewport rules use for a dock across the page (container queries on the panel). */
+.atl .detail-panel{container-type:inline-size}
+@container (max-width:960px){.atl .detail-overview{gap:20px;grid-template-columns:1fr 1.2fr}.atl .detail-overview>section+section{padding-left:20px}.atl .detail-overview .overview-chain{display:none}}
+@container (max-width:740px){.atl .detail-overview{display:flex;flex-direction:column;gap:20px;height:auto}.atl .detail-overview>section+section{border-left:0;border-top:1px solid var(--line);padding:18px 0 0}.atl .detail-overview .overview-chain{display:block}.atl .extensions{grid-template-columns:1fr;gap:12px}}
