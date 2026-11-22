@@ -5,16 +5,21 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Dock, DockBody, Icon, Pill, Props, RecordList, RecordRow, Section } from '../../components/atelier'
+import { Btn, CodeValue, Dock, DockBody, Facts, Icon, Pill, RecordList, RecordRow, Section } from '../../components/atelier'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
 import { discoveryService } from '../../services'
 import { formatDate } from '../../lib/utils'
-import { extensionRows } from '../../lib/certificateDetail'
+import { extensionRows, serialHex } from '../../lib/certificateDetail'
+import { digestHex } from '../../lib/digestHex'
 import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
 import { FOUND_TONES, RUN_TONES, SCAN_TONES, dnParts, durationLabel, errorHint, foundState, portsOf, runState, targetsOf, runTitle, foundTitle, useScanFacts } from './discoveryModel'
 
 const when = (d) => (d ? formatDate(d, { time: true }) : '—')
 const mono = (v) => <span className="mono">{v}</span>
+// A moment, or the absence in grey when there is none
+const moment = (label, d) => (d ? [label, when(d)] : { label, absent: '—' })
+// Key identifiers are digests: copied whole, in equal lines
+const HEX_EXTENSIONS = new Set(['subject_key_identifier', 'authority_key_identifier'])
 
 export function ScanPill({ state }) {
   const { t } = useTranslation()
@@ -51,11 +56,11 @@ export function ScanDock({ profile, run, runs, state, section, onSection, onClos
         ) : (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
-                [t('discovery.form.range'), targetsOf(profile).join(', ') || '—'],
+              <Facts items={[
+                targetsOf(profile).length ? { label: t('discovery.form.range'), value: targetsOf(profile).join(', '), long: true } : { label: t('discovery.form.range'), absent: '—' },
                 [t('discovery.scans.found'), facts.found(profile, run)],
                 [t('discovery.scans.last'), facts.last(profile, run)],
-                [t('atelier.state'), <ScanPill state={state} />],
+                { label: t('atelier.state'), state: [SCAN_TONES[state], t(`discovery.scans.state.${state}`)] },
                 [t('discovery.ports'), portsOf(profile).join(', ')],
                 [t('discovery.schedule'), facts.schedule(profile)],
                 profile.schedule_enabled && profile.next_scan_at && [t('discovery.scans.next'), when(profile.next_scan_at)],
@@ -82,17 +87,17 @@ export function RunDock({ run, onClose }) {
         sections={[['overview', t('atelier.overview')]]} section="overview" onSection={() => {}} sectionsLabel={t('atelier.sectionsOf', { name: title })}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
+            <Facts items={[
               [t('discovery.profile'), title],
               [t('discovery.certsFound'), run.certs_found ?? 0],
               run.new_certs > 0 && [t('discovery.runs.new'), run.new_certs],
               run.changed_certs > 0 && [t('discovery.runs.changed'), run.changed_certs],
               [t('discovery.targetsScanned'), `${run.targets_scanned ?? 0} / ${run.total_targets ?? '—'}`],
-              [t('discovery.startedAt'), when(run.started_at)],
-              [t('discovery.completedAt'), when(run.completed_at)],
-              [t('discovery.duration'), durationLabel(run.duration_seconds) || '—'],
+              moment(t('discovery.startedAt'), run.started_at),
+              moment(t('discovery.completedAt'), run.completed_at),
+              durationLabel(run.duration_seconds) ? [t('discovery.duration'), durationLabel(run.duration_seconds)] : { label: t('discovery.duration'), absent: '—' },
               run.triggered_by && [t('discovery.runs.trigger'), [t(`discovery.runs.by.${run.triggered_by}`, { defaultValue: run.triggered_by }), run.triggered_by_user].filter(Boolean).join(' · ')],
-              [t('atelier.state'), <RunPill run={run} />],
+              { label: t('atelier.state'), state: [RUN_TONES[runState(run)], t(`discovery.runs.state.${runState(run)}`)] },
             ]} />
           </Section>
         </div>
@@ -118,7 +123,7 @@ export function FoundDock({ cert, onClose, actions }) {
   const days = cert.days_until_expiry
   const dn = (v) => {
     const parts = dnParts(v)
-    return parts.length ? <Props items={parts.map(([k, val], i) => [`${k}${parts.slice(0, i).some(([x]) => x === k) ? ` (${i})` : ''}`, val])} /> : <p className="muted small">—</p>
+    return parts.length ? <Facts items={parts.map(([k, val], i) => [`${k}${parts.slice(0, i).some(([x]) => x === k) ? ` (${i})` : ''}`, val])} /> : <p className="muted small">—</p>
   }
   const exts = extensionRows(c.extensions)
   return (
@@ -131,21 +136,23 @@ export function FoundDock({ cert, onClose, actions }) {
             <div className="notice bad" role="note"><Icon name="warning" /><span><span className="mono">{cert.scan_error}</span>{hint && <><br />{t(hint)}</>}</span></div>
           )}
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('discovery.host'), mono(`${cert.target}:${cert.port || 443}`)],
+            <Facts items={[
+              { label: t('discovery.host'), value: `${cert.target}:${cert.port || 443}`, kind: 'url' },
               cert.sni_hostname && ['SNI', mono(cert.sni_hostname)],
               cert.dns_hostname && [t('discovery.dnsHostname'), cert.dns_hostname],
-              [t('atelier.state'), <FoundPill cert={cert} />],
+              { label: t('atelier.state'), state: [FOUND_TONES[foundState(cert)], t(`discovery.found.state.${foundState(cert)}`)] },
               cert.ucm_certificate_id && [t('discovery.found.inInventory'),
                 <button type="button" className="text-link" onClick={() => openEntity('certificate', cert.ucm_certificate_id)}>#{cert.ucm_certificate_id}</button>],
-              !failed && [t('common.serialNumber'), mono(cert.serial_number || '—')],
-              !failed && [t('common.notBefore'), when(cert.not_before)],
+              !failed && (cert.serial_number
+                ? { label: t('common.serialNumber'), value: serialHex(cert.serial_number), kind: 'hex' }
+                : { label: t('common.serialNumber'), absent: '—' }),
+              !failed && moment(t('common.notBefore'), cert.not_before),
               !failed && [t('common.notAfter'), <>{when(cert.not_after)}{cert.is_expired ? <> · <span className="bad">{t('common.expired')}</span></>
                 : days != null && days <= 30 ? <> · <span className="warn">{t('discovery.found.inDays', { count: days })}</span></> : null}</>],
               c.key_algorithm && [t('common.keyAlgorithm'), `${keyAlgorithmLabel(c.key_algorithm, t, c.security_level)}${c.key_size ? ` ${c.key_size}` : ''}${c.curve ? ` (${c.curve})` : ''}`],
               c.signature_algorithm && [t('common.issuerSignatureAlgorithm'), c.signature_algorithm],
-              [t('discovery.firstSeen'), when(cert.first_seen)],
-              [t('discovery.lastSeen'), when(cert.last_seen)],
+              moment(t('discovery.firstSeen'), cert.first_seen),
+              moment(t('discovery.lastSeen'), cert.last_seen),
               cert.last_changed_at && [t('discovery.lastChanged'), when(cert.last_changed_at)],
             ]} />
           </Section>
@@ -153,15 +160,21 @@ export function FoundDock({ cert, onClose, actions }) {
           {!failed && <Section title={t('common.issuer')}>{dn(cert.issuer)}</Section>}
           {!failed && (exts.length > 0 || cert.san_dns_names?.length > 0 || cert.san_ip_addresses?.length > 0) && (
             <Section title={t('discovery.found.extensions')}>
-              <Props items={exts.length ? exts.map((r) => [r.label, <>{r.values.map((v, i) => <span key={i}>{i > 0 && <br />}{v}</span>)}<br /><small className="mono muted">{r.oid}{r.critical ? ` · ${t('inspector.cert.critical')}` : ''}</small></>])
-                : [[t('discovery.subjectAltNames'), [...(cert.san_dns_names || []), ...(cert.san_ip_addresses || [])].join(', ')]]} />
+              <Facts items={exts.length ? exts.map((r) => ({
+                key: r.key, label: r.label, long: true,
+                value: HEX_EXTENSIONS.has(r.key)
+                  ? <CodeValue value={digestHex(r.values[0])} kind="hex" label={r.label} />
+                  : <>{r.values.map((v, i) => <span key={i}>{i > 0 && <br />}{v}</span>)}</>,
+                sub: <span className="mono">{r.oid}{r.critical ? ` · ${t('inspector.cert.critical')}` : ''}</span>,
+              }))
+                : [{ label: t('discovery.subjectAltNames'), value: [...(cert.san_dns_names || []), ...(cert.san_ip_addresses || [])].join(', '), long: true }]} />
             </Section>
           )}
           {!failed && (c.fingerprint_sha256 || c.fingerprint_sha1) && (
             <Section title={t('common.fingerprint')}>
-              <Props items={[
-                c.fingerprint_sha256 && ['SHA-256', mono(c.fingerprint_sha256)],
-                c.fingerprint_sha1 && ['SHA-1', mono(c.fingerprint_sha1)],
+              <Facts items={[
+                c.fingerprint_sha256 && { label: 'SHA-256', value: digestHex(c.fingerprint_sha256), kind: 'hex' },
+                c.fingerprint_sha1 && { label: 'SHA-1', value: digestHex(c.fingerprint_sha1), kind: 'hex' },
               ]} />
             </Section>
           )}

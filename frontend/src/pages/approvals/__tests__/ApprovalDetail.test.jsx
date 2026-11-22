@@ -4,7 +4,7 @@
  * ask the page for a decision.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const stable = vi.hoisted(() => ({ i18n: null, canWrite: true }))
@@ -72,6 +72,31 @@ describe('ApprovalDetail', () => {
     expect(value('Noms alternatifs ajoutés').innerHTML).toContain('<br>')
     expect(value('Noms alternatifs ajoutés')).toHaveTextContent('DNS : payments.example.comIP : 192.0.2.7')
     await waitFor(() => expect(value('Autorité')).toHaveTextContent('Services CA G2 · niveau 2'))
+  })
+
+  it('types its facts: states in pills, the serial a copyable digest, what is missing in grey, sentences long', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    const { container } = show({ ...PROTOCOL, status: 'approved', resolved_at: '2026-11-08T10:00:00Z', requester_comment: 'Renouvellement du serveur de paiement',
+      approvals: [{ username: 'bob', action: 'approve', timestamp: '2026-11-08T10:00:00Z' }],
+      request_summary: { ...PROTOCOL.request_summary, identity: '', serial_number: '1234', certificate_id: 9 } })
+    expect(container.querySelector('dl.props')).toBeNull()
+    const rows = (term) => screen.getAllByText(term, { selector: 'dt' }).map((dt) => dt.closest('.row'))
+    const [state] = rows('État')
+    expect(state.querySelector('dd.v .badge.good')).toHaveTextContent('Approuvée')
+    expect(rows('Décision')[0].querySelector('dd.v .badge.good')).toHaveTextContent('Approuvée')
+    // The request's reason a sentence on its own row, the decision without one in grey
+    const [asked, decided] = rows('Motif')
+    expect(asked).toHaveClass('long')
+    expect(decided.querySelector('dd.absent')).toHaveTextContent('Aucun')
+    expect(rows('Identité du protocole')[0].querySelector('dd.absent')).toHaveTextContent('—')
+    expect(rows('Sujet')[0]).toHaveClass('long')
+    // The serial as the certificate shows it, copied whole
+    const [serial] = rows('Numéro de série')
+    expect(serial.querySelector('.code-value.hex')).toHaveTextContent('04:D2')
+    fireEvent.click(within(serial).getByRole('button', { name: /Numéro de série/ }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('04:D2'))
   })
 
   it('lists the log, newest first', () => {
