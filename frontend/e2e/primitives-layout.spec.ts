@@ -50,7 +50,7 @@ test('the export dialog is the 760 px dialog with translated actions', async ({ 
   await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible()
 })
 
-test('the theme menu is 220 px: the family and the mode, two groups of choices', async ({ page }) => {
+test('the theme menu is 220 px: the family and the mode, two groups of choices', async ({ page, api }) => {
   await page.goto('/certificates')
   await page.getByRole('button', { name: /^Theme: / }).click()
   const menu = page.getByRole('menu', { name: 'Theme' })
