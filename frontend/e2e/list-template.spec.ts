@@ -231,8 +231,11 @@ test.describe('the sort', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
   test('sorts from the keyboard, keeps the sort in the address and after a reload', async ({ page, api }) => {
-    await createCA(api)
-    await createCA(api)
+    // Two authorities with a published CRL each: their publication dates are what the sort reads
+    for (const ca of [await createCA(api), await createCA(api)]) {
+      await api.post(`/crl/${ca.id}/regenerate`)
+      await expect.poll(async () => (await api.get(`/crl/${ca.id}`))?.crl_number).toBeGreaterThan(0)
+    }
     await open(page, LISTS[2])
     const head = (name: string) => page.locator('#module-scroll thead th').filter({ hasText: name })
     await expect(head('Next Update')).toHaveAttribute('aria-sort', 'ascending')
@@ -244,15 +247,19 @@ test.describe('the sort', () => {
     await page.keyboard.press('Enter')
     await expect(head('Publication')).toHaveAttribute('aria-sort', 'descending')
     await expect(page).toHaveURL(/[?&]sort=published&order=desc/)
-    // The same order after a reload: the authorities other tests create meanwhile may come in, never reorder these
-    const names = () => page.locator('#module-scroll tbody tr .entity-name').allTextContents()
-    const before = await names()
+    // The same order after a reload, read on the dates themselves: authorities other tests create meanwhile may come in
     await page.reload()
     await expect(head('Publication')).toHaveAttribute('aria-sort', 'descending')
     await expect(page.locator('#module-scroll tbody tr .entity-name').first()).toBeVisible()
-    const kept = (await names()).filter((n) => before.includes(n))
-    expect(kept.length).toBeGreaterThan(1)
-    expect(kept).toEqual(before.slice(0, kept.length))
+    const dates = await page.locator('#module-scroll').evaluate((el) => {
+      const at = [...el.querySelectorAll('thead th')].findIndex((th) => th.textContent === 'Publication')
+      return [...el.querySelectorAll('tbody tr')].map((tr) => Date.parse(tr.children[at].textContent || ''))
+    })
+    const known = dates.filter((d) => !Number.isNaN(d))
+    expect(known.length).toBeGreaterThan(1)
+    expect(known).toEqual([...known].sort((x, y) => y - x))
+    // An authority without a CRL comes last
+    expect(dates.slice(0, known.length).every((d) => !Number.isNaN(d))).toBe(true)
     // The change is said to a screen reader
     await head('Name').getByRole('button').click()
     await expect(page.locator('.atl .table-container [aria-live=polite]')).toHaveText('Sorted by Name, ascending order')
