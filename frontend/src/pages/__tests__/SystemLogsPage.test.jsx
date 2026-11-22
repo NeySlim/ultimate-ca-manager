@@ -138,25 +138,25 @@ describe('SystemLogsPage', () => {
     expect([...(await screen.findByLabelText('logs.source')).options].map((o) => o.value))
       .toEqual(['app', 'access'])
     // a component entry that means all of them, so the log itself is reachable
-    expect([...screen.getByLabelText('logs.component').options].map((o) => o.value))
+    expect([...screen.getByRole('combobox', { name: 'logs.component' }).options].map((o) => o.value))
       .toEqual(['', 'api.v2', 'services.scep'])
   })
 
   it('narrows to a component, and back to the whole log', async () => {
     await renderPage()
     fireEvent.click(screen.getByText('logs.filters'))
-    fireEvent.change(await screen.findByLabelText('logs.component'), { target: { value: 'services.scep' } })
+    fireEvent.change(await screen.findByRole('combobox', { name: 'logs.component' }), { target: { value: 'services.scep' } })
     await waitFor(() => expect(mocks.getApplicationLog)
       .toHaveBeenLastCalledWith({ ...BASE, component: 'services.scep' }))
 
-    fireEvent.change(screen.getByLabelText('logs.component'), { target: { value: '' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'logs.component' }), { target: { value: '' } })
     await waitFor(() => expect(mocks.getApplicationLog).toHaveBeenLastCalledWith(BASE))
   })
 
   it('drops the component when another log is picked, as it has none', async () => {
     await renderPage()
     fireEvent.click(screen.getByText('logs.filters'))
-    fireEvent.change(await screen.findByLabelText('logs.component'), { target: { value: 'services.scep' } })
+    fireEvent.change(await screen.findByRole('combobox', { name: 'logs.component' }), { target: { value: 'services.scep' } })
     await waitFor(() => expect(mocks.getApplicationLog)
       .toHaveBeenLastCalledWith({ ...BASE, component: 'services.scep' }))
 
@@ -410,7 +410,7 @@ describe('SystemLogsPage', () => {
   it('shows each filter of the panel as a chip that removes it', async () => {
     await renderPage()
     fireEvent.click(screen.getByText('logs.filters'))
-    fireEvent.change(await screen.findByLabelText('logs.component'), { target: { value: 'services.scep' } })
+    fireEvent.change(await screen.findByRole('combobox', { name: 'logs.component' }), { target: { value: 'services.scep' } })
     await waitFor(() => expect(mocks.getApplicationLog)
       .toHaveBeenLastCalledWith({ ...BASE, component: 'services.scep' }))
     fireEvent.click(screen.getByRole('button', { name: 'common.done' }))

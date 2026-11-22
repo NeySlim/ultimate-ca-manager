@@ -38,8 +38,18 @@
 :root .atl .table-container th>.col-sep:not(.col-resize){position:absolute;top:0;bottom:0;right:0;width:1px;pointer-events:none}
 :root .atl .table-container th>:is(.col-sep,.col-resize):before{content:'';position:absolute;right:0;top:calc(50% - 8px);width:1px;height:16px}
 :root .atl .table-container th>.col-sep:before{background:var(--col-sep)}
-:root .atl .table-container th>.col-resize:hover{background:none}
-:root .atl .table-container th>.col-resize:is(:hover,:active):before{top:0;height:100%;width:2px;background:var(--accent)}
+/* The separator is the handle that sets a column's width (C2): the same line at rest, 12 px to grab across the
+   boundary (inside the cell for the last column, so that it never widens the region), the accent on hover, focus and drag. */
+:root .atl .table-container th>.col-resize{position:absolute;top:0;bottom:0;right:-6px;width:12px;z-index:1;cursor:col-resize;touch-action:none;background:none;outline:none}
+:root .atl .table-container th>.col-resize:before{right:6px}
+:root .atl .table-container th>.col-resize:not(.col-sep){right:0}
+:root .atl .table-container th>.col-resize:not(.col-sep):before{right:0}
+:root .atl .table-container th>.col-resize:is(:hover,:focus-visible,.dragging):before{top:0;height:100%;width:2px;background:var(--accent)}
+:root body.col-resizing,:root body.col-resizing *{cursor:col-resize!important;user-select:none}
+/* Réinitialiser les colonnes sits after the range and the folded columns, the page controls at the right. */
+:root .atl .table-footer .folded-note:has(+.reset-columns){margin-right:0}
+:root .atl .table-footer .reset-columns{margin-right:auto;width:auto;min-height:26px;padding:3px 8px;color:var(--muted)}
+:root .atl .table-footer .reset-columns:is(:hover,:focus-visible){color:var(--text)}
 /* The sorted column says so in the text colour and the weight 600, its arrow has a shaft (E3, R5); a sortable one shows
    a solid sign in its label's colour (R3, E2). Its width is measured with that weight: DataTable measures again on a sort. */
 :root .atl .table-container th:is([aria-sort=ascending],[aria-sort=descending]){color:var(--text);font-weight:600}

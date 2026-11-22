@@ -7,14 +7,16 @@
  * A record that opens keeps its chevron on screen and opens from anywhere on it (adjust.css).
  * The columns follow one contract and one layout (columnShare.js, COLONNES-SPEC).
  */
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMobile } from '../../contexts/MobileContext'
 import { Icon } from './Icon'
 import { FilterSelect } from './Toolbar'
 import { SkeletonRows, SkeletonCards } from './Skeleton'
-import { columnKind, checkColumns, layoutColumns, NAME_TEXT_FLOOR } from './columnShare'
-import { FoldedColumns } from './foldedColumns'
+import { columnKind, checkColumns, layoutColumns, columnBounds, NAME_TEXT_FLOOR, RESIZE } from './columnShare'
+import { FoldedColumns, ColumnsReset } from './foldedColumns'
+import { useColumnWidths, cleanWidths } from './columnWidths'
+import { ResetColumns } from './TableFooter'
 
 // `share`: one column takes the room left, the others their content's width within their bounds (columnShare.js)
 const KINDS = {
@@ -98,17 +100,19 @@ function nameFloor(rows, index) {
 
 /**
  * The layout of the columns at any desktop width: a measuring render (every column at its natural width,
- * table.measuring), then the decision of layoutColumns (ceilings, the absorbing column, the folded ones),
- * both before the browser paints. The region's width, the columns, the rows or the sort changing measure again.
+ * table.measuring), then the decision of layoutColumns (ceilings, the absorbing column, the folded ones, the widths
+ * set by hand it holds), both before the browser paints. The region's width, the columns, the rows or the sort
+ * changing measure again; a width set by hand only decides again. Without measures (a journal) the widths set by
+ * hand hold as they are.
  */
-function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, active }) {
+function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, active, observe, fixed }) {
   const [layout, setLayout] = useState(null)
   const [width, setWidth] = useState(0)
   const key = `${columns.map((c) => c.id).join(',')}|${rowsKey}|${width}|${sortKey ?? ''}`
   const measuring = active && layout?.key !== key
   useEffect(() => {
     const el = scrollRef.current
-    if (!active || !el || typeof ResizeObserver === 'undefined') return undefined
+    if (!observe || !el || typeof ResizeObserver === 'undefined') return undefined
     const observer = new ResizeObserver(() => {
       setWidth(el.clientWidth)
       // The dock opening shrinks the region: the open row stays in view (D4)
@@ -116,17 +120,17 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [active, scrollRef])
+  }, [observe, scrollRef])
   useLayoutEffect(() => {
     if (!measuring) return
     const el = scrollRef.current
     const heads = [...(el?.querySelector('thead tr')?.children || [])]
     if (!el || !el.clientWidth || heads.length !== lead + columns.length + trail) {
-      setLayout({ key, folded: [], caps: {} })
+      setLayout({ key, measures: null })
       return
     }
     const rows = [...el.querySelectorAll('tbody tr')].filter((tr) => tr.children.length === heads.length)
-    const fixed = [...heads.slice(0, lead), ...heads.slice(heads.length - trail)].reduce((s, th) => s + th.getBoundingClientRect().width, 0)
+    const sides = [...heads.slice(0, lead), ...heads.slice(heads.length - trail)].reduce((s, th) => s + th.getBoundingClientRect().width, 0)
     const measures = {}
     columns.forEach((c, i) => {
       const th = heads[lead + i]
@@ -136,11 +140,13 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
         floor: columnKind(c) === 'entity' ? nameFloor(rows, lead + i) : 0,
       }
     })
-    const out = layoutColumns(columns, measures, el.clientWidth - fixed, { sortKey, wide: window.innerWidth >= 1800 })
-    setLayout({ key, folded: out.folded, caps: out.caps })
+    setLayout({ key, measures, room: el.clientWidth - sides, wide: window.innerWidth >= 1800 })
   }, [measuring, key]) // eslint-disable-line react-hooks/exhaustive-deps -- the key names everything the measure reads
-  if (!active || measuring || !layout) return { measuring, folded: [], caps: {} }
-  return { measuring, folded: layout.folded, caps: layout.caps }
+  const shown = (ids) => Object.fromEntries(Object.entries(fixed).filter(([id]) => ids.includes(id)))
+  if (measuring) return { measuring, width, folded: [], caps: {}, held: {} }
+  if (!active || !layout?.measures) return { measuring, width, folded: [], caps: {}, held: shown(columns.map((c) => c.id)) }
+  const out = layoutColumns(columns, layout.measures, layout.room, { sortKey, wide: layout.wide, fixed })
+  return { measuring, width, folded: out.folded, caps: out.caps, held: out.fixed, widths: out.widths, absorber: out.absorber, measures: layout.measures, wide: layout.wide }
 }
 
 /** The sign of a sortable column that is not the sorted one: two solid triangles in the label's colour (R3). */
@@ -179,7 +185,7 @@ const plainLabel = (col) => (typeof col.label === 'string' ? col.label : col.lab
 export function DataTable({
   kind = 'certificates', scrollId, label, caption, columns: allColumns, rows = [], rowKey = (r) => r.id, rowLabel = (r) => String(r.id),
   onOpen, openLabel, openedId, rowOpens = false, selection, rowActions, sort, onSort, loading = false, skeletonRows = 12,
-  empty, card, footer, actionsLabel, columnWidths, onColumnWidth, recordsId,
+  empty, card, footer, actionsLabel, columnWidths, onColumnWidth, widthsKey, footerReset = true, recordsId,
 }) {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -196,19 +202,53 @@ export function DataTable({
   const firstRead = loading && !rows.length
   const scrollRef = useRef(null)
   const cards = isMobile && card
-  const { measuring, folded, caps } = useColumnLayout(scrollRef, allColumns, {
+  // The widths set by hand (C2): the page's own (columnWidths, onColumnWidth), else kept here under the list's key;
+  // a drag or the arrows show a draft, kept on release, Enter or leaving the handle. Never on a phone.
+  const controlled = Boolean(onColumnWidth)
+  const storeKey = controlled || cards ? null
+    : widthsKey || `ucm-widths:${globalThis.location?.pathname || ''}:${scrollId || kind}:${allColumns.map((c) => c.id).join(',')}`
+  const [ownWidths, setOwnWidth, clearOwnWidths] = useColumnWidths(storeKey)
+  const widths = controlled ? cleanWidths(columnWidths) : ownWidths
+  const [draft, setDraft] = useState(null)
+  const live = draft ? { ...widths, [draft.id]: draft.w } : widths
+  const liveKey = Object.entries(live).sort().join(';')
+  const { measuring, width: regionWidth, folded, caps, held: laid, widths: laidWidths, absorber: laidAbsorber, measures, wide } = useColumnLayout(scrollRef, allColumns, {
     lead: selection ? 1 : 0, trail: hasActions ? 1 : 0, rowsKey: rows.map(rowKey).join(','), sortKey: sort?.key, active: Boolean(k.share && !cards),
+    observe: !cards, fixed: live,
+  })
+  // A width set by hand never makes the region scroll sideways: past the room it is ignored for this render (R1)
+  const [dropped, setDropped] = useState(null)
+  const guard = `${regionWidth}|${liveKey}`
+  const held = dropped === guard ? {} : laid
+  // Reads the region after each render; sets once per guard key
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || measuring || dropped === guard || !Object.keys(laid).length) return
+    if (el.scrollWidth > el.clientWidth + 1) setDropped(guard)
   })
   const columns = folded.length ? allColumns.filter((c) => !folded.includes(c.id)) : allColumns
   const foldedLabels = allColumns.filter((c) => folded.includes(c.id)).map(plainLabel)
-  // The one column that takes the room left: the growing one, else the name (L7)
-  const absorber = (columns.find((c) => c.grow) || columns.find((c) => columnKind(c) === 'entity'))?.id
+  // The one column that takes the room left: the growing one, else the name (L7), unless set by hand
+  const absorber = laidAbsorber || (columns.find((c) => c.grow) || columns.find((c) => columnKind(c) === 'entity'))?.id
   const sortable = Boolean(onSort) && allColumns.some((c) => c.sort)
+  const resetWidths = () => {
+    setDraft(null)
+    if (controlled) Object.keys(widths).forEach((id) => onColumnWidth(id, null))
+    else clearOwnWidths()
+    scrollRef.current?.focus()
+  }
+  const reset = !cards && footerReset && Object.keys(widths).length ? resetWidths : null
+  const resize = cards ? null : {
+    draft: (id, w) => setDraft({ id, w }),
+    commit: (id, w) => { setDraft(null); (controlled ? onColumnWidth : setOwnWidth)(id, w) },
+    cancel: () => setDraft(null),
+  }
 
   // A free-text cell stops at its ceiling or at the width set by hand, an ellipsis after it; any other column holds its content
   const cellStyle = (c) => {
     if (!freeText(c) || measuring) return undefined
-    const max = [columnWidths?.[c.id], caps[c.id]?.max].filter(Boolean)
+    const max = [held[c.id], caps[c.id]?.max].filter(Boolean)
     const style = {}
     if (max.length) style.maxWidth = Math.min(...max)
     if (caps[c.id]?.min) style.minWidth = caps[c.id].min
@@ -269,6 +309,7 @@ export function DataTable({
 
   return (
     <FoldedColumns.Provider value={foldedLabels.length ? foldedLabels : null}>
+    <ColumnsReset.Provider value={reset}>
       {cards && sortable && (
         // On a phone the headers are gone: the same sort from a select and a button that reverses it (R5)
         <div className="toolbar mobile-sort">
@@ -306,7 +347,8 @@ export function DataTable({
                   {columns.map((c, i) => (
                     <HeaderCell key={c.id} col={c} sort={sort} onSort={onSort} last={i === columns.length - 1}
                       className={join(k.th(c), (k.share ? c.id !== absorber : c.fit) && 'fit', columnKind(c) === 'number' && 'num')}
-                      width={columnWidths?.[c.id]} onWidth={onColumnWidth} />
+                      width={measuring ? undefined : held[c.id]} requested={live[c.id]} auto={laidWidths?.[c.id]} resize={resize}
+                      bounds={columnBounds(c, measures?.[c.id], { wide, absorber: Boolean(c.grow) })} />
                   ))}
                   {hasActions && <th scope="col" className={kind === 'audit' || k.share ? 'fit' : undefined}><span className="sr-only">{actionsLabel || t('common.actions')}</span></th>}
                 </tr>
@@ -351,8 +393,10 @@ export function DataTable({
             </table>
           </div>
         )}
-        {footer}
+        {/* A list without a footer gets one for Réinitialiser les colonnes while a width is set */}
+        {footer || (reset && <footer className="table-footer"><ResetColumns /></footer>)}
       </div>
+    </ColumnsReset.Provider>
     </FoldedColumns.Provider>
   )
 }
@@ -360,28 +404,98 @@ export function DataTable({
 /**
  * A header: a sort button when the list sorts by it (aria-sort, an arrow for the sorted direction, both arrows
  * otherwise); without onSort the sorted column only shows its arrow. A separator before the next header, which is
- * the grip that sets the width by hand when the list offers it.
+ * the handle that sets the column's width (C2): drag, double-click for the automatic width, or from the keyboard.
  */
-function HeaderCell({ col, className, sort, onSort, width, onWidth, last }) {
+function HeaderCell({ col, className, sort, onSort, last, width, requested, auto, bounds, resize }) {
   const { t } = useTranslation()
+  const labelId = useId()
+  const thRef = useRef(null)
   const sorted = Boolean(col.sort) && sort?.key === col.sort
   const button = Boolean(col.sort && onSort)
-  const start = useRef(null)
+  // The checkbox and the actions are not data columns; a column labelled for screen readers only is an action
+  const grip = Boolean(resize) && col.resizable !== false && (typeof col.label === 'string' || Boolean(col.labelFull))
+  const [seen, setSeen] = useState(0)
+  // The header's painted width, set only when it changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!grip) return
+    const w = Math.round(thRef.current?.getBoundingClientRect().width || 0)
+    if (w !== seen) setSeen(w)
+  })
+  const clamp = (w, b = bounds) => Math.round(Math.min(b.max, Math.max(b.min, w)))
+  const now = requested ?? (seen || auto || bounds.min)
+  const act = useRef(resize)
+  act.current = resize
+  const drag = useRef(null)
+  const pending = useRef(null)
   const [dragging, setDragging] = useState(false)
-  const down = useCallback((e) => {
+  const down = (e) => {
+    if (e.button !== undefined && e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
-    start.current = { x: e.clientX, w: e.currentTarget.parentElement.offsetWidth }
+    drag.current = { x: e.clientX, w: now, bounds, moved: null }
     setDragging(true)
-  }, [])
+  }
   useEffect(() => {
     if (!dragging) return undefined
-    const move = (e) => onWidth?.(col.id, Math.max(50, Math.round(start.current.w + e.clientX - start.current.x)))
-    const up = () => setDragging(false)
+    const move = (e) => {
+      const d = drag.current
+      d.moved = clamp(d.w + e.clientX - d.x, d.bounds)
+      act.current.draft(col.id, d.moved)
+    }
+    const up = () => {
+      setDragging(false)
+      if (drag.current.moved !== null) act.current.commit(col.id, drag.current.moved)
+      else act.current.cancel()
+    }
+    const key = (e) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      setDragging(false)
+      act.current.cancel()
+    }
+    document.body.classList.add('col-resizing')
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
-    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
-  }, [dragging, onWidth, col.id])
+    window.addEventListener('pointercancel', up)
+    window.addEventListener('keydown', key, true)
+    return () => {
+      document.body.classList.remove('col-resizing')
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      window.removeEventListener('keydown', key, true)
+    }
+  }, [dragging, col.id]) // eslint-disable-line react-hooks/exhaustive-deps -- the drag reads its start from a ref
+  // Arrows by 16 px (Shift: 64), Home and End to the bounds; Enter or leaving keeps, Escape cancels, Delete goes automatic
+  const keyDown = (e) => {
+    const toward = { ArrowLeft: -1, ArrowRight: 1 }[e.key]
+    const to = toward ? now + toward * (e.shiftKey ? RESIZE.bigStep : RESIZE.step) : { Home: bounds.min, End: bounds.max }[e.key]
+    if (to !== undefined) {
+      e.preventDefault()
+      pending.current = clamp(to)
+      resize.draft(col.id, pending.current)
+    } else if (e.key === 'Enter' && pending.current !== null) {
+      e.preventDefault()
+      resize.commit(col.id, pending.current)
+      pending.current = null
+    } else if (e.key === 'Escape' && pending.current !== null) {
+      e.preventDefault()
+      e.stopPropagation()
+      pending.current = null
+      resize.cancel()
+    } else if (e.key === 'Delete') {
+      e.preventDefault()
+      pending.current = null
+      resize.commit(col.id, null)
+    }
+  }
+  const blur = () => {
+    if (pending.current === null) return
+    resize.commit(col.id, pending.current)
+    pending.current = null
+  }
   const arrow = sorted ? <SortArrow asc={sort.asc} /> : button ? <SortIdle /> : null
   // A number's arrow comes first, so that its label ends on the digits' right edge (L9)
   const content = columnKind(col) === 'number' ? <>{arrow}{col.label}</> : <>{col.label}{arrow}</>
@@ -390,14 +504,17 @@ function HeaderCell({ col, className, sort, onSort, width, onWidth, last }) {
   const does = sorted
     ? t('table.sortedByReverse', { column: col.labelFull || plainLabel(col), order: t(sort.asc ? 'table.sortAscending' : 'table.sortDescending') })
     : t('table.sortByColumn', { column: col.labelFull || plainLabel(col) })
-  const grip = onWidth && col.resizable !== false
+  // The header is named by its label alone, not by its handle's name too
+  const named = !grip ? {} : button ? { 'aria-labelledby': labelId } : { 'aria-label': col.labelFull || col.label }
   return (
-    <th scope="col" className={className} aria-sort={button ? (sorted ? SORT[sort.asc] : 'none') : sorted ? SORT[sort.asc] : undefined}
-      style={width ? { width, minWidth: width } : undefined} {...(button ? {} : full)}>
-      {button ? <button type="button" data-sort={col.sort} onClick={() => onSort(col.sort)} {...full} title={does}>{content}</button> : content}
+    <th ref={thRef} scope="col" className={className} aria-sort={button ? (sorted ? SORT[sort.asc] : 'none') : sorted ? SORT[sort.asc] : undefined}
+      style={width ? { width, minWidth: width } : undefined} {...(button ? {} : full)} {...named}>
+      {button ? <button type="button" id={grip ? labelId : undefined} data-sort={col.sort} onClick={() => onSort(col.sort)} {...full} title={does}>{content}</button> : content}
       {grip ? (
-        <span className={join('col-resize', !last && 'col-sep')} role="presentation" title={t('atelier.resizeColumn')} onPointerDown={down}
-          onDoubleClick={(e) => { e.stopPropagation(); onWidth(col.id, null) }} />
+        <span className={join('col-resize', !last && 'col-sep', dragging && 'dragging')} role="separator" aria-orientation="vertical" tabIndex={0}
+          aria-label={t('table.resizeColumn', { column: col.labelFull || plainLabel(col) })} aria-valuenow={clamp(now)} aria-valuemin={bounds.min}
+          aria-valuemax={bounds.max} title={t('atelier.resizeColumn')} onPointerDown={down} onKeyDown={keyDown} onBlur={blur}
+          onDoubleClick={(e) => { e.stopPropagation(); pending.current = null; resize.commit(col.id, null) }} />
       ) : !last && <span className="col-sep" aria-hidden="true" />}
     </th>
   )

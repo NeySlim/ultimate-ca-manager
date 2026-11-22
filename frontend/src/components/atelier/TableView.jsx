@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { usePersistedState } from '../../hooks/usePersistedState'
 import { useComfortable, setComfortable } from './density'
 import { DataTable } from './DataTable'
+import { useColumnWidths } from './columnWidths'
 import { Toolbar, ToolsDivider, ColumnsButton, DensityButton } from './Toolbar'
 import { IconBtn } from './Btn'
 import { AtelierDialog } from './AtelierDialog'
@@ -21,7 +22,8 @@ import { AtelierDialog } from './AtelierDialog'
  * @param {import('react').ReactNode} [p.tools]  more tools after the divider (a page's own)
  * @param {import('react').ReactNode} [p.applied]  AppliedFilters
  * @param {import('react').ReactNode} [p.batch]  BatchBar, while rows are ticked
- * @param {string} [p.storageKey]  keeps the hidden columns and their widths
+ * @param {string} [p.storageKey]  keeps the hidden columns and their widths (`-columns`, `-widths`); without it the
+ *   list keeps its widths under a key of its own (DataTable)
  * @param {{ note: string }} [p.columnsDialog]  offers the Colonnes dialog; columns with `always` stay shown
  * @param {boolean} [p.density]  offers the density toggle, which sets every list's
  * @param {{ label: string, onClick }} [p.exporter]  the export icon of the toolbar
@@ -33,19 +35,14 @@ export function TableView({
   const { t } = useTranslation()
   const comfortable = useComfortable()
   // Kept as { hidden } so that showing every column is remembered too (an empty list would read as « no choice »)
-  const [prefs, setPrefs] = usePersistedState(storageKey ? `${storageKey}-columns` : null, { hidden: columns.filter((c) => c.defaultHidden).map((c) => c.id) })
-  const [widths, setWidths] = usePersistedState(storageKey ? `${storageKey}-widths` : null, {})
+  const [prefs, setPrefs, resetPrefs] = usePersistedState(storageKey ? `${storageKey}-columns` : null, { hidden: columns.filter((c) => c.defaultHidden).map((c) => c.id) })
+  const [widths, setWidth, clearWidths] = useColumnWidths(storageKey ? `${storageKey}-widths` : null)
   const [dialog, setDialog] = useState(false)
   const hiddenSet = new Set(Array.isArray(prefs?.hidden) ? prefs.hidden : [])
   const shown = columns.filter((c) => c.always || !hiddenSet.has(c.id))
   const toggleColumn = (id) => setPrefs((prev) => {
     const list = Array.isArray(prev?.hidden) ? prev.hidden : []
     return { hidden: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] }
-  })
-  const setWidth = (id, w) => setWidths((prev) => {
-    const next = { ...(prev || {}) }
-    if (w === null) delete next[id]; else next[id] = w
-    return next
   })
   // The mockup counts the data columns, not the checkbox and the actions
   const count = shown.length
@@ -65,7 +62,9 @@ export function TableView({
       </Toolbar>
       {applied}
       {batch}
-      <DataTable label={tableLabel} columns={shown} columnWidths={widths || {}} onColumnWidth={storageKey ? setWidth : undefined} {...table} />
+      {/* With the Colonnes dialog, Réinitialiser les colonnes is there, not in the footer (C2) */}
+      <DataTable label={tableLabel} columns={shown} {...(storageKey ? { columnWidths: widths, onColumnWidth: setWidth } : {})}
+        footerReset={!columnsDialog} {...table} />
       <div className="table-caption">
         <span>{captionNote}</span>
         <span>{t('table.rowsNote', { px: comfortable ? 44 : 36, count })}</span>
@@ -82,6 +81,8 @@ export function TableView({
             ))}
           </div>
           <div className="modal-actions">
+            {/* Back to the page's columns: every width automatic, the columns hidden by default hidden again */}
+            <button type="button" className="btn" data-action="reset-columns" onClick={() => { clearWidths(); resetPrefs() }}>{t('table.resetColumns')}</button>
             <button type="button" className="btn primary" data-write="false" data-action="close-modal" onClick={() => setDialog(false)}>{t('table.done')}</button>
           </div>
         </AtelierDialog>

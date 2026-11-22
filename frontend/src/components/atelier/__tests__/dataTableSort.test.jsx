@@ -43,11 +43,17 @@ const sortOf = (name) => screen.getByRole('columnheader', { name }).getAttribute
 const loc = () => screen.getByTestId('loc').textContent
 
 describe('the headers', () => {
-  it('a separator closes each data header but the last; none in the body', () => {
+  it('a separator closes each data header but the last, the column\'s handle on every list (C2); none in the body', () => {
     const { container } = render(<DataTable columns={columns} rows={rows} onOpen={() => {}} />)
     expect([...container.querySelectorAll('thead th')].map((th) => th.querySelectorAll(':scope > .col-sep').length)).toEqual([1, 1, 1, 0, 0])
-    expect(container.querySelector('thead .col-sep')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.querySelector('thead .col-sep')).toHaveAttribute('role', 'separator')
     expect(container.querySelector('tbody .col-sep')).toBeNull()
+    // A column labelled for screen readers only is an action: a plain separator, no handle
+    const action = { id: 'run', label: <span className="sr-only">Actions</span>, kind: 'fit', priority: 1, cell: () => 'x' }
+    const { container: other } = render(<DataTable columns={[...columns.slice(0, 1), action, ...columns.slice(1)]} rows={rows} />)
+    const sep = other.querySelectorAll('thead th')[1].querySelector(':scope > .col-sep')
+    expect(sep).toHaveAttribute('aria-hidden', 'true')
+    expect(sep).not.toHaveAttribute('role')
   })
 
   it('in a list whose widths are set by hand, the grip is the separator', () => {

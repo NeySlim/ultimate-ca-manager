@@ -84,7 +84,7 @@ describe('WindowsProfileList', () => {
     await screen.findByText('profile-001')
     fireEvent.change(screen.getByLabelText('common.status'), { target: { value: 'keytab_missing' } })
     await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, ...BY_NAME, state: 'keytab_missing' }))
-    fireEvent.change(screen.getByLabelText('xcepWstep.issuingCa'), { target: { value: 'ca-refid-1' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'xcepWstep.issuingCa' }), { target: { value: 'ca-refid-1' } })
     await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(
       { page: 1, per_page: 25, ...BY_NAME, ca: 'ca-refid-1', state: 'keytab_missing' }))
   })

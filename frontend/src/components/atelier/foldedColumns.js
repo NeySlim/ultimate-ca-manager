@@ -2,3 +2,6 @@
 import { createContext } from 'react'
 
 export const FoldedColumns = createContext(null)
+
+/** Réinitialiser les colonnes of a list while a width is set by hand (DataTable), offered by its footer (C2). */
+export const ColumnsReset = createContext(null)

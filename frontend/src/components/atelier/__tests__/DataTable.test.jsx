@@ -15,6 +15,8 @@ vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile
 
 import { DataTable } from '../DataTable'
 import { TableView } from '../TableView'
+import { TableFooter } from '../TableFooter'
+import { ListView } from '../ListView'
 
 const rows = [{ id: 1, name: 'vpn.example.com', ca: 'Services CA' }, { id: 2, name: 'api.example.com', ca: 'Services CA' }]
 const columns = [
@@ -131,6 +133,156 @@ describe('the table', () => {
   })
 })
 
+describe('the column handles (C2)', () => {
+  const grip = (container, i) => container.querySelectorAll('thead th')[i].querySelector('[role=separator]')
+  const head = (container, i) => container.querySelectorAll('thead th')[i]
+
+  it('one handle per data column, on its separator, none on the checkbox nor the actions; named and bounded', () => {
+    const { container } = render(<DataTable columns={columns} rows={rows} selection={sel([])} onOpen={() => {}} columnWidths={{ ca: 180 }} onColumnWidth={() => {}} />)
+    const seps = screen.getAllByRole('separator')
+    expect(seps).toHaveLength(3)
+    expect(head(container, 0).querySelector('[role=separator]')).toBeNull()
+    expect(head(container, 4).querySelector('[role=separator]')).toBeNull()
+    const ca = grip(container, 3)
+    expect(ca).toHaveAttribute('aria-label', 'table.resizeColumn {"column":"Émetteur"}')
+    expect(ca).toHaveAttribute('aria-orientation', 'vertical')
+    expect(ca).toHaveAttribute('tabindex', '0')
+    expect(ca).toHaveAttribute('aria-valuenow', '180')
+    expect(ca).toHaveAttribute('aria-valuemin', '64')
+    expect(ca).toHaveAttribute('aria-valuemax', '640')
+    // The separator drawn between two data headers is the handle; the last one draws none at rest
+    expect(grip(container, 1)).toHaveClass('col-resize', 'col-sep')
+    expect(ca).not.toHaveClass('col-sep')
+    // A header is named by its label alone, not by its handle's name too, with or without a sort button
+    expect(screen.getByRole('columnheader', { name: 'Émetteur' })).toBe(head(container, 3))
+  })
+
+  it('a sortable header is named by its button\'s label, its handle apart', () => {
+    const { container } = render(<DataTable columns={columns} rows={rows} sort={{ key: 'name', asc: true }} onSort={() => {}} />)
+    expect(screen.getByRole('columnheader', { name: 'Nom commun' })).toBe(head(container, 0))
+    expect(screen.getByRole('separator', { name: 'table.resizeColumn {"column":"Nom commun"}' })).toBe(grip(container, 0))
+  })
+
+  it('drags with the pointer: the width follows, is kept on release, and a click without a move keeps nothing', () => {
+    const onWidth = vi.fn()
+    const { container } = render(<DataTable columns={columns} rows={rows} columnWidths={{ ca: 180 }} onColumnWidth={onWidth} />)
+    fireEvent.pointerDown(grip(container, 2), { clientX: 100, button: 0 })
+    fireEvent.pointerMove(window, { clientX: 160 })
+    expect(head(container, 2).style.width).toBe('240px')
+    expect(grip(container, 2)).toHaveClass('dragging')
+    expect(onWidth).not.toHaveBeenCalled()
+    fireEvent.pointerUp(window)
+    expect(onWidth).toHaveBeenCalledWith('ca', 240)
+    expect(grip(container, 2)).not.toHaveClass('dragging')
+    // Bounded to 640, and Escape during a drag gives the width back
+    fireEvent.pointerDown(grip(container, 2), { clientX: 100, button: 0 })
+    fireEvent.pointerMove(window, { clientX: 2000 })
+    expect(head(container, 2).style.width).toBe('640px')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(head(container, 2).style.width).toBe('180px')
+    fireEvent.pointerUp(window)
+    onWidth.mockClear()
+    fireEvent.pointerDown(grip(container, 2), { clientX: 100, button: 0 })
+    fireEvent.pointerUp(window)
+    expect(onWidth).not.toHaveBeenCalled()
+  })
+
+  it('answers the keyboard: arrows by 16 px, Shift by 64, Escape cancels, Enter keeps, Delete goes back to automatic', () => {
+    const onWidth = vi.fn()
+    const { container } = render(<DataTable columns={columns} rows={rows} columnWidths={{ ca: 180 }} onColumnWidth={onWidth} />)
+    const g = grip(container, 2)
+    g.focus()
+    fireEvent.keyDown(g, { key: 'ArrowRight' })
+    expect(head(container, 2).style.width).toBe('196px')
+    expect(g).toHaveAttribute('aria-valuenow', '196')
+    fireEvent.keyDown(g, { key: 'ArrowRight', shiftKey: true })
+    expect(head(container, 2).style.width).toBe('260px')
+    fireEvent.keyDown(g, { key: 'Escape' })
+    expect(head(container, 2).style.width).toBe('180px')
+    expect(onWidth).not.toHaveBeenCalled()
+    fireEvent.keyDown(g, { key: 'ArrowLeft' })
+    fireEvent.keyDown(g, { key: 'Enter' })
+    expect(onWidth).toHaveBeenLastCalledWith('ca', 164)
+    fireEvent.keyDown(g, { key: 'ArrowLeft', shiftKey: true })
+    fireEvent.keyDown(g, { key: 'ArrowLeft', shiftKey: true })
+    fireEvent.keyDown(g, { key: 'ArrowLeft', shiftKey: true })
+    expect(head(container, 2).style.width).toBe('64px')
+    // Leaving the handle keeps what the arrows set
+    fireEvent.blur(g)
+    expect(onWidth).toHaveBeenLastCalledWith('ca', 64)
+    fireEvent.keyDown(g, { key: 'Delete' })
+    expect(onWidth).toHaveBeenLastCalledWith('ca', null)
+  })
+
+  it('keeps a list\'s widths in the browser under its key, and Réinitialiser les colonnes in its footer clears them', () => {
+    const view = () => render(<DataTable columns={columns} rows={rows} label="Tableau" widthsKey="t-widths" footer={<TableFooter range="1–2 sur 2" />} />)
+    const { container, unmount } = view()
+    expect(screen.queryByRole('button', { name: 'table.resetColumns' })).toBeNull()
+    const g = grip(container, 2)
+    fireEvent.pointerDown(g, { clientX: 100, button: 0 })
+    fireEvent.pointerMove(window, { clientX: 300 })
+    fireEvent.pointerUp(window)
+    expect(JSON.parse(localStorage.getItem('t-widths'))).toEqual({ ca: 264 })
+    unmount()
+    const again = view()
+    expect(head(again.container, 2).style.width).toBe('264px')
+    fireEvent.click(screen.getByRole('button', { name: 'table.resetColumns' }))
+    expect(head(again.container, 2).style.width).toBe('')
+    expect(localStorage.getItem('t-widths')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'table.resetColumns' })).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Tableau' }))
+  })
+
+  it('a list without a footer gets one for the reset while a width is set; a broken storage changes nothing on screen', () => {
+    localStorage.setItem('t-bare', JSON.stringify({ ca: 200, gone: 'x' }))
+    const { container } = render(<DataTable columns={columns} rows={rows} widthsKey="t-bare" />)
+    expect(head(container, 2).style.width).toBe('200px')
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
+    const remove = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('quota') })
+    try {
+      fireEvent.keyDown(grip(container, 2), { key: 'ArrowRight' })
+      fireEvent.keyDown(grip(container, 2), { key: 'Enter' })
+      expect(head(container, 2).style.width).toBe('216px')
+      fireEvent.click(container.querySelector('.table-footer button[data-action=reset-columns]'))
+      expect(head(container, 2).style.width).toBe('')
+      expect(container.querySelector('.table-footer')).toBeNull()
+    } finally { set.mockRestore(); remove.mockRestore() }
+  })
+
+  it('a journal holds a width set by hand as it is, but never so that its region scrolls sideways (R1)', () => {
+    const saved = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth')
+    // The region overflows while a header carries a width set by hand
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() { return this.classList?.contains('table-scroll') && this.querySelector('th[style*="width"]') ? 500 : 0 },
+    })
+    try {
+      const { container } = render(<DataTable kind="audit" columns={columns} rows={rows} columnWidths={{ ca: 300 }} onColumnWidth={() => {}} />)
+      expect(head(container, 2).style.width).toBe('')
+      expect(grip(container, 2)).toHaveAttribute('aria-valuenow', '300')
+    } finally {
+      if (saved) Object.defineProperty(HTMLElement.prototype, 'scrollWidth', saved); else delete HTMLElement.prototype.scrollWidth
+    }
+    const { container } = render(<DataTable kind="audit" columns={columns} rows={rows} columnWidths={{ ca: 300 }} onColumnWidth={() => {}} />)
+    expect(head(container, 2).style.width).toBe('300px')
+  })
+
+  it('every list offers them, a module list (ListView) too, kept under a key of its own', () => {
+    const view = () => render(<ListView label="Modèles" icon="template" rows={rows} rowKey={(r) => r.id} title={(r) => r.name} status={() => 'ok'} onOpen={() => {}}
+      columns={[{ id: 'ca', label: 'Émetteur', cell: (r) => r.ca }, { status: true }]} />)
+    const { container, unmount } = view()
+    expect(screen.getAllByRole('separator')).toHaveLength(3)
+    fireEvent.keyDown(grip(container, 1), { key: 'End' })
+    fireEvent.keyDown(grip(container, 1), { key: 'Enter' })
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith('ucm-widths:'))
+    expect(keys).toHaveLength(1)
+    expect(keys[0]).toContain('name,ca,status')
+    unmount()
+    const again = view()
+    expect(head(again.container, 1).style.width).toBe('640px')
+  })
+})
+
 describe('the records on a phone', () => {
   beforeEach(() => { size.isMobile = true })
   const card = (r) => ({ description: 'Desc', meta: [r.ca, null, 'ACME'], status: <span>Valide</span>, end: '11 nov.' })
@@ -200,6 +352,22 @@ describe('the list section', () => {
     unmount()
     view()
     expect(screen.getByRole('columnheader', { name: 'Conformité' })).toBeInTheDocument()
+  })
+  it('Réinitialiser les colonnes in the Colonnes dialog clears the widths and the hidden columns; not in the footer', async () => {
+    localStorage.setItem('t-list-widths', JSON.stringify({ ca: 222 }))
+    localStorage.setItem('t-list-columns', JSON.stringify({ hidden: ['description'] }))
+    const { container } = view({ footer: <TableFooter range="1–2 sur 2" /> })
+    expect(screen.getByRole('columnheader', { name: 'Émetteur' }).style.width).toBe('222px')
+    expect(screen.queryByRole('columnheader', { name: 'Description' })).toBeNull()
+    expect(container.querySelector('.table-footer [data-action=reset-columns]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'table.columns' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'table.resetColumns' }))
+    expect(screen.getByRole('columnheader', { name: 'Émetteur' }).style.width).toBe('')
+    expect(screen.getByRole('columnheader', { name: 'Description' })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Conformité' })).toBeNull()
+    await new Promise((r) => setTimeout(r, 250))
+    expect(localStorage.getItem('t-list-widths')).toBeNull()
+    expect(localStorage.getItem('t-list-columns') ?? '').not.toContain('description')
   })
   it('toggles the comfortable density, says the row height, and exports from the toolbar', () => {
     const onExport = vi.fn()

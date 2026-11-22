@@ -24,8 +24,9 @@ import { cardFacts } from './cardFacts'
  * @param {{key, asc}} [p.sort]  with onSort, the columns naming a `sort` key sort the list (the server's order); nameSort for the name
  * @param {ReturnType<import('./useClientList').useClientList>} [p.list]  a list sorted and paged in memory: its rows, sort and
  *   pagination take the place of rows, sort, onSort and footer.pagination
+ * @param {string} [p.storageKey]  where the widths set by hand are kept; by default a key of the page and its columns
  */
-export function ListView({ filters, label, caption, icon, rows: allRows, rowKey, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions, sort: serverSort, onSort: serverOnSort, nameSort, nameExtra, list }) {
+export function ListView({ filters, label, caption, icon, rows: allRows, rowKey, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions, sort: serverSort, onSort: serverOnSort, nameSort, nameExtra, list, storageKey }) {
   const { t } = useTranslation()
   const rows = list ? list.rows : allRows
   const sort = list ? list.sort : serverSort
@@ -52,7 +53,7 @@ export function ListView({ filters, label, caption, icon, rows: allRows, rowKey,
           <DataTable kind="module" scrollId="module-scroll" label={t('atelier.tableOf', { name: label })} caption={caption}
             columns={cols} rows={rows} rowKey={rowKey} rowLabel={title} sort={sort} onSort={onSort} onOpen={onOpen} openedId={openedId} loading={loading} empty={empty}
             openLabel={(row) => t('atelier.openDetail', { name: title(row) })} card={card} selection={selection} rowActions={rowActions}
-            footer={foot && <TableFooter {...foot} />} />
+            footer={foot && <TableFooter {...foot} />} widthsKey={storageKey} />
         )}
       </section>
     </>
