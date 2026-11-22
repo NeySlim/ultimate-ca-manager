@@ -836,6 +836,10 @@ def certificate_list_conditions(args, dialect, now=None):
         conditions.append(Certificate.valid_to >= moment('expires_from'))
     if 'expires_to' in args:
         conditions.append(Certificate.valid_to < moment('expires_to'))
+    if 'created_from' in args:
+        conditions.append(Certificate.created_at >= moment('created_from'))
+    if 'created_to' in args:
+        conditions.append(Certificate.created_at < moment('created_to'))
     if 'renewal' in args:
         kinds = args.getlist('renewal')
         bad = [k for k in kinds if k not in RENEWAL_KINDS]

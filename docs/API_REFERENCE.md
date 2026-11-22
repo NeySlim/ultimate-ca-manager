@@ -2828,6 +2828,7 @@ The tiles of CAs and HSM modules need no route of their own: `GET /api/v2/cas` g
 | `no_key=true`, `incomplete_chain=true` | no stored private key; issuing CA unknown to this instance |
 | `renewal` (repeatable) | one of `manual_renewal_due`, `client_renewal_overdue`, `auto_renewal_blocked`, `renewal_declined`: the rows of that `queue` kind. `queue` returns `filter_hints` with this parameter for each |
 | `expires_from`, `expires_to` | expiry from `expires_from` (included) to `expires_to` (excluded), each an ISO 8601 date (`2026-12-14`, midnight UTC) or date and time (an offset is converted to UTC) |
+| `created_from`, `created_to` | creation (`created_at`) from `created_from` (included) to `created_to` (excluded), in the same forms; one day of the `issuance` flow is that day and the next. The flow also counts in-place renewals, which keep their creation date and are not in this list |
 
 ### Get Stats Overview
 ```http
