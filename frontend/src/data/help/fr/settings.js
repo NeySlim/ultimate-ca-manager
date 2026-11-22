@@ -157,7 +157,7 @@ export default {
         items: [
           { label: 'Gmail', text: 'Configurer un client OAuth2 Google Cloud avec le scope https://mail.google.com/' },
           { label: 'Microsoft 365 / Outlook.com', text: 'Enregistrer une application Azure AD avec la permission déléguée SMTP.Send' },
-          { label: 'Refresh tokens', text: 'UCM stocke le refresh token et renouvelle les access tokens automatiquement avant chaque envoi' },
+          { label: 'Jetons de rafraîchissement', text: 'UCM stocke le jeton de rafraîchissement et renouvelle les jetons d’accès automatiquement avant chaque envoi' },
           { label: 'Repli', text: 'L’authentification par mot de passe reste supportée si OAuth2 n’est pas configuré' },
         ]
       },
