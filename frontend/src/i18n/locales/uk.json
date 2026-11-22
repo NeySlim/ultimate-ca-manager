@@ -3673,7 +3673,6 @@
     "backupScheduleGroup": "Розклад",
     "backupFrequencyOff": "Вимкнено, не рекомендується",
     "backupSize": "Розмір",
-    "backupSort": "Порядок резервних копій",
     "diskHigh": "Диск майже заповнений",
     "restoreChooseFile": "Виберіть файл резервної копії",
     "restoreTooLarge": "Файл завеликий: щонайбільше {{size}}.",
@@ -3804,12 +3803,6 @@
     "backupCopySha256": "Скопіювати повний SHA-256",
     "backupSharedStoreNote": "У режимі високої доступності архіви зберігаються в базі даних PostgreSQL, яку читає кожен вузол: вони втрачаються разом із цією базою. Завантажте потрібні архіви в місце поза кластером і резервуйте PostgreSQL його власними засобами.",
     "backupSearchPlaceholder": "Пошук копій…",
-    "backupSortNewest": "Спочатку новіші",
-    "backupSortOldest": "Спочатку старіші",
-    "backupSortLargest": "Спочатку більші",
-    "backupSortSmallest": "Спочатку менші",
-    "backupSortNameAsc": "Назва (A→Z)",
-    "backupSortNameDesc": "Назва (Z→A)",
     "backupSelectAll": "Вибрати все",
     "backupDeleteSelected": "Видалити вибрані ({{count}})",
     "backupNoMatch": "Немає відповідних копій",
@@ -4782,7 +4775,11 @@
     "allOf": "Усе з {{name}}",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "Усі ресурси",
-    "anyAction": "будь-яка дія"
+    "anyAction": "будь-яка дія",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "Залежності PKCS#11 недоступні на цьому хості",
@@ -6968,7 +6965,8 @@
         "running": "Виконується",
         "completed": "Завершено",
         "failed": "Невдало"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "Діапазон",
@@ -7307,7 +7305,8 @@
     "deleteRefusedMore_one": "і ще {{count}}",
     "deleteRefusedMore_few": "і ще {{count}}",
     "deleteRefusedMore_many": "і ще {{count}}",
-    "deleteRefusedMore_other": "і ще {{count}}"
+    "deleteRefusedMore_other": "і ще {{count}}",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "Вставити",
@@ -7723,7 +7722,8 @@
       "deploy_delivery": "Розгортання сертифікатів",
       "ad_connector_health": "Стан Active Directory",
       "session_cleanup": "Очищення сеансів"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "Перевірити",

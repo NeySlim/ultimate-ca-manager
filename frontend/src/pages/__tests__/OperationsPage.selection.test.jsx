@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -16,7 +16,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
-const mocks = vi.hoisted(() => ({ bulkDelete: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn() }))
+const mocks = vi.hoisted(() => ({ bulkDelete: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn(), certCalls: [] }))
 
 vi.mock('../../contexts', () => ({
   useNotification: () => ({
@@ -43,7 +43,7 @@ vi.mock('../../hooks', () => ({
 vi.mock('../../services', () => ({
   opnsenseService: { test: vi.fn(), import: vi.fn() },
   casService: { getAll: vi.fn().mockResolvedValue({ data: [] }), bulkDelete: vi.fn() },
-  certificatesService: { getAll: (params) => Promise.resolve(params?.per_page === 1
+  certificatesService: { getAll: (params) => mocks.certCalls.push(params) && Promise.resolve(params?.per_page === 1
     ? { data: [], meta: { total: 30 } }
     : { data: params?.page === 2 ? [{ id: 3, cn: 'third.example', status: 'valid' }] : [{ id: 1, cn: 'first.example', status: 'valid' }, { id: 2, cn: 'second.example', status: 'expired' }], meta: { total: 30 } }) },
   csrsService: { getAll: vi.fn().mockResolvedValue({ data: [], meta: { total: 0 } }), bulkSign: vi.fn() },
@@ -57,6 +57,7 @@ vi.mock('../../services', () => ({
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
 import OperationsPage from '../OperationsPage'
+import { csrsService } from '../../services'
 
 const open = () => render(<MemoryRouter initialEntries={['/operations?tab=bulk']}><OperationsPage /></MemoryRouter>)
 const names = () => [...document.querySelectorAll('#ops-scroll tbody tr')].map((tr) => tr.querySelector('td:nth-child(2)').textContent)
@@ -92,13 +93,45 @@ describe('OperationsPage bulk list', () => {
   it('searches and sorts the resources the server sends whole, here', async () => {
     localStorage.setItem('ucm-ops-resource-type', 'users')
     open()
-    await waitFor(() => expect(names()).toEqual(['zoe', 'alice']))
+    // By name from the first view (T4)
+    await waitFor(() => expect(names()).toEqual(['alice', 'zoe']))
     expect(document.getElementById('page-jump')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'common.user' }))
-    expect(names()).toEqual(['alice', 'zoe'])
-    fireEvent.click(screen.getByRole('button', { name: 'common.user' }))
     expect(names()).toEqual(['zoe', 'alice'])
+    fireEvent.click(screen.getByRole('button', { name: 'common.user' }))
+    expect(names()).toEqual(['alice', 'zoe'])
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'ali' } })
     expect(names()).toEqual(['alice'])
   })
+
+  it('sorts the certificates and the CSRs by the server from the first page, the page shown as it came, the selection kept (T2, T4, T9)', async () => {
+    mocks.certCalls.length = 0
+    localStorage.setItem('ucm-ops-resource-type', 'certificates')
+    const at = { search: '' }
+    function Where() { at.search = useLocation().search; return null }
+    render(<MemoryRouter initialEntries={['/operations?tab=bulk']}><OperationsPage /><Where /></MemoryRouter>)
+    await waitFor(() => expect(names()).toEqual(['first.example', 'second.example']))
+    const pages = () => mocks.certCalls.filter((p) => p.per_page !== 1)
+    expect(pages().pop()).toMatchObject({ page: 1, sort_by: 'subject', sort_order: 'asc' })
+    expect(screen.getByRole('columnheader', { name: 'common.commonName' })).toHaveAttribute('aria-sort', 'ascending')
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'table.selectRow' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    await waitFor(() => expect(names()).toEqual(['third.example']))
+    // In memory the expired one would come first: the page is the server's, as it came
+    fireEvent.click(screen.getByRole('button', { name: 'common.status' }))
+    await waitFor(() => expect(pages().pop()).toMatchObject({ page: 1, sort_by: 'status', sort_order: 'asc' }))
+    await waitFor(() => expect(names()).toEqual(['first.example', 'second.example']))
+    expect(at.search).toBe('?tab=bulk&sort=status&order=asc')
+    expect(screen.getByRole('group', { name: 'table.selection' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'common.expires' }))
+    fireEvent.click(screen.getByRole('button', { name: 'common.expires' }))
+    await waitFor(() => expect(pages().pop()).toMatchObject({ page: 1, sort_by: 'valid_to', sort_order: 'desc' }))
+    // Another resource starts by its name again
+    fireEvent.click(screen.getByRole('button', { name: /common\.csrsShort/ }))
+    await waitFor(() => expect(csrsService.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, sort_by: 'cn', sort_order: 'asc' })))
+    expect(at.search).toBe('?tab=bulk')
+    // The CSR's subject is not a server key: its header does not sort
+    expect(screen.getByRole('columnheader', { name: 'common.subject' }).querySelector('button')).toBeNull()
+  })
 })
+

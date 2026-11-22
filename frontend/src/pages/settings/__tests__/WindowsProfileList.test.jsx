@@ -3,7 +3,10 @@
  * the CA and the state go to the server.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+// The lists keep their sort in the address
+const render = (ui, options) => rtlRender(ui, { wrapper: MemoryRouter, ...options })
 
 // Stable references: the list reloads whenever `t` or the notifier changes identity.
 const mocks = vi.hoisted(() => ({
@@ -53,6 +56,9 @@ beforeEach(() => {
   }))
 })
 
+// The server's default order, asked for by name
+const BY_NAME = { sort_by: 'name', sort_order: 'asc' }
+
 const renderList = (props = {}) => render(
   <WindowsProfileList cas={CAS} canWrite onEdit={vi.fn()} onCreate={vi.fn()} reloadKey={0} {...props} />)
 
@@ -61,7 +67,7 @@ describe('WindowsProfileList', () => {
     renderList()
     await screen.findByText('profile-001')
     expect(mocks.list).toHaveBeenCalledTimes(1)
-    expect(mocks.list).toHaveBeenCalledWith({ page: 1, per_page: 25 })
+    expect(mocks.list).toHaveBeenCalledWith({ page: 1, per_page: 25, ...BY_NAME })
     expect(screen.queryByText('profile-026')).not.toBeInTheDocument()
     expect(screen.getAllByText(/^profile-\d{3}$/)).toHaveLength(25)
   })
@@ -70,17 +76,32 @@ describe('WindowsProfileList', () => {
     renderList()
     await screen.findByText('profile-001')
     fireEvent.change(screen.getByPlaceholderText('xcepWstep.searchPlaceholder'), { target: { value: 'realm9' } })
-    await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, q: 'realm9' }), { timeout: 2000 })
+    await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, ...BY_NAME, q: 'realm9' }), { timeout: 2000 })
   })
 
   it('sends the state and the CA to the server and goes back to the first page', async () => {
     renderList()
     await screen.findByText('profile-001')
     fireEvent.change(screen.getByLabelText('common.status'), { target: { value: 'keytab_missing' } })
-    await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, state: 'keytab_missing' }))
+    await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, ...BY_NAME, state: 'keytab_missing' }))
     fireEvent.change(screen.getByLabelText('xcepWstep.issuingCa'), { target: { value: 'ca-refid-1' } })
     await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(
-      { page: 1, per_page: 25, ca: 'ca-refid-1', state: 'keytab_missing' }))
+      { page: 1, per_page: 25, ...BY_NAME, ca: 'ca-refid-1', state: 'keytab_missing' }))
+  })
+
+  it('sorts by the server from its headers, back to the first page, the order kept in the address (T2, T9)', async () => {
+    renderList()
+    await screen.findByText('profile-001')
+    expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 2, per_page: 25, ...BY_NAME }))
+    fireEvent.click(screen.getByRole('button', { name: 'xcepWstep.realm' }))
+    await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, sort_by: 'realm', sort_order: 'asc' }))
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, sort_by: 'status', sort_order: 'asc' }))
+    // The rows are the server's page as it came: never sorted again here
+    expect(screen.getAllByRole('row').slice(1, 3).map((r) => r.querySelector('.entity-label')?.textContent)).toEqual(['profile-001', 'profile-002'])
+    expect(screen.queryByRole('button', { name: 'xcepWstep.issuingCa' })).toBeNull()
   })
 
   it('offers the four states', async () => {

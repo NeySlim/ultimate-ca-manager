@@ -4,7 +4,10 @@
  * for a task the interface does not know.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render as rtlRender, screen, within, fireEvent } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
+// The lists keep their sort in the address
+const render = (ui, options) => rtlRender(ui, { wrapper: MemoryRouter, ...options })
 
 const KNOWN = new Set(['scheduler.tasks.scheduled_backup'])
 const { notify, api, i18n } = vi.hoisted(() => ({
@@ -49,11 +52,11 @@ describe('SchedulerSection words', () => {
     render(<SchedulerSection hasPermission={() => false} />)
     const backup = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('tr')
     const cells = within(backup).getAllByRole('cell').map((c) => c.textContent)
-    // After the task and its state: interval, last run, next run, duration
-    expect(cells.slice(2, 6)).toEqual(['scheduler.interval.everyHours:6', 'time.compact.minutesAgo:56', 'time.compact.inHours:5', '1,4 ms'])
+    // After the task, its last result and its state: interval, last run, next run, duration
+    expect(cells.slice(3, 7)).toEqual(['scheduler.interval.everyHours:6', 'time.compact.minutesAgo:56', 'time.compact.inHours:5', '1,4 ms'])
     const other = screen.getByText('Brand new task').closest('tr')
     const more = within(other).getAllByRole('cell').map((c) => c.textContent)
-    expect(more.slice(2, 5)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'time.compact.minutesAgo:1'])
+    expect(more.slice(3, 6)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'time.compact.minutesAgo:1'])
   })
 
   it('words a skip reason a task gives as an English sentence', async () => {
@@ -68,14 +71,18 @@ describe('SchedulerSection words', () => {
 })
 
 describe('SchedulerSection column widths', () => {
-  it('sizes the state, schedule, run, duration, count and action columns to their content; the task takes the rest', async () => {
+  it('sizes the task, state, schedule, run, duration, count and action columns to their content; the last result takes the rest', async () => {
     render(<SchedulerSection hasPermission={() => true} />)
     const row = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('tr')
     const table = row.closest('table')
-    // The mockup's module table: a fitted column is marked on its header (adjust.css), the task grows
+    // The mockup's module table: a fitted column is marked on its header (adjust.css), the free text grows
     expect(table).toHaveClass('module-table')
-    expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([false, true, true, true, true, true, true, true])
-    expect(row.children[0]).toHaveClass('description-cell')
+    expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([true, false, true, true, true, true, true, true, true])
+    expect(row.children[1]).toHaveClass('description-cell')
+    // The task names its row on one line, nothing to open: no button, its whole name in a title
+    const name = row.children[0].querySelector('.entity-name')
+    expect(name.tagName).toBe('SPAN')
+    expect(name.querySelector('.entity-label')).toHaveAttribute('title', 'tr(scheduler.tasks.scheduled_backup)')
   })
 
   it('says the state of the last run in words, beside its colour', async () => {
@@ -91,6 +98,33 @@ describe('SchedulerSection column widths', () => {
     expect(await state('C')).toHaveClass('good')
     expect(screen.getByText('boom')).toHaveClass('mono')
     expect(screen.getByText('scheduler.warningsCount:1').closest('legend')).not.toBeNull()
+  })
+})
+
+describe('SchedulerSection sort', () => {
+  it('opens by task name, sorts every column from its header, the order in the address under its own scope (T1, T4, T9)', async () => {
+    const at = { search: '' }
+    function Where() { at.search = useLocation().search; return null }
+    render(<><SchedulerSection hasPermission={() => true} /><Where /></>)
+    await screen.findByText('Brand new task')
+    const names = () => [...document.querySelectorAll('tbody tr .entity-label')].map((n) => n.textContent)
+    expect(screen.getByRole('columnheader', { name: 'scheduler.colTask' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(names()).toEqual(['Brand new task', 'tr(scheduler.tasks.scheduled_backup)'])
+    const sortable = screen.getAllByRole('columnheader').filter((h) => h.querySelector('button[data-sort]')).map((h) => h.textContent)
+    expect(sortable).toEqual(['scheduler.colTask', 'scheduler.colNote', 'atelier.state', 'scheduler.colSchedule', 'scheduler.colLastRun',
+      'scheduler.colNextRun', 'scheduler.colDuration', 'scheduler.colRuns'])
+    fireEvent.click(screen.getByRole('button', { name: 'scheduler.colRuns' }))
+    expect(names()).toEqual(['Brand new task', 'tr(scheduler.tasks.scheduled_backup)'])
+    fireEvent.click(screen.getByRole('button', { name: 'scheduler.colRuns' }))
+    expect(names()).toEqual(['tr(scheduler.tasks.scheduled_backup)', 'Brand new task'])
+    expect(at.search).toBe('?tasks-sort=runs&tasks-order=desc')
+  })
+
+  it('reads its order back from the address', async () => {
+    render(<SchedulerSection hasPermission={() => true} />, { wrapper: ({ children }) => <MemoryRouter initialEntries={['/settings?tasks-sort=next&tasks-order=asc']}>{children}</MemoryRouter> })
+    await screen.findByText('Brand new task')
+    expect(screen.getByRole('columnheader', { name: 'scheduler.colNextRun' })).toHaveAttribute('aria-sort', 'ascending')
+    expect([...document.querySelectorAll('tbody tr .entity-label')].map((n) => n.textContent)).toEqual(['Brand new task', 'tr(scheduler.tasks.scheduled_backup)'])
   })
 })
 

@@ -3529,7 +3529,6 @@
     "backupScheduleGroup": "Programación",
     "backupFrequencyOff": "Desactivada, no recomendado",
     "backupSize": "Tamaño",
-    "backupSort": "Orden de las copias de seguridad",
     "diskHigh": "Disco casi lleno",
     "restoreChooseFile": "Elija un archivo de copia de seguridad",
     "restoreTooLarge": "Archivo demasiado grande: {{size}} como máximo.",
@@ -3660,12 +3659,6 @@
     "backupCopySha256": "Copiar el SHA-256 completo",
     "backupSharedStoreNote": "En alta disponibilidad los archivos se guardan en la base de datos PostgreSQL, que lee cada nodo: se pierden con esa base de datos. Descargue los que conserve a un lugar fuera del clúster y respalde PostgreSQL con sus propias herramientas.",
     "backupSearchPlaceholder": "Buscar copias…",
-    "backupSortNewest": "Más recientes primero",
-    "backupSortOldest": "Más antiguas primero",
-    "backupSortLargest": "Más grandes primero",
-    "backupSortSmallest": "Más pequeñas primero",
-    "backupSortNameAsc": "Nombre (A→Z)",
-    "backupSortNameDesc": "Nombre (Z→A)",
     "backupSelectAll": "Seleccionar todo",
     "backupDeleteSelected": "Eliminar seleccionadas ({{count}})",
     "backupNoMatch": "Ninguna copia coincide",
@@ -4624,7 +4617,11 @@
     "allOf": "Todo de {{name}}",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "Todos los recursos",
-    "anyAction": "cualquier acción"
+    "anyAction": "cualquier acción",
+    "columns": {
+      "permissions": "Rights",
+      "users": "Users"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "Dependencias PKCS#11 no disponibles en este host",
@@ -6686,7 +6683,8 @@
         "running": "En curso",
         "completed": "Completada",
         "failed": "Fallida"
-      }
+      },
+      "targets": "Targets"
     },
     "form": {
       "range": "Rango",
@@ -7021,7 +7019,8 @@
     "deleteRefused_one": "{{count}} perfil de inscripción de Windows usa este conector. Haga que apunte primero a otro conector:",
     "deleteRefused_other": "{{count}} perfiles de inscripción de Windows usan este conector. Haga que apunten primero a otro conector:",
     "deleteRefusedMore_one": "y {{count}} más",
-    "deleteRefusedMore_other": "y {{count}} más"
+    "deleteRefusedMore_other": "y {{count}} más",
+    "lastTest": "Last test"
   },
   "certInput": {
     "modePaste": "Pegar",
@@ -7421,7 +7420,8 @@
       "deploy_delivery": "Despliegues de certificados",
       "ad_connector_health": "Estado de Active Directory",
       "session_cleanup": "Limpieza de sesiones"
-    }
+    },
+    "colNote": "Last result"
   },
   "lint": {
     "action": "Analizar",

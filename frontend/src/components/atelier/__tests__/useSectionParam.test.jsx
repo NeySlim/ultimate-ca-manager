@@ -48,6 +48,21 @@ describe('useSectionParam', () => {
     expect(screen.getByTestId('search')).toHaveTextContent('?keep=1')
   })
 
+  it('another section drops the sort of the list it leaves; the same one keeps it (T9)', () => {
+    mount('/x?tab=b&sort=name&order=desc&keep=1', {})
+    act(() => screen.getByText('to-c').click())
+    expect(screen.getByTestId('search')).toHaveTextContent('?tab=c&keep=1')
+    const again = mount('/x?tab=c&sort=name&order=desc', {})
+    act(() => again.getAllByText('to-c').pop().click())
+    expect(again.getAllByTestId('search').pop()).toHaveTextContent('?tab=c&sort=name&order=desc')
+  })
+
+  it('stacked sections are all on the page: their sorts stay', () => {
+    mount('/x?tab=b&sort=name', { stacked: true })
+    act(() => screen.getByText('to-c').click())
+    expect(screen.getByTestId('search')).toHaveTextContent('?tab=c&sort=name')
+  })
+
   it('gives the title of the newly shown frame the focus', () => {
     mount('/x', {})
     act(() => screen.getByText('to-c').click())

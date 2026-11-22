@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, ListView, Toolbar, SearchField, FilterSelect, EmptyBlock, NoMatch, Pill } from '../../components/atelier'
+import { Btn, ListView, Toolbar, SearchField, FilterSelect, EmptyBlock, NoMatch, Pill, useSortParam } from '../../components/atelier'
 import { windowsProfilesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { PROFILE_STATES } from '../../lib/windowsProfile'
 
 const DEBOUNCE_MS = 300
 const STATE_TONE = { complete: 'good', keytab_missing: 'warn', connector_failing: 'bad', disabled: 'muted' }
+// The server pages the profiles: each sortable column's key there; by name (T4), in the address under this list's scope
+const SERVER_SORT = { name: 'name', realm: 'realm', state: 'status' }
+const BY_NAME = { key: 'name', asc: true }
 
 /**
  * The profiles, one server page at a time: the name or realm search, the CA and the state go to
@@ -27,6 +30,11 @@ export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, re
   const [state, setState] = useState('')
   const [version, setVersion] = useState(0)
   const timer = useRef(null)
+  const { sort, onSort } = useSortParam(BY_NAME, Object.keys(SERVER_SORT), { scope: 'profiles' })
+  // A new order starts from the first page, whether a header or Back set it
+  const order = `${sort.key}:${sort.asc}`
+  const [orderMark, setOrderMark] = useState(order)
+  if (orderMark !== order) { setOrderMark(order); setPage(1) }
 
   const changeSearch = (value) => {
     setSearch(value)
@@ -37,7 +45,7 @@ export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, re
 
   useEffect(() => {
     let cancelled = false
-    const params = { page, per_page: perPage }
+    const params = { page, per_page: perPage, sort_by: SERVER_SORT[sort.key], sort_order: sort.asc ? 'asc' : 'desc' }
     if (query) params.q = query
     if (ca) params.ca = ca
     if (state) params.state = state
@@ -51,7 +59,7 @@ export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, re
       .catch((error) => { if (!cancelled) showError(error.message || t('messages.errors.loadFailed.generic')) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [page, perPage, query, ca, state, version, reloadKey, showError, t])
+  }, [page, perPage, query, ca, state, version, reloadKey, showError, t, sort])
 
   const reload = () => setVersion(v => v + 1)
 
@@ -93,7 +101,7 @@ export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, re
 
   return (
     <>
-      <ListView label={t('xcepWstep.profilesTitle')} icon="monitor" rows={rows} loading={loading}
+      <ListView label={t('xcepWstep.profilesTitle')} icon="monitor" rows={rows} loading={loading} sort={sort} onSort={onSort} nameSort="name"
         title={(row) => row.name} status={(row) => <Pill tone={STATE_TONE[row.state] || 'muted'} label={t(`xcepWstep.state.${row.state}`)} />}
         nameExtra={(row) => (
           <>
@@ -114,12 +122,12 @@ export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, re
         columns={[
           { id: 'realm', label: t('xcepWstep.realm'), cell: (row) => (row.realm
             ? <span className="mono">{row.realm}</span>
-            : <Pill tone="warn" label={t('xcepWstep.realmUnset')} />) },
-          { id: 'ca', label: t('xcepWstep.issuingCa'), cell: (row) => row.issuing_ca_name || '—', grow: true },
+            : <Pill tone="warn" label={t('xcepWstep.realmUnset')} />), title: (row) => row.realm || undefined, kind: 'text', priority: 2, sort: 'realm' },
+          { id: 'ca', label: t('xcepWstep.issuingCa'), cell: (row) => row.issuing_ca_name || '—', kind: 'text', priority: 3 },
           { id: 'connector', label: t('xcepWstep.connector'), cell: (row) => (row.connector_name
             ? <>{row.connector_name}{row.connector_health === 'down' && <> <Pill tone="bad" label={t('adConnector.healthStateDown')} /></>}</>
-            : <span className="muted">{t('xcepWstep.noConnector')}</span>) },
-          { status: true },
+            : <span className="muted">{t('xcepWstep.noConnector')}</span>), title: (row) => row.connector_name || undefined, kind: 'text', priority: 3 },
+          { status: true, sort: 'state' },
         ]}
         rowActions={rowActions}
         empty={filtered ? (

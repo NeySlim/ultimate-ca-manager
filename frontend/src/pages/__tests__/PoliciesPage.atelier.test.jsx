@@ -45,6 +45,8 @@ const P = [
   { id: 3, name: 'Clients', priority: 50, is_active: true, operations: ['issuance'], description: 'Postes nomades', rules: {} },
 ]
 const names = () => [...document.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)
+const sortedHeads = () => screen.getAllByRole('columnheader').filter((h) => /ending/.test(h.getAttribute('aria-sort') || '')).map((h) => [h.textContent, h.getAttribute('aria-sort')])
+const sortableHeads = () => screen.getAllByRole('columnheader').filter((h) => h.querySelector('button[data-sort]')).map((h) => h.textContent)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -146,5 +148,24 @@ describe('the policy dock in the URL', () => {
     const gone = renderAtUrl(<PoliciesPage />, '/policies?item=99')
     await screen.findByRole('button', { name: 'Clients' })
     await waitFor(() => expect(gone.where()).toBe('/policies'))
+  })
+
+  it('opens by priority, sorts every column from its header, keeps the sort in the address and reads it back (T1, T4, T9)', async () => {
+    const r = renderAtUrl(<PoliciesPage />, '/policies')
+    await screen.findByRole('button', { name: 'Clients' })
+    expect(sortedHeads()).toEqual([['policies.priority', 'ascending']])
+    expect(names()).toEqual(['Révocations', 'Clients', 'Serveurs TLS'])
+    expect(sortableHeads()).toEqual(['atelier.name', 'policies.scope', 'policies.operations', 'policies.priority', 'policies.approval', 'atelier.state'])
+    // The priority is a number, at the right; the name takes the room left
+    expect(screen.getByRole('columnheader', { name: 'policies.priority' })).toHaveClass('num')
+    fireEvent.click(screen.getByRole('button', { name: 'policies.approval' }))
+    fireEvent.click(screen.getByRole('button', { name: 'policies.approval' }))
+    expect(names()[0]).toBe('Serveurs TLS')
+    expect(r.where()).toBe('/policies?sort=approval&order=desc')
+    r.unmount()
+    renderAtUrl(<PoliciesPage />, '/policies?sort=name&order=desc')
+    await screen.findByRole('button', { name: 'Clients' })
+    expect(sortedHeads()).toEqual([['atelier.name', 'descending']])
+    expect(names()).toEqual(['Serveurs TLS', 'Révocations', 'Clients'])
   })
 })

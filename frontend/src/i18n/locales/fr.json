@@ -3315,7 +3315,11 @@
     "allOf": "Tout {{name}}",
     "permissionOf": "{{resource}} : {{actions}}",
     "anyResource": "Toutes les ressources",
-    "anyAction": "toutes les actions"
+    "anyAction": "toutes les actions",
+    "columns": {
+      "permissions": "Droits",
+      "users": "Comptes"
+    }
   },
   "scep": {
     "title": "Protocole SCEP",
@@ -3572,7 +3576,6 @@
     "backupScheduleGroup": "Planification",
     "backupFrequencyOff": "Désactivée, déconseillé",
     "backupSize": "Taille",
-    "backupSort": "Ordre des sauvegardes",
     "diskHigh": "Disque presque plein",
     "restoreChooseFile": "Choisir un fichier de sauvegarde",
     "restoreTooLarge": "Fichier trop gros : {{size}} au plus.",
@@ -3836,12 +3839,6 @@
     "backupCopySha256": "Copier le SHA-256 complet",
     "backupSharedStoreNote": "En haute disponibilité, les archives sont conservées dans la base PostgreSQL, que tous les nœuds lisent : elles sont perdues avec cette base. Téléchargez celles que vous gardez vers un emplacement extérieur au cluster, et sauvegardez PostgreSQL avec ses propres outils.",
     "backupSearchPlaceholder": "Rechercher des sauvegardes…",
-    "backupSortNewest": "Plus récents d’abord",
-    "backupSortOldest": "Plus anciens d’abord",
-    "backupSortLargest": "Plus gros d’abord",
-    "backupSortSmallest": "Plus petits d’abord",
-    "backupSortNameAsc": "Nom (A→Z)",
-    "backupSortNameDesc": "Nom (Z→A)",
     "backupSelectAll": "Tout sélectionner",
     "backupDeleteSelected": "Supprimer la sélection ({{count}})",
     "backupNoMatch": "Aucune sauvegarde ne correspond",
@@ -6686,7 +6683,8 @@
         "running": "En cours",
         "completed": "Terminée",
         "failed": "En échec"
-      }
+      },
+      "targets": "Cibles"
     },
     "form": {
       "range": "Plage",
@@ -7021,7 +7019,8 @@
     "deleteRefused_one": "{{count}} profil d’inscription Windows utilise ce connecteur. Faites-le pointer vers un autre connecteur d’abord :",
     "deleteRefused_other": "{{count}} profils d’inscription Windows utilisent ce connecteur. Faites-les pointer vers un autre connecteur d’abord :",
     "deleteRefusedMore_one": "et {{count}} autre",
-    "deleteRefusedMore_other": "et {{count}} autres"
+    "deleteRefusedMore_other": "et {{count}} autres",
+    "lastTest": "Dernier test"
   },
   "certInput": {
     "modePaste": "Coller",
@@ -7421,7 +7420,8 @@
       "deploy_delivery": "Déploiements de certificats",
       "ad_connector_health": "État d’Active Directory",
       "session_cleanup": "Nettoyage des sessions"
-    }
+    },
+    "colNote": "Dernier résultat"
   },
   "lint": {
     "action": "Linter",

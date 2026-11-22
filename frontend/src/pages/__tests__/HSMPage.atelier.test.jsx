@@ -61,6 +61,30 @@ beforeEach(() => {
 const rowOf = (name) => screen.getAllByRole('row').find((r) => within(r).queryByRole('button', { name }))
 
 describe('the HSM list', () => {
+  it('opens by name, sorts every column from its header, keeps the sort in the address and reads it back (T1, T4, T9)', async () => {
+    const r = renderAtUrl(<HSMPage />, '/hsm')
+    await screen.findByRole('button', { name: 'Partition 1' })
+    const names = () => [...document.querySelectorAll('tbody .entity-label')].map((n) => n.textContent)
+    const sorted = () => screen.getAllByRole('columnheader').filter((h) => /ending/.test(h.getAttribute('aria-sort') || '')).map((h) => [h.textContent, h.getAttribute('aria-sort')])
+    expect(sorted()).toEqual([['atelier.name', 'ascending']])
+    expect(names()).toEqual(['Bao transit', 'Partition 1'])
+    expect(screen.getAllByRole('columnheader').filter((h) => h.querySelector('button[data-sort]')).map((h) => h.textContent))
+      .toEqual(['atelier.name', 'hsm.columns.type', 'hsm.columns.keys', 'hsm.columns.checked', 'atelier.state'])
+    // The key count is a number at the right; the name takes the room left, not the type
+    expect(screen.getByRole('columnheader', { name: 'hsm.columns.keys' })).toHaveClass('num')
+    expect(screen.getByRole('columnheader', { name: 'hsm.columns.type' })).toHaveClass('fit')
+    fireEvent.click(screen.getByRole('button', { name: 'hsm.columns.keys' }))
+    fireEvent.click(screen.getByRole('button', { name: 'hsm.columns.keys' }))
+    expect(names()).toEqual(['Partition 1', 'Bao transit'])
+    expect(r.where()).toBe('/hsm?sort=keys&order=desc')
+    r.unmount()
+    // Never tested sorts last, whichever the direction
+    renderAtUrl(<HSMPage />, '/hsm?sort=checked&order=desc')
+    await screen.findByRole('button', { name: 'Partition 1' })
+    expect(sorted()).toEqual([['hsm.columns.checked', 'descending']])
+    expect(names()).toEqual(['Partition 1', 'Bao transit'])
+  })
+
   it('draws the head, the state chips and the four columns of the mockup', async () => {
     const { container } = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     await screen.findByRole('button', { name: 'Partition 1' })

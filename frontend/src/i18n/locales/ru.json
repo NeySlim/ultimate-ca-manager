@@ -3673,7 +3673,6 @@
     "backupScheduleGroup": "Расписание",
     "backupFrequencyOff": "Отключено, не рекомендуется",
     "backupSize": "Размер",
-    "backupSort": "Порядок резервных копий",
     "diskHigh": "Диск почти заполнен",
     "restoreChooseFile": "Выбрать файл резервной копии",
     "restoreTooLarge": "Файл слишком большой: не более {{size}}.",
@@ -3804,12 +3803,6 @@
     "backupCopySha256": "Скопировать полный SHA-256",
     "backupSharedStoreNote": "В режиме высокой доступности архивы хранятся в базе данных PostgreSQL, которую читает каждый узел: они теряются вместе с этой базой. Скачивайте нужные вам копии в место за пределами кластера, а PostgreSQL копируйте её собственными средствами.",
     "backupSearchPlaceholder": "Поиск резервных копий…",
-    "backupSortNewest": "Сначала новые",
-    "backupSortOldest": "Сначала старые",
-    "backupSortLargest": "Сначала большие",
-    "backupSortSmallest": "Сначала малые",
-    "backupSortNameAsc": "Имя (А→Я)",
-    "backupSortNameDesc": "Имя (Я→А)",
     "backupSelectAll": "Выбрать все",
     "backupDeleteSelected": "Удалить выбранные ({{count}})",
     "backupNoMatch": "Нет резервных копий, подходящих под поиск",
@@ -4782,7 +4775,11 @@
     "allOf": "Всё: {{name}}",
     "permissionOf": "{{resource}}: {{actions}}",
     "anyResource": "Все ресурсы",
-    "anyAction": "все действия"
+    "anyAction": "все действия",
+    "columns": {
+      "permissions": "Права",
+      "users": "Пользователи"
+    }
   },
   "hsm": {
     "pkcs11Unavailable": "Зависимости PKCS#11 недоступны на этом узле",
@@ -6968,7 +6965,8 @@
         "running": "Выполняется",
         "completed": "Завершён",
         "failed": "Сбой"
-      }
+      },
+      "targets": "Цели"
     },
     "form": {
       "range": "Диапазон",
@@ -7307,7 +7305,8 @@
     "deleteRefusedMore_one": "и ещё {{count}}",
     "deleteRefusedMore_few": "и ещё {{count}}",
     "deleteRefusedMore_many": "и ещё {{count}}",
-    "deleteRefusedMore_other": "и ещё {{count}}"
+    "deleteRefusedMore_other": "и ещё {{count}}",
+    "lastTest": "Последняя проверка"
   },
   "certInput": {
     "modePaste": "Вставить",
@@ -7723,7 +7722,8 @@
       "deploy_delivery": "Развёртывание сертификатов",
       "ad_connector_health": "Состояние Active Directory",
       "session_cleanup": "Очистка сеансов"
-    }
+    },
+    "colNote": "Последний результат"
   },
   "lint": {
     "action": "Линтер",

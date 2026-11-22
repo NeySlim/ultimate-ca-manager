@@ -21,13 +21,16 @@ const columns = (table) => table.evaluate((t: HTMLTableElement) => {
     walk(td)
     return right
   }
+  // A sort button fills its header (R4): its padding is the cell's
+  const pad = (cell: HTMLElement, side: string) => {
+    const button = cell.tagName === 'TH' ? cell.querySelector(':scope > button') : null
+    return parseFloat(getComputedStyle(cell)[side]) + (button ? parseFloat(getComputedStyle(button)[side]) : 0)
+  }
   return ths.map((th, i) => {
-    const cs = getComputedStyle(th)
-    const inner = th.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+    const inner = th.getBoundingClientRect().width - pad(th, 'paddingLeft') - pad(th, 'paddingRight')
     // the widest content of the column, its header included
     const used = Math.max(...[th, ...rows.map(r => r.children[i] as HTMLElement)].map(cell => {
-      const ccs = getComputedStyle(cell)
-      return contentRight(cell) - cell.getBoundingClientRect().left - parseFloat(ccs.paddingLeft)
+      return contentRight(cell) - cell.getBoundingClientRect().left - pad(cell, 'paddingLeft')
     }))
     return { fit: th.classList.contains('fit'), inner: Math.round(inner), used: Math.round(used) }
   })

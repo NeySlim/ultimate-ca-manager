@@ -9,7 +9,7 @@ import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Icon, Btn, IconBtn, PageHead, Toolbar, SearchField, FilterSelect, ToolsDivider, AppliedFilters,
-  DataTable, TableFooter, LoadError, LoadCause, NoMatch,
+  DataTable, TableFooter, LoadError, LoadCause, NoMatch, useSortParam,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { useNotification, useInspector } from '../contexts'
@@ -26,6 +26,9 @@ import { ExportDialog, ActionsDialog, CleanupDialog } from './activity/JournalDi
 import { FiltersDialog } from './activity/FiltersDialog'
 
 const PAGE_SIZES = [10, 25, 50, 100]
+// A journal sorts by its time only, the newest first (T7), by the server, kept in the address
+const NEWEST_FIRST = { key: 'timestamp', asc: false }
+const TIME_KEYS = ['timestamp']
 const PRESETS_KEY = 'ucm-audit-presets'
 
 function readPresets() {
@@ -50,6 +53,11 @@ export default function AuditLogsPage() {
 
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(50)
+  const { sort, onSort } = useSortParam(NEWEST_FIRST, TIME_KEYS)
+  // A new order starts from the first page, whether the header or Back set it
+  const order = sort.asc ? 'asc' : 'desc'
+  const [orderMark, setOrderMark] = useState(order)
+  if (orderMark !== order) { setOrderMark(order); setPage(1) }
 
   // A link may open the journal on a search (an inspector's « View its activity »)
   const location = useLocation()
@@ -91,7 +99,7 @@ export default function AuditLogsPage() {
     if (typeWaits) return
     if (impossible) { setLogs([]); setTotal(0); setLoading(false); setLoadError(null); return }
     try {
-      const res = await auditService.getLogs({ page, per_page: perPage, ...filterParams })
+      const res = await auditService.getLogs({ page, per_page: perPage, ...filterParams, sort_by: 'timestamp', sort_order: order })
       if (mine !== seq.current) return
       setLogs(res.data || [])
       setTotal(res.meta?.total || 0)
@@ -103,7 +111,7 @@ export default function AuditLogsPage() {
     } finally {
       if (mine === seq.current) setLoading(false)
     }
-  }, [page, perPage, filterParams, impossible, typeWaits])
+  }, [page, perPage, filterParams, impossible, typeWaits, order])
 
   // The journal as a whole: its size, its oldest entry, the last 30 days, the action codes
   const loadJournal = useCallback(async () => {
@@ -293,9 +301,10 @@ export default function AuditLogsPage() {
 
   // The journal's columns: short ones fit their content (adjust.css), the operation and the resource share the rest
   const columns = [
-    { id: 'time', label: t('audit.colTime'), fit: true, tone: ['mono', 'muted'], cell: (e) => rowTime(e.timestamp, locale), skeleton: { width: '64px' } },
+    { id: 'time', label: t('audit.colTime'), fit: true, sort: 'timestamp', tone: ['mono', 'muted'], cell: (e) => rowTime(e.timestamp, locale), skeleton: { width: '64px' } },
     { id: 'operation', label: t('audit.colOperation'), cell: (e) => <span className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action)}</span>, skeleton: { base: 45, spread: 35 } },
-    { id: 'resource', label: t('audit.colResource'), resource: true, cell: resourceOf, skeleton: { base: 50, spread: 40 } },
+    // The resource takes the room left and gives way by an ellipsis, its whole text in a title (audit-resource, R1, L6)
+    { id: 'resource', label: t('audit.colResource'), resource: true, tone: 'audit-resource', title: resourceOf, cell: resourceOf, skeleton: { base: 50, spread: 40 } },
     { id: 'user', label: t('audit.colUser'), fit: true, tone: ['muted', 'small'], cell: (e) => e.username || t('common.system'), skeleton: { width: '70px' } },
     { id: 'result', label: t('audit.colResult'), fit: true, cell: badgeOf, skeleton: { width: '74px', kind: 'pill' } },
   ]
@@ -379,7 +388,7 @@ export default function AuditLogsPage() {
             )}
           </div>
           <DataTable kind="audit" scrollId="audit-scroll" recordsId="audit-records" label={t('audit.regionLabel')} columns={columns} rows={shown}
-            rowKey={(e) => e.id} rowLabel={resourceOf} loading={firstRead} onOpen={openEvent} openLabel={(e) => t('audit.detailOf', { id: e.id })}
+            rowKey={(e) => e.id} rowLabel={resourceOf} loading={firstRead} onOpen={openEvent} sort={sort} onSort={onSort} openLabel={(e) => t('audit.detailOf', { id: e.id })}
             actionsLabel={t('audit.colDetail')} empty={emptyBlock} card={card}
             footer={!firstRead && total > 0 && (
               <TableFooter range={t('audit.pageRange', {

@@ -6,6 +6,7 @@ import { withoutAdminOnly } from './settings/adminOnlySettings'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
+import { useSortParam } from '../components/atelier/useSortParam'
 import { ListBullets, HardDrives, Lock, Palette, Info, Timer, Certificate, Eye, Rocket, Bell, UsersThree, WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp, SlidersHorizontal, PaperPlaneTilt, Archive } from '@phosphor-icons/react'
 import { ServiceReconnectOverlay } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
@@ -154,6 +155,11 @@ export function backupPasswordProblem(password, t) {
   return null
 }
 
+// The archives' sort keys, read by the server as `<key>_<asc|desc>`
+const BACKUP_NEWEST = { key: 'created', asc: false }
+const BACKUP_SORT_KEYS = ['created', 'size', 'name']
+const backupOrder = (sort) => `${sort.key}_${sort.asc ? 'asc' : 'desc'}`
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -197,7 +203,10 @@ export default function SettingsPage() {
   const [backups, setBackups] = useState([])
   const [backupMeta, setBackupMeta] = useState({ total: 0, pages: 1, page: 1 })
   const [backupSchedule, setBackupSchedule] = useState({})
-  const [backupQuery, setBackupQuery] = useState({ page: 1, per_page: 20, search: '', sort: 'created_desc' })
+  // The archives' order lives in the address under its own scope (the sections are stacked): the newest first by default
+  const backupSort = useSortParam(BACKUP_NEWEST, BACKUP_SORT_KEYS, { scope: 'backup' })
+  const urlBackupOrder = backupOrder(backupSort.sort)
+  const [backupQuery, setBackupQuery] = useState(() => ({ page: 1, per_page: 20, search: '', sort: urlBackupOrder }))
   const [selectedBackups, setSelectedBackups] = useState([])
   const [backupBusy, setBackupBusy] = useState(false)
   const [dbStats, setDbStats] = useState(null)
@@ -575,11 +584,20 @@ export default function SettingsPage() {
 
   const updateBackupQuery = (patch) => {
     const next = { ...backupQuery, ...patch }
+    if (patch.sort && patch.sort !== urlBackupOrder) {
+      const [key, dir] = patch.sort.split('_')
+      backupSort.setSort({ key, asc: dir === 'asc' })
+    }
     // Any change other than an explicit page jump resets to page 1.
     if (!('page' in patch)) next.page = 1
     setBackupQuery(next)
     loadBackups(next, { withSchedule: false })
   }
+
+  // Back or a link that changes the order reads the archives again in it
+  useEffect(() => {
+    if (urlBackupOrder !== backupQuery.sort && hasPermission('admin:system')) updateBackupQuery({ sort: urlBackupOrder })
+  }, [urlBackupOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSelectBackup = (filename) => {
     setSelectedBackups((prev) =>

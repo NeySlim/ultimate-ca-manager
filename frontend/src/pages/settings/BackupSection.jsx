@@ -6,7 +6,7 @@
  */
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, IconBtn, Pill, Notice, DataTable, TableFooter, Toolbar, SearchField, FilterSelect, BatchBar } from '../../components/atelier'
+import { Btn, IconBtn, Pill, Notice, DataTable, TableFooter, Toolbar, SearchField, BatchBar } from '../../components/atelier'
 import { Field, NumberInput, Select } from '../../components/atelier/Form'
 import { SettingsGroup, FieldError } from '../../components/atelier/SettingsView'
 import { PasswordMeter } from '../../components/auth/PasswordMeter'
@@ -88,17 +88,19 @@ export default function BackupSection({
       {isAdmin && <IconBtn icon="close" label={`${t('common.delete')} ${b.filename}`} title={t('common.delete')} write onClick={() => handleDeleteBackup(b.filename)} />}
     </span>
   )
+  // The archive's name takes the room left (nothing opens it: its row names it), its digest beside it
   const columns = [
-    { id: 'name', label: t('common.name'), sort: 'name', grow: true, cell: (b) => <><strong>{b.filename}</strong>{digest(b)}</> },
-    { id: 'size', label: t('settings.backupSize'), sort: 'size', fit: true, tone: 'muted', cell: shownSize },
-    { id: 'created', label: t('common.created'), sort: 'created', fit: true, tone: 'muted', cell: created },
-    ...(sharedStore || backups.some((b) => b.node) ? [{ id: 'node', label: t('settings.backupNode'), fit: true, tone: 'muted', cell: (b) => b.node || '—' }] : []),
-    { id: 'actions', label: <span className="sr-only">{t('common.actions')}</span>, fit: true, cell: actions },
+    { id: 'name', label: t('common.name'), sort: 'name', kind: 'entity', priority: 1, cell: (b) => b.filename, extra: digest },
+    { id: 'size', label: t('settings.backupSize'), sort: 'size', kind: 'number', priority: 3, tone: 'muted', cell: shownSize },
+    { id: 'created', label: t('common.created'), sort: 'created', kind: 'fit', priority: 2, labelled: true, tone: 'muted', cell: created },
+    ...(sharedStore || backups.some((b) => b.node) ? [{ id: 'node', label: t('settings.backupNode'), kind: 'fit', priority: 4, labelled: true, tone: 'muted', cell: (b) => b.node || '—' }] : []),
+    { id: 'actions', label: <span className="sr-only">{t('common.actions')}</span>, kind: 'fit', priority: 1, cell: actions },
   ]
+  // The headers are the one sort control (T3: a new column ascending, the sorted one reversed); the server sorts
   const sort = sortOf(backupQuery.sort)
   const onSort = (key) => {
-    const [desc, asc] = SORTS[key]
-    updateBackupQuery({ sort: sort.key === key && !sort.asc ? asc : desc })
+    const asc = sort.key === key ? !sort.asc : true
+    updateBackupQuery({ sort: SORTS[key][asc ? 1 : 0] })
   }
 
   return (
@@ -191,16 +193,6 @@ export default function BackupSection({
           <Toolbar>
             <SearchField id="backup-search" label={t('settings.backupSearchPlaceholder')} placeholder={t('settings.backupSearchPlaceholder')}
               value={backupQuery.search || ''} onChange={(search) => updateBackupQuery({ search })} />
-            <FilterSelect id="backup-sort" label={t('settings.backupSort')} value={backupQuery.sort || 'created_desc'}
-              onChange={(value) => updateBackupQuery({ sort: value })}
-              options={[
-                { value: 'created_desc', label: t('settings.backupSortNewest') },
-                { value: 'created_asc', label: t('settings.backupSortOldest') },
-                { value: 'size_desc', label: t('settings.backupSortLargest') },
-                { value: 'size_asc', label: t('settings.backupSortSmallest') },
-                { value: 'name_asc', label: t('settings.backupSortNameAsc') },
-                { value: 'name_desc', label: t('settings.backupSortNameDesc') },
-              ]} />
           </Toolbar>
         )}
         {isAdmin && selectedBackups.length > 0 && (

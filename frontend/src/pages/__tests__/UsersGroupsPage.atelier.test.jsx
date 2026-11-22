@@ -110,6 +110,28 @@ describe('the account list', () => {
     expect(screen.getByRole('button', { name: 'Chloé Durand' })).toBeTruthy()
   })
 
+  it('opens by name, keeps the sort in the address and reads it back (T4, T9); the e-mail gives way first', async () => {
+    const at = { search: '' }
+    function Where() { at.search = useLocation().search; return null }
+    const r = render(<MemoryRouter initialEntries={['/users']}><UsersGroupsPage /><Where /></MemoryRouter>)
+    await screen.findByRole('button', { name: 'Chloé Durand' })
+    const names = () => [...document.querySelectorAll('tbody .entity-label')].map((n) => n.textContent)
+    const sorted = () => screen.getAllByRole('columnheader').filter((h) => /ending/.test(h.getAttribute('aria-sort') || '')).map((h) => [h.textContent, h.getAttribute('aria-sort')])
+    expect(sorted()).toEqual([['atelier.name', 'ascending']])
+    expect(names()).toEqual(['Administrateur', 'ancien', 'Chloé Durand'])
+    // The e-mail is the absorbing text; the last access a date named on a phone
+    expect(screen.getByRole('columnheader', { name: 'users.email' })).toHaveClass('col-description')
+    fireEvent.click(screen.getByRole('button', { name: 'users.lastSeen' }))
+    expect(at.search).toBe('?sort=seen&order=asc')
+    r.unmount()
+    render(<MemoryRouter initialEntries={['/users?sort=seen&order=desc']}><UsersGroupsPage /></MemoryRouter>)
+    await screen.findByRole('button', { name: 'Chloé Durand' })
+    expect(sorted()).toEqual([['users.lastSeen', 'descending']])
+    // Never seen sorts last whichever the direction
+    expect(names()[0]).toBe('Administrateur')
+  })
+
+  // Thirty-three rows sorted fourteen times: well over a second under a full parallel run
   it('sorts its seven columns from their headers, on the pages it keeps', async () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ id: 100 + i, username: `u${String(i).padStart(2, '0')}`, email: `u${i}@example.com`, role: 'viewer', active: true, sso_identities: [] }))
     m.getAll.mockResolvedValue({ data: [ME, CHLOE, OLD, ...many] })
@@ -146,7 +168,7 @@ describe('the account list', () => {
     fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'example.com' } })
     expect(footer).toHaveTextContent('users.pageRange {"start":1,"end":25,"count":32}')
-  })
+  }, 15000)
 
   it("words the head's main action as a short verb, named in full", async () => {
     page()
@@ -283,11 +305,14 @@ describe('the groups view', () => {
   it('opens on the groups from the address', async () => {
     page('/users?tab=groups')
     expect(await screen.findByRole('button', { name: 'pki-ops' })).toBeTruthy()
-    // Its three columns sort too
-    for (const name of ['atelier.name', 'common.description', 'groups.members']) {
+    // Its three columns sort too, by name first (T4)
+    expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
+    for (const name of ['common.description', 'groups.members']) {
       fireEvent.click(screen.getByRole('button', { name }))
       expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
     }
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
+    expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
   })
 })
 

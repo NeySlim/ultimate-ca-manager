@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
-  Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch,
+  Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { FormModal, Input, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import { useNotification } from '../contexts'
@@ -33,6 +33,9 @@ const PROVIDER_TYPES = [
 const STATES = { connected: 'good', error: 'bad', disconnected: 'muted', unknown: 'muted' }
 const stateOf = (p) => (STATES[p.status] ? p.status : 'unknown')
 const typeLabel = (p) => PROVIDER_TYPES.find((x) => x.value === p.provider_type)?.label || p.provider_type
+// Named configuration: by name (T4), kept in the address
+const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'type', 'keys', 'checked', 'state']
 
 // Everything the sync route reports: counts, then what was kept or changed and why
 export function syncKeysMessage(t, d) {
@@ -312,6 +315,15 @@ export default function HSMPage() {
   const present = Object.keys(STATES).filter((s) => providers.some((p) => stateOf(p) === s))
   const active = present.includes(state) ? state : ''
   const rows = searched.filter((p) => !active || stateOf(p) === active)
+  const sortParam = useSortParam(BY_NAME, SORT_KEYS)
+  const list = useClientList(rows, {
+    sortParam,
+    resetKey: `${query}|${type}|${active}`,
+    sorts: {
+      name: (p) => p.name, type: typeLabel, keys: (p) => p.key_count || 0,
+      checked: (p) => (p.last_tested_at ? Date.parse(p.last_tested_at) : null), state: (p) => Object.keys(STATES).indexOf(stateOf(p)),
+    },
+  })
   const views = [
     { id: '', label: t('common.all'), count: searched.length },
     ...present.map((s) => ({ id: s, label: t(`hsm.states.${s}`), count: searched.filter((p) => stateOf(p) === s).length })),
@@ -382,7 +394,7 @@ export default function HSMPage() {
       <PageHead title={t('shell.moduleLabel.hsm')} total={t('hsm.unit', { count: providers.length })} intent={t('shell.moduleDesc.hsm')}
         actions={create && <Btn tone="primary" icon="plus" id="hsm-new" onClick={create.onClick}>{create.label}</Btn>} />
       {hsmStatus && !hsmStatus.ready && usesLocalPkcs11 && <Pkcs11Notice status={hsmStatus} />}
-      <ListView label={t('shell.moduleLabel.hsm')} caption={t('hsm.caption')} icon="chip" rows={rows} loading={loading}
+      <ListView label={t('shell.moduleLabel.hsm')} caption={t('hsm.caption')} icon="chip" list={list} nameSort="name" loading={loading}
         filters={{ views, active, onChange: setState, label: t('hsm.filterByState') }}
         toolbar={(
           <Toolbar>
@@ -393,10 +405,10 @@ export default function HSMPage() {
         )}
         title={(p) => p.name} status={pill} openedId={openId} onOpen={openProvider}
         columns={[
-          { id: 'type', label: t('hsm.columns.type'), cell: typeLabel, grow: true },
-          { id: 'keys', label: t('hsm.columns.keys'), cell: keyCount },
-          { id: 'checked', label: t('hsm.columns.checked'), cell: checked },
-          { status: true },
+          { id: 'type', label: t('hsm.columns.type'), cell: typeLabel, kind: 'fit', priority: 3, sort: 'type' },
+          { id: 'keys', label: t('hsm.columns.keys'), cell: (p) => p.key_count || 0, kind: 'number', priority: 3, sort: 'keys' },
+          { id: 'checked', label: t('hsm.columns.checked'), cell: checked, kind: 'fit', priority: 2, labelled: true, sort: 'checked' },
+          { status: true, sort: 'state' },
         ]}
         error={loadError && (
           <LoadError id="hsm" title={t('messages.errors.loadFailed.hsmProviders')} onRetry={() => { setLoading(true); loadData() }}
@@ -408,7 +420,7 @@ export default function HSMPage() {
         ) : (
           <EmptyBlock id="hsm" icon="chip" title={t('hsm.noHSM')} text={t('hsm.noHSMDescription')} action={create} />
         )}
-        footer={{ range: t('hsm.range', { shown: rows.length, count: providers.length }) }} />
+        footer={{ range: t('hsm.range', list.counts(providers.length)) }} />
     </Zone>
   )
 }

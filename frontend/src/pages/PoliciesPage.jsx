@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
-  Section, Props, LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog,
+  Section, Props, LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, useClientList, useSortParam,
 } from '../components/atelier'
 import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
@@ -65,6 +65,9 @@ function parseEmails(text) {
   return { emails, invalid: emails.filter(e => !EMAIL_RE.test(e)) }
 }
 
+// Policies read in the order the server evaluates them (T4), kept in the address
+const BY_PRIORITY = { key: 'priority', asc: true }
+const SORT_KEYS = ['name', 'scope', 'operations', 'priority', 'approval', 'state']
 const STATES = { applied: 'good', inactive: 'muted' }
 const stateOf = (p) => (p.is_active ? 'applied' : 'inactive')
 
@@ -364,6 +367,15 @@ export default function PoliciesPage() {
   const present = Object.keys(STATES).filter(s => policies.some(p => stateOf(p) === s))
   const active = present.includes(state) ? state : ''
   const rows = searched.filter(p => !active || stateOf(p) === active)
+  const sortParam = useSortParam(BY_PRIORITY, SORT_KEYS)
+  const list = useClientList(rows, {
+    sortParam,
+    resetKey: `${query}|${type}|${active}`,
+    sorts: {
+      name: (p) => p.name, scope: scopeOf, operations: operationsOf, priority: (p) => p.priority ?? 100,
+      approval: (p) => (p.requires_approval ? p.min_approvers || 1 : 0), state: (p) => Object.keys(STATES).indexOf(stateOf(p)),
+    },
+  })
   const views = [
     { id: '', label: t('common.all'), count: searched.length },
     ...present.map(s => ({ id: s, label: t(`policies.state.${s}`), count: searched.filter(p => stateOf(p) === s).length })),
@@ -448,7 +460,7 @@ export default function PoliciesPage() {
       {platform.fips && (
         <div className="notice" role="note"><Icon name="shield" /><span><strong>{t('policies.fipsRulesTitle')}</strong> {t('policies.fipsRulesDesc')}</span></div>
       )}
-      <ListView label={t('common.policies')} caption={t('policies.caption')} icon="policy" rows={rows} loading={loading}
+      <ListView label={t('common.policies')} caption={t('policies.caption')} icon="policy" list={list} nameSort="name" loading={loading}
         filters={{ views, active, onChange: setState, label: t('policies.filterByState') }}
         toolbar={(
           <Toolbar>
@@ -460,11 +472,11 @@ export default function PoliciesPage() {
         title={(p) => p.name} status={pill} openedId={openId}
         onOpen={(p) => policyDock.select(p)}
         columns={[
-          { id: 'scope', label: t('policies.scope'), cell: scopeOf, grow: true },
-          { id: 'operations', label: t('policies.operations'), cell: operationsOf },
-          { id: 'priority', label: t('policies.priority'), cell: (p) => p.priority, fit: true },
-          { id: 'approval', label: t('policies.approval'), cell: approvalOf },
-          { status: true },
+          { id: 'scope', label: t('policies.scope'), cell: scopeOf, kind: 'text', priority: 3, sort: 'scope' },
+          { id: 'operations', label: t('policies.operations'), cell: operationsOf, kind: 'text', priority: 4, sort: 'operations' },
+          { id: 'priority', label: t('policies.priority'), cell: (p) => p.priority, kind: 'number', priority: 2, sort: 'priority' },
+          { id: 'approval', label: t('policies.approval'), cell: approvalOf, kind: 'text', priority: 3, sort: 'approval' },
+          { status: true, sort: 'state' },
         ]}
         error={loadError && (
           <LoadError id="policies" title={t('policies.loadFailed')} onRetry={() => { setLoading(true); loadData() }} journal={hasPermission('read:audit') && '/audit'}
@@ -476,7 +488,7 @@ export default function PoliciesPage() {
         ) : (
           <EmptyBlock id="policies" icon="policy" title={t('policies.noPolicies')} text={t('policies.noPoliciesDesc')} action={create} />
         )}
-        footer={{ range: t('policies.range', { shown: rows.length, count: policies.length }) }} />
+        footer={{ range: t('policies.range', list.counts(policies.length)) }} />
     </Zone>
   )
 }

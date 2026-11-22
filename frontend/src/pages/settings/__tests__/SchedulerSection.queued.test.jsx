@@ -3,7 +3,10 @@
  * not that it ran, and a state the process stopped publishing is flagged.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+// The lists keep their sort in the address
+const render = (ui, options) => rtlRender(ui, { wrapper: MemoryRouter, ...options })
 
 // Stable references: the page reloads whenever t or showError change
 const { notify, api, i18n } = vi.hoisted(() => ({
