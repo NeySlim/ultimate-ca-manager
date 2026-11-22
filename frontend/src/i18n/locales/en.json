@@ -7726,7 +7726,9 @@
       "password": "password",
       "mtls": "client certificate",
       "webauthn": "security key",
-      "session": "browser session"
+      "session": "browser session",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} certificate expiring or expired",
     "expiringCount_other": "{{count}} certificates expiring or expired",
@@ -7936,6 +7938,11 @@
       "text": "Browsing continues with the data already loaded; actions are suspended and will resume by themselves when the network returns.",
       "said": "Offline: browsing continues, actions are suspended.",
       "back": "Connection restored: actions are available again."
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     }
   },
   "overview": {

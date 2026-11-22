@@ -124,3 +124,6 @@
 :root .atl .theme-menu .swatch{margin:0 2px}
 /* A table row that opens its object opens from anywhere on it (DataTable): the pointer says so. */
 :root .atl tbody tr.opens{cursor:pointer}
+/* The account menu opens on the lock screen's account card, the known facts under it in two columns. */
+:root .atl .user-menu .user-id{gap:10px}
+:root .atl .user-menu .user-facts{grid-template-columns:auto minmax(0,1fr);gap:6px 14px;padding:0 2px}

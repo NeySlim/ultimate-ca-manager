@@ -1,4 +1,4 @@
-/** Account menu of the mockup: identity, method and lock, My account, Settings for who may see it, Sign out; the language on a phone. */
+/** Account menu: the account card and its facts, My account, Settings for who may see it, Sign out apart; the language on a phone. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -7,7 +7,7 @@ import { ROLES, canFor } from './shellTestUtils'
 
 const logout = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const getCurrentUser = vi.hoisted(() => vi.fn())
-const auth = vi.hoisted(() => ({ method: 'password' }))
+const auth = vi.hoisted(() => ({ method: 'password', user: null }))
 const i18n = vi.hoisted(() => ({ language: 'fr-FR', changeLanguage: vi.fn() }))
 const persistPreference = vi.hoisted(() => vi.fn())
 
@@ -16,7 +16,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { username: 'probe', role: 'operator' }, logout, authMethod: auth.method }),
+  useAuth: () => ({ user: auth.user, logout, authMethod: auth.method }),
 }))
 vi.mock('../../../stores/userPreferencesStore', async (importOriginal) => ({ ...(await importOriginal()), persistPreference }))
 vi.mock('../../../services/auth.service', () => ({ authService: { getCurrentUser } }))
@@ -40,6 +40,7 @@ const trigger = () => screen.getByRole('button', { name: 'shell.accountLabel|pro
 beforeEach(() => {
   vi.clearAllMocks()
   auth.method = 'password'
+  auth.user = { username: 'probe', role: 'operator' }
   getCurrentUser.mockResolvedValue({ data: { session_timeout: 1800 } })
 })
 
@@ -50,31 +51,41 @@ describe('UserMenu', () => {
     expect(trigger()).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('opens with the name, the role and login, the method and the inactivity lock', async () => {
+  it('opens on the account card: the avatar beside the name, the role and login, then the facts known', async () => {
+    auth.user = { username: 'probe', role: 'operator', full_name: 'Probe Person', email: 'probe@example.com' }
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'shell.accountLabel|Probe Person,common.operator' }))
+    const card = document.querySelector('#user-menu > .user-id > .auth-user')
+    expect(card.querySelector('.avatar')).toHaveTextContent('PR')
+    expect(card.querySelector('.avatar')).toHaveAttribute('aria-hidden', 'true')
+    expect(card.querySelector('.avatar').nextElementSibling.querySelector('strong')).toHaveTextContent('Probe Person')
+    expect(card).toHaveTextContent('common.operator · probe')
+    const facts = document.querySelector('.user-id > dl.props')
+    await waitFor(() => expect([...facts.querySelectorAll('dt')].map(dt => dt.textContent)).toEqual(['common.email', 'shell.userCard.signIn', 'shell.userCard.session']))
+    expect([...facts.querySelectorAll('dd')].map(dd => dd.textContent)).toEqual(['probe@example.com', 'shell.method.password', 'shell.userCard.lockIn|30'])
+  })
+
+  it('names an SSO or LDAP sign-in', async () => {
+    auth.method = 'sso'
     const user = setup()
     await user.click(trigger())
-    expect(trigger()).toHaveAttribute('aria-expanded', 'true')
-    const id = document.querySelector('.user-id')
-    expect(id.querySelector('strong')).toHaveTextContent('probe')
-    expect(id.querySelector('.mono')).toHaveTextContent('probe')
-    expect(id).toHaveTextContent('common.operator · probe')
-    expect(await screen.findByText(/shell\.lockAfter\|30/)).toBeVisible()
-    expect(screen.getByText(/shell\.signedInWith\|shell\.method\.password/)).toBeVisible()
+    expect(screen.getByText('shell.method.sso')).toBeVisible()
   })
 
   it('says only the lock for a session restored from the browser: the server no longer knows the method', async () => {
     auth.method = 'session'
     const user = setup()
     await user.click(trigger())
-    expect(await screen.findByText(/shell\.lockAfter\|30/)).toBeVisible()
-    expect(screen.queryByText(/shell\.signedInWith/)).toBeNull()
+    expect(await screen.findByText('shell.userCard.lockIn|30')).toBeVisible()
+    expect(screen.queryByText('shell.userCard.signIn')).toBeNull()
   })
 
-  it('says nothing about a method the session does not know', async () => {
+  it('says nothing about a method the session does not know, nor an e-mail it has not', async () => {
     auth.method = null
     const user = setup()
     await user.click(trigger())
-    expect(screen.queryByText(/shell\.signedInWith/)).toBeNull()
+    expect(screen.queryByText('shell.userCard.signIn')).toBeNull()
+    expect(screen.queryByText('common.email')).toBeNull()
   })
 
   it('has My account and Sign out only for who may not see Settings', async () => {
@@ -83,7 +94,8 @@ describe('UserMenu', () => {
     const menu = document.getElementById('user-menu')
     const items = [...menu.querySelectorAll('a, button')].map(el => el.textContent)
     expect(items).toEqual(['common.account', 'shell.signOut'])
-    expect(screen.queryByRole('group')).toBeNull()
+    // Sign out stands apart
+    expect(screen.getByRole('separator').nextElementSibling).toHaveAttribute('id', 'user-logout')
   })
 
   it('puts Settings between My account and Sign out for who may see it, with the module glyph', async () => {

@@ -7726,7 +7726,9 @@
       "password": "contraseña",
       "mtls": "certificado de cliente",
       "webauthn": "clave de seguridad",
-      "session": "sesión del navegador"
+      "session": "sesión del navegador",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} certificado caduca o ha caducado",
     "expiringCount_other": "{{count}} certificados caducan o han caducado",
@@ -7936,6 +7938,11 @@
       "text": "La consulta continúa con los datos ya cargados; las acciones están suspendidas y se reanudarán solas al volver la red.",
       "said": "Sin conexión: la consulta continúa, las acciones están suspendidas.",
       "back": "Conexión restablecida: las acciones vuelven a estar disponibles."
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     }
   },
   "overview": {

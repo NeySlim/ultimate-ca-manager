@@ -7726,7 +7726,9 @@
       "password": "Passwort",
       "mtls": "Clientzertifikat",
       "webauthn": "Sicherheitsschlüssel",
-      "session": "Browsersitzung"
+      "session": "Browsersitzung",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} Zertifikat läuft ab oder ist abgelaufen",
     "expiringCount_other": "{{count}} Zertifikate laufen ab oder sind abgelaufen",
@@ -7936,6 +7938,11 @@
       "text": "Die Ansicht läuft mit den bereits geladenen Daten weiter; Aktionen sind ausgesetzt und werden bei Rückkehr des Netzwerks von selbst wieder möglich.",
       "said": "Offline: Die Ansicht läuft weiter, Aktionen sind ausgesetzt.",
       "back": "Verbindung wiederhergestellt: Aktionen sind wieder verfügbar."
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     }
   },
   "overview": {

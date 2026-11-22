@@ -7726,7 +7726,9 @@
       "password": "密码",
       "mtls": "客户端证书",
       "webauthn": "安全密钥",
-      "session": "浏览器会话"
+      "session": "浏览器会话",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} 张证书即将到期或已过期",
     "expiringCount_other": "{{count}} 张证书即将到期或已过期",
@@ -7936,6 +7938,11 @@
       "text": "可继续浏览已加载的数据；操作已暂停，网络恢复后将自动恢复。",
       "said": "离线：可继续浏览，操作已暂停。",
       "back": "连接已恢复：操作重新可用。"
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     }
   },
   "overview": {
