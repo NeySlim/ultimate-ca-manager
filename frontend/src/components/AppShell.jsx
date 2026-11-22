@@ -45,7 +45,7 @@ export function AppShell() {
   const [helpOpen, setHelpOpen] = usePanel('help')
   const [helpAsk, setHelpAsk] = useState({})
   const help = helpOpen ? helpAsk : null
-  const setHelp = (ask) => { if (ask) setHelpAsk(ask); setHelpOpen(!!ask) }
+  const setHelp = useCallback((ask) => { if (ask) setHelpAsk(ask); setHelpOpen(!!ask) }, [setHelpOpen])
   // Cluster nodes, read from the service status (read:settings), from the bar or the HA banner
   const [nodesOpen, setNodesOpen] = useState(false)
   const ha = haState(useHealth())
@@ -127,7 +127,7 @@ export function AppShell() {
     }
     window.addEventListener('keydown', handleHelpKey)
     return () => window.removeEventListener('keydown', handleHelpKey)
-  }, [])
+  }, [setHelp])
 
   const openHelp = (key, returnTo) => setHelp({ key: typeof key === 'string' ? key : null, returnTo })
 

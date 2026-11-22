@@ -139,7 +139,8 @@ export function ViewSwitch({ id, label, value, onChange, options = [], groups = 
   const shownIn = (g) => g.options.some((o) => !hidden.has(o.value))
 
   // Every tab stays drawn for its width; the ones that do not fit are taken out of the row and of the
-  // tab order (adjust.css). Read after each render: counters arriving widen the tabs.
+  // tab order (extensions.css). Read after each render: counters arriving widen the tabs; set only on a change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const frame = frameRef.current
     const row = rowRef.current
