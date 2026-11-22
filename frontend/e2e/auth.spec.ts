@@ -80,6 +80,27 @@ test.describe('sign-in and session', () => {
     await expect(other.getByText('You locked the session.', { exact: false })).toBeVisible()
   })
 
+  test('a tab that missed the lock message shows the lock screen at its next request', async ({ api, signIn }) => {
+    const user = await createUser(api, 'viewer')
+    const { page } = await signIn(user.username, user.password)
+    await page.goto('/certificates')
+    await expect(page.getByRole('button', { name: /^Account: / })).toBeVisible()
+    // No channel between the tabs: the second one hears nothing of the lock
+    const other = await page.context().newPage()
+    await other.addInitScript(() => { Object.defineProperty(window, 'BroadcastChannel', { value: undefined }) })
+    await other.goto('/')
+    await expect(other.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
+
+    await page.bringToFront()
+    await page.locator('body').press('Alt+Shift+L')
+    await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    // An in-app move to another page sends the second tab's next requests
+    await other.evaluate(() => { history.pushState({}, '', '/certificates'); dispatchEvent(new PopStateEvent('popstate')) })
+    await expect(other.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    await expect(other.getByText('You locked the session.', { exact: false })).toBeVisible()
+    await expect(other).toHaveURL(url => url.pathname === '/login')
+  })
+
   test('a session ended by the server sends the next action back to the sign-in page', async ({ api, signIn, request }) => {
     const user = await createUser(api, 'viewer')
     const { page } = await signIn(user.username, user.password)

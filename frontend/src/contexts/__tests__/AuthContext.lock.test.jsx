@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { AuthProvider, useAuth } from '../AuthContext'
 import { authService } from '../../services/auth.service'
-import { readLock, takeJustLocked, takeSignedOut, announceLock } from '../../lib/sessionLock'
+import { readLock, takeJustLocked, takeSignedOut, announceLock, shareLock, readSharedLock, clearSharedLock } from '../../lib/sessionLock'
 
 vi.mock('../../services/auth.service', () => ({
   authService: { getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn(), lock: vi.fn() },
@@ -26,6 +26,7 @@ describe('AuthContext lock', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sessionStorage.clear()
+    clearSharedLock()
     takeJustLocked()
     takeSignedOut()
     authService.getCurrentUser.mockResolvedValue({
@@ -125,5 +126,109 @@ describe('AuthContext lock', () => {
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(screen.getByTestId('state').textContent).toBe('true|alice|1')
     expect(readLock()).toBeNull()
+  })
+
+  const ALICE = { data: { authenticated: true, user: { username: 'alice', full_name: 'Alice Martin', role: 'operator' }, permissions: ['read:certificates'], auth_method: 'password' } }
+  const delivered = () => new Promise((resolve) => setTimeout(resolve, 30))
+
+  it('locks when the message arrives while the tab still checks its session', async () => {
+    let answer
+    authService.getCurrentUser.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    render(<AuthProvider><Probe /></AuthProvider>)
+    act(() => { announceLock('alice', 'manual') })
+    await delivered()
+    // The server answered the check before the lock reached it
+    await act(async () => { answer(ALICE) })
+    await waitFor(() => expect(auth.sessionChecked).toBe(true))
+    expect(screen.getByTestId('state').textContent).toBe('false||0')
+    expect(readLock()).toEqual({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password', reason: 'manual' })
+    expect(takeJustLocked()).toBe(true)
+    expect(authService.lock).not.toHaveBeenCalled()
+  })
+
+  it('opens when the message heard during the check was of another account', async () => {
+    let answer
+    authService.getCurrentUser.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    render(<AuthProvider><Probe /></AuthProvider>)
+    act(() => { announceLock('bob', 'manual') })
+    await delivered()
+    await act(async () => { answer(ALICE) })
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+    expect(readLock()).toBeNull()
+  })
+
+  it('shares its lock with the tabs that miss the message; a sign-in or a sign-out removes it', async () => {
+    authService.lock.mockResolvedValue({})
+    authService.logout.mockResolvedValue({})
+    authService.login.mockResolvedValue(ALICE)
+    render(<AuthProvider><Probe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+    act(() => { auth.lock('manual') })
+    expect(readSharedLock()).toEqual({ username: 'alice', reason: 'manual' })
+    // This tab hears its own message too, while signed out: let it pass first
+    await delivered()
+    await act(async () => { await auth.login('alice', 'secret') })
+    expect(readSharedLock()).toBeNull()
+    act(() => { auth.lock('idle') })
+    expect(readSharedLock()).toEqual({ username: 'alice', reason: 'idle' })
+    await act(async () => { await auth.logout() })
+    expect(readSharedLock()).toBeNull()
+  })
+
+  it('shows the lock screen when a check finds the session gone and this account was locked elsewhere', async () => {
+    render(<AuthProvider><Probe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+    shareLock({ username: 'alice', reason: 'manual' })
+    authService.getCurrentUser.mockResolvedValue({ data: { authenticated: false } })
+    await act(async () => { await auth.checkSession() })
+    expect(screen.getByTestId('state').textContent).toBe('false||0')
+    expect(readLock()).toEqual({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password', reason: 'manual' })
+  })
+
+  it('shows the sign-in page when the session is gone and the lock elsewhere was of another account', async () => {
+    render(<AuthProvider><Probe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+    shareLock({ username: 'bob', reason: 'manual' })
+    authService.getCurrentUser.mockResolvedValue({ data: { authenticated: false } })
+    await act(async () => { await auth.checkSession() })
+    expect(screen.getByTestId('state').textContent).toBe('false||0')
+    expect(readLock()).toBeNull()
+  })
+
+  describe('back to the foreground', () => {
+    const show = () => act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await delivered()
+    })
+    beforeEach(() => { vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible') })
+
+    it('locks when this account was locked elsewhere and the server confirms the session is gone', async () => {
+      render(<AuthProvider><Probe /></AuthProvider>)
+      await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+      shareLock({ username: 'alice', reason: 'manual' })
+      authService.getCurrentUser.mockResolvedValue({ data: { authenticated: false } })
+      await show()
+      expect(screen.getByTestId('state').textContent).toBe('false||0')
+      expect(readLock()).toMatchObject({ username: 'alice', reason: 'manual' })
+      expect(takeJustLocked()).toBe(true)
+    })
+
+    it('stays open when the server still holds the session', async () => {
+      render(<AuthProvider><Probe /></AuthProvider>)
+      await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+      shareLock({ username: 'alice', reason: 'manual' })
+      await show()
+      expect(authService.getCurrentUser).toHaveBeenCalledTimes(2)
+      expect(screen.getByTestId('state').textContent).toBe('true|alice|1')
+      expect(readLock()).toBeNull()
+    })
+
+    it('asks the server nothing when no lock was made elsewhere', async () => {
+      render(<AuthProvider><Probe /></AuthProvider>)
+      await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+      await show()
+      expect(authService.getCurrentUser).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('state').textContent).toBe('true|alice|1')
+    })
   })
 })
