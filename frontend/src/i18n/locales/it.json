@@ -474,7 +474,9 @@
       "revoked": "Revocato"
     },
     "duplicateKey": "Un'altra riga qui sopra usa già \"{{key}}\": solo una delle due può essere salvata",
-    "chooseFile": "Scegli un file…"
+    "chooseFile": "Scegli un file…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -7731,7 +7733,9 @@
       "password": "password",
       "mtls": "certificato client",
       "webauthn": "chiave di sicurezza",
-      "session": "sessione del browser"
+      "session": "sessione del browser",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} certificato in scadenza o scaduto",
     "expiringCount_other": "{{count}} certificati in scadenza o scaduti",
@@ -7755,9 +7759,10 @@
       "systemNow": "{{mode}} al momento",
       "dark": "Scuro",
       "light": "Chiaro",
-      "auroreSystem": "Aurore sistema",
       "aurore": "Aurore scuro",
-      "auroreLight": "Aurore chiaro"
+      "auroreLight": "Aurore chiaro",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "Notifiche",
@@ -7939,6 +7944,11 @@
       "text": "La consultazione continua con i dati già caricati; le azioni sono sospese e riprenderanno da sole al ritorno della rete.",
       "said": "Offline: la consultazione continua, le azioni sono sospese.",
       "back": "Connessione ristabilita: le azioni sono di nuovo disponibili."
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     },
     "activity": {
       "label": "Activity",

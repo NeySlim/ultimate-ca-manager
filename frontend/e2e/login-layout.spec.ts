@@ -110,8 +110,11 @@ test.describe('sign-in card at phone width', () => {
   test('in Aurore the language menu is the glass panel of the theme menu, 220 px', async ({ page }) => {
     await page.context().clearCookies()
     await page.goto('/login')
+    // Family and mode are two choices of the theme menu
     await page.getByRole('button', { name: /^Theme: / }).click()
-    await page.getByRole('menuitemradio', { name: 'Aurore dark', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: 'Aurore', exact: true }).click()
+    await page.getByRole('button', { name: /^Theme: / }).click()
+    await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click()
     await page.getByRole('button', { name: 'Language', exact: true }).click()
     const menu = page.getByRole('menu', { name: 'Language', exact: true })
     await expect(menu).toBeVisible()

@@ -116,3 +116,18 @@
 @media(max-width:800px){:root .atl .global-tools .language-wrap{display:none}}
 @media(min-width:801px){:root .atl .user-menu .user-lang{display:none}}
 :root .atl .user-menu .user-lang select{min-height:32px;padding:4px 8px;font-size:13px}
+
+/* The theme menu holds two radio groups (family, mode), each under a muted title, a line between them. */
+:root .atl .pop-menu ul[role=group]{list-style:none;margin:0;padding:0}
+:root .atl .pop-group-title{display:block;padding:6px 10px 4px;font-size:12px;color:var(--muted)}
+:root .atl .pop-sep{height:1px;margin:6px 4px;background:var(--line)}
+:root .atl .theme-menu .swatch{margin:0 2px}
+/* A table row that opens its object opens from anywhere on it (DataTable): the pointer says so. */
+:root .atl tbody tr.opens{cursor:pointer}
+/* The account menu opens on the lock screen's account card, the known facts under it in two columns. */
+:root .atl .user-menu .user-id{gap:10px}
+:root .atl .user-menu .user-facts{grid-template-columns:auto minmax(0,1fr);gap:6px 14px;padding:0 2px}
+
+/* From 1001 px the authorities and their side panel scroll apart, as the certificates and their inspector:
+   the view keeps the window's height, the hierarchy (or list) and the panel each scroll inside it. */
+@media(min-width:1001px){:root .atl .scroll-view:has(>.ca-layout){display:flex;flex-direction:column;overflow:hidden}:root .atl .ca-layout{flex:1;min-height:0;align-items:stretch}:root .atl .ca-layout>:is(.ca-tree-panel,.ca-side){min-height:0;overflow:auto;scrollbar-width:thin}}

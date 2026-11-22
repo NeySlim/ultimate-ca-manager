@@ -62,8 +62,8 @@ function useMailState(canSettings) {
 export function NotificationBell({ can }) {
   const { t, i18n } = useTranslation()
   const { items, unread, refresh, markRead, markAllRead } = useNotifications(can)
-  // A side panel, not a popover: a click outside or a focus leaving it does not close it
-  const { open, setOpen, close, buttonRef, rootProps } = useDisclosure({ light: false })
+  // A side panel: a focus leaving it keeps it open; a click outside, Escape, the cross or another panel closes it
+  const { open, setOpen, close, buttonRef, rootProps, partRef } = useDisclosure({ light: false })
   const guard = useWriteGuard()
   const [busy, setBusy] = useState(null)
   const [said, setSaid] = useState('')
@@ -173,7 +173,7 @@ export function NotificationBell({ can }) {
   useLayoutEffect(() => { setSlot(document.getElementById(NOTIF_SLOT)) }, [])
 
   const panel = (
-    <aside className="notif-panel" id="notif-panel" ref={panelRef} aria-labelledby="notif-title" hidden={!open} onKeyDown={onKeyDown}>
+    <aside className="notif-panel" id="notif-panel" ref={(el) => { panelRef.current = el; partRef.current = el }} aria-labelledby="notif-title" hidden={!open} onKeyDown={onKeyDown}>
       <header className="notif-head">
         <div>
           <h2 id="notif-title" ref={titleRef} tabIndex={-1}>{t('shell.bell.title')}</h2>

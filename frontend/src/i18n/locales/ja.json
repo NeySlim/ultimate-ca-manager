@@ -474,7 +474,9 @@
       "revoked": "失効済み"
     },
     "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません",
-    "chooseFile": "ファイルを選択…"
+    "chooseFile": "ファイルを選択…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -7731,7 +7733,9 @@
       "password": "パスワード",
       "mtls": "クライアント証明書",
       "webauthn": "セキュリティキー",
-      "session": "ブラウザセッション"
+      "session": "ブラウザセッション",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "期限切れ間近または期限切れの証明書が{{count}}件",
     "expiringCount_other": "期限切れ間近または期限切れの証明書が{{count}}件",
@@ -7755,9 +7759,10 @@
       "systemNow": "現在: {{mode}}",
       "dark": "ダーク",
       "light": "ライト",
-      "auroreSystem": "オーロラ（システム）",
       "aurore": "オーロラ（ダーク）",
-      "auroreLight": "オーロラ（ライト）"
+      "auroreLight": "オーロラ（ライト）",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "通知",
@@ -7939,6 +7944,11 @@
       "text": "読み込み済みのデータで閲覧を続けられます。操作は一時停止中で、ネットワークが戻ると自動的に再開します。",
       "said": "オフライン: 閲覧は続けられますが、操作は一時停止中です。",
       "back": "接続が回復しました。操作を再び利用できます。"
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     },
     "activity": {
       "label": "Activity",

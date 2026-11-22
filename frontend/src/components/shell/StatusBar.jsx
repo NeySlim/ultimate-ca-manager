@@ -4,7 +4,8 @@
  * to make and the detached windows, each a way to its page; « Nothing pending » when all that may be read is calm. Then the
  * shortcuts (search, close the inspector). Nothing is shown for a field the API omits.
  */
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { usePanel } from './openPanel'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Icon } from '../atelier/Icon'
@@ -29,7 +30,8 @@ function haSummary(ha, t) {
 
 /** The detached windows, in a small menu of the bar: choosing one brings it in front with the focus. */
 function DetachedMenu({ detached, t }) {
-  const [open, setOpen] = useState(false)
+  // One of the shell's panels: opening it closes the bar's menus, and the reverse
+  const [open, setOpen] = usePanel('status-windows')
   const { buttonRef, menuRef, onButtonKeyDown } = useToolbarMenu(open, setOpen)
   const { windows, front } = detached
   useEffect(() => { if (!windows.length) setOpen(false) }, [windows.length])

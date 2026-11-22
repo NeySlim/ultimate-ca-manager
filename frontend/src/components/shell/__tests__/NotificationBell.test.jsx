@@ -215,10 +215,12 @@ describe('NotificationBell', () => {
     expect(screen.getByRole('heading', { name: 'shell.bell.title' })).toHaveFocus()
   })
 
-  it('closes on Escape wherever the focus is, and not on a click outside', async () => {
+  it('closes on a click outside, and on Escape wherever the focus is', async () => {
     const user = setup()
     await user.click(bell())
     await user.click(document.body)
+    expect(bell()).toHaveAttribute('aria-expanded', 'false')
+    await user.click(bell())
     expect(screen.getByRole('complementary', { name: 'shell.bell.title' })).toBeVisible()
     document.activeElement.blur()
     expect(document.activeElement).toBe(document.body)

@@ -1,11 +1,12 @@
 /**
  * The views of a protocol page as a row of tabs under its head: one tab per view (its counter when it
- * has one), the groups apart, the arrow keys, the panel the tabs control, and the edge shadows of a
- * row wider than the page.
+ * has one), the groups apart, the arrow keys, the panel the tabs control, and the « More » menu that
+ * takes the tabs past the room.
  */
 import { useState } from 'react'
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k) => k, i18n: { language: 'en' } }),
@@ -112,64 +113,110 @@ describe('the views of a protocol page', () => {
     raf.mockRestore()
   })
 
-  it('marks the edge the row hides behind with a shadow when the tabs overflow it', () => {
-    const { container } = render(<Page />)
-    const row = container.querySelector('[role="tablist"]')
-    const frame = container.querySelector('.page-views')
-    expect(frame).not.toHaveAttribute('data-more-start')
-    expect(frame).not.toHaveAttribute('data-more-end')
-    Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 900 })
-    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 400 })
-    act(() => { row.scrollLeft = 0; fireEvent.scroll(row) })
-    expect(frame).not.toHaveAttribute('data-more-start')
-    expect(frame).toHaveAttribute('data-more-end')
-    act(() => { row.scrollLeft = 200; fireEvent.scroll(row) })
-    expect(frame).toHaveAttribute('data-more-start')
-    expect(frame).toHaveAttribute('data-more-end')
-    act(() => { row.scrollLeft = 500; fireEvent.scroll(row) })
-    expect(frame).toHaveAttribute('data-more-start')
-    expect(frame).not.toHaveAttribute('data-more-end')
-  })
+})
 
-  it('turns a mouse wheel into a scroll of a row that overflows, until its end', () => {
-    const { container } = render(<Page />)
-    const row = container.querySelector('[role="tablist"]')
-    const wheel = (deltaY) => {
-      const e = new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true })
-      row.dispatchEvent(e)
-      return e.defaultPrevented
+// jsdom lays nothing out: a tab is 100 px, a divider 7 px, the « More » block 60 px, the row's frame W.frame px
+const W = { frame: 300 }
+const widthOf = (el) => (el.dataset?.view ? 100 : el.classList?.contains('tools-divider') ? 7 : el.classList?.contains('views-more') ? 60 : 0)
+const saved = {}
+
+describe('the views past the room', () => {
+  beforeEach(() => {
+    W.frame = 300
+    for (const k of ['offsetWidth', 'clientWidth']) saved[k] = Object.getOwnPropertyDescriptor(HTMLElement.prototype, k)
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get() { return widthOf(this) } })
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get() { return this.classList?.contains('page-views') ? W.frame : 0 } })
+  })
+  afterEach(() => {
+    for (const k of ['offsetWidth', 'clientWidth']) {
+      if (saved[k]) Object.defineProperty(HTMLElement.prototype, k, saved[k])
+      else delete HTMLElement.prototype[k]
     }
-    expect(wheel(100)).toBe(false)
-    Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 900 })
-    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 400 })
-    expect(wheel(100)).toBe(true)
-    expect(row.scrollLeft).toBe(100)
-    row.scrollLeft = 500
-    expect(wheel(100)).toBe(false)
-    expect(wheel(-100)).toBe(true)
-    expect(row.scrollLeft).toBe(400)
+  })
+  const more = () => screen.queryByRole('button', { name: 'common.more' })
+
+  it('shows every tab and no « More » when they fit, and the row never scrolls', () => {
+    W.frame = 1000
+    const { container } = render(<Page />)
+    expect(screen.getAllByRole('tab')).toHaveLength(4)
+    expect(more()).toBeNull()
+    expect(container.querySelector('[data-overflow]')).toBeNull()
   })
 
-  it('measures its edges again when the tabs widen without the row changing size', () => {
-    const { container, rerender } = render(<Page />)
-    const row = container.querySelector('[role="tablist"]')
-    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 400 })
-    Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 900 })
-    rerender(<Page groups={GROUPS.map((g) => ({ ...g, options: g.options.map((o) => ({ ...o, count: 7 })) }))} />)
-    expect(container.querySelector('.page-views')).toHaveAttribute('data-more-end')
+  it('moves the tabs past the room into a « More » menu at the end of the row, their counters with them', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Page />)
+    expect(screen.getAllByRole('tab').map((b) => b.id)).toEqual(['acme-view-tab-accounts', 'acme-view-tab-config'])
+    // Out of the row, the reading and the tab order, still drawn for their width
+    const dns = container.querySelector('#acme-view-tab-dns')
+    expect(dns).toHaveAttribute('data-overflow')
+    expect(dns).toHaveAttribute('aria-hidden', 'true')
+    expect(dns).toHaveAttribute('tabindex', '-1')
+    // The « More » button follows the row, a menu button
+    const button = more()
+    expect(button.closest('.views-more').previousElementSibling).toHaveAttribute('role', 'tablist')
+    expect(button).toHaveAttribute('aria-haspopup', 'menu')
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    await user.click(button)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    const menu = screen.getByRole('menu', { name: 'common.otherViews' })
+    expect(button).toHaveAttribute('aria-controls', menu.id)
+    const items = within(menu).getAllByRole('menuitem')
+    expect(items.map((b) => b.querySelector('.pop-label').textContent)).toEqual(['DNS providers', 'Issued certificates'])
+    expect(items[0]).toHaveFocus()
+    expect(items[0].querySelector('.counter .sk')).not.toBeNull()
+    expect(items[1].querySelector('.counter')).toHaveTextContent('1,234')
+    // Two groups apart, each item described by its group
+    expect(within(menu).getAllByRole('separator')).toHaveLength(1)
+    expect(items[1]).toHaveAccessibleDescription('History')
   })
 
-  it('brings the shown tab into the row when it lies beyond its edge', () => {
-    const { container, rerender } = render(<Page />)
-    const row = container.querySelector('[role="tablist"]')
-    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 300 })
-    Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 900 })
-    const history = tab('Issued certificates')
-    Object.defineProperty(history, 'offsetLeft', { configurable: true, value: 600 })
-    Object.defineProperty(history, 'offsetWidth', { configurable: true, value: 140 })
-    row.scrollTo = vi.fn()
-    fireEvent.click(history)
+  it('a view chosen in the menu takes the place of the last tab shown, and the focus', async () => {
+    const onChange = vi.fn()
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
+    const user = userEvent.setup()
+    render(<Page onChange={onChange} />)
+    await user.click(more())
+    await user.click(screen.getByRole('menuitem', { name: /^Issued certificates/ }))
+    expect(onChange).toHaveBeenCalledWith('history')
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(screen.getAllByRole('tab').map((b) => b.id)).toEqual(['acme-view-tab-accounts', 'acme-view-tab-history'])
+    expect(tab('Issued certificates')).toHaveAttribute('aria-selected', 'true')
+    expect(tab('Issued certificates')).toHaveFocus()
+    raf.mockRestore()
+  })
+
+  it('follows the room: a wider frame brings the tabs back and drops the button', () => {
+    const { rerender } = render(<Page />)
+    expect(more()).not.toBeNull()
+    W.frame = 1000
     rerender(<Page />)
-    expect(row.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 600 + 140 - 300 + 24 }))
+    expect(screen.getAllByRole('tab')).toHaveLength(4)
+    expect(more()).toBeNull()
+  })
+
+  it('the arrows still reach a view in the menu, which comes into the row', () => {
+    const onChange = vi.fn()
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
+    render(<Page initial="config" onChange={onChange} />)
+    fireEvent.keyDown(tab('Server settings'), { key: 'ArrowRight' })
+    expect(onChange).toHaveBeenLastCalledWith('dns')
+    expect(tab('DNS providers')).toHaveFocus()
+    expect(tab('DNS providers')).not.toHaveAttribute('data-overflow')
+    raf.mockRestore()
+  })
+
+  it('the menu answers its keys: down arrow on the button opens it, Escape closes it on the button', async () => {
+    const user = userEvent.setup()
+    render(<Page />)
+    more().focus()
+    await user.keyboard('{ArrowDown}')
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem')
+    expect(items[0]).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(items[1]).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(more()).toHaveFocus()
   })
 })

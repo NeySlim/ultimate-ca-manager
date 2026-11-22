@@ -474,7 +474,9 @@
       "revoked": "已吊销"
     },
     "duplicateKey": "上方另一行已使用“{{key}}”：只能保存其中一行",
-    "chooseFile": "选择文件…"
+    "chooseFile": "选择文件…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -7731,7 +7733,9 @@
       "password": "密码",
       "mtls": "客户端证书",
       "webauthn": "安全密钥",
-      "session": "浏览器会话"
+      "session": "浏览器会话",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} 张证书即将到期或已过期",
     "expiringCount_other": "{{count}} 张证书即将到期或已过期",
@@ -7755,9 +7759,10 @@
       "systemNow": "当前为{{mode}}",
       "dark": "深色",
       "light": "浅色",
-      "auroreSystem": "极光跟随系统",
       "aurore": "极光深色",
-      "auroreLight": "极光浅色"
+      "auroreLight": "极光浅色",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "通知",
@@ -7939,6 +7944,11 @@
       "text": "可继续浏览已加载的数据；操作已暂停，网络恢复后将自动恢复。",
       "said": "离线：可继续浏览，操作已暂停。",
       "back": "连接已恢复：操作重新可用。"
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     },
     "activity": {
       "label": "Activity",

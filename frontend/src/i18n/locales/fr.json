@@ -2377,7 +2377,9 @@
       "active": "Actif",
       "revoked": "Révoqué"
     },
-    "chooseFile": "Choisir un fichier…"
+    "chooseFile": "Choisir un fichier…",
+    "more": "Plus",
+    "otherViews": "Autres vues"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -7731,7 +7733,9 @@
       "password": "mot de passe",
       "mtls": "certificat client",
       "webauthn": "clé de sécurité",
-      "session": "session du navigateur"
+      "session": "session du navigateur",
+      "sso": "SSO",
+      "ldap": "annuaire LDAP"
     },
     "expiringCount_one": "{{count}} certificat expire ou a expiré",
     "expiringCount_other": "{{count}} certificats expirent ou ont expiré",
@@ -7755,9 +7759,10 @@
       "systemNow": "{{mode}} actuellement",
       "dark": "Sombre",
       "light": "Clair",
-      "auroreSystem": "Aurore système",
       "aurore": "Aurore sombre",
-      "auroreLight": "Aurore clair"
+      "auroreLight": "Aurore clair",
+      "family": "Thème",
+      "mode": "Mode"
     },
     "bell": {
       "title": "Notifications",
@@ -7939,6 +7944,11 @@
       "text": "La consultation continue avec les données déjà chargées ; les actions sont suspendues et reprendront d’elles-mêmes au retour du réseau.",
       "said": "Hors ligne : la consultation continue, les actions sont suspendues.",
       "back": "Connexion rétablie : les actions sont de nouveau disponibles."
+    },
+    "userCard": {
+      "signIn": "Connexion",
+      "session": "Session",
+      "lockIn": "Verrouillage après {{minutes}} min d’inactivité"
     },
     "activity": {
       "label": "Activité",

@@ -21,3 +21,25 @@ export function splitTabs(keys, activeKey, fit) {
   }
   return { shown, hidden: keys.filter((k) => !shown.includes(k)) }
 }
+
+/**
+ * A row of tabs of known widths (their gap included) in `avail` px: all of them when they fit, else the first
+ * ones that fit beside a « More » button of `moreW` px, the active one always shown (in the last place if it
+ * lies beyond). Unmeasured widths show everything.
+ */
+export function splitByWidth(keys, widths, activeKey, avail, moreW) {
+  const w = (k) => widths[k] || 0
+  if (!(avail > 0) || keys.some((k) => !(w(k) > 0)) || keys.reduce((s, k) => s + w(k), 0) <= avail) return { shown: keys, hidden: [] }
+  const active = keys.includes(activeKey) ? activeKey : null
+  const room = avail - moreW
+  const shown = new Set()
+  let used = 0
+  for (const k of keys) {
+    const reserve = active !== null && !shown.has(active) && k !== active ? w(active) : 0
+    if (used + w(k) + reserve > room) break
+    shown.add(k)
+    used += w(k)
+  }
+  if (active !== null) shown.add(active)
+  return { shown: keys.filter((k) => shown.has(k)), hidden: keys.filter((k) => !shown.has(k)) }
+}

@@ -93,15 +93,44 @@ describe('the table', () => {
     expect(onOpen.mock.calls.map(([r]) => r.id)).toEqual([2, 1])
     expect(act).toHaveBeenCalledWith(rows[1])
   })
-  it('opens from anywhere on the row only when asked, never from its controls twice', () => {
+  it('opens from anywhere on the row, never from its controls twice', () => {
     const onOpen = vi.fn()
-    const { container, rerender } = render(<DataTable columns={columns} rows={rows} rowLabel={(r) => r.name} onOpen={onOpen} />)
-    fireEvent.click(container.querySelector('tbody td.description-cell'))
-    expect(onOpen).not.toHaveBeenCalled()
-    rerender(<DataTable columns={columns} rows={rows} rowLabel={(r) => r.name} onOpen={onOpen} rowOpens />)
-    fireEvent.click(container.querySelector('tbody td.description-cell'))
+    const { container } = render(<DataTable columns={columns} rows={rows} rowLabel={(r) => r.name} onOpen={onOpen} selection={sel([])} />)
+    const first = container.querySelectorAll('tbody tr')[0]
+    expect(first).toHaveClass('opens')
+    fireEvent.click(first.querySelector('td.description-cell'))
     fireEvent.click(screen.getByRole('button', { name: 'api.example.com' }))
     expect(onOpen.mock.calls.map(([r]) => r.id)).toEqual([1, 2])
+    // The checkbox and its cell only select
+    fireEvent.click(first.querySelector('label.check-hit'))
+    fireEvent.click(first.querySelector('input[type=checkbox]'))
+    expect(onOpen).toHaveBeenCalledTimes(2)
+  })
+  it('opens nothing when the click ends a text selection inside the row', () => {
+    const onOpen = vi.fn()
+    const { container } = render(<DataTable columns={columns} rows={rows} rowLabel={(r) => r.name} onOpen={onOpen} />)
+    const cell = container.querySelector('tbody tr td.description-cell')
+    const range = document.createRange()
+    range.selectNodeContents(cell)
+    window.getSelection().removeAllRanges()
+    window.getSelection().addRange(range)
+    fireEvent.click(cell)
+    expect(onOpen).not.toHaveBeenCalled()
+    window.getSelection().removeAllRanges()
+    fireEvent.click(cell)
+    expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+  it('opens nothing from a row while rows are ticked, and drops the pointer', () => {
+    const onOpen = vi.fn()
+    const { container } = render(<DataTable columns={columns} rows={rows} rowLabel={(r) => r.name} onOpen={onOpen} selection={sel([2])} />)
+    const first = container.querySelectorAll('tbody tr')[0]
+    expect(first).not.toHaveClass('opens')
+    fireEvent.click(first.querySelector('td.description-cell'))
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+  it('a list that opens nothing has no clickable row', () => {
+    const { container } = render(<DataTable columns={columns} rows={rows} rowLabel={(r) => r.name} />)
+    expect(container.querySelector('tbody tr')).not.toHaveClass('opens')
   })
   it('marks the open row', () => {
     const { container } = render(<DataTable columns={columns} rows={rows} openedId={2} />)

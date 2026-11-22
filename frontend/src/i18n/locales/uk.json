@@ -476,7 +476,9 @@
       "revoked": "Відкликано"
     },
     "duplicateKey": "Інший рядок вище вже використовує \"{{key}}\": зберегти можна лише один із них",
-    "chooseFile": "Виберіть файл…"
+    "chooseFile": "Виберіть файл…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
@@ -8053,7 +8055,9 @@
       "password": "пароль",
       "mtls": "клієнтський сертифікат",
       "webauthn": "ключ безпеки",
-      "session": "сеанс браузера"
+      "session": "сеанс браузера",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} сертифікат закінчується або прострочений",
     "expiringCount_few": "{{count}} сертифікати закінчуються або прострочені",
@@ -8085,9 +8089,10 @@
       "systemNow": "Зараз: {{mode}}",
       "dark": "Темна",
       "light": "Світла",
-      "auroreSystem": "Aurore системна",
       "aurore": "Aurore темна",
-      "auroreLight": "Aurore світла"
+      "auroreLight": "Aurore світла",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "Сповіщення",
@@ -8289,6 +8294,11 @@
       "text": "Перегляд триває з уже завантаженими даними; дії призупинено, вони відновляться самі, коли повернеться мережа.",
       "said": "Немає мережі: перегляд триває, дії призупинено.",
       "back": "З’єднання відновлено: дії знову доступні."
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     },
     "activity": {
       "label": "Activity",

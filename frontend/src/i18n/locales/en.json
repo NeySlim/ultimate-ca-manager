@@ -474,7 +474,9 @@
       "active": "Active",
       "revoked": "Revoked"
     },
-    "chooseFile": "Choose a file…"
+    "chooseFile": "Choose a file…",
+    "more": "More",
+    "otherViews": "Other views"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificate, page or action…",
@@ -7731,7 +7733,9 @@
       "password": "password",
       "mtls": "client certificate",
       "webauthn": "security key",
-      "session": "browser session"
+      "session": "browser session",
+      "sso": "SSO",
+      "ldap": "LDAP directory"
     },
     "expiringCount_one": "{{count}} certificate expiring or expired",
     "expiringCount_other": "{{count}} certificates expiring or expired",
@@ -7755,9 +7759,10 @@
       "systemNow": "{{mode}} currently",
       "dark": "Dark",
       "light": "Light",
-      "auroreSystem": "Aurore system",
       "aurore": "Aurore dark",
-      "auroreLight": "Aurore light"
+      "auroreLight": "Aurore light",
+      "family": "Theme",
+      "mode": "Mode"
     },
     "bell": {
       "title": "Notifications",
@@ -7939,6 +7944,11 @@
       "text": "Browsing continues with the data already loaded; actions are suspended and will resume by themselves when the network returns.",
       "said": "Offline: browsing continues, actions are suspended.",
       "back": "Connection restored: actions are available again."
+    },
+    "userCard": {
+      "signIn": "Sign-in",
+      "session": "Session",
+      "lockIn": "Locks after {{minutes}} min of inactivity"
     },
     "activity": {
       "label": "Activity",

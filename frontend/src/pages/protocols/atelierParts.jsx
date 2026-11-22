@@ -4,11 +4,13 @@
  * hint), a checkbox line, a list of URLs with copy and remove, and the views of a module that holds
  * more than the mockup's list (a row of tabs under the page head).
  */
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon, IconBtn, Btn } from '../../components/atelier'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
+import { splitByWidth } from '../../components/inspector/tabFit'
+import { useToolbarMenu } from '../../components/list/useToolbarMenu'
 
 /** A value in mono, then the quiet copy button; « — » when there is none. */
 export function Copyable({ value, label, url = false }) {
@@ -113,98 +115,151 @@ export function UrlList({ urls = [], label, onRemove, adding, onAdding, onAdd, b
 /**
  * The views of a protocol page that holds more than the mockup's list: a row of tabs under the page
  * head (the mockup's .view-btn with its .counter), then the panel they control (`children`). Groups
- * stand apart with the toolbar's .tools-divider, each tab described by its group's name. A row wider
- * than the page scrolls on its own, a shadow on the edge that hides tabs.
+ * stand apart with the toolbar's .tools-divider, each tab described by its group's name. The tabs that
+ * do not fit go into a « More » menu at the end of the row (the mockup's .tabs-menu), their counters with
+ * them; the shown tab always stays in the row, in the last place if it must.
  * options/groups: { value, label, count? } where count null is a counter being read.
  */
 export function ViewSwitch({ id, label, value, onChange, options = [], groups = [], children }) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const number = new Intl.NumberFormat(i18n?.language || undefined)
+  const frameRef = useRef(null)
   const rowRef = useRef(null)
-  const [edges, setEdges] = useState({ start: false, end: false })
+  const moreRef = useRef(null)
+  const [split, setSplit] = useState({ hidden: [] })
+  const [size, setSize] = useState(0)
+  const [menu, setMenu] = useState(false)
+  const { buttonRef, menuRef, onButtonKeyDown } = useToolbarMenu(menu, setMenu)
   const sets = [...(options.length ? [{ options }] : []), ...groups]
   const all = sets.flatMap((g) => g.options)
   const values = all.map((o) => o.value)
   const tabId = (v) => `${id}-tab-${v}`
   const panelId = `${id}-panel`
+  const hidden = new Set(split.hidden)
+  const shownIn = (g) => g.options.some((o) => !hidden.has(o.value))
 
-  const measure = useCallback(() => {
+  // Every tab stays drawn for its width; the ones that do not fit are taken out of the row and of the
+  // tab order (extensions.css). Read after each render: counters arriving widen the tabs; set only on a change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const frame = frameRef.current
     const row = rowRef.current
-    if (!row) return
-    const start = row.scrollLeft > 1
-    const end = row.scrollLeft + row.clientWidth < row.scrollWidth - 1
-    setEdges((e) => (e.start === start && e.end === end ? e : { start, end }))
-  }, [])
-
-  // Measured after each render too: counters arriving widen the tabs, not the row
-  useEffect(measure)
-  useEffect(() => {
-    const row = rowRef.current
-    if (!row) return undefined
-    // A mouse wheel scrolls a row that overflows, until its end lets the page take the wheel again
-    const wheel = (e) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
-      const max = row.scrollWidth - row.clientWidth
-      if (max <= 0 || (e.deltaY < 0 && row.scrollLeft <= 0) || (e.deltaY > 0 && row.scrollLeft >= max - 1)) return
-      e.preventDefault()
-      row.scrollLeft += e.deltaY
+    if (!frame || !row) return
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0
+    const widths = {}
+    let lead = 0
+    for (const el of row.children) {
+      if (el.classList.contains('tools-divider')) { lead += el.offsetWidth + gap; continue }
+      const v = el.dataset.view
+      if (v === undefined) continue
+      widths[v] = el.offsetWidth + gap + lead
+      lead = 0
     }
-    row.addEventListener('wheel', wheel, { passive: false })
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
-    observer?.observe(row)
-    return () => { observer?.disconnect(); row.removeEventListener('wheel', wheel) }
-  }, [measure])
-
-  // The shown tab stays inside the row, clear of the edge shadow
+    const more = moreRef.current?.offsetWidth || 96
+    const next = splitByWidth(values, widths, value, frame.clientWidth, more + gap)
+    const key = next.hidden.join('|')
+    setSplit((s) => (s.hidden.join('|') === key ? s : next))
+  })
   useEffect(() => {
-    const row = rowRef.current
-    const tab = document.getElementById(tabId(value))
-    if (!row || !tab || !row.contains(tab)) return
-    const left = tab.offsetLeft
-    const right = left + tab.offsetWidth
-    const to = left < row.scrollLeft + EDGE ? left - EDGE
-      : right > row.scrollLeft + row.clientWidth - EDGE ? right - row.clientWidth + EDGE : null
-    if (to !== null && row.scrollWidth > row.clientWidth) row.scrollTo?.({ left: Math.max(0, to), behavior: smooth() })
-  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+    const frame = frameRef.current
+    if (!frame || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(() => setSize(frame.clientWidth))
+    observer.observe(frame)
+    for (const el of rowRef.current?.children || []) observer.observe(el)
+    return () => observer.disconnect()
+  }, [values.join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!split.hidden.length) setMenu(false) }, [split.hidden.length])
+  // A click elsewhere closes the menu, as the inspector's « +N » menu
+  useEffect(() => {
+    if (!menu) return undefined
+    const away = (e) => { if (!moreRef.current?.contains(e.target)) setMenu(false) }
+    const out = (e) => { if (e.relatedTarget && !moreRef.current?.contains(e.relatedTarget)) setMenu(false) }
+    document.addEventListener('pointerdown', away)
+    document.addEventListener('focusout', out)
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('focusout', out) }
+  }, [menu])
 
+  // The focus follows the view shown once its tab is back in the row: the page may set the value later
+  const focusNext = useRef(null)
+  const show = (v) => {
+    focusNext.current = v
+    onChange(v)
+  }
+  useEffect(() => {
+    const v = focusNext.current
+    if (v === null || v !== value) return
+    const tab = document.getElementById(tabId(v))
+    if (tab && !tab.hasAttribute('data-overflow')) {
+      focusNext.current = null
+      tab.focus()
+    }
+  })
   const onKey = (e) => {
     const n = values.length
     const i = values.indexOf(value)
     const to = { ArrowRight: (i + 1) % n, ArrowLeft: (i - 1 + n) % n, Home: 0, End: n - 1 }[e.key]
     if (to === undefined) return
     e.preventDefault()
-    onChange(values[to])
-    requestAnimationFrame(() => document.getElementById(tabId(values[to]))?.focus())
+    show(values[to])
   }
+  const counter = (o) => o.count !== undefined && (
+    <span className="counter">{o.count === null ? <span className="sk sk-num" style={{ width: '14px' }} /> : number.format(o.count)}</span>
+  )
+  const describedBy = (g, gi) => (g.label ? `${id}-group-${gi}` : undefined)
 
   return (
     <>
-      <div className="page-views" data-more-start={edges.start ? '' : undefined} data-more-end={edges.end ? '' : undefined}>
-        <div className="page-views-row" role="tablist" aria-label={label} ref={rowRef} onScroll={measure}>
+      <div className="page-views" ref={frameRef} data-size={size || undefined}>
+        <div className="page-views-row" role="tablist" aria-label={label} ref={rowRef}>
           {sets.map((g, gi) => [
-            gi > 0 && <span key={`div-${gi}`} className="tools-divider" aria-hidden="true" />,
-            ...g.options.map((o) => (
-              <button key={o.value} type="button" role="tab" id={tabId(o.value)} className={o.value === value ? 'view-btn active' : 'view-btn'}
-                aria-selected={o.value === value} aria-controls={panelId} tabIndex={o.value === value ? 0 : -1}
-                aria-describedby={g.label ? `${id}-group-${gi}` : undefined} onClick={() => onChange(o.value)} onKeyDown={onKey}>
-                {o.label}
-                {o.count !== undefined && (
-                  <span className="counter">{o.count === null ? <span className="sk sk-num" style={{ width: '14px' }} /> : number.format(o.count)}</span>
-                )}
-              </button>
-            )),
+            gi > 0 && <span key={`div-${gi}`} className="tools-divider" aria-hidden="true"
+              data-overflow={!shownIn(g) || !sets.slice(0, gi).some(shownIn) ? '' : undefined} />,
+            ...g.options.map((o) => {
+              const out = hidden.has(o.value)
+              return (
+                <button key={o.value} type="button" role="tab" id={tabId(o.value)} data-view={o.value} className={o.value === value ? 'view-btn active' : 'view-btn'}
+                  aria-selected={o.value === value} aria-controls={panelId} tabIndex={o.value === value && !out ? 0 : -1}
+                  aria-hidden={out || undefined} inert={out ? '' : undefined} data-overflow={out ? '' : undefined}
+                  aria-describedby={describedBy(g, gi)} onClick={() => onChange(o.value)} onKeyDown={onKey}>
+                  {o.label}
+                  {counter(o)}
+                </button>
+              )
+            }),
           ])}
         </div>
+        {split.hidden.length > 0 && (
+          <div className="pop-wrap views-more" ref={moreRef}>
+            <button ref={buttonRef} type="button" className="view-btn views-more-btn" id={`${id}-more`} aria-haspopup="menu" aria-expanded={menu}
+              aria-controls={`${id}-more-menu`} onClick={() => setMenu(!menu)} onKeyDown={onButtonKeyDown}>
+              {t('common.more')}<Icon name="down" />
+            </button>
+            <ul ref={menuRef} className="pop-menu tabs-menu views-menu" id={`${id}-more-menu`} role="menu" aria-label={t('common.otherViews')} hidden={!menu}>
+              {sets.map((g, gi) => {
+                const rest = g.options.filter((o) => hidden.has(o.value))
+                if (!rest.length) return null
+                const before = sets.slice(0, gi).some((p) => p.options.some((o) => hidden.has(o.value)))
+                return [
+                  before && <li key={`sep-${gi}`} role="separator" className="pop-sep" />,
+                  ...rest.map((o) => (
+                    <li key={o.value} role="none">
+                      <button type="button" role="menuitem" tabIndex={-1} className="tabs-menu-open" data-view-more={o.value}
+                        aria-describedby={describedBy(g, gi)} onClick={() => { setMenu(false); show(o.value) }}>
+                        <span className="pop-label">{o.label}</span>{counter(o)}
+                      </button>
+                    </li>
+                  )),
+                ]
+              })}
+            </ul>
+          </div>
+        )}
         {sets.map((g, gi) => g.label && <span key={gi} id={`${id}-group-${gi}`} hidden>{g.label}</span>)}
       </div>
       <div className="view-panel" role="tabpanel" id={panelId} aria-labelledby={tabId(value)}>{children}</div>
     </>
   )
 }
-
-// The width of the edge shadow: a tab brought into the row clears it
-const EDGE = 24
-const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
 
 /** The mockup's yesNo(): a check and Oui, or a block sign and Non, in a flag. */
 export function YesNo({ value }) {

@@ -20,7 +20,7 @@ A menu path in this guide such as **Modules** > **PKI** > **Certificates** means
 - **Dashboard**, **Certificates** and **Certificate Authorities**, always present; a count on the Certificates link shows how many certificates are expiring or expired, and following the link dismisses it until the count changes
 - up to three modules you pinned
 - the **Modules** menu, which lists every module you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Modules you have no right to are not shown. The pin button next to a module keeps it in the bar; a message says so when a fourth is refused
-- search (`Ctrl K`), the help button, the theme menu, the notification bell and your account menu (your name, role and sign-in method, **My Account** and **Sign out**)
+- search (`Ctrl K`), the help button, the theme menu, the notification bell and your account menu (a card with your initials, name, role and login, your e-mail, sign-in method and inactivity lock, then **My Account** and **Sign out**); one menu or panel of the bar is open at a time
 
 The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME failure, Approval pending, CRL due, CRL overdue, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate, Trust store certificate expiring or expired), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Queue entries open the page of the item, audit entries open the audit log, and a queue entry without a path has no link; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
 
@@ -352,7 +352,7 @@ Pages that ask for your current password (password change, turning off the secur
 
 ## Themes
 
-The theme button in the top bar opens the theme menu: **System** (follows your OS light/dark preference), **Dark**, **Light**, **Aurore system** (Aurore, following the same preference), **Aurore dark** and **Aurore light**, the current choice checked. Atelier and Aurore are the only themes; an account set to a theme of an earlier version (Purple Night, Orange Sunset, Gray) opens in Atelier with its light or dark mode kept.
+The theme button in the top bar opens the theme menu, two groups picked apart: the theme, **Atelier** or **Aurore**, and the **Mode**, **System** (follows your OS light/dark preference), **Dark** or **Light**, the current choices checked. System follows the OS in either theme. An account set to a theme of an earlier version (Purple Night, Orange Sunset, Gray) opens in Atelier with its light, dark or system mode kept.
 
 The choice is saved with your account and follows you to every browser.
 

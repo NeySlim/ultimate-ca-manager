@@ -1,8 +1,9 @@
 /**
- * Account menu, the mockup's userMenu(): identity (name, role and login), the sign-in method with
- * the inactivity lock, then My account and Sign out. Deviation asked by the maintainer: Settings
- * between them, for who may see the Settings module. The language is chosen from the bar's globe
- * menu (from this menu on a phone), the account preferences and the sign-in pages.
+ * Account menu, the mockup's userMenu(): identity, then My account and Sign out. Deviations asked by the
+ * maintainer: the identity is the lock screen's account card (.auth-user: the avatar's initials, the name,
+ * role and login) over the facts the client knows (e-mail, sign-in method, inactivity lock, as .props);
+ * Settings after My account for who may see it, a separator before Sign out. The language is chosen from
+ * the bar's globe menu (from this menu on a phone), the account preferences and the sign-in pages.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +21,10 @@ import { useDisclosure, moveFocus } from './useDisclosure'
 const METHOD_KEYS = {
   password: 'shell.method.password',
   mtls: 'shell.method.mtls',
+  certificate: 'shell.method.mtls',
   webauthn: 'shell.method.webauthn',
+  sso: 'shell.method.sso',
+  ldap: 'shell.method.ldap',
 }
 
 const initialsOf = (name) => (name || '?').slice(0, 2).toUpperCase()
@@ -44,6 +48,8 @@ export function UserMenu({ can }) {
   const [minutes, setMinutes] = useState(null)
   const username = user?.username || 'User'
   const name = user?.full_name || username
+  const email = user?.email || ''
+  const initials = initialsOf(username)
   const role = user?.role ? t(roleKey(user.role), { defaultValue: user.role }) : ''
   const items = () => [...(panelRef.current?.querySelectorAll('a, button') || [])]
   // Without a `can` nothing proves the right: no Settings entry
@@ -88,18 +94,23 @@ export function UserMenu({ can }) {
         title={name}
         onClick={() => setOpen(!open)}
       >
-        {initialsOf(username)}
+        {initials}
       </button>
       <div className="pop-menu user-menu" id="user-menu" ref={panelRef} hidden={!open}>
         <div className="user-id">
-          <strong id="user-name">{name}</strong>
-          <span id="user-role">{role && <>{role} · </>}<span className="mono">{username}</span></span>
-          {method || minutes ? (
-            <span className="muted">
-              {method && t('shell.signedInWith', { method })}
-              {method && minutes ? ' ' : null}
-              {minutes ? t('shell.lockAfter', { count: minutes }) : null}
+          <p className="auth-user">
+            <span className="avatar" aria-hidden="true">{initials}</span>
+            <span>
+              <strong id="user-name">{name}</strong>
+              <span id="user-role">{role && <>{role} · </>}<span className="mono">{username}</span></span>
             </span>
+          </p>
+          {(email || method || minutes) ? (
+            <dl className="props user-facts">
+              {email && <><dt>{t('common.email')}</dt><dd>{email}</dd></>}
+              {method && <><dt>{t('shell.userCard.signIn')}</dt><dd>{method}</dd></>}
+              {minutes ? <><dt>{t('shell.userCard.session')}</dt><dd>{t('shell.userCard.lockIn', { minutes })}</dd></> : null}
+            </dl>
           ) : null}
         </div>
         {/* On a phone the bar has no room for the language menu: it moves here (adjust.css) */}
@@ -117,6 +128,7 @@ export function UserMenu({ can }) {
             <Icon name={glyphOf(settings)} />{t(menuLabelKey(settings))}
           </button>
         )}
+        <div role="separator" className="pop-sep" />
         <button type="button" className="pop-item" id="user-logout" data-action="logout" onClick={handleLogout}>
           <Icon name="logout" />{t('shell.signOut')}
         </button>

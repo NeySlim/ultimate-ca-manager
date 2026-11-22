@@ -4,7 +4,8 @@
  * row actions and the opening chevron, skeleton rows, the empty block), or on a phone the mobile
  * records (`.mobile-list`), then the footer. `kind` names which of the mockup's tables it is:
  * 'certificates' (.cert-table), 'module' (.cert-table.module-table) or 'audit' (.audit-table).
- * A record that opens keeps its chevron on screen and opens from anywhere on it (adjust.css).
+ * A row or a record that opens does so from anywhere on it, its controls and a text selection aside;
+ * a record keeps its chevron on screen (adjust.css).
  * The columns follow one contract and one layout (columnShare.js, COLONNES-SPEC).
  */
 import { useEffect, useLayoutEffect, useRef, useState, useId } from 'react'
@@ -27,6 +28,13 @@ const KINDS = {
 }
 const SORT = { true: 'ascending', false: 'descending' }
 const join = (...c) => c.filter(Boolean).join(' ') || undefined
+// A click on these keeps its own meaning: a row opens from anywhere else (the name stays its keyboard button)
+const OWN_CLICK = '.check-col, button, a, input, label, select, textarea, summary, [role="button"], [role="checkbox"], [contenteditable="true"]'
+/** A click that ends a drag selecting text inside the row selects, it does not open. */
+const selectingIn = (el) => {
+  const sel = window.getSelection?.()
+  return Boolean(sel && !sel.isCollapsed && sel.toString().trim() && (el.contains(sel.anchorNode) || el.contains(sel.focusNode)))
+}
 
 /** Free text, which may end in an ellipsis with its whole text in a title: the name and the text columns. */
 const freeText = (col) => ['entity', 'text'].includes(columnKind(col))
@@ -176,7 +184,7 @@ const plainLabel = (col) => (typeof col.label === 'string' ? col.label : col.lab
  *   cell(row), title?(row), icon?(row), extra?(row), tone?, skeleton?, resource? } — or the old flags (entity, fit, fold), translated
  * @param {Array} p.rows
  * @param {(row) => string} p.rowLabel  names a row in the labels of its checkbox, actions and chevron
- * @param {(row) => void} [p.onOpen]  the entity button and the chevron open the row; with `rowOpens`, the whole row too
+ * @param {(row) => void} [p.onOpen]  the entity button, the chevron and a click anywhere else on the row open it; `rowOpens={false}` keeps the row inert
  * @param {{ selection: Set, onToggle(id), onTogglePage(on) }} [p.selection]
  * @param {(row) => Array<{icon,label,onClick,write,spare}>} [p.rowActions]  icon buttons before the chevron; `spare`: hidden short of room
  * @param {{key, asc}} [p.sort]  with onSort the sortable headers are buttons; without it the sorted header only shows its arrow
@@ -184,7 +192,7 @@ const plainLabel = (col) => (typeof col.label === 'string' ? col.label : col.lab
  */
 export function DataTable({
   kind = 'certificates', scrollId, label, caption, columns: allColumns, rows = [], rowKey = (r) => r.id, rowLabel = (r) => String(r.id),
-  onOpen, openLabel, openedId, rowOpens = false, selection, rowActions, sort, onSort, loading = false, skeletonRows = 12,
+  onOpen, openLabel, openedId, rowOpens = true, selection, rowActions, sort, onSort, loading = false, skeletonRows = 12,
   empty, card, footer, actionsLabel, columnWidths, onColumnWidth, widthsKey, footerReset = true, recordsId,
 }) {
   const { t } = useTranslation()
@@ -360,9 +368,11 @@ export function DataTable({
                   const id = rowKey(row)
                   const checked = selected.has(id)
                   const opened = openedId === id
+                  // While rows are ticked the names wait, and so does the row (the mockup)
+                  const opens = rowOpens && onOpen && !locked
                   return (
-                    <tr key={id} className={join(opened && 'opened', checked && 'checked')} aria-current={opened ? 'true' : undefined}
-                      onClick={rowOpens && onOpen ? (e) => { if (!locked && !e.target.closest?.('button, a, input, label')) onOpen(row) } : undefined}>
+                    <tr key={id} className={join(opened && 'opened', checked && 'checked', opens && 'opens')} aria-current={opened ? 'true' : undefined}
+                      onClick={opens ? (e) => { if (!e.target.closest?.(OWN_CLICK) && !selectingIn(e.currentTarget)) onOpen(row) } : undefined}>
                       {selection && (
                         <td className="check-col">
                           <label className="check-hit">
