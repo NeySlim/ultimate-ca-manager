@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-guide.js",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",

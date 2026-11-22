@@ -105,3 +105,35 @@ test('the page has no horizontal scroll on a phone', async ({ page, api: _api })
   const wide = await page.evaluate(() => [document.documentElement, document.body].some((e) => e.scrollWidth > e.clientWidth + 1))
   expect(wide).toBe(false)
 })
+
+// A browser's reader view decides at load: the chapter is in the page the server sends, before any script
+test('the chapter\'s text is in the page at DOMContentLoaded, and React takes it over without a warning', async ({ page, api: _api, consoleErrors }) => {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const article = document.getElementById('guide-article')
+      Object.assign(window, {
+        atContentLoaded: { text: article?.textContent?.length || 0, sections: article?.querySelectorAll('h2').length || 0 },
+        servedTitle: document.getElementById('guide-title'),
+      })
+    })
+  })
+  const raw = await (await page.request.get('/guide/acme')).text()
+  expect(raw).toContain('<title>ACME · Guide · UCM</title>')
+  expect(raw).toContain('<meta property="og:title" content="ACME" />')
+  expect(raw).toMatch(/<h1 id="guide-title"[^>]*>ACME<\/h1>/)
+  expect(raw).not.toContain('Open the page')
+  await page.goto('/guide/acme', { waitUntil: 'domcontentloaded' })
+  const seen = await page.evaluate(() => (window as unknown as { atContentLoaded: { text: number, sections: number } }).atContentLoaded)
+  expect(seen.text).toBeGreaterThan(5000)
+  expect(seen.sections).toBeGreaterThan(3)
+  // Taken over: the account's rights add the page of the chapter
+  await expect(page.locator('.guide-actions').getByRole('link', { name: 'Open the page' })).toHaveAttribute('href', '/acme')
+  await expect(page).toHaveTitle('ACME · Guide · UCM')
+  await expect(page.locator('meta[property="og:title"]')).toHaveCount(1)
+  // The node the server sent is the one React holds: hydrated, not drawn again
+  expect(await page.evaluate(() => {
+    const served = (window as unknown as { servedTitle: Element | null }).servedTitle
+    return !!served && served === document.getElementById('guide-title') && served.isConnected
+  })).toBe(true)
+  expect(consoleErrors).toEqual([])
+})
