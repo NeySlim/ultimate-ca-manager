@@ -1,11 +1,12 @@
 """SQLite lock waits that never stop the web worker.
 
 sqlite3 waits for a lock in its own busy handler, inside C: under gevent that stops every
-request of the worker, probes included. While a single node's restore gate is up, a request's
-connection waits at most IN_C_MS in C and retries in Python, where time.sleep yields; the
-retries stop at once while the restore's transaction holds the database. Outside a request
-(the scheduler process, a job's thread) nothing changes; in the web worker, a request that met
-a lock and would answer 500 answers 503, gate or not.
+request of the worker, probes included. In the web server (its requests, and every greenlet of
+the gunicorn worker) a connection to a WAL database waits at most IN_C_MS in C and retries in
+Python, where time.sleep yields, for WEB_LOCK_WAIT_SECONDS per request. While a single node's
+restore gate is up, every connection does so for REQUEST_LOCK_WAIT_SECONDS, and not at all once
+the restore's transaction holds the database. Elsewhere (the scheduler process) sqlite3 waits
+in C, as a thread can. A request that met a lock and would answer 500 answers 503.
 """
 import contextlib
 import logging
@@ -20,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 # What a request may wait for the lock, in Python, while the gate is up but the database not held
 REQUEST_LOCK_WAIT_SECONDS = 1.0
+# What a request of the web server may wait for it otherwise: sqlite3's default busy timeout
+WEB_LOCK_WAIT_SECONDS = 5.0
 IN_C_MS = 20
 RETRY_FIRST, RETRY_MAX = 0.01, 0.1
 BUSY_RETRY_AFTER_SECONDS = 5
@@ -27,6 +30,8 @@ _BUSY_INFO = 'ucm_busy_timeout'
 _LOCK_MET = 'ucm_lock_met'
 _DEADLINE = 'ucm_lock_deadline'
 _BUILT = 'ucm_lock_response_built'
+_WAL = 'ucm_wal'
+SQLITE_BUSY_SNAPSHOT = getattr(sqlite3, 'SQLITE_BUSY_SNAPSHOT', 517)
 BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
 
 
@@ -39,6 +44,13 @@ def is_locked(exc) -> bool:
     if code is not None:
         return code & 0xFF in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
     return 'database is locked' in str(orig) or 'database table is locked' in str(orig)
+
+
+def is_busy_snapshot(exc) -> bool:
+    """WAL: the transaction read a snapshot another writer has replaced since. Only a new
+    transaction can write; the same statement fails again however long it waits."""
+    orig = getattr(exc, 'orig', exc)
+    return getattr(orig, 'sqlite_errorcode', None) == SQLITE_BUSY_SNAPSHOT
 
 
 # The web worker's application: its own threads (greenlets) wait like its requests
@@ -70,6 +82,18 @@ def window():
     return 'held' if cluster_maintenance.held_locally(view) else 'gate'
 
 
+def _mode(info):
+    """How a statement on this connection waits for a lock: 'held' (never), 'gate' (shortly),
+    'web' (in Python), None (in sqlite3's busy handler)."""
+    state = window()
+    if state is not None:
+        return state
+    from flask import has_request_context
+    if info.get(_WAL) and (_WEB_WORKER or has_request_context()):
+        return 'web'
+    return None
+
+
 def _on_checkout(dbapi_connection, record, proxy):
     if not isinstance(dbapi_connection, sqlite3.Connection):
         return
@@ -77,7 +101,10 @@ def _on_checkout(dbapi_connection, record, proxy):
     if _BUSY_INFO not in info:
         info[_BUSY_INFO + '_default'] = dbapi_connection.execute('PRAGMA busy_timeout').fetchone()[0]
         info[_BUSY_INFO] = info[_BUSY_INFO + '_default']
-    wanted = IN_C_MS if window() else info[_BUSY_INFO + '_default']
+        # In WAL a commit never waits for a lock (its writer holds it): every wait is a
+        # statement's, which Python can retry. Elsewhere a commit needs the handler in C.
+        info[_WAL] = dbapi_connection.execute('PRAGMA journal_mode').fetchone()[0] == 'wal'
+    wanted = IN_C_MS if _mode(info) else info[_BUSY_INFO + '_default']
     if info[_BUSY_INFO] != wanted:
         dbapi_connection.execute(f'PRAGMA busy_timeout = {int(wanted)}')
         info[_BUSY_INFO] = wanted
@@ -86,13 +113,14 @@ def _on_checkout(dbapi_connection, record, proxy):
 def _execute(cursor, statement, parameters, context, many=False):
     if context is None or context.dialect.name != 'sqlite':
         return None
-    state = window()
+    state = _mode(context.root_connection.connection.info)
     if state is None:
         return None
-    from flask import g, has_app_context
+    from flask import g, has_app_context, has_request_context
     run = cursor.executemany if many else cursor.execute
     delay, local_deadline = RETRY_FIRST, None
     while True:
+        changes = cursor.connection.total_changes
         try:
             if parameters is None:
                 run(statement)
@@ -100,11 +128,15 @@ def _execute(cursor, statement, parameters, context, many=False):
                 run(statement, parameters)
             return True
         except sqlite3.OperationalError as exc:
-            if not is_locked(exc):
+            # Never again: a stale snapshot, nor a statement that already wrote rows (an
+            # executemany stopped partway would write them twice)
+            if not is_locked(exc) or state == 'held' or is_busy_snapshot(exc) \
+                    or cursor.connection.total_changes != changes:
                 raise
             # One wait per request, shared by its statements, from the first lock it met
-            budget = time.monotonic() + (0 if state == 'held' else REQUEST_LOCK_WAIT_SECONDS)
-            if has_app_context():
+            budget = time.monotonic() + (REQUEST_LOCK_WAIT_SECONDS if state == 'gate'
+                                         else WEB_LOCK_WAIT_SECONDS)
+            if has_request_context() or (state != 'web' and has_app_context()):
                 deadline = g.setdefault(_DEADLINE, budget)
             else:
                 deadline = local_deadline = local_deadline or budget
