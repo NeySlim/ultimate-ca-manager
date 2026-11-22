@@ -7,8 +7,9 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { parseTokens, contrast, hexToRgb, rgbToHex, splitArgs, FAMILIES, MODES } from '../../lib/__tests__/themeTokensParser'
-import { parseRules, declarations } from './atelierCopy'
+import { parseTokens, contrast, resolve, hexToRgb, FAMILIES, MODES } from '../../lib/__tests__/themeTokensParser'
+import { parseRules, splitSelectors, declarations } from './atelierCopy'
+import { glowField, rgba, over, hex } from './auroreGlow'
 
 const tokens = parseTokens()
 const SURFACES = ['bg', 'panel', 'raised', 'hover', 'selected']
@@ -35,15 +36,28 @@ const ATELIER_STEPS = [
 const AURORE_PAIRS = [
   ...['grad-a', 'grad-b'].flatMap((c) => ['bg', 'panel', 'raised', 'selected'].map((s) => [c, s, 3])),
   ...['pki', 'protocols', 'governance', 'admin'].flatMap((f) => SURFACES.map((s) => [`fam-${f}`, s, 3])),
+  // the avatar's initials on its gradient
+  ['on-accent', 'grad-a', 4.5], ['on-accent', 'grad-b', 4.5],
 ]
 
-// The key figures written in a gradient (maquette.css, --fig-a to --fig-b by tone): both ends on the card's ground
+// Aurore's rules of the console: the mockup's block (maquette.css), then the product's (adjust.css), which outranks it
 const read = (file) => fs.readFileSync(path.resolve(__dirname, file), 'utf8')
+const MAQUETTE = parseRules(read('../atelier/maquette.css'))
+const ADJUST = parseRules(read('../atelier/adjust.css'))
+function auroreRules(rules, mode) {
+  return rules.flatMap((r) => splitSelectors(r.sel).map((sel) => ({ ...r, sel }))).filter((r) => {
+    if (r.media || !/^:root\[data-theme(\|=aurore|="aurore")\]/.test(r.sel)) return false
+    const m = r.sel.match(/^:root\S*\[data-mode="(\w+)"\]/)
+    return !m || m[1] === mode
+  })
+}
+const valuesOf = (rules, re, prop) => rules.filter((r) => re.test(r.sel)).flatMap((r) => declarations(r.body))
+  .filter(([p]) => p === prop).map(([, v]) => v.replace(/\s+/g, ' '))
+
+// The key figures written in a gradient (--fig-a to --fig-b by tone): the mockup's, then the product's
 function figureGradients(mode) {
   const ends = {}
-  for (const r of parseRules(read('../atelier/maquette.css'))) {
-    const light = r.sel.startsWith(':root[data-theme="aurore"][data-mode="light"]')
-    if (!(r.sel.startsWith(':root[data-theme|=aurore]') || (light && mode === 'light'))) continue
+  for (const r of [...auroreRules(MAQUETTE, mode), ...auroreRules(ADJUST, mode)]) {
     for (const [prop, v] of declarations(r.body)) {
       if (prop !== '--fig-a' && prop !== '--fig-b') continue
       const tone = r.sel.match(/\.value\.(warn|bad|good)/)?.[1] || 'plain'
@@ -53,37 +67,21 @@ function figureGradients(mode) {
   return ends
 }
 
-// The glow behind the console (shell.css): each of its three spots at full strength over the page; their
-// centres lie outside one another's reach, so each peak is measured alone
-function rgba(value, t) {
-  const v = value.replace(/\s+/g, '')
-  const mix = v.match(/^color-mix\(insrgb,var\(--([a-z-]+)\)([0-9.]+)%,transparent\)$/)
-  if (mix) return { rgb: hexToRgb(t[mix[1]]), a: Number(mix[2]) / 100 }
-  const m = v.match(/^rgba\((\d+),(\d+),(\d+),([0-9.]+)\)$/)
-  if (m) return { rgb: m.slice(1, 4).map(Number), a: Number(m[4]) }
-  const ref = v.match(/^var\(--([a-z-]+)\)$/)
-  if (ref) return rgba(t[ref[1]], t)
-  throw new Error(`unread glow: ${value}`)
-}
-function glowPeaks(t, mode) {
-  const rules = parseRules(read('../../components/shell/shell.css')).filter((r) => !r.media && / body::before$/.test(r.sel))
-  const rule = rules.filter((r) => mode === 'light' || !r.sel.includes('data-mode="light"')).filter((r) => /radial-gradient/.test(r.body)).pop()
-  const spots = []
-  for (let i = rule.body.indexOf('radial-gradient('); i >= 0; i = rule.body.indexOf('radial-gradient(', i + 1)) {
-    let depth = 0
-    let j = i + 'radial-gradient'.length
-    for (; j < rule.body.length; j++) {
-      if (rule.body[j] === '(') depth++
-      if (rule.body[j] === ')' && --depth === 0) break
+// The glass surfaces Aurore lays over its glow (adjust.css): a surface token mixed with transparent
+const GLASS = /^color-mix\(in srgb,\s*var\(--(bg|panel|raised|hover|selected)\) ([0-9.]+)%,\s*transparent\)$/
+function glassSurfaces(mode) {
+  // the light rules come after the shared ones: the last value for an element and a property holds
+  const out = new Map()
+  for (const r of auroreRules(ADJUST, mode)) {
+    for (const [prop, v] of declarations(r.body)) {
+      if (['--surf', 'background', 'background-color'].includes(prop)) out.set(`${r.sel.replace(/^:root\S*/, '')}|${prop}`, { sel: r.sel, value: v })
     }
-    spots.push(splitArgs(rule.body.slice(i + 'radial-gradient('.length, j))[1])
   }
-  expect(spots).toHaveLength(3)
-  return spots.map((spot) => {
-    const { rgb, a } = rgba(spot, t)
-    return rgbToHex(hexToRgb(t.bg).map((b, i) => rgb[i] * a + b * (1 - a)))
-  })
+  return [...out.values()].filter((g) => GLASS.test(g.value))
 }
+// Every colour a glass surface can take over the glow, one per point of the layer
+const glassOver = (field, value, t) => field.map((g) => over(rgba(value, t), g))
+const worst = (fg, colours) => Math.min(...colours.map((c) => contrast(fg, hex(c))))
 
 function saturation(hex) {
   const [r, g, b] = hexToRgb(hex).map((v) => v / 255)
@@ -117,22 +115,81 @@ describe('contrast of the palettes', () => {
               expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(min)
             })
           }
-          it('writes each key figure in a gradient whose two ends hold 4.5:1 on the card, at rest and hovered', () => {
+          // read on first use: a spot the field cannot read fails its tests, not the file
+          let fieldCache
+          const lazy = { get field() { return (fieldCache ??= glowField(t, mode)) } }
+          const glass = glassSurfaces(mode)
+          it('writes each key figure in a gradient whose two ends hold 4.5:1 on the card, at rest and hovered, and on the page', () => {
             const tones = figureGradients(mode)
             expect(Object.keys(tones).sort()).toEqual(['bad', 'good', 'plain', 'warn'])
+            const grounds = [...['panel', 'hover'].map((s) => [hexToRgb(t[s])]), lazy.field, ...glass.map((g) => glassOver(lazy.field, g.value, t))]
             for (const [tone, ends] of Object.entries(tones)) {
               for (const end of [ends['--fig-a'] ?? tones.plain['--fig-a'], ends['--fig-b'] ?? tones.plain['--fig-b']]) {
-                const ref = end.match(/^var\(--([a-z-]+)\)$/)
-                const hex = ref ? t[ref[1]] : end
-                for (const s of ['panel', 'hover']) expect(contrast(hex, t[s]), `${tone} ${end} on ${s}`).toBeGreaterThanOrEqual(4.5)
+                const fg = resolve(end, t)
+                for (const g of grounds) expect(worst(fg, g), `${tone} ${end}`).toBeGreaterThanOrEqual(4.5)
               }
             }
           })
-          it('keeps text 7:1, muted text and the accent 4.5:1 where the glow peaks', () => {
-            for (const peak of glowPeaks(t, mode)) {
-              expect(contrast(t.text, peak), `text on ${peak}`).toBeGreaterThanOrEqual(7)
-              expect(contrast(t.muted, peak), `muted on ${peak}`).toBeGreaterThanOrEqual(4.5)
-              expect(contrast(t.accent, peak), `accent on ${peak}`).toBeGreaterThanOrEqual(4.5)
+          it('keeps text 7:1, muted text and the accent 4.5:1 at the worst point of the glow', () => {
+            expect(worst(t.text, lazy.field)).toBeGreaterThanOrEqual(7)
+            expect(worst(t.muted, lazy.field)).toBeGreaterThanOrEqual(4.5)
+            expect(worst(t.accent, lazy.field)).toBeGreaterThanOrEqual(4.5)
+          })
+          it('keeps text 7:1 and muted text 4.5:1 on each glass surface, over the worst point of the glow', () => {
+            // the panels, the table, the dock and the bars, at rest and hovered
+            expect(glass.map((g) => g.sel).join(' ')).toMatch(/\.panel/)
+            expect(glass.map((g) => g.sel).join(' ')).toMatch(/\.masthead/)
+            for (const g of glass) {
+              const seen = glassOver(lazy.field, g.value, t)
+              expect(worst(t.text, seen), `text on ${g.sel}`).toBeGreaterThanOrEqual(7)
+              expect(worst(t.muted, seen), `muted on ${g.sel}`).toBeGreaterThanOrEqual(4.5)
+            }
+          })
+          it('keeps text 7:1 and muted text 4.5:1 on a hovered row of a glass table, its tint over the glow', () => {
+            const tints = auroreRules(ADJUST, mode).filter((r) => /tbody tr:not\(\.opened\):not\(\.checked\):hover$/.test(r.sel))
+              .flatMap((r) => declarations(r.body)).filter(([p]) => p === 'background')
+              .map(([, v]) => v.match(/^linear-gradient\(90deg,(color-mix\(.*?,transparent\)),transparent [0-9]+%\)$/)?.[1])
+            expect(tints.length).toBeGreaterThan(0)
+            const table = glass.filter((g) => /\.table-container/.test(g.sel))
+            expect(table.length).toBeGreaterThan(0)
+            for (const tint of tints) {
+              for (const g of table) {
+                const seen = glassOver(lazy.field, g.value, t).map((c) => over(rgba(tint, t), c))
+                expect(worst(t.text, seen), tint).toBeGreaterThanOrEqual(7)
+                expect(worst(t.muted, seen), tint).toBeGreaterThanOrEqual(4.5)
+              }
+            }
+          })
+          it('keeps text 7:1 and muted text 4.5:1 on the open row, at both ends of its tint', () => {
+            const open = valuesOf(auroreRules(ADJUST, mode), /tbody tr\.opened$/, 'background').pop()
+            const m = open.match(/^linear-gradient\(90deg, ?(color-mix\(.*\)), ?var\(--selected\) [0-9]+%\)$/)
+            expect(m, open).not.toBeNull()
+            for (const ground of [resolve(m[1], t), t.selected]) {
+              expect(contrast(t.text, ground)).toBeGreaterThanOrEqual(7)
+              expect(contrast(t.muted, ground)).toBeGreaterThanOrEqual(4.5)
+              expect(contrast(t.accent, ground)).toBeGreaterThanOrEqual(4.5)
+            }
+          })
+          // pills sit in the panels, the table, the dock and the bars; the tab counters on the page mix with --bg (opaque)
+          it('writes the state pills 4.5:1 on their own tint, over each glass surface', () => {
+            const tints = valuesOf(auroreRules(ADJUST, mode), /:is\(\.chip:not\(\.filter-chip\),\.badge,\.counter,\.queue-kind\)$/, 'background')
+            expect(tints.length).toBeGreaterThan(0)
+            const p = Number(tints.pop().match(/^color-mix\(in srgb, ?currentColor ([0-9.]+)%, ?transparent\)$/)[1]) / 100
+            const grounds = glass.map((g) => glassOver(lazy.field, g.value, t))
+            for (const tone of ['accent', 'good', 'warn', 'bad']) {
+              for (const g of grounds) {
+                expect(worst(t[tone], g.map((c) => over({ rgb: hexToRgb(t[tone]), a: p }, c))), tone).toBeGreaterThanOrEqual(4.5)
+              }
+            }
+          })
+          it('writes the brand word in a gradient whose ends hold 3:1 (large text) on the bar\'s glass', () => {
+            const brand = auroreRules(ADJUST, mode).filter((r) => /\.brand strong$/.test(r.sel)).flatMap((r) => declarations(r.body))
+            const ends = brand.filter(([p]) => p === 'background').map(([, v]) => v).pop()
+            expect(ends).toMatch(/^linear-gradient\(/)
+            const bar = glass.filter((g) => /\.masthead/.test(g.sel)).map((g) => glassOver(lazy.field, g.value, t))
+            expect(bar.length).toBeGreaterThan(0)
+            for (const ref of ends.matchAll(/var\(--([a-z-]+)\)/g)) {
+              for (const g of bar) expect(worst(t[ref[1]], g), ref[1]).toBeGreaterThanOrEqual(3)
             }
           })
         }

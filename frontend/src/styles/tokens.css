@@ -111,8 +111,8 @@
   --paper: #ffffff;
   --scrim: #070e19;
   --shade: #000000;
-  --glow-rose: rgba(236, 72, 153, 0.16);
-  --glow-b: rgba(95, 167, 220, 0.28);
+  --glow-rose: rgba(196, 90, 230, 0.28);
+  --glow-b: rgba(56, 189, 248, 0.22);
   --halo: rgba(107, 120, 224, 0.25);
   --frame-b: rgba(95, 167, 220, 0.25);
   --frame-shade: rgba(0, 0, 0, 0.80);
@@ -149,8 +149,8 @@
   --paper: #ffffff;
   --scrim: #070e19;
   --shade: #1e2864;
-  --glow-rose: rgba(219, 39, 119, 0.10);
-  --glow-b: rgba(34, 170, 220, 0.20);
+  --glow-rose: rgba(192, 63, 216, 0.17);
+  --glow-b: rgba(14, 165, 233, 0.20);
   --halo: rgba(107, 120, 224, 0.25);
   --frame-b: rgba(34, 170, 220, 0.24);
   --frame-shade: rgba(40, 50, 120, 0.35);
