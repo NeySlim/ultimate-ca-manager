@@ -139,7 +139,8 @@ const LISTS: List[] = [
 ]
 const REGION = '#module-scroll'
 // The CRL number reads « CRL number » over a fresh authority's one-digit number (the noun the phone's sort needs, G8)
-const WIDE_HEADS: Record<string, RegExp> = { 'crl-ocsp': /^(CRL number|Numéro de CRL) / }
+// The ACME accounts' order count reads « Commandes » in full: « Cdes » saved 11 px for a header nobody could read
+const WIDE_HEADS: Record<string, RegExp> = { 'crl-ocsp': /^(CRL number|Numéro de CRL) /, 'acme-accounts': /^Commandes / }
 const wide = (list: List, heads: string[]) => heads.filter((h) => !WIDE_HEADS[list.name]?.test(h))
 
 async function open(page: Page, list: List) {
@@ -306,6 +307,7 @@ test.describe('the sort of a protocol list', () => {
     expect(await names()).toEqual(['Actalis', "Let's Encrypt", 'ZeroSSL'])
     await page.getByRole('tab', { name: /^Accounts/ }).click()
     await expect(page).toHaveURL(/\/acme$/)
-    await expect(head('Created')).toHaveAttribute('aria-sort', 'descending')
+    // The header is named by its full label (E10)
+    await expect(head('Creation date')).toHaveAttribute('aria-sort', 'descending')
   })
 })

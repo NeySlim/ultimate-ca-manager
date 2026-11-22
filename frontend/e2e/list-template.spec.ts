@@ -471,7 +471,7 @@ test.describe('the column handles (C2)', () => {
     const g = await geometry(page, '#cert-scroll')
     expect([g.over <= 1, g.page <= 0, g.lost]).toEqual([true, true, 0])
     // The Columns dialog of the certificates resets the widths and the hidden columns
-    await page.getByRole('main').getByRole('button', { name: 'Columns' }).click()
+    await page.getByRole('main').getByRole('button', { name: 'Columns', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Reset columns' }).click()
     await expect.poll(() => issuer.evaluate((el) => Math.round(el.getBoundingClientRect().width))).not.toBe(320)
     expect(await page.evaluate(() => localStorage.getItem('ucm-certs-table-widths'))).toBeNull()
@@ -497,7 +497,8 @@ test.describe('on a phone', () => {
     // A date after its column's label, no fact reduced to a dash
     const facts = await records.locator('.row-meta > span').allTextContents()
     expect(facts.filter((f) => f.trim() === '—')).toEqual([])
-    expect(await records.first().locator('.row-meta > span').first().textContent()).toMatch(/^Next update \S/)
+    // A record names the column in full, as its title does (E6)
+    expect(await records.first().locator('.row-meta > span').first().textContent()).toMatch(/^Next Update \S/)
     // The fact's label is muted beside its value (G9)
     const fact = records.first().locator('.row-meta > span').first()
     expect(await fact.evaluate((s) => getComputedStyle(s).color)).not.toBe(await fact.locator('.fact-label').evaluate((l) => getComputedStyle(l).color))
