@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
-  Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, FormModal, Notice,
+  Section, Facts, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, FormModal, Notice,
   useClientList, useSortParam,
 } from '../components/atelier'
 import { sshCasService, hsmService } from '../services'
@@ -230,6 +230,8 @@ export default function SSHCAsPage() {
   const open = selectedCA
   const openCA = (ca) => { if (open?.id !== ca.id) setSection('overview'); setSelectedCA(ca) }
   const principals = open ? principalList(open) : []
+  // A value the authority has, else the absence in grey
+  const fact = (label, value) => (value || value === 0 ? [label, value] : { label, absent: '—' })
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('sshCas.title') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
@@ -249,15 +251,15 @@ export default function SSHCAsPage() {
         {section === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
+              <Facts items={[
                 [t('sshCas.caType'), typeLabel(open)],
                 [t('sshCas.keyType'), keyCell(open)],
-                open.key_source === 'hsm' && [t('cas.detail.hsmKey'), <span key="k" className="mono">{open.hsm_key_label || '—'}</span>],
-                [t('sshCas.fingerprint'), <span key="f" className="mono">{open.fingerprint || '—'}</span>],
-                [t('sshCas.serialCounter'), open.serial_counter ?? '—'],
+                open.key_source === 'hsm' && fact(t('cas.detail.hsmKey'), open.hsm_key_label && <span className="mono">{open.hsm_key_label}</span>),
+                open.fingerprint ? { label: t('sshCas.fingerprint'), value: open.fingerprint, kind: 'hex', long: true } : fact(t('sshCas.fingerprint'), null),
+                fact(t('sshCas.serialCounter'), open.serial_counter),
                 [t('sshCas.stats.certificates'), open.cert_count || 0],
-                [t('common.created'), formatDate(open.created_at)],
-                [t('common.createdBy'), open.created_by || '—'],
+                fact(t('common.created'), open.created_at && formatDate(open.created_at)),
+                fact(t('common.createdBy'), open.created_by),
               ]} />
             </Section>
             <Section title={t('atelier.summary')}>
@@ -291,12 +293,14 @@ export default function SSHCAsPage() {
         {section === 'config' && (
           <div className="module-detail">
             <Section title={t('sshCas.configuration')}>
-              <Props items={[
-                [t('sshCas.defaultTtl'), open.default_ttl || '—'],
-                [t('sshCas.maxTtl'), open.max_ttl || '—'],
-                [t('sshCas.defaultExtensions'), open.default_extensions?.length ? open.default_extensions.join(', ') : t('sshCas.noExtensions')],
-                [t('sshCas.allowedPrincipals'), principals.length ? principals.join(', ')
-                  : open.allow_any_principal ? <Pill key="p" label={t('sshCas.anyPrincipal')} tone="warn" /> : t('sshCas.noPrincipalSignsNothing')],
+              <Facts items={[
+                // A lifetime of 0 is no lifetime set
+                fact(t('sshCas.defaultTtl'), open.default_ttl || null),
+                fact(t('sshCas.maxTtl'), open.max_ttl || null),
+                open.default_extensions?.length ? [t('sshCas.defaultExtensions'), open.default_extensions.join(', ')] : { label: t('sshCas.defaultExtensions'), absent: t('sshCas.noExtensions') },
+                // The principal rule is a state: any principal a warning, none a CA that signs nothing
+                principals.length ? [t('sshCas.allowedPrincipals'), principals.join(', ')]
+                  : { label: t('sshCas.allowedPrincipals'), state: open.allow_any_principal ? ['warn', t('sshCas.anyPrincipal')] : ['bad', t('sshCas.noPrincipalSignsNothing')] },
                 [t('sshCertificates.keyId'), open.allow_custom_key_id ? t('sshCas.keyIdChosenByRequester') : t('sshCas.keyIdSetByCa')],
               ]} />
             </Section>

@@ -190,3 +190,30 @@ describe('the SSH CA dock in the URL', () => {
     expect(r.where()).toBe('/ssh/cas?item=1&section=install')
   })
 })
+
+describe('the SSH CA dock in typed rows (KV-3)', () => {
+  const rowIn = (dock, label) => within(dock).getByText(label, { selector: 'dt' }).closest('div.row')
+  const openUsers = async () => {
+    const { container } = page()
+    fireEvent.click(await screen.findByRole('button', { name: 'Users CA' }))
+    return waitFor(() => { const d = container.querySelector('aside#inspector'); expect(within(d).getByText('sshCas.fingerprint')).toBeTruthy(); return d })
+  }
+
+  it('puts the fingerprint in a copyable chip and an unknown author in grey', async () => {
+    const dock = await openUsers()
+    expect(dock.querySelector('dl.props')).toBeNull()
+    expect(rowIn(dock, 'sshCas.fingerprint').querySelector('dd.v .code-value')).toHaveTextContent('SHA256:aaa')
+    expect(within(rowIn(dock, 'sshCas.fingerprint')).getByRole('button', { name: 'protocols.copyValue' })).toBeInTheDocument()
+    expect(rowIn(dock, 'common.createdBy').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(rowIn(dock, 'sshCas.stats.certificates').querySelector('dd.v')).toHaveTextContent('7')
+  })
+
+  it('greys an unset lifetime (0 included) and gives the principal rule as a pill', async () => {
+    m.getAll.mockResolvedValue({ data: [{ ...USERS, allowed_principals: [], allow_any_principal: false, max_ttl: 0 }] })
+    const dock = await openUsers()
+    fireEvent.click(within(dock).getByRole('tab', { name: 'sshCas.configuration' }))
+    expect(rowIn(dock, 'sshCas.defaultTtl').querySelector('dd.v')).toHaveTextContent('16h')
+    expect(rowIn(dock, 'sshCas.maxTtl').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(rowIn(dock, 'sshCas.allowedPrincipals').querySelector('dd.v .badge.bad')).toHaveTextContent('sshCas.noPrincipalSignsNothing')
+  })
+})

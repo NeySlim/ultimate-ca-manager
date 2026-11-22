@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
-  Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, AtelierDialog, Notice, useSortParam,
+  Section, Facts, CodeValue, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, AtelierDialog, Notice, useSortParam,
 } from '../components/atelier'
 import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification } from '../contexts'
@@ -285,6 +285,9 @@ export default function SSHCertificatesPage() {
   const openStatus = open && getStatus(open, t)
   const criticalOptions = open?.critical_options && typeof open.critical_options === 'object' ? Object.entries(open.critical_options) : []
   const extensions = open ? (Array.isArray(open.extensions) ? open.extensions : open.extensions ? Object.keys(open.extensions) : []) : []
+  // A value the certificate has, else the absence in grey; a fingerprint or a serial in a chip copied whole
+  const fact = (label, value) => (value || value === 0 ? [label, value] : { label, absent: '—' })
+  const code = (label, value) => (value || value === 0 ? { label, value: String(value), kind: 'hex' } : { label, absent: '—' })
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('sshCertificates.title') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
@@ -304,23 +307,21 @@ export default function SSHCertificatesPage() {
             {/* Another certificate of the CA holds this serial: the KRL revokes by serial */}
             {open.serial_shared_with?.length > 0 && <Notice tone="warn">{t('sshCertificates.serialSharedDetail', { serial: open.serial })}</Notice>}
             <Section title={t('atelier.properties')}>
-              <Props items={[
+              <Facts items={[
                 [t('sshCertificates.certType'), typeLabel(open)],
-                [t('sshCertificates.keyId'), open.key_id || '—'],
-                [t('sshCertificates.serial'), <span key="s" className="mono">{open.serial ?? '—'}</span>],
-                [t('common.keyType'), open.key_type || '—'],
-                [t('sshCertificates.fingerprint'), open.fingerprint ? (
-                  <button key="f" type="button" className="text-link mono" title={t('common.copy')} onClick={() => handleCopyText(open.fingerprint)}>{open.fingerprint}</button>
-                ) : '—'],
-                [t('sshCertificates.validFrom'), open.valid_from ? formatDate(open.valid_from) : '—'],
-                [t('sshCertificates.validTo'), open.valid_to ? formatDate(open.valid_to) : '—'],
+                fact(t('sshCertificates.keyId'), open.key_id),
+                code(t('sshCertificates.serial'), open.serial),
+                fact(t('common.keyType'), open.key_type),
+                { ...code(t('sshCertificates.fingerprint'), open.fingerprint), long: true },
+                fact(t('sshCertificates.validFrom'), open.valid_from && formatDate(open.valid_from)),
+                fact(t('sshCertificates.validTo'), open.valid_to && formatDate(open.valid_to)),
                 [t('atelier.state'), statusPill(open)],
               ]} />
             </Section>
             <Section title={t('sshCertificates.caInfo')}>
-              <Props items={[
-                [t('sshCertificates.caName'), open.ca_name || '—'],
-                open.ca_fingerprint && [t('sshCertificates.caFingerprint'), <span key="cf" className="mono">{open.ca_fingerprint}</span>],
+              <Facts items={[
+                fact(t('sshCertificates.caName'), open.ca_name),
+                open.ca_fingerprint && { ...code(t('sshCertificates.caFingerprint'), open.ca_fingerprint), long: true },
               ]} />
             </Section>
           </div>
@@ -328,10 +329,11 @@ export default function SSHCertificatesPage() {
         {section === 'grants' && (
           <div className="module-detail">
             <Section title={t('sshCertificates.grants')}>
-              <Props items={[
-                [t('sshCertificates.principals'), listOf(open.principals).join(', ') || '—'],
-                [t('sshCertificates.extensions'), extensions.join(', ') || '—'],
-                ...criticalOptions.map(([key, value]) => [key, <span key={key} className="mono">{String(value)}</span>]),
+              <Facts items={[
+                fact(t('sshCertificates.principals'), listOf(open.principals).join(', ')),
+                fact(t('sshCertificates.extensions'), extensions.join(', ')),
+                // A critical option holds a command or addresses: a chip copied whole, under its name when narrow
+                ...criticalOptions.map(([key, value]) => ({ label: key, long: true, value: <CodeValue value={String(value)} label={key} /> })),
               ]} />
             </Section>
           </div>

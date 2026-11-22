@@ -139,3 +139,43 @@ describe('the SSH certificate dock in the URL', () => {
     expect(r.where()).toBe('/ssh/certificates?item=1&section=certificate')
   })
 })
+
+describe('the SSH certificate dock in typed rows (KV-3)', () => {
+  const FP = 'SHA256:9fT1bW0x3hJp2Lq7Vz8Kc5Nd4Rm6Ys1Ae0Gu2Io3Pk'
+  const BOB = { ...ALICE, id: 2, key_id: 'bob', principals: [], extensions: [], fingerprint: FP, ca_fingerprint: 'SHA256:caFP', key_type: null }
+  const rowIn = (dock, label) => within(dock).getByText(label, { selector: 'dt' }).closest('div.row')
+  let writeText
+  beforeEach(() => {
+    writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    getAll.mockResolvedValue({ data: [BOB], meta: { total: 1 } })
+    getById.mockResolvedValue({ data: BOB })
+  })
+  const openBob = async () => {
+    const { container } = page()
+    fireEvent.click(await screen.findByRole('button', { name: 'bob' }))
+    return waitFor(() => { const d = container.querySelector('aside#inspector'); expect(within(d).getByText('sshCertificates.fingerprint')).toBeTruthy(); return d })
+  }
+
+  it('copies the fingerprint whole from its chip, no button left in a value', async () => {
+    const dock = await openBob()
+    expect(dock.querySelector('dl.props')).toBeNull()
+    const fp = rowIn(dock, 'sshCertificates.fingerprint')
+    expect(fp.querySelector('dd.v .code-value')).toHaveTextContent(FP)
+    fireEvent.click(within(fp).getByRole('button', { name: 'protocols.copyValue' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(FP))
+    expect(rowIn(dock, 'sshCertificates.serial').querySelector('dd.v .code-value')).toHaveTextContent('7')
+    expect(rowIn(dock, 'sshCertificates.caFingerprint').querySelector('dd.v .code-value')).toHaveTextContent('SHA256:caFP')
+    expect(rowIn(dock, 'common.keyType').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(dock.querySelectorAll('dd.v button:not(.cp)')).toHaveLength(0)
+  })
+
+  it('greys an empty grant and puts a critical option in a chip', async () => {
+    const dock = await openBob()
+    fireEvent.click(within(dock).getByRole('tab', { name: 'sshCertificates.grants' }))
+    expect(rowIn(dock, 'sshCertificates.principals').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(rowIn(dock, 'sshCertificates.extensions').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(rowIn(dock, 'force-command').querySelector('dd.v .code-value')).toHaveTextContent('/bin/true')
+  })
+})
