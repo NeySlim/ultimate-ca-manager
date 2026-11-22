@@ -6,11 +6,11 @@ vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslatio
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
   getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
-  getDashStats: vi.fn(), getTrend: vi.fn(),
+  getDashStats: vi.fn(), getTrend: vi.fn(), getScores: vi.fn(),
 }))
 vi.mock('../../../services', () => ({
   overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
-  certificatesService: { getStats: api.getStats },
+  certificatesService: { getStats: api.getStats, getComplianceStats: api.getScores },
   casService: { getAll: api.getAll },
   dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity,
     getStats: api.getDashStats, getCertificateTrend: api.getTrend },
@@ -34,6 +34,7 @@ const error = (status) => Object.assign(new Error('x'), { status })
 beforeEach(() => {
   vi.clearAllMocks()
   api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
+  api.getScores.mockResolvedValue({ data: { average_score: 78, distribution: { 'A+': 1, A: 2, B: 3, C: 0, D: 0, F: 0 }, total: 6 } })
   api.getNext.mockResolvedValue({ data: [] })
   api.can.mockReturnValue(true)
 })
@@ -49,7 +50,7 @@ describe('card states', () => {
     ['hierarchy', HierarchyCard, api.getAll, [], 'overview.hierarchy.emptyTitle'],
     ['horizon', HorizonCard, api.getDashStats, { total_certificates: 0 }, 'overview.state.empty'],
     ['activity', ActivityCard, api.getActivity, { activity: [] }, 'overview.state.empty'],
-    ['trend', TrendCard, api.getTrend, { trend: [{ date: '2026-11-19', issued: 0, revoked: 0, expired: 0 }] }, 'overview.state.empty'],
+    ['trend', TrendCard, api.getTrend, { trend: [{ date: '2026-11-19', issued: 0, revoked: 0, expired: 0 }] }, 'overview.trend.quiet'],
   ]
   it.each(cases)('%s: skeleton, empty, error with its cause and retry, missing permission', async (id, Card, fetcher, empty, emptyText) => {
     fetcher.mockReturnValueOnce(new Promise(() => {}))
@@ -132,62 +133,107 @@ describe('queue card preference', () => {
 
 describe('compliance card', () => {
   const entry = (count, hint) => ({ count, filter_available: Boolean(hint), filter_hint: hint })
-  const tile = (name) => document.querySelector(`.tile[data-check="${name}"]`)
-  it('links a counter to the list its hint names, and not one without a filter', async () => {
-    api.getCompliance.mockResolvedValue({ data: {
-      total: 5, by_key_algorithm: [{ key_algo: 'RSA 2048', count: 2, filter_available: true, filter_hint: { live: 'true', key_algo: 'RSA 2048' } }],
-      counters: {
-        rsa_below_3072: entry(2, { live: 'true', key_algo_prefix: 'RSA', key_bits_below: '3072' }),
-        weak_signature_hash: entry(1, { live: 'true', sig_hash: ['sha1', 'md5'] }),
-        no_private_key: entry(3, null),
-      },
-    } })
+  const meter = (name) => document.querySelector(`.meter[data-check="${name}"]`)
+  const counters = {
+    rsa_below_3072: entry(189, { live: 'true', key_algo_prefix: 'RSA', key_bits_below: '3072' }),
+    server_lifetime_over_398_days: entry(11, { live: 'true', server: 'true', lifetime_over_days: '398' }),
+    weak_signature_hash: entry(0, { live: 'true', sig_hash: ['sha1', 'md5'] }),
+    incomplete_chain: entry(0, null),
+    no_private_key: entry(8, null),
+  }
+  const summary = { total: 211, counters, by_key_algorithm: [{ key_algo: 'RSA 2048', count: 189 }] }
+
+  it('a rule opens the list of its gaps the hint names, and not one without a filter', async () => {
+    api.getCompliance.mockResolvedValue({ data: summary })
     show(<ComplianceCard />)
-    const rsa = (await screen.findByText('overview.compliance.rsa_below_3072')).closest('a')
-    expect(rsa.getAttribute('href')).toBe('/certificates?live=true&key_algo_prefix=RSA&key_bits_below=3072')
-    expect(rsa.className).toBe('tile')
-    expect(screen.getByText('overview.compliance.weak_signature_hash').closest('a').getAttribute('href'))
-      .toBe('/certificates?live=true&sig_hash=sha1&sig_hash=md5')
-    expect(screen.getByText('overview.compliance.no_private_key').closest('a')).toBeNull()
-    expect(screen.getByText('RSA 2048').closest('a').getAttribute('href')).toBe('/certificates?live=true&key_algo=RSA+2048')
-    // Each tile says what it counts under its label, as the mockup
-    expect(tile('rsa_below_3072').querySelector('small').textContent).toBe('overview.compliance.sub_rsa_below_3072')
+    await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
+    expect(meter('rsa_below_3072').tagName).toBe('A')
+    expect(meter('rsa_below_3072').getAttribute('href')).toBe('/certificates?live=true&key_algo_prefix=RSA&key_bits_below=3072')
+    expect(meter('weak_signature_hash').getAttribute('href')).toBe('/certificates?live=true&sig_hash=sha1&sig_hash=md5')
+    expect(meter('no_private_key').tagName).toBe('DIV')
+    // The rule in words, its gap counted under it
+    expect(meter('rsa_below_3072').querySelector('.name').textContent).toBe('overview.compliance.rule.rsa_below_3072overview.compliance.gap.rsa_below_3072')
   })
 
-  it('a tile is a warning above zero, fine at zero, and neutral for a plain count; each algorithm has its bar', async () => {
-    api.getCompliance.mockResolvedValue({ data: {
-      total: 10, by_key_algorithm: [{ key_algo: 'RSA 2048', count: 4 }, { key_algo: 'EC P-256', count: 6 }],
-      counters: { rsa_below_3072: entry(4, null), weak_signature_hash: entry(0, null), no_private_key: entry(3, null) },
-    } })
+  it('each gauge gives the conforming share and count, its tone and its state said by an icon', async () => {
+    api.getCompliance.mockResolvedValue({ data: summary })
     show(<ComplianceCard />)
-    await screen.findByText('RSA 2048')
-    const tone = (name) => tile(name).querySelector('.tile-value').className
-    expect(tone('rsa_below_3072')).toBe('tile-value warn')
-    expect(tone('weak_signature_hash')).toBe('tile-value good')
-    expect(tone('no_private_key')).toBe('tile-value')
-    for (const name of ['rsa_below_3072', 'weak_signature_hash', 'no_private_key']) expect(tile(name).querySelector('svg')).not.toBeNull()
-    expect([...document.querySelectorAll('.algo-bar > span')].map((b) => b.style.width)).toEqual(['40%', '60%'])
+    await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
+    const width = (name) => meter(name).querySelector('.track i').style.width
+    expect([width('rsa_below_3072'), width('server_lifetime_over_398_days'), width('weak_signature_hash')]).toEqual(['10%', '94%', '100%'])
+    expect(meter('rsa_below_3072').querySelector('.val').textContent).toContain('22/211')
+    expect(meter('server_lifetime_over_398_days').querySelector('.val').textContent).toContain('200/211')
+    expect(['rsa_below_3072', 'server_lifetime_over_398_days', 'weak_signature_hash', 'no_private_key'].map((n) => meter(n).dataset.tone))
+      .toEqual(['bad', 'warn', 'good', 'info'])
+    for (const name of Object.keys(counters)) expect(meter(name).querySelector('.rule-state[role="img"]').getAttribute('aria-label')).toMatch(/^overview\.compliance\.state\./)
   })
 
-  it('draws the mockup grid: the algorithms tile first, then the five figures, in one grid of tiles', async () => {
-    api.getCompliance.mockResolvedValue({ data: {
-      total: 10, by_key_algorithm: [{ key_algo: 'RSA 2048', count: 4 }],
-      counters: { rsa_below_3072: entry(4, null), weak_signature_hash: entry(0, null) },
-    } })
+  it('lists the rules in the mockup order', async () => {
+    api.getCompliance.mockResolvedValue({ data: summary })
     show(<ComplianceCard />)
-    await screen.findByText('RSA 2048')
-    const tiles = [...document.querySelector('#card-compliance .tiles').children]
-    expect(tiles.map((t) => t.className)).toEqual(['tile algo', 'tile', 'tile', 'tile', 'tile', 'tile'])
-    expect(tiles.slice(1).map((t) => t.dataset.check)).toEqual(['rsa_below_3072', 'weak_signature_hash',
-      'server_lifetime_over_398_days', 'incomplete_chain', 'no_private_key'])
+    await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
+    expect([...document.querySelectorAll('#card-compliance .meter')].map((m) => m.dataset.check)).toEqual([
+      'rsa_below_3072', 'server_lifetime_over_398_days', 'weak_signature_hash', 'incomplete_chain', 'no_private_key'])
   })
 
-  it('shows a dash, not zero, for a figure the response lacks', async () => {
+  it('shows a dash, not zero, and no tone for a figure the response lacks', async () => {
     api.getCompliance.mockResolvedValue({ data: { total: 3, counters: { rsa_below_3072: {} }, by_key_algorithm: [] } })
     show(<ComplianceCard />)
-    await screen.findByText('overview.compliance.rsa_below_3072')
-    expect(tile('rsa_below_3072').querySelector('.tile-value').textContent).toBe('–')
-    expect(tile('rsa_below_3072').querySelector('.tile-value').className).toBe('tile-value')
+    await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
+    expect(meter('rsa_below_3072').querySelector('.val').textContent).toBe('–')
+    expect(meter('rsa_below_3072').dataset.tone).toBeUndefined()
+    expect(meter('rsa_below_3072').querySelector('.track i')).toBeNull()
+  })
+
+  it('rings the average score with its grade and grades, its base written when it is not the rules\' population', async () => {
+    api.getCompliance.mockResolvedValue({ data: summary })
+    api.getScores.mockResolvedValue({ data: { average_score: 78, distribution: { 'A+': 12, A: 80, B: 121, C: 47, D: 6, F: 0 }, total: 266 } })
+    show(<ComplianceCard />)
+    await waitFor(() => expect(document.querySelector('.ring-arc')).not.toBeNull())
+    expect(document.querySelector('.ring-arc').dataset.value).toBe('78')
+    expect(document.querySelector('.ring-center .value').textContent).toBe('78')
+    // F has no certificate: no segment, but its line in the legend
+    expect([...document.querySelectorAll('.grade-bar i')].map((i) => i.dataset.grade)).toEqual(['A+', 'A', 'B', 'C', 'D'])
+    expect([...document.querySelectorAll('.comp .legend li')].map((li) => li.textContent)).toEqual(['A+12', 'A80', 'B121', 'C47', 'D6', 'F0'])
+    expect(document.querySelector('.score-base').textContent).toBe('overview.compliance.scoreBase')
+  })
+
+  it('takes the score of the compliance route once it carries one, without a base line', async () => {
+    api.getCompliance.mockResolvedValue({ data: { ...summary, score: 64, distribution: { 'A+': 0, A: 1, B: 0, C: 0, D: 0, F: 1 } } })
+    show(<ComplianceCard />)
+    await waitFor(() => expect(document.querySelector('.ring-arc')).not.toBeNull())
+    expect(document.querySelector('.ring-arc').dataset.value).toBe('64')
+    expect([...document.querySelectorAll('.grade-bar i')].map((i) => i.dataset.grade)).toEqual(['A', 'F'])
+    expect(document.querySelector('.score-base')).toBeNull()
+  })
+
+  it('keeps its gauges, flagged partial, without the right to read the scores', async () => {
+    api.getCompliance.mockResolvedValue({ data: summary })
+    api.getScores.mockRejectedValue(error(403))
+    show(<ComplianceCard />)
+    await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
+    expect(document.querySelector('.ring-wrap')).toBeNull()
+    expect(screen.getByRole('note').textContent).toBe('overview.state.partialForbidden')
+  })
+
+  it('opens its figures as a table from the card menu, and goes back to the chart', async () => {
+    api.getCompliance.mockResolvedValue({ data: summary })
+    render(<MemoryRouter><OverviewContext.Provider value={{ hide: vi.fn() }}><ComplianceCard /></OverviewContext.Provider></MemoryRouter>)
+    await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
+    fireEvent.click(document.getElementById('card-menu-btn-compliance'))
+    fireEvent.click(document.querySelector('[data-card-table="compliance"]'))
+    const tables = [...document.querySelectorAll('#card-compliance table.viz-table')]
+    expect(tables.map((tb) => tb.querySelector('caption').textContent)).toEqual([
+      'overview.compliance.tableRules', 'overview.compliance.tableGrades', 'overview.compliance.byAlgorithm'])
+    expect([...tables[0].querySelector('tbody tr').children].map((c) => c.textContent))
+      .toEqual(['overview.compliance.rule.rsa_below_3072', '22', '189', '10'])
+    expect(document.querySelector('#card-compliance [data-action="export-csv"]')).not.toBeNull()
+    expect(document.querySelector('#card-compliance .meter')).toBeNull()
+    fireEvent.click(document.getElementById('card-menu-btn-compliance'))
+    expect(document.querySelector('[data-card-table="compliance"]').textContent).toBe('atelier.chartView')
+    fireEvent.click(document.querySelector('[data-card-table="compliance"]'))
+    expect(document.querySelector('#card-compliance table.viz-table')).toBeNull()
+    expect(meter('rsa_below_3072')).not.toBeNull()
   })
 })
 

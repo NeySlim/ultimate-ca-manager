@@ -3,13 +3,15 @@
  * one tree per root, each authority a card with its state, CRL, OCSP and issuances on 7 days,
  * bounded to a few lines on a large installation.
  */
+import { useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { EmptyBlock, Icon } from '../atelier'
 import { casService, overviewService } from '../../services'
 import { HIERARCHY_LIMIT, boundedTree, nameOf } from '../../lib/overviewHierarchy'
 import { stateLabel } from '../../lib/stateLabel'
-import { OverviewCard, num, settle, useCardData } from './shared'
+import { ISSUANCE_DAYS, recentTotal } from '../../lib/overviewViz'
+import { OverviewCard, OverviewContext, num, settle, useCardData } from './shared'
 
 const DAYS = 7
 // A CA state that is not active: its badge tone and icon (the mockup's caStates)
@@ -76,9 +78,13 @@ function IssuedOnly({ entries, t }) {
 
 export function HierarchyCard() {
   const { t } = useTranslation()
+  const page = useContext(OverviewContext)
+  // The strip's 30 days, one request for both; the card counts the last 7
+  const issuance = () => (page?.share
+    ? page.share('issuance', () => overviewService.getIssuance(ISSUANCE_DAYS)) : overviewService.getIssuance(ISSUANCE_DAYS))
   const state = useCardData(async () => {
     const { got, missing } = await settle(
-      { cas: () => casService.getAll(), issuance: () => overviewService.getIssuance(DAYS) },
+      { cas: () => casService.getAll(), issuance },
       (g) => Boolean(g.cas) || g.issuance?.data?.by_ca?.length > 0)
     return { data: { cas: got.cas?.data, issuance: got.issuance?.data, missing }, meta: got.cas?.meta }
   }, ['ca', 'certificate'])
@@ -86,7 +92,7 @@ export function HierarchyCard() {
   const cas = casLoaded ? state.data.cas : []
   const byCa = state.data?.issuance?.by_ca
   // Issuances and renewals per CA in the window; null when the response carries no per-CA series at all
-  const issued = Array.isArray(byCa) ? new Map(byCa.map((e) => [e.caref, e.total ?? e.issued])) : null
+  const issued = Array.isArray(byCa) ? new Map(byCa.map((e) => [e.caref, recentTotal(e, DAYS)])) : null
   const tree = boundedTree(cas, issued)
   const total = typeof state.meta?.total === 'number' ? state.meta.total : cas.length
   const sub = casLoaded && [

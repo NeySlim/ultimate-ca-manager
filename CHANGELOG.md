@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- **Overview widgets that situate their figures.** Each figure of the strip carries its trend or split and a named gap, automation health draws 30 days of mirror bars with each protocol's success rate and its services as pills, compliance rings the average score over one gauge per rule that opens its gaps, and the latest operations fold repeated sign-ins into a timeline by day. Every chart reads from the keyboard with one tooltip and shows its figures as a table, with a CSV download, from its card menu.
 - **Detached windows and a comparison of up to four certificates.** *Detach into a window*, in the detail of a certificate, an authority or a request, opens it in a window over the page that moves, resizes and stays across pages, several at once, its detail laid out in one, two or three columns by its own width; *Compare* takes two to four ticked certificates into a wide window, one column each, the differing lines marked and a filter on them.
 - **The scheduler's tasks open in an inspector.** A task opens from its row in Settings › Scheduler, with every column of the list, those a narrow window folds included, and its *Run now*.
 - **The status bar sums up the activity.** Its middle part links the pending approvals, the backup, restore or audit check running, the interventions of the overview's queue and the open windows, each only for a role that may read it, and says *Nothing pending* when all of it is calm.

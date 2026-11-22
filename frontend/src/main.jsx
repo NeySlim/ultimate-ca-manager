@@ -6,6 +6,7 @@ import './index.css'
 import './styles/atelier/scope.css'
 import './styles/atelier/maquette.css'
 import './styles/atelier/extensions.css'
+import './styles/dataviz.css'
 import './i18n'
 import { takeOverServedGuide } from './ssr/takeOver'
 

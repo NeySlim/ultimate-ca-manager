@@ -8084,7 +8084,55 @@
       "sub_weak_signature_hash": "Signature obsolète",
       "sub_server_lifetime_over_398_days": "Certificats Serveur TLS",
       "sub_incomplete_chain": "Intermédiaire absent",
-      "sub_no_private_key": "CSR externe ou import"
+      "sub_no_private_key": "CSR externe ou import",
+      "subRules_one": "Sur le {{count}} certificat actif. Une ligne ouvre la liste filtrée de ses écarts.",
+      "subRules_other": "Sur les {{count}} certificats actifs. Une ligne ouvre la liste filtrée de ses écarts.",
+      "conformPct": "{{pct}} % conformes",
+      "pct": "{{pct}} %",
+      "conform": "Conformes",
+      "inGap": "En écart",
+      "openGap": "Ouvre la liste des certificats en écart",
+      "tableRules_one": "Règles, sur {{count}} certificat actif",
+      "tableRules_other": "Règles, sur {{count}} certificats actifs",
+      "ruleCol": "Règle",
+      "tableGrades_one": "Notes, sur {{count}} certificat",
+      "tableGrades_other": "Notes, sur {{count}} certificats",
+      "gradeCol": "Note",
+      "certificates": "Certificats",
+      "algoCol": "Algorithme",
+      "ringAlt": "Score moyen de conformité : {{score}} sur 100, note {{grade}}",
+      "ringSub": "score moyen · note {{grade}}",
+      "gradeAlt_one": "Note {{grade}} : {{count}} certificat",
+      "gradeAlt_other": "Note {{grade}} : {{count}} certificats",
+      "grade": "Note {{grade}}",
+      "share": "Part",
+      "scoreBase_one": "Score sur {{count}} certificat non révoqué",
+      "scoreBase_other": "Score sur {{count}} certificats non révoqués",
+      "rule": {
+        "rsa_below_3072": "Clés RSA d’au moins 3072 bits",
+        "server_lifetime_over_398_days": "Validité serveur de 398 jours au plus",
+        "weak_signature_hash": "Hachage de signature sûr",
+        "incomplete_chain": "Chaîne complète",
+        "no_private_key": "Clé privée gardée dans UCM"
+      },
+      "gap": {
+        "rsa_below_3072_one": "{{count}} clé RSA à remplacer",
+        "rsa_below_3072_other": "{{count}} clés RSA à remplacer",
+        "server_lifetime_over_398_days_one": "{{count}} certificat Serveur TLS trop long",
+        "server_lifetime_over_398_days_other": "{{count}} certificats Serveur TLS trop longs",
+        "weak_signature_hash_one": "{{count}} signature SHA-1 ou MD5",
+        "weak_signature_hash_other": "{{count}} signatures SHA-1 ou MD5",
+        "incomplete_chain_one": "{{count}} chaîne sans son intermédiaire",
+        "incomplete_chain_other": "{{count}} chaînes sans leur intermédiaire",
+        "no_private_key_one": "{{count}} CSR externe ou import",
+        "no_private_key_other": "{{count}} CSR externes ou imports"
+      },
+      "state": {
+        "good": "conforme",
+        "warn": "à surveiller",
+        "bad": "écart majeur",
+        "info": "information"
+      }
     },
     "health": {
       "acme": "ACME",
@@ -8156,7 +8204,16 @@
       "taskCount_other": "{{count}} tâches",
       "lastRun": "dernier passage {{when}}",
       "runs_one": "<strong>{{count}}</strong> succès",
-      "runs_other": "<strong>{{count}}</strong> succès"
+      "runs_other": "<strong>{{count}}</strong> succès",
+      "rate": "{{rate}} %",
+      "mirrorAlt_one": "{{name}} sur {{count}} jour : {{ok}} succès, {{failed}} échecs. Les flèches le lisent jour par jour.",
+      "mirrorAlt_other": "{{name}} sur {{count}} jours : {{ok}} succès, {{failed}} échecs. Les flèches le lisent jour par jour.",
+      "ok": "Succès",
+      "failed": "Échecs",
+      "tableCaption_one": "Opérations par jour UTC, sur {{count}} jour",
+      "tableCaption_other": "Opérations par jour UTC, sur {{count}} jours",
+      "okOf": "Succès {{name}}",
+      "failedOf": "Échecs {{name}}"
     },
     "filter": {
       "status": "Statut",
@@ -8228,7 +8285,12 @@
     "activity": {
       "all": "Tout voir",
       "sub": "Les dernières entrées de la piste d’audit.",
-      "subOwn": "Vos propres dernières opérations."
+      "subOwn": "Vos propres dernières opérations.",
+      "today": "Aujourd’hui",
+      "yesterday": "Hier",
+      "folded_one": "{{count}} connexion de {{user}}",
+      "folded_other": "{{count}} connexions de {{user}}",
+      "span": "{{from}} à {{to}}"
     },
     "link": {
       "handled": "L’élément n°{{id}} n’attend plus d’action (état : {{status}}).",
@@ -8262,7 +8324,42 @@
       "inventory": "Inventaire complet",
       "interventions_one": "{{count}} intervention",
       "interventions_other": "{{count}} interventions",
-      "toCheck": "À contrôler"
+      "toCheck": "À contrôler",
+      "issuedSub_one": "émis sur {{count}} j",
+      "issuedSub_other": "émis sur {{count}} j",
+      "active_one": "{{count}} actif",
+      "active_other": "{{count}} actifs",
+      "critical_one": "{{count}} critique",
+      "critical_other": "{{count}} critiques",
+      "todo_one": "{{count}} à faire",
+      "todo_other": "{{count}} à faire",
+      "watch_one": "{{count}} à surveiller",
+      "watch_other": "{{count}} à surveiller",
+      "expiring": "Expirent sous 30 jours",
+      "alreadyExpired_one": "{{count}} déjà expiré",
+      "alreadyExpired_other": "{{count}} déjà expirés",
+      "sinceYesterday": "par rapport à hier · ACME, SCEP, EST, jour UTC",
+      "issuedAlt_one": "Émissions par jour sur {{count}} jour, {{today}} aujourd’hui",
+      "issuedAlt_other": "Émissions par jour sur {{count}} jours, {{today}} aujourd’hui",
+      "failuresAlt_one": "Échecs de protocole par jour sur {{count}} jour, {{today}} aujourd’hui",
+      "failuresAlt_other": "Échecs de protocole par jour sur {{count}} jours, {{today}} aujourd’hui",
+      "part": {
+        "critical": "Critiques",
+        "todo": "À faire",
+        "watch": "À surveiller"
+      },
+      "tip": {
+        "issued_one": "Émissions sur {{count}} jour",
+        "issued_other": "Émissions sur les {{count}} derniers jours",
+        "mean": "Moyenne par jour",
+        "peak": "Maximum ({{date}})",
+        "openInventory": "Ouvre l’inventaire",
+        "openQueue": "Ouvre la file, critiques d’abord",
+        "openList": "Ouvre la liste filtrée",
+        "failures_one": "Échecs de protocole, {{count}} jour",
+        "failures_other": "Échecs de protocole, {{count}} jours",
+        "openFailures": "Ouvre À traiter, filtré sur les échecs"
+      }
     },
     "cause": {
       "acme_order_failed": "Une commande ACME s’est terminée invalide dans les 7 derniers jours",
@@ -8294,7 +8391,10 @@
       "keys": "Graphique : les flèches gauche et droite le lisent jour par jour"
     },
     "clockToday": "aujourd’hui à {{time}}",
-    "allHiddenTitle": "Toutes les cartes sont masquées"
+    "allHiddenTitle": "Toutes les cartes sont masquées",
+    "viz": {
+      "downloadCsv": "Télécharger en CSV"
+    }
   },
   "sectioned": {
     "flagModified": "Modifié",
@@ -8367,7 +8467,9 @@
     "sectionsOf": "Sections : {{name}}",
     "settingsSections": "Sections des paramètres",
     "pageActions": "Autres actions de la page {{name}}",
-    "pageActionsTitle": "Actions de la page"
+    "pageActionsTitle": "Actions de la page",
+    "tableView": "Vue en tableau",
+    "chartView": "Vue graphique"
   },
   "protocols": {
     "copyValue": "Copier {{name}}",

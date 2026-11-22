@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dashboardService } from '../../services'
 import { monotonePath, niceMax, tickIndexes } from '../../lib/overviewChart'
-import { Icon } from '../atelier'
 import { OverviewCard, useCardData, useLang } from './shared'
+import { EmptyLine } from './viz'
 
 const TREND_PERIODS = [7, 15, 30]
 const SERIES = ['issued', 'revoked', 'expired']
@@ -142,7 +142,7 @@ export function TrendCard() {
     <OverviewCard id="trend" state={state} route="GET /api/v2/dashboard/certificate-trend"
       sub={t('overview.trend.sub', { count: days })}
       empty={state.status === 'ready' && quiet && (
-        <div className="queue-empty"><Icon name="check" /><h3>{t('overview.state.empty')}</h3><p>{t('overview.trend.quiet', { count: days })}</p></div>
+        <div className="panel-content"><EmptyLine text={t('overview.trend.quiet', { count: days })} /></div>
       )}
       tools={(
         <div className="segmented" role="group" aria-label={t('overview.trend.period')}>
@@ -161,7 +161,8 @@ export function TrendCard() {
           ))}
         </ul>
         <Chart trend={trend} labels={labels} lang={lang} alt={alt} hint={t('overview.trend.keys')} />
-        <table className="sr-only">
+        {/* A table ignores overflow: the hidden box is a div, or its cells widen the page on a phone */}
+        <div className="sr-only"><table>
           <caption>{alt}</caption>
           <thead>
             <tr><th scope="col">{t('overview.trend.day')}</th>{SERIES.map((s) => <th key={s} scope="col">{labels[s]}</th>)}</tr>
@@ -171,7 +172,7 @@ export function TrendCard() {
               <tr key={d.date}><th scope="row">{d.date}</th>{SERIES.map((s) => <td key={s}>{value(d[s])}</td>)}</tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </OverviewCard>
   )

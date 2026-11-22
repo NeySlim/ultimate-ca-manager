@@ -35,6 +35,20 @@ the server preference) reads as `atelier` in the stored mode; nothing is sent ba
 | `--good` `--goodbg` `--warn` `--warn-fill` `--warnbg` `--bad` `--badbg` | Status text, tinted backgrounds, and the amber fill |
 | `--grad-a` `--grad-b` `--glow` | Aurore gradient and halo (accent for Atelier) |
 
+### Chart tokens
+
+| Token | Role |
+|-------|------|
+| `--s1` `--s2` `--s3` | Series (ACME, SCEP, EST and any three-series chart), one value per mode |
+| `--s0` | Retreat grey (`--control`): past values, the manual series, a neutral gauge |
+| `--grid` | Chart grid line, solid on the card |
+| `--h0` … `--h4` | One-hue heat ramp derived from the accent, palest to strongest |
+
+`styles/__tests__/chartContrast.test.js` holds the series 3:1 on the card (the light teal at 2.8:1,
+its figures always written beside it), apart from each other for every colour vision
+(CIEDE2000 after simulation), and each gauge fill 3:1 on its track. The overview's widgets and the
+one tooltip are in `styles/dataviz.css` and `components/overview/viz.jsx`.
+
 `themeContrast.test.js` enforces WCAG on all 4 palettes: 4.5:1 for text pairs,
 3:1 for `--accent`, `--control` and `--warn-fill` on `--bg`. All text is 4.5:1, `--on-accent`
 included (on the accent, good and bad gradients, and on `--grad-a`/`--grad-b` for Aurore), as is

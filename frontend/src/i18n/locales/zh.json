@@ -8084,7 +8084,55 @@
       "sub_weak_signature_hash": "过时的签名",
       "sub_server_lifetime_over_398_days": "TLS 服务器证书",
       "sub_incomplete_chain": "缺少中间证书",
-      "sub_no_private_key": "外部 CSR 或导入"
+      "sub_no_private_key": "外部 CSR 或导入",
+      "subRules_one": "Over the {{count}} active certificate. A line opens the list of its gaps, filtered.",
+      "subRules_other": "Over the {{count}} active certificates. A line opens the list of its gaps, filtered.",
+      "conformPct": "{{pct}}% conform",
+      "pct": "{{pct}}%",
+      "conform": "Conform",
+      "inGap": "In gap",
+      "openGap": "Opens the list of the certificates in gap",
+      "tableRules_one": "Rules, over {{count}} active certificate",
+      "tableRules_other": "Rules, over {{count}} active certificates",
+      "ruleCol": "Rule",
+      "tableGrades_one": "Grades, over {{count}} certificate",
+      "tableGrades_other": "Grades, over {{count}} certificates",
+      "gradeCol": "Grade",
+      "certificates": "Certificates",
+      "algoCol": "Algorithm",
+      "ringAlt": "Average compliance score: {{score}} out of 100, grade {{grade}}",
+      "ringSub": "average score · grade {{grade}}",
+      "gradeAlt_one": "Grade {{grade}}: {{count}} certificate",
+      "gradeAlt_other": "Grade {{grade}}: {{count}} certificates",
+      "grade": "Grade {{grade}}",
+      "share": "Share",
+      "scoreBase_one": "Score over {{count}} certificate not revoked",
+      "scoreBase_other": "Score over {{count}} certificates not revoked",
+      "rule": {
+        "rsa_below_3072": "RSA keys of at least 3072 bits",
+        "server_lifetime_over_398_days": "Server validity of 398 days at most",
+        "weak_signature_hash": "Safe signature hash",
+        "incomplete_chain": "Complete chain",
+        "no_private_key": "Private key kept in UCM"
+      },
+      "gap": {
+        "rsa_below_3072_one": "{{count}} RSA key to replace",
+        "rsa_below_3072_other": "{{count}} RSA keys to replace",
+        "server_lifetime_over_398_days_one": "{{count}} TLS server certificate too long",
+        "server_lifetime_over_398_days_other": "{{count}} TLS server certificates too long",
+        "weak_signature_hash_one": "{{count}} SHA-1 or MD5 signature",
+        "weak_signature_hash_other": "{{count}} SHA-1 or MD5 signatures",
+        "incomplete_chain_one": "{{count}} chain without its intermediate",
+        "incomplete_chain_other": "{{count}} chains without their intermediate",
+        "no_private_key_one": "{{count}} external CSR or import",
+        "no_private_key_other": "{{count}} external CSRs or imports"
+      },
+      "state": {
+        "good": "conform",
+        "warn": "to watch",
+        "bad": "major gap",
+        "info": "information"
+      }
     },
     "health": {
       "acme": "ACME",
@@ -8156,7 +8204,16 @@
       "taskCount_other": "{{count}} 个任务",
       "lastRun": "上次运行 {{when}}",
       "runs_one": "<strong>{{count}}</strong> 次成功",
-      "runs_other": "<strong>{{count}}</strong> 次成功"
+      "runs_other": "<strong>{{count}}</strong> 次成功",
+      "rate": "{{rate}}%",
+      "mirrorAlt_one": "{{name}} over {{count}} day: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
+      "mirrorAlt_other": "{{name}} over {{count}} days: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
+      "ok": "Successes",
+      "failed": "Failures",
+      "tableCaption_one": "Operations per UTC day, over {{count}} day",
+      "tableCaption_other": "Operations per UTC day, over {{count}} days",
+      "okOf": "{{name}} successes",
+      "failedOf": "{{name}} failures"
     },
     "filter": {
       "status": "状态",
@@ -8228,7 +8285,12 @@
     "activity": {
       "all": "查看全部",
       "sub": "审计记录的最新条目。",
-      "subOwn": "您自己的最新操作。"
+      "subOwn": "您自己的最新操作。",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "folded_one": "{{count}} sign-in by {{user}}",
+      "folded_other": "{{count}} sign-ins by {{user}}",
+      "span": "{{from}} to {{to}}"
     },
     "link": {
       "handled": "项目 #{{id}} 不再需要处理（状态：{{status}}）。",
@@ -8262,7 +8324,42 @@
       "inventory": "完整清单",
       "interventions_one": "{{count}} 项待处理",
       "interventions_other": "{{count}} 项待处理",
-      "toCheck": "待检查"
+      "toCheck": "待检查",
+      "issuedSub_one": "issued over {{count}} day",
+      "issuedSub_other": "issued over {{count}} days",
+      "active_one": "{{count}} active",
+      "active_other": "{{count}} active",
+      "critical_one": "{{count}} critical",
+      "critical_other": "{{count}} critical",
+      "todo_one": "{{count}} to do",
+      "todo_other": "{{count}} to do",
+      "watch_one": "{{count}} to watch",
+      "watch_other": "{{count}} to watch",
+      "expiring": "Expiring within 30 days",
+      "alreadyExpired_one": "{{count}} already expired",
+      "alreadyExpired_other": "{{count}} already expired",
+      "sinceYesterday": "vs yesterday · ACME, SCEP, EST, UTC day",
+      "issuedAlt_one": "Issuances per day over {{count}} day, {{today}} today",
+      "issuedAlt_other": "Issuances per day over {{count}} days, {{today}} today",
+      "failuresAlt_one": "Protocol failures per day over {{count}} day, {{today}} today",
+      "failuresAlt_other": "Protocol failures per day over {{count}} days, {{today}} today",
+      "part": {
+        "critical": "Critical",
+        "todo": "To do",
+        "watch": "To watch"
+      },
+      "tip": {
+        "issued_one": "Issuances, last {{count}} day",
+        "issued_other": "Issuances, last {{count}} days",
+        "mean": "Daily average",
+        "peak": "Peak ({{date}})",
+        "openInventory": "Opens the inventory",
+        "openQueue": "Opens the queue, critical first",
+        "openList": "Opens the list, filtered",
+        "failures_one": "Protocol failures, {{count}} day",
+        "failures_other": "Protocol failures, {{count}} days",
+        "openFailures": "Opens To handle, filtered on the failures"
+      }
     },
     "cause": {
       "acme_order_failed": "过去 7 天内有 ACME 订单以无效结束",
@@ -8294,7 +8391,10 @@
       "keys": "图表：左右方向键可逐日读取"
     },
     "clockToday": "今天 {{time}}",
-    "allHiddenTitle": "所有卡片均已隐藏"
+    "allHiddenTitle": "所有卡片均已隐藏",
+    "viz": {
+      "downloadCsv": "Download as CSV"
+    }
   },
   "sectioned": {
     "flagModified": "已修改",
@@ -8367,7 +8467,9 @@
     "sectionsOf": "分区：{{name}}",
     "settingsSections": "设置分区",
     "pageActions": "{{name}} 页面的其他操作",
-    "pageActionsTitle": "页面操作"
+    "pageActionsTitle": "页面操作",
+    "tableView": "Table view",
+    "chartView": "Chart view"
   },
   "protocols": {
     "copyValue": "复制{{name}}",

@@ -8,6 +8,7 @@ import { Bar, Card, Icon, LoadCause, LoadError, skWidth } from '../atelier'
 import { ConnectionState, useWebSocket } from '../../hooks/useWebSocket'
 import { usePermission } from '../../hooks/usePermission'
 import { REFRESH_EVENT } from '../../lib/overviewRefresh'
+import { ChartTable, EmptyLine } from './viz'
 
 /**
  * What the page gives its cards: `share(key, run)` (one request for two readers), `hide(id)`,
@@ -103,7 +104,8 @@ export function useCardData(fetcher, watch = [], shareKey = null) {
  */
 export async function settle(parts, usable) {
   const names = Object.keys(parts)
-  const results = await Promise.allSettled(names.map((name) => parts[name]()))
+  // A part that throws before its promise is one failed part, not the whole card
+  const results = await Promise.allSettled(names.map((name) => Promise.resolve().then(() => parts[name]())))
   const got = {}
   const missing = []
   const errors = []
@@ -151,13 +153,15 @@ export function CardEmpty({ id, icon = 'check', title, text, children }) {
 
 /**
  * The mockup's card() for one overview card: `state` from useCardData; `route` the request the
- * card reads, named by its load error; `empty` (a node, or true for the common block) replaces
- * the body; `missing` lists the parts of the card that did not load.
+ * card reads, named by its load error; `empty` (a node, or true for the common one-line state)
+ * replaces the body; `missing` lists the parts of the card that did not load; `table` (a function
+ * giving [{caption, columns, rows}]) adds the table view of its figures to the card's menu.
  */
-export function OverviewCard({ id, count, sub, tools, state, route, empty, missing, children }) {
+export function OverviewCard({ id, count, sub, tools, state, route, empty, missing, table, children }) {
   const { t } = useTranslation()
   const page = useContext(OverviewContext)
   const { hasPermission } = usePermission()
+  const [asTable, setAsTable] = useState(false)
   const title = t(`overview.cards.${id}`)
   if (state.status === 'loading') return <CardSkeleton id={id} title={title} />
   const ready = state.status === 'ready'
@@ -174,9 +178,16 @@ export function OverviewCard({ id, count, sub, tools, state, route, empty, missi
       </div>
     )
   } else if (empty) {
-    body = empty === true ? <CardEmpty title={t('overview.state.empty')} /> : empty
+    body = empty === true ? <div className="panel-content"><EmptyLine text={t('overview.state.empty')} /></div> : empty
+  } else if (asTable && table) {
+    body = <ChartTable tables={table()} filename={`ucm-${id}`} />
   } else {
     body = children
+  }
+  const tableable = ready && !empty && Boolean(table)
+  const toggle = () => {
+    setAsTable((v) => !v)
+    requestAnimationFrame(() => document.getElementById(`card-${id}-title`)?.focus())
   }
   const note = ready && missing?.length > 0 && (
     <div className="panel-content">
@@ -190,7 +201,8 @@ export function OverviewCard({ id, count, sub, tools, state, route, empty, missi
     <Card id={id} title={title} count={ready ? count : undefined} sub={ready && !empty ? sub : undefined}
       tools={ready ? tools : undefined}
       onHide={page?.hide ? () => page.hide(id) : undefined}
-      onCustomize={page?.customize ? () => page.customize(id) : undefined}>
+      onCustomize={page?.customize ? () => page.customize(id) : undefined}
+      onTable={tableable ? toggle : undefined} tableShown={tableable && asTable}>
       {note}
       {body}
     </Card>

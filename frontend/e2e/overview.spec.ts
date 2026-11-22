@@ -81,17 +81,20 @@ test('the cards follow the mockup widths: the queue on its own line, then pairs 
   })
 })
 
-test('the compliance figures keep their own height beside the algorithms', async ({ page, api }) => {
+test('the compliance gauges line their tracks up, one per rule', async ({ page, api }) => {
   const ca = await createCA(api)
   await issueCert(api, ca.id)
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto('/')
   const card = page.getByRole('region', { name: 'Compliance' })
-  await expect(card.locator('.sk-body')).toHaveCount(0)
-  await expect(card.getByText('Key algorithms')).toBeVisible()
-  const heights = await card.locator('.tiles > .tile:not(.algo)').evaluateAll(tiles => tiles.map(t => t.getBoundingClientRect().height))
-  expect(heights).toHaveLength(5)
-  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(1)
+  // The region may not be drawn yet when the skeleton check passes: wait for the gauges themselves
+  await expect(card.locator('.meter .track')).toHaveCount(5)
+  const tracks = await card.locator('.meter .track').evaluateAll(els => els.map(t => { const r = t.getBoundingClientRect(); return [r.left, r.width] }))
+  expect(tracks).toHaveLength(5)
+  for (const [left, width] of tracks) {
+    expect(Math.abs(left - tracks[0][0])).toBeLessThanOrEqual(1)
+    expect(Math.abs(width - tracks[0][1])).toBeLessThanOrEqual(1)
+  }
 })
 
 test('a card moves in the Cards dialog, keeps the focus, and the order survives a reload', async ({ page, api }) => {
@@ -136,7 +139,7 @@ test('a head preset shows its cards and reads as pressed', async ({ page, api })
 })
 
 // Aurore set apart from Atelier by its accents only (e2e/theme-geometry.spec.ts): the overview's boxes do not move
-const OVERVIEW_BOXES = ['.masthead', '.metric', '.dash-card', '.panel-heading', '.tile', '.badge', '.chip', '.counter', '.queue-row', '.health-row']
+const OVERVIEW_BOXES = ['.masthead', '.metric', '.dash-card', '.panel-heading', '.meter', '.ring-wrap', '.badge', '.chip', '.counter', '.queue-row', '.health-row', '.mirror']
 
 test('a change of theme moves nothing on the overview', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
@@ -155,7 +158,7 @@ test('a change of theme moves nothing on the overview', async ({ page, api }) =>
       measured[`${family}-${mode}`] = await boxes(page, OVERVIEW_BOXES)
     }
     const reference = measured['atelier-dark']
-    for (const s of ['.metric', '.dash-card', '.tile', '.badge', '.counter']) expect(reference[s].length, s).toBeGreaterThan(0)
+    for (const s of ['.metric', '.dash-card', '.meter', '.mirror', '.counter']) expect(reference[s].length, s).toBeGreaterThan(0)
     for (const [key, got] of Object.entries(measured)) expect(got, key).toEqual(reference)
   })
 })

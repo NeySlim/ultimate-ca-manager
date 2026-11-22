@@ -11,10 +11,11 @@ vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslatio
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(), getCertStats: vi.fn(),
   getCas: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), getStats: vi.fn(), getTrend: vi.fn(), getStatus: vi.fn(),
+  getScores: vi.fn(),
 }))
 vi.mock('../../services', () => ({
   overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
-  certificatesService: { getStats: api.getCertStats },
+  certificatesService: { getStats: api.getCertStats, getComplianceStats: api.getScores },
   casService: { getAll: api.getCas },
   dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity, getStats: api.getStats,
     getCertificateTrend: api.getTrend, getSystemStatus: api.getStatus },
@@ -47,6 +48,7 @@ beforeEach(() => {
   api.getQueue.mockResolvedValue({ data: { items: [{ kind: 'manual_renewal_due', tier: 'warning', id: 1, label: 'cert-one', href_hint: '/certificates/1' }], counts: { manual_renewal_due: 1 }, total: 1 } })
   api.getHealth.mockResolvedValue({ data: { days: 7, protocols: { acme: { periods: [{ date: 'd', ok: 1, failed: 2 }], last_status: 'ok' } } } })
   api.getCompliance.mockResolvedValue({ data: { total: 1, counters: {}, by_key_algorithm: [] } })
+  api.getScores.mockResolvedValue({ data: { average_score: 90, distribution: { A: 1 }, total: 1 } })
   api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
   api.getCertStats.mockResolvedValue({ data: { total: 4, expiring: 1, expired: 1 } })
   api.getCas.mockResolvedValue({ data: [{ id: 1, refid: 'r', descr: 'Root' }], meta: { total: 1 } })
@@ -72,6 +74,9 @@ describe('requests of the overview', () => {
     expect(screen.getByText('cert-one')).toBeTruthy()
     expect(value('certificates')).toBe('4')
     expect(screen.getByText('overview.horizon.state.valid').parentElement.querySelector('strong').textContent).toBe('2')
+    // The strip and the hierarchy read one issuance window, the strip and the health card one health window
+    expect(api.getIssuance).toHaveBeenCalledWith(30)
+    expect(api.getHealth).toHaveBeenCalledWith(30)
   })
 
   it('the refresh button asks each card route once more, not twice', async () => {

@@ -40,3 +40,7 @@ export function fullTime(value, locale) {
   const d = valid(value)
   return d ? `${eventDate(d, locale)}, ${eventTime(d, locale)}` : ''
 }
+
+const CLOCK = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }
+/** Hours and minutes only (« 18:37 »), for a row under its day. */
+export function eventClock(value, locale) { const d = valid(value); return d ? fmt(locale, CLOCK).format(d) : '' }
