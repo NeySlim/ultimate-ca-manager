@@ -41,3 +41,16 @@ export function focusWork(index) {
   const row = list[Math.min(Math.max(index, 0), list.length - 1)]
   ;(row?.querySelector('.work-action .btn:not(:disabled)') || document.getElementById('work-history-toggle') || document.getElementById('main-title'))?.focus()
 }
+
+const COLON_HEX = /^[0-9A-F]{2}(:[0-9A-F]{2})+$/i
+
+/** A colon-separated digest in equal lines (8 bytes a line when that divides it, else 10); any other text whole. */
+export function hexLines(text) {
+  const value = String(text ?? '')
+  if (!COLON_HEX.test(value)) return value
+  const bytes = value.split(':')
+  const per = bytes.length <= 10 ? bytes.length : bytes.length % 8 === 0 ? 8 : 10
+  const lines = []
+  for (let i = 0; i < bytes.length; i += per) lines.push(bytes.slice(i, i + per).join(':') + (i + per < bytes.length ? ':' : ''))
+  return lines.join('\n')
+}

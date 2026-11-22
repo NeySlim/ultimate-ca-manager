@@ -22,6 +22,7 @@
     "filter": "筛选",
     "copy": "复制",
     "copied": "已复制！",
+    "helpAbout": "Help: {{name}}",
     "clickToCopy": "点击复制",
     "yes": "是",
     "no": "否",

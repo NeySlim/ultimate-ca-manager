@@ -83,6 +83,12 @@ function glassSurfaces(mode) {
 const glassOver = (field, value, t) => field.map((g) => over(rgba(value, t), g))
 const worst = (fg, colours) => Math.min(...colours.map((c) => contrast(fg, hex(c))))
 
+// color-mix(in srgb, a p, b): each channel weighted in sRGB (a transparent veil is read over the panel)
+function mixHex(a, b, p) {
+  const [x, y] = [hexToRgb(a), hexToRgb(b)]
+  return `#${x.map((v, i) => Math.round(v * p + y[i] * (1 - p)).toString(16).padStart(2, '0')).join('')}`
+}
+
 function saturation(hex) {
   const [r, g, b] = hexToRgb(hex).map((v) => v / 255)
   const max = Math.max(r, g, b)
@@ -115,6 +121,17 @@ describe('contrast of the palettes', () => {
               expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(min)
             })
           }
+          it('writes a technical value and a row\'s action 7:1, muted text 4.5:1, on their veil of the accent (KV)', () => {
+            const veils = ['.code-value', '.btn-sm'].flatMap((cls) => valuesOf(auroreRules(ADJUST, mode), new RegExp(`\\${cls}$`), 'background'))
+            expect(veils).toHaveLength(2)
+            for (const veil of veils) {
+              const m = veil.match(/^color-mix\(in srgb,\s*var\(--accent\) ([0-9.]+)%,\s*(?:var\(--panel\)|transparent)\)$/)
+              expect(m, veil).not.toBeNull()
+              const ground = mixHex(t.accent, t.panel, Number(m[1]) / 100)
+              expect(contrast(t.text, ground)).toBeGreaterThanOrEqual(7)
+              expect(contrast(t.muted, ground)).toBeGreaterThanOrEqual(4.5)
+            }
+          })
           // read on first use: a spot the field cannot read fails its tests, not the file
           let fieldCache
           const lazy = { get field() { return (fieldCache ??= glowField(t, mode)) } }

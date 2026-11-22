@@ -22,6 +22,7 @@
     "filter": "Filtrar",
     "copy": "Copiar",
     "copied": "¡Copiado!",
+    "helpAbout": "Help: {{name}}",
     "clickToCopy": "Haz clic para copiar",
     "yes": "Sí",
     "no": "No",

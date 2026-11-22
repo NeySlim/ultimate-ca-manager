@@ -136,7 +136,6 @@
 :root .atl tbody tr.opens{cursor:pointer}
 /* The account menu opens on the lock screen's account card, the known facts under it in two columns. */
 :root .atl .user-menu .user-id{gap:10px}
-:root .atl .user-menu .user-facts{grid-template-columns:auto minmax(0,1fr);gap:6px 14px;padding:0 2px}
 
 /* From 1001 px the authorities and their side panel scroll apart, as the certificates and their inspector:
    the view keeps the window's height, the hierarchy (or list) and the panel each scroll inside it. */
@@ -215,3 +214,96 @@
 :root[data-theme|=aurore][data-mode="light"][data-theme] .atl tbody tr:not(.opened):not(.checked):hover,:root[data-theme|=aurore][data-mode="light"][data-theme] .atl .queue-row:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--grad-a) 12%,transparent),transparent 70%)}
 :root[data-theme|=aurore][data-mode="light"][data-theme] .atl :is(.chip:not(.filter-chip),.badge,.counter,.queue-kind){background:color-mix(in srgb,currentColor 14%,transparent)}
 :root[data-theme|=aurore][data-mode="light"][data-theme] .atl .views .counter{background:color-mix(in srgb,currentColor 14%,var(--bg))}
+
+/* Blocks of terms and values (KV), a deviation from the mockup's .props (REPRISE-LITTERALE.md): the value in 13 px weight 500,
+   the term in 12 px, a section title in 13 px weight 600; a rule between rows; the term column as wide as its longest term,
+   44 % at most (42 % in a CA's side panel, shared by its sections); a word breaks only where nothing else can. */
+:root .atl :is(.props,.kv){--kv-rule:color-mix(in srgb,var(--line) 70%,var(--panel))}
+:root[data-theme|=aurore] .atl :is(.props,.kv){--kv-rule:color-mix(in srgb,var(--grad-a) 24%,var(--panel))}
+:root .atl .section-title{font-size:13px;font-weight:600;color:var(--text)}
+:root .atl .props,:root .atl :is(.review-summary,.event-detail) .props{grid-template-columns:fit-content(44%) minmax(0,1fr);gap:0;line-height:1.45}
+:root .atl .ca-side .props{grid-template-columns:42% minmax(0,1fr)}
+:root .atl .props>:is(dt,dd){padding:5px 0;border-top:1px solid var(--kv-rule)}
+:root .atl .props>dt{padding-right:14px;overflow-wrap:break-word}
+:root .atl .props>dt:first-of-type,:root .atl .props>dt:first-of-type+dd{border-top:0;padding-top:0}
+:root .atl .props>dd{font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:break-word;text-wrap:pretty;font-variant-numeric:tabular-nums}
+:root .atl .props>dd :is(.muted,p,small,.small){font-weight:400}
+:root .atl .props>dd.mono{font-size:12px;font-weight:400}
+:root .atl .props>dd p{margin-top:4px;line-height:1.5}
+/* An action written in the value takes its own line; a term's second value stays in the value column, under the first. */
+:root .atl .props>dd .text-link[data-write]{display:block;width:fit-content;margin-top:2px;text-align:left}
+:root .atl .props>dd+dd{grid-column:2;border-top:0;padding-top:0;color:var(--muted);font-size:12px;font-weight:400}
+/* The issue form's hint lists each term over its value. */
+:root .atl .field-hint .props{grid-template-columns:minmax(0,1fr)}
+:root .atl .field-hint .props>dt{padding-right:0}
+:root .atl .field-hint .props>dd{border-top:0;padding-top:0;margin-bottom:0}
+/* A narrow panel: a technical value or a value with its help goes under its term, on the whole width. */
+@container (max-width:380px){
+  :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>p)){grid-column:1/-1;padding-bottom:0}
+  :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>p))+dd{grid-column:1/-1;border-top:0;padding-top:2px}
+}
+/* The panels a block of terms sizes itself on. */
+:root .atl :is(.ca-side,.user-id,.float-body,.modal-body){container-type:inline-size}
+
+/* Facts (Detail.jsx): a row per fact, its term, its value (or the absence), its action apart, its help folded; rows on a
+   subgrid so a group's sections share the term column; long values under their term below 380 px, a list below 260 px. */
+:root .atl .kv,:root .atl .kvg{display:grid;grid-template-columns:fit-content(42%) minmax(0,1fr) auto;column-gap:14px}
+:root .atl .kv{margin:0;font-size:12px;line-height:1.45}
+:root .atl .kvg>*,:root .atl .kvg>section>*{grid-column:1/-1;min-width:0}
+:root .atl .kvg>section{display:grid;grid-template-columns:subgrid}
+:root .atl .kvg .kv{grid-template-columns:subgrid}
+:root .atl .kv>.row{display:grid;grid-template-columns:subgrid;grid-column:1/-1;align-items:baseline;padding:5px 0;border-top:1px solid var(--kv-rule)}
+:root .atl .kv>.row:first-child{border-top:0;padding-top:1px}
+:root .atl .kv>.row:last-child{padding-bottom:1px}
+:root .atl .kv>.row>dt{grid-column:1;min-width:0;color:var(--muted);overflow-wrap:break-word}
+:root .atl .kv>.row>dd{margin:0;min-width:0}
+:root .atl .kv>.row>:is(dd.v,dd.absent){grid-column:2/-1}
+:root .atl .kv>.row>dd.v{font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:break-word;text-wrap:pretty;font-variant-numeric:tabular-nums}
+:root .atl .kv>.row>dd.v :is(.muted,small,p){font-weight:400}
+:root .atl .kv>.row>dd.absent{color:var(--muted)}
+:root .atl .kv>.row>dd.v>.sub{display:block;margin-top:1px;color:var(--muted);font-size:12px;font-weight:400}
+:root .atl .kv>.row:has(>dd.act)>:is(dd.v,dd.absent){grid-column:2}
+:root .atl .kv>.row>dd.act{grid-column:3;justify-self:end;display:flex;flex-wrap:wrap;gap:6px}
+:root .atl .kv>.row>dd.help{grid-column:1/-1;margin-top:6px;max-width:62ch;color:var(--muted);font-size:12px;line-height:1.55}
+/* Compact in the dock under the list, short of height: 3 px above and below a row. */
+:root .atl #app:not(.dock-right) .inspector .kv>.row:not(:first-child){padding-top:3px}
+:root .atl #app:not(.dock-right) .inspector .kv>.row:not(:last-child){padding-bottom:3px}
+:root .atl .kv>.row.wide>dt{grid-column:1/3}
+:root .atl .kv>.row.wide>:is(dd.v,dd.absent){grid-column:1/-1;margin-top:4px}
+@container (max-width:380px){
+  :root .atl .kv>.row.long>dt{grid-column:1/-1}
+  :root .atl .kv>.row.long>:is(dd.v,dd.absent){grid-column:1/-1;margin-top:4px}
+  :root .atl .kv>.row>dd.act{grid-column:2/-1;justify-self:start;margin-top:5px}
+  :root .atl .kv>.row:has(>dd.act)>:is(dd.v,dd.absent){grid-column:2/-1}
+  :root .atl .kv>.row.long:has(>dd.act)>:is(dd.v,dd.absent){grid-column:1/-1}
+}
+@container (max-width:260px){
+  :root .atl .kv{display:block}
+  :root .atl .kv>.row{display:flex;flex-wrap:wrap;justify-content:space-between;column-gap:14px;row-gap:2px}
+  :root .atl .kv>.row>dd.v{text-wrap:balance}
+  :root .atl .kv>.row>dd.act{margin-top:0}
+  :root .atl .kv>.row>dd.help{flex-basis:100%}
+}
+/* The help button after a term: 24 px, the accent on the selection while its help is open. */
+:root .atl .kv .tip{display:inline-grid;place-items:center;width:24px;height:24px;margin:-5px 0 -5px 2px;border-radius:50%;color:var(--muted);vertical-align:middle}
+:root .atl .kv .tip .icon{width:14px;height:14px}
+:root .atl .kv .tip[aria-expanded=true]{color:var(--accent);background:var(--selected)}
+/* A row's action: a small outlined button, 24 px high. */
+:root .atl .btn-sm{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:2px 9px;border:1px solid var(--control);border-radius:4px;font-size:12px;font-weight:500;line-height:1.3;color:var(--text);text-align:left}
+:root .atl .btn-sm:hover:not(:disabled){background:var(--hover)}
+:root .atl .btn-sm:disabled{opacity:.6;cursor:default}
+/* A technical value: mono on the raised ground, its copy button; a digest in equal lines, a URL cut in its middle. */
+:root .atl .code-value{display:inline-flex;max-width:100%;align-items:flex-start;gap:4px;padding:3px 2px 3px 8px;background:var(--raised);border-radius:4px;font-family:Fira,monospace;font-size:12px;font-weight:400;line-height:1.5;vertical-align:top}
+:root .atl .code-value>.val{flex:1;min-width:0;overflow-wrap:break-word}
+:root .atl .code-value>.val>.line{display:block}
+:root .atl .code-value>.val.mid{display:flex;white-space:nowrap;cursor:pointer}
+:root .atl .code-value>.val.mid>.head{min-width:3ch;overflow:hidden;text-overflow:ellipsis}
+:root .atl .code-value>.val.mid>.tail{flex-shrink:0}
+:root .atl .code-value>.val.mid.open{display:block;white-space:normal}
+:root .atl .code-value>.cp{display:grid;place-items:center;width:24px;height:24px;margin:-2px 0;border-radius:4px;color:var(--muted);flex-shrink:0}
+:root .atl .code-value>.cp:hover{background:var(--hover);color:var(--text)}
+:root .atl .code-value>.cp .icon{width:14px;height:14px}
+/* Aurore: the chip and the action button take a veil and an edge of the accent, rounder. */
+:root[data-theme|=aurore] .atl .code-value{background:color-mix(in srgb,var(--accent) 9%,var(--panel));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent);border-radius:6px}
+:root[data-theme|=aurore] .atl .btn-sm{border-radius:6px;border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+:root[data-theme|=aurore] .atl .btn-sm:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 18%,transparent)}

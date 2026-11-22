@@ -1,10 +1,17 @@
 /**
  * Pieces of the mockup's detail panels: section() (a titled block), props() (terms and values),
  * rows() and recordRow() (a list of records, or a sentence when empty), and the one-tab panel of
- * simplePage() (its properties, then its summary).
+ * simplePage() (its properties, then its summary). Facts are the typed rows of terms and values
+ * (KV-2): a fact, a state, an absence, a copyable digest or URL, an action apart, a folded help.
  */
-import { Fragment } from 'react'
+import { Fragment, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNotification } from '../../contexts/NotificationContext'
+import { useClipboard } from '../../hooks/useClipboard'
+import { Icon } from './Icon'
+import { Pill } from './Pill'
+import { hexLines } from './helpers'
+import { Breakable } from './Breakable'
 
 export function Section({ title, children }) {
   return <section><h3 className="section-title">{title}</h3>{children}</section>
@@ -13,6 +20,114 @@ export function Section({ title, children }) {
 /** items: [[term, value]]; a falsy item is skipped. */
 export function Props({ items }) {
   return <dl className="props">{items.filter(Boolean).map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}</dl>
+}
+
+// Outside a NotificationProvider (a test, a page drawn alone) the copy still happens, its button says so
+function useNotificationIfAny() {
+  try {
+    return useNotification()
+  } catch {
+    return null
+  }
+}
+
+// The last characters of a URL stay in view when it is cut in its middle
+const URL_TAIL = 14
+/**
+ * A technical value in mono and its copy button. kind 'hex': a digest in equal lines, never shortened;
+ * kind 'url': one line cut in its middle, whole in its title and on a click. The copy is always the whole value.
+ */
+export function CodeValue({ value, kind, label }) {
+  const { t } = useTranslation()
+  const { copy, copied } = useClipboard()
+  const notify = useNotificationIfAny()
+  const [open, setOpen] = useState(false)
+  if (value === null || value === undefined || value === '') return null
+  const text = String(value)
+  const cut = kind === 'url' && text.length > URL_TAIL + 6
+  const toggle = () => setOpen(!open)
+  const shown = kind === 'hex'
+    ? <span className="val hex">{hexLines(text).split('\n').map((line, i) => <span key={i} className="line"><Breakable text={line} /></span>)}</span>
+    : cut
+      ? (
+        <span className={open ? 'val mid open' : 'val mid'} role="button" tabIndex={0} aria-expanded={open} title={text}
+          onClick={toggle} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}>
+          <span className="head"><Breakable text={text.slice(0, -URL_TAIL)} /></span><span className="tail"><Breakable text={text.slice(-URL_TAIL)} /></span>
+        </span>
+      )
+      : <span className="val"><Breakable text={text} /></span>
+  return (
+    <span className={kind ? `code-value ${kind}` : 'code-value'}>
+      {shown}
+      <button type="button" className="cp" aria-label={t('protocols.copyValue', { name: label })} title={t('protocols.copyValue', { name: label })}
+        onClick={async () => { if (await copy(text)) notify?.showSuccess(t('common.copied')) }}>
+        <Icon name={copied ? 'check' : 'copy'} />
+      </button>
+    </span>
+  )
+}
+
+/** The action of a row, apart from its value: a small outlined button, a write for the central write guard. */
+export function RowAction({ children, ...rest }) {
+  return <button type="button" className="btn-sm" data-write="" {...rest}>{children}</button>
+}
+
+/**
+ * One row of Facts: dt, then the value (dd.v, or dd.absent for a value that is missing), the action
+ * (dd.act) and the help (dd.help, folded behind the button after the term). `product` marks a row
+ * the mockup does not have (data-product, declared to the comparator).
+ */
+export function FactRow({ label, value, state, absent, kind, sub, action, help, long = false, wide = false, product = false, copyLabel, className, ...rest }) {
+  const { t } = useTranslation()
+  const helpId = `help${useId().replace(/:/g, '')}`
+  const [helpOpen, setHelpOpen] = useState(false)
+  const mark = product ? { 'data-product': '' } : {}
+  const name = copyLabel || (typeof label === 'string' ? label : '')
+  const missing = absent !== undefined && absent !== null && absent !== false
+  const shown = state ? <Pill tone={state[0]} label={state[1]} icon={state[2]} />
+    : kind ? <CodeValue value={value} kind={kind} label={name} />
+      : value
+  const rowClass = ['row', long && 'long', wide && 'wide', className].filter(Boolean).join(' ')
+  return (
+    <div className={rowClass} {...rest}>
+      <dt {...mark}>
+        {label}
+        {help && (
+          <button type="button" className="tip" aria-expanded={helpOpen} aria-controls={helpId}
+            aria-label={t('common.helpAbout', { name })} title={t('common.helpAbout', { name })} onClick={() => setHelpOpen(!helpOpen)}>
+            <Icon name="help" />
+          </button>
+        )}
+      </dt>
+      {missing
+        ? <dd className="absent" {...mark}>{absent}</dd>
+        : <dd className="v" {...mark}>{shown}{sub && <span className="sub">{sub}</span>}</dd>}
+      {action && <dd className="act">{action}</dd>}
+      {help && <dd className="help" id={helpId} hidden={!helpOpen}>{help}</dd>}
+    </div>
+  )
+}
+
+/**
+ * items: [term, value] pairs or rows ({ label, value, state: [tone, text], absent, kind: 'hex' | 'url',
+ * sub, action, help, long, wide, product }); a falsy item is skipped. Further rows may come as children.
+ */
+export function Facts({ items = [], children, className, ...rest }) {
+  return (
+    <dl className={className ? `kv ${className}` : 'kv'} {...rest}>
+      {items.filter(Boolean).map((item, i) => {
+        const row = Array.isArray(item) ? { label: item[0], value: item[1] } : item
+        const { key, ...props } = row
+        return <FactRow key={key ?? (typeof row.label === 'string' ? row.label : i)} {...props} />
+      })}
+      {children}
+    </dl>
+  )
+}
+
+/** Sections of one panel whose Facts share one label column, so their values line up from one section to the next. */
+export function FactsGroup({ children, className }) {
+  return <div className={className ? `kvg ${className}` : 'kvg'}>{children}</div>
 }
 
 /** The records, or `empty` in a muted sentence when there are none. */
