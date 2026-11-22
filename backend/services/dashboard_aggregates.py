@@ -164,6 +164,16 @@ def _within_half_validity(next_update, now, dialect):
     return next_update < literal(now, DateTime) + func.make_interval(0, 0, 0, 0, days * 12)
 
 
+def latest_full_crl():
+    """``(ca_id, next_update)`` of the newest full CRL by number, uploads included, as the CDP serves it."""
+    full_crl = or_(CRLMetadata.is_delta.is_(False), CRLMetadata.is_delta.is_(None))
+    newest = (select(CRLMetadata.ca_id.label('ca_id'), func.max(CRLMetadata.crl_number).label('number'))
+              .where(full_crl).group_by(CRLMetadata.ca_id).subquery())
+    return (select(CRLMetadata.ca_id.label('ca_id'), CRLMetadata.next_update.label('next_update'))
+            .join(newest, and_(newest.c.ca_id == CRLMetadata.ca_id, newest.c.number == CRLMetadata.crl_number))
+            .subquery())
+
+
 def _queue_union(now, dialect, kinds=QUEUE_KINDS):
     """One SELECT per kind, all shaped (kind, rank, id, label, due_at); rank 0 is critical."""
     soon = now + CRITICAL_WITHIN
@@ -207,13 +217,7 @@ def _queue_union(now, dialect, kinds=QUEUE_KINDS):
         due(KeyRecoveryRequest.requested_at).label('due_at'),
     ).where(KeyRecoveryRequest.status == STATUS_PENDING))
 
-    # nextUpdate of the newest full CRL by number, uploads included, as the CDP serves it
-    full_crl = or_(CRLMetadata.is_delta.is_(False), CRLMetadata.is_delta.is_(None))
-    newest = (select(CRLMetadata.ca_id.label('ca_id'), func.max(CRLMetadata.crl_number).label('number'))
-              .where(full_crl).group_by(CRLMetadata.ca_id).subquery())
-    latest = (select(CRLMetadata.ca_id.label('ca_id'), CRLMetadata.next_update.label('next_update'))
-              .join(newest, and_(newest.c.ca_id == CRLMetadata.ca_id, newest.c.number == CRLMetadata.crl_number))
-              .subquery())
+    latest = latest_full_crl()
     # Critical once stale or missing; a warning within min(24 h, half the CA's CRL validity)
     stale = or_(latest.c.next_update.is_(None), latest.c.next_update < now)
     parts.append(select(
@@ -468,6 +472,43 @@ def work_queue(session, limit, now=None, kinds=None, permissions=None):
     } for r in rows]
     return {'items': items, 'counts': counts, 'total': sum(counts.values()),
             'filter_hints': {kind: {'renewal': kind} for kind in RENEWAL_KINDS}}
+
+
+# ------------------------------------------------------------ revocation
+
+REVOCATION_STATES = ('missing', 'stale', 'current', 'no_cdp')
+
+
+def revocation_coverage(session, limit, now=None):
+    """The active CAs by what they publish: a current CRL, a stale or missing one (the queue's
+    ``crl_due`` critical and ``crl_missing``), or no distribution point; then the CAs with a
+    distribution point, missing first, stale by oldest ``next_update``, then the next due."""
+    now = now or utc_now()
+    latest = latest_full_crl()
+    cdp = CA.cdp_enabled.is_(True)
+    missing = and_(cdp, latest.c.next_update.is_(None))
+    stale = and_(cdp, latest.c.next_update < now)
+    current = and_(cdp, latest.c.next_update >= now)
+    count_if = lambda cond: func.coalesce(func.sum(case((cond, 1), else_=0)), 0)  # noqa: E731
+    base = lambda *cols: (select(*cols).select_from(CA)  # noqa: E731
+                          .outerjoin(latest, latest.c.ca_id == CA.id).where(_active_ca(now)))
+    row = session.execute(base(func.count(), count_if(current), count_if(stale), count_if(missing),
+                               count_if(~cdp), count_if(CA.ocsp_enabled.is_(True)))).one()
+    total, n_current, n_stale, n_missing, n_no_cdp, n_ocsp = (int(n) for n in row)
+    rank = case((latest.c.next_update.is_(None), 0), (latest.c.next_update < now, 1), else_=2)
+    has_key = or_(and_(CA.prv.isnot(None), CA.prv != ''), CA.hsm_key_id.isnot(None))
+    items = session.execute(base(CA.id, CA.descr, latest.c.next_update, CA.ocsp_enabled, CA.offline, has_key, rank)
+                            .where(cdp).order_by(rank, latest.c.next_update, CA.id).limit(limit)).all()
+    return {
+        'total': total, 'current': n_current, 'stale': n_stale, 'missing': n_missing, 'no_cdp': n_no_cdp,
+        'ocsp_enabled': n_ocsp, 'to_publish': n_stale + n_missing,
+        'items': [{
+            'ca_id': ca_id, 'name': name, 'state': REVOCATION_STATES[r], 'next_update': utc_isoformat(nu),
+            'ocsp_enabled': bool(ocsp), 'offline': bool(offline),
+            # The CRL needs the CA's key, and an offline CA publishes nothing until it is back
+            'can_publish': bool(key) and not offline, 'href_hint': _HREF['crl_due'].format(id=ca_id),
+        } for ca_id, name, nu, ocsp, offline, key, r in items],
+    }
 
 
 # ----------------------------------------------------------------- health
@@ -883,6 +924,54 @@ def _per_ca_day(session, column, start):
         .group_by(Certificate.caref, CA.id, CA.descr, day)).all()
 
 
+# The overview's emission flow groups the sources so; any other source, unset included, is manual
+FLOW_GROUPS = {'acme': ('acme', 'acme_client', 'letsencrypt'), 'scep': ('scep',), 'est': ('est',),
+               'wstep': ('wstep',), 'import': ('import',)}
+FLOW_ORDER = (*FLOW_GROUPS, 'manual')
+_FLOW_GROUP_OF = {source: group for group, sources in FLOW_GROUPS.items() for source in sources}
+
+
+def _flow_counts(session, start, end=None, by_day=True):
+    """``(day or None, source, n)`` of the issuances (``created_at``) and in-place renewals
+    (``renewed_at``) in [start, end), one statement."""
+    source = func.coalesce(Certificate.source, 'manual')
+    parts = []
+    for column in (Certificate.created_at, Certificate.renewed_at):
+        bounds = [column >= start] + ([column < end] if end is not None else [])
+        day = func.date(column) if by_day else literal_column('NULL')
+        parts.append(select(day.label('day'), source.label('source'))
+                     .where(holds_certificate(), *bounds))
+    events = union_all(*parts).subquery()
+    return session.execute(select(events.c.day, events.c.source, func.count())
+                           .group_by(events.c.day, events.c.source)).all()
+
+
+def _flow(session, days, start, dates):
+    """Issuances and in-place renewals per UTC day and source group, and the same totals over the
+    ``days`` before the window (a certificate renewed in both counts in the later one only)."""
+    zero = lambda: dict.fromkeys(FLOW_ORDER, 0)  # noqa: E731
+    per_day = {d: zero() for d in dates}
+    for d, source, n in _flow_counts(session, start):
+        if _day(d) in per_day:
+            per_day[_day(d)][_FLOW_GROUP_OF.get(source, 'manual')] += n
+    previous_start = start - timedelta(days=days)
+    previous = zero()
+    for _, source, n in _flow_counts(session, previous_start, start, by_day=False):
+        previous[_FLOW_GROUP_OF.get(source, 'manual')] += n
+    by_group = zero()
+    for counts in per_day.values():
+        for group, n in counts.items():
+            by_group[group] += n
+    return {
+        'groups': {**{g: list(s) for g, s in FLOW_GROUPS.items()}, 'manual': None},
+        'periods': [{'date': d, **per_day[d], 'total': sum(per_day[d].values())} for d in dates],
+        'by_group': by_group, 'total': sum(by_group.values()),
+        'previous': {'from': previous_start.date().isoformat(),
+                     'to': (start.date() - timedelta(days=1)).isoformat(),
+                     'by_group': previous, 'total': sum(previous.values())},
+    }
+
+
 def issuance(session, days, now=None):
     """Per CA and per UTC day, certificates issued (``created_at``) and renewed in place
     (``renewed_at``: the last renewal of each certificate, so one renewed several times in
@@ -910,4 +999,4 @@ def issuance(session, days, now=None):
     by_ca.sort(key=lambda e: (-e['total'], e['ca_name'] or ''))
     return {'days': days, 'from': dates[0], 'to': dates[-1], 'by_ca': by_ca,
             'by_source': by_source, 'total': sum(by_source.values()),
-            'renewed': sum(e['renewed'] for e in by_ca)}
+            'renewed': sum(e['renewed'] for e in by_ca), 'flow': _flow(session, days, start, dates)}

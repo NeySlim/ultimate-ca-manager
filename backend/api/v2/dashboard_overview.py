@@ -16,15 +16,17 @@ bp = Blueprint('dashboard_overview_v2', __name__)
 
 HEALTH_MAX_DAYS = 30
 ISSUANCE_MAX_DAYS = 90
+EXPIRATIONS_MAX_DAYS = 365
+REVOCATION_DEFAULT_ROWS = 10
 
 
 def _permissions():
     return list(getattr(g, 'permissions', None) or [])
 
 
-def _days(maximum):
+def _days(maximum, default='7'):
     """``?days=`` as an int in [1, maximum], or None when it is anything else."""
-    raw = request.args.get('days', '7')
+    raw = request.args.get('days', default)
     try:
         days = int(raw)
     except (TypeError, ValueError):
@@ -89,12 +91,34 @@ def get_compliance():
     return success_response(data=dashboard_aggregates.compliance_summary(db.session))
 
 
+@bp.route('/api/v2/dashboard/expirations', methods=['GET'])
+@require_auth(['read:dashboard'])
+def get_expirations():
+    """Per UTC day from today over ``days`` (1-365, 90 by default): certificates expiring,
+    split manual and automatic by source, the signers and active CAs expiring that day."""
+    from services.dashboard_horizon import expirations
+    days = _days(EXPIRATIONS_MAX_DAYS, '90')
+    if days is None:
+        return _days_error(EXPIRATIONS_MAX_DAYS)
+    return success_response(data=expirations(db.session, days))
+
+
+@bp.route('/api/v2/dashboard/revocation', methods=['GET'])
+@require_auth(['read:dashboard'])
+def get_revocation():
+    """The active CAs by CRL state (current, stale, missing, no distribution point) and at
+    most ``limit`` CAs with a distribution point, the ones to publish first."""
+    limit = parse_request_limit(REVOCATION_DEFAULT_ROWS, DASHBOARD_MAX_ROWS)
+    return success_response(data=dashboard_aggregates.revocation_coverage(db.session, limit))
+
+
 @bp.route('/api/v2/dashboard/issuance', methods=['GET'])
 @require_auth(['read:dashboard'])
 def get_issuance():
     """Per CA and per UTC day over ``days`` (1-90): ``issued`` by ``created_at`` and
     ``renewed`` in place by ``renewed_at`` (the last renewal of each certificate, counted
-    once however often it was renewed); ``by_source`` and ``total`` count issuances."""
+    once however often it was renewed); ``by_source`` and ``total`` count issuances. ``flow``
+    counts issuances and renewals per day and source group, with the period before."""
     days = _days(ISSUANCE_MAX_DAYS)
     if days is None:
         return _days_error(ISSUANCE_MAX_DAYS)

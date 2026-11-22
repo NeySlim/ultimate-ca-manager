@@ -102,3 +102,60 @@ def test_ninety_days_is_accepted(auth_client):
 
 def test_requires_auth(client):
     assert client.get(URL).status_code == 401
+
+
+GROUPS = ('acme', 'scep', 'est', 'wstep', 'import', 'manual')
+
+
+def _flow_delta(before, after):
+    days = {p['date']: p for p in before['periods']}
+    out = {}
+    for p in after['periods']:
+        diff = {g: p[g] - days[p['date']][g] for g in (*GROUPS, 'total')}
+        if any(diff.values()):
+            out[p['date']] = diff
+    return out
+
+
+def test_flow_per_day_and_source_group_with_the_previous_period(app, auth_client):
+    before = _issuance(auth_client)['flow']
+    pem = self_signed(ec.generate_private_key(ec.SECP256R1()))
+    today = utc_now().date()
+    noon = lambda d: datetime.combine(today - timedelta(days=d), time(12))  # noqa: E731
+    plan = [(s, noon(0), None) for s in ('acme', 'acme_client', 'letsencrypt', 'scep', 'est', 'wstep',
+                                         'import', 'msca', None, 'manual')]
+    plan += [('scep', noon(20), noon(0)),   # renewed in place today: counted today, not 20 days ago
+             ('est', noon(9), None),        # in the 7 days before the window
+             ('est', noon(14), None)]       # before both
+    with app.app_context():
+        rows = [Certificate(refid=str(uuid.uuid4()), descr='issuance-flow', crt=pem, source=s,
+                            created_at=c, renewed_at=r) for s, c, r in plan]
+        rows.append(Certificate(refid=str(uuid.uuid4()), descr='issuance-flow-csr', csr='-', created_at=noon(0)))
+        db.session.add_all(rows)
+        db.session.commit()
+        created = [r.id for r in rows]
+    try:
+        after = _issuance(auth_client)['flow']
+        assert _flow_delta(before, after) == {today.isoformat(): {
+            'acme': 3, 'scep': 2, 'est': 1, 'wstep': 1, 'import': 1, 'manual': 3, 'total': 11}}
+        assert {g: after['previous']['by_group'][g] - before['previous']['by_group'][g] for g in GROUPS} == {
+            'acme': 0, 'scep': 0, 'est': 1, 'wstep': 0, 'import': 0, 'manual': 0}
+        assert after['previous']['total'] - before['previous']['total'] == 1
+        assert (after['previous']['from'], after['previous']['to']) == (
+            (today - timedelta(days=13)).isoformat(), (today - timedelta(days=7)).isoformat())
+        assert [p['date'] for p in after['periods']] == [(today - timedelta(days=6 - i)).isoformat()
+                                                         for i in range(7)]
+        assert after['total'] == sum(p['total'] for p in after['periods']) == sum(after['by_group'].values())
+        assert after['groups'] == {'acme': ['acme', 'acme_client', 'letsencrypt'], 'scep': ['scep'],
+                                   'est': ['est'], 'wstep': ['wstep'], 'import': ['import'], 'manual': None}
+    finally:
+        with app.app_context():
+            Certificate.query.filter(Certificate.id.in_(created)).delete(synchronize_session=False)
+            db.session.commit()
+
+
+def test_the_flow_reads_the_created_and_renewed_indexes(app):
+    from services import dashboard_aggregates
+    from tests.dashboard_plans import plan_of
+    plan = plan_of(app, lambda: dashboard_aggregates.issuance(db.session, 90), 'UNION ALL')
+    assert 'ix_certificates_created_at' in plan and 'ix_certificates_renewed_at' in plan, plan

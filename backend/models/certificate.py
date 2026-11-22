@@ -78,7 +78,7 @@ class Certificate(db.Model):
     created_by = db.Column(db.String(80))
     
     # Last in-place renewal (naive UTC) and how many there were
-    renewed_at = db.Column(db.DateTime, nullable=True)
+    renewed_at = db.Column(db.DateTime, nullable=True, index=True)
     renewed_times = db.Column(db.Integer, nullable=False, default=0, server_default='0')
 
     # Source tracking (issuance origin). Known values:
