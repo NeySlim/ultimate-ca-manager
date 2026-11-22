@@ -106,7 +106,7 @@ En mode AC Microsoft, le modèle AD CS est choisi à la place du type de certifi
 
 Le certificat résultant apparaît sur la page des certificats.
 
-> 💡 Une demande générée sur une carte à puce ne porte souvent qu’un CN. Pour un certificat S/MIME, choisissez le type « Email (S/MIME) » et ajoutez l’adresse : elle devient le nom alternatif du sujet du certificat. Les noms ajoutés passent les contraintes de noms de l’AC, les politiques d’émission et l’approbation comme les autres, et l’approbateur les voit.
+> 💡 Une demande générée sur une carte à puce ne porte souvent qu’un CN. Pour un certificat S/MIME, choisissez le type « E-mail (S/MIME) » et ajoutez l’adresse : elle devient le nom alternatif du sujet du certificat. Les noms ajoutés passent les contraintes de noms de l’AC, les politiques d’émission et l’approbation comme les autres, et l’approbateur les voit.
 
 Ce qu’une demande peut porter est contrôlé comme sur le formulaire d’émission, et chaque refus indique sa raison :
 - **Sujet** : CN, O et OU de 64 caractères au plus, L et ST de 128, C un code pays à deux lettres en PrintableString (RFC 5280 annexe A)

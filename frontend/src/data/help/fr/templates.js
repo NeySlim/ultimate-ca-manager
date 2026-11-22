@@ -14,11 +14,11 @@ export default {
       {
         title: 'Fonctionnalités',
         items: [
-          { label: 'Type', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Définit les valeurs par défaut d’utilisation de la clé, d’EKU et de SAN' },
-          { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et Email. L’Email devient aussi un SAN, quel que soit le type de certificat' },
+          { label: 'Type', text: 'Web Server, E-mail, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Définit les valeurs par défaut d’utilisation de la clé, d’EKU et de SAN' },
+          { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et E-mail. L’e-mail devient aussi un SAN, quel que soit le type de certificat' },
           { label: 'Utilisation de la clé', text: 'Signature numérique, chiffrement de clé, etc.' },
           { label: 'Utilisation étendue de la clé', text: 'Tout usage connu du serveur : authentification serveur, authentification client, signature de code, protection e-mail, Smartcard Logon, horodatage, signature OCSP, IPsec, Microsoft RDP et autres' },
-          { label: 'Types de SAN', text: 'Les types de noms (DNS, IP, Email, URI, UPN) qu’une demande faite avec le modèle peut porter. Avec « Appliquer les types de SAN autorisés » activé, le formulaire d’émission, la signature de CSR, les protocoles d’enrôlement, les renouvellements et les approbations refusent tout autre type, et un nom seulement déduit du CN est omis. Les nouveaux modèles l’ont activé ; les anciens et les modèles intégrés l’ont désactivé. Aucune case cochée : tous les types sont permis' },
+          { label: 'Types de SAN', text: 'Les types de noms (DNS, IP, E-mail, URI, UPN) qu’une demande faite avec le modèle peut porter. Avec « Appliquer les types de SAN autorisés » activé, le formulaire d’émission, la signature de CSR, les protocoles d’enrôlement, les renouvellements et les approbations refusent tout autre type, et un nom seulement déduit du CN est omis. Les nouveaux modèles l’ont activé ; les anciens et les modèles intégrés l’ont désactivé. Aucune case cochée : tous les types sont permis' },
           { label: 'Validité', text: 'Période de validité par défaut en jours' },
           { label: 'Copier', text: 'Cloner un modèle existant et le modifier' },
           { label: 'Filtre d’origine', text: 'Choisissez Personnalisé dans la barre d’outils pour masquer les modèles intégrés et ne travailler qu’avec les vôtres. Mémorisé par navigateur' },
@@ -74,8 +74,8 @@ Les autorités de certification ne se créent pas à partir de modèles : créez
 
 1. Cliquez sur **Créer un modèle**
 2. Entrez un **nom** et une description optionnelle
-3. Sélectionnez le **type** de modèle : Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Il définit les valeurs par défaut d’utilisation de la clé, d’utilisation étendue de la clé et de SAN, que vous pouvez ensuite modifier
-4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, Email). L’Email devient aussi un SAN, quel que soit le type de certificat
+3. Sélectionnez le **type** de modèle : Web Server, E-mail, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Il définit les valeurs par défaut d’utilisation de la clé, d’utilisation étendue de la clé et de SAN, que vous pouvez ensuite modifier
+4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, E-mail). L’e-mail devient aussi un SAN, quel que soit le type de certificat
 5. Sélectionnez les indicateurs d'**utilisation de la clé**
 6. Sélectionnez les valeurs d'**utilisation étendue de la clé** parmi les usages connus du serveur (Smartcard Logon, Time Stamping, Microsoft RDP et autres)
 7. Définissez le **type de clé** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521, Brainpool EC-BP256/384/512 ou ML-DSA-44/65/87), le condensat et la **période de validité par défaut** en jours. Le condensat est le hachage de signature de l’AC émettrice : il s’applique donc toujours à une clé ML-DSA sous une AC RSA ou EC ; une AC ML-DSA l’ignore
