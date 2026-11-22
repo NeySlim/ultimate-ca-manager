@@ -86,3 +86,25 @@ test('a request still carrying the identifier closing the other sessions replace
   const { page, api: own } = await signIn(user.username, user.password)
   await stalePageRequest(page, request, () => own.post('/account/sessions/revoke-all'))
 })
+
+test('the account menu writes the end of the session in the session\'s value, under its delay', async ({ api, signIn }) => {
+  const user = await createUser(api, 'viewer')
+  const { page } = await signIn(user.username, user.password)
+  await page.goto('/certificates')
+  await page.getByRole('button', { name: /^Account: / }).click()
+  const menu = page.locator('#user-menu')
+  const session = menu.locator('.user-facts .row', { has: page.locator('dt', { hasText: 'Session' }) })
+  const value = session.locator('dd.v')
+  const ends = value.locator('.sub')
+  await expect(ends).toHaveText(/^Ends /)
+  const dt = (await session.locator('dt').boundingBox())!
+  const v = (await value.boundingBox())!
+  const e = (await ends.boundingBox())!
+  const m = (await menu.boundingBox())!
+  // In the value's own cell: its left edge, under the delay and under the term, inside the menu
+  expect(Math.abs(e.x - v.x)).toBeLessThanOrEqual(1)
+  expect(e.y).toBeGreaterThanOrEqual(dt.y + dt.height - 1)
+  expect(e.x + e.width).toBeLessThanOrEqual(m.x + m.width)
+  // One term, one value: no dd of its own falls in the term column
+  await expect(session.locator(':scope > dd')).toHaveCount(1)
+})

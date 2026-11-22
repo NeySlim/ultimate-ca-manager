@@ -68,6 +68,8 @@ Open **Modules** > **PKI** > **Certificates**, or **Certificates** in the top ba
 
 **Exporting.** Select a certificate and use **Export** in its details: PEM, DER, PKCS#12 or JKS. Set a password for PKCS#12.
 
+**Copying a value.** The serial number in **Overview** and the fingerprints under **More details** sit in a chip with a copy button, a digest in equal lines; a URL (a CRL distribution point, an OCSP responder) shows its start and its end on one line, whole when clicked or hovered. The copy is always the whole value, as the API gives it.
+
 **Renewing.** **Renew** replaces the certificate in place: same identifier, new serial and validity. A revoked certificate cannot be renewed, nor one whose private key the server does not hold (enrolled by a device, or imported without its key): renew it through its enrollment protocol, sign a new request or issue a new certificate.
 
 **Revoking.** Select the certificate, click **Revoke** and choose a reason. The certificate appears in the CRL and answers OCSP as revoked. A certificate revoked with the reason Certificate Hold can be released with **Remove Hold**.
@@ -107,7 +109,7 @@ The CA list shows an **Offline** badge while offline. Existing CRLs continue to 
 
 ### Unique Subject
 
-RFC 5280 §4.1.2.6 requires a CA to give each distinct entity it certifies a distinct subject name. **Enforce** next to **Unique subject**, in the CA details (`write:cas`), makes the CA refuse a certificate whose subject a certificate of another entity already carries under that CA. It is off by default, including on CAs carried over from 2.254.
+RFC 5280 §4.1.2.6 requires a CA to give each distinct entity it certifies a distinct subject name. **Enforce** next to **Unique subject**, in the CA details (`write:cas`, the help folded behind the button after the term), makes the CA refuse a certificate whose subject a certificate of another entity already carries under that CA. It is off by default, including on CAs carried over from 2.254.
 
 Every certificate of the CA counts, whatever its status: valid, expired, revoked or superseded. A name once certified stays bound to its entity, so that a relying party that saw it on one certificate never finds it on another entity's later.
 

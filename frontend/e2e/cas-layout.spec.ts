@@ -57,3 +57,52 @@ test.describe('phone', () => {
     await expect(page.getByRole('dialog', { name: 'Page actions' }).getByRole('button', { name: 'Import' })).toBeVisible()
   })
 })
+
+test.describe('a phone of 360 px', () => {
+  test.use({ viewport: { width: 360, height: 800 } })
+
+  test('the side panel cuts no word, keeps the actions out of the values, folds its help', async ({ page, api }) => {
+    const root = await createCA(api)
+    await page.goto(`/cas?authority=${root.id}`)
+    const side = page.getByRole('main').locator('aside.ca-side')
+    await expect(side.locator('.kvg dl.kv').first()).toBeVisible()
+    // Every word of a term or a value on one line (a technical value in its chip wraps after its separators)
+    const cut = await side.evaluate((aside) => {
+      const out: string[] = []
+      const cells = [...aside.querySelectorAll('.kvg dl.kv > .row > :is(dt, dd.v, dd.absent)')]
+      for (const cell of cells) {
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if ((node.parentElement as Element).closest('.code-value')) continue
+          const text = node.textContent || ''
+          for (const m of text.matchAll(/\S+/g)) {
+            const range = document.createRange()
+            range.setStart(node, m.index!)
+            range.setEnd(node, m.index! + m[0].length)
+            const tops = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top)))
+            if (tops.size > 1) out.push(m[0])
+          }
+        }
+      }
+      return out
+    })
+    expect(cut).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
+    // The CA's signature is named by its hash, as a certificate's is
+    await expect(side.locator('.row', { has: page.locator('dt', { hasText: /^Signature$/ }) }).locator('dd.v')).toHaveText(/^SHA-(256|384|512)$/)
+    // The actions sit apart from the values
+    await expect(side.locator('.kvg dd.v button[data-write]')).toHaveCount(0)
+    await expect(side.locator('.kvg dd.act button[data-write]').first()).toBeVisible()
+    // The help of « Unique subject » folded behind its button, unfolded on the whole width of the block
+    const tip = side.getByRole('button', { name: 'Help: Unique subject' })
+    await expect(tip).toHaveAttribute('aria-expanded', 'false')
+    const helpId = await tip.getAttribute('aria-controls')
+    const help = side.locator(`[id="${helpId}"]`)
+    await expect(help).toBeHidden()
+    await tip.click()
+    await expect(help).toBeVisible()
+    const block = (await side.locator('.kvg dl.kv').filter({ has: page.locator(`[id="${helpId}"]`) }).boundingBox())!
+    const h = (await help.boundingBox())!
+    expect(Math.abs(h.x - block.x)).toBeLessThanOrEqual(1)
+  })
+})

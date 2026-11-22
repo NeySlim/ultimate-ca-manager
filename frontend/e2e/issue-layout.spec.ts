@@ -67,7 +67,9 @@ test.describe('desktop', () => {
     expect(Math.abs(mark.width - 22)).toBeLessThanOrEqual(EPS)
     const dt = await box(review.locator('.review-summary dt').first())
     const dd = await box(review.locator('.review-summary dd').first())
-    expect(Math.abs(dd.x - (dt.x + 130 + 16))).toBeLessThanOrEqual(EPS)
+    // The term column as wide as its longest term (44 % at most), the value right after it
+    expect(Math.abs(dd.x - (dt.x + dt.width))).toBeLessThanOrEqual(EPS)
+    expect(dt.width).toBeLessThanOrEqual(summary.width * 0.44 + EPS)
   })
 })
 

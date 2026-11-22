@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SideField, SideAction } from './SideField'
+import { FactRow, RowAction } from '../atelier/Detail'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 
@@ -13,13 +13,9 @@ export function UniqueSubjectField({ ca, canWrite = false, onChanged }) {
   const enforced = !!ca.enforce_unique_subject
 
   return (
-    <SideField label={t('cas.uniqueSubject')}>
-      <span title={t('cas.uniqueSubjectHelp')}>
-        {t(enforced ? 'cas.uniqueSubjectEnforced' : 'cas.uniqueSubjectNotEnforced')}
-      </span>
-      {canWrite && <UniqueSubjectSwitch ca={ca} enforced={enforced} onChanged={onChanged} />}
-      <p className="small muted">{t('cas.uniqueSubjectHelp')}</p>
-    </SideField>
+    <FactRow product label={t('cas.uniqueSubject')} help={t('cas.uniqueSubjectHelp')}
+      state={[enforced ? 'good' : 'muted', t(enforced ? 'cas.uniqueSubjectEnforced' : 'cas.uniqueSubjectNotEnforced')]}
+      action={canWrite ? <UniqueSubjectSwitch ca={ca} enforced={enforced} onChanged={onChanged} /> : null} />
   )
 }
 
@@ -54,8 +50,8 @@ function UniqueSubjectSwitch({ ca, enforced, onChanged }) {
   }
 
   return (
-    <SideAction onClick={handleSwitch} disabled={saving}>
+    <RowAction onClick={handleSwitch} disabled={saving}>
       {t(enforced ? 'cas.stopEnforcingUniqueSubject' : 'cas.enforceUniqueSubject')}
-    </SideAction>
+    </RowAction>
   )
 }

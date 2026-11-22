@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SideField, SideAction } from './SideField'
+import { FactRow, RowAction } from '../atelier/Detail'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 
@@ -13,10 +13,8 @@ export function IssuanceVisibilityField({ ca, canWrite = false, onChanged }) {
   const hidden = !!ca.issuance_hidden
 
   return (
-    <SideField label={t('cas.issuancePickers')}>
-      <span>{t(hidden ? 'cas.issuanceHiddenState' : 'cas.issuanceListedState')}</span>
-      {canWrite && <VisibilitySwitch ca={ca} hidden={hidden} onChanged={onChanged} />}
-    </SideField>
+    <FactRow product label={t('cas.issuancePickers')} value={t(hidden ? 'cas.issuanceHiddenState' : 'cas.issuanceListedState')}
+      action={canWrite ? <VisibilitySwitch ca={ca} hidden={hidden} onChanged={onChanged} /> : null} />
   )
 }
 
@@ -41,8 +39,8 @@ function VisibilitySwitch({ ca, hidden, onChanged }) {
   }
 
   return (
-    <SideAction onClick={handleSwitch} disabled={saving}>
+    <RowAction onClick={handleSwitch} disabled={saving}>
       {t(hidden ? 'cas.showInIssuance' : 'cas.hideFromIssuance')}
-    </SideAction>
+    </RowAction>
   )
 }

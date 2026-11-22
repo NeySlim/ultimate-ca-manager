@@ -62,7 +62,7 @@ describe('UserMenu', () => {
     expect(card.querySelector('.avatar')).toHaveAttribute('aria-hidden', 'true')
     expect(card.querySelector('.avatar').nextElementSibling.querySelector('strong')).toHaveTextContent('Probe Person')
     expect(card).toHaveTextContent('common.operator · probe')
-    const facts = document.querySelector('.user-id > dl.props')
+    const facts = document.querySelector('.user-id > dl.kv')
     await waitFor(() => expect([...facts.querySelectorAll('dt')].map(dt => dt.textContent)).toEqual(['common.email', 'shell.userCard.signIn', 'shell.userCard.session']))
     expect([...facts.querySelectorAll('dd')].map(dd => dd.textContent)).toEqual(['probe@example.com', 'shell.method.password', 'shell.userCard.lockIn|30'])
   })
@@ -173,23 +173,27 @@ describe('UserMenu', () => {
     } })
     const user = setup()
     await user.click(trigger())
-    const facts = document.querySelector('.user-id > dl.props')
+    const facts = document.querySelector('.user-id > dl.kv')
     await waitFor(() => expect([...facts.querySelectorAll('dt')].map(dt => dt.textContent))
       .toEqual(['shell.userCard.signIn', 'shell.userCard.mfa', 'shell.userCard.session']))
-    const values = [...facts.querySelectorAll('dd')].map(dd => dd.textContent)
-    expect(values.slice(0, 3)).toEqual([
+    // One value per term: the end of the session under its lock delay, in the same value cell (no dd of its own)
+    const values = [...facts.querySelectorAll('dd')].map(dd => dd.firstChild.textContent)
+    expect(values).toEqual([
       'shell.userCard.methodVia|shell.method.sso,Company SSO',
       'shell.userCard.mfaOn|shell.mfaMethod.totp, shell.method.webauthn',
       'shell.userCard.lockIn|15',
     ])
-    expect(values[3]).toMatch(/^shell\.userCard\.endsAt\|.*2026/)
+    const session = facts.querySelectorAll(':scope > .row')[2]
+    expect(session.querySelector('dd.v > .sub').textContent).toMatch(/^shell\.userCard\.endsAt\|.*2026/)
   })
 
   it('says the second factor is off, and reads the facts again at each opening', async () => {
     getCurrentUser.mockResolvedValue({ data: { auth_method: 'password', mfa: { enabled: false, methods: [] }, session_timeout: 1800 } })
     const user = setup()
     await user.click(trigger())
+    // Off is a neutral state, not a value
     expect(await screen.findByText('shell.userCard.mfaOff')).toBeVisible()
+    expect(screen.getByText('shell.userCard.mfaOff').closest('.badge')).toHaveClass('muted')
     await user.keyboard('{Escape}')
     getCurrentUser.mockResolvedValue({ data: { auth_method: 'password', mfa: { enabled: true, methods: ['totp'] }, session_timeout: 1800 } })
     await user.click(trigger())

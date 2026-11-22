@@ -156,6 +156,17 @@ describe('signatureHashName', () => {
     expect(signatureHashName('RSASSA-PSS-SHA256')).toBe('RSASSA-PSS')
     expect(signatureHashName('ML-DSA-65')).toBe('ML-DSA-65')
   })
+
+  it('names a CA\'s signature the same way, from its OID name or its hash', () => {
+    expect(signatureHashName('sha256WithRSAEncryption')).toBe('SHA-256')
+    expect(signatureHashName('sha1WithRSAEncryption')).toBe('SHA-1')
+    expect(signatureHashName('ecdsa-with-SHA384')).toBe('SHA-384')
+    expect(signatureHashName('ECDSA-SHA256')).toBe('SHA-256')
+    expect(signatureHashName('SHA-512')).toBe('SHA-512')
+    expect(signatureHashName('RSASSA-PSS SHA-256 (salt 32)')).toBe('RSASSA-PSS')
+    expect(signatureHashName('Ed25519')).toBe('Ed25519')
+    expect(signatureHashName('SLH-DSA-SHA2-128s')).toBe('SLH-DSA-SHA2-128s')
+  })
 })
 
 describe('values of « Plus de détails » in words', () => {

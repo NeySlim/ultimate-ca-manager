@@ -1929,6 +1929,7 @@
     "filter": "Filtrer",
     "copy": "Copier",
     "copied": "Copié !",
+    "helpAbout": "Aide : {{name}}",
     "clickToCopy": "Cliquer pour copier",
     "yes": "Oui",
     "no": "Non",
