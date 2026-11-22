@@ -83,7 +83,9 @@ def get_health():
 def get_compliance():
     """Counters over the live issued certificates (not revoked, archived or expired),
     read from columns. ``filter_hint`` is a certificate list query that reproduces the
-    counter, given only when ``filter_available`` is true."""
+    counter, given only when ``filter_available`` is true. ``population`` names that set,
+    ``compliant`` counts its certificates under no counter, ``score`` is the average
+    compliance score and grade distribution over it, as ``/certificates/compliance``."""
     return success_response(data=dashboard_aggregates.compliance_summary(db.session))
 
 

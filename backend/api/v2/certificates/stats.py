@@ -13,7 +13,6 @@ from utils.cert_status import (
     expired_condition, expiring_condition, issued_certificates,
     orphan_condition, revoked_condition, valid_condition,
 )
-from services.compliance_service import calculate_compliance_score
 from utils.response import success_response
 from utils.datetime_utils import utc_now
 from . import bp
@@ -58,42 +57,7 @@ def get_certificate_stats():
 @bp.route('/api/v2/certificates/compliance', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_compliance_stats():
-    """Get aggregate compliance statistics for all certificates"""
-
-    total_count = issued_certificates().filter(Certificate.revoked == False).count()
-    if not total_count:
-        return success_response(data={
-            'average_score': 0,
-            'distribution': {'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0},
-            'total': 0,
-        })
-
-    grades = {'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0}
-    total_score = 0
-    count = 0
-
-    # Batch processing to avoid loading all certs into memory
-    BATCH_SIZE = 200
-    offset = 0
-    while True:
-        batch = issued_certificates().filter(
-            Certificate.revoked == False
-        ).limit(BATCH_SIZE).offset(offset).all()
-        if not batch:
-            break
-        for cert in batch:
-            d = cert.to_dict()
-            result = calculate_compliance_score(d)
-            total_score += result['score']
-            grade = result['grade']
-            if grade in grades:
-                grades[grade] += 1
-            count += 1
-        offset += BATCH_SIZE
-        db.session.expire_all()  # Release memory between batches
-
-    return success_response(data={
-        'average_score': round(total_score / count) if count else 0,
-        'distribution': grades,
-        'total': count,
-    })
+    """Average compliance score and grade distribution over the active certificates, the
+    population of ``/dashboard/compliance``, scored in SQL (services/compliance_sql.py)."""
+    from services.dashboard_aggregates import compliance_score
+    return success_response(data=compliance_score(db.session))

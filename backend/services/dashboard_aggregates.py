@@ -809,25 +809,65 @@ def _list_filter(hint):
     return {'filter_hint': hint, 'filter_available': hint is not None}
 
 
-def compliance_summary(session, now=None):
-    """Counters over the live issued certificates, each with the list filter it stands for."""
-    now = now or utc_now()
+# The set both compliance routes report on, as they publish it
+POPULATION = {'definition': 'active', 'criteria': ['issued', 'not_revoked', 'not_archived', 'not_expired'],
+              'filter_hint': {'live': 'true'}}
+
+
+def _compliance_rules(dialect):
+    return {'rsa_below_3072': weak_rsa_condition(), 'weak_signature_hash': weak_hash_condition(),
+            'server_lifetime_over_398_days': long_server_condition(dialect),
+            'incomplete_chain': orphan_condition(), 'no_private_key': no_key_condition()}
+
+
+def _scored(session, now):
+    """One row over the live certificates: count, score sum, per-grade counts, rule counters, compliant."""
+    from services import compliance_sql
     dialect = session.get_bind().dialect.name
-    rules = {'rsa_below_3072': weak_rsa_condition(), 'weak_signature_hash': weak_hash_condition(),
-             'server_lifetime_over_398_days': long_server_condition(dialect),
-             'incomplete_chain': orphan_condition(), 'no_private_key': no_key_condition()}
-    total = lambda cond: func.coalesce(func.sum(case((cond, 1), else_=0)), 0)  # noqa: E731
-    row = session.execute(
-        select(func.count(), *[total(c) for c in rules.values()])
-        .select_from(Certificate).where(*live_conditions(now))).one()
+    rules = _compliance_rules(dialect)
+    flag = lambda cond: case((cond, 1), else_=0)  # noqa: E731
+    per_row = select(compliance_sql.score_expression(dialect, now).label('score'),
+                     *[flag(c).label(name) for name, c in rules.items()],
+                     # A rule whose test is NULL is no deviation, as its counter does not count it
+                     case((or_(*rules.values()), 0), else_=1).label('compliant')
+                     ).select_from(Certificate).where(*live_conditions(now)).subquery()
+    total = lambda col: func.coalesce(func.sum(col), 0)  # noqa: E731
+    grades, grade_sums = compliance_sql.grade_counts(per_row.c.score)
+    row = session.execute(select(func.count(), total(per_row.c.score), total(per_row.c.compliant),
+                                 *[total(per_row.c[name]) for name in rules], *grade_sums)).one()
+    count, score_sum, compliant = int(row[0]), int(row[1]), int(row[2])
+    counters = dict(zip(rules, (int(n) for n in row[3:3 + len(rules)]), strict=True))
+    distribution = dict(zip(grades, (int(n) for n in row[3 + len(rules):]), strict=True))
+    # Python's round, as the score was averaged before it moved to SQL
+    average = round(score_sum / count) if count else 0
+    return count, average, distribution, counters, compliant
+
+
+def compliance_score(session, now=None):
+    """Average score and grade distribution over the live certificates (``/certificates/compliance``)."""
+    count, average, distribution, _, _ = _scored(session, now or utc_now())
+    return {'average_score': average, 'distribution': distribution, 'total': count,
+            'population': {**POPULATION, 'count': count}}
+
+
+def compliance_summary(session, now=None):
+    """Counters over the live issued certificates, each with the list filter it stands for,
+    the certificates under no counter (``compliant``) and the score over the same set."""
+    from services.compliance_sql import grade_of
+    now = now or utc_now()
+    count, average, distribution, counters, compliant = _scored(session, now)
     algos = session.execute(select(Certificate.key_algo, func.count()).where(*live_conditions(now))
                             .group_by(Certificate.key_algo).order_by(func.count().desc())).all()
     return {
-        'total': row[0],
+        'total': count,
+        'population': {**POPULATION, 'count': count},
+        'compliant': compliant,
+        'score': {'average': average, 'grade': grade_of(average) if count else None,
+                  'distribution': distribution},
         'by_key_algorithm': [{'key_algo': algo, 'count': n, **_list_filter(
             {'live': 'true', 'key_algo': algo} if algo is not None else None)} for algo, n in algos],
-        'counters': {name: {'count': int(n), **_list_filter(COMPLIANCE_LIST_FILTERS[name])}
-                     for name, n in zip(rules, row[1:])},
+        'counters': {name: {'count': n, **_list_filter(COMPLIANCE_LIST_FILTERS[name])}
+                     for name, n in counters.items()},
     }
 
 
