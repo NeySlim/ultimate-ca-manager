@@ -182,15 +182,15 @@ describe('contrast of the palettes', () => {
               }
             }
           })
-          it('writes the brand word in a gradient whose ends hold 3:1 (large text) on the bar\'s glass', () => {
+          it('writes the brand word in one colour that holds 3:1 (large text) on the bar\'s glass', () => {
             const brand = auroreRules(ADJUST, mode).filter((r) => /\.brand strong$/.test(r.sel)).flatMap((r) => declarations(r.body))
-            const ends = brand.filter(([p]) => p === 'background').map(([, v]) => v).pop()
-            expect(ends).toMatch(/^linear-gradient\(/)
+            expect(brand.some(([p, v]) => /^background/.test(p) && /gradient/.test(v))).toBe(false)
+            const colour = brand.filter(([p]) => p === 'color').map(([, v]) => v).pop()
+            const ref = /^var\(--([a-z-]+)\)$/.exec(colour)
+            expect(ref).not.toBeNull()
             const bar = glass.filter((g) => /\.masthead/.test(g.sel)).map((g) => glassOver(lazy.field, g.value, t))
             expect(bar.length).toBeGreaterThan(0)
-            for (const ref of ends.matchAll(/var\(--([a-z-]+)\)/g)) {
-              for (const g of bar) expect(worst(t[ref[1]], g), ref[1]).toBeGreaterThanOrEqual(3)
-            }
+            for (const g of bar) expect(worst(t[ref[1]], g), ref[1]).toBeGreaterThanOrEqual(3)
           })
         }
         it('tints the page and the raised surfaces instead of a neutral grey', () => {
