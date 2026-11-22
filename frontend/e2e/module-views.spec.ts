@@ -1,7 +1,7 @@
 import { test, expect } from './support/fixtures'
 
 // The views of a protocol page are tabs under its head, the row scrolling on its own when narrower
-// than its tabs
+// than its tabs; the settings table of contents scrolls on its own when taller than the page
 const EPS = 1
 type Box = { x: number; y: number; width: number; height: number }
 const box = async (locator): Promise<Box> => {
@@ -9,6 +9,12 @@ const box = async (locator): Promise<Box> => {
   expect(b).not.toBeNull()
   return b as Box
 }
+// The element a click at the centre of the locator would reach is the locator itself (nothing covers it)
+const reachable = (locator) => locator.evaluate((el) => {
+  const r = el.getBoundingClientRect()
+  const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+  return !!hit && (hit === el || el.contains(hit))
+})
 
 test.describe('the views of a protocol page', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
@@ -65,6 +71,57 @@ for (const [width, height] of [[1000, 800], [390, 844]]) {
         return l.x + l.width <= t.x + t.width + EPS && l.x >= t.x - EPS
       }).toBe(true)
       await expect(page.locator('.page-views')).toHaveAttribute('data-more-start', '')
+    })
+  })
+}
+
+for (const [width, height] of [[1000, 700], [1600, 800]]) {
+  test.describe(`settings at ${width} × ${height}`, () => {
+    test.use({ viewport: { width, height } })
+
+    test('the table of contents scrolls on its own: its last entry shows and opens its section', async ({ page, api }) => {
+      await page.goto('/settings')
+      const nav = page.getByRole('navigation', { name: 'Settings sections', exact: true })
+      await expect(nav).toBeVisible()
+      const view = await box(page.locator('#view-scroll'))
+      // Never taller than the scroll area it sticks in
+      const n = await box(nav)
+      expect(n.y + n.height).toBeLessThanOrEqual(view.y + view.height + EPS)
+      expect(await nav.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true)
+      // The wheel over the contents scrolls them, not the page
+      await nav.hover()
+      await page.mouse.wheel(0, 3000)
+      const last = nav.getByRole('link').last()
+      await expect.poll(async () => {
+        const l = await box(last)
+        return l.y >= n.y - EPS && l.y + l.height <= n.y + n.height + EPS
+      }).toBe(true)
+      expect(await reachable(last)).toBe(true)
+      const target = await last.getAttribute('data-jump')
+      await last.click()
+      await expect(page).toHaveURL(new RegExp(`[?&]tab=${target}`))
+      await expect(page.locator(`#set-title-${target}`)).toBeFocused()
+      // The entry shown is still in view inside the contents
+      const l = await box(last)
+      const after = await box(nav)
+      expect(l.y + l.height).toBeLessThanOrEqual(after.y + after.height + EPS)
+    })
+
+    test('a link to the last section shows its entry in the contents', async ({ page, api }) => {
+      await page.goto('/settings')
+      const nav = page.getByRole('navigation', { name: 'Settings sections', exact: true })
+      const target = await nav.getByRole('link').last().getAttribute('data-jump')
+      await page.goto(`/settings?tab=${target}`)
+      const current = nav.locator('a[aria-current="true"]')
+      await expect(current).toHaveAttribute('data-jump', target as string)
+      // Inside the contents and inside the scroll area the page shows
+      const view = await box(page.locator('#view-scroll'))
+      await expect.poll(async () => {
+        const c = await box(current)
+        const n = await box(nav)
+        return c.y >= Math.max(n.y, view.y) - EPS && c.y + c.height <= Math.min(n.y + n.height, view.y + view.height) + EPS
+      }).toBe(true)
+      expect(await reachable(current)).toBe(true)
     })
   })
 }

@@ -164,6 +164,12 @@
  * and the title a link lands on, focused without the keyboard outline.
  */
 .atl .settings-group>.group-hint{margin:-5px 0 12px}
+/*
+ * The settings table of contents scrolls on its own when taller than the page (its height is set by
+ * SettingsToc); its links draw their focus ring inside, where the scroll does not clip it.
+ */
+.atl .settings-toc:not(.guide-toc){overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--control) transparent}
+.atl .settings-toc:not(.guide-toc) a:focus-visible{outline-offset:-2px}
 .atl .group-hint{font-size:12px;line-height:1.6;color:var(--muted)}
 .atl .settings-group>legend .badge{font-weight:400}
 .atl .settings-stack{display:grid;gap:16px;min-width:0}
