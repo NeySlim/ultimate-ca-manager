@@ -27,6 +27,8 @@ import { useThemeColor } from '../lib/themeColor'
 import { BANNER_SLOT } from '../lib/sessionBannerSlot'
 import { NOTIF_SLOT } from './shell/NotificationBell'
 import { ShellBannersContext } from './shell/bannersSlot'
+import { DetachedProvider } from './detached/DetachedContext'
+import { DetachedLayer } from './detached/DetachedLayer'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -133,6 +135,7 @@ export function AppShell() {
 
   return (
     <ShellBannersContext.Provider value={banners}>
+    <DetachedProvider>
     <div className="shell-app">
       <div className="atl atl-island">
         <a className="skip" href="#main" onClick={skipToPage}>{t('shell.skipToContent')}</a>
@@ -166,6 +169,8 @@ export function AppShell() {
 
       <div className="atl atl-island"><StatusBar onShowNodes={showNodes} can={can} /></div>
       {showNodes && <NodesDialog open={nodesOpen} onClose={() => setNodesOpen(false)} ha={ha} />}
+      {/* The detached windows, over the pages and kept across them */}
+      <DetachedLayer />
 
       <CommandPalette
         open={commandPaletteOpen}
@@ -189,6 +194,7 @@ export function AppShell() {
       {/* Ko-fi support card, once per version for admins; the overview shows it in its own flow */}
       {!onOverview && <KofiSupportCard />}
     </div>
+    </DetachedProvider>
     </ShellBannersContext.Provider>
   )
 }

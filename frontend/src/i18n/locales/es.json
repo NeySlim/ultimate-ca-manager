@@ -5181,13 +5181,17 @@
     "differences_one": "{{count}} diferencia",
     "differences_other": "{{count}} diferencias",
     "differences": "{{count}} diferencias",
-    "twoTitle": "Comparar dos certificados",
     "lead": "Se resaltan las propiedades que difieren.",
     "property": "Propiedad",
-    "authority": "Autoridad",
-    "keyHeld": "Presente",
-    "keyAbsent": "Ausente",
-    "close": "Cerrar la comparación"
+    "close": "Cerrar la comparación",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read."
   },
   "members": {
     "manageMembers": "Gestionar miembros",
@@ -5515,7 +5519,8 @@
       "noAudit": "Su rol no puede leer el registro de auditoría: solo se muestran las fechas del registro del certificado.",
       "auditFailed": "No se pudo leer el registro de auditoría: solo se muestran las fechas del registro del certificado.",
       "scope": "Entradas del registro de auditoría entre las últimas {{count}} operaciones sobre certificados, y las fechas del registro del certificado."
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "Sin resultados coincidentes",
@@ -7934,6 +7939,21 @@
       "text": "La consulta continúa con los datos ya cargados; las acciones están suspendidas y se reanudarán solas al volver la red.",
       "said": "Sin conexión: la consulta continúa, las acciones están suspendidas.",
       "back": "Conexión restablecida: las acciones vuelven a estar disponibles."
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      }
     }
   },
   "overview": {
@@ -8364,5 +8384,10 @@
     "resultsShown": "Se muestran los primeros {{shown}}.",
     "noResults": "Sin resultados. Pruebe con otra palabra.",
     "resultsLabel": "Resultados en la guía"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

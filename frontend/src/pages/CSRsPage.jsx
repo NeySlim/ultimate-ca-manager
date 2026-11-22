@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { EkuMultiSelect } from '../components'
 import { Input, Select, Textarea, ToggleSwitch, SegmentedField, SecretInput } from '../components/atelier/Form'
 import {
-  Zone, AtelierDialog, Icon, FieldError, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, LoadError, LoadCause,
+  Zone, AtelierDialog, Icon, FieldError, Btn, IconBtn, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, EmptyBlock, NoMatch, LoadError, LoadCause,
   useSortParam,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
@@ -29,14 +29,14 @@ import {
   CSR_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
   groupedOptions, isUsable, listAlgorithms,
 } from '../lib/keyAlgorithms'
-import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { issueWithSubjectOverride } from '../lib/uniqueSubject'
 import { dateOf } from './admin/adminDates'
-import { PemPanel } from './certificates/inspector/PemPanel'
+import { CsrSections, csrSections, csrName as csrNameOf, csrSubject as csrSubjectOf, csrPill as csrPillOf, csrRequester, csrKey } from './csrs/CsrSections'
+import { useDetached } from '../components/detached/useDetached'
 import { CertMenu } from './certificates/inspector/CertMenu'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
@@ -57,6 +57,7 @@ export default function CSRsPage() {
   const locale = i18n?.language || 'en'
   const navigate = useNavigate()
   const openEntity = useOpenEntity()
+  const detached = useDetached()
   const { showSuccess, showError, showInfo, showConfirm, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
   // Direct private-key export is the admin-only read:private_keys scope,
@@ -912,14 +913,10 @@ export default function CSRsPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const openCSR = (row) => setSelectedCSR(row)
   const signed = activeTab === 'history'
-  const csrName = (row) => t('csrs.module.name', { id: row.id })
-  const csrSubject = (row) => row.common_name || row.cn || row.subject || t('common.unnamed')
-  const csrRequester = (row) => row.requester || row.created_by || '—'
-  const csrKey = (row) => certificateKeyLabel(row) || '—'
+  const csrName = (row) => csrNameOf(t, row)
+  const csrSubject = (row) => csrSubjectOf(t, row)
   const csrDate = (row) => dateOf(row.created_at, locale) || '—'
-  const csrPill = (row) => (row.status === 'Signed' || (signed && row.status !== 'Pending')
-    ? <Pill label={t('csrs.states.signed')} tone="good" />
-    : <Pill label={t('csrs.states.pending')} tone="warn" />)
+  const csrPill = (row) => csrPillOf(t, row, signed)
   const pages = Math.max(1, Math.ceil(listTotal / perPage))
   const first = listTotal ? (page - 1) * perPage + 1 : 0
   const last = Math.min(listTotal, page * perPage)
@@ -928,10 +925,6 @@ export default function CSRsPage() {
 
   const open = selectedCSR
   const openSigned = open && (open.status === 'Signed' || signed)
-  const summary = open && (openSigned
-    ? t('csrs.module.signedSummary', { ca: open.signed_by || open.issuer_name || '—', date: dateOf(open.signed_at || open.valid_from, locale) || '—' })
-    : (open.descr || t('csrs.module.pendingSummary')))
-  const sans = open ? (open.sans?.length ? open.sans : (open.san_combined ? open.san_combined.split(',').map((s) => s.trim()).filter(Boolean) : [])) : []
   const menuItems = open ? [
     !openSigned && canExportKey && open.has_private_key && { id: 'key', icon: 'key', label: t('csrs.downloadKey'), onClick: () => handleDownloadKey(open) },
     !openSigned && write && !open.has_private_key && { id: 'upload-key', icon: 'upload', label: t('csrs.uploadKey'), write: true, onClick: () => setShowKeyModal(true) },
@@ -945,10 +938,11 @@ export default function CSRsPage() {
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('common.csrs') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
-      tabs={[{ key: open.id, title: csrName(open), icon: 'file' }]} onClose={() => setSelectedCSR(null)}>
+      tabs={[{ key: open.id, title: csrName(open), icon: 'file' }]} onClose={() => setSelectedCSR(null)}
+      onDetach={detached?.available ? () => { detached.open('csr', [open.id]); setSelectedCSR(null) } : undefined}>
       <DockBody icon="file" title={csrName(open)} badge={csrPill(open)} section={section} onSection={setSection}
         sectionsLabel={t('atelier.sectionsOf', { name: csrName(open) })}
-        sections={[['overview', t('atelier.overview')], ['details', t('csrs.module.details')], ...(openSigned ? [] : [['pem', 'PEM']])]}
+        sections={csrSections(t, openSigned)}
         actions={<>
           {openSigned ? (
             canReadCertificates && <Btn icon="download" id="csr-download-cert" onClick={() => handleDownloadCertificate(open)}>{t('common.downloadCertificate')}</Btn>
@@ -962,43 +956,7 @@ export default function CSRsPage() {
             <IconBtn quiet icon="more" title={false} label={t('csrs.module.moreActions', { name: csrName(open) })} data-csr-menu={open.id} onClick={() => setMenuOpen(true)} />
           )}
         </>}>
-        {section === 'overview' && (
-          <div className="module-detail">
-            <Section title={t('atelier.properties')}>
-              <Props items={[
-                [t('csrs.module.subject'), csrSubject(open)],
-                [t('csrs.module.requester'), csrRequester(open)],
-                [t('csrs.module.key'), csrKey(open)],
-                [t('csrs.module.submitted'), csrDate(open)],
-                [t('atelier.state'), csrPill(open)],
-                openSigned && [t('common.signedBy'), open.signed_by || open.issuer_name || '—'],
-                openSigned && [t('common.expires'), dateOf(open.valid_to, locale) || '—'],
-                openSigned && open.serial_number && [t('common.serial'), <span key="serial" className="mono">{serialHex(open.serial_number)}</span>],
-              ]} />
-            </Section>
-            <Section title={t('atelier.summary')}><p className="summary">{summary}</p></Section>
-          </div>
-        )}
-        {section === 'details' && (
-          <div className="module-detail">
-            <Section title={t('common.subject')}>
-              <Props items={[
-                [t('common.organization'), open.organization || '—'],
-                [t('common.orgUnit'), open.organizational_unit || '—'],
-                [t('common.country'), open.country || '—'],
-                [t('common.state'), open.state || '—'],
-                [t('common.locality'), open.locality || '—'],
-                [t('common.email'), open.email || '—'],
-                [t('common.signature'), open.signature_algorithm || '—'],
-              ]} />
-            </Section>
-            <Section title={t('common.subjectAltNames')}>
-              {sans.length ? <ul className="record-list">{sans.map((s) => <li key={s}><div className="rl-main"><span className="mono">{s}</span></div></li>)}</ul>
-                : <p className="muted small">{t('csrs.module.noSans')}</p>}
-            </Section>
-          </div>
-        )}
-        {section === 'pem' && <PemPanel cert={open} />}
+        <CsrSections csr={open} signed={openSigned} section={section} />
       </DockBody>
     </Dock>
   )

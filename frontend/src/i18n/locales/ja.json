@@ -5181,13 +5181,17 @@
     "differences_one": "{{count}} 件の相違",
     "differences_other": "{{count}} 件の相違",
     "differences": "{{count}}件の差異",
-    "twoTitle": "2つの証明書を比較",
     "lead": "異なるプロパティを強調表示します。",
     "property": "プロパティ",
-    "authority": "認証局",
-    "keyHeld": "あり",
-    "keyAbsent": "なし",
-    "close": "比較を閉じる"
+    "close": "比較を閉じる",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read."
   },
   "members": {
     "manageMembers": "メンバーの管理",
@@ -5515,7 +5519,8 @@
       "noAudit": "このロールでは監査ログを読み取れないため、証明書レコードの日付のみ表示しています。",
       "auditFailed": "監査ログを読み取れなかったため、証明書レコードの日付のみ表示しています。",
       "scope": "証明書に対する直近 {{count}} 件の操作に含まれる監査ログのエントリと、証明書レコードの日付。"
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "一致する結果がありません",
@@ -7934,6 +7939,21 @@
       "text": "読み込み済みのデータで閲覧を続けられます。操作は一時停止中で、ネットワークが戻ると自動的に再開します。",
       "said": "オフライン: 閲覧は続けられますが、操作は一時停止中です。",
       "back": "接続が回復しました。操作を再び利用できます。"
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      }
     }
   },
   "overview": {
@@ -8364,5 +8384,10 @@
     "resultsShown": "先頭の {{shown}} 件を表示しています。",
     "noResults": "結果がありません。別の語句をお試しください。",
     "resultsLabel": "ガイド内の検索結果"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

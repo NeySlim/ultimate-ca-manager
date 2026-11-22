@@ -1,0 +1,58 @@
+/**
+ * Geometry of the detached windows: a rect { x, y, w, h } in viewport pixels, always kept inside
+ * the visible area, never under the minimum size, cascaded on opening.
+ */
+export const MIN_W = 360
+export const MIN_H = 220
+export const STEP = 20
+const CASCADE = 28
+const ORIGIN = { x: 96, y: 72 }
+
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi))
+
+/** The viewport as the windows see it: above the status bar, which stays reachable under them. */
+export const viewport = () => {
+  const bar = document.querySelector('.shell-app .statusbar')?.getBoundingClientRect().height || 0
+  return { w: window.innerWidth, h: Math.max(0, window.innerHeight - bar) }
+}
+
+/** The rect moved and shrunk to fit the viewport: inside it whole, as large as it fits, never under the minimum. */
+export function clampRect(rect, view) {
+  const w = clamp(Math.round(rect.w), MIN_W, view.w)
+  const h = clamp(Math.round(rect.h), MIN_H, view.h)
+  return { x: clamp(Math.round(rect.x), 0, view.w - w), y: clamp(Math.round(rect.y), 0, view.h - h), w, h }
+}
+
+/** The n-th window opened: down and to the right of the one before, back to the top after eight. */
+export function cascadeRect(n, size, view) {
+  const step = (n % 8) * CASCADE
+  return clampRect({ x: ORIGIN.x + step, y: ORIGIN.y + step, w: size.w, h: size.h }, view)
+}
+
+/** A drag of the edge (n, s, e, w or a corner such as 'se') by dx, dy: the opposite edges stay put. */
+export function resizeRect(rect, edge, dx, dy, view) {
+  let { x, y, w, h } = rect
+  if (edge.includes('e')) w = clamp(w + dx, MIN_W, view.w - x)
+  if (edge.includes('s')) h = clamp(h + dy, MIN_H, view.h - y)
+  if (edge.includes('w')) {
+    const right = x + w
+    const nx = clamp(x + dx, 0, right - MIN_W)
+    w = right - nx
+    x = nx
+  }
+  if (edge.includes('n')) {
+    const bottom = y + h
+    const ny = clamp(y + dy, 0, bottom - MIN_H)
+    h = bottom - ny
+    y = ny
+  }
+  return clampRect({ x, y, w, h }, view)
+}
+
+/** The keyboard of the window's handle: arrows move it, Shift and arrows resize it. */
+export function keyRect(rect, key, shift, view) {
+  const d = { ArrowLeft: [-STEP, 0], ArrowRight: [STEP, 0], ArrowUp: [0, -STEP], ArrowDown: [0, STEP] }[key]
+  if (!d) return null
+  if (shift) return clampRect({ ...rect, w: rect.w + d[0], h: rect.h + d[1] }, view)
+  return clampRect({ ...rect, x: rect.x + d[0], y: rect.y + d[1] }, view)
+}

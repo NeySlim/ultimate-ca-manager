@@ -75,7 +75,8 @@ function useSideData(ca, { readCrl, readCerts }) {
   return { detail: detail?.id === id ? detail : null, setDetail, crl, revoked }
 }
 
-export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick, onIssue, onCleared, asideRef }) {
+/** onDetach: opens the authority in a detached window (a tool of the head); idPrefix: the window's own ids. */
+export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick, onIssue, onCleared, asideRef, onDetach, idPrefix = '' }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { showSuccess, showError } = useNotification()
@@ -128,14 +129,20 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
   const importKey = handler('importKey')
 
   return (
-    <aside className="panel ca-side" aria-labelledby="ca-side-title" data-testid="ca-side" ref={asideRef}>
+    <aside className="panel ca-side" aria-labelledby={`${idPrefix}ca-side-title`} data-testid="ca-side" ref={asideRef}>
       <header className="ca-side-head">
         <Icon name={root ? 'shield' : 'branch'} />
         <div>
-          <h2 id="ca-side-title">{name}</h2>
+          <h2 id={`${idPrefix}ca-side-title`}>{name}</h2>
           <p>{ca.organization || t(root ? 'common.rootCA' : 'common.intermediateCA')}</p>
           <div className="ca-badges"><CAStatePill ca={ca} t={t} /><CAMarks ca={ca} t={t} /></div>
         </div>
+        {onDetach && (
+          <button type="button" className="icon-btn quiet" data-action="ca-detach" style={{ marginLeft: 'auto' }}
+            aria-label={t('inspector.detach')} title={t('inspector.detach')} onClick={onDetach}>
+            <Icon name="layers" />
+          </button>
+        )}
       </header>
 
       {(ca.pending || ca.status === 'Pending') && <p className="notice warn"><Icon name="clock" />{t('cas.awaitingBannerText')}</p>}
@@ -264,18 +271,18 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
         )}
         {canWrite('certificates') && (
           <button type="button" className="btn" data-issue-ca={ca.id} data-write="" disabled={!!reason}
-            aria-describedby={reason ? 'issue-blocked' : undefined} onClick={() => onIssue?.(ca)}>
+            aria-describedby={reason ? `${idPrefix}issue-blocked` : undefined} onClick={() => onIssue?.(ca)}>
             <Icon name="plus" />{t('cas.side.issueWith')}
           </button>
         )}
-        {canWrite('certificates') && reason && <p className="notice" id="issue-blocked"><Icon name="help" />{reason}</p>}
+        {canWrite('certificates') && reason && <p className="notice" id={`${idPrefix}issue-blocked`}><Icon name="help" />{reason}</p>}
         {!ca.pending && (
           <button type="button" className="btn" data-chain-download={ca.id} onClick={downloadChain}>
             <Icon name="download" />{t('cas.side.downloadChain')}
           </button>
         )}
         {menu.length > 0 && (
-          <button type="button" className="btn" id="ca-more-actions" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+          <button type="button" className="btn" id={`${idPrefix}ca-more-actions`} aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
             <Icon name="more" />{t('cas.side.moreActions')}
           </button>
         )}

@@ -5181,13 +5181,17 @@
     "differences_one": "{{count}} Unterschied",
     "differences_other": "{{count}} Unterschiede",
     "differences": "{{count}} Unterschiede",
-    "twoTitle": "Zwei Zertifikate vergleichen",
     "lead": "Die abweichenden Eigenschaften sind hervorgehoben.",
     "property": "Eigenschaft",
-    "authority": "CA",
-    "keyHeld": "Vorhanden",
-    "keyAbsent": "Nicht vorhanden",
-    "close": "Vergleich schließen"
+    "close": "Vergleich schließen",
+    "countTitle_one": "Compare {{count}} certificate",
+    "countTitle_other": "Compare {{count}} certificates",
+    "key": "Key algorithm and size",
+    "usages": "Key usages",
+    "onlyDifferences": "Show only the differences",
+    "noDifference": "No line differs between these certificates.",
+    "differs": "differs",
+    "loadFailed": "A certificate of the comparison could not be read."
   },
   "members": {
     "manageMembers": "Mitglieder verwalten",
@@ -5515,7 +5519,8 @@
       "noAudit": "Ihre Rolle darf das Audit-Protokoll nicht lesen: Es werden nur die Daten des Zertifikatseintrags angezeigt.",
       "auditFailed": "Das Audit-Protokoll konnte nicht gelesen werden: Es werden nur die Daten des Zertifikatseintrags angezeigt.",
       "scope": "Einträge des Audit-Protokolls unter den letzten {{count}} Vorgängen an Zertifikaten sowie die Daten des Zertifikatseintrags."
-    }
+    },
+    "detach": "Detach into a window"
   },
   "table": {
     "noResults": "Keine passenden Ergebnisse",
@@ -7934,6 +7939,21 @@
       "text": "Die Ansicht läuft mit den bereits geladenen Daten weiter; Aktionen sind ausgesetzt und werden bei Rückkehr des Netzwerks von selbst wieder möglich.",
       "said": "Offline: Die Ansicht läuft weiter, Aktionen sind ausgesetzt.",
       "back": "Verbindung wiederhergestellt: Aktionen sind wieder verfügbar."
+    },
+    "activity": {
+      "label": "Activity",
+      "calm": "Nothing pending",
+      "queue_one": "{{count}} to act on",
+      "queue_other": "{{count}} to act on",
+      "windows_one": "{{count}} window",
+      "windows_other": "{{count}} windows",
+      "windowsLabel": "Detached windows",
+      "jobs": {
+        "backup": "Backup in progress",
+        "restore": "Restore in progress",
+        "audit_verify": "Audit chain check in progress",
+        "other": "Background task in progress"
+      }
     }
   },
   "overview": {
@@ -8364,5 +8384,10 @@
     "resultsShown": "Die ersten {{shown}} werden aufgeführt.",
     "noResults": "Keine Ergebnisse. Versuchen Sie ein anderes Wort.",
     "resultsLabel": "Ergebnisse im Handbuch"
+  },
+  "detached": {
+    "moveHandle": "Move or resize the window",
+    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
+    "close": "Close the window {{name}}"
   }
 }

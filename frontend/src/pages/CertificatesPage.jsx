@@ -31,6 +31,7 @@ import { CertificateInspector } from './certificates/inspector/CertificateInspec
 import { ExportDialog } from './certificates/dialogs/ExportDialog'
 import { BulkExportDialog } from './certificates/dialogs/BulkExportDialog'
 import { CompareDialog } from './certificates/dialogs/CompareDialog'
+import { useDetached } from '../components/detached/useDetached'
 import { FiltersDialog } from './certificates/dialogs/FiltersDialog'
 import { certificateKeyLabel } from '../lib/certificateDetail'
 
@@ -61,6 +62,7 @@ function readPresets() {
 }
 
 const DEFAULT_SORT = { key: 'days', asc: true }
+const COMPARE_MAX = 4
 const SORT_KEYS = Object.keys(SORT_FIELDS)
 
 export default function CertificatesPage() {
@@ -70,6 +72,7 @@ export default function CertificatesPage() {
   const location = useLocation()
   const openEntity = useOpenEntity()
   const { opened = [], activeKey, closeOnNav } = useInspector()
+  const detached = useDetached()
   const docked = opened.find((o) => o.key === activeKey)
   const dockedId = docked?.type === 'certificate' ? Number(docked.entityId) : undefined
   const { addToHistory } = useRecentHistory('certificates')
@@ -376,6 +379,12 @@ export default function CertificatesPage() {
   const selCount = selectAll ? total : selectedRows.length
   const pageAll = rows.length > 0 && rows.every((r) => selectedIds.has(r.id))
   const clearSelection = () => { setSelectedIds(new Set()); setSelectAll(false) }
+  // Two to four ticked certificates side by side: in a detached window, else (a phone) in the mockup's dialog
+  const compare = () => {
+    const ids = selectedRows.slice(0, COMPARE_MAX).map((r) => r.id)
+    if (detached?.available) detached.open('compare', ids)
+    else setDialog('compare')
+  }
 
   const allRows = async () => {
     const { rows: list, complete } = await fetchPages(exportLoader, { perPage: 100, max: EXPORT_MAX })
@@ -482,7 +491,7 @@ export default function CertificatesPage() {
         <BulkExportDialog all={dialog === 'bulk-all' || selectAll} count={dialog === 'bulk-all' ? total : selCount} pageCount={rows.length} query={searchValue.trim()}
           onExport={(format) => runBulkExport(format, dialog === 'bulk-all')} onClose={() => setDialog(null)} />
       )}
-      {dialog === 'compare' && selectedRows.length === 2 && <CompareDialog pair={selectedRows} onClose={() => setDialog(null)} />}
+      {dialog === 'compare' && selectedRows.length >= 2 && <CompareDialog ids={selectedRows.slice(0, COMPARE_MAX).map((r) => r.id)} onClose={() => setDialog(null)} />}
       {dialog === 'filters' && (
         <FiltersDialog template={savedTemplate.includes('modified') ? 'modified' : ''}
           onTemplate={(v) => { setPage(1); leaveLink(); setFilterTemplate(v ? [v] : []) }} presets={presets} canSave={narrowed || linkView || activeStatus.length > 0}
@@ -557,7 +566,7 @@ export default function CertificatesPage() {
               : pageAll && total > rows.length
                 ? <button type="button" className="text-link" id="select-all-results" data-action="select-results" onClick={() => setSelectAll(true)}>{t('certificates.selectAllResults', { count: total })}</button>
                 : null}>
-            <Btn icon="compare" data-action="compare" disabled={selectAll || n !== 2 || undefined} onClick={() => setDialog('compare')}>{t('common.compare')}</Btn>
+            <Btn icon="compare" data-action="compare" disabled={selectAll || n < 2 || n > COMPARE_MAX || undefined} onClick={compare}>{t('common.compare')}</Btn>
             <Btn icon="download" id="bulk-export" data-action="bulk-export" onClick={() => setDialog('bulk')}>{t('certificates.exportSelection')}</Btn>
           </BatchBar>
         )}
