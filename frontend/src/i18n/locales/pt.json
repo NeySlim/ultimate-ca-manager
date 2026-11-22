@@ -266,7 +266,7 @@
     "permissions": "Permissões",
     "config": "Configuração",
     "deleteAccount": "Eliminar conta",
-    "deactivateAccount": "Deactivate Conta",
+    "deactivateAccount": "Desativar conta",
     "searchCertificates": "Pesquisar certificados...",
     "challenges": "Desafios",
     "accountInformation": "Conta Informação",
@@ -290,7 +290,7 @@
     "aboutTrustStore": "Acerca Armazém de Confiança",
     "bestPractices": "Melhores Práticas",
     "endEntity": "Entidade Final",
-    "detailsExpiring": "Expiring",
+    "detailsExpiring": "A expirar",
     "purpose": "Finalidade",
     "securityNote": "Segurança Note",
     "technicalDetails": "Technical Detalhes",
@@ -318,7 +318,7 @@
     "aboutAPIKeys": "Acerca Chaves de API",
     "hsm": "Gestão de HSM",
     "searchProviders": "Pesquisar providers...",
-    "enableProvider": "Activar provider",
+    "enableProvider": "Ativar fornecedor",
     "clientId": "ID de Cliente",
     "clientSecret": "Segredo de Cliente",
     "passwordMismatch": "As palavras-passe não coincidem",
@@ -551,7 +551,7 @@
     "ssoProviderDisabled": "SSO provider é desactivado",
     "ssoInvalidState": "Estado SSO inválido. Tente novamente.",
     "ssoTokenFailed": "Troca de token SSO falhou",
-    "ssoUserinfoFailed": "Falhado para get user information",
+    "ssoUserinfoFailed": "Falha ao obter as informações do utilizador",
     "ssoNoUsername": "SSO: não foi possível determinar o nome de utilizador",
     "ssoUserCreationFailed": "Falha ao criar a conta de utilizador",
     "ssoAutoCreateDisabled": "Utilizador não encontrado. A criação automática de contas está desativada. Contacte o seu administrador.",
@@ -1280,7 +1280,7 @@
     "cnPlaceholder": "Minha autoridade certificadora",
     "orgPlaceholder": "Minha empresa",
     "localityPlaceholder": "São Paulo",
-    "exportFailed": "Falhado para export AC",
+    "exportFailed": "Falha ao exportar a CA",
     "passwordTooShort": "A senha deve ter pelo menos 12 caracteres",
     "exportedAs": "AC exported as {{format}}",
     "createFailed": "Falha ao criar AC",
@@ -1594,7 +1594,7 @@
     "invalidKeyFormat": "Formato de chave privada inválido: tem de estar em formato PEM",
     "provideKey": "Forneça uma chave privada",
     "uploadFailed": "Falha ao carregar o CSR",
-    "signFailed": "Falhado para sign Pedido de Certificado",
+    "signFailed": "Falha ao assinar o pedido de certificado",
     "deleteCSR": "Eliminar Pedido de Certificado",
     "deleteFailed": "Falha ao eliminar Pedido de Certificado",
     "keyUploadFailed": "Falha ao carregar a chave privada",
@@ -1716,7 +1716,7 @@
     "sanTypesAny": "Qualquer tipo",
     "enforceSanTypes": "Aplicar os tipos de SAN permitidos",
     "enforceSanTypesDescription": "Um pedido com outro tipo de nome é recusado. Desativado nos modelos criados antes desta opção, incluindo os integrados: não recusam nada até ser ativado.",
-    "templateTypes": "Modelo Types",
+    "templateTypes": "Tipos de modelo",
     "endEntityCerts": "Certs Entidade Final (servidores, utilizadores)",
     "intermediateCAs": "ACs Intermédias",
     "importDescription": "Importe um modelo de certificado a partir de um ficheiro JSON ou cole conteúdo JSON",
@@ -2019,7 +2019,7 @@
     "title": "Protocolo ACME",
     "accounts": "Contas",
     "createAccount": "Criar conta",
-    "newAccount": "New Conta",
+    "newAccount": "Nova conta",
     "accountEmail": "Email da conta",
     "directory": "URL do diretório",
     "endpoints": "Endpoints ACME",
@@ -2036,7 +2036,7 @@
     "accepted": "Aceite",
     "notAccepted": "Não Aceite",
     "noCertificateOrders": "Sem pedidos de certificado",
-    "noActiveChallenges": "Não active challenges",
+    "noActiveChallenges": "Sem desafios ativos",
     "acmeServer": "Servidor ACME local",
     "enableAcmeServer": "Ativar servidor ACME",
     "enableAcmeServerDesc": "Permitir emissão automática de certificados via ACME",
@@ -2056,7 +2056,7 @@
     "setupRequired": "Setup Obrigatório",
     "leProxy": "Proxy LE",
     "aboutAcmeInfo": "O ACME (Automatic Certificate Management Environment) permite a emissão automatizada de certificados. Compatível com certbot, acme.sh e outros clientes ACME.",
-    "letsEncryptProxyTip": "Activar o LE Proxy para forward requests para Let's Encrypt while maintaining centralized audit logging e control.",
+    "letsEncryptProxyTip": "Ative o proxy LE para reencaminhar pedidos para o Let's Encrypt mantendo o registo de auditoria e o controlo centralizados.",
     "accountSecurityWarning": "As contas ACME contêm chaves privadas. Desative ou elimine as contas não utilizadas para minimizar a exposição de segurança.",
     "certbotUsage": "Use este URL com certbot:",
     "deactivateAccountTitle": "Desativar esta conta ACME?",
@@ -2236,7 +2236,7 @@
     "defaultCA": "CA padrão",
     "testDnsAccess": "Testar DNS Acesso",
     "domainCreatedSuccess": "Domínio registado com sucesso",
-    "domainCreateFailed": "Falhado para register domain",
+    "domainCreateFailed": "Falha ao registar o domínio",
     "domainUpdatedSuccess": "Domínio atualizado com sucesso",
     "domainUpdateFailed": "Falha ao actualizar domain",
     "domainDeletedSuccess": "Domínio removido com sucesso",
@@ -2355,8 +2355,8 @@
       "expiresPlaceholder": "Deixe em branco para nunca expirar",
       "expiresHelp": "Opcional. A credencial deixa de ser utilizável após essa data.",
       "generate": "Gerar",
-      "requiredTitle": "Exigir External Account Binding",
-      "requiredDescription": "Quando ativado, toda requisição newAccount deve incluir um EAB válido. O directory anuncia externalAccountRequired=true.",
+      "requiredTitle": "Exigir External Account Binding (EAB)",
+      "requiredDescription": "Quando ativado, todos os pedidos newAccount têm de incluir um EAB válido. O diretório anuncia externalAccountRequired=true.",
       "requiredUpdated": "Exigência de EAB atualizada",
       "requiredUpdateFailed": "Falha ao atualizar a exigência de EAB",
       "createFailed": "Falha ao criar credencial EAB",
@@ -2671,7 +2671,7 @@
     "scepURL": "URL SCEP",
     "noRequests": "Sem pedidos SCEP",
     "noRequestsDesc": "Os pedidos de inscrição aparecerão aqui quando os dispositivos pedirem certificados através do protocolo SCEP",
-    "searchRequests": "Pesquisar requests...",
+    "searchRequests": "Pesquisar pedidos...",
     "transactionId": "ID da Transação",
     "requested": "Pedido",
     "id": "ID",
@@ -2683,7 +2683,7 @@
     "enableScepDesc": "Permitir aos dispositivos inscreverem-se via SCEP",
     "serverSettings": "Definições do servidor",
     "scepEndpointUrl": "URL do Endpoint SCEP",
-    "useThisUrl": "Use este URL em client configuration",
+    "useThisUrl": "Use este URL na configuração do cliente",
     "autoApprove": "Aprovar pedidos automaticamente",
     "autoApproveDesc": "Aprovar automaticamente pedidos SCEP válidos",
     "autoApproveWarning": "Aprovação automática ativada. Garanta que as palavras-passe de desafio são distribuídas de forma segura.",
@@ -2702,7 +2702,7 @@
     "supportedOperations": "Operações Suportadas",
     "ciscoExample": "Exemplo Cisco IOS",
     "rejectRequest": "Rejeitar Pedido SCEP",
-    "rejectEnrollment": "Reject enrollment request de:",
+    "rejectEnrollment": "Rejeitar pedido de inscrição de:",
     "rejectionReason": "Motivo de Rejeição (opcional)",
     "rejectionPlaceholder": "Enter reason para rejection...",
     "scepStats": "SCEP Estatísticas",
@@ -2844,7 +2844,7 @@
     "includeURLsNote": "Inclua estas URLs nas definições da CA para a verificação automática de revogação.",
     "autoRegenEnabled": "Regeneração automática ativada para {{name}}",
     "autoRegenDisabled": "Regeneração automática desativada para {{name}}",
-    "toggleAutoRegenFailed": "Falhado para toggle auto-regeneration",
+    "toggleAutoRegenFailed": "Falha ao alternar a regeneração automática",
     "ocspEnabled": "OCSP ativado para {{name}}",
     "ocspDisabled": "OCSP desativado para {{name}}",
     "toggleOcspFailed": "Falha ao alternar OCSP",
@@ -3085,7 +3085,7 @@
     "addCertificate": "Adicionar certificado",
     "addCertificatesForChain": "Adicione certificados para validar cadeias",
     "adding": "A adicionar...",
-    "allPurposes": "All Purposes",
+    "allPurposes": "Todas as finalidades",
     "category": "Categoria",
     "confirmRemove": "Remover certificado",
     "deleteSelected": "Eliminar seleção",
@@ -3170,9 +3170,9 @@
       "sslWarning": "⚠ A verificação SSL está desativada. As conexões são vulneráveis a ataques man-in-the-middle."
     },
     "export": {
-      "allCertsTitle": "Exportar All Certificados",
+      "allCertsTitle": "Exportar todos os certificados",
       "allCertsDesc": "Transferir todos os certificados num único ficheiro",
-      "allCAsTitle": "Exportar All CAs",
+      "allCAsTitle": "Exportar todas as CAs",
       "allCAsDesc": "Transferir todos os certificados de CA ({{count}} no total)",
       "pemBundle": "Bundle PEM",
       "p7bBundle": "Bundle P7B",
@@ -3255,7 +3255,7 @@
     "signatureValid": "Assinatura Válido",
     "requestedSans": "SANs Pedidos",
     "validCertificate": "Certificado Válido",
-    "notYetValid": "Not Yet Válido",
+    "notYetValid": "Ainda não válido",
     "endEntityCertificate": "Certificado de Entidade Final",
     "subjectCn": "Sujeito CN",
     "issuerCn": "Emissor CN",
@@ -3264,7 +3264,7 @@
     "sha1": "SHA-1",
     "sha256": "SHA-256",
     "keyMatchResults": "Chave Match Results",
-    "allItemsMatch": "All Itens Match!",
+    "allItemsMatch": "Todos os itens coincidem!",
     "mismatchDetected": "Não Correspondência Detetada",
     "matchCount": "{{matches}} correspondências, {{mismatches}} não correspondências",
     "parsedItems": "Parsed Itens",
@@ -3277,7 +3277,7 @@
     "pleaseEnterHostname": "Introduza um nome de host",
     "failedToCheckSsl": "Falha ao verificar o SSL",
     "pleasePasteCsr": "Cole um CSR",
-    "failedToDecodeCsr": "Falhado para decode Pedido de Certificado",
+    "failedToDecodeCsr": "Falha ao descodificar o pedido de certificado",
     "pleasePasteCert": "Cole um certificado",
     "failedToDecodeCert": "Falha ao descodificar o certificado",
     "pleaseProvideItem": "Forneça pelo menos um item para comparar",
@@ -4394,7 +4394,7 @@
       "update": "Atualização do UCM",
       "syslog": "Syslog alterado",
       "mtls": "mTLS alterado",
-      "ct": "Certificate Transparency alterado",
+      "ct": "Certificate Transparency alterada",
       "ctDetail": "Definições de CT guardadas."
     },
     "templateHtmlSource": "Código-fonte HTML",
@@ -4428,7 +4428,7 @@
     "qrCodeAlt": "Código QR do segredo do autenticador",
     "enterDigitCode": "2. Enter o 6-digit code:",
     "backupCodes": "Códigos de Segurança - Guarde Estes!",
-    "verifyAndEnable": "Verificar & Activar",
+    "verifyAndEnable": "Verificar e ativar",
     "securityKeys": "Chaves de segurança (WebAuthn/FIDO2)",
     "addKey": "Adicionar Chave",
     "noSecurityKeys": "Sem chaves de segurança registadas",
@@ -4452,11 +4452,11 @@
     "deleteCertConfirm": "Eliminar este certificado de cliente?",
     "certificateDeleted": "Certificado eliminado",
     "apiKeyTips": [
-      "API keys allow programmatic access to UCM",
-      "Keep your keys secret and rotate them regularly",
-      "Each key can have a custom expiration date"
+      "As chaves de API permitem o acesso programático ao UCM",
+      "Mantenha as suas chaves secretas e rode-as regularmente",
+      "Cada chave pode ter uma data de expiração personalizada"
     ],
-    "yourAPIKeys": "Your Chaves de API",
+    "yourAPIKeys": "As suas chaves de API",
     "createAPIKey": "Criar chave API",
     "createKey": "Criar Chave",
     "apiKeyName": "Nome da chave API",
@@ -4555,7 +4555,7 @@
     "roleName": "Nome da função",
     "assignedUsers": "Utilizadores atribuídos",
     "noRoles": "Sem funções definidas",
-    "noRolesDescription": "Criar custom roles para granular access control",
+    "noRolesDescription": "Crie funções personalizadas para um controlo de acesso granular",
     "searchRoles": "Pesquisar roles...",
     "inherits": "Herda",
     "inheritsFrom": "Inherits de",
@@ -4636,7 +4636,7 @@
     "mldsaUntestedGoogleKms": "O ML-DSA no Google Cloud KMS segue a API do KMS, mas ainda não foi testado com o serviço. O KMS assina no máximo 64 KiB, por isso uma CRL maior precisa de outro fornecedor.",
     "purposes": {
       "general": "Geral Finalidade",
-      "caSigning": "AC Signing"
+      "caSigning": "Assinatura de CA"
     },
     "pkcs11Config": {
       "libraryPath": "PKCS#11 Library Caminho",
@@ -5205,7 +5205,7 @@
     "newRequired": "A nova palavra-passe é obrigatória",
     "minLength": "Palavra-passe deve ser em least 8 characters",
     "changeSuccess": "Palavra-passe changed successfully",
-    "changeFailed": "Falhado para change password"
+    "changeFailed": "Falha ao alterar a palavra-passe"
   },
   "import": {
     "smartImport": "Smart Importar",
@@ -5239,9 +5239,9 @@
     "importingObjects": "a importar objects...",
     "importComplete": "Importar Concluído",
     "noObjectsImported": "Não Objects Imported",
-    "allSkipped": "All objects foram skipped ou already exist",
+    "allSkipped": "Todos os objetos foram ignorados ou já existem",
     "privateKeysMatched": "chave(s) privada(s) correspondida(s)",
-    "importMore": "Importar More",
+    "importMore": "Importar mais",
     "allFormats": "Todos os formatos: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "dropFileHere": "Largue um ficheiro aqui ou",
     "filePassword": "Senha de descriptografia para este arquivo",
@@ -5754,7 +5754,7 @@
         "csr": "Tem certeza de que deseja excluir este CSR?",
         "generic": "Tem certeza de que deseja excluir este item?",
         "group": "Tem certeza de que deseja excluir este grupo?",
-        "template": "Tem certeza de que deseja excluir este template?",
+        "template": "Tem certeza de que deseja excluir este modelo?",
         "truststore": "Remover este certificado do trust store?",
         "user": "Tem certeza de que deseja excluir este usuário?",
         "sshCa": "Tem a certeza de que pretende eliminar esta CA SSH? Esta ação não pode ser anulada."
@@ -5786,7 +5786,7 @@
         "policy": "Falha ao criar política",
         "provider": "Falha ao salvar provedor",
         "role": "Falha ao criar função",
-        "template": "Falha ao criar template",
+        "template": "Falha ao criar modelo",
         "user": "Falha ao criar usuário",
         "sshCa": "Falha ao criar CA SSH"
       },
@@ -5807,7 +5807,7 @@
         "policy": "Falha ao excluir política",
         "provider": "Falha ao excluir provedor",
         "role": "Falha ao excluir função",
-        "template": "Falha ao excluir template",
+        "template": "Falha ao excluir modelo",
         "truststore": "Falha ao remover certificado do trust store",
         "user": "Falha ao excluir usuário",
         "sshCa": "Falha ao eliminar CA SSH",
@@ -5815,7 +5815,7 @@
       },
       "duplicateFailed": {
         "generic": "Falha ao duplicar",
-        "template": "Falha ao duplicar template"
+        "template": "Falha ao duplicar modelo"
       },
       "email": {
         "testFailed": "Falha ao enviar e-mail de teste"
@@ -5823,7 +5823,7 @@
       "exportFailed": {
         "certificate": "Falha ao exportar certificado",
         "generic": "Falha ao exportar",
-        "template": "Falha ao exportar template"
+        "template": "Falha ao exportar modelo"
       },
       "hsm": {
         "testFailed": "Falha no teste de conexão",
@@ -5835,7 +5835,7 @@
       },
       "importFailed": {
         "generic": "Falha ao importar",
-        "template": "Falha ao importar template",
+        "template": "Falha ao importar modelo",
         "truststore": "Falha ao adicionar certificado ao trust store"
       },
       "loadFailed": {
@@ -5878,7 +5878,7 @@
         "policy": "Falha ao atualizar política",
         "role": "Falha ao atualizar função",
         "settings": "Falha ao salvar configurações",
-        "template": "Falha ao atualizar template",
+        "template": "Falha ao atualizar modelo",
         "user": "Falha ao atualizar usuário",
         "sshCa": "Falha ao atualizar CA SSH"
       },
@@ -5904,7 +5904,7 @@
         "policy": "Política criada",
         "provider": "Provedor criado",
         "role": "Função criada",
-        "template": "Template criado com sucesso",
+        "template": "Modelo criado com sucesso",
         "user": "Usuário criado com sucesso",
         "sshCa": "CA SSH criada com sucesso",
         "sshCertificate": "Certificado SSH emitido com sucesso",
@@ -5933,14 +5933,14 @@
         "policy": "Política excluída",
         "provider": "Provedor excluído",
         "role": "Função excluída",
-        "template": "Template excluído com sucesso",
+        "template": "Modelo excluído com sucesso",
         "truststore": "Certificado removido do trust store",
         "user": "Usuário excluído com sucesso",
         "sshCa": "CA SSH eliminada com sucesso",
         "sshCertificate": "Certificado SSH eliminado com sucesso"
       },
       "duplicate": {
-        "template": "Template duplicado com sucesso"
+        "template": "Modelo duplicado com sucesso"
       },
       "email": {
         "testSent": "E-mail de teste enviado com sucesso"
@@ -5950,7 +5950,7 @@
         "ca": "CA exportada com sucesso",
         "certificate": "Certificado exportado com sucesso",
         "database": "Banco de dados exportado com sucesso",
-        "template": "Template exportado com sucesso"
+        "template": "Modelo exportado com sucesso"
       },
       "hsm": {
         "connectionOk": "Conexão bem-sucedida",
@@ -5968,7 +5968,7 @@
         "backup": "Backup restaurado com sucesso",
         "ca": "CA importada com sucesso",
         "certificate": "Certificado importado com sucesso",
-        "template": "Template importado com sucesso",
+        "template": "Modelo importado com sucesso",
         "truststore": "Certificado adicionado ao trust store"
       },
       "other": {
@@ -5988,7 +5988,7 @@
         "provider": "Provedor atualizado",
         "role": "Função atualizada",
         "settings": "Configurações salvas com sucesso",
-        "template": "Template atualizado com sucesso",
+        "template": "Modelo atualizado com sucesso",
         "user": "Usuário atualizado com sucesso",
         "sshCa": "CA SSH atualizada com sucesso"
       },
@@ -6198,7 +6198,7 @@
       "intent": "Inventários agendados e datas de vencimento.",
       "total_one": "{{count}} relatório agendado",
       "total_other": "{{count}} relatórios agendados",
-      "hint": "Tick several reports to download them or suspend their schedule together; the figures follow the inventory, as the overview does.",
+      "hint": "Selecione vários relatórios para os descarregar em conjunto; os valores seguem o inventário, tal como a vista geral.",
       "hintRead": "Um nome abre o detalhe.",
       "emptyTitle": "Nenhum relatório agendado",
       "emptyText": "Um relatório envia por e-mail o inventário, as datas de vencimento ou a conformidade, com a frequência escolhida.",
@@ -8176,12 +8176,12 @@
       "cards": "Cartões",
       "cardsLabel": "Cartões: mostrar, ocultar, reordenar",
       "dialogTitle": "Cartões da visão geral",
-      "dialogSub": "Show, hide and reorder.",
+      "dialogSub": "Mostrar, ocultar e reordenar.",
       "saved": "A ordem e os cartões ocultos são guardados com a sua conta.",
       "up": "Mover {{name}} para cima",
       "down": "Mover {{name}} para baixo",
       "hide": "Ocultar o cartão",
-      "hidden": "{{name}} is hidden. The Cards button shows it again.",
+      "hidden": "{{name}} está oculto. O botão Cartões volta a mostrá-lo.",
       "listLabel": "Cartões, pela ordem da página",
       "queueShown": "Cartão A tratar novamente apresentado."
     },

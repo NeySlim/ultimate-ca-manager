@@ -290,7 +290,7 @@
     "aboutTrustStore": "トラストストアについて",
     "bestPractices": "ベストプラクティス",
     "endEntity": "エンドエンティティ",
-    "detailsExpiring": "Expiring",
+    "detailsExpiring": "まもなく期限切れ",
     "purpose": "用途",
     "securityNote": "セキュリティ上の注意",
     "technicalDetails": "技術詳細",
@@ -4256,7 +4256,7 @@
           "remedy": "FIPS の範囲内に置く必要がある鍵には、PKCS#11、Azure Key Vault、OpenBao のプロバイダーを使用してください。"
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "title": "FIPS モードが拒否する HSM 鍵（2048 ビット未満の RSA、P-256/P-384/P-521 以外の曲線、Ed25519、Ed448、ML-DSA、ChaCha20-Poly1305、不明な種類）",
           "remedy": "RSA 2048 以上、ECDSA P-256/P-384/P-521、または AES の鍵に置き換えてください。FIPS モードでは、これらの種類以外の OpenBao および Vault Transit の鍵は一覧に表示されなくなります。"
         },
         "dns_tsig_hmac_md5": {
@@ -4452,9 +4452,9 @@
     "deleteCertConfirm": "このクライアント証明書を削除しますか？",
     "certificateDeleted": "証明書が削除されました",
     "apiKeyTips": [
-      "API keys allow programmatic access to UCM",
-      "Keep your keys secret and rotate them regularly",
-      "Each key can have a custom expiration date"
+      "API キーを使うと UCM にプログラムからアクセスできます",
+      "キーは秘密にし、定期的にローテーションしてください",
+      "キーごとに有効期限を設定できます"
     ],
     "yourAPIKeys": "あなたのAPIキー",
     "createAPIKey": "APIキーを作成",
@@ -6198,7 +6198,7 @@
       "intent": "スケジュールされたインベントリと期限。",
       "total_one": "スケジュール済みレポート {{count}} 件",
       "total_other": "スケジュール済みレポート {{count}} 件",
-      "hint": "Tick several reports to download them or suspend their schedule together; the figures follow the inventory, as the overview does.",
+      "hint": "複数のレポートにチェックを入れると、まとめてダウンロードするか、スケジュールを一時停止できます。数値は概要と同様に、インベントリに従います。",
       "hintRead": "名前を選ぶと詳細が開きます。",
       "emptyTitle": "スケジュール済みのレポートはありません",
       "emptyText": "レポートは、選択した頻度で、インベントリ、期限、コンプライアンスをメールで送信します。",
@@ -7216,7 +7216,7 @@
     "certType": "タイプ",
     "typeUser": "ユーザー",
     "typeHost": "ホスト",
-    "principals": "Principal",
+    "principals": "プリンシパル",
     "validFrom": "有効開始日",
     "validTo": "有効期限",
     "serial": "シリアル番号",
@@ -7918,7 +7918,7 @@
       "manager": "マネージャー",
       "all": "すべてのカード",
       "short": "プリセット",
-      "allHint": "Every card, in the initial order",
+      "allHint": "すべてのカード、初期の順序",
       "rowLabel": "プリセット"
     },
     "cards": {
@@ -8176,12 +8176,12 @@
       "cards": "カード",
       "cardsLabel": "カード: 表示、非表示、並べ替え",
       "dialogTitle": "概要のカード",
-      "dialogSub": "Show, hide and reorder.",
+      "dialogSub": "表示、非表示、並べ替え",
       "saved": "順序と非表示のカードは、アカウントに保存されます。",
       "up": "{{name}} を上へ移動",
       "down": "{{name}} を下へ移動",
       "hide": "カードを非表示",
-      "hidden": "{{name}} is hidden. The Cards button shows it again.",
+      "hidden": "{{name}} は非表示です。「カード」ボタンで再表示できます。",
       "listLabel": "カード（ページの表示順）",
       "queueShown": "「要処理」カードを再表示しました。"
     },

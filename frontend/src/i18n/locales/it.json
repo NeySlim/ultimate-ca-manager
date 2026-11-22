@@ -290,7 +290,7 @@
     "aboutTrustStore": "Informazioni sullo Store di Fiducia",
     "bestPractices": "Migliori Pratiche",
     "endEntity": "Entità Finale",
-    "detailsExpiring": "Expiring",
+    "detailsExpiring": "In scadenza",
     "purpose": "Scopo",
     "securityNote": "Nota di Sicurezza",
     "technicalDetails": "Dettagli Tecnici",
@@ -1575,7 +1575,7 @@
     "downloadKey": "Scarica Chiave Privata",
     "selectCA": "Seleziona una CA",
     "validityPeriod": "Periodo di Validità (giorni)",
-    "signCSRDescription": "Firma questa CSR con una Certificate Authority per emettere un certificato",
+    "signCSRDescription": "Firma questa CSR con un'autorità di certificazione per emettere un certificato",
     "uploadCSRDescription": "Carica un file di Richiesta Firma Certificato (.pem, .csr)",
     "pasteCSRDescription": "Incolla la tua CSR in formato PEM qui sotto",
     "noPendingCSRs": "Nessuna CSR in attesa",
@@ -2693,7 +2693,7 @@
     "scepDisabled": "SCEP è disabilitato",
     "scepDisabledDesc": "Abilita SCEP nella scheda Configurazione per usare le password di challenge.",
     "noCasAvailable": "Nessuna CA disponibile",
-    "noCasAvailableDesc": "Crea prima una Certificate Authority per configurare le password di challenge SCEP",
+    "noCasAvailableDesc": "Crea prima un'autorità di certificazione per configurare le password di challenge SCEP",
     "regenerate": "Rigenera",
     "challengeRegenerated": "Password di challenge rigenerata",
     "confirmRegenerateChallenge": "Rigenerare la challenge password SCEP di questa CA? Quella attuale smette di funzionare subito e tutti i dispositivi configurati con essa vanno aggiornati.",
@@ -3085,7 +3085,7 @@
     "addCertificate": "Aggiungi certificato",
     "addCertificatesForChain": "Aggiungi certificati per convalidare le catene",
     "adding": "Aggiungendo...",
-    "allPurposes": "All Purposes",
+    "allPurposes": "Tutti gli scopi",
     "category": "Categoria",
     "confirmRemove": "Rimuovi certificato",
     "deleteSelected": "Elimina selezionati",
@@ -4256,7 +4256,7 @@
           "remedy": "Preferisci un provider PKCS#11, Azure Key Vault o OpenBao per le chiavi che devono restare nell'ambito FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "title": "Chiavi HSM rifiutate dalla modalità FIPS (RSA di lunghezza dispari o fuori dall'intervallo da 2048 a 16384 bit, curve diverse da P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, tipi sconosciuti)",
           "remedy": "Sostituiscile con chiavi RSA 2048+, ECDSA P-256/P-384/P-521 o AES; in modalità FIPS le chiavi OpenBao e Vault Transit di questi tipi non sono più elencate."
         },
         "dns_tsig_hmac_md5": {
@@ -4452,9 +4452,9 @@
     "deleteCertConfirm": "Eliminare questo certificato client?",
     "certificateDeleted": "Certificato eliminato",
     "apiKeyTips": [
-      "API keys allow programmatic access to UCM",
-      "Keep your keys secret and rotate them regularly",
-      "Each key can have a custom expiration date"
+      "Le chiavi API consentono l'accesso programmatico a UCM",
+      "Mantieni segrete le tue chiavi e ruotale regolarmente",
+      "Ogni chiave può avere una data di scadenza personalizzata"
     ],
     "yourAPIKeys": "Le tue chiavi API",
     "createAPIKey": "Crea chiave API",
@@ -6198,7 +6198,7 @@
       "intent": "Inventari pianificati e scadenze.",
       "total_one": "{{count}} report pianificato",
       "total_other": "{{count}} report pianificati",
-      "hint": "Tick several reports to download them or suspend their schedule together; the figures follow the inventory, as the overview does.",
+      "hint": "Seleziona più report per scaricarli insieme; le cifre seguono l'inventario, come la panoramica.",
       "hintRead": "Un nome apre il dettaglio.",
       "emptyTitle": "Nessun report pianificato",
       "emptyText": "Un report invia per email l'inventario, le scadenze o la conformità, alla frequenza scelta.",
@@ -7061,7 +7061,7 @@
     "signingCert": "Certificato di firma",
     "signingCertDesc": "Scegli cosa firma i token di marcatura temporale. La RFC 3161 richiede un certificato finale dedicato con EKU timeStamping; il certificato della CA firma solo se la modalità rigorosa qui sotto è disattivata.",
     "caSignerWarning": "Il certificato della CA firma le marche temporali. I verificatori rigorosi come openssl ts -verify e jarsigner rifiutano questi token: la RFC 3161 richiede un firmatario dedicato con un EKU timeStamping critico ed esclusivo. Selezionate o generate qui sotto un certificato di firma dedicato.",
-    "strictNoSigner": "La modalità rigorosa è attiva e non è impostato alcun firmatario dedicato: /tsa rifiuta ogni richiesta di marcatura temporale. Generate qui sotto un certificato di firma: UCM lo emette dalla CA scelta con la sola EKU timeStamping, critica (RFC 3161), e lo seleziona.",
+    "strictNoSigner": "La modalità rigorosa è attiva e non è impostato alcun firmatario dedicato: /tsa rifiuta ogni richiesta di marcatura temporale. Genera qui sotto un certificato di firma: UCM lo emette dalla CA scelta con la sola EKU timeStamping, critica (RFC 3161), e lo seleziona.",
     "signingCertHelp": "Sono elencati solo i certificati la cui chiave privata è detenuta da UCM e che portano l'EKU timeStamping. I rinnovi vengono seguiti automaticamente.",
     "signingCertCa": "Certificato della CA (solo con modalità rigorosa disattivata)",
     "signerExpires": "Scade",
@@ -7918,7 +7918,7 @@
       "manager": "Responsabile",
       "all": "Tutte le schede",
       "short": "Preset",
-      "allHint": "Every card, in the initial order",
+      "allHint": "Tutte le schede, nell'ordine iniziale",
       "rowLabel": "Preset"
     },
     "cards": {
@@ -8176,12 +8176,12 @@
       "cards": "Schede",
       "cardsLabel": "Schede: mostra, nascondi, riordina",
       "dialogTitle": "Schede della panoramica",
-      "dialogSub": "Show, hide and reorder.",
+      "dialogSub": "Mostra, nascondi e riordina",
       "saved": "L'ordine e le schede nascoste vengono salvati con il tuo account.",
       "up": "Sposta {{name}} in alto",
       "down": "Sposta {{name}} in basso",
       "hide": "Nascondi la scheda",
-      "hidden": "{{name}} is hidden. The Cards button shows it again.",
+      "hidden": "Scheda “{{name}}” nascosta. Il pulsante Schede la mostra di nuovo.",
       "listLabel": "Schede, nell'ordine della pagina",
       "queueShown": "Scheda Da gestire mostrata di nuovo."
     },

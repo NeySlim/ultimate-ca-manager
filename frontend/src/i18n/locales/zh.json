@@ -2355,7 +2355,7 @@
       "expiresPlaceholder": "留空表示永不过期",
       "expiresHelp": "可选。此日期之后凭据将无法使用。",
       "generate": "生成",
-      "requiredTitle": "强制使用 External Account Binding",
+      "requiredTitle": "强制使用外部账户绑定",
       "requiredDescription": "启用后，每个 newAccount 请求都必须包含有效的 EAB。directory 中会通告 externalAccountRequired=true。",
       "requiredUpdated": "EAB 要求已更新",
       "requiredUpdateFailed": "更新 EAB 要求失败",
@@ -4256,7 +4256,7 @@
           "remedy": "对于必须保持在 FIPS 范围内的密钥，请优先选择 PKCS#11、Azure Key Vault 或 OpenBao 提供商。"
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "title": "FIPS 模式拒绝的 HSM 密钥（长度为奇数或不在 2048 到 16384 位范围内的 RSA、P-256/P-384/P-521 以外的曲线、Ed25519、Ed448、ML-DSA、ChaCha20-Poly1305、未知类型）",
           "remedy": "请将它们替换为 RSA 2048+、ECDSA P-256/P-384/P-521 或 AES 密钥；在 FIPS 模式下，这些类型的 OpenBao 和 Vault Transit 密钥将不再列出。"
         },
         "dns_tsig_hmac_md5": {

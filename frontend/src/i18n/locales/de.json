@@ -99,7 +99,7 @@
     "allFailures": "Alle Fehler",
     "clearAllFilters": "Alle Filter löschen",
     "countEntries": "{{count}} Protokolleinträge",
-    "selectToView": "Eintrag auswählen für Details",
+    "selectToView": "Eintrag auswählen, um Details anzuzeigen",
     "filtersExport": "Filter & Export",
     "searchLogs": "Protokolle durchsuchen...",
     "allActions": "Alle Aktionen",
@@ -339,7 +339,7 @@
     "csrsShort": "CSRs",
     "certificatesShort": "Zerts",
     "templatesShort": "Vorlage",
-    "usersShort": "User",
+    "usersShort": "Benutzer",
     "cert": "Zertifikat",
     "clear": "Löschen",
     "dashboardShort": "Start",
@@ -1391,7 +1391,7 @@
     "offlineKeyFilePick": "Schlüsseldatei wählen",
     "offlineKeyFileTooLarge": "Schlüsseldatei zu groß (max 256 KB)",
     "restorePasswordHint": "Das beim Offline-Schalten der CA verwendete Passwort.",
-    "namedUrls": "CA Namen in Protokoll URLs verwenden",
+    "namedUrls": "CA-Namen in Protokoll-URLs verwenden",
     "namedUrlsHint": "CDP/OCSP/AIA-Pfade verwenden einen aus dem CA-Namen abgeleiteten Slug statt der zufälligen ID. Einfacher manuell zu konfigurieren; der CA-Name wird in URLs sichtbar. Kann auch später aktiviert werden; einmal aktiviert, nicht rückgängig zu machen.",
     "revocationApprovalRequired": "CA-Widerruf zur Genehmigung eingereicht (Richtlinie: {{policy}})",
     "issuancePickers": "Auswahllisten für die Ausstellung",
@@ -1754,7 +1754,7 @@
     "pinnedCount": "{{count}} von {{total}} Vorlagen angeheftet",
     "qc": {
       "title": "qcStatements (ETSI EN 319 412-5) und Policy-OIDs",
-      "hint": "Fügt jedem aus diesem Template ausgestellten Zertifikat die Erweiterung qcStatements und zusätzliche Zertifikatsrichtlinien-OIDs hinzu. Alle Felder sind optional.",
+      "hint": "Fügt jedem aus dieser Vorlage ausgestellten Zertifikat die Erweiterung qcStatements und zusätzliche Zertifikatsrichtlinien-OIDs hinzu. Alle Felder sind optional.",
       "legalWarning": "QcCompliance ist eine rechtliche Erklärung, dass ein Zertifikat ein qualifiziertes Zertifikat nach eIDAS ist. Nur ein qualifizierter Vertrauensdiensteanbieter darf sie abgeben. UCM fügt hinzu, was Sie hier angeben, und prüft Ihren Qualifikationsstatus nicht.",
       "compliance": "QcCompliance (qualifiziertes Zertifikat)",
       "sscd": "QcSSCD (privater Schlüssel in einer qualifizierten Signaturerstellungseinheit)",
@@ -2266,9 +2266,9 @@
     "keyTypeHelper": "Algorithmus und Schlüsselgröße für ausgestellte Zertifikate",
     "keyTypeUnavailable": "Der gespeicherte Schlüsseltyp {{keyType}} ist auf diesem Server nicht verfügbar: Bestellungen schlagen fehl, bis Sie einen anderen wählen.",
     "keySource": "Schlüsselquelle",
-    "keySourceHelper": "Neuen Schlüssel erzeugen, beim Renewal wiederverwenden (TLSA/Pinning) oder externe CSR bereitstellen",
+    "keySourceHelper": "Neuen Schlüssel erzeugen, bei der Erneuerung wiederverwenden (TLSA/Pinning) oder externe CSR bereitstellen",
     "keySourceGenerate": "Neuen Schlüssel erzeugen",
-    "keySourceReuse": "Schlüssel beim Renewal wiederverwenden",
+    "keySourceReuse": "Schlüssel bei der Erneuerung wiederverwenden",
     "keySourceCsr": "Externe CSR bereitstellen",
     "csrPem": "Zertifikatsanforderung (PEM)",
     "csrPemHelper": "PEM-CSR einfügen. UCM reicht sie bei ACME-Finalize ein; der private Schlüssel bleibt außerhalb von UCM.",
@@ -2433,7 +2433,7 @@
     "defaultChooseAnother": "Dies ist das Standardkonto: Wählen Sie ein anderes Konto als Standard, um es zu ändern",
     "caTimingSettings": "Validierungszeit",
     "caOrderPollTimeout": "Order-Poll-Timeout (Sekunden)",
-    "caOrderPollTimeoutHelper": "Wartezeit bis die CA die Order validiert (30–600). 180+ für langsame CAs.",
+    "caOrderPollTimeoutHelper": "Wartezeit, bis die CA die Bestellung validiert (30–600). 180+ für langsame CAs.",
     "caOrderPollInterval": "Poll-Intervall (Sekunden)",
     "caOrderPollIntervalHelper": "Pause zwischen Statusabfragen (1–30).",
     "caHttpTimeout": "HTTP-Timeout (Sekunden)",
@@ -2972,11 +2972,11 @@
     "testOk": "Verbindung und SFTP OK ({{fingerprint}})",
     "testFailed": "Verbindungstest fehlgeschlagen",
     "failures": "{{count}} Fehlschläge",
-    "hostKeyPinned": "Host-Key gepinnt: {{fingerprint}}",
-    "hostKeyNotPinned": "Host-Key noch nicht gepinnt: wird bei der ersten Verbindung erfasst",
-    "resetHostKey": "Gepinnten Host-Key zurücksetzen",
-    "resetHostKeyConfirm": "Den gepinnten Host-Key für „{{name}}“ zurücksetzen? Die nächste Verbindung vertraut dem vom Host präsentierten Schlüssel und pinnt ihn neu (Trust-on-first-use).",
-    "hostKeyReset": "Gepinnter Host-Key zurückgesetzt: er wird bei der nächsten Verbindung neu gepinnt",
+    "hostKeyPinned": "Host-Schlüssel gepinnt: {{fingerprint}}",
+    "hostKeyNotPinned": "Host-Schlüssel noch nicht gepinnt: wird bei der ersten Verbindung erfasst",
+    "resetHostKey": "Gepinnten Host-Schlüssel zurücksetzen",
+    "resetHostKeyConfirm": "Den gepinnten Host-Schlüssel für „{{name}}“ zurücksetzen? Die nächste Verbindung vertraut dem vom Host präsentierten Schlüssel und pinnt ihn neu (Trust-on-first-use).",
+    "hostKeyReset": "Gepinnter Host-Schlüssel zurückgesetzt: er wird bei der nächsten Verbindung neu gepinnt",
     "lastSuccess": "letzter Erfolg {{date}}",
     "showPublicKey": "Öffentlichen Schlüssel anzeigen",
     "publicKeyTitle": "Öffentlicher Deploy-Schlüssel",
@@ -3199,7 +3199,7 @@
     "sslChecker": "SSL-Prüfer",
     "sslCheckerDesc": "SSL-Zertifikat eines Remote-Servers prüfen",
     "csrDecoder": "CSR-Decoder",
-    "csrDecoderDesc": "Certificate Signing Request dekodieren",
+    "csrDecoderDesc": "Zertifikatsanforderung (CSR) dekodieren",
     "certDecoderDesc": "Zertifikat dekodieren und analysieren",
     "decoder": "Zertifikat-Decoder",
     "converter": "Formatkonverter",
@@ -3237,7 +3237,7 @@
     "pkcs12": "PKCS12 (.p12/.pfx)",
     "pkcs7": "PKCS7 (.p7b)",
     "pkcs12RequiresKey": "PKCS12 erfordert privaten Schlüssel",
-    "privateKeyFile": "Private-Key-Datei (optional, falls in Eingabe enthalten)",
+    "privateKeyFile": "Datei des privaten Schlüssels (optional, falls in Eingabe enthalten)",
     "caChainOptional": "CA-Kette (optional)",
     "caChainPlaceholder": "Intermediate- und Root-Zertifikate...",
     "additionalCerts": "Zusätzliche Zertifikate einschließen...",
@@ -3781,7 +3781,7 @@
     "uptime": "Betriebszeit",
     "memory": "Speichernutzung",
     "serviceStatusUnavailable": "Dienststatus nicht verfügbar.",
-    "dockerRestartNotice": "In Docker, starten Sie den Container neu, um Änderungen anzuwenden.",
+    "dockerRestartNotice": "Starten Sie in Docker den Container neu, um Änderungen anzuwenden.",
     "dockerCertNotice": "Zertifikat gespeichert. Starten Sie den Container neu: docker restart <container>",
     "settingSavedInBrowser": "Diese Einstellung wird in Ihrem Browser gespeichert und bleibt über Sitzungen hinweg erhalten.",
     "smtpConfig": "SMTP-Konfiguration",
@@ -4256,7 +4256,7 @@
           "remedy": "Für Schlüssel, die im FIPS-Bereich bleiben müssen, einen PKCS#11-, Azure-Key-Vault- oder OpenBao-Provider bevorzugen."
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "title": "HSM-Schlüssel, die der FIPS-Modus ablehnt (RSA mit ungerader Länge oder außerhalb von 2048 bis 16384 Bit, andere Kurven als P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unbekannte Typen)",
           "remedy": "Ersetzen Sie sie durch RSA-2048+-, ECDSA-P-256/P-384/P-521- oder AES-Schlüssel; im FIPS-Modus werden OpenBao- und Vault-Transit-Schlüssel dieser Typen nicht mehr aufgelistet."
         },
         "dns_tsig_hmac_md5": {
@@ -4452,9 +4452,9 @@
     "deleteCertConfirm": "Dieses Client-Zertifikat löschen?",
     "certificateDeleted": "Zertifikat gelöscht",
     "apiKeyTips": [
-      "API keys allow programmatic access to UCM",
-      "Keep your keys secret and rotate them regularly",
-      "Each key can have a custom expiration date"
+      "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM",
+      "Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig",
+      "Jeder Schlüssel kann ein eigenes Ablaufdatum haben"
     ],
     "yourAPIKeys": "Ihre API-Schlüssel",
     "createAPIKey": "API-Schlüssel erstellen",
@@ -4817,7 +4817,7 @@
     "allowIdpInitiatedHelp": "Akzeptiert Antworten, die UCM nicht angefordert hat, etwa eine Anmeldung aus dem Portal des Identitätsanbieters. Standardmäßig aus: Eine solche Antwort lässt sich keiner in diesem Browser gestarteten Anmeldung zuordnen.",
     "spEntityId": "SP Entity ID",
     "spMetadata": "Service Provider (SP) Metadaten",
-    "spMetadataHelp": "Kopieren Sie diese URLs in Ihre Identity Provider (IdP) Konfiguration, um die SAML-Vertrauensstellung einzurichten.",
+    "spMetadataHelp": "Kopieren Sie diese URLs in die Konfiguration Ihres Identitätsanbieters (IdP), um die SAML-Vertrauensstellung einzurichten.",
     "spSloUrl": "SP Single Logout URL",
     "ssoAttribute": "SSO-Attribut",
     "ucmField": "UCM-Feld",
@@ -5343,7 +5343,7 @@
         "helper": "Geben Sie das Auth-Schema im Wert mit an, z. B. `auth-key YOUR_TOKEN`"
       },
       "apiKey": {
-        "authorizationWarning": "\"Authorization\" ist für Bearer/Basic reserviert. Verwenden Sie stattdessen den Typ Custom Header, um Authorization direkt zu setzen."
+        "authorizationWarning": "\"Authorization\" ist für Bearer/Basic reserviert. Verwenden Sie stattdessen den Typ „Eigener Header“, um Authorization direkt zu setzen."
       },
       "preview": {
         "title": "Vorschau des ausgehenden Headers",
@@ -5354,7 +5354,7 @@
         "tokenRequired": "Für diesen Auth-Typ ist ein Token erforderlich",
         "usernameRequired": "Für Basic Auth ist ein Benutzername erforderlich",
         "headerNameRequired": "Header-Name ist erforderlich",
-        "authorizationBlocked": "\"Authorization\" kann nicht als Header-Name für API Key verwendet werden: verwenden Sie stattdessen den Typ Custom Header",
+        "authorizationBlocked": "\"Authorization\" kann nicht als Header-Name für den API-Schlüssel verwendet werden: verwenden Sie stattdessen den Typ „Eigener Header“",
         "tokenTooLong": "Token überschreitet die maximale Länge von 8192 Bytes"
       }
     },
@@ -6198,7 +6198,7 @@
       "intent": "Geplante Bestände und Fälligkeiten.",
       "total_one": "{{count}} geplanter Bericht",
       "total_other": "{{count}} geplante Berichte",
-      "hint": "Tick several reports to download them or suspend their schedule together; the figures follow the inventory, as the overview does.",
+      "hint": "Markieren Sie mehrere Berichte, um sie gemeinsam herunterzuladen; die Zahlen folgen dem Bestand, wie in der Übersicht.",
       "hintRead": "Ein Name öffnet die Details.",
       "emptyTitle": "Kein geplanter Bericht",
       "emptyText": "Ein Bericht sendet den Bestand, die Fälligkeiten oder die Compliance per E-Mail, in der gewählten Häufigkeit.",
@@ -7918,7 +7918,7 @@
       "manager": "Manager",
       "all": "Alle Karten",
       "short": "Voreinstellung",
-      "allHint": "Every card, in the initial order",
+      "allHint": "Alle Karten in der ursprünglichen Reihenfolge",
       "rowLabel": "Voreinstellungen"
     },
     "cards": {
@@ -8176,12 +8176,12 @@
       "cards": "Karten",
       "cardsLabel": "Karten: anzeigen, ausblenden, neu anordnen",
       "dialogTitle": "Karten der Übersicht",
-      "dialogSub": "Show, hide and reorder.",
+      "dialogSub": "Anzeigen, ausblenden und neu anordnen.",
       "saved": "Die Reihenfolge und die ausgeblendeten Karten werden mit Ihrem Konto gespeichert.",
       "up": "{{name}} nach oben verschieben",
       "down": "{{name}} nach unten verschieben",
       "hide": "Karte ausblenden",
-      "hidden": "{{name}} is hidden. The Cards button shows it again.",
+      "hidden": "{{name}} ist ausgeblendet. Die Schaltfläche Karten zeigt sie wieder an.",
       "listLabel": "Karten, in der Reihenfolge der Seite",
       "queueShown": "Karte Zu bearbeiten wieder angezeigt."
     },
