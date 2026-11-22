@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Pill, Notice, DataTable, SkeletonPanel, useClientList, useSortParam } from '../../components/atelier'
+import { Btn, Pill, Notice, DataTable, SkeletonPanel, Dock, DockBody, Section, Props, useClientList, useSortParam, useDockParam } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
+import { cardFacts, labelledFact } from '../../components/atelier/cardFacts'
+import { SlotDock } from '../protocols/dockSlot'
 import { useNotification } from '../../contexts'
 import { systemService } from '../../services'
 import { useRefocusAfter } from '../../hooks/useRefocus'
 import { compactRun } from '../../lib/relativeTime'
+import { formatDate } from '../../lib/utils'
 
 const POLL_MS = 15000
 // The tasks by name (T4), the sort kept in the address under this list's own scope (the settings stack their sections)
@@ -83,6 +86,8 @@ export default function SchedulerSection({ hasPermission }) {
   const [running, setRunning] = useState({})
   const pollRef = useRef(null)
   const canRun = hasPermission ? hasPermission('admin:system') : false
+  // The task open in the inspector lives in the address (`item`), as in every module list (E4)
+  const taskDock = useDockParam()
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -143,20 +148,45 @@ export default function SchedulerSection({ hasPermission }) {
       duration: (task) => task.last_duration_ms ?? null, runs: (task) => task.run_count ?? null,
     },
   })
-  // The task names the row (nothing opens); what its last run said is the free text that takes the room left
+  // The task names the row and opens it in the inspector; what its last run said is the free text that takes the room left
   const columns = [
     { id: 'task', label: t('scheduler.colTask'), kind: 'entity', priority: 1, sort: 'task', cell: (task) => taskLabel(t, task) },
     { id: 'note', label: t('scheduler.colNote'), kind: 'text', priority: 4, grow: true, tone: 'muted', sort: 'note', cell: (task) => note(task) || '—',
       title: (task) => noteText(task) || undefined },
     { id: 'status', label: t('atelier.state'), kind: 'fit', priority: 1, sort: 'status', cell: status },
     { id: 'schedule', label: t('scheduler.colSchedule'), kind: 'fit', priority: 4, sort: 'schedule', tone: 'muted', cell: (task) => humanizeInterval(task.interval, t) },
-    { id: 'last', label: t('scheduler.colLastRun'), kind: 'fit', priority: 3, sort: 'last', tone: 'muted', cell: (task) => compactRun(task.last_run, t) || '—' },
-    { id: 'next', label: t('scheduler.colNextRun'), kind: 'fit', priority: 2, sort: 'next', tone: 'muted', cell: (task) => compactRun(task.next_run, t) || '—' },
+    { id: 'last', label: t('scheduler.colLastRun'), kind: 'fit', priority: 3, labelled: true, sort: 'last', tone: 'muted', cell: (task) => compactRun(task.last_run, t) || '—' },
+    { id: 'next', label: t('scheduler.colNextRun'), kind: 'fit', priority: 2, labelled: true, sort: 'next', tone: 'muted', cell: (task) => compactRun(task.next_run, t) || '—' },
     { id: 'duration', label: t('scheduler.colDuration'), kind: 'number', priority: 4, sort: 'duration', tone: 'muted', cell: (task) => fmtDuration(task.last_duration_ms, i18n?.language) },
     { id: 'runs', label: t('scheduler.colRuns'), kind: 'number', priority: 4, sort: 'runs', tone: 'muted', cell: (task) => task.run_count },
     ...(canRun ? [{ id: 'run', label: <span className="sr-only">{t('common.actions')}</span>, kind: 'fit', priority: 1, cell: run }] : []),
   ]
-  const labelled = (key, value) => `${t(key)}${t('work.sep')}${value}`
+  const opened = taskDock.item ? tasks.find((task) => task.name === taskDock.item) : null
+  // A run's moment: when, then how long ago or how soon
+  const moment = (iso) => (iso ? <>{formatDate(iso, { time: true })} <span className="muted">({compactRun(iso, t)})</span></> : '—')
+  // Every column of the list and the task's action, the columns folded for want of room included (E4)
+  const dock = opened && (
+    <Dock label={t('atelier.detailOf', { name: t('scheduler.tasksTitle') })} tabsLabel={t('atelier.openItem')} activeKey={opened.name}
+      tabs={[{ key: opened.name, title: taskLabel(t, opened), icon: 'clock' }]} onClose={() => taskDock.close()}>
+      <DockBody icon="clock" title={taskLabel(t, opened)} badge={status(opened)} section="overview" onSection={() => {}}
+        sectionsLabel={t('atelier.sectionsOf', { name: taskLabel(t, opened) })} sections={[['overview', t('atelier.overview')]]}
+        actions={canRun && run(opened)}>
+        <div className="module-detail">
+          <Section title={t('atelier.properties')}>
+            <Props items={[
+              [t('atelier.state'), status(opened)],
+              [t('scheduler.colNote'), note(opened) || '—'],
+              [t('scheduler.colSchedule'), humanizeInterval(opened.interval, t)],
+              [t('scheduler.colLastRun'), moment(opened.last_run)],
+              [t('scheduler.colNextRun'), moment(opened.next_run)],
+              [t('scheduler.colDuration'), fmtDuration(opened.last_duration_ms, i18n?.language)],
+              [t('scheduler.colRuns'), opened.run_count ?? '—'],
+            ]} />
+          </Section>
+        </div>
+      </DockBody>
+    </Dock>
+  )
 
   return (
     <>
@@ -172,21 +202,18 @@ export default function SchedulerSection({ hasPermission }) {
         ) : (
           <DataTable kind="module" scrollId="scheduler-scroll" recordsId="scheduler-records" label={t('scheduler.tasksTitle')}
             columns={columns} rows={list.rows} rowKey={(task) => task.name} rowLabel={(task) => taskLabel(t, task)} sort={list.sort} onSort={list.onSort}
+            onOpen={(task) => taskDock.open(task.name)} openedId={opened?.name}
             empty={<div className="empty"><p>{t('scheduler.noTasks')}</p></div>}
+            // The record names its facts as every list does; the inspector holds the others
             card={(task) => ({
               description: note(task),
-              meta: [
-                labelled('scheduler.colSchedule', humanizeInterval(task.interval, t)),
-                labelled('scheduler.colLastRun', compactRun(task.last_run, t) || '—'),
-                labelled('scheduler.colNextRun', compactRun(task.next_run, t) || '—'),
-                labelled('scheduler.colDuration', fmtDuration(task.last_duration_ms, i18n?.language)),
-                labelled('scheduler.colRuns', task.run_count),
-              ],
+              meta: [...cardFacts(columns, task), labelledFact(t('scheduler.colSchedule'), humanizeInterval(task.interval, t))],
               status: status(task),
               end: canRun ? run(task) : undefined,
             })} />
         )}
       </SettingsGroup>
+      <SlotDock>{dock}</SlotDock>
     </>
   )
 }

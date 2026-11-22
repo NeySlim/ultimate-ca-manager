@@ -77,11 +77,11 @@ describe('SchedulerSection column widths', () => {
     const table = row.closest('table')
     // The mockup's module table: a fitted column is marked on its header (adjust.css), the free text grows
     expect(table).toHaveClass('module-table')
-    expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([true, false, true, true, true, true, true, true, true])
+    expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([true, false, true, true, true, true, true, true, true, true])
     expect(row.children[1]).toHaveClass('description-cell')
-    // The task names its row on one line, nothing to open: no button, its whole name in a title
+    // The task names its row on one line and opens its inspector (E4), its whole name in a title
     const name = row.children[0].querySelector('.entity-name')
-    expect(name.tagName).toBe('SPAN')
+    expect(name.tagName).toBe('BUTTON')
     expect(name.querySelector('.entity-label')).toHaveAttribute('title', 'tr(scheduler.tasks.scheduled_backup)')
   })
 
@@ -135,10 +135,11 @@ describe('SchedulerSection on a phone', () => {
     const card = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('.mobile-record')
     expect(card).not.toBeNull()
     expect(document.querySelector('table')).toBeNull()
-    // A task opens nothing: its name is not a button, no chevron
-    expect(within(card).getByText('tr(scheduler.tasks.scheduled_backup)').tagName).toBe('STRONG')
-    expect(card).not.toHaveClass('opens')
-    expect(card.textContent).toContain('scheduler.colLastRun')
+    // A task opens its inspector from its record (E4); its facts named as every list's (E10)
+    expect(within(card).getByText('tr(scheduler.tasks.scheduled_backup)').tagName).toBe('BUTTON')
+    expect(card).toHaveClass('opens')
+    expect([...card.querySelectorAll('.row-meta .fact-label')].map((l) => l.textContent))
+      .toEqual(['scheduler.colNextRun', 'scheduler.colLastRun', 'scheduler.colSchedule'])
     expect(card.textContent).toContain('time.compact.minutesAgo:56')
     expect(within(card).getByText('scheduler.statusOk')).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: /scheduler.runNow/ })).toBeEnabled()
