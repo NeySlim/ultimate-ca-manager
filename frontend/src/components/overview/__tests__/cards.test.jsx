@@ -5,15 +5,17 @@ import { MemoryRouter } from 'react-router-dom'
 vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
-  getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
-  getDashStats: vi.fn(), getTrend: vi.fn(), getScores: vi.fn(),
+  getStats: vi.fn(), getAll: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
+  getExpirations: vi.fn(), getRevocation: vi.fn(), getCrls: vi.fn(), getProviders: vi.fn(),
 }))
 vi.mock('../../../services', () => ({
-  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
-  certificatesService: { getStats: api.getStats, getComplianceStats: api.getScores },
+  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance,
+    getExpirations: api.getExpirations, getRevocation: api.getRevocation, expirationQuery: () => ({}) },
+  certificatesService: { getStats: api.getStats, getAll: () => Promise.resolve({ data: [] }) },
   casService: { getAll: api.getAll },
-  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity,
-    getStats: api.getDashStats, getCertificateTrend: api.getTrend },
+  crlService: { getAll: api.getCrls },
+  hsmService: { getProviders: api.getProviders },
+  dashboardService: { getActivityLog: api.getActivity },
 }))
 vi.mock('../../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({ connectionState: 'connected' }),
@@ -24,7 +26,7 @@ const nav = vi.hoisted(() => vi.fn())
 vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: () => nav }))
 
 import { OverviewContext } from '../shared'
-import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard, TrendCard } from '..'
+import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard, IssuanceCard, AuthoritiesCard, RevocationCard } from '..'
 import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
@@ -34,8 +36,8 @@ const error = (status) => Object.assign(new Error('x'), { status })
 beforeEach(() => {
   vi.clearAllMocks()
   api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
-  api.getScores.mockResolvedValue({ data: { average_score: 78, distribution: { 'A+': 1, A: 2, B: 3, C: 0, D: 0, F: 0 }, total: 6 } })
-  api.getNext.mockResolvedValue({ data: [] })
+  api.getCrls.mockResolvedValue({ data: [] })
+  api.getProviders.mockResolvedValue({ data: [] })
   api.can.mockReturnValue(true)
 })
 
@@ -48,9 +50,11 @@ describe('card states', () => {
     ['compliance', ComplianceCard, api.getCompliance, { total: 0, counters: {}, by_key_algorithm: [] }, 'overview.state.empty'],
     ['health', HealthCard, api.getHealth, { protocols: {} }, 'overview.state.empty'],
     ['hierarchy', HierarchyCard, api.getAll, [], 'overview.hierarchy.emptyTitle'],
-    ['horizon', HorizonCard, api.getDashStats, { total_certificates: 0 }, 'overview.state.empty'],
+    ['horizon', HorizonCard, api.getExpirations, { from: '2026-11-19', total: 0, periods: [{ date: '2026-11-19', total: 0 }] }, 'overview.horizon.quiet'],
     ['activity', ActivityCard, api.getActivity, { activity: [] }, 'overview.state.empty'],
-    ['trend', TrendCard, api.getTrend, { trend: [{ date: '2026-11-19', issued: 0, revoked: 0, expired: 0 }] }, 'overview.trend.quiet'],
+    ['issuance', IssuanceCard, api.getIssuance, { flow: { periods: [{ date: '2026-11-19' }], previous: { total: 0 } } }, 'overview.flow.quiet'],
+    ['revocation', RevocationCard, api.getRevocation, { total: 0, items: [] }, 'overview.state.empty'],
+    ['authorities', AuthoritiesCard, api.getAll, [], 'overview.state.empty'],
   ]
   it.each(cases)('%s: skeleton, empty, error with its cause and retry, missing permission', async (id, Card, fetcher, empty, emptyText) => {
     fetcher.mockReturnValueOnce(new Promise(() => {}))
@@ -185,39 +189,43 @@ describe('compliance card', () => {
     expect(meter('rsa_below_3072').querySelector('.track i')).toBeNull()
   })
 
-  it('rings the average score with its grade and grades, its base written when it is not the rules\' population', async () => {
-    api.getCompliance.mockResolvedValue({ data: summary })
-    api.getScores.mockResolvedValue({ data: { average_score: 78, distribution: { 'A+': 12, A: 80, B: 121, C: 47, D: 6, F: 0 }, total: 266 } })
+  it('rings the average score of the compliance route with its grade and grades, over the rules\' population', async () => {
+    api.getCompliance.mockResolvedValue({ data: { ...summary, population: { definition: 'active', count: 211 },
+      score: { average: 78, grade: 'B', distribution: { 'A+': 12, A: 80, B: 66, C: 47, D: 6, F: 0 } } } })
     show(<ComplianceCard />)
     await waitFor(() => expect(document.querySelector('.ring-arc')).not.toBeNull())
     expect(document.querySelector('.ring-arc').dataset.value).toBe('78')
     expect(document.querySelector('.ring-center .value').textContent).toBe('78')
     // F has no certificate: no segment, but its line in the legend
     expect([...document.querySelectorAll('.grade-bar i')].map((i) => i.dataset.grade)).toEqual(['A+', 'A', 'B', 'C', 'D'])
-    expect([...document.querySelectorAll('.comp .legend li')].map((li) => li.textContent)).toEqual(['A+12', 'A80', 'B121', 'C47', 'D6', 'F0'])
-    expect(document.querySelector('.score-base').textContent).toBe('overview.compliance.scoreBase')
-  })
-
-  it('takes the score of the compliance route once it carries one, without a base line', async () => {
-    api.getCompliance.mockResolvedValue({ data: { ...summary, score: 64, distribution: { 'A+': 0, A: 1, B: 0, C: 0, D: 0, F: 1 } } })
-    show(<ComplianceCard />)
-    await waitFor(() => expect(document.querySelector('.ring-arc')).not.toBeNull())
-    expect(document.querySelector('.ring-arc').dataset.value).toBe('64')
-    expect([...document.querySelectorAll('.grade-bar i')].map((i) => i.dataset.grade)).toEqual(['A', 'F'])
+    expect([...document.querySelectorAll('.comp .legend li')].map((li) => li.textContent)).toEqual(['A+12', 'A80', 'B66', 'C47', 'D6', 'F0'])
     expect(document.querySelector('.score-base')).toBeNull()
   })
 
-  it('keeps its gauges, flagged partial, without the right to read the scores', async () => {
+  it('counts the sentence, the gauges and the grades over the one population the route names', async () => {
+    api.getCompliance.mockResolvedValue({ data: { ...summary, total: 999, population: { definition: 'active', count: 211 },
+      score: { average: 78, grade: 'B', distribution: { 'A+': 12, A: 80, B: 66, C: 47, D: 6, F: 0 } } } })
+    render(<MemoryRouter><OverviewContext.Provider value={{ hide: vi.fn() }}><ComplianceCard /></OverviewContext.Provider></MemoryRouter>)
+    await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
+    expect(meter('rsa_below_3072').querySelector('.val').textContent).toContain('22/211')
+    fireEvent.click(document.getElementById('card-menu-btn-compliance'))
+    fireEvent.click(document.querySelector('[data-card-table="compliance"]'))
+    const [rules, grades] = [...document.querySelectorAll('#card-compliance table.viz-table')]
+    const sum = [...grades.querySelectorAll('tbody tr')].reduce((n, tr) => n + Number(tr.children[1].textContent), 0)
+    expect(sum).toBe(211)
+    expect(rules.querySelector('tbody tr').children[1].textContent).toBe('22')
+  })
+
+  it('reads no other route for the score: without one, the gauges stand alone', async () => {
     api.getCompliance.mockResolvedValue({ data: summary })
-    api.getScores.mockRejectedValue(error(403))
     show(<ComplianceCard />)
     await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
     expect(document.querySelector('.ring-wrap')).toBeNull()
-    expect(screen.getByRole('note').textContent).toBe('overview.state.partialForbidden')
+    expect(screen.queryByRole('note')).toBeNull()
   })
 
   it('opens its figures as a table from the card menu, and goes back to the chart', async () => {
-    api.getCompliance.mockResolvedValue({ data: summary })
+    api.getCompliance.mockResolvedValue({ data: { ...summary, score: { average: 78, grade: 'B', distribution: { A: 211 } } } })
     render(<MemoryRouter><OverviewContext.Provider value={{ hide: vi.fn() }}><ComplianceCard /></OverviewContext.Provider></MemoryRouter>)
     await waitFor(() => expect(meter('rsa_below_3072')).not.toBeNull())
     fireEvent.click(document.getElementById('card-menu-btn-compliance'))
@@ -238,16 +246,13 @@ describe('compliance card', () => {
 })
 
 describe('missing figures read as a dash on every card', () => {
-  it('hierarchy, horizon', async () => {
+  it('hierarchy', async () => {
     api.getIssuance.mockResolvedValue({ data: {} })
-    api.getDashStats.mockResolvedValue({ data: { total_certificates: 4 } })
     api.getAll.mockResolvedValue({ data: [{ id: 1, refid: 'r', descr: 'Root' }, { id: 2, refid: 's', descr: 'Sub', parent_id: 1 }], meta: {} })
     const a = show(<HierarchyCard />)
     expect((await screen.findByText('Sub')).closest('a').textContent).toContain('overview.hierarchy.issued')
     expect(screen.getByText('Sub').closest('a').querySelector('.hier-meta').lastChild.textContent).toBe('overview.hierarchy.issued')
     a.unmount()
-    show(<HorizonCard />)
-    expect((await screen.findByText('overview.horizon.state.expiring')).parentElement.textContent).toContain('–')
   })
 })
 
@@ -296,28 +301,12 @@ describe('a card with two requests keeps what one of them gave', () => {
     expect(await screen.findByText('table.retry')).toBeTruthy()
   })
 
-  it('horizon: next expirations down, the counters stay', async () => {
-    api.getDashStats.mockResolvedValue({ data: { total_certificates: 4, expiring_soon: 2, expired: 1 } })
-    api.getNext.mockRejectedValue(error(500))
-    show(<HorizonCard />)
-    expect((await screen.findByText('overview.horizon.state.expiring')).parentElement.textContent).toContain('2')
-    expect(screen.getByRole('note').textContent).toBe('overview.state.partial')
-  })
-
-  it('horizon: counters forbidden, the soonest list stays with dashed counters', async () => {
-    api.getDashStats.mockRejectedValue(error(403))
-    api.getNext.mockResolvedValue({ data: [{ id: 9, common_name: 'soon.example', valid_to: null }] })
-    show(<HorizonCard />)
-    expect(await screen.findByText('soon.example')).toBeTruthy()
-    expect(screen.getByText('overview.horizon.state.expiring').parentElement.textContent).toContain('–')
+  it('authorities: the CRL list forbidden, the tiles stay without their CRL and a partial note', async () => {
+    api.getAll.mockResolvedValue({ data: [{ id: 1, refid: 'r', descr: 'Root', cdp_enabled: true }], meta: {} })
+    api.getCrls.mockRejectedValue(error(403))
+    show(<AuthoritiesCard />)
+    await waitFor(() => expect(document.querySelector('[data-tile="ca"]')).not.toBeNull())
     expect(screen.getByRole('note').textContent).toBe('overview.state.partialForbidden')
-  })
-
-  it('no note when both answer', async () => {
-    api.getDashStats.mockResolvedValue({ data: { total_certificates: 4, expiring_soon: 2, expired: 1 } })
-    show(<HorizonCard />)
-    await screen.findByText('overview.horizon.state.expiring')
-    expect(screen.queryByRole('note')).toBeNull()
   })
 })
 

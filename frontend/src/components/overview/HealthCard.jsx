@@ -3,9 +3,9 @@
  * operation, 30 days of mirror bars (successes up, failures down) and its success rate, then the
  * services that only report a state as compact pills, and the summary under them.
  */
-import { useContext } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '../atelier'
 import { overviewService } from '../../services'
 import { usePermission } from '../../hooks/usePermission'
@@ -13,7 +13,7 @@ import { isVisible, moduleForPath } from '../../navigation/registry'
 import { formatDate } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
 import { clockOf } from '../../lib/overviewTime'
-import { HEALTH_DAYS, successRate } from '../../lib/overviewViz'
+import { HEALTH_DAYS, failuresHref, successRate } from '../../lib/overviewViz'
 import { OverviewCard, OverviewContext, num, useCardData, useLang } from './shared'
 import { MirrorBars } from './viz'
 
@@ -28,6 +28,18 @@ const ROW_LINKS = {
   webhooks: '/settings?tab=webhooks', auto_renewal: '/settings?tab=autoRenewal',
 }
 const TONE_ICON = { good: 'check', warn: 'warning', bad: 'warning' }
+
+/** A key that changes when a reload brings a scheduler run newer than the one shown: the pill beats again. */
+function useNewRun(lastRun) {
+  const seen = useRef(lastRun)
+  const [beat, setBeat] = useState(0)
+  useEffect(() => {
+    const before = Date.parse(seen.current)
+    if (Number.isFinite(before) && Date.parse(lastRun) > before) setBeat((b) => b + 1)
+    if (lastRun) seen.current = lastRun
+  }, [lastRun])
+  return beat
+}
 const SERIES_COLOR = { acme: 'var(--s1)', scep: 'var(--s2)', est: 'var(--s3)' }
 
 /** The row's link, only when the navigation guard of its page lets this user in. */
@@ -121,6 +133,9 @@ export function HealthCard() {
   const lastRun = protocols.scheduler?.last_operation_at
   const days = state.data?.days
   const toQueue = page?.showQueue ? () => page.showQueue('acme') : null
+  const navigate = useNavigate()
+  const toActivity = hasPermission('read:audit') ? (date) => navigate(failuresHref(date)) : null
+  const beat = useNewRun(lastRun)
 
   const name = (id) => {
     const link = rowLink(id, can)
@@ -189,9 +204,14 @@ export function HealthCard() {
                           { label: t('overview.health.ok'), value: ok[i], color: SERIES_COLOR[id] },
                           { label: t('overview.health.failed'), value: failed[i], color: 'var(--bad)' },
                         ],
-                        hint: id === 'acme' && failed[i] > 0 && toQueue ? t('overview.health.seeQueue') : null,
+                        hint: id !== 'acme' || failed[i] === 0 ? null
+                          : toActivity ? t('overview.health.seeActivity') : toQueue ? t('overview.health.seeQueue') : null,
                       })}
-                      onPick={id === 'acme' && toQueue ? () => toQueue() : undefined} />
+                      onPick={id === 'acme' && (toActivity || toQueue) ? (i) => {
+                        if (failed[i] === 0) return
+                        if (toActivity) toActivity(periods[i].date)
+                        else toQueue()
+                      } : undefined} />
                   )}
                   {periods.length > 0 && (
                     <Rate ok={okSum} failed={failSum} lang={lang} t={t} onFailures={id === 'acme' ? toQueue : null}
@@ -217,7 +237,8 @@ export function HealthCard() {
               return (
                 <li key={id} className="health-row svc" data-tone={tone || 'neutral'} {...rowProps(id)}
                   title={id === 'scheduler' && p.last_operation_at ? formatDate(p.last_operation_at, { time: true }) : undefined}>
-                  <i className="pulse" aria-hidden="true" />
+                  <i key={id === 'scheduler' ? `beat-${beat}` : undefined} className={id === 'scheduler' && beat > 0 ? 'pulse live' : 'pulse'}
+                    data-beat={id === 'scheduler' ? beat : undefined} aria-hidden="true" />
                   <strong>{name(id)}</strong>
                   <span className="svc-state">{text}</span>
                   <Icon name={TONE_ICON[tone] || 'block'} />

@@ -12,6 +12,7 @@ import { listHref } from '../../lib/overviewFilters'
 import { GROUP_OF, QUEUE_GROUPS, SINCE_KINDS, UNDATED_KINDS, isWatch } from '../../lib/overviewQueue'
 import { askRenewal } from '../../lib/renewalPrompt'
 import { compactAgo, compactDue, dueTone } from '../../lib/relativeTime'
+import { DAY_MS, countdownShare } from '../../lib/overviewQueue'
 import { formatDate } from '../../lib/utils'
 import { CardEmpty, OverviewCard, OverviewContext, num, useCardData } from './shared'
 
@@ -80,15 +81,24 @@ function useRowActions(reload) {
   return { actionOf, busy }
 }
 
-/** The row's deadline: a delay and the date; a date that tells when it happened reads as « il y a ». */
+/** The row's deadline: a delay and the date, the countdown under it; a date that tells when it happened reads as « il y a ». */
 function Due({ item }) {
   const { t } = useTranslation()
   const at = Date.parse(item.due_at)
   if (!Number.isFinite(at) || UNDATED_KINDS.includes(item.kind)) return <QueueDue label="–" date="" tone="" />
   const since = SINCE_KINDS.includes(item.kind)
+  const tone = since ? '' : dueTone(item.due_at)
+  const share = since ? null : countdownShare(at)
   return (
-    <QueueDue due={item.due_at} tone={since ? '' : dueTone(item.due_at)}
-      label={since ? compactAgo(item.due_at, t) : compactDue(item.due_at, t)} date={formatDate(item.due_at, { time: true })} />
+    <QueueDue due={item.due_at} tone={tone}
+      label={since ? compactAgo(item.due_at, t) : compactDue(item.due_at, t)} date={formatDate(item.due_at, { time: true })}>
+      {share !== null && (
+        <span className="countdown" data-tone={tone || 'neutral'} role="img"
+          aria-label={t('overview.queue.countdown', { count: Math.ceil((at - Date.now()) / DAY_MS) })}>
+          <i style={{ width: `${Math.max(3, Math.round(share * 100))}%` }} />
+        </span>
+      )}
+    </QueueDue>
   )
 }
 

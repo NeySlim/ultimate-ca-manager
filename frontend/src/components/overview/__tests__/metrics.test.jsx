@@ -10,10 +10,10 @@ vi.mock('react-i18next', () => ({
   Trans: ({ i18nKey }) => i18nKey,
   useTranslation: () => ({ t: (k, o) => (o && Object.keys(o).length > 0 ? `${k}:${Object.values(o).join(',')}` : k) }),
 }))
-const api = vi.hoisted(() => ({ getDashStats: vi.fn(), getQueue: vi.fn(), getHealth: vi.fn(), getIssuance: vi.fn() }))
+const api = vi.hoisted(() => ({ getDashStats: vi.fn(), getQueue: vi.fn(), getHealth: vi.fn(), getIssuance: vi.fn(), getExpirations: vi.fn() }))
 vi.mock('../../../services', () => ({
   dashboardService: { getStats: api.getDashStats },
-  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getIssuance: api.getIssuance },
+  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getIssuance: api.getIssuance, getExpirations: api.getExpirations },
 }))
 vi.mock('../../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({ connectionState: 'connected' }),
@@ -35,6 +35,27 @@ beforeEach(() => {
   ] } })
   api.getQueue.mockResolvedValue({ data: { total: 20, counts: { manual_renewal_due: 16, ca_expiring: 4 }, items: [{ kind: 'ca_expiring', tier: 'critical', id: 1 }] } })
   api.getHealth.mockResolvedValue({ data: { protocols: { acme: { periods: days(2) }, scep: { periods: days(0) }, est: { periods: days(1) }, scheduler: { periods: null } } } })
+  // 30 UTC days from a Wednesday: five Monday-first weeks, the third with the busiest day
+  const from = Date.parse('2026-11-25T00:00:00Z')
+  const periods = Array.from({ length: 30 }, (_, i) => ({ date: new Date(from + i * 86400000).toISOString().slice(0, 10), total: 0 }))
+  periods[0].total = 1
+  periods[19].total = 10 // Monday 14 December
+  periods[20].total = 2
+  api.getExpirations.mockResolvedValue({ data: { from: '2026-11-25', periods } })
+})
+
+describe('the expiring figure', () => {
+  it('draws the next 30 UTC days in weekly columns, names the peak day and keeps the stock already expired under it', async () => {
+    render(<MemoryRouter><MetricStrip /></MemoryRouter>)
+    await waitFor(() => expect(metric('expiring').querySelector('svg.mini-bars')).not.toBeNull())
+    expect(api.getExpirations).toHaveBeenCalledWith(30)
+    const bars = [...metric('expiring').querySelectorAll('svg.mini-bars rect')]
+    expect(bars).toHaveLength(5)
+    expect(bars.map((r) => Number(r.getAttribute('height')) > 1.5)).toEqual([true, false, false, true, false])
+    expect(metric('expiring').querySelector('small').textContent).toBe('overview.metrics.expiryPeak:10,Dec 14 · overview.metrics.alreadyExpired:55')
+    fireEvent.focus(metric('expiring'))
+    await waitFor(() => expect(document.querySelector('.chart-tip')?.textContent).toContain('overview.horizon.week:Nov 25'))
+  })
 })
 
 describe('figures strip', () => {
@@ -49,7 +70,7 @@ describe('figures strip', () => {
     expect(metric('certificates').querySelector('svg.spark-trend').getAttribute('aria-label')).toBe('overview.metrics.issuedAlt:3,2')
     expect(value('queue').textContent).toBe('20')
     expect(value('expiring').textContent).toBe('11')
-    expect(metric('expiring').querySelector('small').textContent).toBe('overview.metrics.alreadyExpired:55')
+    expect(metric('expiring').querySelector('small').textContent).toContain('overview.metrics.alreadyExpired:55')
     // Today only: the last day of each protocol series, the scheduler has none
     expect(value('failures').textContent).toBe('3')
   })

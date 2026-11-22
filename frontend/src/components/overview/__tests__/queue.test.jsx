@@ -332,3 +332,21 @@ describe('fold', () => {
     expect(screen.queryByText(/overview\.queue\.(unfold|less)/)).toBeNull()
   })
 })
+
+describe('countdown', () => {
+  it('draws what is left of the last 30 days before a deadline to come, in the tone of the deadline, and nothing once past', async () => {
+    api.getQueue.mockResolvedValue(answer([
+      row('manual_renewal_due', 1, { due_at: at(12) }), row('manual_renewal_due', 2, { due_at: at(3) }),
+      row('manual_renewal_due', 3, { due_at: at(45) }), row('manual_renewal_due', 4, { due_at: at(-2) }),
+    ], { manual_renewal_due: 4 }))
+    show()
+    await waitFor(() => expect(rows()).toHaveLength(4))
+    const bar = (id) => document.querySelector(`[data-row="manual_renewal_due-${id}"] .countdown`)
+    expect(bar(1).querySelector('i').style.width).toBe('40%')
+    expect(bar(1).dataset.tone).toBe('neutral')
+    expect(bar(2).dataset.tone).toBe('warn')
+    expect(bar(2).getAttribute('aria-label')).toMatch(/^overview\.queue\.countdown/)
+    expect(bar(3).querySelector('i').style.width).toBe('100%')
+    expect(bar(4)).toBeNull()
+  })
+})

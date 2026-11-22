@@ -1,6 +1,8 @@
 /** Overview card layout: default order, presets, and the stored preference (`dashboard` key). */
-// The mockup's six cards in its order (dashCards), then the product's trend, on a line of its own
-export const CARD_IDS = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity', 'trend']
+// The mockup's cards (dashCards) and the widgets of the overview study, two per line where they pair
+export const CARD_IDS = ['queue', 'health', 'issuance', 'horizon', 'compliance', 'revocation', 'hierarchy', 'activity', 'authorities']
+// A card renamed since: a stored layout keeps its place and its visibility under the new id
+const RENAMED = { trend: 'issuance' }
 export const PRESETS = {
   operator: ['queue', 'health', 'hierarchy', 'horizon'],
   manager: ['compliance', 'horizon', 'hierarchy', 'activity'],
@@ -10,7 +12,7 @@ export const PRESETS = {
 /** A stored value reduced to known ids: no duplicate, no unknown id, every card kept in the order. */
 export function normalizeLayout(pref) {
   const known = new Set(CARD_IDS)
-  const list = (v) => (Array.isArray(v) ? v.filter((id) => known.has(id)) : [])
+  const list = (v) => (Array.isArray(v) ? v.map((id) => RENAMED[id] || id).filter((id) => known.has(id)) : [])
   const order = [...new Set(list(pref?.order))]
   for (const id of CARD_IDS) if (!order.includes(id)) order.push(id)
   return { order, hidden: [...new Set(list(pref?.hidden))], queueShowAll: pref?.queueShowAll === true }

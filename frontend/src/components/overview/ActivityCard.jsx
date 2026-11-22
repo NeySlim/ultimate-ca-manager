@@ -3,6 +3,7 @@
  * the icon of its family, its operation, its object, who did it and when. Successive sign-ins of one
  * user fold into one line (« 5 sign-ins by admin, 18:37 to 18:53 ») so that they do not hide the PKI.
  */
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Icon, TextLink } from '../atelier'
@@ -16,6 +17,15 @@ import { OverviewCard, useCardData, useLang } from './shared'
 // Read enough entries for the folded sign-ins to leave room for the operations (the route gives 100 at most)
 export const ACTIVITY_READ = 50
 export const ACTIVITY_SHOWN = 6
+
+// The card's filters: PKI operations, sign-ins and accounts, or everything (settings and system included)
+const ACCESS = ['auth', 'users']
+const NOT_PKI = [...ACCESS, 'settings', 'backups', 'system']
+const ACTIVITY_FILTERS = {
+  all: () => true,
+  pki: (a) => !NOT_PKI.includes(typeOf(a?.action)),
+  access: (a) => ACCESS.includes(typeOf(a?.action)),
+}
 
 const failedOf = (a) => /fail|denied|error/i.test(String(a?.action || '')) || a?.success === false
 
@@ -36,7 +46,9 @@ export function ActivityCard() {
   const state = useCardData(() => dashboardService.getActivityLog(ACTIVITY_READ), ['certificate', 'ca', 'user', 'group'])
   const rows = Array.isArray(state.data?.activity) ? state.data.activity : []
   const audit = hasPermission('read:audit')
-  const items = foldActivity(rows).slice(0, ACTIVITY_SHOWN)
+  const [filter, setFilter] = useState('all')
+  const kept = rows.filter(ACTIVITY_FILTERS[filter])
+  const items = foldActivity(kept).slice(0, ACTIVITY_SHOWN)
   const days = []
   for (const item of items) {
     const ts = item.folded ? item.last : item.entry.timestamp
@@ -86,8 +98,22 @@ export function ActivityCard() {
     <OverviewCard id="activity" state={state} route="GET /api/v2/dashboard/activity"
       empty={state.status === 'ready' && rows.length === 0}
       sub={t(audit ? 'overview.activity.sub' : 'overview.activity.subOwn')}
-      tools={audit && <TextLink to="/audit" icon="right" data-nav="activity">{t('overview.activity.all')}</TextLink>}>
+      tools={(
+        <>
+          <div className="segmented" role="group" aria-label={t('overview.activity.filterLabel')}>
+            {Object.keys(ACTIVITY_FILTERS).map((f) => (
+              <button key={f} type="button" id={`activity-${f}`} data-activity-filter={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+                {t(`overview.activity.filter.${f}`)}
+              </button>
+            ))}
+          </div>
+          {audit && <TextLink to="/audit" icon="right" data-nav="activity">{t('overview.activity.all')}</TextLink>}
+        </>
+      )}>
       <div className="panel-content">
+        {items.length === 0 && (
+          <p className="empty-line" role="status"><Icon name="check" /><span>{t('overview.activity.noneOfKind', { name: t(`overview.activity.filter.${filter}`) })}</span></p>
+        )}
         <ol className="timeline">
           {days.map((d) => (
             <li key={d.label} className="tl-day">

@@ -9,10 +9,13 @@ import path from 'path'
 import { parseTokens, contrast, resolve, FAMILIES, MODES } from '../../lib/__tests__/themeTokensParser'
 import { parseRules, declarations } from './atelierCopy'
 import { minSeparation } from './seriesSeparation'
+import { FLOW_SERIES } from '../../lib/overviewHorizon'
+import { coverParts } from '../../lib/overviewTiles'
 
 const tokens = parseTokens()
 const SERIES = ['s1', 's2', 's3']
 const DATAVIZ = parseRules(fs.readFileSync(path.resolve(__dirname, '../dataviz.css'), 'utf8'))
+const token = (color) => color.match(/^var\(--([a-z0-9-]+)\)$/)[1]
 const valueOf = (re, prop) => DATAVIZ.filter((r) => !r.media && re.test(r.sel)).flatMap((r) => declarations(r.body))
   .filter(([p]) => p === prop).map(([, v]) => v.trim()).pop()
 
@@ -52,6 +55,45 @@ describe('chart tokens', () => {
           for (const tone of ['good', 'warn-fill', 'bad', 's0']) {
             const bg = resolve(track.replace('var(--tone)', `var(--${tone})`), t)
             expect(contrast(t[tone], bg), tone).toBeGreaterThanOrEqual(3)
+          }
+        })
+
+        it('draws the issuances of every source 3:1 on the card (the light teal at its 2.8:1), two sources of one colour told apart by hatching', () => {
+          for (const s of FLOW_SERIES) {
+            const floor = mode === 'light' && token(s.color) === 's3' ? 2.8 : 3
+            expect(contrast(t[token(s.color)], t.panel), s.key).toBeGreaterThanOrEqual(floor)
+          }
+          const byColour = {}
+          for (const s of FLOW_SERIES) (byColour[s.color] ||= []).push(s)
+          for (const group of Object.values(byColour)) expect(group.filter((s) => !s.hatch), group.map((s) => s.key).join()).toHaveLength(1)
+          expect(valueOf(/\.flow \.hatch-line$/, 'stroke')).toBe('var(--panel)')
+        })
+
+        it('draws the horizon columns, the manual hatching and the authority diamond 3:1 on the card', () => {
+          expect(valueOf(/\.card-horizon \.auto$/, 'background')).toBe('var(--s0)')
+          expect(valueOf(/\.card-horizon \.manual$/, 'background')).toMatch(/^repeating-linear-gradient\(135deg,var\(--warn-fill\) /)
+          expect(valueOf(/\.card-horizon \.mark$/, 'border')).toMatch(/var\(--warn-fill\)$/)
+          for (const tone of ['s0', 'warn-fill']) expect(contrast(t[tone], t.panel), tone).toBeGreaterThanOrEqual(3)
+        })
+
+        it('keeps the validity gauge of a tile and the countdown of a deadline 3:1 against their track', () => {
+          const life = valueOf(/\.life \.track$/, 'background')
+          const countdown = valueOf(/\.queue-due \.countdown$/, 'background')
+          for (const [track, tones] of [[life, ['accent', 'warn-fill']], [countdown, ['s0', 'warn-fill', 'bad']]]) {
+            expect(track).toMatch(/var\(--tone\)/)
+            for (const tone of tones) {
+              const bg = resolve(track.replace('var(--tone)', `var(--${tone})`), t)
+              expect(contrast(t[tone], bg), tone).toBeGreaterThanOrEqual(3)
+            }
+          }
+        })
+
+        it('draws the three parts of the revocation cover 3:1 on the card, the figures written in them 4.5:1', () => {
+          const label = token(valueOf(/\.cover i$/, 'color'))
+          for (const part of coverParts({})) {
+            expect(contrast(t[token(part.color)], t.panel), part.key).toBeGreaterThanOrEqual(3)
+            // The grey part carries no figure (RevocationCard), the legend gives it
+            if (part.key !== 'noCdp') expect(contrast(t[label], t[token(part.color)]), part.key).toBeGreaterThanOrEqual(4.5)
           }
         })
 

@@ -9,15 +9,16 @@ import { MemoryRouter } from 'react-router-dom'
 vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
-  getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
-  getDashStats: vi.fn(), getTrend: vi.fn(), getScores: vi.fn(),
+  getStats: vi.fn(), getAll: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
+  getExpirations: vi.fn(), getRevocation: vi.fn(), getCertList: vi.fn(),
 }))
 vi.mock('../../../services', () => ({
-  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
-  certificatesService: { getStats: api.getStats, getComplianceStats: api.getScores },
+  overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance,
+    getExpirations: api.getExpirations, getRevocation: api.getRevocation,
+    expirationQuery: (hint, from, to) => ({ status: hint.status, expires_from: from, expires_to: `${to}+1` }) },
+  certificatesService: { getStats: api.getStats, getAll: api.getCertList },
   casService: { getAll: api.getAll },
-  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity,
-    getStats: api.getDashStats, getCertificateTrend: api.getTrend },
+  dashboardService: { getActivityLog: api.getActivity },
 }))
 vi.mock('../../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({ connectionState: 'connected' }),
@@ -25,7 +26,7 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
 
-import { QueueCard, HierarchyCard, HorizonCard, ActivityCard, ComplianceCard, HealthCard, TrendCard } from '..'
+import { QueueCard, HierarchyCard, HorizonCard, ActivityCard, ComplianceCard, HealthCard, IssuanceCard, RevocationCard } from '..'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
 const item = (i) => ({ kind: 'manual_renewal_due', tier: 'warning', id: i, label: `cert-${i}`, due_at: null, href_hint: `/certificates/${i}` })
@@ -36,8 +37,7 @@ const queue = (n, total = n) => ({ data: { items: Array.from({ length: n }, (_, 
 beforeEach(() => {
   vi.clearAllMocks()
   api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
-  api.getScores.mockResolvedValue({ data: { average_score: 78, distribution: { 'A+': 1, A: 2, B: 3, C: 0, D: 0, F: 0 }, total: 6 } })
-  api.getNext.mockResolvedValue({ data: [] })
+  api.getCertList.mockResolvedValue({ data: [{ id: 7, common_name: 'soon.example', source: 'acme' }] })
   api.can.mockReturnValue(true)
 })
 
@@ -91,13 +91,13 @@ describe('exact links', () => {
     expect(root.textContent).not.toContain('overview.hierarchy.issued')
   })
 
-  it('horizon counters open the list of their own status, each soonest row its certificate', async () => {
-    api.getDashStats.mockResolvedValue({ data: { total_certificates: 9, expiring_soon: 3, expired: 1 } })
-    api.getNext.mockResolvedValue({ data: [{ id: 7, common_name: 'soon.example', valid_to: '2027-01-01T00:00:00Z' }] })
+  it('the horizon opens the list of the day picked on its filter hint, each row its certificate', async () => {
+    api.getExpirations.mockResolvedValue({ data: { from: '2026-11-23', total: 3, filter_hint: { status: ['valid', 'expiring'] },
+      periods: [{ date: '2026-11-23', total: 0 }, { date: '2026-11-24', total: 3, manual: 3, automatic: 0 }] } })
     show(<HorizonCard />)
-    expect((await screen.findByText('overview.horizon.state.expiring')).closest('a').getAttribute('href')).toBe('/certificates?status=expiring')
-    expect(screen.getByText('overview.horizon.state.expired').closest('a').getAttribute('href')).toBe('/certificates?status=expired')
-    expect(screen.getByText('soon.example').closest('a').getAttribute('href')).toBe('/certificates/7')
+    expect((await screen.findByText('soon.example')).closest('a').getAttribute('href')).toBe('/certificates/7')
+    expect(screen.getByText('overview.horizon.open').closest('a').getAttribute('href'))
+      .toBe('/certificates?status=valid&status=expiring&expires_from=2026-11-24&expires_to=2026-11-24%2B1')
   })
 
   it('the whole trail is linked only with the audit permission', async () => {
@@ -118,10 +118,11 @@ describe('empty state is not the error state', () => {
     ['queue', QueueCard, api.getQueue, { items: [], counts: {}, total: 0 }, 'overview.queue.emptyTitle'],
     ['health', HealthCard, api.getHealth, { protocols: {} }, 'overview.state.empty'],
     ['hierarchy', HierarchyCard, api.getAll, [], 'overview.hierarchy.emptyTitle'],
-    ['horizon', HorizonCard, api.getDashStats, { total_certificates: 0 }, 'overview.state.empty'],
+    ['horizon', HorizonCard, api.getExpirations, { from: '2026-11-23', total: 0, periods: [{ date: '2026-11-23', total: 0 }] }, 'overview.horizon.quiet'],
     ['compliance', ComplianceCard, api.getCompliance, { total: 0, counters: {}, by_key_algorithm: [] }, 'overview.state.empty'],
     ['activity', ActivityCard, api.getActivity, { activity: [] }, 'overview.state.empty'],
-    ['trend', TrendCard, api.getTrend, { trend: [] }, 'overview.trend.quiet'],
+    ['issuance', IssuanceCard, api.getIssuance, { flow: { periods: [], previous: { total: 0 } } }, 'overview.flow.quiet'],
+    ['revocation', RevocationCard, api.getRevocation, { total: 0, items: [] }, 'overview.state.empty'],
   ]
   it.each(cards)('%s says "nothing" for an empty answer and offers a retry for a failure, never both', async (id, Card, fetcher, empty, emptyText) => {
     fetcher.mockResolvedValueOnce({ data: empty, meta: { total: 0 } })

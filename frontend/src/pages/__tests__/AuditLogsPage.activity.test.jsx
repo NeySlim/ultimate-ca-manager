@@ -272,7 +272,7 @@ describe('the filters the toolbar has no room for', () => {
     fireEvent.change(within(d).getByRole('combobox', { name: 'audit.colResult' }), { target: { value: 'false' } })
     fireEvent.click(within(d).getByRole('checkbox', { name: 'User create' }))
     await waitFor(() => expect(lastList()).toMatchObject({
-      date_from: '2026-11-01', date_to: '2026-11-08', username: 'alice', success: 'false', action: ['user_create'], page: 1,
+      date_from: '2026-11-01', date_to: '2026-11-08T23:59:59.999999', username: 'alice', success: 'false', action: ['user_create'], page: 1,
     }))
     fireEvent.click(within(d).getByRole('button', { name: 'audit.done' }))
     const chips = screen.getByRole('group', { name: 'table.activeFilters' })
@@ -360,5 +360,27 @@ describe('out of the nominal case', () => {
     expect(container.querySelector('.table-container')).toHaveAttribute('aria-busy', 'true')
     await act(async () => { release({ data: rows, meta: { total: 2 } }) })
     expect(container.querySelectorAll('tr.sk-row')).toHaveLength(0)
+  })
+})
+
+describe('a link of the overview', () => {
+  it('opens the journal on one UTC day of failures of a type, the last day included', async () => {
+    localStorage.setItem('ucm-filter-audit-username', JSON.stringify('bob'))
+    auditService.getActions.mockResolvedValue({ data: { actions: [...ACTIONS, 'acme.order.finalize_failed'], categories: {} } })
+    renderPage('/audit?type=acme&success=false&date_from=2026-11-14&date_to=2026-11-14')
+    await waitFor(() => expect(lastList()).toMatchObject({
+      success: 'false', date_from: '2026-11-14', date_to: '2026-11-14T23:59:59.999999', action: ['acme.order.finalize_failed'],
+    }))
+    expect(lastList().username).toBeUndefined()
+    const chips = screen.getByRole('group', { name: 'table.activeFilters' })
+    expect(chips).toHaveTextContent('audit.chipFrom')
+    expect(chips).toHaveTextContent('audit.chipTo')
+  })
+
+  it('ignores a value it does not know', async () => {
+    renderPage('/audit?type=nope&success=maybe&date_from=yesterday')
+    await ready()
+    await waitFor(() => expect(lastList().success).toBeUndefined())
+    expect(lastList().date_from).toBeUndefined()
   })
 })

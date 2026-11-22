@@ -14,13 +14,13 @@ import { BatchBar } from './BatchBar'
 import { RecordList } from './Detail'
 
 /** The due date of a row: the relative words in bold, the exact date under them, coloured by urgency. */
-export function QueueDue({ due, label, date, tone, warnDays = 7 }) {
+export function QueueDue({ due, label, date, tone, warnDays = 7, children }) {
   const { t } = useTranslation()
   const shown = tone ?? dueTone(due, { warnDays })
   return (
     <div className={shown ? `queue-due ${shown}` : 'queue-due'}>
       <Icon name={shown === 'bad' ? 'warning' : 'clock'} />
-      <span><strong>{label ?? compactDue(due, t)}</strong><small>{date ?? (due ? formatDate(due, { time: true }) : '')}</small></span>
+      <span><strong>{label ?? compactDue(due, t)}</strong><small>{date ?? (due ? formatDate(due, { time: true }) : '')}</small>{children}</span>
     </div>
   )
 }

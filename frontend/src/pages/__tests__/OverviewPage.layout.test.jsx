@@ -30,7 +30,8 @@ vi.mock('../../components/overview', async () => {
   }
   return {
     QueueCard: card('queue'), HealthCard: card('health'), ComplianceCard: card('compliance'), HierarchyCard: card('hierarchy'),
-    HorizonCard: card('horizon'), ActivityCard: card('activity'), TrendCard: card('trend'),
+    HorizonCard: card('horizon'), ActivityCard: card('activity'), IssuanceCard: card('issuance'),
+    AuthoritiesCard: card('authorities'), RevocationCard: card('revocation'),
     MetricStrip: () => <div data-testid="strip" />, CardsDialog,
   }
 })
@@ -56,7 +57,7 @@ vi.mock('../../stores/userPreferencesStore', () => ({
 import OverviewPage from '../OverviewPage'
 import { REFRESH_EVENT } from '../../lib/overviewRefresh'
 
-const ALL = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity', 'trend']
+const ALL = ['queue', 'health', 'issuance', 'horizon', 'compliance', 'revocation', 'hierarchy', 'activity', 'authorities']
 function Where() {
   const { pathname, search } = useLocation()
   return <p data-testid="where">{pathname + search}</p>
@@ -69,7 +70,7 @@ const frame = () => new Promise((done) => requestAnimationFrame(() => done()))
 beforeEach(() => { store.prefs = {}; store.persist.mockClear(); perms.list = ['*']; vi.clearAllMocks() })
 
 describe('cards shown', () => {
-  it('shows the seven cards by default in the mockup order, under the banner, the assistant and the figures strip', () => {
+  it('shows the nine cards by default in the mockup order, under the banner, the assistant and the figures strip', () => {
     show()
     expect(cards()).toEqual(ALL)
     const view = document.getElementById('view-scroll')
@@ -77,10 +78,10 @@ describe('cards shown', () => {
     expect(screen.getByTestId('key-banner').compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('a layout saved before keeps its order and hidden cards; the trend comes after', () => {
+  it('a layout saved before keeps its order and hidden cards; the cards added since come after', () => {
     store.prefs = { dashboard: { order: ['activity', 'queue', 'states', 'horizon', 'health', 'hierarchy', 'compliance'], hidden: ['health'] } }
     show()
-    expect(cards()).toEqual(['activity', 'queue', 'horizon', 'hierarchy', 'compliance', 'trend'])
+    expect(cards()).toEqual(['activity', 'queue', 'horizon', 'hierarchy', 'compliance', 'issuance', 'revocation', 'authorities'])
   })
 
   it('a head preset shows its cards, is saved under the dashboard key and reads as pressed', () => {
@@ -92,7 +93,7 @@ describe('cards shown', () => {
     expect(cards()).toEqual(['compliance', 'horizon', 'hierarchy', 'activity'])
     const [key, value] = saved()
     expect(key).toBe('dashboard')
-    expect(value.hidden.sort()).toEqual(['health', 'queue', 'trend'])
+    expect(value.hidden.sort()).toEqual(['authorities', 'health', 'issuance', 'queue', 'revocation'])
     expect(Object.keys(value).sort()).toEqual(['hidden', 'order', 'queueShowAll'])
     expect(screen.getByText('overview.presets.manager').getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByText('overview.presets.operator').getAttribute('aria-pressed')).toBe('false')
@@ -182,18 +183,18 @@ describe('Cards dialog', () => {
   const open = () => { fireEvent.click(screen.getByRole('button', { name: 'overview.layout.cardsLabel' })); return within(screen.getByRole('dialog')) }
 
   it('lists every card with its checkbox, hides and shows one', () => {
-    store.prefs = { dashboard: { hidden: ['trend'] } }
+    store.prefs = { dashboard: { hidden: ['issuance'] } }
     show()
     const dialog = open()
     const boxes = dialog.getAllByRole('checkbox')
     expect(boxes.map((b) => b.id)).toEqual(ALL.map((id) => `card-toggle-${id}`))
-    expect(boxes.map((b) => b.checked)).toEqual([true, true, true, true, true, true, false])
+    expect(boxes.map((b) => b.checked)).toEqual(ALL.map((id) => id !== 'issuance'))
     fireEvent.click(dialog.getByLabelText('overview.cards.health'))
-    expect(saved()[1].hidden.sort()).toEqual(['health', 'trend'])
+    expect(saved()[1].hidden.sort()).toEqual(['health', 'issuance'])
     expect(cards()).not.toContain('health')
-    fireEvent.click(dialog.getByLabelText('overview.cards.trend'))
+    fireEvent.click(dialog.getByLabelText('overview.cards.issuance'))
     expect(saved()[1].hidden).toEqual(['health'])
-    expect(cards()).toContain('trend')
+    expect(cards()).toContain('issuance')
   })
 
   it('moves a card up or down, hidden ones included, stops at the ends and keeps the focus on the move', async () => {
@@ -201,7 +202,7 @@ describe('Cards dialog', () => {
     show()
     const dialog = open()
     expect(dialog.getByRole('button', { name: 'overview.layout.up:overview.cards.queue' }).disabled).toBe(true)
-    expect(dialog.getByRole('button', { name: 'overview.layout.down:overview.cards.trend' }).disabled).toBe(true)
+    expect(dialog.getByRole('button', { name: 'overview.layout.down:overview.cards.authorities' }).disabled).toBe(true)
     fireEvent.click(dialog.getByRole('button', { name: 'overview.layout.down:overview.cards.queue' }))
     expect(saved()[1].order.slice(0, 2)).toEqual(['health', 'queue'])
     await act(frame)

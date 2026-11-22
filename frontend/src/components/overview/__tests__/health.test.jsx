@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, within, configure, waitFor, fireEvent, act } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import fr from '../../../i18n/locales/fr.json'
 
 const lang = vi.hoisted(() => ({ fr: false }))
@@ -380,5 +380,56 @@ describe('summary under the rows', () => {
   it('says so when nothing does', async () => {
     const card = await show({ scheduler: sched({}), smtp: witness('not_configured') })
     expect(card.querySelector('.health-foot.good').textContent).toBe('overview.health.allFine')
+  })
+})
+
+describe('a failure day and the scheduler pill', () => {
+  const day = (i, ok, failed) => ({ date: `2026-11-${13 + i}`, ok, failed })
+  const acme = { periods: [day(0, 1, 0), day(1, 2, 3), day(2, 4, 0)], last_operation_at: '2026-11-15T10:00:00Z', last_status: 'failed' }
+  const Where = () => {
+    const { pathname, search } = useLocation()
+    return <output data-testid="where">{pathname + search}</output>
+  }
+
+  it('opens Activity on that UTC day\'s failed ACME operations, for whom may read the trail', async () => {
+    api.getHealth.mockResolvedValue({ data: { protocols: { acme } } })
+    const showQueue = vi.fn()
+    render(<MemoryRouter><OverviewContext.Provider value={{ showQueue }}><HealthCard /><Where /></OverviewContext.Provider></MemoryRouter>)
+    await waitFor(() => expect(document.querySelector('#card-health .mirror')).not.toBeNull())
+    // A day without failure leads nowhere
+    fireEvent.click(document.querySelector('.mirror .day[data-day="0"]'))
+    expect(document.querySelector('[data-testid="where"]').textContent).toBe('/')
+    fireEvent.click(document.querySelector('.mirror .day[data-day="1"]'))
+    expect(document.querySelector('[data-testid="where"]').textContent)
+      .toBe('/audit?type=acme&success=false&date_from=2026-11-14&date_to=2026-11-14')
+    expect(showQueue).not.toHaveBeenCalled()
+  })
+
+  it('falls back on the queue for whom may not read the trail', async () => {
+    perms.admin = false
+    perms.granted = []
+    api.getHealth.mockResolvedValue({ data: { protocols: { acme } } })
+    const showQueue = vi.fn()
+    render(<MemoryRouter><OverviewContext.Provider value={{ showQueue }}><HealthCard /><Where /></OverviewContext.Provider></MemoryRouter>)
+    await waitFor(() => expect(document.querySelector('#card-health .mirror')).not.toBeNull())
+    fireEvent.click(document.querySelector('.mirror .day[data-day="1"]'))
+    expect(showQueue).toHaveBeenCalledWith('acme')
+    expect(document.querySelector('[data-testid="where"]').textContent).toBe('/')
+  })
+
+  it('beats the scheduler pill when a reload brings a newer run, not on the first load nor an equal one', async () => {
+    const run = (at) => ({ data: { protocols: { scheduler: sched({ last_operation_at: at }) } } })
+    api.getHealth.mockResolvedValueOnce(run('2026-11-19T10:00:00Z')).mockResolvedValueOnce(run('2026-11-19T10:00:00Z'))
+      .mockResolvedValueOnce(run('2026-11-19T10:05:00Z'))
+    render(<MemoryRouter><HealthCard /></MemoryRouter>)
+    const pill = () => document.querySelector('[data-protocol="scheduler"] .pulse')
+    await waitFor(() => expect(pill()).not.toBeNull())
+    expect(pill().className).toBe('pulse')
+    act(() => { window.dispatchEvent(new Event('ucm:overview-refresh')) })
+    await waitFor(() => expect(api.getHealth).toHaveBeenCalledTimes(2))
+    expect(pill().className).toBe('pulse')
+    act(() => { window.dispatchEvent(new Event('ucm:overview-refresh')) })
+    await waitFor(() => expect(pill().className).toBe('pulse live'))
+    expect(pill().dataset.beat).toBe('1')
   })
 })

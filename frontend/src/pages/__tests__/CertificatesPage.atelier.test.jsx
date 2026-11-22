@@ -711,3 +711,32 @@ describe('CertificatesPage on a phone (mobile records)', () => {
     expect(zone().querySelector('table')).toBeNull()
   })
 })
+
+describe('CertificatesPage: the intervals of the overview calendars', () => {
+  it('sends an expiry interval of the horizon to the list and shows it as one chip that removes both bounds', async () => {
+    await mount('/certificates?status=valid&status=expiring&expires_from=2026-12-14&expires_to=2026-12-15')
+    expect(lastParams()).toMatchObject({ status: ['valid', 'expiring'], expires_from: '2026-12-14', expires_to: '2026-12-15' })
+    expect(zone().querySelector('.applied-filters')).toHaveTextContent('table.filterChip:overview.filter.expires/Dec 14, 2026')
+    fireEvent.click(zone().querySelector('#clear-interval-expires'))
+    await waitFor(() => expect(where()).toBe('?status=valid&status=expiring'))
+    expect(lastParams().expires_from).toBeUndefined()
+    expect(lastParams().expires_to).toBeUndefined()
+  })
+
+  it('names a week by its first and last day, the upper bound being the day after', async () => {
+    await mount('/certificates?expires_from=2026-12-14&expires_to=2026-12-21')
+    expect(zone().querySelector('.applied-filters')).toHaveTextContent('table.filterChip:overview.filter.expires/overview.filterValue.range')
+  })
+
+  it('sends a creation day of the issuance flow to the list', async () => {
+    await mount('/certificates?created_from=2026-11-02&created_to=2026-11-03')
+    expect(lastParams()).toMatchObject({ created_from: '2026-11-02', created_to: '2026-11-03' })
+    expect(zone().querySelector('.applied-filters')).toHaveTextContent('table.filterChip:overview.filter.created/Nov 2, 2026')
+  })
+
+  it('drops a bound that is not a calendar day', async () => {
+    await mount('/certificates?expires_from=2026-02-31&created_to=tomorrow')
+    expect(lastParams().expires_from).toBeUndefined()
+    expect(lastParams().created_to).toBeUndefined()
+  })
+})

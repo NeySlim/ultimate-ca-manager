@@ -100,3 +100,28 @@ describe('latest operations', () => {
     expect(screen.queryByRole('link', { name: /overview.activity.all/ })).toBeNull()
   })
 })
+
+describe('latest operations: Tout, PKI, Accès', () => {
+  const rows = [entry(1, 'cert_revoked'), login(2), entry(3, 'user_created'), entry(4, 'settings_updated'), entry(5, 'crl_generated')]
+  const families = () => rowsOf().map((r) => r.dataset.family)
+
+  it('shows everything first, then the PKI operations only, then the sign-ins and accounts only', async () => {
+    api.getActivity.mockResolvedValue({ data: { activity: rows } })
+    render(<MemoryRouter><ActivityCard /></MemoryRouter>)
+    await screen.findByText('event 1')
+    expect(screen.getByRole('button', { name: 'overview.activity.filter.all' }).getAttribute('aria-pressed')).toBe('true')
+    expect(families()).toEqual(['revoked', 'auth', 'users', 'settings', 'crl'])
+    fireEvent.click(screen.getByRole('button', { name: 'overview.activity.filter.pki' }))
+    expect(families()).toEqual(['revoked', 'crl'])
+    fireEvent.click(screen.getByRole('button', { name: 'overview.activity.filter.access' }))
+    expect(families()).toEqual(['auth', 'users'])
+  })
+
+  it('says in one line that a filter keeps nothing', async () => {
+    api.getActivity.mockResolvedValue({ data: { activity: [login(1)] } })
+    render(<MemoryRouter><ActivityCard /></MemoryRouter>)
+    await screen.findByText('overview.activity.filter.pki')
+    fireEvent.click(screen.getByRole('button', { name: 'overview.activity.filter.pki' }))
+    expect(screen.getByText('overview.activity.noneOfKind:overview.activity.filter.pki')).toBeTruthy()
+  })
+})

@@ -1,16 +1,16 @@
 /**
  * Compliance (maquette-1): the average score as a ring (one ratio), its grades A+ to F, then one gauge
  * per rule of GET /dashboard/compliance with its conforming share and count. A rule the server gives
- * a list filter for opens that list, filtered on its gap. The score comes from /certificates/compliance
- * until /dashboard/compliance carries it; its base is written under the ring when the two differ.
+ * a list filter for opens that list, filtered on its gap. Score, grades and rules are all counted over
+ * the one population the route names (`population.count`, the active certificates).
  */
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Icon } from '../atelier'
-import { certificatesService, overviewService } from '../../services'
+import { overviewService } from '../../services'
 import { listHref } from '../../lib/overviewFilters'
 import { GRADE_ORDER, gradeOfScore, rulePercent, ruleTone } from '../../lib/overviewViz'
-import { OverviewCard, num, settle, useCardData, useLang } from './shared'
+import { OverviewCard, num, useCardData, useLang } from './shared'
 import { Ring, useChartTip } from './viz'
 
 const COUNTERS = ['rsa_below_3072', 'server_lifetime_over_398_days', 'weak_signature_hash',
@@ -34,23 +34,14 @@ export function ComplianceCard() {
   const { t } = useTranslation()
   const lang = useLang()
   const tip = useChartTip()
-  const state = useCardData(async () => {
-    const { got, missing } = await settle(
-      { summary: () => overviewService.getCompliance(), scores: () => certificatesService.getComplianceStats() },
-      (g) => Boolean(g.summary))
-    return { data: { summary: got.summary?.data || {}, scores: got.scores?.data || null, missing } }
-  }, ['certificate', 'ca'])
-  const summary = state.data?.summary || {}
-  const scores = state.data?.scores
+  const state = useCardData(() => overviewService.getCompliance(), ['certificate', 'ca'])
+  const summary = state.data || {}
   const counters = summary.counters || {}
   const total = populationOf(summary)
-  // The dashboard's own score once it has one (same population as the rules), else the certificates' route
-  const own = isNum(summary.score)
-  const score = own ? summary.score : (isNum(scores?.average_score) ? scores.average_score : null)
-  const grades = (own ? summary.distribution || summary.grades : null) || scores?.distribution || null
+  const score = isNum(summary.score?.average) ? summary.score.average : null
+  const grades = summary.score?.distribution || null
   const graded = grades ? GRADE_ORDER.reduce((s, g) => s + (Number(grades[g]) || 0), 0) : 0
-  const scoreBase = own ? total : scores?.total
-  const grade = gradeOfScore(score)
+  const grade = summary.score?.grade || gradeOfScore(score)
   const algos = Array.isArray(summary.by_key_algorithm) ? summary.by_key_algorithm : []
   const link = (entry) => (entry?.filter_available ? listHref(entry.filter_hint) : null)
 
@@ -95,7 +86,7 @@ export function ComplianceCard() {
       }),
     },
     ...(grades ? [{
-      caption: t('overview.compliance.tableGrades', { count: num(scoreBase) }),
+      caption: t('overview.compliance.tableGrades', { count: num(total) }),
       columns: [t('overview.compliance.gradeCol'), t('overview.compliance.certificates')],
       rows: gradeParts.map((p) => [p.key, p.value]),
     }] : []),
@@ -107,7 +98,7 @@ export function ComplianceCard() {
   ]
 
   return (
-    <OverviewCard id="compliance" state={state} route="GET /api/v2/dashboard/compliance" missing={state.data?.missing}
+    <OverviewCard id="compliance" state={state} route="GET /api/v2/dashboard/compliance"
       empty={state.status === 'ready' && summary.total === 0} table={table}
       sub={t('overview.compliance.subRules', { count: num(total) })}>
       <div className="panel-content comp">
@@ -134,9 +125,6 @@ export function ComplianceCard() {
                   {gradeParts.map((p) => <li key={p.key}><i className="swatch" style={{ background: p.color }} />{p.key}<b>{p.value.toLocaleString(lang)}</b></li>)}
                 </ul>
               </div>
-            )}
-            {!own && isNum(scoreBase) && scoreBase !== total && (
-              <p className="score-base">{t('overview.compliance.scoreBase', { count: scoreBase })}</p>
             )}
           </div>
         )}

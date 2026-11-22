@@ -5,13 +5,20 @@
 export const OVERVIEW_FILTER_KEYS = [
   'status', 'live', 'key_algo', 'key_algo_prefix', 'key_bits_below', 'sig_hash', 'server',
   'lifetime_over_days', 'no_key', 'incomplete_chain', 'renewal', 'ca_id',
+  'expires_from', 'expires_to', 'created_from', 'created_to',
 ]
 const MULTI = new Set(['status', 'key_algo', 'sig_hash', 'renewal', 'ca_id'])
 // The statuses the list accepts (CERTIFICATE_STATUS_FILTERS); any other is dropped from the link
 export const CERT_STATUSES = ['valid', 'expiring', 'expired', 'revoked', 'orphan', 'archived']
 const ALLOWED = { status: new Set(CERT_STATUSES) }
-// An authority's « Voir les certificats » names it by id
-const VALID = { ca_id: (v) => /^\d+$/.test(v) }
+// An authority's « Voir les certificats » names it by id; an interval bound is a UTC day
+const isDay = (v) => {
+  const at = /^\d{4}-\d{2}-\d{2}$/.test(v) ? Date.parse(`${v}T00:00:00Z`) : NaN
+  return !Number.isNaN(at) && new Date(at).toISOString().slice(0, 10) === v
+}
+const VALID = { ca_id: (v) => /^\d+$/.test(v), expires_from: isDay, expires_to: isDay, created_from: isDay, created_to: isDay }
+// The intervals of the overview's calendars: a chip each, its two bounds removed together
+export const INTERVALS = { expires: ['expires_from', 'expires_to'], created: ['created_from', 'created_to'] }
 
 /** Ordered [key, value] pairs of the known filters in a query string. */
 export function parseOverviewFilters(search) {
@@ -62,4 +69,17 @@ export function toSearch(pairs) {
   for (const [key, value] of pairs) params.append(key, value)
   const qs = params.toString()
   return qs ? `?${qs}` : ''
+}
+
+/**
+ * The days an interval of the URL covers, read for its chip: `{from, last}` (each a YYYY-MM-DD or null),
+ * the exclusive upper bound turned into the last day included.
+ */
+export function intervalDays(from, to) {
+  let last = null
+  if (to) {
+    const at = Date.parse(`${to}T00:00:00Z`) - 86400000
+    last = new Date(at).toISOString().slice(0, 10)
+  }
+  return { from: from || null, last }
 }
