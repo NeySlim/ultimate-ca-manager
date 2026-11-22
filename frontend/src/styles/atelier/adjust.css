@@ -127,3 +127,7 @@
 /* The account menu opens on the lock screen's account card, the known facts under it in two columns. */
 :root .atl .user-menu .user-id{gap:10px}
 :root .atl .user-menu .user-facts{grid-template-columns:auto minmax(0,1fr);gap:6px 14px;padding:0 2px}
+
+/* From 1001 px the authorities and their side panel scroll apart, as the certificates and their inspector:
+   the view keeps the window's height, the hierarchy (or list) and the panel each scroll inside it. */
+@media(min-width:1001px){:root .atl .scroll-view:has(>.ca-layout){display:flex;flex-direction:column;overflow:hidden}:root .atl .ca-layout{flex:1;min-height:0;align-items:stretch}:root .atl .ca-layout>:is(.ca-tree-panel,.ca-side){min-height:0;overflow:auto;scrollbar-width:thin}}
