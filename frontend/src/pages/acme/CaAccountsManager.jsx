@@ -199,7 +199,7 @@ export default function CaAccountsManager({
             kind: 'text', priority: 3, title: (a) => a.directory_url || undefined, sort: 'directory' },
           { id: 'email', label: t('acme.contactEmail'), cell: (a) => a.email || '—', kind: 'text', priority: 4, sort: 'email' },
           { id: 'default', label: t('common.default'), cell: (a) => t(a.is_default ? 'common.yes' : 'common.no'), kind: 'fit', priority: 3, labelled: true, sort: 'default' },
-          { id: 'proxy', label: t('acme.proxy'), cell: (a) => (proxyIsOn(a) ? a.proxy_slug : '—'), kind: 'fit', priority: 3, sort: 'proxy' },
+          { id: 'proxy', label: t('acme.proxy'), cell: (a) => (proxyIsOn(a) ? a.proxy_slug : '—'), kind: 'fit', priority: 3, labelled: true, sort: 'proxy' },
           { status: true, sort: 'state' },
         ]}
         empty={<EmptyBlock id="acme-upstream" icon="server" title={t('acme.noCaAccounts')} text={t('acme.certificateAuthoritiesDesc')}

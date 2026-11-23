@@ -22,6 +22,7 @@ import { downloadBlob } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 import { KEY_ALGORITHMS, isUsable, groupedOptions } from '../lib/keyAlgorithms'
 import { keyLabel } from '../lib/certificateDetail'
+import { signatureHashName } from '../lib/signatureName'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
@@ -334,7 +335,7 @@ export default function TemplatesPage() {
                 [t('templates.source'), tplSource(open)],
                 [t('common.validity'), tplValidity(open)],
                 fact(t('templates.module.defaultKey'), keyLabel(open.key_type)),
-                fact(t('common.digest'), open.digest),
+                fact(t('common.digest'), open.digest && signatureHashName(open.digest)),
                 [t('templates.module.uses'), tplUses(open)],
                 { label: t('atelier.state'), state: tplState(open) === 'active' ? ['good', t('templates.module.states.active')] : ['muted', t('templates.module.states.inactive')] },
                 markers.length > 0 && [t('templates.module.markers'), markers.join(', ')],
@@ -717,7 +718,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
             <Select id="tpl-key" label={t('common.keyType')} value={formData.key_type} onChange={(val) => set('key_type', val)} options={keyTypeOptions}
               after={<BrainpoolNotice atelier label={formData.key_type} />} />
             <Select id="tpl-digest" label={t('common.digest')} value={formData.digest} onChange={(val) => set('digest', val)}
-              options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))} />
+              options={DIGEST_OPTIONS.map(v => ({ value: v, label: signatureHashName(v) }))} />
           </div>
         </fieldset>
 
@@ -729,11 +730,11 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
         <fieldset className="field full">
           <legend>{t('templates.subjectTemplate')}</legend>
           <div className="subject-grid">
-            <Input id="tpl-c" label={t('templates.country')} value={formData.subject.C} onChange={(e) => updateSubject('C', e.target.value)} placeholder="US" />
-            <Input id="tpl-st" label={t('templates.state')} value={formData.subject.ST} onChange={(e) => updateSubject('ST', e.target.value)} placeholder="California" />
-            <Input id="tpl-l" label={t('common.locality')} value={formData.subject.L} onChange={(e) => updateSubject('L', e.target.value)} placeholder="San Francisco" />
+            <Input id="tpl-c" label={t('templates.country')} value={formData.subject.C} onChange={(e) => updateSubject('C', e.target.value)} placeholder={t('common.countryPlaceholder')} />
+            <Input id="tpl-st" label={t('templates.state')} value={formData.subject.ST} onChange={(e) => updateSubject('ST', e.target.value)} placeholder={t('common.statePlaceholder')} />
+            <Input id="tpl-l" label={t('common.locality')} value={formData.subject.L} onChange={(e) => updateSubject('L', e.target.value)} placeholder={t('cas.localityPlaceholder')} />
             <Input id="tpl-o" label={t('templates.organization')} value={formData.subject.O} onChange={(e) => updateSubject('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
-            <Input id="tpl-ou" label="OU" value={formData.subject.OU} onChange={(e) => updateSubject('OU', e.target.value)} placeholder="IT Department" />
+            <Input id="tpl-ou" label="OU" value={formData.subject.OU} onChange={(e) => updateSubject('OU', e.target.value)} placeholder={t('csrs.departmentPlaceholder')} />
             <Input id="tpl-cn" label={t('templates.commonName')} value={formData.subject.CN} onChange={(e) => updateSubject('CN', e.target.value)} placeholder={t('templates.cnPlaceholder')} />
             {/* Not type="email": copies of built-in templates hold the {email} placeholder */}
             <Input id="tpl-email" label={t('common.email')} full value={formData.subject.emailAddress} onChange={(e) => updateSubject('emailAddress', e.target.value)} placeholder={t('certificates.emailPlaceholder')} />
@@ -752,11 +753,11 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
             <legend>{t('templates.pinnedSubjectFields')}</legend>
             <small id="hint-tpl-pinned">{t('templates.pinnedSubjectFieldsDescription')}</small>
             <div className="subject-grid">
-              <Input id="tpl-pin-c" label={t('templates.pinnedCountry')} value={formData.pinned_subject_fields.C} onChange={(e) => updatePinned('C', e.target.value)} placeholder="US" />
-              <Input id="tpl-pin-st" label={t('templates.pinnedState')} value={formData.pinned_subject_fields.ST} onChange={(e) => updatePinned('ST', e.target.value)} placeholder="California" />
-              <Input id="tpl-pin-l" label={t('templates.pinnedLocality')} value={formData.pinned_subject_fields.L} onChange={(e) => updatePinned('L', e.target.value)} placeholder="San Francisco" />
+              <Input id="tpl-pin-c" label={t('templates.pinnedCountry')} value={formData.pinned_subject_fields.C} onChange={(e) => updatePinned('C', e.target.value)} placeholder={t('common.countryPlaceholder')} />
+              <Input id="tpl-pin-st" label={t('templates.pinnedState')} value={formData.pinned_subject_fields.ST} onChange={(e) => updatePinned('ST', e.target.value)} placeholder={t('common.statePlaceholder')} />
+              <Input id="tpl-pin-l" label={t('templates.pinnedLocality')} value={formData.pinned_subject_fields.L} onChange={(e) => updatePinned('L', e.target.value)} placeholder={t('cas.localityPlaceholder')} />
               <Input id="tpl-pin-o" label={t('templates.pinnedOrganization')} value={formData.pinned_subject_fields.O} onChange={(e) => updatePinned('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
-              <Input id="tpl-pin-ou" label={t('templates.pinnedOrganizationalUnit')} value={formData.pinned_subject_fields.OU} onChange={(e) => updatePinned('OU', e.target.value)} placeholder="IT Department" />
+              <Input id="tpl-pin-ou" label={t('templates.pinnedOrganizationalUnit')} value={formData.pinned_subject_fields.OU} onChange={(e) => updatePinned('OU', e.target.value)} placeholder={t('csrs.departmentPlaceholder')} />
             </div>
           </fieldset>
         </fieldset>

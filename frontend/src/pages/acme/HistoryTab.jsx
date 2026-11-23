@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Btn, Pill, ListView, Toolbar, SearchField, FilterSelect, ToolsDivider, Dock, DockBody, Section, Facts, EmptyBlock, NoMatch, AtelierDialog,
+  Btn, IconBtn, Pill, ListView, Toolbar, SearchField, FilterSelect, ToolsDivider, Dock, DockBody, Section, Facts, EmptyBlock, NoMatch, AtelierDialog,
 } from '../../components/atelier'
 import { exportToCSV, exportToJSON } from '../../lib/utils'
 import { fetchPages } from '../../lib/fetchAllPages'
@@ -19,7 +19,7 @@ const EXPORT_PAGE_SIZE = 100
 const EXPORT_MAX_ROWS = 10000
 
 export default function HistoryTab({ history, total, page, perPage, onPageChange, onPerPageChange, search, onSearchChange, sort, onSort,
-  caOptions, exportLoader, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert, loading }) {
+  caOptions, exportLoader, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert, loading, onRefresh }) {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
   const [exporting, setExporting] = useState(false)
@@ -103,6 +103,8 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
               options={[{ value: '', label: t('acme.allCAs') }, ...caOptions]} />
             <ToolsDivider />
             <Btn icon="download" id="acme-history-export" onClick={() => { setNotice(null); setExporting(true) }}>{t('table.exportData')}</Btn>
+            {/* Refresh closes the bar on the right in every ACME list view, as in Accounts */}
+            {onRefresh && <IconBtn icon="refresh" label={t('common.refresh')} onClick={onRefresh} />}
           </Toolbar>
         )}
         title={(r) => r.common_name} status={pill} openedId={cert?.id} onOpen={onSelectCert}

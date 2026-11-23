@@ -65,7 +65,8 @@ describe('TemplatesPage detail digest', () => {
     window.localStorage.clear()
     render(<MemoryRouter><TemplatesPage /></MemoryRouter>)
     fireEvent.click(within(await screen.findByRole('table')).getByText('PQ leaf'))
-    expect(await screen.findByText('sha512')).toBeTruthy()
+    // The digest in the words of the forms and the certificates
+    expect(await screen.findByText('SHA-512')).toBeTruthy()
     expect(screen.getByText('common.digest')).toBeTruthy()
   })
 })

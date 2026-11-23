@@ -172,7 +172,9 @@ describe('no SCEP profile yet', () => {
     const { unmount } = at('/scep-config')
     const block = await waitFor(() => { const b = document.getElementById('empty-scep'); expect(b).not.toBeNull(); return b })
     expect(within(block).getByRole('heading', { level: 3 })).toHaveTextContent('scep.noProfiles')
-    expect(within(block).getByRole('button', { name: 'scep.newProfile' })).toBeTruthy()
+    // Secondary in the block: the head's button above is the primary one
+    expect(within(block).getByRole('button', { name: 'scep.newProfile' })).not.toHaveClass('primary')
+    expect(document.getElementById('scep-new')).toHaveClass('primary')
     unmount()
     setup.state = { visible: true, complete: false }
     at('/scep-config')
@@ -296,6 +298,16 @@ describe('the SCEP docks as facts', () => {
     expect(row('common.subject')).toHaveClass('long')
     expect(row('common.subject').querySelector('dd.v')).toHaveTextContent('CN=device-9,O=Lab')
     expect(row('scep.transactionId').querySelector('dd.v .code-value')).toHaveTextContent('tx-9')
+  })
+
+  it('says a request\'s deleted profile and an approval no one gave in words, never « #3 » or « auto »', async () => {
+    scep.getRequests.mockResolvedValue({ data: [{ ...REQUEST, profile_id: 3, status: 'approved', approved_at: '2026-11-08T10:01:00Z', approved_by: 'auto' }], meta: { total: 1 } })
+    at('/scep-config?tab=requests')
+    fireEvent.click(await screen.findByRole('button', { name: 'device-9' }))
+    await dock()
+    expect(row('scep.columns.profile').querySelector('dd.v')).toHaveTextContent('scep.deletedProfile {"id":3}')
+    expect(row('scep.approvedAt')).toHaveTextContent('scep.approvedAuto')
+    expect(row('scep.approvedAt')).not.toHaveTextContent(/\bauto\b/)
   })
 
   it('shows a registration never tested and unused muted, its tenant in a chip', async () => {

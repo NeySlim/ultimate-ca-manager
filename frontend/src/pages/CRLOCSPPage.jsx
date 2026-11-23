@@ -344,7 +344,8 @@ export default function CRLOCSPPage() {
   const pill = (r) => <Pill label={t(`crlOcsp.states.${stateOf(r)}`)} tone={TONES[stateOf(r)]} />
   const number = (r) => (r.has_crl ? t('crlOcsp.numberOf', { number: r.crl_number }) : t('crlOcsp.noCRL'))
   // Under its column's name the number reads alone; a CA without a CRL says so in its state
-  const crlNumber = (r) => (r.has_crl ? String(r.crl_number) : '—')
+  // The list and the panel say the number alike (« n° 4 »), as the mockup's CRL column
+  const crlNumber = (r) => (r.has_crl ? t('crlOcsp.numberOf', { number: r.crl_number }) : '—')
   const published = (r) => dateTimeOf(r.crl_updated, locale) || '—'
   const next = (r) => dateTimeOf(r.crl_next_update, locale) || '—'
   const ocsp = (r) => t(r.ocsp_enabled ? 'crlOcsp.ocspActive' : 'crlOcsp.ocspInactive')
@@ -624,8 +625,8 @@ export default function CRLOCSPPage() {
         )}
         title={name} status={pill} openedId={openId} onOpen={openCa}
         columns={[
-          { id: 'number', label: t('crlOcsp.columns.crlNumber'), cell: crlNumber, kind: 'fit', priority: 3, labelled: true, sort: 'number' },
-          { id: 'published', label: t('crlOcsp.columns.publication'), cell: published, kind: 'fit', priority: 3, labelled: true, sort: 'published' },
+          { id: 'number', label: 'CRL', cell: crlNumber, kind: 'fit', priority: 3, labelled: true, sort: 'number' },
+          { id: 'published', label: t('crlOcsp.columns.published'), cell: published, kind: 'fit', priority: 3, labelled: true, sort: 'published' },
           { id: 'next', label: t('crlOcsp.columns.nextUpdate'), labelFull: t('crlOcsp.nextUpdate'), cell: next, kind: 'fit', priority: 2, labelled: true, sort: 'next' },
           { id: 'ocsp', label: 'OCSP', cell: ocsp, kind: 'fit', priority: 3, sort: 'ocsp' },
           { status: true, sort: 'state' },

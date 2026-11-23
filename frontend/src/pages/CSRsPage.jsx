@@ -1032,7 +1032,7 @@ function SanRows({ id, legend, hint, rows, onChange, types, allowEmpty = false, 
       {hint && <small id={`hint-${id}`}>{hint}</small>}
       <div className="row-list">
         {rows.map((san, i) => (
-          <div className="san-row" key={i}>
+          <div className={allowEmpty || rows.length > 1 ? 'san-row' : 'san-row lone'} key={i}>
             <label className="sr-only" htmlFor={`${id}-type-${i}`}>{t('certificates.issueForm.sanType', { n: i + 1 })}</label>
             <select id={`${id}-type-${i}`} value={san.type} onChange={(e) => update(i, { type: e.target.value })}>
               {types.map(type => <option key={type} value={type}>{type}</option>)}
@@ -1040,12 +1040,12 @@ function SanRows({ id, legend, hint, rows, onChange, types, allowEmpty = false, 
             <label className="sr-only" htmlFor={`${id}-value-${i}`}>{t('certificates.issueForm.sanValue', { n: i + 1 })}</label>
             <input id={`${id}-value-${i}`} value={san.value} placeholder={SAN_PLACEHOLDERS[san.type]} autoComplete="off" spellCheck="false"
               onChange={(e) => update(i, { value: e.target.value })} />
-            {(allowEmpty || rows.length > 1) ? (
+            {(allowEmpty || rows.length > 1) && (
               <button type="button" className="icon-btn" aria-label={t('certificates.issueForm.removeSan', { n: i + 1 })}
                 onClick={() => onChange(rows.filter((_, j) => j !== i))}>
                 <Icon name="close" />
               </button>
-            ) : <span />}
+            )}
           </div>
         ))}
       </div>

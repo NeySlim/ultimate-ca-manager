@@ -10,7 +10,7 @@ import { dashboardService, overviewService } from '../../services'
 import { queueSplit } from '../../lib/overviewQueue'
 import { HEALTH_DAYS, ISSUANCE_DAYS, failuresPerDay, issuedPerDay, seriesStats } from '../../lib/overviewViz'
 import { expiryCalendar } from '../../lib/overviewHorizon'
-import { num, useCardData, useLang } from './shared'
+import { KeepWith, NB, SEP, num, useCardData, useLang } from './shared'
 import { MiniBars, SplitBar, Spark, useChartTip } from './viz'
 
 const count = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -33,7 +33,7 @@ function Delta({ value, good = 'up' }) {
   const tone = dir === null ? 'muted' : dir === good ? 'good' : 'bad'
   return (
     <span className={`delta ${tone}`} data-delta={value}>
-      {dir && <Icon name={dir} />}{value > 0 ? `+ ${value}` : value < 0 ? `− ${-value}` : '0'}
+      {dir && <Icon name={dir} />}{value > 0 ? `+${NB}${value}` : value < 0 ? `−${NB}${-value}` : '0'}
     </span>
   )
 }
@@ -81,8 +81,8 @@ export function MetricStrip({ showQueue }) {
   const issuedStats = issued && seriesStats(issued.values)
   const active = count(stats.valid) !== null && count(stats.expiring_soon) !== null ? stats.valid + stats.expiring_soon : null
   const certSub = issuedStats ? (
-    <><Delta value={issuedStats.sum} />{t('overview.metrics.issuedSub', { count: ISSUANCE_DAYS })}
-      {active !== null && <>{' · '}{t('overview.metrics.active', { count: active })}</>}</>
+    <><KeepWith lead={<Delta value={issuedStats.sum} />} text={t('overview.metrics.issuedSub', { count: ISSUANCE_DAYS })} />
+      {active !== null && <>{SEP}{t('overview.metrics.active', { count: active })}</>}</>
   ) : t('overview.metrics.inventory')
 
   // To handle: critical rows, the rest to do, what is only to watch
@@ -96,7 +96,7 @@ export function MetricStrip({ showQueue }) {
     { key: 'watch', value: queue.watch || 0, color: 'var(--s0)', label: t('overview.metrics.watch', { count: queue.watch || 0 }) },
   ]
   const queueSub = queue.total === null ? null : critical > 0 ? (
-    <><span className="delta bad"><Icon name="warning" />{queueParts[0].label}</span>{` · ${queueParts[1].label} · ${queueParts[2].label}`}</>
+    <KeepWith lead={<span className="delta bad"><Icon name="warning" />{queueParts[0].label}</span>} text={`${SEP}${queueParts[1].label}${SEP}${queueParts[2].label}`} />
   ) : t('overview.metrics.queueSub', { act: t('overview.metrics.interventions', { count: queue.act }), watch: queue.watch })
 
   // Expiring within the window: the stock already expired goes under it
@@ -107,7 +107,7 @@ export function MetricStrip({ showQueue }) {
   const expirySub = [
     expiryPeak ? t('overview.metrics.expiryPeak', { count: expiryPeak.total, date: dayLabel(expiryPeak.date, lang) }) : null,
     expired === null ? t('overview.metrics.toCheck') : t('overview.metrics.alreadyExpired', { count: expired }),
-  ].filter(Boolean).join(' · ')
+  ].filter(Boolean).join(SEP)
 
   // Failures today: the three protocols, 14 days in columns, the gap with yesterday
   const protocols = healthState.data?.protocols
@@ -171,7 +171,7 @@ export function MetricStrip({ showQueue }) {
         tone={failures > 0 ? 'bad' : ''}
         chart={failSeries && <MiniBars values={failSeries} tone="var(--bad)" label={t('overview.metrics.failuresAlt', { count: failSeries.length, today: failures })} />}
         sub={failStats && failStats.delta !== null
-          ? <><Delta value={failStats.delta} good="down" />{t('overview.metrics.sinceYesterday')}</>
+          ? <KeepWith lead={<Delta value={failStats.delta} good="down" />} text={t('overview.metrics.sinceYesterday')} />
           : t('overview.metrics.failuresSub')}
         href="#card-queue" onClick={toFailures} tip={bind('failures')} />
       {tip.node}

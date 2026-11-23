@@ -133,7 +133,7 @@ export function ImportResultStep({ importResult, onReset, onDone }) {
             {importResult?.certificates_imported > 0 && <RecordRow key="certs" title={`${importResult.certificates_imported} ${t('common.certificate')}${importResult.certificates_imported > 1 ? 's' : ''}`} />}
             {importResult?.cas_imported > 0 && <RecordRow key="cas" title={plural(importResult.cas_imported, 'CA')} />}
             {cross.attached > 0 && <RecordRow key="cross" title={<span data-testid="cross-attached">{t('import.crossAttached', { count: cross.attached })}</span>} />}
-            {importResult?.keys_matched > 0 && <RecordRow key="keys" title={`${importResult.keys_matched} ${t('import.privateKeysMatched')}`} />}
+            {importResult?.keys_matched > 0 && <RecordRow key="keys" title={t('import.privateKeysMatched', { count: importResult.keys_matched })} />}
           </RecordList>
         )}
       </Section>

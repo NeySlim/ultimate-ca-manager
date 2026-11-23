@@ -148,6 +148,18 @@ describe('the SSH certificate dock', () => {
   })
 })
 
+describe('the SSH certificate dock, deletion', () => {
+  it('deletes from the panel\'s « ⋯ » menu, never from a red button beside the revocation', async () => {
+    const { container } = page()
+    fireEvent.click(await screen.findByRole('button', { name: 'alice' }))
+    const dock = await waitFor(() => { const d = container.querySelector('aside#inspector'); expect(d).toBeTruthy(); return d })
+    expect(dock.querySelector('#ssh-cert-delete')).toBeNull()
+    fireEvent.click(dock.querySelector('[data-ssh-cert-menu]'))
+    const menu = await screen.findByTestId('inspector-actions-dialog')
+    expect(menu.querySelector('[data-action="cert-delete"]')).toHaveClass('danger')
+  })
+})
+
 describe('the SSH certificate dock in the URL', () => {
   it('reopens the certificate and section of the URL off the list\'s page, and writes the section', async () => {
     getAll.mockResolvedValue({ data: [], meta: { total: 40 } })

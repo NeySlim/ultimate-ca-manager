@@ -52,7 +52,7 @@ describe('the expiring figure', () => {
     const bars = [...metric('expiring').querySelectorAll('svg.mini-bars rect')]
     expect(bars).toHaveLength(5)
     expect(bars.map((r) => Number(r.getAttribute('height')) > 1.5)).toEqual([true, false, false, true, false])
-    expect(metric('expiring').querySelector('small').textContent).toBe('overview.metrics.expiryPeak:10,Dec 14 · overview.metrics.alreadyExpired:55')
+    expect(metric('expiring').querySelector('small').textContent).toBe('overview.metrics.expiryPeak:10,Dec 14\u00a0· overview.metrics.alreadyExpired:55')
     fireEvent.focus(metric('expiring'))
     await waitFor(() => expect(document.querySelector('.chart-tip')?.textContent).toContain('overview.horizon.week:Nov 25'))
   })
@@ -66,7 +66,9 @@ describe('figures strip', () => {
     // Issued over the window, signed as a gain, and the certificates still usable
     await waitFor(() => expect(metric('certificates').querySelector('.delta')).not.toBeNull())
     expect(metric('certificates').querySelector('.delta').dataset.delta).toBe('8')
-    expect(metric('certificates').querySelector('small').textContent).toBe('+ 8overview.metrics.issuedSub:30 · overview.metrics.active:211')
+    expect(metric('certificates').querySelector('small').textContent).toBe('+\u00a08overview.metrics.issuedSub:30\u00a0· overview.metrics.active:211')
+    // The gap held to the word after it: it never ends a narrow line alone
+    expect(metric('certificates').querySelector('small .keep-with')).toHaveTextContent('+ 8overview.metrics.issuedSub:30')
     expect(metric('certificates').querySelector('svg.spark-trend').getAttribute('aria-label')).toBe('overview.metrics.issuedAlt:3,2')
     expect(value('queue').textContent).toBe('20')
     expect(value('expiring').textContent).toBe('11')
@@ -80,6 +82,10 @@ describe('figures strip', () => {
     await waitFor(() => expect(value('queue').textContent).toBe('20'))
     expect([...metric('queue').querySelectorAll('.split-bar i')].map((i) => [i.dataset.part, i.style.flexGrow])).toEqual([['critical', '1'], ['todo', '16'], ['watch', '3']])
     expect(metric('queue').querySelector('small .delta.bad').textContent).toBe('overview.metrics.critical:1')
+    // On a phone a wrapped line never starts with its separator: each mid-dot is glued to the part before it
+    expect(metric('queue').querySelector('small').textContent).toBe('overview.metrics.critical:1\u00a0· overview.metrics.todo:16\u00a0· overview.metrics.watch:3')
+    // The separator after the critical pill stays on its line, never starting the next one
+    expect(metric('queue').querySelector('small .keep-with').textContent).toBe('overview.metrics.critical:1\u00a0·')
   })
 
   it('the failures carry 14 days of columns and their gap with yesterday, a rise in red', async () => {

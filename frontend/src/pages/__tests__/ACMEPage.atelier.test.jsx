@@ -187,6 +187,18 @@ describe('the ACME views', () => {
     expect(document.querySelector('.page-head select')).toBeNull()
   })
 
+  it('counts the views the server pages too, in their tab and in the head (orders, EAB credentials)', async () => {
+    acmeService.getLocalOrders = vi.fn().mockResolvedValue({ data: { items: [], meta: { page: 1, per_page: 1, total: 22 } } })
+    acmeService.listEabCredentials = vi.fn().mockResolvedValue({ data: [], meta: { total: 25 } })
+    at('/acme?tab=eab')
+    const list = await screen.findByRole('tablist', { name: 'protocols.view' })
+    await waitFor(() => expect(within(list).getByRole('tab', { name: /^acme\.views\.localorders/ })).toHaveTextContent('acme.views.localorders22'))
+    expect(within(list).getByRole('tab', { name: /^acme\.views\.eab/ })).toHaveTextContent('acme.views.eab25')
+    // The head says how many, never the view's name again
+    expect(document.querySelector('.page-head')).toHaveTextContent('acme.eab.totalCount')
+    expect(document.querySelector('.page-head')).not.toHaveTextContent('acme.views.eab')
+  })
+
   it('keeps the view in the address, the former tab names included', async () => {
     at('/acme')
     fireEvent.click(await screen.findByRole('tab', { name: /^acme\.views\.history/ }))

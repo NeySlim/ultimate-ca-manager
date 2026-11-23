@@ -58,7 +58,8 @@ export function ScanDock({ profile, run, runs, state, section, onSection, onClos
             <Section title={t('atelier.properties')}>
               <Facts items={[
                 targetsOf(profile).length ? { label: t('discovery.form.range'), value: targetsOf(profile).join(', '), long: true } : { label: t('discovery.form.range'), absent: '—' },
-                [t('discovery.scans.found'), facts.found(profile, run)],
+                // Never run: the finding is a missing value, in the grey of the other absent facts
+                run ? [t('discovery.scans.found'), facts.found(profile, run)] : { label: t('discovery.scans.found'), absent: t('discovery.scans.notScanned') },
                 [t('discovery.scans.last'), facts.last(profile, run)],
                 { label: t('atelier.state'), state: [SCAN_TONES[state], t(`discovery.scans.state.${state}`)] },
                 [t('discovery.ports'), portsOf(profile).join(', ')],
@@ -193,7 +194,7 @@ export function FoundActions({ cert, canScan, canRemove, busy, onRetry, onRemove
       {cert.status === 'error' && canScan && (
         <Btn icon="refresh" id="found-retry" write disabled={busy || undefined} onClick={() => onRetry(cert)}>{t('discovery.retry')}</Btn>
       )}
-      {canRemove && <Btn tone="danger" icon="block" id="found-remove" onClick={() => onRemove(cert)}>{t('common.delete')}…</Btn>}
+      {canRemove && <Btn tone="danger" icon="close" id="found-remove" onClick={() => onRemove(cert)}>{t('common.delete')}…</Btn>}
     </>
   )
 }

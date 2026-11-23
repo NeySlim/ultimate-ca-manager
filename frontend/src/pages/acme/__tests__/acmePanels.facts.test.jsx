@@ -143,6 +143,16 @@ describe('a DNS provider', () => {
   })
 })
 
+describe('the ACME history toolbar', () => {
+  it('ends with a refresh, as the other ACME lists', () => {
+    const onRefresh = vi.fn()
+    render(<WithDockSlot><HistoryTab history={[]} total={0} page={1} perPage={25} onPageChange={noop} onPerPageChange={noop} search="" onSearchChange={noop}
+      caOptions={[]} filterStatus={[]} onFilterStatusChange={noop} onFilterCAChange={noop} onFilterSourceChange={noop} onSelectCert={noop} onRefresh={onRefresh} /></WithDockSlot>)
+    fireEvent.click(screen.getByRole('button', { name: 'common.refresh' }))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('a certificate in the ACME history', () => {
   it('shows its serial in hex lines that copy whole', async () => {
     const serial = '4A:3F:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD'
@@ -162,7 +172,7 @@ describe('a certificate in the ACME history', () => {
 describe('the ACME proxy URLs', () => {
   it('are chips that copy the whole URL', async () => {
     render(<div className="atl"><LetsEncryptTab clientSettings={{ environment: 'staging', renewal_days: 30 }} caAccounts={[]} canWrite onSaved={noop}
-      onSaveDnsUpdatePort={noop} onRegisterProxy={noop} onUnregisterProxy={noop} onResetProxyAccount={noop}
+      onRegisterProxy={noop} onUnregisterProxy={noop} onResetProxyAccount={noop}
       onTestConnection={noop} testingConnection={false} connectionResult={null} /></div>)
     const proxy = row('acme.proxyPathUrl')
     const whole = proxy.querySelector('.code-value .val').getAttribute('title') || proxy.querySelector('.code-value .val').textContent

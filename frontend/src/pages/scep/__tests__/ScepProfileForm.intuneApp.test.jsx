@@ -102,3 +102,17 @@ describe('ScepProfileForm picks an Intune app registration', () => {
     expect(onClose).toHaveBeenCalled()
   })
 })
+
+describe('ScepProfileForm, the dialog of the other protocols', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getIntuneApps.mockResolvedValue({ data: APPS })
+  })
+
+  it('creates with the + of the other create buttons, and sets Intune apart by no rule', async () => {
+    render(<ScepProfileForm profile={null} cas={CAS} templates={[]} onClose={onClose} onSaved={vi.fn()} />)
+    await screen.findByRole('dialog')
+    expect(screen.getByRole('button', { name: 'common.create' }).querySelector('svg.icon')).toBeTruthy()
+    expect(document.querySelector('form .advanced')).toBeNull()
+  })
+})

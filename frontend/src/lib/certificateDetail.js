@@ -125,6 +125,31 @@ export const keyUsageName = (u) => KEY_USAGES[u] || u
 export const extKeyUsageName = (u) => EXT_KEY_USAGES[u] || u
 
 /** One row per extension: X.509 name, OID, criticality and value lines. */
+const NS_COMMENT = '2.16.840.1.113730.1.13'
+const DER_STRINGS = { 0x0c: 'utf-8', 0x13: 'utf-8', 0x16: 'utf-8', 0x1e: 'utf-16be' }
+
+/** The text of a DER UTF8, Printable, IA5 or BMP string given in hex; null when the value is anything else. */
+function derString(hex) {
+  if (typeof hex !== 'string' || !/^(?:[0-9a-f]{2})+$/i.test(hex)) return null
+  const b = Uint8Array.from(hex.match(/../g), (x) => parseInt(x, 16))
+  const enc = DER_STRINGS[b[0]]
+  if (!enc || b.length < 2) return null
+  let len = b[1]
+  let at = 2
+  if (len & 0x80) {
+    const n = len & 0x7f
+    if (n < 1 || n > 2 || b.length < 2 + n) return null
+    len = n === 1 ? b[2] : (b[2] << 8) | b[3]
+    at = 2 + n
+  }
+  if (at + len !== b.length) return null
+  try {
+    return new TextDecoder(enc, { fatal: true }).decode(b.subarray(at))
+  } catch {
+    return null
+  }
+}
+
 export function extensionRows(ext, sanCombined) {
   const rows = []
   const add = (key, _legacyKey, lines, critical) => {
@@ -178,7 +203,9 @@ export function extensionRows(ext, sanCombined) {
   }
   if (e.signed_certificate_timestamps) add('signed_certificate_timestamps', 'details.ext.sct', 'Present', e.signed_certificate_timestamps.critical)
   for (const o of e.other_extensions || []) {
-    rows.push({ key: `other-${o.oid}`, label: o.name || o.oid, oid: o.oid, critical: !!o.critical, values: o.value_hex ? [o.value_hex] : [], hex: true })
+    const text = o.oid === NS_COMMENT ? derString(o.value_hex) : null
+    if (text !== null) rows.push({ key: `other-${o.oid}`, label: o.name || 'nsComment', oid: o.oid, critical: !!o.critical, values: [text] })
+    else rows.push({ key: `other-${o.oid}`, label: o.name || o.oid, oid: o.oid, critical: !!o.critical, values: o.value_hex ? [o.value_hex] : [], hex: true })
   }
   return rows
 }

@@ -55,9 +55,9 @@ export default function LetsEncryptOrdersTab({
         toolbar={<Toolbar><span className="spacer" /><IconBtn icon="refresh" label={t('common.refresh')} onClick={onRefresh} /></Toolbar>}
         title={name} status={pill} openedId={selectedClientOrder?.id} onOpen={onSelectOrder}
         columns={[
-          { id: 'account', label: t('acme.accountOrCa'), cell: account, kind: 'text', priority: 2, sort: 'account' },
-          { id: 'env', label: t('acme.environment'), cell: env, kind: 'fit', priority: 3, sort: 'env' },
-          { id: 'method', label: t('acme.method'), cell: (o) => o.challenge_type?.toUpperCase() || t('common.unknown'), kind: 'fit', priority: 3, sort: 'method' },
+          { id: 'account', label: t('acme.accountOrCa'), cell: account, kind: 'text', priority: 2, labelled: true, sort: 'account' },
+          { id: 'env', label: t('acme.environment'), cell: env, kind: 'fit', priority: 3, labelled: true, sort: 'env' },
+          { id: 'method', label: t('acme.method'), cell: (o) => o.challenge_type?.toUpperCase() || t('common.unknown'), kind: 'fit', priority: 3, labelled: true, sort: 'method' },
           { id: 'created', label: t('common.created'), labelFull: t('table.fullCreated'), cell: (o) => dateOf(o.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created' },
           // A count under a short header, the whole name in its title (L8); the last error on a failing row
           { id: 'failures', label: t('acme.columns.failures'), labelFull: t('acme.renewalFailuresLabel'), kind: 'number', priority: 3, sort: 'failures',

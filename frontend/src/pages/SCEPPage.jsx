@@ -89,6 +89,7 @@ export default function SCEPPage() {
   const [perPage, setPerPage] = useState(25)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [challengeQuery, setChallengeQuery] = useState('')
   const [rejecting, setRejecting] = useState(null)
   const profileSort = useSortParam(BY_NAME, view === 'profiles' ? PROFILE_SORT_KEYS : NONE)
   const requestSort = useSortParam(NEWEST, view === 'requests' ? REQUEST_SORT_KEYS : NONE)
@@ -492,7 +493,7 @@ crypto ca enroll UCM-CA`}</pre>
           </Btn>
           {!opened.intune_enabled && <Btn icon="refresh" id="scep-rotate" write onClick={() => setRotate(opened)}>{t('scep.rotate')}</Btn>}
           <Btn icon="settings" id="scep-edit" write onClick={() => setProfileForm({ profile: opened })}>{t('common.edit')}</Btn>
-          <Btn icon="block" tone="danger" id="scep-delete" onClick={() => deleteProfile(opened)}>{t('common.delete')}</Btn>
+          <Btn icon="close" tone="danger" id="scep-delete" onClick={() => deleteProfile(opened)}>{t('common.delete')}</Btn>
         </>}>
         <div className="module-detail">
           <Section title={t('scep.sections.enrollment')}>
@@ -532,12 +533,13 @@ crypto ca enroll UCM-CA`}</pre>
             <Facts items={[
               copyRow(t('scep.transactionId'), req.transaction_id, undefined, { long: true }),
               { ...fact(t('common.subject'), req.subject), long: true },
-              req.profile_id && [t('scep.columns.profile'), profileOf(req.profile_id)?.name || `#${req.profile_id}`],
+              req.profile_id && [t('scep.columns.profile'), profileOf(req.profile_id)?.name || t('scep.deletedProfile', { id: req.profile_id })],
               [t('scep.columns.ca'), caName(req.ca_refid)],
               req.client_ip && [t('scep.clientIp'), req.client_ip],
               [t('atelier.state'), requestPill(req)],
               fact(t('common.created'), dateTimeOf(req.created_at, locale)),
-              req.approved_at && { label: t('scep.approvedAt'), value: dateTimeOf(req.approved_at, locale), sub: req.approved_by || undefined },
+              // The server writes « auto » for an approval no one gave: said in words
+              req.approved_at && { label: t('scep.approvedAt'), value: dateTimeOf(req.approved_at, locale), sub: req.approved_by === 'auto' ? t('scep.approvedAuto') : req.approved_by || undefined },
               req.rejection_reason && { label: t('scep.rejectionReason'), value: req.rejection_reason, long: true },
             ]} />
           </Section>
@@ -593,7 +595,7 @@ crypto ca enroll UCM-CA`}</pre>
         sectionsLabel={t('atelier.sectionsOf', { name: appOpen.name })} sections={[['app', t('atelier.overview')]]}
         actions={canEdit && <>
           <Btn icon="settings" id="scep-app-edit" write onClick={() => setAppForm({ app: appOpen })}>{t('common.edit')}</Btn>
-          <Btn icon="block" tone="danger" id="scep-app-delete" onClick={() => deleteApp(appOpen)}>{t('common.delete')}</Btn>
+          <Btn icon="close" tone="danger" id="scep-app-delete" onClick={() => deleteApp(appOpen)}>{t('common.delete')}</Btn>
         </>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
@@ -634,8 +636,9 @@ crypto ca enroll UCM-CA`}</pre>
       empty={profiles.length ? (
         <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setProfileState('')} />
       ) : (
+        // Secondary: the head's « Nouveau profil » is the primary action
         <SetupEmptyBlock id="scep" icon="globe" title={t('scep.noProfiles')} text={t('scep.emptyProfilesText')}
-          action={canEdit ? { label: t('scep.newProfile'), icon: 'plus', onClick: () => setProfileForm({ profile: null }), primary: true } : undefined} />
+          action={canEdit ? { label: t('scep.newProfile'), icon: 'plus', onClick: () => setProfileForm({ profile: null }) } : undefined} />
       )}
       footer={{ range: t('scep.range', profileList.counts(profiles.length)) }} />
   )
@@ -665,7 +668,7 @@ crypto ca enroll UCM-CA`}</pre>
         // The name takes the room left; the transaction id, a long identifier, folds first with its whole value in its title
         { id: 'tx', label: t('scep.transactionId'), cell: (r) => <span className="mono">{r.transaction_id}</span>, kind: 'text', priority: 4,
           title: (r) => r.transaction_id || undefined, sort: 'transaction_id' },
-        { id: 'profile', label: t('scep.columns.profile'), cell: (r) => (r.profile_id ? profileOf(r.profile_id)?.name || `#${r.profile_id}` : t('scep.caWide')), kind: 'text', priority: 3, labelled: true },
+        { id: 'profile', label: t('scep.columns.profile'), cell: (r) => (r.profile_id ? profileOf(r.profile_id)?.name || t('scep.deletedProfile', { id: r.profile_id }) : t('scep.caWide')), kind: 'text', priority: 3, labelled: true },
         { id: 'ca', label: t('scep.columns.ca'), cell: (r) => caName(r.ca_refid), kind: 'text', priority: 3 },
         { id: 'created', label: t('scep.requested'), labelFull: t('table.fullRequested'), cell: (r) => dateTimeOf(r.created_at, locale) || '—', kind: 'fit', priority: 2, labelled: true, sort: 'created_at' },
         { status: true, sort: 'status' },
@@ -679,8 +682,12 @@ crypto ca enroll UCM-CA`}</pre>
       }} />
   )
 
-  const challengeList = useClientList(challenges || NONE, {
+  // A long list of authorities: searched by name or subject, as the requests are
+  const challengeQ = challengeQuery.trim().toLowerCase()
+  const challengeRows = (challenges || NONE).filter((c) => !challengeQ || [c.name, c.subject].some((v) => String(v || '').toLowerCase().includes(challengeQ)))
+  const challengeList = useClientList(challengeRows, {
     sortParam: challengeSort,
+    resetKey: challengeQ,
     sorts: {
       name: (c) => c.name || c.subject, subject: (c) => c.subject || null,
       age: (c) => (c.challenge.generated_at ? -Date.parse(c.challenge.generated_at) : null), state: challengeRank,
@@ -698,6 +705,12 @@ crypto ca enroll UCM-CA`}</pre>
       {!config.enabled && !loading && <Notice tone="warn" id="scep-disabled">{t('scep.scepDisabledDesc')}</Notice>}
       <ListView label={t('common.challenges')} caption={t('scep.challengesCaption')} icon="key" list={challengeList} nameSort="name" loading={loading || challenges === null}
         title={(c) => c.name || c.subject} status={challengePill}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="scep-challenge-search" name="q" label={t('scep.searchChallenges')} placeholder={t('scep.searchChallenges')} value={challengeQuery}
+              onChange={setChallengeQuery} />
+          </Toolbar>
+        )}
         openedId={openCa} onOpen={(c) => setOpenCa(c.id)}
         columns={[
           { id: 'subject', label: t('common.subject'), cell: (c) => c.subject, grow: true, muted: true, kind: 'text', priority: 4, sort: 'subject' },
@@ -705,8 +718,10 @@ crypto ca enroll UCM-CA`}</pre>
             cell: (c) => (c.challenge.generated_at ? compactAgo(c.challenge.generated_at, t) : <span className="muted">—</span>) },
           { status: true, sort: 'state' },
         ]}
-        empty={<EmptyBlock id="scep-cas" icon="key" title={t('scep.noCasAvailable')} text={t('scep.noCasAvailableDesc')} />}
-        footer={{ range: t('crlOcsp.range', challengeList.counts((challenges || []).length)) }} />
+        empty={challengeQ && challenges?.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setChallengeQuery('')} />
+        ) : <EmptyBlock id="scep-cas" icon="key" title={t('scep.noCasAvailable')} text={t('scep.noCasAvailableDesc')} />}
+        footer={{ range: t('crlOcsp.range', challengeList.counts(challengeRows.length)) }} />
     </>
   )
 
@@ -723,7 +738,7 @@ crypto ca enroll UCM-CA`}</pre>
         { status: true, sort: 'state' },
       ]}
       empty={<EmptyBlock id="scep-intune" icon="server" title={t('scep.noIntuneApps')} text={t('scep.noIntuneAppsDesc')}
-        action={canEdit ? { label: t('scep.newIntuneApp'), icon: 'plus', onClick: () => setAppForm({ app: null }), primary: true } : undefined} />}
+        action={canEdit ? { label: t('scep.newIntuneApp'), icon: 'plus', onClick: () => setAppForm({ app: null }) } : undefined} />}
       footer={{ range: t('scep.intuneRange', appList.counts((apps || []).length)) }} />
   )
 

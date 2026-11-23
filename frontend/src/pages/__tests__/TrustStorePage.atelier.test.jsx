@@ -145,7 +145,13 @@ describe('Trust anchor dock', () => {
     expect(dock).toHaveTextContent('RSA 4096')
     fireEvent.click(within(dock).getByRole('tab', { name: 'PEM' }))
     expect(dock.querySelector('.code-preview')).toHaveTextContent('BEGIN CERTIFICATE')
-    fireEvent.click(dock.querySelector('#truststore-delete'))
+    // Deletion is in the panel's « ⋯ » menu, last, in red, with the icon of every deletion
+    expect(dock.querySelector('.btn.danger')).toBeNull()
+    fireEvent.click(dock.querySelector('[data-truststore-menu]'))
+    const menu = await screen.findByTestId('inspector-actions-dialog')
+    const remove = menu.querySelector('[data-action="cert-delete"]')
+    expect(remove).toHaveClass('danger')
+    fireEvent.click(remove)
     await waitFor(() => expect(del).toHaveBeenCalledWith(1))
   })
 
@@ -184,7 +190,7 @@ describe('Trust anchor dock', () => {
     const { container } = renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Bank Root' }))
     const dock = await waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
-    expect(dock.querySelector('#truststore-delete')).toBeNull()
+    expect(dock.querySelector('[data-truststore-menu]')).toBeNull()
     expect(dock.querySelector('#truststore-export')).toBeTruthy()
   })
 })
@@ -216,6 +222,11 @@ describe('adding from the managed CAs', () => {
     expect(await line('Example Root CA')).toHaveTextContent('Root CA')
     expect(await line('Example Issuing CA')).toHaveTextContent('Intermediate CA')
     expect(await line('Example Issuing CA')).not.toHaveTextContent('Root CA')
+    // Nothing chosen: « Add », never « Add 0 selected »; then the count agreed with its noun
+    const add = dialog.querySelector('.modal-actions .btn.primary')
+    expect(add).toHaveTextContent(/^Add$/)
+    fireEvent.click(within(await line('Example Root CA')).getByRole('checkbox'))
+    expect(add).toHaveTextContent(/^Add 1 selected CA$/)
     managed.cas = []
   })
 })

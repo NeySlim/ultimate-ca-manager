@@ -39,6 +39,11 @@ export const acmeService = {
     return apiClient.delete(`/acme/accounts/${id}`)
   },
 
+  // Orders of the local ACME server, paged: { items, meta: { total } }
+  async getLocalOrders(params = {}) {
+    return apiClient.get(`/acme/orders${buildQueryString(params)}`)
+  },
+
   // Orders (ACME Server orders)
   async getOrders(accountId) {
     return apiClient.get(`/acme/accounts/${accountId}/orders`)

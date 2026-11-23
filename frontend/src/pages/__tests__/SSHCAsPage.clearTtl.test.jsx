@@ -52,7 +52,9 @@ async function editCa() {
   render(<MemoryRouter><SSHCAsPage /></MemoryRouter>)
   await waitFor(() => expect(getAll).toHaveBeenCalled())
   fireEvent.click((await screen.findAllByText('Users CA'))[0])
-  fireEvent.click(await screen.findByText('common.edit'))
+  // Edit is in the panel's « ⋯ » menu
+  fireEvent.click(await waitFor(() => { const b = document.querySelector('aside#inspector [data-ssh-ca-menu]'); expect(b).not.toBeNull(); return b }))
+  fireEvent.click(await waitFor(() => { const b = document.querySelector('[data-action="cert-edit"]'); expect(b).not.toBeNull(); return b }))
   await waitFor(() => expect(getEffective).toHaveBeenCalled())
   return document.querySelector('form')
 }

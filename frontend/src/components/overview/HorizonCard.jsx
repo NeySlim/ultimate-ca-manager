@@ -14,7 +14,7 @@ import { listHref } from '../../lib/overviewFilters'
 import { HORIZONS, expiryCalendar, heatLevel, horizonDays } from '../../lib/overviewHorizon'
 import { extractCN } from '../../lib/utils'
 import { sourceLabel, sourceOf } from '../../pages/certificates/certificateSources'
-import { OverviewCard, useCardData, useLang } from './shared'
+import { OverviewCard, SEP, useCardData, useLang } from './shared'
 import { useChartTip } from './viz'
 
 const SIDE_ROWS = 5
@@ -166,7 +166,7 @@ export function HorizonCard() {
           <span className="fig">{x.total}</span>
           <p>
             <b>{selection.kind === 'week' ? weekName(x) : longDay(x.date)}</b>
-            {' · '}{inDays === 0 ? t('overview.activity.today') : t('overview.horizon.inDays', { count: inDays })}
+            {SEP}{inDays === 0 ? t('overview.activity.today') : t('overview.horizon.inDays', { count: inDays })}
           </p>
           <p className="side-chips">
             {x.manual > 0 && <span className="chip warn"><Icon name="warning" />{t('overview.horizon.toRenew', { count: x.manual })}</span>}

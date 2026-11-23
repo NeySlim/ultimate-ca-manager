@@ -27,7 +27,7 @@ const noop = vi.fn()
 const renderTab = (props = {}) => render(
   <div className="atl">
     <LetsEncryptTab clientSettings={{ environment: 'staging', renewal_days: 30 }} caAccounts={[]} canWrite onSaved={noop}
-      onSaveDnsUpdatePort={noop} onRegisterProxy={noop} onUnregisterProxy={noop} onResetProxyAccount={noop}
+      onRegisterProxy={noop} onUnregisterProxy={noop} onResetProxyAccount={noop}
       onTestConnection={noop} testingConnection={false} connectionResult={null} {...props} />
   </div>,
 )
@@ -72,6 +72,41 @@ describe('LetsEncryptTab settings', () => {
     renderTab({ clientSettings: {} })
     expect(screen.queryByText('acme.enableAcmeProxy')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'acme.testConnection' })).toBeDisabled()
+  })
+})
+
+describe('LetsEncryptTab DNS UPDATE port', () => {
+  const port = () => screen.getByRole('spinbutton', { name: 'acme.dnsUpdate.portLabel' })
+
+  it('saves the port with the other settings, in the one request of the save bar', async () => {
+    const onSaved = vi.fn()
+    updateClientSettings.mockResolvedValue({ data: { restart_required: true } })
+    renderTab({ onSaved, clientSettings: { environment: 'staging', renewal_days: 30, dns_update_port: 0 } })
+    // One save button, the bar's: the port has none of its own
+    expect(screen.getAllByRole('button', { name: 'common.save' })).toHaveLength(1)
+    fireEvent.change(port(), { target: { value: '8053' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'acme.renewalDays' }), { target: { value: '45' } })
+    save()
+    await waitFor(() => expect(updateClientSettings).toHaveBeenCalledWith({ renewal_days: 45, dns_update_port: 8053 }))
+    expect(updateClientSettings).toHaveBeenCalledTimes(1)
+    expect(onSaved).toHaveBeenCalledWith({ restartRequired: true })
+  })
+
+  it.each(['53', '70000'])('refuses port %s before any request', (value) => {
+    renderTab({ clientSettings: { environment: 'staging', renewal_days: 30, dns_update_port: 0 } })
+    fireEvent.change(port(), { target: { value } })
+    save()
+    expect(port()).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('acme.dnsUpdate.portInvalid')).toBeInTheDocument()
+    expect(updateClientSettings).not.toHaveBeenCalled()
+  })
+
+  it('shows the restart notice the page keeps, and sends no port set by the environment', async () => {
+    renderTab({ restartRequired: true, clientSettings: { environment: 'staging', renewal_days: 30, dns_update_port: 8053, dns_update_port_env: 5353 } })
+    expect(screen.getByText('acme.dnsUpdate.portRestartRequired')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'acme.renewalDays' }), { target: { value: '45' } })
+    save()
+    await waitFor(() => expect(updateClientSettings).toHaveBeenCalledWith({ renewal_days: 45 }))
   })
 })
 

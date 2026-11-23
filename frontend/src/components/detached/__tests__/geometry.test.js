@@ -47,13 +47,19 @@ describe('detached window geometry', () => {
     expect(maxRect({ x: 0, y: 62, w: 1920, h: 993 }, 1920)).toEqual({ x: 34, y: 96, w: 1852, h: 925 })
   })
 
-  it('past 1920 px, maximizes and opens inside the page held at 1852 px and centred', () => {
+  it('past 1920 px, maximizes inside the page held at 1852 px and centred, opens in its free margin', () => {
     // The side margins are what the page measure leaves; above and below, the mockup's 34 px
     expect(maxRect({ x: 0, y: 62, w: 3440, h: 1353 }, 3440)).toEqual({ x: 794, y: 96, w: 1852, h: 1285 })
     expect(maxRect({ x: 0, y: 62, w: 2560, h: 1353 }, 2560)).toEqual({ x: 354, y: 96, w: 1852, h: 1285 })
-    // A window opens where it opens on a 1920 px page, moved with the page
-    const at1920 = cascadeRect(0, { w: 600, h: 500 }, { w: 1920, h: 1000 })
-    expect(cascadeRect(0, { w: 600, h: 500 }, { w: 3440, h: 1000 })).toEqual({ ...at1920, x: at1920.x + 760 })
+    // A window the right margin holds opens there, clear of the page (its right edge at 3440 - 794), and cascades in it
+    const wide = { w: 3440, h: 1000 }
+    const first = cascadeRect(0, { w: 600, h: 500 }, wide)
+    expect(first.x + first.w).toBe(3440 - 34)
+    for (let n = 0; n < 8; n++) expect(cascadeRect(n, { w: 600, h: 500 }, wide).x).toBeGreaterThanOrEqual(3440 - 794)
+    expect(cascadeRect(1, { w: 600, h: 500 }, wide).y - first.y).toBe(28)
+    // A wider one, as on a 1920 px page, moved with the page
+    const at1920 = cascadeRect(0, { w: 1120, h: 500 }, { w: 1920, h: 1000 })
+    expect(cascadeRect(0, { w: 1120, h: 500 }, wide)).toEqual({ ...at1920, x: at1920.x + 760 })
     expect(cascadeRect(0, { w: 600, h: 500 }, { w: 1880, h: 1000 })).toEqual(cascadeRect(0, { w: 600, h: 500 }, { w: 1440, h: 1000 }))
   })
 })

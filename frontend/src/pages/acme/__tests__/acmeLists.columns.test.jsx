@@ -135,7 +135,7 @@ describe('the domains, providers and upstream CAs of the ACME client, the domain
     ['localdomains', () => <LocalDomainsTab localDomains={DOMAINS} onAdd={noop} onEdit={noop} onDelete={noop} canWrite canDelete />,
       ['alpha.test', 'zeta.test'], ['atelier.name'], ['name', 'ca', 'state'], 'ca'],
     ['dns', () => <DnsProvidersTab dnsProviders={PROVIDERS} onAddProvider={noop} onEditProvider={noop} onTestProvider={noop} onDeleteProvider={noop} canWrite canDelete />,
-      ['Zone A', 'Zone B'], ['atelier.name'], ['name', 'type', 'state'], 'type'],
+      ['Zone A', 'Zone B'], ['atelier.name'], ['name', 'type', 'default', 'state'], 'type'],
     ['upstream', () => <CaAccountsManager accounts={UPSTREAM} canWrite canDelete onCreate={noop} onUpdate={noop} onDelete={noop} />,
       ['Actalis', 'ZeroSSL'], ['acme.directoryUrl'], ['name', 'directory', 'email', 'default', 'proxy', 'state'], 'directory'],
   ])('%s: by name from the first render, every column sorting, the sort in the address', (tabName, ui, names, grows, keys, second) => {
@@ -151,6 +151,17 @@ describe('the domains, providers and upstream CAs of the ACME client, the domain
     expect(rowNames(view.container)).toEqual([...names].reverse())
   })
 
+  it('says a DNS provider is the default in words, its state pill saying only active or disabled', () => {
+    const view = at(<DnsProvidersTab dnsProviders={[{ id: 1, name: 'Zone A', provider_type: 'hetzner', is_default: true }]} onAddProvider={noop}
+      providerTypes={[{ type: 'hetzner', name: 'Hetzner' }]} onEditProvider={noop} onTestProvider={noop} onDeleteProvider={noop} canWrite canDelete />, '/acme?tab=dns')
+    const row = view.container.querySelector('tbody tr')
+    expect(row.querySelector('.badge')).toHaveTextContent('common.active')
+    expect(row).toHaveTextContent('common.yes')
+    // The type by its provider's name, never its code
+    expect(row).toHaveTextContent('Hetzner')
+    expect(row).not.toHaveTextContent('hetzner')
+  })
+
   it('reads a sort from the address and keeps a whole URL in its title', () => {
     const view = at(<CaAccountsManager accounts={UPSTREAM} canWrite canDelete onCreate={noop} onUpdate={noop} onDelete={noop} />, '/acme?tab=upstream&sort=state&order=asc')
     expect(sortedHeaders(view.container)).toEqual([['atelier.state', 'ascending']])
@@ -158,10 +169,10 @@ describe('the domains, providers and upstream CAs of the ACME client, the domain
     expect(view.container.querySelector('td[title="https://acme-api.actalis.com/acme/directory"]')).not.toBeNull()
   })
 
-  it('names a yes or no on a phone record', () => {
+  it('names every fact of a phone record whose value does not say what it is', () => {
     mocks.mobile.isMobile = true
     const view = at(<DomainsTab acmeDomains={DOMAINS} onAdd={noop} onEdit={noop} onDelete={noop} onTest={noop} canWrite canDelete />, '/acme?tab=domains')
-    expect(recordFacts(view.container)[0]).toEqual(['route53', 'A CA', 'acme.wildcard common.no'])
+    expect(recordFacts(view.container)[0]).toEqual(['acme.provider route53', 'acme.issuingCA A CA', 'acme.wildcard common.no'])
   })
 })
 

@@ -840,7 +840,6 @@
     "ctSubmitted": "Certificato inviato ai registri CT",
     "ctSubmitFailed": "Invio ai registri CT fallito",
     "ctScts": "SCT CT",
-    "ctSctsCount": "{{count}} SCT registrati",
     "ctNoScts": "Nessun SCT: non inviato ai registri CT",
     "eku": {
       "title": "Utilizzi estesi della chiave (EKU)",
@@ -2222,12 +2221,16 @@
     "revokeOnRenewal": "Revoca vecchio certificato dopo il rinnovo",
     "revokeOnRenewalDesc": "Revoca automaticamente il certificato precedente con il motivo 'superseded' quando ne viene emesso uno nuovo",
     "renewalPolicy": "Policy di rinnovo",
-    "revokeExistingSuperseded": "Revoca certificati esistenti {{count}}",
+    "revokeExistingSuperseded_one": "Revoca anche {{count}} certificato già sostituito",
+    "revokeExistingSuperseded_other": "Revoca anche {{count}} certificati già sostituiti",
     "revokeExistingSupersededDesc": "Revoca i certificati già emessi per questi domini con il motivo 'superseded'",
     "revokeSupersededConfirmTitle": "Revocare i certificati esistenti?",
-    "revokeSupersededConfirmDesc": "Questo revocherà tutti i certificati esistenti per i domini configurati. Questa azione non può essere annullata {{count}}",
-    "revokeSupersededConfirmAction": "Revoca {{count}}",
-    "supersededRevoked": "Certificato revocato come sostituito {{count}}",
+    "revokeSupersededConfirmDesc_one": "Verrà revocato subito {{count}} certificato sostituito da una versione più recente. Questa azione è irreversibile. I certificati revocati compariranno nelle CRL e saranno segnalati come revocati tramite OCSP.",
+    "revokeSupersededConfirmDesc_other": "Verranno revocati subito {{count}} certificati sostituiti da versioni più recenti. Questa azione è irreversibile. I certificati revocati compariranno nelle CRL e saranno segnalati come revocati tramite OCSP.",
+    "revokeSupersededConfirmAction_one": "Revoca {{count}} certificato",
+    "revokeSupersededConfirmAction_other": "Revoca {{count}} certificati",
+    "supersededRevoked_one": "{{count}} certificato sostituito revocato",
+    "supersededRevoked_other": "{{count}} certificati sostituiti revocati",
     "domains": "Domini",
     "domainsHelper": "Un dominio per riga. Usa *.dominio.com per wildcard.",
     "atLeastOneDomainRequired": "È richiesto almeno un dominio",
@@ -2430,7 +2433,8 @@
       "statusUsed": "Usata",
       "statusRevoked": "Revocata",
       "statusExpired": "Scaduta",
-      "totalCount": "{{count}} credenzial(i)",
+      "totalCount_one": "{{count}} credenziale",
+      "totalCount_other": "{{count}} credenziali",
       "search": "Cerca credenziali",
       "created": "Creata",
       "usedAt": "Usata",
@@ -2519,7 +2523,8 @@
     "defaultProfileNone": "Nessuno (90 giorni, digest predefinito)",
     "defaultProfileDesc": "Si applica agli ordini il cui client non richiede alcun profilo, come fa la maggior parte dei client; senza di esso, tali ordini ricevono 90 giorni e il digest predefinito",
     "localOrders": "Ordini locali",
-    "localOrdersCount": "{{count}} ordine/i",
+    "localOrdersCount_one": "{{count}} ordine",
+    "localOrdersCount_other": "{{count}} ordini",
     "localOrdersLoadFailed": "Impossibile caricare gli ordini locali",
     "deleteLocalOrderConfirm": "Eliminare questo ordine?",
     "deleteLocalOrderConfirmDesc": "L'ordine per {{domain}} con le sue autorizzazioni e challenge sarà rimosso. L'eventuale certificato emesso viene conservato.",
@@ -2527,7 +2532,8 @@
     "purgeLocalOrders": "Elimina scaduti",
     "purgeLocalOrdersConfirm": "Eliminare gli ordini scaduti?",
     "purgeLocalOrdersConfirmDesc": "Rimuove gli ordini scaduti non emessi con autorizzazioni e challenge. Gli ordini emessi vengono conservati.",
-    "purgeLocalOrdersDone": "Pulizia completata: {{count}} ordine/i rimossi",
+    "purgeLocalOrdersDone_one": "Pulizia completata: {{count}} ordine rimosso",
+    "purgeLocalOrdersDone_other": "Pulizia completata: {{count}} ordini rimossi",
     "purgeLocalOrdersFailed": "Pulizia non riuscita",
     "noLocalOrders": "Nessun ordine locale",
     "noLocalOrdersDesc": "Gli ordini dei client ACME verso il server integrato appariranno qui",
@@ -2816,7 +2822,8 @@
     "intuneAppUpdated": "Registrazione dell'app aggiornata",
     "intuneAppDeleted": "Registrazione dell'app eliminata",
     "intuneAppDeleteConfirm": "Eliminare la registrazione dell'app \"{{name}}\"?",
-    "intuneAppUsedBy": "Usata da {{count}} profilo/i",
+    "intuneAppUsedBy_one": "Usata da {{count}} profilo",
+    "intuneAppUsedBy_other": "Usata da {{count}} profili",
     "intuneAppNotUsed": "Non usata da alcun profilo",
     "intuneAppLastTest": "Ultimo test",
     "intuneAppNeverTested": "mai testata",
@@ -2893,7 +2900,10 @@
     "challengeExpires": "Scade il",
     "challengeAge": "Età",
     "challengeAgeUnknown": "Non registrato",
-    "newIntuneAppShort": "Nuova app"
+    "newIntuneAppShort": "Nuova app",
+    "deletedProfile": "Profilo eliminato (n. {{id}})",
+    "approvedAuto": "Automaticamente",
+    "searchChallenges": "Cerca autorità..."
   },
   "crlOcsp": {
     "crl": "Elenco di revoche di certificati (CRL)",
@@ -2999,8 +3009,6 @@
     "ocspInactive": "Inattivo",
     "columns": {
       "published": "Pubblicata",
-      "publication": "Pubblicazione",
-      "crlNumber": "Numero CRL",
       "nextUpdate": "Scadenza"
     },
     "tabs": {
@@ -3185,8 +3193,10 @@
     "noManagedCAs": "Nessuna CA gestita disponibile",
     "alreadyInTruststore": "Già nell'archivio attendibilità",
     "addedFromManaged": "Aggiunto da CA gestite",
-    "addedCount": "{{count}} CA aggiunte all'archivio attendibilità",
-    "addSelected": "Aggiungi {{count}} selezionati",
+    "addedCount_one": "{{count}} CA aggiunta all'archivio attendibilità",
+    "addedCount_other": "{{count}} CA aggiunte all'archivio attendibilità",
+    "addSelected_one": "Aggiungi {{count}} CA selezionata",
+    "addSelected_other": "Aggiungi {{count}} CA selezionate",
     "exportBundle": "Esporta bundle",
     "bundleExported": "Bundle certificati esportato",
     "exportFailed": "Esportazione bundle fallita",
@@ -3216,7 +3226,9 @@
       "emptyTitle": "Nessuna ancora di attendibilità esterna"
     },
     "systemBundleDescription": "Importato dal bundle CA di sistema",
-    "systemBundleNote": "Importato automaticamente da {{path}}"
+    "systemBundleNote": "Importato automaticamente da {{path}}",
+    "moreActions": "Altre azioni per {{name}}",
+    "actionsTitle": "Azioni dell'ancora"
   },
   "importExport": {
     "tabs": {
@@ -5351,7 +5363,8 @@
     "pleaseAddFiles": "Aggiungi file o incolla contenuto PEM",
     "unsupportedFormat": "File non supportato: {{name}}. Formati accettati: {{formats}}",
     "analyzeFailed": "Analisi contenuto fallita",
-    "successImported": "Importati con successo {{count}} oggetto(i)",
+    "successImported_one": "Importato con successo {{count}} oggetto",
+    "successImported_other": "Importati con successo {{count}} oggetti",
     "files": "File",
     "pastePemPlaceholder": "Incolla qui certificati, chiavi, CSR o catene codificate PEM...",
     "encryptedDetected": "Contenuto cifrato rilevato",
@@ -5359,7 +5372,8 @@
     "analyze": "Analizza",
     "analyzeHint": "Riconosce certificati, chiavi, CSR e catene prima dell'importazione; in questa fase nulla viene importato.",
     "certificateChains": "Catene di certificati",
-    "keyPairsDetected": "{{count}} coppie chiave-certificato rilevate",
+    "keyPairsDetected_one": "{{count}} coppia chiave-certificato rilevata",
+    "keyPairsDetected_other": "{{count}} coppie chiave-certificato rilevate",
     "detectedObjects": "Oggetti Rilevati",
     "importOptions": "Opzioni importazione",
     "skipDuplicates": "Salta duplicati",
@@ -5367,12 +5381,14 @@
     "importCertificates": "Importa certificati",
     "importKeys": "Importa chiavi",
     "importCSRs": "Importa CSR",
-    "importObjects": "Importa {{count}} Oggetto(i)",
+    "importObjects_one": "Importa {{count}} oggetto",
+    "importObjects_other": "Importa {{count}} oggetti",
     "importingObjects": "Importazione oggetti...",
     "importComplete": "Importazione Completata",
     "noObjectsImported": "Nessun Oggetto Importato",
     "allSkipped": "Tutti gli oggetti sono stati saltati o esistono già",
-    "privateKeysMatched": "chiave(i) privata(e) corrispondente(i)",
+    "privateKeysMatched_one": "{{count}} chiave privata associata",
+    "privateKeysMatched_other": "{{count}} chiavi private associate",
     "importMore": "Importa Altro",
     "allFormats": "Tutti i formati: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "dropFileHere": "Trascina un file qui oppure",
@@ -6460,7 +6476,8 @@
     "title": "Esporta",
     "titleCertificate": "Esporta il certificato",
     "titleCa": "Esporta la CA",
-    "skippedUnreadable": "{{count}} certificato/i illeggibile/i non esportato/i",
+    "skippedUnreadable_one": "{{count}} certificato illeggibile non esportato",
+    "skippedUnreadable_other": "{{count}} certificati illeggibili non esportati",
     "format": "Formato",
     "options": "Opzioni",
     "password": "Password",
@@ -6764,7 +6781,8 @@
       "caption": "Analisi di rete. Attiva un nome per aprirne il dettaglio.",
       "create": "Nuova analisi…",
       "found": "Trovati",
-      "foundNew": "{{count}}, {{fresh}} nuovi",
+      "foundNew_one": "{{total}}, {{count}} nuovo",
+      "foundNew_other": "{{total}}, {{count}} nuovi",
       "last": "Ultima analisi",
       "next": "Prossima analisi",
       "notScanned": "Non analizzato",
@@ -6784,7 +6802,8 @@
       "removeText": "L'analisi e la sua pianificazione vengono eliminate. I certificati che ha trovato restano tra i certificati trovati.",
       "empty": "Nessuna analisi di rete",
       "emptyText": "Un'analisi elenca i certificati esposti su un intervallo di indirizzi, ad esempio 192.0.2.0/24, per confrontarli con l'inventario.",
-      "progress": "Scansione in corso: {{scanned}} di {{total}} destinazioni, {{found}} certificati trovati."
+      "progress": "Scansione in corso: {{scanned}} di {{total}} destinazioni, {{found}} certificati trovati.",
+      "createTitle": "Nuova analisi"
     },
     "found": {
       "unit_one": "{{count}} certificato",
@@ -6854,7 +6873,8 @@
       },
       "timeoutHint": "Secondi per connessione, da 1 a 30.",
       "workersHint": "Connessioni simultanee, da 1 a 50."
-    }
+    },
+    "quickScanTitle": "Scansione rapida"
   },
   "compliance": {
     "title": "Punteggio di conformità",
@@ -7230,7 +7250,8 @@
     "signingCertCa": "Certificato della CA (solo con modalità rigorosa disattivata)",
     "signerExpires": "Scade",
     "signerChainComplete": "La catena degli emittenti arriva a una radice autofirmata ed è inclusa in ogni token.",
-    "signerChainPartial": "Catena degli emittenti: {{count}} certificato/i inclusi; non raggiunge una radice autofirmata.",
+    "signerChainPartial_one": "Catena degli emittenti: {{count}} certificato incluso; non raggiunge una radice autofirmata.",
+    "signerChainPartial_other": "Catena degli emittenti: {{count}} certificati inclusi; non raggiunge una radice autofirmata.",
     "signerUnsaved": "Salva la configurazione per applicare e convalidare questo certificato di firma.",
     "signerUnusable": "Questo certificato non può essere usato al momento per firmare marche temporali.",
     "signerStrictBadge": "RFC 3161 rigoroso",
@@ -7365,7 +7386,9 @@
     "filterByType": "Filtra per tipo",
     "certTotal": "Certificati firmati:",
     "range": "{{shown}} di {{count}} CA SSH",
-    "pageRange": "{{start}}–{{end}} di {{count}} CA SSH"
+    "pageRange": "{{start}}–{{end}} di {{count}} CA SSH",
+    "moreActions": "Altre azioni per {{name}}",
+    "actionsTitle": "Azioni della CA SSH"
   },
   "sshCertificates": {
     "title": "Certificati SSH",
@@ -7455,7 +7478,9 @@
     "filterByState": "Filtra per stato",
     "searchLabel": "ID chiave, principal, seriale…",
     "pageRange": "{{start}}–{{end}} di {{count}} certificati SSH",
-    "grants": "Principal e opzioni"
+    "grants": "Principal e opzioni",
+    "moreActions": "Altre azioni per {{name}}",
+    "actionsTitle": "Azioni del certificato SSH"
   },
   "filters": {
     "managePresets": "Gestisci preimpostazioni"

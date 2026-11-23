@@ -90,9 +90,9 @@ describe('the CRL / OCSP list', () => {
     await screen.findByRole('button', { name: 'Services CA' })
     expect(container.querySelector('.atl h1#main-title')).toHaveTextContent('shell.moduleLabel.crlOcsp')
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent))
-      .toEqual(['atelier.name', 'crlOcsp.columns.crlNumber', 'crlOcsp.columns.publication', 'crlOcsp.columns.nextUpdate', 'OCSP', 'atelier.state', 'common.actions'])
-    // Under its column's name the CRL number reads alone (G8)
-    expect(rowOf('Services CA').children[1]).toHaveTextContent(/^1842$/)
+      .toEqual(['atelier.name', 'CRL', 'crlOcsp.columns.published', 'crlOcsp.columns.nextUpdate', 'OCSP', 'atelier.state', 'common.actions'])
+    // The mockup's words, the panel's: « CRL » over « n° 1842 », « Publiée »
+    expect(rowOf('Services CA').children[1]).toHaveTextContent(/^crlOcsp\.numberOf \{"number":1842\}$/)
     expect(rowOf('New CA').children[1]).toHaveTextContent(/^—$/)
     expect(rowOf('Services CA')).toHaveTextContent('crlOcsp.states.current')
     expect(rowOf('Services CA')).toHaveTextContent('crlOcsp.ocspActive')
@@ -127,12 +127,12 @@ describe('the CRL / OCSP list', () => {
     fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     expect(container.querySelectorAll('tbody tr')).toHaveLength(9)
     // A header sorts from page one; the second click reverses
-    fireEvent.click(screen.getByRole('button', { name: 'crlOcsp.columns.crlNumber' }))
-    expect(screen.getByRole('columnheader', { name: 'crlOcsp.columns.crlNumber' })).toHaveAttribute('aria-sort', 'ascending')
+    fireEvent.click(screen.getByRole('button', { name: 'CRL' }))
+    expect(screen.getByRole('columnheader', { name: 'CRL' })).toHaveAttribute('aria-sort', 'ascending')
     expect(footer).toHaveTextContent('"shown":"1–25"')
-    expect(container.querySelector('tbody tr').children[1]).toHaveTextContent(/^4$/)
-    fireEvent.click(screen.getByRole('button', { name: 'crlOcsp.columns.crlNumber' }))
-    expect(container.querySelector('tbody tr').children[1]).toHaveTextContent(/^1842$/)
+    expect(container.querySelector('tbody tr').children[1]).toHaveTextContent(/^crlOcsp\.numberOf \{"number":4\}$/)
+    fireEvent.click(screen.getByRole('button', { name: 'CRL' }))
+    expect(container.querySelector('tbody tr').children[1]).toHaveTextContent(/^crlOcsp\.numberOf \{"number":1842\}$/)
     fireEvent.click(screen.getByRole('button', { name: 'OCSP' }))
     expect(container.querySelectorAll('tbody tr')[1]).toHaveTextContent('crlOcsp.ocspActive')
     fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
@@ -140,7 +140,7 @@ describe('the CRL / OCSP list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
     expect([...container.querySelectorAll('tbody tr .entity-name')].slice(0, 3).map((n) => n.textContent))
       .toEqual(['Branch CA 1', 'Branch CA 2', 'Branch CA 3'])
-    for (const name of ['crlOcsp.columns.publication', 'crlOcsp.nextUpdate']) {
+    for (const name of ['crlOcsp.columns.published', 'crlOcsp.nextUpdate']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
     // A search shorter than a page has no page controls
@@ -156,13 +156,13 @@ describe('the CRL / OCSP list', () => {
     expect(sorted().map((h) => [h.textContent, h.getAttribute('aria-sort')])).toEqual([['crlOcsp.columns.nextUpdate', 'ascending']])
     // Old CA's CRL is overdue (1 Nov), Internal CA's is due tomorrow: the nearest first, the CA without a CRL last
     expect([...at.container.querySelectorAll('tbody tr .entity-name')].map((n) => n.textContent)).toEqual(['Old CA', 'Internal CA', 'Services CA', 'New CA'])
-    fireEvent.click(screen.getByRole('button', { name: 'crlOcsp.columns.publication' }))
+    fireEvent.click(screen.getByRole('button', { name: 'crlOcsp.columns.published' }))
     expect(at.where()).toBe('/crl-ocsp?sort=published&order=asc')
     at.unmount()
     const again = renderAtUrl(<CRLOCSPPage />, '/crl-ocsp?sort=number&order=desc')
     await screen.findByRole('button', { name: 'Services CA' })
-    expect(screen.getByRole('columnheader', { name: 'crlOcsp.columns.crlNumber' })).toHaveAttribute('aria-sort', 'descending')
-    expect(again.container.querySelector('tbody tr').children[1]).toHaveTextContent(/^1842$/)
+    expect(screen.getByRole('columnheader', { name: 'CRL' })).toHaveAttribute('aria-sort', 'descending')
+    expect(again.container.querySelector('tbody tr').children[1]).toHaveTextContent(/^crlOcsp\.numberOf \{"number":1842\}$/)
   })
 
   it('draws the facts of a record by priority, the dates after their label', async () => {
@@ -171,9 +171,9 @@ describe('the CRL / OCSP list', () => {
     await screen.findAllByRole('button', { name: 'Services CA' })
     const facts = [...container.querySelectorAll('article.mobile-record')[2].querySelectorAll('.row-meta > span')].map((s) => s.textContent)
     expect(facts[0]).toMatch(/^crlOcsp\.nextUpdate /)
-    // The CRL number named by its column (G9)
-    expect(facts[1]).toBe('crlOcsp.columns.crlNumber 1842')
-    expect(facts[2]).toMatch(/^crlOcsp\.columns\.publication /)
+    // The CRL number named by its column (G9), in the panel's words
+    expect(facts[1]).toBe('CRL crlOcsp.numberOf {"number":1842}')
+    expect(facts[2]).toMatch(/^crlOcsp\.columns\.published /)
     expect(screen.getByRole('combobox', { name: 'table.sortBy' })).toHaveValue('next')
   })
 

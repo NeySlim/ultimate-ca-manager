@@ -92,6 +92,25 @@ describe('extensionRows', () => {
     expect(rows.every((r) => !('labelKey' in r))).toBe(true)
   })
 
+  it('reads a Netscape comment as its text, any other unknown extension staying in hex', () => {
+    // IA5String "OpenSSL Generated Certificate", a UTF8String, a BMPString, then a malformed length
+    const ia5 = '161d4f70656e53534c2047656e657261746564204365727469666963617465'
+    const rows = extensionRows({ other_extensions: [
+      { oid: '2.16.840.1.113730.1.13', name: 'nsComment', value_hex: ia5, critical: false },
+      { oid: '2.16.840.1.113730.1.13', value_hex: '0c03c3a96c', critical: false },
+      { oid: '2.16.840.1.113730.1.13', value_hex: '1e0400e90041', critical: false },
+      { oid: '2.16.840.1.113730.1.13', value_hex: '1605414243', critical: false },
+      { oid: '1.2.3.4', value_hex: '161d4f70656e', critical: false },
+    ] })
+    expect(rows.map((r) => [r.values, !!r.hex])).toEqual([
+      [['OpenSSL Generated Certificate'], false],
+      [['él'], false],
+      [['éA'], false],
+      [['1605414243'], true],
+      [['161d4f70656e'], true],
+    ])
+  })
+
   it('falls back to the combined SAN text', () => {
     expect(extensionRows({}, 'DNS:a, DNS:b')[0].values).toEqual(['DNS:a', 'DNS:b'])
   })

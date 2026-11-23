@@ -840,7 +840,6 @@
     "ctSubmitted": "証明書がCTログに送信されました",
     "ctSubmitFailed": "CTログへの送信に失敗しました",
     "ctScts": "CT SCTs",
-    "ctSctsCount": "{{count}}個のSCTが記録されています",
     "ctNoScts": "SCTなし: CTログに未送信",
     "eku": {
       "title": "拡張鍵用途 (EKU)",
@@ -2222,12 +2221,16 @@
     "revokeOnRenewal": "更新後に古い証明書を失効させる",
     "revokeOnRenewalDesc": "新しい証明書の発行時に前の証明書を'superseded'の理由で自動的に失効させます",
     "renewalPolicy": "更新ポリシー",
-    "revokeExistingSuperseded": "既存の証明書を失効させる {{count}}",
+    "revokeExistingSuperseded_one": "置き換え済みの既存の証明書 {{count}} 件も失効させる",
+    "revokeExistingSuperseded_other": "置き換え済みの既存の証明書 {{count}} 件も失効させる",
     "revokeExistingSupersededDesc": "これらのドメインの既発行証明書を'superseded'の理由で失効させます",
     "revokeSupersededConfirmTitle": "既存の証明書を失効させますか？",
-    "revokeSupersededConfirmDesc": "設定されたドメインの既存の証明書がすべて失効されます。この操作は元に戻せません {{count}}",
-    "revokeSupersededConfirmAction": "失効させる {{count}}",
-    "supersededRevoked": "証明書が置き換えとして失効しました {{count}}",
+    "revokeSupersededConfirmDesc_one": "新しいバージョンに置き換えられた証明書 {{count}} 件をただちに失効させます。この操作は元に戻せません。失効した証明書は CRL に掲載され、OCSP で失効として応答されます。",
+    "revokeSupersededConfirmDesc_other": "新しいバージョンに置き換えられた証明書 {{count}} 件をただちに失効させます。この操作は元に戻せません。失効した証明書は CRL に掲載され、OCSP で失効として応答されます。",
+    "revokeSupersededConfirmAction_one": "証明書 {{count}} 件を失効させる",
+    "revokeSupersededConfirmAction_other": "証明書 {{count}} 件を失効させる",
+    "supersededRevoked_one": "置き換え済みの証明書 {{count}} 件を失効させました",
+    "supersededRevoked_other": "置き換え済みの証明書 {{count}} 件を失効させました",
     "domains": "ドメイン",
     "domainsHelper": "1行に1ドメイン。ワイルドカードには*.domain.comを使用。",
     "atLeastOneDomainRequired": "少なくとも1つのドメインが必要です",
@@ -2430,7 +2433,8 @@
       "statusUsed": "使用済み",
       "statusRevoked": "失効",
       "statusExpired": "期限切れ",
-      "totalCount": "{{count}} 件",
+      "totalCount_one": "{{count}} 件",
+      "totalCount_other": "{{count}} 件",
       "search": "認証情報を検索",
       "created": "作成日",
       "usedAt": "使用日",
@@ -2519,7 +2523,8 @@
     "defaultProfileNone": "なし（90 日、既定のダイジェスト）",
     "defaultProfileDesc": "クライアントがプロファイルを指定しない注文（ほとんどのクライアントが該当）に適用されます。未設定の場合、そのような注文は 90 日と既定のダイジェストになります",
     "localOrders": "ローカル注文",
-    "localOrdersCount": "{{count}} 件の注文",
+    "localOrdersCount_one": "{{count}} 件の注文",
+    "localOrdersCount_other": "{{count}} 件の注文",
     "localOrdersLoadFailed": "ローカル注文を読み込めませんでした",
     "deleteLocalOrderConfirm": "この注文を削除しますか？",
     "deleteLocalOrderConfirmDesc": "{{domain}} の注文とその認可・チャレンジが削除されます。発行済み証明書がある場合は保持されます。",
@@ -2527,7 +2532,8 @@
     "purgeLocalOrders": "期限切れを整理",
     "purgeLocalOrdersConfirm": "期限切れの注文を整理しますか？",
     "purgeLocalOrdersConfirmDesc": "未発行の期限切れ注文を認可・チャレンジごと削除します。発行済みの注文は保持されます。",
-    "purgeLocalOrdersDone": "整理完了：{{count}} 件の注文を削除しました",
+    "purgeLocalOrdersDone_one": "整理完了：{{count}} 件の注文を削除しました",
+    "purgeLocalOrdersDone_other": "整理完了：{{count}} 件の注文を削除しました",
     "purgeLocalOrdersFailed": "整理に失敗しました",
     "noLocalOrders": "ローカル注文はありません",
     "noLocalOrdersDesc": "内蔵サーバーへの ACME クライアントの注文がここに表示されます",
@@ -2816,7 +2822,8 @@
     "intuneAppUpdated": "アプリの登録を更新しました",
     "intuneAppDeleted": "アプリの登録を削除しました",
     "intuneAppDeleteConfirm": "アプリの登録「{{name}}」を削除しますか？",
-    "intuneAppUsedBy": "{{count}} 件のプロファイルで使用中",
+    "intuneAppUsedBy_one": "{{count}} 件のプロファイルで使用中",
+    "intuneAppUsedBy_other": "{{count}} 件のプロファイルで使用中",
     "intuneAppNotUsed": "どのプロファイルでも使用されていません",
     "intuneAppLastTest": "最終テスト",
     "intuneAppNeverTested": "未テスト",
@@ -2893,7 +2900,10 @@
     "challengeExpires": "有効期限",
     "challengeAge": "経過",
     "challengeAgeUnknown": "未記録",
-    "newIntuneAppShort": "新規アプリ"
+    "newIntuneAppShort": "新規アプリ",
+    "deletedProfile": "削除されたプロファイル（No. {{id}}）",
+    "approvedAuto": "自動",
+    "searchChallenges": "認証局を検索..."
   },
   "crlOcsp": {
     "crl": "証明書失効リスト",
@@ -2999,8 +3009,6 @@
     "ocspInactive": "無効",
     "columns": {
       "published": "公開日時",
-      "publication": "公開",
-      "crlNumber": "CRL 番号",
       "nextUpdate": "次回更新"
     },
     "tabs": {
@@ -3185,8 +3193,10 @@
     "noManagedCAs": "利用可能な管理対象CAがありません",
     "alreadyInTruststore": "トラストストアに既に存在",
     "addedFromManaged": "管理対象CAから追加済み",
-    "addedCount": "{{count}}件のCAがトラストストアに追加されました",
-    "addSelected": "選択した{{count}}件を追加",
+    "addedCount_one": "{{count}}件のCAがトラストストアに追加されました",
+    "addedCount_other": "{{count}}件のCAがトラストストアに追加されました",
+    "addSelected_one": "選択した{{count}}件を追加",
+    "addSelected_other": "選択した{{count}}件を追加",
     "exportBundle": "バンドルをエクスポート",
     "bundleExported": "証明書バンドルをエクスポートしました",
     "exportFailed": "バンドルのエクスポートに失敗しました",
@@ -3216,7 +3226,9 @@
       "emptyTitle": "外部のトラストアンカーがありません"
     },
     "systemBundleDescription": "システムの CA バンドルからインポート",
-    "systemBundleNote": "{{path}} から自動インポート"
+    "systemBundleNote": "{{path}} から自動インポート",
+    "moreActions": "{{name}} のその他の操作",
+    "actionsTitle": "トラストアンカーの操作"
   },
   "importExport": {
     "tabs": {
@@ -5351,7 +5363,8 @@
     "pleaseAddFiles": "ファイルを追加するか、PEMコンテンツを貼り付けてください",
     "unsupportedFormat": "サポートされていないファイル: {{name}}。対応形式: {{formats}}",
     "analyzeFailed": "コンテンツの解析に失敗しました",
-    "successImported": "{{count}} 個のオブジェクトを正常にインポートしました",
+    "successImported_one": "{{count}} 個のオブジェクトを正常にインポートしました",
+    "successImported_other": "{{count}} 個のオブジェクトを正常にインポートしました",
     "files": "ファイル",
     "pastePemPlaceholder": "PEMエンコードされた証明書、キー、CSR、またはチェーンをここに貼り付けてください...",
     "encryptedDetected": "暗号化されたコンテンツが検出されました",
@@ -5359,7 +5372,8 @@
     "analyze": "解析",
     "analyzeHint": "インポート前に、証明書、鍵、CSR、チェーンを識別します。この段階では何もインポートされません。",
     "certificateChains": "証明書チェーン",
-    "keyPairsDetected": "{{count}} 組のキーと証明書のペアが検出されました",
+    "keyPairsDetected_one": "{{count}} 組のキーと証明書のペアが検出されました",
+    "keyPairsDetected_other": "{{count}} 組のキーと証明書のペアが検出されました",
     "detectedObjects": "検出されたオブジェクト",
     "importOptions": "インポートオプション",
     "skipDuplicates": "重複をスキップ",
@@ -5367,12 +5381,14 @@
     "importCertificates": "証明書のインポート",
     "importKeys": "キーのインポート",
     "importCSRs": "CSR のインポート",
-    "importObjects": "{{count}} 個のオブジェクトをインポート",
+    "importObjects_one": "{{count}} 個のオブジェクトをインポート",
+    "importObjects_other": "{{count}} 個のオブジェクトをインポート",
     "importingObjects": "オブジェクトをインポート中...",
     "importComplete": "インポート完了",
     "noObjectsImported": "オブジェクトはインポートされませんでした",
     "allSkipped": "すべてのオブジェクトがスキップされたか、既に存在します",
-    "privateKeysMatched": "個の秘密鍵が一致しました",
+    "privateKeysMatched_one": "{{count}} 個の秘密鍵が一致しました",
+    "privateKeysMatched_other": "{{count}} 個の秘密鍵が一致しました",
     "importMore": "さらにインポート",
     "allFormats": "全形式対応: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "dropFileHere": "ここにファイルをドロップするか、",
@@ -6460,7 +6476,8 @@
     "title": "エクスポート",
     "titleCertificate": "証明書をエクスポート",
     "titleCa": "CAをエクスポート",
-    "skippedUnreadable": "読み取れない証明書 {{count}} 件はエクスポートされませんでした",
+    "skippedUnreadable_one": "読み取れない証明書 {{count}} 件はエクスポートされませんでした",
+    "skippedUnreadable_other": "読み取れない証明書 {{count}} 件はエクスポートされませんでした",
     "format": "フォーマット",
     "options": "オプション",
     "password": "パスワード",
@@ -6764,7 +6781,8 @@
       "caption": "ネットワーク分析。名前を操作すると詳細が開きます。",
       "create": "新しい分析…",
       "found": "検出数",
-      "foundNew": "{{count}} 件、うち新規 {{fresh}} 件",
+      "foundNew_one": "{{total}} 件、うち新規 {{count}} 件",
+      "foundNew_other": "{{total}} 件、うち新規 {{count}} 件",
       "last": "前回の分析",
       "next": "次回の分析",
       "notScanned": "未分析",
@@ -6784,7 +6802,8 @@
       "removeText": "分析とそのスケジュールを削除します。検出された証明書は「検出された証明書」に残ります。",
       "empty": "ネットワーク分析はありません",
       "emptyText": "分析は、アドレス範囲（例: 192.0.2.0/24）で公開されている証明書を一覧にし、インベントリと照合します。",
-      "progress": "スキャン実行中: {{total}} 件中 {{scanned}} 件のターゲット、証明書 {{found}} 件を検出。"
+      "progress": "スキャン実行中: {{total}} 件中 {{scanned}} 件のターゲット、証明書 {{found}} 件を検出。",
+      "createTitle": "新しい分析"
     },
     "found": {
       "unit_one": "{{count}} 件の証明書",
@@ -6854,7 +6873,8 @@
       },
       "timeoutHint": "接続あたりの秒数（1〜30）。",
       "workersHint": "同時接続数（1〜50）。"
-    }
+    },
+    "quickScanTitle": "クイックスキャン"
   },
   "compliance": {
     "title": "コンプライアンススコア",
@@ -7230,7 +7250,8 @@
     "signingCertCa": "CA 証明書（厳格モードがオフの場合のみ）",
     "signerExpires": "有効期限",
     "signerChainComplete": "発行者チェーンは自己署名ルートまで到達し、各トークンに含まれます。",
-    "signerChainPartial": "発行者チェーン：{{count}} 件の証明書を含みます。自己署名ルートには到達していません。",
+    "signerChainPartial_one": "発行者チェーン：{{count}} 件の証明書を含みます。自己署名ルートには到達していません。",
+    "signerChainPartial_other": "発行者チェーン：{{count}} 件の証明書を含みます。自己署名ルートには到達していません。",
     "signerUnsaved": "この署名証明書を適用・検証するには設定を保存してください。",
     "signerUnusable": "この証明書は現在タイムスタンプの署名に使用できません。",
     "signerStrictBadge": "RFC 3161 厳格",
@@ -7365,7 +7386,9 @@
     "filterByType": "タイプで絞り込む",
     "certTotal": "署名済みの証明書:",
     "range": "{{count}} 件中 {{shown}} 件のSSH CA",
-    "pageRange": "{{count}} 件中 {{start}}〜{{end}} 件目のSSH CA"
+    "pageRange": "{{count}} 件中 {{start}}〜{{end}} 件目のSSH CA",
+    "moreActions": "{{name}} のその他の操作",
+    "actionsTitle": "SSH CA の操作"
   },
   "sshCertificates": {
     "title": "SSH証明書",
@@ -7455,7 +7478,9 @@
     "filterByState": "状態で絞り込む",
     "searchLabel": "キーID、プリンシパル、シリアル…",
     "pageRange": "{{count}} 件中 {{start}}〜{{end}} 件目のSSH証明書",
-    "grants": "プリンシパルとオプション"
+    "grants": "プリンシパルとオプション",
+    "moreActions": "{{name}} のその他の操作",
+    "actionsTitle": "SSH 証明書の操作"
   },
   "filters": {
     "managePresets": "プリセットを管理"

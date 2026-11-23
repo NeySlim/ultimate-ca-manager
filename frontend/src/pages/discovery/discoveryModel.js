@@ -130,7 +130,7 @@ export function useScanFacts() {
       if (run.status === 'running') return t('discovery.scans.state.running')
       if (run.status !== 'completed') return t('discovery.scans.interrupted')
       return run.new_certs > 0
-        ? t('discovery.scans.foundNew', { count: run.certs_found ?? 0, fresh: run.new_certs })
+        ? t('discovery.scans.foundNew', { count: run.new_certs, total: run.certs_found ?? 0 })
         : String(run.certs_found ?? 0)
     },
     last: (p, run) => {

@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Input } from '../components/atelier/Form'
 import {
-  Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Facts,
+  Zone, AtelierDialog, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Facts,
   LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
@@ -30,6 +30,7 @@ import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
 import { dateOf, dateTimeOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
+import { CertMenu } from './certificates/inspector/CertMenu'
 import { trustStoreText } from './pki/systemTexts'
 
 
@@ -63,6 +64,7 @@ export default function TrustStorePage() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [syncLimit, setSyncLimit] = useState(500)
   const [showImportModal, setShowImportModal] = useState(false)
   // The search, the type and state filters (kept) and the open dock tab
@@ -335,7 +337,7 @@ export default function TrustStorePage() {
           <div className="modal-actions">
             <button type="button" className="btn" data-action="close-modal" onClick={() => closeModal('add')}>{t('common.cancel')}</button>
             <button type="button" className="btn primary" data-write="" onClick={handleAddFromCAs} disabled={adding || selectedCAIds.length === 0 || undefined}>
-              {adding ? t('trustStore.adding') : t('trustStore.addSelected', { count: selectedCAIds.length })}
+              {adding ? t('trustStore.adding') : selectedCAIds.length ? t('trustStore.addSelected', { count: selectedCAIds.length }) : t('common.add')}
             </button>
           </div>
         </AtelierDialog>
@@ -423,7 +425,7 @@ export default function TrustStorePage() {
         sections={[['overview', t('atelier.overview')], ['details', t('trustStore.module.sections.details')], ['pem', 'PEM']]}
         actions={<>
           <Btn icon="download" id="truststore-export" onClick={() => handleExport(open)}>{t('common.export')}</Btn>
-          {canDelete('truststore') && <Btn tone="danger" icon="block" id="truststore-delete" onClick={() => handleDelete(open)}>{t('common.delete')}</Btn>}
+          {canDelete('truststore') && <IconBtn quiet icon="more" title={false} label={t('trustStore.moreActions', { name: open.name })} data-truststore-menu={open.id} onClick={() => setMenuOpen(true)} />}
         </>}>
         {section === 'overview' && (
           <div className="module-detail">
@@ -472,7 +474,14 @@ export default function TrustStorePage() {
   )
 
   return (
-    <Zone dock={dock} testId="truststore-zone" after={dialogs}>
+    <Zone dock={dock} testId="truststore-zone" after={<>
+      {/* Deletion goes through the panel's « ⋯ » menu, as on the CSR and template panels */}
+      {menuOpen && open && (
+        <CertMenu title={t('trustStore.actionsTitle')} name={open.name} onClose={() => setMenuOpen(false)}
+          items={[{ id: 'delete', icon: 'close', label: t('common.delete'), danger: true, write: true, onClick: () => handleDelete(open) }]} />
+      )}
+      {dialogs}
+    </>}>
       <PageHead title={t('shell.moduleLabel.truststore')} total={t('trustStore.module.unit', { count: certificates.length })} intent={t('shell.moduleDesc.truststore')}
         actions={<>
           {certificates.length > 0 && <Btn icon="download" id="truststore-bundle" onClick={() => handleExportBundle('pem')}>{t('trustStore.exportBundle')}</Btn>}
@@ -495,7 +504,7 @@ export default function TrustStorePage() {
           </Toolbar>
           {ticked > 0 && (
             <BatchBar count={t('trustStore.module.selected', { count: ticked })} onClear={() => setSelectedIds(new Set())}>
-              <Btn tone="danger" icon="block" id="truststore-bulk-delete" disabled={bulkDeleting || undefined} onClick={handleBulkDelete}>{t('trustStore.deleteSelected')}</Btn>
+              <Btn tone="danger" icon="close" id="truststore-bulk-delete" disabled={bulkDeleting || undefined} onClick={handleBulkDelete}>{t('trustStore.deleteSelected')}</Btn>
             </BatchBar>
           )}
         </>}
