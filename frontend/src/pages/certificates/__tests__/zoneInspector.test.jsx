@@ -202,6 +202,16 @@ describe('a certificate in the inspector (inspector, certMenu)', () => {
     await waitFor(() => expect(mocks.revoke).toHaveBeenCalledWith(7, 'keyCompromise', undefined))
   })
 
+  // An end passed or a revocation is said in the red of the state pill beside it; amber is for a near end only
+  it('says an expired or revoked certificate in red in its validity block', async () => {
+    mocks.getById.mockImplementation((id) => Promise.resolve({ data: id === 8 ? OTHER : { ...CERT, status: 'expired', valid_to: iso(-3) } }))
+    mount()
+    await open('open-7', 'web.example.com')
+    expect(dock().querySelector('.validity-head strong')).toHaveClass('bad')
+    await open('open-8', 'api.example.com')
+    expect(dock().querySelector('.validity-head strong')).toHaveClass('bad')
+  })
+
   it('goes through Aperçu, Chaîne, Extensions, Historique and PEM', async () => {
     mount()
     await open('open-7', 'web.example.com')

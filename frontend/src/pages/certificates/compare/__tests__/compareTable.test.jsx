@@ -72,6 +72,8 @@ describe('CompareTable', () => {
     // subject, sha1, sha256, serial differ; the rest is identical
     expect(differing).toBe(4)
     expect(screen.getByText(`compare.differences ${JSON.stringify({ count: 4, total })}`)).toBeInTheDocument()
+    // A count, neither a warning nor a deadline: a neutral pill
+    expect(screen.getByText(`compare.differences ${JSON.stringify({ count: 4, total })}`).closest('.badge').className).toBe('badge')
     fireEvent.click(screen.getByRole('checkbox', { name: 'compare.onlyDifferences' }))
     expect(container.querySelectorAll('tbody tr')).toHaveLength(4)
     expect(container.querySelectorAll('tbody td[colspan]')).toHaveLength(0)

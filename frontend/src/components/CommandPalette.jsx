@@ -180,15 +180,17 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
     navigate(command.path)
   }
 
-  // One flat list, in the order of the former sections: records found, favourites, recent items, pages and actions, help
+  // One flat list. On a search, as the mockup's commandResults(): pages and actions first, then the records found,
+  // favourites and recent items; with no search, favourites and recent items before the pages and actions.
+  // A certificate, an authority or a request is hinted by its kind: its whole subject would crowd out its name.
   const SEARCHED = [
-    ['certificates', 'certificate', (i) => i.subject || i.status],
-    ['cas', 'ca', (i) => i.subject],
+    ['certificates', 'certificate', () => null],
+    ['cas', 'ca', () => null],
     ['users', 'user', (i) => i.email || i.role],
     ['templates', 'template', (i) => i.description],
-    ['csrs', 'csr', (i) => i.subject || i.status],
+    ['csrs', 'csr', () => null],
   ]
-  const results = [
+  const found = [
     ...SEARCHED.flatMap(([key, type, hint]) => (searchResults?.[key] || []).map(item => ({
       key: `${type}-${item.id}`, icon: getTypeIcon(type), family: typeFamily(type), name: item.name, hint: hint(item) || t(`commandPalette.searchSections.${key === 'cas' ? 'certificateAuthorities' : key}`),
       run: () => openItem(type, item.id),
@@ -198,6 +200,8 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
       key: `${key}-${item.id}`, icon: glyph, family, name: item.name, hint: t(hint),
       run: () => { onOpenChange(false); navigate(`${path}?item=${encodeURIComponent(item.id)}`) },
     }))),
+  ]
+  const saved = [
     ...filteredFavorites.map(item => ({
       key: `fav-${item.type}-${item.id}`, icon: getTypeIcon(item.type), family: typeFamily(item.type), name: item.name, hint: item.subtitle || t('commandPalette.favorites'),
       run: () => openItem(item.type, item.id),
@@ -206,6 +210,8 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
       key: `recent-${item.type}-${item.id}`, icon: getTypeIcon(item.type), family: typeFamily(item.type), name: item.name, hint: item.subtitle || t('commandPalette.recent'),
       run: () => openItem(item.type, item.id),
     })),
+  ]
+  const nav = [
     ...filteredCommands.map(cmd => ({
       key: `cmd-${cmd.id}`, icon: cmd.action === 'new' || cmd.action === 'upload' ? 'plus' : glyphOf(moduleForPath(cmd.path.split('?')[0])),
       family: familyOf(moduleForPath(cmd.path.split('?')[0])),
@@ -214,6 +220,9 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
     ...filteredViews.map(v => ({
       key: `view-${v.id}`, icon: glyphOf(moduleForPath(v.path.split('?')[0])), family: familyOf(moduleForPath(v.path.split('?')[0])), name: viewName(v), hint: t(v.categoryKey), run: () => executeCommand(v),
     })),
+  ]
+  const results = [
+    ...(search ? [...nav, ...found, ...saved] : [...found, ...saved, ...nav]),
     // The whole guide in a tab of its own (absent from the mockup), on the chapter of the current page
     ...(search && [t('guide.paletteEntry'), t('guide.paletteHint')].some(s => s.toLowerCase().includes(lower)) ? [{
       key: 'guide', icon: 'expand', name: t('guide.paletteEntry'), hint: t('guide.paletteHint'),
@@ -264,7 +273,7 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp, guideHref 
         <div className="command-results" id="command-results" ref={listRef} aria-busy={isSearching || undefined} onKeyDown={onKeyDown}>
           {results.map(r => (
             <button key={r.key} type="button" className="command-result" data-family={r.family} onClick={r.run}>
-              <Icon name={r.icon} /><span className="name">{r.name}</span>{r.hint && <span className="hint">{r.hint}</span>}
+              <Icon name={r.icon} /><span className="name" title={r.name}>{r.name}</span>{r.hint && <span className="hint" title={r.hint}>{r.hint}</span>}
             </button>
           ))}
           {results.length === 0 && !isSearching && (

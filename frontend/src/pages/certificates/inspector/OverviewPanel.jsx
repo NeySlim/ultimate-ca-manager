@@ -100,7 +100,8 @@ function Validity({ cert }) {
     <section>
       <h3 className="section-title">{t('inspector.cert.validity')}</h3>
       <div className="validity-head">
-        <strong className={warn ? 'warn' : undefined}>{big}</strong>
+        {/* Expired or revoked in the colour of its pill beside it; amber only for a near end */}
+        <strong className={revoked || expired ? 'bad' : warn ? 'warn' : undefined}>{big}</strong>
         <span>{!revoked && !expired && f.days !== null ? t('inspector.cert.remaining') : ''}</span>
       </div>
       <div className={warn ? 'progress warn' : 'progress'} role="img" aria-label={t('inspector.cert.validityLeft', { percent: Math.round(f.ratio) })}>

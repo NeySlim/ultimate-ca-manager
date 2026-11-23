@@ -81,6 +81,24 @@ describe('NotificationBell', () => {
     expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending', 'truststore_expiring']))
   })
 
+  // The summary counts the unread items: the panel opens on the first of them, wherever it sits in the list
+  it('brings the first unread item into view at the opening', async () => {
+    const seen = []
+    const own = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
+    Element.prototype.scrollIntoView = function () { seen.push(this) }
+    try {
+      const user = setup()
+      await waitFor(() => expect(bell()).toHaveAccessibleName(/shell\.bell\.unread\|4/))
+      await user.click(bell())
+      const first = document.querySelector('.notif-item.unread')
+      expect(first).not.toBeNull()
+      expect(seen).toContain(first)
+    } finally {
+      if (own) Object.defineProperty(Element.prototype, 'scrollIntoView', own)
+      else delete Element.prototype.scrollIntoView
+    }
+  })
+
   it('asks for the bindings a renewal left behind and links each to its binding', async () => {
     m.getQueue.mockResolvedValue({ data: { counts: {}, items: [
       { kind: 'deploy_binding_left_behind', tier: 'critical', id: 5, label: 'web01', due_at: null,

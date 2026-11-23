@@ -61,7 +61,8 @@ export function CompareTable({ certs }) {
     <div className="compare-view" data-testid="compare-view">
       <div className="compare-options">
         <p className="compare-sum" aria-live="polite">
-          <Pill tone={differing ? 'warn' : 'good'} label={t('compare.differences', { count: differing, total: rows.length })} />
+          {/* A count of differences is neither a warning nor a deadline: neutral, with the comparison's own icon */}
+          <Pill tone={differing ? undefined : 'good'} icon={differing ? 'compare' : undefined} label={t('compare.differences', { count: differing, total: rows.length })} />
           <span className="muted">{t('compare.lead')}</span>
         </p>
         <label className="checkbox-line" htmlFor={toggleId}>

@@ -18,6 +18,13 @@ vi.mock('../../../pages/certificates/CertificateFloat', () => ({
   },
 }))
 
+vi.mock('../../../pages/certificates/compare/CompareFloat', () => ({
+  default: function Body({ ids, onTitle }) {
+    useEffect(() => { onTitle(`compare ${ids.join(',')}`) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    return <p>compare body</p>
+  },
+}))
+
 import { DetachedProvider } from '../DetachedContext'
 import { DetachedLayer } from '../DetachedLayer'
 import { useDetached } from '../useDetached'
@@ -70,6 +77,14 @@ describe('detached windows', () => {
     expect(box(b).x).toBeGreaterThan(box(a).x)
     expect(box(b).y).toBeGreaterThan(box(a).y)
     expect(box(b).z).toBeGreaterThan(box(a).z)
+  })
+
+  // A comparison opens tall enough for its fourteen properties, within the window less the bars
+  it('opens a comparison 820 px high where the window allows it', async () => {
+    setup()
+    act(() => { api.open('compare', [1, 2]) })
+    const w = await screen.findByRole('dialog', { name: 'compare 1,2' })
+    expect(box(w)).toMatchObject({ w: 1120, h: 820 })
   })
 
   it('brings the window touched in front of the others', async () => {

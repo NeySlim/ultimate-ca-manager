@@ -67,6 +67,14 @@ describe('UserMenu', () => {
     expect([...facts.querySelectorAll('dd')].map(dd => dd.textContent)).toEqual(['probe@example.com', 'shell.method.password', 'shell.userCard.lockIn|30'])
   })
 
+  // A lock after whole hours is said in hours: 8 h, never 480 min
+  it('says an idle lock of whole hours in hours', async () => {
+    getCurrentUser.mockResolvedValue({ data: { session_timeout: 28800 } })
+    const user = setup()
+    await user.click(trigger())
+    expect(await screen.findByText('shell.userCard.lockInHours|8')).toBeVisible()
+  })
+
   it('names an SSO or LDAP sign-in', async () => {
     auth.method = 'sso'
     const user = setup()

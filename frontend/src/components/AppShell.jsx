@@ -73,6 +73,7 @@ export function AppShell() {
     'crl-ocsp': 'crlocsp',
     'users': 'usersGroups',
     'tools': 'certTools',
+    'logs': 'systemLogs',
     'ssh/cas': 'sshCas',
     'ssh/certificates': 'sshCertificates'
   }
@@ -85,7 +86,7 @@ export function AppShell() {
     'acme', 'scep', 'est', 'tsa', 'settings', 'truststore', 'crl-ocsp',
     'tools', 'audit', 'account', 'operations', 'user-certificates',
     // Pro pages
-    'rbac', 'hsm',
+    'rbac', 'hsm', 'logs',
     // SSH pages
     'ssh-cas', 'ssh-certificates',
     // Governance pages

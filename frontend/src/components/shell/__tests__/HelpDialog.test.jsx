@@ -97,7 +97,8 @@ describe('HelpDialog', () => {
     expect(terms.querySelector('pre.code-preview')).toHaveTextContent('openssl x509')
     expect(grid).toHaveTextContent('A tip')
     expect(grid).toHaveTextContent('A warning')
-    expect(grid).toHaveTextContent('Certificates')
+    // A « see also » entry is the chapter it names, under its title in the language
+    expect(grid).toHaveTextContent('common.certificates')
   })
 
   it('renders the guide\'s markdown in the help vocabulary', () => {
