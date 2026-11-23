@@ -88,10 +88,13 @@ def test_texts_say_a_kerberos_renewal_keeps_its_template():
     fr = (help_dir / 'help' / 'fr' / 'settings.js').read_text()
     assert 'le renouvelle quand elle nomme le modèle de ce certificat' in fr
     assert 'Une demande qui nomme un autre modèle est un enrôlement' in fr
+    es = (help_dir / 'help' / 'es' / 'settings.js').read_text()
+    assert 'lo renueva cuando nombra la plantilla de ese certificado' in es
+    assert 'Una solicitud que nombra otra plantilla es una inscripción' in es
 
 
 def test_texts_say_how_a_former_ca_renews_and_how_to_cut_it():
-    """Guide, API reference, UPGRADE, CHANGELOG and help (en, fr, ru, zh) say what a change of the issuing CA
+    """Guide, API reference, UPGRADE, CHANGELOG and help (en, es, fr, ru, zh) say what a change of the issuing CA
     lists, that the list only shrinks, that a cut or a revocation stops renewals at once, and that the
     listener trusts a listed CA for WSTEP renewal only."""
     root = GUIDE.parents[1]
@@ -108,6 +111,8 @@ def test_texts_say_how_a_former_ca_renews_and_how_to_cut_it():
     for path, phrase in ((help_dir / 'helpGuides.js', 'A former CA taken off the list, revoked or deleted renews nothing'),
                          (help_dir / 'help' / 'fr' / 'settings.js',
                           'Une ancienne AC retirée de la liste, révoquée ou supprimée ne renouvelle plus rien'),
+                         (help_dir / 'help' / 'es' / 'settings.js',
+                          'anterior quitada de la lista, revocada o eliminada no renueva nada desde ese momento'),
                          (help_dir / 'help' / 'ru' / 'settings.js',
                           'Прежний ЦС, убранный из списка, отозванный или удалённый, с этого момента ничего не продлевает'),
                          (help_dir / 'help' / 'zh' / 'settings.js',

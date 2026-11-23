@@ -5012,7 +5012,7 @@
     "bindingLeftBehind": "Un rinnovo ha lasciato {{name}} sul certificato precedente"
   },
   "help": {
-    "englishOnlyNotice": "La guida è disponibile in inglese, francese, russo e cinese.",
+    "englishOnlyNotice": "La guida è disponibile in inglese, francese, spagnolo, russo e cinese.",
     "aboutCertificates": "Informazioni sui certificati",
     "exportFormats": "Formati di esportazione",
     "aboutCAs": "Informazioni sulle autorità di certificazione",

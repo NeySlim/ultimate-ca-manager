@@ -23,7 +23,7 @@ FRONTEND_DIR = _dist_dir if (_dist_dir / "index.html").exists() else _frontend_b
 # sent by _serve_guide to a valid session only, never as static files
 PRERENDER_DIRNAME = 'guide-prerender'
 # The languages of the help; any other interface language reads the English one
-GUIDE_LANGUAGES = ('en', 'fr', 'ru', 'zh')
+GUIDE_LANGUAGES = ('en', 'es', 'fr', 'ru', 'zh')
 # The interface's languages: the browser's choice among them, as the client makes it
 UI_LANGUAGES = ('en', 'fr', 'de', 'es', 'it', 'pt', 'uk', 'ru', 'zh', 'ja')
 _CHAPTER = re.compile(r'^[A-Za-z][A-Za-z0-9-]{0,63}$')

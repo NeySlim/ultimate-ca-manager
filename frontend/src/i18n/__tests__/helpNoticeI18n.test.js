@@ -1,4 +1,4 @@
-/** The "help is English, French, Russian and Chinese" notice exists, translated, in every locale. */
+/** The "help is English, French, Spanish, Russian and Chinese" notice exists, translated, in every locale. */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -11,7 +11,7 @@ const load = (c) => JSON.parse(readFileSync(join(dir, '..', 'locales', `${c}.jso
 describe('help.englishOnlyNotice', () => {
   const en = load('en').help.englishOnlyNotice
   it('is the agreed English sentence', () => {
-    expect(en).toBe('Help is available in English, French, Russian and Chinese.')
+    expect(en).toBe('Help is available in English, French, Spanish, Russian and Chinese.')
   })
   it.each(codes.filter((c) => c !== 'en'))('is translated in %s', (c) => {
     const v = load(c).help.englishOnlyNotice

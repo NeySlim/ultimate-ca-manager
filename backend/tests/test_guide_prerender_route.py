@@ -7,8 +7,10 @@ unknown chapter, a query or a build without the drawn pages: index.html as befor
 """
 import json
 import os
+import re
 import uuid
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
@@ -22,7 +24,7 @@ PG_URL = os.getenv('UCM_TEST_APP_PG_URL') or os.getenv('UCM_TEST_PG_URL')
 PASSWORD = 'Guide-Reader-Pass-1!'
 INDEX = ('<!doctype html>\n<html lang="en">\n  <head>\n    <title>UCM - Ultimate Certificate Manager</title>\n'
          '  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>\n')
-LANGS = ('en', 'fr', 'ru', 'zh')
+LANGS = ('en', 'es', 'fr', 'ru', 'zh')
 
 
 def _drawn(lang, chapter):
@@ -152,6 +154,7 @@ def test_an_account_language_without_a_help_reads_english(app, dist, reader, cho
     ('ru-RU,ru;q=0.9,en;q=0.5', 'ru'),
     ('zh-CN', 'zh'),
     ('fr-FR,fr;q=0.9', 'fr'),
+    ('es-ES,es;q=0.9', 'es'),
     # The client reads German, as the browser asks: English help, not the French further down the list
     ('de-DE,de;q=0.9,fr;q=0.4', 'en'),
     ('de-DE,de;q=0.9', 'en'),
@@ -340,3 +343,10 @@ def test_a_database_session_gets_the_chapter_on_any_node(nodes, dist):
 def _username(application, user_id):
     with application.app_context():
         return db.session.get(User, user_id).username
+
+
+def test_the_server_serves_the_languages_the_build_draws():
+    # prerender-guide.js draws English and HELP_TRANSLATED_LANGUAGES; a language missing here reads English
+    source = (Path(__file__).resolve().parents[2] / 'frontend/src/data/helpLanguages.js').read_text(encoding='utf-8')
+    drawn = re.search(r'HELP_TRANSLATED_LANGUAGES = \[([^\]]*)\]', source).group(1)
+    assert set(ui_routes.GUIDE_LANGUAGES) == {'en', *re.findall(r"'(\w+)'", drawn)}

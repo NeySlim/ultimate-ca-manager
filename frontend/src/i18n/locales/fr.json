@@ -2944,7 +2944,7 @@
     "grant": "{{action}} : {{resource}}"
   },
   "help": {
-    "englishOnlyNotice": "L’aide est disponible en anglais, en français, en russe et en chinois.",
+    "englishOnlyNotice": "L’aide est disponible en anglais, en français, en espagnol, en russe et en chinois.",
     "aboutCertificates": "À propos des certificats",
     "exportFormats": "Formats d’export",
     "aboutCAs": "À propos des autorités de certification",

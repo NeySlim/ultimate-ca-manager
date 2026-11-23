@@ -5012,7 +5012,7 @@
     "bindingLeftBehind": "Eine Erneuerung hat {{name}} auf dem vorherigen Zertifikat belassen"
   },
   "help": {
-    "englishOnlyNotice": "Die Hilfe ist auf Englisch, Französisch, Russisch und Chinesisch verfügbar.",
+    "englishOnlyNotice": "Die Hilfe ist auf Englisch, Französisch, Spanisch, Russisch und Chinesisch verfügbar.",
     "aboutCertificates": "Über Zertifikate",
     "exportFormats": "Exportformate",
     "aboutCAs": "Über Zertifizierungsstellen",

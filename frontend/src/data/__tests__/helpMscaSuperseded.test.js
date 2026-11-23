@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { helpContent } from '../helpContent'
 import { helpGuides } from '../helpGuides'
+import es from '../help/es/msca'
 import fr from '../help/fr/msca'
 import ru from '../help/ru/msca'
 import zh from '../help/zh/msca'
@@ -15,7 +16,7 @@ const msca = (lang) => locales[`../../i18n/locales/${lang}.json`].default.msca
 const LANGS = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 
 const pending = (content) => content.sections.flatMap((s) => s.items || [])
-  .find((i) => /checkStatus|Check status|Vérifier le statut|检查状态|Проверить статус/.test(i.text) && i.text.includes('CSR')).text
+  .find((i) => /checkStatus|Check status|Verificar estado|Vérifier le statut|检查状态|Проверить статус/.test(i.text) && i.text.includes('CSR')).text
 
 describe('the closed request is described by what the screen shows', () => {
   it('has no status label no screen displays', () => {
@@ -31,6 +32,7 @@ describe('the closed request is described by what the screen shows', () => {
 
   it.each([
     ['en', helpContent.msca, helpGuides.msca.content],
+    ['es', es.helpContent, es.helpGuides.content],
     ['fr', fr.helpContent, fr.helpGuides.content],
     ['ru', ru.helpContent, ru.helpGuides.content],
     ['zh', zh.helpContent, zh.helpGuides.content],

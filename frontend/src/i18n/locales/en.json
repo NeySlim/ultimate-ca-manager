@@ -5012,7 +5012,7 @@
     "bindingLeftBehind": "A renewal left {{name}} on the previous certificate"
   },
   "help": {
-    "englishOnlyNotice": "Help is available in English, French, Russian and Chinese.",
+    "englishOnlyNotice": "Help is available in English, French, Spanish, Russian and Chinese.",
     "aboutCertificates": "About Certificates",
     "exportFormats": "Export Formats",
     "aboutCAs": "About Certificate Authorities",

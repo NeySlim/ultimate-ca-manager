@@ -5012,7 +5012,7 @@
     "bindingLeftBehind": "Una renovación dejó {{name}} en el certificado anterior"
   },
   "help": {
-    "englishOnlyNotice": "La ayuda está disponible en inglés, francés, ruso y chino.",
+    "englishOnlyNotice": "La ayuda está disponible en inglés, francés, español, ruso y chino.",
     "aboutCertificates": "Acerca de certificados",
     "exportFormats": "Formatos de exportación",
     "aboutCAs": "Acerca de autoridades de certificación",
