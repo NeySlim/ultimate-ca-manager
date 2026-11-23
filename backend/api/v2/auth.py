@@ -107,17 +107,22 @@ def lock():
 @require_auth(session_only=True)
 def _lock_signed_in():
     from flask import g
-    from auth.session_lock import lock_session
+    import auth.session_lock as session_lock
     data = request.get_json(silent=True) or {}
     reason = 'inactivity' if isinstance(data, dict) and data.get('reason') == 'idle' else 'manual'
     username = session.get('username') or g.current_user.username
+    session_lock.lock_session(reason)
+    # 200 only once the store holds the lock: a record gone or a store held answers 409
+    cause = session_lock.store_lock()
+    if cause is not None:
+        logger.warning("Session lock of %s not stored (%s)", username, cause)
+        return session_lock.lock_not_stored(cause)
     try:
         from services.audit_service import AuditService
         AuditService.log_auth('session_locked', username=username, user_id=g.user_id,
                               details=f'Session locked by {username} ({reason})')
     except Exception as e:
         logger.warning(f"Non-blocking: failed to audit-log the lock of {username}: {e}", exc_info=True)
-    lock_session(reason)
     # Its open sockets close now, on every node; the handshake refuses a locked session
     from auth.session_start import close_session_sockets
     close_session_sockets(getattr(session, 'sid', None), username)

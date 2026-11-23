@@ -25,9 +25,12 @@ class GuardedRedisSessionInterface(KeepsRemovedRecordsGone, RedisSessionInterfac
         return bool(self.client.delete(store_id))
 
     def _upsert_session(self, session_lifetime, session, store_id):
-        if not self._opened_from_store(session):
+        moved = getattr(session, 'rotated_from', None)
+        if not moved and not self._opened_from_store(session):
             return super()._upsert_session(session_lifetime, session, store_id)
         ttl = total_seconds(session_lifetime)
+        if moved:
+            return self._move(session, moved, store_id, ttl)
         if carries_lock(session):
             # SET XX: one atomic write that never recreates a key removed meanwhile
             written = self.client.set(name=store_id, value=self.serializer.encode(session),
@@ -55,4 +58,29 @@ class GuardedRedisSessionInterface(KeepsRemovedRecordsGone, RedisSessionInterfac
                     continue
                 finally:
                     pipe.reset()
+        session.store_refused = 'busy'
         logger.warning("Session not saved: its record kept changing under the save")
+
+    def _move(self, session, old_id, store_id, ttl):
+        """The old key is watched while it is read: a lock stored in between fails the
+        transaction, is read again and moves too; a key removed meanwhile is not written back."""
+        with self.client.pipeline() as pipe:
+            for _attempt in range(LOCK_MERGE_ATTEMPTS):
+                try:
+                    pipe.watch(old_id)
+                    stored = pipe.get(old_id)
+                    if stored is None:
+                        session.record_gone = True
+                        return
+                    keep_stored_lock(session, self.serializer.decode(stored))
+                    pipe.multi()
+                    pipe.set(name=store_id, value=self.serializer.encode(session), ex=ttl)
+                    pipe.delete(old_id)
+                    pipe.execute()
+                    return
+                except WatchError:
+                    continue
+                finally:
+                    pipe.reset()
+        session.store_refused = 'busy'
+        logger.warning("Session not saved: its record kept changing under the move")

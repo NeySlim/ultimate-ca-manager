@@ -6,14 +6,17 @@ from flask import current_app, g, session
 logger = logging.getLogger(__name__)
 
 
-def _new_identifier():
+def _new_identifier(keep_lock=False):
     """Drop the stored session and give this one a fresh identifier (RFC 6265 §8.4).
+    ``keep_lock``: the record moves to it at the save instead, a lock stored meanwhile with it.
 
     Flask-Session's regenerate() skips an empty session: call it once a key is set.
     """
-    regenerate = getattr(current_app.session_interface, 'regenerate', None)
-    if regenerate is not None:
-        regenerate(session)
+    interface = current_app.session_interface
+    renew = getattr(interface, 'rotate' if keep_lock else 'regenerate', None) or getattr(
+        interface, 'regenerate', None)
+    if renew is not None:
+        renew(session)
 
 
 # The account's creation time: an id handed out again (SQLite reuses the last
@@ -52,7 +55,7 @@ def keep_current_session(user) -> bool:
     if replaced is None or session.get('session_version', 0) != replaced:
         return False
     session['session_version'] = new
-    _new_identifier()
+    _new_identifier(keep_lock=True)
     return True
 
 
@@ -106,7 +109,8 @@ def sessions_closed_by(user):
     if replaced is None:
         return 0
     from utils.session_census import count_sessions
-    return count_sessions(user, replaced)
+    # The record this session leaves goes at the save: it is not another session
+    return count_sessions(user, replaced, skip=getattr(session, 'rotated_from', None))
 
 
 def closed_sessions_note(count):

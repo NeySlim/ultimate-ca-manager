@@ -121,7 +121,8 @@ def carries_lock(session):
 class KeepsRemovedRecordsGone:
     """A session opened from a stored record is saved only while that record exists:
     a renewal or revocation served meanwhile is never undone, and no cookie names the
-    removed identifier. A lock stored meanwhile is kept (keep_stored_lock)."""
+    removed identifier. A lock stored meanwhile is kept (keep_stored_lock), also by a
+    session that moves to a new identifier (rotate)."""
 
     def open_session(self, app, request):
         opened = super().open_session(app, request)
@@ -139,10 +140,50 @@ class KeepsRemovedRecordsGone:
         stored = getattr(session, 'stored_sid', None)
         return stored is not None and stored == getattr(session, 'sid', None)
 
+    @staticmethod
+    def _refused(session):
+        return getattr(session, 'record_gone', False) or getattr(session, 'store_refused', None)
+
+    def rotate(self, session):
+        """A new identifier for a session that stays (RFC 6265 §8.4). Its stored record moves
+        to it at the save, under the store's guard: a lock stored meanwhile moves with it, and
+        a record removed meanwhile is not written back."""
+        if not session:
+            return
+        if not getattr(session, 'rotated_from', None):
+            if not self._opened_from_store(session):
+                return self.regenerate(session)
+            session.rotated_from = self._get_store_id(session.sid)
+        session.sid = self._generate_sid(self.sid_length)
+        session.modified = True
+
+    def write_now(self, app, session):
+        """Writes the session at once, guarded as its save: None once stored, else 'gone' (its
+        record was removed or moved meanwhile) or 'busy' (the store stayed held). A refusal
+        stands for the rest of the request: its save writes nothing and sends no cookie."""
+        if not self._opened_from_store(session):
+            session.record_gone = True
+        else:
+            self._upsert_session(app.permanent_session_lifetime, session,
+                                 self._get_store_id(session.sid))
+        if getattr(session, 'record_gone', False):
+            return 'gone'
+        return getattr(session, 'store_refused', None)
+
     def should_set_cookie(self, app, session):
-        return not getattr(session, 'record_gone', False) and super().should_set_cookie(app, session)
+        return not self._refused(session) and super().should_set_cookie(app, session)
 
     def save_session(self, app, session, response):
+        if self._refused(session):
+            return
+        moved = getattr(session, 'rotated_from', None)
+        if moved and not session and session.modified:
+            # Emptied after its rotation: the record it would have moved goes instead
+            self._remove_if_present(moved)
+            response.delete_cookie(key=self.get_cookie_name(app), domain=self.get_cookie_domain(app),
+                                   path=self.get_cookie_path(app))
+            response.vary.add('Cookie')
+            return
         if not (not session and session.modified and self._opened_from_store(session)):
             return super().save_session(app, session, response)
         if session.accessed:
@@ -180,13 +221,20 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
             super()._delete_session(store_id)
 
     def _upsert_session(self, session_lifetime, session, store_id):
-        if not self._opened_from_store(session):
+        moved = getattr(session, 'rotated_from', None)
+        if not moved and not self._opened_from_store(session):
             return super()._upsert_session(session_lifetime, session, store_id)
-        # A lock is written exclusively, so no save reads the record before it and writes after
-        with session_files_lock(self.cache._path, carries_lock(session), self.lock_wait) as state:
+        # A lock and a move are written exclusively, so no save reads the record before
+        # them and writes after
+        exclusive = bool(moved) or carries_lock(session)
+        with session_files_lock(self.cache._path, exclusive, self.lock_wait) as state:
             if state == BUSY:
                 # A removal holds the store: writing without the lock could undo it
                 logger.warning("Session not saved: the session store stayed locked")
+                session.store_refused = 'busy'
+                return
+            if moved:
+                self._move(session_lifetime, session, moved, store_id)
                 return
             stored = self.cache.get(store_id)
             if stored is None:
@@ -194,6 +242,16 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
                 return
             keep_stored_lock(session, stored)
             super()._upsert_session(session_lifetime, session, store_id)
+
+    def _move(self, session_lifetime, session, old_id, store_id):
+        # Under the exclusive lock: the guarded removal would wait for it
+        stored = self.cache.get(old_id)
+        if stored is None:
+            session.record_gone = True
+            return
+        keep_stored_lock(session, stored)
+        FileSystemSessionInterface._upsert_session(self, session_lifetime, session, store_id)
+        FileSystemSessionInterface._delete_session(self, old_id)
 
 
 class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInterface):
@@ -328,15 +386,43 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
             s.commit()
             if updated:
                 return
+        session.store_refused = 'busy'
         logger.warning("Session not saved: its record kept changing under the save")
+
+    def _move_keeping_lock(self, s, session, old_id, store_id, expiry):
+        """The old row is deleted only as it was read, and the new one inserted in the same
+        transaction: a lock stored in between is read again and moves too."""
+        model = self.sql_session_model
+        for _attempt in range(LOCK_MERGE_ATTEMPTS):
+            row = s.query(model.data).filter_by(session_id=old_id).first()
+            s.commit()  # the read ends its transaction: SQLite never upgrades a stale reader
+            if row is None:
+                session.record_gone = True
+                return
+            keep_stored_lock(session, self.serializer.decode(want_bytes(row.data)))
+            deleted = (s.query(model).filter(model.session_id == old_id, model.data == row.data)
+                       .delete(synchronize_session=False))
+            if not deleted:
+                s.rollback()
+                continue
+            s.add(model(session_id=store_id, data=self.serializer.encode(session), expiry=expiry))
+            s.commit()
+            return
+        session.store_refused = 'busy'
+        logger.warning("Session not saved: its record kept changing under the move")
 
     @retry_query()
     def _upsert_session(self, session_lifetime, session, store_id):
         if self._writes_paused():
+            session.store_refused = 'busy'
             return
         model = self.sql_session_model
         expiry = datetime.utcnow() + session_lifetime
         with self._store() as s:
+            moved = getattr(session, 'rotated_from', None)
+            if moved:
+                self._move_keeping_lock(s, session, moved, store_id, expiry)
+                return
             if self._opened_from_store(session):
                 self._update_keeping_lock(s, session, store_id, expiry)
                 return
