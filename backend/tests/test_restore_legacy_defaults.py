@@ -1,10 +1,38 @@
 """An archive written before a column existed implies the value its version
 had, not today's default: deployment full chains carried the root before 089."""
+import io
+
+import pytest
+
 from services.backup.restore.apply import legacy_defaults
 
 from tests.fresh_app import fresh_app_fixtures
+from tests.job_dispatch_support import DeferredDispatch
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
+
+@pytest.fixture
+def restore_to_the_end(app, auth_client, monkeypatch):
+    """Restore ``blob``, return the job's final status code. Asked asynchronously and run once
+    the route has answered: no dependence on the route's bounded wait, no job left behind."""
+    from services.jobs import restore as restore_job
+    from services.jobs import runner
+    from tests.test_backup_hostile_corpus import PASSWORD, RESTORE_URL
+    deferred = DeferredDispatch(app, monkeypatch)
+
+    def restore(blob):
+        r = auth_client.post(RESTORE_URL, headers={'Prefer': 'respond-async'},
+                             data={'password': PASSWORD, 'file': (io.BytesIO(blob), 'legacy.ucmbkp')},
+                             content_type='multipart/form-data')
+        assert r.status_code == 202, r.data
+        assert runner.join_local(r.headers['Location'].rsplit('/', 1)[1], 300)
+        shown = auth_client.get(r.headers['Location']).get_json()['data']
+        assert shown['state'] == 'succeeded', shown
+        return shown['result']['code']
+    yield restore
+    deferred.conclude_leftovers()
+    restore_job.remove_state()
 
 
 def test_a_binding_without_the_column_keeps_its_root():
@@ -19,12 +47,12 @@ def test_other_sections_have_nothing_implied():
     assert legacy_defaults('users', {}) == {}
 
 
-def test_a_pre_089_binding_comes_back_with_its_root(app, auth_client, create_cert):
+def test_a_pre_089_binding_comes_back_with_its_root(app, auth_client, create_cert, restore_to_the_end):
     """A real archive of this server, with the column forgotten as an older version would."""
     from models import db, DeployBinding
     from models.deploy import DeployTarget
     from security.encryption import encrypt_text
-    from tests.test_backup_hostile_corpus import _forged, _restore
+    from tests.test_backup_hostile_corpus import _forged
     cert = create_cert()
     with app.app_context():
         target = DeployTarget(name='legacy-target', host='legacy.example.test',
@@ -40,18 +68,18 @@ def test_a_pre_089_binding_comes_back_with_its_root(app, auth_client, create_cer
                 del row['include_root']
         blob = _forged(('certificate_authorities', 'certificates', 'deploy_targets', 'deploy_bindings'),
                        mutate=forget_the_column)
-    assert _restore(auth_client, blob).status_code == 200
+    assert restore_to_the_end(blob) == 200
     with app.app_context():
         assert DeployBinding.query.filter_by(certificate_id=cert['id']).one().include_root is True
 
 
 def test_a_pre_091_binding_inherits_its_archived_target_reload_command(
-        app, auth_client, create_cert):
+        app, auth_client, create_cert, restore_to_the_end):
     """Migration 091 cannot touch binding rows inserted later by restore."""
     from models import db, DeployBinding
     from models.deploy import DeployTarget
     from security.encryption import encrypt_text
-    from tests.test_backup_hostile_corpus import _forged, _restore
+    from tests.test_backup_hostile_corpus import _forged
     cert = create_cert()
     with app.app_context():
         target = DeployTarget(
@@ -72,18 +100,18 @@ def test_a_pre_091_binding_inherits_its_archived_target_reload_command(
         blob = _forged(
             ('certificate_authorities', 'certificates', 'deploy_targets',
              'deploy_bindings'), mutate=forget_binding_command)
-    assert _restore(auth_client, blob).status_code == 200
+    assert restore_to_the_end(blob) == 200
     with app.app_context():
         restored = DeployBinding.query.filter_by(certificate_id=cert['id']).one()
         assert restored.reload_command == 'systemctl reload nginx'
 
 
-def test_a_pre_092_intune_profile_gets_a_shared_app_registration(app, auth_client, create_ca):
+def test_a_pre_092_intune_profile_gets_a_shared_app_registration(app, auth_client, create_ca, restore_to_the_end):
     """An archive from before 092 carries the Entra credentials on the profile."""
     from models import db
     from models.scep import IntuneApp, ScepProfile
     from services.backup.export_generic import REFERENCE_SUFFIX
-    from tests.test_backup_hostile_corpus import _forged, _restore
+    from tests.test_backup_hostile_corpus import _forged
     from utils.encryption import is_encrypted
     ca = create_ca(cn='Legacy Intune Archive CA')
     with app.app_context():
@@ -114,8 +142,7 @@ def test_a_pre_092_intune_profile_gets_a_shared_app_registration(app, auth_clien
         IntuneApp.query.filter_by(name='legacy-092-app').delete()
         db.session.commit()
 
-    r = _restore(auth_client, blob)
-    assert r.status_code == 200, r.data
+    assert restore_to_the_end(blob) == 200
     with app.app_context():
         profile = ScepProfile.query.filter_by(name='legacy-092-profile').one()
         registration = profile.intune_app
@@ -127,13 +154,13 @@ def test_a_pre_092_intune_profile_gets_a_shared_app_registration(app, auth_clien
                 profile.intune_client_secret) == (None, None, None)
 
 
-def test_pre_092_profiles_on_different_secrets_get_separate_apps(app, auth_client, create_ca):
+def test_pre_092_profiles_on_different_secrets_get_separate_apps(app, auth_client, create_ca, restore_to_the_end):
     """Two profiles of one tenant, one on the old secret and one on the new:
     both keep enrolling after the restore."""
     from models import db
     from models.scep import IntuneApp, ScepProfile
     from services.backup.export_generic import REFERENCE_SUFFIX
-    from tests.test_backup_hostile_corpus import _forged, _restore
+    from tests.test_backup_hostile_corpus import _forged
     ca = create_ca(cn='Legacy Intune Two Secrets CA')
     secrets = {'legacy-two-a': 'old-secret', 'legacy-two-b': 'new-secret'}
     with app.app_context():
@@ -163,7 +190,7 @@ def test_pre_092_profiles_on_different_secrets_get_separate_apps(app, auth_clien
         IntuneApp.query.filter_by(name='legacy-two-app').delete()
         db.session.commit()
 
-    assert _restore(auth_client, blob).status_code == 200
+    assert restore_to_the_end(blob) == 200
     with app.app_context():
         seen = {}
         for name, secret in secrets.items():
