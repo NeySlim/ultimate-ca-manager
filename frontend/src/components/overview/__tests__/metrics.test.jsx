@@ -66,9 +66,9 @@ describe('figures strip', () => {
     // Issued over the window, signed as a gain, and the certificates still usable
     await waitFor(() => expect(metric('certificates').querySelector('.delta')).not.toBeNull())
     expect(metric('certificates').querySelector('.delta').dataset.delta).toBe('8')
-    expect(metric('certificates').querySelector('small').textContent).toBe('+\u00a08overview.metrics.issuedSub:30\u00a0· overview.metrics.active:211')
-    // The gap held to the word after it: it never ends a narrow line alone
-    expect(metric('certificates').querySelector('small .keep-with')).toHaveTextContent('+ 8overview.metrics.issuedSub:30')
+    expect(metric('certificates').querySelector('small').textContent).toBe('+\u00a08\u00a0overview.metrics.issuedSub:30\u00a0· overview.metrics.active:211')
+    // The gap held to the word after it by a no-break space: it never ends a narrow line alone
+    expect(metric('certificates').querySelector('small .keep-with').textContent).toBe('+\u00a08\u00a0overview.metrics.issuedSub:30')
     expect(metric('certificates').querySelector('svg.spark-trend').getAttribute('aria-label')).toBe('overview.metrics.issuedAlt:3,2')
     expect(value('queue').textContent).toBe('20')
     expect(value('expiring').textContent).toBe('11')

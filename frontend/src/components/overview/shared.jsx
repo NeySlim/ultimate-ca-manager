@@ -214,8 +214,9 @@ export function OverviewCard({ id, count, sub, tools, state, route, empty, missi
   )
 }
 
-/** A lead (a gap, a pill) kept on the line of the text's first word: it never ends a line alone. */
+/** A lead (a gap, a pill) kept on the line of the text's first word, a no-break space between: it never ends a line alone. */
 export function KeepWith({ lead, text }) {
+  const gap = /^[\s\u00a0]/.test(text) ? '' : NB
   const cut = text.indexOf(' ')
-  return <><span className="keep-with">{lead}{cut < 0 ? text : text.slice(0, cut)}</span>{cut < 0 ? '' : text.slice(cut)}</>
+  return <><span className="keep-with">{lead}{gap}{cut < 0 ? text : text.slice(0, cut)}</span>{cut < 0 ? '' : text.slice(cut)}</>
 }
