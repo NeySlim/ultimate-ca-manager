@@ -2950,7 +2950,7 @@
       "published": "Publicada",
       "publication": "Publicação",
       "crlNumber": "Número da CRL",
-      "nextUpdate": "Próxima atualização"
+      "nextUpdate": "Vencimento"
     },
     "tabs": {
       "publication": "Publicação"

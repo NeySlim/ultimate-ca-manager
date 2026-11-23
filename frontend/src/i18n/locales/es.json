@@ -905,7 +905,7 @@
     "selectedOnPage_other": "{{count}} certificados seleccionados en esta página",
     "exportSelected": "Exportar",
     "complianceColumn": "Conformidad",
-    "creationColumn": "Fecha de creación",
+    "creationColumn": "Creación",
     "archivedMark": "Archivado: sustituido por una renovación o una reinscripción, conservado como historial",
     "sourceAcmeRenewal": "Renovación ACME",
     "sourceIssued": "Emitido",
@@ -2950,7 +2950,7 @@
       "published": "Publicada",
       "publication": "Publicación",
       "crlNumber": "Número de CRL",
-      "nextUpdate": "Próxima actualización"
+      "nextUpdate": "Vencimiento"
     },
     "tabs": {
       "publication": "Publicación"

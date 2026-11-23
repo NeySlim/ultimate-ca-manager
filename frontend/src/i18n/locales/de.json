@@ -6509,7 +6509,7 @@
     "defaultEndpoint": "Standardendpunkt",
     "columns": {
       "auth": "Authentifizierung",
-      "authShort": "Authentifizierung"
+      "authShort": "Authentisierung"
     },
     "auth": {
       "cert": "Clientzertifikat",

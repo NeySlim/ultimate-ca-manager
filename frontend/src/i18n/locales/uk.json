@@ -3068,7 +3068,7 @@
       "published": "Опубліковано",
       "publication": "Публікація",
       "crlNumber": "Номер CRL",
-      "nextUpdate": "Наступне оновлення"
+      "nextUpdate": "Термін оновлення"
     },
     "tabs": {
       "publication": "Публікація"
