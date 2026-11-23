@@ -16,8 +16,12 @@ export const viewport = () => {
   return { w: window.innerWidth, h: Math.max(0, window.innerHeight - bar) }
 }
 
-/** The stage's side margin at a viewport width, as the mockup sets it (.stage padding). */
+/** The stage's margin at a viewport width, as the mockup sets it (.stage padding). */
 export const stageMargin = (width) => (width >= 1800 ? 34 : width <= 1000 ? 18 : 24)
+
+/** Past 1920 px the page holds 1852 px, centred (adjust.css --page-max): its side margin is what the measure leaves. */
+export const PAGE_MAX = 1852
+export const stageSide = (width) => (width > 1920 ? (width - PAGE_MAX) / 2 : stageMargin(width))
 
 /** The work area: the stage between the masthead and the status bar, the whole viewport without a shell. */
 export const workArea = () => {
@@ -30,7 +34,8 @@ export const workArea = () => {
 /** A maximized window: the work area inside the stage's margins, the shell left uncovered. */
 export function maxRect(area, width) {
   const m = stageMargin(width)
-  return { x: area.x + m, y: area.y + m, w: Math.max(0, area.w - 2 * m), h: Math.max(0, area.h - 2 * m) }
+  const s = stageSide(width)
+  return { x: area.x + s, y: area.y + m, w: Math.max(0, area.w - 2 * s), h: Math.max(0, area.h - 2 * m) }
 }
 
 /** The rect moved and shrunk to fit the viewport: inside it whole, as large as it fits, never under the minimum. */
@@ -40,10 +45,11 @@ export function clampRect(rect, view) {
   return { x: clamp(Math.round(rect.x), 0, view.w - w), y: clamp(Math.round(rect.y), 0, view.h - h), w, h }
 }
 
-/** The n-th window opened: down and to the right of the one before, back to the top after eight. */
+/** The n-th window opened: down and to the right of the one before, back to the top after eight; moved with a centred page. */
 export function cascadeRect(n, size, view) {
   const step = (n % 8) * CASCADE
-  return clampRect({ x: ORIGIN.x + step, y: ORIGIN.y + step, w: size.w, h: size.h }, view)
+  const shift = stageSide(view.w) - stageMargin(view.w)
+  return clampRect({ x: ORIGIN.x + shift + step, y: ORIGIN.y + step, w: size.w, h: size.h }, view)
 }
 
 /** A drag of the edge (n, s, e, w or a corner such as 'se') by dx, dy: the opposite edges stay put. */

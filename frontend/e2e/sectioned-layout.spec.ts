@@ -1,12 +1,13 @@
 import { test, expect } from './support/fixtures'
 
 // Real geometry of the sectioned pages at 1600 px, as the Atelier form with a table of
-// contents draws it: 200 px contents, 24 px gap, frames to the right gutter
+// contents draws it: 200 px contents, 24 px gap, frames of 960 px at most (adjust.css --form-max)
 const EPS = 1
 const W = 1600
 const H = 1000
 const GUTTER = 24
 const TOC = 200
+const FORM = 960
 type Box = { x: number; y: number; width: number; height: number }
 const box = async (locator): Promise<Box> => {
   const b = await locator.boundingBox()
@@ -24,7 +25,7 @@ const PAGES = [
 ]
 
 for (const { path, toc, first } of PAGES) {
-  test(`${path} puts its contents left of full-width frames`, async ({ page, api }) => {
+  test(`${path} puts its contents left of frames held to the form measure`, async ({ page, api }) => {
     await page.goto(path)
     const nav = page.getByRole('navigation', { name: toc, exact: true })
     const frame = page.getByRole('region', { name: first, exact: true })
@@ -34,7 +35,7 @@ for (const { path, toc, first } of PAGES) {
     expect(Math.abs(n.x - GUTTER)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(n.width - TOC)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(f.x - (GUTTER + TOC + GUTTER))).toBeLessThanOrEqual(EPS)
-    expect(Math.abs(f.x + f.width - (W - GUTTER))).toBeLessThanOrEqual(EPS)
+    expect(Math.abs(f.width - FORM)).toBeLessThanOrEqual(EPS)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
 }
@@ -84,9 +85,9 @@ test('a short field takes one column of four, a button the width of its text', a
   await expect(general).toBeVisible()
   const port = await box(general.getByLabel('ACME public port'))
   const base = await box(general.getByLabel('Public URL', { exact: true }))
-  // 1286 px of fields: 4 columns of 309.5 (short), the public URL on the whole line, 16 px gaps
-  expect(Math.abs(port.width - 309.5)).toBeLessThanOrEqual(2)
-  expect(Math.abs(base.width - 1286)).toBeLessThanOrEqual(2)
+  // 918 px of fields in a 960 px card: 4 columns of 217.5 (short), the public URL on the whole line, 16 px gaps
+  expect(Math.abs(port.width - 217.5)).toBeLessThanOrEqual(2)
+  expect(Math.abs(base.width - 918)).toBeLessThanOrEqual(2)
 
   await page.goto('/tools')
   const run = page.getByRole('button', { name: 'Check SSL', exact: true })

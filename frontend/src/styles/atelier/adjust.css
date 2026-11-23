@@ -312,3 +312,13 @@
 :root[data-theme|=aurore] .atl .code-value{background:color-mix(in srgb,var(--accent) 9%,var(--panel));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent);border-radius:6px}
 :root[data-theme|=aurore] .atl .btn-sm{border-radius:6px;border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
 :root[data-theme|=aurore] .atl .btn-sm:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 18%,transparent)}
+
+/* The measures of the page (MAXW): past a 1920 px window the bars' contents and the stage keep the 1920 px layout, centred,
+   the bars' grounds edge to edge; the settings' cards (not the guide's) 960 px beside their contents, a section of a wide
+   table (.settings-wide) keeping the whole column; their help 62ch. */
+:root .atl{--page-max:1852px;--form-max:960px;--measure:62ch}
+@media(min-width:1921px){:root .atl :is(.masthead,.statusbar,.stage){padding-left:calc((100% - var(--page-max))/2);padding-right:calc((100% - var(--page-max))/2)}}
+@media(min-width:801px){:root .atl .settings-layout:not(.guide-layout) :is(.settings-main,.settings-form)>:not(.settings-form,.settings-wide){max-width:var(--form-max)}}
+:root .atl .settings-body :is(small,p:not(.field-error)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
+/* A help held to the measure in a centred empty block stays centred under its title. */
+:root .atl .settings-body .empty p{margin-left:auto;margin-right:auto}

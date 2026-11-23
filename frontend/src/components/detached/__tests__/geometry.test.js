@@ -46,4 +46,14 @@ describe('detached window geometry', () => {
     expect(maxRect({ x: 0, y: 62, w: 1000, h: 613 }, 1000)).toEqual({ x: 18, y: 80, w: 964, h: 577 })
     expect(maxRect({ x: 0, y: 62, w: 1920, h: 993 }, 1920)).toEqual({ x: 34, y: 96, w: 1852, h: 925 })
   })
+
+  it('past 1920 px, maximizes and opens inside the page held at 1852 px and centred', () => {
+    // The side margins are what the page measure leaves; above and below, the mockup's 34 px
+    expect(maxRect({ x: 0, y: 62, w: 3440, h: 1353 }, 3440)).toEqual({ x: 794, y: 96, w: 1852, h: 1285 })
+    expect(maxRect({ x: 0, y: 62, w: 2560, h: 1353 }, 2560)).toEqual({ x: 354, y: 96, w: 1852, h: 1285 })
+    // A window opens where it opens on a 1920 px page, moved with the page
+    const at1920 = cascadeRect(0, { w: 600, h: 500 }, { w: 1920, h: 1000 })
+    expect(cascadeRect(0, { w: 600, h: 500 }, { w: 3440, h: 1000 })).toEqual({ ...at1920, x: at1920.x + 760 })
+    expect(cascadeRect(0, { w: 600, h: 500 }, { w: 1880, h: 1000 })).toEqual(cascadeRect(0, { w: 600, h: 500 }, { w: 1440, h: 1000 }))
+  })
 })
