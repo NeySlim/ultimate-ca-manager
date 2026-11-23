@@ -2,6 +2,7 @@
  * A page's quick help (helpContent.js) in the mockup's .help-grid.
  */
 import { useTranslation } from 'react-i18next'
+import { Facts } from '../atelier/Detail'
 import { highlightTree, markText } from './highlight'
 
 // An item's text is in its props, out of the tree's reach: it marks its own
@@ -15,6 +16,8 @@ function Item({ item, highlight }) {
 /** highlight: folded search terms marked in the rendered text. */
 export function QuickHelp({ content, highlight }) {
   const { t } = useTranslation()
+  // A definition's term and sentence are props of Facts, out of the tree's reach: marked here
+  const mark = (text) => (highlight?.length && typeof text === 'string' ? markText(text, highlight) : text)
   const grid = (
     <div className="help-grid">
       {content.overview && <section><h3>{t('help.overview')}</h3><p>{content.overview}</p></section>}
@@ -24,7 +27,7 @@ export function QuickHelp({ content, highlight }) {
           {section.content && <p>{section.content}</p>}
           {section.items && <ul>{section.items.map((item, j) => <Item key={j} item={item} highlight={highlight} />)}</ul>}
           {section.definitions && (
-            <dl className="props">{section.definitions.map((d, j) => [<dt key={`t${j}`}>{d.term}</dt>, <dd key={`d${j}`}>{d.description}</dd>])}</dl>
+            <Facts items={section.definitions.map((d, j) => ({ key: j, label: mark(d.term), value: mark(d.description), long: true }))} />
           )}
           {section.example && <pre className="code-preview">{section.example}</pre>}
         </section>

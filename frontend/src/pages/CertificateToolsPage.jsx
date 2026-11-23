@@ -10,7 +10,9 @@ import { useNotification } from '../contexts'
 import { useClipboard } from '../hooks'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
-import { Zone, PageHead, Btn, IconBtn, Pill, Props, RecordList, RecordRow } from '../components/atelier'
+import { Zone, PageHead, Btn, Pill, Facts, RecordList, RecordRow } from '../components/atelier'
+import { copyRow, fact } from '../components/atelier/facts'
+import { digestHex } from '../lib/digestHex'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsTest } from '../components/atelier/SettingsView'
 import { Input, NumberInput, Notice, PemField, SecretInput, Select, Textarea } from '../components/atelier/Form'
 import { useSectionParam } from '../components/atelier/useSectionParam'
@@ -226,14 +228,15 @@ export default function CertificateToolsPage() {
     resetResult()
   }
 
-  const copyable = (value, mono = true) => (value ? (
-    <span className="row-actions">
-      <span className={mono ? 'mono' : undefined}>{value}</span>
-      <IconBtn icon="copy" quiet label={t('common.copy')} onClick={() => copyToClipboard(value)} />
-    </span>
-  ) : '—')
   const listed = (values) => (values?.length ? values.map((v) => String(v).replace('DNS:', '')).join(', ') : null)
-  const shown = (value) => (value === undefined || value === null || value === '' ? '—' : value)
+  const dated = (value) => value && formatDate(value)
+  // A digest in its chip on a long row; a serial in octets (the API writes it in hexadecimal, unpadded)
+  const digest = (label, value) => ({ ...fact(label, value), kind: 'hex', long: true })
+  const serial = (label, value) => {
+    const hex = value ? digestHex(String(value).length % 2 ? `0${value}` : value) : value
+    return { ...fact(label, hex), kind: 'hex', long: Boolean(hex && hex.length > 23) }
+  }
+  const signature = (label, value) => fact(label, value && <span title={t('common.issuerSignatureAlgorithmHint')}>{value}</span>)
 
   const sections = TOOLS.map((tool) => ({ id: tool.id, label: t(tool.labelKey), description: t(tool.descKey), icon: tool.icon }))
   const active = sections.find((section) => section.id === activeTool)
@@ -361,56 +364,56 @@ export default function CertificateToolsPage() {
   const renderSSLResult = (d) => (
     <SettingsGroup legend={t('tools.sslCheckResult')} grid={false}>
       {d.issues?.length > 0 && <Notice tone="bad">{d.issues.join(' · ')}</Notice>}
-      <Props items={[
-        [t('common.commonName'), copyable(d.subject?.commonName, false)],
-        [t('common.issuer'), shown(d.issuer?.commonName || d.issuer?.organizationName)],
-        [t('common.validFrom'), formatDate(d.not_valid_before)],
-        [t('common.validUntil'), formatDate(d.not_valid_after)],
-        [t('tools.daysLeft'), shown(d.days_until_expiry)],
-        [t('common.status'), statusPill(d.status === 'valid', d.status)],
-        [t('tools.tlsVersion'), shown(d.tls_version)],
-        [t('tools.cipher'), shown(d.cipher?.name)],
-        [t('common.keyType'), shown(publicKeyText(d.public_key, t, '-bit'))],
-        [t('common.issuerSignatureShort'), <span title={t('common.issuerSignatureAlgorithmHint')}>{shown(d.signature_algorithm)}</span>],
-        listed(d.extensions?.subject_alt_names) && [t('common.subjectAltNames'), listed(d.extensions.subject_alt_names)],
-        [t('common.sha256'), copyable(d.fingerprints?.sha256)],
+      <Facts items={[
+        copyRow(t('common.commonName'), d.subject?.commonName),
+        fact(t('common.issuer'), d.issuer?.commonName || d.issuer?.organizationName),
+        fact(t('common.validFrom'), dated(d.not_valid_before)),
+        fact(t('common.validUntil'), dated(d.not_valid_after)),
+        fact(t('tools.daysLeft'), d.days_until_expiry),
+        { label: t('common.status'), state: [d.status === 'valid' ? 'good' : 'bad', d.status] },
+        fact(t('tools.tlsVersion'), d.tls_version),
+        fact(t('tools.cipher'), d.cipher?.name),
+        fact(t('common.keyType'), publicKeyText(d.public_key, t, '-bit')),
+        signature(t('common.issuerSignatureShort'), d.signature_algorithm),
+        listed(d.extensions?.subject_alt_names) && { label: t('common.subjectAltNames'), value: listed(d.extensions.subject_alt_names), long: true },
+        digest(t('common.sha256'), d.fingerprints?.sha256),
       ]} />
     </SettingsGroup>
   )
 
   const renderCSRResult = (d) => (
     <SettingsGroup legend={t('common.csrDetails')} grid={false}>
-      <Props items={[
-        [t('common.commonName'), copyable(d.subject?.commonName, false)],
-        [t('common.organization'), shown(d.subject?.organizationName)],
-        [t('common.country'), shown(d.subject?.countryName)],
-        [t('common.state'), shown(d.subject?.stateOrProvinceName)],
-        [t('common.keyType'), shown(publicKeyText(d.public_key, t))],
-        [t('tools.signatureValid'), statusPill(d.is_signature_valid, d.is_signature_valid ? t('common.yes') : t('common.no'))],
-        listed(d.extensions?.subject_alt_names) && [t('tools.requestedSans'), listed(d.extensions.subject_alt_names)],
+      <Facts items={[
+        copyRow(t('common.commonName'), d.subject?.commonName),
+        fact(t('common.organization'), d.subject?.organizationName),
+        fact(t('common.country'), d.subject?.countryName),
+        fact(t('common.state'), d.subject?.stateOrProvinceName),
+        fact(t('common.keyType'), publicKeyText(d.public_key, t)),
+        { label: t('tools.signatureValid'), state: d.is_signature_valid ? ['good', t('common.yes')] : ['bad', t('common.no')] },
+        listed(d.extensions?.subject_alt_names) && { label: t('tools.requestedSans'), value: listed(d.extensions.subject_alt_names), long: true },
       ]} />
     </SettingsGroup>
   )
 
   const renderCertResult = (d) => (
     <SettingsGroup legend={t('common.certificateDetails')} grid={false}>
-      <Props items={[
-        [t('tools.subjectCn'), copyable(d.subject?.commonName, false)],
-        [t('tools.issuerCn'), shown(d.issuer?.commonName)],
-        [t('common.organization'), shown(d.subject?.organizationName)],
-        [t('tools.issuerOrg'), shown(d.issuer?.organizationName)],
-        [t('common.validFrom'), formatDate(d.not_valid_before)],
-        [t('common.validUntil'), formatDate(d.not_valid_after)],
-        [t('tools.daysLeft'), shown(d.days_until_expiry)],
-        [t('common.serialNumber'), copyable(d.serial_number)],
-        [t('tools.version'), shown(d.version)],
-        [t('common.keyType'), shown(publicKeyText(d.public_key, t))],
-        [t('common.issuerSignatureAlgorithm'), <span title={t('common.issuerSignatureAlgorithmHint')}>{shown(d.signature_algorithm)}</span>],
-        listed(d.extensions?.key_usage) && [t('common.keyUsage'), listed(d.extensions.key_usage)],
-        listed(d.extensions?.extended_key_usage) && [t('common.extKeyUsage'), listed(d.extensions.extended_key_usage)],
-        listed(d.extensions?.subject_alt_names) && [t('common.subjectAltNames'), listed(d.extensions.subject_alt_names)],
-        [t('tools.sha1'), copyable(d.fingerprints?.sha1)],
-        [t('tools.sha256'), copyable(d.fingerprints?.sha256)],
+      <Facts items={[
+        copyRow(t('tools.subjectCn'), d.subject?.commonName),
+        fact(t('tools.issuerCn'), d.issuer?.commonName),
+        fact(t('common.organization'), d.subject?.organizationName),
+        fact(t('tools.issuerOrg'), d.issuer?.organizationName),
+        fact(t('common.validFrom'), dated(d.not_valid_before)),
+        fact(t('common.validUntil'), dated(d.not_valid_after)),
+        fact(t('tools.daysLeft'), d.days_until_expiry),
+        serial(t('common.serialNumber'), d.serial_number),
+        fact(t('tools.version'), d.version),
+        fact(t('common.keyType'), publicKeyText(d.public_key, t)),
+        signature(t('common.issuerSignatureAlgorithm'), d.signature_algorithm),
+        listed(d.extensions?.key_usage) && { label: t('common.keyUsage'), value: listed(d.extensions.key_usage), long: true },
+        listed(d.extensions?.extended_key_usage) && { label: t('common.extKeyUsage'), value: listed(d.extensions.extended_key_usage), long: true },
+        listed(d.extensions?.subject_alt_names) && { label: t('common.subjectAltNames'), value: listed(d.extensions.subject_alt_names), long: true },
+        digest(t('tools.sha1'), d.fingerprints?.sha1),
+        digest(t('tools.sha256'), d.fingerprints?.sha256),
       ]} />
     </SettingsGroup>
   )

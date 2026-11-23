@@ -666,14 +666,14 @@ export function IssueCertificateForm({
         <aside className="field-hint" aria-labelledby={id('hint-title')} data-testid="issue-hint">
           <h3 id={id('hint-title')}><Icon name="shield" /> {t(`${P}hintTitle`)}</h3>
           <p>{withName(t, `${P}hintRenew`, certificate?.cn || certificate?.common_name || '')}</p>
-          <dl>
-            <dt>{t(`${P}hintAuthorities`)}</dt><dd>{certificate?.issuer_name || ''}</dd>
-            <dt>{t(`${P}hintAlgorithms`)}</dt><dd>{certificateKeyLabel(certificate, t)}</dd>
-            <dt>{t(`${P}hintValidity`)}</dt><dd>{t(`${P}hintRenewValidity`, { max: num(MAX_DAYS) })}</dd>
-            <dt>{t(`${P}hintSans`)}</dt><dd>{types.length ? types.join(', ') : t(`${P}noneMasc`)}</dd>
-            <dt>{t(`${P}hintCsr`)}</dt><dd>{t(`${P}hintCsrRenew`)}</dd>
-            <dt>{t(`${P}hintHashEku`)}</dt><dd>{[hash, t(`${P}hintRenewKept`)].filter(Boolean).join(' · ')}</dd>
-          </dl>
+          <Facts items={[
+            [t(`${P}hintAuthorities`), certificate?.issuer_name || ''],
+            [t(`${P}hintAlgorithms`), certificateKeyLabel(certificate, t)],
+            [t(`${P}hintValidity`), t(`${P}hintRenewValidity`, { max: num(MAX_DAYS) })],
+            [t(`${P}hintSans`), types.length ? types.join(', ') : t(`${P}noneMasc`)],
+            [t(`${P}hintCsr`), t(`${P}hintCsrRenew`)],
+            [t(`${P}hintHashEku`), [hash, t(`${P}hintRenewKept`)].filter(Boolean).join(' · ')],
+          ]} />
           <p>{t(`${P}hintRenewFooter`)}</p>
         </aside>
       )
@@ -684,29 +684,27 @@ export function IssueCertificateForm({
       <aside className="field-hint" aria-labelledby={id('hint-title')} data-testid="issue-hint">
         <h3 id={id('hint-title')}><Icon name="shield" /> {t(`${P}hintTitle`)}</h3>
         <p>{template ? withName(t, `${P}hintTemplate`, template.name) : t(`${P}hintNoTemplate`)}</p>
-        <dl className="props">
-          <dt>{t(`${P}hintAuthorities`)}</dt>
-          <dd>
-            {signers.length <= 3 ? signers.map(caLabel).join(', ') || t(`${P}noneFem`) : t(`${P}hintCaCount`, { count: signers.length })}
-            {unlisted > 0 && <><br /><span className="muted" data-testid="unlisted-cas">{t(`${P}hintExcluded`, { count: unlisted })}</span></>}
-          </dd>
-          <dt>{t(`${P}hintAlgorithms`)}</dt>
-          <dd data-testid="hint-algorithms">
-            {singleLabels.length ? singleLabels.map((l) => keyLabel(l, t)).join(', ') : t(`${P}hintAlgorithmsNone`)}
-            {pqStandalone && hybridPq.length > 0 && <><br /><span className="muted">{t(`${P}hintPqPairOnly`)}</span></>}
-          </dd>
-          <dt>{t(`${P}hintValidity`)}</dt>
-          <dd>{t(`${P}hintValidityValue`, { days: num(defaultDays), max: num(maxDays) })}</dd>
-          <dt>{t(`${P}hintSans`)}</dt>
-          <dd>{sanTypes.map((s) => SAN_LABEL[s]).join(', ')}
-            {!enforcedSanTypes && templateSanTypes.length > 0 && <span className="muted"> {t(`${P}hintSansSuggested`)}</span>}</dd>
-          {canUseCsr && <><dt>{t(`${P}hintCsr`)}</dt><dd>{t(`${P}hintCsrAccepted`)}</dd></>}
-          <dt>{t(`${P}hintHashEku`)}</dt>
-          <dd>
-            {digest || t(`${P}hintHashCa`)} · {defaultEkus.length ? defaultEkus.map(ekuLabel).join(', ') : t(`${P}ekusNone`)}
-            {allowedDigests && <><br /><span className="muted">{t(`${P}hintDigestsAllowed`, { list: allowedDigests.map((x) => x.toUpperCase().replace(/^SHA(\d)/, 'SHA-$1')).join(', ') })}</span></>}
-          </dd>
-        </dl>
+        <Facts items={[
+          {
+            label: t(`${P}hintAuthorities`),
+            value: signers.length <= 3 ? signers.map(caLabel).join(', ') || t(`${P}noneFem`) : t(`${P}hintCaCount`, { count: signers.length }),
+            sub: unlisted > 0 && <span data-testid="unlisted-cas">{t(`${P}hintExcluded`, { count: unlisted })}</span>,
+          },
+          {
+            label: t(`${P}hintAlgorithms`),
+            value: <span data-testid="hint-algorithms">{singleLabels.length ? singleLabels.map((l) => keyLabel(l, t)).join(', ') : t(`${P}hintAlgorithmsNone`)}</span>,
+            sub: pqStandalone && hybridPq.length > 0 && t(`${P}hintPqPairOnly`),
+          },
+          [t(`${P}hintValidity`), t(`${P}hintValidityValue`, { days: num(defaultDays), max: num(maxDays) })],
+          [t(`${P}hintSans`), <>{sanTypes.map((s) => SAN_LABEL[s]).join(', ')}
+            {!enforcedSanTypes && templateSanTypes.length > 0 && <span className="muted"> {t(`${P}hintSansSuggested`)}</span>}</>],
+          canUseCsr && [t(`${P}hintCsr`), t(`${P}hintCsrAccepted`)],
+          {
+            label: t(`${P}hintHashEku`),
+            value: `${digest || t(`${P}hintHashCa`)} · ${defaultEkus.length ? defaultEkus.map(ekuLabel).join(', ') : t(`${P}ekusNone`)}`,
+            sub: allowedDigests && t(`${P}hintDigestsAllowed`, { list: allowedDigests.map((x) => x.toUpperCase().replace(/^SHA(\d)/, 'SHA-$1')).join(', ') }),
+          },
+        ]} />
         <p>{t(`${P}hintFooter`)}</p>
       </aside>
     )

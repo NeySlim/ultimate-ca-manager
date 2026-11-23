@@ -5,7 +5,7 @@ import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Facts, Emp
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { Notice } from '../protocols/atelierParts'
-import { copyRow } from '../protocols/factRows'
+import { copyRow } from '../../components/atelier/facts'
 import { fetchListing } from '../../lib/fetchAllPages'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { acmeService } from '../../services'

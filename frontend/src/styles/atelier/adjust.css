@@ -221,8 +221,7 @@
 :root .atl :is(.props,.kv){--kv-rule:color-mix(in srgb,var(--line) 70%,var(--panel))}
 :root[data-theme|=aurore] .atl :is(.props,.kv){--kv-rule:color-mix(in srgb,var(--grad-a) 24%,var(--panel))}
 :root .atl .section-title{font-size:13px;font-weight:600;color:var(--text)}
-:root .atl .props,:root .atl :is(.review-summary,.event-detail) .props{grid-template-columns:fit-content(44%) minmax(0,1fr);gap:0;line-height:1.45}
-:root .atl .ca-side .props{grid-template-columns:42% minmax(0,1fr)}
+:root .atl .props{grid-template-columns:fit-content(44%) minmax(0,1fr);gap:0;line-height:1.45}
 :root .atl .props>:is(dt,dd){padding:5px 0;border-top:1px solid var(--kv-rule)}
 :root .atl .props>dt{padding-right:14px;overflow-wrap:break-word}
 :root .atl .props>dt:first-of-type,:root .atl .props>dt:first-of-type+dd{border-top:0;padding-top:0}
@@ -233,10 +232,6 @@
 /* An action written in the value takes its own line; a term's second value stays in the value column, under the first. */
 :root .atl .props>dd .text-link[data-write]{display:block;width:fit-content;margin-top:2px;text-align:left}
 :root .atl .props>dd+dd{grid-column:2;border-top:0;padding-top:0;color:var(--muted);font-size:12px;font-weight:400}
-/* The issue form's hint lists each term over its value. */
-:root .atl .field-hint .props{grid-template-columns:minmax(0,1fr)}
-:root .atl .field-hint .props>dt{padding-right:0}
-:root .atl .field-hint .props>dd{border-top:0;padding-top:0;margin-bottom:0}
 /* A narrow panel: a technical value or a value with its help goes under its term, on the whole width. */
 @container (max-width:380px){
   :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>.mono),:has(+dd>p)){grid-column:1/-1;padding-bottom:0}
@@ -249,6 +244,12 @@
    subgrid so a group's sections share the term column; long values under their term below 380 px, a list below 260 px. */
 :root .atl .kv,:root .atl .kvg{display:grid;grid-template-columns:fit-content(42%) minmax(0,1fr) auto;column-gap:14px}
 :root .atl .kv{margin:0;font-size:12px;line-height:1.45}
+/* The issue form's hint: each term over its value, on the hint's width, the mockup's 14 px around the block and 6 px under a term */
+:root .atl .field-hint .kv{margin:14px 0}
+:root .atl .field-hint .kv>.row{row-gap:6px}
+:root .atl .field-hint .kv>.row>:is(dt,dd.v,dd.absent){grid-column:1/-1}
+/* The mockup's margin of .event-detail .props, on the Facts of a journal entry */
+:root .atl .event-detail>.kv{margin:22px 0}
 :root .atl .kvg>*,:root .atl .kvg>section>*{grid-column:1/-1;min-width:0}
 :root .atl .kvg>section{display:grid;grid-template-columns:subgrid}
 :root .atl .kvg .kv{grid-template-columns:subgrid}
@@ -296,6 +297,8 @@
 :root .atl .code-value{display:inline-flex;max-width:100%;align-items:flex-start;gap:4px;padding:3px 2px 3px 8px;background:var(--raised);border-radius:4px;font-family:Fira,monospace;font-size:12px;font-weight:400;line-height:1.5;vertical-align:top}
 :root .atl .code-value>.val{flex:1;min-width:0;overflow-wrap:break-word}
 :root .atl .code-value>.val>.line{display:block}
+/* A digest's line never wraps: CodeValue sizes its lines to the column, measuring them at their own width */
+:root .atl .code-value>.val.hex>.line{width:max-content;white-space:nowrap}
 :root .atl .code-value>.val.mid{display:flex;white-space:nowrap;cursor:pointer}
 :root .atl .code-value>.val.mid>.head{min-width:3ch;overflow:hidden;text-overflow:ellipsis}
 :root .atl .code-value>.val.mid>.tail{flex-shrink:0}

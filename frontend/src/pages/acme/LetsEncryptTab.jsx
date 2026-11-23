@@ -13,7 +13,7 @@ import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms, isBrainpool } from 
 import { useKeyPlatform } from '../../lib/policyAlgorithms'
 import DnsUpdatePortField from './DnsUpdatePortField'
 import { Field, Notice } from '../protocols/atelierParts'
-import { copyRow } from '../protocols/factRows'
+import { copyRow } from '../../components/atelier/facts'
 
 // Bounds of the integer settings, as the server checks them
 const BOUNDS = { renewal_days: [1, 60, 30], dns_propagation_timeout: [0, 3600, 120], dns_propagation_delay: [0, 300, 10], tls_alpn_port: [1, 65535, 443] }

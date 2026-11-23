@@ -16,6 +16,7 @@ import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
+import { fact } from '../components/atelier/facts'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { sanitizeDownloadName } from '../lib/filename'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
@@ -286,7 +287,6 @@ export default function SSHCertificatesPage() {
   const criticalOptions = open?.critical_options && typeof open.critical_options === 'object' ? Object.entries(open.critical_options) : []
   const extensions = open ? (Array.isArray(open.extensions) ? open.extensions : open.extensions ? Object.keys(open.extensions) : []) : []
   // A value the certificate has, else the absence in grey; a fingerprint or a serial in a chip copied whole
-  const fact = (label, value) => (value || value === 0 ? [label, value] : { label, absent: '—' })
   const code = (label, value) => (value || value === 0 ? { label, value: String(value), kind: 'hex' } : { label, absent: '—' })
   // A list goes under its term in a narrow panel
   const list = (label, items) => (items.length ? { label, value: items.join(', '), long: true } : { label, absent: '—', long: true })

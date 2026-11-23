@@ -4,7 +4,8 @@
  * approval does (Demande, Journal), with the actions the user may take on it in the heading.
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, Dock, DockBody, Pill, Props, RecordList, RecordRow, Section } from '../../components/atelier'
+import { Btn, Dock, DockBody, Facts, Pill, RecordList, RecordRow, Section } from '../../components/atelier'
+import { fact } from '../../components/atelier/facts'
 import { usePermission } from '../../hooks'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
 import { formatDate } from '../../lib/utils'
@@ -46,22 +47,22 @@ export function RecoveryPanel({ req }) {
   return (
     <div className="module-detail">
       <Section title={t('approvals.work.detail.request')}>
-        <Props items={[
+        <Facts items={[
           [t('approvals.work.detail.id'), <span className="mono">#{req.id}</span>],
           [t('keyRecovery.work.certificate'), req.cert_id
             ? <button type="button" className="text-link" onClick={() => openEntity('certificate', req.cert_id)}>{title}</button> : title],
-          [t('approvals.requester'), req.requested_by],
-          [t('approvals.work.detail.submitted'), when(req.requested_at)],
-          [t('approvals.work.detail.state'), <Pill label={state.label} tone={state.tone} />],
-          [t('keyRecovery.reason'), req.reason],
+          fact(t('approvals.requester'), req.requested_by),
+          fact(t('approvals.work.detail.submitted'), req.requested_at && when(req.requested_at)),
+          { label: t('approvals.work.detail.state'), state: [state.tone, state.label] },
+          { ...fact(t('keyRecovery.reason'), req.reason), long: true },
         ]} />
       </Section>
       {(req.decided_at || req.recovered_at) && (
         <Section title={t('approvals.work.detail.decision')}>
-          <Props items={[
+          <Facts items={[
             req.decided_by && [t('approvals.work.detail.by'), req.decided_by],
             req.decided_at && [t('approvals.work.detail.on'), when(req.decided_at)],
-            req.decision_note && [t('keyRecovery.work.dialog.note'), req.decision_note],
+            req.decision_note && { label: t('keyRecovery.work.dialog.note'), value: req.decision_note, long: true },
             req.recovered_by && [t('keyRecovery.work.recoveredBy'), req.recovered_by],
             req.recovered_at && [t('keyRecovery.work.recoveredOn'), when(req.recovered_at)],
           ]} />

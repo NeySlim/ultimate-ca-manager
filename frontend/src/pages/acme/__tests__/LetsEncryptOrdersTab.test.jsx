@@ -37,7 +37,8 @@ describe('LetsEncryptOrdersTab', () => {
     expect(document.querySelector('footer.table-footer')).toHaveTextContent('acme.clientOrdersRange')
   })
 
-  it('sorts every column and pages a long list by 25, back to page one on a chip', () => {
+  // Forty rows drawn some twenty times: about 1 s alone, five times that when the whole suite loads every core
+  it('sorts every column and pages a long list by 25, back to page one on a chip', { timeout: 15000 }, () => {
     const many = Array.from({ length: 40 }, (_, i) => ({ id: 10 + i, primary_domain: `h${String(i).padStart(2, '0')}.example.com`, status: i % 4 ? 'valid' : 'invalid',
       environment: 'production', challenge_type: 'http-01', created_at: `2026-0${1 + (i % 9)}-01T00:00:00Z`, renewal_failures: i === 7 ? 3 : 0 }))
     const { container } = renderTab({ clientOrders: many })

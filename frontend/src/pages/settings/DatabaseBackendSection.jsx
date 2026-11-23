@@ -11,7 +11,7 @@ import { useRefocusAfter } from '../../hooks/useRefocus'
 import { formatBytes } from '../../lib/fileSize'
 import { databaseService } from '../../services'
 import { useNotification } from '../../contexts'
-import { fact } from './facts'
+import { fact } from '../../components/atelier/facts'
 
 export default function DatabaseBackendSection() {
   const { t, i18n } = useTranslation()

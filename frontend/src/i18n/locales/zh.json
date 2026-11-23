@@ -3398,8 +3398,6 @@
     "perPageLabel": "每页事件数",
     "dateTime": "日期 / 时间",
     "client": "客户端",
-    "copyIp": "复制 IP 地址",
-    "ipCopied": "已复制 IP 地址",
     "inspectCertificate": "查看证书",
     "viewAuthority": "查看证书颁发机构",
     "exportScope_one": "{{count, number}} 个事件，按当前搜索和筛选（最多 10 000 个）。",
@@ -4747,7 +4745,6 @@
     "caption": "HSM。激活名称以打开其详情。",
     "filterByState": "按状态筛选",
     "filterByType": "按类型筛选",
-    "copyValue": "复制{{name}}",
     "summaryKeys": "密钥：{{names}}。",
     "deleteKey": "删除密钥 {{name}}"
   },

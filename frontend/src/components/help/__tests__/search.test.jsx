@@ -107,4 +107,11 @@ describe('marking the words', () => {
     const c = draw(<QuickHelp content={quick} highlight={['top']} />)
     expect(marks(c)).toEqual(['top', 'Top', 'top'])
   })
+
+  it('marks the terms and sentences of a quick help\'s definitions', () => {
+    const quick = { title: 'Terms', sections: [{ title: 'Words', definitions: [{ term: 'Top CA', description: 'The CA at the top' }] }] }
+    const c = draw(<QuickHelp content={quick} highlight={['top']} />)
+    expect(marks(c)).toEqual(['Top', 'top'])
+    expect(c.querySelector('dl.kv dt mark')).toHaveTextContent('Top')
+  })
 })

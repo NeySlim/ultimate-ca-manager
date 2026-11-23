@@ -4,13 +4,13 @@
  * simplePage() (its properties, then its summary). Facts are the typed rows of terms and values
  * (KV-2): a fact, a state, an absence, a copyable digest or URL, an action apart, a folded help.
  */
-import { Fragment, useId, useState } from 'react'
+import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNotification } from '../../contexts/NotificationContext'
 import { useClipboard } from '../../hooks/useClipboard'
 import { Icon } from './Icon'
 import { Pill } from './Pill'
-import { hexLines } from './helpers'
+import { hexLines, HEX_PER_LINE } from './helpers'
 import { Breakable } from './Breakable'
 
 export function Section({ title, children }) {
@@ -33,21 +33,61 @@ function useNotificationIfAny() {
 
 // The last characters of a URL stay in view when it is cut in its middle
 const URL_TAIL = 14
+
+const inner = (el) => {
+  const css = getComputedStyle(el)
+  const side = (k) => (parseFloat(css[`padding${k}`]) || 0) + (parseFloat(css[`border${k}Width`]) || 0)
+  return el.getBoundingClientRect().width - side('Left') - side('Right')
+}
+
+/**
+ * The bytes a line of a digest may hold in the width its chip can take: the width of the chip's parent (of the
+ * parent's flex container when the parent is a flex item, whose width follows its content), less the chip's own
+ * padding and button, in characters of 3 per byte. Measured again when that width changes; 10 when unmeasured.
+ */
+function useHexRoom(chip, text) {
+  const [room, setRoom] = useState(HEX_PER_LINE)
+  useLayoutEffect(() => {
+    const el = chip.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const parent = el.parentElement
+    const box = parent && /flex/.test(getComputedStyle(parent.parentElement || parent).display) ? parent.parentElement : parent
+    if (!box) return undefined
+    const measure = () => {
+      const val = el.firstElementChild
+      const line = val?.firstElementChild
+      const chars = line?.textContent.length
+      if (!chars) return
+      const ch = line.getBoundingClientRect().width / chars
+      const free = inner(box) - (el.getBoundingClientRect().width - val.getBoundingClientRect().width)
+      if (ch > 0 && free > 0) setRoom(Math.max(1, Math.floor(Math.floor((free + 0.5) / ch) / 3)))
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(box)
+    measure()
+    document.fonts?.ready?.then(measure)
+    return () => observer.disconnect()
+  }, [chip, text])
+  return room
+}
 /**
  * A technical value in mono and its copy button. kind 'hex': a digest in equal lines, never shortened;
- * kind 'url': one line cut in its middle, whole in its title and on a click. The copy is always the whole value.
+ * as wide as its column allows; kind 'url': one line cut in its middle, whole in its title and on a click. The copy is
+ * always the whole value.
  */
 export function CodeValue({ value, kind, label }) {
   const { t } = useTranslation()
   const { copy, copied } = useClipboard()
   const notify = useNotificationIfAny()
   const [open, setOpen] = useState(false)
-  if (value === null || value === undefined || value === '') return null
-  const text = String(value)
+  const chip = useRef(null)
+  const text = value === null || value === undefined ? '' : String(value)
+  const room = useHexRoom(chip, kind === 'hex' ? text : null)
+  if (text === '') return null
   const cut = kind === 'url' && text.length > URL_TAIL + 6
   const toggle = () => setOpen(!open)
   const shown = kind === 'hex'
-    ? <span className="val hex">{hexLines(text).split('\n').map((line, i) => <span key={i} className="line"><Breakable text={line} /></span>)}</span>
+    ? <span className="val hex">{hexLines(text, room).split('\n').map((line, i) => <span key={i} className="line">{line}</span>)}</span>
     : cut
       ? (
         <span className={open ? 'val mid open' : 'val mid'} role="button" tabIndex={0} aria-expanded={open} title={text}
@@ -57,7 +97,7 @@ export function CodeValue({ value, kind, label }) {
       )
       : <span className="val"><Breakable text={text} /></span>
   return (
-    <span className={kind ? `code-value ${kind}` : 'code-value'}>
+    <span ref={kind === 'hex' ? chip : null} className={kind ? `code-value ${kind}` : 'code-value'}>
       {shown}
       <button type="button" className="cp" aria-label={t('protocols.copyValue', { name: label })} title={t('protocols.copyValue', { name: label })}
         onClick={async () => { if (await copy(text)) notify?.showSuccess(t('common.copied')) }}>

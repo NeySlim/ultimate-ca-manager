@@ -68,7 +68,7 @@ Open **Modules** > **PKI** > **Certificates**, or **Certificates** in the top ba
 
 **Exporting.** Select a certificate and use **Export** in its details: PEM, DER, PKCS#12 or JKS. Set a password for PKCS#12.
 
-**Copying a value.** The serial number in **Overview** and the fingerprints under **More details** sit in a chip with a copy button, a digest in equal lines; a URL (a CRL distribution point, an OCSP responder) shows its start and its end on one line, whole when clicked or hovered. The copy is always the whole value, as the API gives it.
+**Copying a value.** The serial number in **Overview** and the fingerprints under **More details** sit in a chip with a copy button, a digest in equal lines as wide as its column allows; a URL (a CRL distribution point, an OCSP responder) shows its start and its end on one line, whole when clicked or hovered. The copy is always the whole value, as the API gives it.
 
 **Renewing.** **Renew** replaces the certificate in place: same identifier, new serial and validity. A revoked certificate cannot be renewed, nor one whose private key the server does not hold (enrolled by a device, or imported without its key): renew it through its enrollment protocol, sign a new request or issue a new certificate.
 
@@ -168,6 +168,8 @@ Open **Modules** > **PKI** > **Certificate Tools**:
 - **Certificate Decoder**: view all the fields of a PEM certificate
 - **Key Matcher**: verify that a key, a certificate and a CSR match
 - **SSL Converter**: convert between PEM, DER, PKCS#12 and PKCS#7
+
+In the results of the checker and the decoders, the common name, the serial number (in octets) and the fingerprints sit in chips that copy them whole, as described in [Copying a value](#certificates).
 
 ---
 

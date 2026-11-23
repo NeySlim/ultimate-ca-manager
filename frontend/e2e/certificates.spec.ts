@@ -50,8 +50,10 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
   await result.getByRole('button', { name: 'View the certificate' }).click()
   await expect(result).toBeHidden()
 
+  // The certificate opens in the inspector, its tab named after it; the search finds its row in the list
+  await expect(page.locator('#inspector').getByRole('heading', { name: cn })).toBeVisible()
   await page.getByRole('main').getByRole('searchbox').fill(cn)
-  await expect(page.getByRole('main').getByRole('button', { name: cn, exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Certificates table' }).getByRole('button', { name: cn, exact: true })).toBeVisible()
   const [cert] = await findCerts(api, cn)
   expect(cert).toMatchObject({ issuer: `CN=${ca.common_name}`, revoked: false })
 })
@@ -141,4 +143,39 @@ test('a fingerprint of « More details » copies whole, as the API gives it', as
   await expect(digest.locator('.val.hex > .line')).toHaveCount(4)
   await digest.getByRole('button', { name: 'Copy SHA-256' }).press('Enter')
   await expect.poll(() => page.evaluate(() => (window as any).__copied)).toEqual([full.thumbprint_sha256])
+})
+
+test('a SHA-1 in a column of 200 px takes equal lines that fit it, and copies whole', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  const full = await api.get(`/certificates/${cert.id}`)
+  expect(full.thumbprint_sha1).toMatch(/^([0-9A-F]{2}:){19}[0-9A-F]{2}$/)
+  const panel = await openInInspector(page, cert.common_name)
+  await page.evaluate(() => {
+    const copied: string[] = []
+    ;(window as any).__copied = copied
+    navigator.clipboard.writeText = (text: string) => { copied.push(text); return Promise.resolve() }
+  })
+  await panel.getByRole('button', { name: 'More details' }).press('Enter')
+  const digest = panel.locator('.row', { has: page.locator('dt', { hasText: /^SHA-1$/ }) })
+  const value = digest.locator('dd.v')
+  await expect(value.locator('.val.hex > .line').first()).toBeVisible()
+  // The value column narrowed to 200 px: the lines follow it, equal, none past the chip's edge
+  await value.evaluate((dd: HTMLElement) => { dd.style.width = '200px'; dd.style.maxWidth = '200px' })
+  const lines = () => value.evaluate((dd: HTMLElement) => {
+    const val = dd.querySelector('.val.hex')!.getBoundingClientRect()
+    return [...dd.querySelectorAll('.val.hex > .line')].map((l) => ({
+      bytes: l.textContent!.replace(/:$/, '').split(':').length,
+      fits: l.getBoundingClientRect().right <= val.right + 0.5 && val.right <= dd.getBoundingClientRect().right + 0.5,
+      one: l.getBoundingClientRect().height < 24,
+    }))
+  })
+  await expect.poll(async () => (await lines()).length).toBeGreaterThan(2)
+  const narrow = await lines()
+  expect(new Set(narrow.map((l) => l.bytes)).size).toBe(1)
+  expect(narrow.every((l) => l.fits && l.one)).toBe(true)
+  await digest.getByRole('button', { name: 'Copy SHA-1' }).press('Enter')
+  await expect.poll(() => page.evaluate(() => (window as any).__copied)).toEqual([full.thumbprint_sha1])
+  // Given a wide room, the digest returns to two lines of ten
+  await value.evaluate((dd: HTMLElement) => { dd.style.width = '400px'; dd.style.maxWidth = '400px' })
+  await expect.poll(async () => (await lines()).map((l) => l.bytes)).toEqual([10, 10])
 })

@@ -4,7 +4,7 @@ import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatBytes } from '../../lib/fileSize'
 import { formatDate } from '../../lib/utils'
 import DatabaseBackendSection from './DatabaseBackendSection'
-import { fact } from './facts'
+import { fact } from '../../components/atelier/facts'
 
 export default function DatabaseSection({ dbStats, handleOptimizeDb, handleIntegrityCheck, handleExportDb, handleResetDb }) {
   const { t, i18n } = useTranslation()

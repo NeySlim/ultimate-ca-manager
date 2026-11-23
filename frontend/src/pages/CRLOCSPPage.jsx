@@ -22,7 +22,7 @@ import { downloadBlob } from '../lib/utils'
 import { findAlgorithm } from '../lib/keyAlgorithms'
 import { dateTimeOf } from './admin/adminDates'
 import { CheckLine, Field, Notice, UrlList } from './protocols/atelierParts'
-import { copyRow, factRow } from './protocols/factRows'
+import { copyRow, fact } from '../components/atelier/facts'
 import { crlState } from './protocols/protocolStates'
 
 const TONES = { current: 'good', soon: 'warn', expired: 'bad', none: 'muted' }
@@ -415,9 +415,9 @@ export default function CRLOCSPPage() {
             <Section title={t('atelier.properties')}>
               <Facts items={[
                 open.has_crl ? ['CRL', number(open)] : { label: 'CRL', absent: number(open) },
-                factRow(t('crlOcsp.columns.published'), dateTimeOf(open.crl_updated, locale)), factRow(t('crlOcsp.nextUpdate'), dateTimeOf(open.crl_next_update, locale)),
+                fact(t('crlOcsp.columns.published'), dateTimeOf(open.crl_updated, locale)), fact(t('crlOcsp.nextUpdate'), dateTimeOf(open.crl_next_update, locale)),
                 { label: 'OCSP', state: ocspState(open) }, [t('atelier.state'), pill(open)],
-                factRow(t('crlOcsp.revokedCount'), open.has_crl ? String(open.revoked_count || 0) : null),
+                fact(t('crlOcsp.revokedCount'), open.has_crl ? String(open.revoked_count || 0) : null),
               ]} />
             </Section>
             <Section title={t('atelier.summary')}><p className="summary">{summary(open)}</p></Section>
@@ -486,7 +486,7 @@ export default function CRLOCSPPage() {
                   <Facts items={[
                     [t('crlOcsp.deltaCrlNumber'), `#${open.delta_crl.crl_number}`], [t('crlOcsp.baseCrlNumber'), `#${open.delta_crl.base_crl_number}`],
                     [t('crlOcsp.deltaEntries'), String(open.delta_crl.revoked_count ?? 0)],
-                    factRow(t('crlOcsp.deltaNextUpdate'), dateTimeOf(open.delta_crl.next_update, locale)),
+                    fact(t('crlOcsp.deltaNextUpdate'), dateTimeOf(open.delta_crl.next_update, locale)),
                   ]} />
                 )}
                 <div className="form-fields dock-form">

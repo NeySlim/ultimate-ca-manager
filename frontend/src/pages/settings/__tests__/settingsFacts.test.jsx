@@ -27,7 +27,7 @@ import MappingTestResult from '../sso/MappingTestResult'
 import { UpdateCampaignStatus } from '../../../components/UpdateCampaignStatus'
 import { MscaCaControlModal } from '../../../components/MscaCaControlModal'
 import { Facts } from '../../../components/atelier'
-import { fact } from '../facts'
+import { fact } from '../../../components/atelier/facts'
 
 const FP = 'AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89'
 const URI = 'postgresql://ucm:***@db.example.com:5432/ucm_production_database'

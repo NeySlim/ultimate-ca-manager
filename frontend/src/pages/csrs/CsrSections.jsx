@@ -5,6 +5,7 @@
  */
 import { useTranslation } from 'react-i18next'
 import { Pill, Section, Facts } from '../../components/atelier'
+import { fact } from '../../components/atelier/facts'
 import { certificateKeyLabel, serialHex } from '../../lib/certificateDetail'
 import { signatureHashName } from '../../lib/signatureName'
 import { dateOf } from '../admin/adminDates'
@@ -30,7 +31,6 @@ export function CsrSections({ csr, signed, section }) {
     : (csr.descr || t('csrs.module.pendingSummary'))
   // A value the request has, else the absence in grey
   const serial = serialHex(csr.serial_number)
-  const fact = (label, value) => (value ? [label, value] : { label, absent: '—' })
   const sans = csr.sans?.length ? csr.sans : (csr.san_combined ? csr.san_combined.split(',').map((s) => s.trim()).filter(Boolean) : [])
   return (
     <>

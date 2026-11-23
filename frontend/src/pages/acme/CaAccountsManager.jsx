@@ -4,7 +4,7 @@ import { Input, SecretInput, Select, Textarea, ToggleSwitch, Modal } from '../..
 import { Btn, Pill, ListView, Dock, DockBody, Section, Facts, EmptyBlock, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
-import { copyRow, factRow } from '../protocols/factRows'
+import { copyRow, fact } from '../../components/atelier/facts'
 import DnsUpdateKeysPanel from './DnsUpdateKeysPanel'
 
 const EMPTY_FORM = {
@@ -160,8 +160,8 @@ export default function CaAccountsManager({
             <Section title={t('atelier.properties')}>
               <Facts items={[
                 copyRow(t('acme.directoryUrl'), open.directory_url, 'url'),
-                factRow(t('acme.contactEmail'), open.email),
-                factRow(t('acme.accountKeyType'), open.account_key_algorithm),
+                fact(t('acme.contactEmail'), open.email),
+                fact(t('acme.accountKeyType'), open.account_key_algorithm),
                 [t('common.default'), t(open.is_default ? 'common.yes' : 'common.no')],
                 open.eab_kid ? copyRow('EAB', open.eab_kid, undefined, { long: true }) : { label: 'EAB', absent: t('common.no') },
                 open.environment && open.environment !== 'custom' && [t('acme.environment'), open.environment],

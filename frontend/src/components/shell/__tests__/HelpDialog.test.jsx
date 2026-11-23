@@ -90,8 +90,10 @@ describe('HelpDialog', () => {
     expect([...plain.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['A bare item', 'Label: labelled text'])
     expect(plain.querySelector('li strong')).toHaveTextContent('Label:')
     const terms = grid.querySelectorAll('section')[2]
-    expect(terms.querySelector('dl.props dt')).toHaveTextContent('CRL')
-    expect(terms.querySelector('dl.props dd')).toHaveTextContent('revocation list')
+    // A definition is a sentence: a typed row that goes under its term when narrow
+    expect(terms.querySelector('dl.props')).toBeNull()
+    expect(terms.querySelector('dl.kv > div.row.long > dt')).toHaveTextContent('CRL')
+    expect(terms.querySelector('dl.kv > div.row.long > dd.v')).toHaveTextContent('revocation list')
     expect(terms.querySelector('pre.code-preview')).toHaveTextContent('openssl x509')
     expect(grid).toHaveTextContent('A tip')
     expect(grid).toHaveTextContent('A warning')

@@ -25,7 +25,7 @@ import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { dateTimeOf } from './admin/adminDates'
 import { Notice, ViewSwitch } from './protocols/atelierParts'
-import { copyRow, factRow } from './protocols/factRows'
+import { copyRow, fact } from '../components/atelier/facts'
 
 // OpenSSL's example policy OID, assigned to no one
 const DEFAULT_POLICY_OID = '1.2.3.4.1'
@@ -184,7 +184,7 @@ export default function TSAPage() {
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
             <Facts items={[
-              factRow(t('tsa.columns.ca'), row.ca === '—' ? null : row.ca), [t('tsa.columns.digest'), DIGESTS], copyRow(t('tsa.columns.policy'), row.policy),
+              fact(t('tsa.columns.ca'), row.ca === '—' ? null : row.ca), [t('tsa.columns.digest'), DIGESTS], copyRow(t('tsa.columns.policy'), row.policy),
               [t('atelier.state'), pill(row)], { label: t('tsa.signingCert'), value: signerText, long: true },
               config.signer?.not_after && [t('tsa.signerExpires'), dateTimeOf(config.signer.not_after, locale)],
               copyRow('URL', `${baseUrl}/tsa`, 'url', { copyLabel: t('tsa.endpoint') }),
