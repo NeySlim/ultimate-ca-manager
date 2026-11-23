@@ -138,6 +138,16 @@ describe('ReportsPage queue', () => {
     }) }))
   })
 
+  it('gives the format the whole line when no day field stands beside it', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Planifier un rapport' }))
+    const dialog = await screen.findByRole('dialog')
+    const format = () => dialog.querySelector('#sch-format').closest('.field')
+    expect(format()).not.toHaveClass('full')
+    fireEvent.change(dialog.querySelector('#sch-freq'), { target: { value: 'daily' } })
+    expect(format()).toHaveClass('full')
+  })
+
   it('gives the focus back to Schedule a report when its dialog is left with Escape', async () => {
     renderPage()
     const button = await screen.findByRole('button', { name: 'Planifier un rapport' })

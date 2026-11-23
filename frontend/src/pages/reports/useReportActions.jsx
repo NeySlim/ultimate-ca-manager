@@ -215,8 +215,9 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
                 </select>
               </div>
             )}
+            {/* Daily, the format has no day field beside it: it takes the whole line rather than half of one */}
             {!isPdf(form.key) && (
-              <div className="field">
+              <div className={form.frequency === 'daily' ? 'field full' : 'field'}>
                 <label htmlFor="sch-format">{t('reports.format')}</label>
                 <select id="sch-format" value={form.format} onChange={set('format')}>
                   <option value="csv">CSV</option>
