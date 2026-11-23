@@ -1266,3 +1266,51 @@ def test_a_renewal_whose_move_fails_sends_no_cookie_and_writes_nothing_unguarded
     for node in (first, second):
         assert _profile(_held_by(node, held)).status_code == 401
 
+
+@contextmanager
+def _move_refused_as_busy(application, monkeypatch):
+    """The store refuses the renewal's move as 'busy', by a cause of its own: the file store
+    stays held, the SQL row or the Redis key keeps changing under the move."""
+    from utils.session_store import LOCK_MERGE_ATTEMPTS
+    kind = application.config['SESSION_TYPE']
+    if kind == 'filesystem':
+        from utils.session_store import HELD, session_files_lock
+        monkeypatch.setattr(application.session_interface, 'lock_wait', 0.2)
+        with session_files_lock(application.session_interface.cache._path, True, 2.0) as state:
+            assert state == HELD
+            yield
+        return
+    import utils.session_store as module
+    if kind == 'redis':
+        import utils.session_store_redis as module
+    real, changes = module.keep_stored_lock, []
+
+    def changing(session, stored):
+        moved = getattr(session, 'rotated_from', None)
+        if moved:
+            changes.append(1)
+            _store_raw(application, moved, dict(stored, touched=len(changes)))
+        return real(session, stored)
+
+    monkeypatch.setattr(module, 'keep_stored_lock', changing)
+    yield
+    assert len(changes) == LOCK_MERGE_ATTEMPTS
+
+
+def test_a_renewal_refused_by_the_store_counts_only_the_other_sessions(
+        nodes, make_user, factors, monkeypatch):
+    """The move refused as 'busy' leaves the caller's record at the replaced version: the
+    answer and the audit count the account's other sessions only."""
+    first, second = nodes
+    user = make_user(first)
+    other = _password_session(second, user)
+    c = _password_session(first, user)
+    method, url, body, _password = _renewal(first, user, 'delete-passkey', factors)
+    with _move_refused_as_busy(first, monkeypatch):
+        r = c.open(url, method=method, data=json.dumps(body or {}), content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert not _session_cookie_sent(r)
+    assert r.get_json()['meta']['other_sessions_closed'] == 1
+    [(success, details)] = _audits(first, 'webauthn_delete', user['username'])
+    assert success and '(1 other session closed)' in details, details
+    assert _profile(other).status_code == 401
