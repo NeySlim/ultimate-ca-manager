@@ -48,7 +48,7 @@ const csrKeyRow = (csr) => algorithmForKeyType(csr.key_type)
 
 const CSR_SECTIONS = ['overview', 'details', 'pem']
 
-// The newest request first (T4); the keys the server sorts both lists on
+// The newest request first; the keys the server sorts both lists on
 const CSR_SORT = { key: 'created_at', asc: false }
 const CSR_SORT_KEYS = ['id', 'cn', 'requester', 'key_type', 'created_at']
 
@@ -79,7 +79,7 @@ export default function CSRsPage() {
   // What the search box shows, and the term actually sent (debounced)
   const [searchInput, setSearchInput] = useState('')
   const [searchValue, setSearchValue] = useState('')
-  // The server sorts, the newest submitted first by default; the sort lives in the address, the tab's own (T4, T9)
+  // The server sorts, the newest submitted first by default; the sort lives in the address, the tab's own
   const { sort, onSort: sortBy } = useSortParam(CSR_SORT, CSR_SORT_KEYS)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -997,7 +997,7 @@ export default function CSRsPage() {
         )}
         title={csrName} status={csrPill} openedId={open?.id} onOpen={openCSR}
         sort={sort} onSort={sortBy} nameSort="id"
-        // The subject names the request (its name is a number): it takes the room left and folds last (L7, R2)
+        // The subject names the request (its name is a number): it takes the room left and folds last
         columns={[
           { id: 'subject', label: t('csrs.module.subject'), cell: csrSubject, kind: 'text', grow: true, priority: 2, sort: 'cn' },
           { id: 'requester', label: t('csrs.module.requester'), cell: csrRequester, kind: 'text', priority: 3, sort: 'requester' },

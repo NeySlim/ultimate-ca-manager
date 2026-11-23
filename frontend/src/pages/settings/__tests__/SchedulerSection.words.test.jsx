@@ -80,7 +80,7 @@ describe('SchedulerSection column widths', () => {
     expect(table).toHaveClass('module-table')
     expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([true, false, true, true, true, true, true, true, true, true])
     expect(row.children[1]).toHaveClass('description-cell')
-    // The task names its row on one line and opens its inspector (E4), its whole name in a title
+    // The task names its row on one line and opens its inspector, its whole name in a title
     const name = row.children[0].querySelector('.entity-name')
     expect(name.tagName).toBe('BUTTON')
     expect(name.querySelector('.entity-label')).toHaveAttribute('title', 'tr(scheduler.tasks.scheduled_backup)')
@@ -103,7 +103,7 @@ describe('SchedulerSection column widths', () => {
 })
 
 describe('SchedulerSection sort', () => {
-  it('opens by task name, sorts every column from its header, the order in the address under its own scope (T1, T4, T9)', async () => {
+  it('opens by task name, sorts every column from its header, the order in the address under its own scope', async () => {
     const at = { search: '' }
     function Where() { at.search = useLocation().search; return null }
     render(<><SchedulerSection hasPermission={() => true} /><Where /></>)
@@ -136,7 +136,7 @@ describe('SchedulerSection on a phone', () => {
     const card = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('.mobile-record')
     expect(card).not.toBeNull()
     expect(document.querySelector('table')).toBeNull()
-    // A task opens its inspector from its record (E4); its facts named as every list's (E10)
+    // A task opens its inspector from its record; its facts named as every list's
     expect(within(card).getByText('tr(scheduler.tasks.scheduled_backup)').tagName).toBe('BUTTON')
     expect(card).toHaveClass('opens')
     expect([...card.querySelectorAll('.row-meta .fact-label')].map((l) => l.textContent))

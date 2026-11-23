@@ -1,4 +1,4 @@
-/** Expiry horizon (maquette-2): weekly columns on a calendar of UTC days, the side list of the day or week picked. */
+/** Expiry horizon: weekly columns on a calendar of UTC days, the side list of the day or week picked. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, configure, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'

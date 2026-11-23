@@ -217,7 +217,7 @@ export default function SSHCAsPage() {
     { id: 'user', label: t('sshCas.typeUser'), count: searched.filter((ca) => ca.ca_type === 'user').length },
     { id: 'host', label: t('sshCas.typeHost'), count: searched.filter((ca) => ca.ca_type === 'host').length },
   ]
-  // Sorted in memory (the API sends every authority), the sort in the address (T9)
+  // Sorted in memory (the API sends every authority), the sort in the address
   const sortParam = useSortParam(BY_NAME, SSH_CA_SORT_KEYS)
   const list = useClientList(shown, {
     sortParam,
@@ -365,7 +365,7 @@ export default function SSHCAsPage() {
           </Toolbar>
         )}
         title={(ca) => ca.descr || t('common.unnamed')} status={() => null} openedId={open?.id} onOpen={openCA}
-        // No long free text: the name takes the room left (L7)
+        // No long free text: the name takes the room left
         columns={[
           { id: 'type', label: t('sshCas.caType'), cell: typeLabel, kind: 'fit', priority: 3, sort: 'type' },
           { id: 'key', label: t('sshCas.keyType'), cell: keyCell, kind: 'fit', priority: 3, sort: 'key' },

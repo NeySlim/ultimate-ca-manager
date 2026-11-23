@@ -1,7 +1,7 @@
 /**
  * TSA: the mockup's tsa module, a simplePage() list (Autorité, Hachage, Politique, État) with its
  * one-object dock, on the product's one time-stamping service; its configuration takes the mockup's
- * settingsView(). Several named services (M10) and token counts over 7 days (M11) are functions
+ * settingsView(). Several named services and token counts over 7 days are functions
  * the product lacks: the list holds the one service, the dock the totals the server keeps.
  */
 import { useState, useEffect, useMemo, useRef } from 'react'
@@ -275,7 +275,7 @@ openssl ts -reply -in response.tsr -text`}</pre>
       filters={{ views: [{ id: '', label: t('common.all'), count: service.length }, ...(row ? [{ id: row.state, label: t(row.state === 'active' ? 'common.active' : 'common.disabled'), count: 1 }] : [])], active: '', onChange: () => {}, label: t('tsa.filterByState') }}
       title={(r) => r.name} status={pill} openedId={opened ? row?.id : null} onOpen={() => setOpened(true)}
       columns={[
-        // One row by construction: no sort (T1); the name takes the room left
+        // One row by construction: no sort; the name takes the room left
         { id: 'ca', label: t('tsa.columns.ca'), cell: (r) => r.ca, kind: 'text', priority: 2 },
         { id: 'digest', label: t('tsa.columns.digest'), cell: () => DIGESTS, kind: 'fit', priority: 3 },
         { id: 'policy', label: t('tsa.columns.policy'), cell: (r) => r.policy, kind: 'fit', priority: 3, labelled: true },

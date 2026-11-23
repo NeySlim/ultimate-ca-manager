@@ -5,8 +5,8 @@
  * dock, or the mockup's settingsView(), behind the page switch: the server's orders, local domains,
  * EAB credentials and settings; the client's settings, orders, upstream CAs, DNS providers and
  * domains; the history of ACME certificates. The client of an account, its EAB binding, its last
- * order in the list and its journal (M01), the failure of a challenge (M02) and the revocation of
- * an order's certificate (M03) are functions the product lacks.
+ * order in the list and its journal, the failure of a challenge and the revocation of
+ * an order's certificate are functions the product lacks.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -48,7 +48,7 @@ const CLIENT_ORDERS_MAX = 5000
 // The accounts too: every page is read (100 a page), so the list sorts and searches them all
 const ACCOUNTS_MAX = 5000
 
-// The default sorts (COLONNES-SPEC T4, E16): the newest account, the latest certificate first
+// The default sorts: the newest account, the latest certificate first
 const NEWEST_ACCOUNT = { key: 'created', asc: false }
 const ACCOUNT_SORT_KEYS = ['name', 'contact', 'created', 'state', 'orders']
 const LATEST_ISSUED = { key: 'created_at', asc: false }
@@ -156,7 +156,7 @@ export default function ACMEPage() {
   const [historyTotal, setHistoryTotal] = useState(0)
   const [historyCAs, setHistoryCAs] = useState([])
   const [historySearch, setHistorySearch] = useState('')
-  // The sort of each list lives in the address of its own view only (T9)
+  // The sort of each list lives in the address of its own view only
   const accountSort = useSortParam(NEWEST_ACCOUNT, activeTab === 'accounts' ? ACCOUNT_SORT_KEYS : NONE)
   const historySortParam = useSortParam(LATEST_ISSUED, activeTab === 'history' ? HISTORY_SORT_KEYS : NONE)
   const historySort = historySortParam.sort
@@ -933,7 +933,7 @@ export default function ACMEPage() {
   }
 
   // ── The accounts of the server (the mockup's list) ──
-  // The mockup's chips Actifs and Désactivés always, Révoqués when an account is (Avec échec needs the orders per account, M01)
+  // The mockup's chips Actifs and Désactivés always, Révoqués when an account is (Avec échec needs the orders per account)
   const accountStates = ['valid', 'deactivated', ...(accounts.some((a) => a.status === 'revoked') ? ['revoked'] : [])]
   const searchedAccounts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -977,7 +977,7 @@ export default function ACMEPage() {
           title: (a) => accountContact(a) || undefined, sort: 'contact' },
         { id: 'created', label: t('acme.createdOn'), labelFull: t('table.fullCreated'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true, kind: 'fit', priority: 2, labelled: true, sort: 'created' },
         { status: true, sort: 'state' },
-        // A count of one or two digits: an abbreviated header where the noun is long, the noun in its title (L8)
+        // A count of one or two digits: an abbreviated header where the noun is long, the noun in its title
         { id: 'orders', label: t('acme.columns.orders'), labelFull: t('acme.orders'), cell: (a) => String(a.orders_count ?? 0), kind: 'number', priority: 3, sort: 'orders' },
       ]}
       empty={accounts.length ? (

@@ -38,7 +38,7 @@ describe('CommandPalette, the mockup palette', () => {
     })
   })
 
-  it('lists the pages the menu had and the palette lacked (N04)', () => {
+  it('lists the pages the menu had and the palette lacked', () => {
     render(<CommandPalette open onOpenChange={vi.fn()} />)
     for (const key of ['shell.moduleLabel.truststore', 'userCertificates.title', 'common.tsa',
       'shell.moduleLabel.crlOcsp', 'common.keyRecovery', 'shell.moduleLabel.discovery', 'common.systemLogs']) {
@@ -60,7 +60,7 @@ describe('CommandPalette, the mockup palette', () => {
     ['commands.actions.newCertificate', '/certificates?action=create'],
     ['commands.actions.newCA', '/cas?action=create'],
     ['commands.actions.uploadCSR', '/csrs?action=upload'],
-  ])('%s opens its form on its page (N05)', (label, to) => {
+  ])('%s opens its form on its page', (label, to) => {
     const onOpenChange = vi.fn()
     render(<CommandPalette open onOpenChange={onOpenChange} can={can(['*'])} />)
     fireEvent.click(screen.getByText(label))
@@ -68,7 +68,7 @@ describe('CommandPalette, the mockup palette', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it('finds the ACME accounts and SCEP profiles, named by their type, each opening in its page (N03)', async () => {
+  it('finds the ACME accounts and SCEP profiles, named by their type, each opening in its page', async () => {
     render(<CommandPalette open onOpenChange={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('commandPalette.searchPlaceholder'), { target: { value: 'ph' } })
     const account = (await screen.findByText('ops@example.com')).closest('button')

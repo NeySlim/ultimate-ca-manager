@@ -49,7 +49,7 @@ function useSettled(value, delay = TYPING_PAUSE_MS) {
 
 const levelPill = (level) => (level ? <Pill label={level} tone={LEVEL_TONE[level]?.tone} icon={LEVEL_TONE[level]?.icon} /> : null)
 
-// The file's lines sort by their time only, the newest first by default, kept in the address (R6)
+// The file's lines sort by their time only, the newest first by default, kept in the address
 const NEWEST_FIRST = { key: 'time', asc: false }
 const TIME_KEYS = ['time']
 

@@ -1,7 +1,7 @@
 /**
  * A report in the module dock: the mockup's moduleInspector() for reports, reportPanel()
  * (Planification, Chiffre actuel) and reportRunsPanel() (Exécutions). The server keeps no run
- * history it serves (G06): Exécutions says so and the « Dernière exécution » section is left out.
+ * history it serves: Exécutions says so and the « Dernière exécution » section is left out.
  * The product's Aperçu tab comes last; its further actions sit behind the heading's « ⋯ ».
  */
 import { useEffect, useState } from 'react'

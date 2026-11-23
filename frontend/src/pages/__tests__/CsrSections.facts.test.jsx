@@ -1,5 +1,5 @@
 /**
- * The sections of a request in typed rows (KV-3): its state a pill, a missing subject field in grey, the
+ * The sections of a request in typed rows: its state a pill, a missing subject field in grey, the
  * serial of a signed request copyable whole, the signature named by its hash as a certificate's is.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'

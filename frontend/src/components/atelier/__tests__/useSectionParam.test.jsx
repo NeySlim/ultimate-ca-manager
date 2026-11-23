@@ -48,7 +48,7 @@ describe('useSectionParam', () => {
     expect(screen.getByTestId('search')).toHaveTextContent('?keep=1')
   })
 
-  it('another section drops the sort of the list it leaves; the same one keeps it (T9)', () => {
+  it('another section drops the sort of the list it leaves; the same one keeps it', () => {
     mount('/x?tab=b&sort=name&order=desc&keep=1', {})
     act(() => screen.getByText('to-c').click())
     expect(screen.getByTestId('search')).toHaveTextContent('?tab=c&keep=1')

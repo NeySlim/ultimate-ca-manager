@@ -359,7 +359,7 @@ export default function CRLOCSPPage() {
   const present = STATE_ORDER.filter((s) => rows.some((r) => stateOf(r) === s))
   const active = present.includes(state) ? state : ''
   const shown = searched.filter((r) => !active || stateOf(r) === active)
-  // The nearest next update first (E16), kept in the address
+  // The nearest next update first, kept in the address
   const sortParam = useSortParam(NEXT_FIRST, CRL_SORT_KEYS)
   const list = useClientList(shown, {
     resetKey: `${query}|${active}`,

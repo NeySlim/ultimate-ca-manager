@@ -4,7 +4,7 @@
  * actions and their dialogs (scepToggle, scepRotateDialog, then the new value shown once). What
  * the product has more (the enrollment requests and their approval, the challenge of each CA, the
  * Intune app registrations, the server configuration) takes the same list and dock, and the
- * mockup's settingsView(), behind the page switch. Per-profile enrolments and journal (M04) and
+ * mockup's settingsView(), behind the page switch. Per-profile enrolments and journal and
  * an OAEP flag per profile (doubtful, never copied) are not drawn.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -45,11 +45,11 @@ const configDraft = (c) => ({
 })
 
 const NONE = []
-// The default sort of each view (T4): a name ascending, the newest request first; each view keeps its own in the address (T9)
+// The default sort of each view: a name ascending, the newest request first; each view keeps its own in the address
 const BY_NAME = { key: 'name', asc: true }
 const NEWEST = { key: 'created_at', asc: false }
 const PROFILE_SORT_KEYS = ['name', 'ca', 'template', 'intune', 'state']
-// The requests are paged by the server, so sorted by it (T2): its keys
+// The requests are paged by the server, so sorted by it: its keys
 const REQUEST_SORT_KEYS = ['subject', 'transaction_id', 'created_at', 'status']
 const CHALLENGE_SORT_KEYS = ['name', 'subject', 'age', 'state']
 const APP_SORT_KEYS = ['name', 'tenant', 'client', 'test', 'state']

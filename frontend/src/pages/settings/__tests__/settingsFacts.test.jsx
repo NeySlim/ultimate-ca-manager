@@ -1,5 +1,5 @@
 /**
- * Settings read as typed facts (KV-3, zone E): a digest or a path in a copy chip that copies the whole value,
+ * Settings read as typed facts: a digest or a path in a copy chip that copies the whole value,
  * a state as a pill, an absent value muted apart from the values, a DN or a sentence on a long row,
  * and no button left in the value column.
  */

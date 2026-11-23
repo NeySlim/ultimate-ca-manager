@@ -1,5 +1,5 @@
 /**
- * The column contract and the layout of a list (COLONNES-SPEC L3 to L7, R2), as pure functions: what each
+ * The column contract and the layout of a list, as pure functions: what each
  * column declares (kind, grow, priority, sort), the order in which the columns fold, and the widths a region
  * gives them from their natural widths. No DOM: DataTable measures, these decide.
  */
@@ -63,7 +63,7 @@ describe('the fold order', () => {
   })
 })
 
-describe('the layout of the columns: the need first (R1, R2)', () => {
+describe('the layout of the columns: the need first', () => {
   // A name, a growing description, a state, an issuer (text), an owner (text), a source, an expiry: natural widths in px
   const columns = [
     col('name', { kind: 'entity', priority: 1 }),
@@ -113,7 +113,7 @@ describe('the layout of the columns: the need first (R1, R2)', () => {
     expect(out.caps.owner).toBeUndefined()
   })
 
-  it('the growing text keeps its comfort while a column of priority 3 or 4 can fold: rather than 64 px, it folds (R8)', () => {
+  it('the growing text keeps its comfort while a column of priority 3 or 4 can fold: rather than 64 px, it folds', () => {
     // At comfort the columns need 1030 in 1000: the description (priority 4) folds, the name takes the room left
     const out = layoutColumns(columns, measures, 1000)
     expect(out.folded).toEqual(['description'])
@@ -204,7 +204,7 @@ describe('the layout of the columns: the need first (R1, R2)', () => {
   })
 })
 
-describe('a width set by hand (C2): a fixed need, never at the cost of the folds nor of the room', () => {
+describe('a width set by hand: a fixed need, never at the cost of the folds nor of the room', () => {
   const columns = [
     col('name', { kind: 'entity', priority: 1 }),
     col('description', { kind: 'text', priority: 4, grow: true }),

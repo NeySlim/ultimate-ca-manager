@@ -162,7 +162,7 @@ describe('the table', () => {
   })
 })
 
-describe('the column handles (C2)', () => {
+describe('the column handles', () => {
   const grip = (container, i) => container.querySelectorAll('thead th')[i].querySelector('[role=separator]')
   const head = (container, i) => container.querySelectorAll('thead th')[i]
 
@@ -216,7 +216,7 @@ describe('the column handles (C2)', () => {
     expect(onWidth).not.toHaveBeenCalled()
   })
 
-  it('the handle\'s zone straddles the line: its other half, in the next header, drags and resets the same column and never sorts (E1)', () => {
+  it('the handle\'s zone straddles the line: its other half, in the next header, drags and resets the same column and never sorts', () => {
     const onWidth = vi.fn()
     const onSort = vi.fn()
     const { container } = render(<DataTable columns={columns} rows={rows} selection={sel([])} onOpen={() => {}} sort={{ key: 'name', asc: true }} onSort={onSort}
@@ -240,7 +240,7 @@ describe('the column handles (C2)', () => {
     expect(onWidth).toHaveBeenLastCalledWith('ca', null)
   })
 
-  it('a gesture that ends on the automatic width sets nothing: no width kept, no Réinitialiser les colonnes (E8)', () => {
+  it('a gesture that ends on the automatic width sets nothing: no width kept, no Réinitialiser les colonnes', () => {
     const onWidth = vi.fn()
     const { container } = render(<DataTable columns={columns} rows={rows} columnWidths={{}} onColumnWidth={onWidth} />)
     // A column at its narrowest pushed further left, by the pointer then by the keyboard
@@ -322,7 +322,7 @@ describe('the column handles (C2)', () => {
     } finally { set.mockRestore(); remove.mockRestore() }
   })
 
-  it('a journal holds a width set by hand as it is, but never so that its region scrolls sideways (R1)', () => {
+  it('a journal holds a width set by hand as it is, but never so that its region scrolls sideways', () => {
     const saved = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth')
     // The region overflows while a header carries a width set by hand
     Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
@@ -426,7 +426,7 @@ describe('the list section', () => {
     view()
     expect(screen.getByRole('columnheader', { name: 'Conformité' })).toBeInTheDocument()
   })
-  it('Réinitialiser les colonnes: in the footer the widths (E7), in the Colonnes dialog the widths and the hidden columns', async () => {
+  it('Réinitialiser les colonnes: in the footer the widths, in the Colonnes dialog the widths and the hidden columns', async () => {
     localStorage.setItem('t-list-widths', JSON.stringify({ ca: 222 }))
     localStorage.setItem('t-list-columns', JSON.stringify({ hidden: ['description'] }))
     const { container } = view({ footer: <TableFooter range="1–2 sur 2" /> })

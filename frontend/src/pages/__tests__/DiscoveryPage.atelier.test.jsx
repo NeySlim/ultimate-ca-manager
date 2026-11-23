@@ -317,7 +317,7 @@ describe('the discovery dock in the URL', () => {
   })
 })
 
-describe('DiscoveryPage sorts each view (T1, T2, T4, T9)', () => {
+describe('DiscoveryPage sorts each view', () => {
   const sorted = () => screen.getAllByRole('columnheader').filter((h) => /ending/.test(h.getAttribute('aria-sort') || '')).map((h) => h.getAttribute('aria-sort'))
 
   it('asks the server for the certificates found in the nearest expiry first, and shows its page as it came', async () => {

@@ -1,7 +1,7 @@
 import { test, expect } from './support/fixtures'
 import type { Page, Locator } from '@playwright/test'
 
-// Settings and generic dialogs as typed facts (KV-3, zone E): a technical value in a chip that copies it whole,
+// Settings and generic dialogs as typed facts: a technical value in a chip that copies it whole,
 // no button in a value column but a chip's own, no word cut on a phone of 360 px.
 
 const stubClipboard = (page: Page) => page.evaluate(() => {

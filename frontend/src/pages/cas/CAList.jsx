@@ -47,7 +47,7 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, r
   const columns = [
     { id: 'name', label: t('common.name'), sort: 'name', kind: 'entity', priority: 1, grow: true, title: (r) => r.subject || r.label,
       icon: (r) => (r.type === 'root' ? 'shield' : 'branch'), cell: (r) => r.label,
-      // No box for a CA without a badge: an empty group would still count in the name's floor (G5)
+      // No box for a CA without a badge: an empty group would still count in the name's floor
       extra: (r) => (caMarks(r, t, { orphan: r.orphan }).length ? <span className="ca-badges"><CAMarks ca={r} t={t} orphan={r.orphan} /></span> : null) },
     { id: 'type', label: t('common.type'), sort: 'type', kind: 'fit', priority: 3, tone: 'muted', cell: (r) => r.type_label },
     { id: 'state', label: t('common.status'), sort: 'state', kind: 'fit', priority: 1, cell: (r) => <CAStatePill ca={r} t={t} /> },
@@ -73,7 +73,7 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, r
       sort={list.sort}
       onSort={list.onSort}
       rowActions={(r) => (r.state === 'pending' ? [] : [{ icon: 'download', label: t('cas.downloadCertificate'), onClick: () => onDownload?.(r) }])}
-      // The facts by priority, counts and the parent after their label; the expiry date named in the state line (R5)
+      // The facts by priority, counts and the parent after their label; the expiry date named in the state line
       card={(r) => ({
         meta: cardFacts(columns.filter((c) => c.id !== 'expiry'), r),
         note: caMarks(r, t, { orphan: r.orphan }).length > 0 && <span key="marks" className="ca-badges"><CAMarks ca={r} t={t} orphan={r.orphan} /></span>,

@@ -29,7 +29,7 @@ const HTTP_TEMPLATE_VARIABLES = [
 const TEMPLATE_HINT_VARS = {
   example: '{{name}}', jsonExample: '{{cert_pem|json}}', jsonstrExample: '{{cn|jsonstr}}', b64Example: '{{cert_pem|b64}}', urlExample: '{{cn|urlencode}}',
 }
-// The targets by name (T4)
+// The targets by name
 const BY_NAME = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'kind', 'connection', 'success', 'state']
 const HTTP_TEMPLATE_EXAMPLE = '{"name": {{name|json}}, "cert": {{cert_pem|json}}, "chain": {{chain_pem|json}}}'

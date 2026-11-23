@@ -6,7 +6,7 @@
  * 'certificates' (.cert-table), 'module' (.cert-table.module-table) or 'audit' (.audit-table).
  * A row or a record that opens does so from anywhere on it, its controls and a text selection aside;
  * a record keeps its chevron on screen (adjust.css).
- * The columns follow one contract and one layout (columnShare.js, COLONNES-SPEC).
+ * The columns follow one contract and one layout (columnShare.js).
  */
 import { useEffect, useLayoutEffect, useRef, useState, useId } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -54,7 +54,7 @@ const px = (v) => parseFloat(v) || 0
 
 /**
  * The width a header's label asks for: its text and arrow, plus the side padding of the cell and of its sort button,
- * which fills the cell (R4): the button's own box is the column's, not its label's.
+ * which fills the cell: the button's own box is the column's, not its label's.
  */
 function headerWidth(th) {
   const cs = getComputedStyle(th)
@@ -117,7 +117,7 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
   const [layout, setLayout] = useState(null)
   const [width, setWidth] = useState(0)
   const base = `${columns.map((c) => c.id).join(',')}|${rowsKey}|${width}|${sortKey ?? ''}|${lang ?? ''}`
-  // A content that changes under the same key (a state, a cell resolved later) and overflows measures once more (E3)
+  // A content that changes under the same key (a state, a cell resolved later) and overflows measures once more
   const [again, setAgain] = useState(null)
   const [, setGrown] = useState(0)
   const key = again === base ? `${base}|again` : base
@@ -127,7 +127,7 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
     if (!observe || !el || typeof ResizeObserver === 'undefined') return undefined
     const observer = new ResizeObserver(() => {
       setWidth(el.clientWidth)
-      // The dock opening shrinks the region: the open row stays in view (D4)
+      // The dock opening shrinks the region: the open row stays in view
       el.querySelector('tbody tr.opened')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
     })
     observer.observe(el)
@@ -174,7 +174,7 @@ function useColumnLayout(scrollRef, columns, { lead, trail, rowsKey, sortKey, ac
   return { measuring, width, folded: out.folded, caps: out.caps, held: out.fixed, widths: out.widths, absorber: out.absorber, measures: layout.measures, wide: layout.wide, settled }
 }
 
-/** The sign of a sortable column that is not the sorted one: two solid triangles in the label's colour (R3). */
+/** The sign of a sortable column that is not the sorted one: two solid triangles in the label's colour. */
 function SortIdle() {
   return (
     <svg className="icon sort-idle" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
@@ -183,7 +183,7 @@ function SortIdle() {
   )
 }
 
-/** The direction of a sort: an arrow with its shaft, not a chevron, which reads as a menu (R5, G8). */
+/** The direction of a sort: an arrow with its shaft, not a chevron, which reads as a menu. */
 export function SortArrow({ asc }) {
   return (
     <svg className="icon sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -193,9 +193,9 @@ export function SortArrow({ asc }) {
 }
 
 const plainLabel = (col) => (typeof col.label === 'string' ? col.label : col.labelFull || col.id)
-/** A column's name where there is room for it: its whole label, else its header's (E6). */
+/** A column's name where there is room for it: its whole label, else its header's. */
 const fullLabel = (col) => col.labelFull || plainLabel(col)
-/** A data column shows its label: a column labelled for screen readers only is an action, without a separator (M4). */
+/** A data column shows its label: a column labelled for screen readers only is an action, without a separator. */
 const labelled = (col) => typeof col.label === 'string' || Boolean(col.labelFull)
 
 /**
@@ -232,7 +232,7 @@ export function DataTable({
   const firstRead = loading && !rows.length
   const scrollRef = useRef(null)
   const cards = isMobile && card
-  // The widths set by hand (C2): the page's own (columnWidths, onColumnWidth), else kept here under the list's key;
+  // The widths set by hand: the page's own (columnWidths, onColumnWidth), else kept here under the list's key;
   // a drag or the arrows show a draft, kept on release, Enter or leaving the handle. Never on a phone.
   const controlled = Boolean(onColumnWidth)
   const storeKey = controlled || cards ? null
@@ -246,7 +246,7 @@ export function DataTable({
     lead: selection ? 1 : 0, trail: hasActions ? 1 : 0, rowsKey: rows.map(rowKey).join(','), sortKey: sort?.key, active: Boolean(k.share && !cards),
     observe: !cards, fixed: live, lang: i18n?.language,
   })
-  // A width set by hand never makes the region scroll sideways: past the room it is ignored for this render (R1)
+  // A width set by hand never makes the region scroll sideways: past the room it is ignored for this render
   const [dropped, setDropped] = useState(null)
   const guard = `${regionWidth}|${liveKey}`
   const held = dropped === guard ? {} : laid
@@ -259,7 +259,7 @@ export function DataTable({
   })
   const columns = folded.length ? allColumns.filter((c) => !folded.includes(c.id)) : allColumns
   const foldedLabels = allColumns.filter((c) => folded.includes(c.id)).map(fullLabel)
-  // The one column that takes the room left: the growing one, else the name (L7), unless set by hand
+  // The one column that takes the room left: the growing one, else the name, unless set by hand
   const absorber = laidAbsorber || (columns.find((c) => c.grow) || columns.find((c) => columnKind(c) === 'entity'))?.id
   const sortable = Boolean(onSort) && allColumns.some((c) => c.sort)
   const resetWidths = () => {
@@ -269,7 +269,7 @@ export function DataTable({
     scrollRef.current?.focus()
   }
   const reset = !cards && Object.keys(widths).length ? resetWidths : null
-  // Each handle's gestures by its column, so that the half of its zone in the next header starts the same drag (E1)
+  // Each handle's gestures by its column, so that the half of its zone in the next header starts the same drag
   const grips = useRef({})
   const resize = cards ? null : {
     draft: (id, w) => setDraft({ id, w }),
@@ -277,7 +277,7 @@ export function DataTable({
     cancel: () => setDraft(null),
     grips: grips.current,
   }
-  // The last data column draws no separator, nor do the columns of buttons after it (M4)
+  // The last data column draws no separator, nor do the columns of buttons after it
   const lastLabelled = columns.reduce((at, c, i) => (labelled(c) ? i : at), -1)
   const gripOf = (c) => (resize && c && c.resizable !== false && labelled(c) ? c.id : undefined)
 
@@ -292,13 +292,13 @@ export function DataTable({
   }
   const colSpan = columns.length + (selection ? 1 : 0) + (hasActions ? 1 : 0)
 
-  // The open row stays in view after a sort or a fold (D4)
+  // The open row stays in view after a sort or a fold
   const foldedKey = folded.join(',')
   useEffect(() => {
     scrollRef.current?.querySelector('tbody tr.opened')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
   }, [openedId, sort?.key, sort?.asc, foldedKey])
 
-  // Each change of the sort is said in words to a screen reader (T6)
+  // Each change of the sort is said in words to a screen reader
   const [announce, setAnnounce] = useState('')
   const lastSort = useRef(sort)
   useEffect(() => {
@@ -347,7 +347,7 @@ export function DataTable({
     <FoldedColumns.Provider value={foldedLabels.length ? foldedLabels : null}>
     <ColumnsReset.Provider value={reset}>
       {cards && sortable && (
-        // On a phone the headers are gone: the same sort from a select and a button that reverses it (R5)
+        // On a phone the headers are gone: the same sort from a select and a button that reverses it
         <div className="toolbar mobile-sort">
           <FilterSelect id={scrollId ? `${scrollId}-sort` : undefined} label={t('table.sortBy')} value={sort?.key || ''} onChange={(v) => onSort(v)}
             options={[...(sort?.key ? [] : [{ value: '', label: t('table.sortBy') }]), ...sortables.map((c) => ({ value: c.sort, label: t('table.sortByColumn', { column: fullLabel(c) }) }))]} />
@@ -417,7 +417,7 @@ export function DataTable({
                       )}
                       {columns.map((c) => {
                         const content = c.entity || c.kind === 'entity' || c.resource ? openButton(row, c) : c.cell(row)
-                        // Free text that may end in an ellipsis names its whole text: the column's title, else the text itself (L6)
+                        // Free text that may end in an ellipsis names its whole text: the column's title, else the text itself
                         const tip = c.title ? c.title(row) : columnKind(c) === 'text' && typeof content === 'string' && content !== '—' ? content : undefined
                         return <td key={c.id} className={cellClass(c, kind)} title={tip || undefined} style={cellStyle(c)}>{content}</td>
                       })}
@@ -437,7 +437,7 @@ export function DataTable({
             </table>
           </div>
         )}
-        {/* A list without a footer gets one while it folds columns (R3) or a width is set */}
+        {/* A list without a footer gets one while it folds columns or a width is set */}
         {footer || ((reset || foldedLabels.length > 0) && <footer className="table-footer"><FoldedNote /><ResetColumns /></footer>)}
       </div>
     </ColumnsReset.Provider>
@@ -448,10 +448,10 @@ export function DataTable({
 /**
  * A header: a sort button when the list sorts by it (aria-sort, an arrow for the sorted direction, both arrows
  * otherwise); without onSort the sorted column only shows its arrow. A separator before the next header, which is
- * the handle that sets the column's width (C2): drag, double-click for the automatic width, or from the keyboard.
+ * the handle that sets the column's width: drag, double-click for the automatic width, or from the keyboard.
  */
 /**
- * The half of a handle's zone that lies in the next header (E1): 12 px at its left, on the margin of its label,
+ * The half of a handle's zone that lies in the next header: 12 px at its left, on the margin of its label,
  * that starts the same drag and double-click as the handle; hidden from the keyboard and screen readers.
  */
 function GripLead({ id, resize }) {
@@ -487,7 +487,7 @@ function HeaderCell({ col, className, sort, onSort, last, lead, width, requested
   const pending = useRef(null)
   const pendingFrom = useRef(null)
   const [dragging, setDragging] = useState(false)
-  // The automatic width a gesture starts from: a drag or the arrows that end on it set nothing (E8)
+  // The automatic width a gesture starts from: a drag or the arrows that end on it set nothing
   const autoWidth = requested === undefined ? Math.round(now) : null
   const keep = (w, from) => (w === from ? resize.cancel() : resize.commit(col.id, w))
   const down = (e) => {
@@ -562,10 +562,10 @@ function HeaderCell({ col, className, sort, onSort, last, lead, width, requested
     pending.current = null
   }
   const arrow = sorted ? <SortArrow asc={sort.asc} /> : button ? <SortIdle /> : null
-  // A number's arrow comes first, so that its label ends on the digits' right edge (L9)
+  // A number's arrow comes first, so that its label ends on the digits' right edge
   const content = columnKind(col) === 'number' ? <>{arrow}{col.label}</> : <>{col.label}{arrow}</>
   const full = col.labelFull ? { title: col.labelFull, 'aria-label': col.labelFull } : {}
-  // The button says what a click does: sort by the column, or reverse the sort it shows (R4)
+  // The button says what a click does: sort by the column, or reverse the sort it shows
   const does = sorted
     ? t('table.sortedByReverse', { column: fullLabel(col), order: t(sort.asc ? 'table.sortAscending' : 'table.sortDescending') })
     : t('table.sortByColumn', { column: fullLabel(col) })

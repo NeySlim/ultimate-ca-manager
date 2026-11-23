@@ -1,5 +1,5 @@
 /**
- * CASideDetails as typed rows (KV-3): constraints, extensions, fingerprints and metadata are Facts; a digest
+ * CASideDetails as typed rows: constraints, extensions, fingerprints and metadata are Facts; a digest
  * or a key identifier is a hex chip, a URL a url chip, both copied whole; a missing value is an absence.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'

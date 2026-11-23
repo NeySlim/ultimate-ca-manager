@@ -1,5 +1,5 @@
 /**
- * The columns of the ACME accounts and history (COLONNES-SPEC T1, T2, T4, T9, L7): the name takes the room left, one
+ * The columns of the ACME accounts and history: the name takes the room left, one
  * column sorted from the first render, the sort in the address; the accounts read every page of the server before
  * sorting in memory, the history is sorted by the server and shown in its order.
  */
@@ -114,7 +114,7 @@ describe('the ACME history list', () => {
     await screen.findByRole('button', { name: 'h200.example.com' })
     fireEvent.click(screen.getByRole('button', { name: 'table.fullExpires' }))
     await waitFor(() => expect(acmeService.getHistory.mock.calls.at(-1)[0]).toMatchObject({ page: 1, sort_by: 'valid_to', sort_order: 'asc' }))
-    // A change of view drops the sort of the one left (T9)
+    // A change of view drops the sort of the one left
     fireEvent.click(screen.getByRole('tab', { name: /^acme\.views\.accounts/ }))
     expect(at.where()).toBe('/acme')
   })

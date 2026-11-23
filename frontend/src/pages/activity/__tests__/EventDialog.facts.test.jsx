@@ -1,5 +1,5 @@
 /**
- * The detail of a journal entry as typed facts (KV-3, zone E): its result as a state, its IP address in a chip that
+ * The detail of a journal entry as typed facts: its result as a state, its IP address in a chip that
  * copies it, no button beside a value, the client's long signature on a long row.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'

@@ -2,7 +2,7 @@
 
 const DAY = 24 * 3600 * 1000
 
-/** The state of a CRL from its real dates: none, past its nextUpdate, due within 24 h, up to date (M12). */
+/** The state of a CRL from its real dates: none, past its nextUpdate, due within 24 h, up to date. */
 export function crlState(row, now = Date.now()) {
   if (!row.has_crl) return 'none'
   const next = row.crl_next_update ? Date.parse(row.crl_next_update) : NaN

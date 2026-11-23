@@ -170,7 +170,7 @@ describe('ChainUsageSection', () => {
     await waitFor(() => expect(mocks.getChainUsage).toHaveBeenCalledTimes(2))
   })
 
-  // KV-3: a block is a typed row, its count and its list in the value, under its term when narrow
+  // A block is a typed row, its count and its list in the value, under its term when narrow
   it('draws each block as a row of Facts, its count and its list in the value', async () => {
     mocks.getChainUsage.mockResolvedValue(usage({ issued: section({ count: 1, items: [cert] }) }))
     const { container } = renderIt()

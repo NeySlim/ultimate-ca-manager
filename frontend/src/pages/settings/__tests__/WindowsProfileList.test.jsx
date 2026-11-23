@@ -70,7 +70,7 @@ describe('WindowsProfileList', () => {
     expect(mocks.list).toHaveBeenCalledWith({ page: 1, per_page: 25, ...BY_NAME })
     expect(screen.queryByText('profile-026')).not.toBeInTheDocument()
     expect(screen.getAllByText(/^profile-\d{3}$/)).toHaveLength(25)
-    // Its own region among the settings' lists (E12)
+    // Its own region among the settings' lists
     expect(screen.getByText('profile-001').closest('.table-scroll')).toHaveAttribute('id', 'windows-profiles-scroll')
   })
 
@@ -91,7 +91,7 @@ describe('WindowsProfileList', () => {
       { page: 1, per_page: 25, ...BY_NAME, ca: 'ca-refid-1', state: 'keytab_missing' }))
   })
 
-  it('sorts by the server from its headers, back to the first page, the order kept in the address (T2, T9)', async () => {
+  it('sorts by the server from its headers, back to the first page, the order kept in the address', async () => {
     renderList()
     await screen.findByText('profile-001')
     expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')

@@ -34,7 +34,7 @@ const PROVIDER_TYPES = [
 const STATES = { connected: 'good', error: 'bad', disconnected: 'muted', unknown: 'muted' }
 const stateOf = (p) => (STATES[p.status] ? p.status : 'unknown')
 const typeLabel = (p) => PROVIDER_TYPES.find((x) => x.value === p.provider_type)?.label || p.provider_type
-// Named configuration: by name (T4), kept in the address
+// Named configuration: by name, kept in the address
 const BY_NAME = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'type', 'keys', 'checked', 'state']
 

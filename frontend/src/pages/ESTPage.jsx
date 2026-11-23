@@ -2,7 +2,7 @@
  * EST: the mockup's est module, a simplePage() list (Autorité, Authentification, État) with its
  * one-object dock, on the endpoints the product really serves: the default one and one per CA
  * label (/.well-known/est/<label>/). Its configuration takes the mockup's settingsView(). Named
- * profiles with their own activation, authentication and last request (M09) are a function the
+ * profiles with their own activation, authentication and last request are a function the
  * product lacks: activation and HTTP Basic credentials are shared by every endpoint.
  */
 import { useState, useEffect, useMemo, useRef } from 'react'
@@ -42,7 +42,7 @@ const draftOf = (c) => ({
 })
 
 const DEFAULT_ITEM = 'default'
-// The endpoints by name (T4), the sort kept in the address of the list view (T9)
+// The endpoints by name, the sort kept in the address of the list view
 const BY_NAME = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'ca', 'auth', 'state']
 const NO_KEYS = []

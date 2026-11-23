@@ -1,5 +1,5 @@
 /**
- * The header of a fit or number column of the PKI lists is short in every language (COLONNES-SPEC L8):
+ * The header of a fit or number column of the PKI lists is short in every language:
  * 16 characters at most, the whole label going to labelFull when a short one is needed.
  */
 import { describe, it, expect } from 'vitest'

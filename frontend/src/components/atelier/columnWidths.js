@@ -1,5 +1,5 @@
 /**
- * The widths a list's columns were given by hand (COLONNES-SPEC C2), kept in this browser under the list's key
+ * The widths a list's columns were given by hand, kept in this browser under the list's key
  * ({ id: px }); storage refused (private mode, quota) keeps them for the session only.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'

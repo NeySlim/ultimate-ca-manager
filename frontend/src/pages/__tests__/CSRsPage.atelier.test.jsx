@@ -100,7 +100,7 @@ describe('CSRs list', () => {
     expect(getHistory).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, per_page: 25 }))
   })
 
-  it('opens on the newest submitted first, asked of the server, every column but the state sorting (T1, T4)', async () => {
+  it('opens on the newest submitted first, asked of the server, every column but the state sorting', async () => {
     const { container } = renderAt()
     await screen.findByRole('button', { name: 'CSR-139' })
     expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'created_at', sort_order: 'desc', page: 1 }))
@@ -109,7 +109,7 @@ describe('CSRs list', () => {
     expect(absorbing(container)).toEqual(['Subject'])
   })
 
-  it('sorts on the server in two states, back to page one, kept in the address (T3, T9)', async () => {
+  it('sorts on the server in two states, back to page one, kept in the address', async () => {
     getAll.mockImplementation((p) => page([PENDING], p.per_page === 1 ? 1 : 60))
     const at = renderAtUrl(<CSRsPage />, '/csrs')
     await screen.findByRole('button', { name: 'CSR-139' })
@@ -131,7 +131,7 @@ describe('CSRs list', () => {
     expect(at.where()).toBe('/csrs?tab=history')
   })
 
-  it('reads the sort of a link, and falls back on the default for an unknown key (T9)', async () => {
+  it('reads the sort of a link, and falls back on the default for an unknown key', async () => {
     const at = renderAtUrl(<CSRsPage />, '/csrs?sort=key_type&order=desc')
     await screen.findByRole('button', { name: 'CSR-139' })
     expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ sort_by: 'key_type', sort_order: 'desc' }))

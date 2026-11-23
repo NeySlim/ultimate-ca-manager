@@ -122,7 +122,7 @@ describe('contrast of the palettes', () => {
               expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(min)
             })
           }
-          it('writes a technical value and a row\'s action 7:1, muted text 4.5:1, on their veil of the accent (KV)', () => {
+          it('writes a technical value and a row\'s action 7:1, muted text 4.5:1, on their veil of the accent', () => {
             const veils = ['.code-value', '.btn-sm'].flatMap((cls) => valuesOf(auroreRules(ADJUST, mode), new RegExp(`\\${cls}$`), 'background'))
             expect(veils).toHaveLength(2)
             for (const veil of veils) {

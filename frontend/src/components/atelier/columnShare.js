@@ -1,5 +1,5 @@
 /**
- * The column contract of the lists and their layout (COLONNES-SPEC L3 to L7, R1, R2), as pure functions:
+ * The column contract of the lists and their layout, as pure functions:
  * DataTable measures the natural widths, these decide the widths, the absorbing column and the folds.
  */
 
@@ -62,7 +62,7 @@ export function foldOrder(columns, sortKey) {
 }
 
 /**
- * One state of the list (these columns shown) at one level of floors, the need first (R1, R2): every column starts at
+ * One state of the list (these columns shown) at one level of floors, the need first: every column starts at
  * its natural width, no ceiling; short of room the growing text gives way first, down to its comfort floor (its hard
  * floor at the 'hard' level, R8), then the name and the texts together, in proportion to what each has above its
  * comfort floor; at the 'hard' level, then above its hard floor.
@@ -85,11 +85,11 @@ function share(shown, measures, room, level, wide, fixed = {}) {
     } else if (kind === 'text') {
       // A text never grows to reach a floor: a short one keeps its own width
       hard = Math.min(natural, Math.max(c.id === absorber ? BOUNDS.growMin : BOUNDS.textMin, header))
-      // The growing text keeps the comfort of any text while a column of priority 3 or 4 can fold (R8)
+      // The growing text keeps the comfort of any text while a column of priority 3 or 4 can fold
       comfort = Math.max(hard, Math.min(natural, BOUNDS.textComfort))
     }
     span[c.id] = { natural, need, hard, comfort, kind }
-    // A width set by hand is a fixed need, never under the column's hard floor (C2)
+    // A width set by hand is a fixed need, never under the column's hard floor
     if (fixed[c.id]) {
       const w = Math.max(fixed[c.id], hard)
       span[c.id] = { natural, need: w, hard: w, comfort: w, kind, fixed: w }
@@ -139,7 +139,7 @@ function share(shown, measures, room, level, wide, fixed = {}) {
 /**
  * The layout of a list in `room` px (its region less the checkbox and the actions), from each column's measures
  * ({ natural, header, floor }): the fewest folds, in foldOrder, with which the columns fit. No column of priority 1
- * or 2 goes under its comfort floor while a column of priority 3 or 4 can still fold (R2).
+ * or 2 goes under its comfort floor while a column of priority 3 or 4 can still fold.
  * `fixed`: the widths set by hand ({ id: px }).
  * @returns {{ folded: string[], widths: Record<string, number>, caps: Record<string, {min?, max?}>, absorber: string|null,
  *   fixed: Record<string, number>, fits: boolean }}  `fixed`: the widths set by hand this layout holds
@@ -156,7 +156,7 @@ export function layoutColumns(columns, measures, room, { sortKey, wide = false, 
     }
   }
   // Widths set by hand hold while the columns fit, other columns folding first; when only folding a column set by
-  // hand would make room, the widths are ignored for this render (C2)
+  // hand would make room, the widths are ignored for this render
   const set = Object.fromEntries(Object.entries(fixed || {}).filter(([id, w]) => w > 0 && columns.some((c) => c.id === id)))
   const plain = run({})
   if (Object.keys(set).length) {
@@ -166,7 +166,7 @@ export function layoutColumns(columns, measures, room, { sortKey, wide = false, 
   return plain
 }
 
-// A handle's bounds and steps (C2): 64 to 640 px, by 16, by 64 with Shift
+// A handle's bounds and steps: 64 to 640 px, by 16, by 64 with Shift
 export const RESIZE = { min: 64, max: 640, step: 16, bigStep: 64 }
 
 /**

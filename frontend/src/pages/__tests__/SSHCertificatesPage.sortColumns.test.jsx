@@ -76,7 +76,7 @@ describe('SSHCertificatesPage: sortable columns', () => {
     casGetAll.mockResolvedValue({ data: [] })
   })
 
-  it('opens on the nearest expiry; every column the server sorts offers it, the principals do not (T1, T4)', async () => {
+  it('opens on the nearest expiry; every column the server sorts offers it, the principals do not', async () => {
     const { container } = render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
     await screen.findByText('c')
     expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'asc', page: 1 })
@@ -85,7 +85,7 @@ describe('SSHCertificatesPage: sortable columns', () => {
     expect(absorbing(container)).toEqual(['sshCertificates.principals'])
   })
 
-  it('keeps every principal in the cell and its title, an ellipsis shortening it (L6)', async () => {
+  it('keeps every principal in the cell and its title, an ellipsis shortening it', async () => {
     getAll.mockResolvedValue({ data: [{ id: 1, key_id: 'c', cert_type: 'user', principals: ['alice', 'bob', 'carol', 'deploy'], ca_name: 'CA',
       valid_to: '2030-01-01T00:00:00Z' }], meta: { total: 1 } })
     render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
@@ -93,7 +93,7 @@ describe('SSHCertificatesPage: sortable columns', () => {
     expect(cell.closest('td')).toHaveAttribute('title', 'alice, bob, carol, deploy')
   })
 
-  it('sorts by the authority and the state on the server, back to page one, kept in the address (T2, T9)', async () => {
+  it('sorts by the authority and the state on the server, back to page one, kept in the address', async () => {
     getAll.mockResolvedValue({ data: [{ id: 1, key_id: 'c', cert_type: 'user', principals: ['a'], ca_name: 'CA', valid_to: '2030-01-01T00:00:00Z' }], meta: { total: 60 } })
     const at = renderAtUrl(<SSHCertificatesPage />, '/ssh/certificates')
     await screen.findByText('c')
@@ -110,7 +110,7 @@ describe('SSHCertificatesPage: sortable columns', () => {
     expect(lastParams()).toMatchObject({ sort_by: 'key_id', sort_order: 'desc' })
   })
 
-  it('draws a phone record by priority: the expiry after its label (R5)', async () => {
+  it('draws a phone record by priority: the expiry after its label', async () => {
     stable.mobile = true
     render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
     await screen.findByText('c')

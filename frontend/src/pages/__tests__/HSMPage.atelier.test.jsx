@@ -61,7 +61,7 @@ beforeEach(() => {
 const rowOf = (name) => screen.getAllByRole('row').find((r) => within(r).queryByRole('button', { name }))
 
 describe('the HSM list', () => {
-  it('opens by name, sorts every column from its header, keeps the sort in the address and reads it back (T1, T4, T9)', async () => {
+  it('opens by name, sorts every column from its header, keeps the sort in the address and reads it back', async () => {
     const r = renderAtUrl(<HSMPage />, '/hsm')
     await screen.findByRole('button', { name: 'Partition 1' })
     const names = () => [...document.querySelectorAll('tbody .entity-label')].map((n) => n.textContent)
@@ -216,7 +216,7 @@ describe('the provider dock in the URL', () => {
   })
 })
 
-describe('the HSM dock as facts (KV-3)', () => {
+describe('the HSM dock as facts', () => {
   it('writes a provider never checked and an undeclared certification muted, its state a pill', async () => {
     const r = renderAtUrl(<HSMPage />, '/hsm?item=2')
     await r.dock()

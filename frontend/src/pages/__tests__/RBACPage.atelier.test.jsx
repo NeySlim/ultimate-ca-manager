@@ -180,7 +180,7 @@ describe('the role dock in the URL', () => {
     expect(r.where()).toBe('/rbac?item=1')
   })
 
-  it('opens by name, sorts every column from its header, keeps the sort in the address and reads it back (T1, T4, T9)', async () => {
+  it('opens by name, sorts every column from its header, keeps the sort in the address and reads it back', async () => {
     const r = renderAtUrl(<RBACPage />, '/rbac')
     await screen.findByRole('button', { name: 'Cert Team' })
     expect(sortedHeads()).toEqual([['atelier.name', 'ascending']])

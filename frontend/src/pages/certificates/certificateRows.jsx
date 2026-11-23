@@ -62,7 +62,7 @@ export const SORT_FIELDS = {
 
 /**
  * The phone record: the description, the facts of the columns by priority (the issuer after its label), the key
- * note, then the state and the expiry date after its label, where the mockup puts it (R5).
+ * note, then the state and the expiry date after its label, where the mockup puts it.
  */
 export function certificateCard(t) {
   const facts = certificateColumns(t).filter((c) => c.id !== 'expiry')

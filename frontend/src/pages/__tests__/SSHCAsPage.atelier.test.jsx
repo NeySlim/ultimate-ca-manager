@@ -98,7 +98,7 @@ describe('the SSH CA list', () => {
     }
   })
 
-  it('opens on the name ascending, the name taking the room left, the count at the right (T1, T4, L7, L9)', async () => {
+  it('opens on the name ascending, the name taking the room left, the count at the right', async () => {
     const { container } = page()
     await screen.findByRole('button', { name: 'Users CA' })
     expect(sortedHeaders(container)).toEqual([['atelier.name', 'ascending']])
@@ -107,7 +107,7 @@ describe('the SSH CA list', () => {
     expect(numberHeads(container)).toEqual(['sshCas.stats.certificates'])
   })
 
-  it('keeps another sort in the address and reads it back (T9)', async () => {
+  it('keeps another sort in the address and reads it back', async () => {
     const at = renderAtUrl(<SSHCAsPage />, '/ssh/cas')
     await screen.findByRole('button', { name: 'Users CA' })
     fireEvent.click(at.container.querySelector('[data-sort="certs"]'))
@@ -119,7 +119,7 @@ describe('the SSH CA list', () => {
     expect(again.container.querySelector('tbody .entity-name')).toHaveTextContent('Users CA')
   })
 
-  it('draws a phone record whose count is said (R5)', async () => {
+  it('draws a phone record whose count is said', async () => {
     m.mobile = true
     page()
     await screen.findByRole('button', { name: 'Users CA' })
@@ -233,7 +233,7 @@ describe('the SSH CA dock in the URL', () => {
   })
 })
 
-describe('the SSH CA dock in typed rows (KV-3)', () => {
+describe('the SSH CA dock in typed rows', () => {
   const rowIn = (dock, label) => within(dock).getByText(label, { selector: 'dt' }).closest('div.row')
   const openUsers = async () => {
     const { container } = page()

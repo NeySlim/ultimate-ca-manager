@@ -106,7 +106,7 @@ describe('the SSH certificate list', () => {
     expect(screen.getByRole('link', { name: 'sshCas.title' })).toHaveAttribute('href', '/ssh/cas')
   })
 
-  it('keeps a long principal list whole in its cell and its title, the ellipsis shortening it (L6)', async () => {
+  it('keeps a long principal list whole in its cell and its title, the ellipsis shortening it', async () => {
     page()
     const row = (await screen.findByRole('button', { name: 'alice' })).closest('tr')
     const cell = within(row).getByText('ops, dba, web').closest('td')
@@ -173,7 +173,7 @@ describe('the SSH certificate dock in the URL', () => {
   })
 })
 
-describe('the SSH certificate dock in typed rows (KV-3)', () => {
+describe('the SSH certificate dock in typed rows', () => {
   const FP = 'SHA256:9fT1bW0x3hJp2Lq7Vz8Kc5Nd4Rm6Ys1Ae0Gu2Io3Pk'
   const BOB = { ...ALICE, id: 2, key_id: 'bob', principals: [], extensions: [], fingerprint: FP, ca_fingerprint: 'SHA256:caFP', key_type: null }
   const rowIn = (dock, label) => within(dock).getByText(label, { selector: 'dt' }).closest('div.row')

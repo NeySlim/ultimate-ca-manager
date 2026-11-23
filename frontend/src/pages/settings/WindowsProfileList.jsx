@@ -7,7 +7,7 @@ import { PROFILE_STATES } from '../../lib/windowsProfile'
 
 const DEBOUNCE_MS = 300
 const STATE_TONE = { complete: 'good', keytab_missing: 'warn', connector_failing: 'bad', disabled: 'muted' }
-// The server pages the profiles: each sortable column's key there; by name (T4), in the address under this list's scope
+// The server pages the profiles: each sortable column's key there; by name, in the address under this list's scope
 const SERVER_SORT = { name: 'name', realm: 'realm', state: 'status' }
 const BY_NAME = { key: 'name', asc: true }
 

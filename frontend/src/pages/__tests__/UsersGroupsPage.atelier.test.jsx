@@ -122,7 +122,7 @@ describe('the account list', () => {
     expect(screen.getByRole('button', { name: 'Chloé Durand' })).toBeTruthy()
   })
 
-  it('opens by name, keeps the sort in the address and reads it back (T4, T9); the e-mail gives way first', async () => {
+  it('opens by name, keeps the sort in the address and reads it back; the e-mail gives way first', async () => {
     const at = { search: '' }
     function Where() { at.search = useLocation().search; return null }
     const r = render(<MemoryRouter initialEntries={['/users']}><UsersGroupsPage /><Where /></MemoryRouter>)
@@ -363,7 +363,7 @@ describe('the groups view', () => {
   it('opens on the groups from the address', async () => {
     page('/users?tab=groups')
     expect(await screen.findByRole('button', { name: 'pki-ops' })).toBeTruthy()
-    // Its three columns sort too, by name first (T4)
+    // Its three columns sort too, by name first
     expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
     for (const name of ['common.description', 'groups.members']) {
       fireEvent.click(screen.getByRole('button', { name }))

@@ -27,7 +27,7 @@ function CategoryBox({ label, all, some, disabled, onChange }) {
 }
 
 const ROLE_SECTIONS = ['overview', 'permissions']
-// Named configuration: by name (T4), kept in the address
+// Named configuration: by name, kept in the address
 const BY_NAME = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'description', 'inherits', 'permissions', 'users', 'state']
 

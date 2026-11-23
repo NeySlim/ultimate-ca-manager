@@ -1,5 +1,5 @@
 /**
- * The layout of a list in its region (DataTable, COLONNES-SPEC G1): one column takes the room left, the others are
+ * The layout of a list in its region (DataTable): one column takes the room left, the others are
  * fitted within their bounds, the columns fold by priority at any desktop width and the footer says how many, the
  * sorted column never folds, numbers read at the right, the checkbox column is 40 px, the open row is marked and kept
  * in view, the chevron and row actions are never hidden but the Certificates' Export.
@@ -85,7 +85,7 @@ describe('one column takes the room left', () => {
     expect(container.querySelector('table')).not.toHaveClass('measuring')
   })
 
-  it('bounds no name nor text while the sum fits (R1); short of room, an ellipsis and its title after them', () => {
+  it('bounds no name nor text while the sum fits; short of room, an ellipsis and its title after them', () => {
     const before = { ...NATURAL }
     Object.assign(NATURAL, { name: 520, ca: 410 })
     try {
@@ -95,7 +95,7 @@ describe('one column takes the room left', () => {
       expect(cellOf(container, 'ca').style.maxWidth).toBe('')
       expect(cellOf(container, 'ca')).toHaveClass('text-cell')
       expect(cellOf(container, 'ca')).toHaveAttribute('title', 'UCM Production Intermediate CA')
-      // 1360 of room: the description at its comfort, 160 (R8), the name and the issuer share the last 100 px above theirs
+      // 1360 of room: the description at its comfort, 160, the name and the issuer share the last 100 px above theirs
       resize(1400)
       expect(parseFloat(cellOf(container, 'name').style.maxWidth)).toBeCloseTo(471.02, 1)
       expect(parseFloat(cellOf(container, 'ca').style.maxWidth)).toBeCloseTo(358.98, 1)
@@ -182,7 +182,7 @@ describe('short of room, at any desktop width', () => {
   })
 })
 
-describe('measured again when the content changes under the same rows (E3)', () => {
+describe('measured again when the content changes under the same rows', () => {
   // The key column's content grows (a longer label, a state that becomes « Révoqué ») without a new row nor width
   const grown = (body) => {
     const before = NATURAL.key
@@ -224,7 +224,7 @@ describe('measured again when the content changes under the same rows (E3)', () 
   }))
 })
 
-describe('a list without a footer of its own (M2)', () => {
+describe('a list without a footer of its own', () => {
   it('gets one that says how many columns it folded, and their whole names', () => {
     room.width = 850
     const cols = columns.map((c) => (c.id === 'description' ? { ...c, labelFull: 'Description du certificat' } : c))
@@ -237,7 +237,7 @@ describe('a list without a footer of its own (M2)', () => {
   })
 })
 
-describe('a width set by hand beside the folds (C2)', () => {
+describe('a width set by hand beside the folds', () => {
   const widened = (props = {}) => table({ columnWidths: { ca: 400 }, onColumnWidth: () => {}, ...props })
 
   it('holds while it fits: the header and the cells at 400 px, the description takes the rest', () => {
@@ -273,7 +273,7 @@ describe('a width set by hand beside the folds (C2)', () => {
   })
 })
 
-describe('a name with badges under it (the authorities, G5)', () => {
+describe('a name with badges under it (the authorities)', () => {
   // A group of badges spans the cell (adjust.css): its box is the cell's, 535 px; its badges are 90 and 70 px
   const WIDTH = { 'ca-badges': 535, chip: 0, 'entity-name': 262 }
   beforeAll(() => {

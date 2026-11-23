@@ -1,5 +1,5 @@
 /**
- * The HSM provider as typed rows (KV-3): a URL or a path in a chip that copies it whole, an identifier
+ * The HSM provider as typed rows: a URL or a path in a chip that copies it whole, an identifier
  * in a chip, a value the provider does not hold muted.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'

@@ -1,9 +1,9 @@
 import { test, expect, createCA, issueCert, createUser, uid } from './support/fixtures'
 
-// The governance and administration lists on the column template (COLONNES-SPEC, lot P3), measured where jsdom
+// The governance and administration lists on the column template, measured where jsdom
 // cannot: no list scrolls sideways at any desktop width, dock closed or at the right; no header is clipped, no fitted
-// cell cut, no free text cut without its whole text in a title; one column sorted from the first view (T4); the
-// checkbox is 40 px (D2); the tables of the settings keep the 36 px row (D1); on a phone, the sort from the toolbar.
+// cell cut, no free text cut without its whole text in a title; one column sorted from the first view; the
+// checkbox is 40 px; the tables of the settings keep the 36 px row; on a phone, the sort from the toolbar.
 
 const LISTS = [
   { name: 'users', url: '/users', region: '#module-scroll', sorted: 'Name' },

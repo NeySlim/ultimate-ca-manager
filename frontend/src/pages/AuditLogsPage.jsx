@@ -26,7 +26,7 @@ import { ExportDialog, ActionsDialog, CleanupDialog } from './activity/JournalDi
 import { FiltersDialog } from './activity/FiltersDialog'
 
 const PAGE_SIZES = [10, 25, 50, 100]
-// A journal sorts by its time only, the newest first (T7), by the server, kept in the address
+// A journal sorts by its time only, the newest first, by the server, kept in the address
 const NEWEST_FIRST = { key: 'timestamp', asc: false }
 const TIME_KEYS = ['timestamp']
 const PRESETS_KEY = 'ucm-audit-presets'
@@ -337,7 +337,7 @@ export default function AuditLogsPage() {
   const columns = [
     { id: 'time', label: t('audit.colTime'), fit: true, sort: 'timestamp', tone: ['mono', 'muted'], cell: (e) => rowTime(e.timestamp, locale), skeleton: { width: '64px' } },
     { id: 'operation', label: t('audit.colOperation'), cell: (e) => <span className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action, t)}</span>, skeleton: { base: 45, spread: 35 } },
-    // The resource takes the room left and gives way by an ellipsis, its whole text in a title (audit-resource, R1, L6)
+    // The resource takes the room left and gives way by an ellipsis, its whole text in a title (audit-resource)
     { id: 'resource', label: t('audit.colResource'), resource: true, tone: 'audit-resource', title: resourceOf, cell: resourceOf, skeleton: { base: 50, spread: 40 } },
     { id: 'user', label: t('audit.colUser'), fit: true, tone: ['muted', 'small'], cell: (e) => e.username || t('common.system'), skeleton: { width: '70px' } },
     { id: 'result', label: t('audit.colResult'), fit: true, cell: badgeOf, skeleton: { width: '74px', kind: 'pill' } },

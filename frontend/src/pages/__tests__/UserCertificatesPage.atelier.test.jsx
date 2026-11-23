@@ -123,7 +123,7 @@ describe('the enrolment dock in the URL', () => {
   })
 })
 
-describe('the enrolment dock in typed rows (KV-3)', () => {
+describe('the enrolment dock in typed rows', () => {
   const FP = 'AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01'
   const rowIn = (dock, label) => within(dock).getByText(label, { selector: 'dt' }).closest('div.row')
   const openRow = async (row) => {

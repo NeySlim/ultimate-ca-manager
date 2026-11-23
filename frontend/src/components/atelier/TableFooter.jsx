@@ -24,7 +24,7 @@ export function TableFooter({ range, note, pagination }) {
   )
 }
 
-/** The columns the list folded for want of room: their number, their whole names in its title (R3, E6). */
+/** The columns the list folded for want of room: their number, their whole names in its title. */
 export function FoldedNote() {
   const { t } = useTranslation()
   const folded = useContext(FoldedColumns)
@@ -32,7 +32,7 @@ export function FoldedNote() {
   return <span className="folded-note" title={folded.join(', ')}>{t('table.foldedColumns', { count: folded.length })}</span>
 }
 
-/** The widths set by hand back to automatic, offered by the list while one is set (DataTable, C2). */
+/** The widths set by hand back to automatic, offered by the list while one is set (DataTable). */
 export function ResetColumns() {
   const { t } = useTranslation()
   const reset = useContext(ColumnsReset)

@@ -31,7 +31,7 @@ const pageOf = (res) => {
   return Array.isArray(data) ? { items: data, total: data.length } : { items: data?.items ?? [], total: data?.total ?? data?.items?.length ?? 0 }
 }
 
-// Each view's default sort (T4), kept in the address; a change of view drops it
+// Each view's default sort, kept in the address; a change of view drops it
 const BY_NAME = { key: 'name', asc: true }
 const LATEST_FIRST = { key: 'started', asc: false }
 const EXPIRY_FIRST = { key: 'expires', asc: true }

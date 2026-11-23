@@ -61,7 +61,7 @@ describe('AdConnectorSection', () => {
     expect(screen.getByText('adConnector.domainSidUnknown')).toBeInTheDocument()
     expect(screen.getByText('adConnector.healthStateDown')).toBeInTheDocument()
     expect(screen.getByText('adConnector.healthStateUp')).toBeInTheDocument()
-    // Its own region among the settings' lists (E12)
+    // Its own region among the settings' lists
     expect(screen.getByText('forest-a').closest('.table-scroll')).toHaveAttribute('id', 'ad-connectors-scroll')
   })
 
@@ -104,7 +104,7 @@ describe('AdConnectorSection', () => {
     expect(screen.queryByText(/deleteRefusedMore/)).not.toBeInTheDocument()
   })
 
-  it('opens by name, sorts every data column from its header, the order in the address under its own scope (T1, T4, T9)', async () => {
+  it('opens by name, sorts every data column from its header, the order in the address under its own scope', async () => {
     mocks.list.mockResolvedValue({ data: [{ ...CONNECTORS[1], last_test_at: '2026-11-20T10:00:00Z' }, CONNECTORS[0]] })
     const at = { search: '' }
     function Where() { at.search = useLocation().search; return null }

@@ -3,7 +3,7 @@
  * dock (Aperçu), on the server's certificate policies. What the product has more (operations,
  * priority, approval, the rules, search and operation filter, creation, edit, enable / disable and
  * removal) takes the mockup's toolbar, further columns, dock actions and sections, and its form
- * dialog. The mockup's Exceptions column and « En observation » state have no data (G03, G04).
+ * dialog. The mockup's Exceptions column and « En observation » state have no data.
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -65,7 +65,7 @@ function parseEmails(text) {
   return { emails, invalid: emails.filter(e => !EMAIL_RE.test(e)) }
 }
 
-// Policies read in the order the server evaluates them (T4), kept in the address
+// Policies read in the order the server evaluates them, kept in the address
 const BY_PRIORITY = { key: 'priority', asc: true }
 const SORT_KEYS = ['name', 'scope', 'operations', 'priority', 'approval', 'state']
 const STATES = { applied: 'good', inactive: 'muted' }

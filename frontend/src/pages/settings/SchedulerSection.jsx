@@ -11,7 +11,7 @@ import { compactRun } from '../../lib/relativeTime'
 import { formatDate } from '../../lib/utils'
 
 const POLL_MS = 15000
-// The tasks by name (T4), the sort kept in the address under this list's own scope (the settings stack their sections)
+// The tasks by name, the sort kept in the address under this list's own scope (the settings stack their sections)
 const BY_TASK = { key: 'task', asc: true }
 const SORT_KEYS = ['task', 'note', 'status', 'schedule', 'last', 'next', 'duration', 'runs']
 const STATE_RANK = ['warning', 'skipped', 'ok']
@@ -88,7 +88,7 @@ export default function SchedulerSection({ hasPermission }) {
   const [running, setRunning] = useState({})
   const pollRef = useRef(null)
   const canRun = hasPermission ? hasPermission('admin:system') : false
-  // The task open in the inspector lives in the address (`item`), as in every module list (E4)
+  // The task open in the inspector lives in the address (`item`), as in every module list
   const taskDock = useDockParam()
 
   const load = useCallback(async (silent = false) => {
@@ -168,7 +168,7 @@ export default function SchedulerSection({ hasPermission }) {
   const moment = (label, iso, words = compactRun) => (iso
     ? [label, <>{formatDate(iso, { time: true })} <span className="muted">({words(iso, t)})</span></>]
     : { label, absent: '—' })
-  // Every column of the list and the task's action, the columns folded for want of room included (E4)
+  // Every column of the list and the task's action, the columns folded for want of room included
   const dock = opened && (
     <Dock label={t('atelier.detailOf', { name: t('scheduler.tasksTitle') })} tabsLabel={t('atelier.openItem')} activeKey={opened.name}
       tabs={[{ key: opened.name, title: taskLabel(t, opened), icon: 'clock' }]} onClose={() => taskDock.close()}>

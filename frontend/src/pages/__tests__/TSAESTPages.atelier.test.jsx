@@ -252,7 +252,7 @@ describe('nothing configured yet (the mockup\'s emptyBlock)', () => {
   })
 })
 
-// KV-3: the docks as typed rows, the URLs and the policy in chips that copy them whole
+// The docks as typed rows, the URLs and the policy in chips that copy them whole
 const factRow = (term) => {
   const found = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === term)
   if (!found) throw new Error(`no row ${term}`)

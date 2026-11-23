@@ -1,5 +1,5 @@
 /**
- * The strip of figures above the cards (maquette-1): each figure with what situates it, a trend or
+ * The strip of figures above the cards: each figure with what situates it, a trend or
  * a split and a named gap, and the one tooltip on hover and focus. Its requests are shared with the
  * cards that read the same routes; a figure the API did not give is a dash and leads nowhere.
  */

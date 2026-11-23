@@ -1,5 +1,5 @@
 /**
- * Figures strip (maquette-1): four figures from the routes the cards read, each with its trend or split
+ * Figures strip: four figures from the routes the cards read, each with its trend or split
  * and a named gap, its tooltip on focus; a dash for a figure no route gave.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'

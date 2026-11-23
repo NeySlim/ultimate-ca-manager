@@ -109,7 +109,7 @@ describe('Backup: the restore file', () => {
 })
 
 describe('Backup: the archives in the module table', () => {
-  it('sorts by its headers alone, the server order kept in the query: a new column ascending, the sorted one reversed (T3)', () => {
+  it('sorts by its headers alone, the server order kept in the query: a new column ascending, the sorted one reversed', () => {
     const p = backup({ backups: archives, backupQuery: { sort: 'created_desc' } })
     expect(screen.getByRole('columnheader', { name: /table.fullCreated/ })).toHaveAttribute('aria-sort', 'descending')
     fireEvent.click(screen.getByRole('button', { name: /table.fullCreated/ }))
@@ -148,7 +148,7 @@ describe('Backup: the archives in the module table', () => {
     // The name wraps after its separators, never inside its extension
     expect(name.querySelector('wbr')).not.toBeNull()
     const card = name.closest('.mobile-record')
-    // Its date and its size named by their columns (M3)
+    // Its date and its size named by their columns
     expect([...card.querySelectorAll('.row-meta .fact-label')].map((l) => l.textContent)).toEqual(['table.fullCreated', 'settings.backupSize'])
     fireEvent.click(within(card).getByTitle('common.download'))
     expect(p.handleDownloadBackup).toHaveBeenCalledWith('a.ucmbkp')

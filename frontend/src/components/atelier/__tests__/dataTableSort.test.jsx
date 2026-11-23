@@ -1,5 +1,5 @@
 /**
- * The headers and the sort of the lists (DataTable, useSortParam, COLONNES-SPEC G2): a separator between data headers,
+ * The headers and the sort of the lists (DataTable, useSortParam): a separator between data headers,
  * the sign of every sortable column, two states kept in the address with a default sort, the sort said to a screen
  * reader, the journal's static header, and on a phone the sort from the toolbar and the facts named by their column.
  */
@@ -43,7 +43,7 @@ const sortOf = (name) => screen.getByRole('columnheader', { name }).getAttribute
 const loc = () => screen.getByTestId('loc').textContent
 
 describe('the headers', () => {
-  it('a separator closes each data header but the last, the column\'s handle on every list (C2); none in the body', () => {
+  it('a separator closes each data header but the last, the column\'s handle on every list; none in the body', () => {
     const { container } = render(<DataTable columns={columns} rows={rows} onOpen={() => {}} />)
     expect([...container.querySelectorAll('thead th')].map((th) => th.querySelectorAll(':scope > .col-sep').length)).toEqual([1, 1, 1, 0, 0])
     expect(container.querySelector('thead .col-sep')).toHaveAttribute('role', 'separator')
@@ -56,7 +56,7 @@ describe('the headers', () => {
     expect(sep).not.toHaveAttribute('role')
   })
 
-  it('no separator before a column of buttons at the end: the last labelled column closes the row (M4)', () => {
+  it('no separator before a column of buttons at the end: the last labelled column closes the row', () => {
     const run = { id: 'run', label: <span className="sr-only">Actions</span>, kind: 'fit', priority: 1, cell: () => 'x' }
     const { container } = render(<DataTable columns={[...columns, run]} rows={rows} columnWidths={{}} onColumnWidth={() => {}} />)
     expect([...container.querySelectorAll('thead th')].map((th) => th.querySelectorAll(':scope > .col-sep').length)).toEqual([1, 1, 1, 0, 0])
@@ -75,18 +75,18 @@ describe('the headers', () => {
     const head = (name) => screen.getByRole('columnheader', { name })
     const idle = head('Émetteur').querySelector('button[data-sort=ca] svg.sort-idle')
     expect(idle).toHaveAttribute('aria-hidden', 'true')
-    // A glyph painted solid, not a stroke of 0.8 px (R3)
+    // A glyph painted solid, not a stroke of 0.8 px
     expect([idle.getAttribute('fill'), idle.getAttribute('stroke')]).toEqual(['currentColor', 'none'])
     const arrow = head('Certificats').querySelector('button svg')
     expect(arrow).toHaveClass('sort-arrow')
     expect(arrow).not.toHaveClass('sort-idle')
-    // Descending: a shaft down and its head, not a chevron (R5)
+    // Descending: a shaft down and its head, not a chevron
     expect(arrow.querySelector('path').getAttribute('d')).toBe('M12 5v14m-6-6 6 6 6-6')
     expect(head('Note').querySelector('button, svg')).toBeNull()
     expect(head('Note')).not.toHaveAttribute('aria-sort')
   })
 
-  it('without onSort, the sorted column of a journal shows its arrow and aria-sort, with no button (T7)', () => {
+  it('without onSort, the sorted column of a journal shows its arrow and aria-sort, with no button', () => {
     render(<DataTable kind="audit" columns={[{ id: 'time', label: 'Heure', sort: 'time', cell: () => '10:00' }, { id: 'msg', label: 'Message', cell: () => 'm' }]}
       rows={rows} sort={{ key: 'time', asc: false }} />)
     const time = screen.getByRole('columnheader', { name: 'Heure' })
@@ -104,7 +104,7 @@ describe('the headers', () => {
     expect(button).toHaveTextContent('Proch. MàJ')
   })
 
-  it('each sort button says what a click does: sort by its column, or reverse the sort it shows (R4)', () => {
+  it('each sort button says what a click does: sort by its column, or reverse the sort it shows', () => {
     render(<DataTable columns={columns} rows={rows} sort={{ key: 'name', asc: true }} onSort={() => {}} />)
     expect(screen.getByRole('button', { name: 'Émetteur' })).toHaveAttribute('title', 'table.sortByColumn {"column":"Émetteur"}')
     expect(screen.getByRole('button', { name: 'Nom' }))
@@ -220,7 +220,7 @@ describe('on a phone', () => {
     expect(select.closest('.toolbar')).toHaveClass('mobile-sort')
     fireEvent.change(select, { target: { value: 'certs' } })
     expect(loc()).toBe('?sort=certs&order=asc')
-    // The button shows the direction with an arrow and says it, and that a click reverses it (G8)
+    // The button shows the direction with an arrow and says it, and that a click reverses it
     const reverse = screen.getByRole('button', { name: 'table.ascendingReverse' })
     expect(reverse).toHaveAttribute('title', 'table.ascendingReverse')
     expect(reverse.querySelector('svg.sort-arrow path').getAttribute('d')).toBe('M12 19V5m-6 6 6-6 6 6')
@@ -231,7 +231,7 @@ describe('on a phone', () => {
     expect(document.querySelectorAll('article.mobile-record')).toHaveLength(2)
   })
 
-  it('the toolbar names the columns by their whole label, the headers\' short one aside (E6)', () => {
+  it('the toolbar names the columns by their whole label, the headers\' short one aside', () => {
     const cols = columns.map((c) => (c.id === 'certs' ? { ...c, label: 'Certs', labelFull: 'Certificats émis' } : c))
     render(<DataTable columns={cols} rows={rows} card={card} sort={DEFAULT} onSort={() => {}} />)
     expect([...screen.getByRole('combobox', { name: 'table.sortBy' }).options].map((o) => o.textContent)).toEqual([
@@ -255,11 +255,11 @@ describe('on a phone', () => {
     const facts = cardFacts(cols, {})
     const { container } = render(<div>{facts.map((f, i) => <span key={i}>{f}</span>)}</div>)
     expect([...container.querySelectorAll('div > span')].map((s) => s.textContent)).toEqual(['Prochaine mise à jour 26 nov. 2026', 'n° 9', 'Publiée 19 nov. 2026'])
-    // A short header's whole label names the fact (E6)
+    // A short header's whole label names the fact
     const short = cardFacts(cols.map((c) => (c.id === 'next' ? { ...c, label: 'Échéance' , labelFull: 'Prochaine mise à jour' } : c)), {})
     const { container: other } = render(<div>{short.map((f, i) => <span key={i}>{f}</span>)}</div>)
     expect(other.querySelector('.fact-label')).toHaveTextContent('Prochaine mise à jour')
-    // The column's name in its own span, muted beside its value (G9)
+    // The column's name in its own span, muted beside its value
     expect([...container.querySelectorAll('.fact-label')].map((s) => s.textContent)).toEqual(['Prochaine mise à jour', 'Publiée'])
   })
 

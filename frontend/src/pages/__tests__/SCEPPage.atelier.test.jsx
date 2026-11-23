@@ -1,7 +1,7 @@
 /**
  * SCEP as the mockup's scep module draws it: the profiles list (Autorité, Modèle, Intune, État)
  * with its chips, the dock with Activer / Désactiver and Régénérer le mot de passe…, the new
- * challenge shown once in a dialog (M05), and what the product has more behind the page switch:
+ * challenge shown once in a dialog, and what the product has more behind the page switch:
  * the requests (approve, reject with a reason), the Intune registrations, and the rights.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -100,7 +100,7 @@ describe('the SCEP profiles', () => {
     expect(await within(d).findByRole('button', { name: 'scep.enable' })).toBeInTheDocument()
   })
 
-  it('asks before regenerating, then shows the new challenge once even when the clipboard fails (M05)', async () => {
+  it('asks before regenerating, then shows the new challenge once even when the clipboard fails', async () => {
     at('/scep-config')
     fireEvent.click(await screen.findByRole('button', { name: 'Équipements réseau' }))
     fireEvent.click(within(await dock()).getByRole('button', { name: 'scep.rotate' }))
@@ -272,7 +272,7 @@ describe('the SCEP docks in the URL', () => {
   })
 })
 
-// KV-3: the docks as typed rows, a URL or an identifier in a chip, a rule as a pill, a missing value muted
+// The docks as typed rows, a URL or an identifier in a chip, a rule as a pill, a missing value muted
 const row = (term) => {
   const found = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === term)
   if (!found) throw new Error(`no row ${term}`)

@@ -167,7 +167,7 @@ describe('the table on a wider screen', () => {
   })
 })
 
-describe('the journal sorted by its time, by the server (T2, T7, T9)', () => {
+describe('the journal sorted by its time, by the server', () => {
   const at = { search: '' }
   function Where() { at.search = useLocation().search; return null }
   const pageAt = (url) => render(<MemoryRouter initialEntries={[url]}><AuditLogsPage /><Where /></MemoryRouter>)

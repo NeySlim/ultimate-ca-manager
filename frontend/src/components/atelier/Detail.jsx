@@ -2,7 +2,7 @@
  * Pieces of the mockup's detail panels: section() (a titled block), props() (terms and values),
  * rows() and recordRow() (a list of records, or a sentence when empty), and the one-tab panel of
  * simplePage() (its properties, then its summary). Facts are the typed rows of terms and values
- * (KV-2): a fact, a state, an absence, a copyable digest or URL, an action apart, a folded help.
+ *: a fact, a state, an absence, a copyable digest or URL, an action apart, a folded help.
  */
 import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'

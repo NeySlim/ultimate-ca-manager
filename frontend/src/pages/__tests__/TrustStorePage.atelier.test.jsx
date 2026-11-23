@@ -69,7 +69,7 @@ beforeEach(() => {
 })
 
 describe('Trust Store list', () => {
-  it('opens on the name ascending, the subject taking the room left, every column sorting (T1, T4, L7)', async () => {
+  it('opens on the name ascending, the subject taking the room left, every column sorting', async () => {
     const { container } = renderPage()
     await screen.findByRole('button', { name: 'Bank Root' })
     expect(sortedHeaders(container)).toEqual([['Name', 'ascending']])
@@ -77,7 +77,7 @@ describe('Trust Store list', () => {
     expect(absorbing(container)).toEqual(['Subject'])
   })
 
-  it('keeps another sort in the address and reads it back (T9)', async () => {
+  it('keeps another sort in the address and reads it back', async () => {
     const at = renderAtUrl(<TrustStorePage />, '/truststore')
     await screen.findByRole('button', { name: 'Bank Root' })
     fireEvent.click(at.container.querySelector('[data-sort="not_after"]'))
@@ -89,7 +89,7 @@ describe('Trust Store list', () => {
     expect(again.container.querySelector('tbody .entity-name')).toHaveTextContent('Old proxy')
   })
 
-  it('draws a phone record by priority: the expiry after its label, then the type (R5)', async () => {
+  it('draws a phone record by priority: the expiry after its label, then the type', async () => {
     mobile.isMobile = true
     const { container } = renderPage()
     await screen.findByRole('button', { name: 'Bank Root' })
@@ -155,7 +155,7 @@ describe('Trust anchor dock', () => {
     await waitFor(() => expect(del).toHaveBeenCalledWith(1))
   })
 
-  // KV-3: the dock's rows are typed (a DN long, a serial and a digest as hex chips copied whole, a missing value absent)
+  // The dock's rows are typed (a DN long, a serial and a digest as hex chips copied whole, a missing value absent)
   it('types the rows of the overview and the details', async () => {
     const sha256 = 'cecddc905099d8dadfc5b1d209b737cbe2c18cfb2c10c0ff0bcf0d3286fc1aa2'
     const writeText = vi.fn().mockResolvedValue(undefined)

@@ -1,5 +1,5 @@
 /**
- * The typed rows of a certificate's Aperçu outside « Identité et clé » (KV-3): the open ACME failure and
+ * The typed rows of a certificate's Aperçu outside « Identité et clé »: the open ACME failure and
  * « Plus de détails » in Facts, a DN on a long row, the CT logs and the references copyable whole, a
  * compliance criterion's reason under its score, nothing left in a bare dl.props.
  */

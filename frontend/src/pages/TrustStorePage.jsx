@@ -389,7 +389,7 @@ export default function TrustStorePage() {
     ...present.map((s) => ({ id: s, label: t(`trustStore.module.states.${s}`), count: searched.filter((c) => tsState(c) === s).length })),
   ]
   const rows = filteredCertificates
-  // The API sends every anchor (no page nor sort parameter): sorted and paged here, the sort in the address (T9)
+  // The API sends every anchor (no page nor sort parameter): sorted and paged here, the sort in the address
   const sortParam = useSortParam(BY_NAME, TRUST_SORT_KEYS)
   const list = useClientList(rows, {
     sortParam,
@@ -510,7 +510,7 @@ export default function TrustStorePage() {
         </>}
         title={(c) => c.name || '—'} status={tsPill} openedId={open?.id} onOpen={handleSelectCert} selection={selection}
         nameSort="name"
-        // The subject takes the room left; the two long texts fold first, the expiry last (L7, R2)
+        // The subject takes the room left; the two long texts fold first, the expiry last
         columns={[
           { id: 'subject', label: t('trustStore.module.subject'), cell: (c) => c.subject || '—', kind: 'text', grow: true, priority: 4, sort: 'subject' },
           { id: 'usage', label: t('trustStore.module.usage'), cell: tsUsage, kind: 'text', priority: 4, sort: 'usage' },

@@ -1,5 +1,5 @@
 /**
- * Facts, the typed rows of terms and values (KV-2): a plain pair, a state, an absent value, a digest and a URL
+ * Facts, the typed rows of terms and values: a plain pair, a state, an absent value, a digest and a URL
  * that copy whole, an action apart from the value, a help folded behind its button; Props keeps its flat list.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'

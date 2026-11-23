@@ -1,5 +1,5 @@
 /**
- * The expiry horizon (maquette-2) over GET /dashboard/expirations: the weekly columns of the Atelier
+ * The expiry horizon over GET /dashboard/expirations: the weekly columns of the Atelier
  * mockup, manual under automatic, on a calendar of the same weeks (one cell per UTC day, denser is
  * busier, a diamond where an authority or a signer expires). A day or a week fills the side list,
  * which opens Certificates on exactly that interval (`expires_from`, `expires_to`).

@@ -19,7 +19,7 @@ import { SlotDock } from '../protocols/dockSlot'
 const TONES = { valid: 'good', ready: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
 const STATES = ['pending', 'ready', 'processing', 'valid', 'invalid']
 const PER_PAGE = 50
-// Paged by the server, so sorted by it (T2): its keys, the newest order first (T4)
+// Paged by the server, so sorted by it: its keys, the newest order first
 const NEWEST = { key: 'created_at', asc: false }
 const SORT_KEYS = ['domain', 'account', 'expires', 'created_at', 'status']
 

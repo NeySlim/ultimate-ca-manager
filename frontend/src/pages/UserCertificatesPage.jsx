@@ -36,7 +36,7 @@ import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 // The states the server filters on, in the order of the chips (a certificate's states, as the Certificates zone draws them)
 const STATES = { valid: CERT_STATES.valid, expiring: CERT_STATES.expiring, expired: CERT_STATES.expired, revoked: CERT_STATES.revoked }
-// The nearest expiry first (T4); a header's key is the server's
+// The nearest expiry first; a header's key is the server's
 const BY_EXPIRY = { key: 'valid_until', asc: true }
 const SORT_KEYS = ['name', 'owner', 'valid_until', 'status']
 const EXPORT_MAX = 10000
@@ -87,7 +87,7 @@ export default function UserCertificatesPage() {
   const [total, setTotal] = useState(0)
   const [state, setState] = usePersistedState('ucm-usercerts-state', '')
   const [searchValue, setSearchValue] = useState('')
-  // The server sorts the whole list; the sort lives in the address (T9), a new one back on page one
+  // The server sorts the whole list; the sort lives in the address, a new one back on page one
   const { sort, onSort } = useSortParam(BY_EXPIRY, SORT_KEYS)
   const sortMark = `${sort.key}:${sort.asc}`
   const [sortSeen, setSortSeen] = useState(sortMark)

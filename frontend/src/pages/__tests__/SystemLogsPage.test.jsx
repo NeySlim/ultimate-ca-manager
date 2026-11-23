@@ -34,7 +34,7 @@ import SystemLogsPage from '../SystemLogsPage'
 function Loc() {
   return <output data-testid="loc">{useLocation().search}</output>
 }
-// The page keeps its sort in the address (R6): it lives under a router
+// The page keeps its sort in the address: it lives under a router
 const page = (url = '/logs') => <MemoryRouter initialEntries={[url]}><SystemLogsPage /><Loc /></MemoryRouter>
 
 const LINES = [
@@ -74,7 +74,7 @@ describe('SystemLogsPage', () => {
       .toEqual(['logs.time', 'logs.levelShort', 'logs.component', 'logs.message'])
   })
 
-  it('sorts by the time in two states, the newest first by default, kept in the address; nothing else sorts (R6)', async () => {
+  it('sorts by the time in two states, the newest first by default, kept in the address; nothing else sorts', async () => {
     await renderPage()
     const heads = [...document.querySelectorAll('th')].slice(1)
     expect(heads.map((h) => h.getAttribute('aria-sort'))).toEqual(['descending', null, null, null])

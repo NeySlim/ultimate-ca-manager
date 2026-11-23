@@ -62,7 +62,7 @@ export function TableView({
       </Toolbar>
       {applied}
       {batch}
-      {/* Réinitialiser les colonnes is in the footer, the Colonnes dialog keeps its own (E7) */}
+      {/* Réinitialiser les colonnes is in the footer, the Colonnes dialog keeps its own */}
       <DataTable label={tableLabel} columns={shown} {...(storageKey ? { columnWidths: widths, onColumnWidth: setWidth } : {})} {...table} />
       <div className="table-caption">
         <span>{captionNote}</span>
@@ -74,7 +74,7 @@ export function TableView({
           <div className="columns-list">
             {columns.filter((c) => !c.always).map((c) => (
               <label key={c.id} className="checkbox-line">
-                {/* The dialog has room for a short header's whole label (L8) */}
+                {/* The dialog has room for a short header's whole label */}
                 <input type="checkbox" data-column={c.id} checked={!hiddenSet.has(c.id)} onChange={() => toggleColumn(c.id)} />{c.labelFull || c.label}
               </label>
             ))}

@@ -149,7 +149,7 @@ test('the scheduler lists its tasks in the mockup module table, a mockup button 
   const rows = page.locator('#set-sec-scheduler .module-table tbody tr')
   await expect(rows.first()).toBeVisible()
   const run = rows.first().getByRole('button', { name: 'Run now' })
-  // The mockup's .btn, at the height of the row's icon buttons (27 px), so that every row keeps the 36 px density (D1)
+  // The mockup's .btn, at the height of the row's icon buttons (27 px), so that every row keeps the 36 px density
   expect(Math.abs((await box(run)).height - 27)).toBeLessThanOrEqual(EPS)
   const heights = await rows.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))
   expect(Math.max(...heights)).toBeLessThanOrEqual(36 + EPS)

@@ -93,7 +93,7 @@ describe('OperationsPage bulk list', () => {
   it('searches and sorts the resources the server sends whole, here', async () => {
     localStorage.setItem('ucm-ops-resource-type', 'users')
     open()
-    // By name from the first view (T4)
+    // By name from the first view
     await waitFor(() => expect(names()).toEqual(['alice', 'zoe']))
     expect(document.getElementById('page-jump')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'common.user' }))
@@ -104,7 +104,7 @@ describe('OperationsPage bulk list', () => {
     expect(names()).toEqual(['alice'])
   })
 
-  it('sorts the certificates and the CSRs by the server from the first page, the page shown as it came, the selection kept (T2, T4, T9)', async () => {
+  it('sorts the certificates and the CSRs by the server from the first page, the page shown as it came, the selection kept', async () => {
     mocks.certCalls.length = 0
     localStorage.setItem('ucm-ops-resource-type', 'certificates')
     const at = { search: '' }

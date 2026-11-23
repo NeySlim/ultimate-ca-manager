@@ -110,7 +110,7 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
         title={(r) => r.common_name} status={pill} openedId={cert?.id} onOpen={onSelectCert}
         nameSort="common_name" sort={sort} onSort={onSort}
         columns={[
-          // The name takes the room left; the issuer gives way with it, in proportion (R2)
+          // The name takes the room left; the issuer gives way with it, in proportion
           { id: 'issuer', label: t('common.issuer'), cell: (r) => r.issuer || t('common.unknown'), kind: 'text', priority: 2 },
           { id: 'source', label: t('common.source'), cell: sourceLabel, kind: 'fit', priority: 3, sort: 'source' },
           { id: 'method', label: t('acme.method'), cell: (r) => r.challenge_type?.toUpperCase() || '—', kind: 'fit', priority: 3 },

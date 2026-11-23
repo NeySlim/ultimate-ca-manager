@@ -1,5 +1,5 @@
 /**
- * The authority and HSM tiles of the overview (maquette-3), composed from GET /cas, /crl,
+ * The authority and HSM tiles of the overview, composed from GET /cas, /crl,
  * /hsm/providers and the per-CA series of /dashboard/issuance (no request here).
  */
 import { daysUntil, elapsedPercent } from './overviewTime'

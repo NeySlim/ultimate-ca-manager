@@ -84,7 +84,7 @@ describe('user certificates: server-side sort', () => {
     getAll.mockResolvedValue({ data: { items: rows, total: 2 } })
   })
 
-  it('opens on the nearest expiry, asked of the server; name, owner, expiry and state sort (T1, T4)', async () => {
+  it('opens on the nearest expiry, asked of the server; name, owner, expiry and state sort', async () => {
     const { container } = render(<MemoryRouter><UserCertificatesPage /></MemoryRouter>)
     await screen.findAllByText('bravo')
     expect(lastParams()).toMatchObject({ sort_by: 'valid_until', sort_order: 'asc', page: 1 })
@@ -93,7 +93,7 @@ describe('user certificates: server-side sort', () => {
     expect(absorbing(container)).toEqual(['userCertificates.module.description'])
   })
 
-  it('sorts in two states, back to page one, kept in the address and read back (T3, T9)', async () => {
+  it('sorts in two states, back to page one, kept in the address and read back', async () => {
     getAll.mockResolvedValue({ data: { items: rows, total: 60 } })
     const at = renderAtUrl(<UserCertificatesPage />, '/user-certificates')
     await screen.findAllByText('bravo')
@@ -115,7 +115,7 @@ describe('user certificates: server-side sort', () => {
     expect(lastParams()).toMatchObject({ sort_by: 'owner', sort_order: 'desc' })
   })
 
-  it('draws a phone record by priority: the expiry after its label, then the owner (R5)', async () => {
+  it('draws a phone record by priority: the expiry after its label, then the owner', async () => {
     stable.mobile = true
     render(<MemoryRouter><UserCertificatesPage /></MemoryRouter>)
     await screen.findAllByText('bravo')

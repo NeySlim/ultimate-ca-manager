@@ -18,7 +18,7 @@ export function useSectionParam(ids, fallback, { stacked = false, ready = true }
 
   const select = useCallback((id) => {
     const next = new URLSearchParams(params)
-    // One section at a time: the sort of the list left behind is not the next one's (T9)
+    // One section at a time: the sort of the list left behind is not the next one's
     if (!stacked && id !== current) { next.delete('sort'); next.delete('order') }
     if (id === fallback) next.delete('tab')
     else next.set('tab', id)

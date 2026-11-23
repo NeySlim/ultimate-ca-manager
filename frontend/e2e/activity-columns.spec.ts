@@ -21,7 +21,7 @@ const columns = (table) => table.evaluate((t: HTMLTableElement) => {
     walk(td)
     return right
   }
-  // A sort button fills its header (R4): its padding is the cell's
+  // A sort button fills its header: its padding is the cell's
   const pad = (cell: HTMLElement, side: string) => {
     const button = cell.tagName === 'TH' ? cell.querySelector(':scope > button') : null
     return parseFloat(getComputedStyle(cell)[side]) + (button ? parseFloat(getComputedStyle(button)[side]) : 0)

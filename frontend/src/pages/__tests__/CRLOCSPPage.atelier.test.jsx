@@ -171,13 +171,13 @@ describe('the CRL / OCSP list', () => {
     await screen.findAllByRole('button', { name: 'Services CA' })
     const facts = [...container.querySelectorAll('article.mobile-record')[2].querySelectorAll('.row-meta > span')].map((s) => s.textContent)
     expect(facts[0]).toMatch(/^crlOcsp\.nextUpdate /)
-    // The CRL number named by its column (G9), in the panel's words
+    // The CRL number named by its column, in the panel's words
     expect(facts[1]).toBe('CRL crlOcsp.numberOf {"number":1842}')
     expect(facts[2]).toMatch(/^crlOcsp\.columns\.published /)
     expect(screen.getByRole('combobox', { name: 'table.sortBy' })).toHaveValue('next')
   })
 
-  it('computes the state on the CRL dates (M12), never on the publish cadence', () => {
+  it('computes the state on the CRL dates, never on the publish cadence', () => {
     expect(crlState({ has_crl: false }, NOW)).toBe('none')
     expect(crlState({ has_crl: true, crl_next_update: '2026-11-08T11:00:00Z', crl_next_publish: '2026-12-01T00:00:00Z' }, NOW)).toBe('expired')
     expect(crlState({ has_crl: true, crl_next_update: '2026-11-08T20:00:00Z' }, NOW)).toBe('soon')
@@ -295,7 +295,7 @@ describe('the CRL dock in the URL', () => {
   })
 })
 
-// KV-3: the dock as typed rows, OCSP as a pill, a missing CRL muted, a URL and the slug in chips
+// The dock as typed rows, OCSP as a pill, a missing CRL muted, a URL and the slug in chips
 const factRow = (term) => {
   const found = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === term)
   if (!found) throw new Error(`no row ${term}`)

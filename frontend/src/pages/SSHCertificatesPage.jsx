@@ -50,7 +50,7 @@ const DEFAULT_EXTENSIONS = [
   'permit-user-rc',
 ]
 
-// The columns the server sorts, by its keys (the principals ask nothing of it); the nearest expiry first (T4)
+// The columns the server sorts, by its keys (the principals ask nothing of it); the nearest expiry first
 const SORTS = { name: 'key_id', type: 'cert_type', expires: 'valid_to', ca: 'ca', status: 'status' }
 const BY_EXPIRY = { key: 'valid_to', asc: true }
 
@@ -102,7 +102,7 @@ export default function SSHCertificatesPage() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
   const [total, setTotal] = useState(0)
-  // The sort lives in the address (T9); a new one, clicked or read back, starts on page one
+  // The sort lives in the address; a new one, clicked or read back, starts on page one
   const { sort, onSort } = useSortParam(BY_EXPIRY, Object.values(SORTS))
   const sortBy = sort.key
   const sortOrder = sort.asc ? 'asc' : 'desc'
@@ -272,7 +272,7 @@ export default function SSHCertificatesPage() {
 
   const typeLabel = (c) => (c.cert_type === 'host' ? t('sshCertificates.typeHost') : t('sshCertificates.typeUser'))
   const statusPill = (c) => { const s = getStatus(c, t); return <Pill label={s.label} tone={s.tone} icon={s.icon} /> }
-  // Every principal, whole in the DOM: short of room the cell ends in an ellipsis, the list in its title (L6)
+  // Every principal, whole in the DOM: short of room the cell ends in an ellipsis, the list in its title
   const principalsCell = (c) => listOf(c.principals).join(', ') || '—'
   const views = [
     { id: '', label: t('common.all'), count: certStats.total || 0 },

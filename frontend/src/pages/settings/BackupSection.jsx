@@ -216,7 +216,7 @@ export default function BackupSection({
             // On a phone the name wraps after its separators, never inside its extension
             title: <Breakable text={b.filename} />,
             description: digest(b),
-            // Each fact after its column's label, as every list's records (M3)
+            // Each fact after its column's label, as every list's records
             meta: [...cardFacts(columns, b), b.node && labelledFact(t('settings.backupNode'), b.node)],
             end: actions(b),
           })}

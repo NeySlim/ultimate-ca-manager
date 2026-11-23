@@ -190,7 +190,7 @@
 .atl .queue-row[data-tier=critical]{box-shadow:inset 3px 0 0 var(--bad)}
 .atl .queue-row[data-tier=warning]{box-shadow:inset 3px 0 0 var(--warn-fill)}
 
-/* Expiry horizon (maquette-2): weekly columns over a calendar of the same weeks, the side list of the day chosen */
+/* Expiry horizon: weekly columns over a calendar of the same weeks, the side list of the day chosen */
 .atl .hz{display:grid;grid-template-columns:minmax(0,1fr) 330px}
 .atl .hz-main{min-width:0;padding:16px 19px}
 .atl .hz-side{min-width:0;padding:16px 19px;border-left:1px solid var(--line)}
@@ -247,7 +247,7 @@
 @media(max-width:900px){.atl .hz{grid-template-columns:minmax(0,1fr)}.atl .hz-side{border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:560px){.atl .cal{column-gap:2px}.atl .hz-main,.atl .hz-side{padding:14px}.atl .cal .mon{font-size:11px}}
 
-/* Issuances by source (maquette-3): stacked columns per day, one axis, the peak labelled; hatching tells
+/* Issuances by source: stacked columns per day, one axis, the peak labelled; hatching tells
    WSTEP from EST and import from manual, which share their colour */
 .atl .flow-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:10px;font-size:12px}
 .atl .flow-head .fig{font-size:30px;font-weight:500;letter-spacing:-1px;line-height:1}
@@ -270,7 +270,7 @@
 .atl .flow-legend .swatch{background:var(--swatch)}
 .atl .flow-legend .swatch.hatch{background:repeating-linear-gradient(135deg,var(--swatch) 0 3px,var(--panel) 3px 5px)}
 
-/* Authorities and HSM as tiles (maquette-3): state in a word, validity spent in a gauge, CRL, OCSP, activity */
+/* Authorities and HSM as tiles: state in a word, validity spent in a gauge, CRL, OCSP, activity */
 .atl .card-authorities{container-type:inline-size}
 .atl .atiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .atl .atile{display:grid;align-content:start;gap:9px;min-width:0;padding:13px 14px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:inherit;text-decoration:none}
@@ -299,7 +299,7 @@
 @container (max-width:900px){.atl .atiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @container (max-width:560px){.atl .atiles{grid-template-columns:minmax(0,1fr)}}
 
-/* Revocation coverage (maquette-1): the share in figures, a tall bar in three parts, the authorities to publish */
+/* Revocation coverage: the share in figures, a tall bar in three parts, the authorities to publish */
 .atl .rev-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:12px;font-size:12px}
 .atl .rev-head .fig{font-size:30px;font-weight:500;letter-spacing:-1px;line-height:1}
 .atl .cover{display:flex;gap:2px;height:28px;margin:4px 0 8px}

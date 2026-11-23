@@ -1,5 +1,5 @@
 /**
- * COLONNES-SPEC L8: the header of a fit or number column of the protocol lists (ACME, SCEP, EST, TSA, CRL / OCSP) holds
+ * The header of a fit or number column of the protocol lists (ACME, SCEP, EST, TSA, CRL / OCSP) holds
  * 16 characters at most in every language; a longer name goes in labelFull (title and aria-label), not in the header.
  */
 import { describe, it, expect } from 'vitest'

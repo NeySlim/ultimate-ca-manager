@@ -7,7 +7,7 @@ import { useNotification } from '../../contexts'
 import { formatDate } from '../../lib/utils'
 import AdConnectorForm from './AdConnectorForm'
 
-// The connectors by name (T4), the sort in the address under this list's scope (the settings stack their sections)
+// The connectors by name, the sort in the address under this list's scope (the settings stack their sections)
 const BY_NAME = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'realm', 'servers', 'sid', 'test', 'state']
 

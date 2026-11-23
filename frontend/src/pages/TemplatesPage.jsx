@@ -264,7 +264,7 @@ export default function TemplatesPage() {
   const present = ['active', 'inactive'].filter((s) => templates.some((tpl) => tplState(tpl) === s))
   const active = present.includes(state) ? state : ''
   const rows = useMemo(() => searched.filter((tpl) => !active || tplState(tpl) === active), [searched, active])
-  // The API sends every template: sorted and paged here, the sort in the address (T9)
+  // The API sends every template: sorted and paged here, the sort in the address
   const sortParam = useSortParam(BY_NAME, TEMPLATE_SORT_KEYS)
   const tplList = useClientList(rows, {
     sortParam,
@@ -429,7 +429,7 @@ export default function TemplatesPage() {
         )}
         title={(tpl) => tplName(tpl) || t('common.unnamed')} status={tplPill} openedId={open?.id} onOpen={openTemplate}
         nameSort="name"
-        // No long free text: the name takes the room left (L7)
+        // No long free text: the name takes the room left
         columns={[
           { id: 'source', label: t('templates.source'), cell: tplSource, kind: 'fit', priority: 3, sort: 'source' },
           { id: 'validity', label: t('common.validity'), cell: tplValidity, kind: 'number', priority: 3, sort: 'validity_days' },

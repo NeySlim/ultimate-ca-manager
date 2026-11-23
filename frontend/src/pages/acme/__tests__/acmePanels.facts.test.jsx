@@ -1,5 +1,5 @@
 /**
- * The ACME docks as typed rows (KV-3): a URL or an identifier in a copyable chip that copies it whole,
+ * The ACME docks as typed rows: a URL or an identifier in a copyable chip that copies it whole,
  * a serial in hex lines, a rule as a pill, a missing value muted, and the edit of a value apart from it.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'

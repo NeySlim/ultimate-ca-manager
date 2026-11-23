@@ -1,5 +1,5 @@
 /**
- * Automation health over GET /dashboard/health (maquette-3): one row per protocol with its last
+ * Automation health over GET /dashboard/health: one row per protocol with its last
  * operation, 30 days of mirror bars (successes up, failures down) and its success rate, then the
  * services that only report a state as compact pills, and the summary under them.
  */
@@ -97,7 +97,7 @@ function dayOf(date, lang) {
   try { return new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(at) } catch { return date }
 }
 
-/** The success rate and the period's figures (maquette-3), ACME failures leading to the queue. */
+/** The success rate and the period's figures, ACME failures leading to the queue. */
 function Rate({ ok, failed, onFailures, label, lang, t }) {
   const rate = successRate(ok, failed)
   let failure = <span className="muted">{t('overview.health.failures', { count: 0 })}</span>

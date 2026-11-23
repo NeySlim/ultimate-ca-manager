@@ -12,7 +12,7 @@ import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
 
-// Every page is read (200 a page), so the list sorts and searches them all; the newest first (T4)
+// Every page is read (200 a page), so the list sorts and searches them all; the newest first
 const EAB_MAX = 5000
 // Every page of the server, so the search, the chips and the sort read the whole set
 const readCredentials = () => fetchListing((page) => acmeService.listEabCredentials(undefined, page), { perPage: 200, max: EAB_MAX })

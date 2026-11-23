@@ -1,5 +1,5 @@
 /**
- * Revocation coverage (maquette-1) over GET /dashboard/revocation: the share of active authorities
+ * Revocation coverage over GET /dashboard/revocation: the share of active authorities
  * publishing a current CRL, the whole in three parts (current, stale or missing, no distribution
  * point), then the authorities to publish first, each with its action.
  */

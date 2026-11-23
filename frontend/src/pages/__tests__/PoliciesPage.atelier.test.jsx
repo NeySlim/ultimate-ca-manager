@@ -166,7 +166,7 @@ describe('the policy dock in the URL', () => {
     await waitFor(() => expect(gone.where()).toBe('/policies'))
   })
 
-  it('opens by priority, sorts every column from its header, keeps the sort in the address and reads it back (T1, T4, T9)', async () => {
+  it('opens by priority, sorts every column from its header, keeps the sort in the address and reads it back', async () => {
     const r = renderAtUrl(<PoliciesPage />, '/policies')
     await screen.findByRole('button', { name: 'Clients' })
     expect(sortedHeads()).toEqual([['policies.priority', 'ascending']])

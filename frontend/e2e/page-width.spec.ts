@@ -1,6 +1,6 @@
 import { test, expect, open, createCA, issueCert } from './support/fixtures'
 
-// The measures of the page (REPRISE-LITTERALE.md, MAXW): past a 1920 px window the page and the bars' contents hold
+// The measures of the page: past a 1920 px window the page and the bars' contents hold
 // 1852 px, centred, the bars' grounds edge to edge; the settings' cards 960 px beside their contents; their help 62ch.
 const EPS = 1
 const PAGE = 1852

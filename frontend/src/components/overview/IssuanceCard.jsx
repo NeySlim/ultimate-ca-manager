@@ -1,5 +1,5 @@
 /**
- * Issuances by source (maquette-3) over the `flow` of GET /dashboard/issuance: one stacked column per
+ * Issuances by source over the `flow` of GET /dashboard/issuance: one stacked column per
  * UTC day (ACME, SCEP, EST, WSTEP, import, manual), one axis, the peak labelled, the window's total with
  * its gap to the previous window and its automated share. A day opens Certificates created that day.
  */

@@ -1,6 +1,6 @@
 import { test, expect, createCA, issueCert, uid } from './support/fixtures'
 
-// The PKI lists measured where jsdom cannot (COLONNES-SPEC L, R, H, T): certificates, authorities, CSRs (pending and
+// The PKI lists measured where jsdom cannot: certificates, authorities, CSRs (pending and
 // signed), templates, trust store, user certificates, SSH CAs and SSH certificates, at 1000, 1280 and 1600 px dock
 // closed and at 1406 px beside the dock at the right: no sideways scroll, every chevron in view, no header clipped,
 // no fixed cell cut, free text cut only by an ellipsis with its whole text in a title, one sorted header, a sign on
@@ -171,7 +171,7 @@ test.describe('phone', () => {
       await expect(records.first().or(page.locator('.atl .mobile-list .empty'))).toBeVisible()
       await expect(page.locator('.atl article.sk-record')).toHaveCount(0)
       if (!await records.count()) { console.log(`COLP1 empty ${list.name}`); continue }
-      // The sort select is drawn with the records of a sortable list (R5)
+      // The sort select is drawn with the records of a sortable list
       await soft(page.locator('.atl .mobile-sort select'), list.name).toBeVisible()
       const m = await page.evaluate(() => {
         // A lone number, or a date as the interface writes it (« Jan 1, 2040 », « 1 janv. 2040 », « 2040-01-01 »)

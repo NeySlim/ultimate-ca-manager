@@ -1,5 +1,5 @@
 /**
- * The profile of a user in the dock reads as typed rows (KV-3): an absent e-mail or sign-in is muted,
+ * The profile of a user in the dock reads as typed rows: an absent e-mail or sign-in is muted,
  * the second factor is a state, the role's explanation is a help folded behind its button.
  */
 import { describe, it, expect, vi } from 'vitest'

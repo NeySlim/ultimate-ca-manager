@@ -277,7 +277,7 @@ describe('CAsPage: list', () => {
     expect(document.querySelector('footer.table-footer')).toHaveTextContent('cas.range:2')
   })
 
-  it('opens on the name ascending, keeps another sort in the address and reads it back (T4, T9)', async () => {
+  it('opens on the name ascending, keeps another sort in the address and reads it back', async () => {
     window.localStorage.setItem('ucm-ca-view-mode', 'list')
     const view = renderAt('/cas')
     const table = await screen.findByRole('table')

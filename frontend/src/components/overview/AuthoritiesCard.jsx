@@ -1,5 +1,5 @@
 /**
- * Authorities and HSM as live tiles (maquette-3): for the authorities in alert first, then the most
+ * Authorities and HSM as live tiles: for the authorities in alert first, then the most
  * active, their state in a word, algorithm, key guard, validity spent, CRL, OCSP and issuances over
  * 7 days; for the HSM modules, their state, last test, keys held and authorities served.
  */

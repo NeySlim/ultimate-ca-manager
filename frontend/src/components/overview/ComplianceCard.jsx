@@ -1,5 +1,5 @@
 /**
- * Compliance (maquette-1): the average score as a ring (one ratio), its grades A+ to F, then one gauge
+ * Compliance: the average score as a ring (one ratio), its grades A+ to F, then one gauge
  * per rule of GET /dashboard/compliance with its conforming share and count. A rule the server gives
  * a list filter for opens that list, filtered on its gap. Score, grades and rules are all counted over
  * the one population the route names (`population.count`, the active certificates).

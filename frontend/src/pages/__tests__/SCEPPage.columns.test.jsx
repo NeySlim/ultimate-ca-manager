@@ -1,5 +1,5 @@
 /**
- * The columns of the SCEP views (COLONNES-SPEC T1, T2, T4, T9, L7, R5): the name takes the room left in each, one column
+ * The columns of the SCEP views: the name takes the room left in each, one column
  * sorted from the first render and kept in the address of its own view; the requests, paged by the server, are sorted by
  * it and shown in its order; a phone record names its dates.
  */
@@ -149,7 +149,7 @@ describe('the SCEP lists', () => {
     const at = renderAtUrl(<SCEPPage />, '/scep-config?tab=requests')
     await screen.findAllByRole('button', { name: 'beta' })
     expect(recordFacts(at.container)[0][0]).toMatch(/^table\.fullRequested /)
-    // The profile named by its column, never a bare « #2 » (E11)
+    // The profile named by its column, never a bare « #2 »
     expect(recordFacts(at.container)[0][1]).toMatch(/^scep\.columns\.profile /)
   })
 })

@@ -231,7 +231,7 @@ describe('CASide: actions', () => {
   })
 })
 
-describe('CASide: facts of the panel (KV)', () => {
+describe('CASide: facts of the panel', () => {
   it('names the signature by its hash, as a certificate\'s, and the sections share one term column', async () => {
     api.getById.mockImplementation((id) => Promise.resolve({ data: { ...family().find((c) => c.id === id), signature_algorithm: 'sha256WithRSAEncryption' } }))
     const { container } = renderSide(2)

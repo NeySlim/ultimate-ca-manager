@@ -38,7 +38,7 @@ const NONE = []
 const USER_SECTIONS = ['profile', 'permissions', 'keys', 'security', 'mtls']
 const GROUP_SECTIONS = ['overview', 'members', 'permissions']
 
-// Accounts and groups by name (T4), each tab's sort in the address (a tab change drops it)
+// Accounts and groups by name, each tab's sort in the address (a tab change drops it)
 const BY_NAME = { key: 'name', asc: true }
 const USER_SORT_KEYS = ['name', 'login', 'email', 'source', 'role', 'state', 'seen']
 const GROUP_SORT_KEYS = ['name', 'description', 'members']
@@ -648,7 +648,7 @@ export default function UsersGroupsPage() {
   })
   const list = groupsTab ? groupList : userList
 
-  // The full list in a file: identity, source, role and state of every account (U07, without the sessions)
+  // The full list in a file: identity, source, role and state of every account (without the sessions)
   const handleExport = () => {
     downloadBlob(usersCsv(users, {
       head: [t('atelier.name'), t('users.login'), t('users.email'), t('users.source'), t('common.role'), t('atelier.state'), t('users.lastSeen')],

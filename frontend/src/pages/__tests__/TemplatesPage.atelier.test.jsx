@@ -105,7 +105,7 @@ describe('Templates list', () => {
     expect(names()[0]).toBe('Web Server')
   })
 
-  it('opens on the name ascending, the name taking the room left, the counts at the right (T4, L7, L9)', async () => {
+  it('opens on the name ascending, the name taking the room left, the counts at the right', async () => {
     const { container } = renderPage()
     await screen.findByRole('button', { name: 'Web Server' })
     expect(sortedHeaders(container)).toEqual([['Name', 'ascending']])
@@ -114,7 +114,7 @@ describe('Templates list', () => {
     expect(numberHeads(container)).toEqual(['Validity', 'Uses'])
   })
 
-  it('keeps another sort in the address and reads it back (T9)', async () => {
+  it('keeps another sort in the address and reads it back', async () => {
     const at = renderAtUrl(<TemplatesPage />, '/templates')
     await screen.findByRole('button', { name: 'Web Server' })
     fireEvent.click(at.container.querySelector('[data-sort="validity_days"]'))

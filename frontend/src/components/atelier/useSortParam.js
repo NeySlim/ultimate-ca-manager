@@ -1,6 +1,6 @@
 /**
  * The sort of a list, kept in the address as the mockup's Certificats (syncUrl, M:157-158): `?sort=<key>&order=asc|desc`,
- * written only when it differs from the list's default (T9). Two states (T3): a header not sorted sorts ascending, the
+ * written only when it differs from the list's default. Two states: a header not sorted sorts ascending, the
  * sorted one reverses; there is no unsorted state, and every change goes back to page one (`page` removed).
  * An unknown key falls back on the default without an error. A reload, a shared link and Back give the same order.
  */
@@ -8,7 +8,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 /**
- * @param {{key: string, asc: boolean}} initial  the list's default sort (T4): required
+ * @param {{key: string, asc: boolean}} initial  the list's default sort: required
  * @param {string[]} keys  the sort keys the list knows
  * @param {{scope?: string}} [o]  a page that shows several lists at once (the settings) gives each its own
  *   `<scope>-sort` and `<scope>-order`; a scoped sort leaves `page` alone, which is not its own

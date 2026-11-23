@@ -1,13 +1,13 @@
-/** The facts of a phone record drawn from a list's columns (ListView, COLONNES-SPEC R5). */
+/** The facts of a phone record drawn from a list's columns (ListView). */
 import { columnKind } from './columnShare'
 
 const absent = (v) => v === null || v === undefined || v === false || v === '' || v === '—'
 
-/** A value that does not read alone (a date, a number, a yes or no) after its column's label (G9). */
+/** A value that does not read alone (a date, a number, a yes or no) after its column's label. */
 export const labelledFact = (label, value) => <><span className="fact-label">{label}</span> {value}</>
 
 /**
- * The facts of a phone record (R5): the columns of priority 2, then 3, three at most (a list without priorities: its
+ * The facts of a phone record: the columns of priority 2, then 3, three at most (a list without priorities: its
  * first three); a date, a number or a yes or no (`labelled`, a number column) after its column's whole label (span.fact-label,
  * adjust.css: muted beside its value, G9); nothing absent.
  */

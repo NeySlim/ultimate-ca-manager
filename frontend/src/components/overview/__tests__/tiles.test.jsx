@@ -1,4 +1,4 @@
-/** Authorities and HSM tiles, revocation coverage (maquettes 3 and 1), over the routes they are composed from. */
+/** Authorities and HSM tiles, revocation coverage, over the routes they are composed from. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, configure, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'

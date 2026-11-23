@@ -247,7 +247,7 @@ describe('CertificatesPage: the toolbar (tableView)', () => {
   it('shows the mockup columns in order, the product ones in the Columns dialog', async () => {
     await mount()
     expect(headers()).toEqual(['common.commonName', 'common.description', 'certificates.state', 'common.issuer', 'certificates.source', 'certificates.expiry', 'common.key'])
-    // A short header names its whole label to the eye and the ear (L8)
+    // A short header names its whole label to the eye and the ear
     expect(zone().querySelector('th.col-key button')).toHaveAttribute('aria-label', 'common.keyAlgorithm')
     fireEvent.click(screen.getByRole('button', { name: 'table.columns' }))
     const dialog = await screen.findByRole('dialog')
@@ -270,7 +270,7 @@ describe('CertificatesPage: the toolbar (tableView)', () => {
     expect(zone().querySelector('th.col-name').getAttribute('aria-sort')).toBe('descending')
   })
 
-  it('sorts by the source on the server, as the mockup does (C01)', async () => {
+  it('sorts by the source on the server, as the mockup does', async () => {
     await mount()
     fireEvent.click(zone().querySelector('th.col-source button'))
     await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'source', sort_order: 'asc', page: 1 }))
@@ -707,7 +707,7 @@ describe('CertificatesPage on a phone (mobile records)', () => {
     await mount()
     const record = screen.getByText('web.example.com').closest('article.mobile-record')
     expect(record.querySelector('.row-description')).toHaveTextContent('Front door')
-    // The facts by priority, the issuer after its label (R5, G9); the expiry date named in the state line
+    // The facts by priority, the issuer after its label; the expiry date named in the state line
     expect(recordFacts(record).slice(0, 2)).toEqual(['common.issuer Issuing CA 1', 'certificates.sourceAcme'])
     expect(record.querySelector('.row-meta .fact-label')).toHaveTextContent('common.issuer')
     expect(record.querySelector('.row-meta .key-note')).toHaveTextContent('certificates.keyInUcm')

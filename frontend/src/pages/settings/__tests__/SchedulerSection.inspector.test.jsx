@@ -1,5 +1,5 @@
 /**
- * The scheduler's tasks open in an inspector (E4), drawn in the settings' dock slot: every column of the list, those
+ * The scheduler's tasks open in an inspector, drawn in the settings' dock slot: every column of the list, those
  * folded for want of room included, and the task's action; the task lives in the address (`item`).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'

@@ -1,4 +1,4 @@
-/** Issuances by source (maquette-3): stacked columns per UTC day, the window against the previous one, a day opens its list. */
+/** Issuances by source: stacked columns per UTC day, the window against the previous one, a day opens its list. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, configure } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'

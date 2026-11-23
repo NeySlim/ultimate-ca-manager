@@ -1,7 +1,7 @@
 import { test, expect, createCA, issueCert, createUser, uid } from './support/fixtures'
 
 // The column template after its last measure (COL-FIX): the handle grabbed right of its line, the layout measured again
-// after a change of language, the trust store's subject kept readable beside the dock (R8), the scheduler's inspector,
+// after a change of language, the trust store's subject kept readable beside the dock, the scheduler's inspector,
 // and an inspector laid out by its own width in a floating window.
 
 // The page reads the dock at the right; the shared account's preference is never written
@@ -40,7 +40,7 @@ const geometry = (page, region: string) => page.locator(region).evaluate((el) =>
   return { over: el.scrollWidth - el.clientWidth, lost }
 })
 
-test.describe('the handle of a column (E1)', () => {
+test.describe('the handle of a column', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
   test('grabbed 2 px right of its line it widens the column on its left and sorts nothing', async ({ page, api }) => {
@@ -69,7 +69,7 @@ test.describe('the handle of a column (E1)', () => {
     await expect.poll(width).toBeGreaterThanOrEqual(before + 26)
     expect(await next.getAttribute('aria-sort')).toBe(sortBefore)
     expect(page.url()).toBe(url)
-    // Réinitialiser les colonnes in the footer of the Certificates too (E7)
+    // Réinitialiser les colonnes in the footer of the Certificates too
     const reset = page.locator('#cert-scroll').locator('xpath=..').locator('.table-footer [data-action=reset-columns]')
     await reset.click()
     await expect(reset).toHaveCount(0)
@@ -77,7 +77,7 @@ test.describe('the handle of a column (E1)', () => {
   })
 })
 
-test('a change of language measures the columns again: no sideways scroll, every chevron in view (E3)', async ({ api, signIn }) => {
+test('a change of language measures the columns again: no sideways scroll, every chevron in view', async ({ api, signIn }) => {
   const ca = await createCA(api)
   for (let i = 0; i < 3; i += 1) await issueCert(api, ca.id)
   const user = await createUser(api, 'viewer')
@@ -94,7 +94,7 @@ test('a change of language measures the columns again: no sideways scroll, every
   expect((await geometry(page, '#cert-scroll')).lost).toBe(0)
 })
 
-test.describe('beside the dock at 1406 px (R8)', () => {
+test.describe('beside the dock at 1406 px', () => {
   test.use({ viewport: { width: 1406, height: 809 } })
 
   test('the trust store keeps 160 px of subject: a column of priority 3 or 4 folds first', async ({ page, api }) => {
@@ -112,7 +112,7 @@ test.describe('beside the dock at 1406 px (R8)', () => {
   })
 })
 
-test.describe('the scheduler (E4, M2, M4)', () => {
+test.describe('the scheduler', () => {
   test.use({ viewport: { width: 1000, height: 800 } })
 
   test('folds with a footer that says so, no line before its buttons, and opens a task with every column', async ({ page, api }) => {

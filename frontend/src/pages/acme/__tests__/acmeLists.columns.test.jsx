@@ -1,5 +1,5 @@
 /**
- * The columns of the ACME views drawn by their own components (COLONNES-SPEC T1, T2, T4, T9, L7, L8, R5): which column
+ * The columns of the ACME views drawn by their own components: which column
  * takes the room left, which headers sort, the one sorted from the first render, the sort kept in the address; the
  * server's local orders sorted by the server, the EAB credentials read page after page before a sort in memory; the
  * phone's facts by priority, a date after its label.

@@ -1,7 +1,7 @@
 /**
  * The dock of an ACME account, the mockup's acmeAccountPanel() and its tabs (Compte, Commandes,
  * Défis), on the server's account, orders and challenges. The client name, the EAB binding, the
- * failure of a challenge and the account journal are functions the product lacks (M01, M02);
+ * failure of a challenge and the account journal are functions the product lacks;
  * a contact e-mail to edit and the removal of an account are the product's own.
  */
 import { useState } from 'react'

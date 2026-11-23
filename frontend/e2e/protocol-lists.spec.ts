@@ -1,7 +1,7 @@
 import { test, expect, createCA, type Api } from './support/fixtures'
 import type { Page } from '@playwright/test'
 
-// The protocol lists (ACME, SCEP, EST, TSA, CRL / OCSP) measured on the list template (COLONNES-SPEC L, R, H, T): at
+// The protocol lists (ACME, SCEP, EST, TSA, CRL / OCSP) measured on the list template: at
 // 1600, 1406 with the dock on the right, 1280, 1000 and 390 px, no list scrolls sideways, every chevron stays in view,
 // no header is clipped, no fit cell is cut, a cut text keeps its whole value in a title, one column takes the room left
 // (the name, or a free text that is long), one column is sorted from the first render, a short header stays near its
@@ -138,7 +138,7 @@ const LISTS: List[] = [
   { name: 'crl-ocsp', url: '/crl-ocsp', grows: 'Name', sorted: 'Next update' },
 ]
 const REGION = '#module-scroll'
-// The CRL number reads « CRL number » over a fresh authority's one-digit number (the noun the phone's sort needs, G8)
+// The CRL number reads « CRL number » over a fresh authority's one-digit number (the noun the phone's sort needs)
 // The ACME accounts' order count reads « Commandes » in full: « Cdes » saved 11 px for a header nobody could read
 const WIDE_HEADS: Record<string, RegExp> = { 'crl-ocsp': /^(CRL number|Numéro de CRL) /, 'acme-accounts': /^Commandes / }
 const wide = (list: List, heads: string[]) => heads.filter((h) => !WIDE_HEADS[list.name]?.test(h))
@@ -171,14 +171,14 @@ const measure = (page: Page) => page.locator(REGION).evaluate((el) => {
     const fixed = th.classList.contains('fit') && !cells.some((td) => td.matches('.text-cell, .description-cell') || td.querySelector('.entity-name'))
     if (fixed) {
       for (const td of cells) if (td.scrollWidth > td.clientWidth + 1) fitCut.push(`${label}: ${td.textContent}`)
-      // A short header near its values (L8): its label at most 48 px wider than the widest value
+      // A short header near its values: its label at most 48 px wider than the widest value
       const text = [...(th.querySelector('button') || th).childNodes].find((n) => n.nodeType === Node.TEXT_NODE)
       const head = text ? width(text) : 0
       const present = cells.filter((td) => (td.textContent || '').trim() !== '—')
       const widest = Math.max(0, ...present.map((td) => width(td)))
       if (present.length && head > widest + 48) wideHeads.push(`${label} ${Math.round(head)} > ${Math.round(widest)} + 48`)
     }
-    // A cut text keeps its whole value in its title (L6)
+    // A cut text keeps its whole value in its title
     for (const td of cells) {
       const boxes = [td, ...td.querySelectorAll('.entity-label')] as HTMLElement[]
       for (const b of boxes) {
@@ -311,7 +311,7 @@ test.describe('the sort of a protocol list', () => {
     expect(await names()).toEqual(['Actalis', "Let's Encrypt", 'ZeroSSL'])
     await page.getByRole('tab', { name: /^Accounts/ }).click()
     await expect(page).toHaveURL(/\/acme$/)
-    // The header is named by its full label (E10)
+    // The header is named by its full label
     await expect(head('Creation date')).toHaveAttribute('aria-sort', 'descending')
   })
 })

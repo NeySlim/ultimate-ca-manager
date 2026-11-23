@@ -1,5 +1,5 @@
 /**
- * The columns of the TSA and EST lists (COLONNES-SPEC T1, T4, T9, L7, L8): the name takes the room left, never the
+ * The columns of the TSA and EST lists: the name takes the room left, never the
  * authority; the one TSA service has no sort, the EST endpoints sort by name from the first render, kept in the address.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -77,7 +77,7 @@ describe('the TSA and EST lists', () => {
     expect(sortedHeaders(at.container)).toEqual([['atelier.name', 'ascending']])
     expect(absorbers(at.container)).toEqual(['atelier.name'])
     expect(sortKeys(at.container)).toEqual(['name', 'ca', 'auth', 'state'])
-    // The authentication under a short header, its whole name for a screen reader and in the title (L8)
+    // The authentication under a short header, its whole name for a screen reader and in the title
     expect(headersOf(at.container).find((h) => h.sort === 'auth').label).toBe('est.columns.authShort')
     expect(screen.getByRole('button', { name: 'est.columns.auth' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))

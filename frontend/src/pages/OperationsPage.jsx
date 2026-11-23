@@ -50,7 +50,7 @@ const SERVER_SORT = {
   certificates: { name: 'subject', status: 'status', issuer: 'issuer', valid_to: 'valid_to' },
   csrs: { name: 'cn', created_at: 'created_at' },
 }
-// Every resource by its name (T4)
+// Every resource by its name
 const BY_NAME = { key: 'name', asc: true }
 const STATUS = {
   valid: ['good', 'common.valid'], expiring: ['warn', 'common.expiring'], expired: ['bad', 'common.expired'],
@@ -173,7 +173,7 @@ export default function OperationsPage() {
   const [bulkTotal, setBulkTotal] = useState(0)
   const COLUMNS_NOW = COLUMNS[bulkResourceType]
   const { sort, onSort, setSort } = useSortParam(BY_NAME, COLUMNS_NOW.filter((c) => c.sort).map((c) => c.sort))
-  // A new order starts from the first page, the selection kept (T3)
+  // A new order starts from the first page, the selection kept
   const order = `${sort.key}:${sort.asc}`
   const [orderMark, setOrderMark] = useState(order)
   if (orderMark !== order) { setOrderMark(order); setBulkPage(1) }
@@ -246,7 +246,7 @@ export default function OperationsPage() {
     } catch { /* non-critical */ }
   }
 
-  // The page the server cuts is in the server's order: never sorted again here (T2)
+  // The page the server cuts is in the server's order: never sorted again here
   const serverOrder = (type) => {
     const key = SERVER_SORT[type][sort.key] ? sort.key : BY_NAME.key
     return { sort_by: SERVER_SORT[type][key], sort_order: key === sort.key && !sort.asc ? 'desc' : 'asc' }
@@ -645,7 +645,7 @@ export default function OperationsPage() {
   // CAs, templates and users come whole: searched, sorted and paged here; certificates and CSRs by the server
   const searched = serverPaged || !bulkSearch ? bulkData : bulkData.filter((row) => SEARCH_KEYS.some((k) => String(row[k] ?? '').toLowerCase().includes(bulkSearch.toLowerCase())))
   const listed = selectionOnly ? basketItems.filter((row) => selectedIds.has(row.id)) : searched
-  // A list held whole, or the selection alone, sorts here; a page the server cut keeps the server's order (T2)
+  // A list held whole, or the selection alone, sorts here; a page the server cut keeps the server's order
   const sortCol = (!serverPaged || selectionOnly) && columns.find((c) => c.sort === sort.key)
   const collator = new Intl.Collator(i18n?.language || undefined, { numeric: true, sensitivity: 'base' })
   const sorted = sortCol ? [...listed].sort((a, b) => compareValues(sortCol.value(a), sortCol.value(b), sort.asc, collator)) : listed
