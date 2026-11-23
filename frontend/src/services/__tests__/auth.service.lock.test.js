@@ -9,7 +9,7 @@ const api = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), clearCsrfToken: vi.
 vi.mock('../apiClient', () => ({ apiClient: api }))
 
 import { authService } from '../auth.service'
-import { markLockUnconfirmed, readUnconfirmedLock } from '../../lib/sessionLock'
+import { clearUnconfirmedLock, markLockUnconfirmed, readUnconfirmedLock } from '../../lib/sessionLock'
 
 const failure = (status) => Object.assign(new Error('failed'), { status })
 const posts = (path) => api.post.mock.calls.filter(([url]) => url === path).length
@@ -71,13 +71,89 @@ describe('authService.lock', () => {
     expect(posts('/auth/lock')).toBe(2)
   })
 
-  it('stops at a 401: the session is gone or locked already, nothing is left open', async () => {
-    api.post.mockRejectedValueOnce(failure(401))
+  it('stops at a second 401: the session is gone, nothing is left open', async () => {
+    api.post.mockRejectedValueOnce(failure(401)).mockRejectedValueOnce(failure(401))
     const done = authService.lock('manual')
     done.catch(() => {})
     await vi.runAllTimersAsync()
-    expect(posts('/auth/lock')).toBe(1)
+    expect(posts('/auth/lock')).toBe(2)
     expect(posts('/auth/logout')).toBe(0)
     expect(readUnconfirmedLock()).toBeNull()
+  })
+
+  it('sends a lock refused with 401 once more: a renewed identifier may have replaced the cookie', async () => {
+    api.post.mockRejectedValueOnce(failure(401)).mockResolvedValueOnce({})
+    const done = authService.lock('manual')
+    await vi.runAllTimersAsync()
+    await expect(done).resolves.toEqual({})
+    expect(posts('/auth/lock')).toBe(2)
+    expect(readUnconfirmedLock()).toBeNull()
+  })
+
+  it('sends again a lock the server answers it did not store (409)', async () => {
+    api.post.mockRejectedValueOnce(failure(409)).mockResolvedValueOnce({})
+    const done = authService.lock('manual')
+    await vi.runAllTimersAsync()
+    await expect(done).resolves.toEqual({})
+    expect(posts('/auth/lock')).toBe(2)
+    expect(posts('/auth/logout')).toBe(0)
+  })
+
+  it('sends nothing more once a sign-in happened meanwhile: the new session is left alone', async () => {
+    api.post.mockImplementation(async (url) => {
+      if (url === '/auth/lock') {
+        // Another tab signs in while this lock waits for its next attempt (login clears the mark)
+        clearUnconfirmedLock()
+        return Promise.reject(failure(503))
+      }
+      return {}
+    })
+    const done = authService.lock('manual')
+    done.catch(() => {})
+    await vi.runAllTimersAsync()
+    await expect(done).rejects.toMatchObject({ superseded: true })
+    expect(posts('/auth/lock')).toBe(1)
+    expect(posts('/auth/logout')).toBe(0)
+    expect(api.get).not.toHaveBeenCalled()
+    // The token may be the new session's: it stays
+    expect(api.clearCsrfToken).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing more once the mark names another account', async () => {
+    api.post.mockImplementation(async (url) => {
+      if (url === '/auth/lock') {
+        markLockUnconfirmed({ username: 'bob', reason: 'idle' })
+        return Promise.reject(failure(403))
+      }
+      return {}
+    })
+    const done = authService.lock('manual')
+    done.catch(() => {})
+    await vi.runAllTimersAsync()
+    await expect(done).rejects.toMatchObject({ superseded: true })
+    expect(posts('/auth/lock')).toBe(1)
+    expect(posts('/auth/logout')).toBe(0)
+    // No fresh CSRF token taken from the session opened meanwhile
+    expect(api.get).not.toHaveBeenCalled()
+    expect(readUnconfirmedLock()).toEqual({ username: 'bob', reason: 'idle' })
+  })
+
+  it('does not sign out a session opened during the last attempt', async () => {
+    let sent = 0
+    api.post.mockImplementation(async (url) => {
+      if (url === '/auth/lock') {
+        sent += 1
+        if (sent === 4) clearUnconfirmedLock()
+        return Promise.reject(failure(0))
+      }
+      return {}
+    })
+    const done = authService.lock('idle')
+    done.catch(() => {})
+    await vi.runAllTimersAsync()
+    await expect(done).rejects.toBeTruthy()
+    expect(posts('/auth/lock')).toBe(4)
+    expect(posts('/auth/logout')).toBe(0)
+    expect(api.clearCsrfToken).not.toHaveBeenCalled()
   })
 })
