@@ -5928,9 +5928,9 @@
         "rejectedMany_other": "{{count}} Anfragen abgelehnt"
       },
       "cannot": {
-        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
-        "not_in_group": "Only members of the policy's approver group can decide on this request.",
-        "already_voted": "You have already voted on this request."
+        "own_request": "Sie können Ihre eigene Anfrage nicht genehmigen; Sie können sie jedoch ablehnen, um sie zurückzuziehen.",
+        "not_in_group": "Nur Mitglieder der Genehmigungsgruppe der Richtlinie können über diese Anfrage entscheiden.",
+        "already_voted": "Sie haben über diese Anfrage bereits abgestimmt."
       }
     }
   },

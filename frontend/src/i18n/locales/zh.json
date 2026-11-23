@@ -5928,9 +5928,9 @@
         "rejectedMany_other": "已拒绝 {{count}} 个请求"
       },
       "cannot": {
-        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
-        "not_in_group": "Only members of the policy's approver group can decide on this request.",
-        "already_voted": "You have already voted on this request."
+        "own_request": "您不能批准自己的请求；但可以拒绝它以撤回该请求。",
+        "not_in_group": "只有该策略审批组的成员才能对此请求作出决定。",
+        "already_voted": "您已对此请求投过票。"
       }
     }
   },
