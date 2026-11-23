@@ -79,21 +79,27 @@ def ssl_context(conf, default_ssl_context_factory):
     (browsers, ACME, SCEP, EST, the admin API) — TLS version negotiation
     happens before the HTTP path is known, so there's no way to cap only
     WSTEP traffic without a separate port. Scoping the cap to
-    ``WSTEP_TLS12_CAP_NEEDED`` (read once at worker startup, see
+    ``WSTEP_TLS12_CAP_NEEDED`` (read as the master loads this file, see
     ``_wstep_enabled`` below) means installs that never touch Windows
     autoenrollment keep TLS 1.3 for everything else, instead of every UCM
-    instance silently losing it by default. The Windows settings route restarts
-    the service whenever ``wstep_enabled`` is toggled, so this stays in
+    instance silently losing it by default. The Windows settings route reloads
+    the listener whenever ``wstep_enabled`` is toggled (SIGHUP to the master,
+    which re-runs this file and replaces the workers, #452), so this stays in
     sync with the setting rather than only taking effect on the next
-    unrelated restart.
+    unrelated restart; a new certificate or mTLS trust is applied the same way.
     """
     from utils.client_cert import pin_listener_trust, pin_listener_trust_file
-    if conf.ca_certs:
-        # The guard of the application follows the bundle this context loaded, read once here
-        ctx = pin_listener_trust_file(conf.ca_certs, default_ssl_context_factory)
-    else:
-        ctx = default_ssl_context_factory()
+    from utils.listener_tls import pin_served_certificate
+
+    def build():
+        if conf.ca_certs:
+            # The guard of the application follows the bundle this context loaded, read once here
+            return pin_listener_trust_file(conf.ca_certs, default_ssl_context_factory)
+        built = default_ssl_context_factory()
         pin_listener_trust(())
+        return built
+    # The HTTPS state compares the leaf this worker serves with the file on disk
+    ctx = pin_served_certificate(conf.certfile, build)
     if WSTEP_TLS12_CAP_NEEDED:
         ctx.maximum_version = ssl.TLSVersion.TLSv1_2
     if conf.ca_certs:
@@ -303,6 +309,11 @@ def when_ready(server):
 
 def on_reload(server):
     server.log.info("Reloading UCM")
+    from utils.listener_tls import take_reload_request
+    if take_reload_request(data_path):
+        # Asked for the TLS listener alone: the scheduler process serves no TLS, its tasks go on
+        server.log.info("TLS listener reload: the scheduler process keeps running")
+        return
     # The scheduler process takes the new code and configuration too
     from scheduler_supervisor import supervisor
     supervisor.restart()
@@ -338,6 +349,10 @@ def post_worker_init(worker):
     """
     import ssl
     import gevent
+
+    # The master this worker may ask for a TLS listener reload (SIGHUP), checked again at that time
+    from utils.listener_tls import note_master
+    note_master(worker.ppid)
 
     # Before any query: the pool still holds the master's connections
     from models import db

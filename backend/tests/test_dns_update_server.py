@@ -1142,7 +1142,7 @@ def gunicorn_conf(app, monkeypatch):
 
 def _worker(graceful_timeout=30):
     cfg = types.SimpleNamespace(graceful_timeout=graceful_timeout)
-    return types.SimpleNamespace(cfg=cfg, log=logging.getLogger('test.worker'))
+    return types.SimpleNamespace(cfg=cfg, ppid=0, log=logging.getLogger('test.worker'))
 
 
 def test_startup_gunicorn_starts_the_dns_update_listener_with_a_retry_pos(gunicorn_conf, app):

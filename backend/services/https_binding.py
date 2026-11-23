@@ -3,8 +3,8 @@
 Applying a managed certificate to HTTPS remembers its refid
 (SystemConfig ``https_bound_certificate_refid``). When that certificate is
 renewed (in-place since 2.214: the refid survives, the key may change), the
-files are re-materialized and the service restarts, so the web UI never
-serves a stale certificate again.
+files are re-materialized and the TLS listener reloads (HA: a rolling restart),
+so the web UI never serves a stale certificate again.
 """
 import base64
 import logging
@@ -211,41 +211,43 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
 
     Runs synchronously in the renewing request (bus contract): it writes the files,
     commits the chain on the caller's session (rolled back on any error, which is
-    logged and never raised) and asks for an async service restart.
+    logged and never raised) and asks for the listener reload. Returns its
+    ``(outcome, message)``, or None when nothing was written.
     """
     try:
         cert_info = (payload or {}).get('certificate') or {}
         refid = cert_info.get('refid')
         bound = get_bound_refid()
         if not bound or not refid or refid != bound:
-            return
+            return None
         from models import Certificate
         cert = Certificate.query.filter_by(refid=refid).first()
         if not cert or not cert.crt or not cert.prv:
             logger.warning(
                 "HTTPS-bound certificate %s renewed but unusable "
                 "(missing cert or key). HTTPS files left untouched", refid)
-            return
+            return None
         full_cert = materialize_https_cert(cert)
         from models import db
         remember_chain(full_cert)
         db.session.commit()
-        logger.info(
-            "HTTPS-bound certificate %s renewed, re-materialized, "
-            "restarting the service", refid)
+        cert_id, label = cert.id, cert.descr or refid
+        outcome, message = restart_to_serve()
+        from utils.listener_tls import FAILED
+        if outcome == FAILED:
+            logger.error(f"HTTPS certificate {refid} renewed but not served yet: {message}")
+            details = ("HTTPS certificate re-materialized after renewal, not served yet: "
+                       f"the TLS listener was not reloaded: {message}")
+        else:
+            logger.info(f"HTTPS-bound certificate {refid} renewed and re-materialized: {message}")
+            details = 'HTTPS certificate re-materialized after renewal'
         from services.audit_service import AuditService
         AuditService.log_action(
             action='https_apply', resource_type='system',
-            resource_id=str(cert.id), resource_name=cert.descr or refid,
-            details='HTTPS certificate re-materialized after renewal',
-            success=True,
+            resource_id=str(cert_id), resource_name=label,
+            details=details, success=outcome != FAILED,
         )
-        started, message = restart_to_serve()
-        if started is None:
-            logger.warning("Running in Docker: restart the container to load "
-                           "the renewed HTTPS certificate")
-        elif not started:
-            logger.error(f"HTTPS certificate renewed but not served yet: {message}")
+        return outcome, message
     except Exception as exc:  # never break the renewal itself
         try:
             from models import db
@@ -253,23 +255,22 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
         except Exception:
             pass
         logger.error(f"HTTPS re-materialization after renewal failed: {exc}")
+        return None
 
 
 def restart_to_serve():
-    """``(started, message)`` after the HTTPS files changed; ``started`` is None when the
-    container must be restarted by hand. HA: a rolling restart, each node writes the files
-    from the database as it starts."""
-    from config.settings import is_docker
-    from utils.ha import ha_enabled
-    if not ha_enabled() and is_docker():
-        return None, "Restart the container to apply."
-    from utils.service_manager import restart_service
-    return restart_service()
+    """``(outcome, message)`` once the HTTPS files changed (utils.listener_tls outcomes).
+
+    Outside HA the gunicorn master reloads the listener; HA: a rolling restart, each node
+    writes the files from the database as it starts.
+    """
+    from utils.listener_tls import serve_listener_change
+    return serve_listener_change()
 
 
 def apply_bound_now(refid):
     """Re-materialize *refid* now that the binding names it (same path as a renewal)."""
-    on_certificate_renewed('certificate.renewed', {'certificate': {'refid': refid}}, None, {})
+    return on_certificate_renewed('certificate.renewed', {'certificate': {'refid': refid}}, None, {})
 
 
 def register_https_binding_subscriber(app):

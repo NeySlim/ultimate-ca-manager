@@ -107,9 +107,7 @@ def test_wstep_toggle_in_a_ha_container_queues_the_restart_with_the_setting(app,
         _put_config(app, 'wstep_enabled', old)
 
 
-def test_mtls_change_in_a_ha_container_queues_the_restart_with_the_setting(app, auth_client, ha_commands,
-                                                                          monkeypatch):
-    monkeypatch.setattr('api.v2.mtls.is_docker', lambda: True)
+def test_mtls_change_in_a_ha_container_queues_the_restart_with_the_setting(app, auth_client, ha_commands):
     r = auth_client.get('/api/v2/mtls/settings')
     current = (r.get_json() or {}).get('data', {}).get('required', False)
     r = auth_client.put('/api/v2/mtls/settings', json={'required': current})  # same value: nothing changes

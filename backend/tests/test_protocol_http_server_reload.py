@@ -169,7 +169,7 @@ def gunicorn_conf(app, monkeypatch):
 @pytest.mark.parametrize('graceful, expected', [(30, 35.0), (60, 65.0)])
 def test_post_worker_init_reports_after_the_graceful_timeout(gunicorn_conf, app, graceful, expected):
     module, calls = gunicorn_conf
-    worker = types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=graceful),
+    worker = types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=graceful), ppid=0,
                                    log=logging.getLogger('test.worker'))
     module.post_worker_init(worker)
     assert calls[0] == (app, {'error_after': expected})
@@ -178,6 +178,7 @@ def test_post_worker_init_reports_after_the_graceful_timeout(gunicorn_conf, app,
 def test_post_worker_init_leaves_no_epoch_watcher_behind_neg(gunicorn_conf):
     import threading
     module = gunicorn_conf[0]
-    module.post_worker_init(types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=30), log=logging.getLogger('test.worker')))
+    module.post_worker_init(types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=30), ppid=0,
+                                                   log=logging.getLogger('test.worker')))
     # A live watcher would roll back the shared test connection under later tests
     assert [t.name for t in threading.enumerate() if t.name == 'EpochCacheWatcher'] == []
