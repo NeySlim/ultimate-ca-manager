@@ -50,10 +50,12 @@ test.describe('a phone of 360 px', () => {
 })
 
 test('a journal entry keeps its values clear of buttons, its address copyable in its value', async ({ page, api }) => {
-  await createCA(api)
-  await page.goto('/audit')
+  const name = uid('root')
+  await createCA(api, { commonName: name })
+  // This request's own entry, which carries its client's address: a scheduler's entry (a CRL) may be newer and has none
+  await page.goto(`/audit?search=${encodeURIComponent(name)}&action_prefix=ca_created`)
   const rows = page.getByRole('main').locator('.audit-table tbody tr:not(.sk-row)')
-  await expect(rows.first()).toBeVisible()
+  await expect(rows).toHaveCount(1)
   await page.getByRole('main').locator('.audit-table .resource').first().click()
   const dialog = page.locator('dialog[open]')
   await expect(dialog.locator('dl.kv')).toBeVisible()
