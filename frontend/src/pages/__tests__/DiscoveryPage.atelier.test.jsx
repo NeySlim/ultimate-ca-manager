@@ -216,6 +216,7 @@ describe('DiscoveryPage found certificates and history (the product views)', () 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(Array(32).fill('AB').join(':')))
     // A key identifier is a digest too; an extension's OID and criticality under its value
     expect(row('Subject Key Identifier').querySelector('.code-value.hex')).toHaveTextContent('A1:B2:C3:D4')
+    expect(row('Subject Key Identifier')).toHaveClass('wide')
     expect(row('Key Usage').querySelector('dd.v > .sub')).toHaveTextContent('2.5.29.15 · inspector.cert.critical')
   })
 

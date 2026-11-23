@@ -161,7 +161,8 @@ export function FoundDock({ cert, onClose, actions }) {
           {!failed && (exts.length > 0 || cert.san_dns_names?.length > 0 || cert.san_ip_addresses?.length > 0) && (
             <Section title={t('discovery.found.extensions')}>
               <Facts items={exts.length ? exts.map((r) => ({
-                key: r.key, label: r.label, long: true,
+                // A key identifier takes the whole width, its octets on lines of their own
+                key: r.key, label: r.label, long: !HEX_EXTENSIONS.has(r.key), wide: HEX_EXTENSIONS.has(r.key),
                 value: HEX_EXTENSIONS.has(r.key)
                   ? <CodeValue value={digestHex(r.values[0])} kind="hex" label={r.label} />
                   : <>{r.values.map((v, i) => <span key={i}>{i > 0 && <br />}{v}</span>)}</>,
