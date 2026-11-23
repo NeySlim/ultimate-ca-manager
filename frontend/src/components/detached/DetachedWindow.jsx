@@ -14,7 +14,7 @@ const EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 // A layer of its own inside the window (a menu, a dialog) answers Escape before the window does
 const OWN_LAYER = 'dialog, [role="dialog"]:not([data-detached]), [role="alertdialog"], [role="menu"], [role="listbox"]'
 
-export function DetachedWindow({ wkey, icon, title, rect, z, front, maximized = false, onPlace, onFront, onToggleMax, onClose, takeFocus, onFocused, children }) {
+export function DetachedWindow({ wkey, icon, kindLabel, title, rect, z, front, maximized = false, onPlace, onFront, onToggleMax, onClose, takeFocus, onFocused, children }) {
   const { t } = useTranslation()
   const ref = useRef(null)
   const titleId = `detached-title-${useId().replace(/:/g, '')}`
@@ -83,7 +83,10 @@ export function DetachedWindow({ wkey, icon, title, rect, z, front, maximized = 
           <Icon name="move" />
         </button>
         <span id={`${titleId}-hint`} className="sr-only">{t('detached.moveHint')}</span>
-        <div className="float-title"><Icon name={icon} /><h2 id={titleId}>{title}</h2></div>
+        {/* The bar names the type, the body under it the object: the window's name stays the object's for assistive technology */}
+        <div className="float-title"><Icon name={icon} />
+          <h2 id={titleId}>{kindLabel ? <><span aria-hidden="true">{kindLabel}</span><span className="sr-only">{title}</span></> : title}</h2>
+        </div>
         <div className="float-tools">
           <button type="button" className="icon-btn" data-action="float-max" aria-label={t(maximized ? 'detached.restore' : 'detached.maximize')}
             title={t(maximized ? 'detached.restore' : 'detached.maximize')} onClick={toggleMax}>

@@ -45,8 +45,8 @@ export function compareRows(certs, t) {
     list('san', 'SAN', (i) => ext(i, 'subject_alt_names')),
     // Key usages read one by one (the inspector joins them on one line), so the one a certificate adds stands out
     list('usages', t('compare.usages'), (i) => [...ext(i, 'key_usage').flatMap((v) => v.split(', ')), ...ext(i, 'extended_key_usage')]),
-    scalar('sha1', `${t('common.fingerprints')} SHA-1`, (c) => c.thumbprint_sha1 || ABSENT),
-    scalar('sha256', `${t('common.fingerprints')} SHA-256`, (c) => c.thumbprint_sha256 || ABSENT),
+    scalar('sha1', `${t('common.fingerprint')} SHA-1`, (c) => c.thumbprint_sha1 || ABSENT),
+    scalar('sha256', t('common.sha256'), (c) => c.thumbprint_sha256 || ABSENT),
     scalar('serial', t('inspector.cert.serial'), (c) => serialHex(c.serial_number) || ABSENT),
   ]
 

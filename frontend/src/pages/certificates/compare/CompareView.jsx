@@ -9,6 +9,7 @@ import { SkeletonPanel } from '../../../components/atelier/Skeleton'
 import { Breakable } from '../../../components/atelier/Breakable'
 import { Icon } from '../../../components/atelier/Icon'
 import { Pill } from '../../../components/atelier/Pill'
+import { hexLines } from '../../../components/atelier/helpers'
 import { certificatesService } from '../../../services'
 import { entityTitle } from '../../../lib/entityDetail'
 import { extractData } from '../../../lib/utils'
@@ -32,9 +33,16 @@ export function useCertificates(ids) {
 
 const MONO = /^(sha|serial)/
 
-/** A cell's value: a single one breaks after its separators; a list one element per line, each marked when `marked`. */
-function Value({ row, index, marked }) {
+/**
+ * A cell's value: a single one breaks after its separators, a digest or a serial in equal lines of bytes (as its chip
+ * elsewhere); a list one element per line, each marked when `marked`.
+ */
+function Value({ row, index, marked, hex }) {
   const { t } = useTranslation()
+  if (!row.list && hex) {
+    const lines = hexLines(row.values[index]).split('\n')
+    if (lines.length > 1) return <span className="hex-lines">{lines.map((line, i) => <span key={i} className="line">{line}</span>)}</span>
+  }
   if (!row.list) return <Breakable text={row.values[index]} />
   const items = row.items[index]
   if (!items.length) return <span className="absent">{ABSENT}</span>
@@ -88,7 +96,7 @@ export function CompareTable({ certs }) {
                     <th scope="row">{r.label}</th>
                     <td colSpan={certs.length} className={mono}>
                       <span className="eq"><Icon name="equal" />{t('compare.identical')}</span>
-                      <Value row={r} index={0} />
+                      <Value row={r} index={0} hex={!!mono} />
                     </td>
                   </tr>
                 )
@@ -96,7 +104,7 @@ export function CompareTable({ certs }) {
               return (
                 <tr key={r.key} className="different" data-row={r.key}>
                   <th scope="row">{r.label}<span className="sr-only"> ({t('compare.differs')})</span></th>
-                  {certs.map((c, i) => <td key={c.id} className={mono}><Value row={r} index={i} marked={r.byElement} /></td>)}
+                  {certs.map((c, i) => <td key={c.id} className={mono}><Value row={r} index={i} marked={r.byElement} hex={!!mono} /></td>)}
                 </tr>
               )
             })}
