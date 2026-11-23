@@ -5452,7 +5452,6 @@
     "editWebhook": "编辑 Webhook",
     "noWebhooks": "尚未配置 Webhooks",
     "noWebhooksDescription": "添加 Webhook 接入地址以接收证书相关事件通知",
-    "configuredWebhooks": "已配置 Webhook 列表",
     "namePlaceholder": "例如：Slack 通知",
     "events": "事件类型",
     "caFilter": "CA 筛选 (可选)",
@@ -5928,9 +5927,9 @@
         "rejectedMany_other": "已拒绝 {{count}} 个请求"
       },
       "cannot": {
-        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
-        "not_in_group": "Only members of the policy's approver group can decide on this request.",
-        "already_voted": "You have already voted on this request."
+        "own_request": "您不能批准自己的请求；但可以拒绝它以撤回该请求。",
+        "not_in_group": "只有该策略审批组的成员才能对此请求作出决定。",
+        "already_voted": "您已对此请求投过票。"
       }
     }
   },

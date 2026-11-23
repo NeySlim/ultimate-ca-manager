@@ -5692,7 +5692,6 @@
     "editWebhook": "Редагувати вебхук",
     "noWebhooks": "Вебхуки не налаштовані",
     "noWebhooksDescription": "Додайте кінцеві точки вебхуків для отримання сповіщень про події сертифікатів",
-    "configuredWebhooks": "Налаштовані вебхуки",
     "namePlaceholder": "напр., Сповіщення Slack",
     "events": "Події",
     "caFilter": "Фільтр ЦС (необов'язково)",
@@ -6198,9 +6197,9 @@
         "rejectedMany_many": "{{count}} запитів відхилено"
       },
       "cannot": {
-        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
-        "not_in_group": "Only members of the policy's approver group can decide on this request.",
-        "already_voted": "You have already voted on this request."
+        "own_request": "Ви не можете затвердити власний запит; ви можете відхилити його, щоб відкликати.",
+        "not_in_group": "Рішення щодо цього запиту можуть ухвалювати лише учасники групи затвердження політики.",
+        "already_voted": "Ви вже проголосували щодо цього запиту."
       }
     }
   },

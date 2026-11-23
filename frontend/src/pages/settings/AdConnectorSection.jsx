@@ -157,7 +157,7 @@ export default function AdConnectorSection({ hasPermission }) {
     <>
       <Notice><strong>{t('adConnector.helpTitle')}</strong>{' '}{t('adConnector.helpDescription')}</Notice>
 
-      <ListView label={t('adConnector.title')} icon="globe" list={list} nameSort="name" loading={loading} scrollId="ad-connectors-scroll"
+      <ListView label={t('adConnector.title')} icon="globe" list={list} nameSort="name" loading={loading} scrollId="ad-connectors-scroll" cardActions
         title={(row) => row.name} status={state}
         openedId={editing?.id} onOpen={canWrite ? setEditing : undefined}
         toolbar={(

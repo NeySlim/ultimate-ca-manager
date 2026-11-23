@@ -5452,7 +5452,6 @@
     "editWebhook": "Edit Webhook",
     "noWebhooks": "No webhooks configured",
     "noWebhooksDescription": "Add webhook endpoints to receive notifications about certificate events",
-    "configuredWebhooks": "Configured Webhooks",
     "namePlaceholder": "e.g., Slack Notification",
     "events": "Events",
     "caFilter": "CA Filter (optional)",

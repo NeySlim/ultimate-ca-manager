@@ -385,8 +385,9 @@ def _listener_trust_refused(trusted_before):
             or has_permission(LISTENER_TRUST_PERMISSION, getattr(g, 'permissions', None) or [])):
         return None
     db.session.rollback()
-    return error_response('This change alters the CAs the TLS listener trusts for Windows renewal and '
-                          f'reloads the TLS listener: permission required: {LISTENER_TRUST_PERMISSION}', 403)
+    # Names no reload or restart: which one serves the change depends on the mode (HA, native, container)
+    return error_response('This change alters the CAs the TLS listener trusts for Windows renewal: '
+                          f'permission required: {LISTENER_TRUST_PERMISSION}', 403)
 
 
 def _listener_restart(rolling):
