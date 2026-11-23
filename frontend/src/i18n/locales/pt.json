@@ -3398,8 +3398,6 @@
     "perPageLabel": "Eventos por página",
     "dateTime": "Data / hora",
     "client": "Cliente",
-    "copyIp": "Copiar o endereço IP",
-    "ipCopied": "Endereço IP copiado",
     "inspectCertificate": "Inspecionar o certificado",
     "viewAuthority": "Ver a autoridade",
     "exportScope_one": "{{count, number}} evento, com a pesquisa e os filtros atuais (10 000 no máximo).",
@@ -4747,7 +4745,6 @@
     "caption": "HSM. Ative um nome para abrir o respectivo detalhe.",
     "filterByState": "Filtrar por estado",
     "filterByType": "Filtrar por tipo",
-    "copyValue": "Copiar {{name}}",
     "summaryKeys": "Chaves: {{names}}.",
     "deleteKey": "Excluir a chave {{name}}"
   },

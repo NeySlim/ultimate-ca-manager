@@ -3398,8 +3398,6 @@
     "perPageLabel": "1ページあたりのイベント数",
     "dateTime": "日付 / 時刻",
     "client": "クライアント",
-    "copyIp": "IPアドレスをコピー",
-    "ipCopied": "IPアドレスをコピーしました",
     "inspectCertificate": "証明書を確認",
     "viewAuthority": "認証局を表示",
     "exportScope_one": "現在の検索とフィルターに該当するイベント {{count, number}} 件（最大10,000件）。",
@@ -4747,7 +4745,6 @@
     "caption": "HSM。名前を操作すると詳細が開きます。",
     "filterByState": "状態で絞り込む",
     "filterByType": "タイプで絞り込む",
-    "copyValue": "{{name}} をコピー",
     "summaryKeys": "鍵: {{names}}。",
     "deleteKey": "鍵 {{name}} を削除"
   },

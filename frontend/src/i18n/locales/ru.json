@@ -3540,8 +3540,6 @@
     "perPageLabel": "Событий на странице",
     "dateTime": "Дата / время",
     "client": "Клиент",
-    "copyIp": "Скопировать IP-адрес",
-    "ipCopied": "IP-адрес скопирован",
     "inspectCertificate": "Открыть сертификат",
     "viewAuthority": "Открыть центр сертификации",
     "exportScope_one": "{{count, number}} событие с текущим поиском и фильтрами (не более 10 000).",
@@ -4911,7 +4909,6 @@
     "caption": "HSM. Выберите имя, чтобы открыть подробности.",
     "filterByState": "Фильтр по состоянию",
     "filterByType": "Фильтр по типу",
-    "copyValue": "Копировать: {{name}}",
     "summaryKeys": "Ключи: {{names}}.",
     "deleteKey": "Удалить ключ {{name}}"
   },

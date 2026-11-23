@@ -3540,8 +3540,6 @@
     "perPageLabel": "Подій на сторінці",
     "dateTime": "Дата / час",
     "client": "Клієнт",
-    "copyIp": "Копіювати IP-адресу",
-    "ipCopied": "IP-адресу скопійовано",
     "inspectCertificate": "Переглянути сертифікат в інспекторі",
     "viewAuthority": "Переглянути ЦС",
     "exportScope_one": "{{count, number}} подія, із поточними пошуком і фільтрами (щонайбільше 10 000).",
@@ -4911,7 +4909,6 @@
     "caption": "HSM. Активуйте назву, щоб відкрити її деталі.",
     "filterByState": "Фільтрувати за станом",
     "filterByType": "Фільтрувати за типом",
-    "copyValue": "Копіювати {{name}}",
     "summaryKeys": "Ключі: {{names}}.",
     "deleteKey": "Видалити ключ {{name}}"
   },
