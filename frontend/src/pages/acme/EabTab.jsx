@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, Modal, Textarea, ToggleSwitch } from '../../components/atelier/Form'
-import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, Toolbar, SearchField, useClientList, useSortParam } from '../../components/atelier'
+import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Facts, EmptyBlock, NoMatch, Toolbar, SearchField, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
-import { Copyable, Notice } from '../protocols/atelierParts'
+import { Notice } from '../protocols/atelierParts'
+import { copyRow } from '../protocols/factRows'
 import { fetchListing } from '../../lib/fetchAllPages'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { acmeService } from '../../services'
@@ -227,14 +228,14 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
         </>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('acme.eab.kid'), <Copyable key="k" value={open.kid} label={t('acme.eab.kid')} />],
+            <Facts items={[
+              copyRow(t('acme.eab.kid'), open.kid, undefined, { long: true }),
               [t('atelier.state'), pill(open)],
-              [t('acme.eab.allowedDomains'), <span key="d" className="mono" data-testid={`eab-dock-domains-${open.id}`}>{domainsText(open)}</span>],
+              { label: t('acme.eab.allowedDomains'), value: <span data-testid={`eab-dock-domains-${open.id}`}>{domainsText(open)}</span>, long: true },
               [t('acme.eab.created'), dateTimeOf(open.created_at, locale)],
               open.expires_at && [t('common.expires'), dateTimeOf(open.expires_at, locale)],
               open.used_at && [t('acme.eab.usedAt'), dateTimeOf(open.used_at, locale)],
-              open.used_by_account_id && [t('acme.eab.boundTo'), <span key="b" className="mono">{open.used_by_account_id}</span>],
+              open.used_by_account_id && copyRow(t('acme.eab.boundTo'), open.used_by_account_id, undefined, { long: true }),
               open.revoked_at && [t('acme.eab.revokedAt'), dateTimeOf(open.revoked_at, locale)],
             ]} />
           </Section>

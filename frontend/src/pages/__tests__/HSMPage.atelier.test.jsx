@@ -171,7 +171,7 @@ describe('the HSM dock', () => {
     fireEvent.click(within(dock).getByRole('button', { name: 'hsm.deleteKey {"name":"ca-root"}' }))
     await waitFor(() => expect(svc.deleteKey).toHaveBeenCalledWith(9))
     fireEvent.click(within(dock).getByRole('tab', { name: 'common.config' }))
-    expect(within(dock).getByText('https://bao.example:8200')).toBeTruthy()
+    expect(within(dock).getByTitle('https://bao.example:8200')).toBeTruthy()
     expect(rowOf('Bao transit')).toHaveClass('opened')
   })
 
@@ -213,5 +213,16 @@ describe('the provider dock in the URL', () => {
     expect(r.where()).toBe('/hsm?item=1')
     fireEvent.click(within(await r.dock()).getByRole('tab', { name: 'hsm.hsmKeys' }))
     expect(r.where()).toBe('/hsm?item=1&section=keys')
+  })
+})
+
+describe('the HSM dock as facts (KV-3)', () => {
+  it('writes a provider never checked and an undeclared certification muted, its state a pill', async () => {
+    const r = renderAtUrl(<HSMPage />, '/hsm?item=2')
+    await r.dock()
+    const row = (term) => [...document.querySelectorAll('dl.kv > div.row')].find((x) => x.querySelector('dt').textContent === term)
+    expect(row('hsm.columns.checked').querySelector('dd')).toHaveClass('absent')
+    expect(row('hsm.certification.label').querySelector('dd')).toHaveClass('absent')
+    expect(row('atelier.state').querySelector('dd.v .badge')).not.toBeNull()
   })
 })

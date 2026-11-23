@@ -269,3 +269,41 @@ describe('the SCEP docks in the URL', () => {
     expect(scep.getRequest).toHaveBeenCalledWith(9)
   })
 })
+
+// KV-3: the docks as typed rows, a URL or an identifier in a chip, a rule as a pill, a missing value muted
+const row = (term) => {
+  const found = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === term)
+  if (!found) throw new Error(`no row ${term}`)
+  return found
+}
+
+describe('the SCEP docks as facts', () => {
+  it('shows a profile: its URL in a chip, its rules as pills, no template muted', async () => {
+    at('/scep-config')
+    fireEvent.click(await screen.findByRole('button', { name: 'Postes nomades' }))
+    await dock()
+    expect(row('scep.enrollmentUrl').querySelector('.code-value.url .val').getAttribute('title')).toMatch(/\/scep\/mdm\/pkiclient\.exe$/)
+    expect(row('Intune').querySelector('dd.v .badge')).toHaveTextContent('common.yes')
+    expect(row('scep.autoApprove').querySelector('dd.v .badge')).toHaveTextContent('common.yes')
+    expect(row('scep.columns.template').querySelector('dd')).toHaveClass('absent')
+    expect(document.querySelector('dl.kv .flag')).toBeNull()
+  })
+
+  it('shows a request: its subject as a long row, its transaction id in a chip', async () => {
+    at('/scep-config?tab=requests')
+    fireEvent.click(await screen.findByRole('button', { name: 'device-9' }))
+    await dock()
+    expect(row('common.subject')).toHaveClass('long')
+    expect(row('common.subject').querySelector('dd.v')).toHaveTextContent('CN=device-9,O=Lab')
+    expect(row('scep.transactionId').querySelector('dd.v .code-value')).toHaveTextContent('tx-9')
+  })
+
+  it('shows a registration never tested and unused muted, its tenant in a chip', async () => {
+    at('/scep-config?tab=intune')
+    fireEvent.click(await screen.findByRole('button', { name: 'Lab Intune' }))
+    await dock()
+    expect(row('scep.intuneAppLastTest').querySelector('dd')).toHaveClass('absent')
+    expect(row('scep.profiles').querySelector('dd')).toHaveClass('absent')
+    expect(row('scep.intuneTenantId').querySelector('dd.v .code-value')).toHaveTextContent('lab.onmicrosoft.com')
+  })
+})

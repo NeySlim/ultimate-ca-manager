@@ -7,12 +7,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
-  Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
+  Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
+  Section, Facts, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { FormModal, Input, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import { useNotification } from '../contexts'
-import { usePermission, useClipboard, usePersistedState } from '../hooks'
+import { usePermission, usePersistedState } from '../hooks'
 import { useDockSelection } from '../components/atelier/useDockParam'
 import { hsmService } from '../services'
 import { secretInputProps } from '../lib/secretTarget'
@@ -20,6 +20,7 @@ import { KEY_GROUPS, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode, useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice, UntestedKeyNotice } from '../components/BrainpoolNotice'
 import { dateTimeOf } from './admin/adminDates'
+import { copyRow, factRow } from './protocols/factRows'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)' },
@@ -54,51 +55,37 @@ export function syncKeysMessage(t, d) {
   return { text: parts.join(' '), notable: parts.length > 1 }
 }
 
-/** A configuration value that may be copied: the value in mono, then the mockup's quiet copy button. */
-function Copyable({ value, label }) {
-  const { t } = useTranslation()
-  const { copy } = useClipboard()
-  const { showSuccess } = useNotification()
-  if (!value) return '—'
-  return (
-    <>
-      <span className="mono">{value}</span>{' '}
-      <IconBtn quiet icon="copy" label={t('hsm.copyValue', { name: label })} onClick={() => { copy(value); showSuccess(t('common.copied')) }} />
-    </>
-  )
-}
-
 /** The configuration of a provider, per type, as terms and values; secrets never shown. */
 export function ProviderConfig({ provider: p }) {
   const { t } = useTranslation()
   const items = {
     pkcs11: [
       [t('hsm.pkcs11Config.slotId'), p.pkcs11_slot_id ?? 'Auto'],
-      [t('hsm.pkcs11Config.token'), p.pkcs11_token_label || '—'],
-      [t('hsm.pkcs11Config.libraryPath'), <Copyable key="lib" value={p.pkcs11_library_path} label={t('hsm.pkcs11Config.libraryPath')} />],
+      factRow(t('hsm.pkcs11Config.token'), p.pkcs11_token_label),
+      copyRow(t('hsm.pkcs11Config.libraryPath'), p.pkcs11_library_path, 'url'),
     ],
     'aws-cloudhsm': [
-      [t('hsm.awsConfig.clusterId'), <Copyable key="cl" value={p.aws_cluster_id} label={t('hsm.awsConfig.clusterId')} />],
-      [t('hsm.pkcs11Config.tokenLabel'), p.pkcs11_token_label || '—'],
-      [t('hsm.awsConfig.cryptoUser'), p.aws_crypto_user || '—'],
+      copyRow(t('hsm.awsConfig.clusterId'), p.aws_cluster_id),
+      factRow(t('hsm.pkcs11Config.tokenLabel'), p.pkcs11_token_label),
+      factRow(t('hsm.awsConfig.cryptoUser'), p.aws_crypto_user),
     ],
     'azure-keyvault': [
-      [t('hsm.azureConfig.vaultUrl'), <Copyable key="vault" value={p.azure_vault_url} label={t('hsm.azureConfig.vaultUrl')} />],
-      [t('hsm.azureConfig.tenant'), p.azure_tenant_id ? <span className="mono">{p.azure_tenant_id}</span> : '—'],
-      [t('hsm.azureConfig.client'), p.azure_client_id ? <span className="mono">{p.azure_client_id}</span> : '—'],
+      copyRow(t('hsm.azureConfig.vaultUrl'), p.azure_vault_url, 'url'),
+      copyRow(t('hsm.azureConfig.tenant'), p.azure_tenant_id, undefined, { long: true }),
+      copyRow(t('hsm.azureConfig.client'), p.azure_client_id, undefined, { long: true }),
     ],
     'google-kms': [
-      [t('hsm.gcpConfig.project'), p.gcp_project_id || '—'],
-      [t('hsm.gcpConfig.location'), p.gcp_location || '—'],
-      [t('hsm.gcpConfig.keyRing'), p.gcp_keyring || '—'],
+      factRow(t('hsm.gcpConfig.project'), p.gcp_project_id),
+      factRow(t('hsm.gcpConfig.location'), p.gcp_location),
+      factRow(t('hsm.gcpConfig.keyRing'), p.gcp_keyring),
     ],
     openbao: [
-      [t('hsm.openbaoConfig.url'), <Copyable key="url" value={p.openbao_url} label={t('hsm.openbaoConfig.url')} />],
+      copyRow(t('hsm.openbaoConfig.url'), p.openbao_url, 'url'),
       [t('hsm.openbaoConfig.mountPath'), p.openbao_mount_path || 'transit'],
       p.openbao_namespace && [t('hsm.openbaoConfig.namespace'), p.openbao_namespace],
     ],
   }[p.provider_type] || []
-  return <div className="module-detail"><Section title={t('common.config')}><Props items={items} /></Section></div>
+  return <div className="module-detail"><Section title={t('common.config')}><Facts items={items} /></Section></div>
 }
 
 // Providers served by the PKCS#11 driver record what their module reports
@@ -112,9 +99,9 @@ export function ModuleSection({ provider, fips }) {
     <Section title={t('hsm.module.title')}>
       {fips && provider.softhsm && <p className="notice warn"><Icon name="warning" /><span>{t('hsm.module.softhsmFips')}</span></p>}
       {m ? (
-        <Props items={[
-          [t('hsm.module.library'), m.library], [t('hsm.module.manufacturer'), m.manufacturer],
-          [t('hsm.module.libraryVersion'), m.library_version], [t('hsm.module.firmwareVersion'), m.firmware_version],
+        <Facts items={[
+          factRow(t('hsm.module.library'), m.library), factRow(t('hsm.module.manufacturer'), m.manufacturer),
+          factRow(t('hsm.module.libraryVersion'), m.library_version), factRow(t('hsm.module.firmwareVersion'), m.firmware_version),
         ]} />
       ) : <p className="muted small">{t('hsm.module.notRead')}</p>}
     </Section>
@@ -351,10 +338,11 @@ export default function HSMPage() {
         {section === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
-                [t('hsm.columns.type'), typeLabel(open)], [t('hsm.columns.keys'), keyCount(open)], [t('hsm.columns.checked'), checked(open)],
+              <Facts items={[
+                [t('hsm.columns.type'), typeLabel(open)], [t('hsm.columns.keys'), keyCount(open)],
+                factRow(t('hsm.columns.checked'), dateTimeOf(open.last_tested_at, locale), t('hsm.never')),
                 [t('atelier.state'), pill(open)],
-                [t('hsm.certification.label'), open.certification ? t(`hsm.certification.values.${open.certification}`, open.certification) : t('hsm.certification.notDeclared')],
+                factRow(t('hsm.certification.label'), open.certification && t(`hsm.certification.values.${open.certification}`, open.certification), t('hsm.certification.notDeclared')),
               ]} />
               {open.error_message && (
                 <p className="notice warn" id="hsm-error"><Icon name="warning" /><span><strong>{t('hsm.connectionError')}</strong> : {open.error_message}</span></p>

@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
-  Section, Props, RecordList, RecordRow, LoadError, LoadCause, NoMatch, useClientList, useSortParam,
+  Section, Facts, RecordList, RecordRow, LoadError, LoadCause, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { CRLDeploySection } from '../components/CRLDeploySection'
@@ -21,7 +21,8 @@ import { useDockParam, asId } from '../components/atelier/useDockParam'
 import { downloadBlob } from '../lib/utils'
 import { findAlgorithm } from '../lib/keyAlgorithms'
 import { dateTimeOf } from './admin/adminDates'
-import { CheckLine, Field, Notice, UrlList, Copyable } from './protocols/atelierParts'
+import { CheckLine, Field, Notice, UrlList } from './protocols/atelierParts'
+import { copyRow, factRow } from './protocols/factRows'
 import { crlState } from './protocols/protocolStates'
 
 const TONES = { current: 'good', soon: 'warn', expired: 'bad', none: 'muted' }
@@ -347,6 +348,8 @@ export default function CRLOCSPPage() {
   const published = (r) => dateTimeOf(r.crl_updated, locale) || '—'
   const next = (r) => dateTimeOf(r.crl_next_update, locale) || '—'
   const ocsp = (r) => t(r.ocsp_enabled ? 'crlOcsp.ocspActive' : 'crlOcsp.ocspInactive')
+  // In the dock the responder is a state of service: a pill, as in the CA panel
+  const ocspState = (r) => (r.ocsp_enabled ? ['good', ocsp(r), 'check'] : ['muted', ocsp(r), 'block'])
 
   const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -410,10 +413,11 @@ export default function CRLOCSPPage() {
         {section === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
-                ['CRL', number(open)], [t('crlOcsp.columns.published'), published(open)], [t('crlOcsp.nextUpdate'), next(open)],
-                ['OCSP', ocsp(open)], [t('atelier.state'), pill(open)],
-                [t('crlOcsp.revokedCount'), open.has_crl ? String(open.revoked_count || 0) : '—'],
+              <Facts items={[
+                open.has_crl ? ['CRL', number(open)] : { label: 'CRL', absent: number(open) },
+                factRow(t('crlOcsp.columns.published'), dateTimeOf(open.crl_updated, locale)), factRow(t('crlOcsp.nextUpdate'), dateTimeOf(open.crl_next_update, locale)),
+                { label: 'OCSP', state: ocspState(open) }, [t('atelier.state'), pill(open)],
+                factRow(t('crlOcsp.revokedCount'), open.has_crl ? String(open.revoked_count || 0) : null),
               ]} />
             </Section>
             <Section title={t('atelier.summary')}><p className="summary">{summary(open)}</p></Section>
@@ -432,7 +436,7 @@ export default function CRLOCSPPage() {
               </div>
               {open.has_private_key && (
                 <>
-                  {open.crl_next_publish && <Props items={[[t('crlOcsp.nextPublish'), dateTimeOf(open.crl_next_publish, locale)]]} />}
+                  {open.crl_next_publish && <Facts items={[[t('crlOcsp.nextPublish'), dateTimeOf(open.crl_next_publish, locale)]]} />}
                   <div className="form-fields dock-form">
                     <Field label={t('crlOcsp.crlValidity')} id="crl-validity"
                       hint={(open.crl_validity_days || 0) > 365 ? t('crlOcsp.crlValidityOfflineWarning') : undefined}>
@@ -479,10 +483,10 @@ export default function CRLOCSPPage() {
             {open.cdp_enabled && open.delta_crl_enabled && (
               <Section title={t('crlOcsp.deltaCrlTitle')}>
                 {open.delta_crl && (
-                  <Props items={[
+                  <Facts items={[
                     [t('crlOcsp.deltaCrlNumber'), `#${open.delta_crl.crl_number}`], [t('crlOcsp.baseCrlNumber'), `#${open.delta_crl.base_crl_number}`],
                     [t('crlOcsp.deltaEntries'), String(open.delta_crl.revoked_count ?? 0)],
-                    [t('crlOcsp.deltaNextUpdate'), dateTimeOf(open.delta_crl.next_update, locale) || '—'],
+                    factRow(t('crlOcsp.deltaNextUpdate'), dateTimeOf(open.delta_crl.next_update, locale)),
                   ]} />
                 )}
                 <div className="form-fields dock-form">
@@ -514,9 +518,9 @@ export default function CRLOCSPPage() {
                   {t('crlOcsp.ocspResponderOf')}
                 </CheckLine>
               </div>
-              <Props items={[
-                [t('atelier.state'), ocsp(open)],
-                open.ocsp_enabled && (open.ocsp_urls || []).length > 0 && ['URL', <Copyable key="u" url value={open.ocsp_urls[0]} label="OCSP" />],
+              <Facts items={[
+                { label: t('atelier.state'), state: ocspState(open) },
+                open.ocsp_enabled && (open.ocsp_urls || []).length > 0 && copyRow('URL', open.ocsp_urls[0], 'url', { copyLabel: 'OCSP' }),
                 [t('crlOcsp.totalRequests'), String(ocspStats.total_requests || 0)],
                 [t('crlOcsp.cacheHits'), String(ocspStats.cache_hits || 0)],
               ]} />
@@ -555,7 +559,7 @@ export default function CRLOCSPPage() {
         {section === 'distribution' && (
           <div className="module-detail">
             <Section title={t('crlOcsp.namedUrlsTitle')}>
-              {open.url_slug ? <Props items={[[t('crlOcsp.slug'), <span key="s" className="mono">{open.url_slug}</span>]]} /> : <p className="muted small">{t('crlOcsp.namedUrlsOff')}</p>}
+              {open.url_slug ? <Facts items={[copyRow(t('crlOcsp.slug'), open.url_slug)]} /> : <p className="muted small">{t('crlOcsp.namedUrlsOff')}</p>}
               {!open.url_slug && write && (
                 <div className="copy-url"><Btn id="crl-named-urls" write disabled={savingUrls || undefined} onClick={handleEnableNamedUrls}>{t('crlOcsp.namedUrlsEnable')}</Btn></div>
               )}

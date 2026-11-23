@@ -53,7 +53,8 @@ describe('OrderDetailPanel HTTP-01 challenge', () => {
 
   it('shows the URL and the key authorization the CA will fetch', () => {
     renderPanel(order('http-01', { 'www.example.com': http01 }))
-    expect(screen.getByText('http://www.example.com/.well-known/acme-challenge/tok-123')).toBeInTheDocument()
+    // The URL is cut in its middle, whole in its title
+    expect(screen.getByTitle('http://www.example.com/.well-known/acme-challenge/tok-123')).toBeInTheDocument()
     expect(screen.getByText('tok-123.thumbprint')).toBeInTheDocument()
     expect(screen.getByText('acme.http01Hint')).toBeInTheDocument()
   })

@@ -4,10 +4,10 @@
  * row and in the dock, each behind its right.
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill, useClientList, useSortParam } from '../../components/atelier'
+import { Btn, ListView, Dock, DockBody, Section, Facts, EmptyBlock, Pill, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
-import { YesNo } from '../protocols/atelierParts'
+import { factRow, yesNoState } from '../protocols/factRows'
 
 const BY_DOMAIN = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'provider', 'ca', 'wildcard', 'state']
@@ -44,11 +44,11 @@ export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTes
         </>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('acme.domain'), <span key="d" className="mono">{open.domain}</span>],
-              [t('acme.provider'), open.dns_provider_name || open.dns_provider_type || '—'],
+            <Facts items={[
+              [t('acme.domain'), open.domain],
+              factRow(t('acme.provider'), open.dns_provider_name || open.dns_provider_type),
               [t('acme.issuingCA'), open.issuing_ca_name || t('acme.defaultCA')],
-              [t('acme.wildcard'), <YesNo key="w" value={open.is_wildcard_allowed} />],
+              { label: t('acme.wildcard'), state: yesNoState(t, open.is_wildcard_allowed) },
               [t('acme.autoApprove'), approval(open)],
             ]} />
           </Section>

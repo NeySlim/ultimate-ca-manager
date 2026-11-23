@@ -3,7 +3,7 @@
  * mockup's module list with its dock; edit and delete stay on the row and in the dock.
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill, useClientList, useSortParam } from '../../components/atelier'
+import { Btn, ListView, Dock, DockBody, Section, Facts, EmptyBlock, Pill, useClientList, useSortParam } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 
@@ -37,8 +37,8 @@ export default function LocalDomainsTab({ localDomains, onAdd, onEdit, onDelete,
         </>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('acme.domain'), <span key="d" className="mono">{open.domain}</span>],
+            <Facts items={[
+              [t('acme.domain'), open.domain],
               [t('acme.issuingCA'), open.issuing_ca_name || t('acme.defaultCA')],
               [t('acme.autoApprove'), approval(open)],
             ]} />

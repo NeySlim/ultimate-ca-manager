@@ -294,3 +294,30 @@ describe('the CRL dock in the URL', () => {
     expect(within(await r.dock()).getByRole('tab', { name: 'crlOcsp.tabs.publication' })).toHaveAttribute('aria-selected', 'true')
   })
 })
+
+// KV-3: the dock as typed rows, OCSP as a pill, a missing CRL muted, a URL and the slug in chips
+const factRow = (term) => {
+  const found = [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === term)
+  if (!found) throw new Error(`no row ${term}`)
+  return found
+}
+
+describe('the CRL / OCSP dock as facts', () => {
+  it('writes OCSP as a pill and an authority without CRL muted', async () => {
+    const r = renderAtUrl(<CRLOCSPPage />, '/crl-ocsp?item=4')
+    await r.dock()
+    expect(factRow('CRL').querySelector('dd')).toHaveClass('absent')
+    expect(factRow('crlOcsp.columns.published').querySelector('dd')).toHaveClass('absent')
+    expect(factRow('OCSP').querySelector('dd.v .badge.muted')).toHaveTextContent('crlOcsp.ocspInactive')
+  })
+
+  it('shows the responder URL in a chip and the slug of the named URLs in a chip', async () => {
+    cas.getAll.mockResolvedValue({ data: [{ ...CAS[0], ocsp_urls: ['http://ocsp.example.org/responder/services-ca'], url_slug: 'services-ca' }, ...CAS.slice(1)] })
+    const r = renderAtUrl(<CRLOCSPPage />, '/crl-ocsp?item=1&section=ocsp')
+    await r.dock()
+    expect(factRow('atelier.state').querySelector('dd.v .badge.good')).toHaveTextContent('crlOcsp.ocspActive')
+    expect(factRow('URL').querySelector('.code-value.url .val')).toHaveAttribute('title', 'http://ocsp.example.org/responder/services-ca')
+    fireEvent.click(await screen.findByRole('tab', { name: 'crlOcsp.cdpNote' }))
+    expect(factRow('crlOcsp.slug').querySelector('dd.v .code-value')).toHaveTextContent('services-ca')
+  })
+})

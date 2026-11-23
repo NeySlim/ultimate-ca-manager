@@ -6,12 +6,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Btn, Pill, ListView, Toolbar, SearchField, FilterSelect, ToolsDivider, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, AtelierDialog,
+  Btn, Pill, ListView, Toolbar, SearchField, FilterSelect, ToolsDivider, Dock, DockBody, Section, Facts, EmptyBlock, NoMatch, AtelierDialog,
 } from '../../components/atelier'
 import { exportToCSV, exportToJSON } from '../../lib/utils'
 import { fetchPages } from '../../lib/fetchAllPages'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
-import { Copyable, Notice } from '../protocols/atelierParts'
+import { Notice } from '../protocols/atelierParts'
+import { copyRow, factRow } from '../protocols/factRows'
 import { SlotDock } from '../protocols/dockSlot'
 
 const EXPORT_PAGE_SIZE = 100
@@ -64,20 +65,20 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
         sectionsLabel={t('atelier.sectionsOf', { name: cert.common_name })} sections={[['cert', t('atelier.overview')]]}>
         <div className="module-detail">
           <Section title={t('common.certificateDetails')}>
-            <Props items={[
-              [t('common.commonName'), cert.common_name], [t('common.serialNumber'), <Copyable key="s" value={cert.serial} label={t('common.serialNumber')} />],
-              [t('common.issuer'), cert.issuer || t('acme.unknownCA')], [t('common.source'), sourceLabel(cert)],
-              [t('common.validFrom'), dateTimeOf(cert.valid_from, locale) || '—'], [t('common.validTo'), dateTimeOf(cert.valid_to, locale) || '—'],
-              [t('common.issued'), dateTimeOf(cert.created_at, locale) || '—'],
+            <Facts items={[
+              [t('common.commonName'), cert.common_name], copyRow(t('common.serialNumber'), cert.serial, 'hex', { long: String(cert.serial || '').length > 23 }),
+              { ...factRow(t('common.issuer'), cert.issuer, t('acme.unknownCA')), long: true }, [t('common.source'), sourceLabel(cert)],
+              factRow(t('common.validFrom'), dateTimeOf(cert.valid_from, locale)), factRow(t('common.validTo'), dateTimeOf(cert.valid_to, locale)),
+              factRow(t('common.issued'), dateTimeOf(cert.created_at, locale)),
             ]} />
           </Section>
           <Section title={t('acme.acmeOrder')}>
-            <Props items={[
-              [t('acme.method'), cert.challenge_type?.toUpperCase() || '—'], [t('acme.provider'), cert.dns_provider || '—'],
-              [t('acme.environment'), environment(cert)],
-              cert.order?.account && [t('acme.account'), <span key="a" className="mono">{cert.order.account}</span>],
+            <Facts items={[
+              factRow(t('acme.method'), cert.challenge_type?.toUpperCase()), factRow(t('acme.provider'), cert.dns_provider),
+              factRow(t('acme.environment'), cert.environment ? environment(cert) : null),
+              cert.order?.account && copyRow(t('acme.account'), cert.order.account, undefined, { long: true }),
               cert.order?.status && [t('acme.orderStatus'), cert.order.status],
-              cert.order?.order_id && [t('acme.orderId'), <Copyable key="o" value={cert.order.order_id} label={t('acme.orderId')} />],
+              cert.order?.order_id && copyRow(t('acme.orderId'), cert.order.order_id, undefined, { long: true }),
             ]} />
           </Section>
         </div>
