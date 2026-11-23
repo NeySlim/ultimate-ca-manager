@@ -663,23 +663,64 @@ def host_is_ip(host: str) -> bool:
         return False
 
 
+_ORIGIN_HOST_RE = re.compile(r'^[a-z0-9_]([a-z0-9_.-]*[a-z0-9_])?$')
+
+
+def normalize_origin(raw) -> Optional[str]:
+    """RFC 6454 serialization of an explicit http(s) origin: scheme and host in lower case,
+    default port (443, 80) omitted; None for a wildcard, a pattern, a path or credentials."""
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip().rstrip('/')
+    if not text or '*' in text:
+        return None
+    parts = urlsplit(text)
+    scheme = parts.scheme.lower()
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    host = parts.hostname or ''
+    if (scheme not in ('http', 'https') or not host or parts.username is not None
+            or parts.password is not None or parts.path or parts.query or parts.fragment
+            or '?' in text or '#' in text):
+        return None
+    if ':' in host:
+        try:
+            host = f'[{ipaddress.IPv6Address(host).compressed}]'
+        except ValueError:
+            return None
+    elif not _ORIGIN_HOST_RE.match(host):
+        return None
+    if port == (443 if scheme == 'https' else 80):
+        port = None
+    return f'{scheme}://{host}' if port is None else f'{scheme}://{host}:{port}'
+
+
 def get_cors_origins() -> list[str]:
-    """Dynamic CORS allowlist: localhost + canonical admin origin."""
+    """Origins the API CORS and the WebSocket accept, read live from the database (#453).
+
+    localhost, the start list (this host's names), the admin base URL as written and as
+    served, the protocol base URL, CORS_EXTRA_ORIGINS; never an origin taken from the request.
+    """
     https_port = _https_port()
-    suffix = '' if https_port == 443 else f':{https_port}'
-    origins = [
-        f'https://localhost{suffix}',
-        f'https://127.0.0.1{suffix}',
-    ]
-    admin_origin = get_admin_canonical_origin()
-    if admin_origin:
-        origins.append(admin_origin.rstrip('/'))
-    extra = os.getenv('CORS_EXTRA_ORIGINS', '')
-    if extra:
-        for item in extra.split(','):
-            item = item.strip().rstrip('/')
-            if item and item not in origins:
-                origins.append(item)
+    candidates = [f'https://localhost:{https_port}', f'https://127.0.0.1:{https_port}']
+    try:
+        candidates += list(current_app.config.get('CORS_ORIGINS') or ())
+    except (RuntimeError, TypeError):
+        pass
+    for key, scheme in (('base_url', 'https'), ('protocol_base_url', 'http')):
+        parsed = parse_public_url(_config_value(key), default_scheme=scheme)
+        if parsed:
+            candidates.append(parsed.normalized)
+    candidates.append(get_admin_canonical_origin())
+    candidates += os.getenv('CORS_EXTRA_ORIGINS', '').split(',')
+    origins = []
+    for candidate in candidates:
+        origin = normalize_origin(candidate)
+        # Flask-CORS reads brackets as a pattern: an IPv6 origin is left out of both lists
+        if origin and '[' not in origin and origin not in origins:
+            origins.append(origin)
     return origins
 
 

@@ -164,31 +164,18 @@ def _timestamp() -> str:
     return utc_isoformat(utc_now())
 
 
-def _is_explicit_origin(origin) -> bool:
-    """scheme://host[:port] over http(s), with no wildcard, path, query or credentials."""
-    if not isinstance(origin, str) or '*' in origin:
-        return False
-    parsed = urlparse(origin)
-    try:
-        parsed.port
-    except ValueError:
-        return False
-    return (parsed.scheme in ('http', 'https') and bool(parsed.hostname)
-            and parsed.username is None and parsed.password is None
-            and not (parsed.path or parsed.params or parsed.query or parsed.fragment))
-
-
 def _checked_origins(app) -> list:
-    """Normalized explicit origins; invalid entries are skipped, `*` or nothing usable refuses."""
+    """Normalized start origins; invalid entries are skipped, `*` or nothing usable refuses."""
+    from utils.public_endpoints import normalize_origin
     origins = app.config.get('CORS_ORIGINS')
     if not isinstance(origins, (list, tuple)) or not origins:
         raise RuntimeError('CORS_ORIGINS must be a non-empty list of explicit http(s) origins')
     kept = []
     for origin in origins:
-        normalized = origin.strip().rstrip('/') if isinstance(origin, str) else origin
-        if normalized == '*':
+        if isinstance(origin, str) and origin.strip().rstrip('/') == '*':
             raise RuntimeError('CORS_ORIGINS must not allow every origin for the WebSocket')
-        if not _is_explicit_origin(normalized):
+        normalized = normalize_origin(origin)
+        if normalized is None:
             logger.warning("Ignoring invalid WebSocket origin in CORS_ORIGINS: %r", origin)
         elif normalized not in kept:
             kept.append(normalized)
@@ -197,16 +184,30 @@ def _checked_origins(app) -> list:
     return kept
 
 
+def _engineio_origin_check(app):
+    """Engine.IO's origin check, on the live list; the WSGI gate in front answers 403 first."""
+    from .origin_gate import ACCEPTED_KEY, origin_accepted
+
+    def accepted(origin, environ=None):
+        if not origin:
+            return False
+        if environ is not None and environ.get(ACCEPTED_KEY) == origin:
+            return True
+        with app.app_context():
+            return origin_accepted(origin)
+    return accepted
+
+
 # ================== Initialization ==================
 def init_websocket(app):
     """Initialize WebSocket with Flask app; refuses to start without explicit origins."""
     global _queue_in_use
-    origins = _checked_origins(app)
+    _checked_origins(app)
     message_queue = _message_queue(app)
     _queue_in_use = message_queue is not None
     socketio.init_app(
         app,
-        cors_allowed_origins=origins,
+        cors_allowed_origins=_engineio_origin_check(app),
         async_mode=_setting(app, 'WEBSOCKET_ASYNC_MODE', 'gevent'),
         client_manager=message_queue,
         manage_session=False,
