@@ -80,6 +80,37 @@ test.describe('sign-in and session', () => {
     await expect(other.getByText('You locked the session.', { exact: false })).toBeVisible()
   })
 
+  test('Alt+Shift+L pressed before the session check answers locks the session once it does', async ({ api, signIn }) => {
+    const user = await createUser(api, 'viewer')
+    const { page } = await signIn(user.username, user.password)
+    // Records whether the console's page ever showed, from the first paint on
+    await page.addInitScript(() => {
+      const w = window as unknown as { __consoleShown: boolean }
+      w.__consoleShown = false
+      new MutationObserver(() => {
+        if ([...document.querySelectorAll('h1')].some(h => h.textContent?.trim() === 'Certificates')) w.__consoleShown = true
+      }).observe(document, { subtree: true, childList: true })
+    })
+    let release = () => {}
+    const answered = new Promise<void>(resolve => { release = resolve })
+    let held = false
+    await page.route('**/api/v2/auth/verify', async route => {
+      if (!held) { held = true; await answered }
+      await route.continue()
+    })
+    await page.goto('/certificates')
+    await expect(page.getByRole('button', { name: /^Account: / })).toBeVisible()
+    expect(held).toBe(true)
+    await page.locator('body').press('Alt+Shift+L')
+    release()
+
+    await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
+    await expect(page.getByText('You locked the session.', { exact: false })).toBeVisible()
+    expect(await page.evaluate(() => (window as unknown as { __consoleShown: boolean }).__consoleShown)).toBe(false)
+    const verify = (await (await page.request.get('/api/v2/auth/verify')).json()).data
+    expect(verify).toMatchObject({ authenticated: false, locked: { username: user.username, reason: 'manual' } })
+  })
+
   test('a tab that missed the lock message shows the lock screen at its next request', async ({ api, signIn }) => {
     const user = await createUser(api, 'viewer')
     const { page } = await signIn(user.username, user.password)

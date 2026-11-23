@@ -146,6 +146,80 @@ describe('AuthContext lock', () => {
     expect(authService.lock).not.toHaveBeenCalled()
   })
 
+  describe('a lock asked while the tab still checks its session', () => {
+    let answer
+    beforeEach(() => {
+      authService.lock.mockResolvedValue({})
+      authService.getCurrentUser.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    })
+
+    it('is held, then applied to the account the check finds, with the request sent after it', async () => {
+      const heard = []
+      const other = new BroadcastChannel('ucm-session-lock')
+      other.onmessage = (event) => heard.push(event.data)
+      render(<AuthProvider><Probe /></AuthProvider>)
+      act(() => { auth.lock('manual') })
+      // Nothing to send yet: no account, no CSRF token before the check answers
+      expect(authService.lock).not.toHaveBeenCalled()
+      await act(async () => { answer(ALICE) })
+      await waitFor(() => expect(auth.sessionChecked).toBe(true))
+      // Never open in between: the lock screen of the account found
+      expect(screen.getByTestId('state').textContent).toBe('false||0')
+      expect(authService.lock).toHaveBeenCalledTimes(1)
+      expect(authService.lock).toHaveBeenCalledWith('manual')
+      expect(readLock()).toEqual({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password', reason: 'manual' })
+      expect(readSharedLock()).toEqual({ username: 'alice', reason: 'manual' })
+      expect(takeJustLocked()).toBe(true)
+      await waitFor(() => expect(heard).toEqual([{ type: 'locked', username: 'alice', reason: 'manual' }]))
+      other.close()
+    })
+
+    it('keeps the reason of an inactivity lock', async () => {
+      render(<AuthProvider><Probe /></AuthProvider>)
+      act(() => { auth.lock() })
+      await act(async () => { answer(ALICE) })
+      await waitFor(() => expect(auth.sessionChecked).toBe(true))
+      expect(authService.lock).toHaveBeenCalledWith('idle')
+      expect(readLock()).toMatchObject({ username: 'alice', reason: 'idle' })
+    })
+
+    it('is dropped when the check finds no session', async () => {
+      render(<AuthProvider><Probe /></AuthProvider>)
+      act(() => { auth.lock('manual') })
+      await act(async () => { answer({ data: { authenticated: false } }) })
+      await waitFor(() => expect(auth.sessionChecked).toBe(true))
+      expect(authService.lock).not.toHaveBeenCalled()
+      expect(readLock()).toBeNull()
+      expect(readSharedLock()).toBeNull()
+    })
+
+    it('leaves the lock the server already holds as it is', async () => {
+      render(<AuthProvider><Probe /></AuthProvider>)
+      act(() => { auth.lock('manual') })
+      await act(async () => {
+        answer({ data: { authenticated: false, locked: { username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password', reason: 'idle' } } })
+      })
+      await waitFor(() => expect(auth.sessionChecked).toBe(true))
+      expect(authService.lock).not.toHaveBeenCalled()
+      expect(readLock()).toMatchObject({ username: 'alice', reason: 'idle' })
+    })
+
+    it('stays locked when a later check answers before the lock reached the server', async () => {
+      authService.getCurrentUser.mockResolvedValueOnce(ALICE)
+      render(<AuthProvider><Probe /></AuthProvider>)
+      await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+      authService.getCurrentUser.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+      let check
+      act(() => { check = auth.checkSession() })
+      act(() => { auth.lock('manual') })
+      expect(authService.lock).toHaveBeenCalledTimes(1)
+      await act(async () => { answer(ALICE); await check })
+      expect(screen.getByTestId('state').textContent).toBe('false||0')
+      expect(authService.lock).toHaveBeenCalledTimes(1)
+      expect(readLock()).toMatchObject({ username: 'alice', reason: 'manual' })
+    })
+  })
+
   it('opens when the message heard during the check was of another account', async () => {
     let answer
     authService.getCurrentUser.mockReturnValue(new Promise((resolve) => { answer = resolve }))
