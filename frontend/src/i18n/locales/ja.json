@@ -22,7 +22,7 @@
     "filter": "フィルター",
     "copy": "コピー",
     "copied": "コピーしました！",
-    "helpAbout": "Help: {{name}}",
+    "helpAbout": "ヘルプ: {{name}}",
     "clickToCopy": "クリックしてコピー",
     "yes": "はい",
     "no": "いいえ",
@@ -476,8 +476,8 @@
     },
     "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません",
     "chooseFile": "ファイルを選択…",
-    "more": "More",
-    "otherViews": "Other views"
+    "more": "その他",
+    "otherViews": "その他のビュー"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -628,20 +628,20 @@
       "refused": "ユーザー名またはパスワードが正しくありません。失敗が続くと待機時間が発生します。",
       "lockedTitle": "セッションはロックされています",
       "lockedLead": "操作がなかったためセッションの有効期限が切れました。再度サインインすると、元のページに戻ります。",
-      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
+      "lockedLeadManual": "セッションをロックしました。再度サインインすると、元のページに戻ります。",
       "unlock": "ロック解除",
       "switchAccount": "別のアカウントでサインイン",
-      "lockedLeadHeld": "Your session was locked after inactivity. Unlock it to return to the page you were on.",
-      "lockedLeadManualHeld": "You locked the session. Unlock it to return to the page you were on.",
-      "unlockCertificate": "Unlock with the certificate",
-      "unlockCertificateDetail": "Client certificate (mTLS) of this account",
-      "unlockPasskey": "Unlock with a passkey",
-      "unlockPasskeyDetail": "WebAuthn, a key of this account",
-      "unlockRefused": "Incorrect password. After several failures, a delay applies.",
-      "unlockCertificateRefused": "The certificate presented does not open this account.",
-      "unlockPasskeyRefused": "The passkey was not accepted for this account.",
-      "noUnlockMethod": "This account has no password, certificate or passkey to unlock it here: sign out to sign in again.",
-      "ssoSessionLocked": "The session is locked: unlock it, or sign out before signing in with SSO.",
+      "lockedLeadHeld": "操作がなかったためセッションをロックしました。ロックを解除すると、元のページに戻ります。",
+      "lockedLeadManualHeld": "セッションをロックしました。ロックを解除すると、元のページに戻ります。",
+      "unlockCertificate": "証明書でロック解除",
+      "unlockCertificateDetail": "このアカウントのクライアント証明書（mTLS）",
+      "unlockPasskey": "パスキーでロック解除",
+      "unlockPasskeyDetail": "WebAuthn、このアカウントのキー",
+      "unlockRefused": "パスワードが正しくありません。複数回失敗すると、待機時間が発生します。",
+      "unlockCertificateRefused": "提示された証明書ではこのアカウントを開けません。",
+      "unlockPasskeyRefused": "このアカウントではパスキーが受け付けられませんでした。",
+      "noUnlockMethod": "このアカウントには、ここでロックを解除するためのパスワード、証明書、パスキーがありません。サインアウトして再度サインインしてください。",
+      "ssoSessionLocked": "セッションはロックされています。ロックを解除するか、サインアウトしてから SSO でサインインしてください。",
       "skipToContent": "本文へスキップ",
       "tooManyWait_one": "試行回数が多すぎます。{{count}}秒待ってからもう一度お試しください。",
       "tooManyWait_other": "試行回数が多すぎます。{{count}}秒待ってからもう一度お試しください。",
@@ -649,7 +649,7 @@
       "retryIn": "{{seconds}}秒後に再試行できます。",
       "canRetry": "もう一度お試しください。",
       "lockedAnnounce": "セッションの有効期限が切れました。画面はロックされ、現在のページは保持されます。",
-      "lockedAnnounceManual": "Session locked: the current page is kept.",
+      "lockedAnnounceManual": "セッションをロックしました。現在のページは保持されます。",
       "signedIn": "サインインしました: {{name}}、{{role}}。",
       "signedInNoRole": "サインインしました: {{name}}。",
       "signedOut": "サインアウトしました。表示設定は保持されます。"
@@ -905,7 +905,7 @@
     "selectedOnPage_other": "このページで {{count}} 件の証明書を選択中",
     "exportSelected": "エクスポート",
     "complianceColumn": "コンプライアンス",
-    "creationColumn": "Creation date",
+    "creationColumn": "作成日",
     "archivedMark": "アーカイブ済み: 更新または再登録で置き換えられ、履歴として保持されています",
     "sourceAcmeRenewal": "ACME更新",
     "sourceIssued": "発行済み",
@@ -2424,7 +2424,7 @@
       "deleteFailed": "EAB資格の削除に失敗しました",
       "caption": "EAB認証情報。名前を操作すると詳細が開きます。",
       "noNotes": "メモなし。",
-      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
+      "listPartial": "一部のみ表示: {{total}} 件中 {{loaded}} 件の認証情報を読み込みました。更新して再試行してください。"
     },
     "termsOfServiceTitlePlaceholder": "利用規約（空白で非表示）",
     "termsOfServiceBodyPlaceholder": "ここに規約を入力...\n\n対応：**太字**, *斜体*, [リンク](url), - リスト\n\n段落には空行を使用。",
@@ -2679,11 +2679,11 @@
     "emptyAccountsText": "ACMEクライアント（certbot、cert-manager、acme.sh）は、ディレクトリを使って自分でアカウントを作成します。そのURLをクライアントの設定にコピーしてください。",
     "termsOfServiceTitle": "タイトル",
     "termsOfServiceBody": "本文",
-    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "accountsListPartial": "一部のみ表示: {{total}} 件中 {{loaded}} 件のアカウントを読み込みました。更新して再試行してください。",
     "columns": {
-      "failures": "Failures",
-      "wildcard": "Wildcard",
-      "orders": "Orders"
+      "failures": "失敗",
+      "wildcard": "ワイルドカード",
+      "orders": "オーダー"
     }
   },
   "scep": {
@@ -2806,7 +2806,7 @@
       "ca": "認証局",
       "template": "テンプレート",
       "profile": "プロファイル",
-      "lastTest": "Last test"
+      "lastTest": "前回のテスト"
     },
     "tabs": {
       "profile": "プロファイル"
@@ -2948,9 +2948,9 @@
     "ocspInactive": "無効",
     "columns": {
       "published": "公開日時",
-      "publication": "Publication",
-      "crlNumber": "CRL number",
-      "nextUpdate": "Next update"
+      "publication": "公開",
+      "crlNumber": "CRL 番号",
+      "nextUpdate": "次回更新"
     },
     "tabs": {
       "publication": "公開"
@@ -4632,8 +4632,8 @@
     "anyResource": "すべてのリソース",
     "anyAction": "すべての操作",
     "columns": {
-      "permissions": "Rights",
-      "users": "Users"
+      "permissions": "権限",
+      "users": "ユーザー"
     }
   },
   "hsm": {
@@ -5190,22 +5190,22 @@
   "compare": {
     "title": "証明書の比較",
     "field": "フィールド",
-    "differences_one": "{{count}} difference among {{total}} properties",
-    "differences_other": "{{count}} differences among {{total}} properties",
-    "differences": "{{count}} differences among {{total}} properties",
-    "lead": "Identical lines are merged; in a list, “+” marks what another certificate lacks.",
+    "differences_one": "{{total}} 件のプロパティ中 {{count}} 件が異なる",
+    "differences_other": "{{total}} 件のプロパティ中 {{count}} 件が異なる",
+    "differences": "{{total}} 件のプロパティ中 {{count}} 件が異なる",
+    "lead": "同一の行はまとめて表示します。リストでは、「+」は他の証明書にないものを示します。",
     "property": "プロパティ",
     "close": "比較を閉じる",
-    "countTitle_one": "Compare {{count}} certificate",
-    "countTitle_other": "Compare {{count}} certificates",
-    "key": "Key algorithm and size",
-    "usages": "Key usages",
-    "onlyDifferences": "Show only the differences",
-    "noDifference": "No line differs between these certificates.",
-    "differs": "differs",
-    "loadFailed": "A certificate of the comparison could not be read.",
+    "countTitle_one": "{{count}} 件の証明書を比較",
+    "countTitle_other": "{{count}} 件の証明書を比較",
+    "key": "鍵アルゴリズムとサイズ",
+    "usages": "鍵用途",
+    "onlyDifferences": "相違点のみ表示",
+    "noDifference": "これらの証明書に異なる行はありません。",
+    "differs": "異なる",
+    "loadFailed": "比較対象の証明書を読み込めませんでした。",
     "identical": "Identical",
-    "notInAll": "not in every certificate"
+    "notInAll": "すべての証明書にはない"
   },
   "members": {
     "manageMembers": "メンバーの管理",
@@ -5496,9 +5496,9 @@
       "rootCa": "ルート認証局",
       "trustStoreAnchor": "トラストストアのアンカー",
       "intermediateCa": "中間認証局 · レベル {{level}}",
-      "chainRoleRoot": "Root CA",
-      "chainRoleIntermediate": "Intermediate CA",
-      "chainRoleCurrent": "This certificate",
+      "chainRoleRoot": "ルート CA",
+      "chainRoleIntermediate": "中間 CA",
+      "chainRoleCurrent": "この証明書",
       "inspectCa": "認証局を確認",
       "crossSigned": "クロス署名",
       "variants_one": "チェーンのバリアントが {{count}} 件提供されています。エクスポート時に選択してください。",
@@ -5537,7 +5537,7 @@
       "auditFailed": "監査ログを読み取れなかったため、証明書レコードの日付のみ表示しています。",
       "scope": "証明書に対する直近 {{count}} 件の操作に含まれる監査ログのエントリと、証明書レコードの日付。"
     },
-    "detach": "Detach into a window"
+    "detach": "ウィンドウに切り離す"
   },
   "table": {
     "noResults": "一致する結果がありません",
@@ -5596,25 +5596,25 @@
     "results_one": "{{count, number}} 件の結果",
     "results_other": "{{count, number}} 件の結果",
     "searching": "検索中…",
-    "sortHint": "Headers with a button sort the list.",
-    "sortedBy": "Sorted by {{column}}, {{order}}",
-    "sortedByReverse": "Sorted by {{column}}, {{order}}. Click to reverse",
-    "sortAscending": "ascending order",
-    "sortDescending": "descending order",
-    "sortBy": "Sort by",
-    "sortByColumn": "Sort by {{column}}",
-    "fullCreated": "Creation date",
-    "fullExpires": "Expiry date",
-    "fullIssued": "Issue date",
-    "fullRequested": "Request date",
-    "fullSubmitted": "Submission date",
-    "fullStarted": "Start date",
-    "ascendingReverse": "Ascending order, reverse",
-    "descendingReverse": "Descending order, reverse",
-    "foldedColumns_one": "{{count}} column folded",
-    "foldedColumns_other": "{{count}} columns folded",
-    "resizeColumn": "Resize the {{column}} column",
-    "resetColumns": "Reset columns"
+    "sortHint": "ボタン付きの見出しで一覧を並べ替えられます。",
+    "sortedBy": "{{column}} で並べ替え済み、{{order}}",
+    "sortedByReverse": "{{column}} で並べ替え済み、{{order}}。クリックで逆順",
+    "sortAscending": "昇順",
+    "sortDescending": "降順",
+    "sortBy": "並べ替え",
+    "sortByColumn": "{{column}} で並べ替え",
+    "fullCreated": "作成日",
+    "fullExpires": "有効期限",
+    "fullIssued": "発行日",
+    "fullRequested": "リクエスト日",
+    "fullSubmitted": "送信日",
+    "fullStarted": "開始日",
+    "ascendingReverse": "昇順、クリックで逆順",
+    "descendingReverse": "降順、クリックで逆順",
+    "foldedColumns_one": "折りたたまれた列 {{count}} 件",
+    "foldedColumns_other": "折りたたまれた列 {{count}} 件",
+    "resizeColumn": "{{column}} 列の幅を変更",
+    "resetColumns": "列をリセット"
   },
   "reconnect": {
     "countdown": "サービスを再起動中...",
@@ -6509,7 +6509,7 @@
     "defaultEndpoint": "既定のエンドポイント",
     "columns": {
       "auth": "認証",
-      "authShort": "Authentication"
+      "authShort": "認証"
     },
     "auth": {
       "cert": "クライアント証明書",
@@ -6714,7 +6714,7 @@
         "completed": "完了",
         "failed": "失敗"
       },
-      "targets": "Targets"
+      "targets": "ターゲット"
     },
     "form": {
       "range": "範囲",
@@ -7050,7 +7050,7 @@
     "deleteRefused_other": "{{count}} 件の Windows 登録プロファイルがこのコネクターを使用しています。先に別のコネクターに切り替えてください:",
     "deleteRefusedMore_one": "ほか {{count}} 件",
     "deleteRefusedMore_other": "ほか {{count}} 件",
-    "lastTest": "Last test"
+    "lastTest": "前回のテスト"
   },
   "certInput": {
     "modePaste": "貼り付け",
@@ -7451,7 +7451,7 @@
       "ad_connector_health": "Active Directoryの状態",
       "session_cleanup": "セッションのクリーンアップ"
     },
-    "colNote": "Last result"
+    "colNote": "前回の結果"
   },
   "lint": {
     "action": "検査",
@@ -7747,17 +7747,17 @@
     "accountLabel": "アカウント: {{name}}、{{role}}",
     "accountLabelName": "アカウント: {{name}}",
     "signOut": "サインアウト",
-    "lock": "Lock",
+    "lock": "ロック",
     "method": {
       "password": "パスワード",
       "mtls": "クライアント証明書",
       "webauthn": "セキュリティキー",
       "session": "ブラウザセッション",
       "sso": "SSO",
-      "ldap": "LDAP directory"
+      "ldap": "LDAP ディレクトリ"
     },
     "mfaMethod": {
-      "totp": "authenticator app"
+      "totp": "認証アプリ"
     },
     "expiringCount_one": "期限切れ間近または期限切れの証明書が{{count}}件",
     "expiringCount_other": "期限切れ間近または期限切れの証明書が{{count}}件",
@@ -7781,8 +7781,8 @@
       "systemNow": "現在: {{mode}}",
       "dark": "ダーク",
       "light": "ライト",
-      "family": "Theme",
-      "mode": "Mode"
+      "family": "テーマ",
+      "mode": "モード"
     },
     "bell": {
       "title": "通知",
@@ -7966,28 +7966,28 @@
       "back": "接続が回復しました。操作を再び利用できます。"
     },
     "userCard": {
-      "signIn": "Sign-in",
-      "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "signIn": "サインイン",
+      "session": "セッション",
+      "lockIn": "操作がない状態が {{minutes}} 分続くとロック",
       "methodVia": "{{method}} ({{provider}})",
-      "mfa": "Two-factor",
-      "mfaOn": "On: {{methods}}",
-      "mfaOff": "Off",
-      "endsAt": "Ends {{date}}"
+      "mfa": "2 要素認証",
+      "mfaOn": "オン: {{methods}}",
+      "mfaOff": "オフ",
+      "endsAt": "{{date}} に終了"
     },
     "activity": {
-      "label": "Activity",
-      "calm": "Nothing pending",
-      "queue_one": "{{count}} to act on",
-      "queue_other": "{{count}} to act on",
-      "windows_one": "{{count}} window",
-      "windows_other": "{{count}} windows",
-      "windowsLabel": "Detached windows",
+      "label": "アクティビティ",
+      "calm": "保留中のものはありません",
+      "queue_one": "要対応 {{count}} 件",
+      "queue_other": "要対応 {{count}} 件",
+      "windows_one": "ウィンドウ {{count}} 件",
+      "windows_other": "ウィンドウ {{count}} 件",
+      "windowsLabel": "切り離したウィンドウ",
       "jobs": {
-        "backup": "Backup in progress",
-        "restore": "Restore in progress",
-        "audit_verify": "Audit chain check in progress",
-        "other": "Background task in progress"
+        "backup": "バックアップ中",
+        "restore": "復元中",
+        "audit_verify": "監査チェーンを検証中",
+        "other": "バックグラウンドタスクを実行中"
       }
     }
   },
@@ -8010,9 +8010,9 @@
       "horizon": "有効期限の見通し",
       "compliance": "コンプライアンス",
       "activity": "最新の操作",
-      "issuance": "Issuances by source",
-      "authorities": "Authorities and HSM",
-      "revocation": "Revocation coverage"
+      "issuance": "発行元別の発行",
+      "authorities": "認証局と HSM",
+      "revocation": "失効のカバレッジ"
     },
     "state": {
       "loading": "読み込み中...",
@@ -8067,8 +8067,8 @@
       "watchShow_other": "監視対象 {{count}} 行を表示",
       "watchHide_one": "監視対象 {{count}} 行を非表示",
       "watchHide_other": "監視対象 {{count}} 行を非表示",
-      "countdown_one": "{{count}} day left of 30",
-      "countdown_other": "{{count}} days left of 30"
+      "countdown_one": "30 日のうち残り {{count}} 日",
+      "countdown_other": "30 日のうち残り {{count}} 日"
     },
     "kind": {
       "acme_order_failed": "ACMEオーダーの失敗",
@@ -8102,53 +8102,53 @@
       "sub_server_lifetime_over_398_days": "TLSサーバー証明書",
       "sub_incomplete_chain": "中間証明書がありません",
       "sub_no_private_key": "外部のCSRまたはインポート",
-      "subRules_one": "Over the {{count}} active certificate. A line opens the list of its gaps, filtered.",
-      "subRules_other": "Over the {{count}} active certificates. A line opens the list of its gaps, filtered.",
-      "conformPct": "{{pct}}% conform",
+      "subRules_one": "有効な証明書 {{count}} 件が対象。行を開くと、その不適合を絞り込んだ一覧を表示します。",
+      "subRules_other": "有効な証明書 {{count}} 件が対象。行を開くと、その不適合を絞り込んだ一覧を表示します。",
+      "conformPct": "{{pct}}% 適合",
       "pct": "{{pct}}%",
-      "conform": "Conform",
-      "inGap": "In gap",
-      "openGap": "Opens the list of the certificates in gap",
-      "tableRules_one": "Rules, over {{count}} active certificate",
-      "tableRules_other": "Rules, over {{count}} active certificates",
-      "ruleCol": "Rule",
-      "tableGrades_one": "Grades, over {{count}} certificate",
-      "tableGrades_other": "Grades, over {{count}} certificates",
-      "gradeCol": "Grade",
-      "certificates": "Certificates",
-      "algoCol": "Algorithm",
-      "ringAlt": "Average compliance score: {{score}} out of 100, grade {{grade}}",
-      "ringSub": "average score · grade {{grade}}",
-      "gradeAlt_one": "Grade {{grade}}: {{count}} certificate",
-      "gradeAlt_other": "Grade {{grade}}: {{count}} certificates",
-      "grade": "Grade {{grade}}",
-      "share": "Share",
-      "scoreBase_one": "Score over {{count}} certificate not revoked",
-      "scoreBase_other": "Score over {{count}} certificates not revoked",
+      "conform": "適合",
+      "inGap": "不適合",
+      "openGap": "不適合の証明書の一覧を開きます",
+      "tableRules_one": "ルール、有効な証明書 {{count}} 件",
+      "tableRules_other": "ルール、有効な証明書 {{count}} 件",
+      "ruleCol": "ルール",
+      "tableGrades_one": "グレード、証明書 {{count}} 件",
+      "tableGrades_other": "グレード、証明書 {{count}} 件",
+      "gradeCol": "グレード",
+      "certificates": "証明書",
+      "algoCol": "アルゴリズム",
+      "ringAlt": "平均コンプライアンススコア: 100 点中 {{score}} 点、グレード {{grade}}",
+      "ringSub": "平均スコア · グレード {{grade}}",
+      "gradeAlt_one": "グレード {{grade}}: 証明書 {{count}} 件",
+      "gradeAlt_other": "グレード {{grade}}: 証明書 {{count}} 件",
+      "grade": "グレード {{grade}}",
+      "share": "割合",
+      "scoreBase_one": "失効していない証明書 {{count}} 件のスコア",
+      "scoreBase_other": "失効していない証明書 {{count}} 件のスコア",
       "rule": {
-        "rsa_below_3072": "RSA keys of at least 3072 bits",
-        "server_lifetime_over_398_days": "Server validity of 398 days at most",
-        "weak_signature_hash": "Safe signature hash",
-        "incomplete_chain": "Complete chain",
-        "no_private_key": "Private key kept in UCM"
+        "rsa_below_3072": "3072 ビット以上の RSA 鍵",
+        "server_lifetime_over_398_days": "サーバーの有効期間は最大 398 日",
+        "weak_signature_hash": "安全な署名ハッシュ",
+        "incomplete_chain": "完全なチェーン",
+        "no_private_key": "秘密鍵を UCM に保管"
       },
       "gap": {
-        "rsa_below_3072_one": "{{count}} RSA key to replace",
-        "rsa_below_3072_other": "{{count}} RSA keys to replace",
-        "server_lifetime_over_398_days_one": "{{count}} TLS server certificate too long",
-        "server_lifetime_over_398_days_other": "{{count}} TLS server certificates too long",
-        "weak_signature_hash_one": "{{count}} SHA-1 or MD5 signature",
-        "weak_signature_hash_other": "{{count}} SHA-1 or MD5 signatures",
-        "incomplete_chain_one": "{{count}} chain without its intermediate",
-        "incomplete_chain_other": "{{count}} chains without their intermediate",
-        "no_private_key_one": "{{count}} external CSR or import",
-        "no_private_key_other": "{{count}} external CSRs or imports"
+        "rsa_below_3072_one": "置き換えが必要な RSA 鍵 {{count}} 件",
+        "rsa_below_3072_other": "置き換えが必要な RSA 鍵 {{count}} 件",
+        "server_lifetime_over_398_days_one": "有効期間が長すぎる TLS サーバー証明書 {{count}} 件",
+        "server_lifetime_over_398_days_other": "有効期間が長すぎる TLS サーバー証明書 {{count}} 件",
+        "weak_signature_hash_one": "SHA-1 または MD5 の署名 {{count}} 件",
+        "weak_signature_hash_other": "SHA-1 または MD5 の署名 {{count}} 件",
+        "incomplete_chain_one": "中間証明書がないチェーン {{count}} 件",
+        "incomplete_chain_other": "中間証明書がないチェーン {{count}} 件",
+        "no_private_key_one": "外部 CSR またはインポート {{count}} 件",
+        "no_private_key_other": "外部 CSR またはインポート {{count}} 件"
       },
       "state": {
-        "good": "conform",
-        "warn": "to watch",
-        "bad": "major gap",
-        "info": "information"
+        "good": "適合",
+        "warn": "要監視",
+        "bad": "重大な不適合",
+        "info": "情報"
       }
     },
     "health": {
@@ -8223,15 +8223,15 @@
       "runs_one": "成功 <strong>{{count}}</strong> 件",
       "runs_other": "成功 <strong>{{count}}</strong> 件",
       "rate": "{{rate}}%",
-      "mirrorAlt_one": "{{name}} over {{count}} day: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
-      "mirrorAlt_other": "{{name}} over {{count}} days: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
-      "ok": "Successes",
-      "failed": "Failures",
-      "tableCaption_one": "Operations per UTC day, over {{count}} day",
-      "tableCaption_other": "Operations per UTC day, over {{count}} days",
-      "okOf": "{{name}} successes",
-      "failedOf": "{{name}} failures",
-      "seeActivity": "Opens Activity on this day’s failures"
+      "mirrorAlt_one": "{{count}} 日間の{{name}}: 成功 {{ok}} 件、失敗 {{failed}} 件。矢印キーで日ごとに読み上げます。",
+      "mirrorAlt_other": "{{count}} 日間の{{name}}: 成功 {{ok}} 件、失敗 {{failed}} 件。矢印キーで日ごとに読み上げます。",
+      "ok": "成功",
+      "failed": "失敗",
+      "tableCaption_one": "UTC 日ごとの操作、{{count}} 日間",
+      "tableCaption_other": "UTC 日ごとの操作、{{count}} 日間",
+      "okOf": "{{name}}の成功",
+      "failedOf": "{{name}}の失敗",
+      "seeActivity": "この日の失敗についてアクティビティを開きます"
     },
     "filter": {
       "status": "ステータス",
@@ -8247,8 +8247,8 @@
       "renewal": "更新",
       "weak_key": "コンプライアンス",
       "ca_id": "認証局",
-      "expires": "Expiry",
-      "created": "Created"
+      "expires": "有効期限",
+      "created": "作成日"
     },
     "filterValue": {
       "true": "はい",
@@ -8263,9 +8263,9 @@
       "orphan": "孤立",
       "archived": "アーカイブ済み",
       "weakKey": "脆弱な鍵、{{algo}} < {{bits}}",
-      "range": "{{from}} to {{to}}",
-      "since": "from {{date}}",
-      "until": "until {{date}}"
+      "range": "{{from}} から {{to}}",
+      "since": "{{date}} から",
+      "until": "{{date}} まで"
     },
     "hierarchy": {
       "crlOn": "CRL有効",
@@ -8292,67 +8292,67 @@
     },
     "horizon": {
       "expired": "期限切れ",
-      "subWindow_one": "{{count}} certificate not revoked expires by {{date}}, by week and by day. A cell opens the list of its day.",
-      "subWindow_other": "{{count}} certificates not revoked expire by {{date}}, by week and by day. A cell opens the list of its day.",
-      "quiet": "Nothing expires by {{date}}.",
-      "period": "Horizon shown",
-      "year": "1 y",
-      "week": "Week of {{date}}",
-      "weekCol": "Week",
-      "weekAlt_one": "{{name}}: {{count}} expiry, {{manual}} manual, {{automatic}} automatic",
-      "weekAlt_other": "{{name}}: {{count}} expiries, {{manual}} manual, {{automatic}} automatic",
-      "dayAlt_one": "{{date}}: {{count}} expiry",
-      "dayAlt_other": "{{date}}: {{count}} expiries",
-      "withCas_one": "including {{count}} authority",
-      "withCas_other": "including {{count}} authorities",
-      "withSigners_one": "including {{count}} signer",
-      "withSigners_other": "including {{count}} signers",
-      "total": "Total",
-      "manual": "Manual",
-      "automatic": "Automatic",
-      "cas": "Authorities",
-      "signers": "Signers",
-      "weeksLabel": "Expiries per week",
-      "daysLabel": "Expiries per day, one cell per day",
-      "openDay": "Click to see these certificates",
-      "openWeek": "Opens the list of the week",
-      "nothingDay": "Nothing expires that day",
-      "nothing": "Nothing expires over the period.",
-      "legendManual": "Manual: import, manual issuance",
-      "legendAutomatic": "Automatic: ACME, SCEP, EST",
-      "legendInfra": "An authority or a signer expires that day",
-      "less": "Less",
-      "more": "More",
-      "inDays_one": "in {{count}} day",
-      "inDays_other": "in {{count}} days",
-      "toRenew_one": "{{count}} to renew by hand",
-      "toRenew_other": "{{count}} to renew by hand",
-      "automaticCount_one": "{{count}} automatic",
-      "automaticCount_other": "{{count}} automatic",
-      "casCount_one": "{{count}} authority expires",
-      "casCount_other": "{{count}} authorities expire",
-      "listLabel": "First certificates of the period",
-      "open_one": "Open {{count}} in Certificates",
-      "open_other": "Open the {{count}} in Certificates",
-      "tableCaption_one": "Expiries per week, {{count}} week",
-      "tableCaption_other": "Expiries per week, {{count}} weeks"
+      "subWindow_one": "失効していない証明書 {{count}} 件が {{date}} までに期限切れになります（週別・日別）。セルを開くとその日の一覧を表示します。",
+      "subWindow_other": "失効していない証明書 {{count}} 件が {{date}} までに期限切れになります（週別・日別）。セルを開くとその日の一覧を表示します。",
+      "quiet": "{{date}} までに期限が切れるものはありません。",
+      "period": "表示する期間",
+      "year": "1年",
+      "week": "{{date}} の週",
+      "weekCol": "週",
+      "weekAlt_one": "{{name}}: 期限切れ {{count}} 件、手動 {{manual}} 件、自動 {{automatic}} 件",
+      "weekAlt_other": "{{name}}: 期限切れ {{count}} 件、手動 {{manual}} 件、自動 {{automatic}} 件",
+      "dayAlt_one": "{{date}}: 期限切れ {{count}} 件",
+      "dayAlt_other": "{{date}}: 期限切れ {{count}} 件",
+      "withCas_one": "うち認証局 {{count}} 件",
+      "withCas_other": "うち認証局 {{count}} 件",
+      "withSigners_one": "うち署名者 {{count}} 件",
+      "withSigners_other": "うち署名者 {{count}} 件",
+      "total": "合計",
+      "manual": "手動",
+      "automatic": "自動",
+      "cas": "認証局",
+      "signers": "署名者",
+      "weeksLabel": "週ごとの有効期限",
+      "daysLabel": "日ごとの有効期限、1 日 1 セル",
+      "openDay": "クリックしてこれらの証明書を表示",
+      "openWeek": "その週の一覧を開きます",
+      "nothingDay": "この日に期限が切れるものはありません",
+      "nothing": "この期間に期限が切れるものはありません。",
+      "legendManual": "手動: インポート、手動発行",
+      "legendAutomatic": "自動: ACME、SCEP、EST",
+      "legendInfra": "この日に認証局または署名者の期限が切れます",
+      "less": "少",
+      "more": "多",
+      "inDays_one": "{{count}} 日後",
+      "inDays_other": "{{count}} 日後",
+      "toRenew_one": "手動で更新するもの {{count}} 件",
+      "toRenew_other": "手動で更新するもの {{count}} 件",
+      "automaticCount_one": "自動 {{count}} 件",
+      "automaticCount_other": "自動 {{count}} 件",
+      "casCount_one": "認証局 {{count}} 件の期限が切れます",
+      "casCount_other": "認証局 {{count}} 件の期限が切れます",
+      "listLabel": "期間内の最初の証明書",
+      "open_one": "証明書で {{count}} 件を開く",
+      "open_other": "証明書で {{count}} 件を開く",
+      "tableCaption_one": "週別の有効期限、{{count}} 週間",
+      "tableCaption_other": "週別の有効期限、{{count}} 週間"
     },
     "activity": {
       "all": "すべて表示",
       "sub": "監査証跡の最新エントリ。",
       "subOwn": "あなた自身の最新の操作。",
-      "today": "Today",
-      "yesterday": "Yesterday",
-      "folded_one": "{{count}} sign-in by {{user}}",
-      "folded_other": "{{count}} sign-ins by {{user}}",
-      "span": "{{from}} to {{to}}",
+      "today": "今日",
+      "yesterday": "昨日",
+      "folded_one": "{{user}} によるサインイン {{count}} 件",
+      "folded_other": "{{user}} によるサインイン {{count}} 件",
+      "span": "{{from}} から {{to}}",
       "filter": {
-        "all": "All",
+        "all": "すべて",
         "pki": "PKI",
-        "access": "Access"
+        "access": "アクセス"
       },
-      "filterLabel": "Filter the operations",
-      "noneOfKind": "No recent operation under « {{name}} »."
+      "filterLabel": "操作を絞り込む",
+      "noneOfKind": "「{{name}}」の最近の操作はありません。"
     },
     "link": {
       "handled": "項目 #{{id}} は対応待ちではなくなりました（状態: {{status}}）。",
@@ -8387,44 +8387,44 @@
       "interventions_one": "要対応 {{count}} 件",
       "interventions_other": "要対応 {{count}} 件",
       "toCheck": "要確認",
-      "issuedSub_one": "issued over {{count}} day",
-      "issuedSub_other": "issued over {{count}} days",
-      "active_one": "{{count}} active",
-      "active_other": "{{count}} active",
-      "critical_one": "{{count}} critical",
-      "critical_other": "{{count}} critical",
-      "todo_one": "{{count}} to do",
-      "todo_other": "{{count}} to do",
-      "watch_one": "{{count}} to watch",
-      "watch_other": "{{count}} to watch",
-      "expiring": "Expiring within 30 days",
-      "alreadyExpired_one": "{{count}} already expired",
-      "alreadyExpired_other": "{{count}} already expired",
-      "sinceYesterday": "vs yesterday · ACME, SCEP, EST, UTC day",
-      "issuedAlt_one": "Issuances per day over {{count}} day, {{today}} today",
-      "issuedAlt_other": "Issuances per day over {{count}} days, {{today}} today",
-      "failuresAlt_one": "Protocol failures per day over {{count}} day, {{today}} today",
-      "failuresAlt_other": "Protocol failures per day over {{count}} days, {{today}} today",
+      "issuedSub_one": "{{count}} 日間に発行",
+      "issuedSub_other": "{{count}} 日間に発行",
+      "active_one": "アクティブ {{count}} 件",
+      "active_other": "アクティブ {{count}} 件",
+      "critical_one": "重大 {{count}} 件",
+      "critical_other": "重大 {{count}} 件",
+      "todo_one": "要対応 {{count}} 件",
+      "todo_other": "要対応 {{count}} 件",
+      "watch_one": "要監視 {{count}} 件",
+      "watch_other": "要監視 {{count}} 件",
+      "expiring": "30 日以内に期限切れ",
+      "alreadyExpired_one": "期限切れ済み {{count}} 件",
+      "alreadyExpired_other": "期限切れ済み {{count}} 件",
+      "sinceYesterday": "前日比 · ACME、SCEP、EST、UTC 日",
+      "issuedAlt_one": "{{count}} 日間の日別発行数、今日 {{today}} 件",
+      "issuedAlt_other": "{{count}} 日間の日別発行数、今日 {{today}} 件",
+      "failuresAlt_one": "{{count}} 日間の日別プロトコル失敗数、今日 {{today}} 件",
+      "failuresAlt_other": "{{count}} 日間の日別プロトコル失敗数、今日 {{today}} 件",
       "part": {
-        "critical": "Critical",
-        "todo": "To do",
-        "watch": "To watch"
+        "critical": "重大",
+        "todo": "要対応",
+        "watch": "要監視"
       },
       "tip": {
-        "issued_one": "Issuances, last {{count}} day",
-        "issued_other": "Issuances, last {{count}} days",
-        "mean": "Daily average",
-        "peak": "Peak ({{date}})",
-        "openInventory": "Opens the inventory",
-        "openQueue": "Opens the queue, critical first",
-        "openList": "Opens the list, filtered",
-        "failures_one": "Protocol failures, {{count}} day",
-        "failures_other": "Protocol failures, {{count}} days",
-        "openFailures": "Opens To handle, filtered on the failures"
+        "issued_one": "発行数、直近 {{count}} 日間",
+        "issued_other": "発行数、直近 {{count}} 日間",
+        "mean": "1 日の平均",
+        "peak": "ピーク（{{date}}）",
+        "openInventory": "インベントリを開きます",
+        "openQueue": "キューを重大なものから開きます",
+        "openList": "絞り込んだ一覧を開きます",
+        "failures_one": "プロトコルの失敗、{{count}} 日間",
+        "failures_other": "プロトコルの失敗、{{count}} 日間",
+        "openFailures": "要対応を失敗で絞り込んで開きます"
       },
-      "expiryPeak": "peak of {{count}} on {{date}}",
-      "expiryAlt_one": "Expirations per week over {{count}} week: {{total}}",
-      "expiryAlt_other": "Expirations per week over {{count}} weeks: {{total}}"
+      "expiryPeak": "{{date}} にピーク {{count}} 件",
+      "expiryAlt_one": "{{count}} 週間の週別期限切れ: {{total}} 件",
+      "expiryAlt_other": "{{count}} 週間の週別期限切れ: {{total}} 件"
     },
     "cause": {
       "acme_order_failed": "過去7日間にACMEオーダーが無効で終了しました",
@@ -8451,7 +8451,7 @@
     "clockToday": "今日 {{time}}",
     "allHiddenTitle": "すべてのカードが非表示です",
     "viz": {
-      "downloadCsv": "Download as CSV"
+      "downloadCsv": "CSV でダウンロード"
     },
     "flow": {
       "series": {
@@ -8459,83 +8459,83 @@
         "scep": "SCEP",
         "est": "EST",
         "wstep": "WSTEP",
-        "import": "Import",
-        "manual": "Manual"
+        "import": "インポート",
+        "manual": "手動"
       },
-      "sub_one": "Certificates issued per UTC day over the last day ({{count}}), renewals included.",
-      "sub_other": "Certificates issued per UTC day over the last {{count}} days, renewals included.",
-      "quiet_one": "No issuance over the last day ({{count}}).",
-      "quiet_other": "No issuance over the last {{count}} days.",
-      "issuances_one": "<0>{{count}}</0> <1>issuance</1>",
-      "issuances_other": "<0>{{count}}</0> <1>issuances</1>",
-      "vsPrevious_one": "against the previous day ({{count}})",
-      "vsPrevious_other": "against the previous {{count}} days",
-      "automatic": "{{pct}} % automatic",
-      "alt_one": "Issuances per day and source over {{count}} day, peak {{max}} on {{date}}",
-      "alt_other": "Issuances per day and source over {{count}} days, peak {{max}} on {{date}}",
-      "openDay": "Opens the certificates created that day",
-      "tableCaption_one": "Issuances per day and source, {{count}} day",
-      "tableCaption_other": "Issuances per day and source, {{count}} days"
+      "sub_one": "直近 {{count}} 日間に UTC 日ごとに発行された証明書（更新を含む）。",
+      "sub_other": "直近 {{count}} 日間に UTC 日ごとに発行された証明書（更新を含む）。",
+      "quiet_one": "直近 {{count}} 日間に発行はありません。",
+      "quiet_other": "直近 {{count}} 日間に発行はありません。",
+      "issuances_one": "<0>{{count}}</0> <1>件の発行</1>",
+      "issuances_other": "<0>{{count}}</0> <1>件の発行</1>",
+      "vsPrevious_one": "直前の {{count}} 日間との比較",
+      "vsPrevious_other": "直前の {{count}} 日間との比較",
+      "automatic": "{{pct}} % 自動",
+      "alt_one": "{{count}} 日間の日別・発行元別の発行数、{{date}} にピーク {{max}} 件",
+      "alt_other": "{{count}} 日間の日別・発行元別の発行数、{{date}} にピーク {{max}} 件",
+      "openDay": "その日に作成された証明書を開きます",
+      "tableCaption_one": "日別・発行元別の発行数、{{count}} 日間",
+      "tableCaption_other": "日別・発行元別の発行数、{{count}} 日間"
     },
     "tiles": {
       "state": {
-        "revoked": "Revoked",
-        "expired": "Expired",
-        "crlStale": "CRL overdue",
-        "crlMissing": "CRL never published",
-        "expiresIn_one": "Expires in {{count}} d",
-        "expiresIn_other": "Expires in {{count}} d",
-        "pending": "Pending",
-        "offline": "Offline, healthy",
-        "inService": "In service",
-        "reachable": "Reachable",
-        "hsmError": "In error",
-        "disconnected": "Disconnected",
-        "untested": "Never tested",
-        "unknown": "State unknown"
+        "revoked": "失効済み",
+        "expired": "期限切れ",
+        "crlStale": "CRL が期限超過",
+        "crlMissing": "CRL 未公開",
+        "expiresIn_one": "{{count}} 日後に期限切れ",
+        "expiresIn_other": "{{count}} 日後に期限切れ",
+        "pending": "保留中",
+        "offline": "オフライン、正常",
+        "inService": "稼働中",
+        "reachable": "接続可能",
+        "hsmError": "エラー",
+        "disconnected": "切断",
+        "untested": "未テスト",
+        "unknown": "状態不明"
       },
-      "sub": "{{authorities}} and {{modules}}. A tile opens its record.",
-      "modules_one": "{{count}} HSM module",
-      "modules_other": "{{count}} HSM modules",
-      "explore": "Explore the hierarchy",
+      "sub": "{{authorities}}と{{modules}}。タイルを開くとその詳細を表示します。",
+      "modules_one": "HSM モジュール {{count}} 件",
+      "modules_other": "HSM モジュール {{count}} 件",
+      "explore": "階層を探索",
       "hsmKey": "HSM · {{name}}",
-      "softwareKey": "Software key",
-      "noKey": "No key in UCM",
-      "elapsed": "Validity spent",
-      "left": "{{when}} left",
-      "elapsedAlt": "{{pct}} % of the validity spent, {{when}} left",
+      "softwareKey": "ソフトウェア鍵",
+      "noKey": "UCM に鍵なし",
+      "elapsed": "経過した有効期間",
+      "left": "残り {{when}}",
+      "elapsedAlt": "有効期間の {{pct}} % が経過、残り {{when}}",
       "crlWhen": "CRL {{when}}",
-      "crlCurrent": "CRL up to date",
-      "crlStale": "CRL overdue",
-      "crlStaleSince_one": "CRL overdue for {{count}} d",
-      "crlStaleSince_other": "CRL overdue for {{count}} d",
-      "crlMissing": "CRL never published",
-      "crlOff": "No CRL",
-      "activityAlt_one": "{{count}} issuance over 7 days",
-      "activityAlt_other": "{{count}} issuances over 7 days",
-      "noActivity": "No issuance",
-      "keys": "Keys held",
-      "served": "Authorities served",
-      "tested": "Tested {{when}}",
-      "neverTested": "Never tested",
-      "test": "Test",
-      "testDone": "{{name}}: test passed"
+      "crlCurrent": "CRL は最新",
+      "crlStale": "CRL が期限超過",
+      "crlStaleSince_one": "CRL が {{count}} 日間期限超過",
+      "crlStaleSince_other": "CRL が {{count}} 日間期限超過",
+      "crlMissing": "CRL 未公開",
+      "crlOff": "CRL なし",
+      "activityAlt_one": "7 日間の発行 {{count}} 件",
+      "activityAlt_other": "7 日間の発行 {{count}} 件",
+      "noActivity": "発行なし",
+      "keys": "保管中の鍵",
+      "served": "対象の認証局",
+      "tested": "テスト {{when}}",
+      "neverTested": "未テスト",
+      "test": "テスト",
+      "testDone": "{{name}}: テスト成功"
     },
     "revocation": {
       "part": {
-        "current": "CRL up to date",
-        "toPublish": "CRL overdue or missing",
-        "noCdp": "No distribution point"
+        "current": "CRL は最新",
+        "toPublish": "CRL が期限超過または未公開",
+        "noCdp": "配布ポイントなし"
       },
-      "sub": "What the active authorities publish for their certificates.",
-      "headline_one": "of the {{count}} active authority publishes a current CRL",
-      "headline_other": "of the {{count}} active authorities publish a current CRL",
-      "cas": "Authorities",
-      "partCol": "Part",
-      "tableCaption_one": "Revocation coverage, {{count}} active authority",
-      "tableCaption_other": "Revocation coverage, {{count}} active authorities",
-      "nextIn": "Next CRL {{when}}",
-      "publish": "Publish"
+      "sub": "有効な認証局が、その証明書向けに公開しているもの。",
+      "headline_one": "有効な認証局 {{count}} 件のうち、最新の CRL を公開している割合",
+      "headline_other": "有効な認証局 {{count}} 件のうち、最新の CRL を公開している割合",
+      "cas": "認証局",
+      "partCol": "区分",
+      "tableCaption_one": "失効のカバレッジ、有効な認証局 {{count}} 件",
+      "tableCaption_other": "失効のカバレッジ、有効な認証局 {{count}} 件",
+      "nextIn": "次の CRL {{when}}",
+      "publish": "公開"
     }
   },
   "sectioned": {
@@ -8610,8 +8610,8 @@
     "settingsSections": "設定のセクション",
     "pageActions": "{{name}} のその他の操作",
     "pageActionsTitle": "ページの操作",
-    "tableView": "Table view",
-    "chartView": "Chart view"
+    "tableView": "表表示",
+    "chartView": "グラフ表示"
   },
   "protocols": {
     "copyValue": "{{name}} をコピー",
@@ -8652,10 +8652,10 @@
     "resultsLabel": "ガイド内の検索結果"
   },
   "detached": {
-    "moveHandle": "Move or resize the window",
-    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
-    "maximize": "Maximize the window",
-    "restore": "Restore the window",
-    "close": "Close the window {{name}}"
+    "moveHandle": "ウィンドウの移動またはサイズ変更",
+    "moveHint": "矢印キーでウィンドウを移動、Shift と矢印キーでサイズを変更します",
+    "maximize": "ウィンドウを最大化",
+    "restore": "ウィンドウを元に戻す",
+    "close": "ウィンドウ {{name}} を閉じる"
   }
 }

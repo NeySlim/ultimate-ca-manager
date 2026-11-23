@@ -22,7 +22,7 @@
     "filter": "筛选",
     "copy": "复制",
     "copied": "已复制！",
-    "helpAbout": "Help: {{name}}",
+    "helpAbout": "帮助:{{name}}",
     "clickToCopy": "点击复制",
     "yes": "是",
     "no": "否",
@@ -476,8 +476,8 @@
     },
     "duplicateKey": "上方另一行已使用“{{key}}”：只能保存其中一行",
     "chooseFile": "选择文件…",
-    "more": "More",
-    "otherViews": "Other views"
+    "more": "更多",
+    "otherViews": "其他视图"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -628,20 +628,20 @@
       "refused": "用户名或密码错误。多次失败后将需要等待。",
       "lockedTitle": "会话已锁定",
       "lockedLead": "您的会话因长时间未操作已过期。请重新登录以返回之前所在的页面。",
-      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
+      "lockedLeadManual": "您已锁定会话。重新登录以返回之前的页面。",
       "unlock": "解锁",
       "switchAccount": "使用其他账户登录",
-      "lockedLeadHeld": "Your session was locked after inactivity. Unlock it to return to the page you were on.",
-      "lockedLeadManualHeld": "You locked the session. Unlock it to return to the page you were on.",
-      "unlockCertificate": "Unlock with the certificate",
-      "unlockCertificateDetail": "Client certificate (mTLS) of this account",
-      "unlockPasskey": "Unlock with a passkey",
-      "unlockPasskeyDetail": "WebAuthn, a key of this account",
-      "unlockRefused": "Incorrect password. After several failures, a delay applies.",
-      "unlockCertificateRefused": "The certificate presented does not open this account.",
-      "unlockPasskeyRefused": "The passkey was not accepted for this account.",
-      "noUnlockMethod": "This account has no password, certificate or passkey to unlock it here: sign out to sign in again.",
-      "ssoSessionLocked": "The session is locked: unlock it, or sign out before signing in with SSO.",
+      "lockedLeadHeld": "会话因长时间无操作而被锁定。解锁后可返回之前的页面。",
+      "lockedLeadManualHeld": "您已锁定会话。解锁后可返回之前的页面。",
+      "unlockCertificate": "使用证书解锁",
+      "unlockCertificateDetail": "此账户的客户端证书 (mTLS)",
+      "unlockPasskey": "使用通行密钥解锁",
+      "unlockPasskeyDetail": "WebAuthn,此账户的一个密钥",
+      "unlockRefused": "密码错误。多次失败后将启用延迟。",
+      "unlockCertificateRefused": "所提供的证书无法打开此账户。",
+      "unlockPasskeyRefused": "此账户不接受该通行密钥。",
+      "noUnlockMethod": "此账户没有可在此处解锁的密码、证书或通行密钥:请退出后重新登录。",
+      "ssoSessionLocked": "会话已锁定:请先解锁,或退出后再使用 SSO 登录。",
       "skipToContent": "跳到内容",
       "tooManyWait_one": "尝试次数过多：请等待 {{count}} 秒后再试。",
       "tooManyWait_other": "尝试次数过多：请等待 {{count}} 秒后再试。",
@@ -649,7 +649,7 @@
       "retryIn": "{{seconds}} 秒后可再次尝试。",
       "canRetry": "现在可以重试。",
       "lockedAnnounce": "会话已过期：屏幕已锁定，当前页面已保留。",
-      "lockedAnnounceManual": "Session locked: the current page is kept.",
+      "lockedAnnounceManual": "会话已锁定:当前页面已保留。",
       "signedIn": "已登录：{{name}}，{{role}}。",
       "signedInNoRole": "已登录：{{name}}。",
       "signedOut": "您已退出登录。您的显示偏好已保留。"
@@ -905,7 +905,7 @@
     "selectedOnPage_other": "本页已选择 {{count}} 个证书",
     "exportSelected": "导出",
     "complianceColumn": "合规性",
-    "creationColumn": "Creation date",
+    "creationColumn": "创建日期",
     "archivedMark": "已归档：已被续期或重新注册取代，保留作为历史记录",
     "sourceAcmeRenewal": "ACME 续期",
     "sourceIssued": "已签发",
@@ -2424,7 +2424,7 @@
       "deleteFailed": "删除 EAB 凭据失败",
       "caption": "EAB 凭据。激活名称以打开详情。",
       "noNotes": "无备注。",
-      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
+      "listPartial": "部分列表:已加载 {{total}} 个凭据中的 {{loaded}} 个。刷新以重试。"
     },
     "termsOfServiceTitlePlaceholder": "服务条款（留空隐藏）",
     "termsOfServiceBodyPlaceholder": "在此输入条款...\n\n支持：**加粗**, *斜体*, [链接](url), - 列表\n\n空行分隔段落。",
@@ -2679,11 +2679,11 @@
     "emptyAccountsText": "ACME 客户端（certbot、cert-manager、acme.sh）会自行在目录中创建账户：请将目录 URL 复制到它们的配置中。",
     "termsOfServiceTitle": "标题",
     "termsOfServiceBody": "正文",
-    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "accountsListPartial": "部分列表:已加载 {{total}} 个账户中的 {{loaded}} 个。刷新以重试。",
     "columns": {
-      "failures": "Failures",
-      "wildcard": "Wildcard",
-      "orders": "Orders"
+      "failures": "失败",
+      "wildcard": "通配符",
+      "orders": "订单"
     }
   },
   "scep": {
@@ -2806,7 +2806,7 @@
       "ca": "机构",
       "template": "模板",
       "profile": "配置",
-      "lastTest": "Last test"
+      "lastTest": "上次测试"
     },
     "tabs": {
       "profile": "配置"
@@ -2948,9 +2948,9 @@
     "ocspInactive": "未启用",
     "columns": {
       "published": "发布时间",
-      "publication": "Publication",
-      "crlNumber": "CRL number",
-      "nextUpdate": "Next update"
+      "publication": "发布",
+      "crlNumber": "CRL 编号",
+      "nextUpdate": "下次更新"
     },
     "tabs": {
       "publication": "发布"
@@ -4632,8 +4632,8 @@
     "anyResource": "所有资源",
     "anyAction": "所有操作",
     "columns": {
-      "permissions": "Rights",
-      "users": "Users"
+      "permissions": "权限",
+      "users": "用户"
     }
   },
   "hsm": {
@@ -5190,22 +5190,22 @@
   "compare": {
     "title": "比较证书",
     "field": "字段",
-    "differences_one": "{{count}} difference among {{total}} properties",
-    "differences_other": "{{count}} differences among {{total}} properties",
-    "differences": "{{count}} differences among {{total}} properties",
-    "lead": "Identical lines are merged; in a list, “+” marks what another certificate lacks.",
+    "differences_one": "{{total}} 项属性中有 {{count}} 处差异",
+    "differences_other": "{{total}} 项属性中有 {{count}} 处差异",
+    "differences": "{{total}} 项属性中有 {{count}} 处差异",
+    "lead": "相同的行已合并;在列表中,“+”表示其他证书所缺少的内容。",
     "property": "属性",
     "close": "关闭比较",
-    "countTitle_one": "Compare {{count}} certificate",
-    "countTitle_other": "Compare {{count}} certificates",
-    "key": "Key algorithm and size",
-    "usages": "Key usages",
-    "onlyDifferences": "Show only the differences",
-    "noDifference": "No line differs between these certificates.",
-    "differs": "differs",
-    "loadFailed": "A certificate of the comparison could not be read.",
+    "countTitle_one": "比较 {{count}} 个证书",
+    "countTitle_other": "比较 {{count}} 个证书",
+    "key": "密钥算法和长度",
+    "usages": "密钥用途",
+    "onlyDifferences": "仅显示差异",
+    "noDifference": "这些证书之间没有不同的行。",
+    "differs": "不同",
+    "loadFailed": "无法读取比较中的某个证书。",
     "identical": "Identical",
-    "notInAll": "not in every certificate"
+    "notInAll": "并非每个证书都有"
   },
   "members": {
     "manageMembers": "管理成员",
@@ -5496,9 +5496,9 @@
       "rootCa": "根证书颁发机构",
       "trustStoreAnchor": "信任存储锚点",
       "intermediateCa": "中间证书颁发机构 · 第 {{level}} 级",
-      "chainRoleRoot": "Root CA",
-      "chainRoleIntermediate": "Intermediate CA",
-      "chainRoleCurrent": "This certificate",
+      "chainRoleRoot": "根CA",
+      "chainRoleIntermediate": "中间CA",
+      "chainRoleCurrent": "此证书",
       "inspectCa": "查看颁发机构",
       "crossSigned": "交叉签名",
       "variants_one": "提供 {{count}} 种证书链：导出时选择。",
@@ -5537,7 +5537,7 @@
       "auditFailed": "无法读取审计日志：仅显示证书记录中的日期。",
       "scope": "最近 {{count}} 次证书操作中的审计日志条目，以及证书记录中的日期。"
     },
-    "detach": "Detach into a window"
+    "detach": "分离为窗口"
   },
   "table": {
     "noResults": "没有匹配的结果",
@@ -5596,25 +5596,25 @@
     "results_one": "{{count, number}} 个结果",
     "results_other": "{{count, number}} 个结果",
     "searching": "正在搜索…",
-    "sortHint": "Headers with a button sort the list.",
-    "sortedBy": "Sorted by {{column}}, {{order}}",
-    "sortedByReverse": "Sorted by {{column}}, {{order}}. Click to reverse",
-    "sortAscending": "ascending order",
-    "sortDescending": "descending order",
-    "sortBy": "Sort by",
-    "sortByColumn": "Sort by {{column}}",
+    "sortHint": "带按钮的表头可对列表排序。",
+    "sortedBy": "按{{column}}{{order}}排序",
+    "sortedByReverse": "按{{column}}{{order}}排序。点击反转",
+    "sortAscending": "升序",
+    "sortDescending": "降序",
+    "sortBy": "排序方式",
+    "sortByColumn": "按{{column}}排序",
     "fullCreated": "创建日期",
     "fullExpires": "到期日期",
     "fullIssued": "签发日期",
     "fullRequested": "请求日期",
     "fullSubmitted": "提交日期",
     "fullStarted": "开始日期",
-    "ascendingReverse": "Ascending order, reverse",
-    "descendingReverse": "Descending order, reverse",
-    "foldedColumns_one": "{{count}} column folded",
-    "foldedColumns_other": "{{count}} columns folded",
-    "resizeColumn": "Resize the {{column}} column",
-    "resetColumns": "Reset columns"
+    "ascendingReverse": "升序,点击反转",
+    "descendingReverse": "降序,点击反转",
+    "foldedColumns_one": "已折叠 {{count}} 列",
+    "foldedColumns_other": "已折叠 {{count}} 列",
+    "resizeColumn": "调整{{column}}列的宽度",
+    "resetColumns": "重置列"
   },
   "reconnect": {
     "countdown": "服务正在重启...",
@@ -6509,7 +6509,7 @@
     "defaultEndpoint": "默认端点",
     "columns": {
       "auth": "认证",
-      "authShort": "Authentication"
+      "authShort": "认证"
     },
     "auth": {
       "cert": "客户端证书",
@@ -6714,7 +6714,7 @@
         "completed": "已完成",
         "failed": "失败"
       },
-      "targets": "Targets"
+      "targets": "目标"
     },
     "form": {
       "range": "范围",
@@ -7050,7 +7050,7 @@
     "deleteRefused_other": "{{count}} 个 Windows 注册配置文件正在使用此连接器。请先将它们指向其他连接器：",
     "deleteRefusedMore_one": "以及另外 {{count}} 个",
     "deleteRefusedMore_other": "以及另外 {{count}} 个",
-    "lastTest": "Last test"
+    "lastTest": "上次测试"
   },
   "certInput": {
     "modePaste": "粘贴",
@@ -7080,7 +7080,7 @@
       "navigation": "导航",
       "actions": "操作"
     },
-    "viewOf": "{{page}}: {{view}}"
+    "viewOf": "{{page}}:{{view}}"
   },
   "passwordStrength": {
     "weak": "弱",
@@ -7451,7 +7451,7 @@
       "ad_connector_health": "Active Directory 健康状况",
       "session_cleanup": "会话清理"
     },
-    "colNote": "Last result"
+    "colNote": "上次结果"
   },
   "lint": {
     "action": "检查",
@@ -7747,17 +7747,17 @@
     "accountLabel": "账户：{{name}}，{{role}}",
     "accountLabelName": "账户：{{name}}",
     "signOut": "退出登录",
-    "lock": "Lock",
+    "lock": "锁定",
     "method": {
       "password": "密码",
       "mtls": "客户端证书",
       "webauthn": "安全密钥",
       "session": "浏览器会话",
       "sso": "SSO",
-      "ldap": "LDAP directory"
+      "ldap": "LDAP 目录"
     },
     "mfaMethod": {
-      "totp": "authenticator app"
+      "totp": "身份验证器应用"
     },
     "expiringCount_one": "{{count}} 张证书即将到期或已过期",
     "expiringCount_other": "{{count}} 张证书即将到期或已过期",
@@ -7781,8 +7781,8 @@
       "systemNow": "当前为{{mode}}",
       "dark": "深色",
       "light": "浅色",
-      "family": "Theme",
-      "mode": "Mode"
+      "family": "主题",
+      "mode": "模式"
     },
     "bell": {
       "title": "通知",
@@ -7966,28 +7966,28 @@
       "back": "连接已恢复：操作重新可用。"
     },
     "userCard": {
-      "signIn": "Sign-in",
-      "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "signIn": "登录",
+      "session": "会话",
+      "lockIn": "无操作 {{minutes}} 分钟后锁定",
       "methodVia": "{{method}} ({{provider}})",
-      "mfa": "Two-factor",
-      "mfaOn": "On: {{methods}}",
-      "mfaOff": "Off",
-      "endsAt": "Ends {{date}}"
+      "mfa": "双因素认证",
+      "mfaOn": "开启:{{methods}}",
+      "mfaOff": "关闭",
+      "endsAt": "{{date}} 结束"
     },
     "activity": {
-      "label": "Activity",
-      "calm": "Nothing pending",
-      "queue_one": "{{count}} to act on",
-      "queue_other": "{{count}} to act on",
-      "windows_one": "{{count}} window",
-      "windows_other": "{{count}} windows",
-      "windowsLabel": "Detached windows",
+      "label": "活动",
+      "calm": "无待处理项",
+      "queue_one": "{{count}} 项待处理",
+      "queue_other": "{{count}} 项待处理",
+      "windows_one": "{{count}} 个窗口",
+      "windows_other": "{{count}} 个窗口",
+      "windowsLabel": "分离的窗口",
       "jobs": {
-        "backup": "Backup in progress",
-        "restore": "Restore in progress",
-        "audit_verify": "Audit chain check in progress",
-        "other": "Background task in progress"
+        "backup": "备份进行中",
+        "restore": "还原进行中",
+        "audit_verify": "审计链检查进行中",
+        "other": "后台任务进行中"
       }
     }
   },
@@ -8010,9 +8010,9 @@
       "horizon": "到期视野",
       "compliance": "合规性",
       "activity": "最新操作",
-      "issuance": "Issuances by source",
-      "authorities": "Authorities and HSM",
-      "revocation": "Revocation coverage"
+      "issuance": "按来源统计的签发",
+      "authorities": "证书颁发机构和 HSM",
+      "revocation": "吊销覆盖率"
     },
     "state": {
       "loading": "加载中...",
@@ -8067,8 +8067,8 @@
       "watchShow_other": "显示 {{count}} 项需关注",
       "watchHide_one": "隐藏 {{count}} 项需关注",
       "watchHide_other": "隐藏 {{count}} 项需关注",
-      "countdown_one": "{{count}} day left of 30",
-      "countdown_other": "{{count}} days left of 30"
+      "countdown_one": "30 天中还剩 {{count}} 天",
+      "countdown_other": "30 天中还剩 {{count}} 天"
     },
     "kind": {
       "acme_order_failed": "ACME 订单失败",
@@ -8102,53 +8102,53 @@
       "sub_server_lifetime_over_398_days": "TLS 服务器证书",
       "sub_incomplete_chain": "缺少中间证书",
       "sub_no_private_key": "外部 CSR 或导入",
-      "subRules_one": "Over the {{count}} active certificate. A line opens the list of its gaps, filtered.",
-      "subRules_other": "Over the {{count}} active certificates. A line opens the list of its gaps, filtered.",
-      "conformPct": "{{pct}}% conform",
+      "subRules_one": "针对 {{count}} 个有效证书。点击一行可打开其差距列表(已筛选)。",
+      "subRules_other": "针对 {{count}} 个有效证书。点击一行可打开其差距列表(已筛选)。",
+      "conformPct": "{{pct}}% 合规",
       "pct": "{{pct}}%",
-      "conform": "Conform",
-      "inGap": "In gap",
-      "openGap": "Opens the list of the certificates in gap",
-      "tableRules_one": "Rules, over {{count}} active certificate",
-      "tableRules_other": "Rules, over {{count}} active certificates",
-      "ruleCol": "Rule",
-      "tableGrades_one": "Grades, over {{count}} certificate",
-      "tableGrades_other": "Grades, over {{count}} certificates",
-      "gradeCol": "Grade",
-      "certificates": "Certificates",
-      "algoCol": "Algorithm",
-      "ringAlt": "Average compliance score: {{score}} out of 100, grade {{grade}}",
-      "ringSub": "average score · grade {{grade}}",
-      "gradeAlt_one": "Grade {{grade}}: {{count}} certificate",
-      "gradeAlt_other": "Grade {{grade}}: {{count}} certificates",
-      "grade": "Grade {{grade}}",
-      "share": "Share",
-      "scoreBase_one": "Score over {{count}} certificate not revoked",
-      "scoreBase_other": "Score over {{count}} certificates not revoked",
+      "conform": "合规",
+      "inGap": "存在差距",
+      "openGap": "打开存在差距的证书列表",
+      "tableRules_one": "规则,共 {{count}} 个有效证书",
+      "tableRules_other": "规则,共 {{count}} 个有效证书",
+      "ruleCol": "规则",
+      "tableGrades_one": "等级,共 {{count}} 个证书",
+      "tableGrades_other": "等级,共 {{count}} 个证书",
+      "gradeCol": "等级",
+      "certificates": "证书",
+      "algoCol": "算法",
+      "ringAlt": "平均合规得分:{{score}} 分(满分 100),等级 {{grade}}",
+      "ringSub": "平均得分 · 等级 {{grade}}",
+      "gradeAlt_one": "等级 {{grade}}:{{count}} 个证书",
+      "gradeAlt_other": "等级 {{grade}}:{{count}} 个证书",
+      "grade": "等级 {{grade}}",
+      "share": "占比",
+      "scoreBase_one": "基于 {{count}} 个未吊销证书的得分",
+      "scoreBase_other": "基于 {{count}} 个未吊销证书的得分",
       "rule": {
-        "rsa_below_3072": "RSA keys of at least 3072 bits",
-        "server_lifetime_over_398_days": "Server validity of 398 days at most",
-        "weak_signature_hash": "Safe signature hash",
-        "incomplete_chain": "Complete chain",
-        "no_private_key": "Private key kept in UCM"
+        "rsa_below_3072": "RSA 密钥至少 3072 位",
+        "server_lifetime_over_398_days": "服务器证书有效期最长 398 天",
+        "weak_signature_hash": "安全的签名哈希",
+        "incomplete_chain": "证书链完整",
+        "no_private_key": "私钥保存在 UCM 中"
       },
       "gap": {
-        "rsa_below_3072_one": "{{count}} RSA key to replace",
-        "rsa_below_3072_other": "{{count}} RSA keys to replace",
-        "server_lifetime_over_398_days_one": "{{count}} TLS server certificate too long",
-        "server_lifetime_over_398_days_other": "{{count}} TLS server certificates too long",
-        "weak_signature_hash_one": "{{count}} SHA-1 or MD5 signature",
-        "weak_signature_hash_other": "{{count}} SHA-1 or MD5 signatures",
-        "incomplete_chain_one": "{{count}} chain without its intermediate",
-        "incomplete_chain_other": "{{count}} chains without their intermediate",
-        "no_private_key_one": "{{count}} external CSR or import",
-        "no_private_key_other": "{{count}} external CSRs or imports"
+        "rsa_below_3072_one": "{{count}} 个 RSA 密钥待替换",
+        "rsa_below_3072_other": "{{count}} 个 RSA 密钥待替换",
+        "server_lifetime_over_398_days_one": "{{count}} 个 TLS 服务器证书有效期过长",
+        "server_lifetime_over_398_days_other": "{{count}} 个 TLS 服务器证书有效期过长",
+        "weak_signature_hash_one": "{{count}} 个 SHA-1 或 MD5 签名",
+        "weak_signature_hash_other": "{{count}} 个 SHA-1 或 MD5 签名",
+        "incomplete_chain_one": "{{count}} 条证书链缺少中间证书",
+        "incomplete_chain_other": "{{count}} 条证书链缺少中间证书",
+        "no_private_key_one": "{{count}} 个外部 CSR 或导入项",
+        "no_private_key_other": "{{count}} 个外部 CSR 或导入项"
       },
       "state": {
-        "good": "conform",
-        "warn": "to watch",
-        "bad": "major gap",
-        "info": "information"
+        "good": "合规",
+        "warn": "需关注",
+        "bad": "严重差距",
+        "info": "信息"
       }
     },
     "health": {
@@ -8223,15 +8223,15 @@
       "runs_one": "<strong>{{count}}</strong> 次成功",
       "runs_other": "<strong>{{count}}</strong> 次成功",
       "rate": "{{rate}}%",
-      "mirrorAlt_one": "{{name}} over {{count}} day: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
-      "mirrorAlt_other": "{{name}} over {{count}} days: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
-      "ok": "Successes",
-      "failed": "Failures",
-      "tableCaption_one": "Operations per UTC day, over {{count}} day",
-      "tableCaption_other": "Operations per UTC day, over {{count}} days",
-      "okOf": "{{name}} successes",
-      "failedOf": "{{name}} failures",
-      "seeActivity": "Opens Activity on this day’s failures"
+      "mirrorAlt_one": "{{count}} 天内的{{name}}:{{ok}} 次成功,{{failed}} 次失败。使用方向键逐日查看。",
+      "mirrorAlt_other": "{{count}} 天内的{{name}}:{{ok}} 次成功,{{failed}} 次失败。使用方向键逐日查看。",
+      "ok": "成功",
+      "failed": "失败",
+      "tableCaption_one": "按 UTC 日统计的操作,共 {{count}} 天",
+      "tableCaption_other": "按 UTC 日统计的操作,共 {{count}} 天",
+      "okOf": "{{name}} 成功",
+      "failedOf": "{{name}} 失败",
+      "seeActivity": "打开活动,查看当天的失败"
     },
     "filter": {
       "status": "状态",
@@ -8247,8 +8247,8 @@
       "renewal": "续期",
       "weak_key": "合规性",
       "ca_id": "证书颁发机构",
-      "expires": "Expiry",
-      "created": "Created"
+      "expires": "到期",
+      "created": "创建时间"
     },
     "filterValue": {
       "true": "是",
@@ -8263,9 +8263,9 @@
       "orphan": "孤立",
       "archived": "已归档",
       "weakKey": "弱密钥，{{algo}} < {{bits}}",
-      "range": "{{from}} to {{to}}",
-      "since": "from {{date}}",
-      "until": "until {{date}}"
+      "range": "{{from}} 至 {{to}}",
+      "since": "自 {{date}} 起",
+      "until": "至 {{date}}"
     },
     "hierarchy": {
       "crlOn": "CRL 已启用",
@@ -8292,67 +8292,67 @@
     },
     "horizon": {
       "expired": "已过期",
-      "subWindow_one": "{{count}} certificate not revoked expires by {{date}}, by week and by day. A cell opens the list of its day.",
-      "subWindow_other": "{{count}} certificates not revoked expire by {{date}}, by week and by day. A cell opens the list of its day.",
-      "quiet": "Nothing expires by {{date}}.",
-      "period": "Horizon shown",
-      "year": "1 y",
-      "week": "Week of {{date}}",
-      "weekCol": "Week",
-      "weekAlt_one": "{{name}}: {{count}} expiry, {{manual}} manual, {{automatic}} automatic",
-      "weekAlt_other": "{{name}}: {{count}} expiries, {{manual}} manual, {{automatic}} automatic",
-      "dayAlt_one": "{{date}}: {{count}} expiry",
-      "dayAlt_other": "{{date}}: {{count}} expiries",
-      "withCas_one": "including {{count}} authority",
-      "withCas_other": "including {{count}} authorities",
-      "withSigners_one": "including {{count}} signer",
-      "withSigners_other": "including {{count}} signers",
-      "total": "Total",
-      "manual": "Manual",
-      "automatic": "Automatic",
-      "cas": "Authorities",
-      "signers": "Signers",
-      "weeksLabel": "Expiries per week",
-      "daysLabel": "Expiries per day, one cell per day",
-      "openDay": "Click to see these certificates",
-      "openWeek": "Opens the list of the week",
-      "nothingDay": "Nothing expires that day",
-      "nothing": "Nothing expires over the period.",
-      "legendManual": "Manual: import, manual issuance",
-      "legendAutomatic": "Automatic: ACME, SCEP, EST",
-      "legendInfra": "An authority or a signer expires that day",
-      "less": "Less",
-      "more": "More",
-      "inDays_one": "in {{count}} day",
-      "inDays_other": "in {{count}} days",
-      "toRenew_one": "{{count}} to renew by hand",
-      "toRenew_other": "{{count}} to renew by hand",
-      "automaticCount_one": "{{count}} automatic",
-      "automaticCount_other": "{{count}} automatic",
-      "casCount_one": "{{count}} authority expires",
-      "casCount_other": "{{count}} authorities expire",
-      "listLabel": "First certificates of the period",
-      "open_one": "Open {{count}} in Certificates",
-      "open_other": "Open the {{count}} in Certificates",
-      "tableCaption_one": "Expiries per week, {{count}} week",
-      "tableCaption_other": "Expiries per week, {{count}} weeks"
+      "subWindow_one": "到 {{date}} 之前有 {{count}} 个未吊销证书到期,按周和按日统计。点击单元格可打开当天的列表。",
+      "subWindow_other": "到 {{date}} 之前有 {{count}} 个未吊销证书到期,按周和按日统计。点击单元格可打开当天的列表。",
+      "quiet": "到 {{date}} 之前没有到期项。",
+      "period": "显示的时间范围",
+      "year": "1 年",
+      "week": "{{date}} 当周",
+      "weekCol": "周",
+      "weekAlt_one": "{{name}}:{{count}} 个到期,{{manual}} 个手动,{{automatic}} 个自动",
+      "weekAlt_other": "{{name}}:{{count}} 个到期,{{manual}} 个手动,{{automatic}} 个自动",
+      "dayAlt_one": "{{date}}:{{count}} 个到期",
+      "dayAlt_other": "{{date}}:{{count}} 个到期",
+      "withCas_one": "其中 {{count}} 个证书颁发机构",
+      "withCas_other": "其中 {{count}} 个证书颁发机构",
+      "withSigners_one": "其中 {{count}} 个签名者",
+      "withSigners_other": "其中 {{count}} 个签名者",
+      "total": "总计",
+      "manual": "手动",
+      "automatic": "自动",
+      "cas": "证书颁发机构",
+      "signers": "签名者",
+      "weeksLabel": "按周统计的到期数",
+      "daysLabel": "按日统计的到期数,每天一格",
+      "openDay": "点击查看这些证书",
+      "openWeek": "打开该周的列表",
+      "nothingDay": "当天没有到期项",
+      "nothing": "该时段内没有到期项。",
+      "legendManual": "手动:导入、手动签发",
+      "legendAutomatic": "自动:ACME、SCEP、EST",
+      "legendInfra": "当天有证书颁发机构或签名者到期",
+      "less": "较少",
+      "more": "较多",
+      "inDays_one": "{{count}} 天后",
+      "inDays_other": "{{count}} 天后",
+      "toRenew_one": "{{count}} 个需手动续期",
+      "toRenew_other": "{{count}} 个需手动续期",
+      "automaticCount_one": "{{count}} 个自动",
+      "automaticCount_other": "{{count}} 个自动",
+      "casCount_one": "{{count}} 个证书颁发机构即将到期",
+      "casCount_other": "{{count}} 个证书颁发机构即将到期",
+      "listLabel": "该时段内最先到期的证书",
+      "open_one": "在证书中打开这 {{count}} 个",
+      "open_other": "在证书中打开这 {{count}} 个",
+      "tableCaption_one": "按周统计的到期数,{{count}} 周",
+      "tableCaption_other": "按周统计的到期数,{{count}} 周"
     },
     "activity": {
       "all": "查看全部",
       "sub": "审计记录的最新条目。",
       "subOwn": "您自己的最新操作。",
-      "today": "Today",
-      "yesterday": "Yesterday",
-      "folded_one": "{{count}} sign-in by {{user}}",
-      "folded_other": "{{count}} sign-ins by {{user}}",
-      "span": "{{from}} to {{to}}",
+      "today": "今天",
+      "yesterday": "昨天",
+      "folded_one": "{{user}} 的 {{count}} 次登录",
+      "folded_other": "{{user}} 的 {{count}} 次登录",
+      "span": "{{from}} 至 {{to}}",
       "filter": {
-        "all": "All",
+        "all": "全部",
         "pki": "PKI",
-        "access": "Access"
+        "access": "访问"
       },
-      "filterLabel": "Filter the operations",
-      "noneOfKind": "No recent operation under « {{name}} »."
+      "filterLabel": "筛选操作",
+      "noneOfKind": "“{{name}}”下没有最近的操作。"
     },
     "link": {
       "handled": "项目 #{{id}} 不再需要处理（状态：{{status}}）。",
@@ -8387,44 +8387,44 @@
       "interventions_one": "{{count}} 项待处理",
       "interventions_other": "{{count}} 项待处理",
       "toCheck": "待检查",
-      "issuedSub_one": "issued over {{count}} day",
-      "issuedSub_other": "issued over {{count}} days",
-      "active_one": "{{count}} active",
-      "active_other": "{{count}} active",
-      "critical_one": "{{count}} critical",
-      "critical_other": "{{count}} critical",
-      "todo_one": "{{count}} to do",
-      "todo_other": "{{count}} to do",
-      "watch_one": "{{count}} to watch",
-      "watch_other": "{{count}} to watch",
-      "expiring": "Expiring within 30 days",
-      "alreadyExpired_one": "{{count}} already expired",
-      "alreadyExpired_other": "{{count}} already expired",
-      "sinceYesterday": "vs yesterday · ACME, SCEP, EST, UTC day",
-      "issuedAlt_one": "Issuances per day over {{count}} day, {{today}} today",
-      "issuedAlt_other": "Issuances per day over {{count}} days, {{today}} today",
-      "failuresAlt_one": "Protocol failures per day over {{count}} day, {{today}} today",
-      "failuresAlt_other": "Protocol failures per day over {{count}} days, {{today}} today",
+      "issuedSub_one": "{{count}} 天内签发",
+      "issuedSub_other": "{{count}} 天内签发",
+      "active_one": "{{count}} 个有效",
+      "active_other": "{{count}} 个有效",
+      "critical_one": "{{count}} 个严重",
+      "critical_other": "{{count}} 个严重",
+      "todo_one": "{{count}} 个待办",
+      "todo_other": "{{count}} 个待办",
+      "watch_one": "{{count}} 个需关注",
+      "watch_other": "{{count}} 个需关注",
+      "expiring": "30 天内到期",
+      "alreadyExpired_one": "{{count}} 个已过期",
+      "alreadyExpired_other": "{{count}} 个已过期",
+      "sinceYesterday": "较昨天 · ACME、SCEP、EST,UTC 日",
+      "issuedAlt_one": "{{count}} 天内按日统计的签发数,今天 {{today}}",
+      "issuedAlt_other": "{{count}} 天内按日统计的签发数,今天 {{today}}",
+      "failuresAlt_one": "{{count}} 天内按日统计的协议失败数,今天 {{today}}",
+      "failuresAlt_other": "{{count}} 天内按日统计的协议失败数,今天 {{today}}",
       "part": {
-        "critical": "Critical",
-        "todo": "To do",
-        "watch": "To watch"
+        "critical": "严重",
+        "todo": "待办",
+        "watch": "需关注"
       },
       "tip": {
-        "issued_one": "Issuances, last {{count}} day",
-        "issued_other": "Issuances, last {{count}} days",
-        "mean": "Daily average",
-        "peak": "Peak ({{date}})",
-        "openInventory": "Opens the inventory",
-        "openQueue": "Opens the queue, critical first",
-        "openList": "Opens the list, filtered",
-        "failures_one": "Protocol failures, {{count}} day",
-        "failures_other": "Protocol failures, {{count}} days",
-        "openFailures": "Opens To handle, filtered on the failures"
+        "issued_one": "签发数,最近 {{count}} 天",
+        "issued_other": "签发数,最近 {{count}} 天",
+        "mean": "日均值",
+        "peak": "峰值 ({{date}})",
+        "openInventory": "打开清单",
+        "openQueue": "打开队列,严重项优先",
+        "openList": "打开列表(已筛选)",
+        "failures_one": "协议失败,{{count}} 天",
+        "failures_other": "协议失败,{{count}} 天",
+        "openFailures": "打开待处理,并按失败筛选"
       },
-      "expiryPeak": "peak of {{count}} on {{date}}",
-      "expiryAlt_one": "Expirations per week over {{count}} week: {{total}}",
-      "expiryAlt_other": "Expirations per week over {{count}} weeks: {{total}}"
+      "expiryPeak": "{{date}} 达到峰值 {{count}}",
+      "expiryAlt_one": "{{count}} 周内按周统计的到期数:{{total}}",
+      "expiryAlt_other": "{{count}} 周内按周统计的到期数:{{total}}"
     },
     "cause": {
       "acme_order_failed": "过去 7 天内有 ACME 订单以无效结束",
@@ -8451,7 +8451,7 @@
     "clockToday": "今天 {{time}}",
     "allHiddenTitle": "所有卡片均已隐藏",
     "viz": {
-      "downloadCsv": "Download as CSV"
+      "downloadCsv": "下载为 CSV"
     },
     "flow": {
       "series": {
@@ -8459,83 +8459,83 @@
         "scep": "SCEP",
         "est": "EST",
         "wstep": "WSTEP",
-        "import": "Import",
-        "manual": "Manual"
+        "import": "导入",
+        "manual": "手动"
       },
-      "sub_one": "Certificates issued per UTC day over the last day ({{count}}), renewals included.",
-      "sub_other": "Certificates issued per UTC day over the last {{count}} days, renewals included.",
-      "quiet_one": "No issuance over the last day ({{count}}).",
-      "quiet_other": "No issuance over the last {{count}} days.",
-      "issuances_one": "<0>{{count}}</0> <1>issuance</1>",
-      "issuances_other": "<0>{{count}}</0> <1>issuances</1>",
-      "vsPrevious_one": "against the previous day ({{count}})",
-      "vsPrevious_other": "against the previous {{count}} days",
-      "automatic": "{{pct}} % automatic",
-      "alt_one": "Issuances per day and source over {{count}} day, peak {{max}} on {{date}}",
-      "alt_other": "Issuances per day and source over {{count}} days, peak {{max}} on {{date}}",
-      "openDay": "Opens the certificates created that day",
-      "tableCaption_one": "Issuances per day and source, {{count}} day",
-      "tableCaption_other": "Issuances per day and source, {{count}} days"
+      "sub_one": "过去 {{count}} 天内按 UTC 日统计的证书签发量,含续期。",
+      "sub_other": "过去 {{count}} 天内按 UTC 日统计的证书签发量,含续期。",
+      "quiet_one": "过去 {{count}} 天内没有签发。",
+      "quiet_other": "过去 {{count}} 天内没有签发。",
+      "issuances_one": "<0>{{count}}</0> <1>次签发</1>",
+      "issuances_other": "<0>{{count}}</0> <1>次签发</1>",
+      "vsPrevious_one": "与前 {{count}} 天相比",
+      "vsPrevious_other": "与前 {{count}} 天相比",
+      "automatic": "{{pct}} % 自动",
+      "alt_one": "{{count}} 天内按日和来源统计的签发,{{date}} 达到峰值 {{max}}",
+      "alt_other": "{{count}} 天内按日和来源统计的签发,{{date}} 达到峰值 {{max}}",
+      "openDay": "打开当天创建的证书",
+      "tableCaption_one": "按日和来源统计的签发,{{count}} 天",
+      "tableCaption_other": "按日和来源统计的签发,{{count}} 天"
     },
     "tiles": {
       "state": {
-        "revoked": "Revoked",
-        "expired": "Expired",
-        "crlStale": "CRL overdue",
-        "crlMissing": "CRL never published",
-        "expiresIn_one": "Expires in {{count}} d",
-        "expiresIn_other": "Expires in {{count}} d",
-        "pending": "Pending",
-        "offline": "Offline, healthy",
-        "inService": "In service",
-        "reachable": "Reachable",
-        "hsmError": "In error",
-        "disconnected": "Disconnected",
-        "untested": "Never tested",
-        "unknown": "State unknown"
+        "revoked": "已吊销",
+        "expired": "已过期",
+        "crlStale": "CRL 已逾期",
+        "crlMissing": "CRL 从未发布",
+        "expiresIn_one": "{{count}} 天后到期",
+        "expiresIn_other": "{{count}} 天后到期",
+        "pending": "待处理",
+        "offline": "离线,正常",
+        "inService": "服务中",
+        "reachable": "可达",
+        "hsmError": "出错",
+        "disconnected": "已断开",
+        "untested": "从未测试",
+        "unknown": "状态未知"
       },
-      "sub": "{{authorities}} and {{modules}}. A tile opens its record.",
-      "modules_one": "{{count}} HSM module",
-      "modules_other": "{{count}} HSM modules",
-      "explore": "Explore the hierarchy",
+      "sub": "{{authorities}}和{{modules}}。点击磁贴可打开其记录。",
+      "modules_one": "{{count}} 个 HSM 模块",
+      "modules_other": "{{count}} 个 HSM 模块",
+      "explore": "浏览层级结构",
       "hsmKey": "HSM · {{name}}",
-      "softwareKey": "Software key",
-      "noKey": "No key in UCM",
-      "elapsed": "Validity spent",
-      "left": "{{when}} left",
-      "elapsedAlt": "{{pct}} % of the validity spent, {{when}} left",
+      "softwareKey": "软件密钥",
+      "noKey": "UCM 中无密钥",
+      "elapsed": "已用有效期",
+      "left": "剩余 {{when}}",
+      "elapsedAlt": "已用有效期 {{pct}} %,剩余 {{when}}",
       "crlWhen": "CRL {{when}}",
-      "crlCurrent": "CRL up to date",
-      "crlStale": "CRL overdue",
-      "crlStaleSince_one": "CRL overdue for {{count}} d",
-      "crlStaleSince_other": "CRL overdue for {{count}} d",
-      "crlMissing": "CRL never published",
-      "crlOff": "No CRL",
-      "activityAlt_one": "{{count}} issuance over 7 days",
-      "activityAlt_other": "{{count}} issuances over 7 days",
-      "noActivity": "No issuance",
-      "keys": "Keys held",
-      "served": "Authorities served",
-      "tested": "Tested {{when}}",
-      "neverTested": "Never tested",
-      "test": "Test",
-      "testDone": "{{name}}: test passed"
+      "crlCurrent": "CRL 为最新",
+      "crlStale": "CRL 已逾期",
+      "crlStaleSince_one": "CRL 已逾期 {{count}} 天",
+      "crlStaleSince_other": "CRL 已逾期 {{count}} 天",
+      "crlMissing": "CRL 从未发布",
+      "crlOff": "无 CRL",
+      "activityAlt_one": "7 天内 {{count}} 次签发",
+      "activityAlt_other": "7 天内 {{count}} 次签发",
+      "noActivity": "无签发",
+      "keys": "持有的密钥",
+      "served": "已服务的证书颁发机构",
+      "tested": "测试于 {{when}}",
+      "neverTested": "从未测试",
+      "test": "测试",
+      "testDone": "{{name}}:测试通过"
     },
     "revocation": {
       "part": {
-        "current": "CRL up to date",
-        "toPublish": "CRL overdue or missing",
-        "noCdp": "No distribution point"
+        "current": "CRL 为最新",
+        "toPublish": "CRL 已逾期或缺失",
+        "noCdp": "无分发点"
       },
-      "sub": "What the active authorities publish for their certificates.",
-      "headline_one": "of the {{count}} active authority publishes a current CRL",
-      "headline_other": "of the {{count}} active authorities publish a current CRL",
-      "cas": "Authorities",
-      "partCol": "Part",
-      "tableCaption_one": "Revocation coverage, {{count}} active authority",
-      "tableCaption_other": "Revocation coverage, {{count}} active authorities",
-      "nextIn": "Next CRL {{when}}",
-      "publish": "Publish"
+      "sub": "有效证书颁发机构为其证书发布的内容。",
+      "headline_one": "{{count}} 个有效证书颁发机构中发布最新 CRL 的占比",
+      "headline_other": "{{count}} 个有效证书颁发机构中发布最新 CRL 的占比",
+      "cas": "证书颁发机构",
+      "partCol": "部分",
+      "tableCaption_one": "吊销覆盖率,{{count}} 个有效证书颁发机构",
+      "tableCaption_other": "吊销覆盖率,{{count}} 个有效证书颁发机构",
+      "nextIn": "下次 CRL {{when}}",
+      "publish": "发布"
     }
   },
   "sectioned": {
@@ -8610,8 +8610,8 @@
     "settingsSections": "设置分区",
     "pageActions": "{{name}} 页面的其他操作",
     "pageActionsTitle": "页面操作",
-    "tableView": "Table view",
-    "chartView": "Chart view"
+    "tableView": "表格视图",
+    "chartView": "图表视图"
   },
   "protocols": {
     "copyValue": "复制{{name}}",
@@ -8652,10 +8652,10 @@
     "resultsLabel": "指南中的结果"
   },
   "detached": {
-    "moveHandle": "Move or resize the window",
-    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
-    "maximize": "Maximize the window",
-    "restore": "Restore the window",
-    "close": "Close the window {{name}}"
+    "moveHandle": "移动或调整窗口大小",
+    "moveHint": "方向键移动窗口,Shift 加方向键调整窗口大小",
+    "maximize": "最大化窗口",
+    "restore": "还原窗口",
+    "close": "关闭窗口 {{name}}"
   }
 }

@@ -22,7 +22,7 @@
     "filter": "Filtern",
     "copy": "Kopieren",
     "copied": "Kopiert!",
-    "helpAbout": "Help: {{name}}",
+    "helpAbout": "Hilfe: {{name}}",
     "clickToCopy": "Klicken zum Kopieren",
     "yes": "Ja",
     "no": "Nein",
@@ -476,8 +476,8 @@
     },
     "duplicateKey": "Eine weitere Zeile oberhalb verwendet bereits „{{key}}“: Nur eine davon kann gespeichert werden",
     "chooseFile": "Datei auswählen…",
-    "more": "More",
-    "otherViews": "Other views"
+    "more": "Mehr",
+    "otherViews": "Weitere Ansichten"
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
@@ -628,20 +628,20 @@
       "refused": "Benutzername oder Passwort falsch. Nach mehreren Fehlversuchen gilt eine Wartezeit.",
       "lockedTitle": "Sitzung gesperrt",
       "lockedLead": "Ihre Sitzung ist wegen Inaktivität abgelaufen. Melden Sie sich erneut an, um zur vorherigen Seite zurückzukehren.",
-      "lockedLeadManual": "You locked the session. Sign in again to return to the page you were on.",
+      "lockedLeadManual": "Sie haben die Sitzung gesperrt. Melden Sie sich erneut an, um zur vorherigen Seite zurückzukehren.",
       "unlock": "Entsperren",
       "switchAccount": "Mit einem anderen Konto anmelden",
-      "lockedLeadHeld": "Your session was locked after inactivity. Unlock it to return to the page you were on.",
-      "lockedLeadManualHeld": "You locked the session. Unlock it to return to the page you were on.",
-      "unlockCertificate": "Unlock with the certificate",
-      "unlockCertificateDetail": "Client certificate (mTLS) of this account",
-      "unlockPasskey": "Unlock with a passkey",
-      "unlockPasskeyDetail": "WebAuthn, a key of this account",
-      "unlockRefused": "Incorrect password. After several failures, a delay applies.",
-      "unlockCertificateRefused": "The certificate presented does not open this account.",
-      "unlockPasskeyRefused": "The passkey was not accepted for this account.",
-      "noUnlockMethod": "This account has no password, certificate or passkey to unlock it here: sign out to sign in again.",
-      "ssoSessionLocked": "The session is locked: unlock it, or sign out before signing in with SSO.",
+      "lockedLeadHeld": "Ihre Sitzung wurde wegen Inaktivität gesperrt. Entsperren Sie sie, um zur vorherigen Seite zurückzukehren.",
+      "lockedLeadManualHeld": "Sie haben die Sitzung gesperrt. Entsperren Sie sie, um zur vorherigen Seite zurückzukehren.",
+      "unlockCertificate": "Mit dem Zertifikat entsperren",
+      "unlockCertificateDetail": "Client-Zertifikat (mTLS) dieses Kontos",
+      "unlockPasskey": "Mit einem Passkey entsperren",
+      "unlockPasskeyDetail": "WebAuthn, ein Schlüssel dieses Kontos",
+      "unlockRefused": "Falsches Passwort. Nach mehreren Fehlversuchen gilt eine Wartezeit.",
+      "unlockCertificateRefused": "Das vorgelegte Zertifikat öffnet dieses Konto nicht.",
+      "unlockPasskeyRefused": "Der Passkey wurde für dieses Konto nicht akzeptiert.",
+      "noUnlockMethod": "Dieses Konto hat kein Passwort, Zertifikat oder keinen Passkey zum Entsperren: Melden Sie sich ab und erneut an.",
+      "ssoSessionLocked": "Die Sitzung ist gesperrt: Entsperren Sie sie oder melden Sie sich ab, bevor Sie sich per SSO anmelden.",
       "skipToContent": "Zum Inhalt springen",
       "tooManyWait_one": "Zu viele Versuche: Bitte {{count}} Sekunde warten, bevor Sie es erneut versuchen.",
       "tooManyWait_other": "Zu viele Versuche: Bitte {{count}} Sekunden warten, bevor Sie es erneut versuchen.",
@@ -649,7 +649,7 @@
       "retryIn": "Nächster Versuch möglich in {{seconds}} s.",
       "canRetry": "Sie können es erneut versuchen.",
       "lockedAnnounce": "Sitzung abgelaufen: Der Bildschirm ist gesperrt, die aktuelle Seite bleibt erhalten.",
-      "lockedAnnounceManual": "Session locked: the current page is kept.",
+      "lockedAnnounceManual": "Sitzung gesperrt: Die aktuelle Seite bleibt erhalten.",
       "signedIn": "Angemeldet: {{name}}, {{role}}.",
       "signedInNoRole": "Angemeldet: {{name}}.",
       "signedOut": "Sie sind abgemeldet. Ihre Anzeigeeinstellungen bleiben erhalten."
@@ -905,7 +905,7 @@
     "selectedOnPage_other": "{{count}} Zertifikate auf dieser Seite ausgewählt",
     "exportSelected": "Exportieren",
     "complianceColumn": "Compliance",
-    "creationColumn": "Creation date",
+    "creationColumn": "Erstellungsdatum",
     "archivedMark": "Archiviert: durch eine Erneuerung oder erneute Registrierung ersetzt, zur Nachvollziehbarkeit aufbewahrt",
     "sourceAcmeRenewal": "ACME-Erneuerung",
     "sourceIssued": "Ausgestellt",
@@ -2424,7 +2424,7 @@
       "deleteFailed": "EAB-Credential konnte nicht gelöscht werden",
       "caption": "EAB-Zugangsdaten. Aktivieren Sie einen Namen, um die Details zu öffnen.",
       "noNotes": "Keine Notiz.",
-      "listPartial": "Partial list: {{loaded}} of {{total}} credentials loaded. Refresh to try again."
+      "listPartial": "Teilweise Liste: {{loaded}} von {{total}} Zugangsdaten geladen. Aktualisieren Sie, um es erneut zu versuchen."
     },
     "termsOfServiceTitlePlaceholder": "Nutzungsbedingungen (leer lassen zum Ausblenden)",
     "termsOfServiceBodyPlaceholder": "Schreiben Sie hier Ihre Bedingungen...\n\nUnterstützt: **Fett**, *Kursiv*, [Links](url), - Listen\n\nLeerzeilen für Absätze verwenden.",
@@ -2632,7 +2632,7 @@
     "views": {
       "accounts": "Konten",
       "localorders": "Bestellungen",
-      "localdomains": "Domains",
+      "localdomains": "Domänen",
       "eab": "EAB-Zugangsdaten",
       "config": "Servereinstellungen",
       "letsencrypt": "Clienteinstellungen",
@@ -2679,11 +2679,11 @@
     "emptyAccountsText": "ACME-Clients (certbot, cert-manager, acme.sh) legen ihr Konto selbst über das Verzeichnis an: Kopieren Sie dessen URL in ihre Konfiguration.",
     "termsOfServiceTitle": "Titel",
     "termsOfServiceBody": "Text",
-    "accountsListPartial": "Partial list: {{loaded}} of {{total}} accounts loaded. Refresh to try again.",
+    "accountsListPartial": "Teilweise Liste: {{loaded}} von {{total}} Konten geladen. Aktualisieren Sie, um es erneut zu versuchen.",
     "columns": {
-      "failures": "Failures",
+      "failures": "Fehlschläge",
       "wildcard": "Wildcard",
-      "orders": "Orders"
+      "orders": "Bestellungen"
     }
   },
   "scep": {
@@ -2806,7 +2806,7 @@
       "ca": "CA",
       "template": "Vorlage",
       "profile": "Profil",
-      "lastTest": "Last test"
+      "lastTest": "Letzter Test"
     },
     "tabs": {
       "profile": "Profil"
@@ -2948,9 +2948,9 @@
     "ocspInactive": "Inaktiv",
     "columns": {
       "published": "Veröffentlicht",
-      "publication": "Publication",
-      "crlNumber": "CRL number",
-      "nextUpdate": "Next update"
+      "publication": "Veröffentlichung",
+      "crlNumber": "CRL-Nummer",
+      "nextUpdate": "Nächstes Update"
     },
     "tabs": {
       "publication": "Veröffentlichung"
@@ -4632,8 +4632,8 @@
     "anyResource": "Alle Ressourcen",
     "anyAction": "jede Aktion",
     "columns": {
-      "permissions": "Rights",
-      "users": "Users"
+      "permissions": "Rechte",
+      "users": "Benutzer"
     }
   },
   "hsm": {
@@ -5190,22 +5190,22 @@
   "compare": {
     "title": "Zertifikate vergleichen",
     "field": "Feld",
-    "differences_one": "{{count}} difference among {{total}} properties",
-    "differences_other": "{{count}} differences among {{total}} properties",
-    "differences": "{{count}} differences among {{total}} properties",
-    "lead": "Identical lines are merged; in a list, “+” marks what another certificate lacks.",
+    "differences_one": "{{count}} Unterschied bei {{total}} Eigenschaften",
+    "differences_other": "{{count}} Unterschiede bei {{total}} Eigenschaften",
+    "differences": "{{count}} Unterschiede bei {{total}} Eigenschaften",
+    "lead": "Identische Zeilen werden zusammengefasst; in einer Liste markiert „+“, was einem anderen Zertifikat fehlt.",
     "property": "Eigenschaft",
     "close": "Vergleich schließen",
-    "countTitle_one": "Compare {{count}} certificate",
-    "countTitle_other": "Compare {{count}} certificates",
-    "key": "Key algorithm and size",
-    "usages": "Key usages",
-    "onlyDifferences": "Show only the differences",
-    "noDifference": "No line differs between these certificates.",
-    "differs": "differs",
-    "loadFailed": "A certificate of the comparison could not be read.",
+    "countTitle_one": "{{count}} Zertifikat vergleichen",
+    "countTitle_other": "{{count}} Zertifikate vergleichen",
+    "key": "Schlüsselalgorithmus und -größe",
+    "usages": "Schlüsselverwendungen",
+    "onlyDifferences": "Nur Unterschiede anzeigen",
+    "noDifference": "Keine Zeile unterscheidet sich zwischen diesen Zertifikaten.",
+    "differs": "abweichend",
+    "loadFailed": "Ein Zertifikat des Vergleichs konnte nicht gelesen werden.",
     "identical": "Identical",
-    "notInAll": "not in every certificate"
+    "notInAll": "nicht in jedem Zertifikat"
   },
   "members": {
     "manageMembers": "Mitglieder verwalten",
@@ -5496,9 +5496,9 @@
       "rootCa": "Root-CA",
       "trustStoreAnchor": "Anker des Vertrauensspeichers",
       "intermediateCa": "Zwischen-CA · Ebene {{level}}",
-      "chainRoleRoot": "Root CA",
-      "chainRoleIntermediate": "Intermediate CA",
-      "chainRoleCurrent": "This certificate",
+      "chainRoleRoot": "Root-CA",
+      "chainRoleIntermediate": "Zwischen-CA",
+      "chainRoleCurrent": "Dieses Zertifikat",
       "inspectCa": "CA prüfen",
       "crossSigned": "Kreuzsigniert",
       "variants_one": "{{count}} Kettenvariante wird bereitgestellt: Wählen Sie sie beim Export.",
@@ -5537,7 +5537,7 @@
       "auditFailed": "Das Audit-Protokoll konnte nicht gelesen werden: Es werden nur die Daten des Zertifikatseintrags angezeigt.",
       "scope": "Einträge des Audit-Protokolls unter den letzten {{count}} Vorgängen an Zertifikaten sowie die Daten des Zertifikatseintrags."
     },
-    "detach": "Detach into a window"
+    "detach": "In ein Fenster lösen"
   },
   "table": {
     "noResults": "Keine passenden Ergebnisse",
@@ -5596,25 +5596,25 @@
     "results_one": "{{count, number}} Ergebnis",
     "results_other": "{{count, number}} Ergebnisse",
     "searching": "Suche läuft…",
-    "sortHint": "Headers with a button sort the list.",
-    "sortedBy": "Sorted by {{column}}, {{order}}",
-    "sortedByReverse": "Sorted by {{column}}, {{order}}. Click to reverse",
-    "sortAscending": "ascending order",
-    "sortDescending": "descending order",
-    "sortBy": "Sort by",
-    "sortByColumn": "Sort by {{column}}",
-    "fullCreated": "Creation date",
-    "fullExpires": "Expiry date",
-    "fullIssued": "Issue date",
-    "fullRequested": "Request date",
-    "fullSubmitted": "Submission date",
-    "fullStarted": "Start date",
-    "ascendingReverse": "Ascending order, reverse",
-    "descendingReverse": "Descending order, reverse",
-    "foldedColumns_one": "{{count}} column folded",
-    "foldedColumns_other": "{{count}} columns folded",
-    "resizeColumn": "Resize the {{column}} column",
-    "resetColumns": "Reset columns"
+    "sortHint": "Kopfzeilen mit einer Schaltfläche sortieren die Liste.",
+    "sortedBy": "Sortiert nach {{column}}, {{order}}",
+    "sortedByReverse": "Sortiert nach {{column}}, {{order}}. Klicken zum Umkehren",
+    "sortAscending": "aufsteigende Reihenfolge",
+    "sortDescending": "absteigende Reihenfolge",
+    "sortBy": "Sortieren nach",
+    "sortByColumn": "Nach {{column}} sortieren",
+    "fullCreated": "Erstellungsdatum",
+    "fullExpires": "Ablaufdatum",
+    "fullIssued": "Ausstellungsdatum",
+    "fullRequested": "Anfragedatum",
+    "fullSubmitted": "Einreichungsdatum",
+    "fullStarted": "Startdatum",
+    "ascendingReverse": "Aufsteigende Reihenfolge, umkehren",
+    "descendingReverse": "Absteigende Reihenfolge, umkehren",
+    "foldedColumns_one": "{{count}} Spalte eingeklappt",
+    "foldedColumns_other": "{{count}} Spalten eingeklappt",
+    "resizeColumn": "Spalte {{column}} in der Größe ändern",
+    "resetColumns": "Spalten zurücksetzen"
   },
   "reconnect": {
     "countdown": "Dienst wird neu gestartet...",
@@ -6509,7 +6509,7 @@
     "defaultEndpoint": "Standardendpunkt",
     "columns": {
       "auth": "Authentifizierung",
-      "authShort": "Authentication"
+      "authShort": "Authentifizierung"
     },
     "auth": {
       "cert": "Clientzertifikat",
@@ -6714,7 +6714,7 @@
         "completed": "Abgeschlossen",
         "failed": "Fehlgeschlagen"
       },
-      "targets": "Targets"
+      "targets": "Ziele"
     },
     "form": {
       "range": "Bereich",
@@ -7050,7 +7050,7 @@
     "deleteRefused_other": "{{count}} Windows-Registrierungsprofile verwenden diesen Connector. Weisen Sie sie zuerst einem anderen Connector zu:",
     "deleteRefusedMore_one": "und {{count}} weiteres",
     "deleteRefusedMore_other": "und {{count}} weitere",
-    "lastTest": "Last test"
+    "lastTest": "Letzter Test"
   },
   "certInput": {
     "modePaste": "Einfügen",
@@ -7451,7 +7451,7 @@
       "ad_connector_health": "Active-Directory-Status",
       "session_cleanup": "Sitzungsbereinigung"
     },
-    "colNote": "Last result"
+    "colNote": "Letztes Ergebnis"
   },
   "lint": {
     "action": "Prüfen",
@@ -7747,17 +7747,17 @@
     "accountLabel": "Konto: {{name}}, {{role}}",
     "accountLabelName": "Konto: {{name}}",
     "signOut": "Abmelden",
-    "lock": "Lock",
+    "lock": "Sperren",
     "method": {
       "password": "Passwort",
       "mtls": "Clientzertifikat",
       "webauthn": "Sicherheitsschlüssel",
       "session": "Browsersitzung",
       "sso": "SSO",
-      "ldap": "LDAP directory"
+      "ldap": "LDAP-Verzeichnis"
     },
     "mfaMethod": {
-      "totp": "authenticator app"
+      "totp": "Authenticator-App"
     },
     "expiringCount_one": "{{count}} Zertifikat läuft ab oder ist abgelaufen",
     "expiringCount_other": "{{count}} Zertifikate laufen ab oder sind abgelaufen",
@@ -7781,8 +7781,8 @@
       "systemNow": "derzeit {{mode}}",
       "dark": "Dunkel",
       "light": "Hell",
-      "family": "Theme",
-      "mode": "Mode"
+      "family": "Design",
+      "mode": "Modus"
     },
     "bell": {
       "title": "Benachrichtigungen",
@@ -7966,28 +7966,28 @@
       "back": "Verbindung wiederhergestellt: Aktionen sind wieder verfügbar."
     },
     "userCard": {
-      "signIn": "Sign-in",
-      "session": "Session",
-      "lockIn": "Locks after {{minutes}} min of inactivity",
+      "signIn": "Anmeldung",
+      "session": "Sitzung",
+      "lockIn": "Sperrt nach {{minutes}} Min. Inaktivität",
       "methodVia": "{{method}} ({{provider}})",
-      "mfa": "Two-factor",
-      "mfaOn": "On: {{methods}}",
-      "mfaOff": "Off",
-      "endsAt": "Ends {{date}}"
+      "mfa": "Zwei-Faktor",
+      "mfaOn": "Ein: {{methods}}",
+      "mfaOff": "Aus",
+      "endsAt": "Endet {{date}}"
     },
     "activity": {
-      "label": "Activity",
-      "calm": "Nothing pending",
-      "queue_one": "{{count}} to act on",
-      "queue_other": "{{count}} to act on",
-      "windows_one": "{{count}} window",
-      "windows_other": "{{count}} windows",
-      "windowsLabel": "Detached windows",
+      "label": "Aktivität",
+      "calm": "Nichts ausstehend",
+      "queue_one": "{{count}} zu bearbeiten",
+      "queue_other": "{{count}} zu bearbeiten",
+      "windows_one": "{{count}} Fenster",
+      "windows_other": "{{count}} Fenster",
+      "windowsLabel": "Abgelöste Fenster",
       "jobs": {
-        "backup": "Backup in progress",
-        "restore": "Restore in progress",
-        "audit_verify": "Audit chain check in progress",
-        "other": "Background task in progress"
+        "backup": "Sicherung läuft",
+        "restore": "Wiederherstellung läuft",
+        "audit_verify": "Prüfung der Audit-Kette läuft",
+        "other": "Hintergrundaufgabe läuft"
       }
     }
   },
@@ -8010,9 +8010,9 @@
       "horizon": "Ablaufhorizont",
       "compliance": "Compliance",
       "activity": "Letzte Vorgänge",
-      "issuance": "Issuances by source",
-      "authorities": "Authorities and HSM",
-      "revocation": "Revocation coverage"
+      "issuance": "Ausstellungen nach Quelle",
+      "authorities": "Zertifizierungsstellen und HSM",
+      "revocation": "Widerrufsabdeckung"
     },
     "state": {
       "loading": "Wird geladen...",
@@ -8067,8 +8067,8 @@
       "watchShow_other": "Die {{count}} zu beobachtenden Zeilen anzeigen",
       "watchHide_one": "Die {{count}} zu beobachtende Zeile ausblenden",
       "watchHide_other": "Die {{count}} zu beobachtenden Zeilen ausblenden",
-      "countdown_one": "{{count}} day left of 30",
-      "countdown_other": "{{count}} days left of 30"
+      "countdown_one": "{{count}} Tag von 30 übrig",
+      "countdown_other": "{{count}} Tage von 30 übrig"
     },
     "kind": {
       "acme_order_failed": "ACME-Bestellung fehlgeschlagen",
@@ -8102,53 +8102,53 @@
       "sub_server_lifetime_over_398_days": "TLS-Serverzertifikate",
       "sub_incomplete_chain": "Zwischenzertifikat fehlt",
       "sub_no_private_key": "Externer CSR oder Import",
-      "subRules_one": "Over the {{count}} active certificate. A line opens the list of its gaps, filtered.",
-      "subRules_other": "Over the {{count}} active certificates. A line opens the list of its gaps, filtered.",
-      "conformPct": "{{pct}}% conform",
+      "subRules_one": "Über das {{count}} aktive Zertifikat. Eine Zeile öffnet die gefilterte Liste ihrer Abweichungen.",
+      "subRules_other": "Über die {{count}} aktiven Zertifikate. Eine Zeile öffnet die gefilterte Liste ihrer Abweichungen.",
+      "conformPct": "{{pct}} % konform",
       "pct": "{{pct}}%",
-      "conform": "Conform",
-      "inGap": "In gap",
-      "openGap": "Opens the list of the certificates in gap",
-      "tableRules_one": "Rules, over {{count}} active certificate",
-      "tableRules_other": "Rules, over {{count}} active certificates",
-      "ruleCol": "Rule",
-      "tableGrades_one": "Grades, over {{count}} certificate",
-      "tableGrades_other": "Grades, over {{count}} certificates",
-      "gradeCol": "Grade",
-      "certificates": "Certificates",
-      "algoCol": "Algorithm",
-      "ringAlt": "Average compliance score: {{score}} out of 100, grade {{grade}}",
-      "ringSub": "average score · grade {{grade}}",
-      "gradeAlt_one": "Grade {{grade}}: {{count}} certificate",
-      "gradeAlt_other": "Grade {{grade}}: {{count}} certificates",
-      "grade": "Grade {{grade}}",
-      "share": "Share",
-      "scoreBase_one": "Score over {{count}} certificate not revoked",
-      "scoreBase_other": "Score over {{count}} certificates not revoked",
+      "conform": "Konform",
+      "inGap": "Mit Abweichung",
+      "openGap": "Öffnet die Liste der Zertifikate mit Abweichung",
+      "tableRules_one": "Regeln, über {{count}} aktives Zertifikat",
+      "tableRules_other": "Regeln, über {{count}} aktive Zertifikate",
+      "ruleCol": "Regel",
+      "tableGrades_one": "Noten, über {{count}} Zertifikat",
+      "tableGrades_other": "Noten, über {{count}} Zertifikate",
+      "gradeCol": "Note",
+      "certificates": "Zertifikate",
+      "algoCol": "Algorithmus",
+      "ringAlt": "Durchschnittlicher Compliance-Wert: {{score}} von 100, Note {{grade}}",
+      "ringSub": "Durchschnittswert · Note {{grade}}",
+      "gradeAlt_one": "Note {{grade}}: {{count}} Zertifikat",
+      "gradeAlt_other": "Note {{grade}}: {{count}} Zertifikate",
+      "grade": "Note {{grade}}",
+      "share": "Anteil",
+      "scoreBase_one": "Wert über {{count}} nicht widerrufenes Zertifikat",
+      "scoreBase_other": "Wert über {{count}} nicht widerrufene Zertifikate",
       "rule": {
-        "rsa_below_3072": "RSA keys of at least 3072 bits",
-        "server_lifetime_over_398_days": "Server validity of 398 days at most",
-        "weak_signature_hash": "Safe signature hash",
-        "incomplete_chain": "Complete chain",
-        "no_private_key": "Private key kept in UCM"
+        "rsa_below_3072": "RSA-Schlüssel mit mindestens 3072 Bit",
+        "server_lifetime_over_398_days": "Server-Gültigkeit von höchstens 398 Tagen",
+        "weak_signature_hash": "Sicherer Signatur-Hash",
+        "incomplete_chain": "Vollständige Kette",
+        "no_private_key": "Privater Schlüssel in UCM gehalten"
       },
       "gap": {
-        "rsa_below_3072_one": "{{count}} RSA key to replace",
-        "rsa_below_3072_other": "{{count}} RSA keys to replace",
-        "server_lifetime_over_398_days_one": "{{count}} TLS server certificate too long",
-        "server_lifetime_over_398_days_other": "{{count}} TLS server certificates too long",
-        "weak_signature_hash_one": "{{count}} SHA-1 or MD5 signature",
-        "weak_signature_hash_other": "{{count}} SHA-1 or MD5 signatures",
-        "incomplete_chain_one": "{{count}} chain without its intermediate",
-        "incomplete_chain_other": "{{count}} chains without their intermediate",
-        "no_private_key_one": "{{count}} external CSR or import",
-        "no_private_key_other": "{{count}} external CSRs or imports"
+        "rsa_below_3072_one": "{{count}} RSA-Schlüssel zu ersetzen",
+        "rsa_below_3072_other": "{{count}} RSA-Schlüssel zu ersetzen",
+        "server_lifetime_over_398_days_one": "{{count}} TLS-Serverzertifikat zu lang",
+        "server_lifetime_over_398_days_other": "{{count}} TLS-Serverzertifikate zu lang",
+        "weak_signature_hash_one": "{{count}} SHA-1- oder MD5-Signatur",
+        "weak_signature_hash_other": "{{count}} SHA-1- oder MD5-Signaturen",
+        "incomplete_chain_one": "{{count}} Kette ohne Zwischenzertifikat",
+        "incomplete_chain_other": "{{count}} Ketten ohne Zwischenzertifikat",
+        "no_private_key_one": "{{count}} externe CSR oder Import",
+        "no_private_key_other": "{{count}} externe CSRs oder Importe"
       },
       "state": {
-        "good": "conform",
-        "warn": "to watch",
-        "bad": "major gap",
-        "info": "information"
+        "good": "konform",
+        "warn": "beobachten",
+        "bad": "erhebliche Abweichung",
+        "info": "Information"
       }
     },
     "health": {
@@ -8223,15 +8223,15 @@
       "runs_one": "<strong>{{count}}</strong> Erfolg",
       "runs_other": "<strong>{{count}}</strong> Erfolge",
       "rate": "{{rate}}%",
-      "mirrorAlt_one": "{{name}} over {{count}} day: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
-      "mirrorAlt_other": "{{name}} over {{count}} days: {{ok}} successes, {{failed}} failures. Arrow keys read it day by day.",
-      "ok": "Successes",
-      "failed": "Failures",
-      "tableCaption_one": "Operations per UTC day, over {{count}} day",
-      "tableCaption_other": "Operations per UTC day, over {{count}} days",
-      "okOf": "{{name}} successes",
-      "failedOf": "{{name}} failures",
-      "seeActivity": "Opens Activity on this day’s failures"
+      "mirrorAlt_one": "{{name}} über {{count}} Tag: {{ok}} Erfolge, {{failed}} Fehlschläge. Pfeiltasten lesen es Tag für Tag.",
+      "mirrorAlt_other": "{{name}} über {{count}} Tage: {{ok}} Erfolge, {{failed}} Fehlschläge. Pfeiltasten lesen es Tag für Tag.",
+      "ok": "Erfolge",
+      "failed": "Fehlschläge",
+      "tableCaption_one": "Vorgänge pro UTC-Tag, über {{count}} Tag",
+      "tableCaption_other": "Vorgänge pro UTC-Tag, über {{count}} Tage",
+      "okOf": "{{name}}: Erfolge",
+      "failedOf": "{{name}}: Fehlschläge",
+      "seeActivity": "Öffnet Aktivität mit den Fehlschlägen dieses Tages"
     },
     "filter": {
       "status": "Status",
@@ -8247,8 +8247,8 @@
       "renewal": "Erneuerung",
       "weak_key": "Compliance",
       "ca_id": "CA",
-      "expires": "Expiry",
-      "created": "Created"
+      "expires": "Ablauf",
+      "created": "Erstellt"
     },
     "filterValue": {
       "true": "ja",
@@ -8263,9 +8263,9 @@
       "orphan": "Verwaist",
       "archived": "Archiviert",
       "weakKey": "Schwacher Schlüssel, {{algo}} < {{bits}}",
-      "range": "{{from}} to {{to}}",
-      "since": "from {{date}}",
-      "until": "until {{date}}"
+      "range": "{{from}} bis {{to}}",
+      "since": "ab {{date}}",
+      "until": "bis {{date}}"
     },
     "hierarchy": {
       "crlOn": "CRL an",
@@ -8292,67 +8292,67 @@
     },
     "horizon": {
       "expired": "Abgelaufen",
-      "subWindow_one": "{{count}} certificate not revoked expires by {{date}}, by week and by day. A cell opens the list of its day.",
-      "subWindow_other": "{{count}} certificates not revoked expire by {{date}}, by week and by day. A cell opens the list of its day.",
-      "quiet": "Nothing expires by {{date}}.",
-      "period": "Horizon shown",
-      "year": "1 y",
-      "week": "Week of {{date}}",
-      "weekCol": "Week",
-      "weekAlt_one": "{{name}}: {{count}} expiry, {{manual}} manual, {{automatic}} automatic",
-      "weekAlt_other": "{{name}}: {{count}} expiries, {{manual}} manual, {{automatic}} automatic",
-      "dayAlt_one": "{{date}}: {{count}} expiry",
-      "dayAlt_other": "{{date}}: {{count}} expiries",
-      "withCas_one": "including {{count}} authority",
-      "withCas_other": "including {{count}} authorities",
-      "withSigners_one": "including {{count}} signer",
-      "withSigners_other": "including {{count}} signers",
-      "total": "Total",
-      "manual": "Manual",
-      "automatic": "Automatic",
-      "cas": "Authorities",
-      "signers": "Signers",
-      "weeksLabel": "Expiries per week",
-      "daysLabel": "Expiries per day, one cell per day",
-      "openDay": "Click to see these certificates",
-      "openWeek": "Opens the list of the week",
-      "nothingDay": "Nothing expires that day",
-      "nothing": "Nothing expires over the period.",
-      "legendManual": "Manual: import, manual issuance",
-      "legendAutomatic": "Automatic: ACME, SCEP, EST",
-      "legendInfra": "An authority or a signer expires that day",
-      "less": "Less",
-      "more": "More",
-      "inDays_one": "in {{count}} day",
-      "inDays_other": "in {{count}} days",
-      "toRenew_one": "{{count}} to renew by hand",
-      "toRenew_other": "{{count}} to renew by hand",
-      "automaticCount_one": "{{count}} automatic",
-      "automaticCount_other": "{{count}} automatic",
-      "casCount_one": "{{count}} authority expires",
-      "casCount_other": "{{count}} authorities expire",
-      "listLabel": "First certificates of the period",
-      "open_one": "Open {{count}} in Certificates",
-      "open_other": "Open the {{count}} in Certificates",
-      "tableCaption_one": "Expiries per week, {{count}} week",
-      "tableCaption_other": "Expiries per week, {{count}} weeks"
+      "subWindow_one": "{{count}} nicht widerrufenes Zertifikat läuft bis {{date}} ab, nach Woche und Tag. Eine Zelle öffnet die Liste ihres Tages.",
+      "subWindow_other": "{{count}} nicht widerrufene Zertifikate laufen bis {{date}} ab, nach Woche und Tag. Eine Zelle öffnet die Liste ihres Tages.",
+      "quiet": "Bis {{date}} läuft nichts ab.",
+      "period": "Angezeigter Horizont",
+      "year": "1 J",
+      "week": "Woche vom {{date}}",
+      "weekCol": "Woche",
+      "weekAlt_one": "{{name}}: {{count}} Ablauf, {{manual}} manuell, {{automatic}} automatisch",
+      "weekAlt_other": "{{name}}: {{count}} Abläufe, {{manual}} manuell, {{automatic}} automatisch",
+      "dayAlt_one": "{{date}}: {{count}} Ablauf",
+      "dayAlt_other": "{{date}}: {{count}} Abläufe",
+      "withCas_one": "davon {{count}} Zertifizierungsstelle",
+      "withCas_other": "davon {{count}} Zertifizierungsstellen",
+      "withSigners_one": "davon {{count}} Signierer",
+      "withSigners_other": "davon {{count}} Signierer",
+      "total": "Gesamt",
+      "manual": "Manuell",
+      "automatic": "Automatisch",
+      "cas": "Zertifizierungsstellen",
+      "signers": "Signierer",
+      "weeksLabel": "Abläufe pro Woche",
+      "daysLabel": "Abläufe pro Tag, eine Zelle pro Tag",
+      "openDay": "Klicken, um diese Zertifikate anzuzeigen",
+      "openWeek": "Öffnet die Liste der Woche",
+      "nothingDay": "An diesem Tag läuft nichts ab",
+      "nothing": "Im Zeitraum läuft nichts ab.",
+      "legendManual": "Manuell: Import, manuelle Ausstellung",
+      "legendAutomatic": "Automatisch: ACME, SCEP, EST",
+      "legendInfra": "An diesem Tag läuft eine Zertifizierungsstelle oder ein Signierer ab",
+      "less": "Weniger",
+      "more": "Mehr",
+      "inDays_one": "in {{count}} Tag",
+      "inDays_other": "in {{count}} Tagen",
+      "toRenew_one": "{{count}} von Hand zu erneuern",
+      "toRenew_other": "{{count}} von Hand zu erneuern",
+      "automaticCount_one": "{{count}} automatisch",
+      "automaticCount_other": "{{count}} automatisch",
+      "casCount_one": "{{count}} Zertifizierungsstelle läuft ab",
+      "casCount_other": "{{count}} Zertifizierungsstellen laufen ab",
+      "listLabel": "Erste Zertifikate des Zeitraums",
+      "open_one": "{{count}} in Zertifikaten öffnen",
+      "open_other": "Die {{count}} in Zertifikaten öffnen",
+      "tableCaption_one": "Abläufe pro Woche, {{count}} Woche",
+      "tableCaption_other": "Abläufe pro Woche, {{count}} Wochen"
     },
     "activity": {
       "all": "Alle anzeigen",
       "sub": "Die letzten Einträge des Audit-Trails.",
       "subOwn": "Ihre eigenen letzten Vorgänge.",
-      "today": "Today",
-      "yesterday": "Yesterday",
-      "folded_one": "{{count}} sign-in by {{user}}",
-      "folded_other": "{{count}} sign-ins by {{user}}",
-      "span": "{{from}} to {{to}}",
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "folded_one": "{{count}} Anmeldung von {{user}}",
+      "folded_other": "{{count}} Anmeldungen von {{user}}",
+      "span": "{{from}} bis {{to}}",
       "filter": {
-        "all": "All",
+        "all": "Alle",
         "pki": "PKI",
-        "access": "Access"
+        "access": "Zugriff"
       },
-      "filterLabel": "Filter the operations",
-      "noneOfKind": "No recent operation under « {{name}} »."
+      "filterLabel": "Vorgänge filtern",
+      "noneOfKind": "Kein aktueller Vorgang unter „{{name}}“."
     },
     "link": {
       "handled": "Eintrag #{{id}} erwartet keine Aktion mehr (Status: {{status}}).",
@@ -8387,44 +8387,44 @@
       "interventions_one": "{{count}} Eingriff",
       "interventions_other": "{{count}} Eingriffe",
       "toCheck": "Zu prüfen",
-      "issuedSub_one": "issued over {{count}} day",
-      "issuedSub_other": "issued over {{count}} days",
-      "active_one": "{{count}} active",
-      "active_other": "{{count}} active",
-      "critical_one": "{{count}} critical",
-      "critical_other": "{{count}} critical",
-      "todo_one": "{{count}} to do",
-      "todo_other": "{{count}} to do",
-      "watch_one": "{{count}} to watch",
-      "watch_other": "{{count}} to watch",
-      "expiring": "Expiring within 30 days",
-      "alreadyExpired_one": "{{count}} already expired",
-      "alreadyExpired_other": "{{count}} already expired",
-      "sinceYesterday": "vs yesterday · ACME, SCEP, EST, UTC day",
-      "issuedAlt_one": "Issuances per day over {{count}} day, {{today}} today",
-      "issuedAlt_other": "Issuances per day over {{count}} days, {{today}} today",
-      "failuresAlt_one": "Protocol failures per day over {{count}} day, {{today}} today",
-      "failuresAlt_other": "Protocol failures per day over {{count}} days, {{today}} today",
+      "issuedSub_one": "ausgestellt in {{count}} Tag",
+      "issuedSub_other": "ausgestellt in {{count}} Tagen",
+      "active_one": "{{count}} aktiv",
+      "active_other": "{{count}} aktiv",
+      "critical_one": "{{count}} kritisch",
+      "critical_other": "{{count}} kritisch",
+      "todo_one": "{{count}} zu erledigen",
+      "todo_other": "{{count}} zu erledigen",
+      "watch_one": "{{count}} beobachten",
+      "watch_other": "{{count}} beobachten",
+      "expiring": "Läuft innerhalb von 30 Tagen ab",
+      "alreadyExpired_one": "{{count}} bereits abgelaufen",
+      "alreadyExpired_other": "{{count}} bereits abgelaufen",
+      "sinceYesterday": "ggü. gestern · ACME, SCEP, EST, UTC-Tag",
+      "issuedAlt_one": "Ausstellungen pro Tag über {{count}} Tag, {{today}} heute",
+      "issuedAlt_other": "Ausstellungen pro Tag über {{count}} Tage, {{today}} heute",
+      "failuresAlt_one": "Protokoll-Fehlschläge pro Tag über {{count}} Tag, {{today}} heute",
+      "failuresAlt_other": "Protokoll-Fehlschläge pro Tag über {{count}} Tage, {{today}} heute",
       "part": {
-        "critical": "Critical",
-        "todo": "To do",
-        "watch": "To watch"
+        "critical": "Kritisch",
+        "todo": "Zu erledigen",
+        "watch": "Beobachten"
       },
       "tip": {
-        "issued_one": "Issuances, last {{count}} day",
-        "issued_other": "Issuances, last {{count}} days",
-        "mean": "Daily average",
-        "peak": "Peak ({{date}})",
-        "openInventory": "Opens the inventory",
-        "openQueue": "Opens the queue, critical first",
-        "openList": "Opens the list, filtered",
-        "failures_one": "Protocol failures, {{count}} day",
-        "failures_other": "Protocol failures, {{count}} days",
-        "openFailures": "Opens To handle, filtered on the failures"
+        "issued_one": "Ausstellungen, letzter {{count}} Tag",
+        "issued_other": "Ausstellungen, letzte {{count}} Tage",
+        "mean": "Tagesdurchschnitt",
+        "peak": "Spitze ({{date}})",
+        "openInventory": "Öffnet das Inventar",
+        "openQueue": "Öffnet die Warteschlange, Kritisches zuerst",
+        "openList": "Öffnet die Liste, gefiltert",
+        "failures_one": "Protokoll-Fehlschläge, {{count}} Tag",
+        "failures_other": "Protokoll-Fehlschläge, {{count}} Tage",
+        "openFailures": "Öffnet „Zu bearbeiten“, gefiltert auf die Fehlschläge"
       },
-      "expiryPeak": "peak of {{count}} on {{date}}",
-      "expiryAlt_one": "Expirations per week over {{count}} week: {{total}}",
-      "expiryAlt_other": "Expirations per week over {{count}} weeks: {{total}}"
+      "expiryPeak": "Spitze von {{count}} am {{date}}",
+      "expiryAlt_one": "Abläufe pro Woche über {{count}} Woche: {{total}}",
+      "expiryAlt_other": "Abläufe pro Woche über {{count}} Wochen: {{total}}"
     },
     "cause": {
       "acme_order_failed": "Eine ACME-Bestellung ist in den letzten 7 Tagen ungültig geendet",
@@ -8451,7 +8451,7 @@
     "clockToday": "heute um {{time}}",
     "allHiddenTitle": "Alle Karten sind ausgeblendet",
     "viz": {
-      "downloadCsv": "Download as CSV"
+      "downloadCsv": "Als CSV herunterladen"
     },
     "flow": {
       "series": {
@@ -8460,82 +8460,82 @@
         "est": "EST",
         "wstep": "WSTEP",
         "import": "Import",
-        "manual": "Manual"
+        "manual": "Manuell"
       },
-      "sub_one": "Certificates issued per UTC day over the last day ({{count}}), renewals included.",
-      "sub_other": "Certificates issued per UTC day over the last {{count}} days, renewals included.",
-      "quiet_one": "No issuance over the last day ({{count}}).",
-      "quiet_other": "No issuance over the last {{count}} days.",
-      "issuances_one": "<0>{{count}}</0> <1>issuance</1>",
-      "issuances_other": "<0>{{count}}</0> <1>issuances</1>",
-      "vsPrevious_one": "against the previous day ({{count}})",
-      "vsPrevious_other": "against the previous {{count}} days",
-      "automatic": "{{pct}} % automatic",
-      "alt_one": "Issuances per day and source over {{count}} day, peak {{max}} on {{date}}",
-      "alt_other": "Issuances per day and source over {{count}} days, peak {{max}} on {{date}}",
-      "openDay": "Opens the certificates created that day",
-      "tableCaption_one": "Issuances per day and source, {{count}} day",
-      "tableCaption_other": "Issuances per day and source, {{count}} days"
+      "sub_one": "Pro UTC-Tag ausgestellte Zertifikate am letzten Tag ({{count}}), Erneuerungen eingeschlossen.",
+      "sub_other": "Pro UTC-Tag ausgestellte Zertifikate in den letzten {{count}} Tagen, Erneuerungen eingeschlossen.",
+      "quiet_one": "Keine Ausstellung am letzten Tag ({{count}}).",
+      "quiet_other": "Keine Ausstellung in den letzten {{count}} Tagen.",
+      "issuances_one": "<0>{{count}}</0> <1>Ausstellung</1>",
+      "issuances_other": "<0>{{count}}</0> <1>Ausstellungen</1>",
+      "vsPrevious_one": "gegenüber dem Vortag ({{count}})",
+      "vsPrevious_other": "gegenüber den vorherigen {{count}} Tagen",
+      "automatic": "{{pct}} % automatisch",
+      "alt_one": "Ausstellungen pro Tag und Quelle über {{count}} Tag, Spitze {{max}} am {{date}}",
+      "alt_other": "Ausstellungen pro Tag und Quelle über {{count}} Tage, Spitze {{max}} am {{date}}",
+      "openDay": "Öffnet die an diesem Tag erstellten Zertifikate",
+      "tableCaption_one": "Ausstellungen pro Tag und Quelle, {{count}} Tag",
+      "tableCaption_other": "Ausstellungen pro Tag und Quelle, {{count}} Tage"
     },
     "tiles": {
       "state": {
-        "revoked": "Revoked",
-        "expired": "Expired",
-        "crlStale": "CRL overdue",
-        "crlMissing": "CRL never published",
-        "expiresIn_one": "Expires in {{count}} d",
-        "expiresIn_other": "Expires in {{count}} d",
-        "pending": "Pending",
-        "offline": "Offline, healthy",
-        "inService": "In service",
-        "reachable": "Reachable",
-        "hsmError": "In error",
-        "disconnected": "Disconnected",
-        "untested": "Never tested",
-        "unknown": "State unknown"
+        "revoked": "Widerrufen",
+        "expired": "Abgelaufen",
+        "crlStale": "CRL überfällig",
+        "crlMissing": "CRL nie veröffentlicht",
+        "expiresIn_one": "Läuft in {{count}} T ab",
+        "expiresIn_other": "Läuft in {{count}} T ab",
+        "pending": "Ausstehend",
+        "offline": "Offline, fehlerfrei",
+        "inService": "Im Betrieb",
+        "reachable": "Erreichbar",
+        "hsmError": "Fehlerhaft",
+        "disconnected": "Getrennt",
+        "untested": "Nie getestet",
+        "unknown": "Status unbekannt"
       },
-      "sub": "{{authorities}} and {{modules}}. A tile opens its record.",
-      "modules_one": "{{count}} HSM module",
-      "modules_other": "{{count}} HSM modules",
-      "explore": "Explore the hierarchy",
+      "sub": "{{authorities}} und {{modules}}. Eine Kachel öffnet ihren Eintrag.",
+      "modules_one": "{{count}} HSM-Modul",
+      "modules_other": "{{count}} HSM-Module",
+      "explore": "Hierarchie erkunden",
       "hsmKey": "HSM · {{name}}",
-      "softwareKey": "Software key",
-      "noKey": "No key in UCM",
-      "elapsed": "Validity spent",
-      "left": "{{when}} left",
-      "elapsedAlt": "{{pct}} % of the validity spent, {{when}} left",
+      "softwareKey": "Software-Schlüssel",
+      "noKey": "Kein Schlüssel in UCM",
+      "elapsed": "Verbrauchte Gültigkeit",
+      "left": "noch {{when}}",
+      "elapsedAlt": "{{pct}} % der Gültigkeit verbraucht, noch {{when}}",
       "crlWhen": "CRL {{when}}",
-      "crlCurrent": "CRL up to date",
-      "crlStale": "CRL overdue",
-      "crlStaleSince_one": "CRL overdue for {{count}} d",
-      "crlStaleSince_other": "CRL overdue for {{count}} d",
-      "crlMissing": "CRL never published",
-      "crlOff": "No CRL",
-      "activityAlt_one": "{{count}} issuance over 7 days",
-      "activityAlt_other": "{{count}} issuances over 7 days",
-      "noActivity": "No issuance",
-      "keys": "Keys held",
-      "served": "Authorities served",
-      "tested": "Tested {{when}}",
-      "neverTested": "Never tested",
+      "crlCurrent": "CRL aktuell",
+      "crlStale": "CRL überfällig",
+      "crlStaleSince_one": "CRL seit {{count}} T überfällig",
+      "crlStaleSince_other": "CRL seit {{count}} T überfällig",
+      "crlMissing": "CRL nie veröffentlicht",
+      "crlOff": "Keine CRL",
+      "activityAlt_one": "{{count}} Ausstellung in 7 Tagen",
+      "activityAlt_other": "{{count}} Ausstellungen in 7 Tagen",
+      "noActivity": "Keine Ausstellung",
+      "keys": "Gehaltene Schlüssel",
+      "served": "Versorgte Zertifizierungsstellen",
+      "tested": "Getestet {{when}}",
+      "neverTested": "Nie getestet",
       "test": "Test",
-      "testDone": "{{name}}: test passed"
+      "testDone": "{{name}}: Test bestanden"
     },
     "revocation": {
       "part": {
-        "current": "CRL up to date",
-        "toPublish": "CRL overdue or missing",
-        "noCdp": "No distribution point"
+        "current": "CRL aktuell",
+        "toPublish": "CRL überfällig oder fehlend",
+        "noCdp": "Kein Verteilungspunkt"
       },
-      "sub": "What the active authorities publish for their certificates.",
-      "headline_one": "of the {{count}} active authority publishes a current CRL",
-      "headline_other": "of the {{count}} active authorities publish a current CRL",
-      "cas": "Authorities",
-      "partCol": "Part",
-      "tableCaption_one": "Revocation coverage, {{count}} active authority",
-      "tableCaption_other": "Revocation coverage, {{count}} active authorities",
-      "nextIn": "Next CRL {{when}}",
-      "publish": "Publish"
+      "sub": "Was die aktiven Zertifizierungsstellen für ihre Zertifikate veröffentlichen.",
+      "headline_one": "der {{count}} aktiven Zertifizierungsstelle veröffentlicht eine aktuelle CRL",
+      "headline_other": "der {{count}} aktiven Zertifizierungsstellen veröffentlichen eine aktuelle CRL",
+      "cas": "Zertifizierungsstellen",
+      "partCol": "Anteil",
+      "tableCaption_one": "Widerrufsabdeckung, {{count}} aktive Zertifizierungsstelle",
+      "tableCaption_other": "Widerrufsabdeckung, {{count}} aktive Zertifizierungsstellen",
+      "nextIn": "Nächste CRL {{when}}",
+      "publish": "Veröffentlichen"
     }
   },
   "sectioned": {
@@ -8610,8 +8610,8 @@
     "settingsSections": "Abschnitte der Einstellungen",
     "pageActions": "Weitere Aktionen für {{name}}",
     "pageActionsTitle": "Seitenaktionen",
-    "tableView": "Table view",
-    "chartView": "Chart view"
+    "tableView": "Tabellenansicht",
+    "chartView": "Diagrammansicht"
   },
   "protocols": {
     "copyValue": "{{name}} kopieren",
@@ -8652,10 +8652,10 @@
     "resultsLabel": "Ergebnisse im Handbuch"
   },
   "detached": {
-    "moveHandle": "Move or resize the window",
-    "moveHint": "Arrow keys move the window, Shift and the arrow keys resize it",
-    "maximize": "Maximize the window",
-    "restore": "Restore the window",
-    "close": "Close the window {{name}}"
+    "moveHandle": "Fenster verschieben oder in der Größe ändern",
+    "moveHint": "Pfeiltasten verschieben das Fenster, Umschalt und Pfeiltasten ändern die Größe",
+    "maximize": "Fenster maximieren",
+    "restore": "Fenster wiederherstellen",
+    "close": "Fenster {{name}} schließen"
   }
 }
