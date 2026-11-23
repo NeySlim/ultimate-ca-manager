@@ -104,7 +104,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- **PKI and protocol pages finished as one console.** Counted texts take real plural forms in every language, a separator or date no longer starts a line alone, deletion sits in the *⋯* menu with one icon, a detached window opens in the free margin of a wide screen, and the DNS UPDATE port is saved with the other ACME client settings.
+- **PKI and protocol pages finished as one console.** Counted texts take real plural forms in every language, a separator or date no longer starts a line alone, deletion sits in the *⋯* menu with one icon, and the DNS UPDATE port is saved with the other ACME client settings.
 - **Governance, settings and the shell drawn as one console.** Neutral pills line up with the tinted ones, Aurore's light dialogs are opaque, dark modes draw native controls dark, long names stay whole in the search, which lists pages and actions first, and a phone keeps a page head's secondary actions in a « ⋯ » menu and the page help in the account menu.
 - **Settings say each thing once.** *About* gives the version and leaves the service state to *General*, the language is picked among *My account*'s preferences, API keys in use come before revoked ones, the HSM page counts providers, SSO and Microsoft AC lists line up their states and name the authentication in words, and a detached window's bar names the object's type, its name staying in the inspector under it.
 - **Operations and roles in the interface language.** The Activity journal names its common operations in the language (acronyms in capitals otherwise), the seeded roles are named and described as the account list names them, and a role's type is a neutral pill.
