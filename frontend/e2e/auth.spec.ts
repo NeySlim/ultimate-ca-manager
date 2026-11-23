@@ -49,7 +49,7 @@ test.describe('sign-in and session', () => {
     await expect(card).toContainText('password')
     await expect(card).toContainText('Two-factor')
     await expect(card).toContainText('Off')
-    await expect(card).toContainText(/Locks after \d+ min of inactivity/)
+    await expect(card).toContainText(/Locks after \d+ (?:min|h) of inactivity/)
     await expect(card).toContainText(/Ends /)
 
     await page.getByRole('button', { name: 'Lock', exact: true }).click()
