@@ -200,6 +200,17 @@ describe('contrast of the palettes', () => {
               }
             }
           })
+          // a pill or a count on the selection (a checked or open row, the chain's box, the pressed queue chip)
+          it('writes a pill or a count 4.5:1 on its tint over the selection ground', () => {
+            const tints = valuesOf(auroreRules(ADJUST, mode), /:is\(tr\.checked,tr\.opened,\.chain-box,\.queue-chip\[aria-pressed=true\]\) :is\(\.badge,\.counter\)$/, 'background')
+            const shared = valuesOf(auroreRules(ADJUST, mode), /:is\(\.chip:not\(\.filter-chip\),\.badge,\.counter,\.queue-kind\)$/, 'background')
+            const value = (tints.length ? tints : shared).pop()
+            const p = Number(value.match(/^color-mix\(in srgb, ?currentColor ([0-9.]+)%, ?transparent\)$/)[1]) / 100
+            for (const tone of ['accent', 'good', 'warn', 'bad']) {
+              const ground = over({ rgb: hexToRgb(t[tone]), a: p }, hexToRgb(t.selected))
+              expect(contrast(t[tone], hex(ground)), tone).toBeGreaterThanOrEqual(4.5)
+            }
+          })
           it('writes the brand word in one colour that holds 3:1 (large text) on the bar\'s glass', () => {
             const brand = auroreRules(ADJUST, mode).filter((r) => /\.brand strong$/.test(r.sel)).flatMap((r) => declarations(r.body))
             expect(brand.some(([p, v]) => /^background/.test(p) && /gradient/.test(v))).toBe(false)
