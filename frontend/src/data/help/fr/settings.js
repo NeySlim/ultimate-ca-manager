@@ -411,6 +411,8 @@ Gérez le certificat TLS utilisé par l’interface web UCM :
 
 ## Webhooks
 
+Les webhooks sont listés dans un tableau qui se cherche par nom, adresse ou événement, se trie par chaque colonne et se pagine au-delà de dix webhooks.
+
 Configurez des webhooks HTTP pour notifier les systèmes externes lors d’événements :
 
 ### Événements pris en charge

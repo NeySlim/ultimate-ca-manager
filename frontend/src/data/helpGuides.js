@@ -2186,6 +2186,8 @@ Manage the TLS certificate used by the UCM web interface:
 
 ## Webhooks
 
+The webhooks are listed in a table that searches by name, address or event, sorts by any column and pages past ten webhooks.
+
 Configure HTTP webhooks to notify external systems on events:
 
 ### Supported Events
@@ -2436,7 +2438,7 @@ Each key carries the scope chosen at creation (**Full Access**, **Read Only**, *
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
 ### Revoking Keys
-The first **Delete** revokes an API key at once: requests with it are refused from then on. A second Delete on the revoked key removes it.
+**Revoke** on a key in use revokes it at once: requests with it are refused from then on. A revoked or expired key offers **Delete**, which removes it. The table lists the keys in use first, then the expired and revoked ones; it searches by name or prefix, sorts by any column and pages past ten keys.
 
 > 💡 Use short-lived API keys for CI/CD and automation.
 `
