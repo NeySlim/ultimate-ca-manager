@@ -1,6 +1,7 @@
 /** Delays of the overview: the unit follows the length, the words follow the language. */
-import { describe, it, expect } from 'vitest'
-import { daysUntil, elapsedPercent, relativeTime, spanOf, spanText, urgencyOf } from '../overviewTime'
+import { describe, it, expect, afterEach } from 'vitest'
+import { clockOf, daysUntil, elapsedPercent, relativeTime, spanOf, spanText, urgencyOf } from '../overviewTime'
+import { getAppTimezone, setAppTimezone } from '../../stores/timezoneStore'
 
 const NOW = Date.parse('2026-11-19T12:00:00Z')
 const HOUR = 3600000
@@ -57,5 +58,32 @@ describe('expiry', () => {
     expect(elapsedPercent(new Date(NOW + DAY).toISOString(), to, NOW)).toBe(0)
     expect(elapsedPercent(null, to, NOW)).toBeNull()
     expect(elapsedPercent(to, from, NOW)).toBeNull()
+  })
+})
+
+describe('clockOf', () => {
+  const t = (key, p) => `${key} ${p.time}`
+  const zone = getAppTimezone()
+  afterEach(() => setAppTimezone(zone))
+
+  it('says today for the same civil day only, in the application time zone', () => {
+    setAppTimezone('UTC')
+    const morning = Date.parse('2026-11-19T08:00:00Z')
+    expect(clockOf('2026-11-19T01:30:00Z', t, 'en', morning)).toBe('overview.clockToday 01:30')
+    // 21:00 the evening before is eleven hours back, but not today
+    expect(clockOf('2026-11-18T21:00:00Z', t, 'en', morning)).not.toContain('overview.clockToday')
+    expect(clockOf('2026-11-18T21:00:00Z', t, 'en', morning)).toContain('21:00')
+    // Nor is the next morning, seen in the evening
+    expect(clockOf('2026-11-20T07:00:00Z', t, 'en', Date.parse('2026-11-19T22:00:00Z'))).not.toContain('overview.clockToday')
+  })
+
+  it('reads the day in the zone of the instance, not of the browser', () => {
+    setAppTimezone('Asia/Tokyo')
+    // 16:00 UTC on the 18th is 01:00 on the 19th in Tokyo, the day of 08:00 UTC on the 19th (17:00 there)
+    expect(clockOf('2026-11-18T16:00:00Z', t, 'en', Date.parse('2026-11-19T08:00:00Z'))).toBe('overview.clockToday 01:00')
+  })
+
+  it('writes nothing for a date it cannot read', () => {
+    expect(clockOf('nope', t, 'en', NOW)).toBe('')
   })
 })
