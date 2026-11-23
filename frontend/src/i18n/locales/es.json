@@ -477,6 +477,7 @@
     "duplicateKey": "Otra fila anterior ya usa \"{{key}}\": solo una de ellas se puede guardar",
     "chooseFile": "Elegir un archivo…",
     "more": "Más",
+    "moreActions": "Otras acciones",
     "otherViews": "Otras vistas"
   },
   "commandPalette": {
@@ -1866,7 +1867,7 @@
     "editUser": "Editar usuario",
     "deleteUser": "Eliminar usuario",
     "admin": "Administrador",
-    "noUsers": "No se encontraron usuarios",
+    "noUsers": "Sin usuarios",
     "resetPassword": "Restablecer contraseña",
     "activate": "Activar",
     "usernamePlaceholder": "juanperez",
@@ -1990,7 +1991,8 @@
       "auditor": "Acceso de solo lectura a todos los datos operativos, incluido el registro.",
       "viewer": "Acceso de solo lectura a certificados, CA y plantillas."
     },
-    "customRoleOf": "Rol personalizado: {{name}}"
+    "customRoleOf": "Rol personalizado: {{name}}",
+    "noUsersDescription": "Cree una cuenta local o permita el inicio de sesión mediante un proveedor SSO configurado."
   },
   "groups": {
     "group": "Grupo",
@@ -2002,7 +2004,7 @@
     "permissionsHelp": "Permisos concedidos a cada miembro de este grupo, además de su propio rol.",
     "noPermissions": "Sin permisos concedidos",
     "members": "Miembros",
-    "noGroups": "No se encontraron grupos",
+    "noGroups": "Sin grupos",
     "noMembers": "No se encontraron miembros",
     "membersUpdated": "Miembros actualizados: {{added}} añadidos, {{removed}} eliminados",
     "namePlaceholder": "desarrolladores",
@@ -2029,7 +2031,8 @@
       "export": "Exportación",
       "admin": "Administración"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "Un grupo asigna el mismo rol a varias cuentas a la vez."
   },
   "acme": {
     "title": "Protocolo ACME",
@@ -3439,6 +3442,46 @@
       "setup": "Configuración",
       "system": "Sistema"
     },
+    "actions": {
+      "login_success": "Inicio de sesión correcto",
+      "login_failure": "Inicio de sesión fallido",
+      "logout": "Sesión cerrada",
+      "session_locked": "Sesión bloqueada",
+      "scep_challenge_read": "Desafío SCEP consultado",
+      "generate_crl": "CRL generada",
+      "generate_delta_crl": "CRL delta generada",
+      "crl_regenerate": "CRL regenerada",
+      "ca_created": "Autoridad creada",
+      "ca_deleted": "Autoridad eliminada",
+      "ca_updated": "Autoridad modificada",
+      "ca_imported": "Autoridad importada",
+      "ca_revoked": "Autoridad revocada",
+      "certificate_created": "Certificado emitido",
+      "cert_created": "Certificado emitido",
+      "certificate_issued": "Certificado emitido",
+      "cert_deleted": "Certificado eliminado",
+      "certificate_deleted": "Certificado eliminado",
+      "cert_revoked": "Certificado revocado",
+      "certificate_imported": "Certificado importado",
+      "cert_imported": "Certificado importado",
+      "certificate_renewed": "Certificado renovado",
+      "certificate_auto_renewed": "Certificado renovado automáticamente",
+      "csr_signed": "Solicitud firmada",
+      "csr_create": "Solicitud creada",
+      "csr_generated": "Solicitud generada",
+      "csr_delete": "Solicitud eliminada",
+      "settings_update": "Ajustes modificados",
+      "user_create": "Cuenta creada",
+      "user_delete": "Cuenta eliminada",
+      "user_update": "Cuenta modificada",
+      "password_change": "Contraseña cambiada",
+      "system_backup": "Copia de seguridad",
+      "system_restore": "Restauración",
+      "template_create": "Plantilla creada",
+      "template_delete": "Plantilla eliminada",
+      "truststore_add": "Ancla de confianza añadida",
+      "truststore_remove": "Ancla de confianza retirada"
+    },
     "format_csv": "Una fila por evento",
     "format_json": "Datos estructurados"
   },
@@ -4421,7 +4464,9 @@
     },
     "templateHtmlSource": "Código HTML",
     "templateFormat": "Formato de la plantilla",
-    "templateVariablesLead": "Variables: "
+    "templateVariablesLead": "Variables: ",
+    "ocspRevocationTitle": "OCSP y revocación",
+    "interfaceLanguage": "Idioma de la interfaz"
   },
   "account": {
     "profile": "Perfil",
@@ -4473,11 +4518,6 @@
     "noCertificatesEnrolled": "Ningún certificado de cliente inscrito",
     "deleteCertConfirm": "¿Eliminar este certificado de cliente?",
     "certificateDeleted": "Certificado eliminado",
-    "apiKeyTips": [
-      "Las claves de API permiten el acceso programático a UCM",
-      "Mantenga sus claves en secreto y rótelas con regularidad",
-      "Cada clave puede tener una fecha de expiración personalizada"
-    ],
     "yourAPIKeys": "Sus claves de API",
     "createAPIKey": "Crear clave API",
     "createKey": "Crear Clave",
@@ -4566,7 +4606,8 @@
     "tocLabel": "Secciones de la cuenta",
     "apiKeysIntent": "Claves que llaman a la API en nombre de su cuenta.",
     "profileSaved": "Perfil guardado.",
-    "profileReset": "Cambios del perfil deshechos."
+    "profileReset": "Cambios del perfil deshechos.",
+    "apiKeyHint": "Las claves de API permiten el acceso programático a UCM. Mantenga sus claves en secreto y rótelas con regularidad. Cada clave puede tener una fecha de expiración personalizada."
   },
   "rbac": {
     "title": "Control de acceso basado en roles",
@@ -4576,8 +4617,8 @@
     "deleteRole": "Eliminar rol",
     "roleName": "Nombre del rol",
     "assignedUsers": "Usuarios asignados",
-    "noRoles": "Sin roles definidos",
-    "noRolesDescription": "Cree roles personalizados para un control de acceso granular",
+    "noRoles": "Sin roles",
+    "noRolesDescription": "Cree roles personalizados para un control de acceso granular.",
     "searchRoles": "Buscar roles...",
     "inherits": "Hereda",
     "inheritsFrom": "Hereda de",
@@ -4638,6 +4679,12 @@
     "columns": {
       "permissions": "Derechos",
       "users": "Usuarios"
+    },
+    "systemRoles": {
+      "admin": "Acceso completo al sistema con todos los permisos",
+      "operator": "Operaciones diarias con certificados",
+      "auditor": "Acceso de solo lectura a todos los datos operativos para cumplimiento y auditoría",
+      "viewer": "Acceso básico de lectura a certificados y CA"
     }
   },
   "hsm": {
@@ -4728,12 +4775,12 @@
       "softhsmFips": "SoftHSM no es un módulo validado: en modo FIPS, las claves almacenadas en él no están protegidas por FIPS."
     },
     "syncingKeys": "Sincronizando...",
-    "unit_one": "{{count}} ubicación",
-    "unit_other": "{{count}} ubicaciones",
+    "unit_one": "{{count}} proveedor",
+    "unit_other": "{{count}} proveedores",
     "keyCount_one": "{{count}} clave",
     "keyCount_other": "{{count}} claves",
-    "range_one": "{{shown}} de {{count}} ubicación",
-    "range_other": "{{shown}} de {{count}} ubicaciones",
+    "range_one": "{{shown}} de {{count}} proveedor",
+    "range_other": "{{shown}} de {{count}} proveedores",
     "states": {
       "connected": "Conectado",
       "error": "Error",
@@ -7460,7 +7507,8 @@
       "ad_connector_health": "Estado de Active Directory",
       "session_cleanup": "Limpieza de sesiones"
     },
-    "colNote": "Último resultado"
+    "colNote": "Último resultado",
+    "imminent": "inminente"
   },
   "lint": {
     "action": "Analizar",
@@ -7982,7 +8030,8 @@
       "mfa": "Doble factor",
       "mfaOn": "Activado: {{methods}}",
       "mfaOff": "Desactivado",
-      "endsAt": "Termina {{date}}"
+      "endsAt": "Termina {{date}}",
+      "lockInHours": "Se bloquea tras {{hours}} h de inactividad"
     },
     "activity": {
       "label": "Actividad",
@@ -8598,7 +8647,8 @@
       "request": "Solicitud n.º {{id}}",
       "requests_one": "{{count}} solicitud",
       "requests_other": "{{count}} solicitudes"
-    }
+    },
+    "historyMore": "Mostrar {{count}} más"
   },
   "atelier": {
     "name": "Nombre",

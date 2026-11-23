@@ -71,7 +71,9 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <AuthFrame ref={titleRef} title={t('auth.invalidLink')} lead={t('auth.invalidLinkDesc')}>
+      <AuthFrame ref={titleRef} title={t('auth.invalidLink')}>
+        {/* A failure says itself as one: the warning notice and its icon, not a neutral lead */}
+        <p className="notice warn" id="reset-invalid" role="status"><Icon name="warning" /><span>{t('auth.invalidLinkDesc')}</span></p>
         <Link to="/forgot-password" className="btn primary auth-submit">
           <Icon name="send" />{t('auth.requestNewResetLink')}
         </Link>

@@ -80,6 +80,11 @@ export function NotificationBell({ can }) {
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The panel opens on its first unread item, which the summary announces, even when it is not of the day
+  useEffect(() => {
+    if (open) panelRef.current?.querySelector('.notif-item.unread')?.scrollIntoView?.({ block: 'nearest' })
+  }, [open])
+
   // Escape closes the panel wherever the focus is, and gives it back to the bell
   useEffect(() => {
     if (!open) return undefined

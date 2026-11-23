@@ -66,7 +66,7 @@ export default function ServiceStatusWidget() {
         ) : status ? (
           <>
             <Facts items={[
-              fact(t('settings.version'), status.version && `v${status.version}`),
+              fact(t('settings.version'), status.version),
               fact('PID', status.pid),
               fact(t('settings.about.started'), status.uptime_seconds ? compactAgo(new Date(Date.now() - status.uptime_seconds * 1000), t) : null),
               fact(t('settings.memory'), status.memory_mb ? formatBytes(status.memory_mb * 1024 * 1024, i18n?.language) : null),

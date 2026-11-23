@@ -114,7 +114,7 @@ function HelpBody({ pageKey, quick, guide, englishNotice, onSection, guideLink }
           )}
         </Toolbar>
       )}
-      {tab === 'quick' ? <QuickHelp content={quick} /> : <GuideHelp chapter={pageKey} markdown={guide.content} english={guide.english} query={query} onSection={onSection} />}
+      {tab === 'quick' ? <QuickHelp content={quick} newTab /> : <GuideHelp chapter={pageKey} markdown={guide.content} english={guide.english} query={query} onSection={onSection} />}
     </>
   )
 }

@@ -324,3 +324,110 @@
 :root .atl .settings-body .empty p{margin-left:auto;margin-right:auto}
 /* Graphic review: PKI and protocols. */
 /* Graphic review: governance, settings and shell. */
+/* The secondary actions of a page head: buttons above 800 px, a « ⋯ » menu on a phone (the mockup hides the buttons). */
+:root .atl .page-head .page-more{display:none}
+@media(max-width:800px){:root .atl .page-head .page-more{display:flex}:root .atl .page-head .page-more>.icon-btn{width:40px;min-height:40px}:root .atl .page-head .page-more .pop-menu{min-width:200px}}
+:root .atl .page-head .actions{display:flex;align-items:center;gap:8px}
+/* A head's main action named in full, a short verb on a phone. */
+:root .atl .phone-label{display:none}
+@media(max-width:800px){:root .atl .wide-label{display:none}:root .atl .phone-label{display:inline}}
+/* A removal beside a filled red button stays quiet, its text red. */
+:root .atl .btn.quiet[data-danger]{color:var(--bad)}
+/* Under 1000 px the bar has no help button: the account menu gives the page's help. */
+@media(min-width:1001px){:root .atl .user-menu .user-help{display:none}}
+/* A checkbox's help under its label, its box on the first line of a label of several. */
+:root .atl .checkbox-line>span>small{display:block;margin-top:2px}
+:root .atl .checkbox-line:has(>span>small){align-items:flex-start}
+:root .atl .checkbox-line:has(>span>small)>input{margin-top:1px}
+/* A notice titled by its first words in bold: the title on a line of its own, the steps under it. */
+:root .atl .notice>span>strong:has(+.pre-line){display:block;margin-bottom:6px}
+/* Atelier: a neutral pill keeps the box of the tinted ones and takes a ground of its own, so a state column lines up. */
+:root:not([data-theme|=aurore]) .atl .badge:not(.good,.warn,.bad){background-color:color-mix(in srgb,var(--muted) 12%,transparent)}
+/* Aurore, light: a dialog on the dark veil is opaque white, as the page's panels; its fields keep their ground. */
+:root[data-theme="aurore"][data-mode="light"] .atl dialog{background:var(--panel)}
+/* Dark modes: the browser draws its own controls (check boxes, scroll bars) dark. */
+:root[data-mode="dark"] .atl:not(.guide-app){color-scheme:dark}
+/* A block left empty: its title and its action apart. */
+:root .atl .empty>h3+.btn{margin-top:14px}
+/* Phone, narrow: a dialog's paired fields one under the other, so no value is cut under its chevron. */
+@media(max-width:480px){:root .atl dialog .form-fields{grid-template-columns:1fr}:root .atl dialog .form-fields>.field.full{grid-column:auto}:root .atl dialog .settings-grid{grid-template-columns:1fr}}
+/* A definition row holding a pill keeps the 25 px step: centred, the pill without vertical room. */
+:root .atl .kv>.row:has(>dd .badge){align-items:center}
+:root .atl .kv>.row>dd .badge{margin-block:-2px}
+/* The open row: its name keeps the row's ground under the pointer. */
+:root .atl :is(tr.opened,.mobile-record.checked,.work-row.opened) :is(.entity-name,.resource,.work-subject):hover:not(:disabled){background-color:transparent}
+/* Aurore: the rule between a title and its count drawn in the control colour, visible on the glass. */
+:root[data-theme|=aurore] .atl .title-line .total{border-left-color:var(--control)}
+/* A refresh beside the toolbar's buttons takes their ground. */
+:root .atl .toolbar .icon-btn[data-action=refresh]{background:var(--panel)}
+/* The row of an empty table is no data row: no hover ground, no pointer. */
+:root .atl tbody tr:has(>td>.empty):hover{background:transparent;cursor:default}
+/* A policy's operations in columns, each box on the first line of its label. */
+:root .atl #policy-form .eku-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:2px 20px}
+:root .atl #policy-form .eku-list>:not(.checkbox-line){grid-column:1/-1}
+/* Composing a PDF: the sections on the title's left edge, no rule under the last; select all or none above them. */
+:root .atl .columns-list>label{padding-left:0}
+:root .atl .columns-list>label:last-of-type{border-bottom:0}
+:root .atl .pdf-select{display:flex;gap:8px;margin:0 0 10px}
+/* Phone, narrow: the page size on a line of its own, previous, page and next together on the next. */
+@media(max-width:480px){:root .atl .table-footer .controls{flex-wrap:wrap;row-gap:8px}:root .atl .table-footer #page-size{flex-basis:100%}}
+/* The settings' contents mark the section read, as the guide's. */
+:root .atl .settings-toc:not(.guide-toc) a[aria-current]{background:var(--selected);color:var(--text)}
+/* The guide page reads a quick help as an article: one column, the article's type sizes (the help dialog keeps its grid). */
+:root .atl .guide-article .help-grid{display:block;max-width:72ch}
+:root .atl .guide-article .help-grid>section+section{margin-top:30px}
+:root .atl .guide-article .help-grid>section>h3{font-size:16px;font-weight:600;margin:0 0 8px}
+:root .atl .guide-article .help-grid :is(p,li){font-size:15px;line-height:1.75;color:var(--text)}
+/* The system logs read as a list: 36 px rows, as the other tables of the settings. */
+:root .atl #logs-scroll .audit-table td{height:36px}
+/* Phone, narrow: two filters share a line, the buttons go to the next one. */
+@media(max-width:480px){:root .atl .toolbar #ops-selection-only{flex-basis:100%}:root .atl .toolbar :is(#log-level,#log-lines){flex:1 1 calc(50% - 4px);max-width:none}}
+/* A legend's badge stands apart from its title. */
+:root .atl legend>.badge{margin-left:6px}
+/* A heading's sentence and the help of a row breathe as the fields' help. */
+:root .atl :is(.settings-section .panel-heading p,.record-list small,.empty p){line-height:1.5}
+/* The palette: a result's name stays whole on one line; a long hint gives way, cut, its full text in a tooltip. */
+:root .atl .command-result .name{flex:0 1 auto;min-width:0;max-width:60%;overflow-wrap:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root .atl .command-result .hint{flex:1 1 0;min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A notification: the kind takes the room, the time stays on the kind's line, the unread mark follows the kind. */
+:root .atl .notif-meta{flex-wrap:nowrap;align-items:flex-start}
+:root .atl .notif-meta .notif-kind{flex:0 1 auto;min-width:0}
+:root .atl .notif-meta :is(time,.notif-new){flex-shrink:0;white-space:nowrap}
+/* Phone: the bell's count keeps clear of the avatar. */
+@media(max-width:480px){:root .atl .global-tools .notif-count{right:-2px}}
+/* The Modules menu's foot link: a 24 px target in the foot's line. */
+:root .atl .modules-menu .menu-foot>.text-link{padding-block:5px;margin-block:-5px}
+/* The approvals link's warning sign in the warning colour, its words in the accent; a count of certificates due in the warning fill. */
+:root .atl .statusbar .status-link[data-dashboard-link=queue]>.icon{color:var(--warn)}
+:root .atl .main-nav .notif-count.nav-count{background:var(--warn-fill);color:var(--ink)}
+/* Dashboard cards on a phone: a card's links are 24 px targets. */
+@media(max-width:800px){:root .atl .card-tools .text-link{min-height:24px}}
+/* Aurore: a floating window edged as the glass panels, with their glow. */
+:root[data-theme|=aurore] .atl .float-window{border-color:color-mix(in srgb,var(--grad-a) 62%,transparent);box-shadow:0 18px 50px color-mix(in srgb,var(--ink) 40%,transparent),0 0 24px -8px var(--grad-a)}
+/* Aurore, dark: menus and floating windows nearly opaque, the aurora no longer a stain under their text. */
+:root[data-theme="aurore"][data-mode="dark"] .atl :is(.modules-menu,.pop-menu,.float-window){background-color:color-mix(in srgb,var(--panel) 92%,transparent)}
+/* Aurore, dark: a read-only field on its own ground, its text muted. */
+:root[data-theme="aurore"][data-mode="dark"] .atl input[readonly]{background:var(--hover);color:var(--muted)}
+/* The theme menu: a family's swatch centred in the room of a mode's icon, the two groups' labels on one edge. */
+:root .atl .theme-menu [data-theme-family]>.swatch{margin:0 3.5px}
+/* The account menu: its separators on the edge of the account card's rule. */
+:root .atl .user-menu>.pop-sep{margin-inline:0}
+/* Backup planning: the size ceiling, its long label and help, on a line of its own at a field's width. */
+@container (min-width:900px){:root .atl .settings-grid>.field:has(#set-backup_max_total_mb){grid-column:1/span 2}}
+/* A record list in columns: its states and actions line up from row to row; on a phone the actions take a line of their own. */
+@media(min-width:801px){:root .atl .record-list.rl-cols{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:16px}:root .atl .record-list.rl-cols>li{display:grid;grid-column:1/-1;grid-template-columns:subgrid;align-items:center}:root .atl .record-list.rl-cols>li>.rl-action{grid-column:3;justify-content:flex-end}}
+@media(max-width:800px){:root .atl .record-list.rl-cols>li>.rl-action{flex-basis:100%}}
+/* A group made of its test alone draws no rule under its legend; a test after its field lines its button up on the field. */
+:root .atl .settings-stack>.settings-test:first-child{border-top:0;padding-top:0}
+:root .atl .settings-test:has(>.field){align-items:flex-end}
+/* Phone: a row of tabs wider than the screen fades at its right edge; scrolled to, the last tab stands clear of the fade. */
+@media(max-width:800px){:root .atl .views{padding-right:28px;-webkit-mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent);mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent)}}
+/* Phone records: a labelled fact on a line of its own; the detail chevron on the card's right edge. */
+:root .atl .mobile-record .row-meta>span:has(>.fact-label){flex-basis:100%}
+:root .atl .mobile-record .row-top>.icon-btn.quiet:last-child{margin-right:-14px}
+/* An empty block in a table: its action at a button's full height, as the page head's. */
+:root .atl .module-table td .empty .btn{min-height:32px}
+/* A digest or a serial compared: its equal lines of bytes one under the other. */
+:root .atl .compare-table .hex-lines>.line{display:block}
+/* An empty table keeps room for its sortable columns past the name, so their headers do not pile up at its right edge. */
+:root .atl .module-table:has(>tbody>tr>td>.empty)>thead th[aria-sort]:not(:first-child,.check-col+th){width:10em}

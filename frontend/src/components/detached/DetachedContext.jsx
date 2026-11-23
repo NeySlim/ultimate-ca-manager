@@ -14,7 +14,7 @@ const KEY = 'ucm-detached'
 
 // The size a window opens at, by kind: a comparison takes the width of its columns
 const SIZES = {
-  compare: (view) => ({ w: Math.min(1120, view.w - 120), h: Math.min(600, view.h - 140) }),
+  compare: (view) => ({ w: Math.min(1120, view.w - 120), h: Math.min(820, view.h - 140) }),
   default: (view) => ({ w: Math.min(620, view.w - 120), h: Math.min(560, view.h - 140) }),
 }
 

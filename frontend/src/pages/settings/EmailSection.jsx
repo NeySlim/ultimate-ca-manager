@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
-import { Btn, Pill, Notice, RecordList, RecordRow } from '../../components/atelier'
+import { Btn, Pill, Notice } from '../../components/atelier'
 import { Input, NumberInput, SecretInput, Select, ToggleSwitch, SegmentedField, ListInput } from '../../components/atelier/Form'
 import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
 import EmailTemplateDialog from './EmailTemplateDialog'
@@ -144,11 +144,11 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
         )}
       </SettingsGroup>
 
-      <SettingsGroup legend={t('settings.emailTemplate')} grid={false}>
-        <RecordList>
-          <RecordRow title={t('settings.emailTemplate')} meta={isMobile ? t('settings.templateDesktopOnly') : t('settings.templateDescription')}
-            action={<Btn icon="file" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>{t('settings.editTemplate')}</Btn>} />
-        </RecordList>
+      {/* The group's legend names the template: its sentence and its button under it, the name not said twice */}
+      <SettingsGroup legend={t('settings.emailTemplate')} hint={isMobile ? t('settings.templateDesktopOnly') : t('settings.templateDescription')} grid={false}>
+        <div className="settings-actions">
+          <Btn icon="file" id="email-template-edit" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>{t('settings.editTemplate')}</Btn>
+        </div>
       </SettingsGroup>
       {showTemplateEditor && (
         <EmailTemplateDialog onClose={() => setShowTemplateEditor(false)} />
@@ -161,20 +161,21 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
           <>
             <ToggleSwitch id="set-expiry_enabled" checked={expiryAlerts.enabled}
               onChange={(val) => setExpiryAlerts((prev) => ({ ...prev, enabled: val }))} label={t('settings.enableExpiryAlerts')} />
-            <SegmentedField id="set-expiry_alert_days" label={t('settings.alertDays')} hint={t('settings.alertDaysHelp')}
+            {/* Alerts off: their thresholds, recipients and options wait, greyed, for the switch */}
+            <SegmentedField id="set-expiry_alert_days" label={t('settings.alertDays')} hint={t('settings.alertDaysHelp')} disabled={!expiryAlerts.enabled}
               options={ALERT_DAYS.map((d) => ({ value: d, label: t('time.short.days', { count: d }) }))}
               pressed={(d) => expiryAlerts.alert_days.includes(d)}
               onPick={(d) => setExpiryAlerts((prev) => ({
                 ...prev,
                 alert_days: prev.alert_days.includes(d) ? prev.alert_days.filter((x) => x !== d) : [...prev.alert_days, d].sort((a, b) => b - a),
               }))} />
-            <ListInput id="set-expiry_recipients" full label={t('settings.alertRecipients')} value={expiryAlerts.recipients || []}
+            <ListInput id="set-expiry_recipients" full label={t('settings.alertRecipients')} value={expiryAlerts.recipients || []} disabled={!expiryAlerts.enabled}
               onChange={(list) => setExpiryAlerts((prev) => ({ ...prev, recipients: list }))} validate={isEmail}
               invalidMessage={(bad) => t('settings.alertRecipientsInvalid', { list: bad.join(', ') })}
               placeholder={t('settings.alertRecipientsPlaceholder')} hint={t('settings.alertRecipientsHint')} />
-            <ToggleSwitch id="set-expiry_include_revoked" checked={expiryAlerts.include_revoked}
+            <ToggleSwitch id="set-expiry_include_revoked" checked={expiryAlerts.include_revoked} disabled={!expiryAlerts.enabled}
               onChange={(val) => setExpiryAlerts((prev) => ({ ...prev, include_revoked: val }))} label={t('settings.includeRevoked')} />
-            <ToggleSwitch id="set-expiry_exclude_acme" checked={!!expiryAlerts.exclude_acme}
+            <ToggleSwitch id="set-expiry_exclude_acme" checked={!!expiryAlerts.exclude_acme} disabled={!expiryAlerts.enabled}
               onChange={(val) => setExpiryAlerts((prev) => ({ ...prev, exclude_acme: val }))} label={t('settings.excludeAcme')}
               description={t('settings.excludeAcmeDesc')} />
             {canWrite('settings') && (

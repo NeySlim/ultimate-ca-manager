@@ -62,4 +62,18 @@ describe('CommandPalette results', () => {
       expect(mocks.navigate).toHaveBeenCalledWith(to)
       expect(mocks.openEntity).not.toHaveBeenCalled()
     })
+
+  // As the mockup's commandResults(): the pages and actions a search names come before the records it finds,
+  // and a record is hinted by its kind, never by a whole subject that would crowd out its name
+  it('lists the pages and actions first, then the records, hinted by their kind', async () => {
+    render(<CommandPalette open onOpenChange={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('commandPalette.searchPlaceholder'), { target: { value: 'cert' } })
+    const cert = await screen.findByText('web.example.com')
+    const results = [...document.querySelectorAll('.command-result')]
+    const at = results.indexOf(cert.closest('.command-result'))
+    expect(at).toBeGreaterThan(0)
+    expect(results.slice(0, at).every((r) => !r.querySelector('.hint')?.textContent.startsWith('commandPalette.searchSections'))).toBe(true)
+    expect(cert.closest('.command-result').querySelector('.hint')).toHaveTextContent('commandPalette.searchSections.certificates')
+    expect(cert).toHaveAttribute('title', 'web.example.com')
+  })
 })

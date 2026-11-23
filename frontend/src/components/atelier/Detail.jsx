@@ -171,9 +171,26 @@ export function FactsGroup({ children, className }) {
 }
 
 /** The records, or `empty` in a muted sentence when there are none. */
-export function RecordList({ children, empty, label }) {
+/** `step`: a long list shows its first `step` records, then as many more at each ask (a button under it). */
+/** `columns`: the badges and the actions of every record in columns of their own, so they line up from row to row. */
+export function RecordList({ children, empty, label, step, columns = false }) {
+  const { t } = useTranslation()
+  const [limit, setLimit] = useState(step || Infinity)
   const list = [].concat(children || []).filter(Boolean)
-  return list.length ? <ul className="record-list" aria-label={label}>{list}</ul> : <p className="muted small">{empty}</p>
+  if (!list.length) return <p className="muted small">{empty}</p>
+  const rest = list.length - limit
+  return (
+    <>
+      <ul className={columns ? 'record-list rl-cols' : 'record-list'} aria-label={label}>{rest > 0 ? list.slice(0, limit) : list}</ul>
+      {rest > 0 && (
+        <p className="record-more">
+          <button type="button" className="btn" data-action="records-more" onClick={() => setLimit((n) => n + step)}>
+            {t('work.historyMore', { count: Math.min(step, rest) })}
+          </button>
+        </p>
+      )}
+    </>
+  )
 }
 
 /** A record; other props (a data attribute, aria-current) go on its row. */

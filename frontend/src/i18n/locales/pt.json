@@ -477,6 +477,7 @@
     "duplicateKey": "Outra linha acima já usa \"{{key}}\": só uma delas pode ser salva",
     "chooseFile": "Escolher um arquivo…",
     "more": "Mais",
+    "moreActions": "Outras ações",
     "otherViews": "Outras vistas"
   },
   "commandPalette": {
@@ -1990,7 +1991,8 @@
       "auditor": "Acesso só de leitura a todos os dados operacionais, incluindo o diário.",
       "viewer": "Acesso só de leitura a certificados, CA e modelos."
     },
-    "customRoleOf": "Função personalizada: {{name}}"
+    "customRoleOf": "Função personalizada: {{name}}",
+    "noUsersDescription": "Crie uma conta local ou permita o início de sessão através de um fornecedor SSO configurado."
   },
   "groups": {
     "group": "Grupo",
@@ -2029,7 +2031,8 @@
       "export": "Exportar",
       "admin": "Administrar"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "Um grupo atribui a mesma função a várias contas de uma só vez."
   },
   "acme": {
     "title": "Protocolo ACME",
@@ -3439,6 +3442,46 @@
       "setup": "Configuração",
       "system": "Sistema"
     },
+    "actions": {
+      "login_success": "Sessão iniciada",
+      "login_failure": "Falha no início de sessão",
+      "logout": "Sessão terminada",
+      "session_locked": "Sessão bloqueada",
+      "scep_challenge_read": "Desafio SCEP consultado",
+      "generate_crl": "CRL gerada",
+      "generate_delta_crl": "CRL delta gerada",
+      "crl_regenerate": "CRL regenerada",
+      "ca_created": "Autoridade criada",
+      "ca_deleted": "Autoridade eliminada",
+      "ca_updated": "Autoridade alterada",
+      "ca_imported": "Autoridade importada",
+      "ca_revoked": "Autoridade revogada",
+      "certificate_created": "Certificado emitido",
+      "cert_created": "Certificado emitido",
+      "certificate_issued": "Certificado emitido",
+      "cert_deleted": "Certificado eliminado",
+      "certificate_deleted": "Certificado eliminado",
+      "cert_revoked": "Certificado revogado",
+      "certificate_imported": "Certificado importado",
+      "cert_imported": "Certificado importado",
+      "certificate_renewed": "Certificado renovado",
+      "certificate_auto_renewed": "Certificado renovado automaticamente",
+      "csr_signed": "Pedido assinado",
+      "csr_create": "Pedido criado",
+      "csr_generated": "Pedido gerado",
+      "csr_delete": "Pedido eliminado",
+      "settings_update": "Definições alteradas",
+      "user_create": "Conta criada",
+      "user_delete": "Conta eliminada",
+      "user_update": "Conta alterada",
+      "password_change": "Palavra-passe alterada",
+      "system_backup": "Cópia de segurança",
+      "system_restore": "Restauro",
+      "template_create": "Modelo criado",
+      "template_delete": "Modelo eliminado",
+      "truststore_add": "Âncora de confiança adicionada",
+      "truststore_remove": "Âncora de confiança removida"
+    },
     "format_csv": "Uma linha por evento",
     "format_json": "Dados estruturados"
   },
@@ -4421,7 +4464,9 @@
     },
     "templateHtmlSource": "Código-fonte HTML",
     "templateFormat": "Formato do modelo",
-    "templateVariablesLead": "Variáveis: "
+    "templateVariablesLead": "Variáveis: ",
+    "ocspRevocationTitle": "OCSP e revogação",
+    "interfaceLanguage": "Idioma da interface"
   },
   "account": {
     "profile": "Perfil",
@@ -4473,11 +4518,6 @@
     "noCertificatesEnrolled": "Nenhum certificado de cliente inscrito",
     "deleteCertConfirm": "Excluir este certificado de cliente?",
     "certificateDeleted": "Certificado excluído",
-    "apiKeyTips": [
-      "As chaves de API permitem o acesso programático ao UCM",
-      "Mantenha as suas chaves secretas e rode-as regularmente",
-      "Cada chave pode ter uma data de expiração personalizada"
-    ],
     "yourAPIKeys": "As suas chaves de API",
     "createAPIKey": "Criar chave API",
     "createKey": "Criar Chave",
@@ -4566,7 +4606,8 @@
     "tocLabel": "Secções da conta",
     "apiKeysIntent": "Chaves que chamam a API em nome da sua conta.",
     "profileSaved": "Perfil salvo.",
-    "profileReset": "Alterações do perfil anuladas."
+    "profileReset": "Alterações do perfil anuladas.",
+    "apiKeyHint": "As chaves de API permitem o acesso programático ao UCM. Mantenha as suas chaves secretas e rode-as regularmente. Cada chave pode ter uma data de expiração personalizada."
   },
   "rbac": {
     "title": "Controlo de acesso baseado em funções",
@@ -4576,8 +4617,8 @@
     "deleteRole": "Excluir função",
     "roleName": "Nome da função",
     "assignedUsers": "Usuários atribuídos",
-    "noRoles": "Sem funções definidas",
-    "noRolesDescription": "Crie funções personalizadas para um controlo de acesso granular",
+    "noRoles": "Sem funções",
+    "noRolesDescription": "Crie funções personalizadas para um controlo de acesso granular.",
     "searchRoles": "Pesquisar roles...",
     "inherits": "Herda",
     "inheritsFrom": "Inherits de",
@@ -4638,6 +4679,12 @@
     "columns": {
       "permissions": "Permissões",
       "users": "Usuários"
+    },
+    "systemRoles": {
+      "admin": "Acesso total ao sistema com todas as permissões",
+      "operator": "Operações diárias com certificados",
+      "auditor": "Acesso só de leitura a todos os dados operacionais para conformidade e auditoria",
+      "viewer": "Acesso básico de leitura a certificados e CA"
     }
   },
   "hsm": {
@@ -4728,12 +4775,12 @@
       "softhsmFips": "O SoftHSM não é um módulo validado: no modo FIPS, as chaves nele armazenadas não são protegidas por FIPS."
     },
     "syncingKeys": "Sincronizando...",
-    "unit_one": "{{count}} localização",
-    "unit_other": "{{count}} localizações",
+    "unit_one": "{{count}} fornecedor",
+    "unit_other": "{{count}} fornecedores",
     "keyCount_one": "{{count}} chave",
     "keyCount_other": "{{count}} chaves",
-    "range_one": "{{shown}} de {{count}} localização",
-    "range_other": "{{shown}} de {{count}} localizações",
+    "range_one": "{{shown}} de {{count}} fornecedor",
+    "range_other": "{{shown}} de {{count}} fornecedores",
     "states": {
       "connected": "Ligado",
       "error": "Erro",
@@ -7460,7 +7507,8 @@
       "ad_connector_health": "Estado do Active Directory",
       "session_cleanup": "Limpeza de sessões"
     },
-    "colNote": "Último resultado"
+    "colNote": "Último resultado",
+    "imminent": "iminente"
   },
   "lint": {
     "action": "Analisar",
@@ -7982,7 +8030,8 @@
       "mfa": "Dois fatores",
       "mfaOn": "Ativado: {{methods}}",
       "mfaOff": "Desativado",
-      "endsAt": "Termina em {{date}}"
+      "endsAt": "Termina em {{date}}",
+      "lockInHours": "Bloqueia após {{hours}} h de inatividade"
     },
     "activity": {
       "label": "Atividade",
@@ -8598,7 +8647,8 @@
       "request": "Pedido n.º {{id}}",
       "requests_one": "{{count}} pedido",
       "requests_other": "{{count}} pedidos"
-    }
+    },
+    "historyMore": "Mostrar mais {{count}}"
   },
   "atelier": {
     "name": "Nome",

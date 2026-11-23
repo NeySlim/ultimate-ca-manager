@@ -242,6 +242,22 @@ describe('AppShell', () => {
     expect(within(helpDialog()).getByRole('heading', { level: 2 })).toHaveTextContent(helpContent.certificates.title)
   })
 
+  // The system logs have a guide chapter: the bar gives its help as on every documented page
+  it('gives the system logs their help in the bar', async () => {
+    const user = setup('/logs')
+    await user.click(screen.getByRole('button', { name: 'common.help' }))
+    expect(within(helpDialog()).getByRole('heading', { level: 2 })).toHaveTextContent(helpContent.systemLogs.title)
+  })
+
+  // Under 1000 px the bar's help button is hidden: the account menu carries the page's help
+  it('opens the help of the page from the account menu', async () => {
+    const user = setup('/certificates')
+    await user.click(document.getElementById('user-button'))
+    await user.click(screen.getByRole('button', { name: 'commandPalette.pageHelp' }))
+    expect(document.getElementById('user-menu')).toHaveAttribute('hidden')
+    expect(within(helpDialog()).getByRole('heading', { level: 2 })).toHaveTextContent(helpContent.certificates.title)
+  })
+
   it('marks the module of the URL current in the bar', () => {
     setup('/certificates/12')
     const nav = screen.getByRole('navigation', { name: 'shell.mainNav' })

@@ -477,6 +477,7 @@
     "duplicateKey": "Eine weitere Zeile oberhalb verwendet bereits „{{key}}“: Nur eine davon kann gespeichert werden",
     "chooseFile": "Datei auswählen…",
     "more": "Mehr",
+    "moreActions": "Weitere Aktionen",
     "otherViews": "Weitere Ansichten"
   },
   "commandPalette": {
@@ -1866,7 +1867,7 @@
     "editUser": "Benutzer bearbeiten",
     "deleteUser": "Benutzer löschen",
     "admin": "Administrator",
-    "noUsers": "Keine Benutzer gefunden",
+    "noUsers": "Keine Benutzer",
     "resetPassword": "Passwort zurücksetzen",
     "activate": "Aktivieren",
     "usernamePlaceholder": "maxmustermann",
@@ -1990,7 +1991,8 @@
       "auditor": "Lesezugriff auf alle Betriebsdaten, einschließlich des Protokolls.",
       "viewer": "Lesezugriff auf Zertifikate, CAs und Vorlagen."
     },
-    "customRoleOf": "Benutzerdefinierte Rolle: {{name}}"
+    "customRoleOf": "Benutzerdefinierte Rolle: {{name}}",
+    "noUsersDescription": "Legen Sie ein lokales Konto an oder lassen Sie die Anmeldung über einen eingerichteten SSO-Anbieter zu."
   },
   "groups": {
     "group": "Gruppe",
@@ -2002,7 +2004,7 @@
     "permissionsHelp": "Berechtigungen, die jedem Mitglied dieser Gruppe zusätzlich zu seiner eigenen Rolle gewährt werden.",
     "noPermissions": "Keine Berechtigungen gewährt",
     "members": "Mitglieder",
-    "noGroups": "Keine Gruppen gefunden",
+    "noGroups": "Keine Gruppen",
     "noMembers": "Keine Mitglieder gefunden",
     "membersUpdated": "Mitglieder aktualisiert: {{added}} hinzugefügt, {{removed}} entfernt",
     "namePlaceholder": "entwickler",
@@ -2029,7 +2031,8 @@
       "export": "Exportieren",
       "admin": "Verwalten"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "Eine Gruppe gibt mehreren Konten auf einmal dieselbe Rolle."
   },
   "acme": {
     "title": "ACME-Protokoll",
@@ -3439,6 +3442,46 @@
       "setup": "Konfiguration",
       "system": "System"
     },
+    "actions": {
+      "login_success": "Anmeldung erfolgreich",
+      "login_failure": "Anmeldung fehlgeschlagen",
+      "logout": "Abgemeldet",
+      "session_locked": "Sitzung gesperrt",
+      "scep_challenge_read": "SCEP-Challenge gelesen",
+      "generate_crl": "CRL erstellt",
+      "generate_delta_crl": "Delta-CRL erstellt",
+      "crl_regenerate": "CRL neu erstellt",
+      "ca_created": "Zertifizierungsstelle erstellt",
+      "ca_deleted": "Zertifizierungsstelle gelöscht",
+      "ca_updated": "Zertifizierungsstelle geändert",
+      "ca_imported": "Zertifizierungsstelle importiert",
+      "ca_revoked": "Zertifizierungsstelle widerrufen",
+      "certificate_created": "Zertifikat ausgestellt",
+      "cert_created": "Zertifikat ausgestellt",
+      "certificate_issued": "Zertifikat ausgestellt",
+      "cert_deleted": "Zertifikat gelöscht",
+      "certificate_deleted": "Zertifikat gelöscht",
+      "cert_revoked": "Zertifikat widerrufen",
+      "certificate_imported": "Zertifikat importiert",
+      "cert_imported": "Zertifikat importiert",
+      "certificate_renewed": "Zertifikat erneuert",
+      "certificate_auto_renewed": "Zertifikat automatisch erneuert",
+      "csr_signed": "Anforderung signiert",
+      "csr_create": "Anforderung erstellt",
+      "csr_generated": "Anforderung erzeugt",
+      "csr_delete": "Anforderung gelöscht",
+      "settings_update": "Einstellungen geändert",
+      "user_create": "Konto erstellt",
+      "user_delete": "Konto gelöscht",
+      "user_update": "Konto geändert",
+      "password_change": "Passwort geändert",
+      "system_backup": "Sicherung",
+      "system_restore": "Wiederherstellung",
+      "template_create": "Vorlage erstellt",
+      "template_delete": "Vorlage gelöscht",
+      "truststore_add": "Vertrauensanker hinzugefügt",
+      "truststore_remove": "Vertrauensanker entfernt"
+    },
     "format_csv": "Eine Zeile pro Ereignis",
     "format_json": "Strukturierte Daten"
   },
@@ -4421,7 +4464,9 @@
     },
     "templateHtmlSource": "HTML-Quelltext",
     "templateFormat": "Vorlagenformat",
-    "templateVariablesLead": "Variablen: "
+    "templateVariablesLead": "Variablen: ",
+    "ocspRevocationTitle": "OCSP und Widerruf",
+    "interfaceLanguage": "Sprache der Oberfläche"
   },
   "account": {
     "profile": "Profil",
@@ -4473,11 +4518,6 @@
     "noCertificatesEnrolled": "Keine Client-Zertifikate registriert",
     "deleteCertConfirm": "Dieses Client-Zertifikat löschen?",
     "certificateDeleted": "Zertifikat gelöscht",
-    "apiKeyTips": [
-      "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM",
-      "Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig",
-      "Jeder Schlüssel kann ein eigenes Ablaufdatum haben"
-    ],
     "yourAPIKeys": "Ihre API-Schlüssel",
     "createAPIKey": "API-Schlüssel erstellen",
     "createKey": "Schlüssel erstellen",
@@ -4566,7 +4606,8 @@
     "tocLabel": "Abschnitte des Kontos",
     "apiKeysIntent": "Schlüssel, die die API im Namen Ihres Kontos aufrufen.",
     "profileSaved": "Profil gespeichert.",
-    "profileReset": "Profiländerungen verworfen."
+    "profileReset": "Profiländerungen verworfen.",
+    "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben."
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
@@ -4576,8 +4617,8 @@
     "deleteRole": "Rolle löschen",
     "roleName": "Rollenname",
     "assignedUsers": "Zugewiesene Benutzer",
-    "noRoles": "Keine Rollen definiert",
-    "noRolesDescription": "Erstellen Sie benutzerdefinierte Rollen für granulare Zugriffskontrolle",
+    "noRoles": "Keine Rollen",
+    "noRolesDescription": "Erstellen Sie benutzerdefinierte Rollen für granulare Zugriffskontrolle.",
     "searchRoles": "Rollen suchen...",
     "inherits": "Erbt",
     "inheritsFrom": "Erbt von",
@@ -4638,6 +4679,12 @@
     "columns": {
       "permissions": "Rechte",
       "users": "Benutzer"
+    },
+    "systemRoles": {
+      "admin": "Vollständiger Systemzugriff mit allen Berechtigungen",
+      "operator": "Tägliche Zertifikatsvorgänge",
+      "auditor": "Lesezugriff auf alle Betriebsdaten für Compliance und Audit",
+      "viewer": "Einfacher Lesezugriff auf Zertifikate und CAs"
     }
   },
   "hsm": {
@@ -4728,12 +4775,12 @@
       "softhsmFips": "SoftHSM ist kein validiertes Modul: Im FIPS-Modus sind Schlüssel darauf nicht FIPS-geschützt."
     },
     "syncingKeys": "Synchronisierung...",
-    "unit_one": "{{count}} Speicherort",
-    "unit_other": "{{count}} Speicherorte",
+    "unit_one": "{{count}} Anbieter",
+    "unit_other": "{{count}} Anbieter",
     "keyCount_one": "{{count}} Schlüssel",
     "keyCount_other": "{{count}} Schlüssel",
-    "range_one": "{{shown}} von {{count}} Speicherort",
-    "range_other": "{{shown}} von {{count}} Speicherorten",
+    "range_one": "{{shown}} von {{count}} Anbieter",
+    "range_other": "{{shown}} von {{count}} Anbietern",
     "states": {
       "connected": "Verbunden",
       "error": "Fehler",
@@ -7460,7 +7507,8 @@
       "ad_connector_health": "Active-Directory-Status",
       "session_cleanup": "Sitzungsbereinigung"
     },
-    "colNote": "Letztes Ergebnis"
+    "colNote": "Letztes Ergebnis",
+    "imminent": "unmittelbar bevorstehend"
   },
   "lint": {
     "action": "Prüfen",
@@ -7982,7 +8030,8 @@
       "mfa": "Zwei-Faktor",
       "mfaOn": "Ein: {{methods}}",
       "mfaOff": "Aus",
-      "endsAt": "Endet {{date}}"
+      "endsAt": "Endet {{date}}",
+      "lockInHours": "Sperrt nach {{hours}} Std. Inaktivität"
     },
     "activity": {
       "label": "Aktivität",
@@ -8598,7 +8647,8 @@
       "request": "Anfrage Nr. {{id}}",
       "requests_one": "{{count}} Anfrage",
       "requests_other": "{{count}} Anfragen"
-    }
+    },
+    "historyMore": "{{count}} weitere anzeigen"
   },
   "atelier": {
     "name": "Name",

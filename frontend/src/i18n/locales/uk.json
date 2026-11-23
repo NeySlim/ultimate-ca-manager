@@ -479,6 +479,7 @@
     "duplicateKey": "Інший рядок вище вже використовує \"{{key}}\": зберегти можна лише один із них",
     "chooseFile": "Виберіть файл…",
     "more": "Ще",
+    "moreActions": "Інші дії",
     "otherViews": "Інші подання"
   },
   "commandPalette": {
@@ -1936,7 +1937,7 @@
     "editUser": "Редагувати користувача",
     "deleteUser": "Видалити користувача",
     "admin": "Адміністратор",
-    "noUsers": "Користувачів не знайдено",
+    "noUsers": "Користувачів немає",
     "resetPassword": "Скинути пароль",
     "activate": "Активувати",
     "usernamePlaceholder": "ivanpetrov",
@@ -2066,7 +2067,8 @@
       "auditor": "Доступ лише для читання до всіх операційних даних, зокрема журналу.",
       "viewer": "Доступ лише для читання до сертифікатів, ЦС і шаблонів."
     },
-    "customRoleOf": "Власна роль: {{name}}"
+    "customRoleOf": "Власна роль: {{name}}",
+    "noUsersDescription": "Створіть локальний обліковий запис або дозвольте вхід через налаштованого провайдера SSO."
   },
   "groups": {
     "group": "Група",
@@ -2078,7 +2080,7 @@
     "permissionsHelp": "Дозволи, що надаються кожному учаснику цієї групи додатково до його власної ролі.",
     "noPermissions": "Дозволи не надано",
     "members": "Учасники",
-    "noGroups": "Групи не знайдено",
+    "noGroups": "Груп немає",
     "noMembers": "Учасників не знайдено",
     "membersUpdated": "Учасників оновлено: {{added}} додано, {{removed}} вилучено",
     "namePlaceholder": "розробники",
@@ -2113,7 +2115,8 @@
       "export": "Експорт",
       "admin": "Адміністрування"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "Група надає ту саму роль одразу кільком обліковим записам."
   },
   "acme": {
     "title": "Протокол ACME",
@@ -3583,6 +3586,46 @@
       "setup": "Конфігурація",
       "system": "Система"
     },
+    "actions": {
+      "login_success": "Успішний вхід",
+      "login_failure": "Невдалий вхід",
+      "logout": "Вихід",
+      "session_locked": "Сеанс заблоковано",
+      "scep_challenge_read": "Перегляд пароля SCEP",
+      "generate_crl": "CRL сформовано",
+      "generate_delta_crl": "Дельта-CRL сформовано",
+      "crl_regenerate": "CRL перегенеровано",
+      "ca_created": "ЦС створено",
+      "ca_deleted": "ЦС видалено",
+      "ca_updated": "ЦС змінено",
+      "ca_imported": "ЦС імпортовано",
+      "ca_revoked": "ЦС відкликано",
+      "certificate_created": "Сертифікат випущено",
+      "cert_created": "Сертифікат випущено",
+      "certificate_issued": "Сертифікат випущено",
+      "cert_deleted": "Сертифікат видалено",
+      "certificate_deleted": "Сертифікат видалено",
+      "cert_revoked": "Сертифікат відкликано",
+      "certificate_imported": "Сертифікат імпортовано",
+      "cert_imported": "Сертифікат імпортовано",
+      "certificate_renewed": "Сертифікат поновлено",
+      "certificate_auto_renewed": "Сертифікат поновлено автоматично",
+      "csr_signed": "Запит підписано",
+      "csr_create": "Запит створено",
+      "csr_generated": "Запит сформовано",
+      "csr_delete": "Запит видалено",
+      "settings_update": "Параметри змінено",
+      "user_create": "Обліковий запис створено",
+      "user_delete": "Обліковий запис видалено",
+      "user_update": "Обліковий запис змінено",
+      "password_change": "Пароль змінено",
+      "system_backup": "Резервне копіювання",
+      "system_restore": "Відновлення",
+      "template_create": "Шаблон створено",
+      "template_delete": "Шаблон видалено",
+      "truststore_add": "Довірений корінь додано",
+      "truststore_remove": "Довірений корінь вилучено"
+    },
     "format_csv": "Один рядок на подію",
     "format_json": "Структуровані дані"
   },
@@ -4575,7 +4618,9 @@
     },
     "templateHtmlSource": "Вихідний код HTML",
     "templateFormat": "Формат шаблону",
-    "templateVariablesLead": "Змінні: "
+    "templateVariablesLead": "Змінні: ",
+    "ocspRevocationTitle": "OCSP і відкликання",
+    "interfaceLanguage": "Мова інтерфейсу"
   },
   "account": {
     "profile": "Профіль",
@@ -4627,11 +4672,6 @@
     "noCertificatesEnrolled": "Немає зареєстрованих клієнтських сертифікатів",
     "deleteCertConfirm": "Видалити цей клієнтський сертифікат?",
     "certificateDeleted": "Сертифікат видалено",
-    "apiKeyTips": [
-      "Ключі API надають програмний доступ до UCM",
-      "Зберігайте ключі в таємниці та регулярно змінюйте їх",
-      "Для кожного ключа можна задати власний термін дії"
-    ],
     "yourAPIKeys": "Ваші ключі API",
     "createAPIKey": "Створити ключ API",
     "createKey": "Створити ключ",
@@ -4720,7 +4760,8 @@
     "tocLabel": "Розділи облікового запису",
     "apiKeysIntent": "Ключі, які викликають API від імені вашого облікового запису.",
     "profileSaved": "Профіль збережено.",
-    "profileReset": "Зміни профілю скасовано."
+    "profileReset": "Зміни профілю скасовано.",
+    "apiKeyHint": "Ключі API надають програмний доступ до UCM. Зберігайте ключі в таємниці та регулярно змінюйте їх. Для кожного ключа можна задати власний термін дії."
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",
@@ -4730,8 +4771,8 @@
     "deleteRole": "Видалити роль",
     "roleName": "Назва ролі",
     "assignedUsers": "Призначені користувачі",
-    "noRoles": "Немає визначених ролей",
-    "noRolesDescription": "Створюйте власні ролі для детального керування доступом",
+    "noRoles": "Ролей немає",
+    "noRolesDescription": "Створюйте власні ролі для детального керування доступом.",
     "searchRoles": "Пошук ролей...",
     "inherits": "Успадковує",
     "inheritsFrom": "Успадковує від",
@@ -4796,6 +4837,12 @@
     "columns": {
       "permissions": "Права",
       "users": "Користувачі"
+    },
+    "systemRoles": {
+      "admin": "Повний доступ до системи з усіма дозволами",
+      "operator": "Щоденні операції з сертифікатами",
+      "auditor": "Доступ лише для читання до всіх робочих даних для відповідності й аудиту",
+      "viewer": "Базовий доступ на читання до сертифікатів і ЦС"
     }
   },
   "hsm": {
@@ -4886,18 +4933,18 @@
       "softhsmFips": "SoftHSM не є валідованим модулем: у режимі FIPS ключі на ньому не захищені відповідно до FIPS."
     },
     "syncingKeys": "Синхронізація...",
-    "unit_one": "{{count}} розташування",
-    "unit_other": "{{count}} розташувань",
-    "unit_few": "{{count}} розташування",
-    "unit_many": "{{count}} розташувань",
+    "unit_one": "{{count}} провайдер",
+    "unit_other": "{{count}} провайдера",
+    "unit_few": "{{count}} провайдери",
+    "unit_many": "{{count}} провайдерів",
     "keyCount_one": "{{count}} ключ",
     "keyCount_other": "{{count}} ключів",
     "keyCount_few": "{{count}} ключі",
     "keyCount_many": "{{count}} ключів",
-    "range_one": "{{shown}} із {{count}} розташування",
-    "range_other": "{{shown}} із {{count}} розташувань",
-    "range_few": "{{shown}} із {{count}} розташувань",
-    "range_many": "{{shown}} із {{count}} розташувань",
+    "range_one": "{{shown}} із {{count}} провайдера",
+    "range_other": "{{shown}} із {{count}} провайдера",
+    "range_few": "{{shown}} із {{count}} провайдерів",
+    "range_many": "{{shown}} із {{count}} провайдерів",
     "states": {
       "connected": "Підключено",
       "error": "Помилка",
@@ -7764,7 +7811,8 @@
       "ad_connector_health": "Стан Active Directory",
       "session_cleanup": "Очищення сеансів"
     },
-    "colNote": "Останній результат"
+    "colNote": "Останній результат",
+    "imminent": "незабаром"
   },
   "lint": {
     "action": "Перевірити",
@@ -8330,7 +8378,8 @@
       "mfa": "Двофакторна",
       "mfaOn": "Увімк.: {{methods}}",
       "mfaOff": "Вимк.",
-      "endsAt": "Завершується {{date}}"
+      "endsAt": "Завершується {{date}}",
+      "lockInHours": "Блокується після {{hours}} год бездіяльності"
     },
     "activity": {
       "label": "Активність",
@@ -9106,7 +9155,8 @@
       "requests_other": "{{count}} запитів",
       "requests_few": "{{count}} запити",
       "requests_many": "{{count}} запитів"
-    }
+    },
+    "historyMore": "Показати ще {{count}}"
   },
   "atelier": {
     "name": "Назва",

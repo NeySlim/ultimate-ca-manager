@@ -31,6 +31,8 @@ const TOOLS = [
   { id: 'key-matcher', labelKey: 'tools.keyMatcher', descKey: 'tools.keyMatcherDesc', icon: 'key' },
   { id: 'converter', labelKey: 'tools.converter', descKey: 'tools.converterDesc', icon: 'refresh' },
 ]
+// Every PEM a tool reads takes one height
+const PEM_ROWS = 6
 const ANY_FILE = '.pem,.crt,.cer,.der,.p12,.pfx,.p7b,.p7c,.key,.csr'
 const keyOutput = (format) => format === 'pkcs12' || format === 'jks'
 
@@ -264,7 +266,7 @@ export default function CertificateToolsPage() {
   })()
 
   const run = (label, icon, onRun) => (
-    <SettingsTest id={activeTool} label={label} icon={icon} write={false} busy={loading} onTest={onRun} result={outcome} hint={t('tools.runHint')} />
+    <SettingsTest id={activeTool} label={label} icon={icon} write={false} primary busy={loading} onTest={onRun} result={outcome} hint={t('tools.runHint')} />
   )
 
   const renderSSLChecker = () => (
@@ -282,7 +284,7 @@ export default function CertificateToolsPage() {
   const renderCSRDecoder = () => (
     <>
       <SettingsGroup legend={t('tools.sectionPemInput')}>
-        <PemField id="tool-csr" label={t('tools.csrPemLabel')} value={csrPem} onChange={setCsrPem} rows={8} accept=".pem,.csr,.der"
+        <PemField id="tool-csr" label={t('tools.csrPemLabel')} value={csrPem} onChange={setCsrPem} rows={PEM_ROWS} accept=".pem,.csr,.der"
           placeholder={'-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----'} />
       </SettingsGroup>
       {run(t('tools.decodeCsr'), 'file', handleDecodeCSR)}
@@ -292,7 +294,7 @@ export default function CertificateToolsPage() {
   const renderCertDecoder = () => (
     <>
       <SettingsGroup legend={t('tools.sectionCertificateInput')}>
-        <PemField id="tool-cert" label={t('tools.certPemLabel')} value={certPem} onChange={setCertPem} rows={8} accept=".pem,.crt,.cer,.der"
+        <PemField id="tool-cert" label={t('tools.certPemLabel')} value={certPem} onChange={setCertPem} rows={PEM_ROWS} accept=".pem,.crt,.cer,.der"
           placeholder={'-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'} />
       </SettingsGroup>
       {run(t('tools.decodeCert'), 'cert', handleDecodeCert)}
@@ -301,12 +303,12 @@ export default function CertificateToolsPage() {
 
   const renderKeyMatcher = () => (
     <>
-      <SettingsGroup legend={t('tools.sectionKeyInput')}>
-        <PemField id="tool-match-cert" label={t('tools.certificateOptional')} value={matchCert} onChange={setMatchCert} rows={6}
+      <SettingsGroup legend={t('tools.sectionKeyInput')} legendHidden>
+        <PemField id="tool-match-cert" label={t('tools.certificateOptional')} value={matchCert} onChange={setMatchCert} rows={PEM_ROWS}
           accept=".pem,.crt,.cer,.der" placeholder="-----BEGIN CERTIFICATE-----" />
-        <PemField id="tool-match-key" label={t('tools.privateKeyOptional')} value={matchKey} onChange={setMatchKey} rows={6}
+        <PemField id="tool-match-key" label={t('tools.privateKeyOptional')} value={matchKey} onChange={setMatchKey} rows={PEM_ROWS}
           accept=".pem,.key,.der" placeholder="-----BEGIN PRIVATE KEY-----" />
-        <PemField id="tool-match-csr" label={t('tools.csrOptional')} value={matchCsr} onChange={setMatchCsr} rows={6}
+        <PemField id="tool-match-csr" label={t('tools.csrOptional')} value={matchCsr} onChange={setMatchCsr} rows={PEM_ROWS}
           accept=".pem,.csr,.der" placeholder="-----BEGIN CERTIFICATE REQUEST-----" />
         <SecretInput id="tool-match-password" label={t('tools.keyPassword')} placeholder={t('tools.keyPasswordPlaceholder')} value={matchPassword}
           onChange={(e) => setMatchPassword(e.target.value)} />
@@ -317,8 +319,8 @@ export default function CertificateToolsPage() {
 
   const renderConverter = () => (
     <>
-      <SettingsGroup legend={t('tools.sectionConversion')}>
-        <PemField id="tool-convert-input" label={t('tools.inputAnyFormat')} value={convertPem} rows={4} accept={ANY_FILE} hint={t('tools.supportsFormats')}
+      <SettingsGroup legend={t('tools.sectionConversion')} legendHidden>
+        <PemField id="tool-convert-input" label={t('tools.inputAnyFormat')} value={convertPem} rows={PEM_ROWS} accept={ANY_FILE} hint={t('tools.supportsFormats')}
           placeholder={'-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'}
           onChange={(v) => { setConvertFile(null); setConvertPem(v) }}
           onFile={(file) => { setConvertFile(file); setConvertPassword('') }} />
@@ -352,7 +354,7 @@ export default function CertificateToolsPage() {
       {convertFormat === 'pkcs7' && (
         <SettingsGroup legend={t('tools.caChainOptional')}>
           <Textarea id="tool-convert-chain" mono label={t('tools.caChainOptional')} placeholder={t('tools.additionalCerts')} value={convertChain}
-            onChange={(e) => setConvertChain(e.target.value)} rows={4} />
+            onChange={(e) => setConvertChain(e.target.value)} rows={PEM_ROWS} />
         </SettingsGroup>
       )}
       {run(t('tools.convert'), 'refresh', handleConvert)}

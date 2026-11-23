@@ -12,11 +12,11 @@ import { useDetached } from './useDetached'
 import { KIND_ICONS } from './kindIcons'
 import { maxRect, workArea } from './geometry'
 
-// The window's body for each kind, read when the first window of that kind opens
+// The window's body for each kind, read when the first window of that kind opens; `label`: the type its bar names
 export const KINDS = {
-  certificate: { icon: KIND_ICONS.certificate, Body: lazy(() => import('../../pages/certificates/CertificateFloat')) },
-  ca: { icon: KIND_ICONS.ca, Body: lazy(() => import('../../pages/cas/CAFloat')) },
-  csr: { icon: KIND_ICONS.csr, Body: lazy(() => import('../../pages/csrs/CsrFloat')) },
+  certificate: { icon: KIND_ICONS.certificate, label: 'common.certificate', Body: lazy(() => import('../../pages/certificates/CertificateFloat')) },
+  ca: { icon: KIND_ICONS.ca, label: 'common.ca', Body: lazy(() => import('../../pages/cas/CAFloat')) },
+  csr: { icon: KIND_ICONS.csr, label: 'common.csr', Body: lazy(() => import('../../pages/csrs/CsrFloat')) },
   compare: { icon: KIND_ICONS.compare, Body: lazy(() => import('../../pages/certificates/compare/CompareFloat')) },
 }
 
@@ -49,7 +49,7 @@ export function DetachedLayer() {
           const prefix = `float-${w.key.replace(/[^a-z0-9]/gi, '-')}-`
           const maximized = !!maxed[w.key]
           return (
-            <DetachedWindow key={w.uid || w.key} wkey={w.key} icon={kind.icon} title={w.title || t('common.loading')} rect={maximized ? full : rects[w.key]}
+            <DetachedWindow key={w.uid || w.key} wkey={w.key} icon={kind.icon} kindLabel={kind.label && t(kind.label)} title={w.title || t('common.loading')} rect={maximized ? full : rects[w.key]}
               maximized={maximized} onToggleMax={() => toggleMax(w.key)}
               z={BASE_Z + ranks.get(w.key)} front={w.key === top} onPlace={(r) => place(w.key, r)} onFront={() => front(w.key)} onClose={() => close(w.key)}
               takeFocus={focusKey === w.key} onFocused={clearFocus}>

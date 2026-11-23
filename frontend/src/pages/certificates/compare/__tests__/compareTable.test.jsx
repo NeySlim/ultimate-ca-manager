@@ -38,6 +38,16 @@ describe('CompareTable', () => {
     expect(line(container, 'subject').querySelectorAll('td')).toHaveLength(3)
   })
 
+  it('writes a digest in equal lines of bytes, as its chip does elsewhere', () => {
+    const sha = (b) => Array.from({ length: 32 }, () => b).join(':')
+    const certs = [cert(1, 'a.example', ['a.example'], { thumbprint_sha256: sha('AB') }), cert(2, 'b.example', ['b.example'], { thumbprint_sha256: sha('CD') })]
+    const { container } = render(<CompareTable certs={certs} />)
+    const [first] = line(container, 'sha256').querySelectorAll('td')
+    const lines = [...first.querySelectorAll('.hex-lines > .line')].map((l) => l.textContent.replace(/:$/, '').split(':').length)
+    expect(lines.length).toBeGreaterThan(1)
+    expect(new Set(lines).size).toBe(1)
+  })
+
   it('marks in a list the element a certificate has alone, the shared one plain', () => {
     const certs = [cert(1, 'a.example', ['a.example', 'www.example']), cert(2, 'b.example', ['www.example'])]
     const { container } = render(<CompareTable certs={certs} />)
@@ -72,9 +82,11 @@ describe('CompareTable', () => {
     // subject, sha1, sha256, serial differ; the rest is identical
     expect(differing).toBe(4)
     expect(screen.getByText(`compare.differences ${JSON.stringify({ count: 4, total })}`)).toBeInTheDocument()
+    // A count, neither a warning nor a deadline: a neutral pill
+    expect(screen.getByText(`compare.differences ${JSON.stringify({ count: 4, total })}`).closest('.badge').className).toBe('badge')
     fireEvent.click(screen.getByRole('checkbox', { name: 'compare.onlyDifferences' }))
     expect(container.querySelectorAll('tbody tr')).toHaveLength(4)
     expect(container.querySelectorAll('tbody td[colspan]')).toHaveLength(0)
-    expect(within(container.querySelector('tbody')).getAllByRole('rowheader').map((h) => h.firstChild.textContent)).toEqual(['common.subject', 'common.fingerprints SHA-1', 'common.fingerprints SHA-256', 'inspector.cert.serial'])
+    expect(within(container.querySelector('tbody')).getAllByRole('rowheader').map((h) => h.firstChild.textContent)).toEqual(['common.subject', 'common.fingerprint SHA-1', 'common.sha256', 'inspector.cert.serial'])
   })
 })

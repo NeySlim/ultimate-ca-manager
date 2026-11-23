@@ -477,6 +477,7 @@
     "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません",
     "chooseFile": "ファイルを選択…",
     "more": "その他",
+    "moreActions": "その他の操作",
     "otherViews": "その他のビュー"
   },
   "commandPalette": {
@@ -1866,7 +1867,7 @@
     "editUser": "ユーザーを編集",
     "deleteUser": "ユーザーを削除",
     "admin": "管理者",
-    "noUsers": "ユーザーが見つかりません",
+    "noUsers": "ユーザーはいません",
     "resetPassword": "パスワードをリセット",
     "activate": "有効化",
     "usernamePlaceholder": "yamadataro",
@@ -1990,7 +1991,8 @@
       "auditor": "ジャーナルを含むすべての運用データの読み取り専用アクセス。",
       "viewer": "証明書、認証局、テンプレートの読み取り専用アクセス。"
     },
-    "customRoleOf": "カスタムロール: {{name}}"
+    "customRoleOf": "カスタムロール: {{name}}",
+    "noUsersDescription": "ローカルアカウントを作成するか、設定済みの SSO プロバイダーでのサインインを許可します。"
   },
   "groups": {
     "group": "グループ",
@@ -2002,7 +2004,7 @@
     "permissionsHelp": "このグループの各メンバーに、各自のロールに加えて付与される権限。",
     "noPermissions": "権限は付与されていません",
     "members": "メンバー",
-    "noGroups": "グループが見つかりません",
+    "noGroups": "グループはありません",
     "noMembers": "メンバーが見つかりません",
     "membersUpdated": "メンバーを更新しました: {{added}} 件追加、{{removed}} 件削除",
     "namePlaceholder": "開発者",
@@ -2029,7 +2031,8 @@
       "export": "エクスポート",
       "admin": "管理"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "グループは複数のアカウントに同じロールを一度に付与します。"
   },
   "acme": {
     "title": "ACMEプロトコル",
@@ -3439,6 +3442,46 @@
       "setup": "構成",
       "system": "システム"
     },
+    "actions": {
+      "login_success": "サインイン成功",
+      "login_failure": "サインイン失敗",
+      "logout": "サインアウト",
+      "session_locked": "セッションをロック",
+      "scep_challenge_read": "SCEP チャレンジを参照",
+      "generate_crl": "CRL を生成",
+      "generate_delta_crl": "デルタ CRL を生成",
+      "crl_regenerate": "CRL を再生成",
+      "ca_created": "認証局を作成",
+      "ca_deleted": "認証局を削除",
+      "ca_updated": "認証局を更新",
+      "ca_imported": "認証局をインポート",
+      "ca_revoked": "認証局を失効",
+      "certificate_created": "証明書を発行",
+      "cert_created": "証明書を発行",
+      "certificate_issued": "証明書を発行",
+      "cert_deleted": "証明書を削除",
+      "certificate_deleted": "証明書を削除",
+      "cert_revoked": "証明書を失効",
+      "certificate_imported": "証明書をインポート",
+      "cert_imported": "証明書をインポート",
+      "certificate_renewed": "証明書を更新",
+      "certificate_auto_renewed": "証明書を自動更新",
+      "csr_signed": "要求に署名",
+      "csr_create": "要求を作成",
+      "csr_generated": "要求を生成",
+      "csr_delete": "要求を削除",
+      "settings_update": "設定を変更",
+      "user_create": "アカウントを作成",
+      "user_delete": "アカウントを削除",
+      "user_update": "アカウントを変更",
+      "password_change": "パスワードを変更",
+      "system_backup": "バックアップ",
+      "system_restore": "復元",
+      "template_create": "テンプレートを作成",
+      "template_delete": "テンプレートを削除",
+      "truststore_add": "トラストアンカーを追加",
+      "truststore_remove": "トラストアンカーを削除"
+    },
     "format_csv": "イベントごとに1行",
     "format_json": "構造化データ"
   },
@@ -4421,7 +4464,9 @@
     },
     "templateHtmlSource": "HTMLソース",
     "templateFormat": "テンプレート形式",
-    "templateVariablesLead": "変数: "
+    "templateVariablesLead": "変数: ",
+    "ocspRevocationTitle": "OCSP と失効",
+    "interfaceLanguage": "表示言語"
   },
   "account": {
     "profile": "プロフィール",
@@ -4473,11 +4518,6 @@
     "noCertificatesEnrolled": "登録されたクライアント証明書はありません",
     "deleteCertConfirm": "このクライアント証明書を削除しますか？",
     "certificateDeleted": "証明書が削除されました",
-    "apiKeyTips": [
-      "API キーを使うと UCM にプログラムからアクセスできます",
-      "キーは秘密にし、定期的にローテーションしてください",
-      "キーごとに有効期限を設定できます"
-    ],
     "yourAPIKeys": "あなたのAPIキー",
     "createAPIKey": "APIキーを作成",
     "createKey": "キーの作成",
@@ -4566,7 +4606,8 @@
     "tocLabel": "アカウントのセクション",
     "apiKeysIntent": "アカウントの代わりにAPIを呼び出すキー。",
     "profileSaved": "プロフィールを保存しました。",
-    "profileReset": "プロフィールの変更を元に戻しました。"
+    "profileReset": "プロフィールの変更を元に戻しました。",
+    "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
@@ -4576,8 +4617,8 @@
     "deleteRole": "ロールを削除",
     "roleName": "ロール名",
     "assignedUsers": "割り当てられたユーザー",
-    "noRoles": "定義されたロールなし",
-    "noRolesDescription": "詳細なアクセス制御のためのカスタムロールを作成",
+    "noRoles": "ロールはありません",
+    "noRolesDescription": "詳細なアクセス制御のためのカスタムロールを作成。",
     "searchRoles": "ロールを検索...",
     "inherits": "継承",
     "inheritsFrom": "継承元",
@@ -4638,6 +4679,12 @@
     "columns": {
       "permissions": "権限",
       "users": "ユーザー"
+    },
+    "systemRoles": {
+      "admin": "すべての権限を持つシステム全体へのアクセス",
+      "operator": "日常的な証明書の操作",
+      "auditor": "コンプライアンスと監査のための全運用データへの読み取り専用アクセス",
+      "viewer": "証明書と CA への基本的な読み取りアクセス"
     }
   },
   "hsm": {
@@ -4728,12 +4775,12 @@
       "softhsmFips": "SoftHSM は検証済みモジュールではありません。FIPS モードでは、その上の鍵は FIPS で保護されません。"
     },
     "syncingKeys": "同期中...",
-    "unit_one": "{{count}} か所",
-    "unit_other": "{{count}} か所",
+    "unit_one": "{{count}} 件のプロバイダー",
+    "unit_other": "{{count}} 件のプロバイダー",
     "keyCount_one": "{{count}} 個の鍵",
     "keyCount_other": "{{count}} 個の鍵",
-    "range_one": "{{count}} か所中 {{shown}} か所",
-    "range_other": "{{count}} か所中 {{shown}} か所",
+    "range_one": "{{count}} 件のプロバイダー中 {{shown}} 件",
+    "range_other": "{{count}} 件のプロバイダー中 {{shown}} 件",
     "states": {
       "connected": "接続済み",
       "error": "エラー",
@@ -7460,7 +7507,8 @@
       "ad_connector_health": "Active Directoryの状態",
       "session_cleanup": "セッションのクリーンアップ"
     },
-    "colNote": "前回の結果"
+    "colNote": "前回の結果",
+    "imminent": "まもなく"
   },
   "lint": {
     "action": "検査",
@@ -7982,7 +8030,8 @@
       "mfa": "2 要素認証",
       "mfaOn": "オン: {{methods}}",
       "mfaOff": "オフ",
-      "endsAt": "{{date}} に終了"
+      "endsAt": "{{date}} に終了",
+      "lockInHours": "操作がない状態が {{hours}} 時間続くとロック"
     },
     "activity": {
       "label": "アクティビティ",
@@ -8598,7 +8647,8 @@
       "request": "リクエスト #{{id}}",
       "requests_one": "{{count}} 件のリクエスト",
       "requests_other": "{{count}} 件のリクエスト"
-    }
+    },
+    "historyMore": "さらに {{count}} 件を表示"
   },
   "atelier": {
     "name": "名前",

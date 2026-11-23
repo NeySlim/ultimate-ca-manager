@@ -20,7 +20,7 @@ export default function SsoSection({ ssoProviders, ssoLoading, ssoTesting, handl
   if (ssoLoading) return <SkeletonPanel label={t('common.loading')} />
   return (
     <SettingsGroup legend={t('sso.configuredProviders')} grid={false}>
-      <RecordList>
+      <RecordList columns>
         {TYPES.map(({ type, labelKey, descKey }) => {
           const label = t(labelKey)
           const provider = ssoProviders.find(p => p.provider_type === type)

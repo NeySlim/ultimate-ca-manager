@@ -34,8 +34,8 @@ export function ThemeMenu() {
   const family = FAMILIES.find(f => f.id === themeFamily) || FAMILIES[0]
   const modeLabel = mode === 'system' ? `${t('shell.theme.system')} (${modeName.toLowerCase()})` : modeName
   const currentName = `${t(family.labelKey)}, ${modeLabel}`
-  // The button shows the applied theme: sparkles for Aurore, otherwise the resolved mode
-  const buttonIcon = themeFamily === 'aurore' ? 'sparkles' : resolvedMode === 'light' ? 'sun' : 'moon'
+  // The button shows the applied mode in either family, an icon the menu itself shows (the family is the palette)
+  const buttonIcon = resolvedMode === 'light' ? 'sun' : 'moon'
 
   useEffect(() => {
     if (open) {

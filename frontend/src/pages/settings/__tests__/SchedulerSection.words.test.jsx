@@ -56,7 +56,8 @@ describe('SchedulerSection words', () => {
     expect(cells.slice(3, 7)).toEqual(['scheduler.interval.everyHours:6', 'time.compact.minutesAgo:56', 'time.compact.inHours:5', '1,4 ms'])
     const other = screen.getByText('Brand new task').closest('tr')
     const more = within(other).getAllByRole('cell').map((c) => c.textContent)
-    expect(more.slice(3, 6)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'time.compact.minutesAgo:1'])
+    // A next run already due is imminent, not « a minute ago »
+    expect(more.slice(3, 6)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'scheduler.imminent'])
   })
 
   it('words a skip reason a task gives as an English sentence', async () => {

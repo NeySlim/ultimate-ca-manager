@@ -74,7 +74,7 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
             <Icon name="help" />
           </button>
         )}
-        <UserMenu can={can} />
+        <UserMenu can={can} onOpenHelp={hasHelp ? onOpenHelp : undefined} />
       </div>
     </header>
   )

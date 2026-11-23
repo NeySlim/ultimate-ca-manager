@@ -172,6 +172,9 @@ export default function SecuritySection({ settings, fieldErrors = {}, updateSett
         )}
         {settings.hsts_env_locked?.length > 0 && <Notice tone="warn">{t('settings.hstsEnvLocked')}</Notice>}
         {settings.hsts_env_locked?.length === 0 && <Notice>{t('settings.hstsNote')}</Notice>}
+      </SettingsGroup>
+      {/* The responder's validity and renewal and the purge of revoked serials: revocation settings, under their own legend */}
+      <SettingsGroup legend={t('settings.ocspRevocationTitle')}>
         <NumberInput id="set-ocsp_response_validity_hours" label={t('settings.ocspResponseValidity')}
           value={shownNumber(settings.ocsp_response_validity_hours ?? 24)} onChange={(e) => updateSetting('ocsp_response_validity_hours', typedNumber(e))}
           hint={t('settings.ocspResponseValidityDesc')} error={fieldErrors.ocsp_response_validity_hours} />

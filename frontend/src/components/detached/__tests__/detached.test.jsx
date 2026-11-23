@@ -19,6 +19,13 @@ vi.mock('../../../pages/certificates/CertificateFloat', () => ({
   },
 }))
 
+vi.mock('../../../pages/certificates/compare/CompareFloat', () => ({
+  default: function Body({ ids, onTitle }) {
+    useEffect(() => { onTitle(`compare ${ids.join(',')}`) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    return <p>compare body</p>
+  },
+}))
+
 import { DetachedProvider } from '../DetachedContext'
 import { DetachedLayer } from '../DetachedLayer'
 import { useDetached } from '../useDetached'
@@ -71,6 +78,26 @@ describe('detached windows', () => {
     expect(box(b).x).toBeGreaterThan(box(a).x)
     expect(box(b).y).toBeGreaterThan(box(a).y)
     expect(box(b).z).toBeGreaterThan(box(a).z)
+  })
+
+  // The inspector under the bar names the object: the bar shows its type, the window keeps the object's name
+  it('names the type in the bar of an object window, the comparison by its own title', async () => {
+    setup()
+    act(() => { api.open('certificate', [7]); api.open('compare', [1, 2]) })
+    const a = await screen.findByRole('dialog', { name: 'cert 7' })
+    const bar = a.querySelector('.float-title h2')
+    expect(bar.querySelector('[aria-hidden="true"]')).toHaveTextContent('common.certificate')
+    expect(bar.querySelector('.sr-only')).toHaveTextContent('cert 7')
+    const c = await screen.findByRole('dialog', { name: 'compare 1,2' })
+    expect(c.querySelector('.float-title h2').textContent).toBe('compare 1,2')
+  })
+
+  // A comparison opens tall enough for its fourteen properties, within the window less the bars
+  it('opens a comparison 820 px high where the window allows it', async () => {
+    setup()
+    act(() => { api.open('compare', [1, 2]) })
+    const w = await screen.findByRole('dialog', { name: 'compare 1,2' })
+    expect(box(w)).toMatchObject({ w: 1120, h: 820 })
   })
 
   it('brings the window touched in front of the others', async () => {

@@ -101,6 +101,14 @@ test.describe('desktop', () => {
     expect(Math.round((await box(link.locator('svg'))).width)).toBe(17)
   })
 
+  test('the users head shows its secondary actions as buttons, no « ⋯ » menu, the main one named in full', async ({ page, api }) => {
+    await page.goto('/users')
+    const head = page.locator('.page-head')
+    await expect(head.getByRole('button', { name: 'Export the list' })).toBeVisible()
+    await expect(head.getByRole('button', { name: 'Other actions' })).toBeHidden()
+    await expect(head.locator('#users-new')).toHaveText('Create User', { useInnerText: true })
+  })
+
   test('an empty approvals queue says so in the mockup panel', async ({ page, api }) => {
     await page.goto('/approvals')
     const main = page.getByRole('main')
@@ -129,14 +137,34 @@ test.describe('phone', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
 
-  test('the reports head keeps the mockup one action; the PDF composer is under the queue, 40 px', async ({ page, api }) => {
+  test('the reports head keeps the mockup one action; the PDF composer is in its « ⋯ » menu, 40 px', async ({ page, api }) => {
     await page.goto('/reports')
     const head = page.locator('.page-head')
     await expect(head.getByRole('button', { name: 'Schedule a report' })).toBeVisible()
     await expect(head.getByRole('button', { name: 'Build a PDF…' })).toBeHidden()
-    const pdf = page.getByRole('main').locator('.phone-only').getByRole('button', { name: 'Build a PDF…' })
-    await expect(pdf).toBeVisible()
-    expect(Math.round((await box(pdf)).height)).toBe(40)
+    const more = head.getByRole('button', { name: 'Other actions' })
+    expect(Math.round((await box(more)).height)).toBe(40)
+    await more.click()
+    await head.getByRole('menuitem', { name: 'Build a PDF…' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+  })
+
+  // The mockup hides a phone head's secondary buttons; Users and Groups keep them in the « ⋯ » menu
+  test('users and groups: the head\'s secondary actions stay reachable from its « ⋯ » menu', async ({ page, api }) => {
+    await page.goto('/users')
+    const head = page.locator('.page-head')
+    await expect(head.getByRole('button', { name: 'Export the list' })).toBeHidden()
+    const more = head.getByRole('button', { name: 'Other actions' })
+    const m = await box(more)
+    const h1 = await box(head.locator('h1'))
+    expect(m.y + m.height).toBeLessThanOrEqual(h1.y + 60)
+    await more.click()
+    await expect(head.getByRole('menuitem', { name: 'Export the list' })).toBeVisible()
+    await head.getByRole('menuitem', { name: 'Groups' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Groups' })).toBeVisible()
+    await head.getByRole('button', { name: 'Other actions' }).click()
+    await expect(head.getByRole('menuitem', { name: 'Accounts' })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
 
   test('discovery: the actions under the list wrap inside the page, nothing sideways', async ({ page, api }) => {

@@ -75,7 +75,7 @@ export function ActivityCard() {
     }
     const a = item.entry
     const failed = failedOf(a)
-    const operation = actionLabel(a.action)
+    const operation = actionLabel(a.action, t)
     return (
       <li key={`${a.timestamp}-${i}`} className="activity-row tl-row" data-tone={failed ? 'bad' : undefined} data-family={typeOf(a.action)}>
         <Icon name={failed ? 'warning' : typeIcon(typeOf(a.action))} />

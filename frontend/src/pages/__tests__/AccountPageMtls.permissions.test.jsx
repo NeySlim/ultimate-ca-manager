@@ -214,3 +214,25 @@ describe('AccountPage mTLS export of a post-quantum certificate', () => {
     expect(screen.getByText('PEM').closest('label').querySelector('input')).toBeEnabled()
   })
 })
+
+describe('AccountPage mTLS certificate state', () => {
+  beforeEach(() => { authState.permissions = ['*'] })
+
+  // A certificate past its end is said expired, never Active, whatever its switch
+  it('says an enabled certificate past its end expired, a current one active', async () => {
+    accountMocks.getMTLSCertificates.mockResolvedValue({
+      data: [
+        { id: 1, name: 'old', enabled: true, cert_subject: 'CN=old', valid_until: '2020-04-09T19:40:00Z' },
+        { id: 2, name: 'current', enabled: true, cert_subject: 'CN=current', valid_until: '2999-01-01T00:00:00Z' },
+      ],
+    })
+    render(<MemoryRouter><AccountPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByText('common.security'))[0])
+    const row = (name) => screen.getByText(name).closest('li')
+    await screen.findByText('old')
+    expect(row('old')).toHaveTextContent('common.expired')
+    expect(row('old')).not.toHaveTextContent('common.active')
+    expect(row('current')).toHaveTextContent('common.active')
+    expect(row('current')).toHaveTextContent('common.expires')
+  })
+})

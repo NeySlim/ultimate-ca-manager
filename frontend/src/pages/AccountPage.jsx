@@ -564,13 +564,10 @@ export default function AccountPage() {
           <input id="set-role" value={ROLE_KEYS[accountData.role] ? t(ROLE_KEYS[accountData.role]) : (accountData.role || t('common.user'))} readOnly />
         </Field>
       </SettingsGroup>
-      {/* The account's language, saved with its preferences (the account menu no longer carries it) */}
-      <SettingsGroup legend={t('settings.language')}>
-        <Select id="set-language" label={t('settings.language')} value={i18n.language?.split('-')[0] || 'en'} onChange={changeLanguage}
-          options={languages.map((l) => ({ value: l.code, label: l.name }))} />
-      </SettingsGroup>
-      {/* Preferences of this browser; the inspector reads this one when the page changes */}
+      {/* Preferences of this browser and the account's language; the inspector reads the first when the page changes */}
       <SettingsGroup legend={t('account.preferences')}>
+        <Select id="set-language" label={t('settings.interfaceLanguage')} value={i18n.language?.split('-')[0] || 'en'} onChange={changeLanguage}
+          options={languages.map((l) => ({ value: l.code, label: l.name }))} />
         <ToggleSwitch id="set-close_on_nav" checked={closeOnNav} onChange={(on) => { if (on !== closeOnNav) toggleCloseOnNav() }}
           label={t('account.closeInspectorOnNav')} description={t('account.closeInspectorOnNavHint')} />
       </SettingsGroup>
@@ -631,10 +628,13 @@ export default function AccountPage() {
         <RecordList empty={t('account.noCertificatesEnrolled')}>
           {mtlsCertificates.map((cert) => {
             const name = cert.name || cert.cert_subject
+            // A certificate past its end no longer signs anyone in: it says so whatever its switch
+            const expired = cert.valid_until && new Date(cert.valid_until) < new Date()
             return (
               <RecordRow key={cert.id} title={name}
-                badge={<Pill tone={cert.enabled ? 'good' : 'warn'} label={cert.enabled ? t('common.active') : t('common.disabled')} />}
-                meta={[`${t('common.expires')} ${formatDate(cert.valid_until)}`, cert.last_used_at && `${t('common.used')} ${formatDate(cert.last_used_at)}`].filter(Boolean).join(' · ')}
+                badge={expired ? <Pill tone="bad" label={t('common.expired')} />
+                  : <Pill tone={cert.enabled ? 'good' : 'warn'} label={cert.enabled ? t('common.active') : t('common.disabled')} />}
+                meta={[`${t(expired ? 'common.expired' : 'common.expires')} ${formatDate(cert.valid_until)}`, cert.last_used_at && `${t('common.used')} ${formatDate(cert.last_used_at)}`].filter(Boolean).join(' · ')}
                 action={<span className="row-actions">
                   <IconBtn icon="download" label={`${t('common.export')} ${name}`}
                     onClick={() => setExportCert({ id: cert.id, name, hasPrivateKey: true, keyAlgorithm: cert.key_algorithm })} />
@@ -652,9 +652,10 @@ export default function AccountPage() {
 
   const keys = (
     <SettingsGroup legend={t('account.yourAPIKeys')} grid={false}>
-      {[].concat(t('account.apiKeyTips', { returnObjects: true }) || []).map((tip) => <p key={tip} className="group-hint">{tip}</p>)}
-      <RecordList empty={`${t('account.noAPIKeys')}. ${t('account.createKeyToAccess')}`}>
-        {apiKeys.map((key) => {
+      <p className="group-hint">{t('account.apiKeyHint')}</p>
+      <RecordList step={10} empty={`${t('account.noAPIKeys')}. ${t('account.createKeyToAccess')}`}>
+        {/* The keys in use first; revoked and expired ones after them, behind « show more » in a long list */}
+        {[...apiKeys].sort((a, b) => Number(b.is_active && !b.is_expired) - Number(a.is_active && !a.is_expired)).map((key) => {
           const effectivelyActive = key.is_active && !key.is_expired
           return (
             <RecordRow key={key.id} title={key.name}

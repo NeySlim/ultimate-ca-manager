@@ -7,6 +7,8 @@ import { formatDate } from '../../lib/utils'
 
 // The help's paragraphs run inline in the notice; its list keeps its items
 const NOTICE_MARKDOWN = { p: ({ children }) => <>{children} </> }
+// A connection's authentication method in the words of its form
+const AUTH_WORDS = { certificate: 'msca.authCertificate', kerberos: 'msca.authKerberos', basic: 'msca.authBasic' }
 
 export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaTesting, handleMscaCreate, handleMscaEdit, handleMscaToggle, handleMscaTest, handleMscaSyncCrl, handleMscaPublishCrl, handleMscaInventorySync, handleMscaCaControl, setMscaConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
@@ -35,8 +37,8 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
   return (
     <>
       {help}
-      <SettingsGroup legend={t('settings.tabs.microsoftCA')} grid={false}>
-        <RecordList>
+      <SettingsGroup legend={t('settings.tabs.microsoftCA')} legendHidden grid={false}>
+        <RecordList columns>
           {mscaConnections.map(conn => (
             <RecordRow key={conn.id} title={conn.name}
               meta={<>{conn.server}{conn.ca_name ? ` · ${conn.ca_name}` : ''} · {t('msca.defaultTemplate')}{sep}{conn.default_template}</>}
@@ -57,7 +59,7 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
               badge={(
                 <span className="row-actions">
                   <Pill tone={conn.enabled ? 'good' : 'muted'} label={conn.enabled ? t('common.enabled') : t('common.disabled')} />
-                  <Pill icon="key" label={conn.auth_method} />
+                  <Pill icon="key" label={AUTH_WORDS[conn.auth_method] ? t(AUTH_WORDS[conn.auth_method]) : conn.auth_method} />
                 </span>
               )}
               action={<>

@@ -127,13 +127,13 @@ describe('ThemeMenu', () => {
     expect(trigger()).toHaveAttribute('aria-haspopup', 'menu')
   })
 
-  it('draws sparkles for the Aurore family, else the applied mode, with the mockup\'s icon', () => {
+  it('draws the applied mode in either family, with the mockup\'s icon', () => {
     theme.value = { themeFamily: 'aurore', mode: 'light', resolvedMode: 'light' }
     const { unmount } = render(<MemoryRouter><ThemeMenu /></MemoryRouter>)
     expect(trigger()).toHaveAccessibleName('shell.theme.label|settings.themeFamilies.aurore, shell.theme.light')
     const svg = trigger().querySelector('svg')
     expect(svg).toHaveClass('icon')
-    expect(drawn(svg)).toBe(drawnOf('sparkles'))
+    expect(drawn(svg)).toBe(drawnOf('sun'))
     unmount()
     theme.value = { themeFamily: 'atelier', mode: 'dark', resolvedMode: 'dark' }
     render(<MemoryRouter><ThemeMenu /></MemoryRouter>)

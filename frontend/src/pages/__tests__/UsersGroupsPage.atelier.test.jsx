@@ -103,6 +103,14 @@ describe('the account list', () => {
     expect(container.querySelector('footer.table-footer')).toHaveTextContent('users.range {"shown":1,"count":3}')
   })
 
+  it('says why an empty list is empty, in a sentence under its title, as the other empty blocks', async () => {
+    m.getAll.mockResolvedValue({ data: [] })
+    const { container } = page()
+    const empty = await waitFor(() => { const el = container.querySelector('#empty-users'); expect(el).toBeTruthy(); return el })
+    expect(within(empty).getByRole('heading')).toHaveTextContent('users.noUsers')
+    expect(empty).toHaveTextContent('users.noUsersDescription')
+  })
+
   it('searches and filters by role, then resets from the no-match block', async () => {
     page()
     await screen.findByRole('button', { name: 'Chloé Durand' })
@@ -183,11 +191,25 @@ describe('the account list', () => {
     expect(footer).toHaveTextContent('users.pageRange {"start":1,"end":25,"count":32}')
   }, 15000)
 
-  it("words the head's main action as a short verb, named in full", async () => {
+  it("words the head's main action in full, a short verb kept for a phone", async () => {
     page()
     const create = await screen.findByRole('button', { name: 'users.createUser' })
     expect(create).toHaveAttribute('id', 'users-new')
-    expect(create).toHaveTextContent(/^common\.create$/)
+    expect(create.querySelector('.wide-label')).toHaveTextContent(/^users\.createUser$/)
+    expect(create.querySelector('.phone-label')).toHaveTextContent(/^common\.create$/)
+  })
+
+  // A phone hides the head's secondary buttons (the mockup's rule): its « ⋯ » menu gives them back
+  it("gives the head's secondary actions a « ⋯ » menu, as the journal's", async () => {
+    page()
+    await screen.findByRole('button', { name: 'Chloé Durand' })
+    const more = document.querySelector('.page-head .page-more')
+    expect(more).not.toBeNull()
+    fireEvent.click(within(more).getByRole('button', { name: 'common.moreActions' }))
+    const items = within(more).getAllByRole('menuitem').map((b) => b.textContent)
+    expect(items).toEqual(['common.groups', 'users.exportList'])
+    fireEvent.click(within(more).getByRole('menuitem', { name: 'common.groups' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'common.groups' })).toBeInTheDocument()
   })
 
   it('exports the whole list, a formula-like cell neutralised', async () => {

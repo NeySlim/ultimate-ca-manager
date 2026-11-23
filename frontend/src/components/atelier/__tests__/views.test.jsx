@@ -111,10 +111,25 @@ describe('the work queue', () => {
     expect(document.getElementById('work-history')).not.toHaveAttribute('hidden')
     expect(screen.getByText('DEM-1')).toBeInTheDocument()
   })
+  // A long history opens on its newest twenty lines; each ask shows twenty more
+  it('bounds the history to twenty lines, then twenty more at each ask', () => {
+    const items = Array.from({ length: 45 }, (_, i) => <li key={i} className="h">{`DEM-${i}`}</li>)
+    render(<WorkView {...base} groups={groups([row('a', 'CSR a')])} history={{ label: 'Traitées', count: 45, children: items }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Traitées/ }))
+    const lines = () => document.querySelectorAll('#work-history li.h').length
+    expect(lines()).toBe(20)
+    fireEvent.click(screen.getByRole('button', { name: 'work.historyMore {"count":20}' }))
+    expect(lines()).toBe(40)
+    fireEvent.click(screen.getByRole('button', { name: 'work.historyMore {"count":5}' }))
+    expect(lines()).toBe(45)
+    expect(document.querySelector('[data-action="records-more"]')).toBeNull()
+  })
   it('says the queue is empty with its action, shows skeletons while loading, an error in place of the queue', () => {
     const { rerender, container } = render(<WorkView {...base} empty={{ ...base.empty, action: <button type="button">Politiques</button> }} groups={groups([])} />)
     expect(screen.getByTestId('work-empty')).toHaveTextContent('Aucune demande')
     expect(screen.getByRole('button', { name: 'Politiques' })).toBeInTheDocument()
+    // Nothing to tick: no hint on how to tick several rows
+    expect(screen.queryByText('Cochez plusieurs demandes')).toBeNull()
     rerender(<WorkView {...base} state="loading" groups={groups([])} history={{ label: 'x', count: 0 }} />)
     expect(container.querySelector('.work-view')).toHaveAttribute('aria-busy', 'true')
     expect(screen.getByRole('status')).toHaveTextContent('work.loading')

@@ -318,7 +318,7 @@ export default function AuditLogsPage() {
   if (filterSuccess) chip('result', filterSuccess === 'true' ? t('audit.resultsOk') : t('audit.resultsFailed'), () => changeFilter(setFilterSuccess)(''))
   if (filterDateFrom) chip('from', t('audit.chipFrom', { date: eventDate(`${filterDateFrom}T12:00:00`, locale) }), () => changeFilter(setFilterDateFrom)(''))
   if (filterDateTo) chip('to', t('audit.chipTo', { date: eventDate(`${filterDateTo}T12:00:00`, locale) }), () => changeFilter(setFilterDateTo)(''))
-  for (const a of chosenActions) chip(`action-${a}`, t('audit.chipAction', { action: actionLabel(a) }), () => changeFilter(setFilterAction)(chosenActions.filter((x) => x !== a)))
+  for (const a of chosenActions) chip(`action-${a}`, t('audit.chipAction', { action: actionLabel(a, t) }), () => changeFilter(setFilterAction)(chosenActions.filter((x) => x !== a)))
 
   const firstRead = loading && !loadError
   const shown = firstRead ? [] : logs
@@ -336,7 +336,7 @@ export default function AuditLogsPage() {
   // The journal's columns: short ones fit their content (adjust.css), the operation and the resource share the rest
   const columns = [
     { id: 'time', label: t('audit.colTime'), fit: true, sort: 'timestamp', tone: ['mono', 'muted'], cell: (e) => rowTime(e.timestamp, locale), skeleton: { width: '64px' } },
-    { id: 'operation', label: t('audit.colOperation'), cell: (e) => <span className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action)}</span>, skeleton: { base: 45, spread: 35 } },
+    { id: 'operation', label: t('audit.colOperation'), cell: (e) => <span className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action, t)}</span>, skeleton: { base: 45, spread: 35 } },
     // The resource takes the room left and gives way by an ellipsis, its whole text in a title (audit-resource, R1, L6)
     { id: 'resource', label: t('audit.colResource'), resource: true, tone: 'audit-resource', title: resourceOf, cell: resourceOf, skeleton: { base: 50, spread: 40 } },
     { id: 'user', label: t('audit.colUser'), fit: true, tone: ['muted', 'small'], cell: (e) => e.username || t('common.system'), skeleton: { width: '70px' } },
@@ -344,7 +344,7 @@ export default function AuditLogsPage() {
   ]
   const card = (e) => ({
     title: resourceOf(e),
-    meta: [<span key="type" className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action)}</span>, e.username || t('common.system')],
+    meta: [<span key="type" className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action, t)}</span>, e.username || t('common.system')],
     status: badgeOf(e),
     end: rowTime(e.timestamp, locale),
   })

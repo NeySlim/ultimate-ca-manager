@@ -46,7 +46,7 @@ export default function AppearanceSettings() {
       </SettingsGroup>
 
       <SettingsGroup legend={t('settings.language')} hint={t('settings.languageDesc')}>
-        <Select id="set-language" label={t('settings.language')} value={i18n.language?.split('-')[0] || 'en'}
+        <Select id="set-language" label={t('settings.interfaceLanguage')} value={i18n.language?.split('-')[0] || 'en'}
           onChange={(code) => chooseLanguage(i18n, code)} options={languages.map((lang) => ({ value: lang.code, label: lang.name }))} />
       </SettingsGroup>
 

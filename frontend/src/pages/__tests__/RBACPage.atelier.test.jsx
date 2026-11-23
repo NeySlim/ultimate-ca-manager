@@ -61,32 +61,45 @@ describe('the role list', () => {
     await screen.findByRole('button', { name: 'Cert Team' })
     expect(container.querySelector('.page-head .total')).toHaveTextContent('rbac.unit {"count":2}')
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent))
-      .toEqual(['atelier.name', 'common.description', 'rbac.inheritsFrom', 'rbac.columns.permissions', 'rbac.columns.users', 'atelier.state', 'common.actions'])
+      .toEqual(['atelier.name', 'common.description', 'rbac.inheritsFrom', 'rbac.columns.permissions', 'rbac.columns.users', 'common.type', 'common.actions'])
     fireEvent.click(within(screen.getByRole('group', { name: 'rbac.filterByType' })).getByRole('button', { name: /common\.custom/ }))
-    expect(screen.queryByRole('button', { name: 'Viewer' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'common.viewer' })).toBeNull()
     expect(container.querySelector('footer.table-footer')).toHaveTextContent('rbac.range {"shown":1,"count":2}')
   })
 })
 
+describe('the seeded roles', () => {
+  // Named and described in the language, as the account list names the same roles; a custom role keeps its own words
+  it('names and describes a system role in the language, a custom role as written', async () => {
+    page()
+    await screen.findByRole('button', { name: 'common.viewer' })
+    expect(screen.queryByText('Read only')).toBeNull()
+    expect(screen.getAllByText('rbac.systemRoles.viewer').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Cert Team' })).toBeInTheDocument()
+  })
+})
+
 describe('the role dock', () => {
-  it('reads the properties as typed rows: the type a state, no parent muted, the counts plain', async () => {
+  it('reads the properties as typed rows: the type a neutral pill, no parent muted, the counts plain, in the list\'s words', async () => {
     page()
     fireEvent.click(await screen.findByRole('button', { name: 'Cert Team' }))
     const kv = dock().querySelector('dl.kv')
     expect(kv).not.toBeNull()
     expect(dock().querySelector('dl.props')).toBeNull()
     const row = (term) => within(kv).getByText(term, { selector: 'dt' }).closest('div.row')
-    expect(row('common.type').querySelector('dd.v .badge.good')).toHaveTextContent('common.custom')
+    // A type, not a state: neutral, never the success colour
+    expect(row('common.type').querySelector('dd.v .badge')).toHaveTextContent('common.custom')
+    expect(row('common.type').querySelector('dd.v .badge').className).toBe('badge')
     const parent = row('rbac.inheritsFrom').querySelector('dd')
     expect(parent).toHaveClass('absent')
     expect(parent).toHaveTextContent('—')
-    expect(row('common.users').querySelector('dd.v')).toHaveTextContent('rbac.userCount {"count":4}')
-    expect(row('common.permissions').querySelector('dd.v')).toHaveTextContent(/^1\/3$/)
+    expect(row('rbac.columns.users').querySelector('dd.v')).toHaveTextContent('users.unit {"count":4}')
+    expect(row('rbac.columns.permissions').querySelector('dd.v')).toHaveTextContent(/^1\/3$/)
   })
 
   it('reads a system role without any action', async () => {
     page()
-    fireEvent.click(await screen.findByRole('button', { name: 'Viewer' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'common.viewer' }))
     expect(within(dock()).getByText('rbac.systemRoleWarning')).toBeTruthy()
     expect(within(dock()).queryByRole('button', { name: 'common.saveChanges' })).toBeNull()
     expect(within(dock()).queryByRole('button', { name: 'common.delete' })).toBeNull()
@@ -111,7 +124,10 @@ describe('the role dock', () => {
       ['groups.grant {"action":"groups.actions.write","resource":"rbac.categories.certificates"}', false],
     ])
     expect(dock().textContent).not.toMatch(/(read|write|delete):/)
+    // Save waits for a change, then saves it
+    expect(within(dock()).getByRole('button', { name: 'common.saveChanges' })).toBeDisabled()
     fireEvent.click(within(certs).getByRole('checkbox', { name: /groups\.actions\.write/ }))
+    expect(within(dock()).getByRole('button', { name: 'common.saveChanges' })).toBeEnabled()
     fireEvent.click(within(dock()).getByRole('button', { name: 'common.saveChanges' }))
     await waitFor(() => expect(stable.update).toHaveBeenCalled())
     expect(stable.update.mock.calls[0][1].permissions.sort()).toEqual(['read:certificates', 'write:certificates'])
@@ -160,7 +176,7 @@ describe('the role dock in the URL', () => {
     const dock = await r.dock()
     expect(within(dock).getByRole('tab', { name: 'common.permissions' })).toHaveAttribute('aria-selected', 'true')
     expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Cert Team')
-    fireEvent.click(screen.getByRole('button', { name: 'Viewer' }))
+    fireEvent.click(screen.getByRole('button', { name: 'common.viewer' }))
     expect(r.where()).toBe('/rbac?item=1')
   })
 
@@ -168,20 +184,20 @@ describe('the role dock in the URL', () => {
     const r = renderAtUrl(<RBACPage />, '/rbac')
     await screen.findByRole('button', { name: 'Cert Team' })
     expect(sortedHeads()).toEqual([['atelier.name', 'ascending']])
-    expect(names()).toEqual(['Cert Team', 'Viewer'])
-    expect(sortableHeads()).toEqual(['atelier.name', 'common.description', 'rbac.inheritsFrom', 'rbac.columns.permissions', 'rbac.columns.users', 'atelier.state'])
+    expect(names()).toEqual(['Cert Team', 'common.viewer'])
+    expect(sortableHeads()).toEqual(['atelier.name', 'common.description', 'rbac.inheritsFrom', 'rbac.columns.permissions', 'rbac.columns.users', 'common.type'])
     // The counts are numbers at the right, under short labels that name the whole one
     expect(screen.getByRole('button', { name: 'common.permissions' })).toHaveTextContent('rbac.columns.permissions')
     expect(screen.getByRole('button', { name: 'common.users' }).closest('th')).toHaveClass('num')
     fireEvent.click(screen.getByRole('button', { name: 'common.users' }))
-    expect(names()).toEqual(['Cert Team', 'Viewer'])
+    expect(names()).toEqual(['Cert Team', 'common.viewer'])
     fireEvent.click(screen.getByRole('button', { name: 'common.users' }))
-    expect(names()).toEqual(['Viewer', 'Cert Team'])
+    expect(names()).toEqual(['common.viewer', 'Cert Team'])
     expect(r.where()).toBe('/rbac?sort=users&order=desc')
     r.unmount()
     renderAtUrl(<RBACPage />, '/rbac?sort=permissions&order=desc')
     await screen.findByRole('button', { name: 'Cert Team' })
     expect(sortedHeads()).toEqual([['rbac.columns.permissions', 'descending']])
-    expect(names()).toEqual(['Viewer', 'Cert Team'])
+    expect(names()).toEqual(['common.viewer', 'Cert Team'])
   })
 })

@@ -53,11 +53,6 @@
     "noCertificatesEnrolled": "Aucun certificat client inscrit",
     "deleteCertConfirm": "Supprimer ce certificat client?",
     "certificateDeleted": "Certificat supprimé",
-    "apiKeyTips": [
-      "Les clés API permettent l’accès programmatique à UCM",
-      "Gardez vos clés secrètes et faites-les tourner régulièrement",
-      "Chaque clé peut avoir une date d’expiration personnalisée"
-    ],
     "yourAPIKeys": "Vos clés API",
     "createKey": "Créer une clé",
     "keyNameExample": "ex. Pipeline CI/CD",
@@ -142,7 +137,8 @@
     "tocLabel": "Sections du compte",
     "apiKeysIntent": "Clés qui appellent l’API au nom de votre compte.",
     "profileSaved": "Profil enregistré.",
-    "profileReset": "Modifications du profil annulées."
+    "profileReset": "Modifications du profil annulées.",
+    "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée."
   },
   "acme": {
     "title": "Protocole ACME",
@@ -911,6 +907,46 @@
       "settings": "Paramètres",
       "setup": "Configuration",
       "system": "Système"
+    },
+    "actions": {
+      "login_success": "Connexion réussie",
+      "login_failure": "Échec de connexion",
+      "logout": "Déconnexion",
+      "session_locked": "Session verrouillée",
+      "scep_challenge_read": "Défi SCEP consulté",
+      "generate_crl": "CRL générée",
+      "generate_delta_crl": "CRL delta générée",
+      "crl_regenerate": "CRL régénérée",
+      "ca_created": "AC créée",
+      "ca_deleted": "AC supprimée",
+      "ca_updated": "AC modifiée",
+      "ca_imported": "AC importée",
+      "ca_revoked": "AC révoquée",
+      "certificate_created": "Certificat émis",
+      "cert_created": "Certificat émis",
+      "certificate_issued": "Certificat émis",
+      "cert_deleted": "Certificat supprimé",
+      "certificate_deleted": "Certificat supprimé",
+      "cert_revoked": "Certificat révoqué",
+      "certificate_imported": "Certificat importé",
+      "cert_imported": "Certificat importé",
+      "certificate_renewed": "Certificat renouvelé",
+      "certificate_auto_renewed": "Certificat renouvelé automatiquement",
+      "csr_signed": "Demande signée",
+      "csr_create": "Demande créée",
+      "csr_generated": "Demande générée",
+      "csr_delete": "Demande supprimée",
+      "settings_update": "Paramètres modifiés",
+      "user_create": "Compte créé",
+      "user_delete": "Compte supprimé",
+      "user_update": "Compte modifié",
+      "password_change": "Mot de passe modifié",
+      "system_backup": "Sauvegarde",
+      "system_restore": "Restauration",
+      "template_create": "Modèle créé",
+      "template_delete": "Modèle supprimé",
+      "truststore_add": "Ancre de confiance ajoutée",
+      "truststore_remove": "Ancre de confiance retirée"
     },
     "format_csv": "Une ligne par événement",
     "format_json": "Données structurées"
@@ -2256,9 +2292,9 @@
     "renew": "Renouveler",
     "revoke": "Révoquer",
     "sign": "Signer",
-    "casShort": "ACs",
-    "csrsShort": "CSRs",
-    "certificatesShort": "Certs",
+    "casShort": "AC",
+    "csrsShort": "CSR",
+    "certificatesShort": "Certificats",
     "templatesShort": "Modèles",
     "usersShort": "Comptes",
     "cert": "Cert",
@@ -2390,6 +2426,7 @@
     },
     "chooseFile": "Choisir un fichier…",
     "more": "Plus",
+    "moreActions": "Autres actions",
     "otherViews": "Autres vues"
   },
   "compare": {
@@ -2914,7 +2951,7 @@
     "permissionsHelp": "Permissions accordées à chaque membre de ce groupe, en plus de son propre rôle.",
     "noPermissions": "Aucune permission accordée",
     "members": "Membres",
-    "noGroups": "Aucun groupe trouvé",
+    "noGroups": "Aucun groupe",
     "noMembers": "Aucun membre trouvé",
     "membersUpdated": "Membres mis à jour : {{added}} ajoutés, {{removed}} retirés",
     "namePlaceholder": "développeurs",
@@ -2941,7 +2978,8 @@
       "export": "Exporter",
       "admin": "Administrer"
     },
-    "grant": "{{action}} : {{resource}}"
+    "grant": "{{action}} : {{resource}}",
+    "noGroupsDescription": "Un groupe donne le même rôle à plusieurs comptes à la fois."
   },
   "help": {
     "englishOnlyNotice": "L’aide est disponible en anglais, en français, en espagnol, en russe et en chinois.",
@@ -3050,12 +3088,12 @@
       "softhsmFips": "SoftHSM n’est pas un module validé : en mode FIPS, les clés qu’il contient ne sont pas protégées par FIPS."
     },
     "syncingKeys": "Synchronisation...",
-    "unit_one": "{{count}} emplacement",
-    "unit_other": "{{count}} emplacements",
+    "unit_one": "{{count}} fournisseur",
+    "unit_other": "{{count}} fournisseurs",
     "keyCount_one": "{{count}} clé",
     "keyCount_other": "{{count}} clés",
-    "range_one": "{{shown}} sur {{count}} emplacement",
-    "range_other": "{{shown}} sur {{count}} emplacements",
+    "range_one": "{{shown}} sur {{count}} fournisseur",
+    "range_other": "{{shown}} sur {{count}} fournisseurs",
     "states": {
       "connected": "Connecté",
       "error": "En erreur",
@@ -3274,9 +3312,9 @@
     "deleteRole": "Supprimer le rôle",
     "roleName": "Nom du rôle",
     "assignedUsers": "Utilisateurs assignés",
-    "noRoles": "Aucun rôle trouvé",
+    "noRoles": "Aucun rôle",
     "createCustomRole": "Créer un rôle personnalisé",
-    "noRolesDescription": "Créer des rôles personnalisés pour un contrôle d’accès granulaire",
+    "noRolesDescription": "Créez des rôles personnalisés pour un contrôle d’accès granulaire.",
     "searchRoles": "Rechercher des rôles...",
     "inherits": "Hérite",
     "inheritsFrom": "Hérite de",
@@ -3337,6 +3375,12 @@
     "columns": {
       "permissions": "Droits",
       "users": "Comptes"
+    },
+    "systemRoles": {
+      "admin": "Accès complet au système, avec toutes les permissions",
+      "operator": "Opérations courantes sur les certificats",
+      "auditor": "Lecture seule de toutes les données d’exploitation, pour la conformité et l’audit",
+      "viewer": "Lecture des certificats et des AC"
     }
   },
   "scep": {
@@ -4485,7 +4529,9 @@
     },
     "templateHtmlSource": "Source HTML",
     "templateFormat": "Format du modèle",
-    "templateVariablesLead": "Variables : "
+    "templateVariablesLead": "Variables : ",
+    "ocspRevocationTitle": "OCSP et révocation",
+    "interfaceLanguage": "Langue de l’interface"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée.",
@@ -5162,7 +5208,7 @@
     "editUser": "Modifier l’utilisateur",
     "deleteUser": "Supprimer l’utilisateur",
     "admin": "Administrateur",
-    "noUsers": "Aucun utilisateur trouvé",
+    "noUsers": "Aucun utilisateur",
     "resetPassword": "Réinitialiser le mot de passe",
     "activate": "Activer",
     "usernamePlaceholder": "jeandupont",
@@ -5286,7 +5332,8 @@
       "auditor": "Lecture seule de toutes les données d’exploitation, journal compris.",
       "viewer": "Lecture seule des certificats, des AC et des modèles."
     },
-    "customRoleOf": "Rôle personnalisé : {{name}}"
+    "customRoleOf": "Rôle personnalisé : {{name}}",
+    "noUsersDescription": "Créez un compte local, ou laissez les utilisateurs se connecter par un fournisseur SSO configuré."
   },
   "validation": {
     "required": "Ce champ est requis",
@@ -7460,7 +7507,8 @@
       "ad_connector_health": "État d’Active Directory",
       "session_cleanup": "Nettoyage des sessions"
     },
-    "colNote": "Dernier résultat"
+    "colNote": "Dernier résultat",
+    "imminent": "imminente"
   },
   "lint": {
     "action": "Linter",
@@ -7982,7 +8030,8 @@
       "mfa": "Double authentification",
       "mfaOn": "Active : {{methods}}",
       "mfaOff": "Inactive",
-      "endsAt": "Fin le {{date}}"
+      "endsAt": "Fin le {{date}}",
+      "lockInHours": "Verrouillage après {{hours}} h d’inactivité"
     },
     "activity": {
       "label": "Activité",
@@ -8598,7 +8647,8 @@
       "request": "Demande #{{id}}",
       "requests_one": "{{count}} demande",
       "requests_other": "{{count}} demandes"
-    }
+    },
+    "historyMore": "Afficher {{count}} de plus"
   },
   "atelier": {
     "name": "Nom",

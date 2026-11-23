@@ -52,7 +52,7 @@ const readFacts = () => authService.getCurrentUser()
 const isLockKey = (e) => e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyL' || e.key?.toLowerCase() === 'l')
 const inTextField = (el) => el?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.tagName)
 
-export function UserMenu({ can }) {
+export function UserMenu({ can, onOpenHelp }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { user, logout, lock, authMethod } = useAuth()
@@ -154,7 +154,9 @@ export function UserMenu({ can }) {
               factors && { label: t('shell.userCard.mfa'), ...(mfaOn ? { value: factors } : { state: ['muted', factors] }) },
               (minutes || endsAt) && {
                 label: t('shell.userCard.session'), long: true,
-                value: minutes ? t('shell.userCard.lockIn', { minutes }) : t('shell.userCard.endsAt', { date: endsAt }),
+                // Whole hours said in hours (8 h, not 480 min)
+                value: minutes ? (minutes >= 60 && minutes % 60 === 0 ? t('shell.userCard.lockInHours', { hours: minutes / 60 }) : t('shell.userCard.lockIn', { minutes }))
+                  : t('shell.userCard.endsAt', { date: endsAt }),
                 sub: minutes && endsAt ? t('shell.userCard.endsAt', { date: endsAt }) : undefined,
               },
             ]} />
@@ -167,6 +169,12 @@ export function UserMenu({ can }) {
             {languages.map(l => <option key={l.code} value={l.code} lang={l.code}>{l.name}</option>)}
           </select>
         </div>
+        {/* Under 1000 px the bar hides its help button: the page's help is reached from here (adjust.css) */}
+        {onOpenHelp && (
+          <button type="button" className="pop-item user-help" id="user-help" data-action="help-menu" onClick={() => { close(); onOpenHelp() }}>
+            <Icon name="help" />{t('commandPalette.pageHelp')}
+          </button>
+        )}
         <button type="button" className="pop-item" id="user-account" data-action="my-account" onClick={() => { close(); navigate('/account') }}>
           <Icon name="users" />{t('common.account')}
         </button>

@@ -109,10 +109,11 @@ export function SettingsFrame({ id, label, desc, error, aside, wide = false, chi
  * A group of fields: `fieldset.settings-group`, its legend, the two (four) column grid; `grid={false}`
  * for blocks stacked one under the other. `hint` says what the group does, under its legend (absent from the mockup).
  */
-export function SettingsGroup({ legend, hint, grid = true, children, ...rest }) {
+/** `legendHidden`: a legend that would repeat its card's title is kept for assistive technology only. */
+export function SettingsGroup({ legend, hint, grid = true, legendHidden = false, children, ...rest }) {
   return (
     <fieldset className="settings-group" {...rest}>
-      <legend>{legend}</legend>
+      <legend className={legendHidden ? 'sr-only' : undefined}>{legend}</legend>
       {hint && <p className="group-hint">{hint}</p>}
       <div className={grid ? 'settings-grid' : 'settings-stack'}>{children}</div>
     </fieldset>
@@ -122,13 +123,13 @@ export function SettingsGroup({ legend, hint, grid = true, children, ...rest }) 
 /**
  * A section's test (`.settings-test`): the button, then its result in the tone of the outcome, or
  * the hint at rest. result: { ok, text } | null. A field the test needs (`children`) precedes it.
- * `write={false}` for a check that only reads (the write guard lets it run).
+ * `write={false}` for a check that only reads (the write guard lets it run); `primary` when it is the page's one action.
  */
-export function SettingsTest({ id, label, icon = 'send', onTest, busy = false, result, hint, buttonRef, write = true, children }) {
+export function SettingsTest({ id, label, icon = 'send', onTest, busy = false, result, hint, buttonRef, write = true, primary = false, children }) {
   return (
     <div className="settings-test">
       {children}
-      <button type="button" className="btn" id={`test-${id}`} data-settings-test={id} data-write={write ? '' : undefined} ref={buttonRef} disabled={busy || undefined} onClick={onTest}>
+      <button type="button" className={primary ? 'btn primary' : 'btn'} id={`test-${id}`} data-settings-test={id} data-write={write ? '' : undefined} ref={buttonRef} disabled={busy || undefined} onClick={onTest}>
         <Icon name={icon} />{label}
       </button>
       {result ? (

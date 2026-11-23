@@ -69,6 +69,10 @@ describe('ResetPasswordPage', () => {
     renderAt('/reset-password')
     expect(screen.getByRole('heading', { name: 'auth.invalidLink' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'auth.requestNewResetLink' })).toHaveAttribute('href', '/forgot-password')
+    // A failure, said in the warning notice with its icon
+    const notice = screen.getByText('auth.invalidLinkDesc').closest('.notice')
+    expect(notice).toHaveClass('warn')
+    expect(notice.querySelector('svg.icon')).not.toBeNull()
   })
 
   it('refuses a short or unconfirmed password, then resets it', async () => {
