@@ -56,6 +56,58 @@ def test_a_request_waits_for_another_writer_in_python_then_writes(app, wal_engin
     check.close()
 
 
+def _locked_for(path, seconds):
+    other = _writer(path)
+    release = threading.Timer(seconds, lambda: other.execute('ROLLBACK'))
+    release.start()
+    return other, release
+
+
+def test_a_lock_met_late_in_a_request_still_has_the_wait_left(app, wal_engine, monkeypatch):
+    """The budget is the time the request spent waiting, not a window from its first lock."""
+    monkeypatch.setattr(sqlite_wait, 'WEB_LOCK_WAIT_SECONDS', 1.0)
+    engine, path = wal_engine
+    with app.test_request_context():
+        with engine.connect() as conn:
+            other, release = _locked_for(path, 0.1)
+            conn.exec_driver_sql('INSERT INTO t VALUES (1)')
+            conn.commit()
+            release.join()
+            other.close()
+            time.sleep(1.2)  # past a window opened by the first lock
+            other, release = _locked_for(path, 0.3)
+            started = time.monotonic()
+            conn.exec_driver_sql('INSERT INTO t VALUES (2)')
+            conn.commit()
+            took = time.monotonic() - started
+            release.join()
+            other.close()
+    assert 0.2 < took < 1.0, took
+
+
+def test_the_waits_of_a_request_add_up_to_its_budget(app, wal_engine, monkeypatch):
+    monkeypatch.setattr(sqlite_wait, 'WEB_LOCK_WAIT_SECONDS', 1.0)
+    engine, path = wal_engine
+    with app.test_request_context():
+        with engine.connect() as conn:
+            other, release = _locked_for(path, 0.6)
+            conn.exec_driver_sql('INSERT INTO t VALUES (1)')
+            conn.commit()
+            release.join()
+            other.close()
+            other, release = _locked_for(path, 3)
+            started = time.monotonic()
+            with pytest.raises(OperationalError):
+                conn.exec_driver_sql('INSERT INTO t VALUES (2)')
+            took = time.monotonic() - started
+            conn.rollback()
+            release.cancel()
+            other.execute('ROLLBACK')
+            other.close()
+    # About 0.4 s left of the second's budget, never a fresh second
+    assert 0.15 < took < 0.75, took
+
+
 def test_outside_the_web_server_sqlite3_waits_in_c(app, wal_engine):
     engine, _ = wal_engine
     with engine.connect() as conn:

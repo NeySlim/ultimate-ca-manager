@@ -130,3 +130,4 @@ tests/test_like_search_literal.py
 tests/test_search_protocol_objects.py
 tests/test_guide_prerender_route.py
 tests/test_list_sort*.py
+tests/test_smart_import_trust_store.py

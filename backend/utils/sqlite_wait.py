@@ -3,7 +3,7 @@
 sqlite3 waits for a lock in its own busy handler, inside C: under gevent that stops every
 request of the worker, probes included. In the web server (its requests, and every greenlet of
 the gunicorn worker) a connection to a WAL database waits at most IN_C_MS in C and retries in
-Python, where time.sleep yields, for WEB_LOCK_WAIT_SECONDS per request. While a single node's
+Python, where time.sleep yields, WEB_LOCK_WAIT_SECONDS in all per request. While a single node's
 restore gate is up, every connection does so for REQUEST_LOCK_WAIT_SECONDS, and not at all once
 the restore's transaction holds the database. Elsewhere (the scheduler process) sqlite3 waits
 in C, as a thread can. A request that met a lock and would answer 500 answers 503.
@@ -28,7 +28,7 @@ RETRY_FIRST, RETRY_MAX = 0.01, 0.1
 BUSY_RETRY_AFTER_SECONDS = 5
 _BUSY_INFO = 'ucm_busy_timeout'
 _LOCK_MET = 'ucm_lock_met'
-_DEADLINE = 'ucm_lock_deadline'
+_WAITED = 'ucm_lock_waited'
 _BUILT = 'ucm_lock_response_built'
 _WAL = 'ucm_wal'
 SQLITE_BUSY_SNAPSHOT = getattr(sqlite3, 'SQLITE_BUSY_SNAPSHOT', 517)
@@ -118,9 +118,12 @@ def _execute(cursor, statement, parameters, context, many=False):
         return None
     from flask import g, has_app_context, has_request_context
     run = cursor.executemany if many else cursor.execute
-    delay, local_deadline = RETRY_FIRST, None
+    budget = REQUEST_LOCK_WAIT_SECONDS if state == 'gate' else WEB_LOCK_WAIT_SECONDS
+    shared = has_request_context() or (state != 'web' and has_app_context())
+    delay, waited_here = RETRY_FIRST, 0.0
     while True:
         changes = cursor.connection.total_changes
+        tried = time.monotonic()
         try:
             if parameters is None:
                 run(statement)
@@ -133,16 +136,23 @@ def _execute(cursor, statement, parameters, context, many=False):
             if not is_locked(exc) or state == 'held' or is_busy_snapshot(exc) \
                     or cursor.connection.total_changes != changes:
                 raise
-            # One wait per request, shared by its statements, from the first lock it met
-            budget = time.monotonic() + (REQUEST_LOCK_WAIT_SECONDS if state == 'gate'
-                                         else WEB_LOCK_WAIT_SECONDS)
-            if has_request_context() or (state != 'web' and has_app_context()):
-                deadline = g.setdefault(_DEADLINE, budget)
+            # One budget per request, shared by its statements: the time they spent on locks,
+            # never a window that closes some time after the first lock met
+            spent = time.monotonic() - tried
+            if shared:
+                waited = g.get(_WAITED, 0.0) + spent
+                setattr(g, _WAITED, waited)
             else:
-                deadline = local_deadline = local_deadline or budget
-            if time.monotonic() + delay > deadline:
+                waited = waited_here = waited_here + spent
+            if waited + delay > budget:
                 raise
+        slept = time.monotonic()
         time.sleep(delay)  # gevent: the other requests run meanwhile
+        slept = time.monotonic() - slept
+        if shared:
+            setattr(g, _WAITED, g.get(_WAITED, 0.0) + slept)
+        else:
+            waited_here += slept
         delay = min(delay * 2, RETRY_MAX)
 
 

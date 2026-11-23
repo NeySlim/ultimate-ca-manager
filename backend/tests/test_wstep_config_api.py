@@ -91,3 +91,25 @@ def test_unrelated_field_change_does_not_restart(client, app, auth_client):
 
     with app.app_context():
         assert not _restart_signal_path(app).exists()
+
+
+def test_in_ha_the_switch_answers_a_rolling_listener_reload(app, auth_client, monkeypatch):
+    """HA: the rolling restart is queued with the switch, and the answer says so as elsewhere."""
+    from models import ClusterCommand
+    from services.cluster_commands import RESTART
+    from utils.listener_tls import ROLLING
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: True)
+    with app.app_context():
+        _set_config('wstep_enabled', 'false')
+        last = db.session.query(db.func.max(ClusterCommand.id)).scalar() or 0
+    try:
+        r = auth_client.patch('/api/v2/windows-profiles/settings', json={'wstep_enabled': True})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['data'] == {'listener_reload': ROLLING}
+        with app.app_context():
+            assert [c.kind for c in ClusterCommand.query.filter(ClusterCommand.id > last)] == [RESTART]
+    finally:
+        with app.app_context():
+            ClusterCommand.query.filter(ClusterCommand.id > last).delete()
+            db.session.commit()
+            _set_config('wstep_enabled', 'false')

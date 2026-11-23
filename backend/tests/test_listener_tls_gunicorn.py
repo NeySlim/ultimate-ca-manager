@@ -1,12 +1,15 @@
 """A real node in container mode outside HA (gunicorn with the product's configuration, SQLite): a
 regenerated, an applied, then a renewed HTTPS certificate is served after the product's SIGHUP to
 its master, whose pid stays, while the scheduler process keeps running (#452). openssl s_client
-reads what the listener presents.
+reads what the listener presents. An external SIGHUP restarts the scheduler process, silently.
 """
+import os
 import re
 import shutil
+import signal
 import ssl
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -168,3 +171,32 @@ def _regenerate_and_serve(node):
     # The configuration re-read at each SIGHUP finds the bound pair the worker wrote
     assert 'already in place' in console
     assert 'Failed to read config file' not in console and 'Traceback' not in console
+
+
+def test_an_external_sighup_restarts_the_scheduler_without_a_traceback(node):
+    try:
+        _external_sighup(node)
+    except BaseException:
+        print(node.log_text()[-30000:])
+        raise
+
+
+def _external_sighup(node):
+    master = node.proc.pid
+    workers, schedulers = _worker_and_scheduler(master)
+    assert len(workers) == 1 and len(schedulers) == 1, _children(master)
+    console_from = len(node.console.read_text(errors='replace'))
+    os.kill(master, signal.SIGHUP)  # systemctl reload, docker kill --signal=HUP: no reload asked by UCM
+
+    def renewed():
+        new_workers, new_schedulers = _worker_and_scheduler(master)
+        return (len(new_workers) == 1 and new_workers != workers
+                and len(new_schedulers) == 1 and new_schedulers != schedulers)
+    wait_until(renewed, 150, 'a new worker and a new scheduler process')
+    wait_until(node.ready, 60, 'the node ready after the reload')
+    # What the new worker inherited from the master's reload ends within seconds of the old scheduler
+    time.sleep(5)
+    assert node.alive() and node.proc.pid == master
+    console = node.console.read_text(errors='replace')[console_from:]
+    assert 'Hang up' in console
+    assert 'Traceback' not in console and 'KeyError' not in console, console

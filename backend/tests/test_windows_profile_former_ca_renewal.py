@@ -521,7 +521,9 @@ def test_a_save_that_changes_the_listener_trust_needs_admin_system(
     try:
         r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'issuing_ca_refid': a2['refid']})
         assert r.status_code == 403, r.get_json()
-        assert 'admin:system' in r.get_json()['message']
+        message = r.get_json()['message']
+        assert 'admin:system' in message
+        assert 'reloads the TLS listener' in message and 'restarts the service' not in message
         assert restarts == []
         with app.app_context():
             profile = _profile('c04-a')

@@ -14,11 +14,17 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from sqlalchemy import or_ as db_or
 
 from .parser import ParsedObject, ObjectType
 from .chain_builder import ChainInfo, find_ca_by_ski
 from utils.csr_diagnostics import weak_csr_hash_error
 from utils.key_type import unsignable_csr_key
+
+
+def _trusted_dict(row) -> Dict:
+    return {'id': row.id, 'name': row.name, 'certificate_pem': row.certificate_pem,
+            'subject': row.subject, 'fingerprint_sha256': row.fingerprint_sha256}
 
 
 def _compute_cert_fingerprint(pem_or_b64: Optional[str]) -> Optional[str]:
@@ -300,69 +306,46 @@ class ImportValidator:
                 result.add_error(error)
     
     def _find_in_trust_store(self, cert) -> Optional[Dict]:
-        """Look for the issuer of a certificate in the Trust Store"""
-        import sqlite3
-        from flask import current_app
+        """Look for the issuer of a certificate in the Trust Store, through the application's
+        database (SQLite or PostgreSQL); a candidate counts only if its SKI or key matches."""
         from cryptography import x509 as x509_mod
-        from cryptography.hazmat.backends import default_backend as dfb
-        
+        from models.truststore import TrustedCertificate
+        from services.smart_import.chain_builder import ChainBuilder
+
+        rows = TrustedCertificate.query.filter(TrustedCertificate.subject == cert.issuer) \
+            .order_by(TrustedCertificate.id).all() if cert.issuer else []
+        if not rows:
+            cn = self._get_cn(cert, issuer=True)
+            rows = TrustedCertificate.query.filter(db_or(
+                TrustedCertificate.name.contains(cn, autoescape=True),
+                TrustedCertificate.subject.contains(cn, autoescape=True),
+            )).order_by(TrustedCertificate.id).all()
         try:
-            db_path = current_app.config.get('DATABASE', '/opt/ucm/data/ucm.db')
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            
-            # Search by issuer subject match
-            rows = conn.execute(
-                "SELECT id, name, certificate_pem, subject, fingerprint_sha256 FROM trusted_certificates WHERE subject = ?",
-                (cert.issuer,)
-            ).fetchall()
-            
-            if not rows:
-                # Fallback: broader search
-                cn = self._get_cn(cert, issuer=True)
-                rows = conn.execute(
-                    "SELECT id, name, certificate_pem, subject, fingerprint_sha256 FROM trusted_certificates WHERE name LIKE ? OR subject LIKE ?",
-                    (f'%{cn}%', f'%{cn}%')
-                ).fetchall()
-            
-            # Verify AKI→SKI match if available
-            for row in rows:
-                try:
-                    trusted_cert = x509_mod.load_pem_x509_certificate(
-                        row['certificate_pem'].encode(), dfb()
-                    )
-                    # Check AKI→SKI
-                    if cert.aki:
-                        try:
-                            ski_ext = trusted_cert.extensions.get_extension_for_class(
-                                x509_mod.SubjectKeyIdentifier
-                            )
-                            trusted_ski = ski_ext.value.digest.hex()
-                            if trusted_ski == cert.aki:
-                                conn.close()
-                                return dict(row)
-                        except x509_mod.ExtensionNotFound:
-                            pass
-                    
-                    # Verify signature as fallback
-                    if cert.raw_pem:
-                        child_cert = x509_mod.load_pem_x509_certificate(
-                            cert.raw_pem.encode(), dfb()
-                        )
-                        from services.smart_import.chain_builder import ChainBuilder
-                        builder = ChainBuilder()
-                        builder._verify_signature(child_cert, trusted_cert.public_key())
-                        conn.close()
-                        return dict(row)
-                except Exception:
-                    continue
-            
-            conn.close()
-        except Exception:
-            pass
-        
+            child_cert = (x509_mod.load_pem_x509_certificate(cert.raw_pem.encode(), default_backend())
+                          if cert.raw_pem else None)
+        except ValueError:
+            child_cert = None
+
+        for row in rows:
+            try:
+                trusted_cert = x509_mod.load_pem_x509_certificate(
+                    row.certificate_blocks.encode(), default_backend())
+                if cert.aki:
+                    try:
+                        ski = trusted_cert.extensions.get_extension_for_class(
+                            x509_mod.SubjectKeyIdentifier).value.digest.hex()
+                        if ski == cert.aki:
+                            return _trusted_dict(row)
+                    except x509_mod.ExtensionNotFound:
+                        pass
+                # Else the signature: raises when the trusted key did not sign the certificate
+                if child_cert is not None:
+                    ChainBuilder()._verify_signature(child_cert, trusted_cert.public_key())
+                    return _trusted_dict(row)
+            except Exception:
+                continue
         return None
-    
+
     def _check_duplicate_cert(self, obj: ParsedObject) -> Optional[int]:
         """Check if certificate already exists in database (issue #85).
 

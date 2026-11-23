@@ -54,6 +54,8 @@ class SchedulerSupervisor:
         self._stopping = False
         self._restarting = False
         self._wake = threading.Event()
+        # restart() or stop() while the process runs: the watcher looks at once
+        self._nudge = threading.Event()
         self._on_stopped = None
         self._stopped_lock = threading.Lock()
         self._stopped_said = False
@@ -135,14 +137,23 @@ class SchedulerSupervisor:
 
     def _wait(self, proc):
         """The process's exit code. The master stopping stops it at once, beside the workers'
-        drain: an orchestrator's kill at the end of its grace then finds the node released."""
+        drain: an orchestrator's kill at the end of its grace then finds the node released.
+        A reload stops it from here too: this watcher is the only thread a worker inherits."""
+        stopped_for_reload = False
         while True:
-            if _wait_gone(proc, STOP_POLL, STOP_POLL):
+            if _gone(proc):
+                return proc.returncode
+            if self._nudge.wait(STOP_POLL):
+                self._nudge.clear()
+            if _gone(proc):
                 return proc.returncode
             if self._mine() and self._master_stopping():
                 self._stopping = True
                 self._terminate()
                 self._say_stopped()
+            elif self._mine() and self._restarting and not stopped_for_reload:
+                stopped_for_reload = True
+                self._terminate()
 
     def _say_stopped(self) -> None:
         # Under the lock: on_exit, coming second, waits for the watcher's call to end
@@ -174,12 +185,13 @@ class SchedulerSupervisor:
         _wait_gone(proc, 5)
 
     def restart(self) -> None:
-        """New code and configuration on HUP: stop the process, the watcher starts another."""
+        """New code and configuration on HUP: the watcher stops the process and starts another.
+        No thread of its own: under gevent, one running as the arbiter forks dies in the worker."""
         if self._thread is None or self._stopping:
             return
         self._restarting = True
         self._wake.set()
-        threading.Thread(target=self._terminate, name='scheduler-restart', daemon=True).start()
+        self._nudge.set()
 
     def stop(self, on_stopped=None) -> None:
         """``on_stopped``: used when start() was given none (the master stops before ready)."""
@@ -187,6 +199,7 @@ class SchedulerSupervisor:
             self._on_stopped = on_stopped
         self._stopping = True
         self._wake.set()
+        self._nudge.set()
         self._terminate()
         self._say_stopped()
 
