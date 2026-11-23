@@ -47,6 +47,12 @@ export const scepService = {
     return this.rejectRequest(id, reason)
   },
 
+  // The state of every CA's challenge, never the secret: no audited read
+  async getChallengeStates() {
+    return apiClient.get('/scep/challenges')
+  },
+
+  // One audited read of a CA's secret, on demand only
   async getChallenge(caId) {
     return apiClient.get(`/scep/challenge/${caId}`)
   },

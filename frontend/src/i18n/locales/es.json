@@ -1596,7 +1596,7 @@
     "pasteCSRDescription": "Pegue su CSR en formato PEM a continuación",
     "noPendingCSRs": "No hay CSRs pendientes",
     "noSignedCertificates": "No hay certificados firmados",
-    "signToSee": "Firme una CSR para verla aquí",
+    "signToSee": "Firme una CSR para verla aquí.",
     "importCSR": "Importar CSR",
     "searchPending": "Buscar CSRs pendientes...",
     "searchSigned": "Buscar certificados firmados...",
@@ -1713,7 +1713,7 @@
     "keyServerDefault": "Valor predeterminado del servidor",
     "extensions": "Extensiones",
     "noTemplates": "Sin plantillas",
-    "noTemplatesDescription": "Cree su primera plantilla",
+    "noTemplatesDescription": "Cree su primera plantilla.",
     "searchPlaceholder": "Buscar plantillas...",
     "serverAuth": "Autenticación de servidor",
     "clientAuth": "Autenticación de cliente",
@@ -1835,6 +1835,44 @@
       "filterByState": "Filtrar por estado",
       "usesCount_one": "{{count, number}} certificado",
       "usesCount_other": "{{count, number}} certificados"
+    },
+    "builtIn": {
+      "webServer": {
+        "name": "Servidor web (TLS/SSL)",
+        "description": "Certificado TLS para servidores web (HTTPS)."
+      },
+      "email": {
+        "name": "Correo electrónico (S/MIME)",
+        "description": "Certificado S/MIME para cifrar y firmar correo electrónico."
+      },
+      "vpnServer": {
+        "name": "Servidor VPN",
+        "description": "Certificado de servidor VPN (OpenVPN, IPsec, WireGuard)."
+      },
+      "vpnClient": {
+        "name": "Cliente VPN",
+        "description": "Certificado de cliente VPN para autenticar usuarios."
+      },
+      "codeSigning": {
+        "name": "Firma de código",
+        "description": "Certificado para firmar software, scripts y paquetes."
+      },
+      "ocspSigning": {
+        "name": "Firma OCSP",
+        "description": "Certificado de firma de un respondedor OCSP delegado (RFC 6960), emitido por la CA cuyas respuestas firma."
+      },
+      "clientCert": {
+        "name": "Certificado de cliente",
+        "description": "Certificado para autenticar usuarios y dispositivos (802.1X, RADIUS, mTLS)."
+      },
+      "clientAuth": {
+        "name": "Autenticación de cliente",
+        "description": "Certificado para autenticar usuarios y dispositivos (802.1X, RADIUS, mTLS)."
+      },
+      "smartcardLogon": {
+        "name": "Inicio de sesión con tarjeta inteligente",
+        "description": "Certificado de inicio de sesión de Windows con tarjeta inteligente (PKINIT) para Active Directory, con el UPN del usuario."
+      }
     }
   },
   "users": {
@@ -2063,7 +2101,7 @@
     "proxyUpstreamUrl": "URL del directorio upstream",
     "proxyUpstreamUrlHelper": "La URL del directorio del servidor ACME upstream. Por defecto, Let's Encrypt staging si está vacío.",
     "proxyUsage": "Uso con certbot:",
-    "proxyUsageNote": "Requisito: el dominio (o un padre que cubra subdominios) debe estar configurado en ACME Domains con un proveedor DNS. El proxy solo admite dns-01.\n\nCada cuenta CA externa puede exponer un endpoint dedicado: /acme/proxy/<slug>/directory (active **Exponer vía proxy ACME** en Autoridades de certificación (CA)). La ruta predeterminada /acme/proxy/directory sigue la cuenta seleccionada en la configuración del proxy.\n\nUCM crea y elimina automáticamente los registros TXT mediante ese proveedor. Los hooks --manual-auth-hook y --manual-cleanup-hook pueden ser no-ops (/bin/true) porque el proxy realiza la validación DNS.\n\nEvite dos solicitudes simultáneas para el mismo nombre (Certbot + interfaz UCM): el segundo TXT puede sobrescribir el primero. Si el certificado HTTPS de UCM es autofirmado (lab), añada --no-verify-ssl a Certbot.",
+    "proxyUsageNote": "Requisito: el dominio (o un padre que cubra subdominios) debe estar configurado en ACME Domains con un proveedor DNS. El proxy solo admite dns-01.\n\nCada cuenta CA externa puede exponer un endpoint dedicado: /acme/proxy/<slug>/directory (active Exponer vía proxy ACME en Autoridades de certificación (CA)). La ruta predeterminada /acme/proxy/directory sigue la cuenta seleccionada en la configuración del proxy.\n\nUCM crea y elimina automáticamente los registros TXT mediante ese proveedor. Los hooks --manual-auth-hook y --manual-cleanup-hook pueden ser no-ops (/bin/true) porque el proxy realiza la validación DNS.\n\nEvite dos solicitudes simultáneas para el mismo nombre (Certbot + interfaz UCM): el segundo TXT puede sobrescribir el primero. Si el certificado HTTPS de UCM es autofirmado (lab), añada --no-verify-ssl a Certbot.",
     "proxyRegistered": "Proxy registrado",
     "registerAccount": "Registrar cuenta",
     "aboutAcmeDesc": "ACME permite la emisión automatizada de certificados. Configure el servidor a continuación y luego use la URL del directorio con cualquier cliente ACME (certbot, acme.sh, etc.).",
@@ -2684,7 +2722,8 @@
       "failures": "Fallos",
       "wildcard": "Comodín",
       "orders": "Pedidos"
-    }
+    },
+    "addUpstreamCa": "Añadir una CA"
   },
   "scep": {
     "title": "Protocolo SCEP",
@@ -2842,7 +2881,16 @@
     "views": {
       "challenges": "Desafíos de las autoridades"
     },
-    "emptyProfilesText": "Un perfil vincula una CA emisora, una plantilla y una contraseña de desafío."
+    "emptyProfilesText": "Un perfil vincula una CA emisora, una plantilla y una contraseña de desafío.",
+    "challengeExpired": "Caducado",
+    "challengeShow": "Mostrar",
+    "challengeHide": "Ocultar",
+    "challengeCopy": "Copiar",
+    "challengeGenerated": "Generado el",
+    "challengeExpires": "Caduca el",
+    "challengeAge": "Antigüedad",
+    "challengeAgeUnknown": "No registrado",
+    "newIntuneAppShort": "Nueva aplicación"
   },
   "crlOcsp": {
     "crl": "Lista de revocación de certificados",
@@ -3110,7 +3158,7 @@
     "syncFailed": "Error al sincronizar desde el sistema",
     "add": "Añadir",
     "addCertificate": "Agregar certificado",
-    "addCertificatesForChain": "Agregue certificados para validar cadenas",
+    "addCertificatesForChain": "Agregue certificados para validar cadenas.",
     "adding": "Agregando...",
     "allPurposes": "Todos los propósitos",
     "category": "Categoría",
@@ -3163,7 +3211,9 @@
       "filterByState": "Filtrar por estado",
       "filterByType": "Filtrar por tipo",
       "emptyTitle": "Ninguna ancla de confianza externa"
-    }
+    },
+    "systemBundleDescription": "Importado del paquete de CA del sistema",
+    "systemBundleNote": "Importado automáticamente desde {{path}}"
   },
   "importExport": {
     "tabs": {
@@ -3440,7 +3490,11 @@
       "system": "Sistema"
     },
     "format_csv": "Una fila por evento",
-    "format_json": "Datos estructurados"
+    "format_json": "Datos estructurados",
+    "actionDetails": {
+      "scepChallengeRead": "Contraseña de desafío de la CA {{name}} leída",
+      "scepChallengeRegenerate": "Contraseña de desafío de la CA {{name}} regenerada"
+    }
   },
   "settings": {
     "appearanceSubtitle": "Personalice la apariencia y el idioma de UCM",
@@ -7204,7 +7258,7 @@
     "copyPublicKey": "Copiar clave pública",
     "publicKeyCopied": "Clave pública copiada al portapapeles",
     "noData": "Sin CAs SSH",
-    "noDataDescription": "Cree una autoridad de certificación SSH para comenzar a emitir certificados SSH",
+    "noDataDescription": "Cree una autoridad de certificación SSH para comenzar a emitir certificados SSH.",
     "configuration": "Configuración",
     "noPrincipals": "Sin restricciones",
     "noExtensions": "Ninguna",
@@ -7294,7 +7348,7 @@
     "validity": "Validez",
     "validityPreset": "Período de validez",
     "noData": "Sin certificados SSH",
-    "noDataDescription": "Emita un certificado SSH firmando una clave pública o generando un par de claves",
+    "noDataDescription": "Emita un certificado SSH firmando una clave pública o generando un par de claves.",
     "revokeReason": "Motivo de revocación",
     "revokeReasonPlaceholder": "Motivo para revocar este certificado",
     "revokeConfirm": "¿Está seguro de que desea revocar este certificado SSH?",

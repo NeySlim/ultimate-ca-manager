@@ -54,6 +54,7 @@ async function openPicker(savedCaId, enabled = true) {
     getStats: vi.fn().mockResolvedValue({ data: {} }),
     getProfiles: vi.fn().mockResolvedValue({ data: [] }),
     getChallenge: vi.fn().mockResolvedValue({ data: {} }),
+    getChallengeStates: vi.fn().mockResolvedValue({ data: [] }),
   })
   casService.getAll.mockResolvedValue({ data: CAS })
   render(<MemoryRouter initialEntries={['/scep-config?tab=config']}><SCEPPage /></MemoryRouter>)

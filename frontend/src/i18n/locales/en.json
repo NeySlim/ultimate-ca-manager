@@ -1596,7 +1596,7 @@
     "pasteCSRDescription": "Paste your CSR in PEM format below",
     "noPendingCSRs": "No Pending CSRs",
     "noSignedCertificates": "No Signed Certificates",
-    "signToSee": "Sign a CSR to see it here",
+    "signToSee": "Sign a CSR to see it here.",
     "importCSR": "Import CSR",
     "searchPending": "Search pending CSRs...",
     "searchSigned": "Search signed certificates...",
@@ -1693,7 +1693,7 @@
     "adDerivedBadge": "AD",
     "enrollment": "Enrollment",
     "autoenrollEnabled": "Allow autoenrollment",
-    "autoenrollEnabledDescription": "Advertise this template as autoEnroll=true in Certificate Enrollment Policy, so GPO/Kerberos-authenticated clients request it automatically at logon with no user action. Off by default -- like real ADCS, a template can still be enrolled manually (MMC \"Request New Certificate\", certreq) without this, since Enroll and Autoenroll are separate permissions.",
+    "autoenrollEnabledDescription": "Advertise this template as autoEnroll=true in Certificate Enrollment Policy, so GPO/Kerberos-authenticated clients request it automatically at logon with no user action. Off by default. Like real ADCS, a template can still be enrolled manually (MMC \"Request New Certificate\", certreq) without this, since Enroll and Autoenroll are separate permissions.",
     "autoenrollBadge": "Auto",
     "allowedAdGroup": "Restrict enrollment to AD group",
     "allowedAdGroupDescription": "Only principals belonging to this Active Directory group (nested membership included) may enroll against this template over the Kerberos-authenticated endpoint. Enter a group name or full DN. Leave blank to allow any authenticated principal, matching real ADCS's default. Not enforced on the UsernamePassword endpoint, which has no per-request identity to check.",
@@ -1713,7 +1713,7 @@
     "keyServerDefault": "Server default",
     "extensions": "Extensions",
     "noTemplates": "No templates",
-    "noTemplatesDescription": "Create your first template to get started",
+    "noTemplatesDescription": "Create your first template to get started.",
     "searchPlaceholder": "Search templates...",
     "serverAuth": "Server Authentication",
     "clientAuth": "Client Authentication",
@@ -1835,6 +1835,44 @@
       "filterByState": "Filter by state",
       "usesCount_one": "{{count, number}} certificate",
       "usesCount_other": "{{count, number}} certificates"
+    },
+    "builtIn": {
+      "webServer": {
+        "name": "Web Server (TLS/SSL)",
+        "description": "TLS certificate for web servers (HTTPS)."
+      },
+      "email": {
+        "name": "Email (S/MIME)",
+        "description": "S/MIME certificate to encrypt and sign email."
+      },
+      "vpnServer": {
+        "name": "VPN Server",
+        "description": "VPN server certificate (OpenVPN, IPsec, WireGuard)."
+      },
+      "vpnClient": {
+        "name": "VPN Client",
+        "description": "VPN client certificate to authenticate users."
+      },
+      "codeSigning": {
+        "name": "Code Signing",
+        "description": "Certificate to sign software, scripts and packages."
+      },
+      "ocspSigning": {
+        "name": "OCSP Signing",
+        "description": "Delegated OCSP responder signing certificate (RFC 6960), issued by the CA whose responses it signs."
+      },
+      "clientCert": {
+        "name": "Client Certificate",
+        "description": "Certificate to authenticate users and devices (802.1X, RADIUS, mTLS)."
+      },
+      "clientAuth": {
+        "name": "Client Authentication",
+        "description": "Certificate to authenticate users and devices (802.1X, RADIUS, mTLS)."
+      },
+      "smartcardLogon": {
+        "name": "Smartcard Logon",
+        "description": "Windows smartcard (PKINIT) logon certificate for Active Directory, carrying the user's UPN."
+      }
     }
   },
   "users": {
@@ -2063,7 +2101,7 @@
     "proxyUpstreamUrl": "Upstream Directory URL",
     "proxyUpstreamUrlHelper": "The upstream ACME server directory URL. Defaults to Let's Encrypt staging if empty.",
     "proxyUsage": "Usage with certbot:",
-    "proxyUsageNote": "Prerequisite: the domain (or a parent covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy only supports dns-01.\n\nEach external CA account can expose a dedicated endpoint: /acme/proxy/<slug>/directory (enable **Expose via ACME proxy** in Certificate Authorities (CA)). The default path /acme/proxy/directory follows the account selected in proxy settings.\n\nUCM automatically creates and removes TXT records via that provider. The --manual-auth-hook and --manual-cleanup-hook flags can stay as no-ops (/bin/true) because the proxy performs DNS validation.\n\nAvoid two concurrent requests for the same name (Certbot + UCM UI): the second TXT record can overwrite the first. If the UCM HTTPS certificate is self-signed (lab), add --no-verify-ssl to Certbot.",
+    "proxyUsageNote": "Prerequisite: the domain (or a parent covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy only supports dns-01.\n\nEach external CA account can expose a dedicated endpoint: /acme/proxy/<slug>/directory (enable Expose via ACME proxy in Certificate Authorities (CA)). The default path /acme/proxy/directory follows the account selected in proxy settings.\n\nUCM automatically creates and removes TXT records via that provider. The --manual-auth-hook and --manual-cleanup-hook flags can stay as no-ops (/bin/true) because the proxy performs DNS validation.\n\nAvoid two concurrent requests for the same name (Certbot + UCM UI): the second TXT record can overwrite the first. If the UCM HTTPS certificate is self-signed (lab), add --no-verify-ssl to Certbot.",
     "proxyRegistered": "Proxy Registered",
     "registerAccount": "Register Account",
     "aboutAcmeDesc": "ACME enables automated certificate issuance. Configure the server below, then use the directory URL with any ACME client (certbot, acme.sh, etc.).",
@@ -2684,7 +2722,8 @@
       "failures": "Failures",
       "wildcard": "Wildcard",
       "orders": "Orders"
-    }
+    },
+    "addUpstreamCa": "Add a CA"
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -2842,7 +2881,16 @@
     "views": {
       "challenges": "Challenges of the authorities"
     },
-    "emptyProfilesText": "A profile links an issuing CA, a template and a challenge password."
+    "emptyProfilesText": "A profile links an issuing CA, a template and a challenge password.",
+    "challengeExpired": "Expired",
+    "challengeShow": "Show",
+    "challengeHide": "Hide",
+    "challengeCopy": "Copy",
+    "challengeGenerated": "Generated",
+    "challengeExpires": "Expires",
+    "challengeAge": "Age",
+    "challengeAgeUnknown": "Not recorded",
+    "newIntuneAppShort": "New app"
   },
   "crlOcsp": {
     "crl": "Certificate Revocation List",
@@ -3110,7 +3158,7 @@
     "syncFailed": "Failed to sync from system",
     "add": "Add",
     "addCertificate": "Add a certificate",
-    "addCertificatesForChain": "Add certificates to validate chains",
+    "addCertificatesForChain": "Add certificates to validate chains.",
     "adding": "Adding...",
     "allPurposes": "All purposes",
     "category": "Category",
@@ -3163,7 +3211,9 @@
       "filterByState": "Filter by state",
       "filterByType": "Filter by type",
       "emptyTitle": "No external trust anchor"
-    }
+    },
+    "systemBundleDescription": "Imported from the system CA bundle",
+    "systemBundleNote": "Imported automatically from {{path}}"
   },
   "importExport": {
     "tabs": {
@@ -3440,7 +3490,11 @@
       "system": "System"
     },
     "format_csv": "One row per event",
-    "format_json": "Structured data"
+    "format_json": "Structured data",
+    "actionDetails": {
+      "scepChallengeRead": "Challenge password of the CA {{name}} read",
+      "scepChallengeRegenerate": "Challenge password of the CA {{name}} regenerated"
+    }
   },
   "settings": {
     "appearanceSubtitle": "Customize UCM appearance and language.",
@@ -7206,7 +7260,7 @@
     "copyPublicKey": "Copy Public Key",
     "publicKeyCopied": "Public key copied to clipboard",
     "noData": "No SSH CAs",
-    "noDataDescription": "Create an SSH Certificate Authority to start issuing SSH certificates",
+    "noDataDescription": "Create an SSH Certificate Authority to start issuing SSH certificates.",
     "configuration": "Configuration",
     "noPrincipals": "No restrictions",
     "noExtensions": "None",
@@ -7294,7 +7348,7 @@
     "validity": "Validity",
     "validityPreset": "Validity Period",
     "noData": "No SSH Certificates",
-    "noDataDescription": "Issue an SSH certificate by signing a public key or generating a key pair",
+    "noDataDescription": "Issue an SSH certificate by signing a public key or generating a key pair.",
     "revokeReason": "Revocation Reason",
     "revokeReasonPlaceholder": "Reason for revoking this certificate",
     "revokeConfirm": "Are you sure you want to revoke this SSH certificate?",

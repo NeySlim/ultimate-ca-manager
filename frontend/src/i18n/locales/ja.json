@@ -1596,7 +1596,7 @@
     "pasteCSRDescription": "以下にCSRをPEM形式で貼り付けてください",
     "noPendingCSRs": "保留中のCSRはありません",
     "noSignedCertificates": "署名済み証明書はありません",
-    "signToSee": "CSRに署名するとここに表示されます",
+    "signToSee": "CSRに署名するとここに表示されます。",
     "importCSR": "CSRのインポート",
     "searchPending": "保留中のCSRを検索...",
     "searchSigned": "署名済み証明書を検索...",
@@ -1693,7 +1693,7 @@
     "adDerivedBadge": "AD",
     "enrollment": "登録",
     "autoenrollEnabled": "自動登録を許可",
-    "autoenrollEnabledDescription": "このテンプレートを証明書登録ポリシーで autoEnroll=true として公開し、GPO/Kerberos 認証済みクライアントがログオン時にユーザー操作なしで自動的に要求できるようにします。既定では無効です -- 実際の ADCS と同様、これがなくてもテンプレートは手動で登録できます (MMC の「新しい証明書の要求」、certreq)。登録と自動登録は別個の権限であるためです。",
+    "autoenrollEnabledDescription": "このテンプレートを証明書登録ポリシーで autoEnroll=true として公開し、GPO/Kerberos 認証済みクライアントがログオン時にユーザー操作なしで自動的に要求できるようにします。既定では無効です。実際の ADCS と同様、これがなくてもテンプレートは手動で登録できます (MMC の「新しい証明書の要求」、certreq)。登録と自動登録は別個の権限であるためです。",
     "autoenrollBadge": "自動",
     "allowedAdGroup": "登録を AD グループに制限",
     "allowedAdGroupDescription": "この Active Directory グループ(ネストされたメンバーシップを含む)に属するプリンシパルのみが、Kerberos 認証エンドポイント経由でこのテンプレートに登録できます。グループ名または完全な DN を入力してください。空欄のままにすると、実際の ADCS の既定の動作と同様に、認証済みのすべてのプリンシパルが登録可能になります。UsernamePassword エンドポイントには要求ごとの ID がないため、この制限は適用されません。",
@@ -1713,7 +1713,7 @@
     "keyServerDefault": "サーバーの既定値",
     "extensions": "拡張",
     "noTemplates": "テンプレートがありません",
-    "noTemplatesDescription": "最初のテンプレートを作成してください",
+    "noTemplatesDescription": "最初のテンプレートを作成してください。",
     "searchPlaceholder": "テンプレートを検索...",
     "serverAuth": "サーバー認証",
     "clientAuth": "クライアント認証",
@@ -1835,6 +1835,44 @@
       "filterByState": "状態で絞り込む",
       "usesCount_one": "{{count, number}} 件の証明書",
       "usesCount_other": "{{count, number}} 件の証明書"
+    },
+    "builtIn": {
+      "webServer": {
+        "name": "Web サーバー (TLS/SSL)",
+        "description": "Web サーバー (HTTPS) 用の TLS 証明書。"
+      },
+      "email": {
+        "name": "メール (S/MIME)",
+        "description": "メールの暗号化と署名のための S/MIME 証明書。"
+      },
+      "vpnServer": {
+        "name": "VPN サーバー",
+        "description": "VPN サーバー証明書 (OpenVPN、IPsec、WireGuard)。"
+      },
+      "vpnClient": {
+        "name": "VPN クライアント",
+        "description": "ユーザー認証用の VPN クライアント証明書。"
+      },
+      "codeSigning": {
+        "name": "コード署名",
+        "description": "ソフトウェア、スクリプト、パッケージに署名するための証明書。"
+      },
+      "ocspSigning": {
+        "name": "OCSP 署名",
+        "description": "委任 OCSP レスポンダーの署名証明書 (RFC 6960)。応答に署名する CA が発行します。"
+      },
+      "clientCert": {
+        "name": "クライアント証明書",
+        "description": "ユーザーとデバイスを認証するための証明書 (802.1X、RADIUS、mTLS)。"
+      },
+      "clientAuth": {
+        "name": "クライアント認証",
+        "description": "ユーザーとデバイスを認証するための証明書 (802.1X、RADIUS、mTLS)。"
+      },
+      "smartcardLogon": {
+        "name": "スマートカード ログオン",
+        "description": "Active Directory 用の Windows スマートカード (PKINIT) ログオン証明書。ユーザーの UPN を含みます。"
+      }
     }
   },
   "users": {
@@ -2063,7 +2101,7 @@
     "proxyUpstreamUrl": "アップストリームディレクトリURL",
     "proxyUpstreamUrlHelper": "アップストリームACMEサーバーのディレクトリURL。空の場合、Let's Encrypt ステージングがデフォルトです。",
     "proxyUsage": "certbotでの使用方法：",
-    "proxyUsageNote": "前提: ドメイン（またはサブドメインをカバーする親ドメイン）を ACME Domains で DNS プロバイダ付きで設定してください。プロキシは dns-01 のみ対応です。\n\n各外部 CA アカウントは専用エンドポイント /acme/proxy/<slug>/directory を公開できます（「認証局 (CA)」で **ACMEプロキシ経由で公開** を有効化）。既定パス /acme/proxy/directory はプロキシ設定で選択したアカウントに従います。\n\nUCM はそのプロバイダ経由で TXT レコードを自動作成・削除します。--manual-auth-hook と --manual-cleanup-hook は no-op (/bin/true) のままで構いません。DNS 検証はプロキシが行います。\n\n同じ名前で同時に 2 つの要求（Certbot + UCM UI）を行わないでください。2 つ目の TXT が 1 つ目を上書きする可能性があります。UCM の HTTPS 証明書が自己署名（ラボ）の場合は Certbot に --no-verify-ssl を追加してください。",
+    "proxyUsageNote": "前提: ドメイン（またはサブドメインをカバーする親ドメイン）を ACME Domains で DNS プロバイダ付きで設定してください。プロキシは dns-01 のみ対応です。\n\n各外部 CA アカウントは専用エンドポイント /acme/proxy/<slug>/directory を公開できます（「認証局 (CA)」で ACMEプロキシ経由で公開 を有効化）。既定パス /acme/proxy/directory はプロキシ設定で選択したアカウントに従います。\n\nUCM はそのプロバイダ経由で TXT レコードを自動作成・削除します。--manual-auth-hook と --manual-cleanup-hook は no-op (/bin/true) のままで構いません。DNS 検証はプロキシが行います。\n\n同じ名前で同時に 2 つの要求（Certbot + UCM UI）を行わないでください。2 つ目の TXT が 1 つ目を上書きする可能性があります。UCM の HTTPS 証明書が自己署名（ラボ）の場合は Certbot に --no-verify-ssl を追加してください。",
     "proxyRegistered": "プロキシ登録済み",
     "registerAccount": "アカウント登録",
     "aboutAcmeDesc": "ACMEは自動化された証明書発行を可能にします。以下でサーバーを設定し、そのディレクトリURLをACMEクライアント（certbot、acme.shなど）で使用してください。",
@@ -2684,7 +2722,8 @@
       "failures": "失敗",
       "wildcard": "ワイルドカード",
       "orders": "オーダー"
-    }
+    },
+    "addUpstreamCa": "CA を追加"
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -2842,7 +2881,16 @@
     "views": {
       "challenges": "認証局のチャレンジ"
     },
-    "emptyProfilesText": "プロファイルは、発行CA、テンプレート、チャレンジパスワードを結び付けます。"
+    "emptyProfilesText": "プロファイルは、発行CA、テンプレート、チャレンジパスワードを結び付けます。",
+    "challengeExpired": "期限切れ",
+    "challengeShow": "表示",
+    "challengeHide": "非表示",
+    "challengeCopy": "コピー",
+    "challengeGenerated": "生成日時",
+    "challengeExpires": "有効期限",
+    "challengeAge": "経過",
+    "challengeAgeUnknown": "未記録",
+    "newIntuneAppShort": "新規アプリ"
   },
   "crlOcsp": {
     "crl": "証明書失効リスト",
@@ -3110,7 +3158,7 @@
     "syncFailed": "システムからの同期に失敗しました",
     "add": "追加",
     "addCertificate": "証明書を追加",
-    "addCertificatesForChain": "チェーンを検証するための証明書を追加",
+    "addCertificatesForChain": "チェーンを検証するための証明書を追加。",
     "adding": "追加中...",
     "allPurposes": "すべての用途",
     "category": "カテゴリ",
@@ -3163,7 +3211,9 @@
       "filterByState": "状態で絞り込む",
       "filterByType": "タイプで絞り込む",
       "emptyTitle": "外部のトラストアンカーがありません"
-    }
+    },
+    "systemBundleDescription": "システムの CA バンドルからインポート",
+    "systemBundleNote": "{{path}} から自動インポート"
   },
   "importExport": {
     "tabs": {
@@ -3440,7 +3490,11 @@
       "system": "システム"
     },
     "format_csv": "イベントごとに1行",
-    "format_json": "構造化データ"
+    "format_json": "構造化データ",
+    "actionDetails": {
+      "scepChallengeRead": "CA {{name}} のチャレンジ パスワードを読み取りました",
+      "scepChallengeRegenerate": "CA {{name}} のチャレンジ パスワードを再生成しました"
+    }
   },
   "settings": {
     "appearanceSubtitle": "UCMの外観と言語をカスタマイズ",
@@ -7204,7 +7258,7 @@
     "copyPublicKey": "公開鍵をコピー",
     "publicKeyCopied": "公開鍵をクリップボードにコピーしました",
     "noData": "SSH CAがありません",
-    "noDataDescription": "SSH証明書の発行を開始するにはSSH認証局を作成してください",
+    "noDataDescription": "SSH証明書の発行を開始するにはSSH認証局を作成してください。",
     "configuration": "構成",
     "noPrincipals": "制限なし",
     "noExtensions": "なし",
@@ -7294,7 +7348,7 @@
     "validity": "有効期間",
     "validityPreset": "有効期間",
     "noData": "SSH証明書がありません",
-    "noDataDescription": "公開鍵に署名するか鍵ペアを生成してSSH証明書を発行してください",
+    "noDataDescription": "公開鍵に署名するか鍵ペアを生成してSSH証明書を発行してください。",
     "revokeReason": "失効理由",
     "revokeReasonPlaceholder": "この証明書を失効させる理由",
     "revokeConfirm": "このSSH証明書を失効させてもよろしいですか？",

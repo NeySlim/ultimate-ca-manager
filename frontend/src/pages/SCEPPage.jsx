@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
   Zone, Btn, Pill, PageHead, Toolbar, SearchField, IconBtn, ListView, Dock, DockBody, Section, Facts, SettingsView, SkeletonPanel,
-  LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, Icon, useClientList, useSortParam,
+  LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, Icon, useClientList, useSortParam, CodeValue, RowAction,
 } from '../components/atelier'
 import { SetupEmptyBlock } from '../components/shell/SetupEmptyBlock'
 import { scepService, casService, templatesService } from '../services'
@@ -24,7 +24,8 @@ import { stateLabel } from '../lib/stateLabel'
 import { scepPickerCas, unlistedScepPickerCas } from '../lib/caSelection'
 import { extractData } from '../lib/utils'
 import { dateTimeOf } from './admin/adminDates'
-import { Notice, ViewSwitch } from './protocols/atelierParts'
+import { compactAgo } from '../lib/relativeTime'
+import { Notice, ViewSwitch, soleLegendsOff } from './protocols/atelierParts'
 import { copyRow, fact, yesNoState } from '../components/atelier/facts'
 import { parseDN } from './protocols/protocolStates'
 import ScepProfileForm from './scep/ScepProfileForm'
@@ -50,8 +51,9 @@ const NEWEST = { key: 'created_at', asc: false }
 const PROFILE_SORT_KEYS = ['name', 'ca', 'template', 'intune', 'state']
 // The requests are paged by the server, so sorted by it (T2): its keys
 const REQUEST_SORT_KEYS = ['subject', 'transaction_id', 'created_at', 'status']
-const CHALLENGE_SORT_KEYS = ['name', 'subject', 'state']
+const CHALLENGE_SORT_KEYS = ['name', 'subject', 'age', 'state']
 const APP_SORT_KEYS = ['name', 'tenant', 'client', 'test', 'state']
+const challengeRank = (c) => (c.challenge.expired ? 1 : c.challenge.configured ? 0 : 2)
 
 export default function SCEPPage() {
   const { t, i18n } = useTranslation()
@@ -97,8 +99,9 @@ export default function SCEPPage() {
   const [requestMarked, setRequestMarked] = useState(requestMark)
   if (requestMarked !== requestMark) { setRequestMarked(requestMark); setPage(1) }
   const [rejectReason, setRejectReason] = useState('')
-  // The challenge of each CA (the CA-wide endpoint), read when its view opens
+  // The state of each CA's challenge, listed without the secret; the secret itself is read on demand only
   const [challenges, setChallenges] = useState(null)
+  const [revealed, setRevealed] = useState(null)
   // Intune app registrations
   const [apps, setApps] = useState(null)
   // The object open in the view's dock lives in the URL (`item`): a profile, a request, a CA's challenge or an app
@@ -194,17 +197,39 @@ export default function SCEPPage() {
   }, [linkedId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadChallenges = async () => {
-    const list = await Promise.all((cas || []).map(async (ca) => {
-      try {
-        const res = await scepService.getChallenge(ca.id)
-        return { ...ca, scep_challenge: res.data?.challenge || null }
-      } catch {
-        return { ...ca, scep_challenge: null }
-      }
-    }))
-    setChallenges(list)
+    let states = []
+    try {
+      states = extractData(await scepService.getChallengeStates()) || []
+    } catch (error) {
+      showError(error.message || t('messages.errors.loadFailed.scep'))
+    }
+    const byCa = new Map(states.map((s) => [s.ca_id, s]))
+    setChallenges((cas || []).map((ca) => ({ ...ca, challenge: byCa.get(ca.id) || { configured: false } })))
+  }
+  // One audited read of the secret per Show or Copy; a shown secret is copied without another read
+  const readChallenge = async (ca) => {
+    const res = await scepService.getChallenge(ca.id)
+    return res.data?.challenge || res.challenge || null
+  }
+  const showChallenge = async (ca) => {
+    try {
+      const value = await readChallenge(ca)
+      if (value) setRevealed({ id: ca.id, value })
+    } catch (error) {
+      showError(error.message || t('messages.errors.loadFailed.scep'))
+    }
+  }
+  const copyChallenge = async (ca) => {
+    try {
+      const value = revealed?.id === ca.id ? revealed.value : await readChallenge(ca)
+      if (value && await copy(value)) showSuccess(t('common.copied'))
+    } catch (error) {
+      showError(error.message || t('messages.errors.loadFailed.scep'))
+    }
   }
   useEffect(() => { if (view === 'challenges' && !loading && challenges === null) loadChallenges() }, [view, loading]) // eslint-disable-line react-hooks/exhaustive-deps
+  // A shown secret is masked again as soon as its dock closes or another opens
+  useEffect(() => { setRevealed(null) }, [openCa, view])
 
   const loadApps = async () => {
     try {
@@ -325,7 +350,9 @@ export default function SCEPPage() {
     })
     if (!confirmed) return
     try {
-      await scepService.regenerateChallenge(ca.id)
+      const res = await scepService.regenerateChallenge(ca.id)
+      const value = res?.data?.challenge || res?.challenge
+      setRevealed(value ? { id: ca.id, value } : null)
       showSuccess(t('scep.challengeRegenerated'))
       loadChallenges()
     } catch (error) {
@@ -433,7 +460,7 @@ export default function SCEPPage() {
       id: 'info', label: t('scep.connectionDetails'), icon: 'help', desc: t('scep.aboutScepDesc'),
       groups: [],
       children: (
-        <fieldset className="settings-group">
+        <fieldset className="settings-group stacked">
           <legend>{t('scep.supportedOperations')}</legend>
           <Facts items={[
             copyRow(t('scep.scepURL'), `${baseUrl}/scep/pkiclient.exe`, 'url'),
@@ -520,6 +547,8 @@ crypto ca enroll UCM-CA`}</pre>
     </Dock>
   )
 
+  const challengePill = (c) => (c.challenge.expired ? <Pill label={t('scep.challengeExpired')} tone="bad" />
+    : c.challenge.configured ? <Pill label={t('scep.challengeSet')} tone="good" /> : <Pill label={t('scep.noChallengeSet')} tone="muted" />)
   const caOpen = openCa != null ? (challenges || []).find((c) => c.id === openCa) : null
   const caDock = caOpen && (
     <Dock label={t('atelier.detailOf', { name: t('common.challenges') })} tabsLabel={t('atelier.openItem')} activeKey={caOpen.id}
@@ -531,7 +560,23 @@ crypto ca enroll UCM-CA`}</pre>
           <Section title={t('scep.challenge')}>
             <Facts items={[
               { ...fact(t('common.subject'), caOpen.subject), long: true },
-              caOpen.scep_challenge ? copyRow(t('scep.challenge'), caOpen.scep_challenge) : { label: t('scep.challenge'), absent: t('scep.noChallengeSet') },
+              [t('atelier.state'), challengePill(caOpen)],
+              caOpen.challenge.configured && { label: t('scep.challengeGenerated'), ...(caOpen.challenge.generated_at
+                ? { value: dateTimeOf(caOpen.challenge.generated_at, locale), sub: compactAgo(caOpen.challenge.generated_at, t) }
+                : { absent: t('scep.challengeAgeUnknown') }) },
+              caOpen.challenge.expires_at && fact(t('scep.challengeExpires'), dateTimeOf(caOpen.challenge.expires_at, locale)),
+              caOpen.challenge.configured ? {
+                label: t('scep.challenge'),
+                value: revealed?.id === caOpen.id
+                  ? <CodeValue value={revealed.value} label={t('scep.challenge')} />
+                  : <span className="mono muted" aria-label={t('scep.challengeHidden')}>••••••••••••</span>,
+                action: canEdit && <>
+                  {revealed?.id === caOpen.id
+                    ? <RowAction id="scep-ca-hide" onClick={() => setRevealed(null)}>{t('scep.challengeHide')}</RowAction>
+                    : <RowAction id="scep-ca-show" onClick={() => showChallenge(caOpen)}>{t('scep.challengeShow')}</RowAction>}
+                  <RowAction id="scep-ca-copy" onClick={() => copyChallenge(caOpen)}>{t('scep.challengeCopy')}</RowAction>
+                </>,
+              } : { label: t('scep.challenge'), absent: t('scep.noChallengeSet') },
             ]} />
             {!config.enabled && <Notice tone="warn">{t('scep.scepDisabledDesc')}</Notice>}
           </Section>
@@ -636,7 +681,10 @@ crypto ca enroll UCM-CA`}</pre>
 
   const challengeList = useClientList(challenges || NONE, {
     sortParam: challengeSort,
-    sorts: { name: (c) => c.name || c.subject, subject: (c) => c.subject || null, state: (c) => (c.scep_challenge ? 0 : 1) },
+    sorts: {
+      name: (c) => c.name || c.subject, subject: (c) => c.subject || null,
+      age: (c) => (c.challenge.generated_at ? -Date.parse(c.challenge.generated_at) : null), state: challengeRank,
+    },
   })
   const appList = useClientList(apps || NONE, {
     sortParam: appSort,
@@ -649,9 +697,14 @@ crypto ca enroll UCM-CA`}</pre>
     <>
       {!config.enabled && !loading && <Notice tone="warn" id="scep-disabled">{t('scep.scepDisabledDesc')}</Notice>}
       <ListView label={t('common.challenges')} caption={t('scep.challengesCaption')} icon="key" list={challengeList} nameSort="name" loading={loading || challenges === null}
-        title={(c) => c.name || c.subject} status={(c) => <Pill label={t(c.scep_challenge ? 'scep.challengeSet' : 'scep.noChallengeSet')} tone={c.scep_challenge ? 'good' : 'muted'} />}
+        title={(c) => c.name || c.subject} status={challengePill}
         openedId={openCa} onOpen={(c) => setOpenCa(c.id)}
-        columns={[{ id: 'subject', label: t('common.subject'), cell: (c) => c.subject, grow: true, muted: true, kind: 'text', priority: 4, sort: 'subject' }, { status: true, sort: 'state' }]}
+        columns={[
+          { id: 'subject', label: t('common.subject'), cell: (c) => c.subject, grow: true, muted: true, kind: 'text', priority: 4, sort: 'subject' },
+          { id: 'age', label: t('scep.challengeAge'), kind: 'fit', priority: 3, labelled: true, sort: 'age',
+            cell: (c) => (c.challenge.generated_at ? compactAgo(c.challenge.generated_at, t) : <span className="muted">—</span>) },
+          { status: true, sort: 'state' },
+        ]}
         empty={<EmptyBlock id="scep-cas" icon="key" title={t('scep.noCasAvailable')} text={t('scep.noCasAvailableDesc')} />}
         footer={{ range: t('crlOcsp.range', challengeList.counts((challenges || []).length)) }} />
     </>
@@ -675,7 +728,7 @@ crypto ca enroll UCM-CA`}</pre>
   )
 
   const configView = loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? loadErr : (
-    <SettingsView sections={sections} values={draft} errors={errors} changed={changed}
+    <SettingsView sections={soleLegendsOff(sections)} values={draft} errors={errors} changed={changed}
       onChange={(k, v) => { setDraft((d) => ({ ...d, [k]: v })); if (errors[k]) setErrors((e) => { const n = { ...e }; delete n[k]; return n }) }}
       onSave={handleSaveConfig} onReset={() => { setDraft(savedDraft); setErrors({}) }} saving={saving} failed={failed} announce={announce}
       stateRef={stateRef} tocLabel={t('protocols.sectionsOf', { name: 'SCEP' })} />
@@ -690,7 +743,7 @@ crypto ca enroll UCM-CA`}</pre>
   }
   const create = canEdit && (view === 'profiles'
     ? <Btn tone="primary" icon="plus" id="scep-new" onClick={() => setProfileForm({ profile: null })}>{t('scep.newProfile')}</Btn>
-    : view === 'intune' ? <Btn tone="primary" icon="plus" id="scep-app-new" onClick={() => setAppForm({ app: null })}>{t('scep.newIntuneApp')}</Btn> : null)
+    : view === 'intune' ? <Btn tone="primary" icon="plus" id="scep-app-new" onClick={() => setAppForm({ app: null })}>{t('scep.newIntuneAppShort')}</Btn> : null)
 
   return (
     <Zone dock={dock} after={<>

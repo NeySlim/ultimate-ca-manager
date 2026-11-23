@@ -25,6 +25,7 @@ beforeEach(() => {
     getStats: vi.fn().mockResolvedValue({ data: { pending: 80, approved: 0, rejected: 0, total: 80 } }),
     getProfiles: vi.fn().mockResolvedValue({ data: [] }),
     getChallenge: vi.fn().mockResolvedValue({ data: {} }),
+    getChallengeStates: vi.fn().mockResolvedValue({ data: [] }),
   })
   casService.getAll.mockResolvedValue({ data: [] })
 })

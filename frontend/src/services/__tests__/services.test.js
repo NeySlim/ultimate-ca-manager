@@ -936,6 +936,11 @@ describe('scepService', () => {
     expect(call[0]).toContain('/scep/5/reject')
   })
 
+  it('getChallengeStates → GET /scep/challenges', async () => {
+    await scepService.getChallengeStates()
+    expect(mockApiClient.get).toHaveBeenCalledWith('/scep/challenges')
+  })
+
   it('getChallenge → GET /scep/challenge/:caId', async () => {
     await scepService.getChallenge(2)
     expect(mockApiClient.get).toHaveBeenCalledWith('/scep/challenge/2')
