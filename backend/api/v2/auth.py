@@ -115,6 +115,12 @@ def _lock_signed_in():
     except Exception as e:
         logger.warning(f"Non-blocking: failed to audit-log the lock of {username}: {e}", exc_info=True)
     lock_session(reason)
+    # Its open sockets close now, on every node; the handshake refuses a locked session
+    try:
+        from websocket.events import end_session_sockets
+        end_session_sockets(getattr(session, 'sid', None))
+    except Exception as e:
+        logger.warning(f"Non-blocking: the sockets of {username}'s locked session not closed: {e}", exc_info=True)
     return success_response(message='Session locked')
 
 

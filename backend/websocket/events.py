@@ -3,6 +3,7 @@ WebSocket events handler and emitter.
 Provides real-time event broadcasting to connected clients.
 """
 
+import hashlib
 import importlib.util
 import json
 import logging
@@ -79,11 +80,26 @@ def _message_queue(app) -> Optional[socketio_pkg.RedisManager]:
     options = {"socket_connect_timeout": 2}
     if urlparse(url).scheme != "unix":  # TCP options: a Unix socket connection refuses them
         options.update(socket_keepalive=True, socket_keepalive_options=_KEEPALIVE_OPTIONS)
-    return socketio_pkg.RedisManager(
+    return _session_ending(socketio_pkg.RedisManager)(
         url,
         channel=_queue_channel(url, app.config.get("SESSION_KEY_PREFIX", "ucm:session:")),
         redis_options=options,
     )
+
+
+def _session_ending(base):
+    """``base`` whose queue listener ends a session's sockets on its host instead of emitting.
+
+    Built on call: the manager class stays the one ``socketio_pkg`` names."""
+    class SessionEndingManager(base):
+        def _handle_emit(self, message):
+            if message.get('event') == SESSION_END_EVENT and message.get('room') == SESSION_END_ROOM:
+                data = message.get('data')
+                data = data[0] if isinstance(data, list) and data else data
+                cut_session_here(data.get('session') if isinstance(data, dict) else None)
+                return
+            super()._handle_emit(message)
+    return SessionEndingManager
 
 
 # ================== Policy ==================
@@ -117,6 +133,10 @@ _SECRET_KEY_RE = re.compile(
     re.IGNORECASE)
 _SECRET_VALUE_MARKERS = ('PRIVATE KEY-----', 'Traceback (most recent call last)')
 _DETAILS_MAX_DEPTH = 8
+
+# A session's end (lock) told to every process: a room no socket joins and emit_event refuses
+SESSION_END_ROOM = 'control:session-end'
+SESSION_END_EVENT = 'session.end'
 
 # Injectable clock for revalidation and rate limiting.
 _monotonic = time.monotonic
@@ -234,6 +254,17 @@ def _session_identity():
     if not has_permission(MIN_PERMISSION, permissions):
         return None
     return info['user_id'], permissions
+
+
+def session_key(session_id) -> Optional[str]:
+    """What names a session's sockets to the other processes: a digest, never the id itself."""
+    if not isinstance(session_id, str) or not session_id:
+        return None
+    return hashlib.sha256(session_id.encode()).hexdigest()[:32]
+
+
+def _handshake_session_key() -> Optional[str]:
+    return session_key(getattr(session, 'sid', None))
 
 
 def _scope_rooms(permissions) -> set:
@@ -361,11 +392,47 @@ def handle_connect(auth=None):
         'rooms': set(managed),
         'connected_at': utc_now(),
         'auth_method': 'session',
+        'session': _handshake_session_key(),
         'validated_at': _monotonic(),
         'ops': deque(maxlen=SUBSCRIPTION_OPS_LIMIT),
     }
     emit('connected', {'status': 'ok', 'user_id': user_id, 'timestamp': _timestamp()})
     return True
+
+
+def cut_session_here(key) -> int:
+    """Close this process's sockets of the session ``key`` names; the others are left open."""
+    if not isinstance(key, str) or not key:
+        return 0
+    cut = [sid for sid, state in list(connected_clients.items()) if state.get('session') == key]
+    for sid in cut:
+        connected_clients.pop(sid, None)
+        try:
+            socketio.server.disconnect(sid, namespace='/', ignore_queue=True)
+        except Exception as exc:  # noqa: BLE001  # the local state is already gone
+            logger.warning("Could not close WebSocket client: %s", exc)
+    if cut:
+        logger.info("WebSocket: %d socket(s) of an ended session closed", len(cut))
+    return len(cut)
+
+
+def end_session_sockets(session_id) -> int:
+    """Close the sockets of this session here at once, and on the other processes through the
+    transport their events take (database relay or Redis queue). Returns the count closed here."""
+    key = session_key(session_id)
+    if key is None:
+        return 0
+    cut = cut_session_here(key)
+    publisher = _relay_publisher
+    try:
+        if publisher is not None:
+            publisher.publish(SESSION_END_ROOM, {'type': SESSION_END_EVENT, 'session': key})
+        elif _queue_in_use:
+            # The queue's listener on each host cuts instead of emitting (_session_ending)
+            socketio.emit(SESSION_END_EVENT, {'session': key}, to=SESSION_END_ROOM)
+    except Exception as exc:  # noqa: BLE001  # the revalidation still closes them later
+        logger.warning("WebSocket session end not told to the other processes: %s", exc)
+    return cut
 
 
 @socketio.on('disconnect')

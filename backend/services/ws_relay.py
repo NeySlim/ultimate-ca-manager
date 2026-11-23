@@ -384,7 +384,10 @@ def _engine(app):
 
 
 def _emit_local(room, payload):
-    from websocket.events import socketio
+    from websocket.events import SESSION_END_ROOM, cut_session_here, socketio
+    if room == SESSION_END_ROOM:
+        cut_session_here(payload.get('session'))  # a session locked on another node
+        return
     socketio.emit('event', payload, to=room)
 
 
