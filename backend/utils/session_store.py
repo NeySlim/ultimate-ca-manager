@@ -148,7 +148,9 @@ class KeepsRemovedRecordsGone:
         """A new identifier for a session that stays (RFC 6265 §8.4), its record moved there
         now under the store's guard: a stored lock moves with it, a record removed before is
         not written back, and a later request of the old cookie finds nothing left to end.
-        A refused move stands for the request (write_now); its save then updates the new record."""
+        A refused move stands for the request (write_now); its save then updates the new record.
+        A move that raised may have been done in part: refused too, the request ends on its
+        error with no cookie, and the caller's record, left at its replaced version, serves no more."""
         if not session or self._refused(session):
             return
         if not self._opened_from_store(session):
@@ -158,6 +160,9 @@ class KeepsRemovedRecordsGone:
         try:
             self._upsert_session(current_app.permanent_session_lifetime, session,
                                  self._get_store_id(session.sid))
+        except BaseException:
+            session.store_refused = 'busy'
+            raise
         finally:
             session.rotated_from = None
         if not self._refused(session):
