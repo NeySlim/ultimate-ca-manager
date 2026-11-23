@@ -5879,6 +5879,11 @@
         "approvedMany_other": "{{count}} demandes approuvées",
         "rejectedMany_one": "{{count}} demande refusée",
         "rejectedMany_other": "{{count}} demandes refusées"
+      },
+      "cannot": {
+        "own_request": "Vous ne pouvez pas approuver votre propre demande ; vous pouvez la refuser pour la retirer.",
+        "not_in_group": "Seuls les membres du groupe d’approbateurs de la politique peuvent décider de cette demande.",
+        "already_voted": "Vous avez déjà voté sur cette demande."
       }
     }
   },

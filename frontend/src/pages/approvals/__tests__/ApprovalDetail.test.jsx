@@ -117,6 +117,24 @@ describe('ApprovalDetail', () => {
     expect(screen.queryByRole('button', { name: /Refuser/ })).toBeNull()
   })
 
+  it('offers only the decisions the server would take from this user, and says why', () => {
+    const { unmount } = show({ ...PROTOCOL, decision_rights: { approve: 'own_request', reject: null } })
+    expect(screen.queryByRole('button', { name: /^Approuver/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /^Refuser/ })).toBeInTheDocument()
+    expect(screen.getByText(/ne pouvez pas approuver votre propre demande/)).toBeInTheDocument()
+    unmount()
+    for (const code of ['not_in_group', 'already_voted']) {
+      const view = show({ ...PROTOCOL, decision_rights: { approve: code, reject: code } })
+      expect(screen.queryByRole('button', { name: /^Approuver/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /^Refuser/ })).toBeNull()
+      expect(screen.getByText(frI18n.t(`approvals.work.cannot.${code}`))).toBeInTheDocument()
+      view.unmount()
+    }
+    show({ ...PROTOCOL, decision_rights: { approve: null, reject: null } })
+    expect(screen.getByRole('button', { name: /^Approuver/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Refuser/ })).toBeInTheDocument()
+  })
+
   it('asks the page for a decision from its heading, and offers none once the deadline passed', () => {
     const onDecide = vi.fn()
     const { unmount } = show(PROTOCOL, 'request', { onDecide })

@@ -139,7 +139,7 @@ export default function ApprovalsPage() {
       due: requestDeadline(req),
       dueDate: formatDate(requestDeadline(req), { time: true }),
       onOpen: () => open(req),
-      actions: mayDecide ? (disabled) => <DecisionButtons onDecide={(kind) => ask(kind, [req])} disabled={disabled} name={requestTitle(req, t)} /> : undefined,
+      actions: mayDecide ? (disabled) => <DecisionButtons onDecide={(kind) => ask(kind, [req])} disabled={disabled} name={requestTitle(req, t)} refused={req.decision_rights} /> : undefined,
     })),
   }))
 

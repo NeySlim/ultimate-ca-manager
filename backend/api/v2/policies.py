@@ -1293,6 +1293,24 @@ def toggle_policy(policy_id):
 
 # ============ Approval Requests ============
 
+def _decision_rights(user, approval):
+    """What approve and reject would refuse the current user, in their order: None when allowed."""
+    allowed, _ = _user_can_act_on_approval(user, approval)
+    if not allowed:
+        return {'approve': 'not_in_group', 'reject': 'not_in_group'}
+    user_id = getattr(user, 'id', None)
+    if user_id is not None and any(v.get('user_id') == user_id for v in approval.get_approvals()):
+        return {'approve': 'already_voted', 'reject': 'already_voted'}
+    # A requester may withdraw (reject) their request, never approve it
+    own = user_id is not None and approval.requester_id == user_id
+    return {'approve': 'own_request' if own else None, 'reject': None}
+
+
+def _with_rights(approval):
+    user = getattr(g, 'current_user', None)
+    return {**approval.to_dict(), 'decision_rights': _decision_rights(user, approval)}
+
+
 @bp.route('/api/v2/approvals', methods=['GET'])
 @require_auth(['read:approvals'])
 def list_approvals():
@@ -1308,7 +1326,7 @@ def list_approvals():
         query = query.filter_by(status=status)
     
     requests = query.order_by(ApprovalRequest.created_at.desc()).all()
-    return success_response(data=[r.to_dict() for r in requests])
+    return success_response(data=[_with_rights(r) for r in requests])
 
 
 @bp.route('/api/v2/approvals/<int:request_id>', methods=['GET'])
@@ -1318,7 +1336,7 @@ def get_approval(request_id):
     approval = db.get_or_404(ApprovalRequest, request_id)
     if approval.status == 'pending' and _approval_is_expired(approval):
         _expire_request(approval, notify=False)
-    return success_response(data=approval.to_dict())
+    return success_response(data=_with_rights(approval))
 
 
 @bp.route('/api/v2/approvals/<int:request_id>/approve', methods=['POST'])
