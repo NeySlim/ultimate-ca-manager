@@ -263,7 +263,7 @@ export default function UserCertificatesPage() {
         actions={<>
           <Btn tone="primary" write={false} icon="download" id="user-cert-export" onClick={() => setExportCert(open)}>{t('common.export')}</Btn>
           {open.cert_id && hasPermission('read:certificates') && (
-            <Btn icon="cert" id="user-cert-inspect" onClick={() => navigate(`/certificates?id=${open.cert_id}`)}>{t('userCertificates.module.inspect')}</Btn>
+            <Btn icon="cert" id="user-cert-inspect" onClick={() => navigate(`/certificates?item=${open.cert_id}`)}>{t('userCertificates.module.inspect')}</Btn>
           )}
           {menuItems.length > 0 && (
             <IconBtn quiet icon="more" title={false} label={t('userCertificates.module.moreActions', { name: userCertName(open) })} data-user-cert-menu={open.id} onClick={() => setMenuOpen(true)} />

@@ -1,5 +1,5 @@
 /** Relative delays of the overview, written by the browser in the interface language. */
-import { eventTime, fullTime } from '../pages/activity/activityDates'
+import { eventDate, eventTime, fullTime } from '../pages/activity/activityDates'
 
 const MINUTE = 60000
 const HOUR = 60 * MINUTE
@@ -62,10 +62,10 @@ export function elapsedPercent(validFrom, validTo, now = Date.now()) {
   return Math.round(Math.min(1, Math.max(0, (now - from) / (to - from))) * 100)
 }
 
-/** The mockup's clock(): « aujourd’hui à 11:45 » within twelve hours of now, else the date and time. */
+/** The mockup's clock(): « aujourd’hui à 11:45 » on the same civil day as now (instance time zone), else the date and time. */
 export function clockOf(value, t, lang, now = Date.now()) {
   const at = Date.parse(value)
   if (!Number.isFinite(at)) return ''
-  if (Math.abs(at - now) < 12 * 3600000) return t('overview.clockToday', { time: eventTime(value, lang).slice(0, 5) })
+  if (eventDate(at, lang) === eventDate(now, lang)) return t('overview.clockToday', { time: eventTime(value, lang).slice(0, 5) })
   return fullTime(value, lang).replace(/:\d\d$/, '')
 }

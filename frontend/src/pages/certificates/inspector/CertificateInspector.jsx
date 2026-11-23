@@ -17,6 +17,8 @@ import { extractData } from '../../../lib/utils'
 import { CertificateBody } from './CertificateBody'
 import { SECTIONS } from './certificateSections'
 
+const ALIASES = ['id']
+
 // The certificate rows carry their id in data-open: its tab takes that key, so the focus finds the row back
 const tabKey = (o) => String(o.entityId)
 // One certificate open is `item` alone; several are listed in `open` as well
@@ -27,8 +29,9 @@ export function CertificateInspector() {
   const navigate = useNavigate()
   const detached = useDetached()
   const { opened = [], activeKey, setActiveKey, openEntity, closeEntity, closeAll, setEntityData } = useInspector()
-  // The active certificate and its section live in the URL (`item`, `section`), as every dock's object, and the open ones in `open`
-  const { item, section, list, setSection, setList, open: openInUrl, close: closeInUrl } = useDockParam({ sections: SECTIONS, list: true })
+  // The active certificate and its section live in the URL (`item`, `section`), as every dock's object, and the open ones in `open`;
+  // `id` is the former name of the item in links (`/certificates?id=N`)
+  const { item, section, list, setSection, setList, open: openInUrl, close: closeInUrl } = useDockParam({ sections: SECTIONS, list: true, aliases: ALIASES })
   const active = opened.find((o) => o.key === activeKey) || opened[0]
   const activeId = active ? String(active.entityId) : null
   const ids = opened.map(tabKey)

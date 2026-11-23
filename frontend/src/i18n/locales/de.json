@@ -3408,7 +3408,7 @@
     "integrityNote": "Die Prüfung liest die Hash-Kette des Protokolls erneut, vom ersten bis zum letzten Eintrag.",
     "cleanupWarning": "Einträge, die älter als die Aufbewahrungsdauer sind, werden endgültig gelöscht.",
     "retentionDays": "Aufbewahrung (Tage)",
-    "retentionMinimum": "Minimum: 30 Tage, Maximum: 365 Tage.",
+    "retentionMinimum": "Minimum: 30 Tage, Maximum: 3650 Tage.",
     "deleteOldLogs": "Alte Protokolle löschen",
     "filtersTitle": "Protokollfilter",
     "filtersIntro": "Sie ergänzen die Suche, den Vorgangstyp, den Benutzer und das Ergebnis.",
@@ -5797,6 +5797,11 @@
         "approvedMany_other": "{{count}} Anfragen genehmigt",
         "rejectedMany_one": "{{count}} Anfrage abgelehnt",
         "rejectedMany_other": "{{count}} Anfragen abgelehnt"
+      },
+      "cannot": {
+        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
+        "not_in_group": "Only members of the policy's approver group can decide on this request.",
+        "already_voted": "You have already voted on this request."
       }
     }
   },

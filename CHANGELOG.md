@@ -257,6 +257,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Closing a dock keeps the list as it was left.** A sort, filter, search or page chosen while a dock was open was undone when it closed; closing now keeps them.
+- **A day's ACME failures on the overview open the entries it counts.** The day's link opened the journal's ACME type, which missed failed finalizations and held other codes; it now selects the `acme.` actions the card counts.
+- **The audit clean-up never deletes logs the operator kept.** The dialog lowered a retention above 365 days to 365 without saying so; it now sends the number typed, from 30 to 3650 days, and `POST /api/v2/audit/cleanup` refuses a retention above 3650 days instead of lowering it.
+- **Replacing the CA of a detached window keeps its focus.** The window kept its place but was drawn anew, the focus falling on the page and never coming back to the control that opened it.
+- **"Today at" means today.** The overview wrote "today at 21:00" for the evening before; it now does so only on the same day, in the instance's time zone.
+- **The issue form's drafts end with the session.** A draft kept by the form outlived a sign-out and reached the next account signed in in the same tab.
+- **"View certificate" opens the certificate.** The buttons of the CSRs, ACME orders and user certificates opened the Certificates list without the certificate; former `/certificates?id=N` links open it too.
+- **A user's Permissions tab is offered only to whom may read it.** It is listed with `admin:users`, which the server requires, instead of always failing for a reader of users.
+- **The approval inspector offers only the decisions the server accepts.** Approve is not offered on one's own request, and neither decision after one's vote or outside the policy's approver group, the reason shown instead; requests carry these refusals in `decision_rights`.
+- Ukrainian and Russian plurals of the backup counter agree with the count.
 - **A renewed or applied HTTPS certificate is served without restarting the container (#452).** Outside HA the TLS listener now reloads through a SIGHUP to the gunicorn master (also for mTLS and WSTEP changes), and Settings > HTTPS and `served` in `cert-info` say when the certificate on disk is not served yet.
 - **The Activity page's end date includes its last day.** A date range stopped at midnight at the start of its end date; it now covers that whole UTC day.
 - **Open certificate tabs keep their titles.** After a visit to another page or a Back, the tabs of the certificates still open showed "…" instead of their names; each tab now keeps its certificate's name.

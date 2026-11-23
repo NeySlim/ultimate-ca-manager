@@ -3408,7 +3408,7 @@
     "integrityNote": "The check reads the log’s hash chain again, from the first entry to the last.",
     "cleanupWarning": "Entries older than the retention period are deleted for good.",
     "retentionDays": "Retention (days)",
-    "retentionMinimum": "Minimum: 30 days, maximum: 365 days.",
+    "retentionMinimum": "Minimum: 30 days, maximum: 3650 days.",
     "deleteOldLogs": "Delete old logs",
     "filtersTitle": "Log filters",
     "filtersIntro": "They add to the search, the operation type, the user and the result.",
@@ -5866,6 +5866,11 @@
         "approvedMany_other": "{{count}} requests approved",
         "rejectedMany_one": "{{count}} request rejected",
         "rejectedMany_other": "{{count}} requests rejected"
+      },
+      "cannot": {
+        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
+        "not_in_group": "Only members of the policy's approver group can decide on this request.",
+        "already_voted": "You have already voted on this request."
       }
     }
   },

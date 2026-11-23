@@ -7,6 +7,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { useDockParam, useDockSelection, useDockId } from '../useDockParam'
+import { useSortParam } from '../useSortParam'
 
 let nav
 function Where() {
@@ -25,6 +26,28 @@ function Probe({ opts }) {
       <button type="button" onClick={() => d.open('8', { section: 'chain' })}>open8</button>
       <button type="button" onClick={() => d.setSection('chain')}>chain</button>
       <button type="button" onClick={() => d.setSection('overview')}>overview</button>
+      <button type="button" onClick={d.close}>close</button>
+    </div>
+  )
+}
+
+// A page whose other hooks rewrite the URL in place while the dock is open, keeping its state
+function SortedProbe() {
+  const d = useDockParam({})
+  const { onSort } = useSortParam({ key: 'created', asc: false }, ['created', 'name'])
+  const loc = useLocation()
+  const navigate = useNavigate()
+  const search = () => {
+    const p = new URLSearchParams(loc.search)
+    p.set('q', 'b')
+    p.set('page', '2')
+    navigate({ pathname: loc.pathname, search: `?${p}` }, { replace: true, state: loc.state })
+  }
+  return (
+    <div>
+      <button type="button" onClick={() => d.open(7)}>open7</button>
+      <button type="button" onClick={() => onSort('name')}>sortName</button>
+      <button type="button" onClick={search}>search</button>
       <button type="button" onClick={d.close}>close</button>
     </div>
   )
@@ -91,6 +114,23 @@ describe('useDockParam', () => {
     await waitFor(() => expect(url()).toBe('/x?q=a'))
     act(() => nav(-1))
     await waitFor(() => expect(url()).toBe('/elsewhere'))
+  })
+
+  it('closing keeps a sort chosen while the dock was open', async () => {
+    at('/x?q=a', <SortedProbe />)
+    fireEvent.click(screen.getByText('open7'))
+    fireEvent.click(screen.getByText('sortName'))
+    expect(url()).toBe('/x?q=a&item=7&sort=name&order=asc')
+    fireEvent.click(screen.getByText('close'))
+    await waitFor(() => expect(url()).toBe('/x?q=a&sort=name&order=asc'))
+  })
+
+  it('closing keeps a search and a page written while the dock was open', async () => {
+    at('/x?q=a', <SortedProbe />)
+    fireEvent.click(screen.getByText('open7'))
+    fireEvent.click(screen.getByText('search'))
+    fireEvent.click(screen.getByText('close'))
+    await waitFor(() => expect(url()).toBe('/x?q=b&page=2'))
   })
 
   it('closing a dock that came with the link only drops the object', () => {

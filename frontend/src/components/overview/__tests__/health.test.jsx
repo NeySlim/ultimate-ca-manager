@@ -401,7 +401,7 @@ describe('a failure day and the scheduler pill', () => {
     expect(document.querySelector('[data-testid="where"]').textContent).toBe('/')
     fireEvent.click(document.querySelector('.mirror .day[data-day="1"]'))
     expect(document.querySelector('[data-testid="where"]').textContent)
-      .toBe('/audit?type=acme&success=false&date_from=2026-11-14&date_to=2026-11-14')
+      .toBe('/audit?action_prefix=acme.&success=false&date_from=2026-11-14&date_to=2026-11-14')
     expect(showQueue).not.toHaveBeenCalled()
   })
 

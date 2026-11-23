@@ -15,7 +15,7 @@ vi.mock('react-i18next', () => ({
 }))
 const m = vi.hoisted(() => ({
   update: vi.fn(), getAll: vi.fn(), getApiKeys: vi.fn(), effective: vi.fn(), catalog: vi.fn(), download: vi.fn(),
-  groupById: vi.fn(), create: vi.fn(), write: true, del: true,
+  groupById: vi.fn(), create: vi.fn(), write: true, del: true, granted: null,
 }))
 const stable = vi.hoisted(() => ({
   i18n: { t: (k, o) => (o ? `${k} ${JSON.stringify(o)}` : k), i18n: { language: 'fr', changeLanguage: () => {}, on: () => {}, off: () => {} } },
@@ -35,7 +35,7 @@ vi.mock('../../hooks', async () => {
     usePersistedState: persisted.usePersistedState,
     useCRUDPage: crud.useCRUDPage,
     useWebSocket: () => ({ muteToasts: () => {} }),
-    usePermission: () => ({ canWrite: () => m.write, canDelete: () => m.del, hasPermission: () => true, canRead: () => true }),
+    usePermission: () => ({ canWrite: () => m.write, canDelete: () => m.del, hasPermission: (p) => !m.granted || m.granted.includes(p), canRead: () => true }),
   }
 })
 vi.mock('../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
@@ -77,6 +77,7 @@ beforeEach(() => {
   phone.on = false
   m.write = true
   m.del = true
+  m.granted = null
   m.getAll.mockResolvedValue({ data: [ME, CHLOE, OLD] })
   m.update.mockResolvedValue({})
   m.getApiKeys.mockResolvedValue({ data: [{ id: 5, name: 'Supervision', key_prefix: 'ucm_3f9a', permissions: ['read:*'], created_at: '2026-03-02T10:00:00Z',
@@ -282,6 +283,16 @@ describe('the account dock', () => {
     }
     expect(within(dock).queryByRole('tab', { name: 'users.mtls.title' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'users.createUser' })).toBeNull()
+  })
+
+  it('offers the effective permissions only to whom the server shows them (admin:users)', async () => {
+    m.write = false
+    m.granted = ['read:users']
+    const { container } = page('/users?item=2&section=permissions')
+    const dock = await waitFor(() => { const d = dockOf(container); expect(d).toBeTruthy(); return d })
+    expect(within(dock).queryByRole('tab', { name: 'users.tabs.permissions' })).toBeNull()
+    expect(within(dock).getByRole('tab', { name: 'users.tabs.profile' })).toHaveAttribute('aria-selected', 'true')
+    expect(m.effective).not.toHaveBeenCalled()
   })
 })
 

@@ -122,15 +122,20 @@ export function ApprovalLog({ req }) {
   )
 }
 
-/** The two decision buttons of the mockup (decisionButtons()), named after the request when given. */
-export function DecisionButtons({ onDecide, disabled, name }) {
+/**
+ * The two decision buttons of the mockup (decisionButtons()), named after the request when given.
+ * `refused` holds the server's refusal of each decision for this user (decision_rights): that button goes, its reason shows.
+ */
+export function DecisionButtons({ onDecide, disabled, name, refused }) {
   const { t } = useTranslation()
+  const reason = refused?.approve || refused?.reject
   return (
     <>
-      <Btn icon="check" write disabled={disabled || undefined} data-decision="approve" onClick={() => onDecide('approve')}
-        aria-label={name ? t('approvals.work.approveNamed', { name }) : undefined}>{t('approvals.work.approveAsk')}</Btn>
-      <Btn tone="quiet" icon="block" write disabled={disabled || undefined} data-decision="refuse" onClick={() => onDecide('reject')}
-        aria-label={name ? t('approvals.work.rejectNamed', { name }) : undefined}>{t('approvals.work.rejectAsk')}</Btn>
+      {!refused?.approve && <Btn icon="check" write disabled={disabled || undefined} data-decision="approve" onClick={() => onDecide('approve')}
+        aria-label={name ? t('approvals.work.approveNamed', { name }) : undefined}>{t('approvals.work.approveAsk')}</Btn>}
+      {!refused?.reject && <Btn tone="quiet" icon="block" write disabled={disabled || undefined} data-decision="refuse" onClick={() => onDecide('reject')}
+        aria-label={name ? t('approvals.work.rejectNamed', { name }) : undefined}>{t('approvals.work.rejectAsk')}</Btn>}
+      {reason && <span className="small muted" data-refusal={reason}>{t(`approvals.work.cannot.${reason}`)}</span>}
     </>
   )
 }
@@ -146,7 +151,7 @@ export function ApprovalDock({ req, section, onSection, onClose, onDecide }) {
     <Dock label={t('atelier.detailOf', { name: t('common.approvals') })} tabsLabel={t('atelier.openItem')} activeKey={req.id}
       tabs={[{ key: req.id, title, icon: 'approve' }]} onClose={onClose}>
       <DockBody icon="approve" title={title} badge={<Pill label={state.label} tone={state.tone} />}
-        actions={decidable && <DecisionButtons onDecide={onDecide} name={title} />}
+        actions={decidable && <DecisionButtons onDecide={onDecide} name={title} refused={req.decision_rights} />}
         sections={[['request', t('approvals.work.sections.request')], ['log', t('approvals.work.sections.log')]]}
         section={section} onSection={onSection} sectionsLabel={t('atelier.sectionsOf', { name: title })}>
         {section === 'log' ? <ApprovalLog req={req} /> : <ApprovalRequestPanel req={req} />}

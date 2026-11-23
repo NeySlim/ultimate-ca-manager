@@ -3552,7 +3552,7 @@
     "integrityNote": "Перевірка заново читає хеш-ланцюжок журналу від першого запису до останнього.",
     "cleanupWarning": "Записи старші за період зберігання видаляються остаточно.",
     "retentionDays": "Зберігання (днів)",
-    "retentionMinimum": "Мінімум: 30 днів, максимум: 365 днів.",
+    "retentionMinimum": "Мінімум: 30 днів, максимум: 3650 днів.",
     "deleteOldLogs": "Видалити старі журнали",
     "filtersTitle": "Фільтри журналу",
     "filtersIntro": "Вони додаються до пошуку, типу операції, користувача та результату.",
@@ -4534,12 +4534,12 @@
       "caSigned": "Підписаний ЦС",
       "selfSigned": "Самопідписаний"
     },
-    "backupCount_one": "{{count}} копій",
-    "backupCount_other": "{{count}} копій",
-    "backupCount_few": "{{count}} копій",
+    "backupCount_one": "{{count}} копія",
+    "backupCount_other": "{{count}} копії",
+    "backupCount_few": "{{count}} копії",
     "backupCount_many": "{{count}} копій",
-    "backupSpaceUsed_one": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
-    "backupSpaceUsed_other": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
+    "backupSpaceUsed_one": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копії",
+    "backupSpaceUsed_other": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копії",
     "backupSpaceUsed_few": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
     "backupSpaceUsed_many": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
     "check": {
@@ -6039,6 +6039,11 @@
         "rejectedMany_other": "{{count}} запитів відхилено",
         "rejectedMany_few": "{{count}} запити відхилено",
         "rejectedMany_many": "{{count}} запитів відхилено"
+      },
+      "cannot": {
+        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
+        "not_in_group": "Only members of the policy's approver group can decide on this request.",
+        "already_voted": "You have already voted on this request."
       }
     }
   },

@@ -186,6 +186,14 @@ describe('ApprovalsPage queue', () => {
     success.mockRestore()
   })
 
+  it('offers in a row only the decisions the server would take from this user', async () => {
+    rows[0] = req(118, 'payments.example.com', { decision_rights: { approve: 'own_request', reject: null } })
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Refuser CSR à signer : payments.example.com' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Approuver CSR à signer : payments.example.com' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Approuver CSR à signer : later.example.com' })).toBeInTheDocument()
+  })
+
   it('offers neither decisions nor selection without write:approvals', async () => {
     stable.canWrite = false
     renderPage()

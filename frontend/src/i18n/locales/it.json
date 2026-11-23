@@ -3408,7 +3408,7 @@
     "integrityNote": "La verifica rilegge la catena di hash del log, dalla prima all'ultima voce.",
     "cleanupWarning": "Le voci più vecchie del periodo di conservazione vengono eliminate definitivamente.",
     "retentionDays": "Conservazione (giorni)",
-    "retentionMinimum": "Minimo: 30 giorni, massimo: 365 giorni.",
+    "retentionMinimum": "Minimo: 30 giorni, massimo: 3650 giorni.",
     "deleteOldLogs": "Elimina i log vecchi",
     "filtersTitle": "Filtri del log",
     "filtersIntro": "Si aggiungono alla ricerca, al tipo di operazione, all'utente e all'esito.",
@@ -5797,6 +5797,11 @@
         "approvedMany_other": "{{count}} richieste approvate",
         "rejectedMany_one": "{{count}} richiesta rifiutata",
         "rejectedMany_other": "{{count}} richieste rifiutate"
+      },
+      "cannot": {
+        "own_request": "You cannot approve your own request; you may still reject it to withdraw it.",
+        "not_in_group": "Only members of the policy's approver group can decide on this request.",
+        "already_voted": "You have already voted on this request."
       }
     }
   },

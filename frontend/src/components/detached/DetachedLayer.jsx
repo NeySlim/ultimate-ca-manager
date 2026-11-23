@@ -49,7 +49,7 @@ export function DetachedLayer() {
           const prefix = `float-${w.key.replace(/[^a-z0-9]/gi, '-')}-`
           const maximized = !!maxed[w.key]
           return (
-            <DetachedWindow key={w.key} wkey={w.key} icon={kind.icon} title={w.title || t('common.loading')} rect={maximized ? full : rects[w.key]}
+            <DetachedWindow key={w.uid || w.key} wkey={w.key} icon={kind.icon} title={w.title || t('common.loading')} rect={maximized ? full : rects[w.key]}
               maximized={maximized} onToggleMax={() => toggleMax(w.key)}
               z={BASE_Z + ranks.get(w.key)} front={w.key === top} onPlace={(r) => place(w.key, r)} onFront={() => front(w.key)} onClose={() => close(w.key)}
               takeFocus={focusKey === w.key} onFocused={clearFocus}>

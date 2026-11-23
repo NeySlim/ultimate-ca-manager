@@ -12,7 +12,8 @@ export const ITEM_PARAM = 'item'
 export const SECTION_PARAM = 'section'
 export const LIST_PARAM = 'open'
 const NONE = []
-// The mark of a history step this hook added: closing then steps back instead of adding one
+// The mark of a history step this hook added, holding the page's own parameters at that point:
+// closing steps back only while they are unchanged, so a sort or filter set meanwhile is kept
 const OPENED = 'ucmDockOpened'
 
 const sameId = (a, b) => a != null && b != null && String(a) === String(b)
@@ -42,6 +43,14 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [], li
   now.current = { params, location, item }
   const aliasKey = aliases.join(',')
 
+  // The URL's parameters that are not the dock's, in a stable order
+  const pageOf = useCallback((search) => {
+    const p = new URLSearchParams(search)
+    for (const n of [ITEM_PARAM, SECTION_PARAM, ...aliasKey.split(',').filter(Boolean)]) p.delete(n)
+    if (withList) p.delete(LIST_PARAM)
+    return [...p.entries()].map(([k, v]) => `${k}=${v}`).sort().join('&')
+  }, [aliasKey, withList])
+
   const write = useCallback((patch, { push = false } = {}) => {
     const { params: cur, location: loc } = now.current
     const next = new URLSearchParams(cur)
@@ -58,11 +67,11 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [], li
     }
     const qs = next.toString()
     const to = { pathname: loc.pathname, search: qs ? `?${qs}` : '', hash: loc.hash }
-    const state = push ? { ...(loc.state || {}), [OPENED]: true } : loc.state
+    const state = push ? { ...(loc.state || {}), [OPENED]: pageOf(loc.search) } : loc.state
     navigate(to, { replace: !push, state })
     // A second write in the same handler builds on this one, not on the URL still rendered
     now.current = { params: next, location: { ...loc, search: to.search, state }, item: patch.item != null ? String(patch.item) : null }
-  }, [navigate, fallback, aliasKey, withList])
+  }, [navigate, fallback, aliasKey, withList, pageOf])
 
   const open = useCallback((id, { section: asked, list: ids } = {}) => {
     if (id == null) return
@@ -74,11 +83,12 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [], li
   const close = useCallback(() => {
     const { item: cur, location: loc } = now.current
     if (cur == null) return
-    if (loc.state?.[OPENED] && loc.key !== 'default') {
+    const mark = loc.state?.[OPENED]
+    if (typeof mark === 'string' && loc.key !== 'default' && mark === pageOf(loc.search)) {
       navigate(-1)
       now.current = { ...now.current, item: null }
     } else write({})
-  }, [navigate, write])
+  }, [navigate, write, pageOf])
 
   const setSection = useCallback((id) => {
     const cur = now.current.item
