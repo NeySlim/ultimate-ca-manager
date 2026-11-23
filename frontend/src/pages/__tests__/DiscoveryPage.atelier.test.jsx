@@ -193,6 +193,33 @@ describe('DiscoveryPage found certificates and history (the product views)', () 
     await waitFor(() => expect(svc.delete).toHaveBeenCalledWith(5))
   })
 
+  it('types the facts of a found certificate: address and digests copyable, name parts and extensions in rows', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    svc.getById.mockResolvedValue({ data: {
+      fingerprint_sha256: 'ab'.repeat(32), extensions: { subject_key_identifier: { value: 'a1b2c3d4' }, key_usage: { usages: ['digital_signature'], critical: true } },
+    } })
+    renderAt('/discovery?tab=discovered')
+    fireEvent.click(await screen.findByRole('button', { name: 'intranet.example.com' }))
+    const dock = screen.getByRole('complementary', { name: 'atelier.detailOf' })
+    expect(dock.querySelector('dl.props')).toBeNull()
+    const row = (term) => within(dock).getAllByText(term, { selector: 'dt' })[0].closest('.row')
+    expect(row('discovery.host').querySelector('.code-value.url')).toHaveTextContent('192.0.2.10:443')
+    expect(row('atelier.state').querySelector('dd.v .badge')).toBeTruthy()
+    expect(row('common.serialNumber').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(row('CN').querySelector('dd.v')).toHaveTextContent('intranet.example.com')
+    // The digest in four lines of eight octets, copied whole
+    const sha = await waitFor(() => row('SHA-256'))
+    expect(sha.querySelectorAll('.code-value.hex .line')).toHaveLength(4)
+    fireEvent.click(within(sha).getByRole('button'))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(Array(32).fill('AB').join(':')))
+    // A key identifier is a digest too; an extension's OID and criticality under its value
+    expect(row('Subject Key Identifier').querySelector('.code-value.hex')).toHaveTextContent('A1:B2:C3:D4')
+    expect(row('Subject Key Identifier')).toHaveClass('wide')
+    expect(row('Key Usage').querySelector('dd.v > .sub')).toHaveTextContent('2.5.29.15 · inspector.cert.critical')
+  })
+
   it('explains an unreachable target in its dock and retries it for admin:system', async () => {
     renderAt('/discovery?tab=discovered')
     fireEvent.click(await screen.findByRole('button', { name: '192.0.2.11:443' }))

@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { TemplatePreviewModal } from '../components'
 import { Modal, Input, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import {
-  Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Props,
+  Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Facts,
   LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { useDockSelection } from '../components/atelier/useDockParam'
@@ -291,7 +291,9 @@ export default function TemplatesPage() {
   }
   const ext = open?.extensions_template || {}
   const pinned = Object.entries(open?.pinned_subject_fields || {})
-  const onOff = (v) => (v ? t('common.enabled') : t('common.disabled'))
+  // A rule switched on or off is a state; a value not set is an absence, in grey
+  const onOff = (label, v) => ({ label, state: v ? ['good', t('common.enabled')] : ['muted', t('common.disabled')] })
+  const fact = (label, value, row = {}, absent = '—') => (value ? { label, value, ...row } : { label, absent })
   const markers = open ? [
     open.ad_derived_subject && t('templates.adDerivedBadge'),
     open.autoenroll_enabled && t('templates.autoenrollBadge'),
@@ -326,13 +328,13 @@ export default function TemplatesPage() {
         {section === 'overview' && (
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
-              <Props items={[
+              <Facts items={[
                 [t('templates.source'), tplSource(open)],
                 [t('common.validity'), tplValidity(open)],
-                [t('templates.module.defaultKey'), tplKey(open)],
-                [t('common.digest'), open.digest || '—'],
+                fact(t('templates.module.defaultKey'), keyLabel(open.key_type)),
+                fact(t('common.digest'), open.digest),
                 [t('templates.module.uses'), tplUses(open)],
-                [t('atelier.state'), tplPill(open)],
+                { label: t('atelier.state'), state: tplState(open) === 'active' ? ['good', t('templates.module.states.active')] : ['muted', t('templates.module.states.inactive')] },
                 markers.length > 0 && [t('templates.module.markers'), markers.join(', ')],
               ]} />
             </Section>
@@ -342,23 +344,23 @@ export default function TemplatesPage() {
         {section === 'subject' && (
           <div className="module-detail">
             <Section title={t('templates.subjectTemplate')}>
-              <Props items={[
-                [t('templates.commonName'), open.dn_template?.CN || '—'],
-                [t('templates.organization'), open.dn_template?.O || '—'],
-                [t('common.orgUnit'), open.dn_template?.OU || '—'],
-                [t('templates.country'), open.dn_template?.C || '—'],
-                [t('templates.state'), open.dn_template?.ST || '—'],
-                [t('common.locality'), open.dn_template?.L || '—'],
-                [t('common.email'), open.dn_template?.emailAddress || '—'],
+              <Facts items={[
+                fact(t('templates.commonName'), open.dn_template?.CN),
+                fact(t('templates.organization'), open.dn_template?.O),
+                fact(t('common.orgUnit'), open.dn_template?.OU),
+                fact(t('templates.country'), open.dn_template?.C),
+                fact(t('templates.state'), open.dn_template?.ST),
+                fact(t('common.locality'), open.dn_template?.L),
+                fact(t('common.email'), open.dn_template?.emailAddress),
               ]} />
             </Section>
             <Section title={t('templates.module.sections.rules')}>
-              <Props items={[
-                [t('templates.adDerivedSubject'), onOff(open.ad_derived_subject)],
-                [t('templates.cnPattern'), open.subject_cn_pattern
-                  ? `${open.subject_cn_pattern}${open.subject_cn_keep_path ? ` (${t('templates.cnPatternKeepPath')})` : ''}` : '—'],
-                [t('templates.enforceSanTypes'), onOff(open.enforce_san_types)],
-                [t('templates.module.sanTypes'), (ext.san_types || []).join(', ') || '—'],
+              <Facts items={[
+                onOff(t('templates.adDerivedSubject'), open.ad_derived_subject),
+                fact(t('templates.cnPattern'), open.subject_cn_pattern && <span className="mono">{open.subject_cn_pattern}</span>,
+                  { long: true, sub: open.subject_cn_keep_path ? t('templates.cnPatternKeepPath') : undefined }),
+                onOff(t('templates.enforceSanTypes'), open.enforce_san_types),
+                fact(t('templates.module.sanTypes'), (ext.san_types || []).join(', ')),
               ]} />
             </Section>
           </div>
@@ -388,10 +390,10 @@ export default function TemplatesPage() {
         {section === 'enrollment' && (
           <div className="module-detail">
             <Section title={t('templates.enrollment')}>
-              <Props items={[
-                [t('templates.autoenrollEnabled'), onOff(open.autoenroll_enabled)],
-                [t('templates.allowedAdGroup'), open.allowed_ad_group || t('templates.allowedAdGroupUnset')],
-                [t('templates.pinnedSubjectFields'), pinned.length ? pinned.map(([k, v]) => `${k}=${v}`).join(', ') : t('templates.pinnedSubjectFieldsUnset')],
+              <Facts items={[
+                onOff(t('templates.autoenrollEnabled'), open.autoenroll_enabled),
+                fact(t('templates.allowedAdGroup'), open.allowed_ad_group, { long: true }, t('templates.allowedAdGroupUnset')),
+                fact(t('templates.pinnedSubjectFields'), pinned.map(([k, v]) => `${k}=${v}`).join(', '), { long: true }, t('templates.pinnedSubjectFieldsUnset')),
               ]} />
             </Section>
           </div>

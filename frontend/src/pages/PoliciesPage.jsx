@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
-  Section, Props, LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, useClientList, useSortParam,
+  Section, Facts, LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog, useClientList, useSortParam,
 } from '../components/atelier'
 import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
@@ -402,11 +402,11 @@ export default function PoliciesPage() {
         </>}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
+            <Facts items={[
               [t('policies.scope'), scopeOf(open)],
-              [t('atelier.state'), pill(open)],
+              { label: t('atelier.state'), state: [STATES[stateOf(open)], t(`policies.state.${stateOf(open)}`)] },
               [t('policies.operations'), operationsOf(open)],
-              [t('policies.priority'), <span className="mono">{open.priority}</span>],
+              [t('policies.priority'), open.priority],
               [t('policies.approval'), approvalOf(open)],
               [t('common.createdAt'), formatDate(open.created_at)],
               open.created_by && [t('common.createdBy'), open.created_by],
@@ -416,20 +416,23 @@ export default function PoliciesPage() {
             <p className="summary">{open.description || <span className="muted">{t('policies.noDescription')}</span>}</p>
           </Section>
           <Section title={t('policies.rules')}>
-            <Props items={[
+            <Facts items={[
               r.max_validity_days > 0 && [t('policies.maxValidity'), r.max_validity_days],
               r.san_restrictions?.max_dns_names > 0 && [t('policies.maxSANs'), r.san_restrictions.max_dns_names],
-              [t('policies.allowedKeyTypes'), r.allowed_key_types?.length ? r.allowed_key_types.join(', ') : <span className="muted">{t('policies.anyKeyType')}</span>],
-              [t('policies.allowedDigests'), r.allowed_digests?.length
-                ? r.allowed_digests.map(d => DIGEST_OPTIONS.find(o => o.value === d)?.label || d).join(', ')
-                : <span className="muted">{t('policies.anyDigest')}</span>],
-              r.san_restrictions?.dns_pattern && [t('policies.dnsPattern'), <span className="mono">{r.san_restrictions.dns_pattern}</span>],
+              // No restriction is the absence of a rule, in grey
+              r.allowed_key_types?.length
+                ? [t('policies.allowedKeyTypes'), r.allowed_key_types.join(', ')]
+                : { label: t('policies.allowedKeyTypes'), absent: t('policies.anyKeyType') },
+              r.allowed_digests?.length
+                ? [t('policies.allowedDigests'), r.allowed_digests.map(d => DIGEST_OPTIONS.find(o => o.value === d)?.label || d).join(', ')]
+                : { label: t('policies.allowedDigests'), absent: t('policies.anyDigest') },
+              r.san_restrictions?.dns_pattern && { label: t('policies.dnsPattern'), value: <span className="mono">{r.san_restrictions.dns_pattern}</span>, long: true },
             ]} />
           </Section>
           {open.requires_approval && (
             <Section title={t('policies.approvalWorkflow')}>
-              <Props items={[
-                [t('policies.approvalGroup'), open.approval_group_name || '—'],
+              <Facts items={[
+                open.approval_group_name ? [t('policies.approvalGroup'), open.approval_group_name] : { label: t('policies.approvalGroup'), absent: '—' },
                 [t('policies.minApprovers'), open.min_approvers],
               ]} />
             </Section>

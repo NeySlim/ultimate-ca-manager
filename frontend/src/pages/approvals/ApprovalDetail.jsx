@@ -6,10 +6,11 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Dock, DockBody, Pill, Props, RecordList, RecordRow, Section } from '../../components/atelier'
+import { Btn, Dock, DockBody, Facts, Pill, RecordList, RecordRow, Section } from '../../components/atelier'
 import { usePermission } from '../../hooks'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
 import { formatDate } from '../../lib/utils'
+import { serialHex } from '../../lib/certificateDetail'
 import { requestDeadline, stateOf, requesterOf, lastVote, typeLabel, subjectOf, loadCaIndex, sanLine, requestTitle, isLapsed } from './approvalModel'
 
 const when = (d) => formatDate(d, { time: true })
@@ -39,50 +40,57 @@ export function ApprovalRequestPanel({ req }) {
   const state = stateOf(req, t)
   const target = s.certificate_id || req.certificate_id
   const signing = s.csr || req.request_type === 'csr'
+  // A subject goes under its term in a narrow panel only when it is a long one
+  const subjectText = req.request_type === 'csr' ? `CN=${s.cn}` : s.cn
   // The authority reads as the mockup's text, and still opens the CA
   const caText = ca?.name ? <>{ca.name} <span className="muted">· {t('cas.tree.level', { level: ca.level })}</span></> : `#${caId}`
   return (
     <div className="module-detail">
       <Section title={t('approvals.work.detail.request')}>
-        <Props items={[
+        <Facts items={[
           [t('approvals.work.detail.id'), <span className="mono">#{req.id}</span>],
           [t('common.type'), typeLabel(req, t)],
           [t('approvals.requester'), requesterOf(req, t)],
           [t('approvals.work.detail.submitted'), when(req.created_at)],
           pending && [t('approvals.work.detail.due'), when(requestDeadline(req))],
-          [t('approvals.work.detail.state'), <Pill label={state.label} tone={state.tone} />],
-          req.requester_comment && [t('approvals.work.detail.reason'), req.requester_comment],
+          { label: t('approvals.work.detail.state'), state: [state.tone, state.label] },
+          req.requester_comment && { label: t('approvals.work.detail.reason'), value: req.requester_comment, long: true },
           req.policy_name && [t('approvals.policy'), req.policy_name],
           (req.required_approvals || 1) > 1 && [t('approvals.work.detail.votes'),
             t('approvals.work.votes', { count: (req.approvals || []).filter((v) => v.action === 'approve').length, need: req.required_approvals })],
         ]} />
       </Section>
       <Section title={signing ? t('approvals.work.detail.csr') : t('approvals.work.detail.object')}>
-        <Props items={[
-          s.cn && [t('approvals.work.detail.subject'), req.request_type === 'csr' ? `CN=${s.cn}` : s.cn],
+        <Facts items={[
+          s.cn && { label: t('approvals.work.detail.subject'), value: subjectText, long: subjectText.length > 24 },
           caId && [t('approvals.work.detail.ca'), <button type="button" className="text-link" onClick={() => openEntity('ca', caId)}>{caText}</button>],
           s.validity_days && [t('approvals.work.detail.validity'), t('approvals.work.detail.days', { count: s.validity_days })],
           s.extra_san?.length > 0 && [t('approvals.work.detail.extraSan'),
             <>{s.extra_san.map((v, i) => <span key={i}>{i > 0 && <br />}{sanLine(v, t)}</span>)}</>],
           s.csr_id && [t('approvals.work.detail.csrId'), `#${s.csr_id}`],
           target && [t('approvals.certificateId'), <button type="button" className="text-link" onClick={() => openEntity('certificate', target)}>#{target}</button>],
-          s.serial_number && [t('approvals.summarySerial'), <span className="mono">{s.serial_number}</span>],
+          // Written as the certificate's inspector writes it, so the two read alike
+          s.serial_number && { label: t('approvals.summarySerial'), value: serialHex(s.serial_number), kind: 'hex', long: serialHex(s.serial_number).length > 23 },
           s.reason && [t('revocation.reasonLabel'), t(`revocation.reasons.${s.reason}`, s.reason)],
           s.invalidity_at && [t('approvals.summaryInvalidity'), formatDate(s.invalidity_at)],
           s.trigger === 'auto' && [t('approvals.summaryTrigger'), t('approvals.triggerScheduler')],
           s.protocol && [t('approvals.summaryProtocol'), `${s.protocol.toUpperCase()}${s.operation ? ` (${s.operation})` : ''}`],
-          s.protocol && [t('approvals.summaryIdentity'), <span className="mono">{s.identity || '—'}</span>],
-          s.extra_ekus?.length > 0 && [t('approvals.summaryExtraEkus'), <span className="mono">{s.extra_ekus.join(', ')}</span>],
+          s.protocol && (s.identity
+            ? { label: t('approvals.summaryIdentity'), value: <span className="mono">{s.identity}</span>, long: true }
+            : { label: t('approvals.summaryIdentity'), absent: '—' }),
+          s.extra_ekus?.length > 0 && { label: t('approvals.summaryExtraEkus'), value: <span className="mono">{s.extra_ekus.join(', ')}</span>, long: true },
         ]} />
       </Section>
       {s.csr && <Section title={t('approvals.summaryCsr')}><pre className="code-preview">{s.csr}</pre></Section>}
       {!pending && (
         <Section title={t('approvals.work.detail.decision')}>
-          <Props items={[
-            [t('approvals.work.detail.decision'), <Pill label={state.label} tone={state.tone} />],
+          <Facts items={[
+            { label: t('approvals.work.detail.decision'), state: [state.tone, state.label] },
             vote && [t('approvals.work.detail.by'), vote.username],
             req.resolved_at && [t('approvals.work.detail.on'), when(req.resolved_at)],
-            [t('approvals.work.dialog.reason'), vote?.comment || <span className="muted">{t('approvals.work.detail.noReason')}</span>],
+            vote?.comment
+              ? { label: t('approvals.work.dialog.reason'), value: vote.comment, long: true }
+              : { label: t('approvals.work.dialog.reason'), absent: t('approvals.work.detail.noReason') },
           ]} />
         </Section>
       )}

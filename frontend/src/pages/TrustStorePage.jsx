@@ -384,6 +384,8 @@ export default function TrustStorePage() {
   const tsUsage = (c) => c.description || '—'
   const tsType = (c) => (PURPOSES.includes(c.purpose) ? t(PURPOSE_LABELS[c.purpose]) : (c.purpose || '—'))
   const tsExpires = (c) => dateOf(c.not_after, locale) || '—'
+  // A row of the dock: its value, or the absence in grey
+  const fact = (label, value, row = {}) => (value ? { label, value, ...row } : { label, absent: '—' })
   const present = ['valid', 'expiring', 'expired'].filter((s) => certificates.some((c) => tsState(c) === s))
   const active = present.includes(state) ? state : ''
   const views = [

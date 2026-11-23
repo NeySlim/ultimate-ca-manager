@@ -1,10 +1,9 @@
 /**
  * TemplatePreviewModal: what a certificate issued from this template would carry, in the mockup's
- * modal(): the notice, then the sample in the review-summary of the issue form (dl.props), its restrictions as pills.
+ * modal(): the notice, then the sample in the review-summary of the issue form (Facts), its restrictions as pills.
  */
-import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AtelierDialog, Icon, Pill } from './atelier'
+import { AtelierDialog, Facts, Icon, Pill } from './atelier'
 import { VALIDITY } from '../constants/config'
 import { algorithmName, findAlgorithm } from '../lib/keyAlgorithms'
 
@@ -52,8 +51,8 @@ export function TemplatePreviewModal({ open, onClose, template }) {
     [t('common.validityPeriod'), `${t('templates.validityDays', { count: validityDays })} (${validFrom} → ${validTo})`],
     template.key_usage && [t('common.keyUsage'), list(template.key_usage)],
     template.extended_key_usage && [t('common.extKeyUsage'), list(template.extended_key_usage)],
-    [t('common.subjectAltNames'), <span className="mono" style={{ whiteSpace: 'pre-line' }}>{SANPreview({ template, t })}</span>],
-  ].filter(Boolean)
+    { label: t('common.subjectAltNames'), value: <span className="mono" style={{ whiteSpace: 'pre-line' }}>{SANPreview({ template, t })}</span>, long: true },
+  ].filter(Boolean).map((row) => (Array.isArray(row) ? (row[1] ? { label: row[0], value: row[1] } : { label: row[0], absent: '—' }) : row))
   const restricted = template.max_path_length !== undefined || template.require_cn || !template.allow_any_cn
 
   return (
@@ -61,9 +60,7 @@ export function TemplatePreviewModal({ open, onClose, template }) {
       <p className="notice"><Icon name="eye" /><span>{t('templates.previewDescription')}</span></p>
       <div className="review-summary">
         <h3>{t('templates.sampleCertificate')} <Pill tone="good" label={t('common.valid')} /></h3>
-        <dl className="props">
-          {rows.map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd>{v || '—'}</dd></Fragment>)}
-        </dl>
+        <Facts items={rows} />
       </div>
       {restricted && (
         <section style={{ marginTop: 18 }}>

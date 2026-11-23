@@ -54,7 +54,7 @@ import TrustStorePage from '../TrustStorePage'
 const ROWS = [
   { id: 1, name: 'Bank Root', subject: 'CN=Bank Root,O=Bank', description: 'Chain of the bank client', purpose: 'root_ca',
     not_after: '2035-03-14T00:00:00Z', notes: 'Completes the imported chain', issuer: 'CN=Bank Root,O=Bank', serial_number: '0A0B',
-    key_type: 'RSA 4096', signature_algorithm: 'SHA256-RSA', fingerprint_sha256: 'AB:CD', certificate_pem: '-----BEGIN CERTIFICATE-----' },
+    key_type: 'RSA 4096', signature_algorithm: 'SHA256-RSA', fingerprint_sha256: 'abcd', certificate_pem: '-----BEGIN CERTIFICATE-----' },
   { id: 2, name: 'Old proxy', subject: 'CN=Old proxy', description: '', purpose: 'custom', not_after: '2020-09-01T00:00:00Z' },
 ]
 const renderPage = () => render(<MemoryRouter><TrustStorePage /></MemoryRouter>)

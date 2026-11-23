@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Dock, DockBody, Icon, IconBtn, Pill, Props, Section, TextLink } from '../../components/atelier'
+import { Btn, Dock, DockBody, Facts, Icon, IconBtn, Pill, Section, TextLink } from '../../components/atelier'
 import { usePermission } from '../../hooks'
 import { reportsService, certificatesService } from '../../services'
 import { formatDate } from '../../lib/utils'
@@ -76,11 +76,13 @@ export function ReportDock({ entry, section, onSection, onClose, actions }) {
         {section === 'report' && (
           <div className="module-detail">
             <Section title={t('reports.work.detail.schedule')}>
-              <Props items={[
+              <Facts items={[
                 [t('reports.work.dialog.content'), title],
-                [t('reports.frequency'), schedule.enabled ? frequencyLong(schedule, t) : <span className="muted">{t('reports.work.state.unscheduled')}</span>],
-                schedule.enabled && [t('reports.work.detail.next'), next ? formatDate(next, { time: true }) : '—'],
-                [t('reports.recipients'), schedule.recipients?.length ? schedule.recipients.join(', ') : <span className="muted">{t('reports.work.noRecipient')}</span>],
+                schedule.enabled ? [t('reports.frequency'), frequencyLong(schedule, t)] : { label: t('reports.frequency'), absent: t('reports.work.state.unscheduled') },
+                schedule.enabled && (next ? [t('reports.work.detail.next'), formatDate(next, { time: true })] : { label: t('reports.work.detail.next'), absent: '—' }),
+                schedule.recipients?.length
+                  ? { label: t('reports.recipients'), value: schedule.recipients.join(', '), long: schedule.recipients.length > 1 }
+                  : { label: t('reports.recipients'), absent: t('reports.work.noRecipient') },
                 [t('reports.format'), formatLabel(key, schedule)],
               ]} />
             </Section>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Pill, Notice, DataTable, SkeletonPanel, Dock, DockBody, Section, Props, useClientList, useSortParam, useDockParam } from '../../components/atelier'
+import { Btn, Pill, Notice, DataTable, SkeletonPanel, Dock, DockBody, Section, Facts, useClientList, useSortParam, useDockParam } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { cardFacts, labelledFact } from '../../components/atelier/cardFacts'
 import { SlotDock } from '../protocols/dockSlot'
@@ -124,10 +124,10 @@ export default function SchedulerSection({ hasPermission }) {
     }
   }
 
-  const status = (task) => (task.last_error || task.last_status === 'warning'
-    ? <Pill tone="warn" label={t('scheduler.statusWarning')} />
-    : task.last_status === 'skipped' ? <Pill tone="muted" icon="clock" label={t('scheduler.statusSkipped')} />
-      : <Pill tone="good" label={t('scheduler.statusOk')} />)
+  // A task's state as [tone, text, icon], drawn as a pill in its row and in the inspector
+  const stateFact = (task) => (task.last_error || task.last_status === 'warning' ? ['warn', t('scheduler.statusWarning')]
+    : task.last_status === 'skipped' ? ['muted', t('scheduler.statusSkipped'), 'clock'] : ['good', t('scheduler.statusOk')])
+  const status = (task) => { const [tone, label, icon] = stateFact(task); return <Pill tone={tone} label={label} icon={icon} /> }
   // What the last run said: its error, its warning, or why it stood down
   const note = (task) => (task.last_error ? <span className="mono">{task.last_error}</span>
     : task.last_status === 'warning' && task.last_reason ? task.last_reason
@@ -162,8 +162,10 @@ export default function SchedulerSection({ hasPermission }) {
     ...(canRun ? [{ id: 'run', label: <span className="sr-only">{t('common.actions')}</span>, kind: 'fit', priority: 1, cell: run }] : []),
   ]
   const opened = taskDock.item ? tasks.find((task) => task.name === taskDock.item) : null
-  // A run's moment: when, then how long ago or how soon
-  const moment = (iso) => (iso ? <>{formatDate(iso, { time: true })} <span className="muted">({compactRun(iso, t)})</span></> : '—')
+  // A run's moment: when, then how long ago or how soon; none is an absence, in grey
+  const moment = (label, iso) => (iso
+    ? [label, <>{formatDate(iso, { time: true })} <span className="muted">({compactRun(iso, t)})</span></>]
+    : { label, absent: '—' })
   // Every column of the list and the task's action, the columns folded for want of room included (E4)
   const dock = opened && (
     <Dock label={t('atelier.detailOf', { name: t('scheduler.tasksTitle') })} tabsLabel={t('atelier.openItem')} activeKey={opened.name}
@@ -173,14 +175,14 @@ export default function SchedulerSection({ hasPermission }) {
         actions={canRun && run(opened)}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
-              [t('atelier.state'), status(opened)],
-              [t('scheduler.colNote'), note(opened) || '—'],
+            <Facts items={[
+              { label: t('atelier.state'), state: stateFact(opened) },
+              note(opened) ? { label: t('scheduler.colNote'), value: note(opened), long: true } : { label: t('scheduler.colNote'), absent: '—' },
               [t('scheduler.colSchedule'), humanizeInterval(opened.interval, t)],
-              [t('scheduler.colLastRun'), moment(opened.last_run)],
-              [t('scheduler.colNextRun'), moment(opened.next_run)],
-              [t('scheduler.colDuration'), fmtDuration(opened.last_duration_ms, i18n?.language)],
-              [t('scheduler.colRuns'), opened.run_count ?? '—'],
+              moment(t('scheduler.colLastRun'), opened.last_run),
+              moment(t('scheduler.colNextRun'), opened.next_run),
+              opened.last_duration_ms == null ? { label: t('scheduler.colDuration'), absent: '—' } : [t('scheduler.colDuration'), fmtDuration(opened.last_duration_ms, i18n?.language)],
+              opened.run_count == null ? { label: t('scheduler.colRuns'), absent: '—' } : [t('scheduler.colRuns'), opened.run_count],
             ]} />
           </Section>
         </div>

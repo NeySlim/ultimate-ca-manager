@@ -131,7 +131,7 @@ test.describe('the scheduler (E4, M2, M4)', () => {
     await region.locator('tbody tr').first().locator('td:last-child button[data-open]').click()
     const dock = page.locator('#inspector')
     await expect(dock).toBeVisible()
-    await expect(dock.locator('dl.props dt')).toHaveCount(7)
+    await expect(dock.locator('dl.kv dt')).toHaveCount(7)
     await expect(page).toHaveURL(/item=/)
   })
 })

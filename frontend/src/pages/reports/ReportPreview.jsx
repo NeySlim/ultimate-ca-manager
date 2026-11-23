@@ -1,9 +1,9 @@
 /**
- * Preview of a generated data report: its summary counts in the mockup's props, then its rows
+ * Preview of a generated data report: its summary counts in Facts, then its rows
  * in the module table of listView() (the first 200; the download holds them all).
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, Props, Section } from '../../components/atelier'
+import { Btn, Facts, Section } from '../../components/atelier'
 
 const SHOWN_ROWS = 200
 const label = (col) => col.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
@@ -49,7 +49,7 @@ export function ReportPreview({ report, busy, failed, canGenerate, onGenerate })
     <div className="module-detail">
       {summary.length > 0 && (
         <Section title={t('atelier.summary')}>
-          <Props items={summary.map(([k, v]) => [label(k), typeof v === 'number' ? v.toLocaleString() : String(v)])} />
+          <Facts items={summary.map(([k, v]) => [label(k), typeof v === 'number' ? v.toLocaleString() : String(v)])} />
         </Section>
       )}
       {grouped ? report.items.map((item) => (

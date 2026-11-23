@@ -158,6 +158,23 @@ describe('Template dock', () => {
     expect(dock).toHaveTextContent('PKI-Users')
     expect(dock).toHaveTextContent('O=Example')
   })
+
+  it('types its facts: switches and state in pills, the fields it leaves unset in grey', async () => {
+    const { container } = renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Archive' }))
+    const dock = await waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
+    const row = (term) => within(dock).getByText(term, { selector: 'dt' }).closest('.row')
+    expect(dock.querySelector('dl.props')).toBeNull()
+    expect(row('State').querySelector('dd.v .badge.muted')).toHaveTextContent('Inactive')
+    expect(row('Digest').querySelector('dd.absent')).toHaveTextContent('—')
+    fireEvent.click(within(dock).getByRole('tab', { name: 'Subject' }))
+    expect(row('Org Unit').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(row('Build subject from Active Directory').querySelector('dd.v .badge.muted')).toHaveTextContent('Disabled')
+    expect(row('Common name pattern (Windows enrollment)').querySelector('dd.absent')).toBeTruthy()
+    fireEvent.click(within(dock).getByRole('tab', { name: 'Enrollment' }))
+    expect(row('Allow autoenrollment').querySelector('dd.v .badge.muted')).toHaveTextContent('Disabled')
+    expect(row('Pinned subject fields').querySelector('dd.absent')).toHaveTextContent('None pinned')
+  })
 })
 
 describe('Template dock in the URL', () => {

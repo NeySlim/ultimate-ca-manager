@@ -57,6 +57,19 @@ describe('ReportDock', () => {
     expect(screen.getByText('pki@example.com')).toBeInTheDocument()
   })
 
+  it('draws a report without schedule or recipient as absences, in grey, and its recipients as a fact', () => {
+    const { container, unmount } = show(entry('expiring_certificates', { enabled: false, recipients: [] }))
+    expect(container.querySelector('dl.props')).toBeNull()
+    const row = (term) => screen.getByText(term, { selector: 'dt' }).closest('.row')
+    expect(row('Fréquence').querySelector('dd.absent')).toHaveTextContent('Non planifié')
+    expect(row('Destinataires').querySelector('dd.absent')).toHaveTextContent('Aucun destinataire')
+    expect(screen.queryByText('Prochaine exécution', { selector: 'dt' })).toBeNull()
+    unmount()
+    show(entry('expiring_certificates', WEEKLY))
+    expect(row('Destinataires').querySelector('dd.v')).toHaveTextContent('pki@example.com')
+    expect(row('Fréquence').querySelector('dd.absent')).toBeNull()
+  })
+
   it('names its content as the queue does, not by its long description', () => {
     show(entry('expiring_certificates', WEEKLY))
     expect(screen.getByText('Contenu', { selector: 'dt' }).nextElementSibling).toHaveTextContent('Certificats expirants')

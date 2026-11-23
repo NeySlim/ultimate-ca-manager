@@ -52,10 +52,10 @@ describe('the scheduler inspector', () => {
     expect(screen.getByTestId('loc').textContent).toContain('item=scheduled_backup')
     const dock = await screen.findByRole('complementary')
     expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Scheduled backups')
-    const terms = [...dock.querySelectorAll('dl.props dt')].map((d) => d.textContent)
+    const terms = [...dock.querySelectorAll('dl.kv dt')].map((d) => d.textContent)
     expect(terms).toEqual(['atelier.state', 'scheduler.colNote', 'scheduler.colSchedule', 'scheduler.colLastRun', 'scheduler.colNextRun',
       'scheduler.colDuration', 'scheduler.colRuns'])
-    const value = (term) => [...dock.querySelectorAll('dl.props dt')].find((d) => d.textContent === term).nextElementSibling.textContent
+    const value = (term) => [...dock.querySelectorAll('dl.kv dt')].find((d) => d.textContent === term).nextElementSibling.textContent
     expect(value('scheduler.colSchedule')).toBe('scheduler.interval.daily')
     expect(value('scheduler.colRuns')).toBe('7')
     expect(value('scheduler.colDuration')).toBe('1,40 s')
@@ -72,6 +72,12 @@ describe('the scheduler inspector', () => {
     page(false, '/settings?tab=scheduler&item=crl_refresh')
     const dock = await screen.findByRole('complementary')
     expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('CRL refresh')
+    // Its state in a pill, what it never did in grey
+    const row = (term) => [...dock.querySelectorAll('dl.kv dt')].find((d) => d.textContent === term).closest('.row')
+    expect(row('atelier.state').querySelector('dd.v .badge.good')).toHaveTextContent('scheduler.statusOk')
+    for (const term of ['scheduler.colNote', 'scheduler.colLastRun', 'scheduler.colNextRun', 'scheduler.colDuration']) {
+      expect(row(term).querySelector('dd.absent')).toHaveTextContent('—')
+    }
     expect(within(dock).queryByRole('button', { name: 'scheduler.runNow' })).toBeNull()
     fireEvent.click(within(dock).getByRole('button', { name: 'inspector.close' }))
     expect(screen.queryByRole('complementary')).toBeNull()
