@@ -414,3 +414,18 @@
 :root .atl .user-menu>.pop-sep{margin-inline:0}
 /* Backup planning: the size ceiling, its long label and help, on a line of its own at a field's width. */
 @container (min-width:900px){:root .atl .settings-grid>.field:has(#set-backup_max_total_mb){grid-column:1/span 2}}
+/* A record list in columns: its states and actions line up from row to row; on a phone the actions take a line of their own. */
+@media(min-width:801px){:root .atl .record-list.rl-cols{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:16px}:root .atl .record-list.rl-cols>li{display:grid;grid-column:1/-1;grid-template-columns:subgrid;align-items:center}:root .atl .record-list.rl-cols>li>.rl-action{grid-column:3;justify-content:flex-end}}
+@media(max-width:800px){:root .atl .record-list.rl-cols>li>.rl-action{flex-basis:100%}}
+/* A group made of its test alone draws no rule under its legend; a test after its field lines its button up on the field. */
+:root .atl .settings-stack>.settings-test:first-child{border-top:0;padding-top:0}
+:root .atl .settings-test:has(>.field){align-items:flex-end}
+/* Phone: a row of tabs wider than the screen fades at its right edge; scrolled to, the last tab stands clear of the fade. */
+@media(max-width:800px){:root .atl .views{padding-right:28px;-webkit-mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent);mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent)}}
+/* Phone records: a labelled fact on a line of its own; the detail chevron on the card's right edge. */
+:root .atl .mobile-record .row-meta>span:has(>.fact-label){flex-basis:100%}
+:root .atl .mobile-record .row-top>.icon-btn.quiet:last-child{margin-right:-14px}
+/* An empty block in a table: its action at a button's full height, as the page head's. */
+:root .atl .module-table td .empty .btn{min-height:32px}
+/* A digest or a serial compared: its equal lines of bytes one under the other. */
+:root .atl .compare-table .hex-lines>.line{display:block}
