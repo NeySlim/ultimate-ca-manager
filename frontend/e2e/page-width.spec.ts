@@ -114,6 +114,15 @@ for (const width of [1440, 1920, 3440]) {
       return out
     })
     expect(over).toEqual([])
+    // A help held to the measure in a centred empty block stays centred under its title
+    const empties = await page.locator('.atl .settings-layout').evaluate((layout) => [...layout.querySelectorAll('.settings-body .empty p')]
+      .filter((p) => (p as HTMLElement).offsetParent)
+      .map((p) => {
+        const a = p.getBoundingClientRect(), b = p.closest('.empty')!.getBoundingClientRect()
+        return Math.round(Math.abs((a.left + a.right) / 2 - (b.left + b.right) / 2))
+      }))
+    expect(empties.length).toBeGreaterThan(0)
+    expect(empties.filter((d) => d > 1)).toEqual([])
   })
 }
 

@@ -319,3 +319,5 @@
 @media(min-width:1921px){:root .atl :is(.masthead,.statusbar,.stage){padding-left:calc((100% - var(--page-max))/2);padding-right:calc((100% - var(--page-max))/2)}}
 @media(min-width:801px){:root .atl .settings-layout:not(.guide-layout){grid-template-columns:200px minmax(0,var(--form-max))}}
 :root .atl .settings-body :is(small,p:not(.field-error)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
+/* A help held to the measure in a centred empty block stays centred under its title. */
+:root .atl .settings-body .empty p{margin-left:auto;margin-right:auto}
