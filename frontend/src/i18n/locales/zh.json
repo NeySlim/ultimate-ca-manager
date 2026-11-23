@@ -5452,7 +5452,6 @@
     "editWebhook": "编辑 Webhook",
     "noWebhooks": "尚未配置 Webhooks",
     "noWebhooksDescription": "添加 Webhook 接入地址以接收证书相关事件通知",
-    "configuredWebhooks": "已配置 Webhook 列表",
     "namePlaceholder": "例如：Slack 通知",
     "events": "事件类型",
     "caFilter": "CA 筛选 (可选)",

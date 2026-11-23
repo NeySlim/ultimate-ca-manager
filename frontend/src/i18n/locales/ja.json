@@ -5452,7 +5452,6 @@
     "editWebhook": "Webhookを編集",
     "noWebhooks": "Webhookが設定されていません",
     "noWebhooksDescription": "証明書イベントの通知を受け取るWebhookエンドポイントを追加してください",
-    "configuredWebhooks": "設定済みのWebhook",
     "namePlaceholder": "例: Slack通知",
     "events": "イベント",
     "caFilter": "CAフィルター（任意）",

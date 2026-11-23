@@ -169,6 +169,20 @@ describe('table footer', () => {
     expect(onPage).toHaveBeenLastCalledWith(3)
     expect(screen.getByRole('button', { name: 'table.nextPage' })).not.toBeDisabled()
   })
+  it('gives each table its own page size field, each named by its label', () => {
+    const pagination = (perPageLabel) => ({ page: 1, pages: 2, perPage: 25, onPage: vi.fn(), onPerPage: vi.fn(), perPageLabel })
+    const { container } = render(<>
+      <TableFooter range="a" pagination={pagination('Webhooks par page')} />
+      <TableFooter range="b" pagination={pagination('Clés par page')} />
+    </>)
+    const fields = [...container.querySelectorAll('select.page-size')]
+    expect(fields).toHaveLength(2)
+    expect(fields[0].id).toBeTruthy()
+    expect(fields[0].id).not.toBe(fields[1].id)
+    expect(container.querySelectorAll('[id="page-size"]')).toHaveLength(0)
+    expect(screen.getByRole('combobox', { name: 'Webhooks par page' })).toBe(fields[0])
+    expect(screen.getByRole('combobox', { name: 'Clés par page' })).toBe(fields[1])
+  })
   it('says the range and a note when the list is not paged', () => {
     const { container } = render(<TableFooter range="5 sur 5 modèles" note="Données" />)
     expect(container.querySelectorAll('footer.table-footer > span')).toHaveLength(2)

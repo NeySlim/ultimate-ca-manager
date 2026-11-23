@@ -4,7 +4,7 @@
  * list), next. Without `pagination` the footer only says the range and a note. Under a list short of room, the
  * number of columns it folded follows the range, then Réinitialiser les colonnes while a width is set by hand.
  */
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
 import { FoldedColumns, ColumnsReset } from './foldedColumns'
@@ -44,10 +44,12 @@ function PageControls({ page, pages, perPage, sizes = [10, 25, 50, 100], onPage,
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || undefined
   const goTo = (n) => onPage?.(Math.min(pages, Math.max(1, n)))
+  // Several paged tables share a page (the settings): each size field has an id of its own
+  const sizeId = useId()
   return (
     <div className="controls">
       {onPerPage && (
-        <select id="page-size" aria-label={perPageLabel || t('table.perPageLabel')} value={perPage} onChange={(e) => onPerPage(Number(e.target.value))}>
+        <select id={sizeId} className="page-size" aria-label={perPageLabel || t('table.perPageLabel')} value={perPage} onChange={(e) => onPerPage(Number(e.target.value))}>
           {sizes.map((n) => <option key={n} value={n}>{t('table.perPage', { size: n })}</option>)}
         </select>
       )}

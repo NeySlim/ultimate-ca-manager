@@ -438,7 +438,7 @@
 :root .atl .columns-list>label:last-of-type{border-bottom:0}
 :root .atl .pdf-select{display:flex;gap:8px;margin:0 0 10px}
 /* Phone, narrow: the page size on a line of its own, previous, page and next together on the next. */
-@media(max-width:480px){:root .atl .table-footer .controls{flex-wrap:wrap;row-gap:8px}:root .atl .table-footer #page-size{flex-basis:100%}}
+@media(max-width:480px){:root .atl .table-footer .controls{flex-wrap:wrap;row-gap:8px}:root .atl .table-footer .page-size{flex-basis:100%}}
 /* The settings' contents mark the section read, as the guide's. */
 :root .atl .settings-toc:not(.guide-toc) a[aria-current]{background:var(--selected);color:var(--text)}
 /* The guide page reads a quick help as an article: one column, the article's type sizes (the help dialog keeps its grid). */
