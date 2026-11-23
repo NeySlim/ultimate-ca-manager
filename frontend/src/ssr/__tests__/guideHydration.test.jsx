@@ -76,7 +76,7 @@ afterEach(async () => {
 })
 
 describe('the guide drawn at build time', () => {
-  it.each([['en', 'cas'], ['fr', 'cas'], ['zh', 'acme'], ['ru', 'navigation']])('holds the chapter %s/%s, its title and sections, without the rights', async (lang, chapter) => {
+  it.each([['en', 'cas'], ['fr', 'cas'], ['zh', 'acme'], ['ru', 'navigation'], ['es', 'templates']])('holds the chapter %s/%s, its title and sections, without the rights', async (lang, chapter) => {
     const { html, title, chapterTitle } = await renderChapter(lang, chapter)
     const page = document.createElement('div')
     page.innerHTML = html
@@ -102,7 +102,7 @@ describe('the guide drawn at build time', () => {
 })
 
 describe('the console takes the drawn chapter over', () => {
-  it.each([['en', 'cas'], ['fr', 'acme'], ['ru', 'navigation'], ['zh', 'cas']])('keeps the nodes of %s/%s and warns of nothing', async (lang, chapter) => {
+  it.each([['en', 'cas'], ['fr', 'acme'], ['ru', 'navigation'], ['zh', 'cas'], ['es', 'acme']])('keeps the nodes of %s/%s and warns of nothing', async (lang, chapter) => {
     await drawn(lang, chapter)
     const title = container.querySelector('#guide-title')
     const body = container.querySelector('#guide-article').lastElementChild

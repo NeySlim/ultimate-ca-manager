@@ -76,8 +76,8 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
   of `frontend/src/i18n/locales/*.json`, and `node scripts/check-i18n-sync.js` tells
   you if one is missing.
 - **Built-in help.** It exists in English (`helpContent.js`, `helpGuides.js`), French,
-  Russian and Chinese (`frontend/src/data/help/<lang>/<page>.js`); the other
-  interface languages show the English text. A change to a help page updates all four
+  Spanish, Russian and Chinese (`frontend/src/data/help/<lang>/<page>.js`); the other
+  interface languages show the English text. A change to a help page updates all five
   versions; the parity test checks that each translated page has the English structure
   (entries per section, item types, tips and warnings), not that its text says the same.
 - **Migrations** work on SQLite *and* PostgreSQL: a file

@@ -85,11 +85,11 @@ describe('French wording of the certification authority', () => {
 })
 
 describe('SSO setup steps', () => {
-  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const locales = import.meta.glob('../../i18n/locales/{en,es,fr,ru,zh}.json', { eager: true })
   const guide = (lang) => (lang === 'en' ? helpGuides.sso : pages[`../help/${lang}/sso.js`].default.helpGuides).content
   // Settings > SSO shows one card per type with a Configure button; there is no "Add SSO Provider" button.
-  const oldLabel = { en: 'Add SSO Provider', fr: 'Ajouter un fournisseur SSO', ru: 'Добавить провайдера SSO', zh: '添加 SSO 提供者' }
-  it.each(['en', 'fr', 'ru', 'zh'])('%s names the Configure button of each provider card', (lang) => {
+  const oldLabel = { en: 'Add SSO Provider', es: 'Agregar proveedor SSO', fr: 'Ajouter un fournisseur SSO', ru: 'Добавить провайдера SSO', zh: '添加 SSO 提供者' }
+  it.each(['en', 'es', 'fr', 'ru', 'zh'])('%s names the Configure button of each provider card', (lang) => {
     const { sso } = locales[`../../i18n/locales/${lang}.json`].default
     const text = guide(lang)
     expect(text).not.toContain(oldLabel[lang])
@@ -107,15 +107,15 @@ describe('dead locale keys', () => {
 })
 
 describe('values and buttons quoted by the translated pages', () => {
-  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const locales = import.meta.glob('../../i18n/locales/{en,es,fr,ru,zh}.json', { eager: true })
   const page = (lang, key) => (lang === 'en' ? helpContent[key] : pages[`../help/${lang}/${key}.js`].default.helpContent)
-  it.each(['fr', 'ru', 'zh'])('%s keeps the renamed duplicates "name (N)" in English', (lang) => {
+  it.each(['es', 'fr', 'ru', 'zh'])('%s keeps the renamed duplicates "name (N)" in English', (lang) => {
     const found = strings(entries.filter((e) => e.lang === lang).map((e) => e.page))
       .filter((s) => s.includes('name (2)') && !s.includes('name (3)') && /\(3\)/.test(s))
     expect(found).toEqual([])
   })
   // The provider details have a Sync keys button; the SSH CA guide names the key storage and provider fields.
-  it.each(['en', 'fr', 'ru', 'zh'])('%s names the HSM Sync keys button and the SSH CA key fields', (lang) => {
+  it.each(['en', 'es', 'fr', 'ru', 'zh'])('%s names the HSM Sync keys button and the SSH CA key fields', (lang) => {
     const t = locales[`../../i18n/locales/${lang}.json`].default
     const guide = (key) => (lang === 'en' ? helpGuides[key].content : pages[`../help/${lang}/${key}.js`].default.helpGuides.content)
     expect(guide('hsm')).toContain(`**${t.common.syncKeys}**`)
@@ -126,7 +126,7 @@ describe('values and buttons quoted by the translated pages', () => {
     expect(items.join('\n')).toContain(t.common.syncKeys)
   })
   // The HSM page creates a provider with its "New Provider" button.
-  it.each(['en', 'fr', 'ru', 'zh'])('%s names the HSM New Provider button', (lang) => {
+  it.each(['en', 'es', 'fr', 'ru', 'zh'])('%s names the HSM New Provider button', (lang) => {
     const { hsm } = locales[`../../i18n/locales/${lang}.json`].default
     const actions = helpContent.hsm.sections.findIndex((s) => s.title === 'Actions')
     expect(page(lang, 'hsm').sections[actions].items[0].label).toBe(hsm.newProvider)
@@ -146,35 +146,35 @@ describe('buttons named by the English help', () => {
 })
 
 describe('buttons of the HSM, certificate and template guides in every language', () => {
-  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const locales = import.meta.glob('../../i18n/locales/{en,es,fr,ru,zh}.json', { eager: true })
   const guide = (lang, key) => (lang === 'en' ? helpGuides[key].content : pages[`../help/${lang}/${key}.js`].default.helpGuides.content)
-  it.each(['en', 'fr', 'ru', 'zh'])('%s quotes the Generate, Issue Certificate and Copy buttons as the screen shows them', (lang) => {
+  it.each(['en', 'es', 'fr', 'ru', 'zh'])('%s quotes the Generate, Issue Certificate and Copy buttons as the screen shows them', (lang) => {
     const t = locales[`../../i18n/locales/${lang}.json`].default
     expect(guide(lang, 'hsm')).toContain(`**${t.common.generate}**`)
     expect(guide(lang, 'certificates')).toContain(`**${t.certificates.issueCertificate}**`)
     expect(guide(lang, 'templates')).toContain(`**${t.common.copy}**`)
-    const oldCopy = { en: 'Duplicate', fr: 'Dupliquer', ru: 'Дублировать' }[lang]
+    const oldCopy = { en: 'Duplicate', es: 'Duplicar', fr: 'Dupliquer', ru: 'Дублировать' }[lang]
     if (oldCopy) expect(guide(lang, 'templates')).not.toContain(`**${oldCopy}**`)
     // The key generation modal opens with Generate; the former labels are gone from the steps.
-    const oldLabel = { en: 'Generate Key', fr: 'Générer une clé', ru: 'Сформировать ключ HSM', zh: '生成密钥' }[lang]
+    const oldLabel = { en: 'Generate Key', es: 'Generar clave', fr: 'Générer une clé', ru: 'Сформировать ключ HSM', zh: '生成密钥' }[lang]
     expect(guide(lang, 'hsm')).not.toContain(`**${oldLabel}**`)
     if (lang === 'en') expect(guide(lang, 'certificates')).not.toMatch(/Click \*\*Issue\*\*/)
   })
-  it.each(['en', 'fr', 'ru', 'zh'])('%s says the forced password prompt has Logout as its only other button', (lang) => {
+  it.each(['en', 'es', 'fr', 'ru', 'zh'])('%s says the forced password prompt has Logout as its only other button', (lang) => {
     const t = locales[`../../i18n/locales/${lang}.json`].default
     const text = (lang === 'en' ? helpContent.account : pages[`../help/${lang}/account.js`].default.helpContent)
     const forced = strings(text.sections).find((s) => s.includes('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE'))
     expect(forced).toContain(t.common.logout)
-    expect(forced).toMatch({ en: /only other button is Logout/, fr: /seul autre bouton est Déconnexion/, ru: /только одна другая кнопка/, zh: /唯一的另一个按钮/ }[lang])
+    expect(forced).toMatch({ en: /only other button is Logout/, es: /único otro botón es Cerrar sesión/, fr: /seul autre bouton est Déconnexion/, ru: /только одна другая кнопка/, zh: /唯一的另一个按钮/ }[lang])
   })
 })
 
 describe('screen labels quoted by every help language', () => {
-  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const locales = import.meta.glob('../../i18n/locales/{en,es,fr,ru,zh}.json', { eager: true })
   const help = (lang, key) => (lang === 'en'
     ? { guide: helpGuides[key].content, page: helpContent[key] }
     : { guide: pages[`../help/${lang}/${key}.js`].default.helpGuides.content, page: pages[`../help/${lang}/${key}.js`].default.helpContent })
-  it.each(['en', 'fr', 'ru', 'zh'])('%s quotes the labels and API routes users actually have', (lang) => {
+  it.each(['en', 'es', 'fr', 'ru', 'zh'])('%s quotes the labels and API routes users actually have', (lang) => {
     const t = locales[`../../i18n/locales/${lang}.json`].default
     const bold = (s) => `**${s.replace(/\{\{\w+\}\}/g, 'N')}**`
     const mtls = help(lang, 'user-certificates').guide
@@ -215,14 +215,14 @@ describe('system template advice', () => {
     .map((key) => locales[`../../i18n/locales/${lang}.json`].default.templates[key]).join('\n')
   const help = (lang) => {
     const page = lang === 'en' ? helpContent.templates : pages[`../help/${lang}/templates.js`].default.helpContent
-    return page.sections.flatMap((sec) => sec.items || []).filter((i) => /^(Deactivate|Désactiver|Деактивировать|停用)$/.test(i.label)).map((i) => i.text)
+    return page.sections.flatMap((sec) => sec.items || []).filter((i) => /^(Deactivate|Desactivar|Désactiver|Деактивировать|停用)$/.test(i.label)).map((i) => i.text)
   }
   it.each(Object.keys(verbs))('%s tooltip advises the Copy button', (lang) => {
     const [old, copy] = verbs[lang]
     if (lang !== 'zh') expect(tip(lang)).not.toMatch(old)
     expect(tip(lang)).toMatch(copy)
   })
-  it.each(['en', 'fr', 'ru', 'zh'])('%s help advises the Copy button', (lang) => {
+  it.each(['en', 'es', 'fr', 'ru', 'zh'])('%s help advises the Copy button', (lang) => {
     const [old, copy] = verbs[lang]
     const text = help(lang).join('\n')
     if (lang !== 'zh') expect(text).not.toMatch(old)

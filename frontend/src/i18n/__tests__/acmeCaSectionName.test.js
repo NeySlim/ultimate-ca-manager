@@ -85,7 +85,7 @@ describe('help pointers to the section carry the exact screen title', () => {
   })
   for (const code of HELP_TRANSLATED_LANGUAGES) {
     it(`${code}: the upstream account item points at the section`, () => {
-      const m = helpFile(code).match(/label: ['"](?:Compte AC en amont|上游 CA 账户|Учётная запись вышестоящего ЦС)['"], text: ['"]((?:[^'"\\]|\\.)*)['"]/)
+      const m = helpFile(code).match(/label: ['"](?:Compte AC en amont|Cuenta de CA de origen|上游 CA 账户|Учётная запись вышестоящего ЦС)['"], text: ['"]((?:[^'"\\]|\\.)*)['"]/)
       expect(m, `${code} item`).not.toBeNull()
       expect(m[1]).toContain(title(code))
     })

@@ -1,5 +1,5 @@
 /**
- * The protocol pages show their views as tabs under the head: their help, in the four languages it is
+ * The protocol pages show their views as tabs under the head: their help, in the languages it is
  * written in, names the tabs and no longer the View menu of the page head.
  */
 import { describe, it, expect } from 'vitest'
@@ -8,8 +8,8 @@ import { helpGuides } from '../helpGuides'
 
 const pages = import.meta.glob('../help/*/*.js', { eager: true })
 const PAGES = ['acme', 'scep', 'est', 'tsa']
-const TABS = { en: 'Tabs', fr: 'Onglets', ru: 'Вкладки', zh: '选项卡' }
-const RETIRED = [/View menu/i, /menu Vue/i, /Меню «Вид»/, /视图菜单/, /^Views$/, /^Vues$/, /^Представления$/, /^视图$/]
+const TABS = { en: 'Tabs', es: 'Pestañas', fr: 'Onglets', ru: 'Вкладки', zh: '选项卡' }
+const RETIRED = [/View menu/i, /menú Vista/i, /menu Vue/i, /Меню «Вид»/, /视图菜单/, /^Views$/, /^Vistas$/, /^Vues$/, /^Представления$/, /^视图$/]
 
 const texts = (node, out = []) => {
   if (typeof node === 'string') out.push(node)
@@ -29,7 +29,7 @@ describe('the help of the protocol pages names their tabs', () => {
       const all = [...texts(content), ...texts(guide)]
       for (const re of RETIRED) expect(all.filter((s) => re.test(s.trim())), String(re)).toEqual([])
       // The guide's headings follow the panel
-      for (const s of texts(guide)) for (const re of [/^## Views$/m, /^## Vues$/m, /^## Представления$/m, /^## 视图$/m]) expect(re.test(s), String(re)).toBe(false)
+      for (const s of texts(guide)) for (const re of [/^## Views$/m, /^## Vistas$/m, /^## Vues$/m, /^## Представления$/m, /^## 视图$/m]) expect(re.test(s), String(re)).toBe(false)
     })
   }
 })

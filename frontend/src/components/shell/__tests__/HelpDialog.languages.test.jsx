@@ -33,11 +33,11 @@ describe('HelpDialog help languages', () => {
     h.load.mockResolvedValue({ default: { helpContent: { title: 'TRADUIT' } } })
   })
 
-  it('lists exactly fr, ru and zh', () => {
-    expect([...HELP_TRANSLATED_LANGUAGES].sort()).toEqual(['fr', 'ru', 'zh'])
+  it('lists exactly es, fr, ru and zh', () => {
+    expect([...HELP_TRANSLATED_LANGUAGES].sort()).toEqual(['es', 'fr', 'ru', 'zh'])
   })
 
-  it.each(['fr', 'ru', 'zh-CN'])('merges the translation for %s', async (lang) => {
+  it.each(['es-ES', 'fr', 'ru', 'zh-CN'])('merges the translation for %s', async (lang) => {
     h.lang = lang
     open()
     await waitFor(() => expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('TRADUIT'))
@@ -45,7 +45,7 @@ describe('HelpDialog help languages', () => {
     expect(screen.queryByText('NOTICE')).toBeNull()
   })
 
-  it.each(['de', 'es', 'it', 'ja', 'pt', 'uk'])('shows English with no import for %s, with the notice', async (lang) => {
+  it.each(['de', 'it', 'ja', 'pt', 'uk'])('shows English with no import for %s, with the notice', async (lang) => {
     h.lang = lang
     open()
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(en)
