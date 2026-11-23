@@ -1271,6 +1271,21 @@ def user_factory(auth_client):
 
 
 @pytest.fixture
+def dual_control_at_its_default(app):
+    """No stored key_recovery_dual_control row before or after the test: the default (on) applies."""
+    from models import db, SystemConfig
+
+    def _delete():
+        with app.app_context():
+            SystemConfig.query.filter_by(key='key_recovery_dual_control').delete()
+            db.session.commit()
+
+    _delete()
+    yield
+    _delete()
+
+
+@pytest.fixture
 def clear_acme_public_vhost_settings(app):
     """Clear acme_public_* SystemConfig before and after tests that set them."""
     from models import db, SystemConfig

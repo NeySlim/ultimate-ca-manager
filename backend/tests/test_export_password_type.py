@@ -10,7 +10,8 @@ from tests.test_mtls_pem_chain import enrolled  # noqa: F401
 from tests.test_user_certificate_key_export_guard import (
     _enrolment_for, an_operator, somebody_elses_certificate)  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users',
+                                     'dual_control_at_its_default')
 
 NOT_STRINGS = [0, False, [], {}, 12345678]
 

@@ -14,7 +14,8 @@ from tests.test_key_recovery import _open_request, _set_dual_control
 from tests.test_mtls_pem_chain import enrolled  # noqa: F401
 from tests.test_user_certificate_key_export_guard import _enrolment_for
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users',
+                                     'dual_control_at_its_default')
 
 PASSWORD = 'Passw0rd!2026'
 SECRET = 'Sup3rSecretValue!'
