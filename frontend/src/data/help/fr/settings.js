@@ -217,7 +217,7 @@ export default {
       'Le basculement SQLite ↔ PostgreSQL est bidirectionnel : l’UI exécute des contrôles de sûreté (driver chargé, cible joignable, cible vide) avant migration',
     ],
     warnings: [
-      'Le changement du certificat HTTPS nécessite un redémarrage du service',
+      'Le changement du certificat HTTPS recharge l’écoute TLS sans redémarrage, en conteneur aussi (HA : redémarrage progressif)',
       'La modification des paramètres de sécurité peut verrouiller les utilisateurs : vérifiez l’accès avant d’enregistrer',
     ],
   },
@@ -397,7 +397,8 @@ Gérez le certificat TLS utilisé par l’interface web UCM :
 - Générer un certificat auto-signé
 - Quand le certificat lié est renouvelé par un protocole sans que sa clé parvienne à UCM, la page le signale : HTTPS continue de servir le certificat précédent jusqu’à l’import de la clé du certificat renouvelé, ce qui l’applique
 
-> ⚠ Le changement du certificat HTTPS nécessite un redémarrage du service.
+- Appliquer, régénérer ou renouveler le certificat recharge l’écoute TLS sans arrêter le service, en conteneur aussi (HA : redémarrage progressif des nœuds)
+- *Renouvelé, pas encore servi* signifie que l’écoute présente encore un autre certificat que celui du disque : le journal du service dit pourquoi le rechargement a échoué
 
 ## Mises à jour
 

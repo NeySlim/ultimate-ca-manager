@@ -440,7 +440,7 @@ Content-Type: application/json
 
 { "enabled": true, "required": false, "trusted_ca_id": "<CA refid>" }
 ```
-Permission `admin:system`. Every field is optional; an empty body answers `400`. Unknown `trusted_ca_id` when enabling answers `404`. `required: true` with `enabled: true` answers `400` while no active admin has an enabled enrolled certificate. The change needs a service restart: the response carries `needs_restart` and `restart_message` (in HA mode a rolling restart is queued instead).
+Permission `admin:system`. Every field is optional; an empty body answers `400`. Unknown `trusted_ca_id` when enabling answers `404`. `required: true` with `enabled: true` answers `400` while no active admin has an enabled enrolled certificate. The change reloads the TLS listener, in a container too (in HA mode a rolling restart is queued instead): the response carries `needs_restart`, `restart_message` and `listener_reload`, as for `POST /api/v2/system/https/apply`.
 
 ```http
 GET /api/v2/mtls/certificates
@@ -2115,12 +2115,12 @@ PATCH /api/v2/windows-profiles/settings
 - `PUT` and `PATCH` are the same partial update: only the fields sent change.
 - Each profile carries `policy_id` (the MS-XCEP policy identifier) and `policy_oid_root` (the root of its template OIDs, `<policy_oid_root>.1.<template id>`). Both are read-only: set at creation (at random, or the values 2.254 served for the default profile of an upgraded installation), never changed by a change of CA, and ignored in a `POST`, `PUT` or `PATCH` body. A replacing restore puts back the archived values; a merge keeps those of a profile that already exists.
 - Writable fields: `name`, `realm` (upper-cased; refused when another profile holds it or the keytab does not name it; `null` clears it, an empty or blank string is a 400), `enabled` and `is_default` (JSON booleans, else 400; `is_default` is accepted at creation only, for the first default profile), `connector_id` (an integer or `null`) (its base DN domain must equal the realm), `issuing_ca_refid` (a string; must be able to sign), `policy_ca_refid` (a string; no EdDSA key), `validity_days`, `xcep_username`, `xcep_password`, `wstep_username`, `wstep_password`, `allowed_ad_group`, `pinned_subject_fields`, `template_ids` (the templates offered; empty: those of the CA), `renewal_ca_refids` (see below).
-- `renewal_cas` lists the former issuing CAs whose certificates still renew under the profile (`refid`, `name`, `null` for a deleted CA). A change of `issuing_ca_refid` adds the outgoing CA, and a CA becoming the issuing one again leaves the list. `renewal_ca_refids` (a list of refids) may only remove entries: a refid not on the list, other than the outgoing CA of the same request, is a 400. The outgoing CA of a change of `issuing_ca_refid` is added after the list sent is applied, even when that list leaves it out (audited as listed); a later request removes it. A `PUT`, `PATCH` or `DELETE` that changes the former CAs the TLS listener trusts (mTLS on, not revoked, not under the mTLS CA) restarts the service, or queues a rolling restart in HA; its answer carries `needs_restart` and `restart_message`. It needs `admin:system` beside `write:xcep`, the permission of `PUT /api/v2/mtls/settings`: without it the request is a 403 whose message names that permission, and nothing is saved.
+- `renewal_cas` lists the former issuing CAs whose certificates still renew under the profile (`refid`, `name`, `null` for a deleted CA). A change of `issuing_ca_refid` adds the outgoing CA, and a CA becoming the issuing one again leaves the list. `renewal_ca_refids` (a list of refids) may only remove entries: a refid not on the list, other than the outgoing CA of the same request, is a 400. The outgoing CA of a change of `issuing_ca_refid` is added after the list sent is applied, even when that list leaves it out (audited as listed); a later request removes it. A `PUT`, `PATCH` or `DELETE` that changes the former CAs the TLS listener trusts (mTLS on, not revoked, not under the mTLS CA) reloads the TLS listener, or queues a rolling restart in HA; its answer carries `needs_restart` and `restart_message`. It needs `admin:system` beside `write:xcep`, the permission of `PUT /api/v2/mtls/settings`: without it the request is a 403 whose message names that permission, and nothing is saved.
 - `pinned_subject_fields` takes an object, or its JSON text, with the keys `O`, `OU`, `C` (two letters, upper-cased), `ST` and `L` only; an empty object, an empty string or `null` stores none, anything else is a 400. It is returned as JSON text.
 - There is at most one default profile; it cannot be deleted (disable it) and `is_default` cannot be changed on an existing profile.
 - A profile through which valid certificates were issued cannot be deleted (409 with the count); disable it instead.
 - `POST /{id}/keytab` takes a multipart `file` (a keytab GSSAPI loads, 256 KiB at most; every entry must be `HTTP/<SPN host>@<realm of the profile>`, else 400) and replaces the profile's keytab; with the form field `dry_run=1` it stores nothing and lists the entries by realm, `foreign_entries` being those the server would refuse. It needs `write:xcep` and `write:kerberos`, the scope of the retired `POST /api/v2/kerberos/keytab`.
-- `settings` holds what every profile shares: `xcep_enabled`, `wstep_enabled` (needs `read:wstep` / `write:wstep`; changing it restarts the service, the TLS cap being read at startup), `kerberos_enabled`, `kerberos_spn` (`read:kerberos` / `write:kerberos`), the state of the served keytab, and the `default_profile` with its realm.
+- `settings` holds what every profile shares: `xcep_enabled`, `wstep_enabled` (needs `read:wstep` / `write:wstep`; changing it reloads the TLS listener, which reads the TLS cap as it loads, and the answer carries `listener_reload`), `kerberos_enabled`, `kerberos_spn` (`read:kerberos` / `write:kerberos`), the state of the served keytab, and the `default_profile` with its realm.
 - The single-row routes `/api/v2/xcep/config`, `/api/v2/wstep/config`, `/api/v2/kerberos/config`, `/api/v2/kerberos/keytab` and `/api/v2/ad-connector` (with `/test` and `/test-saved`) are gone since 3.0; the connectors are under `/api/v2/ad-connectors`. A refused connector deletion (409) lists the profiles that use it in `details.profiles` (50 names at most, by name) and their number in `details.total`.
 - `PUT /api/v2/ad-connectors/{id}` that changes the domain of `base_dn` also moves the realm of the profiles that use the connector: a profile without keytab whose realm was the old domain takes the new one in the same transaction (the audit entry of `ad_connector_update` names it). A profile with no realm, or already on the new domain, is left as is. If any other profile has a keytab, has a realm other than the old domain, or the new realm is served by another profile, the answer is 409, the message names the profile and says to change its realm or connector first (`details.profiles` lists them with a `reason`, `details.total` counts them) and nothing is written.
 - Each profile carries `connector_domain_mismatch`, true when its realm and the domain of its connector differ (list and detail); it is a warning only, such a profile still serves.
@@ -3352,6 +3352,13 @@ Permission `admin:settings`. Copies all data from the current backend to the tar
 `successor_has_key`, `successor_archived`) when a renewal left the HTTPS binding on the previous certificate, else `null`; applying a
 certificate or unbinding clears it, and importing the renewed certificate's key moves the binding to it.
 Its `fingerprint` is the whole SHA-256 of the certificate, in colon-separated uppercase hex (`-` when no certificate could be read).
+`served` compares it with the certificate the TLS listener presents, read on the server as the listener loaded its files:
+`fingerprint` (same notation) and `matches`, `false` for a certificate written but not served yet, `null` (with a `null`
+fingerprint) when the process answering serves no TLS listener.
+`regenerate` and `apply` answer `listener_reload`: `reloading` (outside HA, in a container as under systemd, the gunicorn
+master was sent SIGHUP: it re-reads its configuration and replaces its workers, which load the new files, without the
+service stopping), `restarting` (DEB/RPM without a gunicorn master to signal: the service restarts), `rolling` (HA: a
+rolling restart) or `failed`, with `error`, a message saying the listener was not reloaded and an error in the service log.
 ```http
 # Get current certificate info
 GET /api/v2/system/https/cert-info
@@ -3365,13 +3372,12 @@ Content-Type: application/json
   "validity_days": 365
 }
 
-# Apply new certificate
+# Apply a managed certificate (with its private key) to HTTPS
 POST /api/v2/system/https/apply
 Content-Type: application/json
 
 {
-  "certificate": "-----BEGIN CERTIFICATE-----\n...",
-  "private_key": "-----BEGIN PRIVATE KEY-----\n..."
+  "cert_id": 42
 }
 ```
 `password` opens an encrypted input (PKCS#12, encrypted key). `output_password` (the older name `pkcs12_password` is still accepted; two different values answer `400`) protects the OUTPUT: it is required for `pkcs12` and `jks`, and encrypts a private key written as `pem` (PKCS#8, 8 to 256 characters, else `400`). A `der` output that would carry a private key refuses an `output_password` with `400`; with a certificate or a request in `der`, a `pkcs7` output, or a `pem` without a key, it is ignored. A value that is not a string answers `400` whatever the output.

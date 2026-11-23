@@ -1399,7 +1399,7 @@ export const helpContent = {
       'Switching SQLite ↔ PostgreSQL is bidirectional: the UI runs safety checks (driver loaded, target reachable, target empty) before migrating',
     ],
     warnings: [
-      'Changing the HTTPS certificate requires a service restart',
+      'Changing the HTTPS certificate reloads the TLS listener without a restart, in a container too (HA: a rolling restart)',
       'Modifying security settings may lock out users: verify access before saving',
     ],
     related: ['Users & Groups', 'Audit Logs', 'Account']
