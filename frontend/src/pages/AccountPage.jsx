@@ -15,7 +15,7 @@ import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
-import { apiKeyScopePermissions, apiKeyScopeLabel } from '../lib/apiKeyScopes'
+import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
 import { describePermissions } from '../lib/rbacPermissions'
 import { useUnloadGuard } from '../hooks/useSaveParts'
 import { keepDraft, readDraft } from '../lib/draftMemory'
@@ -28,6 +28,7 @@ import { validityDays } from '../components/mtls/validity'
 import { ExportDialog } from './certificates/dialogs/ExportDialog'
 import { ROLE_KEYS } from './users/userFacts'
 import { languages } from '../i18n'
+import ApiKeyList from './account/ApiKeyList'
 import { chooseLanguage } from '../lib/chooseLanguage'
 
 // Profile edit left pending, kept for the tab (lib/draftMemory)
@@ -54,6 +55,7 @@ export default function AccountPage() {
   const [announce, setAnnounce] = useState('')
 
   const [apiKeys, setApiKeys] = useState([])
+  const [apiKeysLoading, setApiKeysLoading] = useState(true)
   const [webauthnCredentials, setWebauthnCredentials] = useState([])
   const [mtlsCertificates, setMtlsCertificates] = useState([])
   const [cas, setCas] = useState([])
@@ -142,7 +144,9 @@ export default function AccountPage() {
     try {
       const response = await accountService.getApiKeys()
       setApiKeys(response.data || response || [])
-    } catch { /* non-critical: API keys tab may not be available */ }
+    } catch { /* non-critical: API keys tab may not be available */ } finally {
+      setApiKeysLoading(false)
+    }
   }
 
   const loadWebAuthnCredentials = async () => {
@@ -653,35 +657,8 @@ export default function AccountPage() {
   const keys = (
     <SettingsGroup legend={t('account.yourAPIKeys')} grid={false}>
       <p className="group-hint">{t('account.apiKeyHint')}</p>
-      <RecordList step={10} empty={`${t('account.noAPIKeys')}. ${t('account.createKeyToAccess')}`}>
-        {/* The keys in use first; revoked and expired ones after them, behind « show more » in a long list */}
-        {[...apiKeys].sort((a, b) => Number(b.is_active && !b.is_expired) - Number(a.is_active && !a.is_expired)).map((key) => {
-          const effectivelyActive = key.is_active && !key.is_expired
-          return (
-            <RecordRow key={key.id} title={key.name}
-              badge={!key.is_active ? <Pill tone="muted" label={t('common.revoked')} /> : key.is_expired ? <Pill tone="muted" label={t('common.expired')} /> : null}
-              meta={[
-                `${t('common.created')}${t('work.sep')}${formatDate(key.created_at)}`,
-                `${t('account.apiKeyLastUsed')}${t('work.sep')}${key.last_used_at ? formatDate(key.last_used_at) : t('common.never')}`,
-                key.expires_at && `${t('common.expires')}${t('work.sep')}${formatDate(key.expires_at)}`,
-              ].filter(Boolean).join(' · ')}
-              extra={<>
-                <span className="rl-meta row-actions">
-                  {key.key_prefix ? (
-                    <>
-                      <span className="mono">{key.key_prefix}…</span>
-                      <IconBtn icon="copy" quiet label={t('common.copy')} onClick={() => { copy(key.key_prefix); showSuccess(t('common.copied')) }} />
-                    </>
-                  ) : t('account.apiKeyPrefixUnavailable')}
-                </span>
-                {key.permissions && <span className="rl-meta">{apiKeyScopeLabel(t, key.permissions)}</span>}
-              </>}
-              action={effectivelyActive
-                ? <IconBtn icon="block" write label={`${t('common.revoke')} ${key.name}`} onClick={() => handleRevokeApiKey(key.id)} />
-                : <IconBtn icon="close" write label={`${t('common.delete')} ${key.name}`} onClick={() => handleDeleteApiKey(key.id)} />} />
-          )
-        })}
-      </RecordList>
+      <ApiKeyList keys={apiKeys} loading={apiKeysLoading} onRevoke={handleRevokeApiKey} onDelete={handleDeleteApiKey}
+        onCopy={(prefix) => { copy(prefix); showSuccess(t('common.copied')) }} />
     </SettingsGroup>
   )
 

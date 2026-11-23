@@ -207,18 +207,18 @@ describe('AccountPage sections', () => {
     expect(dd('common.status').querySelector('.badge')).not.toBeNull()
   })
 
-  it('lists the API keys one per line with the revoke action named', async () => {
+  it('lists the API keys in the settings table with the revoke action named', async () => {
     accountService.getApiKeys.mockResolvedValueOnce({ data: [
       { id: 4, name: 'ci', key_prefix: 'ucm_ab', is_active: true, is_expired: false, created_at: '2026-11-01T10:00:00Z', permissions: ['read:certificates'] },
     ] })
     open()
     const keys = await screen.findByRole('region', { name: 'account.apiKeys' })
-    const row = (await within(keys).findByText('ci')).closest('li')
-    expect(row.closest('ul')).toHaveClass('record-list')
+    const row = (await within(keys).findByText('ci')).closest('tr')
+    expect(row.closest('table')).toHaveClass('module-table')
     // its permissions in words, never the raw scope
     expect(row).toHaveTextContent('rbac.permissionOf')
     expect(row).not.toHaveTextContent('read:certificates')
     expect(row).toHaveTextContent('ucm_ab…')
-    expect(within(row).getByRole('button', { name: 'common.revoke ci' })).toBeInTheDocument()
+    expect(within(row).getByTitle('common.revoke')).toHaveAttribute('data-write')
   })
 })
