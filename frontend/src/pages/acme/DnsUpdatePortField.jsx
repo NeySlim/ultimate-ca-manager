@@ -54,8 +54,9 @@ export default function DnsUpdatePortField({ clientSettings = {}, canWrite, onSa
         <label htmlFor="acme-dns-update-port">{t('acme.dnsUpdate.portLabel')} {state}</label>
         <input id="acme-dns-update-port" aria-label={t('acme.dnsUpdate.portLabel')} type="number" min="0" max="65535" value={overridden ? String(envPort) : value}
           onChange={(e) => { setValue(e.target.value); setError('') }} readOnly={overridden} disabled={!canWrite || undefined}
-          aria-invalid={error ? 'true' : undefined} aria-describedby="acme-dns-update-port-hint" />
-        <small id="acme-dns-update-port-hint">{overridden ? t('acme.dnsUpdate.portEnvOverride', { port: envPort }) : t('acme.dnsUpdate.portHelper')}</small>
+          aria-invalid={error ? 'true' : undefined} aria-describedby={overridden ? 'acme-dns-update-port-hint' : undefined} />
+        {/* The card's description already says what the port does: the field adds only the environment's override */}
+        {overridden && <small id="acme-dns-update-port-hint">{t('acme.dnsUpdate.portEnvOverride', { port: envPort })}</small>}
         {error && <p className="field-error"><Icon name="warning" /><span>{error}</span></p>}
       </div>
       {canWrite && !overridden && (

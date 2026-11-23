@@ -269,7 +269,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
           })),
           active: eabFilterStatus, onChange: setEabFilterStatus, label: t('acme.filterByState'),
           aside: (
-            <label className="checkbox-line eab-required" title={t('acme.eab.requiredDescription')}>
+            <label className="checkbox-line eab-required phone-aside" title={t('acme.eab.requiredDescription')}>
               <input type="checkbox" checked={!!eabRequired} disabled={!canWrite || undefined} onChange={(e) => onToggleEabRequired(e.target.checked)} />
               {t('acme.eab.requiredTitle')}
             </label>

@@ -67,7 +67,7 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
           {canWrite && account.status === 'valid' && (
             <Btn tone="danger" icon="block" id="acme-disable" onClick={() => setConfirming(true)}>{t('acme.disableAccount')}</Btn>
           )}
-          {canDelete && <Btn icon="close" id="acme-delete" onClick={() => onDelete(account.id)}>{t('common.delete')}</Btn>}
+          {canDelete && <Btn tone="danger" icon="block" id="acme-delete" onClick={() => onDelete(account.id)}>{t('common.delete')}…</Btn>}
         </>}>
         {section === 'account' && (
           <div className="module-detail">

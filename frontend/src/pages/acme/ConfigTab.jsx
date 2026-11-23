@@ -9,7 +9,7 @@ import { Input, Textarea, Modal } from '../../components/atelier/Form'
 import { MARKDOWN_COMPONENTS } from '../../components/atelier/markdown'
 import ProfilesEditor from './ProfilesEditor'
 import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
-import { Field, Notice } from '../protocols/atelierParts'
+import { Field, Notice, soleLegendsOff } from '../protocols/atelierParts'
 
 /** Render a markdown ToS preview.
  *
@@ -135,8 +135,7 @@ export default function ConfigTab({ acmeSettings, saved = acmeSettings, savedPro
       extraKeys: [['profiles', t('acme.profiles')], ['default_profile', t('acme.defaultProfile')], ['default_digest', t('acme.defaultDigest')]],
       groups: [],
       children: (
-        <fieldset className="settings-group">
-          <legend>{t('acme.profiles')}</legend>
+        <fieldset className="settings-group stacked" aria-label={t('acme.profiles')}>
           <ProfilesEditor value={acmeSettings.profiles || {}} saved={savedProfiles} onChange={onProfiles} disabled={off} templates={templates} />
           <p className="muted small">{t('acme.profileTemplateHelp')}</p>
           <div className="settings-grid">
@@ -206,8 +205,7 @@ export default function ConfigTab({ acmeSettings, saved = acmeSettings, savedPro
       extraKeys: [['terms_of_service', t('acme.termsOfService')]],
       groups: [],
       children: (
-        <fieldset className="settings-group">
-          <legend>{t('acme.termsOfService')}</legend>
+        <fieldset className="settings-group stacked" aria-label={t('acme.termsOfService')}>
           {tosExists && tos?.body?.trim() ? (
             <div className="summary tos-preview">
               {tos.title && <strong>{tos.title}</strong>}
@@ -230,7 +228,7 @@ export default function ConfigTab({ acmeSettings, saved = acmeSettings, savedPro
 
   return (
     <>
-      <SettingsView sections={sections} values={values} changed={changed} onChange={onChange}
+      <SettingsView sections={soleLegendsOff(sections)} values={values} changed={changed} onChange={onChange}
         onSave={canWrite ? onSaveConfig : undefined} onReset={onReset} saving={saving} tocLabel={t('protocols.sectionsOf', { name: t('acme.acmeServer') })} />
       {/* Terms of Service edit modal */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title={t('acme.termsOfService')} testId="acme-tos-dialog">

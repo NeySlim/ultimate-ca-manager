@@ -98,6 +98,12 @@ describe('DnsUpdatePortField', () => {
     expect(screen.queryByRole('button', { name: 'common.save' })).not.toBeInTheDocument()
   })
 
+  it('does not repeat the card\'s description under the field, only the environment\'s override', () => {
+    renderField({ dns_update_port: 8053 })
+    expect(screen.queryByText('acme.dnsUpdate.portHelper')).toBeNull()
+    expect(input()).not.toHaveAttribute('aria-describedby')
+  })
+
   it('shows the listening status', () => {
     renderField({ dns_update_port: 8053, dns_update_listening: true })
     expect(screen.getByText('acme.dnsUpdate.portListening')).toBeInTheDocument()

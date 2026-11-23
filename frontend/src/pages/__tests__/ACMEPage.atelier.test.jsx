@@ -125,8 +125,16 @@ describe('the ACME accounts', () => {
   })
 
   it('copies the directory URL from the head', async () => {
-    at('/acme')
-    fireEvent.click(await screen.findByRole('button', { name: 'acme.copyDirectory' }))
+    const { container } = at('/acme')
+    await screen.findByRole('button', { name: 'acct/abcdefghijkl' })
+    fireEvent.click(within(container.querySelector('.page-head')).getByRole('button', { name: 'acme.copyDirectory' }))
+    await waitFor(() => expect(clip.copy).toHaveBeenCalledWith('https://pki.example.com/acme/directory'))
+  })
+
+  it('keeps the directory URL a tap away on a phone, where the head shows its main button only', async () => {
+    const { container } = at('/acme?tab=localdomains')
+    const phone = await waitFor(() => { const p = container.querySelector('p.phone-only'); if (!p) throw new Error('none'); return p })
+    fireEvent.click(within(phone).getByRole('button', { name: 'acme.copyDirectory' }))
     await waitFor(() => expect(clip.copy).toHaveBeenCalledWith('https://pki.example.com/acme/directory'))
   })
 
@@ -149,7 +157,7 @@ describe('the ACME accounts', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'acct/abcdefghijkl' }))
     const dock = await screen.findByRole('complementary', { name: /atelier.detailOf/ })
     expect(within(dock).queryByRole('button', { name: 'acme.disableAccount' })).toBeNull()
-    expect(within(dock).queryByRole('button', { name: 'common.delete' })).toBeNull()
+    expect(within(dock).queryByRole('button', { name: 'common.delete…' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'acme.newAccount' })).toBeNull()
   })
 
@@ -157,7 +165,10 @@ describe('the ACME accounts', () => {
     at('/acme')
     fireEvent.click(await screen.findByRole('button', { name: 'acct/abcdefghijkl' }))
     const dock = await screen.findByRole('complementary', { name: /atelier.detailOf/ })
-    fireEvent.click(within(dock).getByRole('button', { name: 'common.delete' }))
+    const remove = within(dock).getByRole('button', { name: 'common.delete…' })
+    // A destructive action that asks first: the danger button and its ellipsis, as the other docks of the zone
+    expect(remove).toHaveClass('btn', 'danger')
+    fireEvent.click(remove)
     await waitFor(() => expect(acmeService.deleteAccount).toHaveBeenCalledWith(5))
   })
 })

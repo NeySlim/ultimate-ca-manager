@@ -12,7 +12,7 @@ import { publicBaseUrl } from '../../lib/utils'
 import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms, isBrainpool } from '../../lib/keyAlgorithms'
 import { useKeyPlatform } from '../../lib/policyAlgorithms'
 import DnsUpdatePortField from './DnsUpdatePortField'
-import { Field, Notice } from '../protocols/atelierParts'
+import { Field, Notice, soleLegendsOff } from '../protocols/atelierParts'
 import { copyRow } from '../../components/atelier/facts'
 
 // Bounds of the integer settings, as the server checks them
@@ -187,12 +187,12 @@ export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWri
     {
       id: 'dnsupdate', label: t('acme.dnsUpdate.portLabel'), icon: 'plug', desc: t('acme.dnsUpdate.portHelper'),
       groups: [],
-      children: <fieldset className="settings-group"><legend>{t('acme.dnsUpdate.portLabel')}</legend><DnsUpdatePortField clientSettings={clientSettings} canWrite={canWrite} onSave={onSaveDnsUpdatePort} /></fieldset>,
+      children: <fieldset className="settings-group" aria-label={t('acme.dnsUpdate.portLabel')}><DnsUpdatePortField clientSettings={clientSettings} canWrite={canWrite} onSave={onSaveDnsUpdatePort} /></fieldset>,
     },
   ]
 
   return (
-    <SettingsView sections={sections} values={draft} errors={errors} changed={changed}
+    <SettingsView sections={soleLegendsOff(sections)} values={draft} errors={errors} changed={changed}
       onChange={(k, v) => { setDraft((d) => ({ ...d, [k]: v })); if (errors[k]) setErrors((e) => { const n = { ...e }; delete n[k]; return n }) }}
       onSave={canWrite ? save : undefined} onReset={() => { setDraft(saved); setErrors({}) }} saving={saving} announce={announce} stateRef={stateRef}
       tocLabel={t('protocols.sectionsOf', { name: t('acme.views.client') })} />
