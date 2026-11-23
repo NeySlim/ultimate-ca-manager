@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
   Section, Facts, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, FormModal, Notice,
@@ -16,7 +17,8 @@ import { sshCasService, hsmService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard, useCRUDPage } from '../hooks'
 import { useDockSelection } from '../components/atelier/useDockParam'
-import { fact } from '../components/atelier/facts'
+import { copyRow, fact } from '../components/atelier/facts'
+import { PhoneMoreActions } from './pki/PhoneMoreActions'
 import { formatDate, downloadBlob, extractData } from '../lib/utils'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 import { findAlgorithm, isUsable, GROUP_RSA, GROUP_NIST } from '../lib/keyAlgorithms'
@@ -60,6 +62,7 @@ const SSH_CA_SECTIONS = ['overview', 'install', 'config', 'key']
 
 export default function SSHCAsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { copy: clipboardCopy, isCopied } = useClipboard()
@@ -255,7 +258,8 @@ export default function SSHCAsPage() {
                 [t('sshCas.caType'), typeLabel(open)],
                 [t('sshCas.keyType'), keyCell(open)],
                 open.key_source === 'hsm' && fact(t('cas.detail.hsmKey'), open.hsm_key_label && <span className="mono">{open.hsm_key_label}</span>),
-                open.fingerprint ? { label: t('sshCas.fingerprint'), value: open.fingerprint, kind: 'hex', long: true } : fact(t('sshCas.fingerprint'), null),
+                // An SSH fingerprint is base64, not colon-separated bytes: it wraps in the chip instead of running under its copy button
+                open.fingerprint ? copyRow(t('sshCas.fingerprint'), open.fingerprint, undefined, { long: true }) : fact(t('sshCas.fingerprint'), null),
                 fact(t('sshCas.serialCounter'), open.serial_counter),
                 [t('sshCas.stats.certificates'), open.cert_count || 0],
                 fact(t('common.created'), open.created_at && formatDate(open.created_at)),
@@ -336,12 +340,16 @@ export default function SSHCAsPage() {
       <PageHead title={t('sshCas.title')} total={t('sshCas.subtitle', { count: sshCas.length })} intent={t('sshCas.intent')}
         actions={<>
           <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh/certificates">{t('sshCertificates.title')}</Btn>
-          {canWrite('ssh_cas') && <Btn icon="upload" id="ssh-ca-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
+          {canWrite('ssh_cas') && <Btn tone="quiet" icon="upload" id="ssh-ca-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
+          <PhoneMoreActions title={t('sshCas.title')} items={[
+            { id: 'ssh-switch', icon: 'terminal', label: t('sshCertificates.title'), onClick: () => navigate('/ssh/certificates') },
+            canWrite('ssh_cas') && { id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setShowImportModal(true) },
+          ]} />
           {create && <Btn tone="primary" icon="plus" id="ssh-ca-new" onClick={create.onClick}>{create.label}</Btn>}
         </>} />
       <ListView label={t('sshCas.title')} caption={t('sshCas.caption')} icon="terminal" list={list} nameSort="name" loading={loading && !sshCas.length}
         filters={{ views, active: typeView, onChange: setTypeView, label: t('sshCas.filterByType'),
-          aside: <span id="ssh-cert-total">{t('sshCas.certTotal')} {sshCas.reduce((n, ca) => n + (ca.cert_count || 0), 0)}</span> }}
+          aside: <span id="ssh-cert-total" className="phone-aside">{t('sshCas.certTotal')} {sshCas.reduce((n, ca) => n + (ca.cert_count || 0), 0)}</span> }}
         toolbar={(
           <Toolbar>
             <SearchField id="ssh-ca-search" name="q" label={t('sshCas.searchPlaceholder')} placeholder={t('sshCas.searchPlaceholder')} value={query}

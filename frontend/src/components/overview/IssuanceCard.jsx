@@ -39,6 +39,9 @@ function useWidth(initial) {
   return [setEl, width]
 }
 
+// Room a dated tick leaves to the right-aligned « today » label, so the two never overlap on a narrow card
+const TODAY_ROOM = 90
+
 /** The fill of a series: its colour, or its hatching over that colour. */
 const paint = (s, ids) => (s.hatch ? `url(#${ids[s.key]})` : s.color)
 
@@ -163,7 +166,7 @@ export function IssuanceCard() {
                           rx={k === d.segments.length - 1 ? 2 : 0} style={{ fill: paint(s, ids) }} />
                       })}
                       {i === peak && <text className="lab" x={x + bw / 2} y={y(d.total) - 6} textAnchor="middle">{d.total}</text>}
-                      {(i === n - 1 || (n - 1 - i) % tickEvery === 0) && (n <= 7 || i < n - 4 || i === n - 1) && (
+                      {(i === n - 1 || ((n - 1 - i) % tickEvery === 0 && (n <= 7 || (n - 1 - i) * slot >= TODAY_ROOM))) && (
                         <text x={x + bw / 2} y={H - 6} textAnchor={i === n - 1 ? 'end' : 'middle'}>
                           {i === n - 1 ? t('overview.activity.today') : dayLabel(d.date, lang)}
                         </text>

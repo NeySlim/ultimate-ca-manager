@@ -54,7 +54,7 @@ describe('card states', () => {
     ['activity', ActivityCard, api.getActivity, { activity: [] }, 'overview.state.empty'],
     ['issuance', IssuanceCard, api.getIssuance, { flow: { periods: [{ date: '2026-11-19' }], previous: { total: 0 } } }, 'overview.flow.quiet'],
     ['revocation', RevocationCard, api.getRevocation, { total: 0, items: [] }, 'overview.state.empty'],
-    ['authorities', AuthoritiesCard, api.getAll, [], 'overview.state.empty'],
+    ['authorities', AuthoritiesCard, api.getAll, [], 'overview.hierarchy.emptyTitle'],
   ]
   it.each(cases)('%s: skeleton, empty, error with its cause and retry, missing permission', async (id, Card, fetcher, empty, emptyText) => {
     fetcher.mockReturnValueOnce(new Promise(() => {}))

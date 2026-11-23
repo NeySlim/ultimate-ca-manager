@@ -78,6 +78,29 @@ describe('authority and HSM tiles', () => {
     expect(tile('ca', 1).textContent).toContain('overview.tiles.noActivity')
   })
 
+  it('reads an expired authority red to its life bar, as its pill, and keeps amber for one late in its life', async () => {
+    api.cas.mockResolvedValue({ data: [
+      { id: 3, refid: 'r3', descr: 'R3 expirée', status: 'active', valid_from: at(-400), valid_to: at(-5), cdp_enabled: false, key_type: 'RSA 2048' },
+      { id: 4, refid: 'r4', descr: 'Presque finie', status: 'active', valid_from: at(-950), valid_to: at(50), cdp_enabled: false, key_type: 'RSA 2048' },
+    ] })
+    show(<AuthoritiesCard />)
+    await waitFor(() => expect(tile('ca', 3)).not.toBeNull())
+    expect(tile('ca', 3).querySelector('.life b')).toHaveClass('bad')
+    expect(tile('ca', 3).querySelector('.track')).toHaveClass('expired')
+    expect(tile('ca', 3).querySelector('.track')).not.toHaveClass('late')
+    expect(tile('ca', 4).querySelector('.life b')).toHaveClass('warn')
+    expect(tile('ca', 4).querySelector('.track')).toHaveClass('late')
+  })
+
+  it('says there is no authority with the hierarchy\'s block, not the green tick of an empty card', async () => {
+    api.cas.mockResolvedValue({ data: [] })
+    api.providers.mockResolvedValue({ data: [] })
+    show(<AuthoritiesCard />)
+    const block = await waitFor(() => { const el = document.querySelector('#card-authorities #tiles-empty'); expect(el).not.toBeNull(); return el })
+    expect(block.textContent).toContain('overview.hierarchy.emptyTitle')
+    expect(document.querySelector('#card-authorities .empty-line')).toBeNull()
+  })
+
   it('counts the authorities a module serves and tests it from its tile', async () => {
     show(<AuthoritiesCard />)
     await waitFor(() => expect(tile('hsm', 7)).not.toBeNull())

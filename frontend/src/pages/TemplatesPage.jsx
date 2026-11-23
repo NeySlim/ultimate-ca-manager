@@ -34,6 +34,7 @@ import { CustomExtensionsEditor } from '../components/CustomExtensionsEditor'
 import { CN_PATTERN_VARIABLES, cnPatternNonUnique, cnPatternSource } from '../lib/cnPattern'
 import { CertMenu } from './certificates/inspector/CertMenu'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
+import { templateText } from './pki/systemTexts'
 
 const TEMPLATE_SECTIONS = ['overview', 'subject', 'extensions', 'enrollment']
 const BY_NAME = { key: 'name', asc: true }
@@ -250,13 +251,14 @@ export default function TemplatesPage() {
     ? <Pill label={t('templates.module.states.active')} tone="good" />
     : <Pill label={t('templates.module.states.inactive')} tone="muted" />)
   const tplSource = (tpl) => (tpl.is_system ? t('templates.system') : t('templates.custom'))
+  const tplName = (tpl) => templateText(t, tpl, 'name')
   const tplValidity = (tpl) => t('templates.module.validity', { count: tpl.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS })
   const tplKey = (tpl) => keyLabel(tpl.key_type) || '—'
   const tplUses = (tpl) => t('templates.module.usesCount', { count: tpl.usage_count || 0 })
   const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
     return templates.filter((tpl) => (!source || (source === 'system') === !!tpl.is_system)
-      && (!q || [tpl.name, tpl.description, tplSource(tpl)].some((v) => String(v || '').toLowerCase().includes(q))))
+      && (!q || [tpl.name, tpl.description, tplName(tpl), tplSource(tpl)].some((v) => String(v || '').toLowerCase().includes(q))))
   }, [templates, source, query]) // eslint-disable-line react-hooks/exhaustive-deps
   const present = ['active', 'inactive'].filter((s) => templates.some((tpl) => tplState(tpl) === s))
   const active = present.includes(state) ? state : ''
@@ -267,7 +269,7 @@ export default function TemplatesPage() {
     sortParam,
     resetKey: `${query}|${source}|${active}`,
     sorts: {
-      name: (x) => x.name, source: tplSource, validity_days: (x) => x.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
+      name: tplName, source: tplSource, validity_days: (x) => x.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
       key: (x) => keyLabel(x.key_type), usage_count: (x) => x.usage_count || 0, state: (x) => (tplState(x) === 'active' ? 0 : 1),
     },
   })
@@ -277,7 +279,7 @@ export default function TemplatesPage() {
   ]
   const narrowed = Boolean(query.trim() || source || active)
   const write = canWrite('templates')
-  const create = write ? { label: t('templates.createTemplate'), icon: 'plus', onClick: () => { setEditingTemplate(null); setShowTemplateModal(true) }, write: true } : undefined
+  const create = write ? { label: t('templates.createTemplate'), icon: 'plus', onClick: () => { setEditingTemplate(null); setShowTemplateModal(true) }, write: true, primary: true } : undefined
 
   // An open system template leaves the dock when the system templates are filtered out
   useEffect(() => {
@@ -312,9 +314,9 @@ export default function TemplatesPage() {
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('common.templates') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
-      tabs={[{ key: open.id, title: open.name, icon: 'template' }]} onClose={() => setSelectedTemplate(null)}>
-      <DockBody icon="template" title={open.name} badge={tplPill(open)} section={section} onSection={setSection}
-        sectionsLabel={t('atelier.sectionsOf', { name: open.name })}
+      tabs={[{ key: open.id, title: tplName(open), icon: 'template' }]} onClose={() => setSelectedTemplate(null)}>
+      <DockBody icon="template" title={tplName(open)} badge={tplPill(open)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: tplName(open) })}
         sections={[['overview', t('atelier.overview')], ['subject', t('templates.module.sections.subject')], ['extensions', t('templates.module.sections.extensions')], ['enrollment', t('templates.enrollment')]]}
         actions={<>
           <Btn icon="download" id="template-export" onClick={() => handleExportTemplate(open)}>{t('common.export')}</Btn>
@@ -323,7 +325,7 @@ export default function TemplatesPage() {
               title={open.is_system ? t('templates.systemNotEditable') : undefined}
               onClick={() => { setEditingTemplate(open); setShowTemplateModal(true) }}>{t('common.edit')}</Btn>
           )}
-          <IconBtn quiet icon="more" title={false} label={t('templates.module.moreActions', { name: open.name })} data-template-menu={open.id} onClick={() => setMenuOpen(true)} />
+          <IconBtn quiet icon="more" title={false} label={t('templates.module.moreActions', { name: tplName(open) })} data-template-menu={open.id} onClick={() => setMenuOpen(true)} />
         </>}>
         {section === 'overview' && (
           <div className="module-detail">
@@ -338,7 +340,7 @@ export default function TemplatesPage() {
                 markers.length > 0 && [t('templates.module.markers'), markers.join(', ')],
               ]} />
             </Section>
-            <Section title={t('atelier.summary')}><p className="summary">{open.description || t('templates.module.noDescription')}</p></Section>
+            <Section title={t('atelier.summary')}><p className="summary">{templateText(t, open, 'description') || t('templates.module.noDescription')}</p></Section>
           </div>
         )}
         {section === 'subject' && (
@@ -406,12 +408,12 @@ export default function TemplatesPage() {
 
   return (
     <Zone dock={dock} testId="templates-zone" after={<>
-      {menuOpen && open && <CertMenu title={t('templates.module.actionsTitle')} name={open.name} items={menuItems} onClose={() => setMenuOpen(false)} />}
+      {menuOpen && open && <CertMenu title={t('templates.module.actionsTitle')} name={tplName(open)} items={menuItems} onClose={() => setMenuOpen(false)} />}
       {dialogs}
     </>}>
       <PageHead title={t('common.templates')} total={t('templates.module.unit', { count: templates.length })} intent={t('shell.moduleDesc.templates')}
         actions={write && <>
-          <Btn icon="upload" id="template-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
+          <Btn tone="quiet" icon="upload" id="template-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
           <PhoneMoreActions title={t('common.templates')} items={[{ id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setShowImportModal(true) }]} />
           <Btn tone="primary" icon="plus" id="template-new" onClick={create.onClick}>{create.label}</Btn>
         </>} />
@@ -424,7 +426,7 @@ export default function TemplatesPage() {
               options={[{ value: '', label: t('templates.allSources') }, { value: 'system', label: t('templates.system') }, { value: 'custom', label: t('templates.custom') }]} />
           </Toolbar>
         )}
-        title={(tpl) => tpl.name || t('common.unnamed')} status={tplPill} openedId={open?.id} onOpen={openTemplate}
+        title={(tpl) => tplName(tpl) || t('common.unnamed')} status={tplPill} openedId={open?.id} onOpen={openTemplate}
         nameSort="name"
         // No long free text: the name takes the room left (L7)
         columns={[
@@ -698,7 +700,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   )
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form className="template-form" onSubmit={handleSubmit}>
       <div className="form-fields">
         <Input id="tpl-name" label={t('templates.templateName')} value={formData.name} onChange={(e) => set('name', e.target.value)}
           placeholder={t('templates.namePlaceholder')} required data-autofocus="" />

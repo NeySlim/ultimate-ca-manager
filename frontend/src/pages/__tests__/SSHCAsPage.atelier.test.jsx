@@ -132,6 +132,20 @@ describe('the SSH CA list', () => {
     expect(screen.getByRole('link', { name: 'sshCertificates.title' })).toHaveAttribute('href', '/ssh/certificates')
   })
 
+  it('keeps the link to the certificates and Importer on a phone, in the page actions menu', async () => {
+    m.mobile = true
+    const at = renderAtUrl(<SSHCAsPage />, '/ssh/cas')
+    await screen.findAllByRole('button', { name: 'Users CA' })
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.pageActions' }))
+    const menu = screen.getByTestId('inspector-actions-dialog')
+    expect(within(menu).getAllByRole('button').map((b) => b.textContent).filter(Boolean)).toEqual(['sshCertificates.title', 'common.import'])
+    fireEvent.click(within(menu).getByRole('button', { name: 'common.import' }))
+    expect(await screen.findByText('sshCas.importCA')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.pageActions' }))
+    fireEvent.click(within(screen.getByTestId('inspector-actions-dialog')).getByRole('button', { name: 'sshCertificates.title' }))
+    expect(at.where()).toBe('/ssh/certificates')
+  })
+
   it('gives a reader no create, import, edit or delete', async () => {
     m.write = false
     m.del = false
@@ -203,6 +217,7 @@ describe('the SSH CA dock in typed rows (KV-3)', () => {
     const dock = await openUsers()
     expect(dock.querySelector('dl.props')).toBeNull()
     expect(rowIn(dock, 'sshCas.fingerprint').querySelector('dd.v .code-value')).toHaveTextContent('SHA256:aaa')
+    expect(rowIn(dock, 'sshCas.fingerprint').querySelector('.code-value.hex')).toBeNull()
     expect(within(rowIn(dock, 'sshCas.fingerprint')).getByRole('button', { name: 'protocols.copyValue' })).toBeInTheDocument()
     expect(rowIn(dock, 'common.createdBy').querySelector('dd.absent')).toHaveTextContent('—')
     expect(rowIn(dock, 'sshCas.stats.certificates').querySelector('dd.v')).toHaveTextContent('7')
