@@ -116,6 +116,23 @@ def test_unsupported_or_unsafe_requests_are_refused(auth_client, history):
     assert r.status_code == 400
 
 
+def test_the_journal_cleanup_never_deletes_what_the_operator_keeps(app, auth_client, history):
+    """A retention above the ceiling is refused, not lowered: lowering it would erase kept logs."""
+    with app.app_context():
+        _row(-1, 4000)
+    r = auth_client.post('/api/v2/audit/cleanup', data=json.dumps(
+        {'retention_days': 5000}), content_type='application/json')
+    assert r.status_code == 400
+    assert '3650' in r.get_data(as_text=True)
+    with app.app_context():
+        assert _alive([-1]) == {-1}
+    r = auth_client.post('/api/v2/audit/cleanup', data=json.dumps(
+        {'retention_days': 3650}), content_type='application/json')
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        assert _alive([-1]) == set()
+
+
 def test_a_failed_purge_is_reported_as_failed(app, history, monkeypatch):
     def boom(cutoff):
         raise RuntimeError('purge exploded')
