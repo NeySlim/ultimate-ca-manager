@@ -322,3 +322,5 @@
 :root .atl .settings-body :is(small,p:not(.field-error)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
 /* A help held to the measure in a centred empty block stays centred under its title. */
 :root .atl .settings-body .empty p{margin-left:auto;margin-right:auto}
+/* Graphic review: PKI and protocols. */
+/* Graphic review: governance, settings and shell. */
