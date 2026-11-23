@@ -20,7 +20,7 @@ import pytest
 from models import AuditLog, User, db
 from utils.datetime_utils import utc_now
 from tests.test_factor_change_sessions import (  # noqa: F401 (fixtures)
-    _drop_session_table_from_metadata, nodes)
+    PG_URL, _drop_session_table_from_metadata, nodes)
 from tests.test_session_lock_and_info import (  # noqa: F401 (fixture)
     PASSWORD, _password_session, _post, _verify, make_user)
 
@@ -1180,6 +1180,27 @@ def test_a_lock_the_file_store_could_not_write_says_it_was_not_stored(app, make_
         assert state == HELD
         r = _post(c, '/api/v2/auth/lock', {'reason': 'manual'})
     _not_stored(r, 'busy')
+    assert _profile(c).status_code == 200
+    _lock(c)
+    _refused_as_locked(_profile(c))
+
+
+@pytest.mark.parametrize('nodes', ['sql-sqlite', pytest.param('sql-postgresql', marks=[
+    pytest.mark.postgres, pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL')])], indirect=True)
+def test_a_lock_while_ha_maintenance_pauses_session_writes_says_it_was_not_stored(
+        nodes, make_user, monkeypatch):
+    """An HA maintenance pauses the SQL store's writes: the lock answers 409 'busy', as when
+    the file store stays held, and goes through once the writes resume."""
+    first, second = nodes
+    from utils.session_store import IsolatedSqlSessionInterface
+    user = make_user(first)
+    c = _password_session(first, user)
+    with monkeypatch.context() as paused:
+        paused.setattr(IsolatedSqlSessionInterface, '_writes_paused', staticmethod(lambda: True))
+        r = _post(_held_by(second, c.get_cookie('session').value), '/api/v2/auth/lock',
+                  {'reason': 'manual'})
+    _not_stored(r, 'busy')
+    assert _audits(first, 'session_locked', user['username']) == []
     assert _profile(c).status_code == 200
     _lock(c)
     _refused_as_locked(_profile(c))

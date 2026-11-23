@@ -166,7 +166,8 @@ class KeepsRemovedRecordsGone:
 
     def write_now(self, app, session):
         """Writes the session at once, guarded as its save: None once stored, else 'gone' (its
-        record was removed or moved meanwhile) or 'busy' (the store stayed held). A refusal
+        record was removed or moved meanwhile) or 'busy' (the store refused the write: held,
+        paused by an HA maintenance, or the record kept changing). A refusal
         stands for the rest of the request: its save writes nothing and sends no cookie."""
         if not self._opened_from_store(session):
             session.record_gone = True
