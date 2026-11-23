@@ -822,11 +822,11 @@ def test_a_lock_stored_between_the_read_and_the_write_of_a_save_is_kept(nodes, m
     _refused_as_locked(_profile(c))
 
 
-def test_a_lock_saved_while_a_file_store_save_is_under_way_waits_and_wins(nodes, make_user, monkeypatch):
+def test_a_lock_saved_while_a_file_store_save_is_under_way_waits_and_wins(app, make_user, monkeypatch):
     """The file store writes a lock under an exclusive flock: a save that read the record before
     the lock finishes first, then the lock is written over it, never the reverse."""
-    first, second = nodes
-    if second.config['SESSION_TYPE'] != 'filesystem':
+    first = second = app
+    if app.config['SESSION_TYPE'] != 'filesystem':
         pytest.skip('the SQL and Redis stores compare and swap (test above)')
     import utils.session_store as module
     monkeypatch.setattr(second.session_interface, 'lock_wait', 20.0)
