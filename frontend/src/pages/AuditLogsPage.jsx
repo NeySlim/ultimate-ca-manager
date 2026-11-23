@@ -31,7 +31,7 @@ const NEWEST_FIRST = { key: 'timestamp', asc: false }
 const TIME_KEYS = ['timestamp']
 const PRESETS_KEY = 'ucm-audit-presets'
 // The filters an overview link may carry in the address
-const LINK_KEYS = ['type', 'success', 'date_from', 'date_to']
+const LINK_KEYS = ['type', 'action_prefix', 'success', 'date_from', 'date_to']
 
 function readPresets() {
   try { const saved = localStorage.getItem(PRESETS_KEY); return saved ? JSON.parse(saved) : [] } catch { return [] }
@@ -52,6 +52,7 @@ export default function AuditLogsPage() {
   const [oldest, setOldest] = useState(null)
   const [stats, setStats] = useState(null)
   const [actions, setActions] = useState([])
+  const [actionsRead, setActionsRead] = useState(false)
 
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(50)
@@ -73,6 +74,12 @@ export default function AuditLogsPage() {
   const [presets, setPresets] = useState(readPresets)
   // A link of the overview opens the journal on one UTC day's failures of one type: it sets these filters, the others go
   const linked = useRef(null)
+  // A link's action prefix, resolved into the journal's actions once the server listed them
+  const prefixOf = (search) => {
+    const v = new URLSearchParams(search).get('action_prefix') || ''
+    return /^[\w.-]+$/.test(v) ? v : null
+  }
+  const [linkPrefix, setLinkPrefix] = useState(() => prefixOf(location.search))
   useEffect(() => {
     const q = new URLSearchParams(location.search)
     if (!LINK_KEYS.some((k) => q.has(k)) || linked.current === location.search) return
@@ -84,8 +91,16 @@ export default function AuditLogsPage() {
     setFilterDateTo(day(q.get('date_to')))
     setFilterUsername('')
     setFilterAction([])
+    setLinkPrefix(prefixOf(location.search))
     setPage(1)
   }, [location.search]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (linkPrefix == null || !actionsRead) return
+    const held = actions.filter((a) => a.startsWith(linkPrefix))
+    // No action holds the prefix: the prefix itself, which no entry carries, selects nothing
+    setFilterAction(held.length ? held : [linkPrefix])
+    setLinkPrefix(null)
+  }, [linkPrefix, actionsRead, actions]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [dialog, setDialog] = useState(null)
   const [cleanupLoading, setCleanupLoading] = useState(false)
@@ -109,7 +124,7 @@ export default function AuditLogsPage() {
   }), [search, filterUsername, sentActions, filterSuccess, filterDateFrom, filterDateTo])
   // A type whose actions do not meet the chosen ones selects nothing: nothing is read
   const impossible = Array.isArray(sentActions) && sentActions.length === 0 && (Boolean(filterType) || chosenActions.length > 0)
-  const typeWaits = Boolean(filterType) && actions.length === 0
+  const typeWaits = (Boolean(filterType) && actions.length === 0) || linkPrefix != null
 
   const seq = useRef(0)
   const loadLogs = useCallback(async () => {
@@ -143,11 +158,12 @@ export default function AuditLogsPage() {
       setJournalTotal(count)
       setStats(statsRes?.data || null)
       setActions(actionsRes?.data?.actions || [])
+      setActionsRead(true)
       if (count > 0) {
         const last = await auditService.getLogs({ page: count, per_page: 1 })
         setOldest(last?.data?.[0]?.timestamp || null)
       } else setOldest(null)
-    } catch (error) { reportSilentFailure('loadJournal', error) }
+    } catch (error) { setActionsRead(true); reportSilentFailure('loadJournal', error) }
   }, [])
 
   useEffect(() => { loadJournal() }, [loadJournal])

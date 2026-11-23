@@ -60,8 +60,8 @@ export function failuresPerDay(protocols, names, days) {
   return Array.from({ length }, (_, i) => series.reduce((sum, s) => sum + n(s[s.length - length + i]?.failed), 0))
 }
 
-/** Activité on one UTC day's failed ACME operations: the series of the card is the audit trail's acme.* entries. */
-export const failuresHref = (date) => `/audit?${new URLSearchParams({ type: 'acme', success: 'false', date_from: date, date_to: date })}`
+/** Activité on one UTC day's failed ACME operations: the card counts the trail's `acme.` actions, the link selects them. */
+export const failuresHref = (date) => `/audit?${new URLSearchParams({ action_prefix: 'acme.', success: 'false', date_from: date, date_to: date })}`
 
 /** Share of successful operations in percent, one decimal, rounded down so that one failure never reads 100 %. */
 export function successRate(ok, failed) {

@@ -390,6 +390,20 @@ describe('a link of the overview', () => {
     expect(chips).toHaveTextContent('audit.chipTo')
   })
 
+  it('opens on the actions of a prefix, the set the overview counts, and reads nothing before it knows them', async () => {
+    const acme = ['acme.account.new', 'acme.order.finalize', 'acme.client.renewal_failed']
+    auditService.getActions.mockResolvedValue({ data: { actions: [...ACTIONS, ...acme, 'acme_client_renewal_failed', 'dns_provider_test'], categories: {} } })
+    renderPage('/audit?action_prefix=acme.&success=false&date_from=2026-11-14&date_to=2026-11-14')
+    await waitFor(() => expect(lastList()).toMatchObject({ success: 'false', date_from: '2026-11-14', action: acme }))
+    expect(listCalls().every((p) => Array.isArray(p.action) && p.action.length === 3)).toBe(true)
+  })
+
+  it('reads nothing for a prefix no action of the journal holds', async () => {
+    renderPage('/audit?action_prefix=acme.&success=false&date_from=2026-11-14&date_to=2026-11-14')
+    await waitFor(() => expect(lastList()?.action).toEqual(['acme.']))
+    expect(listCalls().filter((p) => !p.action)).toHaveLength(0)
+  })
+
   it('ignores a value it does not know', async () => {
     renderPage('/audit?type=nope&success=maybe&date_from=yesterday')
     await ready()
