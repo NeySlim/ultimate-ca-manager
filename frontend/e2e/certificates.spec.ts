@@ -50,8 +50,10 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
   await result.getByRole('button', { name: 'View the certificate' }).click()
   await expect(result).toBeHidden()
 
+  // The certificate opens in the inspector, its tab named after it; the search finds its row in the list
+  await expect(page.locator('#inspector').getByRole('heading', { name: cn })).toBeVisible()
   await page.getByRole('main').getByRole('searchbox').fill(cn)
-  await expect(page.getByRole('main').getByRole('button', { name: cn, exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Certificates table' }).getByRole('button', { name: cn, exact: true })).toBeVisible()
   const [cert] = await findCerts(api, cn)
   expect(cert).toMatchObject({ issuer: `CN=${ca.common_name}`, revoked: false })
 })
