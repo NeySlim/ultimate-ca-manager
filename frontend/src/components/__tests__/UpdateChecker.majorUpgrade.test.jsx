@@ -68,6 +68,15 @@ describe('upgrade to a later major version', () => {
     expect(mocks.waitForRestart).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: '4.3' }))
   })
 
+  // The installed version is written as the status bar and About write it: no « v » before it
+  it('writes the installed version without a leading v', async () => {
+    mocks.get.mockResolvedValue(check())
+    render(<UpdateChecker />)
+    await flush()
+    const term = screen.getByText('settings.updates.installed')
+    expect(term.parentElement.querySelector('dd')).toHaveTextContent(/^3\.1$/)
+  })
+
   it('installs nothing when the confirmation is declined', async () => {
     mocks.get.mockResolvedValue(check())
     mocks.showConfirm.mockResolvedValue(false)

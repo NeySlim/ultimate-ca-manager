@@ -189,7 +189,7 @@ export function UpdateChecker() {
         <>{legend}{updateInfo?.prerelease && <>{' '}<Pill tone="warn" icon="sparkles" label={t('settings.prerelease')} /></>}</>
       )}>
         <Facts items={[
-          updateInfo?.current_version ? [t('settings.updates.installed'), `v${updateInfo.current_version}`] : { label: t('settings.updates.installed'), absent: '—' },
+          updateInfo?.current_version ? [t('settings.updates.installed'), updateInfo.current_version] : { label: t('settings.updates.installed'), absent: '—' },
           updateInfo?.update_available && [t('settings.updates.latest'), `v${updateInfo.latest_version}`],
           updateInfo?.update_available && updateInfo?.published_at && [t('settings.updates.published'), ago(updateInfo.published_at)],
         ]} />

@@ -631,10 +631,13 @@ export default function AccountPage() {
         <RecordList empty={t('account.noCertificatesEnrolled')}>
           {mtlsCertificates.map((cert) => {
             const name = cert.name || cert.cert_subject
+            // A certificate past its end no longer signs anyone in: it says so whatever its switch
+            const expired = cert.valid_until && new Date(cert.valid_until) < new Date()
             return (
               <RecordRow key={cert.id} title={name}
-                badge={<Pill tone={cert.enabled ? 'good' : 'warn'} label={cert.enabled ? t('common.active') : t('common.disabled')} />}
-                meta={[`${t('common.expires')} ${formatDate(cert.valid_until)}`, cert.last_used_at && `${t('common.used')} ${formatDate(cert.last_used_at)}`].filter(Boolean).join(' · ')}
+                badge={expired ? <Pill tone="bad" label={t('common.expired')} />
+                  : <Pill tone={cert.enabled ? 'good' : 'warn'} label={cert.enabled ? t('common.active') : t('common.disabled')} />}
+                meta={[`${t(expired ? 'common.expired' : 'common.expires')} ${formatDate(cert.valid_until)}`, cert.last_used_at && `${t('common.used')} ${formatDate(cert.last_used_at)}`].filter(Boolean).join(' · ')}
                 action={<span className="row-actions">
                   <IconBtn icon="download" label={`${t('common.export')} ${name}`}
                     onClick={() => setExportCert({ id: cert.id, name, hasPrivateKey: true, keyAlgorithm: cert.key_algorithm })} />
@@ -653,7 +656,7 @@ export default function AccountPage() {
   const keys = (
     <SettingsGroup legend={t('account.yourAPIKeys')} grid={false}>
       {[].concat(t('account.apiKeyTips', { returnObjects: true }) || []).map((tip) => <p key={tip} className="group-hint">{tip}</p>)}
-      <RecordList empty={`${t('account.noAPIKeys')}. ${t('account.createKeyToAccess')}`}>
+      <RecordList step={10} empty={`${t('account.noAPIKeys')}. ${t('account.createKeyToAccess')}`}>
         {apiKeys.map((key) => {
           const effectivelyActive = key.is_active && !key.is_expired
           return (

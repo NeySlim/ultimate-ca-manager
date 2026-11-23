@@ -374,3 +374,16 @@ describe('SecuritySection session key', () => {
     expect(rotate).toHaveBeenCalled()
   })
 })
+
+describe('SecuritySection revocation settings', () => {
+  // The OCSP and purge settings are no part of HSTS: their own fieldset, under their own legend
+  it('groups the OCSP and revocation settings apart from HSTS', () => {
+    renderSection({ enabled: false })
+    const legend = (text) => screen.getByText(text, { selector: 'legend, legend *' }).closest('fieldset')
+    const hsts = legend('settings.hstsTitle')
+    const ocsp = legend('settings.ocspRevocationTitle')
+    expect(ocsp).not.toBe(hsts)
+    expect(ocsp.querySelector('#set-ocsp_response_validity_hours')).not.toBeNull()
+    expect(hsts.querySelector('#set-ocsp_response_validity_hours')).toBeNull()
+  })
+})

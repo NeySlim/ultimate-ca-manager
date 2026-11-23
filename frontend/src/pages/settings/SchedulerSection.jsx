@@ -16,6 +16,8 @@ const BY_TASK = { key: 'task', asc: true }
 const SORT_KEYS = ['task', 'note', 'status', 'schedule', 'last', 'next', 'duration', 'runs']
 const STATE_RANK = ['warning', 'skipped', 'ok']
 const time = (iso) => (iso ? Date.parse(iso) : null)
+// A next run already due is imminent, never « a minute ago »: the scheduler takes it at its next tick
+const nextRun = (iso, t) => (iso && Date.parse(iso) <= Date.now() ? t('scheduler.imminent') : compactRun(iso, t))
 
 // The interval in words: whole days, hours or minutes when it divides, else seconds
 function humanizeInterval(seconds, t) {
@@ -156,15 +158,15 @@ export default function SchedulerSection({ hasPermission }) {
     { id: 'status', label: t('atelier.state'), kind: 'fit', priority: 1, sort: 'status', cell: status },
     { id: 'schedule', label: t('scheduler.colSchedule'), kind: 'fit', priority: 4, sort: 'schedule', tone: 'muted', cell: (task) => humanizeInterval(task.interval, t) },
     { id: 'last', label: t('scheduler.colLastRun'), kind: 'fit', priority: 3, labelled: true, sort: 'last', tone: 'muted', cell: (task) => compactRun(task.last_run, t) || '—' },
-    { id: 'next', label: t('scheduler.colNextRun'), kind: 'fit', priority: 2, labelled: true, sort: 'next', tone: 'muted', cell: (task) => compactRun(task.next_run, t) || '—' },
+    { id: 'next', label: t('scheduler.colNextRun'), kind: 'fit', priority: 2, labelled: true, sort: 'next', tone: 'muted', cell: (task) => nextRun(task.next_run, t) || '—' },
     { id: 'duration', label: t('scheduler.colDuration'), kind: 'number', priority: 4, sort: 'duration', tone: 'muted', cell: (task) => fmtDuration(task.last_duration_ms, i18n?.language) },
     { id: 'runs', label: t('scheduler.colRuns'), kind: 'number', priority: 4, sort: 'runs', tone: 'muted', cell: (task) => task.run_count },
     ...(canRun ? [{ id: 'run', label: <span className="sr-only">{t('common.actions')}</span>, kind: 'fit', priority: 1, cell: run }] : []),
   ]
   const opened = taskDock.item ? tasks.find((task) => task.name === taskDock.item) : null
   // A run's moment: when, then how long ago or how soon; none is an absence, in grey
-  const moment = (label, iso) => (iso
-    ? [label, <>{formatDate(iso, { time: true })} <span className="muted">({compactRun(iso, t)})</span></>]
+  const moment = (label, iso, words = compactRun) => (iso
+    ? [label, <>{formatDate(iso, { time: true })} <span className="muted">({words(iso, t)})</span></>]
     : { label, absent: '—' })
   // Every column of the list and the task's action, the columns folded for want of room included (E4)
   const dock = opened && (
@@ -180,7 +182,7 @@ export default function SchedulerSection({ hasPermission }) {
               note(opened) ? { label: t('scheduler.colNote'), value: note(opened), long: true } : { label: t('scheduler.colNote'), absent: '—' },
               [t('scheduler.colSchedule'), humanizeInterval(opened.interval, t)],
               moment(t('scheduler.colLastRun'), opened.last_run),
-              moment(t('scheduler.colNextRun'), opened.next_run),
+              moment(t('scheduler.colNextRun'), opened.next_run, nextRun),
               opened.last_duration_ms == null ? { label: t('scheduler.colDuration'), absent: '—' } : [t('scheduler.colDuration'), fmtDuration(opened.last_duration_ms, i18n?.language)],
               opened.run_count == null ? { label: t('scheduler.colRuns'), absent: '—' } : [t('scheduler.colRuns'), opened.run_count],
             ]} />

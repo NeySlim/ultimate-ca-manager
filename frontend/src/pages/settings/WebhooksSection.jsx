@@ -22,7 +22,8 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
     // The mockup's record list: name and state, address and events, then the actions
     body = (
       <SettingsGroup legend={t('webhooks.configuredWebhooks')} grid={false}>
-        <RecordList>
+        {/* Ten at first: a long list no longer pushes the sections after it thousands of pixels down */}
+        <RecordList step={10}>
           {webhooks.map(webhook => {
             const events = webhook.events || []
             return (

@@ -3,7 +3,7 @@
  * per record, named icon actions, and only the actions the API grants to the viewer.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import '../../__tests__/pageRenderingSetup.jsx'
 import SsoSection from '../SsoSection'
 import WebhooksSection from '../WebhooksSection'
@@ -117,5 +117,16 @@ describe('settings record lists: write guard', () => {
     )
     expect(blockedWhileSuspended(screen.getByRole('button', { name: /settings.createBackup/ }))).toBe(true)
     expect(blockedWhileSuspended(screen.getByRole('button', { name: /settings.backupCleanupNow/ }))).toBe(true)
+  })
+
+  // A long list of webhooks shows ten, then ten more at each ask: the sections after it stay within reach
+  it('shows the first ten webhooks, then ten more at each ask', () => {
+    const many = Array.from({ length: 23 }, (_, i) => ({ id: i + 1, name: `hook-${i + 1}`, url: `https://h${i}.example.com`, enabled: true, events: [] }))
+    render(<WebhooksSection webhooks={many} webhooksLoading={false} handleWebhookCreate={noop} handleWebhookEdit={noop} handleWebhookToggle={noop}
+      handleWebhookTest={noop} setWebhookConfirmDelete={noop} hasPermission={can('read:settings')} />)
+    const shown = () => document.querySelectorAll('.record-list > li').length
+    expect(shown()).toBe(10)
+    fireEvent.click(document.querySelector('[data-action="records-more"]'))
+    expect(shown()).toBe(20)
   })
 })

@@ -2,6 +2,8 @@
  * A page's quick help (helpContent.js) in the mockup's .help-grid.
  */
 import { useTranslation } from 'react-i18next'
+import { Link, useInRouterContext } from 'react-router-dom'
+import { guideChapter, guideHref } from '../../navigation/guide'
 import { Facts } from '../atelier/Detail'
 import { highlightTree, markText } from './highlight'
 
@@ -13,8 +15,33 @@ function Item({ item, highlight }) {
   return <li>{item.label && <strong>{mark(t('help.term', { term: item.label }))}</strong>}{mark(item.text)}</li>
 }
 
-/** highlight: folded search terms marked in the rendered text. */
-export function QuickHelp({ content, highlight }) {
+// The help's « see also » entries name chapters in English: each is the chapter it names, under its title in the language
+const RELATED = {
+  Overview: 'dashboard', Certificates: 'certificates', CAs: 'cas', CSRs: 'csrs', Templates: 'templates', Settings: 'settings',
+  settings: 'settings', 'CRL/OCSP': 'crlocsp', 'CRL & OCSP': 'crlocsp', Account: 'account', 'Microsoft CA': 'msca', SCEP: 'scep',
+  ACME: 'acme', RBAC: 'rbac', 'Audit Logs': 'auditLogs', auditLogs: 'auditLogs', 'Users & Groups': 'usersGroups',
+  Operations: 'operations', 'Import/Export': 'operations', Approvals: 'approvals', Policies: 'policies', Reports: 'reports',
+  'SSH Certificates': 'sshCertificates', 'SSH CAs': 'sshCas',
+}
+
+function Related({ name, newTab }) {
+  const { t } = useTranslation()
+  const routed = useInRouterContext()
+  const chapter = guideChapter(RELATED[name] || name)
+  if (!chapter?.labelKey) return <li>{name}</li>
+  const tab = newTab ? { target: '_blank', rel: 'noopener' } : {}
+  const href = guideHref(chapter.key)
+  return (
+    <li>
+      {routed && !newTab
+        ? <Link className="text-link" to={href}>{t(chapter.labelKey)}</Link>
+        : <a className="text-link" href={href} {...tab}>{t(chapter.labelKey)}</a>}
+    </li>
+  )
+}
+
+/** highlight: folded search terms marked in the rendered text; newTab: the « see also » chapters open in a tab of their own. */
+export function QuickHelp({ content, highlight, newTab = false }) {
   const { t } = useTranslation()
   // A definition's term and sentence are props of Facts, out of the tree's reach: marked here
   const mark = (text) => (highlight?.length && typeof text === 'string' ? markText(text, highlight) : text)
@@ -34,7 +61,7 @@ export function QuickHelp({ content, highlight }) {
       ))}
       {content.tips?.length > 0 && <section><h3>{t('help.proTips')}</h3><ul>{content.tips.map((tip, i) => <li key={i}>{tip}</li>)}</ul></section>}
       {content.warnings?.length > 0 && <section><h3>{t('common.warnings')}</h3><ul>{content.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></section>}
-      {content.related?.length > 0 && <section><h3>{t('help.seeAlso')}</h3><ul>{content.related.map((r, i) => <li key={i}>{r}</li>)}</ul></section>}
+      {content.related?.length > 0 && <section><h3>{t('help.seeAlso')}</h3><ul>{content.related.map((r, i) => <Related key={i} name={r} newTab={newTab} />)}</ul></section>}
     </div>
   )
   return highlight?.length ? highlightTree(grid, highlight) : grid
