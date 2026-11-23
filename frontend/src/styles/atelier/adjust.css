@@ -504,3 +504,20 @@
 :root[data-mode="dark"] .atl .badge.muted{color:color-mix(in srgb,var(--muted) 70%,var(--text))}
 /* A notice's console link on a line of its own under the steps, not on the last step's line. */
 :root .atl .notice>span>.pre-line+.text-link{display:block;width:fit-content;margin-top:6px}
+/* Overview density: a card's width follows its neighbours, the line still wrapping greedily so no order leaves a hole. */
+/* Compliance takes 62 % only before revocation (38 %), 44 % before any other card. */
+@media(min-width:1001px){:root .atl .card-compliance:not(:has(+.card-revocation)){flex-basis:calc(44% - 10px)}}
+/* Up to 1400 px health and its wide neighbour share the line in halves, so its mirrors keep their row. */
+@media(min-width:1001px) and (max-width:1399px){:root .atl .dash-cards>:is(.card-health,.card-health+:is(.card-issuance,.card-hierarchy),:is(.card-issuance,.card-hierarchy):has(+.card-health)){flex-basis:calc(50% - 10px)}}
+/* From 1400 px a wide card after a half card (or first, before one) shares that line instead of leaving it alone; */
+/* the horizon keeps the full line for more than half a year of weeks, the queue for more than four rows. */
+@media(min-width:1400px){
+  :root .atl .dash-cards>:is(.card-health,.card-compliance,.card-revocation,.card-activity)+:is(.card-horizon,.card-authorities,:where(.card-queue:not(:has(.queue-list:not([hidden])>li:nth-child(5):not([hidden]))))),
+  :root .atl .dash-cards>:first-child:is(.card-horizon,.card-authorities):has(+:is(.card-health,.card-compliance,.card-revocation,.card-activity)){flex-basis:calc(56% - 10px)}
+  /* Compliance beside the horizon or the authorities narrows to 38 %: its gauges grow taller, nearer their height. */
+  :root .atl .dash-cards>.card-compliance:has(+:is(.card-horizon,.card-authorities)),
+  :root .atl .dash-cards>.card-authorities:first-child+.card-compliance:not(:has(+.card-revocation)){flex-basis:calc(38% - 10px)}
+  :root .atl .dash-cards>.card-compliance+:is(.card-horizon,.card-authorities),
+  :root .atl .dash-cards>.card-authorities:first-child:has(+.card-compliance:not(:has(+.card-revocation))){flex-basis:calc(62% - 10px)}
+  :root .atl .dash-cards>.card-horizon:has(.wk-row>.wk:nth-child(27)){flex-basis:100%}
+}
