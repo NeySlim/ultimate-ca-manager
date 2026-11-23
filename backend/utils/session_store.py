@@ -145,16 +145,23 @@ class KeepsRemovedRecordsGone:
         return getattr(session, 'record_gone', False) or getattr(session, 'store_refused', None)
 
     def rotate(self, session):
-        """A new identifier for a session that stays (RFC 6265 §8.4). Its stored record moves
-        to it at the save, under the store's guard: a lock stored meanwhile moves with it, and
-        a record removed meanwhile is not written back."""
-        if not session:
+        """A new identifier for a session that stays (RFC 6265 §8.4), its record moved there
+        now under the store's guard: a stored lock moves with it, a record removed before is
+        not written back, and a later request of the old cookie finds nothing left to end.
+        A refused move stands for the request (write_now); its save then updates the new record."""
+        if not session or self._refused(session):
             return
-        if not getattr(session, 'rotated_from', None):
-            if not self._opened_from_store(session):
-                return self.regenerate(session)
-            session.rotated_from = self._get_store_id(session.sid)
+        if not self._opened_from_store(session):
+            return self.regenerate(session)
+        session.rotated_from = self._get_store_id(session.sid)
         session.sid = self._generate_sid(self.sid_length)
+        try:
+            self._upsert_session(current_app.permanent_session_lifetime, session,
+                                 self._get_store_id(session.sid))
+        finally:
+            session.rotated_from = None
+        if not self._refused(session):
+            session.stored_sid = session.sid
         session.modified = True
 
     def write_now(self, app, session):
@@ -175,14 +182,6 @@ class KeepsRemovedRecordsGone:
 
     def save_session(self, app, session, response):
         if self._refused(session):
-            return
-        moved = getattr(session, 'rotated_from', None)
-        if moved and not session and session.modified:
-            # Emptied after its rotation: the record it would have moved goes instead
-            self._remove_if_present(moved)
-            response.delete_cookie(key=self.get_cookie_name(app), domain=self.get_cookie_domain(app),
-                                   path=self.get_cookie_path(app))
-            response.vary.add('Cookie')
             return
         if not (not session and session.modified and self._opened_from_store(session)):
             return super().save_session(app, session, response)
