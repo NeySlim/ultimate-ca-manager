@@ -297,11 +297,12 @@ export default function SSHCAsPage() {
                 // A lifetime of 0 is no lifetime set
                 fact(t('sshCas.defaultTtl'), open.default_ttl || null),
                 fact(t('sshCas.maxTtl'), open.max_ttl || null),
-                open.default_extensions?.length ? [t('sshCas.defaultExtensions'), open.default_extensions.join(', ')] : { label: t('sshCas.defaultExtensions'), absent: t('sshCas.noExtensions') },
+                // A list or a sentence goes under its term in a narrow panel
+                open.default_extensions?.length ? { label: t('sshCas.defaultExtensions'), value: open.default_extensions.join(', '), long: true } : { label: t('sshCas.defaultExtensions'), absent: t('sshCas.noExtensions') },
                 // The principal rule is a state: any principal a warning, none a CA that signs nothing
-                principals.length ? [t('sshCas.allowedPrincipals'), principals.join(', ')]
+                principals.length ? { label: t('sshCas.allowedPrincipals'), value: principals.join(', '), long: true }
                   : { label: t('sshCas.allowedPrincipals'), state: open.allow_any_principal ? ['warn', t('sshCas.anyPrincipal')] : ['bad', t('sshCas.noPrincipalSignsNothing')] },
-                [t('sshCertificates.keyId'), open.allow_custom_key_id ? t('sshCas.keyIdChosenByRequester') : t('sshCas.keyIdSetByCa')],
+                { label: t('sshCertificates.keyId'), value: open.allow_custom_key_id ? t('sshCas.keyIdChosenByRequester') : t('sshCas.keyIdSetByCa'), long: true },
               ]} />
             </Section>
           </div>

@@ -176,6 +176,7 @@ describe('the SSH certificate dock in typed rows (KV-3)', () => {
     fireEvent.click(within(dock).getByRole('tab', { name: 'sshCertificates.grants' }))
     expect(rowIn(dock, 'sshCertificates.principals').querySelector('dd.absent')).toHaveTextContent('—')
     expect(rowIn(dock, 'sshCertificates.extensions').querySelector('dd.absent')).toHaveTextContent('—')
+    expect(rowIn(dock, 'sshCertificates.extensions')).toHaveClass('long')
     expect(rowIn(dock, 'force-command').querySelector('dd.v .code-value')).toHaveTextContent('/bin/true')
   })
 })

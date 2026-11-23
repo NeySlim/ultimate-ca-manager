@@ -288,6 +288,8 @@ export default function SSHCertificatesPage() {
   // A value the certificate has, else the absence in grey; a fingerprint or a serial in a chip copied whole
   const fact = (label, value) => (value || value === 0 ? [label, value] : { label, absent: '—' })
   const code = (label, value) => (value || value === 0 ? { label, value: String(value), kind: 'hex' } : { label, absent: '—' })
+  // A list goes under its term in a narrow panel
+  const list = (label, items) => (items.length ? { label, value: items.join(', '), long: true } : { label, absent: '—', long: true })
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('sshCertificates.title') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
@@ -330,8 +332,8 @@ export default function SSHCertificatesPage() {
           <div className="module-detail">
             <Section title={t('sshCertificates.grants')}>
               <Facts items={[
-                fact(t('sshCertificates.principals'), listOf(open.principals).join(', ')),
-                fact(t('sshCertificates.extensions'), extensions.join(', ')),
+                list(t('sshCertificates.principals'), listOf(open.principals)),
+                list(t('sshCertificates.extensions'), extensions),
                 // A critical option holds a command or addresses: a chip copied whole, under its name when narrow
                 ...criticalOptions.map(([key, value]) => ({ label: key, long: true, value: <CodeValue value={String(value)} label={key} /> })),
               ]} />

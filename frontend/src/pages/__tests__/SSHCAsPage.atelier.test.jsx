@@ -215,5 +215,7 @@ describe('the SSH CA dock in typed rows (KV-3)', () => {
     expect(rowIn(dock, 'sshCas.defaultTtl').querySelector('dd.v')).toHaveTextContent('16h')
     expect(rowIn(dock, 'sshCas.maxTtl').querySelector('dd.absent')).toHaveTextContent('—')
     expect(rowIn(dock, 'sshCas.allowedPrincipals').querySelector('dd.v .badge.bad')).toHaveTextContent('sshCas.noPrincipalSignsNothing')
+    expect(rowIn(dock, 'sshCas.defaultExtensions')).toHaveClass('long')
+    expect(rowIn(dock, 'sshCertificates.keyId')).toHaveClass('long')
   })
 })
