@@ -501,7 +501,7 @@ def test_a_worker_that_loaded_a_former_ca_keeps_its_certificates_aside_after_a_r
     assert seen == []
 
 
-# --- A save that changes the listener's trust restarts the service: admin:system ---------------------
+# --- A save that changes the listener's trust reloads or restarts it: admin:system --------------------
 
 def _scoped(auth_client, permissions):
     r = auth_client.post('/api/v2/account/apikeys', json={'name': 'c20-scope', 'permissions': permissions})
@@ -512,7 +512,7 @@ def _scoped(auth_client, permissions):
 
 def test_a_save_that_changes_the_listener_trust_needs_admin_system(
         app, auth_client, world, create_ca, restarts, mtls_on_a2):
-    """write:xcep alone edits a profile, never the CAs the TLS listener trusts (that restarts it)."""
+    """write:xcep alone edits a profile, never the CAs the TLS listener trusts (that reloads or restarts it)."""
     a2 = create_ca(cn='C20 A2b CA')
     mtls_on_a2(a2['refid'])
     with app.app_context():
@@ -522,8 +522,9 @@ def test_a_save_that_changes_the_listener_trust_needs_admin_system(
         r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'issuing_ca_refid': a2['refid']})
         assert r.status_code == 403, r.get_json()
         message = r.get_json()['message']
-        assert 'admin:system' in message
-        assert 'reloads the TLS listener' in message and 'restarts the service' not in message
+        # A reload, a service restart or a rolling restart in HA: the refusal names none of them
+        assert message == ('This change alters the CAs the TLS listener trusts for Windows renewal: '
+                           'permission required: admin:system')
         assert restarts == []
         with app.app_context():
             profile = _profile('c04-a')
