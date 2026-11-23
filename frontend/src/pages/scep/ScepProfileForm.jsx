@@ -93,7 +93,7 @@ export default function ScepProfileForm({ profile, cas, templates, onClose, onSa
 
   return (
     <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? t('scep.editProfile') : t('scep.newProfile')} testId="scep-profile-dialog">
-      <form onSubmit={handleSubmit}>
+      <form className="scep-profile-form" onSubmit={handleSubmit}>
         <div className="form-fields">
           <Input id="scep-profile-name" label={t('common.name')} value={formData.name} onChange={(e) => update('name', e.target.value)} required data-autofocus="" />
           <Input id="scep-profile-slug" label={t('scep.profileSlug')} value={formData.url_slug} onChange={(e) => update('url_slug', e.target.value)}

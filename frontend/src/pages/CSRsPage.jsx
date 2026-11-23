@@ -967,7 +967,7 @@ export default function CSRsPage() {
   ) : (
     <EmptyBlock id="csrs" icon="file" title={pendingEmpty ? t('csrs.module.emptyTitle') : t('csrs.noSignedCertificates')}
       text={pendingEmpty ? t('csrs.module.emptyText') : t('csrs.signToSee')}
-      action={pendingEmpty && write ? { label: t('csrs.importCSR'), icon: 'upload', onClick: () => setShowImportModal(true), write: true } : undefined} />
+      action={pendingEmpty && write ? { label: t('csrs.importCSR'), icon: 'upload', onClick: () => setShowImportModal(true), write: true, primary: true } : undefined} />
   )
 
   return (
@@ -977,7 +977,7 @@ export default function CSRsPage() {
     </>}>
       <PageHead title={t('common.csrs')} total={t('csrs.module.unit', { count: pendingTotal + historyTotal })} intent={t('shell.moduleDesc.csrs')}
         actions={write && <>
-          <Btn icon="upload" id="csr-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
+          <Btn tone="quiet" icon="upload" id="csr-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
           <PhoneMoreActions title={t('common.csrs')} items={[{ id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setShowImportModal(true) }]} />
           <Btn tone="primary" icon="plus" id="csr-generate" onClick={() => openModal('generate')}>{t('csrs.generateCSR')}</Btn>
         </>} />

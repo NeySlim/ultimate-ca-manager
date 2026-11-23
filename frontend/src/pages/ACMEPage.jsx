@@ -1072,7 +1072,7 @@ export default function ACMEPage() {
     eab: w && <Btn tone="primary" icon="plus" onClick={() => setOpenEabCreate(true)}>{t('acme.eab.new')}</Btn>,
     letsencrypt: w && <Btn tone="primary" icon="plus" id="acme-request" onClick={() => setShowRequestModal(true)}>{t('acme.requestCertificate')}</Btn>,
     letsencryptorders: w && <Btn tone="primary" icon="plus" onClick={() => setShowRequestModal(true)}>{t('acme.requestCertificate')}</Btn>,
-    upstream: w && <Btn tone="primary" icon="plus" onClick={() => setUpstreamCreate((n) => n + 1)}>{t('acme.addCertificateAuthority')}</Btn>,
+    upstream: w && <Btn tone="primary" icon="plus" onClick={() => setUpstreamCreate((n) => n + 1)}>{t('acme.addUpstreamCa')}</Btn>,
     dns: w && <Btn tone="primary" icon="plus" onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>{t('common.addDnsProvider')}</Btn>,
     domains: w && <Btn tone="primary" icon="plus" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>{t('acme.addDomain')}</Btn>,
   }[activeTab]
@@ -1096,6 +1096,10 @@ export default function ACMEPage() {
           ]}>
           {views[activeTab]}
         </ViewSwitch>
+        {/* The phone hides the head's secondary buttons: the directory URL stays one tap away under the view */}
+        <p className="phone-only">
+          <Btn icon="copy" id="acme-copy-directory-phone" onClick={async () => { if (await copy(directoryUrl)) showSuccess(t('common.copied')) }}>{t('acme.copyDirectory')}</Btn>
+        </p>
       </Zone>
       {/* Create Account Modal */}
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('acme.createAccountTitle')} size="sm" testId="acme-account-dialog">

@@ -34,6 +34,7 @@ import { CompareDialog } from './certificates/dialogs/CompareDialog'
 import { useDetached } from '../components/detached/useDetached'
 import { FiltersDialog } from './certificates/dialogs/FiltersDialog'
 import { certificateKeyLabel } from '../lib/certificateDetail'
+import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 const NONE = []
 // The state tabs after « Tous », in the mockup's order; orphan when there are some, archived (no counter) last
@@ -479,6 +480,7 @@ export default function CertificatesPage() {
       actions={canWrite('certificates') && (
         <>
           <Btn tone="quiet" icon="upload" write data-action="import" onClick={() => setDialog('import')}>{t('common.import')}</Btn>
+          <PhoneMoreActions title={t('common.certificates')} items={[{ id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setDialog('import') }]} />
           <Btn tone="primary" icon="plus" data-action="issue" onClick={() => setDialog('issue')}>{t('certificates.issue')}</Btn>
         </>
       )} />

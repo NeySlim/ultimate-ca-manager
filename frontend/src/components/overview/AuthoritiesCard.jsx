@@ -13,7 +13,7 @@ import { compactDue, shortParts } from '../../lib/relativeTime'
 import { clockOf } from '../../lib/overviewTime'
 import { ISSUANCE_DAYS } from '../../lib/overviewViz'
 import { chooseTiles, daysSince } from '../../lib/overviewTiles'
-import { OverviewCard, OverviewContext, settle, useCardData, useLang } from './shared'
+import { CardEmpty, OverviewCard, OverviewContext, settle, useCardData, useLang } from './shared'
 import { Spark } from './viz'
 
 const STATE_ICON = { good: 'check', warn: 'warning', bad: 'warning', muted: 'block' }
@@ -35,6 +35,7 @@ function Badge({ tile, t }) {
 
 function CaTile({ tile, t }) {
   const left = tile.validTo ? leftOf(tile.validTo, t) : '–'
+  const expired = tile.elapsed !== null && tile.elapsed >= 100
   const crl = {
     current: tile.crl.next_update ? t('overview.tiles.crlWhen', { when: compactDue(tile.crl.next_update, t) }) : t('overview.tiles.crlCurrent'),
     stale: tile.crl.next_update ? t('overview.tiles.crlStaleSince', { count: daysSince(tile.crl.next_update) }) : t('overview.tiles.crlStale'),
@@ -50,10 +51,11 @@ function CaTile({ tile, t }) {
         </span>
       </span>
       {tile.elapsed !== null && (
-        <span className="life" style={{ '--tone': tile.late ? 'var(--warn-fill)' : 'var(--accent)' }}>
+        // An expired CA reads red as its pill; amber is for one late in its life
+        <span className="life" style={{ '--tone': expired ? 'var(--bad)' : tile.late ? 'var(--warn-fill)' : 'var(--accent)' }}>
           <span>{t('overview.tiles.elapsed')}</span>
-          <span><b className={tile.late ? 'warn' : undefined}>{t('overview.compliance.pct', { pct: tile.elapsed })}</b>{tile.elapsed < 100 ? ` · ${t('overview.tiles.left', { when: left })}` : ''}</span>
-          <span className={tile.late ? 'track late' : 'track'} role="img" aria-label={t('overview.tiles.elapsedAlt', { pct: tile.elapsed, when: left })}>
+          <span><b className={expired ? 'bad' : tile.late ? 'warn' : undefined}>{t('overview.compliance.pct', { pct: tile.elapsed })}</b>{tile.elapsed < 100 ? ` · ${t('overview.tiles.left', { when: left })}` : ''}</span>
+          <span className={expired ? 'track expired' : tile.late ? 'track late' : 'track'} role="img" aria-label={t('overview.tiles.elapsedAlt', { pct: tile.elapsed, when: left })}>
             <i style={{ width: `${Math.max(2, tile.elapsed)}%` }} />
           </span>
         </span>
@@ -130,7 +132,8 @@ export function AuthoritiesCard() {
   return (
     <OverviewCard id="authorities" state={state} route="GET /api/v2/cas" missing={data.missing}
       sub={t('overview.tiles.sub', { authorities: t('overview.hierarchy.authorities', { count: authorities }), modules: t('overview.tiles.modules', { count: modules }) })}
-      empty={state.status === 'ready' && tiles.length === 0}
+      // No authority: the hierarchy's empty block, not the green tick of a card with nothing to report
+      empty={state.status === 'ready' && tiles.length === 0 && <div className="panel-content"><CardEmpty id="tiles-empty" icon="shield" title={t('overview.hierarchy.emptyTitle')} /></div>}
       tools={<Link to="/cas" className="text-link" data-nav="cas">{t('overview.tiles.explore')} <Icon name="right" /></Link>}>
       <div className="panel-content">
         <div className="atiles">

@@ -130,12 +130,14 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
         filters={{
           views: [{ id: '', label: t('common.all') }, ...STATES.map((s) => ({ id: s, label: stateLabel(t, s) }))],
           active: status, onChange: (v) => { setPage(1); setStatus(v) }, label: t('acme.filterByState'),
-          aside: t('acme.localOrdersCount', { count: meta.total }),
+          aside: <span className="phone-aside">{t('acme.localOrdersCount', { count: meta.total })}</span>,
         }}
         toolbar={(
           <Toolbar>
-            <IconBtn icon="refresh" label={t('common.refresh')} onClick={() => load()} />
             {canDeleteOrders && <Btn icon="close" id="acme-orders-purge" onClick={handlePurge}>{t('acme.purgeLocalOrders')}</Btn>}
+            {/* Refresh closes the bar on the right in every ACME view, as in Accounts */}
+            <span className="spacer" />
+            <IconBtn icon="refresh" label={t('common.refresh')} onClick={() => load()} />
           </Toolbar>
         )}
         title={(o) => o.domain} status={pill} openedId={opened?.id} onOpen={setOpened} nameSort="domain" sort={sort} onSort={onSort}

@@ -172,7 +172,7 @@
     "proxyUpstreamUrl": "URL du répertoire upstream",
     "proxyUpstreamUrlHelper": "L’URL du répertoire du serveur ACME upstream. Par défaut, Let’s Encrypt staging si vide.",
     "proxyUsage": "Utilisation avec certbot :",
-    "proxyUsageNote": "Prérequis : le domaine (ou un parent couvrant les sous-domaines) doit être configuré dans Domaines ACME avec un fournisseur DNS. Le proxy ne prend en charge que dns-01.\n\nChaque compte AC externe peut exposer un point de terminaison dédié : /acme/proxy/<slug>/directory (activez **Exposer via le proxy ACME** dans Autorités de certification (AC)). Le chemin par défaut /acme/proxy/directory suit le compte sélectionné dans les réglages du proxy.\n\nUCM crée et supprime automatiquement les enregistrements TXT via ce fournisseur. Les options --manual-auth-hook et --manual-cleanup-hook peuvent rester des no-op (/bin/true), car la validation DNS est assurée par le proxy.\n\nÉvitez deux demandes simultanées pour le même nom (Certbot + interface UCM) : le second enregistrement TXT peut écraser le premier. Si le certificat HTTPS d’UCM est auto-signé (lab), ajoutez --no-verify-ssl à Certbot.",
+    "proxyUsageNote": "Prérequis : le domaine (ou un parent couvrant les sous-domaines) doit être configuré dans Domaines ACME avec un fournisseur DNS. Le proxy ne prend en charge que dns-01.\n\nChaque compte AC externe peut exposer un point de terminaison dédié : /acme/proxy/<slug>/directory (activez « Exposer via le proxy ACME » dans Autorités de certification (AC)). Le chemin par défaut /acme/proxy/directory suit le compte sélectionné dans les réglages du proxy.\n\nUCM crée et supprime automatiquement les enregistrements TXT via ce fournisseur. Les options --manual-auth-hook et --manual-cleanup-hook peuvent rester des no-op (/bin/true), car la validation DNS est assurée par le proxy.\n\nÉvitez deux demandes simultanées pour le même nom (Certbot + interface UCM) : le second enregistrement TXT peut écraser le premier. Si le certificat HTTPS d’UCM est auto-signé (lab), ajoutez --no-verify-ssl à Certbot.",
     "proxyRegistered": "Proxy enregistré",
     "registerAccount": "Enregistrer le compte",
     "aboutAcmeDesc": "ACME permet l’émission automatique de certificats.",
@@ -279,9 +279,9 @@
     "renewalRetryDaily": "Le renouvellement échoue toujours : une tentative par jour désormais",
     "orderAutoRenew": "Renouvellement automatique",
     "orderRenewalUpdated": "Renouvellement automatique mis à jour",
-    "dnsPropagationTimeout": "Délai de propagation DNS (s)",
+    "dnsPropagationTimeout": "Attente maximale de propagation DNS (s)",
     "dnsPropagationTimeoutHelper": "Secondes d’attente du TXT DNS-01 avant validation AC (DNS auto). 0 = ignorer l’attente de propagation (auto et vérification manuelle soumettent à l’AC sans polling). Valeur positive : l’auto-poll en arrière-plan attend jusqu’à cette limite ; la vérification manuelle sonde 30 s max puis signale « pas prêt » pour réessayer. Procède dès que chaque serveur de noms autoritaire sert l’enregistrement (ou que le résolveur configuré le confirme) ; les lignes 9.9.9.9 / 8.8.8.8 / 1.1.1.1 sont informatives uniquement.",
-    "dnsPropagationDelay": "Délai de propagation DNS (s)",
+    "dnsPropagationDelay": "Attente après propagation DNS (s)",
     "dnsPropagationDelayHelper": "Secondes d’attente supplémentaires une fois le TXT visible, avant la validation AC. Les fournisseurs DNS avec des serveurs de noms anycast peuvent mettre quelques secondes à mettre à jour chaque nœud. 0 = aucune attente ; la vérification manuelle attend 30 s max.",
     "debugLogging": "Logs ACME/DNS détaillés",
     "debugLoggingDesc": "Émet les diagnostics de polling DNS en INFO dans les logs UCM. Désactiver après diagnostic.",
@@ -471,7 +471,7 @@
     "proxy": "Proxy",
     "eab": {
       "tab": "Identifiants EAB",
-      "new": "Nouveau EAB",
+      "new": "Nouvel EAB",
       "newTitle": "Générer un identifiant EAB",
       "newDescription": "Génère un kid et une clé HMAC pour lier un client ACME externe (cert-manager, certbot...) à un compte ACME UCM. La clé HMAC n’est affichée qu’une seule fois.",
       "label": "Libellé",
@@ -793,7 +793,8 @@
       "failures": "Échecs",
       "wildcard": "Générique",
       "orders": "Commandes"
-    }
+    },
+    "addUpstreamCa": "Ajouter une AC"
   },
   "audit": {
     "event": "Événement",
@@ -949,7 +950,11 @@
       "truststore_remove": "Ancre de confiance retirée"
     },
     "format_csv": "Une ligne par événement",
-    "format_json": "Données structurées"
+    "format_json": "Données structurées",
+    "actionDetails": {
+      "scepChallengeRead": "Mot de passe de défi de l’AC {{name}} lu",
+      "scepChallengeRegenerate": "Mot de passe de défi de l’AC {{name}} régénéré"
+    }
   },
   "auth": {
     "continue": "Continuer",
@@ -2712,7 +2717,7 @@
     "pasteCSRDescription": "Collez votre CSR au format PEM ci-dessous",
     "noPendingCSRs": "Aucune CSR en attente",
     "noSignedCertificates": "Aucun certificat signé",
-    "signToSee": "Signez une CSR pour la voir ici",
+    "signToSee": "Signez une CSR pour la voir ici.",
     "importCSR": "Importer une CSR",
     "searchPending": "Rechercher les CSR en attente...",
     "searchSigned": "Rechercher les certificats signés...",
@@ -2731,7 +2736,7 @@
     "deleteFailed": "Échec de la suppression de la CSR",
     "keyUploadFailed": "Échec du téléversement de la clé privée",
     "downloadFailed": "Échec du téléchargement",
-    "generateCSR": "Générer un CSR",
+    "generateCSR": "Générer une CSR",
     "generateDescription": "Générer une nouvelle demande de signature de certificat",
     "department": "Département (OU)",
     "departmentPlaceholder": "Département IT",
@@ -2746,13 +2751,13 @@
     "sanUriInvalid": "L’URI doit inclure un schéma, ex. https://example.com (reçu : {{value}})",
     "sanUpnInvalid": "UPN invalide : {{value}} (attendu : utilisateur@domaine)",
     "certTypeForSign": "Type de certificat",
-    "generateFailed": "Échec de la génération du CSR",
+    "generateFailed": "Échec de la génération de la CSR",
     "rekey": "Recréer la clé",
-    "rekeyTitle": "Recréer la clé du CSR",
+    "rekeyTitle": "Recréer la clé de la CSR",
     "rekeyDescription": "Générer une nouvelle paire de clés pour \"{{cn}}\" en conservant les mêmes champs sujet et SANs.",
-    "rekeyAsCSR": "Nouveau CSR",
+    "rekeyAsCSR": "Nouvelle CSR",
     "rekeyAsCert": "Nouveau certificat",
-    "rekeyAsCSRDescription": "Générer un nouveau CSR avec les mêmes champs DN et SANs mais une nouvelle paire de clés.",
+    "rekeyAsCSRDescription": "Générer une nouvelle CSR avec les mêmes champs DN et SANs mais une nouvelle paire de clés.",
     "rekeyAsCertDescription": "Émettre directement un nouveau certificat avec le même sujet, signé par une AC.",
     "states": {
       "pending": "En attente",
@@ -3416,7 +3421,7 @@
     "noCasAvailableDesc": "Créez d’abord une autorité de certification pour configurer SCEP",
     "regenerate": "Régénérer",
     "challengeRegenerated": "Mot de passe de défi régénéré",
-    "confirmRegenerateChallenge": "Régénérer le mot de passe de challenge SCEP de cette AC ? L’actuel cesse de fonctionner immédiatement et tous les appareils configurés avec doivent être mis à jour.",
+    "confirmRegenerateChallenge": "Régénérer le mot de passe de défi SCEP de cette AC ? L’actuel cesse de fonctionner immédiatement et tous les appareils configurés avec doivent être mis à jour.",
     "noChallengeSet": "Aucun mot de passe de défi défini",
     "connectionDetails": "Détails de connexion",
     "supportedOperations": "Opérations prises en charge",
@@ -3447,9 +3452,9 @@
     "profileTemplate": "Modèle de certificat",
     "profileTemplateHelp": "Si défini, les KU/EKU et la validité du modèle gouvernent chaque certificat émis via ce profil.",
     "noTemplate": "Sans modèle (piloté par la CSR)",
-    "profileChallengeHelp": "Laisser vide pour conserver le challenge actuel (édition) ou aucun (création). Stocké chiffré.",
+    "profileChallengeHelp": "Laisser vide pour conserver le défi actuel (édition) ou aucun (création). Stocké chiffré.",
     "intuneForcesAutoApprove": "Intune nécessite l’approbation automatique : son flux d’inscription est un aller-retour synchrone de validation puis émission, pas une file d’approbation manuelle.",
-    "intuneEnabled": "Validation du challenge SCEP Microsoft Intune",
+    "intuneEnabled": "Validation du défi SCEP Microsoft Intune",
     "intuneHelpTitle": "Enregistrement d’application Entra requis",
     "intuneHelpDesc": "Enregistrez une application dans Microsoft Entra ID avec les autorisations d’application Intune API → SCEP challenge validation (scep_challenge_provider) et Microsoft Graph → Application.Read.All, avec consentement administrateur. Intune émet son propre challenge par appareil au lieu du challenge statique ci-dessus : les deux s’excluent mutuellement.",
     "intuneTenantId": "ID de locataire",
@@ -3539,7 +3544,16 @@
     "views": {
       "challenges": "Défis des autorités"
     },
-    "emptyProfilesText": "Un profil relie une AC émettrice, un modèle et un mot de passe de défi."
+    "emptyProfilesText": "Un profil relie une AC émettrice, un modèle et un mot de passe de défi.",
+    "challengeExpired": "Expiré",
+    "challengeShow": "Afficher",
+    "challengeHide": "Masquer",
+    "challengeCopy": "Copier",
+    "challengeGenerated": "Généré le",
+    "challengeExpires": "Expire le",
+    "challengeAge": "Âge",
+    "challengeAgeUnknown": "Non enregistré",
+    "newIntuneAppShort": "Nouvelle application"
   },
   "session": {
     "expiring": "Session en cours d’expiration",
@@ -4799,7 +4813,7 @@
     "adDerivedBadge": "AD",
     "enrollment": "Inscription",
     "autoenrollEnabled": "Autoriser l’auto-inscription",
-    "autoenrollEnabledDescription": "Annoncer ce modèle comme autoEnroll=true dans la stratégie d’inscription de certificats, afin que les clients authentifiés par GPO/Kerberos le demandent automatiquement à la connexion sans action de l’utilisateur. Désactivé par défaut -- comme avec un vrai ADCS, un modèle peut toujours être inscrit manuellement (MMC « Demander un nouveau certificat », certreq) sans cela, car Inscrire et Auto-inscrire sont des autorisations distinctes.",
+    "autoenrollEnabledDescription": "Annoncer ce modèle comme autoEnroll=true dans la stratégie d’inscription de certificats, afin que les clients authentifiés par GPO/Kerberos le demandent automatiquement à la connexion sans action de l’utilisateur. Désactivé par défaut. Comme avec un vrai ADCS, un modèle peut toujours être inscrit manuellement (MMC « Demander un nouveau certificat », certreq) sans cela, car Inscrire et Auto-inscrire sont des autorisations distinctes.",
     "autoenrollBadge": "Auto",
     "allowedAdGroup": "Restreindre l’inscription à un groupe AD",
     "allowedAdGroupDescription": "Seuls les principaux appartenant à ce groupe Active Directory (appartenance imbriquée incluse) peuvent s’inscrire pour ce modèle via le point de terminaison authentifié par Kerberos. Saisissez un nom de groupe ou un DN complet. Laissez vide pour autoriser tout principal authentifié, comme le comportement par défaut d’un vrai ADCS. Non appliqué sur le point de terminaison UsernamePassword, qui n’a pas d’identité par requête à vérifier.",
@@ -4824,7 +4838,7 @@
     "emailProtection": "Protection e-mail",
     "editTemplate": "Modifier le modèle",
     "importTemplate": "Importer un modèle",
-    "noTemplatesDescription": "Créez votre premier modèle pour commencer",
+    "noTemplatesDescription": "Créez votre premier modèle pour commencer.",
     "searchPlaceholder": "Rechercher des modèles...",
     "cert": "Cert",
     "source": "Origine",
@@ -4943,6 +4957,44 @@
       "filterByState": "Filtrer par état",
       "usesCount_one": "{{count, number}} certificat",
       "usesCount_other": "{{count, number}} certificats"
+    },
+    "builtIn": {
+      "webServer": {
+        "name": "Serveur web (TLS/SSL)",
+        "description": "Certificat TLS pour les serveurs web (HTTPS)."
+      },
+      "email": {
+        "name": "E-mail (S/MIME)",
+        "description": "Certificat S/MIME pour chiffrer et signer les e-mails."
+      },
+      "vpnServer": {
+        "name": "Serveur VPN",
+        "description": "Certificat de serveur VPN (OpenVPN, IPsec, WireGuard)."
+      },
+      "vpnClient": {
+        "name": "Client VPN",
+        "description": "Certificat de client VPN pour authentifier les utilisateurs."
+      },
+      "codeSigning": {
+        "name": "Signature de code",
+        "description": "Certificat pour signer des logiciels, des scripts et des paquets."
+      },
+      "ocspSigning": {
+        "name": "Signature OCSP",
+        "description": "Certificat de signature d’un répondeur OCSP délégué (RFC 6960), émis par l’AC dont il signe les réponses."
+      },
+      "clientCert": {
+        "name": "Certificat client",
+        "description": "Certificat pour authentifier les utilisateurs et les appareils (802.1X, RADIUS, mTLS)."
+      },
+      "clientAuth": {
+        "name": "Authentification client",
+        "description": "Certificat pour authentifier les utilisateurs et les appareils (802.1X, RADIUS, mTLS)."
+      },
+      "smartcardLogon": {
+        "name": "Ouverture de session par carte à puce",
+        "description": "Certificat d’ouverture de session Windows par carte à puce (PKINIT) pour Active Directory, portant l’UPN de l’utilisateur."
+      }
     }
   },
   "time": {
@@ -5127,7 +5179,7 @@
     "sync": "Synchroniser",
     "add": "Ajouter",
     "allPurposes": "Tous les objectifs",
-    "addCertificatesForChain": "Ajoutez des certificats pour valider les chaînes",
+    "addCertificatesForChain": "Ajoutez des certificats pour valider les chaînes.",
     "adding": "Ajout...",
     "syncDescription": "Importe les certificats AC de confiance depuis le bundle AC du système.",
     "syncLimitLabel": "Nombre maximum de certificats à importer",
@@ -5177,7 +5229,9 @@
       "filterByState": "Filtrer par état",
       "filterByType": "Filtrer par type",
       "emptyTitle": "Aucune ancre de confiance externe"
-    }
+    },
+    "systemBundleDescription": "Importé du magasin d’AC du système",
+    "systemBundleNote": "Importé automatiquement depuis {{path}}"
   },
   "users": {
     "securityKeys": {
@@ -6182,7 +6236,7 @@
       "createFailed": {
         "certificate": "Échec de la création du certificat",
         "ca": "Échec de la création de l’AC",
-        "csr": "Échec de la création du CSR",
+        "csr": "Échec de la création de la CSR",
         "user": "Échec de la création de l’utilisateur",
         "group": "Échec de la création du groupe",
         "template": "Échec de la création du modèle",
@@ -6207,7 +6261,7 @@
       "deleteFailed": {
         "certificate": "Échec de la suppression du certificat",
         "ca": "Échec de la suppression de l’AC",
-        "csr": "Échec de la suppression du CSR",
+        "csr": "Échec de la suppression de la CSR",
         "user": "Échec de la suppression de l’utilisateur",
         "group": "Échec de la suppression du groupe",
         "template": "Échec de la suppression du modèle",
@@ -6271,7 +6325,7 @@
       "create": {
         "certificate": "Certificat créé avec succès",
         "ca": "AC créée avec succès",
-        "csr": "CSR créé avec succès",
+        "csr": "CSR créée avec succès",
         "user": "Utilisateur créé avec succès",
         "group": "Groupe créé avec succès",
         "template": "Modèle créé avec succès",
@@ -6300,7 +6354,7 @@
       "delete": {
         "certificate": "Certificat supprimé avec succès",
         "ca": "AC supprimée avec succès",
-        "csr": "CSR supprimé avec succès",
+        "csr": "CSR supprimée avec succès",
         "user": "Utilisateur supprimé avec succès",
         "group": "Groupe supprimé avec succès",
         "template": "Modèle supprimé avec succès",
@@ -6337,7 +6391,7 @@
         "passwordChanged": "Mot de passe modifié avec succès",
         "keyUploaded": "Clé privée téléversée avec succès",
         "revoked": "Certificat révoqué avec succès",
-        "signed": "CSR signé avec succès",
+        "signed": "CSR signée avec succès",
         "twoFactorEnabled": "2FA activé avec succès ! Sauvegardez vos codes de secours.",
         "twoFactorDisabled": "Authentification à deux facteurs désactivée"
       },
@@ -6381,7 +6435,7 @@
       "delete": {
         "ca": "Êtes-vous sûr de vouloir supprimer cette AC ?",
         "certificate": "Êtes-vous sûr de vouloir supprimer ce certificat ?",
-        "csr": "Êtes-vous sûr de vouloir supprimer ce CSR ?",
+        "csr": "Êtes-vous sûr de vouloir supprimer cette CSR ?",
         "user": "Êtes-vous sûr de vouloir supprimer cet utilisateur ?",
         "group": "Êtes-vous sûr de vouloir supprimer ce groupe ?",
         "template": "Êtes-vous sûr de vouloir supprimer ce modèle ?",
@@ -6530,7 +6584,7 @@
     "cacerts": "Certificats AC",
     "cacertsDesc": "Obtenir la chaîne de certificats AC (PKCS#7)",
     "simpleenroll": "Inscription simple",
-    "simpleenrollDesc": "Inscrire un nouveau certificat (envoyer un CSR PKCS#10)",
+    "simpleenrollDesc": "Inscrire un nouveau certificat (envoyer une CSR PKCS#10)",
     "simplereenroll": "Réinscription simple",
     "simplereenrollDesc": "Renouveler un certificat existant",
     "csrattrs": "Attributs CSR",
@@ -7130,7 +7184,7 @@
     "actions": {
       "newCertificate": "Émettre un nouveau certificat",
       "newCA": "Créer une nouvelle AC",
-      "uploadCSR": "Télécharger un CSR"
+      "uploadCSR": "Téléverser une CSR"
     },
     "categories": {
       "navigation": "Navigation",
@@ -7256,7 +7310,7 @@
     "copyPublicKey": "Copier la clé publique",
     "publicKeyCopied": "Clé publique copiée dans le presse-papiers",
     "noData": "Aucune AC SSH",
-    "noDataDescription": "Créez une autorité de certification SSH pour commencer à émettre des certificats SSH",
+    "noDataDescription": "Créez une autorité de certification SSH pour commencer à émettre des certificats SSH.",
     "configuration": "Configuration",
     "noPrincipals": "Aucune restriction",
     "noExtensions": "Aucune",
@@ -7346,7 +7400,7 @@
     "validity": "Validité",
     "validityPreset": "Durée de validité",
     "noData": "Aucun certificat SSH",
-    "noDataDescription": "Émettez un certificat SSH en signant une clé publique ou en générant une paire de clés",
+    "noDataDescription": "Émettez un certificat SSH en signant une clé publique ou en générant une paire de clés.",
     "revokeReason": "Motif de révocation",
     "revokeReasonPlaceholder": "Motif de révocation de ce certificat",
     "revokeConfirm": "Êtes-vous sûr de vouloir révoquer ce certificat SSH ?",

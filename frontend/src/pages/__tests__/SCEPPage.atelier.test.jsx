@@ -34,7 +34,7 @@ vi.mock('../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
 const scep = vi.hoisted(() => ({
   getConfig: vi.fn(), getStats: vi.fn(), getProfiles: vi.fn(), getRequests: vi.fn(), getRequest: vi.fn(), getIntuneApps: vi.fn(),
   updateProfile: vi.fn(), regenerateProfileChallenge: vi.fn(), approveRequest: vi.fn(), rejectRequest: vi.fn(), deleteIntuneApp: vi.fn(),
-  getChallenge: vi.fn(), deleteProfile: vi.fn(),
+  getChallenge: vi.fn(), getChallengeStates: vi.fn().mockResolvedValue({ data: [] }), deleteProfile: vi.fn(),
 }))
 vi.mock('../../services', () => ({
   scepService: scep,

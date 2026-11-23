@@ -30,6 +30,7 @@ import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
 import { dateOf, dateTimeOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
+import { trustStoreText } from './pki/systemTexts'
 
 
 // A managed CA is a root when its certificate is self-issued, as the CA page reads it (CASide)
@@ -376,7 +377,7 @@ export default function TrustStorePage() {
   const tsState = (c) => c._expiry_status || 'valid'
   const TONES = { valid: 'good', expiring: 'warn', expired: 'bad' }
   const tsPill = (c) => <Pill label={t(`trustStore.module.states.${tsState(c)}`)} tone={TONES[tsState(c)] || 'muted'} />
-  const tsUsage = (c) => c.description || '—'
+  const tsUsage = (c) => trustStoreText(t, c.description) || '—'
   const tsType = (c) => (PURPOSES.includes(c.purpose) ? t(PURPOSE_LABELS[c.purpose]) : (c.purpose || '—'))
   const tsExpires = (c) => dateOf(c.not_after, locale) || '—'
   const present = ['valid', 'expiring', 'expired'].filter((s) => certificates.some((c) => tsState(c) === s))
@@ -392,13 +393,13 @@ export default function TrustStorePage() {
     sortParam,
     resetKey: `${query}|${purpose}|${state}`,
     sorts: {
-      name: (c) => c.name, subject: (c) => c.subject, usage: (c) => c.description, type: tsType,
+      name: (c) => c.name, subject: (c) => c.subject, usage: (c) => trustStoreText(t, c.description), type: tsType,
       not_after: (c) => c.not_after && Date.parse(c.not_after), state: (c) => ['valid', 'expiring', 'expired'].indexOf(tsState(c)),
     },
   })
   const narrowed = Boolean(query.trim() || purpose || active)
   const write = canWrite('truststore')
-  const add = write ? { label: t('trustStore.addCertificate'), icon: 'plus', onClick: handleOpenAddModal, write: true } : undefined
+  const add = write ? { label: t('trustStore.addCertificate'), icon: 'plus', onClick: handleOpenAddModal, write: true, primary: true } : undefined
   const selection = canDelete('truststore') ? {
     selected: selectedIds,
     onToggle: (id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }),
@@ -429,13 +430,13 @@ export default function TrustStorePage() {
             <Section title={t('atelier.properties')}>
               <Facts items={[
                 { ...fact(t('trustStore.module.subject'), open.subject), long: true },
-                { ...fact(t('trustStore.module.usage'), open.description), long: true },
+                { ...fact(t('trustStore.module.usage'), trustStoreText(t, open.description)), long: true },
                 [t('common.type'), tsType(open)],
                 fact(t('trustStore.module.expires'), dateOf(open.not_after, locale)),
                 [t('atelier.state'), tsPill(open)],
               ]} />
             </Section>
-            <Section title={t('atelier.summary')}><p className="summary">{open.notes || t('trustStore.module.noNotes')}</p></Section>
+            <Section title={t('atelier.summary')}><p className="summary">{trustStoreText(t, open.notes) || t('trustStore.module.noNotes')}</p></Section>
           </div>
         )}
         {section === 'details' && (
@@ -476,7 +477,7 @@ export default function TrustStorePage() {
         actions={<>
           {certificates.length > 0 && <Btn icon="download" id="truststore-bundle" onClick={() => handleExportBundle('pem')}>{t('trustStore.exportBundle')}</Btn>}
           {write && <Btn icon="refresh" id="truststore-sync" write disabled={syncing || undefined} onClick={() => openModal('sync')}>{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</Btn>}
-          {write && <Btn icon="upload" id="truststore-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
+          {write && <Btn tone="quiet" icon="upload" id="truststore-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
           <PhoneMoreActions title={t('shell.moduleLabel.truststore')} items={[
             certificates.length > 0 && { id: 'bundle', icon: 'download', label: t('trustStore.exportBundle'), onClick: () => handleExportBundle('pem') },
             write && { id: 'sync', icon: 'refresh', label: t('trustStore.sync'), write: true, disabled: syncing, onClick: () => openModal('sync') },

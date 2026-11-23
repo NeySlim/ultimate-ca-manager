@@ -323,6 +323,52 @@
 /* A help held to the measure in a centred empty block stays centred under its title. */
 :root .atl .settings-body .empty p{margin-left:auto;margin-right:auto}
 /* Graphic review: PKI and protocols. */
+/* The page actions menu opens inside the page head's actions: its buttons escape the phone rule that hides all but the main one. */
+@media(max-width:800px){:root .atl .page-head .actions dialog .btn:not(.primary){display:inline-flex}}
+/* A filters aside that carries a setting or the page's only summary stays on a phone, on its own line above the chips. */
+@media(max-width:800px){:root .atl .filters-row:has(>.active-filters>.phone-aside){flex-wrap:wrap}:root .atl .active-filters:has(>.phone-aside){display:flex;flex-basis:100%;order:-1;padding:8px 0 0}}
+/* The registered upstream account URL breaks anywhere, so the proxy card keeps the width of its neighbours on a phone. */
+:root .atl .acme-proxy .notice .mono{overflow-wrap:anywhere}
+/* A hierarchy name wraps beside its icon instead of dropping under it. */
+:root .atl .hier-head>strong{min-width:0;max-width:calc(100% - 23px)}
+/* A folded subject grid stays folded: its display rule must not undo [hidden]. */
+:root .atl .subject-grid[hidden]{display:none}
+/* Template form: each section opens on a rule and a heading heavier than a field label; the actions stay in view. */
+:root .atl .template-form>.form-fields>fieldset.field.full{padding-top:14px;margin-top:6px;border-top:1px solid var(--line)}
+:root .atl .template-form>.form-fields>fieldset.field.full>legend{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
+:root .atl .template-form .choice-grid{gap:2px 10px}
+:root .atl .template-form>.modal-actions{position:sticky;bottom:0;z-index:1;background:var(--panel);margin-top:0;padding-bottom:4px}
+/* Lone roots: boxes of one width in as many columns as the panel holds, the count and date aligned at the right. */
+:root .atl .ca-tree>:is(.ca-compact,.ca-bundle){align-self:stretch}
+:root .atl .ca-lines{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));align-items:stretch}
+:root .atl .ca-lines>.ca-more{grid-column:1/-1}
+:root .atl .ca-lines>.ca-node>.ca-line{flex:1;min-width:0}
+:root .atl .ca-line>.ca-badges{flex:1 1 auto}
+:root .atl .ca-line .ca-line-count,:root .atl .ca-line .ca-line-date:not(.ca-line-count~.ca-line-date){margin-left:auto}
+/* An empty search status takes no room in the toolbar (it stays rendered: it is a live region). */
+:root .atl .toolbar .search-status:empty{min-width:0}
+/* No hover tint on the empty-state row, nor on a name inside the open row; a touch leaves no hover behind. */
+:root .atl tbody tr:has(>td[colspan]:only-child):hover{background:none}
+:root .atl tr.opened .entity-name:hover:not(:disabled){background-color:transparent}
+@media(hover:none){:root .atl .entity-name:hover:not(:disabled){background-color:transparent}}
+/* The profile and scan forms take one column on a phone: two columns of 150 px cut their lists and stretch their help. */
+@media(max-width:560px){:root .atl :is(.scep-profile-form,#scan-form)>.form-fields{grid-template-columns:1fr}}
+/* ACME issued certificates on a phone: the two lists share a line at half width each, the export on the next. */
+@media(max-width:560px){:root .atl .toolbar:has(>#acme-history-export){flex-wrap:wrap}:root .atl .toolbar:has(>#acme-history-export)>.filter-select{flex:1 1 40%;max-width:none}:root .atl .toolbar>#acme-history-export{margin-left:auto}}
+/* An expired authority's life bar and share in red, in both themes (Aurore's gradient included). */
+:root .atl .life b.bad{color:var(--bad)}
+:root .atl .life .track.expired i{background:var(--bad)}
+/* Aurore dark: a pill or count on the selection ground tints at 14 %, so its text keeps 4.5:1 (measured 4.99 and 4.81). */
+:root[data-theme|=aurore][data-mode="dark"][data-theme] .atl :is(tr.checked,tr.opened,.chain-box,.queue-chip[aria-pressed=true]) :is(.badge,.counter){background:color-mix(in srgb,currentColor 14%,transparent)}
+/* Protocol settings built of stacked blocks (proxy, profiles, labels, examples, TSA signer): 12 px between blocks, buttons apart. */
+:root .atl :is(.settings-group.stacked,.acme-proxy,.tsa-signer){display:grid;gap:12px;min-width:0}
+:root .atl :is(.settings-group.stacked,.acme-proxy,.tsa-signer)>:is(h3,h4){margin:4px 0 0}
+:root .atl :is(.acme-proxy,.tsa-signer) .copy-url{display:flex;flex-wrap:wrap;gap:8px}
+:root .atl .module-detail .summary+.tsa-usage-title{margin-top:16px}
+/* A block's help reads as a field's help: 12 px on 19. */
+:root .atl :is(.settings-group.stacked,.acme-proxy,.tsa-signer)>p.muted.small{line-height:19px}
+/* A read-only setting (an endpoint URL) is a copyable chip under its label, as wide as its text. */
+:root .atl .readonly-value>.code-value{align-self:flex-start;max-width:100%}
 /* Graphic review: governance, settings and shell. */
 /* The secondary actions of a page head: buttons above 800 px, a « ⋯ » menu on a phone (the mockup hides the buttons). */
 :root .atl .page-head .page-more{display:none}

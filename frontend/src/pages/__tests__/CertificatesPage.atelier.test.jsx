@@ -148,6 +148,14 @@ describe('CertificatesPage: the page head (pageHead)', () => {
     expect(screen.getByTestId('import-open')).toBeInTheDocument()
   })
 
+  it('keeps Importer reachable on a phone from the page actions menu', async () => {
+    state.mobile = true
+    await mount()
+    fireEvent.click(within(head()).getByRole('button', { name: /^atelier\.pageActions/ }))
+    fireEvent.click(within(screen.getByTestId('inspector-actions-dialog')).getByRole('button', { name: 'common.import' }))
+    expect(screen.getByTestId('import-open')).toBeInTheDocument()
+  })
+
   it('offers neither to a principal who cannot write certificates', async () => {
     state.write = false
     await mount()

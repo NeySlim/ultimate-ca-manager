@@ -8,6 +8,7 @@
 import { Component, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
+import { CodeValue } from './Detail'
 import { jumpTo } from './helpers'
 
 /** A field's error under it: the warning icon and the words, named by aria-describedby. */
@@ -35,7 +36,8 @@ export function SettingsField({ field: f, value, error, onChange }) {
     return <label className="checkbox-line field full">{box}{f.label}</label>
   }
   if (f.readonly) {
-    return <div className="field full"><label htmlFor={id}>{f.label}</label><input id={id} value={f.readonly} readOnly aria-describedby={ids} />{hint}</div>
+    // A value to read and copy (an endpoint URL): the copyable chip the docks use, not a greyed field
+    return <div className="field full readonly-value" id={id} role="group" aria-labelledby={`label-${id}`} aria-describedby={ids}><span className="label" id={`label-${id}`}>{f.label}</span><CodeValue value={f.readonly} kind="url" label={f.label} />{hint}</div>
   }
   if (f.options) {
     return (

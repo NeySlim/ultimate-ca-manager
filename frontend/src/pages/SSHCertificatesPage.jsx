@@ -16,7 +16,8 @@ import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
-import { fact } from '../components/atelier/facts'
+import { copyRow, fact } from '../components/atelier/facts'
+import { PhoneMoreActions } from './pki/PhoneMoreActions'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { sanitizeDownloadName } from '../lib/filename'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
@@ -56,10 +57,11 @@ const BY_EXPIRY = { key: 'valid_to', asc: true }
 
 function getStatus(cert, t) {
   if (cert.revoked || cert.status === 'revoked') return { key: 'revoked', label: t('sshCertificates.statusRevoked'), tone: 'bad', icon: 'block' }
-  if (cert.status === 'expired') return { key: 'expired', label: t('sshCertificates.statusExpired'), tone: 'warn', icon: 'clock' }
+  // Expired reads as the X.509 certificates do: red and a warning sign, amber is for what is due soon
+  if (cert.status === 'expired') return { key: 'expired', label: t('sshCertificates.statusExpired'), tone: 'bad', icon: 'warning' }
   if (cert.valid_to) {
     const validTo = new Date(cert.valid_to).getTime()
-    if (!isNaN(validTo) && Date.now() > validTo) return { key: 'expired', label: t('sshCertificates.statusExpired'), tone: 'warn', icon: 'clock' }
+    if (!isNaN(validTo) && Date.now() > validTo) return { key: 'expired', label: t('sshCertificates.statusExpired'), tone: 'bad', icon: 'warning' }
   }
   return { key: 'valid', label: t('sshCertificates.statusValid'), tone: 'good', icon: 'check' }
 }
@@ -274,7 +276,7 @@ export default function SSHCertificatesPage() {
   const views = [
     { id: '', label: t('common.all'), count: certStats.total || 0 },
     { id: 'valid', label: t('sshCertificates.statusValid'), count: certStats.valid || 0 },
-    { id: 'expired', label: t('sshCertificates.statusExpired'), count: certStats.expired || 0, warn: (certStats.expired || 0) > 0 },
+    { id: 'expired', label: t('sshCertificates.statusExpired'), count: certStats.expired || 0 },
     { id: 'revoked', label: t('sshCertificates.statusRevoked'), count: certStats.revoked || 0 },
   ]
   const narrowed = Boolean(searchValue || filterStatus || filterType || filterCA)
@@ -314,7 +316,8 @@ export default function SSHCertificatesPage() {
                 fact(t('sshCertificates.keyId'), open.key_id),
                 code(t('sshCertificates.serial'), open.serial),
                 fact(t('common.keyType'), open.key_type),
-                { ...code(t('sshCertificates.fingerprint'), open.fingerprint), long: true },
+                // A base64 fingerprint wraps in its chip; the colon-separated bytes keep the digest lines
+                copyRow(t('sshCertificates.fingerprint'), open.fingerprint, undefined, { long: true }),
                 fact(t('sshCertificates.validFrom'), open.valid_from && formatDate(open.valid_from)),
                 fact(t('sshCertificates.validTo'), open.valid_to && formatDate(open.valid_to)),
                 [t('atelier.state'), statusPill(open)],
@@ -323,7 +326,7 @@ export default function SSHCertificatesPage() {
             <Section title={t('sshCertificates.caInfo')}>
               <Facts items={[
                 fact(t('sshCertificates.caName'), open.ca_name),
-                open.ca_fingerprint && { ...code(t('sshCertificates.caFingerprint'), open.ca_fingerprint), long: true },
+                open.ca_fingerprint && copyRow(t('sshCertificates.caFingerprint'), open.ca_fingerprint, undefined, { long: true }),
               ]} />
             </Section>
           </div>
@@ -385,7 +388,11 @@ export default function SSHCertificatesPage() {
       <PageHead title={t('sshCertificates.title')} total={t('sshCertificates.subtitle', { count: total })} intent={t('sshCertificates.intent')}
         actions={<>
           <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh/cas">{t('sshCas.title')}</Btn>
-          {canWrite('ssh') && <Btn icon="upload" id="ssh-cert-import" write onClick={() => setDialog('import')}>{t('common.import')}</Btn>}
+          {canWrite('ssh') && <Btn tone="quiet" icon="upload" id="ssh-cert-import" write onClick={() => setDialog('import')}>{t('common.import')}</Btn>}
+          <PhoneMoreActions title={t('sshCertificates.title')} items={[
+            { id: 'ssh-switch', icon: 'terminal', label: t('sshCas.title'), onClick: () => navigate('/ssh/cas') },
+            canWrite('ssh') && { id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setDialog('import') },
+          ]} />
           {issue && <Btn tone="primary" icon="plus" id="ssh-cert-new" onClick={issue.onClick}>{issue.label}</Btn>}
         </>} />
       <ListView label={t('sshCertificates.title')} caption={t('sshCertificates.caption')} icon="terminal" rows={certificates} loading={loading && !certificates.length}

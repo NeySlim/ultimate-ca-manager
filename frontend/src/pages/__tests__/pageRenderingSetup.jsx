@@ -160,6 +160,7 @@ vi.mock('../../services/scep.service', () => ({
     getConfig: vi.fn().mockResolvedValue({ data: {} }),
     getInfo: vi.fn().mockResolvedValue({ data: {} }),
     getChallenges: vi.fn().mockResolvedValue({ data: [] }),
+    getChallengeStates: vi.fn().mockResolvedValue({ data: [] }),
   }
 }))
 vi.mock('../../services/crl.service', () => ({

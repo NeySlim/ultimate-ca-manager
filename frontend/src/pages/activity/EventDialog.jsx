@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { AtelierDialog } from '../../components/atelier/AtelierDialog'
 import { CodeValue, Facts } from '../../components/atelier/Detail'
 import { actionLabel } from './activityTypes'
+import { actionDetail } from './actionDetails'
 import { fullTime } from './activityDates'
 
 const INSPECTABLE = { certificate: 'certificate', ca: 'ca' }
@@ -19,7 +20,7 @@ export function EventDialog({ log, locale, resource, onClose, onInspect, canInsp
   return (
     <AtelierDialog title={actionLabel(log.action, t) || t('audit.event')} size="narrow" onClose={onClose} testId="audit-event-dialog">
       <div className="event-detail">
-        {log.details && <p>{log.details}</p>}
+        {log.details && <p>{actionDetail(log.details, t)}</p>}
         <Facts items={[
           [t('audit.colResource'), resource],
           [t('audit.colUser'), log.username || t('common.system')],

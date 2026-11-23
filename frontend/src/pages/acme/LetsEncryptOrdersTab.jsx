@@ -52,7 +52,7 @@ export default function LetsEncryptOrdersTab({
           views: [{ id: '', label: t('common.all'), count: clientOrders.length }, ...present.map((s) => ({ id: s, label: stateLabel(t, s), count: clientOrders.filter((o) => statusOf(o) === s).length }))],
           active: status, onChange: setStatus, label: t('acme.filterByState'),
         }}
-        toolbar={<Toolbar><IconBtn icon="refresh" label={t('common.refresh')} onClick={onRefresh} /></Toolbar>}
+        toolbar={<Toolbar><span className="spacer" /><IconBtn icon="refresh" label={t('common.refresh')} onClick={onRefresh} /></Toolbar>}
         title={name} status={pill} openedId={selectedClientOrder?.id} onOpen={onSelectOrder}
         columns={[
           { id: 'account', label: t('acme.accountOrCa'), cell: account, kind: 'text', priority: 2, sort: 'account' },

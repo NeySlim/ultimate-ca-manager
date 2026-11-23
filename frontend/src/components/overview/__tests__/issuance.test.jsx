@@ -135,3 +135,31 @@ describe('issuances by source: the chart fills its card', () => {
     }
   })
 })
+
+describe('the dates under the columns', () => {
+  const month = { periods: Array.from({ length: 30 }, (_, i) => p(`2026-11-${String(i + 1).padStart(2, '0')}`, { acme: i % 3 })), previous: { total: 0 } }
+  const ticks = () => [...document.querySelectorAll('#card-issuance g[data-day] > text:not(.lab)')].map((el) => el.closest('g').dataset.day)
+  const atWidth = async (width) => {
+    const ro = globalThis.ResizeObserver
+    const cw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+    globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get() { return width } })
+    try {
+      api.getIssuance.mockResolvedValue({ data: { days: 30, flow: month } })
+      await show()
+      return ticks()
+    } finally {
+      globalThis.ResizeObserver = ro
+      if (cw) Object.defineProperty(HTMLElement.prototype, 'clientWidth', cw)
+      else delete HTMLElement.prototype.clientWidth
+    }
+  }
+
+  it('keeps a weekly date a week before today on a wide card', async () => {
+    expect(await atWidth(560)).toEqual(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23', '2026-11-30'])
+  })
+
+  it('drops the weekly date that would run into « today » on a phone', async () => {
+    expect(await atWidth(330)).toEqual(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-30'])
+  })
+})

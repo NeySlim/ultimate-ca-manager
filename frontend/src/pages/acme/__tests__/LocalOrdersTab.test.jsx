@@ -93,6 +93,14 @@ describe('LocalOrdersTab', () => {
     expect(screen.queryByText('acme.purgeLocalOrders')).not.toBeInTheDocument()
   })
 
+  it('closes its toolbar with Refresh on the right, after the purge', async () => {
+    render(<WithDockSlot><LocalOrdersTab /></WithDockSlot>)
+    await screen.findAllByText('example.com')
+    const bar = document.querySelector('.toolbar')
+    expect(bar.lastElementChild).toHaveAccessibleName('common.refresh')
+    expect(bar.lastElementChild.previousElementSibling).toHaveClass('spacer')
+  })
+
   it('passes translated scope and danger options to delete confirmation', async () => {
     render(<WithDockSlot><LocalOrdersTab /></WithDockSlot>)
     await screen.findAllByText('example.com')

@@ -22,7 +22,7 @@ vi.mock('../../hooks', async () => ({
 }))
 vi.mock('../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
 const scep = vi.hoisted(() => ({
-  getConfig: vi.fn(), getStats: vi.fn(), getProfiles: vi.fn(), getRequests: vi.fn(), getRequest: vi.fn(), getIntuneApps: vi.fn(), getChallenge: vi.fn(),
+  getConfig: vi.fn(), getStats: vi.fn(), getProfiles: vi.fn(), getRequests: vi.fn(), getRequest: vi.fn(), getIntuneApps: vi.fn(), getChallenge: vi.fn(), getChallengeStates: vi.fn(),
 }))
 vi.mock('../../services', () => ({
   scepService: scep,
@@ -54,7 +54,7 @@ beforeEach(() => {
   scep.getStats.mockResolvedValue({ data: { pending: 1, approved: 1, rejected: 1, total: 3 } })
   scep.getProfiles.mockResolvedValue({ data: PROFILES })
   scep.getRequests.mockResolvedValue({ data: REQUESTS, meta: { total: 3 } })
-  scep.getChallenge.mockImplementation(async (id) => ({ data: { challenge: id === 3 ? 'secret' : null } }))
+  scep.getChallengeStates.mockResolvedValue({ data: [{ ca_id: 3, configured: true, expired: false, generated_at: '2026-11-08T10:00:00Z' }] })
   scep.getIntuneApps.mockResolvedValue({ data: [
     { id: 7, name: 'Lab Intune', tenant_id: 'lab.onmicrosoft.com', client_id: 'client-8', profile_count: 0, last_test_at: '2026-11-01T00:00:00Z' },
     { id: 8, name: 'Corp Intune', tenant_id: 'corp.onmicrosoft.com', client_id: 'client-7', profile_count: 2 },
@@ -127,7 +127,8 @@ describe('the SCEP lists', () => {
     expect(rowNames(at.container)).toEqual(['Branch CA', 'IoT CA'])
     expect(sortedHeaders(at.container)).toEqual([['atelier.name', 'ascending']])
     expect(absorbers(at.container)).toEqual(['common.subject'])
-    expect(sortKeys(at.container)).toEqual(['name', 'subject', 'state'])
+    expect(sortKeys(at.container)).toEqual(['name', 'subject', 'age', 'state'])
+    expect(scep.getChallenge).not.toHaveBeenCalled()
   })
 
   it('Intune apps: by name, the name taking the room left, the last test under a short header', async () => {

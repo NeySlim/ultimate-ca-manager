@@ -24,7 +24,7 @@ import { TSA_LABELS, findAlgorithm, groupedOptions, listAlgorithms } from '../li
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { dateTimeOf } from './admin/adminDates'
-import { Notice, ViewSwitch } from './protocols/atelierParts'
+import { Notice, ViewSwitch, soleLegendsOff } from './protocols/atelierParts'
 import { copyRow, fact } from '../components/atelier/facts'
 
 // OpenSSL's example policy OID, assigned to no one
@@ -318,7 +318,7 @@ openssl ts -reply -in response.tsr -text`}</pre>
       <ViewSwitch id="tsa-view" label={t('protocols.view')} value={view} onChange={setView}
         options={[{ value: 'list', label: t('tsa.views.list'), count: loading ? null : service.length }, { value: 'config', label: t('tsa.views.config') }]}>
         {view === 'list' ? listView : loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? listView : (
-          <SettingsView sections={sections} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
+          <SettingsView sections={soleLegendsOff(sections)} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
             onReset={() => setDraft(saved)} saving={saving} failed={failed} announce={announce} stateRef={stateRef}
             tocLabel={t('protocols.sectionsOf', { name: 'TSA' })} />
         )}

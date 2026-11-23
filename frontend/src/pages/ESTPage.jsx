@@ -18,7 +18,7 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useDockParam } from '../components/atelier/useDockParam'
 import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
-import { Notice, ViewSwitch } from './protocols/atelierParts'
+import { Notice, ViewSwitch, soleLegendsOff } from './protocols/atelierParts'
 import { copyRow, fact } from '../components/atelier/facts'
 import { repeatedRows } from './protocols/protocolStates'
 
@@ -209,8 +209,7 @@ export default function ESTPage() {
       extraKeys: [['labels', t('est.labels')]],
       groups: [],
       children: (
-        <fieldset className="settings-group">
-          <legend>{t('est.labels')}</legend>
+        <fieldset className="settings-group stacked" aria-label={t('est.labels')}>
           <div className="row-list" id="est-labels">
             {rows.map((row, i) => {
               const duplicate = repeated.has(row.id) ? t('common.duplicateKey', { key: row.key }) : ''
@@ -257,7 +256,7 @@ export default function ESTPage() {
   const listView = (
     <ListView label="EST" caption={t('est.caption')} icon="plug" list={list} nameSort="name" loading={loading}
       filters={{ views: [{ id: '', label: t('common.all'), count: endpoints.length }, ...(endpoints.length ? [{ id: state, label: t(state === 'active' ? 'common.active' : 'common.disabled'), count: endpoints.length }] : [])], active: '', onChange: () => {}, label: t('tsa.filterByState'),
-        aside: t('est.aside', { total: stats.total || 0, failed: stats.failed || 0 }) }}
+        aside: <span className="phone-aside">{t('est.aside', { total: stats.total || 0, failed: stats.failed || 0 })}</span> }}
       title={(r) => r.name} status={pill} openedId={open ? (open.id || '') : null} onOpen={(r) => setOpenId(r.id)}
       columns={[
         { id: 'ca', label: t('tsa.columns.ca'), cell: (r) => r.ca, kind: 'text', priority: 2, sort: 'ca' },
@@ -280,7 +279,7 @@ export default function ESTPage() {
       <ViewSwitch id="est-view" label={t('protocols.view')} value={view} onChange={setView}
         options={[{ value: 'list', label: t('est.views.list'), count: loading ? null : endpoints.length }, { value: 'config', label: t('tsa.views.config') }]}>
         {view === 'list' ? listView : loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? listView : (
-          <SettingsView sections={sections} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
+          <SettingsView sections={soleLegendsOff(sections)} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
             onReset={() => { setDraft(saved); setRows(toRows(config.labels)); setTried(false) }} saving={saving} failed={failed} announce={announce}
             stateRef={stateRef} tocLabel={t('protocols.sectionsOf', { name: 'EST' })} />
         )}

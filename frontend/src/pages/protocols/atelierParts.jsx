@@ -244,3 +244,7 @@ export function ViewSwitch({ id, label, value, onChange, options = [], groups = 
     </>
   )
 }
+
+/** Settings sections without a legend that only repeats their title: a lone group named as its card. */
+export const soleLegendsOff = (sections) => sections.map((s) => (s.groups?.length === 1 && s.groups[0].legend === s.label
+  ? { ...s, groups: [{ ...s.groups[0], legend: undefined }] } : s))

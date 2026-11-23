@@ -1597,7 +1597,7 @@
     "pasteCSRDescription": "Incolla la tua CSR in formato PEM qui sotto",
     "noPendingCSRs": "Nessuna CSR in attesa",
     "noSignedCertificates": "Nessun certificato firmato",
-    "signToSee": "Firma una CSR per vederla qui",
+    "signToSee": "Firma una CSR per vederla qui.",
     "importCSR": "Importa CSR",
     "searchPending": "Cerca CSR in attesa...",
     "searchSigned": "Cerca certificati firmati...",
@@ -1694,7 +1694,7 @@
     "adDerivedBadge": "AD",
     "enrollment": "Iscrizione",
     "autoenrollEnabled": "Consenti iscrizione automatica",
-    "autoenrollEnabledDescription": "Annuncia questo modello come autoEnroll=true nei criteri di registrazione certificato, in modo che i client autenticati tramite GPO/Kerberos lo richiedano automaticamente all'accesso senza alcuna azione dell'utente. Disattivato per impostazione predefinita -- come nel vero ADCS, un modello può comunque essere iscritto manualmente (MMC \"Richiedi nuovo certificato\", certreq) senza questa opzione, poiché Iscrivi e Iscrizione automatica sono autorizzazioni separate.",
+    "autoenrollEnabledDescription": "Annuncia questo modello come autoEnroll=true nei criteri di registrazione certificato, in modo che i client autenticati tramite GPO/Kerberos lo richiedano automaticamente all'accesso senza alcuna azione dell'utente. Disattivato per impostazione predefinita. Come nel vero ADCS, un modello può comunque essere iscritto manualmente (MMC \"Richiedi nuovo certificato\", certreq) senza questa opzione, poiché Iscrivi e Iscrizione automatica sono autorizzazioni separate.",
     "autoenrollBadge": "Auto",
     "allowedAdGroup": "Limita l'iscrizione a un gruppo AD",
     "allowedAdGroupDescription": "Solo i principal appartenenti a questo gruppo di Active Directory (inclusa l'appartenenza annidata) possono iscriversi a questo modello tramite l'endpoint autenticato Kerberos. Inserire un nome di gruppo o un DN completo. Lasciare vuoto per consentire l'iscrizione a qualsiasi principal autenticato, come il comportamento predefinito di un vero ADCS. Non applicato sull'endpoint UsernamePassword, che non dispone di un'identità per richiesta da verificare.",
@@ -1714,7 +1714,7 @@
     "keyServerDefault": "Predefinito del server",
     "extensions": "Estensioni",
     "noTemplates": "Nessun modello",
-    "noTemplatesDescription": "Crea il tuo primo modello",
+    "noTemplatesDescription": "Crea il tuo primo modello.",
     "searchPlaceholder": "Cerca modello...",
     "serverAuth": "Autenticazione server",
     "clientAuth": "Autenticazione client",
@@ -1836,6 +1836,44 @@
       "filterByState": "Filtra per stato",
       "usesCount_one": "{{count, number}} certificato",
       "usesCount_other": "{{count, number}} certificati"
+    },
+    "builtIn": {
+      "webServer": {
+        "name": "Server web (TLS/SSL)",
+        "description": "Certificato TLS per server web (HTTPS)."
+      },
+      "email": {
+        "name": "E-mail (S/MIME)",
+        "description": "Certificato S/MIME per cifrare e firmare le e-mail."
+      },
+      "vpnServer": {
+        "name": "Server VPN",
+        "description": "Certificato per server VPN (OpenVPN, IPsec, WireGuard)."
+      },
+      "vpnClient": {
+        "name": "Client VPN",
+        "description": "Certificato client VPN per autenticare gli utenti."
+      },
+      "codeSigning": {
+        "name": "Firma del codice",
+        "description": "Certificato per firmare software, script e pacchetti."
+      },
+      "ocspSigning": {
+        "name": "Firma OCSP",
+        "description": "Certificato di firma di un responder OCSP delegato (RFC 6960), emesso dalla CA di cui firma le risposte."
+      },
+      "clientCert": {
+        "name": "Certificato client",
+        "description": "Certificato per autenticare utenti e dispositivi (802.1X, RADIUS, mTLS)."
+      },
+      "clientAuth": {
+        "name": "Autenticazione client",
+        "description": "Certificato per autenticare utenti e dispositivi (802.1X, RADIUS, mTLS)."
+      },
+      "smartcardLogon": {
+        "name": "Accesso con smart card",
+        "description": "Certificato di accesso Windows con smart card (PKINIT) per Active Directory, con l'UPN dell'utente."
+      }
     }
   },
   "users": {
@@ -2066,7 +2104,7 @@
     "proxyUpstreamUrl": "URL directory upstream",
     "proxyUpstreamUrlHelper": "L'URL della directory del server ACME upstream. Per impostazione predefinita, Let's Encrypt staging se vuoto.",
     "proxyUsage": "Utilizzo con certbot:",
-    "proxyUsageNote": "Prerequisito: il dominio (o un genitore che copra i sottodomini) deve essere configurato in Domini ACME con un provider DNS. Il proxy supporta solo dns-01.\n\nOgni account CA esterno può esporre un endpoint dedicato: /acme/proxy/<slug>/directory (attivare **Esporre tramite proxy ACME** in Autorità di certificazione (CA)). Il percorso predefinito /acme/proxy/directory segue l'account selezionato nelle impostazioni proxy.\n\nUCM crea e rimuove automaticamente i record TXT tramite quel provider. I flag --manual-auth-hook e --manual-cleanup-hook possono restare no-op (/bin/true) perché il proxy esegue la validazione DNS.\n\nEvitare due richieste simultanee per lo stesso nome (Certbot + interfaccia UCM): il secondo record TXT può sovrascrivere il primo. Se il certificato HTTPS di UCM è autofirmato (lab), aggiungere --no-verify-ssl a Certbot.",
+    "proxyUsageNote": "Prerequisito: il dominio (o un genitore che copra i sottodomini) deve essere configurato in Domini ACME con un provider DNS. Il proxy supporta solo dns-01.\n\nOgni account CA esterno può esporre un endpoint dedicato: /acme/proxy/<slug>/directory (attivare Esporre tramite proxy ACME in Autorità di certificazione (CA)). Il percorso predefinito /acme/proxy/directory segue l'account selezionato nelle impostazioni proxy.\n\nUCM crea e rimuove automaticamente i record TXT tramite quel provider. I flag --manual-auth-hook e --manual-cleanup-hook possono restare no-op (/bin/true) perché il proxy esegue la validazione DNS.\n\nEvitare due richieste simultanee per lo stesso nome (Certbot + interfaccia UCM): il secondo record TXT può sovrascrivere il primo. Se il certificato HTTPS di UCM è autofirmato (lab), aggiungere --no-verify-ssl a Certbot.",
     "proxyRegistered": "Proxy Registrato",
     "registerAccount": "Registra account",
     "aboutAcmeDesc": "ACME consente l'emissione automatizzata di certificati. Configura il server qui sotto, quindi usa l'URL della directory con qualsiasi client ACME (certbot, acme.sh, ecc.).",
@@ -2687,7 +2725,8 @@
       "failures": "Errori",
       "wildcard": "Wildcard",
       "orders": "Ordini"
-    }
+    },
+    "addUpstreamCa": "Aggiungi una CA"
   },
   "scep": {
     "title": "Protocollo SCEP",
@@ -2845,7 +2884,16 @@
     "views": {
       "challenges": "Challenge delle autorità"
     },
-    "emptyProfilesText": "Un profilo collega una CA emittente, un modello e una password challenge."
+    "emptyProfilesText": "Un profilo collega una CA emittente, un modello e una password challenge.",
+    "challengeExpired": "Scaduto",
+    "challengeShow": "Mostra",
+    "challengeHide": "Nascondi",
+    "challengeCopy": "Copia",
+    "challengeGenerated": "Generato il",
+    "challengeExpires": "Scade il",
+    "challengeAge": "Età",
+    "challengeAgeUnknown": "Non registrato",
+    "newIntuneAppShort": "Nuova app"
   },
   "crlOcsp": {
     "crl": "Elenco di revoche di certificati (CRL)",
@@ -3113,7 +3161,7 @@
     "syncFailed": "Sincronizzazione dal sistema fallita",
     "add": "Aggiungi",
     "addCertificate": "Aggiungi certificato",
-    "addCertificatesForChain": "Aggiungi certificati per convalidare le catene",
+    "addCertificatesForChain": "Aggiungi certificati per convalidare le catene.",
     "adding": "Aggiungendo...",
     "allPurposes": "Tutti gli scopi",
     "category": "Categoria",
@@ -3166,7 +3214,9 @@
       "filterByState": "Filtra per stato",
       "filterByType": "Filtra per tipo",
       "emptyTitle": "Nessuna ancora di attendibilità esterna"
-    }
+    },
+    "systemBundleDescription": "Importato dal bundle CA di sistema",
+    "systemBundleNote": "Importato automaticamente da {{path}}"
   },
   "importExport": {
     "tabs": {
@@ -3483,7 +3533,11 @@
       "truststore_remove": "Ancora di fiducia rimossa"
     },
     "format_csv": "Una riga per evento",
-    "format_json": "Dati strutturati"
+    "format_json": "Dati strutturati",
+    "actionDetails": {
+      "scepChallengeRead": "Password di sfida della CA {{name}} letta",
+      "scepChallengeRegenerate": "Password di sfida della CA {{name}} rigenerata"
+    }
   },
   "settings": {
     "appearanceSubtitle": "Personalizza l'aspetto e la lingua di UCM",
@@ -7256,7 +7310,7 @@
     "copyPublicKey": "Copia chiave pubblica",
     "publicKeyCopied": "Chiave pubblica copiata negli appunti",
     "noData": "Nessuna CA SSH",
-    "noDataDescription": "Crea un'autorità di certificazione SSH per iniziare a emettere certificati SSH",
+    "noDataDescription": "Crea un'autorità di certificazione SSH per iniziare a emettere certificati SSH.",
     "configuration": "Configurazione",
     "noPrincipals": "Nessuna restrizione",
     "noExtensions": "Nessuna",
@@ -7346,7 +7400,7 @@
     "validity": "Validità",
     "validityPreset": "Periodo di validità",
     "noData": "Nessun certificato SSH",
-    "noDataDescription": "Emetti un certificato SSH firmando una chiave pubblica o generando una coppia di chiavi",
+    "noDataDescription": "Emetti un certificato SSH firmando una chiave pubblica o generando una coppia di chiavi.",
     "revokeReason": "Motivo della revoca",
     "revokeReasonPlaceholder": "Motivo della revoca di questo certificato",
     "revokeConfirm": "Sei sicuro di voler revocare questo certificato SSH?",

@@ -17,8 +17,9 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
-vi.mock('../../contexts', () => ({ useNotification: () => stable.notify, useMobile: () => ({ isMobile: false }) }))
-const m = vi.hoisted(() => ({ write: true }))
+const m = vi.hoisted(() => ({ write: true, mobile: false }))
+vi.mock('../../contexts', () => ({ useNotification: () => stable.notify, useMobile: () => ({ isMobile: m.mobile }) }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: m.mobile }) }))
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual('../../hooks')
   return {
@@ -50,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   window.localStorage.clear()
   m.write = true
+  m.mobile = false
   getAll.mockResolvedValue({ data: [ALICE], meta: { total: 1 } })
   getById.mockResolvedValue({ data: ALICE })
 })
@@ -77,6 +79,25 @@ describe('the SSH certificate list', () => {
     await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'desc' }))
     fireEvent.click(screen.getByRole('button', { name: 'certificates.expiry' }))
     await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'asc' }))
+  })
+
+  it('reads an expired certificate in red with a warning sign, its chip unmarked, as the X.509 ones', async () => {
+    getAll.mockResolvedValue({ data: [{ ...ALICE, valid_to: '2001-01-01T00:00:00Z' }], meta: { total: 1 } })
+    page()
+    const row = (await screen.findByRole('button', { name: 'alice' })).closest('tr')
+    expect(row.querySelector('.badge.bad')).toHaveTextContent('sshCertificates.statusExpired')
+    expect(row.querySelector('.badge.warn')).toBeNull()
+    const chips = screen.getByRole('group', { name: 'sshCertificates.filterByState' })
+    expect(within(chips).getByRole('button', { name: /sshCertificates\.statusExpired/ }).querySelector('.dot')).toBeNull()
+  })
+
+  it('keeps the link to the authorities and Importer on a phone, in the page actions menu', async () => {
+    m.mobile = true
+    page()
+    await screen.findAllByRole('button', { name: 'alice' })
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.pageActions' }))
+    const menu = screen.getByTestId('inspector-actions-dialog')
+    expect(within(menu).getAllByRole('button').map((b) => b.textContent).filter(Boolean)).toEqual(['sshCas.title', 'common.import'])
   })
 
   it('links to the SSH authorities at their registered address', async () => {
@@ -163,6 +184,8 @@ describe('the SSH certificate dock in typed rows (KV-3)', () => {
     expect(dock.querySelector('dl.props')).toBeNull()
     const fp = rowIn(dock, 'sshCertificates.fingerprint')
     expect(fp.querySelector('dd.v .code-value')).toHaveTextContent(FP)
+    // base64, not colon-separated bytes: a wrapping chip, never the one-line digest layout that ran under the copy button
+    expect(fp.querySelector('.code-value.hex')).toBeNull()
     fireEvent.click(within(fp).getByRole('button', { name: 'protocols.copyValue' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(FP))
     expect(rowIn(dock, 'sshCertificates.serial').querySelector('dd.v .code-value')).toHaveTextContent('7')

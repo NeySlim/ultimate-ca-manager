@@ -374,7 +374,7 @@ export default function CRLOCSPPage() {
   ]
   const hitRate = ocspStats.total_requests > 0 ? Math.round((ocspStats.cache_hits / ocspStats.total_requests) * 100) : 0
   const responder = t(!ocspStatus.enabled ? 'crlOcsp.responderDisabled' : ocspStatus.running ? 'crlOcsp.responderRunning' : 'crlOcsp.responderStopped')
-  const aside = t('crlOcsp.responderAside', { state: responder, count: ocspStats.total_requests || 0, rate: hitRate })
+  const aside = <span className="phone-aside">{t('crlOcsp.responderAside', { state: responder, count: ocspStats.total_requests || 0, rate: hitRate })}</span>
 
   const write = canWrite('crl')
   const withKey = (r) => r.has_private_key !== false

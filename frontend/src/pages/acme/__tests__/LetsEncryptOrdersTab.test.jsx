@@ -63,6 +63,13 @@ describe('LetsEncryptOrdersTab', () => {
     }
   })
 
+  it('closes its toolbar with Refresh on the right', () => {
+    renderTab()
+    const bar = document.querySelector('.toolbar')
+    expect(bar.lastElementChild).toHaveAccessibleName('common.refresh')
+    expect(bar.lastElementChild.previousElementSibling).toHaveClass('spacer')
+  })
+
   it('filters orders by state', () => {
     renderTab()
     fireEvent.click(within(screen.getByRole('group', { name: 'acme.filterByState' })).getByRole('button', { name: /valid/i }))

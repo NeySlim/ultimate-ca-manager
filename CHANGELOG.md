@@ -257,6 +257,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Requests that name no key or hash follow one default on every issuance path: without a profile or policy it stays RSA-2048 with SHA-256, a profile or policy that refuses it moves to the first accepted type (RSA-3072, EC-P256, EC-P384) or answers 400 when none is. The hash follows the signing key, and a new intermediate CA never takes a hash below its parent's key or its own; #397.
 - Templates: a fresh installation seeds the same system template list an upgrade completes (eight templates, Client Authentication and VPN Client among them) instead of an older seven-entry list.
 - Breaking: a policy that requires approval now holds ACME, EST, SCEP and WSTEP requests in the approval queue, so a protocol request can stay pending until an approver decides; each client is told so in its protocol's terms (ACME `processing`, EST 202 with Retry-After, SCEP PENDING, WSTEP pending RSTR and QueryTokenStatus), even on an auto-approving SCEP profile.
+- **The PKI and protocol pages drawn as one console.** A phone keeps the head's other actions in a menu, the EAB setting and the protocol summaries in view, an expired SSH certificate or authority tile reads red, settings name a lone group once and space their blocks, and the system templates, trust bundle notes and SCEP challenge events read in the interface language.
 
 ### Fixed
 
@@ -468,6 +469,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- SCEP: opening the CA challenges read the secret of every CA, one audited read each; the list now shows each challenge's state and age without it (`GET /api/v2/scep/challenges`), and a secret is read only by *Show* or *Copy*, one audited read per action.
 - Export: a PEM export with the private key and a password returned the key unencrypted: a certificate or CA export validated the password first, a user certificate export accepted and ignored it. The key is now written as PKCS#8 encrypted with that password, a password too short is refused with `400`, and the audit entry says `password-protected` for the PEM and the hybrid bundle.
 - Microsoft CA: a Kerberos connection could name a file of the UCM data folder, the keytab XCEP and WSTEP accept with among them, as its client keytab, and authenticate under its service principals toward any host. Such a path is now refused with `400` on save and on test, and a connection saved with one fails its Kerberos authentication.
 - Microsoft CA: a user with `write:settings` could make the server sign in with Kerberos toward a host of their choice, under any keytab it can read or, without one, under the tickets the process already holds, by saving or testing a connection. Creating a Kerberos connection, switching one to Kerberos or turning on a Kerberos WinRM channel, moving it, changing its keytab or principal, and testing it against another target now need `admin:system`; a disabled WinRM channel does not count. A save that moved a client certificate connection to another server kept its saved key; the key must now be entered again.

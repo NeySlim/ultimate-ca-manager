@@ -76,7 +76,12 @@ describe('the configuration form', () => {
     expect(screen.getByLabelText('Fuseau').tagName).toBe('SELECT')
     expect(screen.getByLabelText('Fuseau').closest('.field')).toHaveClass('short')
     expect(screen.getByLabelText('Notifier').closest('label')).toHaveClass('checkbox-line', 'field', 'full')
-    expect(screen.getByLabelText('FIPS')).toHaveAttribute('readonly')
+    // A read-only value is a chip to copy, named by its label, not a greyed field
+    const fips = screen.getByRole('group', { name: 'FIPS' })
+    expect(fips.querySelector('input')).toBeNull()
+    expect(fips.querySelector('.code-value')).toHaveTextContent('Désactivé')
+    expect(within(fips).getByRole('button', { name: 'protocols.copyValue {"name":"FIPS"}' })).toBeTruthy()
+    expect(fips).toHaveAttribute('aria-describedby', 'hint-set-fips')
   })
   it('runs a section test and shows its result, or the hint before', () => {
     const onTest = vi.fn()

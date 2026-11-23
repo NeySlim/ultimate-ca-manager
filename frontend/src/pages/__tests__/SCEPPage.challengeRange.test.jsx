@@ -24,6 +24,7 @@ Object.assign(scepService, {
   getStats: vi.fn().mockResolvedValue({ data: {} }),
   getProfiles: vi.fn().mockResolvedValue({ data: [] }),
   getChallenge: vi.fn().mockResolvedValue({ data: {} }),
+  getChallengeStates: vi.fn().mockResolvedValue({ data: [] }),
 })
 
 describe('SCEP challenge validity range', () => {

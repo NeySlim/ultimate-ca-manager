@@ -10,6 +10,7 @@ import { Icon, TextLink } from '../atelier'
 import { dashboardService } from '../../services'
 import { usePermission } from '../../hooks/usePermission'
 import { actionLabel, typeIcon, typeOf } from '../../pages/activity/activityTypes'
+import { actionDetail } from '../../pages/activity/actionDetails'
 import { eventClock, eventDate, fullTime } from '../../pages/activity/activityDates'
 import { foldActivity } from '../../lib/overviewViz'
 import { OverviewCard, useCardData, useLang } from './shared'
@@ -80,11 +81,11 @@ export function ActivityCard() {
       <li key={`${a.timestamp}-${i}`} className="activity-row tl-row" data-tone={failed ? 'bad' : undefined} data-family={typeOf(a.action)}>
         <Icon name={failed ? 'warning' : typeIcon(typeOf(a.action))} />
         <div>
-          <strong>{operation || a.message}</strong>
+          <strong>{operation || actionDetail(a.message, t)}</strong>
           {/* The journal, searched for this operation: the event itself needs its id (not in this feed) */}
           {!operation ? null : audit
-            ? <button type="button" data-event={a.action} onClick={() => journal(a.action)}>{a.message}</button>
-            : <span className="tl-object">{a.message}</span>}
+            ? <button type="button" data-event={a.action} onClick={() => journal(a.action)}>{actionDetail(a.message, t)}</button>
+            : <span className="tl-object">{actionDetail(a.message, t)}</span>}
           <span className="muted small">{a.user}</span>
         </div>
         {a.timestamp

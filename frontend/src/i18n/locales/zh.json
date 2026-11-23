@@ -1597,7 +1597,7 @@
     "pasteCSRDescription": "在下方粘贴 PEM 格式的 CSR",
     "noPendingCSRs": "没有待处理的CSR",
     "noSignedCertificates": "没有已签名的证书",
-    "signToSee": "签署CSR后将在此显示",
+    "signToSee": "签署CSR后将在此显示。",
     "importCSR": "导入 CSR",
     "searchPending": "搜索待处理 CSR...",
     "searchSigned": "搜索已签名证书...",
@@ -1694,7 +1694,7 @@
     "adDerivedBadge": "AD",
     "enrollment": "注册",
     "autoenrollEnabled": "允许自动注册",
-    "autoenrollEnabledDescription": "在证书注册策略中将此模板公布为 autoEnroll=true，使经 GPO/Kerberos 身份验证的客户端在登录时自动请求它，无需用户操作。默认关闭 -- 与真实 ADCS 相同，即使不启用此项，模板仍可手动注册（MMC“申请新证书”、certreq），因为“注册”和“自动注册”是各自独立的权限。",
+    "autoenrollEnabledDescription": "在证书注册策略中将此模板公布为 autoEnroll=true，使经 GPO/Kerberos 身份验证的客户端在登录时自动请求它，无需用户操作。默认关闭。与真实 ADCS 相同，即使不启用此项，模板仍可手动注册（MMC“申请新证书”、certreq），因为“注册”和“自动注册”是各自独立的权限。",
     "autoenrollBadge": "自动",
     "allowedAdGroup": "将注册限制为 AD 组",
     "allowedAdGroupDescription": "只有属于此 Active Directory 组(包括嵌套成员)的主体才能通过 Kerberos 身份验证端点为此模板注册。输入组名或完整 DN。留空则允许任何已通过身份验证的主体注册,与真实 ADCS 的默认行为一致。不会在 UsernamePassword 端点上强制执行,因为该端点没有可检查的按请求身份。",
@@ -1714,7 +1714,7 @@
     "keyServerDefault": "服务器默认",
     "extensions": "扩展",
     "noTemplates": "没有模板",
-    "noTemplatesDescription": "创建您的第一个模板",
+    "noTemplatesDescription": "创建您的第一个模板。",
     "searchPlaceholder": "搜索模板...",
     "serverAuth": "服务器认证",
     "clientAuth": "客户端认证",
@@ -1836,6 +1836,44 @@
       "filterByState": "按状态筛选",
       "usesCount_one": "{{count, number}} 个证书",
       "usesCount_other": "{{count, number}} 个证书"
+    },
+    "builtIn": {
+      "webServer": {
+        "name": "Web 服务器 (TLS/SSL)",
+        "description": "用于 Web 服务器 (HTTPS) 的 TLS 证书。"
+      },
+      "email": {
+        "name": "电子邮件 (S/MIME)",
+        "description": "用于加密和签名电子邮件的 S/MIME 证书。"
+      },
+      "vpnServer": {
+        "name": "VPN 服务器",
+        "description": "VPN 服务器证书（OpenVPN、IPsec、WireGuard）。"
+      },
+      "vpnClient": {
+        "name": "VPN 客户端",
+        "description": "用于用户身份验证的 VPN 客户端证书。"
+      },
+      "codeSigning": {
+        "name": "代码签名",
+        "description": "用于签名软件、脚本和软件包的证书。"
+      },
+      "ocspSigning": {
+        "name": "OCSP 签名",
+        "description": "委派 OCSP 响应程序的签名证书（RFC 6960），由其所签名响应的 CA 签发。"
+      },
+      "clientCert": {
+        "name": "客户端证书",
+        "description": "用于用户和设备身份验证的证书（802.1X、RADIUS、mTLS）。"
+      },
+      "clientAuth": {
+        "name": "客户端身份验证",
+        "description": "用于用户和设备身份验证的证书（802.1X、RADIUS、mTLS）。"
+      },
+      "smartcardLogon": {
+        "name": "智能卡登录",
+        "description": "用于 Active Directory 的 Windows 智能卡 (PKINIT) 登录证书，包含用户的 UPN。"
+      }
     }
   },
   "users": {
@@ -2066,7 +2104,7 @@
     "proxyUpstreamUrl": "上游目录 URL",
     "proxyUpstreamUrlHelper": "上游 ACME 服务器的目录 URL。如果为空，默认使用 Let's Encrypt staging。",
     "proxyUsage": "certbot 使用方法：",
-    "proxyUsageNote": "前提：域名（或覆盖子域的父域）须在 ACME 域名中配置 DNS 提供商。代理仅支持 dns-01。\n\n每个外部 CA 账户可暴露专用端点：/acme/proxy/<slug>/directory（在“证书颁发机构 (CA)”中启用 **通过 ACME 代理暴露**）。默认路径 /acme/proxy/directory 遵循代理设置中所选账户。\n\nUCM 通过该提供商自动创建和删除 TXT 记录。--manual-auth-hook 与 --manual-cleanup-hook 可保持为 no-op（/bin/true），DNS 校验由代理完成。\n\n避免对同一名称并发发起两次请求（Certbot + UCM 界面）：第二条 TXT 记录可能覆盖第一条。若 UCM HTTPS 证书为自签名（实验环境），请为 Certbot 添加 --no-verify-ssl。",
+    "proxyUsageNote": "前提：域名（或覆盖子域的父域）须在 ACME 域名中配置 DNS 提供商。代理仅支持 dns-01。\n\n每个外部 CA 账户可暴露专用端点：/acme/proxy/<slug>/directory（在“证书颁发机构 (CA)”中启用 通过 ACME 代理暴露）。默认路径 /acme/proxy/directory 遵循代理设置中所选账户。\n\nUCM 通过该提供商自动创建和删除 TXT 记录。--manual-auth-hook 与 --manual-cleanup-hook 可保持为 no-op（/bin/true），DNS 校验由代理完成。\n\n避免对同一名称并发发起两次请求（Certbot + UCM 界面）：第二条 TXT 记录可能覆盖第一条。若 UCM HTTPS 证书为自签名（实验环境），请为 Certbot 添加 --no-verify-ssl。",
     "proxyRegistered": "代理已注册",
     "registerAccount": "注册账户",
     "aboutAcmeDesc": "ACME 实现自动化证书颁发。配置下方服务器，然后使用任何 ACME 客户端（certbot, acme.sh 等）连接目录 URL。",
@@ -2687,7 +2725,8 @@
       "failures": "失败",
       "wildcard": "通配符",
       "orders": "订单"
-    }
+    },
+    "addUpstreamCa": "添加 CA"
   },
   "scep": {
     "title": "SCEP协议",
@@ -2845,7 +2884,16 @@
     "views": {
       "challenges": "机构质询"
     },
-    "emptyProfilesText": "配置文件将签发 CA、模板和质询密码关联在一起。"
+    "emptyProfilesText": "配置文件将签发 CA、模板和质询密码关联在一起。",
+    "challengeExpired": "已过期",
+    "challengeShow": "显示",
+    "challengeHide": "隐藏",
+    "challengeCopy": "复制",
+    "challengeGenerated": "生成时间",
+    "challengeExpires": "过期时间",
+    "challengeAge": "时长",
+    "challengeAgeUnknown": "未记录",
+    "newIntuneAppShort": "新建应用"
   },
   "crlOcsp": {
     "crl": "证书吊销列表",
@@ -3113,7 +3161,7 @@
     "syncFailed": "从系统同步失败",
     "add": "添加",
     "addCertificate": "添加证书",
-    "addCertificatesForChain": "添加证书以验证证书链",
+    "addCertificatesForChain": "添加证书以验证证书链。",
     "adding": "正在添加...",
     "allPurposes": "全部用途",
     "category": "类别",
@@ -3166,7 +3214,9 @@
       "filterByState": "按状态筛选",
       "filterByType": "按类型筛选",
       "emptyTitle": "没有外部信任锚"
-    }
+    },
+    "systemBundleDescription": "从系统 CA 证书包导入",
+    "systemBundleNote": "自动从 {{path}} 导入"
   },
   "importExport": {
     "tabs": {
@@ -3483,7 +3533,11 @@
       "truststore_remove": "已移除信任锚"
     },
     "format_csv": "每个事件一行",
-    "format_json": "结构化数据"
+    "format_json": "结构化数据",
+    "actionDetails": {
+      "scepChallengeRead": "已读取 CA {{name}} 的质询密码",
+      "scepChallengeRegenerate": "已重新生成 CA {{name}} 的质询密码"
+    }
   },
   "settings": {
     "appearanceSubtitle": "自定义UCM的外观和语言。",
@@ -7256,7 +7310,7 @@
     "copyPublicKey": "复制公钥",
     "publicKeyCopied": "公钥已复制到剪贴板",
     "noData": "没有 SSH CA",
-    "noDataDescription": "创建 SSH 证书颁发机构以开始签发 SSH 证书",
+    "noDataDescription": "创建 SSH 证书颁发机构以开始签发 SSH 证书。",
     "configuration": "配置",
     "noPrincipals": "无限制",
     "noExtensions": "无",
@@ -7346,7 +7400,7 @@
     "validity": "有效期",
     "validityPreset": "有效期",
     "noData": "没有 SSH 证书",
-    "noDataDescription": "通过签名公钥或生成密钥对来签发 SSH 证书",
+    "noDataDescription": "通过签名公钥或生成密钥对来签发 SSH 证书。",
     "revokeReason": "吊销原因",
     "revokeReasonPlaceholder": "吊销此证书的原因",
     "revokeConfirm": "确定要吊销此 SSH 证书吗？",
