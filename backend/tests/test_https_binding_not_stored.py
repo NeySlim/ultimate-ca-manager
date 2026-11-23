@@ -18,7 +18,7 @@ def broken_binding(monkeypatch, tmp_path):
         raise RuntimeError('commit failed')
     monkeypatch.setattr('services.https_binding.set_bound_refid', fail)
     restarts = []
-    monkeypatch.setattr(route, 'restart_to_serve', lambda: restarts.append(1) or (True, ''))
+    monkeypatch.setattr(route, 'restart_to_serve', lambda: restarts.append(1) or ('reloading', ''))
     return restarts
 
 

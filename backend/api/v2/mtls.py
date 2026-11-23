@@ -20,7 +20,6 @@ from utils.algorithm_refusal import refuse_unexportable_key
 from utils.issuance_defaults import browser_key_type
 
 from auth.unified import require_auth, has_permission
-from config.settings import is_docker, restart_ucm_service
 from models import User, Certificate, CA, SystemConfig, db
 from models.auth_certificate import AuthCertificate
 from services.audit_service import AuditService
@@ -89,7 +88,7 @@ def get_mtls_settings():
 @bp.route('/settings', methods=['PUT'])
 @require_auth(['admin:system'])
 def update_mtls_settings():
-    """Update mTLS configuration. Requires UCM restart to take effect."""
+    """Update mTLS configuration. The TLS listener reloads to apply it (HA: a rolling restart)."""
     data = request.get_json()
     if not data:
         return error_response('No data provided', 400)
@@ -150,16 +149,19 @@ def update_mtls_settings():
         success=True
     )
 
-    restart_message = None
+    restart_message = listener_reload = None
     if rolling:
         from services.cluster_commands import ROLLING_RESTART_MESSAGE
-        restart_message = ROLLING_RESTART_MESSAGE
+        from utils.listener_tls import ROLLING
+        restart_message, listener_reload = ROLLING_RESTART_MESSAGE, ROLLING
     elif needs_restart:
-        if is_docker():
-            restart_message = 'Restart the container to apply mTLS changes.'
-        else:
-            success, msg = restart_ucm_service()
-            restart_message = msg if not success else 'Service restart initiated to apply mTLS changes.'
+        # The trust and the client certificate request are read by the listener at its (re)load
+        from utils.listener_tls import RELOADING, RESTARTING, reload_or_restart
+        listener_reload, msg = reload_or_restart()
+        restart_message = {
+            RELOADING: 'The TLS listener reloads to apply mTLS changes.',
+            RESTARTING: 'Service restart initiated to apply mTLS changes.',
+        }.get(listener_reload, f'The TLS listener was not reloaded: {msg}')
 
     return success_response(
         data={
@@ -168,6 +170,7 @@ def update_mtls_settings():
             'trusted_ca_id': _get_mtls_config('mtls_trusted_ca_id'),
             'needs_restart': needs_restart,
             'restart_message': restart_message,
+            'listener_reload': listener_reload,
         },
         message='mTLS settings updated'
     )

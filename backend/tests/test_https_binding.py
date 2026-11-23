@@ -266,7 +266,7 @@ class TestApplyingTheBoundCertificateAgain:
         import api.v2.system.https as route
         monkeypatch.setenv('HTTPS_CERT_PATH', str(tmp_path / 'https_cert.pem'))
         monkeypatch.setenv('HTTPS_KEY_PATH', str(tmp_path / 'https_key.pem'))
-        monkeypatch.setattr(route, 'restart_to_serve', lambda: (True, 'ok'))
+        monkeypatch.setattr(route, 'restart_to_serve', lambda: ('reloading', 'ok'))
         cert = create_cert(cn='reapply-https.example.com')
         first = auth_client.post('/api/v2/system/https/apply', json={'cert_id': cert['id']})
         assert first.status_code == 200, first.data

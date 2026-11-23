@@ -390,18 +390,18 @@ def _listener_trust_refused(trusted_before):
 
 
 def _listener_restart(rolling):
-    """``(needs_restart, message)`` once the change is committed, the local restart asked for."""
+    """``(needs_restart, message)`` once the change is committed, the local reload asked for."""
     if rolling is None:
         return False, None
     if rolling:
         from services.cluster_commands import ROLLING_RESTART_MESSAGE
         return True, ROLLING_RESTART_MESSAGE
-    from config.settings import is_docker, restart_ucm_service
-    if is_docker():
-        return True, 'Restart the container so that the TLS listener trusts the former CAs as listed.'
-    success, msg = restart_ucm_service()
-    return True, ('Service restart initiated so that the TLS listener trusts the former CAs as listed.'
-                  if success else msg)
+    from utils.listener_tls import RELOADING, RESTARTING, reload_or_restart
+    outcome, msg = reload_or_restart()
+    return True, {
+        RELOADING: 'The TLS listener reloads so that it trusts the former CAs as listed.',
+        RESTARTING: 'Service restart initiated so that the TLS listener trusts the former CAs as listed.',
+    }.get(outcome, f'The TLS listener was not reloaded: {msg}')
 
 
 def _template_id_list(value):
@@ -853,18 +853,15 @@ def update_windows_settings():
         return success_response(message='Settings saved. Rolling restart requested: '
                                         'the nodes restart one at a time.')
     if enabled_changed:
-        from config.settings import is_docker
-        if is_docker():
+        # The TLS 1.2 cap of WSTEP is read by the listener at its (re)load
+        from utils.listener_tls import FAILED, RELOADING, reload_or_restart
+        outcome, msg = reload_or_restart()
+        if outcome == FAILED:
             return success_response(
-                message='Settings saved. Restart the container to apply the TLS behavior change.',
-                data={'requires_container_restart': True})
-        from utils.service_manager import restart_service
-        success, msg = restart_service()
-        if not success:
-            logger.warning('Settings saved but service restart failed: %s', msg)
-            return success_response(
-                message='Settings saved, but the automatic restart failed: restart UCM manually '
-                        'for the TLS behavior change to take effect.',
-                data={'restart_failed': True})
-        return success_response(message='Settings saved. Service restarting...')
+                message=f'Settings saved, but the TLS behavior change is not applied yet: {msg}',
+                data={'listener_reload': outcome, 'error': msg})
+        return success_response(
+            message=('Settings saved. The TLS listener reloads to apply the TLS behavior change.'
+                     if outcome == RELOADING else 'Settings saved. Service restarting...'),
+            data={'listener_reload': outcome})
     return success_response(message='Settings saved')

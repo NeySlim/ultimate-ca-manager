@@ -92,7 +92,8 @@ def _load_gunicorn_config(monkeypatch, app):
 
 
 def _worker():
-    return types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=30),
+    # ppid 0 names no master: nothing here may ever signal the process running the tests
+    return types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=30), ppid=0,
                                  log=logging.getLogger('test.worker'))
 
 

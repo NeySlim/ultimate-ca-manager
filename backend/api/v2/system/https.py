@@ -48,6 +48,34 @@ def _https_attention():
     }
 
 
+def _colons(hexdigest):
+    return ':'.join(hexdigest[i:i+2].upper() for i in range(0, len(hexdigest), 2))
+
+
+def _served(recorded):
+    """The certificate this worker's listener presents, against *recorded* (the file on disk):
+    ``matches`` is False for a certificate written but not served yet, None when unknown here."""
+    from utils.listener_tls import served_fingerprint
+    served = served_fingerprint()
+    if not served:
+        return {'fingerprint': None, 'matches': None}
+    return {'fingerprint': _colons(served), 'matches': served == recorded}
+
+
+def _served_answer(done):
+    """The answer once the HTTPS files changed: whether the listener reload left (#452)."""
+    from utils.listener_tls import FAILED, RELOADING
+    outcome, msg = restart_to_serve()
+    if outcome == FAILED:
+        return success_response(message=f"{done}, but the TLS listener was not reloaded: {msg}",
+                                data={'listener_reload': outcome, 'error': msg})
+    if outcome == RELOADING:
+        message = f"{done}. The TLS listener reloads and serves it in a few seconds."
+    else:
+        message = f"{done}. {msg}"
+    return success_response(message=message, data={'listener_reload': outcome})
+
+
 @bp.route('/api/v2/system/https/cert-info', methods=['GET'])
 @require_auth(['read:settings'])
 def get_https_cert_info():
@@ -88,7 +116,7 @@ def get_https_cert_info():
 
         # Calculate fingerprint
         fingerprint = cert.fingerprint(hashes.SHA256()).hex()
-        fingerprint_formatted = ':'.join(fingerprint[i:i+2].upper() for i in range(0, len(fingerprint), 2))
+        fingerprint_formatted = _colons(fingerprint)
 
         # Dedicated binding (#303 M1): which managed certificate follows
         # renewals automatically, surfaced so the UI can show it (#303 follow-up)
@@ -111,6 +139,7 @@ def get_https_cert_info():
 
         return success_response(data={
             'bound_certificate': bound,
+            'served': _served(fingerprint),
             'common_name': cn or 'Unknown',
             'issuer': issuer_cn or 'Unknown',
             'valid_from': utc_isoformat(cert.not_valid_before_utc),
@@ -271,19 +300,7 @@ def regenerate_https_cert():
             success=True
         )
 
-        started, msg = restart_to_serve()
-        if started is None:
-            return success_response(
-                message="Certificate regenerated. Restart the container to apply.",
-                data={'requires_container_restart': True}
-            )
-        if not started:
-            return success_response(
-                message="Certificate regenerated but service restart failed. Please restart manually.",
-                data={'restart_failed': True, 'error': msg}
-            )
-
-        return success_response(message="Certificate regenerated. Service restarting...")
+        return _served_answer("Certificate regenerated")
 
     except Exception as e:
         current_app.logger.error(f"Failed to regenerate HTTPS cert: {e}")
@@ -354,19 +371,7 @@ def apply_https_cert():
             success=True
         )
 
-        started, msg = restart_to_serve()
-        if started is None:
-            return success_response(
-                message="Certificate applied. Restart the container to apply.",
-                data={'requires_container_restart': True}
-            )
-        if not started:
-            return success_response(
-                message="Certificate applied but service restart failed. Please restart manually.",
-                data={'restart_failed': True, 'error': msg}
-            )
-
-        return success_response(message="Certificate applied. Service restarting...")
+        return _served_answer("Certificate applied")
 
     except Exception as e:
         current_app.logger.error(f"Failed to apply HTTPS cert: {e}")

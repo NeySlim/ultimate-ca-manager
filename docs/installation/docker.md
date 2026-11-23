@@ -221,6 +221,10 @@ docker run -v /path/to/cert.pem:/opt/ucm/data/https_cert.pem:ro \
            ...
 ```
 
+### Certificate changes without a restart
+
+Applying or regenerating the HTTPS certificate in **Settings > HTTPS**, a renewal of the applied certificate, and a change of the mTLS settings or of the WSTEP switch reload the TLS listener in place: UCM sends SIGHUP to its gunicorn master, which re-reads its configuration and replaces its worker. The container keeps running, whatever its restart policy, and needs no access to the Docker socket. Settings > HTTPS shows *Renewed, not served yet* while the listener still presents another certificate than the one on disk; the container log says why a reload failed. Files replaced by hand on a mounted volume are loaded the same way with `docker kill --signal=HUP ucm`. In HA mode a rolling restart of the nodes is requested instead.
+
 ---
 
 ## Update & Maintenance
@@ -308,7 +312,7 @@ sudo netstat -tlnp | grep 8443
 ### SSL Certificate Issues
 
 ```bash
-# Regenerate certificate
+# Regenerate certificate (or Settings > HTTPS > Regenerate, without a restart)
 docker exec ucm rm -f /opt/ucm/data/https_cert.pem /opt/ucm/data/https_key.pem
 docker restart ucm
 ```

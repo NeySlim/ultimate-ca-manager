@@ -110,6 +110,8 @@ const SETTINGS_GROUPS = [
 const SETTINGS_SAVE_ACTIONS = ['settings_update', 'syslog_config_updated', 'mtls_settings_update', 'ct_settings_updated']
 
 // Type of the HTTPS certificate the server names, in the reader's language
+// After a TLS listener reload: the new worker serves within a few seconds, then the state is read again
+const HTTPS_RELOAD_SETTLE_MS = 4000
 const HTTPS_TYPES = { 'CA-Signed': 'settings.httpsType.caSigned', 'Self-Signed': 'settings.httpsType.selfSigned' }
 
 // Draft of the page kept for the tab (lib/draftMemory)
@@ -1214,7 +1216,10 @@ export default function SettingsPage() {
       setMtlsSettings(prev => ({ ...prev, ...data }))
       setSavedMtls({ ...mtlsSettings, ...data })
       if (!quiet) showSuccess(t('settings.mtls.saved'))
-      if (data.needs_restart && !isDocker) {
+      // A hot reload keeps the service up: only a real restart is awaited (#452)
+      if (data.listener_reload === 'reloading') {
+        showInfo(data.restart_message)
+      } else if (data.needs_restart && !isDocker && data.listener_reload !== 'failed') {
         waitForRestart()
       } else if (data.restart_message) {
         showWarning(data.restart_message)
@@ -1746,6 +1751,20 @@ export default function SettingsPage() {
     }
   }
 
+  // After an HTTPS change: a hot reload keeps the service up, so no restart is awaited (#452)
+  const afterHttpsChange = (data, doneKey, onRestart = waitForRestart) => {
+    if (data?.listener_reload === 'failed') {
+      showWarning(t('settings.httpsReloadFailed', { error: data.error || '' }))
+      loadHttpsInfo()
+    } else if (data?.listener_reload === 'reloading') {
+      showSuccess(t('settings.httpsReloading'))
+      setTimeout(loadHttpsInfo, HTTPS_RELOAD_SETTLE_MS)
+    } else {
+      showSuccess(t(doneKey))
+      onRestart()
+    }
+  }
+
   const handleApplyUcmCert = async () => {
     if (!selectedHttpsCert) {
       showError(t('settings.selectCertificate'))
@@ -1762,12 +1781,7 @@ export default function SettingsPage() {
       const response = await systemService.applyHttpsCert({
         cert_id: selectedHttpsCert.id
       })
-      if (response.data?.requires_container_restart) {
-        showSuccess(t('settings.dockerCertNotice'))
-      } else {
-        showSuccess(t('messages.success.https.applied'))
-        waitForRestart()
-      }
+      afterHttpsChange(response.data, 'messages.success.https.applied')
     } catch (error) {
       if (!isDocker && (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK')) {
         waitForRestart()
@@ -1789,12 +1803,7 @@ export default function SettingsPage() {
         common_name: window.location.hostname,
         validity_days: 365
       })
-      if (response.data?.requires_container_restart) {
-        showSuccess(t('settings.dockerCertNotice'))
-      } else {
-        showSuccess(t('messages.success.https.regenerated'))
-        waitForRestart()
-      }
+      afterHttpsChange(response.data, 'messages.success.https.regenerated')
     } catch (error) {
       if (!isDocker && (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK')) {
         waitForRestart()
@@ -2459,12 +2468,8 @@ export default function SettingsPage() {
             if (apply) {
               try {
                 const response = await systemService.applyHttpsCert({ cert_id: imported.id })
-                if (response.data?.requires_container_restart) {
-                  showSuccess(t('settings.dockerCertNotice'))
-                } else {
-                  showSuccess(t('messages.success.https.applied'))
-                  setTimeout(() => window.location.reload(), 3000)
-                }
+                afterHttpsChange(response.data, 'messages.success.https.applied',
+                  () => setTimeout(() => window.location.reload(), 3000))
               } catch (error) {
                 showError(error.message || t('messages.errors.https.applyFailed'))
               }

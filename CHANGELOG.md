@@ -258,6 +258,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A renewed or applied HTTPS certificate is served without restarting the container (#452).** Outside HA the TLS listener now reloads through a SIGHUP to the gunicorn master (also for mTLS and WSTEP changes), and Settings > HTTPS and `served` in `cert-info` say when the certificate on disk is not served yet.
 - **The Activity page's end date includes its last day.** A date range stopped at midnight at the start of its end date; it now covers that whole UTC day.
 - **Open certificate tabs keep their titles.** After a visit to another page or a Back, the tabs of the certificates still open showed "…" instead of their names; each tab now keeps its certificate's name.
 - **Trust Store: adding from the managed CAs names each CA Root CA or Intermediate CA** in the interface language, read as the CA page reads it, where it showed the untranslated "Root" or "Inter".

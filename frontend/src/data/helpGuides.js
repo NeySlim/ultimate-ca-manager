@@ -2172,7 +2172,8 @@ Manage the TLS certificate used by the UCM web interface:
 - Generate a self-signed certificate
 - When the bound certificate is renewed through a protocol without its key reaching UCM, the page says so: HTTPS keeps serving the previous certificate until the key of the renewed one is imported, which applies it
 
-> ⚠ Changing the HTTPS certificate requires a service restart.
+- Applying, regenerating or renewing the certificate reloads the TLS listener without stopping the service, in a container too (HA: a rolling restart of the nodes)
+- *Renewed, not served yet* means the listener still presents another certificate than the one on disk: the service log says why the reload failed
 
 ## Updates
 

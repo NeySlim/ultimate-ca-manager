@@ -71,7 +71,7 @@ export default function WindowsSettingsPanel({ hasPermission, onLoaded }) {
         payload.kerberos_spn = draft.kerberos_spn
       }
       const response = await windowsProfilesService.updateSettings(payload)
-      if (response.data?.requires_container_restart || response.data?.restart_failed) showWarning(response.message)
+      if (response.data?.listener_reload === 'failed') showWarning(response.message)
       load()
       return { ok: true }
     } catch (error) {

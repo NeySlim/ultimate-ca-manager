@@ -11,6 +11,8 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
   const { t } = useTranslation()
   const bound = httpsInfo?.bound_certificate
   const attention = bound?.needs_attention
+  // The listener still presents another certificate than the one on disk (#452)
+  const notServed = httpsInfo?.served?.matches === false
   return (
     <>
       <SettingsGroup legend={t('settings.currentCertificate')} grid={false}>
@@ -20,7 +22,13 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
           fact(t('common.validFrom'), httpsInfo?.valid_from && formatDate(httpsInfo.valid_from)),
           fact(t('common.validUntil'), httpsInfo?.valid_to && formatDate(httpsInfo.valid_to)),
           fact(t('settings.fingerprintSha256'), given(httpsInfo?.fingerprint), { kind: 'hex' }),
+          ...(notServed ? [fact(t('settings.httpsServedFingerprint'), httpsInfo.served.fingerprint, { kind: 'hex' })] : []),
         ]} />
+        {notServed && (
+          <Notice tone="warn" id="https-not-served">
+            <strong>{t('settings.httpsNotServedYet')}</strong>{' '}{t('settings.httpsNotServedYetDesc')}
+          </Notice>
+        )}
         {bound ? (
           <RecordList>
             <RecordRow title={<>{t('settings.httpsBound')}{t('work.sep')}{certificateLabel(bound) || bound.refid}</>}
