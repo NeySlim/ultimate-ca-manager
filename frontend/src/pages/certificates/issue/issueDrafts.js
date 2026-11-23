@@ -1,8 +1,12 @@
 /**
  * Drafts of the issue form, one per operation ('issue', 'renew:<id>'), kept in memory only:
  * closing the form without issuing keeps it for the next opening, a reload forgets it.
+ * They live in the session's draft memory, so a sign-out or another account drops them.
  */
-const drafts = new Map()
+import { hasDraft as held, keepDraft as hold, readDraft } from '../../../lib/draftMemory'
+
+const keyOf = (op) => `issue-form:${op}`
+const ops = new Set()
 
 // The only fields a draft keeps: form entries, never a private key nor a password
 export const DRAFT_FIELDS = [
@@ -18,18 +22,18 @@ const pick = (draft) => JSON.parse(JSON.stringify(
   Object.fromEntries(DRAFT_FIELDS.filter((k) => draft?.[k] !== undefined).map((k) => [k, draft[k]])),
 ))
 
-export function keepDraft(op, draft) { drafts.set(op, pick(draft)) }
+export function keepDraft(op, draft) { ops.add(op); hold(keyOf(op), pick(draft)) }
 
 /** The kept draft of *op*, removed from the store (the form now holds it), or null. */
 export function takeDraft(op) {
-  const draft = drafts.get(op)
-  drafts.delete(op)
+  const draft = readDraft(keyOf(op))
+  dropDraft(op)
   return draft ?? null
 }
 
-export function dropDraft(op) { drafts.delete(op) }
+export function dropDraft(op) { ops.delete(op); hold(keyOf(op), null) }
 
-export const hasDraft = (op) => drafts.has(op)
+export const hasDraft = (op) => held(keyOf(op))
 
-/** Forgets every draft (tests). */
-export function clearDrafts() { drafts.clear() }
+/** Forgets every draft of the form (tests). */
+export function clearDrafts() { for (const op of [...ops]) dropDraft(op) }
