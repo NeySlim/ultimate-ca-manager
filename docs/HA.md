@@ -176,6 +176,7 @@ Before restoring a `pg_dump`, make sure every node runs with the key-encryption 
 Sign-in sessions do not need it: they are stored in PostgreSQL (in Redis when `REDIS_URL` is set), so any node accepts a session another one opened. Only the Kerberos handshake depends on the node that received the first request:
 
 - **Socket.IO needs no affinity, but the balancer must pass the WebSocket upgrade.** The UI opens a WebSocket only and never falls back to HTTP requests. One WebSocket is one connection to one node, and the sign-in session is shared, so any node can accept it. A balancer that does not pass the upgrade gives no live updates whatever its affinity: the browser retries 5 times, then stops until the page is reloaded. Events emitted on one node reach the browsers connected to the others (through PostgreSQL, or Redis when set).
+- **A lock closes the session's WebSockets on every node.** The node that takes the lock closes its own at once and tells the others through the same path as the events: through Redis they close at once; through PostgreSQL within the relay's read, woken by `NOTIFY` and at most 2 s later, or 6 s when another node's event is still being written. A node that misses the notice (database or Redis unreachable at that moment) closes them at the socket's first message once its 60 s revalidation is due; a locked session cannot open a new socket on any node.
 - **Kerberos enrollment.** A SPNEGO handshake of more than one request needs source-address affinity, see [Windows enrollment](#windows-enrollment-kerberos).
 
 ### Rate limits
