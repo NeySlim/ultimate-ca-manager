@@ -62,7 +62,7 @@ La liste de la barre d’outils regroupe les codes d’action par type : émissi
 ### Filtres
 Le bouton **Filtres** ouvre les dates (**Du**, **Au**), l’**Utilisateur**, le **Résultat** et les codes d’action un par un (restreints au type choisi). Deux raccourcis posent **Connexions échouées** ou **Tous les échecs**. Les filtres en cours s’enregistrent sous un nom et se réappliquent plus tard ; ils sont gardés dans ce navigateur. Chaque filtre actif apparaît en pastille sous la barre d’outils, et **Réinitialiser les filtres** les retire tous.
 
-La liste est lue page par page sur le serveur : 25, 50 ou 100 entrées par page, précédente et suivante, ou un numéro de page et **Aller**.
+La liste est lue page par page sur le serveur : 10, 25, 50 ou 100 entrées par page, précédente et suivante, ou un numéro de page et **Aller**.
 
 ## Exportation
 

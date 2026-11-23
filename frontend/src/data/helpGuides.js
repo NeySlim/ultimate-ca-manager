@@ -1962,7 +1962,7 @@ The select of the toolbar groups the action codes by type: issuances, renewals, 
 ### Filters
 The **Filters** button opens the dates (**From**, **To**), the **User**, the **Result** and the individual action codes (narrowed to the chosen type). Two shortcuts set **Failed logins** or **All failures**. The current filters can be saved under a name and applied again later; they are kept in this browser. Every active filter shows as a chip under the toolbar, and **Reset the filters** clears them all.
 
-The list is read page by page from the server: 25, 50 or 100 entries per page, previous and next, or a page number and **Go**.
+The list is read page by page from the server: 10, 25, 50 or 100 entries per page, previous and next, or a page number and **Go**.
 
 ## Export
 
@@ -3028,7 +3028,7 @@ Certificate policies define the rules and constraints enforced when certificates
 
 ## The list
 
-The policies are listed in the order the server applies them, by priority then by name, with their scope, operations, priority, approval and state (**Applied** or **Disabled**); the chips filter by state, the search and the operation filter narrow the list. A name opens the policy in the inspector, with its properties, rules and approval; **Edit**, **Disable** or **Enable** ask for write:policies, **Delete Policy…** for delete:policies and a confirmation.
+The policies are listed by priority, the order the server applies them in, and by name between equal priorities, with their scope, operations, priority, approval and state (**Applied** or **Disabled**); the chips filter by state, the search and the operation filter narrow the list. A name opens the policy in the inspector, with its properties, rules and approval; **Edit**, **Disable** or **Enable** ask for write:policies, **Delete Policy…** for delete:policies and a confirmation.
 
 ## Operations
 
@@ -3090,7 +3090,7 @@ Policies are evaluated in priority order. Lower numbers have higher precedence:
 - **10-20**: Standard compliance (public TLS, internal PKI)
 - **20+**: Permissive defaults
 
-When multiple policies match a certificate request, the highest-priority (lowest number) policy decides the approval; the rules of every matching policy apply together (the smallest maximum validity, the intersection of the allowed key types, and so on).
+When multiple policies match a certificate request, the highest-priority (lowest number) policy decides the approval; the rules of every matching policy apply together (the smallest maximum validity, the intersection of the allowed key types, and so on). Between matching policies of the same priority the server follows no set order: give them different priorities.
 
 ## Scope
 

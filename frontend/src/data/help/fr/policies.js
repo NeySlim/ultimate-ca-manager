@@ -47,7 +47,7 @@ Les politiques de certificat définissent les règles et contraintes appliquées
 
 ## La liste
 
-Les politiques sont listées dans l’ordre où le serveur les applique, par priorité puis par nom, avec leur portée, leurs opérations, leur priorité, leur approbation et leur état (**Appliquée** ou **Désactivée**) ; les pastilles filtrent par état, la recherche et le filtre d’opération resserrent la liste. Un nom ouvre la politique dans l’inspecteur, avec ses propriétés, ses règles et son approbation ; **Modifier**, **Désactiver** ou **Activer** demandent write:policies, **Supprimer la politique…** demande delete:policies et une confirmation.
+Les politiques sont listées par priorité, l’ordre où le serveur les applique, et par nom à priorité égale, avec leur portée, leurs opérations, leur priorité, leur approbation et leur état (**Appliquée** ou **Désactivée**) ; les pastilles filtrent par état, la recherche et le filtre d’opération resserrent la liste. Un nom ouvre la politique dans l’inspecteur, avec ses propriétés, ses règles et son approbation ; **Modifier**, **Désactiver** ou **Activer** demandent write:policies, **Supprimer la politique…** demande delete:policies et une confirmation.
 
 ## Opérations
 
@@ -109,7 +109,7 @@ Les politiques sont évaluées par ordre de priorité. Les nombres plus bas ont 
 - **10-20** : Conformité standard (TLS public, PKI interne)
 - **20+** : Valeurs par défaut permissives
 
-Lorsque plusieurs politiques correspondent à une demande de certificat, la politique de priorité la plus élevée (nombre le plus bas) décide de l’approbation ; les règles de toutes les politiques correspondantes s’appliquent ensemble (la validité maximale la plus petite, l’intersection des types de clé autorisés, etc.).
+Lorsque plusieurs politiques correspondent à une demande de certificat, la politique de priorité la plus élevée (nombre le plus bas) décide de l’approbation ; les règles de toutes les politiques correspondantes s’appliquent ensemble (la validité maximale la plus petite, l’intersection des types de clé autorisés, etc.). Entre des politiques correspondantes de même priorité, le serveur ne suit aucun ordre établi : donnez-leur des priorités différentes.
 
 ## Portée
 
