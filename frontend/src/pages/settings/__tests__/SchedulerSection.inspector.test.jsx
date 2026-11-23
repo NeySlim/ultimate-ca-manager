@@ -52,10 +52,10 @@ describe('the scheduler inspector', () => {
     expect(screen.getByTestId('loc').textContent).toContain('item=scheduled_backup')
     const dock = await screen.findByRole('complementary')
     expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Scheduled backups')
-    const terms = [...dock.querySelectorAll('dl.props dt')].map((d) => d.textContent)
+    const terms = [...dock.querySelectorAll('dl.kv dt')].map((d) => d.textContent)
     expect(terms).toEqual(['atelier.state', 'scheduler.colNote', 'scheduler.colSchedule', 'scheduler.colLastRun', 'scheduler.colNextRun',
       'scheduler.colDuration', 'scheduler.colRuns'])
-    const value = (term) => [...dock.querySelectorAll('dl.props dt')].find((d) => d.textContent === term).nextElementSibling.textContent
+    const value = (term) => [...dock.querySelectorAll('dl.kv dt')].find((d) => d.textContent === term).nextElementSibling.textContent
     expect(value('scheduler.colSchedule')).toBe('scheduler.interval.daily')
     expect(value('scheduler.colRuns')).toBe('7')
     expect(value('scheduler.colDuration')).toBe('1,40 s')

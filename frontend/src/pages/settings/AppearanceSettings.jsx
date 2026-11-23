@@ -3,7 +3,7 @@
  * choices, the desktop layout as a check line, the language, and what is in force.
  */
 import { useTranslation } from 'react-i18next'
-import { Props } from '../../components/atelier'
+import { Facts } from '../../components/atelier'
 import { Select, ToggleSwitch, SegmentedField } from '../../components/atelier/Form'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { chooseLanguage } from '../../lib/chooseLanguage'
@@ -51,7 +51,7 @@ export default function AppearanceSettings() {
       </SettingsGroup>
 
       <SettingsGroup legend={t('settings.preview')} grid={false}>
-        <Props items={[[t('settings.currentSettings'), (
+        <Facts items={[[t('settings.currentSettings'), (
           <>
             {t(family?.nameKey)}
             {' · '}

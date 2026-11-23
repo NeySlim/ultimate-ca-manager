@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { ServiceReconnectOverlay } from '../components'
-import { Btn, Pill, Props, RecordList, RecordRow } from './atelier'
+import { Btn, Facts, Pill, RecordList, RecordRow } from './atelier'
 import { Select, Notice } from './atelier/Form'
 import { SettingsGroup } from './atelier/SettingsView'
 import { compactAgo } from '../lib/relativeTime'
@@ -188,8 +188,8 @@ export function UpdateChecker() {
       <SettingsGroup grid={false} legend={(
         <>{legend}{updateInfo?.prerelease && <>{' '}<Pill tone="warn" icon="sparkles" label={t('settings.prerelease')} /></>}</>
       )}>
-        <Props items={[
-          [t('settings.updates.installed'), updateInfo?.current_version ? `v${updateInfo.current_version}` : '—'],
+        <Facts items={[
+          updateInfo?.current_version ? [t('settings.updates.installed'), `v${updateInfo.current_version}`] : { label: t('settings.updates.installed'), absent: '—' },
           updateInfo?.update_available && [t('settings.updates.latest'), `v${updateInfo.latest_version}`],
           updateInfo?.update_available && updateInfo?.published_at && [t('settings.updates.published'), ago(updateInfo.published_at)],
         ]} />

@@ -3,7 +3,7 @@
  * as a record of the mockup's list with its properties under it.
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, Pill, Props, RecordList, RecordRow } from './atelier'
+import { Btn, Facts, Pill, RecordList, RecordRow } from './atelier'
 import { Notice } from './atelier/Form'
 
 const STATUS_TONE = { running: 'warn', stopped: 'bad', done: 'good' }
@@ -28,9 +28,10 @@ export function UpdateCampaignStatus({ campaign, onResume, resuming = false }) {
             <Btn icon="refresh" onClick={onResume} disabled={resuming}>{t('settings.updateCampaign.resume')}</Btn>
           )} />
       </RecordList>
-      <Props items={[
-        [t('settings.updateCampaign.nodesDone'), done.length ? done.join(', ') : t('settings.updateCampaign.none')],
-        [t('settings.updateCampaign.currentNode'), campaign.current?.node || t('settings.updateCampaign.none')],
+      <Facts items={[
+        done.length ? [t('settings.updateCampaign.nodesDone'), done.join(', ')] : { label: t('settings.updateCampaign.nodesDone'), absent: t('settings.updateCampaign.none') },
+        campaign.current?.node ? [t('settings.updateCampaign.currentNode'), campaign.current.node]
+          : { label: t('settings.updateCampaign.currentNode'), absent: t('settings.updateCampaign.none') },
         pending.length > 0 && [t('settings.updateCampaign.pending'), pending.join(', ')],
         families && [t('settings.updateCampaign.packages'), families],
       ]} />

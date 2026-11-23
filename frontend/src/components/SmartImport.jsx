@@ -9,7 +9,7 @@ import { AtelierDialog } from './atelier/AtelierDialog'
 import { Btn, TextLink } from './atelier/Btn'
 import { Pill } from './atelier/Pill'
 import { Icon } from './atelier/Icon'
-import { Section, Props, RecordList, RecordRow } from './atelier/Detail'
+import { Section, Facts, RecordList, RecordRow } from './atelier/Detail'
 import { Input, Textarea, ToggleSwitch, ModalActions, Notice } from './atelier/Form'
 import { SkeletonPanel } from './atelier/Skeleton'
 import { apiClient as api } from '../services'
@@ -51,10 +51,10 @@ export function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
         <>
           {obj.error && <Notice tone="bad">{obj.error}</Notice>}
           {expanded && (
-            <Props items={[
-              obj.subject && [t('common.subject'), <span className="mono">{obj.subject}</span>],
-              obj.issuer && obj.issuer !== obj.subject && [t('common.issuer'), <span className="mono">{obj.issuer}</span>],
-              obj.san_dns?.length > 0 && [t('details.sanDns'), <span className="mono">{obj.san_dns.join(', ')}</span>],
+            <Facts items={[
+              obj.subject && { label: t('common.subject'), value: <span className="mono">{obj.subject}</span>, long: true },
+              obj.issuer && obj.issuer !== obj.subject && { label: t('common.issuer'), value: <span className="mono">{obj.issuer}</span>, long: true },
+              obj.san_dns?.length > 0 && { label: t('details.sanDns'), value: <span className="mono">{obj.san_dns.join(', ')}</span>, long: true },
               obj.not_before && [t('common.valid'), `${formatDate(obj.not_before)} → ${formatDate(obj.not_after)}`],
               obj.key_algorithm && [t('common.algorithm'), `${keyAlgorithmLabel(obj.key_algorithm, t, obj.security_level)}${obj.key_size > 0 ? ` (${obj.key_size} bits)` : ''}`],
             ]} />
@@ -465,7 +465,7 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
     )
     return (
       <>
-        <Props items={[
+        <Facts items={[
           count(o => o.type === 'certificate' && !o.is_ca) > 0 && [t('common.certificates'), count(o => o.type === 'certificate' && !o.is_ca)],
           count(o => o.is_ca) > 0 && [t('common.cas'), count(o => o.is_ca)],
           count(o => o.type === 'private_key') > 0 && [t('import.typePrivateKey'), count(o => o.type === 'private_key')],

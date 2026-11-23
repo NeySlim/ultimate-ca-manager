@@ -1,7 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { Btn, IconBtn, Notice, Props, RecordList, RecordRow } from '../../components/atelier'
+import { Btn, Facts, IconBtn, Notice, RecordList, RecordRow } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatDate, certificateLabel } from '../../lib/utils'
+import { fact } from './facts'
+
+// The API says « - » for what it could not read
+const given = (value) => (value && value !== '-' ? value : null)
 
 export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelectedHttpsCert, setShowCertPicker, handleApplyUcmCert, handleRegenerateHttpsCert, setShowHttpsImportModal, onUnbindHttpsCert }) {
   const { t } = useTranslation()
@@ -10,12 +14,12 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
   return (
     <>
       <SettingsGroup legend={t('settings.currentCertificate')} grid={false}>
-        <Props items={[
+        <Facts items={[
           [t('common.commonName'), httpsInfo?.common_name || window.location.hostname],
-          [t('common.issuer'), httpsInfo?.issuer || '—'],
-          [t('common.validFrom'), formatDate(httpsInfo?.valid_from)],
-          [t('common.validUntil'), formatDate(httpsInfo?.valid_to)],
-          [t('settings.fingerprintSha256'), httpsInfo?.fingerprint ? <span className="mono">{httpsInfo.fingerprint}</span> : '—'],
+          fact(t('common.issuer'), given(httpsInfo?.issuer)),
+          fact(t('common.validFrom'), httpsInfo?.valid_from && formatDate(httpsInfo.valid_from)),
+          fact(t('common.validUntil'), httpsInfo?.valid_to && formatDate(httpsInfo.valid_to)),
+          fact(t('settings.fingerprintSha256'), given(httpsInfo?.fingerprint), { kind: 'hex' }),
         ]} />
         {bound ? (
           <RecordList>

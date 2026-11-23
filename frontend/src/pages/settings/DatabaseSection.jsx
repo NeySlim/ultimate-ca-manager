@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { Btn, Props, RecordList, RecordRow } from '../../components/atelier'
+import { Btn, Facts, RecordList, RecordRow } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatBytes } from '../../lib/fileSize'
 import { formatDate } from '../../lib/utils'
 import DatabaseBackendSection from './DatabaseBackendSection'
+import { fact } from './facts'
 
 export default function DatabaseSection({ dbStats, handleOptimizeDb, handleIntegrityCheck, handleExportDb, handleResetDb }) {
   const { t, i18n } = useTranslation()
@@ -11,11 +12,11 @@ export default function DatabaseSection({ dbStats, handleOptimizeDb, handleInteg
     <>
       <DatabaseBackendSection />
       <SettingsGroup legend={t('settings.databaseStatistics')} grid={false}>
-        <Props items={[
-          [t('settings.totalCertificates'), dbStats?.certificates ?? '—'],
-          [t('common.cas'), dbStats?.cas ?? '—'],
-          [t('settings.databaseSize'), dbStats?.size_mb ? formatBytes(dbStats.size_mb * 1024 * 1024, i18n?.language) : '—'],
-          [t('settings.lastOptimized'), dbStats?.last_optimized && dbStats.last_optimized !== 'Never' ? formatDate(dbStats.last_optimized) : '—'],
+        <Facts items={[
+          fact(t('settings.totalCertificates'), dbStats?.certificates),
+          fact(t('common.cas'), dbStats?.cas),
+          fact(t('settings.databaseSize'), dbStats?.size_mb ? formatBytes(dbStats.size_mb * 1024 * 1024, i18n?.language) : null),
+          fact(t('settings.lastOptimized'), dbStats?.last_optimized && dbStats.last_optimized !== 'Never' ? formatDate(dbStats.last_optimized) : null),
         ]} />
       </SettingsGroup>
 

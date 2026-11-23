@@ -170,9 +170,8 @@ describe('the detail of an entry', () => {
     renderPage()
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'device-05.example.com' }))
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'audit.copyIp' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: /^protocols\.copyValue.*audit\.ipAddress/ }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('192.0.2.10'))
-    expect(await within(dialog()).findByRole('button', { name: 'audit.ipCopied' })).toBeInTheDocument()
   })
 
   it('offers no inspection without the right to read certificates', async () => {

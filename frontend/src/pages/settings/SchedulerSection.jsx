@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Pill, Notice, DataTable, SkeletonPanel, Dock, DockBody, Section, Props, useClientList, useSortParam, useDockParam } from '../../components/atelier'
+import { Btn, Pill, Notice, DataTable, SkeletonPanel, Dock, DockBody, Section, Facts, useClientList, useSortParam, useDockParam } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { cardFacts, labelledFact } from '../../components/atelier/cardFacts'
 import { SlotDock } from '../protocols/dockSlot'
@@ -9,6 +9,7 @@ import { systemService } from '../../services'
 import { useRefocusAfter } from '../../hooks/useRefocus'
 import { compactRun } from '../../lib/relativeTime'
 import { formatDate } from '../../lib/utils'
+import { fact } from './facts'
 
 const POLL_MS = 15000
 // The tasks by name (T4), the sort kept in the address under this list's own scope (the settings stack their sections)
@@ -163,7 +164,7 @@ export default function SchedulerSection({ hasPermission }) {
   ]
   const opened = taskDock.item ? tasks.find((task) => task.name === taskDock.item) : null
   // A run's moment: when, then how long ago or how soon
-  const moment = (iso) => (iso ? <>{formatDate(iso, { time: true })} <span className="muted">({compactRun(iso, t)})</span></> : '—')
+  const moment = (iso) => (iso ? <>{formatDate(iso, { time: true })} <span className="muted">({compactRun(iso, t)})</span></> : null)
   // Every column of the list and the task's action, the columns folded for want of room included (E4)
   const dock = opened && (
     <Dock label={t('atelier.detailOf', { name: t('scheduler.tasksTitle') })} tabsLabel={t('atelier.openItem')} activeKey={opened.name}
@@ -173,14 +174,14 @@ export default function SchedulerSection({ hasPermission }) {
         actions={canRun && run(opened)}>
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
+            <Facts items={[
               [t('atelier.state'), status(opened)],
-              [t('scheduler.colNote'), note(opened) || '—'],
+              fact(t('scheduler.colNote'), note(opened), { long: true }),
               [t('scheduler.colSchedule'), humanizeInterval(opened.interval, t)],
-              [t('scheduler.colLastRun'), moment(opened.last_run)],
-              [t('scheduler.colNextRun'), moment(opened.next_run)],
-              [t('scheduler.colDuration'), fmtDuration(opened.last_duration_ms, i18n?.language)],
-              [t('scheduler.colRuns'), opened.run_count ?? '—'],
+              fact(t('scheduler.colLastRun'), moment(opened.last_run)),
+              fact(t('scheduler.colNextRun'), moment(opened.next_run)),
+              fact(t('scheduler.colDuration'), opened.last_duration_ms == null ? null : fmtDuration(opened.last_duration_ms, i18n?.language)),
+              fact(t('scheduler.colRuns'), opened.run_count),
             ]} />
           </Section>
         </div>

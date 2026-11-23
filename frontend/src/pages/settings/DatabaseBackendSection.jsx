@@ -4,23 +4,19 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, IconBtn, Pill, Notice, Props } from '../../components/atelier'
+import { Btn, Facts, Notice } from '../../components/atelier'
 import { Input, ConfirmModal } from '../../components/atelier/Form'
 import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
 import { useRefocusAfter } from '../../hooks/useRefocus'
-import { useClipboard } from '../../hooks/useClipboard'
 import { formatBytes } from '../../lib/fileSize'
 import { databaseService } from '../../services'
 import { useNotification } from '../../contexts'
+import { fact } from './facts'
 
 export default function DatabaseBackendSection() {
   const { t, i18n } = useTranslation()
-  const { showError, showSuccess, showWarning, showInfo } = useNotification()
-  const { copy } = useClipboard()
+  const { showError, showSuccess, showWarning } = useNotification()
   const testButton = useRef(null)
-  const copyUri = async () => {
-    if (await copy(status.uri_redacted)) showInfo(t('common.copiedToClipboard'))
-  }
 
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -122,20 +118,13 @@ export default function DatabaseBackendSection() {
   return (
     <>
       <SettingsGroup legend={t('settings.backend.currentTitle')} grid={false}>
-        <Props items={[
+        <Facts items={[
           [t('settings.backend.type'), isPg ? 'PostgreSQL' : 'SQLite'],
-          [t('settings.backend.version'), status?.version || '—'],
-          [t('settings.backend.tableCount'), status?.table_count ?? '—'],
-          [t('settings.backend.size'), status ? formatBytes(status.size_bytes, i18n?.language) : '—'],
-          [t('settings.backend.uri'), (
-            <span className="copy-value">
-              <span className="mono">{status?.uri_redacted || '—'}</span>
-              {status?.uri_redacted && <IconBtn icon="copy" quiet label={t('common.copy')} onClick={copyUri} />}
-            </span>
-          )],
-          [t('settings.backend.health'), (
-            <Pill tone={status?.healthy ? 'good' : 'bad'} label={status?.healthy ? t('settings.backend.healthy') : t('settings.backend.unhealthy')} />
-          )],
+          fact(t('settings.backend.version'), status?.version),
+          fact(t('settings.backend.tableCount'), status?.table_count),
+          fact(t('settings.backend.size'), status ? formatBytes(status.size_bytes, i18n?.language) : null),
+          fact(t('settings.backend.uri'), status?.uri_redacted, { kind: 'url' }),
+          { label: t('settings.backend.health'), state: status?.healthy ? ['good', t('settings.backend.healthy')] : ['bad', t('settings.backend.unhealthy')] },
         ]} />
         {status?.error && <Notice tone="bad">{status.error}</Notice>}
       </SettingsGroup>

@@ -39,13 +39,8 @@ const renderForm = (props = {}) => {
 const advancedToggle = () => screen.getByRole('button', { name: new RegExp(`${P}advanced`) })
 const announced = () => screen.getByRole('status').textContent
 
-// A review row is its term and its value, siblings in the mockup's list
-const rowOf = (review, id) => {
-  const dt = review.querySelector(`[data-row="${id}"]`)
-  const box = document.createElement('div')
-  box.append(dt.cloneNode(true), dt.nextElementSibling.cloneNode(true))
-  return box
-}
+// A review row holds its term and its value
+const rowOf = (review, id) => review.querySelector(`[data-row="${id}"]`).cloneNode(true)
 
 describe('IssueCertificateForm against the Atelier', () => {
   beforeEach(() => {
