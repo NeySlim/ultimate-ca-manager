@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+
+// The targets keep their sort in the address
+const render = (ui) => rtlRender(ui, { wrapper: MemoryRouter })
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
@@ -11,6 +15,7 @@ vi.mock('../../../contexts', () => ({
     showError: vi.fn(),
     showConfirm: vi.fn(),
   }),
+  useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true, isTouch: false, isLargeScreen: true, screenWidth: 1440 }),
 }))
 
 const getEffective = vi.hoisted(() => vi.fn())
@@ -101,7 +106,7 @@ describe('DeploySection HTTP API target (#428)', () => {
     expect(screen.getByText('deploy.httpSendsKey')).toBeInTheDocument()
     expect(screen.queryByTitle('deploy.showPublicKey')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'common.edit' }))
+    fireEvent.click(screen.getByTitle('common.edit'))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByText('deploy.kind_http')).not.toBeInTheDocument()  // the kind is fixed after creation
     fireEvent.submit(dialog.querySelector('form'))
@@ -122,7 +127,7 @@ describe('DeploySection HTTP API target (#428)', () => {
     deployService.updateTarget = vi.fn().mockResolvedValue({ data: {} })
     render(<DeploySection />)
     await screen.findByText('POST https://fw.example.net/api')
-    fireEvent.click(screen.getByRole('button', { name: 'common.edit' }))
+    fireEvent.click(screen.getByTitle('common.edit'))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(screen.getByText('common.remove'))
     expect(screen.getByText('deploy.httpHeadersRemoved')).toBeInTheDocument()
@@ -142,5 +147,63 @@ describe('DeploySection write guard', () => {
     render(<DeploySection />)
     await screen.findByText('PUT https://fw.example.net/api')
     expect(blockedWhileSuspended(screen.getByText('deploy.addTarget').closest('button'))).toBe(true)
+  })
+})
+
+const pad = (n) => String(n).padStart(2, '0')
+const rows = () => [...document.querySelectorAll('table.module-table tbody tr')]
+const names = () => rows().map((tr) => tr.querySelector('th, td').textContent.trim())
+const TARGETS = Array.from({ length: 27 }, (_, i) => (i % 3 === 0
+  ? { id: i + 1, kind: 'http', name: `api-${pad(i + 1)}`, enabled: true, url: `https://fw${pad(i + 1)}.example.net/api`, http_method: 'PUT', failure_count: 0 }
+  : { id: i + 1, kind: 'ssh', name: `host-${pad(i + 1)}`, enabled: i !== 1, host: `srv${pad(i + 1)}.example.net`, port: 22, username: 'deploy', failure_count: i === 4 ? 2 : 0 }))
+
+describe('DeploySection targets table', () => {
+  const load = async (targets) => {
+    const { deployService } = await import('../../../services')
+    deployService.getTargets = vi.fn().mockResolvedValue({ data: targets })
+    deployService.testTarget = vi.fn().mockResolvedValue({ data: { status_code: 200 } })
+    render(<DeploySection />)
+    return deployService
+  }
+
+  it('pages the targets by 25 in the module table', async () => {
+    await load(TARGETS)
+    await screen.findByText('api-01')
+    expect(document.querySelector('.record-list')).toBeNull()
+    expect(rows()).toHaveLength(25)
+    fireEvent.click(document.querySelector('[data-page="next"]'))
+    expect(names()).toEqual(['host-26', 'host-27'])
+  })
+
+  it('finds a target by its host or address and sorts by kind', async () => {
+    await load(TARGETS)
+    await screen.findByText('api-01')
+    fireEvent.change(document.getElementById('deploy-search'), { target: { value: 'srv14' } })
+    expect(names()).toEqual(['host-14'])
+    fireEvent.change(document.getElementById('deploy-search'), { target: { value: 'fw07' } })
+    expect(names()).toEqual(['api-07'])
+    fireEvent.change(document.getElementById('deploy-search'), { target: { value: '' } })
+    fireEvent.click(document.querySelector('button[data-sort="kind"]'))
+    expect(rows()[0]).toHaveTextContent('deploy.kind_http')
+    fireEvent.click(document.querySelector('button[data-sort="kind"]'))
+    expect(rows()[0]).toHaveTextContent('deploy.kind_ssh')
+  })
+
+  it('keeps the empty block when there is no target', async () => {
+    await load([])
+    expect(await screen.findByText('deploy.noTargets')).toBeInTheDocument()
+    expect(document.getElementById('empty-deploy')).not.toBeNull()
+    expect(document.querySelector('table.module-table')).toBeNull()
+    expect(document.getElementById('deploy-search')).toBeNull()
+  })
+
+  it('tests a target from its row, the SSH key only on an SSH target', async () => {
+    const service = await load(TARGETS.slice(0, 2))
+    await screen.findByText('api-01')
+    const [api, ssh] = rows()
+    expect(within(api).queryByTitle('deploy.showPublicKey')).toBeNull()
+    expect(within(ssh).getByTitle('deploy.showPublicKey')).toBeInTheDocument()
+    fireEvent.click(within(api).getByTitle('deploy.testConnection'))
+    await vi.waitFor(() => expect(service.testTarget).toHaveBeenCalledWith(1))
   })
 })
