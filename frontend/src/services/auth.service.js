@@ -3,23 +3,36 @@
  * Handles login, logout, and CSRF token management
  */
 import { apiClient } from './apiClient'
-import { clearUnconfirmedLock } from '../lib/sessionLock'
+import { clearUnconfirmedLock, readUnconfirmedLock } from '../lib/sessionLock'
 
 let pendingLock = null
 
-// A lock the server did not take is sent again after these delays; then the session is signed
-// out, so none stays open behind the lock screen (a 401 means it is gone or locked already).
+// A lock the server did not take (409, 5xx, network) is sent again after these delays; then the
+// session is signed out, so none stays open behind the lock screen. A 401 is sent once more (a
+// renewal may have just replaced the cookie), a second one means the session is gone.
 // Until one of them is answered, the lock stays marked unconfirmed for the next load.
 const LOCK_RETRY_DELAYS_MS = [500, 1000, 2000]
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
-async function postLock(reason) {
+// The lock belongs to the account its unconfirmed mark named when it was sent: a sign-in or a
+// sign-out since, in any tab, removes or replaces the mark, and nothing more is sent for it.
+// Without a mark (storage blocked) there is nothing to tell them apart by.
+const stillOwed = (owner) => !owner || readUnconfirmedLock()?.username === owner.username
+
+function superseded(error) {
+  return Object.assign(new Error('Lock superseded by a sign-in or sign-out'), { superseded: true, cause: error })
+}
+
+async function postLock(reason, owner) {
+  let refused = false
   for (let attempt = 0; ; attempt += 1) {
     try {
       return await apiClient.post('/auth/lock', { reason })
     } catch (error) {
-      if (error?.status === 401 || attempt >= LOCK_RETRY_DELAYS_MS.length) throw error
+      if ((error?.status === 401 && refused) || attempt >= LOCK_RETRY_DELAYS_MS.length) throw error
+      if (error?.status === 401) refused = true
       await wait(LOCK_RETRY_DELAYS_MS[attempt])
+      if (!stillOwed(owner)) throw superseded(error)
       if (error?.status === 403) {
         // A CSRF token gone stale: the session check hands a fresh one
         try {
@@ -55,12 +68,20 @@ export const authService = {
 
   // Locks the session on the server, which keeps it until it is unlocked; `reason` is 'manual' or 'idle'
   lock(reason) {
+    const owner = readUnconfirmedLock()
     const request = (async () => {
+      // The CSRF token goes with the locked session, never one a sign-in set meanwhile
+      let ownToken = true
       try {
-        const answer = await postLock(reason)
+        const answer = await postLock(reason, owner)
+        ownToken = stillOwed(owner)
         clearUnconfirmedLock()
         return answer
       } catch (error) {
+        if (error?.superseded || !stillOwed(owner)) {
+          ownToken = false
+          throw error?.superseded ? error : superseded(error)
+        }
         if (error?.status === 401) {
           clearUnconfirmedLock()
         } else {
@@ -73,7 +94,7 @@ export const authService = {
         }
         throw error
       } finally {
-        apiClient.clearCsrfToken()
+        if (ownToken) apiClient.clearCsrfToken()
       }
     })()
     pendingLock = request.catch(() => {})

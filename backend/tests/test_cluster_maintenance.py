@@ -152,12 +152,16 @@ def test_no_session_row_is_written_during_maintenance(app, held, monkeypatch):
     def no_store(self):
         raise AssertionError('no session row during the maintenance')
     monkeypatch.setattr(IsolatedSqlSessionInterface, '_store', no_store)
+    from flask_session.base import ServerSideSession
     interface = IsolatedSqlSessionInterface.__new__(IsolatedSqlSessionInterface)
+    session = ServerSideSession(sid='sid')
     with app.app_context():
-        for call in (lambda: interface._upsert_session(timedelta(hours=1), {}, 'sid'),
+        for call in (lambda: interface._upsert_session(timedelta(hours=1), session, 'sid'),
                      lambda: interface._delete_session('sid'),
                      lambda: interface._delete_expired_sessions()):
             assert call() is None
+    # The save says it wrote nothing (a lock answers 409 then)
+    assert session.store_refused == 'busy'
 
 
 def test_outside_ha_a_row_changes_nothing(app, auth_client, monkeypatch):

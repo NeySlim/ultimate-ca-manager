@@ -10,6 +10,9 @@ LOCK_KEY = 'locked'
 # The second factor owed by a password unlock, bound to the locked account
 UNLOCK_2FA_KEY = 'unlock_2fa'
 SESSION_LOCKED_PROBLEM = 'urn:ucm:problem:session-locked'
+# A lock the store did not take: its record went meanwhile ('gone') or stayed held ('busy')
+LOCK_NOT_STORED_PROBLEM = 'urn:ucm:problem:session-lock-not-stored'
+LOCK_RETRY_AFTER_SECONDS = 1
 
 
 class SessionLocked(Exception):
@@ -36,6 +39,23 @@ def lock_session(reason):
     from utils.datetime_utils import utc_now
     session.pop(UNLOCK_2FA_KEY, None)
     session[LOCK_KEY] = {'at': utc_now().isoformat(), 'reason': reason}
+
+
+def store_lock():
+    """Writes the lock of this request's session now: None once stored, else why not."""
+    from flask import current_app
+    write_now = getattr(current_app.session_interface, 'write_now', None)
+    return write_now(current_app, session) if write_now is not None else None
+
+
+def lock_not_stored(cause):
+    """The 409 of a lock the store did not take: the client sends it again, then signs out."""
+    from utils.response import error_response
+    response, status = error_response('Session lock not stored: send it again', 409,
+                                      problem_type=LOCK_NOT_STORED_PROBLEM,
+                                      details={'cause': cause})
+    response.headers['Retry-After'] = str(LOCK_RETRY_AFTER_SECONDS)
+    return response, status
 
 
 def locked_refusal():

@@ -850,3 +850,200 @@ def test_a_lock_saved_while_a_file_store_save_is_under_way_waits_and_wins(app, m
     assert done.is_set()
     monkeypatch.setattr(module, 'keep_stored_lock', real)
     _refused_as_locked(_profile(c))
+
+
+# --- A renewal of the identifier carries a lock that landed meanwhile --------------------
+
+LOCK_NOT_STORED = 'urn:ucm:problem:session-lock-not-stored'
+NEW_PASSWORD = 'An0ther-L0ck-Rotation!'
+
+
+@contextmanager
+def _in_flight(application, client, method, url, body=None):
+    """``client``'s request held at its view, its session copy already read, until the block
+    ends; it then completes and saves that copy. Yields its response holder."""
+    endpoint = application.url_map.bind('localhost').match(url, method=method)[0]
+    view = application.view_functions[endpoint]
+    entered, release, held, response = threading.Event(), threading.Event(), [], {}
+
+    def holding(*args, **kwargs):
+        if not held:
+            held.append(1)
+            entered.set()
+            release.wait(15)
+        return view(*args, **kwargs)
+
+    def send():
+        response['r'] = client.open(url, method=method, data=json.dumps(body or {}),
+                                     content_type='application/json')
+
+    application.view_functions[endpoint] = holding
+    worker = threading.Thread(target=send)
+    worker.start()
+    try:
+        assert entered.wait(15), 'the request in flight never reached its view'
+        yield response
+    finally:
+        release.set()
+        worker.join(30)
+        application.view_functions[endpoint] = view
+    assert not worker.is_alive()
+
+
+def _renewal(application, user, operation, factors):
+    """(method, url, body, password after it) of a request that keeps the caller's session
+    under a new identifier."""
+    if operation == 'change-password':
+        return 'POST', '/api/v2/account/password', {
+            'current_password': PASSWORD, 'new_password': NEW_PASSWORD}, NEW_PASSWORD
+    if operation == 'close-other-sessions':
+        return 'POST', '/api/v2/account/sessions/revoke-all', None, PASSWORD
+    if operation == 'disable-totp':
+        return 'POST', '/api/v2/account/2fa/disable', {'code': _next_code(user)}, PASSWORD
+    from models.webauthn import WebAuthnCredential
+    credential = factors(user, 'passkey', application)
+    with application.app_context():
+        row_id = WebAuthnCredential.query.filter_by(credential_id=credential).one().id
+    return 'DELETE', f'/api/v2/webauthn/credentials/{row_id}', None, PASSWORD
+
+
+@pytest.mark.parametrize('operation', ['change-password', 'close-other-sessions',
+                                       'disable-totp', 'delete-passkey'])
+def test_a_lock_landing_while_the_identifier_is_renewed_moves_to_the_new_one(
+        nodes, make_user, factors, operation):
+    """A factor change read the session before the lock and renews its identifier after:
+    the session it keeps under the new identifier is locked too, on every store."""
+    first, second = nodes
+    user = make_user(first, totp=operation == 'disable-totp')
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    method, url, body, password = _renewal(first, user, operation, factors)
+    renewing = _held_by(second, held)
+    with _in_flight(second, renewing, method, url, body) as flight:
+        _lock(c)
+        _refused_as_locked(_profile(c))
+    assert flight['r'].status_code == 200, flight['r'].data
+    renewed = renewing.get_cookie('session').value
+    assert renewed != held
+    for node in (first, second):
+        _refused_as_locked(_profile(_held_by(node, renewed)))
+        assert _verify(_held_by(node, renewed))['authenticated'] is False
+        r = _profile(_held_by(node, held))
+        assert r.status_code == 401 and r.get_json()['type'] == AUTH_REQUIRED
+    # Its own account unlocks it as any locked session
+    back = _held_by(first, renewed)
+    r = _post(back, '/api/v2/auth/unlock/password', {'password': password})
+    assert r.status_code == 200, r.data
+    assert _profile(back).status_code == 200
+
+
+def test_a_lock_stored_between_the_read_and_the_move_of_a_renewal_moves_too(
+        nodes, make_user, monkeypatch):
+    """The move deletes the old record only as it read it (SQL) or under a watch (Redis): a
+    lock landing after that read is read again and moves to the new identifier."""
+    first, second = nodes
+    kind = second.config['SESSION_TYPE']
+    if kind == 'filesystem':
+        pytest.skip('the file store moves a record under an exclusive flock, which no lock straddles')
+    import utils.session_store as module
+    if kind == 'redis':
+        import utils.session_store_redis as module
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    store_id = second.session_interface._get_store_id(held)
+    real, landed = module.keep_stored_lock, []
+
+    def lock_lands_now(session, stored):
+        if not landed:
+            landed.append(True)
+            _store_raw(second, store_id, dict(stored, locked={'at': utc_now().isoformat(), 'reason': 'manual'}))
+        return real(session, stored)
+
+    monkeypatch.setattr(module, 'keep_stored_lock', lock_lands_now)
+    renewing = _held_by(second, held)
+    assert _post(renewing, '/api/v2/account/sessions/revoke-all').status_code == 200
+    assert landed
+    renewed = renewing.get_cookie('session').value
+    assert renewed != held
+    _refused_as_locked(_profile(_held_by(first, renewed)))
+
+
+# --- POST /auth/lock answers 200 only once the lock is stored ------------------------------
+
+@contextmanager
+def _lock_held_before_its_write(application):
+    """The next POST /auth/lock held once its session check passed, before the lock is
+    set and written, until the block ends."""
+    import auth.session_lock as module
+    real, entered, release = module.lock_session, threading.Event(), threading.Event()
+
+    def holding(reason):
+        entered.set()
+        release.wait(15)
+        return real(reason)
+
+    module.lock_session = holding
+    try:
+        yield entered
+    finally:
+        release.set()
+        module.lock_session = real
+
+
+def _not_stored(r, cause):
+    assert r.status_code == 409, r.data
+    body = r.get_json()
+    assert body['type'] == LOCK_NOT_STORED, body
+    assert body['details'] == {'cause': cause}
+    assert r.headers.get('Retry-After') == '1'
+    assert not any(h.startswith('session=') for h in r.headers.getlist('Set-Cookie'))
+
+
+@pytest.mark.parametrize('ending', ['renewal', 'sign-out'])
+def test_a_lock_whose_session_went_before_its_write_says_it_was_not_stored(
+        nodes, make_user, ending):
+    """A renewal moved the record or a sign-out removed it after the lock's check: the lock
+    answers 409 so the client sends it again (to the renewed session) or signs out."""
+    first, second = nodes
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    locking = _held_by(second, held)
+    response = {}
+    with _lock_held_before_its_write(second) as entered:
+        worker = threading.Thread(target=lambda: response.setdefault(
+            'r', _post(locking, '/api/v2/auth/lock', {'reason': 'manual'})))
+        worker.start()
+        assert entered.wait(15)
+        if ending == 'renewal':
+            assert _post(c, '/api/v2/account/sessions/revoke-all').status_code == 200
+        else:
+            assert _post(c, '/api/v2/auth/logout').status_code == 200
+    worker.join(30)
+    _not_stored(response['r'], 'gone')
+    assert _audits(first, 'session_locked', user['username']) == []
+    if ending == 'renewal':
+        # Sent again with the renewed cookie, it locks the session that stays
+        assert _profile(c).status_code == 200
+        _lock(c)
+        _refused_as_locked(_profile(c))
+    else:
+        assert _profile(c).status_code == 401
+
+
+def test_a_lock_the_file_store_could_not_write_says_it_was_not_stored(app, make_user, monkeypatch):
+    """The file store stayed held (a removal under way): no 200 for a lock never written."""
+    if app.config['SESSION_TYPE'] != 'filesystem':
+        pytest.skip('the file store only')
+    from utils.session_store import HELD, session_files_lock
+    monkeypatch.setattr(app.session_interface, 'lock_wait', 0.2)
+    user = make_user()
+    c = _password_session(app, user)
+    with session_files_lock(app.session_interface.cache._path, True, 2.0) as state:
+        assert state == HELD
+        r = _post(c, '/api/v2/auth/lock', {'reason': 'manual'})
+    _not_stored(r, 'busy')
+    assert _profile(c).status_code == 200
+    _lock(c)
+    _refused_as_locked(_profile(c))
