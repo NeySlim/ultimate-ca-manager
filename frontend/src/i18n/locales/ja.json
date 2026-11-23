@@ -3084,7 +3084,12 @@
     "reattachFailed": "デプロイを再バインドできませんでした",
     "kind_http": "HTTP API",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "リロードコマンド:"
+    "reloadCommandIs": "リロードコマンド:",
+    "searchPlaceholder": "名前、ホスト、URL で検索...",
+    "kindColumn": "種類",
+    "connectionColumn": "接続",
+    "deliveryColumn": "送信内容",
+    "lastSuccessColumn": "最終成功"
   },
   "crlDeploy": {
     "title": "CRL デプロイ",
@@ -4466,7 +4471,10 @@
     "templateFormat": "テンプレート形式",
     "templateVariablesLead": "変数: ",
     "ocspRevocationTitle": "OCSP と失効",
-    "interfaceLanguage": "表示言語"
+    "interfaceLanguage": "表示言語",
+    "anomalySearchPlaceholder": "種類、アドレス、メッセージで検索...",
+    "anomalySource": "発生元",
+    "anomalySeverity": "重大度"
   },
   "account": {
     "profile": "プロフィール",
@@ -4607,7 +4615,9 @@
     "apiKeysIntent": "アカウントの代わりにAPIを呼び出すキー。",
     "profileSaved": "プロフィールを保存しました。",
     "profileReset": "プロフィールの変更を元に戻しました。",
-    "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。"
+    "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。",
+    "apiKeySearchPlaceholder": "名前またはプレフィックスで検索...",
+    "apiKeyPrefix": "プレフィックス"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
@@ -5455,7 +5465,9 @@
     },
     "customHeadersSet": "この Webhook には API でカスタムヘッダーが設定されています。値は表示されません。",
     "dropCustomHeaders": "カスタムヘッダーを削除する",
-    "customHeadersFollowUrl": "カスタムヘッダーは保存済みの URL に紐づいています。URL を変更するには削除するか、API で再入力してください。"
+    "customHeadersFollowUrl": "カスタムヘッダーは保存済みの URL に紐づいています。URL を変更するには削除するか、API で再入力してください。",
+    "url": "URL",
+    "searchPlaceholder": "名前、URL、イベントで検索..."
   },
   "safeMode": {
     "title": "セーフモード",
@@ -6951,7 +6963,13 @@
       "enrolleeUpnPlaceholder": "taro.yamada@corp.local",
       "upnRequired": "代理登録が有効な場合、UPNは必須です",
       "hint": "CAに構成された登録エージェント証明書が必要です。テンプレートは他のユーザーの代理登録を許可する必要があります。"
-    }
+    },
+    "searchPlaceholder": "名前、サーバー、テンプレートで検索...",
+    "serverColumn": "サーバー",
+    "templateColumn": "テンプレート",
+    "authColumn": "認証",
+    "lastTestColumn": "最終テスト",
+    "runsColumn": "同期"
   },
   "xcepWstep": {
     "title": "Windows 自動登録",

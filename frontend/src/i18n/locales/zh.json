@@ -3084,7 +3084,12 @@
     "reattachFailed": "无法重新绑定部署",
     "kind_http": "HTTP API",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "重新加载命令："
+    "reloadCommandIs": "重新加载命令：",
+    "searchPlaceholder": "按名称、主机或 URL 搜索...",
+    "kindColumn": "类型",
+    "connectionColumn": "连接",
+    "deliveryColumn": "发送内容",
+    "lastSuccessColumn": "上次成功"
   },
   "crlDeploy": {
     "title": "CRL 部署",
@@ -4466,7 +4471,10 @@
     "templateFormat": "模板格式",
     "templateVariablesLead": "变量：",
     "ocspRevocationTitle": "OCSP 与吊销",
-    "interfaceLanguage": "界面语言"
+    "interfaceLanguage": "界面语言",
+    "anomalySearchPlaceholder": "按类型、地址或消息搜索...",
+    "anomalySource": "来源",
+    "anomalySeverity": "严重程度"
   },
   "account": {
     "profile": "个人资料",
@@ -4607,7 +4615,9 @@
     "apiKeysIntent": "以您的账户名义调用 API 的密钥。",
     "profileSaved": "个人资料已保存。",
     "profileReset": "已撤销个人资料的修改。",
-    "apiKeyHint": "API 密钥支持通过程序调用访问 UCM。妥善保管密钥，定期轮换。每个密钥可设置独立过期时间。"
+    "apiKeyHint": "API 密钥支持通过程序调用访问 UCM。妥善保管密钥，定期轮换。每个密钥可设置独立过期时间。",
+    "apiKeySearchPlaceholder": "按名称或前缀搜索...",
+    "apiKeyPrefix": "前缀"
   },
   "rbac": {
     "title": "基于角色的访问控制",
@@ -5455,7 +5465,9 @@
     },
     "customHeadersSet": "此 Webhook 已通过 API 设置自定义请求头，其值不会显示。",
     "dropCustomHeaders": "删除自定义请求头",
-    "customHeadersFollowUrl": "自定义请求头与已保存的 URL 绑定：如需更改 URL，请删除它们，或通过 API 重新输入。"
+    "customHeadersFollowUrl": "自定义请求头与已保存的 URL 绑定：如需更改 URL，请删除它们，或通过 API 重新输入。",
+    "url": "URL",
+    "searchPlaceholder": "按名称、URL 或事件搜索..."
   },
   "safeMode": {
     "title": "安全模式",
@@ -6951,7 +6963,13 @@
       "enrolleeUpnPlaceholder": "zhangsan@corp.local",
       "upnRequired": "启用代理注册时，UPN 为必填项",
       "hint": "需要在CA上配置注册代理证书。模板必须允许代理其他用户进行注册。"
-    }
+    },
+    "searchPlaceholder": "按名称、服务器或模板搜索...",
+    "serverColumn": "服务器",
+    "templateColumn": "模板",
+    "authColumn": "身份验证",
+    "lastTestColumn": "上次测试",
+    "runsColumn": "同步"
   },
   "xcepWstep": {
     "title": "Windows 自动注册",

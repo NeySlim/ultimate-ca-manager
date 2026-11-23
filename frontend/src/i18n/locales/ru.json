@@ -3208,7 +3208,12 @@
     "reattachFailed": "Не удалось привязать развёртывание заново",
     "kind_http": "HTTP API",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Команда перезагрузки:"
+    "reloadCommandIs": "Команда перезагрузки:",
+    "searchPlaceholder": "Поиск по имени, хосту или URL...",
+    "kindColumn": "Тип",
+    "connectionColumn": "Подключение",
+    "deliveryColumn": "Доставка",
+    "lastSuccessColumn": "Последний успех"
   },
   "crlDeploy": {
     "title": "Развёртывание CRL",
@@ -4620,7 +4625,10 @@
     "templateFormat": "Формат шаблона",
     "templateVariablesLead": "Переменные: ",
     "ocspRevocationTitle": "OCSP и отзыв",
-    "interfaceLanguage": "Язык интерфейса"
+    "interfaceLanguage": "Язык интерфейса",
+    "anomalySearchPlaceholder": "Поиск по типу, адресу или сообщению...",
+    "anomalySource": "Источник",
+    "anomalySeverity": "Серьёзность"
   },
   "account": {
     "profile": "Профиль",
@@ -4761,7 +4769,9 @@
     "apiKeysIntent": "Ключи для вызова API от имени вашей учётной записи.",
     "profileSaved": "Профиль сохранён.",
     "profileReset": "Изменения профиля отменены.",
-    "apiKeyHint": "Ключи API дают программный доступ к UCM. Храните ключи в секрете и регулярно меняйте их. У каждого ключа может быть свой срок действия."
+    "apiKeyHint": "Ключи API дают программный доступ к UCM. Храните ключи в секрете и регулярно меняйте их. У каждого ключа может быть свой срок действия.",
+    "apiKeySearchPlaceholder": "Поиск по имени или префиксу...",
+    "apiKeyPrefix": "Префикс"
   },
   "rbac": {
     "title": "Управление доступом на основе ролей",
@@ -5667,7 +5677,9 @@
     },
     "customHeadersSet": "Свои заголовки заданы для этого вебхука через API; их значения не показываются.",
     "dropCustomHeaders": "Удалить свои заголовки",
-    "customHeadersFollowUrl": "Свои заголовки привязаны к сохранённому URL: удалите их, чтобы изменить его, или введите их заново через API."
+    "customHeadersFollowUrl": "Свои заголовки привязаны к сохранённому URL: удалите их, чтобы изменить его, или введите их заново через API.",
+    "url": "URL",
+    "searchPlaceholder": "Поиск по имени, URL или событию..."
   },
   "safeMode": {
     "title": "Безопасный режим",
@@ -7235,7 +7247,13 @@
       "enrolleeUpnPlaceholder": "ivan.ivanov@corp.local",
       "upnRequired": "При включённой регистрации от имени другого нужен UPN",
       "hint": "Требует сертификат агента регистрации, настроенный в ЦС. Шаблон должен разрешать регистрацию от имени других пользователей."
-    }
+    },
+    "searchPlaceholder": "Поиск по имени, серверу или шаблону...",
+    "serverColumn": "Сервер",
+    "templateColumn": "Шаблон",
+    "authColumn": "Аутентификация",
+    "lastTestColumn": "Последняя проверка",
+    "runsColumn": "Синхронизации"
   },
   "xcepWstep": {
     "title": "Автоматическая регистрация Windows",

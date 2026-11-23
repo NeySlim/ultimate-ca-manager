@@ -138,7 +138,9 @@
     "apiKeysIntent": "Clés qui appellent l’API au nom de votre compte.",
     "profileSaved": "Profil enregistré.",
     "profileReset": "Modifications du profil annulées.",
-    "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée."
+    "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée.",
+    "apiKeySearchPlaceholder": "Rechercher par nom ou préfixe...",
+    "apiKeyPrefix": "Préfixe"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -2686,7 +2688,12 @@
     "reattachFailed": "Impossible de rattacher le déploiement",
     "kind_http": "API HTTP",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Commande de rechargement :"
+    "reloadCommandIs": "Commande de rechargement :",
+    "searchPlaceholder": "Rechercher par nom, hôte ou URL...",
+    "kindColumn": "Type",
+    "connectionColumn": "Connexion",
+    "deliveryColumn": "Envoi",
+    "lastSuccessColumn": "Dernier succès"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",
@@ -4531,7 +4538,10 @@
     "templateFormat": "Format du modèle",
     "templateVariablesLead": "Variables : ",
     "ocspRevocationTitle": "OCSP et révocation",
-    "interfaceLanguage": "Langue de l’interface"
+    "interfaceLanguage": "Langue de l’interface",
+    "anomalySearchPlaceholder": "Rechercher par type, adresse ou message...",
+    "anomalySource": "Source",
+    "anomalySeverity": "Gravité"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée.",
@@ -5455,7 +5465,9 @@
     },
     "customHeadersSet": "Des en-têtes personnalisés sont définis sur ce webhook via l’API ; leurs valeurs ne sont pas affichées.",
     "dropCustomHeaders": "Supprimer les en-têtes personnalisés",
-    "customHeadersFollowUrl": "Les en-têtes personnalisés restent liés à l’URL enregistrée : supprimez-les pour la modifier, ou ressaisissez-les via l’API."
+    "customHeadersFollowUrl": "Les en-têtes personnalisés restent liés à l’URL enregistrée : supprimez-les pour la modifier, ou ressaisissez-les via l’API.",
+    "url": "URL",
+    "searchPlaceholder": "Rechercher par nom, URL ou événement..."
   },
   "safeMode": {
     "title": "Mode sans échec",
@@ -6951,7 +6963,13 @@
       "enrolleeUpnPlaceholder": "jean.dupont@corp.local",
       "upnRequired": "Le UPN est requis lorsque l’inscription au nom de est activée",
       "hint": "Nécessite un certificat d’agent d’inscription configuré sur l’AC. Le modèle doit autoriser l’inscription pour le compte d’autres utilisateurs."
-    }
+    },
+    "searchPlaceholder": "Rechercher par nom, serveur ou modèle...",
+    "serverColumn": "Serveur",
+    "templateColumn": "Modèle",
+    "authColumn": "Authentification",
+    "lastTestColumn": "Dernier test",
+    "runsColumn": "Synchronisations"
   },
   "xcepWstep": {
     "title": "Auto-inscription Windows",

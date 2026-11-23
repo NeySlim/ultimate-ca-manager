@@ -26,8 +26,9 @@ import { cardFacts } from './cardFacts'
  *   pagination take the place of rows, sort, onSort and footer.pagination
  * @param {string} [p.storageKey]  where the widths set by hand are kept; by default a key of the page and its columns
  * @param {string} [p.scrollId]  the region's id, its own where several lists share a page (the settings)
+ * @param {boolean} [p.cardActions]  the phone records carry the row actions (a list whose detail is a form without them)
  */
-export function ListView({ filters, label, caption, icon, rows: allRows, rowKey, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions, sort: serverSort, onSort: serverOnSort, nameSort, nameExtra, list, storageKey, scrollId = 'module-scroll' }) {
+export function ListView({ filters, label, caption, icon, rows: allRows, rowKey, title, status, columns, openedId, onOpen, footer, toolbar, loading, empty, error, selection, rowActions, sort: serverSort, onSort: serverOnSort, nameSort, nameExtra, list, storageKey, scrollId = 'module-scroll', cardActions = false }) {
   const { t } = useTranslation()
   const rows = list ? list.rows : allRows
   const sort = list ? list.sort : serverSort
@@ -54,7 +55,7 @@ export function ListView({ filters, label, caption, icon, rows: allRows, rowKey,
           <DataTable kind="module" scrollId={scrollId} label={t('atelier.tableOf', { name: label })} caption={caption}
             columns={cols} rows={rows} rowKey={rowKey} rowLabel={title} sort={sort} onSort={onSort} onOpen={onOpen} openedId={openedId} loading={loading} empty={empty}
             openLabel={(row) => t('atelier.openDetail', { name: title(row) })} card={card} selection={selection} rowActions={rowActions}
-            footer={foot && <TableFooter {...foot} />} widthsKey={storageKey} />
+            footer={foot && <TableFooter {...foot} />} widthsKey={storageKey} cardActions={cardActions} />
         )}
       </section>
     </>

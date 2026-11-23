@@ -3084,7 +3084,12 @@
     "reattachFailed": "Não foi possível vincular novamente a implantação",
     "kind_http": "API HTTP",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Comando de recarregamento:"
+    "reloadCommandIs": "Comando de recarregamento:",
+    "searchPlaceholder": "Pesquisar por nome, host ou URL...",
+    "kindColumn": "Tipo",
+    "connectionColumn": "Conexão",
+    "deliveryColumn": "Envio",
+    "lastSuccessColumn": "Último sucesso"
   },
   "crlDeploy": {
     "title": "Implantação de CRL",
@@ -4466,7 +4471,10 @@
     "templateFormat": "Formato do modelo",
     "templateVariablesLead": "Variáveis: ",
     "ocspRevocationTitle": "OCSP e revogação",
-    "interfaceLanguage": "Idioma da interface"
+    "interfaceLanguage": "Idioma da interface",
+    "anomalySearchPlaceholder": "Pesquisar por tipo, endereço ou mensagem...",
+    "anomalySource": "Origem",
+    "anomalySeverity": "Gravidade"
   },
   "account": {
     "profile": "Perfil",
@@ -4607,7 +4615,9 @@
     "apiKeysIntent": "Chaves que chamam a API em nome da sua conta.",
     "profileSaved": "Perfil salvo.",
     "profileReset": "Alterações do perfil anuladas.",
-    "apiKeyHint": "As chaves de API permitem o acesso programático ao UCM. Mantenha as suas chaves secretas e rode-as regularmente. Cada chave pode ter uma data de expiração personalizada."
+    "apiKeyHint": "As chaves de API permitem o acesso programático ao UCM. Mantenha as suas chaves secretas e rode-as regularmente. Cada chave pode ter uma data de expiração personalizada.",
+    "apiKeySearchPlaceholder": "Pesquisar por nome ou prefixo...",
+    "apiKeyPrefix": "Prefixo"
   },
   "rbac": {
     "title": "Controlo de acesso baseado em funções",
@@ -5455,7 +5465,9 @@
     },
     "customHeadersSet": "Este webhook tem cabeçalhos personalizados definidos pela API; seus valores não são exibidos.",
     "dropCustomHeaders": "Remover os cabeçalhos personalizados",
-    "customHeadersFollowUrl": "Os cabeçalhos personalizados ficam vinculados à URL salva: remova-os para alterá-la ou digite-os novamente pela API."
+    "customHeadersFollowUrl": "Os cabeçalhos personalizados ficam vinculados à URL salva: remova-os para alterá-la ou digite-os novamente pela API.",
+    "url": "URL",
+    "searchPlaceholder": "Pesquisar por nome, URL ou evento..."
   },
   "safeMode": {
     "title": "Modo seguro",
@@ -6951,7 +6963,13 @@
       "enrolleeUpnPlaceholder": "joao.silva@corp.local",
       "upnRequired": "O UPN é obrigatório quando a inscrição em nome de está ativada",
       "hint": "Requer um certificado de agente de inscrição configurado na CA. O modelo deve permitir a inscrição em nome de outros usuários."
-    }
+    },
+    "searchPlaceholder": "Pesquisar por nome, servidor ou modelo...",
+    "serverColumn": "Servidor",
+    "templateColumn": "Modelo",
+    "authColumn": "Autenticação",
+    "lastTestColumn": "Último teste",
+    "runsColumn": "Sincronizações"
   },
   "xcepWstep": {
     "title": "Autoinscrição do Windows",
