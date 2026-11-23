@@ -7,6 +7,7 @@ import logging
 import os
 import socket
 import threading
+import time
 
 import pytest
 from gevent import pywsgi
@@ -241,4 +242,8 @@ def test_the_worker_refuses_before_switching_protocols(app, monkeypatch):
     assert seen == []
     assert _handshake(address, PROXY).startswith(b'HTTP/1.1 101')
     assert _handshake(address, None).startswith(b'HTTP/1.1 101')
-    assert seen == [PROXY, None]
+    # The application runs after the 101 has gone out: wait for it
+    deadline = time.monotonic() + 5
+    while len(seen) < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert sorted(seen, key=str) == sorted([PROXY, None], key=str)
