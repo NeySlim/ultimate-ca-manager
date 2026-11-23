@@ -1,9 +1,11 @@
 """Each listed request tells the signed-in user which decision the server would take from them,
 by the rules of approve and reject: the approver group, one's own request, one vote each."""
 import json
+import threading
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import event
 
 from models import db
 from models.group import Group, GroupMember
@@ -76,3 +78,50 @@ def test_the_rights_say_what_the_server_refuses(app, setting):
 
 def test_an_admin_passes_the_group_gate(app, auth_client, setting):
     assert _rights(auth_client, setting['req']) == {'approve': None, 'reject': None}
+
+
+def _group_member_statements(app, client):
+    seen = []
+    mine = threading.get_ident()
+
+    def hook(conn, cursor, statement, *rest):
+        if threading.get_ident() == mine and 'group_members' in statement.lower():
+            seen.append(statement)
+    with app.app_context():
+        event.listen(db.engine, 'before_cursor_execute', hook)
+        try:
+            r = client.get('/api/v2/approvals?status=pending')
+        finally:
+            event.remove(db.engine, 'before_cursor_execute', hook)
+    assert r.status_code == 200, r.data
+    return len(seen), r.get_json()['data']
+
+
+def test_the_list_reads_the_group_membership_once(app, setting):
+    """The approver-group check of a listed request costs no statement of its own."""
+    bob = _login(app, setting['bob'])
+    one, _ = _group_member_statements(app, bob)
+    extra = []
+    with app.app_context():
+        for _ in range(6):
+            req = ApprovalRequest(request_type='certificate', policy_id=setting['policy'],
+                                  requester_id=setting['alice']['id'], status='pending', required_approvals=2,
+                                  expires_at=utc_now() + timedelta(days=1))
+            db.session.add(req)
+            db.session.flush()
+            extra.append(req.id)
+        db.session.commit()
+    try:
+        seven, listed = _group_member_statements(app, bob)
+        rights = {x['id']: x['decision_rights'] for x in listed if x['id'] in extra + [setting['req']]}
+        assert len(rights) == 7
+        assert all(r == {'approve': None, 'reject': None} for r in rights.values())
+        assert seven == one
+        carol = _login(app, setting['carol'])
+        _, listed = _group_member_statements(app, carol)
+        assert all(x['decision_rights'] == {'approve': 'not_in_group', 'reject': 'not_in_group'}
+                   for x in listed if x['id'] in extra)
+    finally:
+        with app.app_context():
+            db.session.query(ApprovalRequest).filter(ApprovalRequest.id.in_(extra)).delete(synchronize_session=False)
+            db.session.commit()

@@ -42,13 +42,14 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.signing_hash import rsa_padding_for
 
 
-def _user_can_act_on_approval(user, approval):
+def _user_can_act_on_approval(user, approval, member_of=None):
     """RBAC + group-membership check for approve/reject.
 
     If the request's policy pins an approval_group_id, the acting user MUST
     be a member of that group (admins keep their override). Without this
     check, any user with write:approvals can vote on any request, defeating
-    the whole point of approval_group_id.
+    the whole point of approval_group_id. ``member_of``, when given, is a
+    callable telling whether the user belongs to a group id (a list reads it once).
 
     Returns (allowed: bool, reason: Optional[str]).
     """
@@ -62,11 +63,14 @@ def _user_can_act_on_approval(user, approval):
         # No group restriction → write:approvals already enforced by decorator
         return True, None
     try:
-        from models.group import GroupMember
-        is_member = db.session.query(GroupMember.id).filter_by(
-            group_id=policy.approval_group_id,
-            user_id=user.id,
-        ).first() is not None
+        if member_of is not None:
+            is_member = member_of(policy.approval_group_id)
+        else:
+            from models.group import GroupMember
+            is_member = db.session.query(GroupMember.id).filter_by(
+                group_id=policy.approval_group_id,
+                user_id=user.id,
+            ).first() is not None
     except Exception as e:
         logger.error(f"Group membership check failed for user={user.id} approval={approval.id}: {e}")
         return False, "Authorization check failed"
@@ -1293,9 +1297,9 @@ def toggle_policy(policy_id):
 
 # ============ Approval Requests ============
 
-def _decision_rights(user, approval):
+def _decision_rights(user, approval, member_of=None):
     """What approve and reject would refuse the current user, in their order: None when allowed."""
-    allowed, _ = _user_can_act_on_approval(user, approval)
+    allowed, _ = _user_can_act_on_approval(user, approval, member_of)
     if not allowed:
         return {'approve': 'not_in_group', 'reject': 'not_in_group'}
     user_id = getattr(user, 'id', None)
@@ -1306,9 +1310,22 @@ def _decision_rights(user, approval):
     return {'approve': 'own_request' if own else None, 'reject': None}
 
 
-def _with_rights(approval):
+def _with_rights(approval, member_of=None):
     user = getattr(g, 'current_user', None)
-    return {**approval.to_dict(), 'decision_rights': _decision_rights(user, approval)}
+    return {**approval.to_dict(), 'decision_rights': _decision_rights(user, approval, member_of)}
+
+
+def _group_membership_of(user):
+    """A ``member_of`` for a list: the user's group ids are read once, on the first question."""
+    groups = None
+
+    def member_of(group_id):
+        nonlocal groups
+        if groups is None:
+            from models.group import GroupMember
+            groups = {gid for (gid,) in db.session.query(GroupMember.group_id).filter_by(user_id=user.id)}
+        return group_id in groups
+    return member_of
 
 
 @bp.route('/api/v2/approvals', methods=['GET'])
@@ -1326,7 +1343,9 @@ def list_approvals():
         query = query.filter_by(status=status)
     
     requests = query.order_by(ApprovalRequest.created_at.desc()).all()
-    return success_response(data=[_with_rights(r) for r in requests])
+    user = getattr(g, 'current_user', None)
+    member_of = _group_membership_of(user) if user is not None else None
+    return success_response(data=[_with_rights(r, member_of) for r in requests])
 
 
 @bp.route('/api/v2/approvals/<int:request_id>', methods=['GET'])
