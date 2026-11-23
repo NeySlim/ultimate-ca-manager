@@ -51,7 +51,7 @@ export default function LocalDomainsTab({ localDomains, onAdd, onEdit, onDelete,
     <>
       <ListView label={t('acme.localDomains')} caption={t('acme.domainsCaption')} icon="globe" list={list} nameSort="name"
         title={(d) => d.domain} status={approval} openedId={openId} onOpen={(d) => setOpenId(d.id)}
-        columns={[{ id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), kind: 'text', priority: 2, sort: 'ca' }, { status: true, sort: 'state' }]}
+        columns={[{ id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), kind: 'text', priority: 2, labelled: true, sort: 'ca' }, { status: true, sort: 'state' }]}
         rowActions={actions}
         empty={<EmptyBlock id="acme-local-domains" icon="globe" title={t('acme.noLocalDomains')} text={t('acme.noLocalDomainsDesc')}
           action={canWrite ? { label: t('acme.addDomain'), icon: 'plus', onClick: onAdd, primary: true } : undefined} />}

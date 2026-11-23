@@ -72,6 +72,18 @@ describe('the challenges of the CAs', () => {
     expect(at.container).not.toHaveTextContent('S3CRET-VALUE')
   })
 
+  it('searches the authorities of the list by name, and puts them back from the no-match block', async () => {
+    const at = renderAtUrl(<SCEPPage />, '/scep-config?tab=challenges')
+    await screen.findByRole('button', { name: 'Old CA' })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'scep.searchChallenges' }), { target: { value: 'iot' } })
+    expect(screen.getByRole('button', { name: 'IoT CA' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Old CA' })).toBeNull()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'scep.searchChallenges' }), { target: { value: 'nothing-like-it' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'table.clearFilters' }))
+    expect(await screen.findByRole('button', { name: 'Old CA' })).toBeInTheDocument()
+    expect(at.container).not.toHaveTextContent('S3CRET-VALUE')
+  })
+
   it('a dock shows the state masked; Show reads the secret once, Hide masks it again', async () => {
     renderAtUrl(<SCEPPage />, '/scep-config?tab=challenges&item=3')
     const show = await screen.findByRole('button', { name: 'scep.challengeShow' })

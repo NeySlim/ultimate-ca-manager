@@ -39,7 +39,7 @@ function AllowedDomainsField({ id, allDomains, onAllDomainsChange, text, onTextC
   )
 }
 
-export default function EabTab({ eabRequired, onToggleEabRequired, showCreateModal, onCloseCreateModal, canWrite, canDelete }) {
+export default function EabTab({ eabRequired, onToggleEabRequired, showCreateModal, onCloseCreateModal, canWrite, canDelete, onTotal }) {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
   const [loading, setLoading] = useState(true)
@@ -72,6 +72,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     const { rows, partial: cut } = await readCredentials()
     setEabCredentials(rows)
     setPartial(cut)
+    onTotal?.(cut ? cut.total : rows.length)
   }
 
   useEffect(() => {
@@ -280,7 +281,8 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
             <SearchField id="acme-eab-search" name="q" label={t('acme.eab.search')} placeholder={t('acme.eab.search')} value={eabQuery} onChange={setEabQuery} />
           </Toolbar>
         )}
-        title={name} status={pill} openedId={openId} onOpen={(c) => setOpenId(c.id)}
+        // A credential without a label reads as a missing value, in grey, not as a name
+        title={(c) => c.label || <span className="absent-name">{t('acme.eab.unlabeled')}</span>} status={pill} openedId={openId} onOpen={(c) => setOpenId(c.id)}
         columns={[
           { id: 'kid', label: t('acme.eab.kid'), cell: (c) => <span className="mono">{c.kid}</span>, kind: 'text', priority: 4, title: (c) => c.kid, sort: 'kid' },
           { id: 'domains', label: t('acme.eab.allowedDomains'), cell: (c) => <span data-testid={`eab-domains-${c.id}`}>{domainsText(c)}</span>, grow: true,

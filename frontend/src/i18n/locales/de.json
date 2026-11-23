@@ -840,7 +840,6 @@
     "ctSubmitted": "Zertifikat an CT-Logs übermittelt",
     "ctSubmitFailed": "Übermittlung an CT-Logs fehlgeschlagen",
     "ctScts": "CT-SCTs",
-    "ctSctsCount": "{{count}} SCT(s) aufgezeichnet",
     "ctNoScts": "Keine SCTs: nicht an CT-Logs übermittelt",
     "eku": {
       "title": "Erweiterte Schlüsselverwendungen (EKU)",
@@ -2222,12 +2221,16 @@
     "revokeOnRenewal": "Altes Zertifikat nach Erneuerung widerrufen",
     "revokeOnRenewalDesc": "Das vorherige Zertifikat automatisch mit dem Grund 'superseded' widerrufen, wenn ein neues ausgestellt wird",
     "renewalPolicy": "Erneuerungsrichtlinie",
-    "revokeExistingSuperseded": "Bestehende Zertifikate widerrufen {{count}}",
+    "revokeExistingSuperseded_one": "Auch {{count}} bereits ersetztes Zertifikat widerrufen",
+    "revokeExistingSuperseded_other": "Auch {{count}} bereits ersetzte Zertifikate widerrufen",
     "revokeExistingSupersededDesc": "Bereits ausgestellte Zertifikate für diese Domains mit dem Grund 'superseded' widerrufen",
     "revokeSupersededConfirmTitle": "Bestehende Zertifikate widerrufen?",
-    "revokeSupersededConfirmDesc": "Dies widerruft alle bestehenden Zertifikate für die konfigurierten Domains. Diese Aktion kann nicht rückgängig gemacht werden {{count}}",
-    "revokeSupersededConfirmAction": "Widerrufen {{count}}",
-    "supersededRevoked": "Zertifikat als ersetzt widerrufen {{count}}",
+    "revokeSupersededConfirmDesc_one": "Damit wird {{count}} Zertifikat, das durch eine neuere Version ersetzt wurde, sofort widerrufen. Diese Aktion kann nicht rückgängig gemacht werden. Widerrufene Zertifikate erscheinen in den CRLs und werden per OCSP als widerrufen gemeldet.",
+    "revokeSupersededConfirmDesc_other": "Damit werden {{count}} Zertifikate, die durch neuere Versionen ersetzt wurden, sofort widerrufen. Diese Aktion kann nicht rückgängig gemacht werden. Widerrufene Zertifikate erscheinen in den CRLs und werden per OCSP als widerrufen gemeldet.",
+    "revokeSupersededConfirmAction_one": "{{count}} Zertifikat widerrufen",
+    "revokeSupersededConfirmAction_other": "{{count}} Zertifikate widerrufen",
+    "supersededRevoked_one": "{{count}} ersetztes Zertifikat widerrufen",
+    "supersededRevoked_other": "{{count}} ersetzte Zertifikate widerrufen",
     "domains": "Domains",
     "domainsHelper": "Eine Domain pro Zeile. Verwenden Sie *.domain.com für Wildcards.",
     "atLeastOneDomainRequired": "Mindestens eine Domain ist erforderlich",
@@ -2430,7 +2433,8 @@
       "statusUsed": "Verwendet",
       "statusRevoked": "Widerrufen",
       "statusExpired": "Abgelaufen",
-      "totalCount": "{{count}} Anmeldedaten",
+      "totalCount_one": "{{count}} Zugangsdatensatz",
+      "totalCount_other": "{{count}} Zugangsdatensätze",
       "search": "Zugangsdaten suchen",
       "created": "Erstellt",
       "usedAt": "Verwendet",
@@ -2519,7 +2523,8 @@
     "defaultProfileNone": "Keines (90 Tage, Standard-Digest)",
     "defaultProfileDesc": "Gilt für Bestellungen, deren Client kein Profil anfordert, was die meisten Clients tun; ohne Standardprofil erhalten solche Bestellungen 90 Tage und den Standard-Digest",
     "localOrders": "Lokale Bestellungen",
-    "localOrdersCount": "{{count}} Bestellung(en)",
+    "localOrdersCount_one": "{{count}} Bestellung",
+    "localOrdersCount_other": "{{count}} Bestellungen",
     "localOrdersLoadFailed": "Lokale Bestellungen konnten nicht geladen werden",
     "deleteLocalOrderConfirm": "Diese Bestellung löschen?",
     "deleteLocalOrderConfirmDesc": "Die Bestellung für {{domain}} sowie ihre Autorisierungen und Challenges werden entfernt. Ein ausgestelltes Zertifikat bleibt erhalten.",
@@ -2527,7 +2532,8 @@
     "purgeLocalOrders": "Abgelaufene bereinigen",
     "purgeLocalOrdersConfirm": "Abgelaufene Bestellungen bereinigen?",
     "purgeLocalOrdersConfirmDesc": "Entfernt abgelaufene, nicht ausgestellte Bestellungen mit ihren Autorisierungen und Challenges. Ausgestellte Bestellungen bleiben erhalten.",
-    "purgeLocalOrdersDone": "Bereinigung abgeschlossen: {{count}} Bestellung(en) entfernt",
+    "purgeLocalOrdersDone_one": "Bereinigung abgeschlossen: {{count}} Bestellung entfernt",
+    "purgeLocalOrdersDone_other": "Bereinigung abgeschlossen: {{count}} Bestellungen entfernt",
     "purgeLocalOrdersFailed": "Bereinigung fehlgeschlagen",
     "noLocalOrders": "Keine lokalen Bestellungen",
     "noLocalOrdersDesc": "Bestellungen von ACME-Clients am integrierten Server erscheinen hier",
@@ -2816,7 +2822,8 @@
     "intuneAppUpdated": "App-Registrierung aktualisiert",
     "intuneAppDeleted": "App-Registrierung gelöscht",
     "intuneAppDeleteConfirm": "App-Registrierung \"{{name}}\" löschen?",
-    "intuneAppUsedBy": "Von {{count}} Profil(en) verwendet",
+    "intuneAppUsedBy_one": "Von {{count}} Profil verwendet",
+    "intuneAppUsedBy_other": "Von {{count}} Profilen verwendet",
     "intuneAppNotUsed": "Von keinem Profil verwendet",
     "intuneAppLastTest": "Letzter Test",
     "intuneAppNeverTested": "nie getestet",
@@ -2893,7 +2900,10 @@
     "challengeExpires": "Läuft ab am",
     "challengeAge": "Alter",
     "challengeAgeUnknown": "Nicht erfasst",
-    "newIntuneAppShort": "Neue App"
+    "newIntuneAppShort": "Neue App",
+    "deletedProfile": "Gelöschtes Profil (Nr. {{id}})",
+    "approvedAuto": "Automatisch",
+    "searchChallenges": "Zertifizierungsstellen suchen..."
   },
   "crlOcsp": {
     "crl": "Zertifikatssperrliste",
@@ -2999,8 +3009,6 @@
     "ocspInactive": "Inaktiv",
     "columns": {
       "published": "Veröffentlicht",
-      "publication": "Veröffentlichung",
-      "crlNumber": "CRL-Nummer",
       "nextUpdate": "Nächstes Update"
     },
     "tabs": {
@@ -3190,8 +3198,10 @@
     "noManagedCAs": "Keine verwalteten CAs verfügbar",
     "alreadyInTruststore": "Bereits im Trust Store",
     "addedFromManaged": "Von verwalteten CAs hinzugefügt",
-    "addedCount": "{{count}} CA(s) zum Trust Store hinzugefügt",
-    "addSelected": "{{count}} ausgewählte hinzufügen",
+    "addedCount_one": "{{count}} CA zum Trust Store hinzugefügt",
+    "addedCount_other": "{{count}} CAs zum Trust Store hinzugefügt",
+    "addSelected_one": "{{count}} ausgewählte CA hinzufügen",
+    "addSelected_other": "{{count}} ausgewählte CAs hinzufügen",
     "exportBundle": "Paket exportieren",
     "bundleExported": "Zertifikatspaket exportiert",
     "exportFailed": "Paketexport fehlgeschlagen",
@@ -3221,7 +3231,9 @@
       "emptyTitle": "Kein externer Vertrauensanker"
     },
     "systemBundleDescription": "Aus dem CA-Bündel des Systems importiert",
-    "systemBundleNote": "Automatisch importiert aus {{path}}"
+    "systemBundleNote": "Automatisch importiert aus {{path}}",
+    "moreActions": "Weitere Aktionen für {{name}}",
+    "actionsTitle": "Aktionen des Vertrauensankers"
   },
   "importExport": {
     "tabs": {
@@ -5361,7 +5373,8 @@
     "pleaseAddFiles": "Bitte Dateien hinzufügen oder PEM-Inhalt einfügen",
     "unsupportedFormat": "Nicht unterstützte Datei: {{name}}. Akzeptierte Formate: {{formats}}",
     "analyzeFailed": "Fehler beim Analysieren des Inhalts",
-    "successImported": "{{count}} Objekt(e) erfolgreich importiert",
+    "successImported_one": "{{count}} Objekt erfolgreich importiert",
+    "successImported_other": "{{count}} Objekte erfolgreich importiert",
     "files": "Dateien",
     "pastePemPlaceholder": "PEM-kodierte Zertifikate, Schlüssel, CSRs oder Ketten hier einfügen...",
     "encryptedDetected": "Verschlüsselter Inhalt erkannt",
@@ -5369,7 +5382,8 @@
     "analyze": "Analysieren",
     "analyzeHint": "Erkennt Zertifikate, Schlüssel, CSRs und Ketten vor dem Import; in diesem Schritt wird nichts importiert.",
     "certificateChains": "Zertifikatsketten",
-    "keyPairsDetected": "{{count}} Schlüssel-Zertifikat-Paar(e) erkannt",
+    "keyPairsDetected_one": "{{count}} Schlüssel-Zertifikat-Paar erkannt",
+    "keyPairsDetected_other": "{{count}} Schlüssel-Zertifikat-Paare erkannt",
     "detectedObjects": "Erkannte Objekte",
     "importOptions": "Import-Optionen",
     "skipDuplicates": "Duplikate überspringen",
@@ -5377,12 +5391,14 @@
     "importCertificates": "Zertifikate importieren",
     "importKeys": "Schlüssel importieren",
     "importCSRs": "CSRs importieren",
-    "importObjects": "{{count}} Objekt(e) importieren",
+    "importObjects_one": "{{count}} Objekt importieren",
+    "importObjects_other": "{{count}} Objekte importieren",
     "importingObjects": "Objekte werden importiert...",
     "importComplete": "Import abgeschlossen",
     "noObjectsImported": "Keine Objekte importiert",
     "allSkipped": "Alle Objekte wurden übersprungen oder existieren bereits",
-    "privateKeysMatched": "private(r) Schlüssel übereinstimmend",
+    "privateKeysMatched_one": "{{count}} privater Schlüssel zugeordnet",
+    "privateKeysMatched_other": "{{count}} private Schlüssel zugeordnet",
     "importMore": "Mehr importieren",
     "allFormats": "Alle Formate: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "dropFileHere": "Datei hier ablegen oder",
@@ -6472,7 +6488,8 @@
     "title": "Exportieren",
     "titleCertificate": "Zertifikat exportieren",
     "titleCa": "CA exportieren",
-    "skippedUnreadable": "{{count}} nicht lesbare(s) Zertifikat(e) wurde(n) nicht exportiert",
+    "skippedUnreadable_one": "{{count}} nicht lesbares Zertifikat wurde nicht exportiert",
+    "skippedUnreadable_other": "{{count}} nicht lesbare Zertifikate wurden nicht exportiert",
     "format": "Format",
     "options": "Optionen",
     "password": "Passwort",
@@ -6776,7 +6793,8 @@
       "caption": "Netzwerkanalysen. Aktivieren Sie einen Namen, um die Details zu öffnen.",
       "create": "Neue Analyse…",
       "found": "Gefunden",
-      "foundNew": "{{count}}, davon {{fresh}} neu",
+      "foundNew_one": "{{total}}, davon {{count}} neu",
+      "foundNew_other": "{{total}}, davon {{count}} neu",
       "last": "Letzte Analyse",
       "next": "Nächste Analyse",
       "notScanned": "Nicht analysiert",
@@ -6796,7 +6814,8 @@
       "removeText": "Die Analyse und ihr Zeitplan werden gelöscht. Die von ihr gefundenen Zertifikate bleiben unter den gefundenen Zertifikaten.",
       "empty": "Keine Netzwerkanalyse",
       "emptyText": "Eine Analyse listet die in einem Adressbereich bereitgestellten Zertifikate auf, zum Beispiel 192.0.2.0/24, um sie mit dem Bestand abzugleichen.",
-      "progress": "Scan läuft: {{scanned}} von {{total}} Zielen, {{found}} Zertifikate gefunden."
+      "progress": "Scan läuft: {{scanned}} von {{total}} Zielen, {{found}} Zertifikate gefunden.",
+      "createTitle": "Neue Analyse"
     },
     "found": {
       "unit_one": "{{count}} Zertifikat",
@@ -6866,7 +6885,8 @@
       },
       "timeoutHint": "Sekunden pro Verbindung, 1 bis 30.",
       "workersHint": "Gleichzeitige Verbindungen, 1 bis 50."
-    }
+    },
+    "quickScanTitle": "Schnellscan"
   },
   "compliance": {
     "title": "Konformitätsbewertung",
@@ -7248,7 +7268,8 @@
     "signingCertCa": "CA-Zertifikat (nur bei ausgeschaltetem strengem Modus)",
     "signerExpires": "Läuft ab",
     "signerChainComplete": "Die Ausstellerkette reicht bis zu einer selbstsignierten Wurzel und wird in jeden Token eingebettet.",
-    "signerChainPartial": "Ausstellerkette: {{count}} Zertifikat(e) eingebettet; erreicht keine selbstsignierte Wurzel.",
+    "signerChainPartial_one": "Ausstellerkette: {{count}} Zertifikat eingebettet; erreicht keine selbstsignierte Wurzel.",
+    "signerChainPartial_other": "Ausstellerkette: {{count}} Zertifikate eingebettet; erreicht keine selbstsignierte Wurzel.",
     "signerUnsaved": "Speichern Sie die Konfiguration, um dieses Signaturzertifikat anzuwenden und zu validieren.",
     "signerUnusable": "Dieses Zertifikat kann derzeit nicht zum Signieren von Zeitstempeln verwendet werden.",
     "signerStrictBadge": "RFC 3161 streng",
@@ -7383,7 +7404,9 @@
     "filterByType": "Nach Typ filtern",
     "certTotal": "Signierte Zertifikate:",
     "range": "{{shown}} von {{count}} SSH-CAs",
-    "pageRange": "{{start}}–{{end}} von {{count}} SSH-CAs"
+    "pageRange": "{{start}}–{{end}} von {{count}} SSH-CAs",
+    "moreActions": "Weitere Aktionen für {{name}}",
+    "actionsTitle": "Aktionen der SSH-CA"
   },
   "sshCertificates": {
     "title": "SSH-Zertifikate",
@@ -7473,7 +7496,9 @@
     "filterByState": "Nach Status filtern",
     "searchLabel": "Schlüssel-ID, Principal, Seriennummer…",
     "pageRange": "{{start}}–{{end}} von {{count}} SSH-Zertifikaten",
-    "grants": "Principals und Optionen"
+    "grants": "Principals und Optionen",
+    "moreActions": "Weitere Aktionen für {{name}}",
+    "actionsTitle": "Aktionen des SSH-Zertifikats"
   },
   "filters": {
     "managePresets": "Voreinstellungen verwalten"

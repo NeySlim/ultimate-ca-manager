@@ -11,7 +11,7 @@ const KEYS = [
   'atelier.state', 'acme.createdOn', 'acme.columns.orders', 'acme.method', 'common.expires', 'common.created', 'common.source', 'common.issued',
   'acme.environment', 'acme.columns.failures', 'acme.columns.wildcard', 'common.default', 'acme.proxy', 'common.type', 'acme.eab.created',
   'scep.requested', 'scep.columns.lastTest', 'est.columns.authShort', 'tsa.columns.digest', 'tsa.columns.policy',
-  'crlOcsp.columns.crlNumber', 'crlOcsp.columns.publication', 'crlOcsp.columns.nextUpdate',
+  'crlOcsp.columns.published', 'crlOcsp.columns.nextUpdate',
 ]
 const at = (tree, key) => key.split('.').reduce((node, part) => node?.[part], tree)
 

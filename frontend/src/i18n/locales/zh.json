@@ -840,7 +840,6 @@
     "ctSubmitted": "证书已提交到CT日志",
     "ctSubmitFailed": "提交到CT日志失败",
     "ctScts": "CT SCTs",
-    "ctSctsCount": "已记录{{count}}个SCT",
     "ctNoScts": "无SCT: 未提交到CT日志",
     "eku": {
       "title": "扩展密钥用法 (EKU)",
@@ -2222,12 +2221,16 @@
     "revokeOnRenewal": "续期后吊销旧证书",
     "revokeOnRenewalDesc": "签发新证书时自动以'superseded'为由吊销前一个证书",
     "renewalPolicy": "续期策略",
-    "revokeExistingSuperseded": "吊销现有证书 {{count}}",
+    "revokeExistingSuperseded_one": "同时吊销 {{count}} 个已被替代的现有证书",
+    "revokeExistingSuperseded_other": "同时吊销 {{count}} 个已被替代的现有证书",
     "revokeExistingSupersededDesc": "以'superseded'为由吊销这些域名的已签发证书",
     "revokeSupersededConfirmTitle": "吊销现有证书？",
-    "revokeSupersededConfirmDesc": "这将吊销已配置域名的所有现有证书。此操作无法撤消 {{count}}",
-    "revokeSupersededConfirmAction": "吊销 {{count}}",
-    "supersededRevoked": "证书已被标记为已替代并吊销 {{count}}",
+    "revokeSupersededConfirmDesc_one": "这将立即吊销 {{count}} 个已被新版本替代的证书。此操作不可撤销。已吊销的证书会出现在 CRL 中，并通过 OCSP 报告为已吊销。",
+    "revokeSupersededConfirmDesc_other": "这将立即吊销 {{count}} 个已被新版本替代的证书。此操作不可撤销。已吊销的证书会出现在 CRL 中，并通过 OCSP 报告为已吊销。",
+    "revokeSupersededConfirmAction_one": "吊销 {{count}} 个证书",
+    "revokeSupersededConfirmAction_other": "吊销 {{count}} 个证书",
+    "supersededRevoked_one": "已吊销 {{count}} 个已被替代的证书",
+    "supersededRevoked_other": "已吊销 {{count}} 个已被替代的证书",
     "domains": "域名",
     "domainsHelper": "每行一个域名。使用*.domain.com表示通配符。",
     "atLeastOneDomainRequired": "至少需要一个域名",
@@ -2430,7 +2433,8 @@
       "statusUsed": "已使用",
       "statusRevoked": "已吊销",
       "statusExpired": "已过期",
-      "totalCount": "{{count}} 个凭据",
+      "totalCount_one": "{{count}} 个凭据",
+      "totalCount_other": "{{count}} 个凭据",
       "search": "搜索凭据",
       "created": "创建时间",
       "usedAt": "使用时间",
@@ -2519,7 +2523,8 @@
     "defaultProfileNone": "无（90 天，默认摘要）",
     "defaultProfileDesc": "适用于客户端未请求任何配置文件的订单（大多数客户端都是如此）；未设置时，这类订单获得 90 天有效期和默认摘要",
     "localOrders": "本地订单",
-    "localOrdersCount": "{{count}} 个订单",
+    "localOrdersCount_one": "{{count}} 个订单",
+    "localOrdersCount_other": "{{count}} 个订单",
     "localOrdersLoadFailed": "无法加载本地订单",
     "deleteLocalOrderConfirm": "删除此订单？",
     "deleteLocalOrderConfirmDesc": "将删除 {{domain}} 的订单及其授权和质询。已签发的证书（如有）将保留。",
@@ -2527,7 +2532,8 @@
     "purgeLocalOrders": "清理过期订单",
     "purgeLocalOrdersConfirm": "清理过期订单？",
     "purgeLocalOrdersConfirmDesc": "删除未签发的过期订单及其授权和质询。已签发的订单将保留。",
-    "purgeLocalOrdersDone": "清理完成：已删除 {{count}} 个订单",
+    "purgeLocalOrdersDone_one": "清理完成：已删除 {{count}} 个订单",
+    "purgeLocalOrdersDone_other": "清理完成：已删除 {{count}} 个订单",
     "purgeLocalOrdersFailed": "清理失败",
     "noLocalOrders": "没有本地订单",
     "noLocalOrdersDesc": "ACME 客户端对内置服务器发起的订单将显示在此处",
@@ -2816,7 +2822,8 @@
     "intuneAppUpdated": "已更新应用注册",
     "intuneAppDeleted": "已删除应用注册",
     "intuneAppDeleteConfirm": "删除应用注册“{{name}}”？",
-    "intuneAppUsedBy": "被 {{count}} 个配置文件使用",
+    "intuneAppUsedBy_one": "被 {{count}} 个配置文件使用",
+    "intuneAppUsedBy_other": "被 {{count}} 个配置文件使用",
     "intuneAppNotUsed": "未被任何配置文件使用",
     "intuneAppLastTest": "上次测试",
     "intuneAppNeverTested": "从未测试",
@@ -2893,7 +2900,10 @@
     "challengeExpires": "过期时间",
     "challengeAge": "时长",
     "challengeAgeUnknown": "未记录",
-    "newIntuneAppShort": "新建应用"
+    "newIntuneAppShort": "新建应用",
+    "deletedProfile": "已删除的配置文件（编号 {{id}}）",
+    "approvedAuto": "自动",
+    "searchChallenges": "搜索证书颁发机构..."
   },
   "crlOcsp": {
     "crl": "证书吊销列表",
@@ -2999,8 +3009,6 @@
     "ocspInactive": "未启用",
     "columns": {
       "published": "发布时间",
-      "publication": "发布",
-      "crlNumber": "CRL 编号",
       "nextUpdate": "下次更新"
     },
     "tabs": {
@@ -3190,8 +3198,10 @@
     "noManagedCAs": "没有可用的托管CA",
     "alreadyInTruststore": "已在信任存储中",
     "addedFromManaged": "已从托管CA添加",
-    "addedCount": "{{count}}个CA已添加到信任存储",
-    "addSelected": "添加{{count}}个已选",
+    "addedCount_one": "{{count}}个CA已添加到信任存储",
+    "addedCount_other": "{{count}}个CA已添加到信任存储",
+    "addSelected_one": "添加{{count}}个已选",
+    "addSelected_other": "添加{{count}}个已选",
     "exportBundle": "导出包",
     "bundleExported": "证书包已导出",
     "exportFailed": "导出包失败",
@@ -3221,7 +3231,9 @@
       "emptyTitle": "没有外部信任锚"
     },
     "systemBundleDescription": "从系统 CA 证书包导入",
-    "systemBundleNote": "自动从 {{path}} 导入"
+    "systemBundleNote": "自动从 {{path}} 导入",
+    "moreActions": "{{name}} 的其他操作",
+    "actionsTitle": "信任锚操作"
   },
   "importExport": {
     "tabs": {
@@ -5361,7 +5373,8 @@
     "pleaseAddFiles": "请添加文件或粘贴 PEM 内容",
     "unsupportedFormat": "不支持的文件: {{name}}。接受的格式: {{formats}}",
     "analyzeFailed": "分析内容失败",
-    "successImported": "成功导入 {{count}} 个对象",
+    "successImported_one": "成功导入 {{count}} 个对象",
+    "successImported_other": "成功导入 {{count}} 个对象",
     "files": "文件",
     "pastePemPlaceholder": "在此粘贴 PEM 编码的证书、密钥、CSR 或证书链...",
     "encryptedDetected": "检测到加密内容",
@@ -5369,7 +5382,8 @@
     "analyze": "分析",
     "analyzeHint": "导入前识别证书、密钥、CSR 和证书链；此步骤不会导入任何内容。",
     "certificateChains": "证书链",
-    "keyPairsDetected": "检测到 {{count}} 对密钥证书",
+    "keyPairsDetected_one": "检测到 {{count}} 对密钥证书",
+    "keyPairsDetected_other": "检测到 {{count}} 对密钥证书",
     "detectedObjects": "检测到的对象",
     "importOptions": "导入选项",
     "skipDuplicates": "跳过重复项",
@@ -5377,12 +5391,14 @@
     "importCertificates": "导入证书",
     "importKeys": "导入密钥",
     "importCSRs": "导入 CSR",
-    "importObjects": "导入 {{count}} 个对象",
+    "importObjects_one": "导入 {{count}} 个对象",
+    "importObjects_other": "导入 {{count}} 个对象",
     "importingObjects": "正在导入对象...",
     "importComplete": "导入完成",
     "noObjectsImported": "未导入对象",
     "allSkipped": "所有对象被跳过或已存在",
-    "privateKeysMatched": "个私钥匹配",
+    "privateKeysMatched_one": "{{count}} 个私钥匹配",
+    "privateKeysMatched_other": "{{count}} 个私钥匹配",
     "importMore": "导入更多",
     "allFormats": "所有格式: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "dropFileHere": "将文件拖放到此处，或",
@@ -6472,7 +6488,8 @@
     "title": "导出",
     "titleCertificate": "导出证书",
     "titleCa": "导出 CA",
-    "skippedUnreadable": "有 {{count}} 个无法读取的证书未导出",
+    "skippedUnreadable_one": "有 {{count}} 个无法读取的证书未导出",
+    "skippedUnreadable_other": "有 {{count}} 个无法读取的证书未导出",
     "format": "格式",
     "options": "选项",
     "password": "密码",
@@ -6776,7 +6793,8 @@
       "caption": "网络分析。激活名称以打开其详情。",
       "create": "新建分析…",
       "found": "已发现",
-      "foundNew": "{{count}}，其中 {{fresh}} 个新证书",
+      "foundNew_one": "{{total}}，其中 {{count}} 个新证书",
+      "foundNew_other": "{{total}}，其中 {{count}} 个新证书",
       "last": "上次分析",
       "next": "下次分析",
       "notScanned": "未分析",
@@ -6796,7 +6814,8 @@
       "removeText": "将删除该分析及其计划。它发现的证书仍保留在已发现证书中。",
       "empty": "没有网络分析",
       "emptyText": "分析会列出某个地址范围（例如 192.0.2.0/24）上暴露的证书，以便将其与清单关联。",
-      "progress": "正在扫描：{{scanned}} / {{total}} 个目标，已发现 {{found}} 个证书。"
+      "progress": "正在扫描：{{scanned}} / {{total}} 个目标，已发现 {{found}} 个证书。",
+      "createTitle": "新建分析"
     },
     "found": {
       "unit_one": "{{count}} 个证书",
@@ -6866,7 +6885,8 @@
       },
       "timeoutHint": "每个连接的秒数，1 到 30。",
       "workersHint": "同时连接数，1 到 50。"
-    }
+    },
+    "quickScanTitle": "快速扫描"
   },
   "compliance": {
     "title": "合规评分",
@@ -7248,7 +7268,8 @@
     "signingCertCa": "CA 证书（仅在关闭严格模式时）",
     "signerExpires": "到期",
     "signerChainComplete": "颁发者链可追溯到自签名根证书，并包含在每个令牌中。",
-    "signerChainPartial": "颁发者链：已包含 {{count}} 个证书；未到达自签名根。",
+    "signerChainPartial_one": "颁发者链：已包含 {{count}} 个证书；未到达自签名根。",
+    "signerChainPartial_other": "颁发者链：已包含 {{count}} 个证书；未到达自签名根。",
     "signerUnsaved": "保存配置以应用并验证此签名证书。",
     "signerUnusable": "此证书当前无法用于签署时间戳。",
     "signerStrictBadge": "RFC 3161 严格",
@@ -7383,7 +7404,9 @@
     "filterByType": "按类型筛选",
     "certTotal": "已签发证书：",
     "range": "{{shown}} / {{count}} 个 SSH CA",
-    "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH CA"
+    "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH CA",
+    "moreActions": "{{name}} 的其他操作",
+    "actionsTitle": "SSH CA 操作"
   },
   "sshCertificates": {
     "title": "SSH 证书",
@@ -7473,7 +7496,9 @@
     "filterByState": "按状态筛选",
     "searchLabel": "密钥 ID、主体、序列号…",
     "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH 证书",
-    "grants": "主体和选项"
+    "grants": "主体和选项",
+    "moreActions": "{{name}} 的其他操作",
+    "actionsTitle": "SSH 证书操作"
   },
   "filters": {
     "managePresets": "管理预设"

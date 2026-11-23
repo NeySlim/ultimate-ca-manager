@@ -19,6 +19,7 @@ import { usePermission, useClipboard, useCRUDPage } from '../hooks'
 import { useDockSelection } from '../components/atelier/useDockParam'
 import { copyRow, fact } from '../components/atelier/facts'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
+import { CertMenu } from './certificates/inspector/CertMenu'
 import { formatDate, downloadBlob, extractData } from '../lib/utils'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 import { findAlgorithm, isUsable, GROUP_RSA, GROUP_NIST } from '../lib/keyAlgorithms'
@@ -83,6 +84,7 @@ export default function SSHCAsPage() {
   const [importPrivateKey, setImportPrivateKey] = useState('')
   const [query, setQuery] = useState('')
   const [typeView, setTypeView] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
   // The open authority and its section live in the URL (`item`, `section`); found in the full list, not the page
   const { selected: selectedCA, select: setSelectedCA, section, setSection } = useDockSelection(sshCas, { ready: !loading, sections: SSH_CA_SECTIONS })
 
@@ -236,6 +238,13 @@ export default function SSHCAsPage() {
   const principals = open ? principalList(open) : []
   // A value the authority has, else the absence in grey
 
+  // The panel keeps its two everyday actions; the others, deletion last, in its « ⋯ » menu (CSR, templates)
+  const menuItems = open ? [
+    { id: 'krl', icon: 'download', label: t('sshCas.downloadKrl'), onClick: () => handleDownloadKRL(open) },
+    canWrite('ssh_cas') && { id: 'edit', icon: 'settings', label: t('common.edit'), write: true, onClick: () => openEdit(open) },
+    canDelete('ssh_cas') && { id: 'delete', icon: 'close', label: t('common.delete'), danger: true, write: true, onClick: () => handleDelete(open) },
+  ].filter(Boolean) : []
+
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('sshCas.title') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
       tabs={[{ key: open.id, title: open.descr || t('common.unnamed'), icon: 'terminal' }]} onClose={() => setSelectedCA(null)}>
@@ -244,12 +253,10 @@ export default function SSHCAsPage() {
         sections={[['overview', t('atelier.overview')], ['install', t('sshCas.quickInstall')], ['config', t('sshCas.configuration')], ['key', t('sshCas.publicKey')]]}
         actions={<>
           <Btn icon="download" id="ssh-ca-pubkey" onClick={() => handleDownloadPublicKey(open)}>{t('sshCas.downloadPublicKey')}</Btn>
-          <Btn icon="download" id="ssh-ca-krl" onClick={() => handleDownloadKRL(open)}>{t('sshCas.downloadKrl')}</Btn>
           <Btn icon={isCopied('publicKey') ? 'check' : 'copy'} id="ssh-ca-copy" onClick={() => handleCopyPublicKey(open)}>
             {isCopied('publicKey') ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
           </Btn>
-          {canWrite('ssh_cas') && <Btn icon="settings" id="ssh-ca-edit" write onClick={() => openEdit(open)}>{t('common.edit')}</Btn>}
-          {canDelete('ssh_cas') && <Btn tone="danger" icon="block" id="ssh-ca-delete" onClick={() => handleDelete(open)}>{t('common.delete')}</Btn>}
+          <IconBtn quiet icon="more" title={false} label={t('sshCas.moreActions', { name: open.descr || '' })} data-ssh-ca-menu={open.id} onClick={() => setMenuOpen(true)} />
         </>}>
         {section === 'overview' && (
           <div className="module-detail">
@@ -324,6 +331,7 @@ export default function SSHCAsPage() {
 
   return (
     <Zone dock={dock} after={<>
+      {menuOpen && open && <CertMenu title={t('sshCas.actionsTitle')} name={open.descr || t('common.unnamed')} items={menuItems} onClose={() => setMenuOpen(false)} />}
       {showModal && (
         <SSHCAModal ca={editingCA} onSave={editingCA ? handleUpdate : handleCreate} onClose={() => { setShowModal(false); setEditingCA(null) }} />
       )}
@@ -367,7 +375,7 @@ export default function SSHCAsPage() {
         rowActions={(ca) => [
           ...(canWrite('ssh_cas') ? [{ icon: 'settings', label: t('common.edit'), write: true, onClick: openEdit }] : []),
           { icon: 'download', label: t('sshCas.downloadPublicKey'), onClick: handleDownloadPublicKey },
-          ...(canDelete('ssh_cas') ? [{ icon: 'block', label: t('common.delete'), write: true, onClick: () => handleDelete(ca) }] : []),
+          ...(canDelete('ssh_cas') ? [{ icon: 'close', label: t('common.delete'), write: true, onClick: () => handleDelete(ca) }] : []),
         ]}
         empty={narrowed && sshCas.length ? (
           <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setQuery(''); setTypeView('') }} />

@@ -177,6 +177,18 @@ describe('Template dock', () => {
   })
 })
 
+describe('Template words', () => {
+  it('names the digest SHA-256 as the certificates do, in the panel and in the form', async () => {
+    const { container } = renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Web Server' }))
+    const dock = await waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
+    expect(within(dock).getByText('Digest', { selector: 'dt' }).closest('.row')).toHaveTextContent('SHA-256')
+    fireEvent.click(screen.getByRole('button', { name: 'Create Template' }))
+    const digest = await screen.findByLabelText('Digest')
+    expect([...digest.options].map((o) => o.textContent)).toEqual(['SHA-256', 'SHA-384', 'SHA-512'])
+  })
+})
+
 describe('Template dock in the URL', () => {
   let where
   function Where() { const l = useLocation(); where = l.pathname + l.search; return null }

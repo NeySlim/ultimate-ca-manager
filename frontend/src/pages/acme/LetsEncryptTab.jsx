@@ -12,6 +12,7 @@ import { publicBaseUrl } from '../../lib/utils'
 import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms, isBrainpool } from '../../lib/keyAlgorithms'
 import { useKeyPlatform } from '../../lib/policyAlgorithms'
 import DnsUpdatePortField from './DnsUpdatePortField'
+import { parseDnsUpdatePort } from './dnsUpdatePort'
 import { Field, Notice, soleLegendsOff } from '../protocols/atelierParts'
 import { copyRow } from '../../components/atelier/facts'
 
@@ -25,9 +26,11 @@ const clientDraft = (s) => ({
   ...Object.fromEntries(Object.entries(BOOLS).map(([k, d]) => [k, s[k] ?? d])),
   ...Object.fromEntries(Object.entries(BOUNDS).map(([k, [, , d]]) => [k, String(s[k] ?? d)])),
   proxy_acme_account_id: s.proxy_acme_account_id != null ? String(s.proxy_acme_account_id) : '',
+  // Set by the environment, the port is read-only and never part of the draft
+  ...(s.dns_update_port_env == null ? { dns_update_port: String(s.dns_update_port ?? 0) } : {}),
 })
 
-export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWrite, onSaved, onSaveDnsUpdatePort, onRegisterProxy, onUnregisterProxy,
+export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWrite, onSaved, restartRequired = false, onRegisterProxy, onUnregisterProxy,
   onResetProxyAccount, onTestConnection, testingConnection, connectionResult }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
@@ -60,6 +63,7 @@ export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWri
       const n = Number(draft[k])
       if (!Number.isInteger(n) || n < min || n > max) e[k] = t('acme.boundsError', { min, max })
     }
+    if ('dns_update_port' in draft && parseDnsUpdatePort(draft.dns_update_port) === null) e.dns_update_port = t('acme.dnsUpdate.portInvalid')
     return e
   }
 
@@ -71,13 +75,14 @@ export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWri
       requestAnimationFrame(() => document.querySelector('#settings-form [aria-invalid="true"]')?.focus())
       return
     }
-    const patch = Object.fromEntries(changed.map((k) => [k, k in BOUNDS ? Number(draft[k]) : k === 'proxy_acme_account_id' ? (draft[k] ? Number(draft[k]) : null) : draft[k]]))
+    const patch = Object.fromEntries(changed.map((k) => [k, k in BOUNDS || k === 'dns_update_port' ? Number(draft[k]) : k === 'proxy_acme_account_id' ? (draft[k] ? Number(draft[k]) : null) : draft[k]]))
     setSaving(true)
     try {
-      await acmeService.updateClientSettings(patch)
+      const res = await acmeService.updateClientSettings(patch)
       showSuccess(t('messages.success.update.settings'))
       setAnnounce(t('messages.success.update.settings'))
-      await onSaved?.()
+      // The page reloads its settings: a new port's restart notice is kept by the page, past the reload
+      await onSaved?.('dns_update_port' in patch ? { restartRequired: !!res?.data?.restart_required } : {})
       stateRef.current?.focus()
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
@@ -85,6 +90,8 @@ export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWri
       setSaving(false)
     }
   }
+
+  const change = (k, v) => { setDraft((d) => ({ ...d, [k]: v })); if (errors[k]) setErrors((e) => { const n = { ...e }; delete n[k]; return n }) }
 
   const sections = [
     {
@@ -187,13 +194,18 @@ export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWri
     {
       id: 'dnsupdate', label: t('acme.dnsUpdate.portLabel'), icon: 'plug', desc: t('acme.dnsUpdate.portHelper'),
       groups: [],
-      children: <fieldset className="settings-group" aria-label={t('acme.dnsUpdate.portLabel')}><DnsUpdatePortField clientSettings={clientSettings} canWrite={canWrite} onSave={onSaveDnsUpdatePort} /></fieldset>,
+      children: (
+        <fieldset className="settings-group" aria-label={t('acme.dnsUpdate.portLabel')}>
+          <DnsUpdatePortField clientSettings={clientSettings} canWrite={canWrite} value={draft.dns_update_port} error={errors.dns_update_port}
+            restartRequired={restartRequired} onChange={(v) => change('dns_update_port', v)} />
+        </fieldset>
+      ),
     },
   ]
 
   return (
     <SettingsView sections={soleLegendsOff(sections)} values={draft} errors={errors} changed={changed}
-      onChange={(k, v) => { setDraft((d) => ({ ...d, [k]: v })); if (errors[k]) setErrors((e) => { const n = { ...e }; delete n[k]; return n }) }}
+      onChange={change}
       onSave={canWrite ? save : undefined} onReset={() => { setDraft(saved); setErrors({}) }} saving={saving} announce={announce} stateRef={stateRef}
       tocLabel={t('protocols.sectionsOf', { name: t('acme.views.client') })} />
   )

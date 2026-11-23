@@ -16,6 +16,11 @@ import { ChartTable, EmptyLine } from './viz'
  */
 export const OverviewContext = createContext(null)
 
+/** A mid-dot between two parts of a line, glued to the part before it: a wrapped line never starts with it. */
+export const SEP = '\u00a0· '
+/** A sign, figure and unit that never part on a narrow line (« − 33 % »). */
+export const NB = '\u00a0'
+
 /** A figure from the API response; anything but a finite number reads as a dash. */
 export function num(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : '–'
@@ -207,4 +212,11 @@ export function OverviewCard({ id, count, sub, tools, state, route, empty, missi
       {body}
     </Card>
   )
+}
+
+/** A lead (a gap, a pill) kept on the line of the text's first word, a no-break space between: it never ends a line alone. */
+export function KeepWith({ lead, text }) {
+  const gap = /^[\s\u00a0]/.test(text) ? '' : NB
+  const cut = text.indexOf(' ')
+  return <><span className="keep-with">{lead}{gap}{cut < 0 ? text : text.slice(0, cut)}</span>{cut < 0 ? '' : text.slice(cut)}</>
 }

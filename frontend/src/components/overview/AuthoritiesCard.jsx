@@ -13,7 +13,7 @@ import { compactDue, shortParts } from '../../lib/relativeTime'
 import { clockOf } from '../../lib/overviewTime'
 import { ISSUANCE_DAYS } from '../../lib/overviewViz'
 import { chooseTiles, daysSince } from '../../lib/overviewTiles'
-import { CardEmpty, OverviewCard, OverviewContext, settle, useCardData, useLang } from './shared'
+import { CardEmpty, OverviewCard, OverviewContext, SEP, settle, useCardData, useLang } from './shared'
 import { Spark } from './viz'
 
 const STATE_ICON = { good: 'check', warn: 'warning', bad: 'warning', muted: 'block' }
@@ -54,7 +54,7 @@ function CaTile({ tile, t }) {
         // An expired CA reads red as its pill; amber is for one late in its life
         <span className="life" style={{ '--tone': expired ? 'var(--bad)' : tile.late ? 'var(--warn-fill)' : 'var(--accent)' }}>
           <span>{t('overview.tiles.elapsed')}</span>
-          <span><b className={expired ? 'bad' : tile.late ? 'warn' : undefined}>{t('overview.compliance.pct', { pct: tile.elapsed })}</b>{tile.elapsed < 100 ? ` · ${t('overview.tiles.left', { when: left })}` : ''}</span>
+          <span><b className={expired ? 'bad' : tile.late ? 'warn' : undefined}>{t('overview.compliance.pct', { pct: tile.elapsed })}</b>{tile.elapsed < 100 ? `${SEP}${t('overview.tiles.left', { when: left })}` : ''}</span>
           <span className={expired ? 'track expired' : tile.late ? 'track late' : 'track'} role="img" aria-label={t('overview.tiles.elapsedAlt', { pct: tile.elapsed, when: left })}>
             <i style={{ width: `${Math.max(2, tile.elapsed)}%` }} />
           </span>

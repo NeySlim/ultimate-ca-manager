@@ -234,7 +234,7 @@ export default function DiscoveryPage() {
         actions={canScan && <>
           <Btn icon="radar" id="scan-run" write disabled={scanning || undefined} onClick={() => startScan(() => discoveryService.scanProfile(openedItem.id))}>{t('discovery.scans.runNow')}</Btn>
           <Btn icon="settings" id="scan-edit" write onClick={() => setDialog({ kind: 'profile', profile: openedItem, from: 'scan-edit' })}>{t('common.edit')}…</Btn>
-          <Btn tone="danger" icon="block" id="scan-remove" onClick={() => setDialog({ kind: 'removeProfile', item: openedItem, from: 'scan-remove' })}>{t('common.delete')}…</Btn>
+          <Btn tone="danger" icon="close" id="scan-remove" onClick={() => setDialog({ kind: 'removeProfile', item: openedItem, from: 'scan-remove' })}>{t('common.delete')}…</Btn>
         </>} />
     ) : view === 'history' ? (
       <RunDock run={openedItem} onClose={() => setOpened(null)} />
@@ -245,11 +245,12 @@ export default function DiscoveryPage() {
     )
   )
 
-  const createScan = canScan ? { label: t('discovery.scans.create'), icon: 'plus', primary: true, onClick: () => setDialog({ kind: 'profile', profile: null, from: 'scan-new' }) } : undefined
+  // The head already holds the primary action: the empty block repeats it as a secondary button
+  const createScan = canScan ? { label: t('discovery.scans.create'), icon: 'plus', onClick: () => setDialog({ kind: 'profile', profile: null, from: 'scan-new' }) } : undefined
   const quick = canScan ? { label: t('discovery.quickScanAsk'), icon: 'radar', onClick: () => setDialog({ kind: 'quick', from: 'scan-quick' }) } : undefined
   const others = VIEWS.filter((v) => v !== view)
   const switches = others.map((v) => (
-    <Btn key={v} tone="quiet" icon={VIEW_ICONS[v]} data-view={v} onClick={() => goView(v)}>{t(`discovery.views.${v}`)}</Btn>
+    <Btn key={v} icon={VIEW_ICONS[v]} data-view={v} onClick={() => goView(v)}>{t(`discovery.views.${v}`)}</Btn>
   ))
   const profileOptions = [{ value: '', label: t('discovery.allProfiles') }, ...profiles.map((p) => ({ value: String(p.id), label: p.name }))]
   const search = (id, label) => <SearchField id={id} name="q" label={label} placeholder={label} value={query} onChange={(v) => { setQuery(v); setPage(1) }} />
@@ -331,7 +332,7 @@ export default function DiscoveryPage() {
               <Btn icon="download" id="found-export" disabled={busy || !found.total || undefined} onClick={exportFound}>{t('common.export')}</Btn>
               {canScan && found.total > 0 && <Btn icon="globe" id="found-dns" write disabled={busy || undefined} onClick={resolveDns}>{t('discovery.bulkResolveDns')}</Btn>}
               {canScan && stats.errors > 0 && <Btn icon="refresh" id="found-retry-all" write disabled={scanning || undefined} onClick={retryErrors}>{t('discovery.retryAllErrors')}</Btn>}
-              {canScan && found.total > 0 && <Btn tone="danger" icon="block" id="found-purge" onClick={() => setDialog({ kind: 'removeAll', from: 'found-purge' })}>{t('discovery.deleteAll')}…</Btn>}
+              {canScan && found.total > 0 && <Btn tone="danger" icon="close" id="found-purge" onClick={() => setDialog({ kind: 'removeAll', from: 'found-purge' })}>{t('discovery.deleteAll')}…</Btn>}
             </Toolbar>
           )}
           title={(c) => foundTitle(c, t)} status={(c) => <FoundPill cert={c} />} openedId={openedId} onOpen={open('discovered')}

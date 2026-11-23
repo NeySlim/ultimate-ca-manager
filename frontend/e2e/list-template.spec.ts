@@ -250,20 +250,20 @@ test.describe('the sort', () => {
     await open(page, LISTS[2])
     const head = (name: string) => page.locator('#module-scroll thead th').filter({ hasText: name })
     await expect(head('Next Update')).toHaveAttribute('aria-sort', 'ascending')
-    const button = head('Publication').getByRole('button')
+    const button = head('Published').getByRole('button')
     await button.focus()
     await page.keyboard.press('Enter')
-    await expect(head('Publication')).toHaveAttribute('aria-sort', 'ascending')
+    await expect(head('Published')).toHaveAttribute('aria-sort', 'ascending')
     await expect(button).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect(head('Publication')).toHaveAttribute('aria-sort', 'descending')
+    await expect(head('Published')).toHaveAttribute('aria-sort', 'descending')
     await expect(page).toHaveURL(/[?&]sort=published&order=desc/)
     // The same order after a reload, read on the dates themselves: authorities other tests create meanwhile may come in
     await page.reload()
-    await expect(head('Publication')).toHaveAttribute('aria-sort', 'descending')
+    await expect(head('Published')).toHaveAttribute('aria-sort', 'descending')
     await expect(page.locator('#module-scroll tbody tr .entity-name').first()).toBeVisible()
     const dates = await page.locator('#module-scroll').evaluate((el) => {
-      const at = [...el.querySelectorAll('thead th')].findIndex((th) => th.textContent === 'Publication')
+      const at = [...el.querySelectorAll('thead th')].findIndex((th) => th.textContent === 'Published')
       return [...el.querySelectorAll('tbody tr')].map((tr) => Date.parse(tr.children[at].textContent || ''))
     })
     const known = dates.filter((d) => !Number.isNaN(d))
@@ -292,16 +292,16 @@ test.describe('the sort button and the sorted column', () => {
     }))
     expect(boxes.length).toBeGreaterThan(3)
     for (const d of boxes) expect(d.map(Math.abs).every((v) => v <= 1)).toBe(true)
-    await expect(head('Publication').getByRole('button')).toHaveAttribute('title', 'Sort by Publication')
+    await expect(head('Published').getByRole('button')).toHaveAttribute('title', 'Sort by Published')
     await expect(head('Next Update').getByRole('button')).toHaveAttribute('title', 'Sorted by Next Update, ascending order. Click to reverse')
     // The sorted column in weight 600 (R5), the others 400
     expect(await head('Next Update').evaluate((th) => getComputedStyle(th.querySelector('button')!).fontWeight)).toBe('600')
-    expect(await head('Publication').evaluate((th) => getComputedStyle(th.querySelector('button')!).fontWeight)).toBe('400')
+    expect(await head('Published').evaluate((th) => getComputedStyle(th.querySelector('button')!).fontWeight)).toBe('400')
     // Hover turns the label and its sign to the text colour, the sorted column's
     const text = await head('Next Update').evaluate((th) => getComputedStyle(th).color)
-    const colours = () => head('Publication').evaluate((th) => [getComputedStyle(th.querySelector('button')!).color, getComputedStyle(th.querySelector('svg')!).color])
+    const colours = () => head('Published').evaluate((th) => [getComputedStyle(th.querySelector('button')!).color, getComputedStyle(th.querySelector('svg')!).color])
     expect((await colours())[0]).not.toBe(text)
-    await head('Publication').hover({ position: { x: 20, y: 17 } })
+    await head('Published').hover({ position: { x: 20, y: 17 } })
     expect(await colours()).toEqual([text, text])
     // The keyboard's ring stays inside the 34 px header (G7); Tab passes the column's handle (C2) before the next header
     await page.mouse.move(0, 0)
@@ -311,9 +311,9 @@ test.describe('the sort button and the sorted column', () => {
     await page.keyboard.press('Tab')
     const ring = await page.evaluate(() => { const b = document.activeElement as HTMLElement; return [b.matches(':focus-visible'), getComputedStyle(b).outlineOffset, b.closest('th') !== null] })
     expect(ring).toEqual([true, '-2px', true])
-    const cell = (await head('Publication').boundingBox())!
+    const cell = (await head('Published').boundingBox())!
     await page.mouse.click(cell.x + cell.width - 16, cell.y + cell.height / 2)
-    await expect(head('Publication')).toHaveAttribute('aria-sort', 'ascending')
+    await expect(head('Published')).toHaveAttribute('aria-sort', 'ascending')
   })
 })
 

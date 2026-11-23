@@ -23,7 +23,7 @@ const PER_PAGE = 50
 const NEWEST = { key: 'created_at', asc: false }
 const SORT_KEYS = ['domain', 'account', 'expires', 'created_at', 'status']
 
-export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
+export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked, onTotal }) {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -54,6 +54,8 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
       const nextMeta = data.meta || { page: p, per_page: PER_PAGE, total: 0 }
       const totalPages = Math.max(1, Math.ceil(nextMeta.total / nextMeta.per_page))
       setMeta(nextMeta)
+      // Unfiltered, the total is the view's: the page head and the tab say it
+      if (!s) onTotal?.(nextMeta.total)
       if (p > totalPages) {
         setPage(totalPages)
         return
@@ -64,7 +66,7 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
     } finally {
       setLoading(false)
     }
-  }, [page, status, sort, showError, t])
+  }, [page, status, sort, showError, t, onTotal])
 
   useEffect(() => { load(page, status) }, [page, status, sort]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (linkedOrder) setOpened(linkedOrder) }, [linkedOrder]) // eslint-disable-line react-hooks/exhaustive-deps

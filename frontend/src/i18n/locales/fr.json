@@ -292,12 +292,16 @@
     "revokeOnRenewal": "Révoquer l’ancien certificat après renouvellement",
     "revokeOnRenewalDesc": "Révoquer automatiquement le certificat précédent avec la raison 'superseded' lors de l’émission d’un nouveau",
     "renewalPolicy": "Politique de renouvellement",
-    "revokeExistingSuperseded": "Révoquer aussi {{count}} certificat(s) déjà remplacé(s)",
+    "revokeExistingSuperseded_one": "Révoquer aussi {{count}} certificat déjà remplacé",
+    "revokeExistingSuperseded_other": "Révoquer aussi {{count}} certificats déjà remplacés",
     "revokeExistingSupersededDesc": "Révoquer les anciens certificats déjà remplacés par des renouvellements",
     "revokeSupersededConfirmTitle": "Révoquer les certificats remplacés",
-    "revokeSupersededConfirmDesc": "Cette action va immédiatement révoquer {{count}} certificat(s) remplacé(s) par des versions plus récentes. Cette action est irréversible. Les certificats révoqués apparaîtront dans les CRL et seront signalés comme révoqués via OCSP.",
-    "revokeSupersededConfirmAction": "Révoquer {{count}} certificat(s)",
-    "supersededRevoked": "{{count}} certificat(s) remplacé(s) révoqué(s) avec succès",
+    "revokeSupersededConfirmDesc_one": "Cette action va immédiatement révoquer {{count}} certificat remplacé par une version plus récente. Cette action est irréversible. Les certificats révoqués apparaîtront dans les CRL et seront signalés comme révoqués via OCSP.",
+    "revokeSupersededConfirmDesc_other": "Cette action va immédiatement révoquer {{count}} certificats remplacés par des versions plus récentes. Cette action est irréversible. Les certificats révoqués apparaîtront dans les CRL et seront signalés comme révoqués via OCSP.",
+    "revokeSupersededConfirmAction_one": "Révoquer {{count}} certificat",
+    "revokeSupersededConfirmAction_other": "Révoquer {{count}} certificats",
+    "supersededRevoked_one": "{{count}} certificat remplacé révoqué",
+    "supersededRevoked_other": "{{count}} certificats remplacés révoqués",
     "domains": "Domaines",
     "domainsHelper": "Un domaine par ligne. Utilisez *.domaine.com pour les wildcards.",
     "atLeastOneDomainRequired": "Au moins un domaine est requis",
@@ -500,7 +504,8 @@
       "statusUsed": "Utilisé",
       "statusRevoked": "Révoqué",
       "statusExpired": "Expiré",
-      "totalCount": "{{count}} identifiant(s)",
+      "totalCount_one": "{{count}} identifiant",
+      "totalCount_other": "{{count}} identifiants",
       "search": "Rechercher des identifiants",
       "created": "Créé",
       "usedAt": "Utilisé",
@@ -589,7 +594,8 @@
     "defaultProfileNone": "Aucun (90 jours, digest par défaut)",
     "defaultProfileDesc": "Appliqué aux commandes dont le client ne demande aucun profil, ce que font la plupart des clients ; sans lui, ces commandes reçoivent 90 jours et le digest par défaut",
     "localOrders": "Commandes locales",
-    "localOrdersCount": "{{count}} commande(s)",
+    "localOrdersCount_one": "{{count}} commande",
+    "localOrdersCount_other": "{{count}} commandes",
     "localOrdersLoadFailed": "Échec du chargement des commandes locales",
     "deleteLocalOrderConfirm": "Supprimer cette commande ?",
     "deleteLocalOrderConfirmDesc": "La commande pour {{domain}} et ses autorisations et challenges seront supprimés. Le certificat émis, le cas échéant, est conservé.",
@@ -597,7 +603,8 @@
     "purgeLocalOrders": "Purger les expirées",
     "purgeLocalOrdersConfirm": "Purger les commandes expirées ?",
     "purgeLocalOrdersConfirmDesc": "Supprime les commandes expirées non émises avec leurs autorisations et challenges. Les commandes émises sont conservées.",
-    "purgeLocalOrdersDone": "Purge terminée : {{count}} commande(s) supprimée(s)",
+    "purgeLocalOrdersDone_one": "Purge terminée : {{count}} commande supprimée",
+    "purgeLocalOrdersDone_other": "Purge terminée : {{count}} commandes supprimées",
     "purgeLocalOrdersFailed": "Échec de la purge",
     "noLocalOrders": "Aucune commande locale",
     "noLocalOrdersDesc": "Les commandes passées par les clients ACME sur le serveur intégré apparaîtront ici",
@@ -1592,7 +1599,6 @@
     "ctSubmitted": "Certificat soumis aux journaux CT",
     "ctSubmitFailed": "Échec de la soumission aux journaux CT",
     "ctScts": "SCTs CT",
-    "ctSctsCount": "{{count}} SCT(s) enregistré(s)",
     "ctNoScts": "Aucun SCT : non soumis aux journaux CT",
     "eku": {
       "title": "Utilisations étendues de la clé (EKU)",
@@ -2560,8 +2566,6 @@
     "ocspInactive": "Inactif",
     "columns": {
       "published": "Publiée",
-      "publication": "Publication",
-      "crlNumber": "Numéro de CRL",
       "nextUpdate": "Échéance"
     },
     "tabs": {
@@ -3136,7 +3140,8 @@
     "pleaseAddFiles": "Veuillez ajouter des fichiers ou coller du contenu PEM",
     "unsupportedFormat": "Fichier non supporté : {{name}}. Formats acceptés : {{formats}}",
     "analyzeFailed": "Échec de l’analyse du contenu",
-    "successImported": "{{count}} objet(s) importé(s) avec succès",
+    "successImported_one": "{{count}} objet importé avec succès",
+    "successImported_other": "{{count}} objets importés avec succès",
     "files": "Fichiers",
     "pastePemPlaceholder": "Collez des certificats, clés, CSRs ou chaînes encodés en PEM ici...",
     "encryptedDetected": "Contenu chiffré détecté",
@@ -3144,7 +3149,8 @@
     "analyze": "Analyser",
     "analyzeHint": "Reconnaît certificats, clés, CSR et chaînes avant l’import ; rien n’est importé à cette étape.",
     "certificateChains": "Chaînes de certificats",
-    "keyPairsDetected": "{{count}} paire(s) clé-certificat détectée(s)",
+    "keyPairsDetected_one": "{{count}} paire clé-certificat détectée",
+    "keyPairsDetected_other": "{{count}} paires clé-certificat détectées",
     "detectedObjects": "Objets détectés",
     "importOptions": "Options d’importation",
     "skipDuplicates": "Ignorer les doublons",
@@ -3152,12 +3158,14 @@
     "importCertificates": "Importer les certificats",
     "importKeys": "Importer les clés",
     "importCSRs": "Importer les CSR",
-    "importObjects": "Importer {{count}} objet(s)",
+    "importObjects_one": "Importer {{count}} objet",
+    "importObjects_other": "Importer {{count}} objets",
     "importingObjects": "Importation en cours...",
     "importComplete": "Importation terminée",
     "noObjectsImported": "Aucun objet importé",
     "allSkipped": "Tous les objets ont été ignorés ou existent déjà",
-    "privateKeysMatched": "clé(s) privée(s) associée(s)",
+    "privateKeysMatched_one": "{{count}} clé privée associée",
+    "privateKeysMatched_other": "{{count}} clés privées associées",
     "importMore": "Importer d’autres",
     "allFormats": "Tous les formats : PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "dropFileHere": "Déposez un fichier ici ou",
@@ -3463,7 +3471,7 @@
     "intuneForcesAutoApprove": "Intune nécessite l’approbation automatique : son flux d’inscription est un aller-retour synchrone de validation puis émission, pas une file d’approbation manuelle.",
     "intuneEnabled": "Validation du défi SCEP Microsoft Intune",
     "intuneHelpTitle": "Enregistrement d’application Entra requis",
-    "intuneHelpDesc": "Enregistrez une application dans Microsoft Entra ID avec les autorisations d’application Intune API → SCEP challenge validation (scep_challenge_provider) et Microsoft Graph → Application.Read.All, avec consentement administrateur. Intune émet son propre challenge par appareil au lieu du challenge statique ci-dessus : les deux s’excluent mutuellement.",
+    "intuneHelpDesc": "Enregistrez une application dans Microsoft Entra ID avec les autorisations d’application Intune API → SCEP challenge validation (scep_challenge_provider) et Microsoft Graph → Application.Read.All, avec consentement administrateur. Intune émet son propre mot de passe de défi par appareil au lieu du mot de passe statique ci-dessus : les deux s’excluent mutuellement.",
     "intuneTenantId": "ID de locataire",
     "intuneClientId": "ID client",
     "intuneClientSecret": "Secret client",
@@ -3483,7 +3491,8 @@
     "intuneAppUpdated": "Inscription d’application mise à jour",
     "intuneAppDeleted": "Inscription d’application supprimée",
     "intuneAppDeleteConfirm": "Supprimer l’inscription d’application {{name}} ?",
-    "intuneAppUsedBy": "Utilisée par {{count}} profil(s)",
+    "intuneAppUsedBy_one": "Utilisée par {{count}} profil",
+    "intuneAppUsedBy_other": "Utilisée par {{count}} profils",
     "intuneAppNotUsed": "Utilisée par aucun profil",
     "intuneAppLastTest": "Dernier test",
     "intuneAppNeverTested": "jamais testée",
@@ -3560,7 +3569,10 @@
     "challengeExpires": "Expire le",
     "challengeAge": "Âge",
     "challengeAgeUnknown": "Non enregistré",
-    "newIntuneAppShort": "Nouvelle application"
+    "newIntuneAppShort": "Nouvelle application",
+    "deletedProfile": "Profil supprimé (n° {{id}})",
+    "approvedAuto": "Automatiquement",
+    "searchChallenges": "Rechercher des autorités..."
   },
   "session": {
     "expiring": "Session en cours d’expiration",
@@ -5210,8 +5222,10 @@
     "noManagedCAs": "Aucune AC gérée disponible",
     "alreadyInTruststore": "Déjà dans le Trust Store",
     "addedFromManaged": "Ajouté depuis les AC gérées",
-    "addedCount": "{{count}} AC(s) ajoutée(s) au Trust Store",
-    "addSelected": "Ajouter {{count}} sélectionné(s)",
+    "addedCount_one": "{{count}} AC ajoutée au Trust Store",
+    "addedCount_other": "{{count}} AC ajoutées au Trust Store",
+    "addSelected_one": "Ajouter {{count}} AC sélectionnée",
+    "addSelected_other": "Ajouter {{count}} AC sélectionnées",
     "exportBundle": "Exporter le bundle",
     "bundleExported": "Bundle de certificats exporté",
     "exportFailed": "Échec de l’export du bundle",
@@ -5241,7 +5255,9 @@
       "emptyTitle": "Aucune ancre de confiance externe"
     },
     "systemBundleDescription": "Importé du magasin d’AC du système",
-    "systemBundleNote": "Importé automatiquement depuis {{path}}"
+    "systemBundleNote": "Importé automatiquement depuis {{path}}",
+    "moreActions": "Autres actions de {{name}}",
+    "actionsTitle": "Actions de l’ancre"
   },
   "users": {
     "securityKeys": {
@@ -6472,7 +6488,8 @@
     "title": "Exporter",
     "titleCertificate": "Exporter le certificat",
     "titleCa": "Exporter l’AC",
-    "skippedUnreadable": "{{count}} certificat(s) illisible(s) n’ont pas été exportés",
+    "skippedUnreadable_one": "{{count}} certificat illisible n’a pas été exporté",
+    "skippedUnreadable_other": "{{count}} certificats illisibles n’ont pas été exportés",
     "format": "Format",
     "options": "Options",
     "password": "Mot de passe",
@@ -6739,7 +6756,7 @@
     "searchDiscovered": "Rechercher des certificats découverts...",
     "searchHistory": "Rechercher dans l’historique...",
     "searchProfiles": "Rechercher des profils...",
-    "startScan": "Démarrer le scan",
+    "startScan": "Lancer l’analyse",
     "startedAt": "Début",
     "stats": {
       "total": "Total",
@@ -6776,7 +6793,8 @@
       "caption": "Analyses du réseau. Activez un nom pour ouvrir son détail.",
       "create": "Nouvelle analyse…",
       "found": "Trouvés",
-      "foundNew": "{{count}}, dont {{fresh}} nouveaux",
+      "foundNew_one": "{{total}}, dont {{count}} nouveau",
+      "foundNew_other": "{{total}}, dont {{count}} nouveaux",
       "last": "Dernière analyse",
       "next": "Prochaine analyse",
       "notScanned": "Non analysé",
@@ -6796,7 +6814,8 @@
       "removeText": "L’analyse et sa planification sont supprimées. Les certificats qu’elle a trouvés restent dans les certificats trouvés.",
       "empty": "Aucune analyse du réseau",
       "emptyText": "Une analyse recense les certificats exposés sur une plage d’adresses, par exemple 192.0.2.0/24, pour les rattacher à l’inventaire.",
-      "progress": "Analyse en cours : {{scanned}} cibles sur {{total}}, {{found}} certificats trouvés."
+      "progress": "Analyse en cours : {{scanned}} cibles sur {{total}}, {{found}} certificats trouvés.",
+      "createTitle": "Nouvelle analyse"
     },
     "found": {
       "unit_one": "{{count}} certificat",
@@ -6866,7 +6885,8 @@
       },
       "timeoutHint": "Secondes par connexion, de 1 à 30.",
       "workersHint": "Connexions simultanées, de 1 à 50."
-    }
+    },
+    "quickScanTitle": "Analyse rapide"
   },
   "compliance": {
     "title": "Score de conformité",
@@ -7248,7 +7268,8 @@
     "signingCertCa": "Certificat de l’AC (mode strict désactivé seulement)",
     "signerExpires": "Expire",
     "signerChainComplete": "La chaîne d’émetteurs remonte à une racine auto-signée et est incluse dans chaque jeton.",
-    "signerChainPartial": "Chaîne d’émetteurs : {{count}} certificat(s) inclus ; n’atteint pas une racine auto-signée.",
+    "signerChainPartial_one": "Chaîne d’émetteurs : {{count}} certificat inclus ; n’atteint pas une racine auto-signée.",
+    "signerChainPartial_other": "Chaîne d’émetteurs : {{count}} certificats inclus ; n’atteint pas une racine auto-signée.",
     "signerUnsaved": "Enregistrez la configuration pour appliquer et valider ce certificat de signature.",
     "signerUnusable": "Ce certificat ne peut pas être utilisé actuellement pour signer des horodatages.",
     "signerStrictBadge": "RFC 3161 strict",
@@ -7383,7 +7404,9 @@
     "filterByType": "Filtrer par type",
     "certTotal": "Certificats signés :",
     "range": "{{shown}} sur {{count}} AC SSH",
-    "pageRange": "{{start}}–{{end}} sur {{count}} AC SSH"
+    "pageRange": "{{start}}–{{end}} sur {{count}} AC SSH",
+    "moreActions": "Autres actions de {{name}}",
+    "actionsTitle": "Actions de l’AC SSH"
   },
   "sshCertificates": {
     "title": "Certificats SSH",
@@ -7473,7 +7496,9 @@
     "filterByState": "Filtrer par état",
     "searchLabel": "Identifiant de clé, principal, numéro…",
     "pageRange": "{{start}}–{{end}} sur {{count}} certificats SSH",
-    "grants": "Principaux et options"
+    "grants": "Principaux et options",
+    "moreActions": "Autres actions de {{name}}",
+    "actionsTitle": "Actions du certificat SSH"
   },
   "filters": {
     "managePresets": "Gérer les préréglages"

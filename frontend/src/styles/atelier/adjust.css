@@ -344,7 +344,7 @@
 :root .atl .ca-lines>.ca-more{grid-column:1/-1}
 :root .atl .ca-lines>.ca-node>.ca-line{flex:1;min-width:0}
 :root .atl .ca-line>.ca-badges{flex:1 1 auto}
-:root .atl .ca-line .ca-line-count,:root .atl .ca-line .ca-line-date:not(.ca-line-count~.ca-line-date){margin-left:auto}
+:root .atl .ca-line .ca-line-end{display:inline-flex;gap:9px;margin-left:auto}
 /* An empty search status takes no room in the toolbar (it stays rendered: it is a live region). */
 :root .atl .toolbar .search-status:empty{min-width:0}
 /* No hover tint on the empty-state row, nor on a name inside the open row; a touch leaves no hover behind. */
@@ -369,6 +369,28 @@
 :root .atl :is(.settings-group.stacked,.acme-proxy,.tsa-signer)>p.muted.small{line-height:19px}
 /* A read-only setting (an endpoint URL) is a copyable chip under its label, as wide as its text. */
 :root .atl .readonly-value>.code-value{align-self:flex-start;max-width:100%}
+/* Compliance on a wide card: one label column for all rules, as wide as its longest label (420 px at most), the bars beside it. */
+@container (min-width:761px){:root .atl .card-compliance .meters{grid-template-columns:fit-content(420px) minmax(64px,1fr) 96px 16px;column-gap:10px}:root .atl .card-compliance .meters>li,:root .atl .card-compliance .meter{display:grid;grid-column:1/-1;grid-template-columns:subgrid}}
+/* Hierarchy roots in columns: a short tree no longer leaves the height of its tall neighbour empty under it. */
+:root .atl .hier-columns:has(>.hier-tree+.hier-tree){display:block;columns:250px;column-gap:18px}
+:root .atl .hier-columns>.hier-tree{break-inside:avoid;margin-bottom:14px}
+/* Aurore: the preset switch keeps the frame of the buttons beside it. */
+:root[data-theme|=aurore] .atl .segmented{border-color:var(--control);border-radius:6px}
+/* The folds that close a CA panel follow one another without a rule and a gap each. */
+:root .atl .ca-fold+.ca-fold{border-top:0;margin-top:0;padding-top:0}
+/* A lone SAN row has no remove button: its value takes the button's place. */
+:root .atl .san-row.lone>input{grid-column:2/-1}
+/* A wide settings grid: a short field with a help takes two quarters, its input staying one, so the help reads on a half. */
+@container (min-width:900px){:root .atl .settings-grid>.field.short:has(>small){grid-column:span 2}:root .atl .settings-grid>.field.short:has(>small)>:is(input,select){max-width:calc(50% - 8px)}}
+/* One height for every filters row: a chip without a counter, or a setting beside the chips, moves no rule by a pixel. */
+:root .atl .filters-row>.views .view-btn{min-height:38px}
+@media(min-width:801px){:root .atl .filters-row>.active-filters>.checkbox-line{min-height:0}}
+/* A dock's two or three tabs keep together on a phone instead of spreading to its edges. */
+@media(max-width:800px){:root .atl .detail-tabs:not(:has(>:nth-child(4))){justify-content:flex-start;gap:24px}}
+/* A missing name (a credential without a label) reads in the grey of a missing value. */
+:root .atl .entity-label>.absent-name{color:var(--muted);font-weight:400}
+/* A figure's gap or pill held to the word after it (KeepWith): no separator or lone delta starts a narrow line. */
+:root .atl .keep-with{white-space:nowrap}
 /* Graphic review: governance, settings and shell. */
 /* The secondary actions of a page head: buttons above 800 px, a « ⋯ » menu on a phone (the mockup hides the buttons). */
 :root .atl .page-head .page-more{display:none}

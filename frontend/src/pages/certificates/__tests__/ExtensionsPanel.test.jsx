@@ -61,3 +61,15 @@ describe('ExtensionsPanel, other extensions', () => {
     expect(screen.queryByRole('button', { name: 'details.ext.copyValue' })).toBeNull()
   })
 })
+
+describe('ExtensionsPanel, narrow column', () => {
+  it('lets a key identifier wrap only between its bytes, never inside one', () => {
+    const ski = 'B6:2D:1A:9F:00:41'
+    render(<ExtensionsPanel cert={{ extensions: { subject_key_identifier: { value: ski } } }} />)
+    const dd = row('Subject Key Identifier').querySelector('dd')
+    expect(dd.textContent).toBe(ski)
+    // One break point after each byte's colon, none inside a byte
+    expect(dd.querySelectorAll('wbr')).toHaveLength(5)
+    expect([...dd.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent)).toEqual(['B6:', '2D:', '1A:', '9F:', '00:', '41'])
+  })
+})

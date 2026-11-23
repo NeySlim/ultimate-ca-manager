@@ -69,7 +69,8 @@ export function ScanDialog({ quick = false, profile, busy, onSubmit, onClose, re
     </label>
   )
   const preset = PORT_PRESETS.find((p) => p.ports.join(', ') === splitList(f.ports).join(', '))?.id || ''
-  const title = quick ? t('discovery.quickScanAsk') : profile ? t('discovery.editProfile') : t('discovery.scans.create')
+  // A dialog's title names what is open, without the ellipsis of the button that opened it
+  const title = quick ? t('discovery.quickScanTitle') : profile ? t('discovery.editProfile') : t('discovery.scans.createTitle')
 
   return (
     <AtelierDialog title={title} subtitle={profile?.name} onClose={onClose} returnTo={returnTo} testId={quick ? 'quick-scan-dialog' : 'scan-profile-dialog'}>

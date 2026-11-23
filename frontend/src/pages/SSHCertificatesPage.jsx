@@ -18,6 +18,7 @@ import { usePermission, useWebSocket, useClipboard, usePersistedState } from '..
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { copyRow, fact } from '../components/atelier/facts'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
+import { CertMenu } from './certificates/inspector/CertMenu'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { sanitizeDownloadName } from '../lib/filename'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
@@ -304,7 +305,7 @@ export default function SSHCertificatesPage() {
           {canWrite('ssh') && openStatus.key === 'valid' && (
             <Btn tone="danger" icon="block" id="ssh-cert-revoke" onClick={() => handleRevoke(open)}>{t('sshCertificates.revokeCertificate')}</Btn>
           )}
-          {canDelete('ssh') && <Btn tone="danger" icon="block" id="ssh-cert-delete" onClick={() => handleDelete(open)}>{t('common.delete')}</Btn>}
+          {canDelete('ssh') && <IconBtn quiet icon="more" title={false} label={t('sshCertificates.moreActions', { name: open.key_id || '' })} data-ssh-cert-menu={open.id} onClick={() => setDialog('menu')} />}
         </>}>
         {section === 'overview' && (
           <div className="module-detail">
@@ -359,6 +360,11 @@ export default function SSHCertificatesPage() {
 
   return (
     <Zone dock={dock} after={<>
+      {/* Deletion goes through the panel's « ⋯ » menu, as on the CSR and template panels */}
+      {dialog === 'menu' && open && (
+        <CertMenu title={t('sshCertificates.actionsTitle')} name={open.key_id || t('common.unnamed')} onClose={() => setDialog(null)}
+          items={[{ id: 'delete', icon: 'close', label: t('common.delete'), danger: true, write: true, onClick: () => handleDelete(open) }]} />
+      )}
       {dialog === 'issue' && (
         <AtelierDialog title={t('sshCertificates.issueCertificate')} size="wide" onClose={() => setDialog(null)} returnTo="ssh-cert-new">
           <IssueCertificateForm cas={cas} canListCas={canListSshCas} onSubmit={handleIssueSubmit} onCancel={() => setDialog(null)} />

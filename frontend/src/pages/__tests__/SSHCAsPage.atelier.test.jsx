@@ -35,6 +35,7 @@ vi.mock('../../services', () => ({
 
 import { renderAtUrl } from '../../test/dockUrl'
 import { sortKeys, sortedHeaders, absorbing, numberHeads, recordFacts } from '../../test/listColumns'
+import { PATHS } from '../../components/atelier/icons'
 import SSHCAsPage from '../SSHCAsPage'
 
 const USERS = { id: 1, refid: 'r-users', descr: 'Users CA', ca_type: 'user', key_type: 'ssh-ed25519', fingerprint: 'SHA256:aaa', cert_count: 7,
@@ -179,6 +180,33 @@ describe('the SSH CA dock', () => {
 
     fireEvent.click(within(dock).getByRole('tab', { name: 'sshCas.publicKey' }))
     expect(within(dock).getByText('ssh-ed25519 AAAA users')).toBeInTheDocument()
+  })
+
+  it('keeps two everyday actions on the panel, the others in its « ⋯ » menu, deletion last in red', async () => {
+    const { container } = page()
+    fireEvent.click(await screen.findByRole('button', { name: 'Users CA' }))
+    const dock = container.querySelector('aside#inspector')
+    const actions = dock.querySelector('.dock-heading .actions') || dock
+    expect(actions.querySelector('#ssh-ca-pubkey')).toBeTruthy()
+    expect(actions.querySelector('#ssh-ca-copy')).toBeTruthy()
+    for (const id of ['#ssh-ca-krl', '#ssh-ca-edit', '#ssh-ca-delete']) expect(dock.querySelector(id)).toBeNull()
+    expect(dock.querySelector('.btn.danger')).toBeNull()
+    fireEvent.click(dock.querySelector('[data-ssh-ca-menu]'))
+    const menu = await screen.findByTestId('inspector-actions-dialog')
+    const items = [...menu.querySelectorAll('.columns-list > .btn')]
+    expect(items.map((b) => b.dataset.action)).toEqual(['cert-krl', 'cert-edit', 'cert-delete'])
+    expect(items.at(-1)).toHaveClass('danger')
+  })
+
+  it('draws a deletion with one icon, the cross of the CSR and template menus, not the « revoked » sign', async () => {
+    const { container } = page()
+    const row = (await screen.findByRole('button', { name: 'Users CA' })).closest('tr')
+    const drawing = (name) => { const div = document.createElement('div'); div.innerHTML = `<svg>${PATHS[name]}</svg>`; return div.querySelector('svg').innerHTML }
+    expect(within(row).getByTitle('common.delete').querySelector('svg').innerHTML).toBe(drawing('close'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Users CA' }))
+    fireEvent.click(container.querySelector('aside#inspector [data-ssh-ca-menu]'))
+    const remove = (await screen.findByTestId('inspector-actions-dialog')).querySelector('[data-action="cert-delete"]')
+    expect(remove.querySelector('svg').innerHTML).toBe(drawing('close'))
   })
 
   it('opens the import dialog in the mockup frame, its key in monospace', async () => {

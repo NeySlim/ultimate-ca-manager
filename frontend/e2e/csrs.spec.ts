@@ -14,7 +14,7 @@ test('a CSR imported on screen is signed by a CA', async ({ page, api }) => {
   const dialog = page.getByRole('dialog', { name: 'Smart Import' })
   await dialog.getByRole('textbox').fill(pem)
   await dialog.getByRole('button', { name: 'Analyze' }).click()
-  await dialog.getByRole('button', { name: /^Import 1 Object/ }).click()
+  await dialog.getByRole('button', { name: /^Import 1 object/ }).click()
   await dialog.getByRole('button', { name: 'Done' }).click()
 
   // The row opens from its name (CSR-<id>); the subject is a cell of that row, the request opens in the dock

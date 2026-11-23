@@ -61,8 +61,8 @@ export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTes
       <ListView label={t('acme.domains')} caption={t('acme.domainsCaption')} icon="globe" list={list} nameSort="name"
         title={(d) => d.domain} status={approval} openedId={openId} onOpen={(d) => setOpenId(d.id)}
         columns={[
-          { id: 'provider', label: t('acme.provider'), cell: (d) => d.dns_provider_name || d.dns_provider_type || '—', kind: 'text', priority: 2, sort: 'provider' },
-          { id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), kind: 'text', priority: 3, sort: 'ca' },
+          { id: 'provider', label: t('acme.provider'), cell: (d) => d.dns_provider_name || d.dns_provider_type || '—', kind: 'text', priority: 2, labelled: true, sort: 'provider' },
+          { id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), kind: 'text', priority: 3, labelled: true, sort: 'ca' },
           { id: 'wildcard', label: t('acme.columns.wildcard'), labelFull: t('acme.wildcard'), cell: (d) => t(d.is_wildcard_allowed ? 'common.yes' : 'common.no'),
             kind: 'fit', priority: 3, labelled: true, sort: 'wildcard' },
           { status: true, sort: 'state' },

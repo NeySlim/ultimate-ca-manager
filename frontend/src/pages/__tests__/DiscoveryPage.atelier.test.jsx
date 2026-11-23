@@ -81,7 +81,8 @@ describe('DiscoveryPage analyses (the mockup module list)', () => {
       ['atelier.name', 'discovery.form.range', 'discovery.scans.found', 'discovery.scans.last', 'atelier.state', 'common.actions'])
     const row = (name) => screen.getByRole('button', { name }).closest('tr')
     // The newest run counts: Réseau A's failure of the 7th is behind its completion of the 8th
-    expect(row('Réseau A')).toHaveTextContent('discovery.scans.foundNew:14')
+    // The plural follows the new ones (« 14, dont 2 nouveaux »), the total is a plain figure
+    expect(row('Réseau A')).toHaveTextContent('discovery.scans.foundNew:2')
     expect(row('Réseau A')).toHaveTextContent('discovery.scans.state.done')
     expect(row('Réseau B')).toHaveTextContent('198.51.100.0/24, web.example.com +1')
     expect(row('Réseau B')).toHaveTextContent('discovery.scans.notScanned')
@@ -110,10 +111,21 @@ describe('DiscoveryPage analyses (the mockup module list)', () => {
     await waitFor(() => expect(svc.deleteProfile).toHaveBeenCalledWith(1))
   })
 
+  it('greys the finding of an analysis never run in its panel, as any missing value', async () => {
+    renderAt()
+    fireEvent.click(await screen.findByRole('button', { name: 'Réseau B' }))
+    const dock = await waitFor(() => { const d = document.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
+    const found = [...dock.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt').textContent === 'discovery.scans.found')
+    expect(found.querySelector('dd')).toHaveClass('absent')
+    expect(found).toHaveTextContent('discovery.scans.notScanned')
+  })
+
   it('creates an analysis, refusing a DNS wildcard, an IPv6 range and a range past the scanner cap', async () => {
     renderAt()
     fireEvent.click(await screen.findByRole('button', { name: 'discovery.scans.create' }))
     const dialog = await screen.findByTestId('scan-profile-dialog')
+    // The dialog's title drops the button's ellipsis: the dialog is already open
+    expect(within(dialog).getByRole('heading', { level: 2 })).toHaveTextContent('discovery.scans.createTitle')
     const targets = within(dialog).getByLabelText('discovery.form.range')
     fireEvent.change(within(dialog).getByLabelText('common.name'), { target: { value: 'DMZ' } })
     for (const [value, problem] of [['*.example.com', 'wildcard'], ['2001:db8::/64', 'ipv6Range'], ['10.0.0.0/8', 'tooWide']]) {
@@ -136,6 +148,7 @@ describe('DiscoveryPage analyses (the mockup module list)', () => {
     renderAt()
     fireEvent.click((await screen.findAllByRole('button', { name: 'discovery.quickScanAsk' }))[0])
     const dialog = await screen.findByTestId('quick-scan-dialog')
+    expect(within(dialog).getByRole('heading', { level: 2 })).toHaveTextContent('discovery.quickScanTitle')
     expect(within(dialog).queryByLabelText('common.name')).toBeNull()
     fireEvent.change(within(dialog).getByLabelText('discovery.form.range'), { target: { value: 'web.example.com, 192.0.2.7' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'discovery.startScan' }))
@@ -158,6 +171,10 @@ describe('DiscoveryPage analyses (the mockup module list)', () => {
     svc.getRuns.mockResolvedValueOnce({ data: [] })
     const { unmount } = renderAt()
     expect(await screen.findByText('discovery.scans.empty')).toBeInTheDocument()
+    // One primary action, the head's; the other views as bordered buttons beside it
+    expect(within(document.getElementById('empty-discovery')).getByRole('button', { name: 'discovery.scans.create' })).not.toHaveClass('primary')
+    expect(document.getElementById('scan-new')).toHaveClass('primary')
+    expect(document.querySelector('[data-view="history"]')).not.toHaveClass('quiet')
     unmount()
     svc.getProfiles.mockRejectedValueOnce(Object.assign(new Error('Service Unavailable'), { status: 503 }))
     renderAt()

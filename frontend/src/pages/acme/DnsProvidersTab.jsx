@@ -1,6 +1,6 @@
 /**
  * DNS providers of the ACME client (DNS-01), drawn as the mockup's module list with its dock: type
- * and default per provider; test, edit and delete stay on the row and in the dock.
+ * and default per provider (the default in words, as on the upstream CAs); test, edit and delete stay on the row and in the dock.
  */
 import { useTranslation } from 'react-i18next'
 import { Btn, ListView, Dock, DockBody, Section, Facts, EmptyBlock, Pill, useClientList, useSortParam } from '../../components/atelier'
@@ -10,18 +10,20 @@ import { Notice } from '../protocols/atelierParts'
 import { fact } from '../../components/atelier/facts'
 
 const BY_NAME = { key: 'name', asc: true }
-const SORT_KEYS = ['name', 'type', 'state']
-// Disabled last, the default first among the active (the pill's three words)
-const stateRank = (p) => (p.enabled === false ? 2 : p.is_default ? 0 : 1)
+const SORT_KEYS = ['name', 'type', 'default', 'state']
+// Active first, disabled last; being the default is a column of its own, never a state
+const stateRank = (p) => (p.enabled === false ? 1 : 0)
 
-export default function DnsProvidersTab({ dnsProviders, onAddProvider, onEditProvider, onTestProvider, onDeleteProvider, canWrite, canDelete }) {
+export default function DnsProvidersTab({ dnsProviders, providerTypes = [], onAddProvider, onEditProvider, onTestProvider, onDeleteProvider, canWrite, canDelete }) {
   const { t } = useTranslation()
   // The open object lives in the URL (`item`)
   const { openId, setOpenId } = useDockId()
   const open = dnsProviders.find((p) => p.id === openId)
+  // A type by the name its provider gives (« Hetzner »), its code only when the server does not know it
+  const typeName = (p) => providerTypes.find((x) => x.type === p.provider_type)?.name || p.provider_type
   const state = (p) => (p.enabled === false
     ? <Pill label={t('common.disabled')} tone="muted" />
-    : <Pill label={p.is_default ? t('common.default') : t('common.active')} tone="good" />)
+    : <Pill label={t('common.active')} tone="good" />)
   const actions = (p) => [
     { icon: 'send', label: t('common.test'), onClick: () => onTestProvider(p) },
     ...(canWrite ? [{ icon: 'settings', label: t('common.edit'), onClick: () => onEditProvider(p), write: true }] : []),
@@ -29,7 +31,7 @@ export default function DnsProvidersTab({ dnsProviders, onAddProvider, onEditPro
   ]
   // The API sends every provider: sorted and paged here, the sort kept in the address
   const sortParam = useSortParam(BY_NAME, SORT_KEYS)
-  const list = useClientList(dnsProviders, { sortParam, sorts: { name: (p) => p.name, type: (p) => p.provider_type, state: stateRank } })
+  const list = useClientList(dnsProviders, { sortParam, sorts: { name: (p) => p.name, type: typeName, default: (p) => (p.is_default ? 0 : 1), state: stateRank } })
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('acme.dnsProviders') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
       tabs={[{ key: open.id, title: open.name, icon: 'server' }]} onClose={() => setOpenId(null)}>
@@ -43,7 +45,7 @@ export default function DnsProvidersTab({ dnsProviders, onAddProvider, onEditPro
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
             <Facts items={[
-              [t('common.providerType'), open.provider_type],
+              [t('common.providerType'), typeName(open)],
               [t('common.default'), t(open.is_default ? 'common.yes' : 'common.no')],
               fact(t('acme.credentials'), (open.credential_keys || []).join(', ')),
             ]} />
@@ -57,7 +59,12 @@ export default function DnsProvidersTab({ dnsProviders, onAddProvider, onEditPro
     <>
       <ListView label={t('acme.dnsProviders')} caption={t('acme.providersCaption')} icon="server" list={list} nameSort="name"
         title={(p) => p.name} status={state} openedId={openId} onOpen={(p) => setOpenId(p.id)}
-        columns={[{ id: 'type', label: t('common.type'), labelFull: t('common.providerType'), cell: (p) => p.provider_type, kind: 'fit', priority: 3, sort: 'type' }, { status: true, sort: 'state' }]}
+        // « Par défaut » in words as on the upstream CAs, not in the green of a state
+        columns={[
+          { id: 'type', label: t('common.type'), labelFull: t('common.providerType'), cell: typeName, kind: 'fit', priority: 3, labelled: true, sort: 'type' },
+          { id: 'default', label: t('common.default'), cell: (p) => t(p.is_default ? 'common.yes' : 'common.no'), kind: 'fit', priority: 3, labelled: true, sort: 'default' },
+          { status: true, sort: 'state' },
+        ]}
         rowActions={actions}
         empty={<EmptyBlock id="acme-dns" icon="server" title={t('acme.noDnsProviders')} text={t('acme.noDnsProvidersDesc')}
           action={canWrite ? { label: t('common.addDnsProvider'), icon: 'plus', onClick: onAddProvider, primary: true } : undefined} />}

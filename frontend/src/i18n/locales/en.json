@@ -840,7 +840,6 @@
     "ctSubmitted": "Certificate submitted to CT logs",
     "ctSubmitFailed": "Failed to submit to CT logs",
     "ctScts": "CT SCTs",
-    "ctSctsCount": "{{count}} SCT(s) recorded",
     "ctNoScts": "No SCTs, not submitted to CT logs",
     "eku": {
       "title": "Extended Key Usages (EKU)",
@@ -2222,12 +2221,16 @@
     "revokeOnRenewal": "Revoke old certificate after renewal",
     "revokeOnRenewalDesc": "Automatically revoke the previous certificate with reason 'superseded' when a new one is issued",
     "renewalPolicy": "Renewal Policy",
-    "revokeExistingSuperseded": "Also revoke {{count}} existing superseded certificate(s)",
+    "revokeExistingSuperseded_one": "Also revoke {{count}} existing superseded certificate",
+    "revokeExistingSuperseded_other": "Also revoke {{count}} existing superseded certificates",
     "revokeExistingSupersededDesc": "Revoke old certificates that have already been replaced by renewals",
     "revokeSupersededConfirmTitle": "Revoke Superseded Certificates",
-    "revokeSupersededConfirmDesc": "This will immediately revoke {{count}} certificate(s) that have been replaced by newer versions. This action is irreversible. Revoked certificates will appear in CRLs and be reported as revoked via OCSP.",
-    "revokeSupersededConfirmAction": "Revoke {{count}} certificate(s)",
-    "supersededRevoked": "{{count}} superseded certificate(s) revoked successfully",
+    "revokeSupersededConfirmDesc_one": "This will immediately revoke {{count}} certificate that has been replaced by a newer version. This action is irreversible. Revoked certificates will appear in CRLs and be reported as revoked via OCSP.",
+    "revokeSupersededConfirmDesc_other": "This will immediately revoke {{count}} certificates that have been replaced by newer versions. This action is irreversible. Revoked certificates will appear in CRLs and be reported as revoked via OCSP.",
+    "revokeSupersededConfirmAction_one": "Revoke {{count}} certificate",
+    "revokeSupersededConfirmAction_other": "Revoke {{count}} certificates",
+    "supersededRevoked_one": "{{count}} superseded certificate revoked",
+    "supersededRevoked_other": "{{count}} superseded certificates revoked",
     "domains": "Domains",
     "domainsHelper": "One domain per line. Use *.domain.com for wildcards.",
     "atLeastOneDomainRequired": "At least one domain is required",
@@ -2430,7 +2433,8 @@
       "statusUsed": "Used",
       "statusRevoked": "Revoked",
       "statusExpired": "Expired",
-      "totalCount": "{{count}} credential(s)",
+      "totalCount_one": "{{count}} credential",
+      "totalCount_other": "{{count}} credentials",
       "search": "Search credentials",
       "created": "Created",
       "usedAt": "Used",
@@ -2519,7 +2523,8 @@
     "defaultProfileNone": "None (90 days, default digest)",
     "defaultProfileDesc": "Applied to orders whose client requests no profile, which is what most clients do; without one, such orders get 90 days and the default digest",
     "localOrders": "Local orders",
-    "localOrdersCount": "{{count}} order(s)",
+    "localOrdersCount_one": "{{count}} order",
+    "localOrdersCount_other": "{{count}} orders",
     "localOrdersLoadFailed": "Failed to load local orders",
     "deleteLocalOrderConfirm": "Delete this order?",
     "deleteLocalOrderConfirmDesc": "Order for {{domain}} and its authorizations and challenges will be removed. The issued certificate, if any, is kept.",
@@ -2527,7 +2532,8 @@
     "purgeLocalOrders": "Purge expired",
     "purgeLocalOrdersConfirm": "Purge expired orders?",
     "purgeLocalOrdersConfirmDesc": "Removes expired non-issued orders with their authorizations and challenges. Issued orders are kept.",
-    "purgeLocalOrdersDone": "Purge complete: {{count}} order(s) removed",
+    "purgeLocalOrdersDone_one": "Purge complete: {{count}} order removed",
+    "purgeLocalOrdersDone_other": "Purge complete: {{count}} orders removed",
     "purgeLocalOrdersFailed": "Purge failed",
     "noLocalOrders": "No local orders",
     "noLocalOrdersDesc": "Orders placed by ACME clients against the built-in server will appear here",
@@ -2816,7 +2822,8 @@
     "intuneAppUpdated": "App registration updated",
     "intuneAppDeleted": "App registration deleted",
     "intuneAppDeleteConfirm": "Delete the app registration {{name}}?",
-    "intuneAppUsedBy": "Used by {{count}} profile(s)",
+    "intuneAppUsedBy_one": "Used by {{count}} profile",
+    "intuneAppUsedBy_other": "Used by {{count}} profiles",
     "intuneAppNotUsed": "Not used by any profile",
     "intuneAppLastTest": "Last test",
     "intuneAppNeverTested": "never tested",
@@ -2893,7 +2900,10 @@
     "challengeExpires": "Expires",
     "challengeAge": "Age",
     "challengeAgeUnknown": "Not recorded",
-    "newIntuneAppShort": "New app"
+    "newIntuneAppShort": "New app",
+    "deletedProfile": "Deleted profile (no. {{id}})",
+    "approvedAuto": "Automatically",
+    "searchChallenges": "Search authorities..."
   },
   "crlOcsp": {
     "crl": "Certificate Revocation List",
@@ -2999,8 +3009,6 @@
     "ocspInactive": "Inactive",
     "columns": {
       "published": "Published",
-      "publication": "Publication",
-      "crlNumber": "CRL number",
       "nextUpdate": "Next update"
     },
     "tabs": {
@@ -3190,8 +3198,10 @@
     "noManagedCAs": "No managed CAs available",
     "alreadyInTruststore": "Already in trust store",
     "addedFromManaged": "Added from managed CAs",
-    "addedCount": "{{count}} CA(s) added to trust store",
-    "addSelected": "Add {{count}} selected",
+    "addedCount_one": "{{count}} CA added to the trust store",
+    "addedCount_other": "{{count}} CAs added to the trust store",
+    "addSelected_one": "Add {{count}} selected CA",
+    "addSelected_other": "Add {{count}} selected CAs",
     "exportBundle": "Export Bundle",
     "bundleExported": "Certificate bundle exported",
     "exportFailed": "Failed to export bundle",
@@ -3221,7 +3231,9 @@
       "emptyTitle": "No external trust anchor"
     },
     "systemBundleDescription": "Imported from the system CA bundle",
-    "systemBundleNote": "Imported automatically from {{path}}"
+    "systemBundleNote": "Imported automatically from {{path}}",
+    "moreActions": "Other actions for {{name}}",
+    "actionsTitle": "Anchor actions"
   },
   "importExport": {
     "tabs": {
@@ -5361,7 +5373,8 @@
     "pleaseAddFiles": "Please add files or paste PEM content",
     "unsupportedFormat": "Unsupported file: {{name}}. Accepted formats: {{formats}}",
     "analyzeFailed": "Failed to analyze content",
-    "successImported": "Successfully imported {{count}} object(s)",
+    "successImported_one": "Successfully imported {{count}} object",
+    "successImported_other": "Successfully imported {{count}} objects",
     "files": "Files",
     "pastePemPlaceholder": "Paste PEM-encoded certificates, keys, CSRs, or chains here...",
     "encryptedDetected": "Encrypted content detected",
@@ -5369,7 +5382,8 @@
     "analyze": "Analyze",
     "analyzeHint": "Recognizes certificates, keys, CSRs and chains before the import; nothing is imported at this step.",
     "certificateChains": "Certificate Chains",
-    "keyPairsDetected": "{{count}} key-certificate pair(s) detected",
+    "keyPairsDetected_one": "{{count}} key-certificate pair detected",
+    "keyPairsDetected_other": "{{count}} key-certificate pairs detected",
     "detectedObjects": "Detected Objects",
     "importOptions": "Import Options",
     "skipDuplicates": "Skip duplicates",
@@ -5377,12 +5391,14 @@
     "importCertificates": "Import certificates",
     "importKeys": "Import keys",
     "importCSRs": "Import CSRs",
-    "importObjects": "Import {{count}} Object(s)",
+    "importObjects_one": "Import {{count}} object",
+    "importObjects_other": "Import {{count}} objects",
     "importingObjects": "Importing objects...",
     "importComplete": "Import Complete",
     "noObjectsImported": "No Objects Imported",
     "allSkipped": "All objects were skipped or already exist",
-    "privateKeysMatched": "private key(s) matched",
+    "privateKeysMatched_one": "{{count}} private key matched",
+    "privateKeysMatched_other": "{{count}} private keys matched",
     "importMore": "Import More",
     "allFormats": "All formats: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "dropFileHere": "Drop a file here or",
@@ -6472,7 +6488,8 @@
     "title": "Export",
     "titleCertificate": "Export the certificate",
     "titleCa": "Export the CA",
-    "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
+    "skippedUnreadable_one": "{{count}} unreadable certificate was not exported",
+    "skippedUnreadable_other": "{{count}} unreadable certificates were not exported",
     "format": "Format",
     "options": "Options",
     "password": "Password",
@@ -6776,7 +6793,8 @@
       "caption": "Network analyses. Activate a name to open its detail.",
       "create": "New analysis…",
       "found": "Found",
-      "foundNew": "{{count}}, {{fresh}} new",
+      "foundNew_one": "{{total}}, {{count}} new",
+      "foundNew_other": "{{total}}, {{count}} new",
       "last": "Last analysis",
       "next": "Next analysis",
       "notScanned": "Not analysed",
@@ -6796,7 +6814,8 @@
       "removeText": "The analysis and its schedule are deleted. The certificates it found stay in the found certificates.",
       "empty": "No network analysis",
       "emptyText": "An analysis lists the certificates exposed on a range of addresses, for example 192.0.2.0/24, to match them with the inventory.",
-      "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found."
+      "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found.",
+      "createTitle": "New analysis"
     },
     "found": {
       "unit_one": "{{count}} certificate",
@@ -6866,7 +6885,8 @@
       },
       "timeoutHint": "Seconds per connection, 1 to 30.",
       "workersHint": "Connections at once, 1 to 50."
-    }
+    },
+    "quickScanTitle": "Quick scan"
   },
   "compliance": {
     "title": "Compliance Score",
@@ -7248,7 +7268,8 @@
     "signingCertCa": "CA certificate (strict mode off only)",
     "signerExpires": "Expires",
     "signerChainComplete": "Issuer chain resolves to a self-signed root and is embedded in every token.",
-    "signerChainPartial": "Issuer chain: {{count}} certificate(s) embedded; does not reach a self-signed root.",
+    "signerChainPartial_one": "Issuer chain: {{count}} certificate embedded; does not reach a self-signed root.",
+    "signerChainPartial_other": "Issuer chain: {{count}} certificates embedded; does not reach a self-signed root.",
     "signerUnsaved": "Save the configuration to apply and validate this signing certificate.",
     "signerUnusable": "This certificate cannot currently be used to sign timestamps.",
     "signerStrictBadge": "RFC 3161 strict",
@@ -7383,7 +7404,9 @@
     "filterByType": "Filter by type",
     "certTotal": "Certificates signed:",
     "range": "{{shown}} of {{count}} SSH CAs",
-    "pageRange": "{{start}}–{{end}} of {{count}} SSH CAs"
+    "pageRange": "{{start}}–{{end}} of {{count}} SSH CAs",
+    "moreActions": "Other actions for {{name}}",
+    "actionsTitle": "SSH CA actions"
   },
   "sshCertificates": {
     "title": "SSH Certificates",
@@ -7473,7 +7496,9 @@
     "filterByState": "Filter by state",
     "searchLabel": "Key ID, principal, serial…",
     "pageRange": "{{start}}–{{end}} of {{count}} SSH certificates",
-    "grants": "Principals and options"
+    "grants": "Principals and options",
+    "moreActions": "Other actions for {{name}}",
+    "actionsTitle": "SSH certificate actions"
   },
   "filters": {
     "managePresets": "Manage presets"

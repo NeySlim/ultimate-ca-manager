@@ -118,7 +118,8 @@ export default function ScepProfileForm({ profile, cas, templates, onClose, onSa
           )}
           <ToggleSwitch id="scep-profile-auto" checked={formData.auto_approve} onChange={(val) => update('auto_approve', val)} label={t('scep.autoApprove')}
             disabled={formData.intune_enabled} description={formData.intune_enabled ? t('scep.intuneForcesAutoApprove') : undefined} />
-          <fieldset className="field full advanced">
+          {/* Intune is one more switch of the profile: no rule sets it apart from the switch above */}
+          <fieldset className="field full">
             <ToggleSwitch id="scep-profile-intune" checked={formData.intune_enabled} onChange={(val) => update('intune_enabled', val)} label={t('scep.intuneEnabled')} />
             {formData.intune_enabled && (
               <>
@@ -139,7 +140,7 @@ export default function ScepProfileForm({ profile, cas, templates, onClose, onSa
         </div>
         <div className="modal-actions">
           <button type="button" className="btn" data-action="close-modal" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-          <button type="submit" className="btn primary" disabled={saving || undefined}>{saving ? t('common.saving') : (editing ? t('common.saveChanges') : t('common.create'))}</button>
+          <button type="submit" className="btn primary" disabled={saving || undefined}><Icon name={editing ? 'check' : 'plus'} />{saving ? t('common.saving') : (editing ? t('common.saveChanges') : t('common.create'))}</button>
         </div>
       </form>
     </Modal>

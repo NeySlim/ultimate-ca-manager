@@ -215,8 +215,13 @@ export function HierarchyTree({ forest, query = '', filtered = false, crossLinks
           <span className="ca-badges" id={`ca-meta-${ca.id}`}>
             <CAStatePill ca={ca} t={t} />
             <CAMarks ca={ca} t={t} orphan={forest.orphans.has(ca.id)} />
-            {ca.certs > 0 && <span className="ca-line-count">{t('cas.certificateCount', { count: ca.certs })}</span>}
-            {end && <time className="ca-line-date" dateTime={String(end)}>{formatDate(end, { time: false })}</time>}
+            {/* Count and date wrap together: on a phone the date never drops alone on a line of its own */}
+            {(ca.certs > 0 || end) && (
+              <span className="ca-line-end">
+                {ca.certs > 0 && <span className="ca-line-count">{t('cas.certificateCount', { count: ca.certs })}</span>}
+                {end && <time className="ca-line-date" dateTime={String(end)}>{formatDate(end, { time: false })}</time>}
+              </span>
+            )}
           </span>
         </div>
       </li>

@@ -12,7 +12,7 @@ import { usePermission } from '../../hooks/usePermission'
 import { listHref } from '../../lib/overviewFilters'
 import { FLOW_SERIES, axisTop, flowColumns, nextDay } from '../../lib/overviewHorizon'
 import { ISSUANCE_DAYS } from '../../lib/overviewViz'
-import { OverviewCard, OverviewContext, useCardData, useLang } from './shared'
+import { NB, OverviewCard, OverviewContext, SEP, useCardData, useLang } from './shared'
 import { SeriesFrame } from './viz'
 
 const PERIODS = [7, 30, 90]
@@ -118,11 +118,11 @@ export function IssuanceCard() {
             components={[<span key="fig" className="fig" data-total={f.total} />, <span key="word" className="muted" />]} />
           <span className="muted">
             {trend !== null && (
-              <>{' · '}<span className={`delta ${trend > 0 ? 'good' : trend < 0 ? 'bad' : 'muted'}`} data-trend={trend}>
-                {trend !== 0 && <Icon name={trend > 0 ? 'up' : 'down'} />}{trend > 0 ? `+ ${trend} %` : trend < 0 ? `− ${-trend} %` : '0 %'}
+              <>{SEP}<span className={`delta ${trend > 0 ? 'good' : trend < 0 ? 'bad' : 'muted'}`} data-trend={trend}>
+                {trend !== 0 && <Icon name={trend > 0 ? 'up' : 'down'} />}{trend > 0 ? `+${NB}${trend}${NB}%` : trend < 0 ? `−${NB}${-trend}${NB}%` : `0${NB}%`}
               </span>{' '}{t('overview.flow.vsPrevious', { count: days })}</>
             )}
-            {f.automaticShare !== null && <>{' · '}{t('overview.flow.automatic', { pct: f.automaticShare })}</>}
+            {f.automaticShare !== null && <>{SEP}{t('overview.flow.automatic', { pct: f.automaticShare })}</>}
           </span>
         </div>
         <div ref={frame}>

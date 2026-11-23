@@ -35,7 +35,7 @@ import HistoryTab from './acme/HistoryTab'
 import CreateAccountForm from './acme/CreateAccountForm'
 import RequestCertificateForm from './acme/RequestCertificateForm'
 import CaAccountsManager from './acme/CaAccountsManager'
-import { effectiveDnsUpdatePort, settingsAfterPortSave } from './acme/dnsUpdatePort'
+import { effectiveDnsUpdatePort } from './acme/dnsUpdatePort'
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
@@ -85,7 +85,11 @@ export default function ACMEPage() {
   // Data states - ACME client
   const [clientOrders, setClientOrders] = useState([])
   const [clientOrdersPartial, setClientOrdersPartial] = useState(null)
+  // Server-paged views: their totals, read with the page and kept up to date by the views themselves
+  const [localOrdersTotal, setLocalOrdersTotal] = useState(null)
+  const [eabTotal, setEabTotal] = useState(null)
   const [clientSettings, setClientSettings] = useState({})
+  const [dnsRestartRequired, setDnsRestartRequired] = useState(false)
   const [caAccounts, setCaAccounts] = useState([])
   const [dnsProviders, setDnsProviders] = useState([])
   const [dnsProviderTypes, setDnsProviderTypes] = useState([])
@@ -287,8 +291,13 @@ export default function ACMEPage() {
         acmeService.getDomains().catch(() => ({ data: [] })),
         acmeService.getLocalDomains().catch(() => ({ data: [] })),
         acmeService.getEabRequired().catch(() => ({ data: { eab_required: false } })),
-        acmeService.getCaAccounts().catch(() => ({ data: [] }))
+        acmeService.getCaAccounts().catch(() => ({ data: [] })),
       ])
+      // The totals of the two views paged by the server: one row each, only their meta is read
+      Promise.resolve().then(() => acmeService.getLocalOrders({ page: 1, per_page: 1 }))
+        .then((res) => setLocalOrdersTotal(res?.data?.meta?.total ?? res?.meta?.total ?? null)).catch(() => {})
+      Promise.resolve().then(() => acmeService.listEabCredentials(undefined, { page: 1, per_page: 1 }))
+        .then((res) => setEabTotal(res?.meta?.total ?? null)).catch(() => {})
       setAccounts(accountsRes.data || [])
       setAccountsPartial(accountsRes.partial)
       setAcmeSettings(settingsRes.data || settingsRes || {})
@@ -426,17 +435,6 @@ export default function ACMEPage() {
   // =========================================================================
   
   // The DNS UPDATE listener port is read at start: the response says if a restart is needed.
-  const handleSaveDnsUpdatePort = async (port) => {
-    try {
-      const res = await acmeService.updateClientSettings({ dns_update_port: port })
-      setClientSettings(prev => settingsAfterPortSave(prev, port))
-      return res
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-      return null
-    }
-  }
-
   const handleToggleRevokeOnRenewal = (enabled) => {
     if (enabled && revokeSuperseded && acmeSettings.superseded_count > 0) {
       setShowRevokeConfirm(true)
@@ -997,7 +995,7 @@ export default function ACMEPage() {
         onClose={() => setSelectedAccount(null)} onDeactivate={handleDeactivate} onDelete={handleDelete}
         onChanged={(updated) => { setSelectedAccount(updated); loadData() }} />
     )}</SlotDock></>,
-    localorders: <LocalOrdersTab linkedOrder={linkedLocalOrder} onCloseLinked={() => setLinkedLocalOrder(null)} />,
+    localorders: <LocalOrdersTab linkedOrder={linkedLocalOrder} onCloseLinked={() => setLinkedLocalOrder(null)} onTotal={setLocalOrdersTotal} />,
     localdomains: (
       <LocalDomainsTab localDomains={localDomains} cas={cas} onAdd={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}
         onEdit={(d) => { setSelectedLocalDomain(d); setShowLocalDomainModal(true) }} onDelete={handleDeleteLocalDomain}
@@ -1005,7 +1003,7 @@ export default function ACMEPage() {
     ),
     eab: (
       <EabTab eabRequired={eabRequired} onToggleEabRequired={handleToggleEabRequired} showCreateModal={openEabCreate}
-        onCloseCreateModal={() => setOpenEabCreate(false)} canWrite={canWrite('acme')} canDelete={canDelete('acme')} />
+        onCloseCreateModal={() => setOpenEabCreate(false)} canWrite={canWrite('acme')} canDelete={canDelete('acme')} onTotal={setEabTotal} />
     ),
     config: loading ? <SkeletonPanel label={t('common.loading')} /> : (
       <ConfigTab acmeSettings={acmeSettings} saved={serverSaved} savedProfiles={savedProfiles} cas={cas} templates={templates}
@@ -1014,8 +1012,9 @@ export default function ACMEPage() {
         onToggleRevokeOnRenewal={handleToggleRevokeOnRenewal} canWrite={canWrite('acme')} />
     ),
     letsencrypt: loading ? <SkeletonPanel label={t('common.loading')} /> : (
-      <LetsEncryptTab clientSettings={clientSettings} caAccounts={caAccounts} canWrite={canWrite('acme')} onSaved={() => { setConnectionResult(null); return loadData() }}
-        onSaveDnsUpdatePort={handleSaveDnsUpdatePort} onRegisterProxy={handleRegisterProxy} onUnregisterProxy={handleUnregisterProxy}
+      <LetsEncryptTab clientSettings={clientSettings} caAccounts={caAccounts} canWrite={canWrite('acme')} onSaved={(saved = {}) => { setConnectionResult(null); if ('restartRequired' in saved) setDnsRestartRequired(saved.restartRequired); return loadData() }}
+        restartRequired={dnsRestartRequired}
+        onRegisterProxy={handleRegisterProxy} onUnregisterProxy={handleUnregisterProxy}
         onResetProxyAccount={handleResetProxyAccount} onTestConnection={handleTestConnection} testingConnection={testingConnection} connectionResult={connectionResult} />
     ),
     letsencryptorders: (
@@ -1032,7 +1031,7 @@ export default function ACMEPage() {
         onSetDefault={handleSetDefaultCaAccount} onRegister={handleRegisterCaAccount} />
     ),
     dns: (
-      <DnsProvidersTab dnsProviders={dnsProviders} onAddProvider={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}
+      <DnsProvidersTab dnsProviders={dnsProviders} providerTypes={dnsProviderTypes} onAddProvider={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}
         onEditProvider={(p) => { setSelectedDnsProvider(p); setShowDnsProviderModal(true) }} onTestProvider={handleTestDnsProvider}
         onDeleteProvider={handleDeleteDnsProvider} canWrite={canWrite('acme')} canDelete={canDelete('acme')} />
     ),
@@ -1045,7 +1044,7 @@ export default function ACMEPage() {
       <HistoryTab history={history} total={historyTotal} loading={historyLoading} page={historyPage} perPage={historyPerPage} onPageChange={setHistoryPage}
         onPerPageChange={(v) => { setHistoryPerPage(v); setHistoryPage(1) }} search={historySearch}
         onSearchChange={(v) => { setHistorySearch(v); setHistoryPage(1) }} sort={historySort} onSort={historySortParam.onSort}
-        caOptions={historyCAs} exportLoader={exportHistory} filterStatus={historyFilterStatus}
+        caOptions={historyCAs} exportLoader={exportHistory} onRefresh={loadHistory} filterStatus={historyFilterStatus}
         onFilterStatusChange={(v) => { setHistoryFilterStatus(v); setHistoryPage(1) }} filterCA={historyFilterCA}
         onFilterCAChange={(v) => { setHistoryFilterCA(v); setHistoryPage(1) }} filterSource={historyFilterSource}
         onFilterSourceChange={(v) => { setHistoryFilterSource(v); setHistoryPage(1) }} selectedCert={selectedCert} onSelectCert={setSelectedCert} />
@@ -1054,12 +1053,13 @@ export default function ACMEPage() {
 
   const totals = {
     accounts: t('acme.unit', { count: accounts.length }),
-    localorders: t('acme.views.localorders'),
+    localorders: localOrdersTotal === null ? t('acme.views.localorders') : t('acme.localOrdersCount', { count: localOrdersTotal }),
     localdomains: t('acme.domainsRange', { count: localDomains.length }),
-    eab: t('acme.views.eab'),
+    eab: eabTotal === null ? t('acme.views.eab') : t('acme.eab.totalCount', { count: eabTotal }),
     config: t('protocols.sections', { count: 8 }),
     letsencrypt: t('protocols.sections', { count: 3 }),
-    letsencryptorders: t('acme.clientOrdersRange', { shown: clientOrders.length, count: clientOrders.length }),
+    // « 10 sur 10 » only when the list stops short of the server's total
+    letsencryptorders: clientOrdersPartial ? t('acme.clientOrdersRange', { shown: clientOrders.length, count: clientOrdersPartial.total }) : t('acme.localOrdersCount', { count: clientOrders.length }),
     upstream: t('acme.upstreamRange', { count: caAccounts.length }),
     dns: t('acme.providersRange', { count: dnsProviders.length }),
     domains: t('acme.domainsRange', { count: acmeDomains.length }),
@@ -1078,7 +1078,8 @@ export default function ACMEPage() {
   }[activeTab]
   // A tab counts what its view lists, a bar while it is read
   const counts = { accounts: accounts.length, localdomains: localDomains.length, letsencryptorders: clientOrders.length, upstream: caAccounts.length, dns: dnsProviders.length, domains: acmeDomains.length }
-  const option = (v) => ({ value: v, label: t(`acme.views.${v}`), count: v === 'history' ? (historyLoading ? null : historyTotal) : v in counts ? (loading ? null : counts[v]) : undefined })
+  const paged = { history: historyLoading ? null : historyTotal, localorders: localOrdersTotal, eab: eabTotal }
+  const option = (v) => ({ value: v, label: t(`acme.views.${v}`), count: v in paged ? paged[v] : v in counts ? (loading ? null : counts[v]) : undefined })
 
   return (
     <DockSlotProvider>
