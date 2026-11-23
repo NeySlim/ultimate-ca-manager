@@ -379,14 +379,14 @@ LISTENER_TRUST_PERMISSION = 'admin:system'
 
 
 def _listener_trust_refused(trusted_before):
-    """A 403 when this change moves the CAs the TLS listener trusts (a service restart) and the
+    """A 403 when this change moves the CAs the TLS listener trusts (a listener reload) and the
     account lacks the scope of the mTLS settings; None otherwise. The change is rolled back."""
     if (windows_profiles.listener_former_refids() == trusted_before
             or has_permission(LISTENER_TRUST_PERMISSION, getattr(g, 'permissions', None) or [])):
         return None
     db.session.rollback()
     return error_response('This change alters the CAs the TLS listener trusts for Windows renewal and '
-                          f'restarts the service: permission required: {LISTENER_TRUST_PERMISSION}', 403)
+                          f'reloads the TLS listener: permission required: {LISTENER_TRUST_PERMISSION}', 403)
 
 
 def _listener_restart(rolling):
@@ -811,7 +811,7 @@ def get_windows_settings():
 @require_auth(['write:xcep'])
 def update_windows_settings():
     """Set the XCEP, WSTEP and Kerberos switches and the SPN. WSTEP and Kerberos need their own
-    write scope; a change of the WSTEP switch restarts the service (TLS cap read at startup)."""
+    write scope; a change of the WSTEP switch reloads the TLS listener (TLS cap read as it loads)."""
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response('A JSON object is required', 400)
@@ -850,8 +850,10 @@ def update_windows_settings():
                             details=f"Updated Windows enrollment settings: {', '.join(sorted(data))}",
                             success=True)
     if rolling:
+        from utils.listener_tls import ROLLING
         return success_response(message='Settings saved. Rolling restart requested: '
-                                        'the nodes restart one at a time.')
+                                        'the nodes restart one at a time.',
+                                data={'listener_reload': ROLLING})
     if enabled_changed:
         # The TLS 1.2 cap of WSTEP is read by the listener at its (re)load
         from utils.listener_tls import FAILED, RELOADING, reload_or_restart
