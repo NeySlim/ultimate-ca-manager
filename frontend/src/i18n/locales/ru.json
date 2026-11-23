@@ -4536,7 +4536,7 @@
     },
     "backupCount_one": "{{count}} резервная копия",
     "backupCount_other": "{{count}} резервной копии",
-    "backupCount_few": "{{count}} резервной копии",
+    "backupCount_few": "{{count}} резервные копии",
     "backupCount_many": "{{count}} резервных копий",
     "backupSpaceUsed_one": "Место, занятое резервными копиями: {{size}}, {{count}} копия.",
     "backupSpaceUsed_other": "Место, занятое резервными копиями: {{size}}, {{count}} копии.",

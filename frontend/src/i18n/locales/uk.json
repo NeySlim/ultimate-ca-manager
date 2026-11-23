@@ -4534,12 +4534,12 @@
       "caSigned": "Підписаний ЦС",
       "selfSigned": "Самопідписаний"
     },
-    "backupCount_one": "{{count}} копій",
-    "backupCount_other": "{{count}} копій",
-    "backupCount_few": "{{count}} копій",
+    "backupCount_one": "{{count}} копія",
+    "backupCount_other": "{{count}} копії",
+    "backupCount_few": "{{count}} копії",
     "backupCount_many": "{{count}} копій",
-    "backupSpaceUsed_one": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
-    "backupSpaceUsed_other": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
+    "backupSpaceUsed_one": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копії",
+    "backupSpaceUsed_other": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копії",
     "backupSpaceUsed_few": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
     "backupSpaceUsed_many": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
     "check": {
