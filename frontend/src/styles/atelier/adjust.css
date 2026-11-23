@@ -399,11 +399,11 @@
 :root .atl .modules-menu .menu-foot>.text-link{padding-block:5px;margin-block:-5px}
 /* The approvals link's warning sign in the warning colour, its words in the accent; a count of certificates due in the warning fill. */
 :root .atl .statusbar .status-link[data-dashboard-link=queue]>.icon{color:var(--warn)}
-:root .atl .main-nav .notif-count.nav-count{background:var(--warn-fill);color:#111}
+:root .atl .main-nav .notif-count.nav-count{background:var(--warn-fill);color:var(--ink)}
 /* Dashboard cards on a phone: a card's links are 24 px targets. */
 @media(max-width:800px){:root .atl .card-tools .text-link{min-height:24px}}
 /* Aurore: a floating window edged as the glass panels, with their glow. */
-:root[data-theme|=aurore] .atl .float-window{border-color:color-mix(in srgb,var(--grad-a) 62%,transparent);box-shadow:0 18px 50px #0006,0 0 24px -8px var(--grad-a)}
+:root[data-theme|=aurore] .atl .float-window{border-color:color-mix(in srgb,var(--grad-a) 62%,transparent);box-shadow:0 18px 50px color-mix(in srgb,var(--ink) 40%,transparent),0 0 24px -8px var(--grad-a)}
 /* Aurore, dark: menus and floating windows nearly opaque, the aurora no longer a stain under their text. */
 :root[data-theme="aurore"][data-mode="dark"] .atl :is(.modules-menu,.pop-menu,.float-window){background-color:color-mix(in srgb,var(--panel) 92%,transparent)}
 /* Aurore, dark: a read-only field on its own ground, its text muted. */
