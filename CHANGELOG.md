@@ -104,6 +104,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **Governance, settings and the shell drawn as one console.** Neutral pills line up with the tinted ones, Aurore's light dialogs are opaque, dark modes draw native controls dark, long names stay whole in the search, which lists pages and actions first, and a phone keeps a page head's secondary actions in a « ⋯ » menu and the page help in the account menu.
+- **Operations and roles in the interface language.** The Activity journal names its common operations in the language (acronyms in capitals otherwise), the seeded roles are named and described as the account list names them, and a role's type is a neutral pill.
 - **The console keeps its 1920 px layout on wider screens, and settings read in a narrower column.** Past a 1920 px window the page, the contents of both bars and a maximized window hold 1852 px, centred; settings cards hold 960 px beside their contents (the scheduler's table keeps the whole width) and their help about 80 characters a line.
 - **The certificate comparison reads at a glance.** An identical line is merged into one cell marked *Identical*, a differing one is drawn by a stroke beside its label instead of a full highlight, and in a list (names, usages, extensions) a "+" marks the element not every certificate has; the summary counts the differences among the properties.
 - **Terms and values read at a glance.** Every block of terms and values sets the value in 13 px and weight 500 under a rule per row, the term column as wide as its longest term, and breaks no word in its middle; in the account menu, the certificate overview and a CA's side panel, states show as pills, fingerprints and URLs copy whole from their chip, actions sit apart as buttons and the help of *Unique subject* folds behind its button. A CA's signature is named by its hash (*SHA-256*), as a certificate's.
@@ -259,6 +261,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **An expired mTLS certificate no longer shows as Active.** *My account › Security* marks a client certificate past its end *Expired*, in red, whatever its switch; a scheduler task already due reads *imminent* instead of *a minute ago*.
 - **A renewed or applied HTTPS certificate is served without restarting the container (#452).** Outside HA the TLS listener now reloads through a SIGHUP to the gunicorn master (also for mTLS and WSTEP changes), and Settings > HTTPS and `served` in `cert-info` say when the certificate on disk is not served yet.
 - **The Activity page's end date includes its last day.** A date range stopped at midnight at the start of its end date; it now covers that whole UTC day.
 - **Open certificate tabs keep their titles.** After a visit to another page or a Back, the tabs of the certificates still open showed "…" instead of their names; each tab now keeps its certificate's name.
