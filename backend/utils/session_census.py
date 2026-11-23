@@ -11,11 +11,10 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 
-def count_sessions(user, version, skip=None):
+def count_sessions(user, version):
     """Sessions of ``user`` (signed in or waiting on a second factor) still at ``version``,
     not already ended by the application's lifetime or inactivity limits, and not left by
-    an earlier account of the same id (SQLite hands the last deleted id out again).
-    ``skip``: the store id of a record this request moves to a new identifier, not counted."""
+    an earlier account of the same id (SQLite hands the last deleted id out again)."""
     from auth.session_start import holds_account
     from auth.unified import AuthManager
     user_id = user.id
@@ -25,7 +24,7 @@ def count_sessions(user, version, skip=None):
     if serializer is None:
         return None
     try:
-        blobs = _stored_blobs(iface, skip)
+        blobs = _stored_blobs(iface)
         if blobs is None:
             return None
         count = 0
@@ -49,8 +48,8 @@ def count_sessions(user, version, skip=None):
         return None
 
 
-def _stored_blobs(iface, skip=None):
-    """Every live entry as the store keeps it but ``skip``, or None for a store not listed here."""
+def _stored_blobs(iface):
+    """Every live entry as the store keeps it, or None for a store not listed here."""
     prefix = getattr(iface, 'key_prefix', '')
     model = getattr(iface, 'sql_session_model', None)
     if model is not None:
@@ -58,11 +57,8 @@ def _stored_blobs(iface, skip=None):
         session = store if store is not None else iface.client.session
         now = datetime.now(timezone.utc).replace(tzinfo=None)  # the store's naive UTC
         try:
-            query = session.query(model.data).filter(
-                model.session_id.startswith(prefix), model.expiry > now)
-            if skip is not None:
-                query = query.filter(model.session_id != skip)
-            rows = query.all()
+            rows = session.query(model.data).filter(
+                model.session_id.startswith(prefix), model.expiry > now).all()
         finally:
             if store is not None:
                 store.close()
@@ -70,24 +66,20 @@ def _stored_blobs(iface, skip=None):
     from cachelib.file import FileSystemCache
     cache = getattr(iface, 'cache', None) or getattr(iface, 'client', None)
     if isinstance(cache, FileSystemCache):
-        return list(_file_entries(cache, cache._get_filename(skip) if skip is not None else None))
+        return list(_file_entries(cache))
     redis_scan = getattr(cache, 'scan_iter', None)
     if redis_scan is not None:
-        skipped = skip.encode() if isinstance(skip, str) else skip
-        return [blob for blob in (cache.get(key) for key in redis_scan(match=f'{prefix}*')
-                                  if key not in (skip, skipped)) if blob]
+        return [blob for blob in (cache.get(key) for key in redis_scan(match=f'{prefix}*'))
+                if blob]
     return None
 
 
-def _file_entries(cache, skip=None):
-    """Each unexpired value of a cachelib file cache but the file ``skip``, read as its own
-    get() reads it."""
+def _file_entries(cache):
+    """Each unexpired value of a cachelib file cache, read as its own get() reads it."""
     import struct
     import time
     now = time.time()
     for name in cache._list_dir():
-        if name == skip:
-            continue
         try:
             with open(name, 'rb') as f:
                 expires = struct.unpack('I', f.read(4))[0]

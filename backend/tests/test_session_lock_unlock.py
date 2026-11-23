@@ -20,7 +20,7 @@ import pytest
 from models import AuditLog, User, db
 from utils.datetime_utils import utc_now
 from tests.test_factor_change_sessions import (  # noqa: F401 (fixtures)
-    _drop_session_table_from_metadata, nodes)
+    PG_URL, _drop_session_table_from_metadata, nodes)
 from tests.test_session_lock_and_info import (  # noqa: F401 (fixture)
     PASSWORD, _password_session, _post, _verify, make_user)
 
@@ -969,6 +969,142 @@ def test_a_lock_stored_between_the_read_and_the_move_of_a_renewal_moves_too(
     _refused_as_locked(_profile(_held_by(first, renewed)))
 
 
+# --- A renewal keeps its session against the old cookie's requests -------------------------
+
+RENEWAL_OPERATIONS = ['change-password', 'close-other-sessions', 'disable-totp', 'delete-passkey']
+
+
+@contextmanager
+def _held_before_its_save(application):
+    """The next request of ``application`` held once its view answered, before its session
+    is saved, until the block ends."""
+    entered, release, held = threading.Event(), threading.Event(), []
+
+    def holding(response):
+        if not held:
+            held.append(1)
+            entered.set()
+            release.wait(15)
+        return response
+
+    hooks = application.after_request_funcs.setdefault(None, [])
+    hooks.append(holding)
+    try:
+        yield entered
+    finally:
+        release.set()
+        hooks.remove(holding)
+
+
+def _send(client, method, url, body, response):
+    response['r'] = client.open(url, method=method, data=json.dumps(body or {}),
+                                content_type='application/json')
+
+
+def _session_cookie_sent(r):
+    return any(h.startswith('session=') for h in r.headers.getlist('Set-Cookie'))
+
+
+def _remove_records_of(application, user_id):
+    """Removes every stored session of ``user_id``, as a revocation on another node would."""
+    import os
+    from itsdangerous import want_bytes
+    interface = application.session_interface
+    kind = application.config['SESSION_TYPE']
+    with application.app_context():
+        if kind == 'filesystem':
+            cache = interface.cache
+            for name in cache._list_dir():
+                with open(name, 'rb') as f:
+                    f.read(4)
+                    data = cache.serializer.load(f)
+                if isinstance(data, dict) and data.get('user_id') == user_id:
+                    os.remove(name)
+        elif kind == 'redis':
+            for key in interface.client.scan_iter(match=f'{interface.key_prefix}*'):
+                blob = interface.client.get(key)
+                if blob and interface.serializer.decode(blob).get('user_id') == user_id:
+                    interface.client.delete(key)
+        else:
+            model = interface.sql_session_model
+            with interface._store() as s:
+                for row in s.query(model.session_id, model.data).all():
+                    if interface.serializer.decode(want_bytes(row.data)).get('user_id') == user_id:
+                        s.query(model).filter_by(session_id=row.session_id).delete()
+                s.commit()
+
+
+@pytest.mark.parametrize('operation', RENEWAL_OPERATIONS)
+def test_a_request_of_the_old_cookie_during_a_renewal_never_ends_the_kept_session(
+        nodes, make_user, factors, operation):
+    """Another tab's request with the old cookie, served once the renewal changed the session
+    version and before its response: refused, and the session kept under the new identifier
+    lives on every node."""
+    first, second = nodes
+    user = make_user(first, totp=operation == 'disable-totp')
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    method, url, body, _password = _renewal(first, user, operation, factors)
+    renewing, flight = _held_by(second, held), {}
+    with _held_before_its_save(second) as entered:
+        worker = threading.Thread(target=_send, args=(renewing, method, url, body, flight))
+        worker.start()
+        assert entered.wait(15), 'the renewal never answered'
+        stale = _profile(_held_by(first, held))
+        assert stale.status_code == 401 and stale.get_json()['type'] == AUTH_REQUIRED
+    worker.join(30)
+    assert flight['r'].status_code == 200, flight['r'].data
+    renewed = renewing.get_cookie('session').value
+    assert renewed != held
+    for node in (first, second):
+        assert _profile(_held_by(node, renewed)).status_code == 200
+        assert _profile(_held_by(node, held)).status_code == 401
+
+
+@pytest.mark.parametrize('operation', ['change-password', 'close-other-sessions'])
+def test_a_sign_out_before_the_renewal_moves_its_record_stays_signed_out(
+        nodes, make_user, factors, operation):
+    """The old cookie signs out while the renewal waits at its view: the renewal answers
+    without a session cookie and no identifier serves again."""
+    first, second = nodes
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    method, url, body, _password = _renewal(first, user, operation, factors)
+    renewing = _held_by(second, held)
+    with _in_flight(second, renewing, method, url, body) as flight:
+        assert _post(c, '/api/v2/auth/logout').status_code == 200
+    assert flight['r'].status_code == 200, flight['r'].data
+    assert not _session_cookie_sent(flight['r'])
+    for node in (first, second):
+        assert _profile(_held_by(node, renewing.get_cookie('session').value)).status_code == 401
+        assert _profile(_held_by(node, held)).status_code == 401
+
+
+@pytest.mark.parametrize('operation', ['change-password', 'close-other-sessions'])
+def test_a_renewed_record_removed_before_the_save_is_not_written_back(
+        nodes, make_user, factors, operation):
+    """The renewal's own save updates the record it moved, never recreates it: removed before
+    that save, the session stays ended and no cookie names it."""
+    first, second = nodes
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    method, url, body, _password = _renewal(first, user, operation, factors)
+    renewing, flight = _held_by(second, held), {}
+    with _held_before_its_save(second) as entered:
+        worker = threading.Thread(target=_send, args=(renewing, method, url, body, flight))
+        worker.start()
+        assert entered.wait(15), 'the renewal never answered'
+        _remove_records_of(first, user['id'])
+    worker.join(30)
+    assert flight['r'].status_code == 200, flight['r'].data
+    assert not _session_cookie_sent(flight['r'])
+    assert renewing.get_cookie('session').value == held
+    for node in (first, second):
+        assert _profile(_held_by(node, held)).status_code == 401
+
+
 # --- POST /auth/lock answers 200 only once the lock is stored ------------------------------
 
 @contextmanager
@@ -1044,6 +1180,27 @@ def test_a_lock_the_file_store_could_not_write_says_it_was_not_stored(app, make_
         assert state == HELD
         r = _post(c, '/api/v2/auth/lock', {'reason': 'manual'})
     _not_stored(r, 'busy')
+    assert _profile(c).status_code == 200
+    _lock(c)
+    _refused_as_locked(_profile(c))
+
+
+@pytest.mark.parametrize('nodes', ['sql-sqlite', pytest.param('sql-postgresql', marks=[
+    pytest.mark.postgres, pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL')])], indirect=True)
+def test_a_lock_while_ha_maintenance_pauses_session_writes_says_it_was_not_stored(
+        nodes, make_user, monkeypatch):
+    """An HA maintenance pauses the SQL store's writes: the lock answers 409 'busy', as when
+    the file store stays held, and goes through once the writes resume."""
+    first, second = nodes
+    from utils.session_store import IsolatedSqlSessionInterface
+    user = make_user(first)
+    c = _password_session(first, user)
+    with monkeypatch.context() as paused:
+        paused.setattr(IsolatedSqlSessionInterface, '_writes_paused', staticmethod(lambda: True))
+        r = _post(_held_by(second, c.get_cookie('session').value), '/api/v2/auth/lock',
+                  {'reason': 'manual'})
+    _not_stored(r, 'busy')
+    assert _audits(first, 'session_locked', user['username']) == []
     assert _profile(c).status_code == 200
     _lock(c)
     _refused_as_locked(_profile(c))

@@ -138,6 +138,36 @@ describe('authService.lock', () => {
     expect(readUnconfirmedLock()).toEqual({ username: 'bob', reason: 'idle' })
   })
 
+  it('leaves the mark another account posted while the lock was answered', async () => {
+    api.post.mockImplementation(async (url) => {
+      if (url === '/auth/lock') markLockUnconfirmed({ username: 'bob', reason: 'idle' })
+      return {}
+    })
+    const done = authService.lock('manual')
+    await vi.runAllTimersAsync()
+    await expect(done).resolves.toEqual({})
+    expect(readUnconfirmedLock()).toEqual({ username: 'bob', reason: 'idle' })
+  })
+
+  it.each([
+    ['answered', async () => ({})],
+    ['refused with 401', async () => Promise.reject(failure(401))],
+  ])('leaves the mark another account posted during the sign-out fallback (%s)', async (_name, signOut) => {
+    api.post.mockImplementation(async (url) => {
+      if (url === '/auth/logout') {
+        markLockUnconfirmed({ username: 'bob', reason: 'idle' })
+        return signOut()
+      }
+      return Promise.reject(failure(0))
+    })
+    const done = authService.lock('idle')
+    done.catch(() => {})
+    await vi.runAllTimersAsync()
+    await expect(done).rejects.toMatchObject({ status: 0 })
+    expect(posts('/auth/logout')).toBe(1)
+    expect(readUnconfirmedLock()).toEqual({ username: 'bob', reason: 'idle' })
+  })
+
   it('does not sign out a session opened during the last attempt', async () => {
     let sent = 0
     api.post.mockImplementation(async (url) => {

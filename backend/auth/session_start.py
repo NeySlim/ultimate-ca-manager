@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def _new_identifier(keep_lock=False):
     """Drop the stored session and give this one a fresh identifier (RFC 6265 §8.4).
-    ``keep_lock``: the record moves to it at the save instead, a lock stored meanwhile with it.
+    ``keep_lock``: the stored record moves to it at once instead, its lock with it.
 
     Flask-Session's regenerate() skips an empty session: call it once a key is set.
     """
@@ -109,8 +109,7 @@ def sessions_closed_by(user):
     if replaced is None:
         return 0
     from utils.session_census import count_sessions
-    # The record this session leaves goes at the save: it is not another session
-    return count_sessions(user, replaced, skip=getattr(session, 'rotated_from', None))
+    return count_sessions(user, replaced)
 
 
 def closed_sessions_note(count):
