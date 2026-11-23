@@ -451,6 +451,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SSO: a second attribute mapping row with the same attribute name silently replaced the first one on save; the row is now marked and the provider is not saved until one of them is changed or removed.
 - SSH: the KRL of a CA failed to generate once a certificate of serial 0 (an imported one) was revoked; such a certificate is now listed as OpenSSH lists it, by its key ID under that CA, and the CA's other certificates with that key ID are revoked with it.
 - **An AD connector's CA bundle that is not text answers 400.** A `ca_bundle` sent as a number, list or object to the connector save or test answered 500; it is now refused with `400` naming the field.
+- **Smart import finds an issuer held in the trust store on every installation.** It looked it up in a fixed SQLite file, so on PostgreSQL or with another database path a chain whose issuer is in the trust store was reported incomplete; it now reads the application's database.
 
 ### Security
 
