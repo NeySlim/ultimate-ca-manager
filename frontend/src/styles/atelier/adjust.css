@@ -249,6 +249,8 @@
    subgrid so a group's sections share the term column; long values under their term below 380 px, a list below 260 px. */
 :root .atl .kv,:root .atl .kvg{display:grid;grid-template-columns:fit-content(42%) minmax(0,1fr) auto;column-gap:14px}
 :root .atl .kv{margin:0;font-size:12px;line-height:1.45}
+/* The mockup's margin of .event-detail .props, on the Facts of a journal entry */
+:root .atl .event-detail>.kv{margin:22px 0}
 :root .atl .kvg>*,:root .atl .kvg>section>*{grid-column:1/-1;min-width:0}
 :root .atl .kvg>section{display:grid;grid-template-columns:subgrid}
 :root .atl .kvg .kv{grid-template-columns:subgrid}

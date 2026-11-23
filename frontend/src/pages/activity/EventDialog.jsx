@@ -10,8 +10,6 @@ import { actionLabel } from './activityTypes'
 import { fullTime } from './activityDates'
 
 const INSPECTABLE = { certificate: 'certificate', ca: 'ca' }
-// The mockup's .event-detail .props margin, kept for the Facts that replace it
-const FACTS_MARGIN = { margin: '22px 0' }
 
 export function EventDialog({ log, locale, resource, onClose, onInspect, canInspect }) {
   const { t } = useTranslation()
@@ -22,7 +20,7 @@ export function EventDialog({ log, locale, resource, onClose, onInspect, canInsp
     <AtelierDialog title={actionLabel(log.action) || t('audit.event')} size="narrow" onClose={onClose} testId="audit-event-dialog">
       <div className="event-detail">
         {log.details && <p>{log.details}</p>}
-        <Facts style={FACTS_MARGIN} items={[
+        <Facts items={[
           [t('audit.colResource'), resource],
           [t('audit.colUser'), log.username || t('common.system')],
           [t('audit.dateTime'), fullTime(log.timestamp, locale)],

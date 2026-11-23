@@ -58,6 +58,9 @@ test('a journal entry keeps its values clear of buttons, its address copyable in
   const dialog = page.locator('dialog[open]')
   await expect(dialog.locator('dl.kv')).toBeVisible()
   await expect(dialog.locator('dl.props')).toHaveCount(0)
+  // The mockup's 22 px above and below the block of the entry, from the stylesheet
+  expect(await dialog.locator('.event-detail > dl.kv').evaluate((dl) => [dl.getAttribute('style'), getComputedStyle(dl).marginTop, getComputedStyle(dl).marginBottom]))
+    .toEqual([null, '22px', '22px'])
   // The result a pill, the client a sentence on its own row, no button in a value but a value's own copy
   await expect(dialog.locator('.row', { has: page.locator('dt', { hasText: /^Result$/ }) }).locator('dd.v .badge')).toBeVisible()
   expect(await dialog.locator('dl.kv dd.v button').evaluateAll((list) => list.every((b) => b.closest('.code-value')))).toBe(true)

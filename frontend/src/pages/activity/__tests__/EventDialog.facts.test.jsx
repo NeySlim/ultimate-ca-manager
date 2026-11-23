@@ -39,6 +39,8 @@ describe('the event dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /protocols\.copyValue/ }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('2001:db8::10'))
     expect(row('audit.client')).toHaveClass('long')
+    // Its margin comes from the stylesheet (.event-detail .kv), not from a style of its own
+    expect(document.querySelector('.event-detail > dl.kv')).not.toHaveAttribute('style')
   })
 
   it('names the system when no user did it, and shows no address it does not have', () => {
