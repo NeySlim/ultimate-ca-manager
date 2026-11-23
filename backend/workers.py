@@ -103,6 +103,16 @@ class MTLSWebSocketHandler(WebSocketHandler, PyWSGIHandler):
             except Exception:
                 pass
 
+    def run_application(self):
+        # geventwebsocket answers 101 before the application runs: a refused origin must
+        # take the plain HTTP path, where the origin gate answers 403 (#453)
+        if self.environ.get('HTTP_UPGRADE', '').lower() == 'websocket':
+            from websocket.origin_gate import REFUSED_KEY, refused
+            if refused(self.environ):
+                self.environ[REFUSED_KEY] = True
+                return super(WebSocketHandler, self).run_application()
+        return super().run_application()
+
     def get_environ(self):
         env = super().get_environ()
         # gevent hands the raw socket to any request with "Connection: upgrade"; outside a

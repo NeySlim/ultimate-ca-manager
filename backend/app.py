@@ -401,6 +401,8 @@ def create_app(config_name=None):
     app.logger.info("✓ WebSocket support enabled")
 
     # Flask-SocketIO answers /socket.io/ before any before_request hook runs.
+    from websocket.origin_gate import SocketIOOriginGate
+    app.wsgi_app = SocketIOOriginGate(app.wsgi_app, app)
     from utils.admin_allowlist import SocketIOAllowlistGate, disabled_by_env as _allowlist_off
     app.wsgi_app = SocketIOAllowlistGate(app.wsgi_app, app, trusted_hops=_trusted_hops)
     if _allowlist_off():

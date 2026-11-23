@@ -133,3 +133,5 @@ tests/test_search_protocol_objects.py
 tests/test_guide_prerender_route.py
 tests/test_list_sort*.py
 tests/test_smart_import_trust_store.py
+tests/test_websocket_origin.py
+tests/test_cors_dynamic_origins.py

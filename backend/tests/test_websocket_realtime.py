@@ -802,7 +802,11 @@ class TestStartup:
         monkeypatch.setitem(app.config, 'CORS_ORIGINS', origins)
         events.init_websocket(app)
         (kw,) = init_kwargs
-        assert kw['cors_allowed_origins'] == origins
+        # Engine.IO asks the live list (#453) rather than a copy taken at start
+        accepted = kw['cors_allowed_origins']
+        assert all(accepted(o, {}) for o in origins)
+        assert not accepted('https://evil.test', {})
+        assert not accepted(None, {})
         assert kw['manage_session'] is False
         assert kw['async_mode'] == 'gevent'
         assert (kw['ping_timeout'], kw['ping_interval']) == (60, 25)
@@ -813,7 +817,8 @@ class TestStartup:
                              'https://pki.example.com'])
         events.init_websocket(app)
         (kw,) = init_kwargs
-        assert kw['cors_allowed_origins'] == ['https://pki.example.com', 'https://b.test:8443']
+        accepted = kw['cors_allowed_origins']
+        assert accepted('https://pki.example.com', {}) and accepted('https://b.test:8443', {})
 
     @pytest.mark.parametrize('bad', ['https://ucm.test/path', 'ftp://ucm.test',
                                      'https://*.ucm.test', 'https://user:pw@ucm.test', 42])
@@ -823,7 +828,9 @@ class TestStartup:
         with caplog.at_level(logging.WARNING, logger='websocket.events'):
             events.init_websocket(app)
         (kw,) = init_kwargs
-        assert kw['cors_allowed_origins'] == ['https://ok.test']
+        assert kw['cors_allowed_origins']('https://ok.test', {})
+        if isinstance(bad, str):
+            assert not kw['cors_allowed_origins'](bad, {})
         assert any(repr(bad) in r.getMessage() for r in caplog.records
                    if r.levelno == logging.WARNING)
 

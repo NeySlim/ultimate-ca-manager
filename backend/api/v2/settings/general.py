@@ -271,10 +271,13 @@ def update_general_settings():
             probe_err = probe_admin_base_url(normalized)
             if probe_err:
                 return error_response(
-                    f'base_url looks unreachable: {probe_err}. Fix it, or '
-                    'resend with "force": true to apply anyway. If the UI '
-                    'ever becomes unreachable because of this setting, start '
-                    'the service with UCM_DISABLE_CANONICAL_REDIRECT=1.', 400)
+                    f'base_url looks unreachable from this server: {probe_err}. UCM checks '
+                    'the name from where it runs, inside the container under Docker: make '
+                    'it resolve and answer there (DNS, a hosts entry, or a network alias '
+                    'on the reverse proxy container), or send the change through the API '
+                    'with "force": true to apply it anyway. If the UI ever becomes '
+                    'unreachable because of this setting, start the service with '
+                    'UCM_DISABLE_CANONICAL_REDIRECT=1.', 400)
         data.pop('force', None)
         data['base_url'] = normalized or ''
 

@@ -61,6 +61,17 @@ class TestPatchGuard:
         assert r.status_code == 400
         assert 'force' in r.get_json().get('message', '') or 'force' in str(r.get_json())
 
+    def test_the_refusal_says_where_the_name_is_checked_and_what_to_do(self, auth_client,
+                                                                       monkeypatch):
+        # #453: a container on a network without outside DNS fails here for a valid public name
+        monkeypatch.setattr(pe, 'probe_admin_base_url',
+                            lambda _u: "'ucm.example.test' does not resolve in DNS")
+        r = self._patch(auth_client, {'base_url': 'https://ucm.example.test'})
+        assert r.status_code == 400
+        message = r.get_json().get('message', '')
+        assert 'from this server' in message and 'container' in message
+        assert 'network alias' in message and '"force": true' in message
+
     def test_force_applies_anyway_and_can_be_cleared(self, auth_client, monkeypatch):
         monkeypatch.setattr(pe, 'probe_admin_base_url',
                             lambda _u: 'unreachable')

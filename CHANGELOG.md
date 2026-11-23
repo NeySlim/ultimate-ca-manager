@@ -265,6 +265,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Live updates behind a reverse proxy on port 443.** The WebSocket accepts the origins of the admin base URL and of the protocol base URL as soon as they are saved, on every node, a default port making no difference (`https://host:443` is `https://host`), and refuses any other origin with 403 before the upgrade and a warning in the log, instead of a 101 closed at once (#453).
+- **The base URL hostname check says what to do.** Its refusal explains that the name is checked from inside the server or container, and how to make it resolve there (DNS, hosts entry, network alias) or apply it with `"force": true` (#453).
 - **The audit clean-up never deletes logs the operator kept.** The dialog lowered a retention above 365 days to 365 without saying so; it now sends the number typed, from 30 to 3650 days, and `POST /api/v2/audit/cleanup` refuses a retention above 3650 days instead of lowering it.
 - **"View certificate" opens the certificate.** The buttons of the CSRs, ACME orders and user certificates opened the Certificates list without the certificate; former `/certificates?id=N` links open it too.
 - **The approval inspector offers only the decisions the server accepts.** Approve is not offered on one's own request, and neither decision after one's vote or outside the policy's approver group, the reason shown instead; requests carry these refusals in `decision_rights`.
