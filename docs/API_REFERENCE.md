@@ -2968,6 +2968,8 @@ Content-Type: application/json
 }
 ```
 
+Permission `delete:audit`. `retention_days` is the number of days kept: a value under 30 is raised to 30, one above 3650 is refused with `400`.
+
 ### Verify Audit Log Integrity
 ```http
 GET /api/v2/audit/verify
@@ -5156,6 +5158,8 @@ GET /api/v2/approvals?status=pending
 ```http
 GET /api/v2/approvals/{request_id}
 ```
+
+Each request, listed or read, carries `decision_rights`: for `approve` and `reject`, `null` when the signed-in user may take that decision, else the reason the server would refuse it: `not_in_group` (the policy names an approver group the user is not in; an administrator passes), `already_voted`, or `own_request` (approve only: a requester may still reject, to withdraw, their own request).
 
 ### Approve Request
 ```http

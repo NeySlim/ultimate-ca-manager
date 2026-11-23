@@ -1976,7 +1976,7 @@ On a phone the head button is hidden: the export is in the « ⋯ » menu.
 
 In the « ⋯ » menu, with the right to delete the log:
 1. Choose **Clean up old logs…**
-2. Set the retention in days (30 to 365)
+2. Set the retention in days (30 to 3650)
 3. Choose **Delete old logs**
 
 > ⚠ Cleaning up is irreversible. Export the entries you need first.

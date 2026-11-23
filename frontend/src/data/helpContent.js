@@ -1159,7 +1159,7 @@ export const helpContent = {
         items: [
           { label: 'Export the log', text: 'CSV or JSON, with the current search and filters, 10,000 entries at most; on a phone it is in the « ⋯ » menu' },
           { label: 'Verify integrity', text: 'In the « ⋯ » menu: checks the hash chain of the log; on a large log it runs in the background, its progress and Cancel verification show in the summary line' },
-          { label: 'Clean up old logs', text: 'In the « ⋯ » menu, with the right to delete the log: deletes the entries older than a retention of 30 to 365 days' },
+          { label: 'Clean up old logs', text: 'In the « ⋯ » menu, with the right to delete the log: deletes the entries older than a retention of 30 to 3650 days' },
         ]
       },
     ],

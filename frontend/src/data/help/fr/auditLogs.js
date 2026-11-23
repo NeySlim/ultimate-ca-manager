@@ -19,7 +19,7 @@ export default {
         items: [
           { label: 'Exporter le journal', text: 'CSV ou JSON, avec la recherche et les filtres en cours, 10 000 entrées au plus ; sur un téléphone, dans le menu « ⋯ »' },
           { label: 'Vérifier l’intégrité', text: 'Dans le menu « ⋯ » : contrôle la chaîne d’empreintes du journal ; sur un gros journal, elle tourne en tâche de fond, son avancement et Annuler la vérification s’affichent dans la ligne de résumé' },
-          { label: 'Nettoyer les anciens journaux', text: 'Dans le menu « ⋯ », avec le droit de supprimer le journal : supprime les entrées plus anciennes qu’une durée de conservation de 30 à 365 jours' },
+          { label: 'Nettoyer les anciens journaux', text: 'Dans le menu « ⋯ », avec le droit de supprimer le journal : supprime les entrées plus anciennes qu’une durée de conservation de 30 à 3650 jours' },
         ]
       },
     ],
@@ -76,7 +76,7 @@ Sur un téléphone, le bouton de l’en-tête est masqué : l’export est dans 
 
 Dans le menu « ⋯ », avec le droit de supprimer le journal :
 1. Choisissez **Nettoyer les anciens journaux…**
-2. Indiquez la durée de conservation en jours (30 à 365)
+2. Indiquez la durée de conservation en jours (30 à 3650)
 3. Choisissez **Supprimer les anciens journaux**
 
 > ⚠ Le nettoyage est irréversible. Exportez d’abord les entrées utiles.
