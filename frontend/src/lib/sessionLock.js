@@ -84,7 +84,9 @@ export function readUnconfirmedLock() {
   }
 }
 
-export function clearUnconfirmedLock() {
+// `username`: only that account's mark goes, never one another account posted since
+export function clearUnconfirmedLock(username) {
+  if (username !== undefined && readUnconfirmedLock()?.username !== username) return
   try { localStorage.removeItem(UNCONFIRMED_KEY) } catch { /* noop */ }
 }
 

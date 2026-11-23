@@ -69,13 +69,15 @@ export const authService = {
   // Locks the session on the server, which keeps it until it is unlocked; `reason` is 'manual' or 'idle'
   lock(reason) {
     const owner = readUnconfirmedLock()
+    // Only the mark this lock was sent under: without one there is nothing of its own to clear
+    const clearOwnMark = () => { if (owner) clearUnconfirmedLock(owner.username) }
     const request = (async () => {
       // The CSRF token goes with the locked session, never one a sign-in set meanwhile
       let ownToken = true
       try {
         const answer = await postLock(reason, owner)
         ownToken = stillOwed(owner)
-        clearUnconfirmedLock()
+        clearOwnMark()
         return answer
       } catch (error) {
         if (error?.superseded || !stillOwed(owner)) {
@@ -83,13 +85,13 @@ export const authService = {
           throw error?.superseded ? error : superseded(error)
         }
         if (error?.status === 401) {
-          clearUnconfirmedLock()
+          clearOwnMark()
         } else {
           try {
             await apiClient.post('/auth/logout')
-            clearUnconfirmedLock()
+            clearOwnMark()
           } catch (signOut) {
-            if (signOut?.status === 401) clearUnconfirmedLock()
+            if (signOut?.status === 401) clearOwnMark()
           }
         }
         throw error
