@@ -3351,6 +3351,7 @@ Permission `admin:settings`. Copies all data from the current backend to the tar
 `cert-info` returns `bound_certificate.needs_attention` (`reason`, `successor_id`, `successor_refid`, `successor_descr`,
 `successor_has_key`, `successor_archived`) when a renewal left the HTTPS binding on the previous certificate, else `null`; applying a
 certificate or unbinding clears it, and importing the renewed certificate's key moves the binding to it.
+Its `fingerprint` is the whole SHA-256 of the certificate, in colon-separated uppercase hex (`-` when no certificate could be read).
 ```http
 # Get current certificate info
 GET /api/v2/system/https/cert-info

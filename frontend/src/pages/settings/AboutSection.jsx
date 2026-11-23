@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Props, RecordList, RecordRow } from '../../components/atelier'
+import { Btn, Facts, RecordList, RecordRow } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
@@ -11,6 +11,7 @@ import { compactAgo } from '../../lib/relativeTime'
 import FipsPreflightPanel from './FipsPreflightPanel'
 import CompliancePreflightPanel from './CompliancePreflightPanel'
 import { KOFI_URL } from '../../lib/support'
+import { fact } from './facts'
 
 const REPO = 'https://github.com/NeySlim/ultimate-ca-manager'
 
@@ -50,7 +51,7 @@ export default function AboutSection() {
   // The start of the service worded as the mockup words a past event (« il y a 19 h »)
   const started = info?.uptime_seconds
     ? compactAgo(new Date(Date.now() - info.uptime_seconds * 1000), t)
-    : '—'
+    : null
   const links = [
     { href: REPO, title: 'GitHub', meta: t('settings.about.sourceCode') },
     { href: `${REPO}/issues`, title: t('settings.about.issues'), meta: t('settings.about.reportBugs') },
@@ -61,12 +62,12 @@ export default function AboutSection() {
   return (
     <>
       <SettingsGroup legend={t('settings.about.systemInfo')} grid={false}>
-        <Props items={[
+        <Facts items={[
           [t('settings.about.version'), info?.version || __APP_VERSION__],
-          [t('settings.about.pythonVersion'), info?.python_version || '—'],
-          [t('settings.about.started'), started],
-          [t('settings.about.memory'), info?.memory_mb ? formatBytes(info.memory_mb * 1024 * 1024, i18n?.language) : '—'],
-          [t('settings.about.environment'), info ? (info.is_docker ? 'Docker' : t('settings.about.envNative')) : '—'],
+          fact(t('settings.about.pythonVersion'), info?.python_version),
+          fact(t('settings.about.started'), started),
+          fact(t('settings.about.memory'), info?.memory_mb ? formatBytes(info.memory_mb * 1024 * 1024, i18n?.language) : null),
+          fact(t('settings.about.environment'), info ? (info.is_docker ? 'Docker' : t('settings.about.envNative')) : null),
         ]} />
       </SettingsGroup>
 

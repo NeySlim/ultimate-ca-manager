@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import { Btn, Pill, Props, Notice, RecordList, RecordRow, Section, SkeletonPanel } from '../../components/atelier'
+import { Btn, Facts, Pill, Notice, RecordList, RecordRow, Section, SkeletonPanel } from '../../components/atelier'
 import { NumberInput, Select, Textarea, ToggleSwitch } from '../../components/atelier/Form'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatDate } from '../../lib/utils'
 import { anchorPickerCas } from '../../lib/caSelection'
 import AdminLockLabel from './AdminLockLabel'
 import { shownNumber, typedNumber } from './numberFields'
+import { fact } from './facts'
 
 // The API sends a list; the textarea edits one entry per line.
 function networksText(value) {
@@ -31,11 +32,11 @@ export default function SecuritySection({ settings, fieldErrors = {}, updateSett
       <SettingsGroup legend={t('settings.keyEncryption')} grid={false}>
         {enc ? (
           <>
-            <Props items={[
-              [t('common.status'), enc.disabling ? <Pill tone="warn" label={t('settings.encryptionDisabling')} />
-                : <Pill tone={enc.enabled ? 'good' : 'warn'} label={enc.enabled ? t('common.enabled') : t('common.disabled')} />],
-              enc.enabled && enc.key_source && [t('settings.keySource'), enc.key_file_path],
-              enc.enabled && enc.kek_fingerprint && [t('settings.kekFingerprint'), <span className="mono">{enc.kek_fingerprint}</span>],
+            <Facts items={[
+              { label: t('common.status'), state: enc.disabling ? ['warn', t('settings.encryptionDisabling')]
+                : [enc.enabled ? 'good' : 'warn', enc.enabled ? t('common.enabled') : t('common.disabled')] },
+              enc.enabled && enc.key_source && fact(t('settings.keySource'), enc.key_file_path, { kind: 'url' }),
+              enc.enabled && enc.kek_fingerprint && { label: t('settings.kekFingerprint'), value: enc.kek_fingerprint, kind: 'hex' },
               enc.enabled && enc.kek_fingerprint && [t('settings.dekVersion'), (
                 <span className="row-actions">
                   <span>{enc.dek_version}</span>
@@ -148,7 +149,7 @@ export default function SecuritySection({ settings, fieldErrors = {}, updateSett
           : networksList(settings.admin_allowed_networks).length > 0 && <>{' '}<Pill tone="good" label={t('settings.adminAllowlistActive')} /></>}</>}
         hint={t('settings.adminAllowlistDesc')}
       >
-        <div className="field full"><Props items={[[t('settings.adminAllowlistYourIp'), settings.admin_client_ip || '—']]} /></div>
+        <div className="field full"><Facts items={[fact(t('settings.adminAllowlistYourIp'), settings.admin_client_ip)]} /></div>
         <Textarea id="set-admin_allowed_networks" mono label={t('settings.adminAllowlistNetworks')} value={networksText(settings.admin_allowed_networks)}
           onChange={(e) => updateSetting('admin_allowed_networks', e.target.value)} rows={4} placeholder={'192.168.10.0/24\n2001:db8:10::/64'}
           hint={t('settings.adminAllowlistHelper')} disabled={settings.admin_allowed_networks_env_locked || !canAdminSettings} spellCheck={false} />

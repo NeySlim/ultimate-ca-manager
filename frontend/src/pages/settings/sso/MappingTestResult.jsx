@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Pill, Props } from '../../../components/atelier'
+import { Facts, Pill } from '../../../components/atelier'
 
 const REFUSAL_KEYS = {
   account_disabled: 'sso.testMappingRefusalAccountDisabled',
@@ -24,13 +24,14 @@ export default function MappingTestResult({ result }) {
       : <span className="muted">{t('sso.testMappingNoGroups')}</span>
   return (
     <div className="field full" role="status">
-      <Props items={[
-        ['DN', <span key="dn" className="mono">{result.user_dn}</span>],
+      <Facts items={[
+        { label: 'DN', value: <span className="mono">{result.user_dn}</span>, long: true },
         [t('sso.testMappingGroups'), groups],
-        [t('sso.testMappingAccess'), <>
-          <Pill tone={allowed ? 'good' : 'bad'} label={allowed ? t('sso.testMappingAccessAllowed') : t('sso.testMappingAccessRefused')} />
-          {!allowed && REFUSAL_KEYS[result.refusal] && <> <span className="muted">{t(REFUSAL_KEYS[result.refusal])}</span></>}
-        </>],
+        {
+          label: t('sso.testMappingAccess'),
+          state: allowed ? ['good', t('sso.testMappingAccessAllowed')] : ['bad', t('sso.testMappingAccessRefused')],
+          sub: !allowed && REFUSAL_KEYS[result.refusal] && t(REFUSAL_KEYS[result.refusal]),
+        },
         allowed && [t('sso.testMappingResolvedRole'), <>
           <Pill tone={ROLE_TONE[result.resolved_role] || 'muted'} icon="users" label={result.resolved_role} />
           {result.resolved_custom_role && <> <span className="chip">{result.resolved_custom_role}</span></>}

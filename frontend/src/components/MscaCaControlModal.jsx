@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Props, RecordList, RecordRow, Section } from './atelier'
+import { Btn, Facts, RecordList, RecordRow, Section } from './atelier'
 import { Modal, Notice } from './atelier/Form'
 import { useNotification } from '../contexts'
 import { mscaService } from '../services'
@@ -90,11 +90,17 @@ export function MscaCaControlModal({ connection, open, onClose }) {
         <Btn icon="refresh" onClick={load} disabled={loading || undefined}>{t('common.refresh')}</Btn>
       </div>
       <Section title={t('msca.caControl')}>
-        <Props items={[
-          [t('msca.healthService'), <span key="s" className={health?.certsvc_status ? (svcOk ? 'good' : 'bad') : undefined}>{health?.certsvc_status || '—'}</span>],
-          [t('msca.healthCaExpiry'), <span key="e" className={caDays != null && caDays < 90 ? 'warn' : undefined}>{caDays != null ? t('msca.daysCount', { count: caDays }) : '—'}</span>],
-          [t('msca.healthCrl'), <span key="c" className={crlExpired ? 'bad' : undefined}>{health?.crl?.next_update ? formatDate(health.crl.next_update) : '—'}</span>],
-          [t('msca.healthPending'), health?.pending_count ?? '—'],
+        <Facts items={[
+          health?.certsvc_status
+            ? { label: t('msca.healthService'), state: [svcOk ? 'good' : 'bad', health.certsvc_status] }
+            : { label: t('msca.healthService'), absent: '—' },
+          caDays != null
+            ? [t('msca.healthCaExpiry'), <span key="e" className={caDays < 90 ? 'warn' : undefined}>{t('msca.daysCount', { count: caDays })}</span>]
+            : { label: t('msca.healthCaExpiry'), absent: '—' },
+          health?.crl?.next_update
+            ? [t('msca.healthCrl'), <span key="c" className={crlExpired ? 'bad' : undefined}>{formatDate(health.crl.next_update)}</span>]
+            : { label: t('msca.healthCrl'), absent: '—' },
+          health?.pending_count != null ? [t('msca.healthPending'), health.pending_count] : { label: t('msca.healthPending'), absent: '—' },
         ]} />
       </Section>
       {(health?.warnings || []).map((w, i) => <Notice key={i} tone="warn">{w}</Notice>)}

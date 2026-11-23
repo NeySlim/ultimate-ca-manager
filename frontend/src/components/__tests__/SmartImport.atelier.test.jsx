@@ -56,7 +56,7 @@ describe('SmartImport in the mockup\'s vocabulary', () => {
     expect(within(card).getByRole('checkbox')).toBeChecked()
     expect(card.querySelector('.badge')).toHaveTextContent('import.typeCertificate')
     fireEvent.click(within(card).getByRole('button', { name: 'common.details' }))
-    expect(card.querySelector('dl.props')).toHaveTextContent('CN=ca')
+    expect(card.querySelector('dl.kv')).toHaveTextContent('CN=ca')
     expect([...dialog.querySelectorAll('.notice.warn')].map((n) => n.textContent)).toEqual(['gap', 'weak'])
     expect(within(dialog).getByText('import.chain 1').closest('ul.record-list')).toBeTruthy()
     expect(productDrawn(dialog)).toBeNull()

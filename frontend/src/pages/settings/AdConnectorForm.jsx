@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Icon, Props } from '../../components/atelier'
+import { Btn, Facts, Icon } from '../../components/atelier'
 import { Input, NumberInput, SecretInput, Textarea, ToggleSwitch } from '../../components/atelier/Form'
 import { formatDate } from '../../lib/utils'
 import { adConnectorsService } from '../../services'
@@ -117,9 +117,10 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
           placeholder={t('adConnector.namePlaceholder')} maxLength={100} required data-autofocus="" />
         {config?.id && (
           <div className="field full">
-            <Props items={[
-              [t('adConnector.realm'), <span key="r" className="mono">{config.realm || '—'}</span>],
-              [t('adConnector.domainSid'), <span key="s" className="mono">{config.domain_sid || t('adConnector.domainSidUnknown')}</span>],
+            <Facts items={[
+              config.realm ? [t('adConnector.realm'), <span key="r" className="mono">{config.realm}</span>] : { label: t('adConnector.realm'), absent: '—' },
+              config.domain_sid ? [t('adConnector.domainSid'), <span key="s" className="mono">{config.domain_sid}</span>]
+                : { label: t('adConnector.domainSid'), absent: t('adConnector.domainSidUnknown') },
             ]} />
           </div>
         )}

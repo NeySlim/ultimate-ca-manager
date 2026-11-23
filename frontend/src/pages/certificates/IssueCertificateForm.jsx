@@ -5,6 +5,7 @@
  */
 import { Fragment, useState, useEffect, useMemo, useRef, useId } from 'react'
 import { Icon } from '../../components/atelier/Icon'
+import { Facts } from '../../components/atelier/Detail'
 import { templatesService, ekuService, toolsService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../../lib/caSelection'
@@ -25,6 +26,8 @@ const MAX_DAYS = RENEW_MAX_DAYS
 const DEFAULT_DAYS = VALIDITY.DEFAULT_DAYS
 const SAN_TYPES = ['dns', 'ip', 'email', 'uri', 'upn']
 const SAN_LABEL = { dns: 'DNS', ip: 'IP', email: 'Email', uri: 'URI', upn: 'UPN' }
+// Review rows read as a DN or a sentence: under their term in a narrow dialog
+const LONG_ROWS = new Set(['subject', 'description', 'extensions'])
 const SAN_PLACEHOLDER = { dns: 'service.example.com', ip: '192.0.2.10', email: 'alice@example.com', uri: 'https://service.example.com', upn: 'alice@example.com' }
 const COMMON_EKUS = [
   ['serverAuth', '1.3.6.1.5.5.7.3.1'], ['clientAuth', '1.3.6.1.5.5.7.3.2'], ['codeSigning', '1.3.6.1.5.5.7.3.3'],
@@ -1202,19 +1205,19 @@ export function IssueCertificateForm({
       <>
         <div className="review-summary" data-testid="issue-review" data-fields={[...fields].join(' ')}>
           <h3 ref={reviewTitle} tabIndex={-1}>{title}</h3>
-          <dl className="props">
-            {rows.map((r) => (
-              <Fragment key={r.id}>
-                <dt data-row={r.id}>{r.label}</dt>
-                <dd className={r.lines.some((l) => l.mono) ? 'mono' : undefined}>
-                  {r.lines.map((l, i) => (
-                    <Fragment key={i}>{i > 0 && <br />}{l.muted === true ? <span className="muted">{l.text}</span> : l.text}
-                      {typeof l.muted === 'string' && l.muted && <span className="muted">{l.muted}</span>}</Fragment>
-                  ))}
-                </dd>
-              </Fragment>
-            ))}
-          </dl>
+          <Facts items={rows.map((r) => {
+            const row = { key: r.id, label: r.label, 'data-row': r.id }
+            // A row that only says "none" is an absent value, short, beside its term
+            if (r.lines.length === 1 && r.lines[0].muted === true) return { ...row, absent: r.lines[0].text }
+            return {
+              ...row,
+              long: LONG_ROWS.has(r.id),
+              value: r.lines.map((l, i) => (
+                <Fragment key={i}>{i > 0 && <br />}{l.mono ? <span className="mono">{l.text}</span> : l.muted === true ? <span className="muted">{l.text}</span> : l.text}
+                  {typeof l.muted === 'string' && l.muted && <span className="muted">{l.muted}</span>}</Fragment>
+              )),
+            }
+          })} />
         </div>
         {approval !== null ? (
           <div className="notice warn" style={{ marginTop: 18, marginBottom: 0 }} role="status" data-testid="approval-sent">

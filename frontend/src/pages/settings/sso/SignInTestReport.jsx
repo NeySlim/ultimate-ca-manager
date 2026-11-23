@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Notice, Pill, Props } from '../../../components/atelier'
+import { Facts, Notice, Pill } from '../../../components/atelier'
 
 // The message the login page shows for each refusal code (LoginPage.jsx).
 const LOGIN_ERROR_KEYS = {
@@ -49,14 +49,14 @@ export default function SignInTestReport({ report, formData, handleChange }) {
 
   return (
     <div className="field full" role="status">
-      <Props items={[
-        [t('sso.signInTestVerdict'), <>
-          <Pill tone={accepted ? 'good' : 'bad'} label={accepted ? t('sso.signInTestAccepted') : t('sso.signInTestRefused')} />
-          {!accepted && report.code && (
-            <> <span className="muted">{LOGIN_ERROR_KEYS[report.code] ? t(LOGIN_ERROR_KEYS[report.code]) : null}{' '}<span className="mono">({report.code})</span></span></>
-          )}
-        </>],
-        report.reason && [t('sso.signInTestReason'), report.reason],
+      <Facts items={[
+        {
+          label: t('sso.signInTestVerdict'),
+          state: accepted ? ['good', t('sso.signInTestAccepted')] : ['bad', t('sso.signInTestRefused')],
+          // What the login page would have said, under the verdict
+          sub: !accepted && report.code && <>{LOGIN_ERROR_KEYS[report.code] ? t(LOGIN_ERROR_KEYS[report.code]) : null}{' '}<span className="mono">({report.code})</span></>,
+        },
+        report.reason && { label: t('sso.signInTestReason'), value: report.reason, long: true },
         identity && [t('sso.signInTestIdentity'), <>
           <span className="mono">{identity.username}</span>
           {identity.email && <span className="muted"> · {identity.email}</span>}
@@ -79,8 +79,8 @@ export default function SignInTestReport({ report, formData, handleChange }) {
           )}
         </>],
         accountLine && [t('sso.signInTestAccount'), accountLine],
-        report.diagnosis && [t('sso.signInTestDiagnosis'), report.diagnosis],
-        report.detail && !report.diagnosis && [t('sso.signInTestDetail'), report.detail],
+        report.diagnosis && { label: t('sso.signInTestDiagnosis'), value: report.diagnosis, long: true },
+        report.detail && !report.diagnosis && { label: t('sso.signInTestDetail'), value: report.detail, long: true },
       ]} />
       {!accepted && report.candidates?.length > 0 && (
         <>

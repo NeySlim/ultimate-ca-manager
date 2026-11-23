@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ServiceReconnectOverlay } from '../../components'
-import { Btn, Props, SkeletonPanel } from '../../components/atelier'
+import { Btn, Facts, SkeletonPanel } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatBytes } from '../../lib/fileSize'
 import { compactAgo } from '../../lib/relativeTime'
@@ -9,6 +9,7 @@ import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useServiceReconnect } from '../../hooks'
 import { usePermission } from '../../hooks'
+import { fact } from './facts'
 
 export default function ServiceStatusWidget() {
   const { t, i18n } = useTranslation()
@@ -64,12 +65,12 @@ export default function ServiceStatusWidget() {
           <SkeletonPanel label={t('common.loading')} />
         ) : status ? (
           <>
-            <Props items={[
-              [t('settings.version'), `v${status.version}`],
-              ['PID', status.pid],
-              [t('settings.about.started'), status.uptime_seconds ? compactAgo(new Date(Date.now() - status.uptime_seconds * 1000), t) : '—'],
-              [t('settings.memory'), status.memory_mb ? formatBytes(status.memory_mb * 1024 * 1024, i18n?.language) : '—'],
-              ['Python', status.python_version],
+            <Facts items={[
+              fact(t('settings.version'), status.version && `v${status.version}`),
+              fact('PID', status.pid),
+              fact(t('settings.about.started'), status.uptime_seconds ? compactAgo(new Date(Date.now() - status.uptime_seconds * 1000), t) : null),
+              fact(t('settings.memory'), status.memory_mb ? formatBytes(status.memory_mb * 1024 * 1024, i18n?.language) : null),
+              fact('Python', status.python_version),
               [t('settings.environment'), status.is_docker ? 'Docker' : t('settings.about.envNative')],
             ]} />
             {canWrite('settings') && !status.is_docker && (

@@ -104,6 +104,28 @@ describe('IssueCertificateForm steps', () => {
     expect(review.textContent).toContain('1.3.6.1.4.1.32473.1 = 0500')
   })
 
+  it('reads the request as typed facts: an absent choice muted, the subject and an extension on long rows', async () => {
+    renderForm()
+    fill()
+    openAdvanced()
+    type('common.organization', 'Example')
+    fireEvent.click(screen.getByText('customExtensions.add'))
+    type(`${P}extOid`, '1.3.6.1.4.1.32473.1')
+    type(`${P}extValue`, '0500')
+    const review = await toReview()
+    expect(review.querySelector('dl.props')).toBeNull()
+    const row = (id) => review.querySelector(`dl.kv > div.row[data-row="${id}"]`)
+    expect(row('template').querySelector('dd')).toHaveClass('absent')
+    // No description: absent, beside its term rather than under it
+    expect(row('description').querySelector('dd')).toHaveClass('absent')
+    expect(row('description')).not.toHaveClass('long')
+    expect(row('ca').querySelector('dd')).toHaveClass('v')
+    expect(row('subject')).toHaveClass('long')
+    expect(row('extensions')).toHaveClass('long')
+    expect(row('extensions').querySelector('dd.v .mono')).toHaveTextContent('1.3.6.1.4.1.32473.1 = 0500')
+    expect(row('key')).not.toHaveClass('long')
+  })
+
   it('offers a new SAN row only the types the template allows', async () => {
     mocks.templates = [TEMPLATE]
     renderForm()
@@ -229,7 +251,7 @@ describe('IssueCertificateForm steps', () => {
     const review = await toReview()
     expect(within(review).getByRole('heading').textContent).toBe('device.example.com')
     // The key of the CSR is named as the list and the inspector name a key
-    expect(review.querySelector('[data-row="key"] + dd').textContent).toBe('ECDSA P-256')
+    expect(review.querySelector('[data-row="key"] dd').textContent).toBe('ECDSA P-256')
     fireEvent.click(screen.getByTestId('issue-submit'))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
     const [body, info] = onSubmit.mock.calls[0]
@@ -277,7 +299,7 @@ describe('IssueCertificateForm steps', () => {
     expect(values.map((v) => [v.value, v.readOnly])).toEqual([['fw.lan', true]])
     expect(screen.getAllByLabelText(new RegExp(`${P}sanType`)).map((v) => v.value)).toEqual(['DNS'])
     const review = await toReview()
-    expect(review.querySelector('[data-row="sans"] + dd').textContent).toBe('DNS : fw.lan')
+    expect(review.querySelector('[data-row="sans"] dd').textContent).toBe('DNS : fw.lan')
   })
 
   it('keeps the empty SAN row of the Atelier for a certificate without any name', () => {
@@ -298,7 +320,7 @@ describe('IssueCertificateForm steps', () => {
     expect(field(LABEL.key).value).toBe('ECDSA P-256')
     expect(screen.getByTestId('issue-hint').textContent).toContain('ECDSA P-256')
     const review = await toReview()
-    expect(review.querySelector('[data-row="key"] + dd').textContent).toBe('ECDSA P-256')
+    expect(review.querySelector('[data-row="key"] dd').textContent).toBe('ECDSA P-256')
   })
 
   it('counts the authorities once: the field hint and the column agree, hidden ones included', () => {

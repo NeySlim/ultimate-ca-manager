@@ -65,10 +65,11 @@ test.describe('desktop', () => {
     expect(Math.abs(summary.width - 870)).toBeLessThanOrEqual(EPS)
     const mark = await box(review.locator('.steps .step > span').first())
     expect(Math.abs(mark.width - 22)).toBeLessThanOrEqual(EPS)
-    const dt = await box(review.locator('.review-summary dt').first())
-    const dd = await box(review.locator('.review-summary dd').first())
-    // The term column as wide as its longest term (44 % at most), the value right after it
-    expect(Math.abs(dd.x - (dt.x + dt.width))).toBeLessThanOrEqual(EPS)
+    const dt = await box(review.locator('.review-summary dl.kv dt').first())
+    const dd = await box(review.locator('.review-summary dl.kv dd').first())
+    const gap = await review.locator('.review-summary dl.kv').evaluate((el) => parseFloat(getComputedStyle(el).columnGap))
+    // The term column as wide as its longest term (44 % at most), the value one column gap after it
+    expect(Math.abs(dd.x - (dt.x + dt.width) - gap)).toBeLessThanOrEqual(EPS)
     expect(dt.width).toBeLessThanOrEqual(summary.width * 0.44 + EPS)
   })
 })

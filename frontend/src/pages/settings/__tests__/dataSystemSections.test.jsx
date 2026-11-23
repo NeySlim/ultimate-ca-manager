@@ -180,8 +180,8 @@ describe('Database: change of backend', () => {
   it('names its health in words and offers the redacted URI to copy', async () => {
     render(<DatabaseBackendSection />)
     expect((await screen.findByText('settings.backend.healthy')).closest('.badge')).toHaveClass('good')
-    expect(screen.getByText('sqlite:///x.db')).toHaveClass('mono')
-    expect(screen.getByRole('button', { name: 'common.copy' })).toBeInTheDocument()
+    expect(screen.getByText('sqlite:///x.db').closest('.code-value')).toHaveClass('url')
+    expect(screen.getByRole('button', { name: /^protocols\.copyValue/ })).toBeInTheDocument()
   })
 })
 

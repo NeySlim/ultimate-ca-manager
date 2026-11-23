@@ -34,6 +34,16 @@ describe('smart import object card', () => {
     expect(screen.queryByText(/bits/)).toBeNull()
   })
 
+  it('reads its details as facts, the subject and the issuer DN on long rows', () => {
+    show({ type: 'certificate', index: 0, matched_key_index: null, subject: 'CN=web.example.com,O=Example,C=FR', issuer: 'CN=Example CA,O=Example,C=FR',
+      key_algorithm: 'RSA', key_size: 2048 })
+    expect(document.querySelector('dl.props')).toBeNull()
+    const row = (term) => [...document.querySelectorAll('dl.kv > div.row')].find((r) => r.querySelector('dt')?.textContent === term)
+    expect(row('common.subject')).toHaveClass('long')
+    expect(row('common.issuer')).toHaveClass('long')
+    expect(row('common.algorithm')).not.toHaveClass('long')
+  })
+
   it('keeps the size of an RSA key', () => {
     show(key({ key_algorithm: 'RSA', key_size: 2048 }))
     expect(screen.getByText('RSA (2048 bits)')).toBeInTheDocument()
