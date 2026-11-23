@@ -465,9 +465,10 @@
 @media(max-width:480px){:root .atl .global-tools .notif-count{right:-2px}}
 /* The Modules menu's foot link: a 24 px target in the foot's line. */
 :root .atl .modules-menu .menu-foot>.text-link{padding-block:5px;margin-block:-5px}
-/* The approvals link's warning sign in the warning colour, its words in the accent; a count of certificates due in the warning fill. */
+/* The approvals link's warning sign in the warning colour, its words in the accent; a count of certificates due in the warning fill,
+   its ink above the mockup's white count of Aurore light (4.5:1 in every palette). */
 :root .atl .statusbar .status-link[data-dashboard-link=queue]>.icon{color:var(--warn)}
-:root .atl .main-nav .notif-count.nav-count{background:var(--warn-fill);color:var(--ink)}
+:root .atl .masthead .main-nav>a>.notif-count.nav-count{background:var(--warn-fill);color:var(--ink)}
 /* Dashboard cards on a phone: a card's links are 24 px targets. */
 @media(max-width:800px){:root .atl .card-tools .text-link{min-height:24px}}
 /* Aurore: a floating window edged as the glass panels, with their glow. */
@@ -499,3 +500,7 @@
 :root .atl .compare-table .hex-lines>.line{display:block}
 /* An empty table keeps room for its sortable columns past the name, so their headers do not pile up at its right edge. */
 :root .atl .module-table:has(>tbody>tr>td>.empty)>thead th[aria-sort]:not(:first-child,.check-col+th){width:10em}
+/* Dark modes: a muted pill's words lifted toward the text, so they keep 4.5:1 on its tint over an opened or hovered row. */
+:root[data-mode="dark"] .atl .badge.muted{color:color-mix(in srgb,var(--muted) 70%,var(--text))}
+/* A notice's console link on a line of its own under the steps, not on the last step's line. */
+:root .atl .notice>span>.pre-line+.text-link{display:block;width:fit-content;margin-top:6px}
