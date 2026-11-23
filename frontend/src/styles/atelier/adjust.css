@@ -392,7 +392,7 @@
 /* A notification: the kind takes the room, the time stays on the kind's line, the unread mark follows the kind. */
 :root .atl .notif-meta{flex-wrap:nowrap;align-items:flex-start}
 :root .atl .notif-meta .notif-kind{flex:0 1 auto;min-width:0}
-:root .atl .notif-meta time{flex-shrink:0}
+:root .atl .notif-meta :is(time,.notif-new){flex-shrink:0;white-space:nowrap}
 /* Phone: the bell's count keeps clear of the avatar. */
 @media(max-width:480px){:root .atl .global-tools .notif-count{right:-2px}}
 /* The Modules menu's foot link: a 24 px target in the foot's line. */
