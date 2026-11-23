@@ -8,14 +8,17 @@ the same account (password, then its second factor as at sign-in; client certifi
 passkey), each attempt audited and counted as the sign-in counts it.
 """
 import json
+import threading
 import time
 import uuid
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pyotp
 import pytest
 
 from models import AuditLog, User, db
+from utils.datetime_utils import utc_now
 from tests.test_factor_change_sessions import (  # noqa: F401 (fixtures)
     _drop_session_table_from_metadata, nodes)
 from tests.test_session_lock_and_info import (  # noqa: F401 (fixture)
@@ -693,3 +696,127 @@ def test_the_lock_holds_on_every_node_and_any_node_unlocks(nodes, make_user, cer
     stale = first.test_client()
     stale.set_cookie('session', held)
     assert _profile(stale).status_code == 401
+
+
+# --- A request in flight never undoes the lock -------------------------------------------
+
+@contextmanager
+def _profile_in_flight(application, client):
+    """A GET /account/profile of ``client`` held at its view, its session copy already read,
+    until the block ends; it then completes and saves that copy. Yields its response holder."""
+    endpoint = application.url_map.bind('localhost').match('/api/v2/account/profile', method='GET')[0]
+    view = application.view_functions[endpoint]
+    entered, release, held, response = threading.Event(), threading.Event(), [], {}
+
+    def holding(*args, **kwargs):
+        if not held:
+            held.append(1)
+            entered.set()
+            release.wait(15)
+        return view(*args, **kwargs)
+
+    application.view_functions[endpoint] = holding
+    worker = threading.Thread(target=lambda: response.setdefault('r', _profile(client)))
+    worker.start()
+    try:
+        assert entered.wait(15), 'the request in flight never reached its view'
+        yield response
+    finally:
+        release.set()
+        worker.join(30)
+        application.view_functions[endpoint] = view
+    assert not worker.is_alive()
+
+
+def _held_by(application, cookie):
+    client = application.test_client()
+    client.set_cookie('session', cookie)
+    return client
+
+
+def test_a_request_in_flight_when_the_lock_lands_never_lifts_it(nodes, make_user):
+    """It read the session before the lock and saves its copy after: the lock stays,
+    on the node that locked and on the one that served the request."""
+    first, second = nodes
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    with _profile_in_flight(second, _held_by(second, held)) as flight:
+        _lock(c)
+        _refused_as_locked(_profile(c))
+    assert flight['r'].status_code == 200
+    for client in (c, _held_by(first, held), _held_by(second, held)):
+        _refused_as_locked(_profile(client))
+        assert _verify(client)['authenticated'] is False
+
+
+def test_a_request_in_flight_across_an_unlock_never_brings_the_old_session_back(nodes, make_user):
+    first, second = nodes
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    with _profile_in_flight(second, _held_by(second, held)):
+        _lock(c)
+        assert _post(c, '/api/v2/auth/unlock/password', {'password': PASSWORD}).status_code == 200
+    assert c.get_cookie('session').value != held
+    assert _profile(c).status_code == 200
+    for node in (first, second):
+        r = _profile(_held_by(node, held))
+        assert r.status_code == 401 and r.get_json()['type'] == AUTH_REQUIRED
+
+
+@pytest.mark.parametrize('locked', [False, True])
+def test_a_request_in_flight_across_a_sign_out_never_brings_the_session_back(nodes, make_user, locked):
+    first, second = nodes
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    with _profile_in_flight(second, _held_by(second, held)):
+        if locked:
+            _lock(c)
+        assert _post(c, '/api/v2/auth/logout').status_code == 200
+    for node in (first, second):
+        r = _profile(_held_by(node, held))
+        assert r.status_code == 401 and r.get_json()['type'] == AUTH_REQUIRED
+
+
+def _store_raw(application, store_id, data):
+    """Writes ``data`` as the stored record of ``store_id``, as another node's save would."""
+    interface = application.session_interface
+    encoded = interface.serializer.encode(data)
+    if application.config['SESSION_TYPE'] == 'redis':
+        assert interface.client.set(store_id, encoded, keepttl=True, xx=True)
+        return
+    model = interface.sql_session_model
+    with interface._store() as s:
+        assert s.query(model).filter_by(session_id=store_id).update(
+            {'data': encoded}, synchronize_session=False) == 1
+        s.commit()
+
+
+def test_a_lock_stored_between_the_read_and_the_write_of_a_save_is_kept(nodes, make_user, monkeypatch):
+    """The save compares and swaps (SQL) or watches the key (Redis): a lock landing after it
+    read the record is read again and kept, never overwritten."""
+    first, second = nodes
+    kind = second.config['SESSION_TYPE']
+    if kind == 'filesystem':
+        pytest.skip('the file store writes a lock under an exclusive flock, which no save straddles')
+    import utils.session_store as module
+    if kind == 'redis':
+        import utils.session_store_redis as module
+    user = make_user(first)
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    store_id = second.session_interface._get_store_id(held)
+    real, landed = module.keep_stored_lock, []
+
+    def lock_lands_now(session, stored):
+        if not landed:
+            landed.append(True)
+            _store_raw(second, store_id, dict(stored, locked={'at': utc_now().isoformat(), 'reason': 'manual'}))
+        return real(session, stored)
+
+    monkeypatch.setattr(module, 'keep_stored_lock', lock_lands_now)
+    assert _profile(_held_by(second, held)).status_code == 200
+    assert landed
+    _refused_as_locked(_profile(c))

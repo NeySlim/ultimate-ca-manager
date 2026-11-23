@@ -97,10 +97,31 @@ def removal_lock(directory, what, wait=2.0):
         yield state
 
 
+# Attempts of a save that keeps the stored lock before it gives up (the lock already won)
+LOCK_MERGE_ATTEMPTS = 5
+
+
+def keep_stored_lock(session, stored):
+    """A copy read before the lock was set takes the stored lock: only an unlock (a new
+    identifier) or a sign-out (removal) lifts it, never a request saving what it read."""
+    from auth.session_lock import LOCK_KEY, UNLOCK_2FA_KEY, is_locked
+    if is_locked(session) or not stored or not is_locked(stored):
+        return
+    session[LOCK_KEY] = stored[LOCK_KEY]
+    session.pop(UNLOCK_2FA_KEY, None)
+    if UNLOCK_2FA_KEY in stored:
+        session[UNLOCK_2FA_KEY] = stored[UNLOCK_2FA_KEY]
+
+
+def carries_lock(session):
+    from auth.session_lock import is_locked
+    return is_locked(session)
+
+
 class KeepsRemovedRecordsGone:
     """A session opened from a stored record is saved only while that record exists:
     a renewal or revocation served meanwhile is never undone, and no cookie names the
-    removed identifier."""
+    removed identifier. A lock stored meanwhile is kept (keep_stored_lock)."""
 
     def open_session(self, app, request):
         opened = super().open_session(app, request)
@@ -161,14 +182,17 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
     def _upsert_session(self, session_lifetime, session, store_id):
         if not self._opened_from_store(session):
             return super()._upsert_session(session_lifetime, session, store_id)
-        with session_files_lock(self.cache._path, False, self.lock_wait) as state:
+        # A lock is written exclusively, so no save reads the record before it and writes after
+        with session_files_lock(self.cache._path, carries_lock(session), self.lock_wait) as state:
             if state == BUSY:
                 # A removal holds the store: writing without the lock could undo it
                 logger.warning("Session not saved: the session store stayed locked")
                 return
-            if not self.cache.has(store_id):
+            stored = self.cache.get(store_id)
+            if stored is None:
                 session.record_gone = True
                 return
+            keep_stored_lock(session, stored)
             super()._upsert_session(session_lifetime, session, store_id)
 
 
@@ -277,22 +301,46 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
             s.query(model).filter_by(session_id=store_id).delete()
             s.commit()
 
+    def _update_keeping_lock(self, s, session, store_id, expiry):
+        """UPDATE only, so a record removed since the request opened it stays removed. An
+        unlocked copy is compared and swapped against the row it read, so a lock stored in
+        between is seen and kept: the lock wins on every node and both engines."""
+        model = self.sql_session_model
+        if carries_lock(session):
+            updated = (s.query(model).filter_by(session_id=store_id)
+                       .update({'data': self.serializer.encode(session), 'expiry': expiry},
+                               synchronize_session=False))
+            s.commit()
+            if not updated:
+                session.record_gone = True
+            return
+        for _attempt in range(LOCK_MERGE_ATTEMPTS):
+            row = s.query(model.data).filter_by(session_id=store_id).first()
+            s.commit()  # the read ends its transaction: SQLite never upgrades a stale reader
+            if row is None:
+                session.record_gone = True
+                return
+            keep_stored_lock(session, self.serializer.decode(want_bytes(row.data)))
+            updated = (s.query(model)
+                       .filter(model.session_id == store_id, model.data == row.data)
+                       .update({'data': self.serializer.encode(session), 'expiry': expiry},
+                               synchronize_session=False))
+            s.commit()
+            if updated:
+                return
+        logger.warning("Session not saved: its record kept changing under the save")
+
     @retry_query()
     def _upsert_session(self, session_lifetime, session, store_id):
         if self._writes_paused():
             return
         model = self.sql_session_model
         expiry = datetime.utcnow() + session_lifetime
-        data = self.serializer.encode(session)
         with self._store() as s:
             if self._opened_from_store(session):
-                # UPDATE only: a record removed since the request opened it stays removed
-                updated = (s.query(model).filter_by(session_id=store_id)
-                           .update({'data': data, 'expiry': expiry}, synchronize_session=False))
-                s.commit()
-                if not updated:
-                    session.record_gone = True
+                self._update_keeping_lock(s, session, store_id, expiry)
                 return
+            data = self.serializer.encode(session)
             record = s.query(model).filter_by(session_id=store_id).first()
             if record:
                 record.data = data
