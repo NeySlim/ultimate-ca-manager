@@ -95,9 +95,19 @@ for (const width of [1440, 1920, 3440]) {
     const m = side(width)
     const toc = await box(page.locator('.atl .settings-toc'))
     near(toc.x, m, 'contents at the left of the page')
-    const main = await box(page.locator('.atl .settings-layout > .settings-main'))
-    near(main.x, toc.x + 200 + 24, 'cards beside the contents')
-    near(main.width, Math.min(960, width - 2 * m - 224), 'cards width')
+    const column = width - 2 * m - 224
+    const cards = await page.locator('.atl .settings-layout .settings-section').evaluateAll((els) => els.map((el) => {
+      const r = el.getBoundingClientRect()
+      return { id: el.id, x: r.x, width: r.width }
+    }))
+    expect(cards.length).toBeGreaterThan(10)
+    for (const c of cards) {
+      near(c.x, toc.x + 200 + 24, `${c.id} beside the contents`)
+      // The scheduler's table of nine columns is the exception: it keeps the whole column
+      near(c.width, c.id === 'set-sec-scheduler' ? column : Math.min(960, column), `${c.id} width`)
+    }
+    const bar = await box(page.locator('#settings-savebar'))
+    near(bar.width, 960, 'save bar under the cards')
     // Every help and description of a section, a block, at most 62ch of its own font
     const over = await page.locator('.atl .settings-layout').evaluate((layout) => {
       const out: string[] = []

@@ -97,6 +97,8 @@ const SECTION_ICONS = {
   audit: 'activity', database: 'server', https: 'cert', updates: 'download', scheduler: 'clock', webhooks: 'bell',
   ct: 'eye', autoRenewal: 'refresh', deploy: 'upload', microsoftCA: 'plug', adConnector: 'globe', xcepWstep: 'monitor', about: 'help',
 }
+// The sections whose table needs more than the 960 px of the form measure (the scheduler's nine columns)
+const WIDE_SECTIONS = new Set(['scheduler'])
 // Groups of the table of contents, named by what they hold; the frames follow the same
 // order. Four groups keep every entry in view on a 1000 px high window.
 const SETTINGS_GROUPS = [
@@ -2286,7 +2288,7 @@ export default function SettingsPage() {
             <SettingsJump sections={sections} current={selectedCategory} onJump={handleCategoryChange} />
             {sections.map(section => (
               <SettingsFrame key={section.id} id={section.id} label={section.label} desc={section.description}
-                aside={sectionAside[section.id]} error={sectionErrors[section.id]}>
+                aside={sectionAside[section.id]} error={sectionErrors[section.id]} wide={WIDE_SECTIONS.has(section.id)}>
                 {renderCategoryContent(section.id)}
               </SettingsFrame>
             ))}
