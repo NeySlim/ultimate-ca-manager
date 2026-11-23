@@ -429,3 +429,5 @@
 :root .atl .module-table td .empty .btn{min-height:32px}
 /* A digest or a serial compared: its equal lines of bytes one under the other. */
 :root .atl .compare-table .hex-lines>.line{display:block}
+/* An empty table keeps room for its sortable columns, so their headers do not pile up at its right edge. */
+:root .atl .module-table:has(>tbody>tr>td>.empty)>thead th[aria-sort]:not(:first-child){width:10em}
