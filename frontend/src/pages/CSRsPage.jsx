@@ -930,7 +930,7 @@ export default function CSRsPage() {
     !openSigned && write && !open.has_private_key && { id: 'upload-key', icon: 'upload', label: t('csrs.uploadKey'), write: true, onClick: () => setShowKeyModal(true) },
     !openSigned && canWrite('certificates') && mscaRequest && { id: 'msca', icon: 'refresh', label: t('msca.checkStatus'), write: true, onClick: handleCheckMscaStatus },
     openSigned && { id: 'csr', icon: 'file', label: t('csrs.downloadCSR'), onClick: () => handleDownload(open.id, `${open.cn || 'csr'}.csr`) },
-    openSigned && canReadCertificates && { id: 'view', icon: 'cert', label: t('common.viewCertificate'), onClick: () => navigate(`/certificates?id=${open.id}`) },
+    openSigned && canReadCertificates && { id: 'view', icon: 'cert', label: t('common.viewCertificate'), onClick: () => navigate(`/certificates?item=${open.id}`) },
     openSigned && write && canReadCertificates && { id: 'sign-again', icon: 'stamp', label: t('csrs.signAgain'), write: true, onClick: () => handleSignAgain(open) },
     write && { id: 'rekey', icon: 'refresh', label: t('csrs.rekey'), write: true, onClick: () => handleRekey(open) },
     !openSigned && canDelete('csrs') && { id: 'delete', icon: 'close', label: t('common.delete'), danger: true, write: true, onClick: () => handleDelete(open.id) },

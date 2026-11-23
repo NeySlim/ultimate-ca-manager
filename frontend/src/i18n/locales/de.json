@@ -3408,7 +3408,7 @@
     "integrityNote": "Die Prüfung liest die Hash-Kette des Protokolls erneut, vom ersten bis zum letzten Eintrag.",
     "cleanupWarning": "Einträge, die älter als die Aufbewahrungsdauer sind, werden endgültig gelöscht.",
     "retentionDays": "Aufbewahrung (Tage)",
-    "retentionMinimum": "Minimum: 30 Tage, Maximum: 365 Tage.",
+    "retentionMinimum": "Minimum: 30 Tage, Maximum: 3650 Tage.",
     "deleteOldLogs": "Alte Protokolle löschen",
     "filtersTitle": "Protokollfilter",
     "filtersIntro": "Sie ergänzen die Suche, den Vorgangstyp, den Benutzer und das Ergebnis.",

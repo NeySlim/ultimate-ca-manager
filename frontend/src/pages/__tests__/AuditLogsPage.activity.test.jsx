@@ -240,7 +240,7 @@ describe('the journal actions', () => {
     expect(within(dialog()).getByRole('button', { name: 'audit.download' })).toBeInTheDocument()
   })
 
-  it('cleans up old entries with a retention of 30 to 365 days', async () => {
+  it('cleans up old entries with the retention typed, from 30 to 3650 days', async () => {
     renderPage()
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'audit.moreActions' }))
@@ -248,7 +248,7 @@ describe('the journal actions', () => {
     const days = within(dialog()).getByRole('spinbutton')
     fireEvent.change(days, { target: { value: '1' } })
     fireEvent.change(days, { target: { value: '12' } })
-    expect(days).toHaveValue(12) // a value is clamped when sent, not while it is typed
+    expect(days).toHaveValue(12) // a value is checked when complete, not while it is typed
     fireEvent.change(days, { target: { value: '120' } })
     expect(days).toHaveValue(120)
     fireEvent.click(within(dialog()).getByRole('button', { name: 'audit.deleteOldLogs' }))
@@ -256,9 +256,18 @@ describe('the journal actions', () => {
     await waitFor(() => expect(notify.showSuccess).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'audit.moreActions' }))
     fireEvent.click(within(dialog()).getByRole('button', { name: 'audit.cleanupLogsEllipsis' }))
-    fireEvent.change(within(dialog()).getByRole('spinbutton'), { target: { value: '5' } })
+    // Two years are kept as typed; out of range, nothing is sent and the field says why
+    fireEvent.change(within(dialog()).getByRole('spinbutton'), { target: { value: '730' } })
     fireEvent.click(within(dialog()).getByRole('button', { name: 'audit.deleteOldLogs' }))
-    await waitFor(() => expect(auditService.cleanupLogs).toHaveBeenLastCalledWith(30))
+    await waitFor(() => expect(auditService.cleanupLogs).toHaveBeenLastCalledWith(730))
+    fireEvent.click(screen.getByRole('button', { name: 'audit.moreActions' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'audit.cleanupLogsEllipsis' }))
+    for (const value of ['5', '5000', '']) {
+      fireEvent.change(within(dialog()).getByRole('spinbutton'), { target: { value } })
+      expect(within(dialog()).getByRole('spinbutton')).toHaveAttribute('aria-invalid', 'true')
+      expect(within(dialog()).getByRole('button', { name: 'audit.deleteOldLogs' })).toBeDisabled()
+    }
+    expect(auditService.cleanupLogs).toHaveBeenCalledTimes(2)
   })
 
   it('offers no clean-up without the right to delete the journal', async () => {

@@ -117,6 +117,12 @@ describe('the certificate dock in the URL', () => {
     expect(await within(dock()).findByRole('heading', { name: 'mail.example.com' })).toBeInTheDocument()
   })
 
+  it('opens the certificate of a former ?id= link', async () => {
+    at('/certificates?id=8')
+    await waitFor(() => expect(dock()).not.toBeNull())
+    expect(await within(dock()).findByRole('heading', { name: 'mail.example.com' })).toBeInTheDocument()
+  })
+
   it('a second certificate replaces the first in the URL, and closing drops it', async () => {
     at('/certificates?item=7')
     await waitFor(() => expect(dock()).not.toBeNull())

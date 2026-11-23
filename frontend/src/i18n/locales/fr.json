@@ -881,7 +881,7 @@
     "integrityNote": "La vérification relit la chaîne d’empreintes du journal, de la première entrée à la dernière.",
     "cleanupWarning": "Les entrées plus anciennes que la durée de conservation sont supprimées définitivement.",
     "retentionDays": "Durée de conservation (jours)",
-    "retentionMinimum": "Minimum : 30 jours, maximum : 365 jours.",
+    "retentionMinimum": "Minimum : 30 jours, maximum : 3650 jours.",
     "deleteOldLogs": "Supprimer les anciens journaux",
     "filtersTitle": "Filtres du journal",
     "filtersIntro": "Ils s’ajoutent à la recherche, au type d’opération, à l’utilisateur et au résultat.",

@@ -98,7 +98,7 @@ describe('User certificate dock', () => {
     expect([...menu.querySelectorAll('.columns-list button')].map((b) => b.textContent)).toEqual(['Lint', 'Recover key', 'Revoke', 'Delete'])
     fireEvent.click(menu.querySelector('.modal-head button'))
     fireEvent.click(within(dock).getByRole('button', { name: 'Inspect the certificate' }))
-    expect(screen.getByTestId('where').textContent).toBe('/certificates?id=97')
+    expect(screen.getByTestId('where').textContent).toBe('/certificates?item=97')
   })
 
   it('offers no link to the certificate without read:certificates', async () => {

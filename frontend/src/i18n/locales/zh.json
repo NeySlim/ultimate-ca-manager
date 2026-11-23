@@ -3408,7 +3408,7 @@
     "integrityNote": "校验会从第一条到最后一条重新读取日志的哈希链。",
     "cleanupWarning": "早于保留期限的条目将被永久删除。",
     "retentionDays": "保留期限（天）",
-    "retentionMinimum": "最短 30 天，最长 365 天。",
+    "retentionMinimum": "最短 30 天，最长 3650 天。",
     "deleteOldLogs": "删除旧日志",
     "filtersTitle": "日志筛选",
     "filtersIntro": "它们与搜索、操作类型、用户和结果一起生效。",

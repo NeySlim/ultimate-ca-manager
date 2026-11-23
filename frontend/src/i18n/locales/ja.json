@@ -3408,7 +3408,7 @@
     "integrityNote": "チェックでは、最初のエントリから最後のエントリまで、ログのハッシュチェーンを再読み込みして検証します。",
     "cleanupWarning": "保持期間より古いエントリは完全に削除されます。",
     "retentionDays": "保持期間（日）",
-    "retentionMinimum": "最小30日、最大365日。",
+    "retentionMinimum": "最小30日、最大3650日。",
     "deleteOldLogs": "古いログを削除",
     "filtersTitle": "ログのフィルター",
     "filtersIntro": "検索、操作タイプ、ユーザー、結果に追加で適用されます。",

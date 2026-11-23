@@ -3408,7 +3408,7 @@
     "integrityNote": "A verificação lê novamente a cadeia de hashes do registo, da primeira à última entrada.",
     "cleanupWarning": "As entradas anteriores ao período de retenção são excluídas definitivamente.",
     "retentionDays": "Retenção (dias)",
-    "retentionMinimum": "Mínimo: 30 dias, máximo: 365 dias.",
+    "retentionMinimum": "Mínimo: 30 dias, máximo: 3650 dias.",
     "deleteOldLogs": "Excluir registos antigos",
     "filtersTitle": "Filtros do registo",
     "filtersIntro": "Acrescem à pesquisa, ao tipo de operação, ao usuário e ao resultado.",

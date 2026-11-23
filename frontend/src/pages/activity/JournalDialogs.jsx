@@ -53,19 +53,20 @@ export function ActionsDialog({ canClean, verifying, onExport, onVerify, onClean
 export function CleanupDialog({ loading, onConfirm, onClose }) {
   const { t } = useTranslation()
   const [days, setDays] = useState('90')
-  // Clamped when sent, not while typed: « 120 » goes through « 1 » and « 12 »
-  const retention = Math.min(365, Math.max(30, parseInt(days, 10) || 90))
+  // The retention sent is the one typed, never lowered: out of the server's 30 to 3650, nothing is sent
+  const retention = /^\d+$/.test(days.trim()) ? parseInt(days, 10) : NaN
+  const valid = retention >= 30 && retention <= 3650
   return (
     <AtelierDialog title={t('audit.cleanupLogs')} size="narrow" onClose={onClose} testId="audit-cleanup-dialog">
       <div className="notice warn"><Icon name="warning" />{t('audit.cleanupWarning')}</div>
       <label className="field">{t('audit.retentionDays')}
-        <input type="number" name="retentionDays" min={30} max={365} value={days}
-          onChange={(e) => setDays(e.target.value)} />
+        <input type="number" name="retentionDays" min={30} max={3650} value={days} aria-describedby="retention-bounds"
+          aria-invalid={valid ? undefined : 'true'} onChange={(e) => setDays(e.target.value)} />
       </label>
-      <p className="small muted" style={{ marginTop: 14 }}>{t('audit.retentionMinimum')}</p>
+      <p id="retention-bounds" className={valid ? 'small muted' : 'field-error'} style={{ marginTop: 14 }}>{t('audit.retentionMinimum')}</p>
       <div className="modal-actions">
         <button type="button" className="btn" data-action="close-modal" onClick={onClose}>{t('common.cancel')}</button>
-        <button type="button" className="btn danger" data-write="" disabled={loading} onClick={() => onConfirm(retention)}>{t('audit.deleteOldLogs')}</button>
+        <button type="button" className="btn danger" data-write="" disabled={loading || !valid} onClick={() => onConfirm(retention)}>{t('audit.deleteOldLogs')}</button>
       </div>
     </AtelierDialog>
   )

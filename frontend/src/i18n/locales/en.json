@@ -3408,7 +3408,7 @@
     "integrityNote": "The check reads the log’s hash chain again, from the first entry to the last.",
     "cleanupWarning": "Entries older than the retention period are deleted for good.",
     "retentionDays": "Retention (days)",
-    "retentionMinimum": "Minimum: 30 days, maximum: 365 days.",
+    "retentionMinimum": "Minimum: 30 days, maximum: 3650 days.",
     "deleteOldLogs": "Delete old logs",
     "filtersTitle": "Log filters",
     "filtersIntro": "They add to the search, the operation type, the user and the result.",

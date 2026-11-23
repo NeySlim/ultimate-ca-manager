@@ -3408,7 +3408,7 @@
     "integrityNote": "La comprobación vuelve a leer la cadena de hashes del registro, de la primera entrada a la última.",
     "cleanupWarning": "Las entradas anteriores al período de retención se eliminan definitivamente.",
     "retentionDays": "Retención (días)",
-    "retentionMinimum": "Mínimo: 30 días, máximo: 365 días.",
+    "retentionMinimum": "Mínimo: 30 días, máximo: 3650 días.",
     "deleteOldLogs": "Eliminar registros antiguos",
     "filtersTitle": "Filtros del registro",
     "filtersIntro": "Se suman a la búsqueda, al tipo de operación, al usuario y al resultado.",

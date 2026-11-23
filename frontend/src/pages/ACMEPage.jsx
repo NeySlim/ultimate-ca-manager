@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Modal } from '../components/atelier/Form'
 import { Zone, Icon, Btn, IconBtn, Pill, RecordList, RecordRow, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause, useClientList, useSortParam } from '../components/atelier'
 import { acmeService, casService, certificatesService, templatesService } from '../services'
@@ -100,6 +100,7 @@ export default function ACMEPage() {
   const [saving, setSaving] = useState(false)
   // /acme?tab=<view>&order=N: the view, and the order it holds
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const linkedTab = searchParams.get('tab')
   const linkedOrder = useLinkedId('order')
   const activeTab = ACME_TABS.includes(linkedTab) ? linkedTab : 'accounts'
@@ -707,7 +708,7 @@ export default function ACMEPage() {
       showError(t('acme.noCertificateYet'))
       return
     }
-    window.location.href = `/certificates?id=${order.certificate_id}`
+    navigate(`/certificates?item=${order.certificate_id}`)
   }
   
   const handleToggleOrderRenewal = async (order, enabled) => {

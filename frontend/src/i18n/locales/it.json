@@ -3408,7 +3408,7 @@
     "integrityNote": "La verifica rilegge la catena di hash del log, dalla prima all'ultima voce.",
     "cleanupWarning": "Le voci più vecchie del periodo di conservazione vengono eliminate definitivamente.",
     "retentionDays": "Conservazione (giorni)",
-    "retentionMinimum": "Minimo: 30 giorni, massimo: 365 giorni.",
+    "retentionMinimum": "Minimo: 30 giorni, massimo: 3650 giorni.",
     "deleteOldLogs": "Elimina i log vecchi",
     "filtersTitle": "Filtri del log",
     "filtersIntro": "Si aggiungono alla ricerca, al tipo di operazione, all'utente e all'esito.",
