@@ -221,8 +221,7 @@
 :root .atl :is(.props,.kv){--kv-rule:color-mix(in srgb,var(--line) 70%,var(--panel))}
 :root[data-theme|=aurore] .atl :is(.props,.kv){--kv-rule:color-mix(in srgb,var(--grad-a) 24%,var(--panel))}
 :root .atl .section-title{font-size:13px;font-weight:600;color:var(--text)}
-:root .atl .props,:root .atl :is(.review-summary,.event-detail) .props{grid-template-columns:fit-content(44%) minmax(0,1fr);gap:0;line-height:1.45}
-:root .atl .ca-side .props{grid-template-columns:42% minmax(0,1fr)}
+:root .atl .props{grid-template-columns:fit-content(44%) minmax(0,1fr);gap:0;line-height:1.45}
 :root .atl .props>:is(dt,dd){padding:5px 0;border-top:1px solid var(--kv-rule)}
 :root .atl .props>dt{padding-right:14px;overflow-wrap:break-word}
 :root .atl .props>dt:first-of-type,:root .atl .props>dt:first-of-type+dd{border-top:0;padding-top:0}

@@ -49,7 +49,6 @@
 .atl .ca-side .notice .text-link{min-height:24px;padding:2px 0}
 .atl .ca-fold>div:not([hidden]){margin-top:10px}
 .atl .ca-fold .code-preview{margin:0;max-height:240px;overflow:auto}
-.atl .ca-fold .props dt{overflow-wrap:anywhere}
 /* The chain repair strip under the page head: a notice holding the counts, the progress bar and the findings. */
 .atl .ca-repair-body{flex:1;min-width:0;display:grid;gap:8px}
 .atl .ca-repair-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
