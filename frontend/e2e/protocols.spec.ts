@@ -86,9 +86,7 @@ test.describe('a phone of 360 px', () => {
     await expect.poll(() => page.evaluate(() => (window as any).__copied)).toEqual([await enroll.locator('.val').getAttribute('title')])
   })
 
-  // Blink breaks at the <wbr> of the shared CodeValue even under nowrap: the fix belongs to that component
   test('EST: a URL cut in its middle stays on one line', async ({ page, api }) => {
-    test.fail(true, 'CodeValue keeps <wbr> inside a URL cut in its middle')
     const dock = await openDefaultEndpoint(page, api)
     const lines = await dock.locator('dl.kv .code-value.url .val').evaluateAll((vals) => vals.map((val) =>
       Math.round(val.getBoundingClientRect().height / parseFloat(getComputedStyle(val).lineHeight))))
