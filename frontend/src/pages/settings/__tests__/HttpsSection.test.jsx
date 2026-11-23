@@ -100,6 +100,28 @@ describe('HttpsSection bound certificate indicator (#303 follow-up)', () => {
   })
 })
 
+describe('HttpsSection served certificate (#452)', () => {
+  const recorded = 'AA:BB'
+  it('says a certificate written but not served yet, with the one the listener presents', () => {
+    renderSection({ type: 'CA-Signed', fingerprint: recorded, served: { fingerprint: 'CC:DD', matches: false } })
+    expect(screen.getByText('settings.httpsNotServedYet')).toBeInTheDocument()
+    expect(screen.getByText('settings.httpsNotServedYetDesc')).toBeInTheDocument()
+    expect(screen.getByText('settings.httpsServedFingerprint')).toBeInTheDocument()
+    expect(screen.getByText('CC:DD')).toBeInTheDocument()
+  })
+
+  it('says nothing more while the recorded certificate is the one served', () => {
+    renderSection({ type: 'CA-Signed', fingerprint: recorded, served: { fingerprint: recorded, matches: true } })
+    expect(screen.queryByText('settings.httpsNotServedYet')).not.toBeInTheDocument()
+    expect(screen.queryByText('settings.httpsServedFingerprint')).not.toBeInTheDocument()
+  })
+
+  it('says nothing when the served certificate is not known here', () => {
+    renderSection({ type: 'CA-Signed', fingerprint: recorded, served: { fingerprint: null, matches: null } })
+    expect(screen.queryByText('settings.httpsNotServedYet')).not.toBeInTheDocument()
+  })
+})
+
 describe('HttpsSection write guard', () => {
   it('suspends Import a certificate with the other writes', () => {
     renderSection({ common_name: 'ucm.example.com', issuer: 'UCM', valid_to: '2027-01-01T00:00:00Z', fingerprint: 'AA', type: 'self_signed' })
