@@ -11,10 +11,11 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 
-def count_sessions(user, version):
+def count_sessions(user, version, other_than=None):
     """Sessions of ``user`` (signed in or waiting on a second factor) still at ``version``,
     not already ended by the application's lifetime or inactivity limits, and not left by
-    an earlier account of the same id (SQLite hands the last deleted id out again)."""
+    an earlier account of the same id (SQLite hands the last deleted id out again).
+    ``other_than``: the store id of a record left out of the count."""
     from auth.session_start import holds_account
     from auth.unified import AuthManager
     user_id = user.id
@@ -24,7 +25,7 @@ def count_sessions(user, version):
     if serializer is None:
         return None
     try:
-        blobs = _stored_blobs(iface)
+        blobs = _stored_blobs(iface, other_than)
         if blobs is None:
             return None
         count = 0
@@ -48,8 +49,9 @@ def count_sessions(user, version):
         return None
 
 
-def _stored_blobs(iface):
-    """Every live entry as the store keeps it, or None for a store not listed here."""
+def _stored_blobs(iface, other_than=None):
+    """Every live entry but ``other_than`` as the store keeps it, or None for a store not
+    listed here."""
     prefix = getattr(iface, 'key_prefix', '')
     model = getattr(iface, 'sql_session_model', None)
     if model is not None:
@@ -58,7 +60,8 @@ def _stored_blobs(iface):
         now = datetime.now(timezone.utc).replace(tzinfo=None)  # the store's naive UTC
         try:
             rows = session.query(model.data).filter(
-                model.session_id.startswith(prefix), model.expiry > now).all()
+                model.session_id.startswith(prefix), model.session_id != (other_than or ''),
+                model.expiry > now).all()
         finally:
             if store is not None:
                 store.close()
@@ -66,20 +69,26 @@ def _stored_blobs(iface):
     from cachelib.file import FileSystemCache
     cache = getattr(iface, 'cache', None) or getattr(iface, 'client', None)
     if isinstance(cache, FileSystemCache):
-        return list(_file_entries(cache))
+        skipped = cache._get_filename(other_than) if other_than else None
+        return list(_file_entries(cache, skipped))
     redis_scan = getattr(cache, 'scan_iter', None)
     if redis_scan is not None:
-        return [blob for blob in (cache.get(key) for key in redis_scan(match=f'{prefix}*'))
-                if blob]
+        skipped = other_than.encode() if other_than else None
+        keys = (key for key in redis_scan(match=f'{prefix}*')
+                if (key if isinstance(key, bytes) else key.encode()) != skipped)
+        return [blob for blob in (cache.get(key) for key in keys) if blob]
     return None
 
 
-def _file_entries(cache):
-    """Each unexpired value of a cachelib file cache, read as its own get() reads it."""
+def _file_entries(cache, skipped=None):
+    """Each unexpired value of a cachelib file cache but the file ``skipped``, read as its
+    own get() reads it."""
     import struct
     import time
     now = time.time()
     for name in cache._list_dir():
+        if name == skipped:
+            continue
         try:
             with open(name, 'rb') as f:
                 expires = struct.unpack('I', f.read(4))[0]

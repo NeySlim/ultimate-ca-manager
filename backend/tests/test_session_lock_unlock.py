@@ -900,6 +900,13 @@ def _renewal(application, user, operation, factors):
         return 'POST', '/api/v2/account/sessions/revoke-all', None, PASSWORD
     if operation == 'disable-totp':
         return 'POST', '/api/v2/account/2fa/disable', {'code': _next_code(user)}, PASSWORD
+    if operation == 'own-password-reset':
+        # An administrator's reset of its own password: the route catches what the store raises
+        with application.app_context():
+            db.session.get(User, user['id']).role = 'admin'
+            db.session.commit()
+        return 'POST', f"/api/v2/users/{user['id']}/reset-password", {
+            'current_password': PASSWORD, 'new_password': NEW_PASSWORD}, NEW_PASSWORD
     from models.webauthn import WebAuthnCredential
     credential = factors(user, 'passkey', application)
     with application.app_context():
@@ -1005,12 +1012,14 @@ def _session_cookie_sent(r):
     return any(h.startswith('session=') for h in r.headers.getlist('Set-Cookie'))
 
 
-def _remove_records_of(application, user_id):
-    """Removes every stored session of ``user_id``, as a revocation on another node would."""
+def _records_of(application, user_id, remove=False):
+    """The data of every stored session of ``user_id``; ``remove``: removes them too, as a
+    revocation on another node would."""
     import os
     from itsdangerous import want_bytes
     interface = application.session_interface
     kind = application.config['SESSION_TYPE']
+    found = []
     with application.app_context():
         if kind == 'filesystem':
             cache = interface.cache
@@ -1019,19 +1028,32 @@ def _remove_records_of(application, user_id):
                     f.read(4)
                     data = cache.serializer.load(f)
                 if isinstance(data, dict) and data.get('user_id') == user_id:
-                    os.remove(name)
+                    found.append(data)
+                    if remove:
+                        os.remove(name)
         elif kind == 'redis':
             for key in interface.client.scan_iter(match=f'{interface.key_prefix}*'):
                 blob = interface.client.get(key)
-                if blob and interface.serializer.decode(blob).get('user_id') == user_id:
-                    interface.client.delete(key)
+                data = interface.serializer.decode(blob) if blob else {}
+                if data.get('user_id') == user_id:
+                    found.append(data)
+                    if remove:
+                        interface.client.delete(key)
         else:
             model = interface.sql_session_model
             with interface._store() as s:
                 for row in s.query(model.session_id, model.data).all():
-                    if interface.serializer.decode(want_bytes(row.data)).get('user_id') == user_id:
-                        s.query(model).filter_by(session_id=row.session_id).delete()
+                    data = interface.serializer.decode(want_bytes(row.data))
+                    if data.get('user_id') == user_id:
+                        found.append(data)
+                        if remove:
+                            s.query(model).filter_by(session_id=row.session_id).delete()
                 s.commit()
+    return found
+
+
+def _remove_records_of(application, user_id):
+    _records_of(application, user_id, remove=True)
 
 
 @pytest.mark.parametrize('operation', RENEWAL_OPERATIONS)
@@ -1204,3 +1226,91 @@ def test_a_lock_while_ha_maintenance_pauses_session_writes_says_it_was_not_store
     assert _profile(c).status_code == 200
     _lock(c)
     _refused_as_locked(_profile(c))
+
+
+# --- A renewal whose move fails or is refused ----------------------------------------------
+
+def _failing_move(application, monkeypatch):
+    """The store's move raises from now on, on every node of ``application``'s store."""
+    kind = application.config['SESSION_TYPE']
+    name = '_move_keeping_lock' if kind not in ('filesystem', 'redis') else '_move'
+
+    def failing(*args, **kwargs):
+        raise RuntimeError('session store failed during the move')
+
+    monkeypatch.setattr(type(application.session_interface), name, failing)
+
+
+@pytest.mark.parametrize('operation', RENEWAL_OPERATIONS + ['own-password-reset'])
+def test_a_renewal_whose_move_fails_sends_no_cookie_and_writes_nothing_unguarded(
+        nodes, make_user, factors, monkeypatch, operation):
+    """The store raises while it moves the record, once a lock landed on it: the answer (an
+    error, from the error handler or the route) names no new identifier, nothing is written
+    without the store's guard, and the lock stays on every record of the session."""
+    from auth.session_lock import is_locked
+    first, second = nodes
+    user = make_user(first, totp=operation == 'disable-totp')
+    c = _password_session(first, user)
+    held = c.get_cookie('session').value
+    method, url, body, _password = _renewal(first, user, operation, factors)
+    renewing = _held_by(second, held)
+    with _in_flight(second, renewing, method, url, body) as flight:
+        _lock(c)
+        _failing_move(second, monkeypatch)
+    r = flight['r']
+    assert r.status_code == 500, r.data
+    assert not _session_cookie_sent(r)
+    assert renewing.get_cookie('session').value == held
+    records = _records_of(first, user['id'])
+    assert records and all(is_locked(data) for data in records), records
+    for node in (first, second):
+        assert _profile(_held_by(node, held)).status_code == 401
+
+
+@contextmanager
+def _move_refused_as_busy(application, monkeypatch):
+    """The store refuses the renewal's move as 'busy', by a cause of its own: the file store
+    stays held, the SQL row or the Redis key keeps changing under the move."""
+    from utils.session_store import LOCK_MERGE_ATTEMPTS
+    kind = application.config['SESSION_TYPE']
+    if kind == 'filesystem':
+        from utils.session_store import HELD, session_files_lock
+        monkeypatch.setattr(application.session_interface, 'lock_wait', 0.2)
+        with session_files_lock(application.session_interface.cache._path, True, 2.0) as state:
+            assert state == HELD
+            yield
+        return
+    import utils.session_store as module
+    if kind == 'redis':
+        import utils.session_store_redis as module
+    real, changes = module.keep_stored_lock, []
+
+    def changing(session, stored):
+        moved = getattr(session, 'rotated_from', None)
+        if moved:
+            changes.append(1)
+            _store_raw(application, moved, dict(stored, touched=len(changes)))
+        return real(session, stored)
+
+    monkeypatch.setattr(module, 'keep_stored_lock', changing)
+    yield
+    assert len(changes) == LOCK_MERGE_ATTEMPTS
+
+
+def test_a_renewal_refused_by_the_store_counts_only_the_other_sessions(
+        nodes, make_user, factors, monkeypatch):
+    """The move refused as 'busy' leaves the caller's record at the replaced version: the
+    answer and the audit count the account's other sessions only."""
+    first, second = nodes
+    user = make_user(first)
+    other = _password_session(second, user)
+    c = _password_session(first, user)
+    method, url, body, _password = _renewal(first, user, 'delete-passkey', factors)
+    with _move_refused_as_busy(first, monkeypatch):
+        r = c.open(url, method=method, data=json.dumps(body or {}), content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert not _session_cookie_sent(r)
+    assert r.get_json()['meta']['other_sessions_closed'] == 1
+    [(success, details)] = _audits(first, 'webauthn_delete', user['username'])
+    assert success and '(1 other session closed)' in details, details
+    assert _profile(other).status_code == 401

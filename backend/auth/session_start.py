@@ -59,10 +59,21 @@ def keep_current_session(user) -> bool:
     return True
 
 
+def _acts_on_own_account(user) -> bool:
+    return getattr(g, 'auth_method', None) == 'session' and getattr(g, 'user_id', None) == user.id
+
+
 def keep_own_session(user):
     """The caller's own session survives a change it made to its own account."""
-    if getattr(g, 'auth_method', None) == 'session' and getattr(g, 'user_id', None) == user.id:
+    if _acts_on_own_account(user):
         keep_current_session(user)
+
+
+def _own_record(user):
+    """Store id of the record the caller's own session was read from, or None."""
+    sid = getattr(session, 'stored_sid', None)
+    store_id = getattr(current_app.session_interface, '_get_store_id', None)
+    return store_id(sid) if sid and store_id and _acts_on_own_account(user) else None
 
 
 def session_is_current(user) -> bool:
@@ -103,13 +114,15 @@ def _opened_after_creation(data, user) -> bool:
 
 def sessions_closed_by(user):
     """After ``user.end_sessions()`` is committed: the caller's own session stays, and
-    the count of the account's other sessions that ended (None: store not listed)."""
+    the count of the account's other sessions that ended (None: store not listed).
+    The caller's record is never one of them, even where the store refused to move it."""
+    own = _own_record(user)
     keep_own_session(user)
     replaced, _new = getattr(user, '_sessions_bump', (None, None))
     if replaced is None:
         return 0
     from utils.session_census import count_sessions
-    return count_sessions(user, replaced)
+    return count_sessions(user, replaced, other_than=own)
 
 
 def closed_sessions_note(count):
