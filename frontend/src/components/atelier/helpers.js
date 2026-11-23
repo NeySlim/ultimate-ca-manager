@@ -44,12 +44,24 @@ export function focusWork(index) {
 
 const COLON_HEX = /^[0-9A-F]{2}(:[0-9A-F]{2})+$/i
 
-/** A colon-separated digest in equal lines (8 bytes a line when that divides it, else 10); any other text whole. */
-export function hexLines(text) {
+// Bytes a line when the room is unknown or wide: 29 characters, a SHA-1 in two lines, a SHA-256 in four
+export const HEX_PER_LINE = 10
+
+/**
+ * A colon-separated digest in equal lines of at most `room` bytes (10 when unknown): the widest divisor of its
+ * length, or lines as even as they can be when no divisor is at least half the room; any other text whole.
+ */
+export function hexLines(text, room) {
   const value = String(text ?? '')
   if (!COLON_HEX.test(value)) return value
   const bytes = value.split(':')
-  const per = bytes.length <= 10 ? bytes.length : bytes.length % 8 === 0 ? 8 : 10
+  const limit = room === undefined || room === null ? HEX_PER_LINE : Math.min(HEX_PER_LINE, Math.max(1, Math.floor(room)))
+  let per = bytes.length
+  if (per > limit) {
+    per = limit
+    while (bytes.length % per) per -= 1
+    if (per * 2 < limit) per = Math.ceil(bytes.length / Math.ceil(bytes.length / limit))
+  }
   const lines = []
   for (let i = 0; i < bytes.length; i += per) lines.push(bytes.slice(i, i + per).join(':') + (i + per < bytes.length ? ':' : ''))
   return lines.join('\n')

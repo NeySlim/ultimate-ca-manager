@@ -3,7 +3,7 @@
  * that copy whole, an action apart from the value, a help folded behind its button; Props keeps its flat list.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 const showSuccess = vi.hoisted(() => vi.fn())
 vi.mock('react-i18next', () => ({
@@ -97,6 +97,55 @@ describe('Facts', () => {
     expect(lines.map((l) => l.replace(/:$/, '').split(':').length)).toEqual([8, 8, 8, 8])
     fireEvent.click(screen.getByRole('button', { name: 'protocols.copyValue {"name":"SHA-256"}' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(SHA256))
+  })
+
+  it('cuts a digest in equal lines no wider than the room it is given', () => {
+    const sha1 = SHA256.split(':').slice(0, 20).join(':')
+    const sizes = (text, room) => hexLines(text, room).split('\n').map((l) => l.replace(/:$/, '').split(':').length)
+    expect(sizes(sha1, 10)).toEqual([10, 10])
+    expect(sizes(sha1, 9)).toEqual([5, 5, 5, 5])
+    expect(sizes(sha1, 4)).toEqual([4, 4, 4, 4, 4])
+    expect(sizes(SHA256, 7)).toEqual([4, 4, 4, 4, 4, 4, 4, 4])
+    expect(sizes(SHA256, 40)).toEqual([8, 8, 8, 8])
+    expect(sizes(sha1, 0)).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    // twelve bytes: two lines of six, not ten and two
+    expect(sizes(SHA256.split(':').slice(0, 12).join(':'))).toEqual([6, 6])
+    // a prime count: lines as even as they can be
+    expect(sizes(SHA256.split(':').slice(0, 19).join(':'), 10)).toEqual([10, 9])
+    expect(hexLines(sha1, 3).replace(/\n/g, '')).toBe(sha1)
+  })
+
+  it('fits the lines of a digest to the width of its column, and copies it whole', async () => {
+    const sha1 = SHA256.split(':').slice(0, 20).join(':')
+    let observed
+    const RO = window.ResizeObserver
+    window.ResizeObserver = class { constructor(cb) { observed = cb } observe() {} disconnect() {} }
+    let room = 400
+    // 7 px a character, the chip's padding, gap and button 38 px
+    const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      const el = this
+      const width = el.classList.contains('line') ? el.textContent.length * 7
+        : el.classList.contains('code-value') ? Math.min(room, Math.max(...[...el.querySelectorAll('.line')].map((l) => l.textContent.length * 7)) + 38)
+          : el.classList.contains('val') ? Math.min(room, Math.max(...[...el.querySelectorAll('.line')].map((l) => l.textContent.length * 7)) + 38) - 38
+            : el.tagName === 'DD' ? room : 0
+      return { width, height: 0, top: 0, left: 0, right: width, bottom: 0, x: 0, y: 0 }
+    })
+    try {
+      render(<Facts items={[{ label: 'SHA-1', value: sha1, kind: 'hex' }]} />)
+      const sizes = () => [...document.querySelectorAll('.code-value .val.hex > .line')].map((l) => l.textContent.replace(/:$/, '').split(':').length)
+      expect(sizes()).toEqual([10, 10])
+      room = 200 // 162 px for the text: 23 characters, 7 bytes at most
+      act(() => observed([]))
+      expect(sizes()).toEqual([5, 5, 5, 5])
+      room = 400
+      act(() => observed([]))
+      expect(sizes()).toEqual([10, 10])
+      fireEvent.click(screen.getByRole('button', { name: 'protocols.copyValue {"name":"SHA-1"}' }))
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith(sha1))
+    } finally {
+      rect.mockRestore()
+      window.ResizeObserver = RO
+    }
   })
 
   it('splits a 20-byte serial in two lines of ten, and leaves a value that is not colon hex whole', () => {
