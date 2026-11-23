@@ -19,7 +19,7 @@ import { usePermission } from '../hooks'
 import { useDockParam } from '../components/atelier/useDockParam'
 import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { Notice, ViewSwitch } from './protocols/atelierParts'
-import { copyRow, factRow } from './protocols/factRows'
+import { copyRow, fact } from '../components/atelier/facts'
 import { repeatedRows } from './protocols/protocolStates'
 
 const ENDPOINTS = ['cacerts', 'simpleenroll', 'simplereenroll', 'csrattrs', 'serverkeygen']
@@ -163,7 +163,7 @@ export default function ESTPage() {
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
             <Facts items={[
-              factRow(t('tsa.columns.ca'), open.ca === '—' ? null : open.ca), [t('est.columns.auth'), auth], [t('atelier.state'), pill()],
+              fact(t('tsa.columns.ca'), open.ca === '—' ? null : open.ca), [t('est.columns.auth'), auth], [t('atelier.state'), pill()],
               [t('est.validityDays'), String(config.validity_days || 365)],
             ]} />
             {!config.enabled && <Notice tone="warn">{t('est.estDisabledDesc')}</Notice>}

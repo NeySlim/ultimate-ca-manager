@@ -16,6 +16,7 @@ import { sshCasService, hsmService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard, useCRUDPage } from '../hooks'
 import { useDockSelection } from '../components/atelier/useDockParam'
+import { fact } from '../components/atelier/facts'
 import { formatDate, downloadBlob, extractData } from '../lib/utils'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 import { findAlgorithm, isUsable, GROUP_RSA, GROUP_NIST } from '../lib/keyAlgorithms'
@@ -231,7 +232,6 @@ export default function SSHCAsPage() {
   const openCA = (ca) => { if (open?.id !== ca.id) setSection('overview'); setSelectedCA(ca) }
   const principals = open ? principalList(open) : []
   // A value the authority has, else the absence in grey
-  const fact = (label, value) => (value || value === 0 ? [label, value] : { label, absent: '—' })
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('sshCas.title') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}

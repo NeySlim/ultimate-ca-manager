@@ -19,6 +19,7 @@ import { useNotification } from '../contexts'
 import { usePermission, usePersistedState } from '../hooks'
 import { useEntityActions } from '../hooks/useEntityActions'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
+import { fact } from '../components/atelier/facts'
 import { extractCN, isOnHold, downloadBlob, exportToJSON } from '../lib/utils'
 import { fetchPages } from '../lib/fetchAllPages'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -233,7 +234,6 @@ export default function UserCertificatesPage() {
     : <Pill label={t(STATES[row.status].key)} tone={STATES[row.status].tone} icon={STATES[row.status].icon} />)
   const ucExpires = (row) => dateOf(row.valid_to || row.valid_until, locale) || '—'
   // A value the enrolment has, else the absence in grey; a DN wraps after its separators, a serial or a fingerprint is a chip copied whole
-  const fact = (label, value) => (value ? { label, value } : { label, absent: '—' })
   const dn = (value) => value && <Breakable text={value} />
   // A digest longer than a short value goes under its term in a narrow panel
   const code = (label, value) => (value ? { label, value, kind: 'hex', long: value.length > 23 } : { label, absent: '—' })

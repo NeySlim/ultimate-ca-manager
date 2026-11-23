@@ -13,7 +13,7 @@ import { usePermission } from '../../hooks'
 import { stateLabel } from '../../lib/stateLabel'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { Notice } from '../protocols/atelierParts'
-import { copyRow, factRow } from '../protocols/factRows'
+import { copyRow, fact } from '../../components/atelier/facts'
 import { ACCOUNT_TONES, accountLabel, accountContact } from '../protocols/protocolStates'
 
 const ORDER_TONES = { valid: 'good', ready: 'good', issued: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
@@ -75,11 +75,11 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
               <Facts items={[
                 copyRow(t('acme.identifier'), account.account_id, undefined, { copyLabel: t('acme.accountId'), long: true }),
                 {
-                  ...factRow(t('acme.contact'), currentEmail && `mailto:${currentEmail}`, t('acme.noContact')),
+                  ...fact(t('acme.contact'), currentEmail && `mailto:${currentEmail}`, { absent: t('acme.noContact') }),
                   action: canWrite && <RowAction id="acme-edit-email" onClick={() => { setEmailDraft(currentEmail); setEditing(true) }}>{t('acme.editEmail')}</RowAction>,
                 },
-                factRow(t('acme.accountKey'), account.key_type),
-                factRow(t('acme.createdOn'), dateOf(account.created_at, locale)),
+                fact(t('acme.accountKey'), account.key_type),
+                fact(t('acme.createdOn'), dateOf(account.created_at, locale)),
                 [t('acme.termsOfService'), t(account.terms_of_service_agreed || account.tos_agreed ? 'acme.accepted' : 'acme.notAccepted')],
               ]} />
             </Section>
@@ -117,7 +117,7 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
       {confirming && (
         <AtelierDialog size="narrow" title={t('acme.disableTitle')} onClose={() => setConfirming(false)} returnTo="acme-disable">
           <div className="notice warn"><Icon name="warning" /><span>{t('acme.disableWarning', { name })}</span></div>
-          <Facts items={[[t('acme.tabs.account'), name], factRow(t('acme.contact'), currentEmail), factRow(t('acme.accountKey'), account.key_type)]} />
+          <Facts items={[[t('acme.tabs.account'), name], fact(t('acme.contact'), currentEmail), fact(t('acme.accountKey'), account.key_type)]} />
           <div className="modal-actions">
             <Btn onClick={() => setConfirming(false)}>{t('common.cancel')}</Btn>
             <Btn tone="danger" icon="block" id="acme-disable-confirm" onClick={async () => { setConfirming(false); await onDeactivate(account.id) }}>

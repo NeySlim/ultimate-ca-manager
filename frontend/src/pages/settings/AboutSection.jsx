@@ -11,7 +11,7 @@ import { compactAgo } from '../../lib/relativeTime'
 import FipsPreflightPanel from './FipsPreflightPanel'
 import CompliancePreflightPanel from './CompliancePreflightPanel'
 import { KOFI_URL } from '../../lib/support'
-import { fact } from './facts'
+import { fact } from '../../components/atelier/facts'
 
 const REPO = 'https://github.com/NeySlim/ultimate-ca-manager'
 

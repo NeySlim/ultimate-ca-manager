@@ -7,7 +7,7 @@ import { Btn, ListView, Dock, DockBody, Section, Facts, EmptyBlock, Pill, useCli
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { Notice } from '../protocols/atelierParts'
-import { factRow } from '../protocols/factRows'
+import { fact } from '../../components/atelier/facts'
 
 const BY_NAME = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'type', 'state']
@@ -45,7 +45,7 @@ export default function DnsProvidersTab({ dnsProviders, onAddProvider, onEditPro
             <Facts items={[
               [t('common.providerType'), open.provider_type],
               [t('common.default'), t(open.is_default ? 'common.yes' : 'common.no')],
-              factRow(t('acme.credentials'), (open.credential_keys || []).join(', ')),
+              fact(t('acme.credentials'), (open.credential_keys || []).join(', ')),
             ]} />
             <Notice>{t('acme.dnsProvidersAboutDesc')}</Notice>
           </Section>

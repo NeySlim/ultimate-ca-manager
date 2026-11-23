@@ -25,7 +25,7 @@ import { scepPickerCas, unlistedScepPickerCas } from '../lib/caSelection'
 import { extractData } from '../lib/utils'
 import { dateTimeOf } from './admin/adminDates'
 import { Notice, ViewSwitch } from './protocols/atelierParts'
-import { copyRow, factRow, yesNoState } from './protocols/factRows'
+import { copyRow, fact, yesNoState } from '../components/atelier/facts'
 import { parseDN } from './protocols/protocolStates'
 import ScepProfileForm from './scep/ScepProfileForm'
 import IntuneAppForm from './scep/IntuneAppForm'
@@ -478,7 +478,7 @@ crypto ca enroll UCM-CA`}</pre>
           <Section title={t('scep.sections.issuance')}>
             <Facts items={[
               [t('scep.columns.ca'), opened.ca_name || caName(opened.ca_refid)],
-              factRow(t('scep.columns.template'), opened.template_name, t('scep.noTemplate')),
+              fact(t('scep.columns.template'), opened.template_name, { absent: t('scep.noTemplate') }),
               { label: 'Intune', state: yesNoState(t, opened.intune_enabled) },
               { label: t('scep.autoApprove'), state: yesNoState(t, opened.auto_approve) },
               [t('atelier.state'), profilePill(opened)],
@@ -504,12 +504,12 @@ crypto ca enroll UCM-CA`}</pre>
           <Section title={t('common.requestDetails')}>
             <Facts items={[
               copyRow(t('scep.transactionId'), req.transaction_id, undefined, { long: true }),
-              factRow(t('common.subject'), req.subject, '—', { long: true }),
+              { ...fact(t('common.subject'), req.subject), long: true },
               req.profile_id && [t('scep.columns.profile'), profileOf(req.profile_id)?.name || `#${req.profile_id}`],
               [t('scep.columns.ca'), caName(req.ca_refid)],
               req.client_ip && [t('scep.clientIp'), req.client_ip],
               [t('atelier.state'), requestPill(req)],
-              factRow(t('common.created'), dateTimeOf(req.created_at, locale)),
+              fact(t('common.created'), dateTimeOf(req.created_at, locale)),
               req.approved_at && { label: t('scep.approvedAt'), value: dateTimeOf(req.approved_at, locale), sub: req.approved_by || undefined },
               req.rejection_reason && { label: t('scep.rejectionReason'), value: req.rejection_reason, long: true },
             ]} />
@@ -530,7 +530,7 @@ crypto ca enroll UCM-CA`}</pre>
         <div className="module-detail">
           <Section title={t('scep.challenge')}>
             <Facts items={[
-              factRow(t('common.subject'), caOpen.subject, '—', { long: true }),
+              { ...fact(t('common.subject'), caOpen.subject), long: true },
               caOpen.scep_challenge ? copyRow(t('scep.challenge'), caOpen.scep_challenge) : { label: t('scep.challenge'), absent: t('scep.noChallengeSet') },
             ]} />
             {!config.enabled && <Notice tone="warn">{t('scep.scepDisabledDesc')}</Notice>}

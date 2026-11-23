@@ -6,7 +6,7 @@ import { formatDate } from '../../lib/utils'
 import { anchorPickerCas } from '../../lib/caSelection'
 import AdminLockLabel from './AdminLockLabel'
 import { shownNumber, typedNumber } from './numberFields'
-import { fact } from './facts'
+import { fact } from '../../components/atelier/facts'
 
 // The API sends a list; the textarea edits one entry per line.
 function networksText(value) {

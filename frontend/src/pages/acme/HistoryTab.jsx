@@ -12,7 +12,7 @@ import { exportToCSV, exportToJSON } from '../../lib/utils'
 import { fetchPages } from '../../lib/fetchAllPages'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { Notice } from '../protocols/atelierParts'
-import { copyRow, factRow } from '../protocols/factRows'
+import { copyRow, fact } from '../../components/atelier/facts'
 import { SlotDock } from '../protocols/dockSlot'
 
 const EXPORT_PAGE_SIZE = 100
@@ -67,15 +67,15 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
           <Section title={t('common.certificateDetails')}>
             <Facts items={[
               [t('common.commonName'), cert.common_name], copyRow(t('common.serialNumber'), cert.serial, 'hex', { long: String(cert.serial || '').length > 23 }),
-              { ...factRow(t('common.issuer'), cert.issuer, t('acme.unknownCA')), long: true }, [t('common.source'), sourceLabel(cert)],
-              factRow(t('common.validFrom'), dateTimeOf(cert.valid_from, locale)), factRow(t('common.validTo'), dateTimeOf(cert.valid_to, locale)),
-              factRow(t('common.issued'), dateTimeOf(cert.created_at, locale)),
+              { ...fact(t('common.issuer'), cert.issuer, { absent: t('acme.unknownCA') }), long: true }, [t('common.source'), sourceLabel(cert)],
+              fact(t('common.validFrom'), dateTimeOf(cert.valid_from, locale)), fact(t('common.validTo'), dateTimeOf(cert.valid_to, locale)),
+              fact(t('common.issued'), dateTimeOf(cert.created_at, locale)),
             ]} />
           </Section>
           <Section title={t('acme.acmeOrder')}>
             <Facts items={[
-              factRow(t('acme.method'), cert.challenge_type?.toUpperCase()), factRow(t('acme.provider'), cert.dns_provider),
-              factRow(t('acme.environment'), cert.environment ? environment(cert) : null),
+              fact(t('acme.method'), cert.challenge_type?.toUpperCase()), fact(t('acme.provider'), cert.dns_provider),
+              fact(t('acme.environment'), cert.environment ? environment(cert) : null),
               cert.order?.account && copyRow(t('acme.account'), cert.order.account, undefined, { long: true }),
               cert.order?.status && [t('acme.orderStatus'), cert.order.status],
               cert.order?.order_id && copyRow(t('acme.orderId'), cert.order.order_id, undefined, { long: true }),

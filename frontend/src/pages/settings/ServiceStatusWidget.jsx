@@ -9,7 +9,7 @@ import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useServiceReconnect } from '../../hooks'
 import { usePermission } from '../../hooks'
-import { fact } from './facts'
+import { fact } from '../../components/atelier/facts'
 
 export default function ServiceStatusWidget() {
   const { t, i18n } = useTranslation()

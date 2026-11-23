@@ -9,7 +9,7 @@ import { downloadBlob } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
 import { dateTimeOf } from '../admin/adminDates'
 import { Notice } from '../protocols/atelierParts'
-import { copyRow, factRow } from '../protocols/factRows'
+import { copyRow, fact } from '../../components/atelier/facts'
 import { http01Url } from '../protocols/protocolStates'
 
 const ORDER_TONES = { valid: 'good', issued: 'good', ready: 'good', pending: 'warn', processing: 'warn', validating: 'warn', invalid: 'bad' }
@@ -45,11 +45,11 @@ export default function OrderDetailPanel({ order, onClose, onDownloadCert, onVie
             <Facts items={[
               { label: t('acme.domains'), value: (order.domains || []).join(', ') || name, long: (order.domains || []).length > 1 },
               [t('acme.environment'), t(order.environment === 'production' ? 'acme.production' : 'acme.staging')],
-              factRow(t('acme.method'), order.challenge_type?.toUpperCase()),
+              fact(t('acme.method'), order.challenge_type?.toUpperCase()),
               [t('acme.provider'), order.dns_provider_name || t('acme.manualDns')],
               order.is_proxy_order && (order.account_email || order.account_short_id) && [t('acme.account'), order.account_email || `${order.account_short_id}…`],
               [t('atelier.state'), pill],
-              factRow(t('common.created'), dateTimeOf(order.created_at, locale)),
+              fact(t('common.created'), dateTimeOf(order.created_at, locale)),
               order.expires_at && [t('common.expires'), dateTimeOf(order.expires_at, locale)],
               order.renewal_failures > 0 && {
                 label: t('acme.renewalFailuresLabel'), value: t('acme.renewalFailures', { count: order.renewal_failures }),

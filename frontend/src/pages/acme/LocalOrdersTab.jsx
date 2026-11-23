@@ -13,7 +13,7 @@ import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { stateLabel } from '../../lib/stateLabel'
 import { dateTimeOf, dateOf } from '../admin/adminDates'
-import { copyRow, factRow } from '../protocols/factRows'
+import { copyRow, fact } from '../../components/atelier/facts'
 import { SlotDock } from '../protocols/dockSlot'
 
 const TONES = { valid: 'good', ready: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
@@ -114,8 +114,8 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
           <Section title={t('acme.orderInfo')}>
             <Facts items={[
               [t('acme.domains'), opened.domain], copyRow(t('acme.account'), opened.account, undefined, { long: true }),
-              factRow(t('acme.challengeType'), opened.method), [t('atelier.state'), pill(opened)],
-              factRow(t('common.expires'), dateOf(opened.expires, locale)), factRow(t('common.created'), dateTimeOf(opened.created_at, locale)),
+              fact(t('acme.challengeType'), opened.method), [t('atelier.state'), pill(opened)],
+              fact(t('common.expires'), dateOf(opened.expires, locale)), fact(t('common.created'), dateTimeOf(opened.created_at, locale)),
               opened.order_id && copyRow(t('acme.orderId'), opened.order_id, undefined, { long: true }),
             ]} />
           </Section>

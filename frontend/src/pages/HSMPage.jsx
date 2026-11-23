@@ -20,7 +20,7 @@ import { KEY_GROUPS, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode, useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice, UntestedKeyNotice } from '../components/BrainpoolNotice'
 import { dateTimeOf } from './admin/adminDates'
-import { copyRow, factRow } from './protocols/factRows'
+import { copyRow, fact } from '../components/atelier/facts'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)' },
@@ -61,13 +61,13 @@ export function ProviderConfig({ provider: p }) {
   const items = {
     pkcs11: [
       [t('hsm.pkcs11Config.slotId'), p.pkcs11_slot_id ?? 'Auto'],
-      factRow(t('hsm.pkcs11Config.token'), p.pkcs11_token_label),
+      fact(t('hsm.pkcs11Config.token'), p.pkcs11_token_label),
       copyRow(t('hsm.pkcs11Config.libraryPath'), p.pkcs11_library_path, 'url'),
     ],
     'aws-cloudhsm': [
       copyRow(t('hsm.awsConfig.clusterId'), p.aws_cluster_id),
-      factRow(t('hsm.pkcs11Config.tokenLabel'), p.pkcs11_token_label),
-      factRow(t('hsm.awsConfig.cryptoUser'), p.aws_crypto_user),
+      fact(t('hsm.pkcs11Config.tokenLabel'), p.pkcs11_token_label),
+      fact(t('hsm.awsConfig.cryptoUser'), p.aws_crypto_user),
     ],
     'azure-keyvault': [
       copyRow(t('hsm.azureConfig.vaultUrl'), p.azure_vault_url, 'url'),
@@ -75,9 +75,9 @@ export function ProviderConfig({ provider: p }) {
       copyRow(t('hsm.azureConfig.client'), p.azure_client_id, undefined, { long: true }),
     ],
     'google-kms': [
-      factRow(t('hsm.gcpConfig.project'), p.gcp_project_id),
-      factRow(t('hsm.gcpConfig.location'), p.gcp_location),
-      factRow(t('hsm.gcpConfig.keyRing'), p.gcp_keyring),
+      fact(t('hsm.gcpConfig.project'), p.gcp_project_id),
+      fact(t('hsm.gcpConfig.location'), p.gcp_location),
+      fact(t('hsm.gcpConfig.keyRing'), p.gcp_keyring),
     ],
     openbao: [
       copyRow(t('hsm.openbaoConfig.url'), p.openbao_url, 'url'),
@@ -100,8 +100,8 @@ export function ModuleSection({ provider, fips }) {
       {fips && provider.softhsm && <p className="notice warn"><Icon name="warning" /><span>{t('hsm.module.softhsmFips')}</span></p>}
       {m ? (
         <Facts items={[
-          factRow(t('hsm.module.library'), m.library), factRow(t('hsm.module.manufacturer'), m.manufacturer),
-          factRow(t('hsm.module.libraryVersion'), m.library_version), factRow(t('hsm.module.firmwareVersion'), m.firmware_version),
+          fact(t('hsm.module.library'), m.library), fact(t('hsm.module.manufacturer'), m.manufacturer),
+          fact(t('hsm.module.libraryVersion'), m.library_version), fact(t('hsm.module.firmwareVersion'), m.firmware_version),
         ]} />
       ) : <p className="muted small">{t('hsm.module.notRead')}</p>}
     </Section>
@@ -340,9 +340,9 @@ export default function HSMPage() {
             <Section title={t('atelier.properties')}>
               <Facts items={[
                 [t('hsm.columns.type'), typeLabel(open)], [t('hsm.columns.keys'), keyCount(open)],
-                factRow(t('hsm.columns.checked'), dateTimeOf(open.last_tested_at, locale), t('hsm.never')),
+                fact(t('hsm.columns.checked'), dateTimeOf(open.last_tested_at, locale), { absent: t('hsm.never') }),
                 [t('atelier.state'), pill(open)],
-                factRow(t('hsm.certification.label'), open.certification && t(`hsm.certification.values.${open.certification}`, open.certification), t('hsm.certification.notDeclared')),
+                fact(t('hsm.certification.label'), open.certification && t(`hsm.certification.values.${open.certification}`, open.certification), { absent: t('hsm.certification.notDeclared') }),
               ]} />
               {open.error_message && (
                 <p className="notice warn" id="hsm-error"><Icon name="warning" /><span><strong>{t('hsm.connectionError')}</strong> : {open.error_message}</span></p>

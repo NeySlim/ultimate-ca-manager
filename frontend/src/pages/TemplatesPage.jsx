@@ -14,6 +14,7 @@ import {
   LoadError, LoadCause, EmptyBlock, NoMatch, useClientList, useSortParam,
 } from '../components/atelier'
 import { useDockSelection } from '../components/atelier/useDockParam'
+import { fact } from '../components/atelier/facts'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
@@ -293,7 +294,6 @@ export default function TemplatesPage() {
   const pinned = Object.entries(open?.pinned_subject_fields || {})
   // A rule switched on or off is a state; a value not set is an absence, in grey
   const onOff = (label, v) => ({ label, state: v ? ['good', t('common.enabled')] : ['muted', t('common.disabled')] })
-  const fact = (label, value, row = {}, absent = '—') => (value ? { label, value, ...row } : { label, absent })
   const markers = open ? [
     open.ad_derived_subject && t('templates.adDerivedBadge'),
     open.autoenroll_enabled && t('templates.autoenrollBadge'),
@@ -392,8 +392,8 @@ export default function TemplatesPage() {
             <Section title={t('templates.enrollment')}>
               <Facts items={[
                 onOff(t('templates.autoenrollEnabled'), open.autoenroll_enabled),
-                fact(t('templates.allowedAdGroup'), open.allowed_ad_group, { long: true }, t('templates.allowedAdGroupUnset')),
-                fact(t('templates.pinnedSubjectFields'), pinned.map(([k, v]) => `${k}=${v}`).join(', '), { long: true }, t('templates.pinnedSubjectFieldsUnset')),
+                fact(t('templates.allowedAdGroup'), open.allowed_ad_group, { long: true, absent: t('templates.allowedAdGroupUnset') }),
+                fact(t('templates.pinnedSubjectFields'), pinned.map(([k, v]) => `${k}=${v}`).join(', '), { long: true, absent: t('templates.pinnedSubjectFieldsUnset') }),
               ]} />
             </Section>
           </div>

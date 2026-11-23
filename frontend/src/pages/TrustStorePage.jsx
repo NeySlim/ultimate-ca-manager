@@ -19,6 +19,8 @@ import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals, usePersistedState } from '../hooks'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
+import { fact } from '../components/atelier/facts'
+import { digestHex } from '../lib/digestHex'
 import { downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { trustStoreExpiryStatus } from '../lib/expiry'
@@ -29,13 +31,6 @@ import { dateOf, dateTimeOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
-// A fact of the dock, or the dash of absence when the anchor has no such value
-const fact = (label, value) => (value ? { label, value } : { label, absent: '—' })
-// A stored digest (bare hex) in the pairs of a certificate's fingerprint, as the CA panel shows one
-const digestPairs = (value) => {
-  const hex = String(value || '').replace(/[:\s]/g, '').toUpperCase()
-  return /^(?:[0-9A-F]{2})+$/.test(hex) ? hex.match(/../g).join(':') : value
-}
 
 // A managed CA is a root when its certificate is self-issued, as the CA page reads it (CASide)
 const isRootCa = (ca) => Boolean(ca && (ca.type === 'root' || ca.is_root))
@@ -384,8 +379,6 @@ export default function TrustStorePage() {
   const tsUsage = (c) => c.description || '—'
   const tsType = (c) => (PURPOSES.includes(c.purpose) ? t(PURPOSE_LABELS[c.purpose]) : (c.purpose || '—'))
   const tsExpires = (c) => dateOf(c.not_after, locale) || '—'
-  // A row of the dock: its value, or the absence in grey
-  const fact = (label, value, row = {}) => (value ? { label, value, ...row } : { label, absent: '—' })
   const present = ['valid', 'expiring', 'expired'].filter((s) => certificates.some((c) => tsState(c) === s))
   const active = present.includes(state) ? state : ''
   const views = [
@@ -460,8 +453,8 @@ export default function TrustStorePage() {
             </Section>
             <Section title={t('common.fingerprints')}>
               <Facts items={[
-                { ...fact('SHA-256', digestPairs(open.fingerprint_sha256)), kind: 'hex', long: true },
-                { ...fact('SHA-1', digestPairs(open.fingerprint_sha1)), kind: 'hex', long: true },
+                { ...fact('SHA-256', digestHex(open.fingerprint_sha256)), kind: 'hex', long: true },
+                { ...fact('SHA-1', digestHex(open.fingerprint_sha1)), kind: 'hex', long: true },
               ]} />
             </Section>
             <Section title={t('details.metadata')}>

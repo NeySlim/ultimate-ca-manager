@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Btn, Facts, IconBtn, Notice, RecordList, RecordRow } from '../../components/atelier'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatDate, certificateLabel } from '../../lib/utils'
-import { fact } from './facts'
+import { fact } from '../../components/atelier/facts'
 
 // The API says « - » for what it could not read
 const given = (value) => (value && value !== '-' ? value : null)
