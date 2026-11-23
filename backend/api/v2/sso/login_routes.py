@@ -155,7 +155,10 @@ def _saml_logout_request(provider):
     closed = (session.get('auth_method') == 'sso' and session.get('user_id') in users
               and (not indexes or own_index is None or own_index in indexes))
     if closed:
+        from auth.session_start import close_session_sockets
+        ended, who = getattr(session, 'sid', None), session.get('username')
         session.clear()
+        close_session_sockets(ended, who)
     AuditService.log_action(
         action='logout', resource_type='sso', resource_name=name_id,
         details=(f'SAML Single Logout from {provider.name}: '

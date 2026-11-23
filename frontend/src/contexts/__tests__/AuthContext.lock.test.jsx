@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { AuthProvider, useAuth } from '../AuthContext'
 import { authService } from '../../services/auth.service'
-import { readLock, takeJustLocked, takeSignedOut, announceLock, shareLock, readSharedLock, clearSharedLock } from '../../lib/sessionLock'
+import { readLock, takeJustLocked, takeSignedOut, announceLock, shareLock, readSharedLock, clearSharedLock, clearUnconfirmedLock } from '../../lib/sessionLock'
 
 vi.mock('../../services/auth.service', () => ({
   authService: { getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn(), lock: vi.fn() },
@@ -27,6 +27,8 @@ describe('AuthContext lock', () => {
     vi.clearAllMocks()
     sessionStorage.clear()
     clearSharedLock()
+    // The mocked lock route never confirms a lock
+    clearUnconfirmedLock()
     takeJustLocked()
     takeSignedOut()
     authService.getCurrentUser.mockResolvedValue({

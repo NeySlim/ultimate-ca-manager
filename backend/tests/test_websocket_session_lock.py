@@ -1,4 +1,5 @@
-"""A lock cuts the WebSocket of that session at once, on every process, and only of that session.
+"""A lock or a sign-out cuts the WebSocket of that session at once, on every process, and only of
+that session.
 
 The node that takes ``POST /api/v2/auth/lock`` closes its own sockets of the session before it
 answers; the other processes hear it through the transport their events take (the database
@@ -106,6 +107,32 @@ class TestLockCutsTheSessionSockets:
         _lock(first, reason='idle')
         assert not ws_first.is_connected()
         assert ws_second.is_connected()
+
+
+class TestSignOutCutsTheSessionSockets:
+    @pytest.mark.parametrize('locked', [False, True])
+    def test_signing_out_cuts_that_session_socket_only(self, app, two_sessions, locked):
+        (first, ws_first), (_, ws_second) = two_sessions
+        if locked:
+            _lock(first)
+        assert _post(first, '/api/v2/auth/logout').status_code == 200
+        assert not ws_first.is_connected()
+        assert _sid(ws_second) in events.connected_clients and ws_second.is_connected()
+
+    def test_signing_out_tells_the_other_processes(self, app, two_sessions, monkeypatch):
+        (first, ws_first), _ = two_sessions
+        key = _key_of(ws_first)
+        published = []
+
+        class Publisher:
+            def publish(self, room, payload):
+                published.append((room, payload))
+
+        monkeypatch.setattr(events, '_relay_publisher', Publisher())
+        monkeypatch.setattr(events, '_relay_emits_here', True)
+        assert _post(first, '/api/v2/auth/logout').status_code == 200
+        ended = [entry for entry in published if entry[0] == events.SESSION_END_ROOM]
+        assert ended == [(events.SESSION_END_ROOM, {'type': events.SESSION_END_EVENT, 'session': key})]
 
 
 class TestOtherProcesses:

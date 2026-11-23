@@ -10,7 +10,7 @@ import { authService } from '../services/auth.service'
 import { accountService } from '../services/account.service'
 import { apiClient } from '../services/apiClient'
 import { setAppTimezone } from '../stores/timezoneStore'
-import { saveLock, markJustLocked, markSignedOut, announceLock, listenForLocks, shareLock, readSharedLock, clearSharedLock, setTabAccount } from '../lib/sessionLock'
+import { saveLock, markLockUnconfirmed, readUnconfirmedLock, clearUnconfirmedLock, markJustLocked, markSignedOut, announceLock, listenForLocks, shareLock, readSharedLock, clearSharedLock, setTabAccount } from '../lib/sessionLock'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
@@ -83,6 +83,7 @@ export function AuthProvider({ children }) {
     const account = lockHere(reason)
     shareLock(account)
     announceLock(account.username, reason)
+    markLockUnconfirmed(account)
     authService.lock(reason).catch(() => {})
   }, [lockHere])
 
@@ -133,6 +134,13 @@ export function AuthProvider({ children }) {
       // The server answered before a lock another tab made reached it
       if (pending && pending.username === who?.username) {
         lockHere(pending.reason)
+        return false
+      }
+      // A lock of this account the server answers open never reached it (its POST failed):
+      // sent again before any console shows
+      const marked = readUnconfirmedLock()
+      if (marked && marked.username === who?.username) {
+        lockNow(marked.reason)
         return false
       }
       setUser(who)
@@ -211,6 +219,7 @@ export function AuthProvider({ children }) {
       const userData = response.data?.user || response.user || { username }
       // Signed in again: no tab takes the lock made before any more
       clearSharedLock()
+      clearUnconfirmedLock()
       current.current = { user: userData, authMethod: response.data?.auth_method || response.auth_method || null }
       setUser(userData)
       setIsAuthenticated(true)

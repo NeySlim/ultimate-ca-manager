@@ -1,8 +1,9 @@
 /**
  * Session expiry warning: a banner over the console in the last minutes of the
  * inactivity timeout (backend session_timeout, from /auth/verify), with Extend.
- * At the end, once the server confirms the session is gone, the screen locks:
- * the console unmounts and the sign-in page keeps the current page in ?next=.
+ * The idle time is the time since the user's last gesture in any tab, never a poll
+ * (which keeps the server session fresh): at its end the screen locks, the console
+ * unmounts and the sign-in page keeps the current page in ?next=.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -12,10 +13,9 @@ import { useAuth, useNotification } from '../contexts'
 import { authService } from '../services'
 import { focusPageTitle } from '../lib/focusPageTitle'
 import { BANNER_SLOT } from '../lib/sessionBannerSlot'
+import { noteGesture, lastSharedGesture } from '../lib/userActivity'
 
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
-const UNKNOWN_RECHECK = 30 * 1000 // Server unreachable: ask again after this
-const UNKNOWN_MAX = 5 * 60 * 1000 // ...and lock the tab locally after this long
 const FALLBACK_TIMEOUT = 8 * 60 * 60 * 1000 // 8h fallback (matches backend default)
 
 const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
@@ -30,15 +30,12 @@ export function SessionWarning() {
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
   const sessionTimeoutRef = useRef(FALLBACK_TIMEOUT)
-  const checkingRef = useRef(false)
-  const recheckAtRef = useRef(0)
-  const unknownSinceRef = useRef(null)
+  // One lock per idle period, not one per tick
+  const lockedRef = useRef(false)
 
   // Fetch actual session timeout from backend on mount
   useEffect(() => {
     if (!user) return
-    recheckAtRef.current = 0 // a new sign-in starts a fresh countdown
-    unknownSinceRef.current = null
     const fetchTimeout = async () => {
       try {
         const response = await authService.getCurrentUser()
@@ -53,13 +50,26 @@ export function SessionWarning() {
     fetchTimeout()
   }, [user])
 
+  // A sign-in (an unlock too) starts a fresh countdown
+  const account = user?.username
+  useEffect(() => {
+    if (!account) return
+    lockedRef.current = false
+    setLastActivity(Date.now())
+    noteGesture()
+  }, [account])
+
   // Track user activity; once the warning shows, only Extend keeps the session
   const warningRef = useRef(false)
   warningRef.current = showWarning
   useEffect(() => {
-    const updateActivity = () => { if (!warningRef.current) setLastActivity(Date.now()) }
+    const updateActivity = () => {
+      if (warningRef.current) return
+      setLastActivity(Date.now())
+      noteGesture()
+    }
 
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
+    const events = ['mousedown', 'keydown', 'scroll', 'wheel', 'touchstart']
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }))
     
     return () => {
@@ -73,12 +83,21 @@ export function SessionWarning() {
 
     const checkExpiry = () => {
       const sessionTimeout = sessionTimeoutRef.current
-      const timeSinceActivity = Date.now() - lastActivity
+      // Gestures in this tab or in another tab of the session (the shared one is read each tick)
+      const timeSinceActivity = Date.now() - Math.max(lastActivity, lastSharedGesture())
       const timeUntilExpiry = sessionTimeout - timeSinceActivity
 
       if (timeUntilExpiry <= 0) {
-        // Verify with backend before logging out — session may still be valid
-        if (!checkingRef.current && Date.now() >= recheckAtRef.current) handleExpired()
+        if (!lockedRef.current) {
+          lockedRef.current = true
+          lock()
+        }
+        return
+      }
+
+      // Another tab was used or extended meanwhile: the end moved back
+      if (showWarning && timeUntilExpiry > WARNING_BEFORE) {
+        setShowWarning(false)
         return
       }
 
@@ -95,45 +114,15 @@ export function SessionWarning() {
 
     const interval = setInterval(checkExpiry, 1000)
     return () => clearInterval(interval)
-  }, [user, lastActivity, showWarning])
-
-  // Verify with backend before actually logging out
-  const handleExpired = useCallback(async () => {
-    checkingRef.current = true
-    try {
-      const stillValid = await checkSession()
-      if (stillValid) {
-        // Backend says session is still valid — reset timer
-        unknownSinceRef.current = null
-        setLastActivity(Date.now())
-        setShowWarning(false)
-        return
-      }
-      if (stillValid === null) {
-        // Server unreachable (e.g. a laptop waking before the network is
-        // back): wait for it, but not forever, the expired tab still shows data
-        unknownSinceRef.current ??= Date.now()
-        if (Date.now() - unknownSinceRef.current < UNKNOWN_MAX) {
-          recheckAtRef.current = Date.now() + UNKNOWN_RECHECK
-          return
-        }
-      }
-    } catch {
-      // Truly expired
-    } finally {
-      checkingRef.current = false
-    }
-    recheckAtRef.current = Infinity // one lock, not one per tick while it runs
-    lock()
-  }, [checkSession, lock])
+  }, [user, lastActivity, showWarning, lock])
 
   const extendSession = useCallback(async () => {
     // /auth/verify refreshes the server session; only a server that says it
     // is gone signs out, an unreachable one leaves the warning up
     const stillValid = await checkSession()
     if (stillValid) {
-      unknownSinceRef.current = null
       setLastActivity(Date.now())
+      noteGesture()
       setShowWarning(false)
       const extended = t('session.extended', { count: Math.max(1, Math.round(sessionTimeoutRef.current / 60000)) })
       setAnnounce(extended)

@@ -1,7 +1,7 @@
 /**
- * #384: once the inactivity timeout passed, an unreachable server (a laptop
- * waking before the network is back) logged the tab out, without even
- * reaching the server. Only a check that says the session is gone may.
+ * #384: an unreachable server (a laptop waking before the network is back) signed
+ * the tab out. The end of the idle time now locks the tab, which keeps the session
+ * for its unlock, and Extend never signs out while the server cannot answer.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, act, screen, fireEvent } from '@testing-library/react'
@@ -31,34 +31,12 @@ describe('SessionWarning with the server unreachable (#384)', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('does not lock while the session check cannot answer, and asks again later', async () => {
+  it('locks at the end of the idle time without waiting for the server to answer', async () => {
     auth.checkSession.mockResolvedValue(null)
     render(<SessionWarning />)
     await tick(5000)
-    expect(auth.checkSession).toHaveBeenCalledTimes(1)
-    expect(auth.lock).not.toHaveBeenCalled()
-
-    await tick(30000)
-    expect(auth.checkSession).toHaveBeenCalledTimes(2)
-    expect(auth.lock).not.toHaveBeenCalled()
-  })
-
-  it('locks once the server says the session is gone', async () => {
-    auth.checkSession.mockResolvedValueOnce(null).mockResolvedValue(false)
-    render(<SessionWarning />)
-    await tick(5000)
-    expect(auth.lock).not.toHaveBeenCalled()
-    await tick(30000)
     expect(auth.lock).toHaveBeenCalledTimes(1)
-  })
-
-  it('still locks the tab once the server stayed unreachable for five minutes', async () => {
-    auth.checkSession.mockResolvedValue(null)
-    render(<SessionWarning />)
-    await tick(4 * 60 * 1000)
-    expect(auth.lock).not.toHaveBeenCalled()
-    await tick(2 * 60 * 1000)
-    expect(auth.lock).toHaveBeenCalledTimes(1)
+    expect(auth.checkSession).not.toHaveBeenCalled()
   })
 
   it('Extend leaves the warning up when the server cannot answer', async () => {

@@ -59,6 +59,35 @@ export function clearSharedLock() {
   try { localStorage.removeItem(SHARED_KEY) } catch { /* noop */ }
 }
 
+// A lock sent to the server and not yet confirmed (its POST failed, or the page went first): the
+// next load of any tab sends it again before showing the console. Confirmed, or the session
+// signed out instead, it goes.
+const UNCONFIRMED_KEY = 'ucm_session_lock_unconfirmed'
+
+export function markLockUnconfirmed(account) {
+  if (!account?.username) return
+  try {
+    localStorage.setItem(UNCONFIRMED_KEY, JSON.stringify({
+      username: String(account.username),
+      reason: account.reason === 'manual' ? 'manual' : 'idle',
+    }))
+  } catch { /* the lock is still sent and retried */ }
+}
+
+export function readUnconfirmedLock() {
+  try {
+    const value = JSON.parse(localStorage.getItem(UNCONFIRMED_KEY) || 'null')
+    if (!value || typeof value.username !== 'string' || !value.username) return null
+    return { username: value.username, reason: value.reason === 'manual' ? 'manual' : 'idle' }
+  } catch {
+    return null
+  }
+}
+
+export function clearUnconfirmedLock() {
+  try { localStorage.removeItem(UNCONFIRMED_KEY) } catch { /* noop */ }
+}
+
 // The account this tab is signed in as, set by the auth context, for a request refused outside it
 let tabAccount = null
 

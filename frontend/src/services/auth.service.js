@@ -3,8 +3,33 @@
  * Handles login, logout, and CSRF token management
  */
 import { apiClient } from './apiClient'
+import { clearUnconfirmedLock } from '../lib/sessionLock'
 
 let pendingLock = null
+
+// A lock the server did not take is sent again after these delays; then the session is signed
+// out, so none stays open behind the lock screen (a 401 means it is gone or locked already).
+// Until one of them is answered, the lock stays marked unconfirmed for the next load.
+const LOCK_RETRY_DELAYS_MS = [500, 1000, 2000]
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+async function postLock(reason) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await apiClient.post('/auth/lock', { reason })
+    } catch (error) {
+      if (error?.status === 401 || attempt >= LOCK_RETRY_DELAYS_MS.length) throw error
+      await wait(LOCK_RETRY_DELAYS_MS[attempt])
+      if (error?.status === 403) {
+        // A CSRF token gone stale: the session check hands a fresh one
+        try {
+          const response = await apiClient.get('/auth/verify')
+          if (response?.data?.csrf_token) apiClient.setCsrfToken(response.data.csrf_token)
+        } catch { /* sent again with the token held */ }
+      }
+    }
+  }
+}
 
 export const authService = {
   async login(username, password) {
@@ -21,8 +46,9 @@ export const authService = {
   async logout() {
     const response = await apiClient.post('/auth/logout')
     
-    // Clear CSRF token on logout
+    // Clear CSRF token on logout; a lock not confirmed has nothing left to lock
     apiClient.clearCsrfToken()
+    clearUnconfirmedLock()
     
     return response
   },
@@ -31,7 +57,21 @@ export const authService = {
   lock(reason) {
     const request = (async () => {
       try {
-        return await apiClient.post('/auth/lock', { reason })
+        const answer = await postLock(reason)
+        clearUnconfirmedLock()
+        return answer
+      } catch (error) {
+        if (error?.status === 401) {
+          clearUnconfirmedLock()
+        } else {
+          try {
+            await apiClient.post('/auth/logout')
+            clearUnconfirmedLock()
+          } catch (signOut) {
+            if (signOut?.status === 401) clearUnconfirmedLock()
+          }
+        }
+        throw error
       } finally {
         apiClient.clearCsrfToken()
       }
