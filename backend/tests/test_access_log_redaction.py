@@ -19,9 +19,36 @@ from utils.access_log import RedactingLogger, redact_url
     ('/api/v2/certificates?page=2', '/api/v2/certificates?page=2'),
     ('/api/v2/x?mytoken=keep', '/api/v2/x?mytoken=keep'),
     ('-', '-'),
+    ('/api/v2/csrs/4/export?format=key&password=Pw1', '/api/v2/csrs/4/export?format=key&password=[REDACTED]'),
+    ('/api/v2/certificates/4/export?Password=Pw1&format=pem',
+     '/api/v2/certificates/4/export?Password=[REDACTED]&format=pem'),
+    ('/api/v2/cas/4/export?PASSPHRASE=Pw1', '/api/v2/cas/4/export?PASSPHRASE=[REDACTED]'),
+    ('/api/v2/x?pkcs12_password=Pw1&a=1', '/api/v2/x?pkcs12_password=[REDACTED]&a=1'),
+    # The name as the server decodes it, however the URL spells it
+    ('/api/v2/csrs/4/export?pass%77ord=Pw1&format=key', '/api/v2/csrs/4/export?pass%77ord=[REDACTED]&format=key'),
+    ('/api/v2/csrs/4/export?password%5B%5D=Pw1', '/api/v2/csrs/4/export?password%5B%5D=[REDACTED]'),
+    ('/api/v2/csrs/4/export?password+=Pw1', '/api/v2/csrs/4/export?password+=[REDACTED]'),
+    ('/reset-password?%74oken=abc', '/reset-password?%74oken=[REDACTED]'),
+    ('/api/v2/x?pass%2Bword=keep', '/api/v2/x?pass%2Bword=keep'),
+    # A second "?" typed for "&": the secret parameter behind it is still one
+    ('/reset-password?lang=fr?token=abc', '/reset-password?lang=fr?token=[REDACTED]'),
+    ('/api/v2/certificates/4/export?format=key?password=S3cret',
+     '/api/v2/certificates/4/export?format=key?password=[REDACTED]'),
+    ('/cb?x=1?code=abc&state=s', '/cb?x=1?code=[REDACTED]&state=[REDACTED]'),
+    ('/reset-password?token=ab?cd=ef', '/reset-password?token=[REDACTED]'),
 ])
 def test_redact_url(url, expected):
     assert redact_url(url) == expected
+
+
+def test_a_long_run_of_question_marks_is_still_read_to_its_end():
+    """The line is masked whatever its length: a URL cannot make the log drop its own request."""
+    url = '/x?x=1' + '?a=' * 1300 + '?token=abc&b=2'
+    assert redact_url(url) == '/x?x=1' + '?a=' * 1300 + '?token=[REDACTED]&b=2'
+
+
+def test_a_name_cut_by_a_question_mark_does_not_hide_the_parameter_behind_it():
+    assert redact_url('/x?a?token=abc') == '/x?a?token=[REDACTED]'
 
 
 def test_the_gunicorn_line_carries_no_token():
@@ -55,3 +82,23 @@ def test_gunicorn_config_uses_the_redacting_logger(monkeypatch):
     cfg = Config()
     cfg.set('logger_class', gunicorn_config.logger_class)
     assert cfg.logger_class is RedactingLogger
+
+
+@pytest.mark.parametrize('url, expected', [
+    ('/x?my"password=secret', '/x?my"password=[REDACTED]'),
+    ('/x?a=1&"Passphrase"=abc&b=2', '/x?a=1&"Passphrase"=[REDACTED]&b=2'),
+    ('/x?password=se"cret&b=2', '/x?password=[REDACTED]&b=2'),
+    ('/x?a="1"&b=2', '/x?a="1"&b=2'),
+])
+def test_a_quote_neither_hides_a_name_nor_cuts_a_value(url, expected):
+    assert redact_url(url) == expected
+
+
+@pytest.mark.parametrize('unit', ['&', '?a=', '"', '?"', '&"=', '?a"'])
+def test_a_one_megabyte_url_is_redacted_in_linear_time(unit):
+    import time
+    url = '/x?' + unit * (1_000_000 // len(unit)) + '&password=secret'
+    started = time.perf_counter()
+    redacted = redact_url(url)
+    assert time.perf_counter() - started < 2
+    assert redacted.endswith('&password=[REDACTED]') and 'secret' not in redacted

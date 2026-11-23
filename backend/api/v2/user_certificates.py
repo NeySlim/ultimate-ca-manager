@@ -21,6 +21,7 @@ from auth.unified import require_auth, has_permission
 from models import CA, AuthCertificate, Certificate, User, db
 from utils.key_codec import load_pem_bytes
 from services.audit_service import AuditService
+from services.key_export_audit import encrypt_key_pem
 from services.cert_service import CertificateService
 from services.approval_gate import PairApprovalConflict, approval_payload, queue_revocation
 from services.cert.related_pair import mutual_partner
@@ -36,7 +37,7 @@ from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import json_boolean, query_boolean, check_export_request
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +304,10 @@ def export_user_certificate(cert_id):
     if not cert:
         return error_response('Certificate data not found', 404)
 
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
+
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
@@ -469,7 +474,11 @@ def export_user_certificate(cert_id):
         filename = f"{filename_base}.crt"
 
         if include_key and cert.prv:
-            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
+            pw_err = validate_export_password(password, allow_empty=True)
+            if pw_err:
+                return error_response(pw_err, 400)
+            key_pem = encrypt_key_pem(
+                load_pem_bytes(cert.prv, context=f"certificate {cert.id}"), password)
             if not result.endswith(b'\n'):
                 result += b'\n'
             result += key_pem
@@ -486,7 +495,8 @@ def export_user_certificate(cert_id):
             resource_type='user_certificate',
             resource_id=cert_id,
             resource_name=filename_base,
-            details=(f'Exported PEM with private key (unencrypted) for user cert: {filename_base}'
+            details=(f'Exported PEM with private key ({"password-protected" if password else "unencrypted"}) '
+                     f'for user cert: {filename_base}'
                      if include_key and cert.prv else f'Exported PEM for user cert: {filename_base}'),
             success=True
         )

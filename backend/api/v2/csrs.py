@@ -13,6 +13,7 @@ from flask import Blueprint, request, jsonify, g, Response
 from sqlalchemy import func, or_
 from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
+from utils.export_options import check_export_request
 from utils import notices as notices_mod
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
@@ -771,6 +772,10 @@ def export_csr(csr_id):
     cert = db.session.get(Certificate, csr_id)
     if not cert or not cert.csr:
         return error_response('CSR not found', 404)
+
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
 
     if request.method == 'POST' and request.is_json:
         data = request.get_json(silent=True) or {}

@@ -9,6 +9,7 @@ import logging
 
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response
+from utils.export_options import check_export_request, json_boolean, query_boolean
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_isoformat
 from models import CA, Certificate, db
@@ -24,7 +25,7 @@ from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
 
 from utils.export_password import validate_export_password
-from services.key_export_audit import audit_key_export
+from services.key_export_audit import audit_key_export, encrypt_key_pem
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,10 @@ def _audit_key_export(ca, export_format, password):
 def export_all_cas():
     """Export all CA certificates in various formats"""
 
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
+
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
@@ -166,17 +171,28 @@ def export_ca(ca_id):
     if not ca.crt:
         return error_response('CA certificate data not available', 400)
 
+    shape_err = check_export_request(
+        'Password and private key exports must use POST with a JSON body, not the query string')
+    if shape_err:
+        return shape_err
+
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
-        include_key = bool(data.get('include_key', False))
+        try:
+            include_key = json_boolean(data, 'include_key', False)
+        except ValueError as exc:
+            return error_response(str(exc), 400)
         include_chain = bool(data.get('include_chain', False))
         password = data.get('password')
         legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
         variant, variant_err = _requested_variant(data, ca)
     else:
         export_format = request.args.get('format', 'pem').lower()
-        include_key = request.args.get('include_key', 'false').lower() == 'true'
+        try:
+            include_key = query_boolean(request.args, 'include_key', False)
+        except ValueError as exc:
+            return error_response(str(exc), 400)
         include_chain = request.args.get('include_chain', 'false').lower() == 'true'
         password = request.args.get('password')
         legacy = False
@@ -201,6 +217,11 @@ def export_ca(ca_id):
         # HSM-backed CAs cannot export their private key — it never leaves the HSM
         if ca.uses_hsm:
             return error_response('Cannot export HSM-backed key', 409)
+        # An offline CA's stored key is sealed under its offline password: no second one applies
+        if password and ca.offline and ca.prv and export_format in ('pem', 'key'):
+            return error_response(
+                'The key of an offline CA is sealed under its offline password; '
+                'export it without a password', 409)
 
     # Cap export password length (PKCS12/PFX/JKS or PEM-encrypted key)
     pw_err = _validate_export_password(password)
@@ -237,7 +258,7 @@ def export_ca(ca_id):
 
             # Include private key if requested
             if include_key and ca.prv:
-                key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
+                key_pem = encrypt_key_pem(load_pem_bytes(ca.prv, context=f"CA {ca.id}"), password)
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem

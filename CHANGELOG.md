@@ -7,6 +7,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- Exports: a password sent as a form or in a `GET`, as a non-string, under another name (`Password`, `passphrase`) or twice in the JSON body was ignored and the private key came back in clear. The export routes now answer 400 for these shapes, and the access log masks `password` and `passphrase` query values.
+- Exports: a password given with a PEM export that carries the private key was ignored and the key came back in clear; the key is now encrypted (PKCS#8) with that password. The CA export read `include_key` loosely, so `"include_key": "false"` returned the CA key; a value that is not a boolean now answers 400.
+- Access log: a double quote in a parameter's name (`my"password=`) left its value in the log, and one in a secret value left the rest of it; both are now masked.
+
 ## [2.254.6] - 2026-11-19
 
 ### Security

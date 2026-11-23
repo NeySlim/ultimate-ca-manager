@@ -29,6 +29,7 @@ from auth.unified import require_auth, has_permission
 # This route imported that one and called it the way this one expects,
 # so the administrator half of the rule below answered no to everyone.
 from utils.response import success_response, error_response, created_response
+from utils.export_options import check_export_request
 from utils.export_password import validate_export_password
 from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
@@ -211,6 +212,10 @@ def recover_key(rid):
     # Only the original requester or an admin may collect the key.
     if req.requested_by != _username() and not has_permission('admin:key_recovery', getattr(g, 'permissions', [])):
         return error_response('Only the requester or an admin may recover this key', 403)
+
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
 
     data = request.get_json(silent=True) or {}
     password = data.get('password') or ''

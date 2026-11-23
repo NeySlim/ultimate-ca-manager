@@ -607,6 +607,19 @@ GET /api/v2/cas/{ca_id}/export?format=pem&include_chain=true&chain_variant=cross
 `chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
 or `cross:<id>`; any other value, or one that is not part of the chain of this CA, answers 400.
 
+Every export route that can return a private key (certificates, CAs, CSRs, user certificates, mTLS
+downloads, key recovery) takes a request body only from a `POST` whose body is a JSON object sent
+with `Content-Type: application/json`, and reads the password only from its `password` string (or
+`null`). A body of another kind, a `password` of another type, a name given twice, or a name
+containing `password` or `passphrase` placed anywhere else (including the query string) answers 400.
+
+A PEM export that carries the private key returns it as an encrypted PKCS#8 block
+(`BEGIN ENCRYPTED PRIVATE KEY`) when a `password` is given, and in clear without one. `include_key`
+is a JSON boolean (`true` or `false` in the query string); any other value answers 400.
+
+The key of an offline CA kept under its offline password is exported as stored, already encrypted
+under that password: a `password` given with its `pem` or `key` export answers 409.
+
 ### Export All CAs
 ```http
 GET /api/v2/cas/export

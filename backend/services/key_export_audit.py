@@ -1,12 +1,24 @@
 """Audit trail for exports that hand out a private key."""
+from cryptography.hazmat.primitives import serialization
+
 from services.audit_service import AuditService
+
+
+def encrypt_key_pem(key_pem, password):
+    """PKCS#8 PEM encrypted with *password*; the key unchanged when no password was given."""
+    if not password:
+        return key_pem
+    key = serialization.load_pem_private_key(key_pem, password=None)
+    return key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.BestAvailableEncryption(password.encode()))
 
 
 def audit_key_export(resource_type, resource_id, resource_name, export_format, password):
     """Record who exported which private key, in what format; never the key or password."""
-    # Bundles always carry a password; a bare .key only when one was given; PEM never.
+    # Bundles always carry a password; key, PEM and hybrid zip only when one was given.
     encrypted = export_format in ('pkcs12', 'p12', 'pfx', 'jks') or (
-        export_format == 'key' and bool(password))
+        export_format in ('key', 'pem', 'hybrid-bundle') and bool(password))
     protection = 'password-protected' if encrypted else 'unencrypted'
     AuditService.log_action(
         action='private_key_exported',
