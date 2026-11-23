@@ -50,9 +50,11 @@ function ChartTip({ id, anchor, model }) {
  * One tooltip per chart: `bind(model)` gives an element the pointer and focus handlers, `show` and `hide`
  * drive it by hand; `node` renders it. Escape hides an open tooltip before anything else hears the key.
  */
-export function useChartTip() {
+export function useChartTip(onEscape) {
   const id = domId(useId())
   const [tip, setTip] = useState(null)
+  const escaped = useRef(onEscape)
+  escaped.current = onEscape
   const show = useCallback((anchor, model) => {
     const m = typeof model === 'function' ? model() : model
     setTip(anchor && m ? { anchor, model: m } : null)
@@ -65,6 +67,7 @@ export function useChartTip() {
       e.preventDefault()
       e.stopPropagation()
       setTip(null)
+      escaped.current?.()
     }
     document.addEventListener('keydown', key, true)
     return () => document.removeEventListener('keydown', key, true)
@@ -85,8 +88,9 @@ export function useChartTip() {
  * `children({at, ref, enter})` draws the marks: `ref(i)` names mark i's element, `enter(i)` its hover.
  */
 export function SeriesFrame({ count, label, className, tipModel, onPick, children }) {
-  const tip = useChartTip()
   const [at, setAt] = useState(null)
+  // Escape clears the cursor with the tooltip: the next render would otherwise show the tooltip again
+  const tip = useChartTip(() => setAt(null))
   const els = useRef([])
   const { show, hide } = tip
   useEffect(() => {
