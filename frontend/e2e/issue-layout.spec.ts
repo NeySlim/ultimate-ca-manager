@@ -31,6 +31,13 @@ test.describe('desktop', () => {
     expect(Math.abs(hint.width - 250)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(hint.x - (fields.x + fields.width + 26))).toBeLessThanOrEqual(EPS)
     expect(Math.abs(fields.x - (d.x + 25))).toBeLessThanOrEqual(EPS)
+    // The hint's typed rows keep each term over its value, both on the hint's whole width
+    const terms = await dialog.locator('.field-hint dl.kv > .row').evaluateAll((rows) => rows.map((r) => {
+      const [dt, dd] = [r.querySelector('dt')!.getBoundingClientRect(), r.querySelector('dd')!.getBoundingClientRect()]
+      return { under: dd.top >= dt.bottom - 0.5, left: Math.abs(dd.left - dt.left), wide: Math.abs(dd.width - r.getBoundingClientRect().width) }
+    }))
+    expect(terms.length).toBeGreaterThan(3)
+    for (const t of terms) expect(t).toEqual({ under: true, left: 0, wide: 0 })
 
     // Template and authority side by side, 36 px high; the common name across both
     const tpl = await box(dialog.getByLabel('Template'))

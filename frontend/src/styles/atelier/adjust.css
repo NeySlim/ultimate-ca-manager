@@ -233,10 +233,6 @@
 /* An action written in the value takes its own line; a term's second value stays in the value column, under the first. */
 :root .atl .props>dd .text-link[data-write]{display:block;width:fit-content;margin-top:2px;text-align:left}
 :root .atl .props>dd+dd{grid-column:2;border-top:0;padding-top:0;color:var(--muted);font-size:12px;font-weight:400}
-/* The issue form's hint lists each term over its value. */
-:root .atl .field-hint .props{grid-template-columns:minmax(0,1fr)}
-:root .atl .field-hint .props>dt{padding-right:0}
-:root .atl .field-hint .props>dd{border-top:0;padding-top:0;margin-bottom:0}
 /* A narrow panel: a technical value or a value with its help goes under its term, on the whole width. */
 @container (max-width:380px){
   :root .atl .props>dt:is(:has(+dd.mono),:has(+dd>.mono),:has(+dd>p)){grid-column:1/-1;padding-bottom:0}
@@ -249,6 +245,10 @@
    subgrid so a group's sections share the term column; long values under their term below 380 px, a list below 260 px. */
 :root .atl .kv,:root .atl .kvg{display:grid;grid-template-columns:fit-content(42%) minmax(0,1fr) auto;column-gap:14px}
 :root .atl .kv{margin:0;font-size:12px;line-height:1.45}
+/* The issue form's hint: each term over its value, on the hint's width, the mockup's 14 px around the block and 6 px under a term */
+:root .atl .field-hint .kv{margin:14px 0}
+:root .atl .field-hint .kv>.row{row-gap:6px}
+:root .atl .field-hint .kv>.row>:is(dt,dd.v,dd.absent){grid-column:1/-1}
 /* The mockup's margin of .event-detail .props, on the Facts of a journal entry */
 :root .atl .event-detail>.kv{margin:22px 0}
 :root .atl .kvg>*,:root .atl .kvg>section>*{grid-column:1/-1;min-width:0}

@@ -352,6 +352,11 @@ describe('IssueCertificateForm steps', () => {
     expect(hint.textContent).toContain(`${P}hintDigestsAllowed:{"list":"SHA-384"}`)
     // No CSR row without the right to hand one in
     expect(hint.textContent).not.toContain(`${P}hintCsr`)
+    // Typed rows, each term over its value; a note under a value in its muted second line
+    expect(hint.querySelector('dl.props')).toBeNull()
+    const rows = [...hint.querySelectorAll('dl.kv > div.row')]
+    expect(rows.map((r) => r.querySelector('dt').textContent)).toEqual([`${P}hintAuthorities`, `${P}hintAlgorithms`, `${P}hintValidity`, `${P}hintSans`, `${P}hintHashEku`])
+    expect(rows[4].querySelector('dd.v > .sub')).toHaveTextContent(`${P}hintDigestsAllowed:{"list":"SHA-384"}`)
   })
 
   it('takes an end date instead of a duration and sends the days it makes', async () => {
