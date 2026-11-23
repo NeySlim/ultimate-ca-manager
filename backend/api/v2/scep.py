@@ -398,6 +398,24 @@ def get_scep_stats():
     })
 
 
+def _challenge_validity_hours():
+    try:
+        return int(get_config('scep_challenge_validity', '24'))
+    except (TypeError, ValueError):
+        return 24
+
+
+def _parse_stamp(raw):
+    """The UTC generation time of a challenge, or None when it has no readable stamp."""
+    if not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(raw)
+    except (TypeError, ValueError):
+        return None
+    return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+
+
 def challenge_age_state(ca_id):
     """Return ``(challenge, expired, expires_at)`` for a CA's SCEP challenge.
 
@@ -411,21 +429,9 @@ def challenge_age_state(ca_id):
     if not challenge:
         return None, False, None
 
-    try:
-        validity_hours = int(get_config('scep_challenge_validity', '24'))
-    except (TypeError, ValueError):
-        validity_hours = 24
-
+    validity_hours = _challenge_validity_hours()
     stamp_key = f'scep_challenge_{ca_id}_generated_at'
-    raw = get_config(stamp_key)
-    generated_at = None
-    if raw:
-        try:
-            generated_at = datetime.fromisoformat(raw)
-            if generated_at.tzinfo is None:
-                generated_at = generated_at.replace(tzinfo=timezone.utc)
-        except (TypeError, ValueError):
-            generated_at = None
+    generated_at = _parse_stamp(get_config(stamp_key))
 
     if generated_at is None:
         # Legacy challenge: adopt it now instead of failing every enrollment.
@@ -438,6 +444,37 @@ def challenge_age_state(ca_id):
 
     expires_at = generated_at + timedelta(hours=validity_hours)
     return challenge, datetime.now(timezone.utc) >= expires_at, expires_at
+
+
+@bp.route('/api/v2/scep/challenges', methods=['GET'])
+@require_auth(['read:scep'])
+def list_challenge_states():
+    """The state of each CA's challenge: set or not, generated and expiry times.
+
+    Never the secret, so no audited read; a challenge without its stamp is
+    listed as it is (no age) rather than stamped by a read-only listing.
+    """
+    ca_ids = [row.id for row in db.session.query(CA.id).order_by(CA.id).all()]
+    keys = [f'scep_challenge_{i}' for i in ca_ids] + [f'scep_challenge_{i}_generated_at' for i in ca_ids]
+    stored = {}
+    for start in range(0, len(keys), 500):
+        for row in SystemConfig.query.filter(SystemConfig.key.in_(keys[start:start + 500])).all():
+            stored[row.key] = row.value
+    validity = timedelta(hours=_challenge_validity_hours())
+    now = datetime.now(timezone.utc)
+    states = []
+    for ca_id in ca_ids:
+        configured = bool(stored.get(f'scep_challenge_{ca_id}'))
+        generated_at = _parse_stamp(stored.get(f'scep_challenge_{ca_id}_generated_at')) if configured else None
+        expires_at = generated_at + validity if generated_at else None
+        states.append({
+            'ca_id': ca_id,
+            'configured': configured,
+            'expired': bool(expires_at and now >= expires_at),
+            'generated_at': generated_at.isoformat() if generated_at else None,
+            'expires_at': expires_at.isoformat() if expires_at else None,
+        })
+    return success_response(data=states)
 
 
 @bp.route('/api/v2/scep/challenge/<int:ca_id>', methods=['GET'])

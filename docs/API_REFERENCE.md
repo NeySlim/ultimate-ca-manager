@@ -2016,10 +2016,17 @@ Content-Type: application/json
 }
 ```
 
+### List Challenge States
+```http
+GET /api/v2/scep/challenges
+```
+Needs `read:scep`. One entry per CA: `ca_id`, `configured`, `expired`, `generated_at` and `expires_at` (`null` when unknown). The secret is never returned and the listing writes no audit entry.
+
 ### Get Challenge Password
 ```http
 GET /api/v2/scep/challenge/{ca_id}
 ```
+Needs `write:scep`. Returns the secret and records one `scep_challenge_read` audit entry per call.
 
 ### Regenerate Challenge Password
 ```http
