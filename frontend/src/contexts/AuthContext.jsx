@@ -50,6 +50,8 @@ export function AuthProvider({ children }) {
   // A lock heard while this tab still checks its session: applied to the account the check finds
   const checking = useRef(false)
   const pendingLock = useRef(null)
+  // A lock asked in this tab before the check named an account: sent once the check answers
+  const heldLock = useRef(null)
 
   const lockHere = useCallback((reason) => {
     const { user: who, authMethod: via } = current.current
@@ -75,6 +77,14 @@ export function AuthProvider({ children }) {
     const shared = who ? readSharedLock() : null
     return shared?.username === who ? shared : null
   }, [])
+
+  // This tab's lock: the console goes, the other tabs hear it, then the server is told (CSRF set by the check)
+  const lockNow = useCallback((reason) => {
+    const account = lockHere(reason)
+    shareLock(account)
+    announceLock(account.username, reason)
+    authService.lock(reason).catch(() => {})
+  }, [lockHere])
 
   const checkSession = useCallback(async () => {
     checking.current = true
@@ -112,6 +122,12 @@ export function AuthProvider({ children }) {
       const who = userData.user || userData
       // The ref follows at once: a lock message between this answer and the next render is kept
       current.current = { user: who, authMethod: current.current.authMethod || userData.auth_method || null }
+      const held = heldLock.current
+      heldLock.current = null
+      if (held) {
+        lockNow(held.reason)
+        return false
+      }
       const pending = pendingLock.current
       pendingLock.current = null
       // The server answered before a lock another tab made reached it
@@ -159,10 +175,12 @@ export function AuthProvider({ children }) {
     } finally {
       checking.current = false
       pendingLock.current = null
+      // No session found (or the server holds it locked already): nothing left to lock
+      heldLock.current = null
       setLoading(false)
       setSessionChecked(true)
     }
-  }, [lockHere, lockedElsewhere])
+  }, [lockHere, lockNow, lockedElsewhere])
 
   // Always check session on mount — enables mTLS auto-login on /login too
   useEffect(() => {
@@ -262,10 +280,17 @@ export function AuthProvider({ children }) {
   }
 
   const lock = (reason = 'idle') => {
-    const account = lockHere(reason)
-    shareLock(account)
-    announceLock(account.username, reason)
-    authService.lock(reason).catch(() => {})
+    if (checking.current) {
+      const who = current.current.user?.username
+      if (!who) {
+        // No account and no CSRF token yet: held until the check answers, the console stays closed
+        heldLock.current = { reason }
+        return
+      }
+      // A check answering before the lock reached the server must not reopen the console
+      pendingLock.current = { username: who, reason }
+    }
+    lockNow(reason)
   }
 
   useEffect(() => listenForLocks(({ username, reason }) => {

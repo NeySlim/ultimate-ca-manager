@@ -594,16 +594,43 @@ def test_upper_case_direction_and_empty_key_read_as_given_and_default(auth_clien
 
 # --- The capped lists: their callers keep their shape and get the total ------------------------
 
+@pytest.fixture
+def acme_crowd(app):
+    """More ACME accounts than one page holds, as other files of a shared database leave them."""
+    from models.acme_models import AcmeAccount
+    tag = _tag()
+    with app.app_context():
+        rows = [AcmeAccount(account_id=f'crowd-{tag}-{n}', jwk='{}', jwk_thumbprint=f'crowd-{tag}-{n}',
+                            status='valid') for n in range(101)]
+        db.session.add_all(rows)
+        db.session.commit()
+        ids = [row.id for row in rows]
+    yield
+    with app.app_context():
+        AcmeAccount.query.filter(AcmeAccount.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+
 @pytest.mark.parametrize('route,default_size', [('acme_accounts', 100), ('eab', 200), ('key_recovery', 500)])
 def test_a_formerly_capped_list_keeps_its_shape_and_says_its_total(request, auth_client, route, default_size):
-    seeded = request.getfixturevalue(route)
+    _says_its_total(auth_client, request.getfixturevalue(route), route, default_size)
+
+
+def test_a_formerly_capped_list_longer_than_its_page_says_its_total(auth_client, acme_accounts, acme_crowd):
+    _says_its_total(auth_client, acme_accounts, 'acme_accounts', 100)
+
+
+def _says_its_total(auth_client, seeded, route, default_size):
     r = auth_client.get(seeded.url)
     assert r.status_code == 200, r.data
     body = r.get_json()
     rows = seeded.rows_of(body)
     assert isinstance(rows, list) and len(rows) >= len(next(iter(seeded.values.values())))
     assert body['meta']['per_page'] == default_size and body['meta']['page'] == 1
-    assert body['meta']['total'] == len(rows)
+    # The total counts every row of the table, which other files of a shared database fill too
+    everything = walk(auth_client, seeded.url, seeded.params, seeded.rows_of, default_size)
+    assert body['meta']['total'] == len(everything)
+    assert len(rows) == min(len(everything), default_size)
     if route == 'key_recovery':
         assert set(body['data']) == {'requests', 'dual_control'}
     small = auth_client.get(seeded.url, query_string={'per_page': 1, 'page': 2}).get_json()
