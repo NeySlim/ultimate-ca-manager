@@ -254,7 +254,9 @@ class TestRevalidation:
         with _socket(app, client) as ws:
             sid = _sid(ws)
             assert sid in events.connected_clients
-            client.post('/api/v2/auth/logout')
+            # Ended in the store without the sign-out route, which cuts the socket itself
+            with client.session_transaction() as stored:
+                stored.clear()
             ws.emit('ping')
             assert not ws.is_connected()
             assert sid not in events.connected_clients

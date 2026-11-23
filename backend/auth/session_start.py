@@ -1,5 +1,9 @@
 """Where a login starts its session, and where a credential change keeps the current one."""
+import logging
+
 from flask import current_app, g, session
+
+logger = logging.getLogger(__name__)
 
 
 def _new_identifier():
@@ -120,3 +124,13 @@ def end_sessions_on_commit(user_id):
     if owner is not None:
         owner.end_sessions()
     return owner
+
+
+def close_session_sockets(session_id, username=None):
+    """The sockets of a session that ends or locks close now, on every node; never fails the
+    request (the 60 s revalidation closes them otherwise)."""
+    try:
+        from websocket.events import end_session_sockets
+        end_session_sockets(session_id)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Non-blocking: the sockets of %s's session not closed: %s", username, e, exc_info=True)

@@ -86,7 +86,10 @@ def _sign_out():
     except Exception as e:
         logger.warning(f"Non-blocking: failed to emit on_user_logout WebSocket event for {username}: {e}", exc_info=True)
     
+    from auth.session_start import close_session_sockets
+    session_id = getattr(session, 'sid', None)
     session.clear()
+    close_session_sockets(session_id, username)
     
     return success_response(message='Logout successful')
 
@@ -116,11 +119,8 @@ def _lock_signed_in():
         logger.warning(f"Non-blocking: failed to audit-log the lock of {username}: {e}", exc_info=True)
     lock_session(reason)
     # Its open sockets close now, on every node; the handshake refuses a locked session
-    try:
-        from websocket.events import end_session_sockets
-        end_session_sockets(getattr(session, 'sid', None))
-    except Exception as e:
-        logger.warning(f"Non-blocking: the sockets of {username}'s locked session not closed: {e}", exc_info=True)
+    from auth.session_start import close_session_sockets
+    close_session_sockets(getattr(session, 'sid', None), username)
     return success_response(message='Session locked')
 
 

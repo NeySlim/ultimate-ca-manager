@@ -848,6 +848,17 @@ def test_signed_logout_request_closes_the_session_and_answers_the_idp(app, slo_u
         assert SSOSession.query.filter_by(sso_name_id=name_id).count() == 0
 
 
+def test_a_single_logout_closes_the_sockets_of_the_session(app, slo_url, idp_signer, monkeypatch):
+    from websocket import events
+    client, name_id = _signed_in(app, idp_signer)
+    sid = client.get_cookie('session', domain='ucm.example.test').value
+    ended = []
+    monkeypatch.setattr(events, 'end_session_sockets', ended.append)
+    _, url = _logout_request(idp_signer[0], name_id)
+    assert client.get(url, base_url=SP_BASE).status_code == 302
+    assert ended == [sid]
+
+
 @pytest.mark.parametrize('sign_requests', [True, False])
 def test_logout_response_is_signed_with_an_rsa_sp_key(app, slo_url, provider, idp_signer,
                                                       https_identity, sign_requests):
