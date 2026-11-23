@@ -81,11 +81,13 @@ All API responses follow this structure:
 
 ### Sorting
 
-The lists that page on the server sort with `sort_by` (a key the list names) and `sort_order` (`asc` or `desc`; an empty value takes the list's default). Text is compared without regard to ASCII letter case, byte by byte otherwise, the same on SQLite and PostgreSQL; rows with no value in the sorted column come last in both directions; ties are broken by `id` in the same direction, so two pages never share a row. A key or direction the list does not know answers `400`, with the keys it accepts in `details.allowed_sort_by`:
+The lists whose section below names a `sort_by` key sort with `sort_by` (a key the list names) and `sort_order` (`asc` or `desc`; an empty value takes the list's default). Text is compared without regard to ASCII letter case, byte by byte otherwise, the same on SQLite and PostgreSQL; rows with no value in the sorted column come last in both directions; ties are broken by `id` in the same direction, so two pages never share a row. A key or direction the list does not know answers `400`, with the keys it accepts in `details.allowed_sort_by`:
 
 ```json
 { "status": 400, "detail": "Unknown sort_by 'size'; allowed: created_at, name", "details": { "allowed_sort_by": ["created_at", "name"] } }
 ```
+
+The other paged lists keep a fixed order and ignore `sort_by`: `/api/v2/cas`, `/api/v2/cas/{id}/certificates`, `/api/v2/ssh/cas`, `/api/v2/acme/client/orders`, `/api/v2/account/activity`, `/api/v2/webhooks/{id}/deliveries`, `/api/v2/settings/backup/history`, `/api/v2/settings/notifications/logs` and `/api/v2/settings/audit-logs`. The archive list (`/api/v2/system/backups`) sorts by its own `sort` parameter (`created_desc` by default, `created_asc`, `size_desc`, `size_asc`, `name_asc`, `name_desc`), and an unknown value takes the default.
 
 ---
 

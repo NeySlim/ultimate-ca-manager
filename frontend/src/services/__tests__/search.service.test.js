@@ -16,14 +16,17 @@ beforeEach(() => get.mockReset())
 
 describe('searchService.globalSearch', () => {
   it('gives the groups of the envelope the server answers', async () => {
-    const groups = { certificates: [{ id: 224, name: 'web.example.com' }], cas: [], users: [], templates: [], csrs: [] }
+    const groups = { certificates: [{ id: 224, name: 'web.example.com' }], cas: [], users: [], templates: [] }
     get.mockResolvedValue({ data: groups })
     await expect(searchService.globalSearch('web', 5)).resolves.toEqual(groups)
     expect(get).toHaveBeenCalledWith('/search?q=web&limit=5')
   })
 
-  it('asks nothing under two characters', async () => {
-    await expect(searchService.globalSearch('w')).resolves.toMatchObject({ certificates: [], cas: [] })
+  it('asks nothing under two characters, and answers the empty groups the server would', async () => {
+    // The groups of GET /search (api/v2/search.py): it has no CSR group
+    await expect(searchService.globalSearch('w')).resolves.toEqual({
+      certificates: [], cas: [], users: [], templates: [], acme_accounts: [], scep_profiles: [],
+    })
     expect(get).not.toHaveBeenCalled()
   })
 })

@@ -306,7 +306,7 @@ An SSH CA on an HSM key keeps its private key on the token and needs the `read:h
 
 ### Settings
 
-Open **Modules** > **Administration** > **Settings** (administrators), or **Settings** from the search (`Ctrl K`). The tabs are: General, Appearance & Language, Email, Security, SSO, Backup, Audit, Database, HTTPS, Updates, Scheduler, Webhooks, CT, Auto-Renewal, Deployment, Microsoft CA, Active Directory, Windows Autoenrollment and About; a tab you have no right to is not shown.
+Open **Modules** > **Administration** > **Settings** (administrators), or **Settings** from the search (`Ctrl K`). Its sections, one under the other on a single page and listed in the table of contents, are: General, Appearance & Language, SMTP, Security, SSO, Backup, Audit, Database, HTTPS, Updates, Scheduler, Webhooks, CT, Auto-Renewal, Deployment, Microsoft CA, Active Directory, Windows Autoenrollment and About; a section you have no right to is not shown.
 
 - **Backup** takes and restores archives. In HA mode they are stored in PostgreSQL.
 - **Updates** installs updates; in HA mode on DEB and RPM it updates the nodes one at a time.
