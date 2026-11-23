@@ -45,18 +45,10 @@ export function clampRect(rect, view) {
   return { x: clamp(Math.round(rect.x), 0, view.w - w), y: clamp(Math.round(rect.y), 0, view.h - h), w, h }
 }
 
-/**
- * The n-th window opened: in the free margin right of a centred page when it holds the window, clear of the
- * page; else down and to the right of the one before, moved with a centred page (the inspector's controls, at
- * the right, stay uncovered). Back to the top after eight.
- */
+/** The n-th window opened: down and to the right of the one before, back to the top after eight; moved with a centred page. */
 export function cascadeRect(n, size, view) {
   const step = (n % 8) * CASCADE
-  const margin = stageMargin(view.w)
-  const shift = stageSide(view.w) - margin
-  if (shift >= size.w) {
-    return clampRect({ x: view.w - margin - size.w - Math.min(step, shift - size.w), y: ORIGIN.y + step, w: size.w, h: size.h }, view)
-  }
+  const shift = stageSide(view.w) - stageMargin(view.w)
   return clampRect({ x: ORIGIN.x + shift + step, y: ORIGIN.y + step, w: size.w, h: size.h }, view)
 }
 

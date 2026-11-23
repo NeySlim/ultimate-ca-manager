@@ -158,22 +158,3 @@ test.describe('desktop, PKI and protocols', () => {
     expect(new Set(heights).size).toBe(1)
   })
 })
-
-test.describe('wide screen', () => {
-  test.use({ viewport: { width: 3440, height: 1300 } })
-
-  test('a detached certificate opens in the free margin right of the page, clear of its title and names', async ({ page, api }) => {
-    const ca = await createCA(api)
-    const cert = await issueCert(api, ca.id, { cn: `${uid('right')}.example.com` })
-    await page.goto('/certificates')
-    await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
-    await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
-    await page.locator('#inspector').getByRole('button', { name: 'Detach into a window' }).click()
-    const win = page.getByRole('dialog', { name: cert.common_name })
-    await expect(win).toBeVisible()
-    const w = (await win.boundingBox())!
-    const head = (await page.locator('.page-head').first().boundingBox())!
-    expect(w.x).toBeGreaterThanOrEqual(head.x + head.width)
-    expect(w.x + w.width).toBeLessThanOrEqual(3440)
-  })
-})
