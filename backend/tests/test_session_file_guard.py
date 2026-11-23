@@ -51,27 +51,28 @@ def _save_with_a_removal_in_between(app, cookie, remove, before_removal=None):
     store_id = iface._get_store_id(sid)
     path = iface.cache._get_filename(store_id)
     seen = {}
-    original_has = iface.cache.has
+    original_get = iface.cache.get
 
-    def has(key):
-        present = original_has(key)
-        if present and key == store_id and 'thread' not in seen:
+    def get(key):
+        stored = original_get(key)
+        if stored is not None and key == store_id and 'thread' not in seen:
             if before_removal:
                 before_removal(path)
             seen['thread'] = threading.Thread(target=remove, args=(app, store_id))
             seen['thread'].start()
             seen['thread'].join(PAUSE)
             seen['present_meanwhile'] = os.path.exists(path)
-        return present
+        return stored
 
-    iface.cache.has = has
     try:
         with app.test_request_context('/api/v2/account/profile',
                                       headers={'Cookie': f'session={cookie}'}):
             flask_session['probe'] = time.time()
+            # Installed once the session is open: the read it watches is the save's own
+            iface.cache.get = get
             iface.save_session(app, flask_session, app.response_class())
     finally:
-        del iface.cache.has
+        vars(iface.cache).pop('get', None)
     assert 'thread' in seen, 'the save never checked its record'
     seen['thread'].join(10)
     assert not seen['thread'].is_alive()
