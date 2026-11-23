@@ -31,6 +31,10 @@ const ROLE_SECTIONS = ['overview', 'permissions']
 const BY_NAME = { key: 'name', asc: true }
 const SORT_KEYS = ['name', 'description', 'inherits', 'permissions', 'users', 'state']
 
+// The roles the server seeds (their English names), keyed as the account list's role names
+const SYSTEM_ROLES = { Administrator: 'admin', Operator: 'operator', Auditor: 'auditor', Viewer: 'viewer' }
+const SYSTEM_ROLE_NAMES = { admin: 'users.admin', operator: 'common.operator', auditor: 'common.auditor', viewer: 'common.viewer' }
+
 export default function RBACPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -148,12 +152,17 @@ export default function RBACPage() {
     setSelectedRole({ ...selectedRole, permissions: updated })
   }
 
+  // The four roles the server seeds are named and described in the language, as the account list names them
+  const seeded = (r) => (r?.is_system ? SYSTEM_ROLES[r.name] : null)
+  const nameOf = (r) => (seeded(r) ? t(SYSTEM_ROLE_NAMES[seeded(r)]) : r?.name)
+  const describe = (r) => (seeded(r) ? t(`rbac.systemRoles.${seeded(r)}`) : r?.description)
   const typeOf = (r) => (r.is_system ? 'system' : 'custom')
-  const pill = (r) => <Pill label={t(r.is_system ? 'common.system' : 'common.custom')} tone={r.is_system ? 'muted' : 'good'} />
+  // A type, not a state: a neutral pill, the lock of a system role or the shield of a custom one (the dock's icons)
+  const pill = (r) => <Pill label={t(r.is_system ? 'common.system' : 'common.custom')} icon={r.is_system ? 'lock' : 'shield'} />
   const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return roles.filter((r) => !q || [r.name, r.description].some((v) => String(v || '').toLowerCase().includes(q)))
-  }, [roles, query])
+    return roles.filter((r) => !q || [r.name, r.description, nameOf(r), describe(r)].some((v) => String(v || '').toLowerCase().includes(q)))
+  }, [roles, query, t]) // eslint-disable-line react-hooks/exhaustive-deps -- nameOf and describe follow t
   const rows = searched.filter((r) => !kind || typeOf(r) === kind)
   const views = [
     { id: '', label: t('common.all'), count: searched.length },
@@ -162,30 +171,33 @@ export default function RBACPage() {
   ]
   const narrowed = Boolean(query.trim() || kind)
   const create = { label: t('rbac.createRole'), icon: 'plus', onClick: () => openModal('create'), primary: true }
-  const parentOf = (r) => (r.inherits_from ? (r.parent_name || `#${r.inherits_from}`) : '—')
+  const parentOf = (r) => (r.inherits_from ? (nameOf(roles.find((x) => x.id === r.inherits_from)) || r.parent_name || `#${r.inherits_from}`) : '—')
   const sortParam = useSortParam(BY_NAME, SORT_KEYS)
   const list = useClientList(rows, {
     sortParam,
     resetKey: `${query}|${kind}`,
     sorts: {
-      name: (r) => r.name, description: (r) => r.description, inherits: (r) => (r.inherits_from ? parentOf(r) : null),
+      name: nameOf, description: describe, inherits: (r) => (r.inherits_from ? parentOf(r) : null),
       permissions: (r) => r.all_permissions?.length ?? 0, users: (r) => r.user_count || 0, state: (r) => (r.is_system ? 0 : 1),
     },
   })
 
   const role = selectedRole
+  // Save waits for a change: the open role's permissions against the ones the server listed
+  const saved = role ? roles.find((r) => r.id === role.id) : null
+  const changed = !!role && !!saved && [...new Set(role.permissions || [])].sort().join() !== [...new Set(saved.permissions || [])].sort().join()
   const direct = role ? appliedPermissions(role.permissions, grantable) : []
   const all = role ? (role.all_permissions || direct) : []
   const ignored = role ? ignoredPermissions(role.permissions, grantable) : []
 
   const dock = role && (
     <Dock label={t('atelier.detailOf', { name: t('common.rbac') })} tabsLabel={t('atelier.openItem')} activeKey={role.id}
-      tabs={[{ key: role.id, title: role.name, icon: role.is_system ? 'lock' : 'shield' }]} onClose={() => setSelectedRole(null)}>
-      <DockBody icon={role.is_system ? 'lock' : 'shield'} title={role.name} badge={pill(role)} section={section} onSection={setSection}
-        sectionsLabel={t('atelier.sectionsOf', { name: role.name })}
+      tabs={[{ key: role.id, title: nameOf(role), icon: role.is_system ? 'lock' : 'shield' }]} onClose={() => setSelectedRole(null)}>
+      <DockBody icon={role.is_system ? 'lock' : 'shield'} title={nameOf(role)} badge={pill(role)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: nameOf(role) })}
         sections={[['overview', t('atelier.overview')], ['permissions', t('common.permissions')]]}
         actions={!role.is_system && <>
-          <Btn tone="primary" icon="check" id="rbac-save" write onClick={handleUpdate}>{t('common.saveChanges')}</Btn>
+          <Btn tone="primary" icon="check" id="rbac-save" write disabled={!changed || undefined} onClick={handleUpdate}>{t('common.saveChanges')}</Btn>
           <Btn tone="danger" icon="block" id="rbac-delete" onClick={() => handleDelete(role)}>{t('common.delete')}</Btn>
         </>}>
         {role.is_system && <p className="notice warn" id="rbac-system"><Icon name="lock" /><span>{t('rbac.systemRoleWarning')}</span></p>}
@@ -195,12 +207,12 @@ export default function RBACPage() {
               <Facts items={[
                 { label: t('common.type'), value: pill(role) },
                 role.inherits_from ? [t('rbac.inheritsFrom'), parentOf(role)] : { label: t('rbac.inheritsFrom'), absent: '—' },
-                [t('common.users'), t('rbac.userCount', { count: role.user_count || 0 })],
-                [t('common.permissions'), `${direct.length}/${grantable.length}`],
+                [t('rbac.columns.users'), t('users.unit', { count: role.user_count || 0 })],
+                [t('rbac.columns.permissions'), `${direct.length}/${grantable.length}`],
               ]} />
             </Section>
             <Section title={t('atelier.summary')}>
-              <p className="summary">{role.description || t('rbac.noDescription')}</p>
+              <p className="summary">{describe(role) || t('rbac.noDescription')}</p>
             </Section>
           </div>
         )}
@@ -288,13 +300,13 @@ export default function RBACPage() {
             <SearchField id="rbac-search" name="q" label={t('rbac.searchRoles')} placeholder={t('rbac.searchRoles')} value={query} onChange={setQuery} />
           </Toolbar>
         )}
-        title={(r) => r.name} status={pill} openedId={role?.id} onOpen={(r) => { setSection('overview'); selectRole(r) }}
+        title={nameOf} status={pill} openedId={role?.id} onOpen={(r) => { setSection('overview'); selectRole(r) }}
         columns={[
-          { id: 'description', label: t('common.description'), cell: (r) => r.description || '—', kind: 'text', priority: 4, grow: true, muted: true, sort: 'description' },
+          { id: 'description', label: t('common.description'), cell: (r) => describe(r) || '—', kind: 'text', priority: 4, grow: true, muted: true, sort: 'description' },
           { id: 'inherits', label: t('rbac.inheritsFrom'), cell: parentOf, kind: 'text', priority: 3, sort: 'inherits' },
           { id: 'permissions', label: t('rbac.columns.permissions'), labelFull: t('common.permissions'), cell: (r) => r.all_permissions?.length ?? 0, kind: 'number', priority: 3, sort: 'permissions' },
           { id: 'users', label: t('rbac.columns.users'), labelFull: t('common.users'), cell: (r) => r.user_count || 0, kind: 'number', priority: 3, sort: 'users' },
-          { status: true, sort: 'state' },
+          { status: true, label: t('common.type'), sort: 'state' },
         ]}
         error={loadError && (
           <LoadError id="rbac" title={t('messages.errors.loadFailed.roles')} onRetry={() => { setLoading(true); loadRoles() }}

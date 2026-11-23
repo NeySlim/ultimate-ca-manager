@@ -56,8 +56,24 @@ export function effectiveActions(actions, type, chosen) {
   return picked.filter((a) => allowed.has(a))
 }
 
-/** "cert_revoked" → "Cert revoked": the code as the server writes it, readable. */
-export function actionLabel(action) {
-  const text = String(action || '').replace(/[._]+/g, ' ').trim()
-  return text ? text[0].toUpperCase() + text.slice(1) : ''
+// Acronyms and product names inside an action code, written as the interface writes them
+const WORDS = {
+  acme: 'ACME', scep: 'SCEP', est: 'EST', crl: 'CRL', ocsp: 'OCSP', csr: 'CSR', csrs: 'CSRs', ca: 'CA', cas: 'CAs',
+  hsm: 'HSM', ssh: 'SSH', sso: 'SSO', mfa: 'MFA', '2fa': '2FA', totp: 'TOTP', api: 'API', apikey: 'API key', ldap: 'LDAP',
+  mtls: 'mTLS', tsa: 'TSA', wstep: 'WSTEP', xcep: 'XCEP', eab: 'EAB', smtp: 'SMTP', oauth: 'OAuth', https: 'HTTPS',
+  ct: 'CT', dns: 'DNS', msca: 'Microsoft CA', webauthn: 'WebAuthn', intune: 'Intune',
+}
+
+/**
+ * The operation an action code names: its label in the language when there is one (audit.actions, the code's dots
+ * as underscores), else the code made readable, "cert_revoked" → "Cert revoked", "scep_challenge_read" → "SCEP challenge read".
+ */
+export function actionLabel(action, t) {
+  const code = String(action || '')
+  const key = `audit.actions.${code.replace(/\./g, '_')}`
+  const named = t && code ? t(key, { defaultValue: '' }) : ''
+  if (named && !named.startsWith(key)) return named
+  const [first = '', ...rest] = code.split(/[._]+/).filter(Boolean)
+  const head = WORDS[first.toLowerCase()] || (first && first[0].toUpperCase() + first.slice(1))
+  return [head, ...rest.map((w) => WORDS[w.toLowerCase()] || w)].join(' ')
 }

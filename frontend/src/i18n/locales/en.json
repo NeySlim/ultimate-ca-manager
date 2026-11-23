@@ -477,6 +477,7 @@
     },
     "chooseFile": "Choose a file…",
     "more": "More",
+    "moreActions": "Other actions",
     "otherViews": "Other views"
   },
   "commandPalette": {
@@ -3439,6 +3440,46 @@
       "setup": "Configuration",
       "system": "System"
     },
+    "actions": {
+      "login_success": "Signed in",
+      "login_failure": "Sign-in failed",
+      "logout": "Signed out",
+      "session_locked": "Session locked",
+      "scep_challenge_read": "SCEP challenge read",
+      "generate_crl": "CRL generated",
+      "generate_delta_crl": "Delta CRL generated",
+      "crl_regenerate": "CRL regenerated",
+      "ca_created": "Authority created",
+      "ca_deleted": "Authority deleted",
+      "ca_updated": "Authority updated",
+      "ca_imported": "Authority imported",
+      "ca_revoked": "Authority revoked",
+      "certificate_created": "Certificate issued",
+      "cert_created": "Certificate issued",
+      "certificate_issued": "Certificate issued",
+      "cert_deleted": "Certificate deleted",
+      "certificate_deleted": "Certificate deleted",
+      "cert_revoked": "Certificate revoked",
+      "certificate_imported": "Certificate imported",
+      "cert_imported": "Certificate imported",
+      "certificate_renewed": "Certificate renewed",
+      "certificate_auto_renewed": "Certificate renewed automatically",
+      "csr_signed": "Request signed",
+      "csr_create": "Request created",
+      "csr_generated": "Request generated",
+      "csr_delete": "Request deleted",
+      "settings_update": "Settings changed",
+      "user_create": "Account created",
+      "user_delete": "Account deleted",
+      "user_update": "Account changed",
+      "password_change": "Password changed",
+      "system_backup": "Backup",
+      "system_restore": "Restore",
+      "template_create": "Template created",
+      "template_delete": "Template deleted",
+      "truststore_add": "Trust anchor added",
+      "truststore_remove": "Trust anchor removed"
+    },
     "format_csv": "One row per event",
     "format_json": "Structured data"
   },
@@ -4421,7 +4462,8 @@
     },
     "templateHtmlSource": "HTML source",
     "templateFormat": "Template format",
-    "templateVariablesLead": "Variables: "
+    "templateVariablesLead": "Variables: ",
+    "ocspRevocationTitle": "OCSP and revocation"
   },
   "account": {
     "profile": "Profile",
@@ -4638,6 +4680,12 @@
     "columns": {
       "permissions": "Rights",
       "users": "Users"
+    },
+    "systemRoles": {
+      "admin": "Full system access with all permissions",
+      "operator": "Day-to-day certificate operations",
+      "auditor": "Read-only access to all operational data for compliance and audit",
+      "viewer": "Basic read access to certificates and CAs"
     }
   },
   "hsm": {
@@ -7455,7 +7503,8 @@
       "ad_connector_health": "Active Directory health",
       "session_cleanup": "Session cleanup"
     },
-    "colNote": "Last result"
+    "colNote": "Last result",
+    "imminent": "imminent"
   },
   "lint": {
     "action": "Lint",
@@ -7977,7 +8026,8 @@
       "mfa": "Two-factor",
       "mfaOn": "On: {{methods}}",
       "mfaOff": "Off",
-      "endsAt": "Ends {{date}}"
+      "endsAt": "Ends {{date}}",
+      "lockInHours": "Locks after {{hours}} h of inactivity"
     },
     "activity": {
       "label": "Activity",
@@ -8593,7 +8643,8 @@
       "request": "Request #{{id}}",
       "requests_one": "{{count}} request",
       "requests_other": "{{count}} requests"
-    }
+    },
+    "historyMore": "Show {{count}} more"
   },
   "atelier": {
     "name": "Name",

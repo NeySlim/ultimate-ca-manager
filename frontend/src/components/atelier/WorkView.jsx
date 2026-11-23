@@ -102,6 +102,9 @@ function WorkSkeleton({ history }) {
   )
 }
 
+// The history shows its newest twenty lines, then as many more at each ask: never a page of a hundred lines at once
+const HISTORY_STEP = 20
+
 /**
  * @param {object} p
  * @param {'loading'|'error'|'ready'} [p.state]
@@ -131,9 +134,10 @@ export function WorkView({ state = 'ready', error, hint, groups, bulk, openedId,
   else {
     body = (
       <div className="work-view" aria-label={label}>
+        {/* The hint says how to tick several rows: none when there is no row to tick */}
         {selectable && ids.length > 0 ? (
           <BatchBar work count={t('work.selected', { count: ids.length })} onClear={clear}>{bulk(ids, clear)}</BatchBar>
-        ) : hint && <p className="work-hint"><Icon name="help" /><span>{hint}</span></p>}
+        ) : hint && shown.length > 0 && <p className="work-hint"><Icon name="help" /><span>{hint}</span></p>}
         {shown.length ? shown.map((g) => (
           <WorkGroup key={g.id} group={g} selected={selected} openedId={openedId} selecting={selectable && ids.length > 0}
             selectable={selectable} toggle={toggle} setMany={setMany} />
@@ -151,7 +155,7 @@ export function WorkView({ state = 'ready', error, hint, groups, bulk, openedId,
               </button>
             </h2>
             <div className="work-history-body" id="work-history" hidden={!historyOpen}>
-              <RecordList empty={history.empty || t('work.historyEmpty')}>{history.children}</RecordList>
+              <RecordList empty={history.empty || t('work.historyEmpty')} step={HISTORY_STEP}>{history.children}</RecordList>
             </div>
           </section>
         )}

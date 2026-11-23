@@ -689,7 +689,8 @@ export default function UsersGroupsPage() {
       {canWrite('users') && !self(u) && (u.active
         ? <Btn tone="danger" icon="block" id="user-disable" onClick={() => setDisabling(u)}>{t('users.disableEllipsis')}</Btn>
         : <Btn icon="check" write id="user-enable" onClick={() => handleToggleUser(u)}>{t('users.activate')}</Btn>)}
-      {canDelete('users') && !self(u) && <Btn tone="danger" icon="block" id="user-delete" onClick={() => handleDeleteUser(u)}>{t('common.delete')}</Btn>}
+      {/* One filled red button in the head, as the mockup: the removal stays a quiet button, red text */}
+      {canDelete('users') && !self(u) && <Btn tone="quiet" write data-danger="" icon="block" id="user-delete" onClick={() => handleDeleteUser(u)}>{t('common.delete')}</Btn>}
     </>
   )
 
@@ -919,13 +920,19 @@ export default function UsersGroupsPage() {
         <PageHead title={groupsTab ? t('common.groups') : t('users.title')}
           total={groupsTab ? t('groups.unit', { count: groups.length }) : t('users.unit', { count: users.length })}
           intent={groupsTab ? t('groups.intent') : t('users.intent')}
+          more={[
+            { id: 'users-switch', icon: 'users', label: groupsTab ? t('users.accounts') : t('common.groups'), onClick: () => handleTabChange(groupsTab ? 'users' : 'groups') },
+            !groupsTab && { id: 'users-export', icon: 'download', label: t('users.exportList'), disabled: !users.length, onClick: handleExport },
+          ]}
           actions={<>
             <Btn tone="quiet" icon="users" id="users-switch" onClick={() => handleTabChange(groupsTab ? 'users' : 'groups')}>
               {groupsTab ? t('users.accounts') : t('common.groups')}
             </Btn>
             {!groupsTab && <Btn icon="download" data-action="users-export" disabled={!users.length || undefined} onClick={handleExport}>{t('users.exportList')}</Btn>}
-            {/* The head's main action is a short verb, as the mockup's « Émettre »: on a phone it sits beside the title on one line */}
-            {create && <Btn tone="primary" icon="plus" id="users-new" aria-label={create.label} onClick={create.onClick}>{t('common.create')}</Btn>}
+            {/* The head's main action is named in full; on a phone a short verb, as the mockup's « Émettre », beside the title on one line */}
+            {create && <Btn tone="primary" icon="plus" id="users-new" aria-label={create.label} onClick={create.onClick}>
+              <span className="wide-label">{create.label}</span><span className="phone-label">{t('common.create')}</span>
+            </Btn>}
           </>} />
         {groupsTab ? (
           <ListView label={t('common.groups')} caption={t('groups.caption')} icon="users" list={groupList} nameSort="name" loading={loading} toolbar={toolbar}

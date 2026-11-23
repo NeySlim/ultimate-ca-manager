@@ -116,6 +116,7 @@ export default function ReportsPage() {
     <Zone dock={dock} after={actions.dialog}>
       <PageHead title={t('reports.title')} total={state === 'ready' ? t('reports.work.total', { count: scheduledCount }) : ''}
         intent={t('reports.work.intent')}
+        more={[canExport && { id: 'report-pdf', icon: 'file', label: t('reports.work.customPdf'), onClick: () => actions.openPdf() }]}
         actions={(canExport || canSchedule) && (
           <>
             {canExport && <Btn icon="file" id="report-pdf" onClick={() => actions.openPdf('report-pdf')}>{t('reports.work.customPdf')}</Btn>}
@@ -153,7 +154,6 @@ export default function ReportsPage() {
               </>} />
           )),
         }}
-        after={canExport && <p className="phone-only"><Btn icon="file" onClick={() => actions.openPdf()}>{t('reports.work.customPdf')}</Btn></p>}
       />
     </Zone>
   )

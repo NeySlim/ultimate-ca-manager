@@ -132,6 +132,17 @@ describe('PoliciesPage on the mockup module list', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent('policies.policyName')
   })
 
+  // The rules' title is a block of its own: no separator is left at the head of its help
+  it('heads the rules help with its title and no orphan separator', async () => {
+    svc.list.mockResolvedValue({ data: [] })
+    render(<PoliciesPage />)
+    const empty = await screen.findByText('policies.noPolicies')
+    fireEvent.click(within(empty.closest('#empty-policies')).getByRole('button', { name: 'policies.createPolicy' }))
+    const title = within(await screen.findByRole('dialog')).getByText('policies.rules')
+    expect(title.parentElement.textContent).toMatch(/^policies\.rules policies\.rulesEnforcedHelp/)
+    expect(title.parentElement.textContent).not.toContain('·')
+  })
+
   it('shows a read failure with its request and Réessayer, which reads again', async () => {
     svc.list.mockRejectedValueOnce(Object.assign(new Error('Service Unavailable'), { status: 503 }))
     render(<PoliciesPage />)

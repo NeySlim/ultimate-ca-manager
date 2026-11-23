@@ -477,6 +477,7 @@
     "duplicateKey": "上方另一行已使用“{{key}}”：只能保存其中一行",
     "chooseFile": "选择文件…",
     "more": "更多",
+    "moreActions": "其他操作",
     "otherViews": "其他视图"
   },
   "commandPalette": {
@@ -3439,6 +3440,46 @@
       "setup": "配置",
       "system": "系统"
     },
+    "actions": {
+      "login_success": "登录成功",
+      "login_failure": "登录失败",
+      "logout": "已退出",
+      "session_locked": "会话已锁定",
+      "scep_challenge_read": "已查看 SCEP 质询",
+      "generate_crl": "已生成 CRL",
+      "generate_delta_crl": "已生成增量 CRL",
+      "crl_regenerate": "已重新生成 CRL",
+      "ca_created": "已创建证书颁发机构",
+      "ca_deleted": "已删除证书颁发机构",
+      "ca_updated": "已更新证书颁发机构",
+      "ca_imported": "已导入证书颁发机构",
+      "ca_revoked": "已吊销证书颁发机构",
+      "certificate_created": "已签发证书",
+      "cert_created": "已签发证书",
+      "certificate_issued": "已签发证书",
+      "cert_deleted": "已删除证书",
+      "certificate_deleted": "已删除证书",
+      "cert_revoked": "已吊销证书",
+      "certificate_imported": "已导入证书",
+      "cert_imported": "已导入证书",
+      "certificate_renewed": "已续期证书",
+      "certificate_auto_renewed": "已自动续期证书",
+      "csr_signed": "已签署请求",
+      "csr_create": "已创建请求",
+      "csr_generated": "已生成请求",
+      "csr_delete": "已删除请求",
+      "settings_update": "已更改设置",
+      "user_create": "已创建账户",
+      "user_delete": "已删除账户",
+      "user_update": "已更改账户",
+      "password_change": "已更改密码",
+      "system_backup": "备份",
+      "system_restore": "恢复",
+      "template_create": "已创建模板",
+      "template_delete": "已删除模板",
+      "truststore_add": "已添加信任锚",
+      "truststore_remove": "已移除信任锚"
+    },
     "format_csv": "每个事件一行",
     "format_json": "结构化数据"
   },
@@ -4421,7 +4462,8 @@
     },
     "templateHtmlSource": "HTML 源码",
     "templateFormat": "模板格式",
-    "templateVariablesLead": "变量："
+    "templateVariablesLead": "变量：",
+    "ocspRevocationTitle": "OCSP 与吊销"
   },
   "account": {
     "profile": "个人资料",
@@ -4638,6 +4680,12 @@
     "columns": {
       "permissions": "权限",
       "users": "用户"
+    },
+    "systemRoles": {
+      "admin": "拥有全部权限的完整系统访问",
+      "operator": "日常证书操作",
+      "auditor": "为合规与审计只读访问全部运行数据",
+      "viewer": "对证书和 CA 的基本读取访问"
     }
   },
   "hsm": {
@@ -7455,7 +7503,8 @@
       "ad_connector_health": "Active Directory 健康状况",
       "session_cleanup": "会话清理"
     },
-    "colNote": "上次结果"
+    "colNote": "上次结果",
+    "imminent": "即将"
   },
   "lint": {
     "action": "检查",
@@ -7977,7 +8026,8 @@
       "mfa": "双因素认证",
       "mfaOn": "开启:{{methods}}",
       "mfaOff": "关闭",
-      "endsAt": "{{date}} 结束"
+      "endsAt": "{{date}} 结束",
+      "lockInHours": "无操作 {{hours}} 小时后锁定"
     },
     "activity": {
       "label": "活动",
@@ -8593,7 +8643,8 @@
       "request": "请求 #{{id}}",
       "requests_one": "{{count}} 个请求",
       "requests_other": "{{count}} 个请求"
-    }
+    },
+    "historyMore": "再显示 {{count}} 条"
   },
   "atelier": {
     "name": "名称",

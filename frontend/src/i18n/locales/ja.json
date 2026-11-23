@@ -477,6 +477,7 @@
     "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません",
     "chooseFile": "ファイルを選択…",
     "more": "その他",
+    "moreActions": "その他の操作",
     "otherViews": "その他のビュー"
   },
   "commandPalette": {
@@ -3439,6 +3440,46 @@
       "setup": "構成",
       "system": "システム"
     },
+    "actions": {
+      "login_success": "サインイン成功",
+      "login_failure": "サインイン失敗",
+      "logout": "サインアウト",
+      "session_locked": "セッションをロック",
+      "scep_challenge_read": "SCEP チャレンジを参照",
+      "generate_crl": "CRL を生成",
+      "generate_delta_crl": "デルタ CRL を生成",
+      "crl_regenerate": "CRL を再生成",
+      "ca_created": "認証局を作成",
+      "ca_deleted": "認証局を削除",
+      "ca_updated": "認証局を更新",
+      "ca_imported": "認証局をインポート",
+      "ca_revoked": "認証局を失効",
+      "certificate_created": "証明書を発行",
+      "cert_created": "証明書を発行",
+      "certificate_issued": "証明書を発行",
+      "cert_deleted": "証明書を削除",
+      "certificate_deleted": "証明書を削除",
+      "cert_revoked": "証明書を失効",
+      "certificate_imported": "証明書をインポート",
+      "cert_imported": "証明書をインポート",
+      "certificate_renewed": "証明書を更新",
+      "certificate_auto_renewed": "証明書を自動更新",
+      "csr_signed": "要求に署名",
+      "csr_create": "要求を作成",
+      "csr_generated": "要求を生成",
+      "csr_delete": "要求を削除",
+      "settings_update": "設定を変更",
+      "user_create": "アカウントを作成",
+      "user_delete": "アカウントを削除",
+      "user_update": "アカウントを変更",
+      "password_change": "パスワードを変更",
+      "system_backup": "バックアップ",
+      "system_restore": "復元",
+      "template_create": "テンプレートを作成",
+      "template_delete": "テンプレートを削除",
+      "truststore_add": "トラストアンカーを追加",
+      "truststore_remove": "トラストアンカーを削除"
+    },
     "format_csv": "イベントごとに1行",
     "format_json": "構造化データ"
   },
@@ -4421,7 +4462,8 @@
     },
     "templateHtmlSource": "HTMLソース",
     "templateFormat": "テンプレート形式",
-    "templateVariablesLead": "変数: "
+    "templateVariablesLead": "変数: ",
+    "ocspRevocationTitle": "OCSP と失効"
   },
   "account": {
     "profile": "プロフィール",
@@ -4638,6 +4680,12 @@
     "columns": {
       "permissions": "権限",
       "users": "ユーザー"
+    },
+    "systemRoles": {
+      "admin": "すべての権限を持つシステム全体へのアクセス",
+      "operator": "日常的な証明書の操作",
+      "auditor": "コンプライアンスと監査のための全運用データへの読み取り専用アクセス",
+      "viewer": "証明書と CA への基本的な読み取りアクセス"
     }
   },
   "hsm": {
@@ -7455,7 +7503,8 @@
       "ad_connector_health": "Active Directoryの状態",
       "session_cleanup": "セッションのクリーンアップ"
     },
-    "colNote": "前回の結果"
+    "colNote": "前回の結果",
+    "imminent": "まもなく"
   },
   "lint": {
     "action": "検査",
@@ -7977,7 +8026,8 @@
       "mfa": "2 要素認証",
       "mfaOn": "オン: {{methods}}",
       "mfaOff": "オフ",
-      "endsAt": "{{date}} に終了"
+      "endsAt": "{{date}} に終了",
+      "lockInHours": "操作がない状態が {{hours}} 時間続くとロック"
     },
     "activity": {
       "label": "アクティビティ",
@@ -8593,7 +8643,8 @@
       "request": "リクエスト #{{id}}",
       "requests_one": "{{count}} 件のリクエスト",
       "requests_other": "{{count}} 件のリクエスト"
-    }
+    },
+    "historyMore": "さらに {{count}} 件を表示"
   },
   "atelier": {
     "name": "名前",

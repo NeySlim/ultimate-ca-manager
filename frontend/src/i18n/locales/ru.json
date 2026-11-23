@@ -479,6 +479,7 @@
     },
     "chooseFile": "Выбрать файл…",
     "more": "Ещё",
+    "moreActions": "Другие действия",
     "otherViews": "Другие разделы"
   },
   "commandPalette": {
@@ -3583,6 +3584,46 @@
       "setup": "Конфигурация",
       "system": "Система"
     },
+    "actions": {
+      "login_success": "Успешный вход",
+      "login_failure": "Неудачный вход",
+      "logout": "Выход",
+      "session_locked": "Сеанс заблокирован",
+      "scep_challenge_read": "Просмотр пароля SCEP",
+      "generate_crl": "CRL сформирован",
+      "generate_delta_crl": "Дельта-CRL сформирован",
+      "crl_regenerate": "CRL пересоздан",
+      "ca_created": "ЦС создан",
+      "ca_deleted": "ЦС удалён",
+      "ca_updated": "ЦС изменён",
+      "ca_imported": "ЦС импортирован",
+      "ca_revoked": "ЦС отозван",
+      "certificate_created": "Сертификат выпущен",
+      "cert_created": "Сертификат выпущен",
+      "certificate_issued": "Сертификат выпущен",
+      "cert_deleted": "Сертификат удалён",
+      "certificate_deleted": "Сертификат удалён",
+      "cert_revoked": "Сертификат отозван",
+      "certificate_imported": "Сертификат импортирован",
+      "cert_imported": "Сертификат импортирован",
+      "certificate_renewed": "Сертификат обновлён",
+      "certificate_auto_renewed": "Сертификат обновлён автоматически",
+      "csr_signed": "Запрос подписан",
+      "csr_create": "Запрос создан",
+      "csr_generated": "Запрос сформирован",
+      "csr_delete": "Запрос удалён",
+      "settings_update": "Параметры изменены",
+      "user_create": "Учётная запись создана",
+      "user_delete": "Учётная запись удалена",
+      "user_update": "Учётная запись изменена",
+      "password_change": "Пароль изменён",
+      "system_backup": "Резервное копирование",
+      "system_restore": "Восстановление",
+      "template_create": "Шаблон создан",
+      "template_delete": "Шаблон удалён",
+      "truststore_add": "Доверенный корень добавлен",
+      "truststore_remove": "Доверенный корень удалён"
+    },
     "format_csv": "Одна строка на событие",
     "format_json": "Структурированные данные"
   },
@@ -4575,7 +4616,8 @@
     },
     "templateHtmlSource": "Исходный код HTML",
     "templateFormat": "Формат шаблона",
-    "templateVariablesLead": "Переменные: "
+    "templateVariablesLead": "Переменные: ",
+    "ocspRevocationTitle": "OCSP и отзыв"
   },
   "account": {
     "profile": "Профиль",
@@ -4796,6 +4838,12 @@
     "columns": {
       "permissions": "Права",
       "users": "Пользователи"
+    },
+    "systemRoles": {
+      "admin": "Полный доступ к системе со всеми разрешениями",
+      "operator": "Повседневные операции с сертификатами",
+      "auditor": "Доступ только для чтения ко всем рабочим данным для соответствия и аудита",
+      "viewer": "Базовый доступ на чтение к сертификатам и ЦС"
     }
   },
   "hsm": {
@@ -7759,7 +7807,8 @@
       "ad_connector_health": "Состояние Active Directory",
       "session_cleanup": "Очистка сеансов"
     },
-    "colNote": "Последний результат"
+    "colNote": "Последний результат",
+    "imminent": "вот-вот"
   },
   "lint": {
     "action": "Линтер",
@@ -8325,7 +8374,8 @@
       "mfa": "Двухфакторная аутентификация",
       "mfaOn": "Включена: {{methods}}",
       "mfaOff": "Выключена",
-      "endsAt": "Завершится {{date}}"
+      "endsAt": "Завершится {{date}}",
+      "lockInHours": "Блокировка после {{hours}} ч бездействия"
     },
     "activity": {
       "label": "Активность",
@@ -9101,7 +9151,8 @@
       "requests_other": "{{count}} запроса",
       "requests_few": "{{count}} запроса",
       "requests_many": "{{count}} запросов"
-    }
+    },
+    "historyMore": "Показать ещё {{count}}"
   },
   "atelier": {
     "name": "Имя",

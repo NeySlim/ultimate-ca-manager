@@ -477,6 +477,7 @@
     "duplicateKey": "Otra fila anterior ya usa \"{{key}}\": solo una de ellas se puede guardar",
     "chooseFile": "Elegir un archivo…",
     "more": "Más",
+    "moreActions": "Otras acciones",
     "otherViews": "Otras vistas"
   },
   "commandPalette": {
@@ -3439,6 +3440,46 @@
       "setup": "Configuración",
       "system": "Sistema"
     },
+    "actions": {
+      "login_success": "Inicio de sesión correcto",
+      "login_failure": "Inicio de sesión fallido",
+      "logout": "Sesión cerrada",
+      "session_locked": "Sesión bloqueada",
+      "scep_challenge_read": "Desafío SCEP consultado",
+      "generate_crl": "CRL generada",
+      "generate_delta_crl": "CRL delta generada",
+      "crl_regenerate": "CRL regenerada",
+      "ca_created": "Autoridad creada",
+      "ca_deleted": "Autoridad eliminada",
+      "ca_updated": "Autoridad modificada",
+      "ca_imported": "Autoridad importada",
+      "ca_revoked": "Autoridad revocada",
+      "certificate_created": "Certificado emitido",
+      "cert_created": "Certificado emitido",
+      "certificate_issued": "Certificado emitido",
+      "cert_deleted": "Certificado eliminado",
+      "certificate_deleted": "Certificado eliminado",
+      "cert_revoked": "Certificado revocado",
+      "certificate_imported": "Certificado importado",
+      "cert_imported": "Certificado importado",
+      "certificate_renewed": "Certificado renovado",
+      "certificate_auto_renewed": "Certificado renovado automáticamente",
+      "csr_signed": "Solicitud firmada",
+      "csr_create": "Solicitud creada",
+      "csr_generated": "Solicitud generada",
+      "csr_delete": "Solicitud eliminada",
+      "settings_update": "Ajustes modificados",
+      "user_create": "Cuenta creada",
+      "user_delete": "Cuenta eliminada",
+      "user_update": "Cuenta modificada",
+      "password_change": "Contraseña cambiada",
+      "system_backup": "Copia de seguridad",
+      "system_restore": "Restauración",
+      "template_create": "Plantilla creada",
+      "template_delete": "Plantilla eliminada",
+      "truststore_add": "Ancla de confianza añadida",
+      "truststore_remove": "Ancla de confianza retirada"
+    },
     "format_csv": "Una fila por evento",
     "format_json": "Datos estructurados"
   },
@@ -4421,7 +4462,8 @@
     },
     "templateHtmlSource": "Código HTML",
     "templateFormat": "Formato de la plantilla",
-    "templateVariablesLead": "Variables: "
+    "templateVariablesLead": "Variables: ",
+    "ocspRevocationTitle": "OCSP y revocación"
   },
   "account": {
     "profile": "Perfil",
@@ -4638,6 +4680,12 @@
     "columns": {
       "permissions": "Derechos",
       "users": "Usuarios"
+    },
+    "systemRoles": {
+      "admin": "Acceso completo al sistema con todos los permisos",
+      "operator": "Operaciones diarias con certificados",
+      "auditor": "Acceso de solo lectura a todos los datos operativos para cumplimiento y auditoría",
+      "viewer": "Acceso básico de lectura a certificados y CA"
     }
   },
   "hsm": {
@@ -7455,7 +7503,8 @@
       "ad_connector_health": "Estado de Active Directory",
       "session_cleanup": "Limpieza de sesiones"
     },
-    "colNote": "Último resultado"
+    "colNote": "Último resultado",
+    "imminent": "inminente"
   },
   "lint": {
     "action": "Analizar",
@@ -7977,7 +8026,8 @@
       "mfa": "Doble factor",
       "mfaOn": "Activado: {{methods}}",
       "mfaOff": "Desactivado",
-      "endsAt": "Termina {{date}}"
+      "endsAt": "Termina {{date}}",
+      "lockInHours": "Se bloquea tras {{hours}} h de inactividad"
     },
     "activity": {
       "label": "Actividad",
@@ -8593,7 +8643,8 @@
       "request": "Solicitud n.º {{id}}",
       "requests_one": "{{count}} solicitud",
       "requests_other": "{{count}} solicitudes"
-    }
+    },
+    "historyMore": "Mostrar {{count}} más"
   },
   "atelier": {
     "name": "Nombre",

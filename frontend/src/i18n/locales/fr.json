@@ -912,6 +912,46 @@
       "setup": "Configuration",
       "system": "Système"
     },
+    "actions": {
+      "login_success": "Connexion réussie",
+      "login_failure": "Échec de connexion",
+      "logout": "Déconnexion",
+      "session_locked": "Session verrouillée",
+      "scep_challenge_read": "Défi SCEP consulté",
+      "generate_crl": "CRL générée",
+      "generate_delta_crl": "CRL delta générée",
+      "crl_regenerate": "CRL régénérée",
+      "ca_created": "AC créée",
+      "ca_deleted": "AC supprimée",
+      "ca_updated": "AC modifiée",
+      "ca_imported": "AC importée",
+      "ca_revoked": "AC révoquée",
+      "certificate_created": "Certificat émis",
+      "cert_created": "Certificat émis",
+      "certificate_issued": "Certificat émis",
+      "cert_deleted": "Certificat supprimé",
+      "certificate_deleted": "Certificat supprimé",
+      "cert_revoked": "Certificat révoqué",
+      "certificate_imported": "Certificat importé",
+      "cert_imported": "Certificat importé",
+      "certificate_renewed": "Certificat renouvelé",
+      "certificate_auto_renewed": "Certificat renouvelé automatiquement",
+      "csr_signed": "Demande signée",
+      "csr_create": "Demande créée",
+      "csr_generated": "Demande générée",
+      "csr_delete": "Demande supprimée",
+      "settings_update": "Paramètres modifiés",
+      "user_create": "Compte créé",
+      "user_delete": "Compte supprimé",
+      "user_update": "Compte modifié",
+      "password_change": "Mot de passe modifié",
+      "system_backup": "Sauvegarde",
+      "system_restore": "Restauration",
+      "template_create": "Modèle créé",
+      "template_delete": "Modèle supprimé",
+      "truststore_add": "Ancre de confiance ajoutée",
+      "truststore_remove": "Ancre de confiance retirée"
+    },
     "format_csv": "Une ligne par événement",
     "format_json": "Données structurées"
   },
@@ -2256,9 +2296,9 @@
     "renew": "Renouveler",
     "revoke": "Révoquer",
     "sign": "Signer",
-    "casShort": "ACs",
-    "csrsShort": "CSRs",
-    "certificatesShort": "Certs",
+    "casShort": "AC",
+    "csrsShort": "CSR",
+    "certificatesShort": "Certificats",
     "templatesShort": "Modèles",
     "usersShort": "Comptes",
     "cert": "Cert",
@@ -2390,6 +2430,7 @@
     },
     "chooseFile": "Choisir un fichier…",
     "more": "Plus",
+    "moreActions": "Autres actions",
     "otherViews": "Autres vues"
   },
   "compare": {
@@ -3337,6 +3378,12 @@
     "columns": {
       "permissions": "Droits",
       "users": "Comptes"
+    },
+    "systemRoles": {
+      "admin": "Accès complet au système, avec toutes les permissions",
+      "operator": "Opérations courantes sur les certificats",
+      "auditor": "Lecture seule de toutes les données d’exploitation, pour la conformité et l’audit",
+      "viewer": "Lecture des certificats et des AC"
     }
   },
   "scep": {
@@ -4485,7 +4532,8 @@
     },
     "templateHtmlSource": "Source HTML",
     "templateFormat": "Format du modèle",
-    "templateVariablesLead": "Variables : "
+    "templateVariablesLead": "Variables : ",
+    "ocspRevocationTitle": "OCSP et révocation"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée.",
@@ -7455,7 +7503,8 @@
       "ad_connector_health": "État d’Active Directory",
       "session_cleanup": "Nettoyage des sessions"
     },
-    "colNote": "Dernier résultat"
+    "colNote": "Dernier résultat",
+    "imminent": "imminente"
   },
   "lint": {
     "action": "Linter",
@@ -7977,7 +8026,8 @@
       "mfa": "Double authentification",
       "mfaOn": "Active : {{methods}}",
       "mfaOff": "Inactive",
-      "endsAt": "Fin le {{date}}"
+      "endsAt": "Fin le {{date}}",
+      "lockInHours": "Verrouillage après {{hours}} h d’inactivité"
     },
     "activity": {
       "label": "Activité",
@@ -8593,7 +8643,8 @@
       "request": "Demande #{{id}}",
       "requests_one": "{{count}} demande",
       "requests_other": "{{count}} demandes"
-    }
+    },
+    "historyMore": "Afficher {{count}} de plus"
   },
   "atelier": {
     "name": "Nom",

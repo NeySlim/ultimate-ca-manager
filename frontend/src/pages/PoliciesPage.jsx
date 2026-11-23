@@ -158,7 +158,7 @@ function PolicyDialog({ editing, cas, groups, keyTypeOptions, saving, onSave, on
               onChange={(e) => set('priority', parseInt(e.target.value, 10) || 100)} />
           </div>
           <p className="field full small muted">
-            <strong>{t('policies.rules')}</strong> · {t('policies.rulesEnforcedHelp')}
+            <strong>{t('policies.rules')}</strong> {t('policies.rulesEnforcedHelp')}
             {!(formData.operations || []).some(op => op === 'issuance' || op === 'renewal') && <> {t('policies.rulesRevocationOnly')}</>}
           </p>
           <div className="field">

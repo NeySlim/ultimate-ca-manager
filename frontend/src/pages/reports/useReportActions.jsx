@@ -258,6 +258,11 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
       )}
       {dlg.kind === 'pdf' && (
         <form noValidate onSubmit={(e) => { e.preventDefault(); buildPdf() }}>
+          {/* Ticking all or none acts on the list: above it, small buttons, the dialog's foot keeps its two buttons */}
+          <p className="pdf-select">
+            <button type="button" className="btn-sm" data-action="pdf-all" onClick={() => setForm((f) => ({ ...f, sections: [...pdfSections] }))}>{t('common.selectAll')}</button>
+            <button type="button" className="btn-sm" data-action="pdf-none" onClick={() => setForm((f) => ({ ...f, sections: [] }))}>{t('common.deselectAll')}</button>
+          </p>
           <fieldset className="columns-list">
             <legend className="sr-only">{t('reports.pdf.sections')}</legend>
             {pdfSections.map((id) => (
@@ -269,8 +274,6 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
             ))}
           </fieldset>
           <div className="modal-actions">
-            <Btn tone="quiet" onClick={() => setForm((f) => ({ ...f, sections: [...pdfSections] }))}>{t('common.selectAll')}</Btn>
-            <Btn tone="quiet" onClick={() => setForm((f) => ({ ...f, sections: [] }))}>{t('common.deselectAll')}</Btn>
             {cancel}
             <Btn type="submit" tone="primary" icon="download" write={false} disabled={busy || !form.sections?.length || undefined}>{t('reports.pdf.generateCustom')}</Btn>
           </div>

@@ -52,7 +52,7 @@ export function FiltersDialog({
           <div className="columns-list compare-scroll" style={{ maxHeight: 220 }}>
             {list.map((a) => (
               <label key={a} className="checkbox-line">
-                <input type="checkbox" checked={picked.has(a)} onChange={() => toggle(a)} />{actionLabel(a)}
+                <input type="checkbox" checked={picked.has(a)} onChange={() => toggle(a)} />{actionLabel(a, t)}
               </label>
             ))}
           </div>

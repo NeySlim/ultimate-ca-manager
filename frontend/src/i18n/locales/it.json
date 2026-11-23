@@ -477,6 +477,7 @@
     "duplicateKey": "Un'altra riga qui sopra usa già \"{{key}}\": solo una delle due può essere salvata",
     "chooseFile": "Scegli un file…",
     "more": "Altro",
+    "moreActions": "Altre azioni",
     "otherViews": "Altre viste"
   },
   "commandPalette": {
@@ -3439,6 +3440,46 @@
       "setup": "Configurazione",
       "system": "Sistema"
     },
+    "actions": {
+      "login_success": "Accesso riuscito",
+      "login_failure": "Accesso non riuscito",
+      "logout": "Disconnessione",
+      "session_locked": "Sessione bloccata",
+      "scep_challenge_read": "Challenge SCEP letto",
+      "generate_crl": "CRL generata",
+      "generate_delta_crl": "CRL delta generata",
+      "crl_regenerate": "CRL rigenerata",
+      "ca_created": "Autorità creata",
+      "ca_deleted": "Autorità eliminata",
+      "ca_updated": "Autorità modificata",
+      "ca_imported": "Autorità importata",
+      "ca_revoked": "Autorità revocata",
+      "certificate_created": "Certificato emesso",
+      "cert_created": "Certificato emesso",
+      "certificate_issued": "Certificato emesso",
+      "cert_deleted": "Certificato eliminato",
+      "certificate_deleted": "Certificato eliminato",
+      "cert_revoked": "Certificato revocato",
+      "certificate_imported": "Certificato importato",
+      "cert_imported": "Certificato importato",
+      "certificate_renewed": "Certificato rinnovato",
+      "certificate_auto_renewed": "Certificato rinnovato automaticamente",
+      "csr_signed": "Richiesta firmata",
+      "csr_create": "Richiesta creata",
+      "csr_generated": "Richiesta generata",
+      "csr_delete": "Richiesta eliminata",
+      "settings_update": "Impostazioni modificate",
+      "user_create": "Account creato",
+      "user_delete": "Account eliminato",
+      "user_update": "Account modificato",
+      "password_change": "Password modificata",
+      "system_backup": "Backup",
+      "system_restore": "Ripristino",
+      "template_create": "Modello creato",
+      "template_delete": "Modello eliminato",
+      "truststore_add": "Ancora di fiducia aggiunta",
+      "truststore_remove": "Ancora di fiducia rimossa"
+    },
     "format_csv": "Una riga per evento",
     "format_json": "Dati strutturati"
   },
@@ -4421,7 +4462,8 @@
     },
     "templateHtmlSource": "Sorgente HTML",
     "templateFormat": "Formato del modello",
-    "templateVariablesLead": "Variabili: "
+    "templateVariablesLead": "Variabili: ",
+    "ocspRevocationTitle": "OCSP e revoca"
   },
   "account": {
     "profile": "Profilo",
@@ -4638,6 +4680,12 @@
     "columns": {
       "permissions": "Permessi",
       "users": "Utenti"
+    },
+    "systemRoles": {
+      "admin": "Accesso completo al sistema con tutti i permessi",
+      "operator": "Operazioni quotidiane sui certificati",
+      "auditor": "Accesso in sola lettura a tutti i dati operativi per conformità e audit",
+      "viewer": "Accesso base in lettura a certificati e CA"
     }
   },
   "hsm": {
@@ -7455,7 +7503,8 @@
       "ad_connector_health": "Stato di Active Directory",
       "session_cleanup": "Pulizia delle sessioni"
     },
-    "colNote": "Ultimo risultato"
+    "colNote": "Ultimo risultato",
+    "imminent": "imminente"
   },
   "lint": {
     "action": "Analizza",
@@ -7977,7 +8026,8 @@
       "mfa": "Due fattori",
       "mfaOn": "Attiva: {{methods}}",
       "mfaOff": "Disattivata",
-      "endsAt": "Termina {{date}}"
+      "endsAt": "Termina {{date}}",
+      "lockInHours": "Si blocca dopo {{hours}} h di inattività"
     },
     "activity": {
       "label": "Attività",
@@ -8593,7 +8643,8 @@
       "request": "Richiesta #{{id}}",
       "requests_one": "{{count}} richiesta",
       "requests_other": "{{count}} richieste"
-    }
+    },
+    "historyMore": "Mostra altri {{count}}"
   },
   "atelier": {
     "name": "Nome",

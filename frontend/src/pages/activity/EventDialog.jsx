@@ -17,7 +17,7 @@ export function EventDialog({ log, locale, resource, onClose, onInspect, canInsp
   const id = Number(log.resource_id)
   const inspect = target && Number.isInteger(id) && id > 0 && canInspect(target)
   return (
-    <AtelierDialog title={actionLabel(log.action) || t('audit.event')} size="narrow" onClose={onClose} testId="audit-event-dialog">
+    <AtelierDialog title={actionLabel(log.action, t) || t('audit.event')} size="narrow" onClose={onClose} testId="audit-event-dialog">
       <div className="event-detail">
         {log.details && <p>{log.details}</p>}
         <Facts items={[

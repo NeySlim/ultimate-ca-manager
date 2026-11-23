@@ -49,6 +49,27 @@ describe('operation types', () => {
     expect(actionLabel('key_recovery.approve_denied')).toBe('Key recovery approve denied')
     expect(actionLabel('')).toBe('')
   })
+
+  // The language names the operation when it can; else the code, its acronyms as the interface writes them
+  it('names an operation in the language, an unnamed code with its acronyms in capitals', () => {
+    const labels = { 'audit.actions.login_success': 'Connexion réussie', 'audit.actions.certificate_issued': 'Certificat émis' }
+    const t = (key, opts) => labels[key] ?? opts?.defaultValue ?? key
+    expect(actionLabel('login_success', t)).toBe('Connexion réussie')
+    expect(actionLabel('certificate.issued', t)).toBe('Certificat émis')
+    expect(actionLabel('scep_challenge_read', t)).toBe('SCEP challenge read')
+    expect(actionLabel('acme.order.create', t)).toBe('ACME order create')
+    expect(actionLabel('mtls_cert_create', (k) => k)).toBe('mTLS cert create')
+  })
+
+  // Every label the locales give is a code the journal knows, in all ten languages
+  it('gives each named operation in every language', () => {
+    const locales = import.meta.glob('../../../i18n/locales/*.json', { eager: true, import: 'default' })
+    const keys = (d) => Object.keys(d.audit.actions || {}).sort()
+    const en = keys(locales['../../../i18n/locales/en.json'])
+    expect(en.length).toBeGreaterThan(20)
+    expect(Object.keys(locales)).toHaveLength(10)
+    for (const d of Object.values(locales)) expect(keys(d)).toEqual(en)
+  })
 })
 
 describe('dates of the journal', () => {

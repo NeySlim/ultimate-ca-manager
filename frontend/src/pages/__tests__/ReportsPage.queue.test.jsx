@@ -66,10 +66,10 @@ describe('ReportsPage queue', () => {
     const { container } = renderPage()
     expect(await screen.findByText('2 rapports planifiés')).toBeInTheDocument()
     expect(screen.getByText('Cochez plusieurs rapports pour les télécharger ensemble ; les chiffres suivent l’inventaire, comme la vue d’ensemble.')).toBeInTheDocument()
-    // The PDF composer leaves the head on a phone for a line under the queue
     expect(container.querySelector('.page-head .actions #report-pdf')).toHaveTextContent('Composer un PDF…')
-    // The mockup's phone head keeps the primary button only: the composer stays reachable under the queue
-    expect(container.querySelector('.work-view > .phone-only')).toHaveTextContent('Composer un PDF…')
+    // The mockup's phone head keeps the primary button only: the composer is in the head's « ⋯ » menu, as the journal's actions
+    expect(container.querySelector('.page-head .page-more [data-more="report-pdf"]')).toHaveTextContent('Composer un PDF…')
+    expect(container.querySelector('.work-view > .phone-only')).toBeNull()
     expect(screen.getByText('Inventaires et échéances planifiés.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Planifier un rapport' })).toHaveClass('btn', 'primary')
   })
@@ -172,6 +172,19 @@ describe('ReportsPage queue', () => {
     fireEvent.click(within(dialog).getByLabelText('Certificats expirants'))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Générer le PDF' }))
     await waitFor(() => expect(api.generateCustomPDF).toHaveBeenCalledWith({ sections: ['expiry'] }))
+  })
+
+  // Ticking all or none acts on the list: small buttons above it, the foot keeps Annuler and Générer
+  it('puts the select-all and select-none above the sections, the foot keeping its two buttons', async () => {
+    renderPage()
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Composer un PDF…' }))[0])
+    const dialog = await screen.findByRole('dialog')
+    const row = dialog.querySelector('.pdf-select')
+    expect(row.nextElementSibling).toHaveClass('columns-list')
+    expect([...row.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Tout sélectionner', 'Tout désélectionner'])
+    expect([...dialog.querySelectorAll('.modal-actions .btn')].map((b) => b.textContent)).toEqual(['Annuler', 'Générer le PDF'])
+    fireEvent.click(within(row).getByRole('button', { name: 'Tout sélectionner' }))
+    expect(within(dialog).getByLabelText('Certificats expirants')).toBeChecked()
   })
 
   it('offers no action to a reader of the audit log', async () => {
