@@ -49,7 +49,7 @@ export default function UsersGroupsPage() {
   const { user: me } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
   const { muteToasts } = useWebSocket()
   
   // Tab state
@@ -693,8 +693,9 @@ export default function UsersGroupsPage() {
     </>
   )
 
+  // The server shows a user's effective permissions to admin:users only
   const userSections = [
-    ['profile', t('users.tabs.profile')], ['permissions', t('users.tabs.permissions')], ['keys', t('users.apiKeys.title')],
+    ['profile', t('users.tabs.profile')], ...(hasPermission('admin:users') ? [['permissions', t('users.tabs.permissions')]] : []), ['keys', t('users.apiKeys.title')],
     ['security', t('common.security')], ...(canWrite('users') ? [['mtls', t('users.mtls.title')]] : []),
   ]
 
@@ -707,7 +708,7 @@ export default function UsersGroupsPage() {
         {(section === 'profile' || !userSections.some(([id]) => id === section)) && (
           <UserProfile user={selectedUser} self={self(selectedUser)} canWrite={canWrite('users')} sso={sso} />
         )}
-        {section === 'permissions' && <UserPermissions user={selectedUser} />}
+        {section === 'permissions' && userSections.some(([id]) => id === 'permissions') && <UserPermissions user={selectedUser} />}
         {section === 'keys' && <UserApiKeys user={selectedUser} canRevoke={canWrite('users')} />}
         {section === 'security' && (
           <div className="module-detail">
