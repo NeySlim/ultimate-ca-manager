@@ -19,7 +19,7 @@ export default {
         items: [
           { label: "Exportar el registro", text: "CSV o JSON, con la búsqueda y los filtros actuales, 10 000 entradas como máximo; en un teléfono está en el menú « ⋯ »" },
           { label: "Verificar integridad", text: "En el menú « ⋯ »: comprueba la cadena de hashes del registro; en un registro grande se ejecuta en segundo plano, y su progreso y Cancelar verificación aparecen en la línea de resumen" },
-          { label: "Limpiar registros antiguos", text: "En el menú « ⋯ », con el derecho de eliminar el registro: elimina las entradas anteriores a un período de retención de 30 a 365 días" },
+          { label: "Limpiar registros antiguos", text: "En el menú « ⋯ », con el derecho de eliminar el registro: elimina las entradas anteriores a un período de retención de 30 a 3650 días" },
         ]
       },
     ],
@@ -76,7 +76,7 @@ En un teléfono el botón de la cabecera está oculto: la exportación está en 
 
 En el menú « ⋯ », con el derecho de eliminar el registro:
 1. Elija **Limpiar registros antiguos…**
-2. Indique el período de retención en días (30 a 365)
+2. Indique el período de retención en días (30 a 3650)
 3. Elija **Eliminar registros antiguos**
 
 > ⚠ La limpieza es irreversible. Exporte antes las entradas que necesite.
