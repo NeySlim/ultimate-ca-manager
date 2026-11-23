@@ -220,6 +220,25 @@ class TestHttpsCertInfo:
         data = assert_success(r)
         assert 'fingerprint' in data
 
+    def test_fingerprint_is_whole(self, auth_client, tmp_path, monkeypatch):
+        # The interface copies the fingerprint: it must be the whole SHA-256, not its first bytes
+        import datetime
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, 'ucm.example.test')])
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+                .serial_number(x509.random_serial_number()).not_valid_before(now)
+                .not_valid_after(now + datetime.timedelta(days=30)).sign(key, hashes.SHA256()))
+        path = tmp_path / 'https_cert.pem'
+        path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        monkeypatch.setenv('HTTPS_CERT_PATH', str(path))
+        data = assert_success(auth_client.get('/api/v2/system/https/cert-info'))
+        digest = cert.fingerprint(hashes.SHA256()).hex().upper()
+        assert data['fingerprint'] == ':'.join(digest[i:i + 2] for i in range(0, len(digest), 2))
+
     def test_has_validity_dates(self, auth_client):
         r = auth_client.get('/api/v2/system/https/cert-info')
         data = assert_success(r)
