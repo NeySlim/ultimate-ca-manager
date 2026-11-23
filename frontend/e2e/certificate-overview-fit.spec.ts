@@ -5,8 +5,8 @@ import { test, expect, createCA, issueCert, uid } from './support/fixtures'
 // in the dock at the right at its default width, at 1440 x 900 and 1280 x 800 (INSP-FIT)
 
 // The page reads the dock at the right; the shared account's preference is never written
-async function dockRight(page) {
-  const right = { position: 'right', height: 278, width: 460 }
+async function dockRight(page, width = 460) {
+  const right = { position: 'right', height: 278, width }
   await page.route('**/api/v2/account/preferences', async (route) => {
     if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' })
     const response = await route.fetch()
@@ -86,3 +86,34 @@ for (const [w, h] of [[1440, 900], [1280, 800]]) {
     })
   })
 }
+
+test.describe('in the dock at the right at its narrowest', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  // « More details » in one column at 360 px: a DN on the panel's width, no word of an ordinary value cut, no button in a value
+  test('lays « More details » out in one column', async ({ page, api }) => {
+    await dockRight(page, 360)
+    const cert = await ordinaryCertificate(api)
+    const dock = await openInDock(page, cert.common_name)
+    await dock.getByRole('button', { name: 'More details' }).press('Enter')
+    const more = dock.locator('.advanced-panel')
+    const columns = await more.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)
+    expect(columns).toBe(1)
+    const subject = more.locator('dl.kv > .row', { has: page.locator('dt', { hasText: /^Subject DN$/ }) })
+    const term = (await subject.locator('dt').boundingBox())!
+    const value = (await subject.locator('dd.v').boundingBox())!
+    expect(value.y, 'the DN under its term').toBeGreaterThan(term.y + term.height - 1)
+    expect(value.width, 'the DN on the panel width').toBeGreaterThan(250)
+    const cut = await more.evaluate((root) => {
+      const cv = document.createElement('canvas').getContext('2d')!
+      return [...root.querySelectorAll('dl.kv > .row > dd.v')].filter((d) => !d.querySelector('.code-value')).flatMap((d) => {
+        const c = getComputedStyle(d); cv.font = `${c.fontWeight} ${c.fontSize} ${c.fontFamily}`
+        const w = d.getBoundingClientRect().width
+        return (d as HTMLElement).innerText.split(/\s+/).filter((x) => x && cv.measureText(x).width > w + 1)
+      })
+    })
+    expect(cut).toEqual([])
+    await expect(more.locator('dd.v button:not(.cp)')).toHaveCount(0)
+    await expect(dock.locator('dl.props')).toHaveCount(0)
+  })
+})

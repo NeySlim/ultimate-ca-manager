@@ -122,3 +122,35 @@ describe('the enrolment dock in the URL', () => {
     expect(again.where()).toBe('/user-certificates?item=4')
   })
 })
+
+describe('the enrolment dock in typed rows (KV-3)', () => {
+  const FP = 'AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01'
+  const rowIn = (dock, label) => within(dock).getByText(label, { selector: 'dt' }).closest('div.row')
+  const openRow = async (row) => {
+    getAll.mockResolvedValue({ data: { items: [row], total: 1 } })
+    ROWS.splice(0, ROWS.length, row)
+    const { container } = renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: row.name }))
+    return waitFor(() => { const d = container.querySelector('aside#inspector'); expect(d).toBeTruthy(); return d })
+  }
+
+  it('puts the DNs on long rows, the serial and the fingerprint in chips, the absences in grey', async () => {
+    const saved = [...ROWS]
+    try {
+      const dock = await openRow({ ...saved[0], description: '', cert_subject: 'CN=admin,O=Example', cert_fingerprint: FP, has_private_key: false, last_used_at: null })
+      await waitFor(() => expect(within(dock).getByText('Fingerprint', { selector: 'dt' })).toBeTruthy())
+      expect(dock.querySelector('dl.props')).toBeNull()
+      expect(rowIn(dock, 'Subject')).toHaveClass('long')
+      expect(rowIn(dock, 'Issuer')).toHaveClass('long')
+      expect(rowIn(dock, 'Serial Number').querySelector('dd.v .code-value.hex')).toHaveTextContent('FF')
+      expect(rowIn(dock, 'Serial Number')).not.toHaveClass('long')
+      expect(rowIn(dock, 'Fingerprint')).toHaveClass('long')
+      expect(rowIn(dock, 'Fingerprint').querySelector('dd.v .code-value.hex')).toBeTruthy()
+      expect(rowIn(dock, 'Description').querySelector('dd.absent')).toHaveTextContent('—')
+      expect(rowIn(dock, 'Last Used').querySelector('dd.absent')).toHaveTextContent('Never')
+      expect(rowIn(dock, 'Private Key Stored').querySelector('dd.absent')).toHaveTextContent('No')
+    } finally {
+      ROWS.splice(0, ROWS.length, ...saved)
+    }
+  })
+})

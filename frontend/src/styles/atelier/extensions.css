@@ -436,6 +436,8 @@
 @container (max-width:960px){.atl .detail-overview{gap:20px;grid-template-columns:1fr 1.2fr;grid-template-rows:auto 1fr}.atl .detail-overview>section+section{padding-left:20px}.atl .detail-overview>section:nth-child(2){grid-column:2;grid-row:1/span 2}.atl .detail-overview .overview-chain{display:block;grid-column:1;grid-row:2;border-left:0;border-top:1px solid var(--line);padding:18px 0 0}}
 @container (max-width:740px){.atl .extensions{grid-template-columns:1fr;gap:12px}}
 @container (max-width:540px){.atl .detail-overview{display:flex;flex-direction:column;gap:20px}.atl .detail-overview>section+section{border-left:0;border-top:1px solid var(--line);padding:18px 0 0}}
+/* « More details » in one column in a narrow panel, as the mockup's form does under 800 px: a DN never in a half. */
+@container (max-width:540px){.atl .detail-panel>.advanced>.advanced-panel{grid-template-columns:minmax(0,1fr)}}
 /* « More details » follows the overview; folded in the dock at the right or a floating window, it stays on screen at
    the panel's foot while what is above it scrolls (the mockup's sticky save bar). */
 .atl .detail-overview+.advanced{margin-top:18px}

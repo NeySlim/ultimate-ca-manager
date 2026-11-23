@@ -4,8 +4,9 @@
  * draw the same ones.
  */
 import { useTranslation } from 'react-i18next'
-import { Pill, Section, Props } from '../../components/atelier'
+import { Pill, Section, Facts } from '../../components/atelier'
 import { certificateKeyLabel, serialHex } from '../../lib/certificateDetail'
+import { signatureHashName } from '../../lib/signatureName'
 import { dateOf } from '../admin/adminDates'
 import { PemPanel } from '../certificates/inspector/PemPanel'
 
@@ -27,21 +28,25 @@ export function CsrSections({ csr, signed, section }) {
   const summary = signed
     ? t('csrs.module.signedSummary', { ca: csr.signed_by || csr.issuer_name || '—', date: dateOf(csr.signed_at || csr.valid_from, locale) || '—' })
     : (csr.descr || t('csrs.module.pendingSummary'))
+  // A value the request has, else the absence in grey
+  const serial = serialHex(csr.serial_number)
+  const fact = (label, value) => (value ? [label, value] : { label, absent: '—' })
   const sans = csr.sans?.length ? csr.sans : (csr.san_combined ? csr.san_combined.split(',').map((s) => s.trim()).filter(Boolean) : [])
   return (
     <>
       {section === 'overview' && (
         <div className="module-detail">
           <Section title={t('atelier.properties')}>
-            <Props items={[
+            <Facts items={[
               [t('csrs.module.subject'), csrSubject(t, csr)],
-              [t('csrs.module.requester'), csrRequester(csr)],
-              [t('csrs.module.key'), csrKey(csr)],
-              [t('csrs.module.submitted'), dateOf(csr.created_at, locale) || '—'],
+              fact(t('csrs.module.requester'), csr.requester || csr.created_by),
+              fact(t('csrs.module.key'), certificateKeyLabel(csr)),
+              fact(t('csrs.module.submitted'), dateOf(csr.created_at, locale)),
               [t('atelier.state'), csrPill(t, csr, signed)],
-              signed && [t('common.signedBy'), csr.signed_by || csr.issuer_name || '—'],
-              signed && [t('common.expires'), dateOf(csr.valid_to, locale) || '—'],
-              signed && csr.serial_number && [t('common.serial'), <span key="serial" className="mono">{serialHex(csr.serial_number)}</span>],
+              signed && fact(t('common.signedBy'), csr.signed_by || csr.issuer_name),
+              signed && fact(t('common.expires'), dateOf(csr.valid_to, locale)),
+              // A serial longer than a short value goes under its term in a narrow panel
+              signed && serial && { label: t('common.serial'), value: serial, kind: 'hex', long: serial.length > 23 },
             ]} />
           </Section>
           <Section title={t('atelier.summary')}><p className="summary">{summary}</p></Section>
@@ -50,14 +55,15 @@ export function CsrSections({ csr, signed, section }) {
       {section === 'details' && (
         <div className="module-detail">
           <Section title={t('common.subject')}>
-            <Props items={[
-              [t('common.organization'), csr.organization || '—'],
-              [t('common.orgUnit'), csr.organizational_unit || '—'],
-              [t('common.country'), csr.country || '—'],
-              [t('common.state'), csr.state || '—'],
-              [t('common.locality'), csr.locality || '—'],
-              [t('common.email'), csr.email || '—'],
-              [t('common.signature'), csr.signature_algorithm || '—'],
+            <Facts items={[
+              fact(t('common.organization'), csr.organization),
+              fact(t('common.orgUnit'), csr.organizational_unit),
+              fact(t('common.country'), csr.country),
+              fact(t('common.state'), csr.state),
+              fact(t('common.locality'), csr.locality),
+              fact(t('common.email'), csr.email),
+              // Named by its hash, as a certificate's signature is
+              fact(t('common.signature'), csr.signature_algorithm && signatureHashName(csr.signature_algorithm)),
             ]} />
           </Section>
           <Section title={t('common.subjectAltNames')}>
