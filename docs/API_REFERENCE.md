@@ -3203,7 +3203,7 @@ GET /api/v2/settings/public-endpoints
 PATCH /api/v2/settings/public-endpoints
 POST /api/v2/settings/public-endpoints/preflight
 ```
-`GET` (`read:settings`) returns the effective public URLs, CORS origins and host-role status. `PATCH` (`write:settings`) updates the admin, protocol and ACME public endpoint settings with the same body and validation as `PATCH /api/v2/settings/general`. `preflight` (`write:settings`) runs DNS and TLS diagnostics for the configured admin and ACME hosts.
+`GET` (`read:settings`) returns the effective public URLs, CORS origins and host-role status. `cors_origins` lists the origins the API's CORS answers and the Socket.IO channel accept, read from the settings at each request: `localhost`, the host's own names, the admin base URL as written and with the port UCM serves, the protocol base URL and `CORS_EXTRA_ORIGINS`, each with its scheme and host in lower case and without a default port (`https://ucm.example.com:443` is listed as `https://ucm.example.com`). `PATCH` (`write:settings`) updates the admin, protocol and ACME public endpoint settings with the same body and validation as `PATCH /api/v2/settings/general`. `preflight` (`write:settings`) runs DNS and TLS diagnostics for the configured admin and ACME hosts.
 
 ### Settings Audit Logs
 ```http
