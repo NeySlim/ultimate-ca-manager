@@ -1937,7 +1937,7 @@
     "editUser": "Редагувати користувача",
     "deleteUser": "Видалити користувача",
     "admin": "Адміністратор",
-    "noUsers": "Користувачів не знайдено",
+    "noUsers": "Користувачів немає",
     "resetPassword": "Скинути пароль",
     "activate": "Активувати",
     "usernamePlaceholder": "ivanpetrov",
@@ -2067,7 +2067,8 @@
       "auditor": "Доступ лише для читання до всіх операційних даних, зокрема журналу.",
       "viewer": "Доступ лише для читання до сертифікатів, ЦС і шаблонів."
     },
-    "customRoleOf": "Власна роль: {{name}}"
+    "customRoleOf": "Власна роль: {{name}}",
+    "noUsersDescription": "Створіть локальний обліковий запис або дозвольте вхід через налаштованого провайдера SSO."
   },
   "groups": {
     "group": "Група",
@@ -2079,7 +2080,7 @@
     "permissionsHelp": "Дозволи, що надаються кожному учаснику цієї групи додатково до його власної ролі.",
     "noPermissions": "Дозволи не надано",
     "members": "Учасники",
-    "noGroups": "Групи не знайдено",
+    "noGroups": "Груп немає",
     "noMembers": "Учасників не знайдено",
     "membersUpdated": "Учасників оновлено: {{added}} додано, {{removed}} вилучено",
     "namePlaceholder": "розробники",
@@ -2114,7 +2115,8 @@
       "export": "Експорт",
       "admin": "Адміністрування"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "Група надає ту саму роль одразу кільком обліковим записам."
   },
   "acme": {
     "title": "Протокол ACME",
@@ -4617,7 +4619,8 @@
     "templateHtmlSource": "Вихідний код HTML",
     "templateFormat": "Формат шаблону",
     "templateVariablesLead": "Змінні: ",
-    "ocspRevocationTitle": "OCSP і відкликання"
+    "ocspRevocationTitle": "OCSP і відкликання",
+    "interfaceLanguage": "Мова інтерфейсу"
   },
   "account": {
     "profile": "Профіль",
@@ -4669,11 +4672,6 @@
     "noCertificatesEnrolled": "Немає зареєстрованих клієнтських сертифікатів",
     "deleteCertConfirm": "Видалити цей клієнтський сертифікат?",
     "certificateDeleted": "Сертифікат видалено",
-    "apiKeyTips": [
-      "Ключі API надають програмний доступ до UCM",
-      "Зберігайте ключі в таємниці та регулярно змінюйте їх",
-      "Для кожного ключа можна задати власний термін дії"
-    ],
     "yourAPIKeys": "Ваші ключі API",
     "createAPIKey": "Створити ключ API",
     "createKey": "Створити ключ",
@@ -4762,7 +4760,8 @@
     "tocLabel": "Розділи облікового запису",
     "apiKeysIntent": "Ключі, які викликають API від імені вашого облікового запису.",
     "profileSaved": "Профіль збережено.",
-    "profileReset": "Зміни профілю скасовано."
+    "profileReset": "Зміни профілю скасовано.",
+    "apiKeyHint": "Ключі API надають програмний доступ до UCM. Зберігайте ключі в таємниці та регулярно змінюйте їх. Для кожного ключа можна задати власний термін дії."
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",
@@ -4772,8 +4771,8 @@
     "deleteRole": "Видалити роль",
     "roleName": "Назва ролі",
     "assignedUsers": "Призначені користувачі",
-    "noRoles": "Немає визначених ролей",
-    "noRolesDescription": "Створюйте власні ролі для детального керування доступом",
+    "noRoles": "Ролей немає",
+    "noRolesDescription": "Створюйте власні ролі для детального керування доступом.",
     "searchRoles": "Пошук ролей...",
     "inherits": "Успадковує",
     "inheritsFrom": "Успадковує від",
@@ -4934,18 +4933,18 @@
       "softhsmFips": "SoftHSM не є валідованим модулем: у режимі FIPS ключі на ньому не захищені відповідно до FIPS."
     },
     "syncingKeys": "Синхронізація...",
-    "unit_one": "{{count}} розташування",
-    "unit_other": "{{count}} розташувань",
-    "unit_few": "{{count}} розташування",
-    "unit_many": "{{count}} розташувань",
+    "unit_one": "{{count}} провайдер",
+    "unit_other": "{{count}} провайдера",
+    "unit_few": "{{count}} провайдери",
+    "unit_many": "{{count}} провайдерів",
     "keyCount_one": "{{count}} ключ",
     "keyCount_other": "{{count}} ключів",
     "keyCount_few": "{{count}} ключі",
     "keyCount_many": "{{count}} ключів",
-    "range_one": "{{shown}} із {{count}} розташування",
-    "range_other": "{{shown}} із {{count}} розташувань",
-    "range_few": "{{shown}} із {{count}} розташувань",
-    "range_many": "{{shown}} із {{count}} розташувань",
+    "range_one": "{{shown}} із {{count}} провайдера",
+    "range_other": "{{shown}} із {{count}} провайдера",
+    "range_few": "{{shown}} із {{count}} провайдерів",
+    "range_many": "{{shown}} із {{count}} провайдерів",
     "states": {
       "connected": "Підключено",
       "error": "Помилка",

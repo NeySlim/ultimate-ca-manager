@@ -144,7 +144,10 @@ describe('Backup: the archives in the module table', () => {
   it('keeps download and delete on each card of a phone', () => {
     mocks.mobile.isMobile = true
     const p = backup({ backups: archives })
-    const card = screen.getByText('a.ucmbkp').closest('.mobile-record')
+    const name = screen.getByText('a.ucmbkp')
+    // The name wraps after its separators, never inside its extension
+    expect(name.querySelector('wbr')).not.toBeNull()
+    const card = name.closest('.mobile-record')
     // Its date and its size named by their columns (M3)
     expect([...card.querySelectorAll('.row-meta .fact-label')].map((l) => l.textContent)).toEqual(['table.fullCreated', 'settings.backupSize'])
     fireEvent.click(within(card).getByTitle('common.download'))
@@ -194,7 +197,7 @@ describe('Appearance', () => {
     expect(mocks.theme.setThemeFamily).toHaveBeenCalledWith('aurore')
     fireEvent.click(within(screen.getByRole('group', { name: 'settings.appearanceMode' })).getByRole('button', { name: 'settings.light' }))
     expect(mocks.theme.setMode).toHaveBeenCalledWith('light')
-    fireEvent.change(screen.getByLabelText('settings.language'), { target: { value: 'en' } })
+    fireEvent.change(screen.getByLabelText('settings.interfaceLanguage'), { target: { value: 'en' } })
     expect(mocks.chooseLanguage).toHaveBeenCalledWith(expect.anything(), 'en')
     fireEvent.click(screen.getByRole('checkbox', { name: 'settings.forceDesktopLayout' }))
     expect(mocks.mobile.setForceDesktop).toHaveBeenCalledWith(true)

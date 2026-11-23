@@ -1867,7 +1867,7 @@
     "editUser": "ユーザーを編集",
     "deleteUser": "ユーザーを削除",
     "admin": "管理者",
-    "noUsers": "ユーザーが見つかりません",
+    "noUsers": "ユーザーはいません",
     "resetPassword": "パスワードをリセット",
     "activate": "有効化",
     "usernamePlaceholder": "yamadataro",
@@ -1991,7 +1991,8 @@
       "auditor": "ジャーナルを含むすべての運用データの読み取り専用アクセス。",
       "viewer": "証明書、認証局、テンプレートの読み取り専用アクセス。"
     },
-    "customRoleOf": "カスタムロール: {{name}}"
+    "customRoleOf": "カスタムロール: {{name}}",
+    "noUsersDescription": "ローカルアカウントを作成するか、設定済みの SSO プロバイダーでのサインインを許可します。"
   },
   "groups": {
     "group": "グループ",
@@ -2003,7 +2004,7 @@
     "permissionsHelp": "このグループの各メンバーに、各自のロールに加えて付与される権限。",
     "noPermissions": "権限は付与されていません",
     "members": "メンバー",
-    "noGroups": "グループが見つかりません",
+    "noGroups": "グループはありません",
     "noMembers": "メンバーが見つかりません",
     "membersUpdated": "メンバーを更新しました: {{added}} 件追加、{{removed}} 件削除",
     "namePlaceholder": "開発者",
@@ -2030,7 +2031,8 @@
       "export": "エクスポート",
       "admin": "管理"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "グループは複数のアカウントに同じロールを一度に付与します。"
   },
   "acme": {
     "title": "ACMEプロトコル",
@@ -4463,7 +4465,8 @@
     "templateHtmlSource": "HTMLソース",
     "templateFormat": "テンプレート形式",
     "templateVariablesLead": "変数: ",
-    "ocspRevocationTitle": "OCSP と失効"
+    "ocspRevocationTitle": "OCSP と失効",
+    "interfaceLanguage": "表示言語"
   },
   "account": {
     "profile": "プロフィール",
@@ -4515,11 +4518,6 @@
     "noCertificatesEnrolled": "登録されたクライアント証明書はありません",
     "deleteCertConfirm": "このクライアント証明書を削除しますか？",
     "certificateDeleted": "証明書が削除されました",
-    "apiKeyTips": [
-      "API キーを使うと UCM にプログラムからアクセスできます",
-      "キーは秘密にし、定期的にローテーションしてください",
-      "キーごとに有効期限を設定できます"
-    ],
     "yourAPIKeys": "あなたのAPIキー",
     "createAPIKey": "APIキーを作成",
     "createKey": "キーの作成",
@@ -4608,7 +4606,8 @@
     "tocLabel": "アカウントのセクション",
     "apiKeysIntent": "アカウントの代わりにAPIを呼び出すキー。",
     "profileSaved": "プロフィールを保存しました。",
-    "profileReset": "プロフィールの変更を元に戻しました。"
+    "profileReset": "プロフィールの変更を元に戻しました。",
+    "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
@@ -4618,8 +4617,8 @@
     "deleteRole": "ロールを削除",
     "roleName": "ロール名",
     "assignedUsers": "割り当てられたユーザー",
-    "noRoles": "定義されたロールなし",
-    "noRolesDescription": "詳細なアクセス制御のためのカスタムロールを作成",
+    "noRoles": "ロールはありません",
+    "noRolesDescription": "詳細なアクセス制御のためのカスタムロールを作成。",
     "searchRoles": "ロールを検索...",
     "inherits": "継承",
     "inheritsFrom": "継承元",
@@ -4776,12 +4775,12 @@
       "softhsmFips": "SoftHSM は検証済みモジュールではありません。FIPS モードでは、その上の鍵は FIPS で保護されません。"
     },
     "syncingKeys": "同期中...",
-    "unit_one": "{{count}} か所",
-    "unit_other": "{{count}} か所",
+    "unit_one": "{{count}} 件のプロバイダー",
+    "unit_other": "{{count}} 件のプロバイダー",
     "keyCount_one": "{{count}} 個の鍵",
     "keyCount_other": "{{count}} 個の鍵",
-    "range_one": "{{count}} か所中 {{shown}} か所",
-    "range_other": "{{count}} か所中 {{shown}} か所",
+    "range_one": "{{count}} 件のプロバイダー中 {{shown}} 件",
+    "range_other": "{{count}} 件のプロバイダー中 {{shown}} 件",
     "states": {
       "connected": "接続済み",
       "error": "エラー",

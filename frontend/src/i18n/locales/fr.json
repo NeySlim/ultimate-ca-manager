@@ -53,11 +53,6 @@
     "noCertificatesEnrolled": "Aucun certificat client inscrit",
     "deleteCertConfirm": "Supprimer ce certificat client?",
     "certificateDeleted": "Certificat supprimé",
-    "apiKeyTips": [
-      "Les clés API permettent l’accès programmatique à UCM",
-      "Gardez vos clés secrètes et faites-les tourner régulièrement",
-      "Chaque clé peut avoir une date d’expiration personnalisée"
-    ],
     "yourAPIKeys": "Vos clés API",
     "createKey": "Créer une clé",
     "keyNameExample": "ex. Pipeline CI/CD",
@@ -142,7 +137,8 @@
     "tocLabel": "Sections du compte",
     "apiKeysIntent": "Clés qui appellent l’API au nom de votre compte.",
     "profileSaved": "Profil enregistré.",
-    "profileReset": "Modifications du profil annulées."
+    "profileReset": "Modifications du profil annulées.",
+    "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée."
   },
   "acme": {
     "title": "Protocole ACME",
@@ -2955,7 +2951,7 @@
     "permissionsHelp": "Permissions accordées à chaque membre de ce groupe, en plus de son propre rôle.",
     "noPermissions": "Aucune permission accordée",
     "members": "Membres",
-    "noGroups": "Aucun groupe trouvé",
+    "noGroups": "Aucun groupe",
     "noMembers": "Aucun membre trouvé",
     "membersUpdated": "Membres mis à jour : {{added}} ajoutés, {{removed}} retirés",
     "namePlaceholder": "développeurs",
@@ -2982,7 +2978,8 @@
       "export": "Exporter",
       "admin": "Administrer"
     },
-    "grant": "{{action}} : {{resource}}"
+    "grant": "{{action}} : {{resource}}",
+    "noGroupsDescription": "Un groupe donne le même rôle à plusieurs comptes à la fois."
   },
   "help": {
     "englishOnlyNotice": "L’aide est disponible en anglais, en français, en russe et en chinois.",
@@ -3091,12 +3088,12 @@
       "softhsmFips": "SoftHSM n’est pas un module validé : en mode FIPS, les clés qu’il contient ne sont pas protégées par FIPS."
     },
     "syncingKeys": "Synchronisation...",
-    "unit_one": "{{count}} emplacement",
-    "unit_other": "{{count}} emplacements",
+    "unit_one": "{{count}} fournisseur",
+    "unit_other": "{{count}} fournisseurs",
     "keyCount_one": "{{count}} clé",
     "keyCount_other": "{{count}} clés",
-    "range_one": "{{shown}} sur {{count}} emplacement",
-    "range_other": "{{shown}} sur {{count}} emplacements",
+    "range_one": "{{shown}} sur {{count}} fournisseur",
+    "range_other": "{{shown}} sur {{count}} fournisseurs",
     "states": {
       "connected": "Connecté",
       "error": "En erreur",
@@ -3315,9 +3312,9 @@
     "deleteRole": "Supprimer le rôle",
     "roleName": "Nom du rôle",
     "assignedUsers": "Utilisateurs assignés",
-    "noRoles": "Aucun rôle trouvé",
+    "noRoles": "Aucun rôle",
     "createCustomRole": "Créer un rôle personnalisé",
-    "noRolesDescription": "Créer des rôles personnalisés pour un contrôle d’accès granulaire",
+    "noRolesDescription": "Créez des rôles personnalisés pour un contrôle d’accès granulaire.",
     "searchRoles": "Rechercher des rôles...",
     "inherits": "Hérite",
     "inheritsFrom": "Hérite de",
@@ -4533,7 +4530,8 @@
     "templateHtmlSource": "Source HTML",
     "templateFormat": "Format du modèle",
     "templateVariablesLead": "Variables : ",
-    "ocspRevocationTitle": "OCSP et révocation"
+    "ocspRevocationTitle": "OCSP et révocation",
+    "interfaceLanguage": "Langue de l’interface"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée.",
@@ -5210,7 +5208,7 @@
     "editUser": "Modifier l’utilisateur",
     "deleteUser": "Supprimer l’utilisateur",
     "admin": "Administrateur",
-    "noUsers": "Aucun utilisateur trouvé",
+    "noUsers": "Aucun utilisateur",
     "resetPassword": "Réinitialiser le mot de passe",
     "activate": "Activer",
     "usernamePlaceholder": "jeandupont",
@@ -5334,7 +5332,8 @@
       "auditor": "Lecture seule de toutes les données d’exploitation, journal compris.",
       "viewer": "Lecture seule des certificats, des AC et des modèles."
     },
-    "customRoleOf": "Rôle personnalisé : {{name}}"
+    "customRoleOf": "Rôle personnalisé : {{name}}",
+    "noUsersDescription": "Créez un compte local, ou laissez les utilisateurs se connecter par un fournisseur SSO configuré."
   },
   "validation": {
     "required": "Ce champ est requis",

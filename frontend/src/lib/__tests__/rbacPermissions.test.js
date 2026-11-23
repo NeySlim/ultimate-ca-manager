@@ -74,6 +74,13 @@ describe('permissions in words', () => {
     ].join(' · '))
   })
 
+  it('names the SSO and system scopes of an API key in words', () => {
+    expect(describePermissions(t, ['write:sso', 'admin:system'])).toBe([
+      'rbac.permissionOf {"resource":"common.sso","actions":"groups.actions.write"}',
+      'rbac.permissionOf {"resource":"common.system","actions":"groups.actions.admin"}',
+    ].join(' · '))
+  })
+
   it('keeps an unknown resource or action by its name', () => {
     expect(describePermissions(t, ['purge:widgets'])).toBe('rbac.permissionOf {"resource":"widgets","actions":"purge"}')
   })

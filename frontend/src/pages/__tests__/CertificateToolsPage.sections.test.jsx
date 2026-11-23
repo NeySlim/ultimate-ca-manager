@@ -83,6 +83,24 @@ describe('certificate tools sections', () => {
     expect(screen.getByLabelText(en.common.portLabel).closest('.field')).toHaveClass('short')
   })
 
+  it('makes a tool\'s run its page\'s primary action and gives every PEM it reads one height', () => {
+    for (const [tab, button] of [['', en.tools.checkSSL], ['csr-decoder', en.tools.decodeCsr], ['key-matcher', en.tools.matchKeys], ['converter', en.tools.convert]]) {
+      const { unmount, container } = open(tab ? `/tools?tab=${tab}` : '/tools')
+      expect(screen.getByRole('button', { name: button })).toHaveClass('primary')
+      const heights = new Set([...container.querySelectorAll('textarea')].map((area) => area.getAttribute('rows')))
+      expect(heights.size).toBeLessThanOrEqual(1)
+      unmount()
+    }
+  })
+
+  it('names the key matcher and the converter once: their one group under the card\'s title', () => {
+    for (const tab of ['key-matcher', 'converter']) {
+      const { unmount, container } = open(`/tools?tab=${tab}`)
+      for (const legend of container.querySelectorAll('.settings-frame legend, fieldset > legend')) expect(legend).toHaveClass('sr-only')
+      unmount()
+    }
+  })
+
   it('says the outcome on the test line, then the details under it', async () => {
     decoded.data = { status: 'expired', is_ca: false, public_key: { type: 'RSA', size: 2048 }, subject: { commonName: 'a' }, issuer: { commonName: 'a' }, extensions: {} }
     open('/tools?tab=cert-decoder')

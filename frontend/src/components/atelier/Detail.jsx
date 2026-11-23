@@ -172,7 +172,8 @@ export function FactsGroup({ children, className }) {
 
 /** The records, or `empty` in a muted sentence when there are none. */
 /** `step`: a long list shows its first `step` records, then as many more at each ask (a button under it). */
-export function RecordList({ children, empty, label, step }) {
+/** `columns`: the badges and the actions of every record in columns of their own, so they line up from row to row. */
+export function RecordList({ children, empty, label, step, columns = false }) {
   const { t } = useTranslation()
   const [limit, setLimit] = useState(step || Infinity)
   const list = [].concat(children || []).filter(Boolean)
@@ -180,7 +181,7 @@ export function RecordList({ children, empty, label, step }) {
   const rest = list.length - limit
   return (
     <>
-      <ul className="record-list" aria-label={label}>{rest > 0 ? list.slice(0, limit) : list}</ul>
+      <ul className={columns ? 'record-list rl-cols' : 'record-list'} aria-label={label}>{rest > 0 ? list.slice(0, limit) : list}</ul>
       {rest > 0 && (
         <p className="record-more">
           <button type="button" className="btn" data-action="records-more" onClick={() => setLimit((n) => n + step)}>

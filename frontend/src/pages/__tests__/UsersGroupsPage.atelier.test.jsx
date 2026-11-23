@@ -102,6 +102,14 @@ describe('the account list', () => {
     expect(container.querySelector('footer.table-footer')).toHaveTextContent('users.range {"shown":1,"count":3}')
   })
 
+  it('says why an empty list is empty, in a sentence under its title, as the other empty blocks', async () => {
+    m.getAll.mockResolvedValue({ data: [] })
+    const { container } = page()
+    const empty = await waitFor(() => { const el = container.querySelector('#empty-users'); expect(el).toBeTruthy(); return el })
+    expect(within(empty).getByRole('heading')).toHaveTextContent('users.noUsers')
+    expect(empty).toHaveTextContent('users.noUsersDescription')
+  })
+
   it('searches and filters by role, then resets from the no-match block', async () => {
     page()
     await screen.findByRole('button', { name: 'Chloé Durand' })

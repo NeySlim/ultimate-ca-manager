@@ -31,6 +31,8 @@ const CATEGORY_LABELS = [
   ['users', 'rbac.categories.userManagement'],
   ['groups', 'rbac.categories.groups'],
   ['settings', 'rbac.categories.settings'],
+  ['sso', 'common.sso'],
+  ['system', 'common.system'],
 ]
 /** Resources the frontend knows how to label. */
 export const PERMISSION_RESOURCES = CATEGORY_LABELS.map(([resource]) => resource)

@@ -1867,7 +1867,7 @@
     "editUser": "Edit User",
     "deleteUser": "Delete User",
     "admin": "Administrator",
-    "noUsers": "No users found",
+    "noUsers": "No users",
     "resetPassword": "Reset Password",
     "activate": "Activate",
     "usernamePlaceholder": "johndoe",
@@ -1991,7 +1991,8 @@
       "auditor": "Read-only access to all operational data, the journal included.",
       "viewer": "Read-only access to certificates, CAs and templates."
     },
-    "customRoleOf": "Custom role: {{name}}"
+    "customRoleOf": "Custom role: {{name}}",
+    "noUsersDescription": "Create a local account, or let people sign in through a configured SSO provider."
   },
   "groups": {
     "group": "Group",
@@ -2003,7 +2004,7 @@
     "permissionsHelp": "Permissions granted to every member of this group, in addition to their own role.",
     "noPermissions": "No permissions granted",
     "members": "Members",
-    "noGroups": "No groups found",
+    "noGroups": "No groups",
     "noMembers": "No members found",
     "membersUpdated": "Members updated: {{added}} added, {{removed}} removed",
     "namePlaceholder": "developers",
@@ -2030,7 +2031,8 @@
       "export": "Export",
       "admin": "Administer"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "A group gives the same role to several accounts at once."
   },
   "acme": {
     "title": "ACME Protocol",
@@ -4463,7 +4465,8 @@
     "templateHtmlSource": "HTML source",
     "templateFormat": "Template format",
     "templateVariablesLead": "Variables: ",
-    "ocspRevocationTitle": "OCSP and revocation"
+    "ocspRevocationTitle": "OCSP and revocation",
+    "interfaceLanguage": "Interface language"
   },
   "account": {
     "profile": "Profile",
@@ -4515,11 +4518,6 @@
     "noCertificatesEnrolled": "No client certificates enrolled",
     "deleteCertConfirm": "Delete this client certificate?",
     "certificateDeleted": "Certificate deleted",
-    "apiKeyTips": [
-      "API keys allow programmatic access to UCM",
-      "Keep your keys secret and rotate them regularly",
-      "Each key can have a custom expiration date"
-    ],
     "yourAPIKeys": "Your API Keys",
     "createAPIKey": "Create API Key",
     "createKey": "Create Key",
@@ -4608,7 +4606,8 @@
     "tocLabel": "Account sections",
     "apiKeysIntent": "Keys that call the API on behalf of your account.",
     "profileSaved": "Profile saved.",
-    "profileReset": "Profile changes undone."
+    "profileReset": "Profile changes undone.",
+    "apiKeyHint": "API keys allow programmatic access to UCM. Keep your keys secret and rotate them regularly. Each key can have a custom expiration date."
   },
   "rbac": {
     "title": "Role-Based Access Control",
@@ -4618,8 +4617,8 @@
     "deleteRole": "Delete Role",
     "roleName": "Role Name",
     "assignedUsers": "Assigned Users",
-    "noRoles": "No roles found",
-    "noRolesDescription": "Create custom roles for granular access control",
+    "noRoles": "No roles",
+    "noRolesDescription": "Create custom roles for granular access control.",
     "searchRoles": "Search roles...",
     "inherits": "Inherits",
     "inheritsFrom": "Inherits From",
@@ -4776,12 +4775,12 @@
       "softhsmFips": "SoftHSM is not a validated module: in FIPS mode, keys on it are not FIPS protected."
     },
     "syncingKeys": "Syncing...",
-    "unit_one": "{{count}} location",
-    "unit_other": "{{count}} locations",
+    "unit_one": "{{count}} provider",
+    "unit_other": "{{count}} providers",
     "keyCount_one": "{{count}} key",
     "keyCount_other": "{{count}} keys",
-    "range_one": "{{shown}} of {{count}} location",
-    "range_other": "{{shown}} of {{count}} locations",
+    "range_one": "{{shown}} of {{count}} provider",
+    "range_other": "{{shown}} of {{count}} providers",
     "states": {
       "connected": "Connected",
       "error": "Error",

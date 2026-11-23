@@ -1867,7 +1867,7 @@
     "editUser": "编辑用户",
     "deleteUser": "删除用户",
     "admin": "管理员",
-    "noUsers": "未找到用户",
+    "noUsers": "没有用户",
     "resetPassword": "重置密码",
     "activate": "激活",
     "usernamePlaceholder": "zhangsan",
@@ -1991,7 +1991,8 @@
       "auditor": "只读访问所有运营数据，包括日志。",
       "viewer": "只读访问证书、CA 和模板。"
     },
-    "customRoleOf": "自定义角色：{{name}}"
+    "customRoleOf": "自定义角色：{{name}}",
+    "noUsersDescription": "创建本地帐户，或允许用户通过已配置的 SSO 提供商登录。"
   },
   "groups": {
     "group": "组",
@@ -2003,7 +2004,7 @@
     "permissionsHelp": "授予该组每个成员的权限，作为其自身角色的补充。",
     "noPermissions": "未授予任何权限",
     "members": "成员",
-    "noGroups": "未找到组",
+    "noGroups": "没有组",
     "noMembers": "未找到成员",
     "membersUpdated": "成员已更新：新增 {{added}} 个，移除 {{removed}} 个",
     "namePlaceholder": "开发人员",
@@ -2030,7 +2031,8 @@
       "export": "导出",
       "admin": "管理"
     },
-    "grant": "{{action}}：{{resource}}"
+    "grant": "{{action}}：{{resource}}",
+    "noGroupsDescription": "组可以一次为多个帐户授予相同的角色。"
   },
   "acme": {
     "title": "ACME协议",
@@ -4463,7 +4465,8 @@
     "templateHtmlSource": "HTML 源码",
     "templateFormat": "模板格式",
     "templateVariablesLead": "变量：",
-    "ocspRevocationTitle": "OCSP 与吊销"
+    "ocspRevocationTitle": "OCSP 与吊销",
+    "interfaceLanguage": "界面语言"
   },
   "account": {
     "profile": "个人资料",
@@ -4515,11 +4518,6 @@
     "noCertificatesEnrolled": "未注册客户端证书",
     "deleteCertConfirm": "确认删除此客户端证书？",
     "certificateDeleted": "证书已删除",
-    "apiKeyTips": [
-      "API 密钥支持通过程序调用访问 UCM",
-      "妥善保管密钥，定期轮换",
-      "每个密钥可设置独立过期时间"
-    ],
     "yourAPIKeys": "您的 API 密钥",
     "createAPIKey": "创建API密钥",
     "createKey": "创建密钥",
@@ -4608,7 +4606,8 @@
     "tocLabel": "账户部分",
     "apiKeysIntent": "以您的账户名义调用 API 的密钥。",
     "profileSaved": "个人资料已保存。",
-    "profileReset": "已撤销个人资料的修改。"
+    "profileReset": "已撤销个人资料的修改。",
+    "apiKeyHint": "API 密钥支持通过程序调用访问 UCM。妥善保管密钥，定期轮换。每个密钥可设置独立过期时间。"
   },
   "rbac": {
     "title": "基于角色的访问控制",
@@ -4618,8 +4617,8 @@
     "deleteRole": "删除角色",
     "roleName": "角色名称",
     "assignedUsers": "分配的用户",
-    "noRoles": "没有定义的角色",
-    "noRolesDescription": "创建自定义角色以进行细粒度访问控制",
+    "noRoles": "没有角色",
+    "noRolesDescription": "创建自定义角色以进行细粒度访问控制。",
     "searchRoles": "搜索角色...",
     "inherits": "继承",
     "inheritsFrom": "继承自",
@@ -4776,12 +4775,12 @@
       "softhsmFips": "SoftHSM 不是经过验证的模块：在 FIPS 模式下，其上的密钥不受 FIPS 保护。"
     },
     "syncingKeys": "正在同步...",
-    "unit_one": "{{count}} 个位置",
-    "unit_other": "{{count}} 个位置",
+    "unit_one": "{{count}} 个提供商",
+    "unit_other": "{{count}} 个提供商",
     "keyCount_one": "{{count}} 个密钥",
     "keyCount_other": "{{count}} 个密钥",
-    "range_one": "{{shown}} / 共 {{count}} 个位置",
-    "range_other": "{{shown}} / 共 {{count}} 个位置",
+    "range_one": "{{shown}} / 共 {{count}} 个提供商",
+    "range_other": "{{shown}} / 共 {{count}} 个提供商",
     "states": {
       "connected": "已连接",
       "error": "出错",

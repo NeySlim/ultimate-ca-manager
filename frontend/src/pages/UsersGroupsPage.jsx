@@ -783,7 +783,8 @@ export default function UsersGroupsPage() {
     <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
       onReset={() => { setQuery(''); setUserView(''); setRoleFilter('') }} />
   ) : (
-    <EmptyBlock id={groupsTab ? 'groups' : 'users'} icon="users" title={groupsTab ? t('groups.noGroups') : t('users.noUsers')} action={create} />
+    <EmptyBlock id={groupsTab ? 'groups' : 'users'} icon="users" title={groupsTab ? t('groups.noGroups') : t('users.noUsers')}
+      text={groupsTab ? t('groups.noGroupsDescription') : t('users.noUsersDescription')} action={create} />
   )
   const toolbar = (
     <Toolbar>

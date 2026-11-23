@@ -59,6 +59,20 @@ describe('settings record lists', () => {
     expect(within(row).queryByRole('button', { name: 'common.delete' })).toBeNull()
   })
 
+  it('lines up the states and actions of the SSO and Microsoft AC lists in columns', () => {
+    sso(can('read:sso'))
+    expect(screen.getAllByRole('listitem')[0].closest('ul')).toHaveClass('rl-cols')
+  })
+
+  it('names a Microsoft AC connection\'s authentication in words, the group under the card\'s title only once', () => {
+    const { container } = msca(can('read:settings'))
+    const [row] = screen.getAllByRole('listitem')
+    expect(row.closest('ul')).toHaveClass('rl-cols')
+    expect(row).toHaveTextContent('msca.authBasic')
+    expect(row.textContent).not.toMatch(/\bbasic\b/)
+    expect(container.querySelector('legend')).toHaveClass('sr-only')
+  })
+
   it('lists the Microsoft AC connections, edit kept from a reader', () => {
     msca(can('read:settings'))
     const [row] = screen.getAllByRole('listitem')

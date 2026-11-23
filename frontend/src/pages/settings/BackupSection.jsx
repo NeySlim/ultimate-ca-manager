@@ -7,6 +7,7 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Btn, IconBtn, Pill, Notice, DataTable, TableFooter, Toolbar, SearchField, BatchBar } from '../../components/atelier'
+import { Breakable } from '../../components/atelier/Breakable'
 import { Field, NumberInput, Select } from '../../components/atelier/Form'
 import { SettingsGroup, FieldError } from '../../components/atelier/SettingsView'
 import { cardFacts, labelledFact } from '../../components/atelier/cardFacts'
@@ -212,6 +213,8 @@ export default function BackupSection({
             onTogglePage: () => toggleSelectAllBackups(),
           } : undefined}
           card={(b) => ({
+            // On a phone the name wraps after its separators, never inside its extension
+            title: <Breakable text={b.filename} />,
             description: digest(b),
             // Each fact after its column's label, as every list's records (M3)
             meta: [...cardFacts(columns, b), b.node && labelledFact(t('settings.backupNode'), b.node)],

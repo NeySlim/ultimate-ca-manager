@@ -1867,7 +1867,7 @@
     "editUser": "Editar usuario",
     "deleteUser": "Eliminar usuario",
     "admin": "Administrador",
-    "noUsers": "No se encontraron usuarios",
+    "noUsers": "Sin usuarios",
     "resetPassword": "Restablecer contraseña",
     "activate": "Activar",
     "usernamePlaceholder": "juanperez",
@@ -1991,7 +1991,8 @@
       "auditor": "Acceso de solo lectura a todos los datos operativos, incluido el registro.",
       "viewer": "Acceso de solo lectura a certificados, CA y plantillas."
     },
-    "customRoleOf": "Rol personalizado: {{name}}"
+    "customRoleOf": "Rol personalizado: {{name}}",
+    "noUsersDescription": "Cree una cuenta local o permita el inicio de sesión mediante un proveedor SSO configurado."
   },
   "groups": {
     "group": "Grupo",
@@ -2003,7 +2004,7 @@
     "permissionsHelp": "Permisos concedidos a cada miembro de este grupo, además de su propio rol.",
     "noPermissions": "Sin permisos concedidos",
     "members": "Miembros",
-    "noGroups": "No se encontraron grupos",
+    "noGroups": "Sin grupos",
     "noMembers": "No se encontraron miembros",
     "membersUpdated": "Miembros actualizados: {{added}} añadidos, {{removed}} eliminados",
     "namePlaceholder": "desarrolladores",
@@ -2030,7 +2031,8 @@
       "export": "Exportación",
       "admin": "Administración"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "Un grupo asigna el mismo rol a varias cuentas a la vez."
   },
   "acme": {
     "title": "Protocolo ACME",
@@ -4463,7 +4465,8 @@
     "templateHtmlSource": "Código HTML",
     "templateFormat": "Formato de la plantilla",
     "templateVariablesLead": "Variables: ",
-    "ocspRevocationTitle": "OCSP y revocación"
+    "ocspRevocationTitle": "OCSP y revocación",
+    "interfaceLanguage": "Idioma de la interfaz"
   },
   "account": {
     "profile": "Perfil",
@@ -4515,11 +4518,6 @@
     "noCertificatesEnrolled": "Ningún certificado de cliente inscrito",
     "deleteCertConfirm": "¿Eliminar este certificado de cliente?",
     "certificateDeleted": "Certificado eliminado",
-    "apiKeyTips": [
-      "Las claves de API permiten el acceso programático a UCM",
-      "Mantenga sus claves en secreto y rótelas con regularidad",
-      "Cada clave puede tener una fecha de expiración personalizada"
-    ],
     "yourAPIKeys": "Sus claves de API",
     "createAPIKey": "Crear clave API",
     "createKey": "Crear Clave",
@@ -4608,7 +4606,8 @@
     "tocLabel": "Secciones de la cuenta",
     "apiKeysIntent": "Claves que llaman a la API en nombre de su cuenta.",
     "profileSaved": "Perfil guardado.",
-    "profileReset": "Cambios del perfil deshechos."
+    "profileReset": "Cambios del perfil deshechos.",
+    "apiKeyHint": "Las claves de API permiten el acceso programático a UCM. Mantenga sus claves en secreto y rótelas con regularidad. Cada clave puede tener una fecha de expiración personalizada."
   },
   "rbac": {
     "title": "Control de acceso basado en roles",
@@ -4618,8 +4617,8 @@
     "deleteRole": "Eliminar rol",
     "roleName": "Nombre del rol",
     "assignedUsers": "Usuarios asignados",
-    "noRoles": "Sin roles definidos",
-    "noRolesDescription": "Cree roles personalizados para un control de acceso granular",
+    "noRoles": "Sin roles",
+    "noRolesDescription": "Cree roles personalizados para un control de acceso granular.",
     "searchRoles": "Buscar roles...",
     "inherits": "Hereda",
     "inheritsFrom": "Hereda de",
@@ -4776,12 +4775,12 @@
       "softhsmFips": "SoftHSM no es un módulo validado: en modo FIPS, las claves almacenadas en él no están protegidas por FIPS."
     },
     "syncingKeys": "Sincronizando...",
-    "unit_one": "{{count}} ubicación",
-    "unit_other": "{{count}} ubicaciones",
+    "unit_one": "{{count}} proveedor",
+    "unit_other": "{{count}} proveedores",
     "keyCount_one": "{{count}} clave",
     "keyCount_other": "{{count}} claves",
-    "range_one": "{{shown}} de {{count}} ubicación",
-    "range_other": "{{shown}} de {{count}} ubicaciones",
+    "range_one": "{{shown}} de {{count}} proveedor",
+    "range_other": "{{shown}} de {{count}} proveedores",
     "states": {
       "connected": "Conectado",
       "error": "Error",

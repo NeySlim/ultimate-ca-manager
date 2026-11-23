@@ -1867,7 +1867,7 @@
     "editUser": "Benutzer bearbeiten",
     "deleteUser": "Benutzer löschen",
     "admin": "Administrator",
-    "noUsers": "Keine Benutzer gefunden",
+    "noUsers": "Keine Benutzer",
     "resetPassword": "Passwort zurücksetzen",
     "activate": "Aktivieren",
     "usernamePlaceholder": "maxmustermann",
@@ -1991,7 +1991,8 @@
       "auditor": "Lesezugriff auf alle Betriebsdaten, einschließlich des Protokolls.",
       "viewer": "Lesezugriff auf Zertifikate, CAs und Vorlagen."
     },
-    "customRoleOf": "Benutzerdefinierte Rolle: {{name}}"
+    "customRoleOf": "Benutzerdefinierte Rolle: {{name}}",
+    "noUsersDescription": "Legen Sie ein lokales Konto an oder lassen Sie die Anmeldung über einen eingerichteten SSO-Anbieter zu."
   },
   "groups": {
     "group": "Gruppe",
@@ -2003,7 +2004,7 @@
     "permissionsHelp": "Berechtigungen, die jedem Mitglied dieser Gruppe zusätzlich zu seiner eigenen Rolle gewährt werden.",
     "noPermissions": "Keine Berechtigungen gewährt",
     "members": "Mitglieder",
-    "noGroups": "Keine Gruppen gefunden",
+    "noGroups": "Keine Gruppen",
     "noMembers": "Keine Mitglieder gefunden",
     "membersUpdated": "Mitglieder aktualisiert: {{added}} hinzugefügt, {{removed}} entfernt",
     "namePlaceholder": "entwickler",
@@ -2030,7 +2031,8 @@
       "export": "Exportieren",
       "admin": "Verwalten"
     },
-    "grant": "{{action}}: {{resource}}"
+    "grant": "{{action}}: {{resource}}",
+    "noGroupsDescription": "Eine Gruppe gibt mehreren Konten auf einmal dieselbe Rolle."
   },
   "acme": {
     "title": "ACME-Protokoll",
@@ -4463,7 +4465,8 @@
     "templateHtmlSource": "HTML-Quelltext",
     "templateFormat": "Vorlagenformat",
     "templateVariablesLead": "Variablen: ",
-    "ocspRevocationTitle": "OCSP und Widerruf"
+    "ocspRevocationTitle": "OCSP und Widerruf",
+    "interfaceLanguage": "Sprache der Oberfläche"
   },
   "account": {
     "profile": "Profil",
@@ -4515,11 +4518,6 @@
     "noCertificatesEnrolled": "Keine Client-Zertifikate registriert",
     "deleteCertConfirm": "Dieses Client-Zertifikat löschen?",
     "certificateDeleted": "Zertifikat gelöscht",
-    "apiKeyTips": [
-      "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM",
-      "Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig",
-      "Jeder Schlüssel kann ein eigenes Ablaufdatum haben"
-    ],
     "yourAPIKeys": "Ihre API-Schlüssel",
     "createAPIKey": "API-Schlüssel erstellen",
     "createKey": "Schlüssel erstellen",
@@ -4608,7 +4606,8 @@
     "tocLabel": "Abschnitte des Kontos",
     "apiKeysIntent": "Schlüssel, die die API im Namen Ihres Kontos aufrufen.",
     "profileSaved": "Profil gespeichert.",
-    "profileReset": "Profiländerungen verworfen."
+    "profileReset": "Profiländerungen verworfen.",
+    "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben."
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
@@ -4618,8 +4617,8 @@
     "deleteRole": "Rolle löschen",
     "roleName": "Rollenname",
     "assignedUsers": "Zugewiesene Benutzer",
-    "noRoles": "Keine Rollen definiert",
-    "noRolesDescription": "Erstellen Sie benutzerdefinierte Rollen für granulare Zugriffskontrolle",
+    "noRoles": "Keine Rollen",
+    "noRolesDescription": "Erstellen Sie benutzerdefinierte Rollen für granulare Zugriffskontrolle.",
     "searchRoles": "Rollen suchen...",
     "inherits": "Erbt",
     "inheritsFrom": "Erbt von",
@@ -4776,12 +4775,12 @@
       "softhsmFips": "SoftHSM ist kein validiertes Modul: Im FIPS-Modus sind Schlüssel darauf nicht FIPS-geschützt."
     },
     "syncingKeys": "Synchronisierung...",
-    "unit_one": "{{count}} Speicherort",
-    "unit_other": "{{count}} Speicherorte",
+    "unit_one": "{{count}} Anbieter",
+    "unit_other": "{{count}} Anbieter",
     "keyCount_one": "{{count}} Schlüssel",
     "keyCount_other": "{{count}} Schlüssel",
-    "range_one": "{{shown}} von {{count}} Speicherort",
-    "range_other": "{{shown}} von {{count}} Speicherorten",
+    "range_one": "{{shown}} von {{count}} Anbieter",
+    "range_other": "{{shown}} von {{count}} Anbietern",
     "states": {
       "connected": "Verbunden",
       "error": "Fehler",

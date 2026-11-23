@@ -6,17 +6,14 @@ import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { downloadBlob } from '../../lib/utils'
-import { formatBytes } from '../../lib/fileSize'
-import { compactAgo } from '../../lib/relativeTime'
 import FipsPreflightPanel from './FipsPreflightPanel'
 import CompliancePreflightPanel from './CompliancePreflightPanel'
 import { KOFI_URL } from '../../lib/support'
-import { fact } from '../../components/atelier/facts'
 
 const REPO = 'https://github.com/NeySlim/ultimate-ca-manager'
 
 export default function AboutSection() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { showError, showSuccess } = useNotification()
   const { isAdmin, hasPermission } = usePermission()
   const [info, setInfo] = useState(null)
@@ -48,10 +45,6 @@ export default function AboutSection() {
     fetchInfo()
   }, [])
 
-  // The start of the service worded as the mockup words a past event (« il y a 19 h »)
-  const started = info?.uptime_seconds
-    ? compactAgo(new Date(Date.now() - info.uptime_seconds * 1000), t)
-    : null
   const links = [
     { href: REPO, title: 'GitHub', meta: t('settings.about.sourceCode') },
     { href: `${REPO}/issues`, title: t('settings.about.issues'), meta: t('settings.about.reportBugs') },
@@ -62,13 +55,8 @@ export default function AboutSection() {
   return (
     <>
       <SettingsGroup legend={t('settings.about.systemInfo')} grid={false}>
-        <Facts items={[
-          [t('settings.about.version'), info?.version || __APP_VERSION__],
-          fact(t('settings.about.pythonVersion'), info?.python_version),
-          fact(t('settings.about.started'), started),
-          fact(t('settings.about.memory'), info?.memory_mb ? formatBytes(info.memory_mb * 1024 * 1024, i18n?.language) : null),
-          fact(t('settings.about.environment'), info ? (info.is_docker ? 'Docker' : t('settings.about.envNative')) : null),
-        ]} />
+        {/* The live state of the service (start, memory, Python) is told once, in General */}
+        <Facts items={[[t('settings.about.version'), info?.version || __APP_VERSION__]]} />
       </SettingsGroup>
 
       {/* Diagnostic bundle: admin only */}

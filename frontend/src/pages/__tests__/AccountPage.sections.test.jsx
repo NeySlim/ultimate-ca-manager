@@ -103,7 +103,7 @@ describe('AccountPage sections', () => {
 
   it('carries the language of the account in its profile, saved with the preferences', async () => {
     open()
-    const select = await screen.findByRole('combobox', { name: 'settings.language' })
+    const select = await screen.findByRole('combobox', { name: 'settings.interfaceLanguage' })
     fireEvent.change(select, { target: { value: 'fr' } })
     expect(m.persistPreference).toHaveBeenCalledWith('language', 'fr')
   })

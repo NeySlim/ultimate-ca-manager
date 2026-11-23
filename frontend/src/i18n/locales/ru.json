@@ -1937,7 +1937,7 @@
     "editUser": "Изменение пользователя",
     "deleteUser": "Удаление пользователя",
     "admin": "Администратор",
-    "noUsers": "Пользователи не найдены",
+    "noUsers": "Пользователей нет",
     "resetPassword": "Сбросить пароль",
     "activate": "Активировать",
     "usernamePlaceholder": "ivanov",
@@ -2067,7 +2067,8 @@
       "auditor": "Только чтение всех рабочих данных, включая журнал.",
       "viewer": "Только чтение сертификатов, ЦС и шаблонов."
     },
-    "customRoleOf": "Пользовательская роль: {{name}}"
+    "customRoleOf": "Пользовательская роль: {{name}}",
+    "noUsersDescription": "Создайте локальную учётную запись или разрешите вход через настроенного провайдера SSO."
   },
   "groups": {
     "group": "Группа",
@@ -2079,7 +2080,7 @@
     "permissionsHelp": "Права, предоставляемые каждому участнику группы в дополнение к его собственной роли.",
     "noPermissions": "Права не предоставлены",
     "members": "Участники",
-    "noGroups": "Группы не найдены",
+    "noGroups": "Групп нет",
     "noMembers": "Участники не найдены",
     "membersUpdated": "Участники обновлены: добавлено {{added}}, удалено {{removed}}",
     "namePlaceholder": "developers",
@@ -2114,7 +2115,8 @@
       "export": "Экспорт",
       "admin": "Администрирование"
     },
-    "grant": "{{resource}}: {{action}}"
+    "grant": "{{resource}}: {{action}}",
+    "noGroupsDescription": "Группа даёт одну и ту же роль сразу нескольким учётным записям."
   },
   "acme": {
     "title": "Протокол ACME",
@@ -4617,7 +4619,8 @@
     "templateHtmlSource": "Исходный код HTML",
     "templateFormat": "Формат шаблона",
     "templateVariablesLead": "Переменные: ",
-    "ocspRevocationTitle": "OCSP и отзыв"
+    "ocspRevocationTitle": "OCSP и отзыв",
+    "interfaceLanguage": "Язык интерфейса"
   },
   "account": {
     "profile": "Профиль",
@@ -4669,11 +4672,6 @@
     "noCertificatesEnrolled": "Клиентские сертификаты не зарегистрированы",
     "deleteCertConfirm": "Удалить этот клиентский сертификат?",
     "certificateDeleted": "Сертификат удалён",
-    "apiKeyTips": [
-      "Ключи API дают программный доступ к UCM",
-      "Храните ключи в секрете и регулярно меняйте их",
-      "У каждого ключа может быть свой срок действия"
-    ],
     "yourAPIKeys": "Ваши ключи API",
     "createAPIKey": "Создать ключ API",
     "createKey": "Создать ключ",
@@ -4762,7 +4760,8 @@
     "tocLabel": "Разделы учётной записи",
     "apiKeysIntent": "Ключи для вызова API от имени вашей учётной записи.",
     "profileSaved": "Профиль сохранён.",
-    "profileReset": "Изменения профиля отменены."
+    "profileReset": "Изменения профиля отменены.",
+    "apiKeyHint": "Ключи API дают программный доступ к UCM. Храните ключи в секрете и регулярно меняйте их. У каждого ключа может быть свой срок действия."
   },
   "rbac": {
     "title": "Управление доступом на основе ролей",
@@ -4772,8 +4771,8 @@
     "deleteRole": "Удалить роль",
     "roleName": "Имя роли",
     "assignedUsers": "Назначенные пользователи",
-    "noRoles": "Роли не найдены",
-    "noRolesDescription": "Создайте свои роли для гибкого управления доступом",
+    "noRoles": "Ролей нет",
+    "noRolesDescription": "Создайте свои роли для гибкого управления доступом.",
     "searchRoles": "Поиск ролей...",
     "inherits": "Наследует",
     "inheritsFrom": "Наследует от",
@@ -4934,18 +4933,18 @@
       "softhsmFips": "SoftHSM не является валидированным модулем: в режиме FIPS ключи на нём не защищены по FIPS."
     },
     "syncingKeys": "Синхронизация...",
-    "unit_one": "{{count}} хранилище",
-    "unit_other": "{{count}} хранилища",
-    "unit_few": "{{count}} хранилища",
-    "unit_many": "{{count}} хранилищ",
+    "unit_one": "{{count}} провайдер",
+    "unit_other": "{{count}} провайдера",
+    "unit_few": "{{count}} провайдера",
+    "unit_many": "{{count}} провайдеров",
     "keyCount_one": "{{count}} ключ",
     "keyCount_other": "{{count}} ключа",
     "keyCount_few": "{{count}} ключа",
     "keyCount_many": "{{count}} ключей",
-    "range_one": "{{shown}} из {{count}} хранилища",
-    "range_other": "{{shown}} из {{count}} хранилищ",
-    "range_few": "{{shown}} из {{count}} хранилищ",
-    "range_many": "{{shown}} из {{count}} хранилищ",
+    "range_one": "{{shown}} из {{count}} провайдера",
+    "range_other": "{{shown}} из {{count}} провайдера",
+    "range_few": "{{shown}} из {{count}} провайдеров",
+    "range_many": "{{shown}} из {{count}} провайдеров",
     "states": {
       "connected": "Подключён",
       "error": "Ошибка",
