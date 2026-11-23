@@ -13,8 +13,9 @@ vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile
 vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: size.signedIn }) }))
 vi.mock('../../../pages/certificates/CertificateFloat', () => ({
   default: function Body({ ids, onTitle }) {
-    useEffect(() => { onTitle(`cert ${ids[0]}`) }, []) // eslint-disable-line react-hooks/exhaustive-deps
-    return <p>{`body ${ids[0]}`}</p>
+    useEffect(() => { onTitle(`cert ${ids[0]}`) }, [ids[0]]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Keyed by its object, as an authority's side panel: a replaced object draws a new one
+    return <><p>{`body ${ids[0]}`}</p><button key={ids[0]} type="button">{`pick ${ids[0]}`}</button></>
   },
 }))
 
@@ -232,6 +233,35 @@ describe('detached windows', () => {
     expect(await screen.findByRole('dialog', { name: 'cert 9' })).toHaveClass('maximized')
     act(() => { document.body.focus(); api.front('certificate:9', { focus: true }) })
     await vi.waitFor(() => expect(document.activeElement).toBe(maxButton(win('cert 9'))))
+  })
+
+  it('keeps the window and its focus when its object is replaced, and gives the focus back to its opener on close', async () => {
+    setup()
+    const opener = document.createElement('button')
+    opener.getClientRects = () => [{ width: 10, height: 10 }]
+    document.body.appendChild(opener)
+    opener.focus()
+    act(() => { api.open('certificate', [7]) })
+    const a = await screen.findByRole('dialog', { name: 'cert 7' })
+    within(a).getByRole('button', { name: 'pick 7' }).focus()
+    act(() => { api.replace('certificate:7', [9]) })
+    const b = await screen.findByRole('dialog', { name: 'cert 9' })
+    expect(b).toBe(a)
+    // The control that had the focus went with the former object: the window takes it, not the page
+    await vi.waitFor(() => expect(b.contains(document.activeElement)).toBe(true))
+    act(() => { api.close('certificate:9') })
+    await vi.waitFor(() => expect(document.activeElement).toBe(opener))
+    opener.remove()
+  })
+
+  it('gives the focus to the window already showing the object it is replaced by', async () => {
+    setup()
+    act(() => { api.open('certificate', [9]); api.open('certificate', [7]) })
+    const a = await screen.findByRole('dialog', { name: 'cert 7' })
+    within(a).getByRole('button', { name: 'pick 7' }).focus()
+    act(() => { api.replace('certificate:7', [9]) })
+    expect(screen.queryByRole('dialog', { name: 'cert 7' })).toBeNull()
+    await vi.waitFor(() => expect(win('cert 9').contains(document.activeElement)).toBe(true))
   })
 
   it('draws no window on a phone', () => {

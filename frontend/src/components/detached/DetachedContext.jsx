@@ -27,6 +27,10 @@ function raise(s, key) {
   return { ...s, windows: s.windows.map((x) => (x === w ? { ...x, z: top + 1 } : x)) }
 }
 
+// A window's own identity (`uid`), kept when its object is replaced: React keeps it mounted, focus included
+let lastUid = 0
+const newUid = () => `w${Date.now().toString(36)}-${++lastUid}`
+
 // `maxed` marks the maximized windows; their `rects` stay the place a restore gives back
 const EMPTY = { windows: [], rects: {}, maxed: {} }
 
@@ -45,6 +49,8 @@ export function DetachedProvider({ children }) {
   const auth = useAuth()
   const signedIn = !!auth?.isAuthenticated
   const [state, setState] = useState(readStored)
+  const now = useRef(state)
+  now.current = state
   const openers = useRef(new Map())
   // A window that asked to come forward takes the focus once drawn
   const [focusKey, setFocusKey] = useState(null)
@@ -78,7 +84,7 @@ export function DetachedProvider({ children }) {
       const view = viewport()
       if (s.windows.some((w) => w.key === key)) return raise(s, key)
       const rect = s.rects[key] ? clampRect(s.rects[key], view) : cascadeRect(s.windows.length, (SIZES[kind] || SIZES.default)(view), view)
-      return { ...s, windows: [...s.windows, { key, kind, ids: [].concat(ids), title, z: topZ(s.windows) + 1 }], rects: { ...s.rects, [key]: rect } }
+      return { ...s, windows: [...s.windows, { key, uid: newUid(), kind, ids: [].concat(ids), title, z: topZ(s.windows) + 1 }], rects: { ...s.rects, [key]: rect } }
     })
     setFocusKey(key)
     return key
@@ -119,11 +125,19 @@ export function DetachedProvider({ children }) {
 
   // An authority picked inside its window replaces it there, as a page would
   const replace = useCallback((key, ids) => {
+    const w = now.current.windows.find((x) => x.key === key)
+    if (!w) return
+    const next = windowKey(w.kind, ids)
+    if (next === key) return
+    // The opener of the window replaced is the one its close gives the focus back to
+    if (!openers.current.has(next) && openers.current.has(key)) openers.current.set(next, openers.current.get(key))
+    openers.current.delete(key)
+    if (now.current.windows.some((x) => x.key === next)) {
+      setState((s) => raise({ ...s, windows: s.windows.filter((x) => x.key !== key) }, next))
+      setFocusKey(next)
+      return
+    }
     setState((s) => {
-      const w = s.windows.find((x) => x.key === key)
-      if (!w) return s
-      const next = windowKey(w.kind, ids)
-      if (s.windows.some((x) => x.key === next)) return raise({ ...s, windows: s.windows.filter((x) => x.key !== key) }, next)
       const maxed = { ...s.maxed }
       if (maxed[key]) maxed[next] = true
       else delete maxed[next]
@@ -132,6 +146,11 @@ export function DetachedProvider({ children }) {
         rects: { ...s.rects, [next]: s.rects[key] },
         maxed,
       }
+    })
+    // Its control that had the focus may go with the former object: the window then takes it
+    requestAnimationFrame(() => {
+      const at = document.activeElement
+      if (!at || at === document.body || !at.isConnected) setFocusKey(next)
     })
   }, [])
 
