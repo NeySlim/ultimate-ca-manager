@@ -3132,7 +3132,12 @@
     "reattachFailed": "No se pudo volver a vincular el despliegue",
     "kind_http": "API HTTP",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Comando de recarga:"
+    "reloadCommandIs": "Comando de recarga:",
+    "searchPlaceholder": "Buscar por nombre, host o URL...",
+    "kindColumn": "Tipo",
+    "connectionColumn": "Conexión",
+    "deliveryColumn": "Envío",
+    "lastSuccessColumn": "Último éxito"
   },
   "crlDeploy": {
     "title": "Despliegue de CRL",
@@ -4520,7 +4525,10 @@
     "templateFormat": "Formato de la plantilla",
     "templateVariablesLead": "Variables: ",
     "ocspRevocationTitle": "OCSP y revocación",
-    "interfaceLanguage": "Idioma de la interfaz"
+    "interfaceLanguage": "Idioma de la interfaz",
+    "anomalySearchPlaceholder": "Buscar por tipo, dirección o mensaje...",
+    "anomalySource": "Origen",
+    "anomalySeverity": "Gravedad"
   },
   "account": {
     "profile": "Perfil",
@@ -4661,7 +4669,9 @@
     "apiKeysIntent": "Claves que llaman a la API en nombre de su cuenta.",
     "profileSaved": "Perfil guardado.",
     "profileReset": "Cambios del perfil deshechos.",
-    "apiKeyHint": "Las claves de API permiten el acceso programático a UCM. Mantenga sus claves en secreto y rótelas con regularidad. Cada clave puede tener una fecha de expiración personalizada."
+    "apiKeyHint": "Las claves de API permiten el acceso programático a UCM. Mantenga sus claves en secreto y rótelas con regularidad. Cada clave puede tener una fecha de expiración personalizada.",
+    "apiKeySearchPlaceholder": "Buscar por nombre o prefijo...",
+    "apiKeyPrefix": "Prefijo"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",
@@ -5509,7 +5519,9 @@
     },
     "customHeadersSet": "Este webhook tiene encabezados personalizados definidos mediante la API; sus valores no se muestran.",
     "dropCustomHeaders": "Eliminar los encabezados personalizados",
-    "customHeadersFollowUrl": "Los encabezados personalizados quedan ligados a la URL guardada: elimínelos para cambiarla o vuelva a introducirlos mediante la API."
+    "customHeadersFollowUrl": "Los encabezados personalizados quedan ligados a la URL guardada: elimínelos para cambiarla o vuelva a introducirlos mediante la API.",
+    "url": "URL",
+    "searchPlaceholder": "Buscar por nombre, URL o evento..."
   },
   "safeMode": {
     "title": "Modo seguro",
@@ -7005,7 +7017,13 @@
       "enrolleeUpnPlaceholder": "juan.garcia@corp.local",
       "upnRequired": "El UPN es requerido cuando la inscripción en nombre de está habilitada",
       "hint": "Requiere un certificado de agente de inscripción configurado en la CA. La plantilla debe permitir la inscripción en nombre de otros usuarios."
-    }
+    },
+    "searchPlaceholder": "Buscar por nombre, servidor o plantilla...",
+    "serverColumn": "Servidor",
+    "templateColumn": "Plantilla",
+    "authColumn": "Autenticación",
+    "lastTestColumn": "Última prueba",
+    "runsColumn": "Sincronizaciones"
   },
   "xcepWstep": {
     "title": "Autoinscripción de Windows",

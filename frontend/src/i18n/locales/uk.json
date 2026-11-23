@@ -3256,7 +3256,12 @@
     "reattachFailed": "Не вдалося знову прив'язати розгортання",
     "kind_http": "HTTP API",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Команда перезавантаження:"
+    "reloadCommandIs": "Команда перезавантаження:",
+    "searchPlaceholder": "Пошук за назвою, хостом або URL...",
+    "kindColumn": "Тип",
+    "connectionColumn": "Підключення",
+    "deliveryColumn": "Доставка",
+    "lastSuccessColumn": "Останній успіх"
   },
   "crlDeploy": {
     "title": "Розгортання CRL",
@@ -4674,7 +4679,10 @@
     "templateFormat": "Формат шаблону",
     "templateVariablesLead": "Змінні: ",
     "ocspRevocationTitle": "OCSP і відкликання",
-    "interfaceLanguage": "Мова інтерфейсу"
+    "interfaceLanguage": "Мова інтерфейсу",
+    "anomalySearchPlaceholder": "Пошук за типом, адресою або повідомленням...",
+    "anomalySource": "Джерело",
+    "anomalySeverity": "Серйозність"
   },
   "account": {
     "profile": "Профіль",
@@ -4815,7 +4823,9 @@
     "apiKeysIntent": "Ключі, які викликають API від імені вашого облікового запису.",
     "profileSaved": "Профіль збережено.",
     "profileReset": "Зміни профілю скасовано.",
-    "apiKeyHint": "Ключі API надають програмний доступ до UCM. Зберігайте ключі в таємниці та регулярно змінюйте їх. Для кожного ключа можна задати власний термін дії."
+    "apiKeyHint": "Ключі API надають програмний доступ до UCM. Зберігайте ключі в таємниці та регулярно змінюйте їх. Для кожного ключа можна задати власний термін дії.",
+    "apiKeySearchPlaceholder": "Пошук за назвою або префіксом...",
+    "apiKeyPrefix": "Префікс"
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",
@@ -5721,7 +5731,9 @@
     },
     "customHeadersSet": "Для цього вебхука через API задано власні заголовки; їхні значення не показуються.",
     "dropCustomHeaders": "Видалити власні заголовки",
-    "customHeadersFollowUrl": "Власні заголовки прив'язані до збереженої URL-адреси: видаліть їх, щоб її змінити, або введіть їх знову через API."
+    "customHeadersFollowUrl": "Власні заголовки прив'язані до збереженої URL-адреси: видаліть їх, щоб її змінити, або введіть їх знову через API.",
+    "url": "URL",
+    "searchPlaceholder": "Пошук за назвою, URL або подією..."
   },
   "safeMode": {
     "title": "Безпечний режим",
@@ -7289,7 +7301,13 @@
       "enrolleeUpnPlaceholder": "ivan.petrenko@corp.local",
       "upnRequired": "UPN обов'язковий, коли увімкнено реєстрацію від імені",
       "hint": "Потрібен сертифікат агента реєстрації, налаштований на ЦС. Шаблон повинен дозволяти реєстрацію від імені інших користувачів."
-    }
+    },
+    "searchPlaceholder": "Пошук за назвою, сервером або шаблоном...",
+    "serverColumn": "Сервер",
+    "templateColumn": "Шаблон",
+    "authColumn": "Автентифікація",
+    "lastTestColumn": "Остання перевірка",
+    "runsColumn": "Синхронізації"
   },
   "xcepWstep": {
     "title": "Автореєстрація Windows",

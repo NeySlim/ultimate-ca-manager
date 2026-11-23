@@ -3132,7 +3132,12 @@
     "reattachFailed": "Die Bereitstellung konnte nicht neu gebunden werden",
     "kind_http": "HTTP-API",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Neuladebefehl:"
+    "reloadCommandIs": "Neuladebefehl:",
+    "searchPlaceholder": "Nach Name, Host oder URL suchen...",
+    "kindColumn": "Typ",
+    "connectionColumn": "Verbindung",
+    "deliveryColumn": "Übertragung",
+    "lastSuccessColumn": "Letzter Erfolg"
   },
   "crlDeploy": {
     "title": "CRL-Bereitstellung",
@@ -4520,7 +4525,10 @@
     "templateFormat": "Vorlagenformat",
     "templateVariablesLead": "Variablen: ",
     "ocspRevocationTitle": "OCSP und Widerruf",
-    "interfaceLanguage": "Sprache der Oberfläche"
+    "interfaceLanguage": "Sprache der Oberfläche",
+    "anomalySearchPlaceholder": "Nach Typ, Adresse oder Meldung suchen...",
+    "anomalySource": "Quelle",
+    "anomalySeverity": "Schweregrad"
   },
   "account": {
     "profile": "Profil",
@@ -4661,7 +4669,9 @@
     "apiKeysIntent": "Schlüssel, die die API im Namen Ihres Kontos aufrufen.",
     "profileSaved": "Profil gespeichert.",
     "profileReset": "Profiländerungen verworfen.",
-    "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben."
+    "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben.",
+    "apiKeySearchPlaceholder": "Nach Name oder Präfix suchen...",
+    "apiKeyPrefix": "Präfix"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
@@ -5509,7 +5519,9 @@
     },
     "customHeadersSet": "Für diesen Webhook sind benutzerdefinierte Header über die API gesetzt; ihre Werte werden nicht angezeigt.",
     "dropCustomHeaders": "Benutzerdefinierte Header entfernen",
-    "customHeadersFollowUrl": "Benutzerdefinierte Header bleiben an die gespeicherte URL gebunden: Entfernen Sie sie, um die URL zu ändern, oder geben Sie sie über die API erneut ein."
+    "customHeadersFollowUrl": "Benutzerdefinierte Header bleiben an die gespeicherte URL gebunden: Entfernen Sie sie, um die URL zu ändern, oder geben Sie sie über die API erneut ein.",
+    "url": "URL",
+    "searchPlaceholder": "Nach Name, URL oder Ereignis suchen..."
   },
   "safeMode": {
     "title": "Abgesicherter Modus",
@@ -7005,7 +7017,13 @@
       "enrolleeUpnPlaceholder": "max.mustermann@corp.local",
       "upnRequired": "UPN ist erforderlich, wenn die Registrierung im Auftrag aktiviert ist",
       "hint": "Erfordert ein auf der CA konfiguriertes Registrierungsagenten-Zertifikat. Die Vorlage muss die Registrierung im Auftrag anderer Benutzer zulassen."
-    }
+    },
+    "searchPlaceholder": "Nach Name, Server oder Vorlage suchen...",
+    "serverColumn": "Server",
+    "templateColumn": "Vorlage",
+    "authColumn": "Authentifizierung",
+    "lastTestColumn": "Letzter Test",
+    "runsColumn": "Synchronisierungen"
   },
   "xcepWstep": {
     "title": "Windows-Autoregistrierung",

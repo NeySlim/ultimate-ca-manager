@@ -1,67 +1,79 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, IconBtn, Pill, RecordList, RecordRow, SkeletonPanel, EmptyBlock } from '../../components/atelier'
-import { SettingsGroup } from '../../components/atelier/SettingsView'
+import { Btn, ListView, Toolbar, SearchField, EmptyBlock, NoMatch, Pill, useClientList, useSortParam } from '../../components/atelier'
 import { webhookEventLabel } from './WebhookForm'
 import WebhookDeliveriesModal from './WebhookDeliveriesModal'
+
+// The webhooks by name, the sort in the address under this list's scope (the settings stack their sections)
+const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'url', 'events', 'state']
 
 export default function WebhooksSection({ webhooks, webhooksLoading, webhookTesting, handleWebhookCreate, handleWebhookEdit, handleWebhookToggle, handleWebhookTest, setWebhookConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
   const [deliveriesFor, setDeliveriesFor] = useState(null)
+  const [search, setSearch] = useState('')
   // Test, enable and edit write a webhook (write:settings), deleting one is delete:settings
   const canWrite = hasPermission('write:settings')
   const canDelete = hasPermission('delete:settings')
-  let body
-  if (webhooksLoading) body = <SkeletonPanel label={t('common.loading')} />
-  else if (webhooks.length === 0) {
-    body = (
-      <EmptyBlock id="webhooks" icon="bell" title={t('webhooks.noWebhooks')} text={t('webhooks.noWebhooksDescription')}
-        action={{ label: t('webhooks.addWebhook'), icon: 'plus', onClick: handleWebhookCreate, primary: true }} />
-    )
-  } else {
-    // The mockup's record list: name and state, address and events, then the actions
-    body = (
-      <SettingsGroup legend={t('webhooks.configuredWebhooks')} grid={false}>
-        {/* Ten at first: a long list no longer pushes the sections after it thousands of pixels down */}
-        <RecordList step={10}>
-          {webhooks.map(webhook => {
-            const events = webhook.events || []
-            return (
-              <RecordRow key={webhook.id} title={webhook.name}
-                meta={<span className="mono">{webhook.url}</span>}
-                extra={events.length > 0 && (
-                  <span className="rl-meta">
-                    {events.slice(0, 3).map(ev => webhookEventLabel(t, ev)).join(', ')}
-                    {events.length > 3 && ` +${events.length - 3}`}
-                  </span>
-                )}
-                badge={<Pill tone={webhook.enabled ? 'good' : 'muted'} label={webhook.enabled ? t('common.enabled') : t('common.disabled')} />}
-                action={<>
-                  <IconBtn icon="clock" label={t('webhooks.deliveries.title', { name: webhook.name })} onClick={() => setDeliveriesFor(webhook)} />
-                  {canWrite && (
-                    <>
-                      <IconBtn icon="send" label={t('webhooks.test')} disabled={webhookTesting === webhook.id || undefined} onClick={() => handleWebhookTest(webhook)} />
-                      <IconBtn icon={webhook.enabled ? 'block' : 'check'} write label={webhook.enabled ? t('common.disable') : t('common.enable')}
-                        onClick={() => handleWebhookToggle(webhook)} />
-                      <IconBtn icon="settings" label={t('common.edit')} onClick={() => handleWebhookEdit(webhook)} />
-                    </>
-                  )}
-                  {canDelete && <IconBtn icon="close" write label={t('common.delete')} onClick={() => setWebhookConfirmDelete(webhook)} />}
-                </>} />
-            )
-          })}
-        </RecordList>
-        {hasPermission('admin:system') && (
-          <div className="settings-actions">
-            <Btn tone="primary" icon="plus" onClick={handleWebhookCreate}>{t('webhooks.addWebhook')}</Btn>
-          </div>
-        )}
-      </SettingsGroup>
-    )
+  const canAdd = hasPermission('admin:system')
+
+  // The search reads the name, the address and the events, by their code or their words
+  const needle = search.trim().toLowerCase()
+  const words = (hook) => [hook.name, hook.url, ...(hook.events || []).flatMap((ev) => [ev, webhookEventLabel(t, ev)])]
+  const shown = needle ? webhooks.filter((hook) => words(hook).some((v) => (v || '').toLowerCase().includes(needle))) : webhooks
+  const sortParam = useSortParam(BY_NAME, SORT_KEYS, { scope: 'webhooks' })
+  const list = useClientList(shown, {
+    sortParam,
+    resetKey: needle,
+    sorts: { name: (r) => r.name, url: (r) => r.url, events: (r) => (r.events || []).length, state: (r) => (r.enabled ? 0 : 1) },
+  })
+
+  const events = (row) => {
+    const all = row.events || []
+    if (!all.length) return '—'
+    return `${all.slice(0, 3).map((ev) => webhookEventLabel(t, ev)).join(', ')}${all.length > 3 ? ` +${all.length - 3}` : ''}`
   }
+  const rowActions = (row) => [
+    { icon: 'clock', label: t('webhooks.deliveries.title', { name: row.name }), onClick: () => setDeliveriesFor(row) },
+    ...(canWrite ? [
+      { icon: 'send', label: t('webhooks.test'), disabled: webhookTesting === row.id, onClick: () => handleWebhookTest(row) },
+      { icon: row.enabled ? 'block' : 'check', label: row.enabled ? t('common.disable') : t('common.enable'), write: true, onClick: () => handleWebhookToggle(row) },
+      { icon: 'settings', label: t('common.edit'), onClick: () => handleWebhookEdit(row) },
+    ] : []),
+    ...(canDelete ? [{ icon: 'close', label: t('common.delete'), write: true, onClick: () => setWebhookConfirmDelete(row) }] : []),
+  ]
+
+  // The module list of the Active Directory section: the name opens the form, the row holds the actions
   return (
     <>
-      {body}
+      <ListView label={t('webhooks.title')} icon="bell" list={list} nameSort="name" loading={webhooksLoading} scrollId="webhooks-scroll" cardActions
+        title={(row) => row.name}
+        status={(row) => <Pill tone={row.enabled ? 'good' : 'muted'} label={row.enabled ? t('common.enabled') : t('common.disabled')} />}
+        onOpen={canWrite ? handleWebhookEdit : undefined}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="webhook-search" label={t('common.search')} placeholder={t('webhooks.searchPlaceholder')} value={search} onChange={setSearch} />
+          </Toolbar>
+        )}
+        columns={[
+          { id: 'url', label: t('webhooks.url'), cell: (row) => <span className="mono">{row.url}</span>, title: (row) => row.url, kind: 'text', priority: 2, grow: true, sort: 'url' },
+          { id: 'events', label: t('webhooks.events'), cell: events, title: (row) => (row.events || []).map((ev) => webhookEventLabel(t, ev)).join(', ') || undefined, kind: 'text', priority: 3, sort: 'events' },
+          { status: true, sort: 'state' },
+        ]}
+        rowActions={rowActions}
+        empty={webhooks.length ? (
+          <NoMatch title={t('common.noResults')} resetLabel={t('common.clear')} onReset={() => setSearch('')} />
+        ) : (
+          <EmptyBlock id="webhooks" icon="bell" title={t('webhooks.noWebhooks')} text={t('webhooks.noWebhooksDescription')}
+            action={canAdd ? { label: t('webhooks.addWebhook'), icon: 'plus', onClick: handleWebhookCreate, primary: true } : undefined} />
+        )}
+        footer={list.paged ? { range: t('table.range', { start: list.start, end: list.end, total: list.total }) } : undefined} />
+
+      {canAdd && webhooks.length > 0 && (
+        <div className="settings-actions">
+          <Btn tone="primary" icon="plus" onClick={handleWebhookCreate}>{t('webhooks.addWebhook')}</Btn>
+        </div>
+      )}
       <WebhookDeliveriesModal
         webhook={deliveriesFor}
         onClose={() => setDeliveriesFor(null)}

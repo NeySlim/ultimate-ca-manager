@@ -3132,7 +3132,12 @@
     "reattachFailed": "Impossibile riassociare la distribuzione",
     "kind_http": "API HTTP",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Comando di ricaricamento:"
+    "reloadCommandIs": "Comando di ricaricamento:",
+    "searchPlaceholder": "Cerca per nome, host o URL...",
+    "kindColumn": "Tipo",
+    "connectionColumn": "Connessione",
+    "deliveryColumn": "Invio",
+    "lastSuccessColumn": "Ultimo successo"
   },
   "crlDeploy": {
     "title": "Distribuzione CRL",
@@ -4520,7 +4525,10 @@
     "templateFormat": "Formato del modello",
     "templateVariablesLead": "Variabili: ",
     "ocspRevocationTitle": "OCSP e revoca",
-    "interfaceLanguage": "Lingua dell'interfaccia"
+    "interfaceLanguage": "Lingua dell'interfaccia",
+    "anomalySearchPlaceholder": "Cerca per tipo, indirizzo o messaggio...",
+    "anomalySource": "Origine",
+    "anomalySeverity": "Gravità"
   },
   "account": {
     "profile": "Profilo",
@@ -4661,7 +4669,9 @@
     "apiKeysIntent": "Chiavi che chiamano l'API per conto del tuo account.",
     "profileSaved": "Profilo salvato.",
     "profileReset": "Modifiche al profilo annullate.",
-    "apiKeyHint": "Le chiavi API consentono l'accesso programmatico a UCM. Mantieni segrete le tue chiavi e ruotale regolarmente. Ogni chiave può avere una data di scadenza personalizzata."
+    "apiKeyHint": "Le chiavi API consentono l'accesso programmatico a UCM. Mantieni segrete le tue chiavi e ruotale regolarmente. Ogni chiave può avere una data di scadenza personalizzata.",
+    "apiKeySearchPlaceholder": "Cerca per nome o prefisso...",
+    "apiKeyPrefix": "Prefisso"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",
@@ -5509,7 +5519,9 @@
     },
     "customHeadersSet": "Questo webhook ha intestazioni personalizzate impostate tramite l'API; i loro valori non vengono mostrati.",
     "dropCustomHeaders": "Rimuovi le intestazioni personalizzate",
-    "customHeadersFollowUrl": "Le intestazioni personalizzate restano legate all'URL salvato: rimuovile per modificarlo, oppure reinseriscile tramite l'API."
+    "customHeadersFollowUrl": "Le intestazioni personalizzate restano legate all'URL salvato: rimuovile per modificarlo, oppure reinseriscile tramite l'API.",
+    "url": "URL",
+    "searchPlaceholder": "Cerca per nome, URL o evento..."
   },
   "safeMode": {
     "title": "Modalità sicura",
@@ -7005,7 +7017,13 @@
       "enrolleeUpnPlaceholder": "mario.rossi@corp.local",
       "upnRequired": "L'UPN è richiesto quando l'iscrizione per conto di è abilitata",
       "hint": "Richiede un certificato dell'agente di iscrizione configurato sulla CA. Il modello deve consentire l'iscrizione per conto di altri utenti."
-    }
+    },
+    "searchPlaceholder": "Cerca per nome, server o modello...",
+    "serverColumn": "Server",
+    "templateColumn": "Modello",
+    "authColumn": "Autenticazione",
+    "lastTestColumn": "Ultimo test",
+    "runsColumn": "Sincronizzazioni"
   },
   "xcepWstep": {
     "title": "Iscrizione automatica Windows",

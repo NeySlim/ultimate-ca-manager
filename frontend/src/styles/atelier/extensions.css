@@ -28,6 +28,8 @@
 /* A row's own buttons keep the row at its density (36 px, D1), as the icons of .table-actions do */
 .atl .module-table td .btn,.atl .module-table td .row-actions>.icon-btn{min-height:27px;padding-top:0;padding-bottom:0}
 .atl .mobile-record:not(:has(.check-hit)) .row-description{margin-left:0}
+/* The row actions a phone record carries (cardActions) sit at the end of its state line, as tight as in a cell */
+.atl .mobile-record .row-status>.row-actions{gap:1px;margin-left:auto}
 .atl .result-icon.warn{background:var(--warnbg);color:var(--warn)}
 @media(max-width:800px){.atl .subject-grid{grid-template-columns:1fr}.atl .subject-grid .field.wide{grid-column:auto}.atl .ext-row:not(.fixed){grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:"oid remove" "value value" "critical critical"}.atl .ext-row .ext-critical{grid-area:critical}}
 /* Authorities: a root alone on one line, the group of idle roots and the button that draws more of them
@@ -152,9 +154,9 @@
 .atl .settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .atl .settings-grid>.settings-actions,.atl .settings-grid>.notice{grid-column:1/-1}
 .atl .settings-grid>.notice,.atl .settings-stack>.notice,.atl .settings-body>.notice{margin:0}
-/* A list in a section (the state chips and the table of Operations) keeps to the section's width: its own region scrolls. */
+/* A list in a section or a group of it (Operations, the API keys, the anomalies) keeps to its width: its own region scrolls. */
 .atl .settings-body>.filters-row{min-width:0}
-.atl .settings-body>.table-workspace{min-width:0}
+.atl .settings-body>.table-workspace,.atl .settings-stack>.table-workspace{min-width:0}
 .atl .notice-actions{margin-top:8px}
 .atl .pre-line{white-space:pre-line}
 .atl .field>.segmented{align-self:flex-start;flex-wrap:wrap}

@@ -1,9 +1,10 @@
 /**
- * SSO providers, webhooks and Microsoft AC connections as the mockup's record list: one line
- * per record, named icon actions, and only the actions the API grants to the viewer.
+ * SSO providers as the mockup's record list (a small fixed set); webhooks and Microsoft AC
+ * connections, which grow, in the module table of settingsTables.test.jsx.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render as rtlRender, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import '../../__tests__/pageRenderingSetup.jsx'
 import SsoSection from '../SsoSection'
 import WebhooksSection from '../WebhooksSection'
@@ -13,6 +14,8 @@ import { blockedWhileSuspended } from '../../../components/shell/__tests__/write
 
 vi.mock('../WebhookDeliveriesModal', () => ({ default: () => null }))
 
+// The tables keep their sort in the address
+const render = (ui) => rtlRender(ui, { wrapper: MemoryRouter })
 const can = (...granted) => (p) => granted.includes(p)
 const noop = vi.fn()
 
@@ -51,34 +54,9 @@ describe('settings record lists', () => {
     expect(within(ldap).queryByRole('button', { name: 'common.delete' })).toBeNull()
   })
 
-  it('lists the webhooks with their address and events, actions by permission', () => {
-    hooks(can('read:settings', 'write:settings'))
-    const [row] = screen.getAllByRole('listitem')
-    expect(row).toHaveTextContent('https://hook.example.com')
-    expect(within(row).getByRole('button', { name: 'webhooks.test' })).toBeInTheDocument()
-    expect(within(row).queryByRole('button', { name: 'common.delete' })).toBeNull()
-  })
-
-  it('lines up the states and actions of the SSO and Microsoft AC lists in columns', () => {
+  it('lines up the states and actions of the SSO list in columns', () => {
     sso(can('read:sso'))
     expect(screen.getAllByRole('listitem')[0].closest('ul')).toHaveClass('rl-cols')
-  })
-
-  it('names a Microsoft AC connection\'s authentication in words, the group under the card\'s title only once', () => {
-    const { container } = msca(can('read:settings'))
-    const [row] = screen.getAllByRole('listitem')
-    expect(row.closest('ul')).toHaveClass('rl-cols')
-    expect(row).toHaveTextContent('msca.authBasic')
-    expect(row.textContent).not.toMatch(/\bbasic\b/)
-    expect(container.querySelector('legend')).toHaveClass('sr-only')
-  })
-
-  it('lists the Microsoft AC connections, edit kept from a reader', () => {
-    msca(can('read:settings'))
-    const [row] = screen.getAllByRole('listitem')
-    expect(row.closest('ul')).toHaveClass('record-list')
-    expect(row).toHaveTextContent('dc.example.com')
-    expect(within(row).queryByRole('button', { name: 'common.edit' })).toBeNull()
   })
 
   it('lists the archives with a size in units and a date in the reader format', () => {
@@ -94,21 +72,6 @@ describe('settings record lists', () => {
     expect(row.textContent).toMatch(/1[.,]5\s?(MB|Mo)/)
     expect(within(row).getByTitle('common.download')).toBeInTheDocument()
     expect(within(row).getByTitle('common.delete')).toHaveAttribute('data-write')
-  })
-
-  it('says the outcome of a Microsoft AC test and syncs in words, without check marks', () => {
-    render(
-      <MicrosoftCASection mscaConnections={[{ id: 3, name: 'adcs', server: 'dc.example.com', enabled: true, auth_method: 'basic',
-        default_template: 'User', last_test_at: '2026-11-20T10:00:00Z', last_test_result: 'success',
-        crl_sync_enabled: true, last_crl_sync_at: '2026-11-20T10:00:00Z', last_crl_sync_result: 'error: timeout' }]}
-        mscaLoading={false} handleMscaCreate={noop} handleMscaEdit={noop} handleMscaToggle={noop} handleMscaTest={noop}
-        handleMscaSyncCrl={noop} handleMscaPublishCrl={noop} handleMscaInventorySync={noop} handleMscaCaControl={noop}
-        setMscaConfirmDelete={noop} hasPermission={can('read:settings')} />,
-    )
-    const row = screen.getAllByRole('listitem')[0]
-    expect(row.textContent).not.toMatch(/[✓✗]/)
-    expect(row.textContent).toMatch(/Success|common\.success/)
-    expect(row.textContent).toMatch(/Failed|common\.failed/)
   })
 })
 
@@ -131,16 +94,5 @@ describe('settings record lists: write guard', () => {
     )
     expect(blockedWhileSuspended(screen.getByRole('button', { name: /settings.createBackup/ }))).toBe(true)
     expect(blockedWhileSuspended(screen.getByRole('button', { name: /settings.backupCleanupNow/ }))).toBe(true)
-  })
-
-  // A long list of webhooks shows ten, then ten more at each ask: the sections after it stay within reach
-  it('shows the first ten webhooks, then ten more at each ask', () => {
-    const many = Array.from({ length: 23 }, (_, i) => ({ id: i + 1, name: `hook-${i + 1}`, url: `https://h${i}.example.com`, enabled: true, events: [] }))
-    render(<WebhooksSection webhooks={many} webhooksLoading={false} handleWebhookCreate={noop} handleWebhookEdit={noop} handleWebhookToggle={noop}
-      handleWebhookTest={noop} setWebhookConfirmDelete={noop} hasPermission={can('read:settings')} />)
-    const shown = () => document.querySelectorAll('.record-list > li').length
-    expect(shown()).toBe(10)
-    fireEvent.click(document.querySelector('[data-action="records-more"]'))
-    expect(shown()).toBe(20)
   })
 })

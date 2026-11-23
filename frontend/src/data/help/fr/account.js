@@ -140,7 +140,7 @@ Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **L
 Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d’administration des utilisateurs : celles-ci exigent une session interactive.
 
 ### Révoquer des clés
-Le premier **Supprimer** révoque une clé API immédiatement : les requêtes qui l’utilisent sont refusées dès lors. Un second Supprimer sur la clé révoquée la retire.
+**Révoquer** sur une clé en usage la révoque immédiatement : les requêtes qui l’utilisent sont refusées dès lors. Une clé révoquée ou expirée propose **Supprimer**, qui la retire. Le tableau liste d’abord les clés en usage, puis les clés expirées et révoquées ; il se cherche par nom ou préfixe, se trie par chaque colonne et se pagine au-delà de dix clés.
 
 > 💡 Utilisez des clés API de courte durée pour le CI/CD et l’automatisation.
 `

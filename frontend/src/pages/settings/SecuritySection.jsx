@@ -5,6 +5,7 @@ import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatDate } from '../../lib/utils'
 import { anchorPickerCas } from '../../lib/caSelection'
 import AdminLockLabel from './AdminLockLabel'
+import AnomalyList from './AnomalyList'
 import { shownNumber, typedNumber } from './numberFields'
 import { fact } from '../../components/atelier/facts'
 
@@ -212,19 +213,7 @@ export default function SecuritySection({ settings, fieldErrors = {}, updateSett
       </SettingsGroup>
       <SettingsGroup grid={false}
         legend={<>{t('settings.anomalyDetection')}{anomalies.length > 0 && <>{' '}<Pill tone="warn" label={String(anomalies.length)} /></>}</>}>
-        {anomaliesLoading ? (
-          <SkeletonPanel label={t('common.loading')} />
-        ) : (
-          <RecordList empty={`${t('settings.noAnomalies')}. ${t('settings.noAnomaliesDesc')}`}>
-            {anomalies.map((anomaly, i) => (
-              <RecordRow key={i} title={anomaly.details?.type || t('settings.unknownAnomaly')}
-                meta={[formatDate(anomaly.timestamp), anomaly.details?.ip, anomaly.details?.user_id && `#${anomaly.details.user_id}`].filter(Boolean).join(' · ')}
-                extra={anomaly.details?.message && <span className="rl-meta">{anomaly.details.message}</span>}
-                badge={<Pill tone={anomaly.details?.severity === 'high' ? 'bad' : 'warn'}
-                  label={anomaly.details?.severity === 'high' ? t('settings.anomalyHigh') : t('settings.anomalyWarn')} />} />
-            ))}
-          </RecordList>
-        )}
+        <AnomalyList anomalies={anomalies} loading={anomaliesLoading} />
         <div className="settings-actions">
           <Btn icon="refresh" onClick={loadAnomalies} disabled={anomaliesLoading}>{t('common.refresh')}</Btn>
         </div>

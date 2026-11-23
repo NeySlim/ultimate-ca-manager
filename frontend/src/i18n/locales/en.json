@@ -3132,7 +3132,12 @@
     "reattachFailed": "Could not reattach the deployment",
     "kind_http": "HTTP API",
     "kind_ssh": "SSH / SFTP",
-    "reloadCommandIs": "Reload command:"
+    "reloadCommandIs": "Reload command:",
+    "searchPlaceholder": "Search by name, host or URL...",
+    "kindColumn": "Type",
+    "connectionColumn": "Connection",
+    "deliveryColumn": "Delivery",
+    "lastSuccessColumn": "Last success"
   },
   "crlDeploy": {
     "title": "CRL Deployment",
@@ -4520,7 +4525,10 @@
     "templateFormat": "Template format",
     "templateVariablesLead": "Variables: ",
     "ocspRevocationTitle": "OCSP and revocation",
-    "interfaceLanguage": "Interface language"
+    "interfaceLanguage": "Interface language",
+    "anomalySearchPlaceholder": "Search by type, address or message...",
+    "anomalySource": "Source",
+    "anomalySeverity": "Severity"
   },
   "account": {
     "profile": "Profile",
@@ -4661,7 +4669,9 @@
     "apiKeysIntent": "Keys that call the API on behalf of your account.",
     "profileSaved": "Profile saved.",
     "profileReset": "Profile changes undone.",
-    "apiKeyHint": "API keys allow programmatic access to UCM. Keep your keys secret and rotate them regularly. Each key can have a custom expiration date."
+    "apiKeyHint": "API keys allow programmatic access to UCM. Keep your keys secret and rotate them regularly. Each key can have a custom expiration date.",
+    "apiKeySearchPlaceholder": "Search by name or prefix...",
+    "apiKeyPrefix": "Prefix"
   },
   "rbac": {
     "title": "Role-Based Access Control",
@@ -5509,7 +5519,9 @@
     },
     "customHeadersSet": "Custom headers are set on this webhook through the API; their values are not shown.",
     "dropCustomHeaders": "Remove the custom headers",
-    "customHeadersFollowUrl": "Custom headers stay with the saved URL: remove them to change it, or re-enter them through the API."
+    "customHeadersFollowUrl": "Custom headers stay with the saved URL: remove them to change it, or re-enter them through the API.",
+    "url": "URL",
+    "searchPlaceholder": "Search by name, URL or event..."
   },
   "safeMode": {
     "title": "Safe Mode",
@@ -7005,7 +7017,13 @@
       "enrolleeUpnPlaceholder": "john.doe@corp.local",
       "upnRequired": "UPN is required when Enroll on Behalf Of is enabled",
       "hint": "Requires an enrollment agent certificate configured on the CA. The template must allow enrollment on behalf of other users."
-    }
+    },
+    "searchPlaceholder": "Search by name, server or template...",
+    "serverColumn": "Server",
+    "templateColumn": "Template",
+    "authColumn": "Authentication",
+    "lastTestColumn": "Last test",
+    "runsColumn": "Syncs"
   },
   "xcepWstep": {
     "title": "Windows Autoenrollment",

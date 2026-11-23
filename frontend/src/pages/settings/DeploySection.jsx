@@ -7,9 +7,8 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, IconBtn, Pill, RecordList, RecordRow, SkeletonPanel, EmptyBlock } from '../../components/atelier'
+import { Btn, ListView, Toolbar, SearchField, NoMatch, Pill, EmptyBlock, useClientList, useSortParam } from '../../components/atelier'
 import { Modal, Input, NumberInput, Select, Textarea, ToggleSwitch, ChoiceField, Notice } from '../../components/atelier/Form'
-import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { deployService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
@@ -30,6 +29,9 @@ const HTTP_TEMPLATE_VARIABLES = [
 const TEMPLATE_HINT_VARS = {
   example: '{{name}}', jsonExample: '{{cert_pem|json}}', jsonstrExample: '{{cn|jsonstr}}', b64Example: '{{cert_pem|b64}}', urlExample: '{{cn|urlencode}}',
 }
+// The targets by name (T4)
+const BY_NAME = { key: 'name', asc: true }
+const SORT_KEYS = ['name', 'kind', 'connection', 'success', 'state']
 const HTTP_TEMPLATE_EXAMPLE = '{"name": {{name|json}}, "cert": {{cert_pem|json}}, "chain": {{chain_pem|json}}}'
 
 export default function DeploySection() {
@@ -46,6 +48,21 @@ export default function DeploySection() {
   const [saving, setSaving] = useState(false)
   const [publicKeyFor, setPublicKeyFor] = useState(null)
   const { copy, isCopied } = useClipboard(1500)
+  const [search, setSearch] = useState('')
+  // The search reads the name, the host and the address; the sort is in the address under this list's scope
+  const needle = search.trim().toLowerCase()
+  const shownTargets = needle
+    ? targets.filter((target) => [target.name, target.host, target.url, target.username].some((v) => (v || '').toLowerCase().includes(needle)))
+    : targets
+  const sortParam = useSortParam(BY_NAME, SORT_KEYS, { scope: 'deploy' })
+  const targetList = useClientList(shownTargets, {
+    sortParam,
+    resetKey: needle,
+    sorts: {
+      name: (r) => r.name, kind: (r) => r.kind || 'ssh', connection: (r) => (r.kind === 'http' ? r.url : r.host),
+      success: (r) => (r.last_success_at ? Date.parse(r.last_success_at) : null), state: (r) => (r.enabled ? 0 : 1),
+    },
+  })
 
   const load = async () => {
     try {
@@ -176,52 +193,60 @@ export default function DeploySection() {
   }))
 
   const closeForm = () => { if (!saving) setFormOpen(false) }
-  let list
-  if (loading) list = <SkeletonPanel label={t('common.loading')} />
-  else if (targets.length === 0) {
-    list = (
-      <EmptyBlock id="deploy" icon="upload" title={t('deploy.noTargets')} text={t('deploy.noTargetsDescription')}
-        action={{ label: t('deploy.addTarget'), icon: 'plus', onClick: openCreate, primary: true }} />
-    )
-  } else {
-    // The mockup's record list: name and state, the connection, its key or what it sends, then the actions
-    list = (
-      <SettingsGroup legend={t('deploy.targets')} grid={false}>
-        <RecordList>
-          {targets.map(target => (
-            <RecordRow key={target.id} title={target.name}
-              meta={<span className="mono">{target.kind === 'http' ? `${target.http_method} ${target.url}` : `${target.username}@${target.host}:${target.port}`}</span>}
-              extra={(
-                <span className="rl-meta">
-                  {target.kind === 'http'
-                    ? (target.allow_private_key ? t('deploy.httpSendsKey') : t('deploy.httpCertOnly'))
-                    : target.host_key_pinned
-                      ? t('deploy.hostKeyPinned', { fingerprint: target.host_key_fingerprint })
-                      : t('deploy.hostKeyNotPinned')}
-                  {target.last_success_at && ` · ${t('deploy.lastSuccess', { date: formatDate(target.last_success_at) })}`}
-                </span>
-              )}
-              badge={(
-                <span className="row-actions">
-                  <Pill icon={target.kind === 'http' ? 'globe' : 'terminal'} label={t(`deploy.kind_${target.kind === 'http' ? 'http' : 'ssh'}`)} />
-                  <Pill tone={target.enabled ? 'good' : 'muted'} label={target.enabled ? t('common.enabled') : t('common.disabled')} />
-                  {target.failure_count > 0 && <Pill tone="bad" label={t('deploy.failures', { count: target.failure_count })} />}
-                </span>
-              )}
-              action={<>
-                {target.kind !== 'http' && <IconBtn icon="key" label={t('deploy.showPublicKey')} onClick={() => setPublicKeyFor(target)} />}
-                <IconBtn icon="send" label={t('deploy.testConnection')} disabled={testing === target.id || undefined} onClick={() => handleTest(target)} />
-                <IconBtn icon="settings" label={t('common.edit')} onClick={() => openEdit(target)} />
-                <IconBtn icon="close" write label={t('common.delete')} onClick={() => handleDelete(target)} />
-              </>} />
-          ))}
-        </RecordList>
+  // The module list of the Active Directory section: the name opens the form, the row holds the actions
+  const connection = (target) => (target.kind === 'http' ? `${target.http_method} ${target.url}` : `${target.username}@${target.host}:${target.port}`)
+  const delivery = (target) => (target.kind === 'http'
+    ? (target.allow_private_key ? t('deploy.httpSendsKey') : t('deploy.httpCertOnly'))
+    : target.host_key_pinned
+      ? t('deploy.hostKeyPinned', { fingerprint: target.host_key_fingerprint })
+      : t('deploy.hostKeyNotPinned'))
+  const rowActions = (target) => [
+    ...(target.kind !== 'http' ? [{ icon: 'key', label: t('deploy.showPublicKey'), onClick: () => setPublicKeyFor(target) }] : []),
+    { icon: 'send', label: t('deploy.testConnection'), disabled: testing === target.id, onClick: () => handleTest(target) },
+    { icon: 'settings', label: t('common.edit'), onClick: () => openEdit(target) },
+    { icon: 'close', label: t('common.delete'), write: true, onClick: () => handleDelete(target) },
+  ]
+  const empty = (
+    <EmptyBlock id="deploy" icon="upload" title={t('deploy.noTargets')} text={t('deploy.noTargetsDescription')}
+      action={{ label: t('deploy.addTarget'), icon: 'plus', onClick: openCreate, primary: true }} />
+  )
+  // Without any target the section keeps its empty block alone, the table comes with the first one
+  const list = !loading && targets.length === 0 ? empty : (
+    <>
+      <ListView label={t('deploy.targets')} icon="upload" list={targetList} nameSort="name" loading={loading} scrollId="deploy-scroll" cardActions
+        title={(target) => target.name}
+        status={(target) => (
+          <span className="row-actions">
+            <Pill tone={target.enabled ? 'good' : 'muted'} label={target.enabled ? t('common.enabled') : t('common.disabled')} />
+            {target.failure_count > 0 && <Pill tone="bad" label={t('deploy.failures', { count: target.failure_count })} />}
+          </span>
+        )}
+        onOpen={openEdit}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="deploy-search" label={t('common.search')} placeholder={t('deploy.searchPlaceholder')} value={search} onChange={setSearch} />
+          </Toolbar>
+        )}
+        columns={[
+          { id: 'kind', label: t('deploy.kindColumn'), cell: (target) => <Pill icon={target.kind === 'http' ? 'globe' : 'terminal'} label={t(`deploy.kind_${target.kind === 'http' ? 'http' : 'ssh'}`)} />,
+            kind: 'fit', priority: 3, sort: 'kind' },
+          { id: 'connection', label: t('deploy.connectionColumn'), cell: (target) => <span className="mono">{connection(target)}</span>, title: connection,
+            kind: 'text', priority: 2, grow: true, sort: 'connection' },
+          { id: 'delivery', label: t('deploy.deliveryColumn'), cell: delivery, title: delivery, kind: 'text', priority: 4 },
+          { id: 'success', label: t('deploy.lastSuccessColumn'), cell: (target) => (target.last_success_at ? formatDate(target.last_success_at) : '—'),
+            kind: 'fit', priority: 3, sort: 'success' },
+          { status: true, sort: 'state' },
+        ]}
+        rowActions={rowActions}
+        empty={<NoMatch title={t('common.noResults')} resetLabel={t('common.clear')} onReset={() => setSearch('')} />}
+        footer={targetList.paged ? { range: t('table.range', { start: targetList.start, end: targetList.end, total: targetList.total }) } : undefined} />
+      {targets.length > 0 && (
         <div className="settings-actions">
           <Btn tone="primary" icon="plus" onClick={openCreate}>{t('deploy.addTarget')}</Btn>
         </div>
-      </SettingsGroup>
-    )
-  }
+      )}
+    </>
+  )
 
   return (
     <>

@@ -140,7 +140,7 @@ Cada clave lleva el alcance elegido al crearla (**Acceso completo**, **Solo lect
 Las claves API, incluso las de Acceso completo, no pueden cambiar el perfil, la contraseña, el 2FA, las llaves de seguridad, los certificados mTLS ni las sesiones, ni alcanzar la propia cuenta mediante las acciones de administración de usuarios: estas requieren una sesión interactiva.
 
 ### Revocar claves
-El primer **Eliminar** revoca una clave API de inmediato: las solicitudes con ella se rechazan desde ese momento. Un segundo Eliminar sobre la clave revocada la borra.
+**Revocar** en una clave en uso la revoca de inmediato: las solicitudes con ella se rechazan desde ese momento. Una clave revocada o caducada ofrece **Eliminar**, que la borra. La tabla muestra primero las claves en uso y después las caducadas y revocadas; se busca por nombre o prefijo, se ordena por cualquier columna y se pagina a partir de diez claves.
 
 > 💡 Usar claves API de corta duración para CI/CD y automatización.
 `

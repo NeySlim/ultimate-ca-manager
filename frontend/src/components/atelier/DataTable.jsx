@@ -207,14 +207,15 @@ const labelled = (col) => typeof col.label === 'string' || Boolean(col.labelFull
  * @param {(row) => string} p.rowLabel  names a row in the labels of its checkbox, actions and chevron
  * @param {(row) => void} [p.onOpen]  the entity button, the chevron and a click anywhere else on the row open it; `rowOpens={false}` keeps the row inert
  * @param {{ selection: Set, onToggle(id), onTogglePage(on) }} [p.selection]
- * @param {(row) => Array<{icon,label,onClick,write,spare}>} [p.rowActions]  icon buttons before the chevron; `spare`: hidden short of room
+ * @param {(row) => Array<{icon,label,onClick,write,spare,disabled}>} [p.rowActions]  icon buttons before the chevron; `spare`: hidden short of room
  * @param {{key, asc}} [p.sort]  with onSort the sortable headers are buttons; without it the sorted header only shows its arrow
  * @param {(row) => {description?, meta?: Array, status?, end?, note?}} [p.card]  the phone record
+ * @param {boolean} [p.cardActions]  the phone record carries the row actions, for a list whose detail does not hold them
  */
 export function DataTable({
   kind = 'certificates', scrollId, label, caption, columns: allColumns, rows = [], rowKey = (r) => r.id, rowLabel = (r) => String(r.id),
   onOpen, openLabel, openedId, rowOpens = true, selection, rowActions, sort, onSort, loading = false, skeletonRows = 12,
-  empty, card, footer, actionsLabel, columnWidths, onColumnWidth, widthsKey, recordsId,
+  empty, card, footer, actionsLabel, columnWidths, onColumnWidth, widthsKey, recordsId, cardActions = false,
 }) {
   const { t, i18n } = useTranslation()
   const { isMobile } = useMobile()
@@ -335,7 +336,7 @@ export function DataTable({
   )
   const actionButtons = (row) => (rowActions?.(row) || []).map((a, i) => (
     <button key={i} type="button" className="icon-btn" aria-label={t('table.rowAction', { action: a.label, name: rowLabel(row) })}
-      title={a.label} disabled={locked || undefined} data-write={a.write ? '' : undefined} data-spare={a.spare ? '' : undefined}
+      title={a.label} disabled={locked || a.disabled || undefined} data-write={a.write ? '' : undefined} data-spare={a.spare ? '' : undefined}
       onClick={(e) => { e.stopPropagation(); a.onClick?.(row) }}>
       <Icon name={a.icon} />
     </button>
@@ -362,7 +363,8 @@ export function DataTable({
           <div className="mobile-list" id={recordsId}>
             {firstRead ? <SkeletonCards /> : rows.length ? rows.map((row) => (
               <MobileRecord key={rowKey(row)} row={row} id={rowKey(row)} name={rowLabel(row)} card={card(row) || {}} selection={selection}
-                checked={selected.has(rowKey(row))} opened={kind === 'module' && openedId === rowKey(row)} locked={locked} onOpen={onOpen} chevronLabel={chevronLabel(row)} />
+                checked={selected.has(rowKey(row))} opened={kind === 'module' && openedId === rowKey(row)} locked={locked} onOpen={onOpen} chevronLabel={chevronLabel(row)}
+                actions={cardActions && rowActions ? actionButtons(row) : null} />
             )) : empty}
           </div>
         ) : (
@@ -589,7 +591,7 @@ function HeaderCell({ col, className, sort, onSort, last, lead, width, requested
  * state (a module's open item is marked as a ticked one, as the mockup does). A record that opens carries its chevron at the right and opens from anywhere on it;
  * the checkbox only selects, and nothing opens while rows are ticked.
  */
-export function MobileRecord({ row, id, name, card, selection, checked, opened, locked, onOpen, chevronLabel }) {
+export function MobileRecord({ row, id, name, card, selection, checked, opened, locked, onOpen, chevronLabel, actions }) {
   const { t } = useTranslation()
   const meta = (card.meta || []).filter((m) => m !== null && m !== undefined && m !== false && m !== '')
   return (
@@ -613,7 +615,12 @@ export function MobileRecord({ row, id, name, card, selection, checked, opened, 
       </div>
       {card.description && <p className="row-description">{card.description}</p>}
       {(meta.length > 0 || card.note) && <div className="row-meta">{meta.map((m, i) => <span key={i}>{m}</span>)}{card.note}</div>}
-      {(card.status || card.end) && <div className="row-status">{card.status}{card.end !== undefined && <span className="remaining">{card.end}</span>}</div>}
+      {(card.status || card.end || actions?.length > 0) && (
+        <div className="row-status">
+          {card.status}{card.end !== undefined && <span className="remaining">{card.end}</span>}
+          {actions?.length > 0 && <span className="row-actions">{actions}</span>}
+        </div>
+      )}
     </article>
   )
 }

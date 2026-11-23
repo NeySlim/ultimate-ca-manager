@@ -87,7 +87,7 @@ describe('AccountPage after the graphic review', () => {
     expect(hints).toHaveLength(1)
     expect(hints[0]).toHaveTextContent('account.apiKeyHint')
     const row = await within(group).findByText('ops')
-    expect(row.closest('li')).toHaveTextContent('common.sso')
+    expect(row.closest('tr')).toHaveTextContent('common.sso')
   })
 
   it('lists the keys in use before the revoked ones', async () => {
@@ -95,7 +95,7 @@ describe('AccountPage after the graphic review', () => {
     fireEvent.click((await screen.findAllByText('account.apiKeys'))[0])
     const group = (await screen.findByText('account.yourAPIKeys')).closest('fieldset')
     await within(group).findByText('ops')
-    expect([...group.querySelectorAll('.record-list > li strong')].map((s) => s.textContent)).toEqual(['ops', 'old'])
+    expect([...group.querySelectorAll('table.module-table tbody tr')].map((tr) => tr.querySelector('th, td').textContent.trim())).toEqual(['ops', 'old'])
   })
 
   it('puts the language of the interface among the preferences, no group named after its one field', async () => {
