@@ -22,6 +22,26 @@ def certsrv(monkeypatch):
     return calls
 
 
+@pytest.fixture
+def clients(monkeypatch):
+    """The certsrv clients built; ``sign_in()`` makes their Kerberos handlers acquire."""
+    from services.msca.connection import MicrosoftCAConnectionMixin
+    from tests.msca_kerberos_support import sign_in
+    built = []
+    real = MicrosoftCAConnectionMixin._get_client
+
+    def get_client(msca, typed=False):
+        client = real(msca, typed)
+        built.append(client)
+        return client
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_get_client', staticmethod(get_client))
+
+    def sign_in_all():
+        for client in built:
+            sign_in(client.session.auth)
+    return SimpleNamespace(sign_in=sign_in_all)
+
+
 def test_inline_test_with_basic_auth_uses_the_typed_password(app, certsrv):
     from services.msca.connection import MicrosoftCAConnectionMixin
     with app.app_context():
@@ -90,37 +110,29 @@ def test_a_typed_key_shaped_like_a_token_is_written_as_typed(app, certsrv):
     assert seen['key'] == typed
 
 
-def test_kerberos_principal_picks_the_identity(app, certsrv, monkeypatch):
-    # requests-kerberos is faked at the library boundary: no KDC is contacted
-    seen = {}
-
-    class fake_auth:  # subclassed by the connection, as the real handler
-        def __init__(self, **kwargs):
-            seen.update(kwargs)
-
-    monkeypatch.setitem(sys.modules, 'requests_kerberos',
-                        SimpleNamespace(HTTPKerberosAuth=fake_auth, OPTIONAL=2))
-    monkeypatch.setenv('KRB5_CLIENT_KTNAME', '')  # restored on teardown
+def test_kerberos_principal_picks_the_identity(app, certsrv, clients, monkeypatch, tmp_path):
+    # python-gssapi is faked at the library boundary: no KDC is contacted
+    from tests.msca_kerberos_support import FakeGssapi
+    gss = FakeGssapi().install(monkeypatch)
+    keytab = tmp_path / 'ucm.keytab'
+    keytab.write_bytes(b'')
     from services.msca.connection import MicrosoftCAConnectionMixin
     with app.app_context():
         result = MicrosoftCAConnectionMixin.test_connection_inline(
             {'server': 'ca.example', 'auth_method': 'kerberos',
-             'kerberos_principal': 'svc-ucm@CORP.LOCAL', 'kerberos_keytab_path': '/k/ucm.keytab'})
+             'kerberos_principal': 'svc-ucm@CORP.LOCAL', 'kerberos_keytab_path': str(keytab)})
     assert result.get('success') is True, result
-    assert seen.get('principal') == 'svc-ucm@CORP.LOCAL'
+    clients.sign_in()
+    assert gss.principals == ['svc-ucm@CORP.LOCAL']
+    assert gss.acquired[0][1]['client_keytab'] == str(keytab)
 
 
-def test_kerberos_without_a_principal_uses_the_ambient_identity(app, certsrv, monkeypatch):
-    seen = {}
-
-    class fake_auth:  # subclassed by the connection, as the real handler
-        def __init__(self, **kwargs):
-            seen.update(kwargs)
-
-    monkeypatch.setitem(sys.modules, 'requests_kerberos',
-                        SimpleNamespace(HTTPKerberosAuth=fake_auth, OPTIONAL=2))
+def test_kerberos_without_a_principal_uses_the_ambient_identity(app, certsrv, clients, monkeypatch):
+    from tests.msca_kerberos_support import FakeGssapi
+    gss = FakeGssapi().install(monkeypatch)
     from services.msca.connection import MicrosoftCAConnectionMixin
     with app.app_context():
         MicrosoftCAConnectionMixin.test_connection_inline(
             {'server': 'ca.example', 'auth_method': 'kerberos'})
-    assert seen.get('principal') is None
+    clients.sign_in()
+    assert gss.acquired == [] and len(gss.tokens) == 1 and gss.tokens[0][1] is None

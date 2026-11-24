@@ -8,7 +8,7 @@ from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
 from utils.encryption import decrypt_required
 from utils.secret_target import MASKS, changed_targets, keeps_saved_secret
-from .client_keytab import KerberosBusy, client_keytab
+from .kerberos import KerberosAuth, MSCAKerberosError, initiator_credential
 
 logger = logging.getLogger(__name__)
 
@@ -83,23 +83,10 @@ class MicrosoftCAConnectionMixin:
                 )
 
             elif msca.auth_method == 'kerberos':
-                try:
-                    from requests_kerberos import HTTPKerberosAuth, OPTIONAL
-                except ImportError:
-                    raise RuntimeError(
-                        "requests-kerberos package not installed. "
-                        "Install with: pip install requests-kerberos"
-                    )
-
-                # KRB5_KTNAME is the acceptor's keytab: a client never writes it (A12)
+                # One credential per saved connection, from its own keytab (A12: never KRB5_KTNAME)
                 keytab = msca.kerberos_keytab_path or None
                 principal = msca.kerberos_principal or None
-
-                class _ConnectionKerberosAuth(HTTPKerberosAuth):
-                    # The credential is acquired here: the connection keytab is named only meanwhile
-                    def generate_request_header(self, *args, **kwargs):
-                        with client_keytab(keytab):
-                            return super().generate_request_header(*args, **kwargs)
+                kept = None if typed or not isinstance(msca, MicrosoftCA) else msca.id
 
                 # auth_method='basic' is a placeholder: the real auth is the
                 # Kerberos handler set below. 'ntlm' would make certsrv import
@@ -111,11 +98,8 @@ class MicrosoftCAConnectionMixin:
                     auth_method='basic',
                     cafile=cafile,
                 )
-                # principal selects the credential in the cache or keytab (None: default)
-                client.session.auth = _ConnectionKerberosAuth(
-                    mutual_authentication=OPTIONAL,
-                    principal=principal,
-                )
+                client.session.auth = KerberosAuth(
+                    lambda: initiator_credential(kept, principal, keytab))
 
             elif msca.auth_method == 'basic':
                 client = certsrv.Certsrv(
@@ -201,7 +185,7 @@ class MicrosoftCAConnectionMixin:
                 permissions_ok = len(templates) > 0
                 if not permissions_ok:
                     permission_warning = 'authenticated_but_no_templates'
-            except KerberosBusy:
+            except MSCAKerberosError:
                 raise
             except Exception as tpl_err:
                 permission_warning = 'authenticated_but_template_access_denied'
@@ -228,8 +212,6 @@ class MicrosoftCAConnectionMixin:
             if permission_warning:
                 result['warning'] = permission_warning
             return result
-        except KerberosBusy:
-            raise  # a wait, not a result: nothing is recorded
         except Exception as e:
             logger.error(f"MS CA connection test failed for '{msca.name}': {e}")
             if not overrides:
@@ -281,7 +263,7 @@ class MicrosoftCAConnectionMixin:
                 templates = sorted(templates) if templates else []
                 if not templates:
                     permission_warning = 'authenticated_but_no_templates'
-            except KerberosBusy:
+            except MSCAKerberosError:
                 raise
             except Exception:
                 permission_warning = 'authenticated_but_template_access_denied'
@@ -294,8 +276,6 @@ class MicrosoftCAConnectionMixin:
             if permission_warning:
                 result['warning'] = permission_warning
             return result
-        except KerberosBusy:
-            raise
         except Exception as e:
             logger.error(f"MS CA inline test failed: {e}")
             return {'success': False, 'error': str(e)}

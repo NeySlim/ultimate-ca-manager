@@ -142,14 +142,8 @@ def test_a_new_auth_method_brings_no_saved_password(app, auth_client, certsrv):
 
 
 def test_an_administrator_tests_the_saved_principal_on_another_server(app, auth_client, certsrv, monkeypatch):
-    principals = []
-
-    class HTTPKerberosAuth:
-        def __init__(self, **kw):
-            principals.append(kw.get('principal'))
-
-    monkeypatch.setitem(sys.modules, 'requests_kerberos', SimpleNamespace(
-        OPTIONAL=1, HTTPKerberosAuth=HTTPKerberosAuth))
+    from tests.msca_kerberos_support import record_principals
+    principals = record_principals(monkeypatch)
     with app.app_context():
         row = MicrosoftCA(name=f'form-krb-{uuid.uuid4().hex[:8]}', server='saved.example',
                           auth_method='kerberos', kerberos_principal='svc@CORP',

@@ -51,7 +51,7 @@ def test_saving_an_ntlm_channel_is_refused_and_nothing_changes(app, auth_client,
 
 @pytest.mark.parametrize('kerberos, advice', [
     (True, 'use the Kerberos transport'),
-    (False, 'the Kerberos transport is not installed (pywinrm[kerberos]): turn off the WinRM'),
+    (False, 'the Kerberos transport is not installed (pyspnego[kerberos]): turn off the WinRM'),
 ])
 def test_a_stored_ntlm_connection_is_not_opened(app, fips, monkeypatch, kerberos, advice):
     from services.msca import admin_channel
@@ -68,12 +68,17 @@ def test_a_stored_ntlm_connection_is_not_opened(app, fips, monkeypatch, kerberos
     assert advice in str(exc.value)
 
 
-def test_kerberos_availability_is_what_pywinrm_says(monkeypatch):
+def test_kerberos_availability_is_python_gssapi_not_pykerberos(monkeypatch):
+    import sys
+    import types
     import winrm.transport
     from services.msca.admin_channel import kerberos_transport_available
-    for have in (True, False):
-        monkeypatch.setattr(winrm.transport, 'HAVE_KERBEROS', have)
-        assert kerberos_transport_available() is have
+    monkeypatch.setattr(winrm.transport, 'HAVE_KERBEROS', False)
+    monkeypatch.setitem(sys.modules, 'gssapi', types.ModuleType('gssapi'))
+    assert kerberos_transport_available() is True
+    monkeypatch.setattr(winrm.transport, 'HAVE_KERBEROS', True)
+    monkeypatch.setitem(sys.modules, 'gssapi', None)
+    assert kerberos_transport_available() is False
 
 
 def test_ntlm_still_works_outside_fips(app):
