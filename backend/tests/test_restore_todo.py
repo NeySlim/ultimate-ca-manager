@@ -7,6 +7,7 @@ from config.settings import Config
 from services.backup import storage
 from services.backup.restore_report import restore_todo_lines
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -53,9 +54,9 @@ class TestRoutesAnswerWithTheLines:
         # At its source, read at call time by the restore job: no restart file is written
         monkeypatch.setattr('services.backup.restore_completion.request_restart', lambda: (True, 'ok'))
 
-        response = auth_client.post(
-            route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
-                         'password': 'a-password-that-is-long-enough'},
+        response = post_to_the_end(
+            auth_client, route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
+                                      'password': 'a-password-that-is-long-enough'},
             content_type='multipart/form-data')
 
         assert response.status_code == 200, response.data
@@ -86,9 +87,9 @@ class TestArchiveWithoutSection:
                                                    'sections_not_restored': ['future_thing']})
         monkeypatch.setattr(BackupService, 'check_archive_opens', lambda self, *a, **k: None)
 
-        response = auth_client.post(
-            route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
-                         'password': 'a-password-that-is-long-enough'},
+        response = post_to_the_end(
+            auth_client, route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
+                                      'password': 'a-password-that-is-long-enough'},
             content_type='multipart/form-data')
 
         assert response.status_code == 200, response.data

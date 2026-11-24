@@ -7,6 +7,7 @@ import pytest
 
 from services.audit_service import AuditService
 from services.backup.restore_completion import REQUEST_REFUSED
+from tests.restore_support import post_to_the_end
 
 CREATE = ('/api/v2/system/backup', '/api/v2/settings/backup/create')
 RESTORE = ('/api/v2/system/restore', '/api/v2/settings/backup/restore')
@@ -58,8 +59,8 @@ def test_failed_backup_is_audited(auth_client, audit, monkeypatch, route, error)
 
 
 def _upload(client, route):
-    return client.post(
-        route, data={'file': (io.BytesIO(b'x'), 'r.ucmbkp'), 'password': SECRET + 'xx'},
+    return post_to_the_end(
+        client, route, data={'file': (io.BytesIO(b'x'), 'r.ucmbkp'), 'password': SECRET + 'xx'},
         content_type='multipart/form-data')
 
 
@@ -131,7 +132,7 @@ def test_a_fips_refused_kdf_is_audited(auth_client, audit, monkeypatch, route):
 
 
 def _restore(client, route, data):
-    return client.post(route, data=data, content_type='multipart/form-data')
+    return post_to_the_end(client, route, data=data, content_type='multipart/form-data')
 
 
 def _form(filename='r.ucmbkp', **extra):
@@ -231,8 +232,8 @@ def _raw_restore(client, route, filename, **fields):
     parts.append("--B\r\nContent-Disposition: form-data; name=\"file\"; "
                  f"filename*=UTF-8''{quote(filename, safe='')}\r\n"
                  "Content-Type: application/octet-stream\r\n\r\nx\r\n--B--\r\n")
-    return client.post(route, data=''.join(parts).encode(),
-                       content_type='multipart/form-data; boundary=B')
+    return post_to_the_end(client, route, data=''.join(parts).encode(),
+                           content_type='multipart/form-data; boundary=B')
 
 
 @pytest.mark.parametrize('route', RESTORE)

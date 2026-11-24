@@ -15,6 +15,7 @@ from services.backup.errors import BackupSchemaError
 from services.backup.restore import RestoreValidationError
 
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 from tests.test_backup_cross_installation import (_authority, _leaf, _stored_certificate,
                                                   _stored_key)
 from tests.test_backup_hostile_corpus import _forged, _service
@@ -75,7 +76,7 @@ def test_the_route_answers_400_for_a_key_that_does_not_decrypt(app, auth_client,
         blob = _forged(['deploy_targets'], **{section: [
             dict(ROWS[section], private_key_pem_encrypted=UNREADABLE_KEY)]})
         before = _counts()
-    response = auth_client.post(RESTORE_URL, content_type='multipart/form-data', data={
+    response = post_to_the_end(auth_client, RESTORE_URL, content_type='multipart/form-data', data={
         'password': PASSWORD, 'file': (io.BytesIO(blob), 'fields.ucmbkp')})
     body = response.get_json(silent=True) or {}
     message = str(body.get('message') or body.get('error') or '')

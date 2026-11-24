@@ -14,6 +14,7 @@ import pytest
 from models import db
 
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 from tests.test_restore_sso_one_per_type import target  # noqa: F401  (SQLite and PostgreSQL)
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
@@ -262,7 +263,7 @@ def _sqlite_app_only(app):
 
 
 def _post_restore(auth_client, blob, mode):
-    return auth_client.post(RESTORE_URL, content_type='multipart/form-data', data={
+    return post_to_the_end(auth_client, RESTORE_URL, content_type='multipart/form-data', data={
         'password': PASSWORD, 'mode': mode, 'file': (io.BytesIO(blob), 'nul.ucmbkp')})
 
 

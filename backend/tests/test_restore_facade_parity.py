@@ -19,10 +19,12 @@ import io
 
 import pytest
 
+from tests.restore_support import post_to_the_end
+
 
 def _upload(client, route, payload=b'not a real archive'):
-    return client.post(
-        route,
+    return post_to_the_end(
+        client, route,
         data={'file': (io.BytesIO(payload), 'x.ucmbkp'),
               'password': 'a-password-that-is-long-enough'},
         content_type='multipart/form-data')
@@ -76,8 +78,8 @@ class TestAMigrationHoldsBothRoutes:
 
 class TestAModeThatIsNotHonouredIsRefused:
     def test_the_settings_route_refuses_merge(self, app, auth_client):
-        response = auth_client.post(
-            '/api/v2/settings/backup/restore',
+        response = post_to_the_end(
+            auth_client, '/api/v2/settings/backup/restore',
             data={'file': (io.BytesIO(b'not a real archive'), 'x.ucmbkp'),
                   'password': 'a-password-that-is-long-enough',
                   'mode': 'merge'},
@@ -92,8 +94,8 @@ class TestAModeThatIsNotHonouredIsRefused:
 
     def test_the_system_route_still_honours_merge(self, app, auth_client):
         """The other direction: refusing everywhere would be just as wrong."""
-        response = auth_client.post(
-            '/api/v2/system/restore',
+        response = post_to_the_end(
+            auth_client, '/api/v2/system/restore',
             data={'file': (io.BytesIO(b'not a real archive'), 'x.ucmbkp'),
                   'password': 'a-password-that-is-long-enough',
                   'mode': 'merge'},
@@ -206,9 +208,9 @@ class TestAnUploadLeavesATrace:
             AuditService, 'log_action',
             staticmethod(lambda **kw: recorded.append(kw.get('action'))))
 
-        response = auth_client.post(
-            route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
-                         'password': 'a-password-long-enough'},
+        response = post_to_the_end(
+            auth_client, route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
+                                      'password': 'a-password-long-enough'},
             content_type='multipart/form-data')
 
         # The archive must reach the restore, or the line below is the

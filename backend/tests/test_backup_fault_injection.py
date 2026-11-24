@@ -43,6 +43,7 @@ from models import db, SystemConfig
 from services.backup import manifest
 
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -283,8 +284,8 @@ def _no_real_restart(monkeypatch):
 
 
 def _restore_through_the_route(auth_client, blob):
-    return auth_client.post(
-        '/api/v2/system/restore',
+    return post_to_the_end(
+        auth_client, '/api/v2/system/restore',
         data={'password': PASSWORD, 'file': (io.BytesIO(blob), 'backup.ucmbkp')},
         content_type='multipart/form-data')
 

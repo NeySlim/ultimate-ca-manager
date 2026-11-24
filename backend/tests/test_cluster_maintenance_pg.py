@@ -20,6 +20,7 @@ from services import cluster_commands as cc
 from services import cluster_maintenance as cm
 from services.backup.manifest import SECTIONS
 from tests import pg_app_harness
+from tests.restore_support import post_to_the_end
 from utils.datetime_utils import utc_now
 
 pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
@@ -165,8 +166,8 @@ def _user_exists(app, name):
 
 
 def _restore(client, blob, path='/api/v2/system/restore'):
-    return client.post(path, data={'file': (io.BytesIO(blob), 'hd1.ucmbkp'), 'password': PASSWORD},
-                       content_type='multipart/form-data')
+    return post_to_the_end(client, path, data={'file': (io.BytesIO(blob), 'hd1.ucmbkp'), 'password': PASSWORD},
+                           content_type='multipart/form-data')
 
 
 def test_b_observes_the_maintenance_refuses_writes_and_acknowledges(cluster, auth_client):

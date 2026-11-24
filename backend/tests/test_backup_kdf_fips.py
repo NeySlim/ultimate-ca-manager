@@ -11,6 +11,7 @@ from fips_mode import FipsRestricted
 from services.backup import container, manifest
 
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -109,9 +110,9 @@ class TestRestore:
 @pytest.mark.parametrize('route', ['/api/v2/system/restore', '/api/v2/settings/backup/restore'])
 def test_the_refusal_reaches_the_restore_api_unchanged(
         auth_client, fips, no_argon2_derivation, argon2_archive, route):
-    r = auth_client.post(route, data={'password': PASSWORD,
-                                      'file': (io.BytesIO(argon2_archive), 'b.ucmbkp')},
-                         content_type='multipart/form-data')
+    r = post_to_the_end(auth_client, route, data={'password': PASSWORD,
+                                                  'file': (io.BytesIO(argon2_archive), 'b.ucmbkp')},
+                        content_type='multipart/form-data')
     body = json.loads(r.data)
     assert r.status_code == 400, r.data
     assert body['type'] == fips_mode.PROBLEM_TYPE

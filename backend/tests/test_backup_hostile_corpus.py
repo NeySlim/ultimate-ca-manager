@@ -40,6 +40,7 @@ from services.backup.restore import RestorePlan, RestoreValidationError
 from tests.backup_v3 import as_v3, v3_header
 from tests.test_restore_sso_one_per_type import target  # noqa: F401  (SQLite and PostgreSQL)
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -177,8 +178,8 @@ def _drop_forged_targets():
 
 
 def _restore(auth_client, blob, filename='hostile.ucmbkp', password=PASSWORD):
-    return auth_client.post(
-        RESTORE_URL,
+    return post_to_the_end(
+        auth_client, RESTORE_URL,
         data={'password': password, 'file': (io.BytesIO(blob), filename)},
         content_type='multipart/form-data')
 

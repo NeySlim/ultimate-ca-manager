@@ -98,6 +98,7 @@ Each test file covers 3 levels per endpoint:
 - CSRF disabled via `CSRF_DISABLED=true` environment variable
 - No external dependencies (no Docker, no network)
 - PostgreSQL mode: `UCM_TEST_APP_PG_URL` runs the same fixtures on PostgreSQL, see [testing/postgres-harness.md](testing/postgres-harness.md)
+- A test that restores through a restore route calls `tests/restore_support.post_to_the_end`: it asks for the job with `Prefer: respond-async` and reads its final answer, so a loaded host past the route's bounded wait never turns it into a 202
 
 #### Optional backends: SoftHSM, GSSAPI, Redis
 

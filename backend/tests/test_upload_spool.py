@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.restore_support import post_to_the_end
+
 PASSWORD = 'Correct-Horse-Battery-9'
 TWO_MIB = 2 * 1024 * 1024
 
@@ -37,8 +39,8 @@ def seen(monkeypatch):
 
 def _restore(client, name='r.ucmbkp'):
     data = {'file': (io.BytesIO(b'\0' * TWO_MIB), name), 'password': PASSWORD}
-    return client.post('/api/v2/system/restore', data=data,
-                       content_type='multipart/form-data')
+    return post_to_the_end(client, '/api/v2/system/restore', data=data,
+                           content_type='multipart/form-data')
 
 
 def test_the_spool_dir_is_private(app):
