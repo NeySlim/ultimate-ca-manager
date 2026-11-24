@@ -23,7 +23,7 @@ This guide covers all installation methods for Ultimate Certificate Manager.
 
 ### Optional: Kerberos/SPNEGO support
 
-Windows Autoenrollment's Kerberos binding (silent GPO autoenrollment via MS-XCEP/MS-WSTEP) needs an extra dependency. The Docker images ship it; the DEB, RPM and source installs do not install it by default, since it requires a C compiler and the system's Kerberos headers to build:
+Windows Autoenrollment's Kerberos binding (silent GPO autoenrollment via MS-XCEP/MS-WSTEP) and the Kerberos method of a Microsoft CA connection need an extra dependency. The Docker images ship it; the DEB, RPM and source installs do not install it by default, since it requires a C compiler and the system's Kerberos headers to build:
 
 ```bash
 # Debian/Ubuntu
@@ -35,7 +35,7 @@ pip install pyspnego[kerberos]   # run inside the venv UCM uses, e.g. /opt/ucm/v
 systemctl restart ucm
 ```
 
-Skip this if you don't need Kerberos/SPNEGO — every other autoenrollment binding (username/password, certificate) works without it. See the "Windows Autoenrollment" section in [ADMIN_GUIDE.md](../ADMIN_GUIDE.md) for details.
+Skip this if you don't need Kerberos/SPNEGO: every other autoenrollment binding (username/password, certificate) and Microsoft CA method (certificate, basic) works without it. See the "Windows Autoenrollment" section in [ADMIN_GUIDE.md](../ADMIN_GUIDE.md) for details.
 
 ---
 

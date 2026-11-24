@@ -9,7 +9,7 @@ export default {
         items: [
           { label: '客户端证书 (mTLS)', text: '最安全。在 MS CA 上生成客户端证书，导出为 PFX，上传证书和密钥 PEM。' },
           { label: 'Basic Auth', text: '基于 HTTPS 的用户名/密码认证。无需加入域。需在 IIS certsrv 中启用 Basic Auth。' },
-          { label: 'Kerberos', text: '需要 requests-kerberos 包以及加入域的机器或已配置的 keytab。' },
+          { label: 'Kerberos', text: '需要 pyspnego[kerberos] 包以及加入域的机器或已配置的 keytab。' },
         ]
       },
       {

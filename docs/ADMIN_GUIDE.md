@@ -942,13 +942,20 @@ dnf install -y krb5-devel gcc python3-devel
 pip install pyspnego[kerberos]
 ```
 
-For a DEB/RPM install, run `pip install` inside `/opt/ucm/venv` (e.g. `/opt/ucm/venv/bin/pip install pyspnego[kerberos]`) as the `ucm` user. For Docker, add the same `apt-get`/`pip install` lines to a custom image built from `neyslim/ultimate-ca-manager`: the extra isn't baked into the published image either.
+For a DEB/RPM install, run `pip install` inside `/opt/ucm/venv` (e.g. `/opt/ucm/venv/bin/pip install pyspnego[kerberos]`) as the `ucm` user; a package upgrade reinstalls it, and also installs it in place of a `requests-kerberos` added by hand to a 2.x venv. The Docker images ship it.
 
 ```bash
 systemctl restart ucm
 ```
 
-Once installed, `gssapi`/`spnego` are importable and the warning clears without any further configuration. This mirrors how `requests-kerberos` is handled for the MS CA WinRM/Kerberos admin channel (also excluded from the default install for the same reason).
+Once installed, `gssapi`/`spnego` are importable and the warning clears without any further configuration. The same extra serves the Kerberos authentication of a Microsoft CA connection (certsrv and the WinRM admin channel); `requests-kerberos` and `pykerberos` are no longer used.
+
+### Microsoft CA connections: Kerberos
+
+A connection with the **Kerberos** method signs in to the CA web enrollment (`/certsrv`), and its WinRM admin channel with the Kerberos transport, through python-gssapi (the `pyspnego[kerberos]` extra above, shipped in the Docker images).
+
+- **Its own credential.** With a keytab (`kerberos_keytab_path`), each connection gets its tickets from that keytab alone, into an in-memory ticket cache of its own: two connections of two principals or two forests never share a ticket, and nothing goes through the process' ticket cache or `KRB5_CLIENT_KTNAME`. The tickets are kept while the keytab file and the principal stay the same; a keytab replaced, moved or removed, or another principal, takes effect at the next request, and a removed keytab fails at once. Without a keytab, the connection uses the tickets the service account holds (`kinit`, the default cache).
+- **Failures say why.** A Kerberos sign-in that fails (wrong key in the keytab, principal missing from it, no KDC reachable, a ticket the CA refuses) answers `400` with the cause, `Kerberos sign-in failed: Preauthentication failed` for instance, for signing, renewal, the poll of a pending request, the template list and both connection tests; nothing is recorded on the CA side.
 
 ### Windows enrollment profiles: one per realm
 

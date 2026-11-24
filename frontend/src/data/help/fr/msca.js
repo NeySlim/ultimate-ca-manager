@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Certificat client (mTLS)', text: 'Le plus sécurisé. Générez un certificat client sur votre AC Microsoft, exportez en PFX, téléversez le certificat et la clé en PEM.' },
           { label: 'Basic Auth', text: 'Nom d’utilisateur/mot de passe sur HTTPS. Fonctionne sans jonction au domaine. Activez basic auth dans IIS certsrv.' },
-          { label: 'Kerberos', text: 'Nécessite le paquet requests-kerberos et une machine jointe au domaine ou un keytab configuré.' },
+          { label: 'Kerberos', text: 'Nécessite le paquet pyspnego[kerberos] et une machine jointe au domaine ou un keytab configuré.' },
         ]
       },
       {
