@@ -9,6 +9,7 @@ by two nodes. The audit entry says how many sessions were closed.
 import json
 import os
 import uuid
+from contextlib import contextmanager
 
 import pyotp
 import pytest
@@ -45,10 +46,9 @@ def _sql_store_app(monkeypatch, url, database_type):
 
 
 def _dispose(*applications):
+    from tests.app_disposal import dispose_app
     for application in applications:
-        with application.app_context():
-            db.session.remove()
-            db.engine.dispose()
+        dispose_app(application)
 
 
 @pytest.fixture(params=[
@@ -86,12 +86,20 @@ def nodes(request, app, monkeypatch, tmp_path):
         finally:
             _dispose(node)
         return
+    with pg_nodes(monkeypatch) as (first, second, _schema):
+        yield first, second
+
+
+@contextmanager
+def pg_nodes(monkeypatch):
+    """Two nodes on one PostgreSQL schema, their connections named after it; disposed on exit."""
     import psycopg
+    from tests import pg_app_harness
     schema = f'ucm_factor_{uuid.uuid4().hex[:8]}'
     admin = psycopg.connect(PG_URL, autocommit=True)
     admin.execute(f'CREATE SCHEMA "{schema}"')
     sep = '&' if '?' in PG_URL else '?'
-    url = f'{PG_URL}{sep}options=-csearch_path%3D{schema}'
+    url = f'{PG_URL}{sep}options=-csearch_path%3D{schema}&application_name={schema}'
     monkeypatch.setenv('DATABASE_URL', url)
     # The shared-suite wrapper would give each application its own schema
     pg_app_harness._creating_session_app.append(True)
@@ -99,7 +107,7 @@ def nodes(request, app, monkeypatch, tmp_path):
     try:
         created.append(_sql_store_app(monkeypatch, url, 'postgresql'))
         created.append(_sql_store_app(monkeypatch, url, 'postgresql'))
-        yield created[0], created[1]
+        yield created[0], created[1], schema
     finally:
         pg_app_harness._creating_session_app.pop()
         _dispose(*created)

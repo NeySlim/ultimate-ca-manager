@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from tests.header_guard import guarded
+from tests.app_disposal import dispose_app
 
 from api.v2.sso import saml_sp, sign_in_tests
 from models import db
@@ -63,9 +64,7 @@ def nodes(monkeypatch):
     finally:
         pg_app_harness._creating_session_app.pop()
         for application in created:
-            with application.app_context():
-                db.session.remove()
-                db.engine.dispose()
+            dispose_app(application)
         admin.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
         admin.close()
 

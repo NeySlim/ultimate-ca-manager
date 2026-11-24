@@ -7,6 +7,7 @@ PostgreSQL without Redis gets is test_sessions_store.test_configuration_picks_th
 import pytest
 
 from tests.header_guard import guarded
+from tests.app_disposal import dispose_app
 
 PROFILE = '/api/v2/account/profile'
 
@@ -28,7 +29,6 @@ def _login(client):
 
 def test_a_file_session_of_2x_is_not_taken_up_by_the_database_store(monkeypatch, tmp_path):
     from config.settings import TestingConfig
-    from models import db
     from tests import pg_app_harness
     from tests.conftest import clear_admin_password_flag
 
@@ -69,6 +69,4 @@ def test_a_file_session_of_2x_is_not_taken_up_by_the_database_store(monkeypatch,
         assert upgraded.get(PROFILE).status_code == 200
     finally:
         for application in apps:
-            with application.app_context():
-                db.session.remove()
-                db.engine.dispose()
+            dispose_app(application)
