@@ -6365,7 +6365,8 @@
       },
       "validation": {
         "requiredField": "Це поле є обов'язковим"
-      }
+      },
+      "serverBusy": "The server is busy with another change: try again in a few seconds."
     },
     "success": {
       "backup": {

@@ -1,4 +1,8 @@
-import { test, expect, createCA, uid } from './support/fixtures'
+import { readFileSync } from 'node:fs'
+import { test, expect, createCA, uid, BUSY_MESSAGE } from './support/fixtures'
+
+const en = JSON.parse(readFileSync(new URL('../src/i18n/locales/en.json', import.meta.url), 'utf8'))
+const SIGN = /\/api\/v2\/csrs\/\d+\/sign$/
 
 test('a CSR imported on screen is signed by a CA', async ({ page, api }) => {
   const ca = await createCA(api)
@@ -27,7 +31,21 @@ test('a CSR imported on screen is signed by a CA', async ({ page, api }) => {
   const picker = sign.getByLabel('Certificate Authority')
   const value = await picker.locator('option', { hasText: ca.common_name }).first().getAttribute('value')
   await picker.selectOption(value!)
-  await sign.getByRole('button', { name: 'Sign CSR' }).click()
+  // The first press meets the server's busy answer, as when another write holds SQLite; any later
+  // one may meet it for real. The page says the server is busy, keeps the dialog, the operator signs again
+  await page.route(SIGN, (route) => route.fulfill({
+    status: 503, contentType: 'application/problem+json', headers: { 'Retry-After': '1' },
+    body: JSON.stringify({ type: 'about:blank', title: 'Service Unavailable', status: 503, detail: BUSY_MESSAGE, message: BUSY_MESSAGE, error: true, code: 503 }),
+  }), { times: 1 })
+  for (let attempt = 1; ; attempt += 1) {
+    const answer = page.waitForResponse((r) => r.request().method() === 'POST' && SIGN.test(r.url()))
+    await sign.getByRole('button', { name: 'Sign CSR' }).click()
+    const r = await answer
+    if (r.status() !== 503 || attempt === 5) break
+    await expect(page.getByText(en.messages.errors.serverBusy).first()).toBeVisible()
+    await expect(sign).toBeVisible()
+    await page.waitForTimeout(1000 * Math.min(Number(r.headers()['retry-after']) || 1, 2))
+  }
   await expect(sign).toBeHidden()
 
   await expect.poll(async () => {
