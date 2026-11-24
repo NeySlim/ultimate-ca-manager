@@ -193,7 +193,7 @@ export default {
           { label: 'Windows 续期 (v2.248)', text: 'certreq ... Renew 以待续期的证书作为 TLS 客户端证书进行身份验证：需要启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。自 3.0 起，只有通过 Windows 注册签发的证书才能这样续期：在界面中签发的证书会被拒绝，必须通过 Windows 注册重新签发。续期会保留被续期证书的模板和 EKU，并在 CSR 不含 SubjectAltName 时保留其 SubjectAltName (v2.252)' },
           { label: '按证书续期 (3.0)', text: '由证书所记录的配置文件（2.x 的 WSTEP 证书：默认配置文件）在其签发 CA 下服务；当该配置文件已被删除或已禁用时拒绝，每次拒绝都会连同配置文件和原因写入审计。只有 SID 会由该配置文件的连接器再次检查：已从组中移除的计算机在其证书被吊销前仍可续期。通过 TLS 时，要求配置文件的签发 CA 即 mTLS CA 或在其之下；其他配置文件通过 Kerberos 续期，由领域的配置文件提供服务，新证书会记录该配置文件' },
           { label: '证书类型', text: '没有服务器身份验证时，带有电子邮件保护或 EFS 的模板签发 S/MIME 证书，带有客户端身份验证或智能卡登录的模板签发客户端证书：没有 SAN 的用户请求 CN=jdoe 不会从其 CN 得到 DNS 名称。没有密钥用法的请求会获得模板配置的密钥用法，否则获得该模板类型的默认值：S/MIME 或 EFS 为数字签名、密钥加密和不可否认性，智能卡登录为数字签名和密钥加密，客户端身份验证仅为数字签名。任何其他模板或无模板则签发服务器证书' },
-          { label: 'Docker 中的 Kerberos (v2.251)', text: 'Docker 镜像包含 pyspnego 的 Kerberos 后端，因此 Kerberos 绑定在容器中的工作方式与 DEB 和 RPM 安装相同' },
+          { label: 'Docker 中的 Kerberos', text: 'Docker 镜像包含 pyspnego 的 Kerberos 后端，因此 Kerberos 绑定在容器中的工作方式与 DEB 和 RPM 安装相同，但 FIPS 模式除外：镜像中的 Kerberos 库自行执行密码运算，不经过 FIPS 模块，因此该绑定在镜像中会被拒绝。在 FIPS 模式下，RHEL 上的软件包安装允许使用该绑定' },
         ]
       },
       {
