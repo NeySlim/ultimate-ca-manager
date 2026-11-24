@@ -639,7 +639,7 @@ class TestACrlUcmSignedPublishes:
         row_id, real = _leaf_row(app, ca, f'signed-crl-{external}')
         _revoke(auth_client, row_id)
         at = _revoked_at(app, ca[1], real)
-        _signed_crl(app, ca[0], at - timedelta(seconds=1))
+        _signed_crl(app, ca[0], at - timedelta(minutes=10))
         assert _detail(auth_client, row_id)['local_revocation_lift'] == 'local'
         _signed_crl(app, ca[0], at, external=external)
         assert _records(app, ca[1], real) == [('superseded', False)]
@@ -684,6 +684,24 @@ class TestACrlUcmSignedPublishes:
         r = _post(auth_client, LIFT.format(row_id), {'confirm': True, 'acknowledge_unknown_publication': True})
         assert r.status_code == 409 and 'this revocation was published' in r.get_json()['message'], r.data
         assert _records(app, ca[1], real) == [('superseded', None)]
+
+
+    def test_a_crl_dated_just_before_the_revocation_may_still_list_it(self, app, auth_client, create_ca):
+        """A delta CRL dates itself before reading the list; a node's clock may lag."""
+        ca = _keyless_ca(app, create_ca, 'Signed CRL 450 margin')
+        row_id, real = _leaf_row(app, ca, 'signed-crl-margin')
+        _record(app, ca[1], real, reason='superseded', certificate_id=row_id)
+        _signed_crl(app, ca[0], _revoked_at(app, ca[1], real) - timedelta(seconds=30))
+        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True, 'acknowledge_unknown_publication': True})
+        assert r.status_code == 409, r.data
+
+    def test_a_crl_signed_well_before_the_revocation_cannot_list_it(self, app, auth_client, create_ca):
+        ca = _keyless_ca(app, create_ca, 'Signed CRL 450 older')
+        row_id, real = _leaf_row(app, ca, 'signed-crl-older')
+        _record(app, ca[1], real, reason='superseded', certificate_id=row_id)
+        _signed_crl(app, ca[0], _revoked_at(app, ca[1], real) - timedelta(days=1))
+        assert _detail(auth_client, row_id)['local_revocation_lift'] == 'unknown'
 
 
 class TestAKeyGainedPublishesTheRecords:

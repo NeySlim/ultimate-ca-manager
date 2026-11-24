@@ -7,6 +7,7 @@ an external CRL UCM serves publishes what it lists, and only that. A Microsoft C
 publishes the revocations UCM tells it of. Under any other CA no CRL or OCSP answer ever carries
 a revocation: it is local, may be lifted, and a valid certificate is deleted without one.
 """
+from datetime import timedelta
 from typing import Optional
 
 from models import CA, Certificate, RevokedSerial, db
@@ -206,6 +207,9 @@ def publish_on_flush(session) -> None:
                                    session.connection())
 
 
+CRL_DATE_MARGIN = timedelta(minutes=5)
+
+
 def _in_a_signed_crl(records, ca) -> bool:
     """Whether UCM signed a CRL for a record of ``ca``'s key since ``records`` were revoked: it may
     list them. Kept until that CA record is deleted; an external CRL is not one UCM signed."""
@@ -217,7 +221,8 @@ def _in_a_signed_crl(records, ca) -> bool:
         CA.refid.in_(same_key_refids(ca)), CRLMetadata.is_external.isnot(True))
     dates = [r.revoked_at for r in records]
     if None not in dates:
-        query = query.filter(CRLMetadata.this_update >= min(dates))
+        # A delta CRL dates itself before it reads the list, and HA nodes' clocks drift: a margin
+        query = query.filter(CRLMetadata.this_update >= min(dates) - CRL_DATE_MARGIN)
     return query.first() is not None
 
 
