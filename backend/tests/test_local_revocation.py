@@ -22,6 +22,8 @@ from tests.test_revocation_record_rule import (  # noqa: F401  (issuer is a fixt
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
 LIFT = '/api/v2/certificates/{}/lift-local-revocation'
+# An archive older than upgrade step 176 carries no `published` key
+_DROP = object()
 
 
 def _post(client, url, body=None):
@@ -291,6 +293,27 @@ class TestLiftingALocalRevocation:
         row_id, _ = _leaf_row(app, keyless, 'valid')
         assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 400
 
+    def test_a_record_changed_while_the_lift_runs_refuses_it(self, app, auth_client, keyless, monkeypatch):
+        """Seen under the second lock (taken after the rows): a revocation written meanwhile stays."""
+        from services.cert import issued_lookup
+        row_id, real = _leaf_row(app, keyless, 'meanwhile')
+        _revoke(auth_client, row_id)
+        lock, calls = issued_lookup.lock_serial_records, []
+
+        def lock_then_revoke_meanwhile(targets):
+            calls.append(1)
+            if len(calls) == 2:
+                db.session.add(RevokedSerial(caref=keyless[1], serial_number=str(real.serial_number),
+                                             revoke_reason='keyCompromise',
+                                             valid_to=real.not_valid_after_utc.replace(tzinfo=None)))
+                db.session.flush()
+            return lock(targets)
+        monkeypatch.setattr(issued_lookup, 'lock_serial_records', lock_then_revoke_meanwhile)
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 409 and 'meanwhile' in r.get_json()['message'], r.data
+        assert len(calls) == 2
+        assert _row(app, row_id)[0] is True and _records(app, keyless[1], real) == [('superseded', False)]
+
     def test_a_lift_during_the_hourly_pass_ends_lifted(self, app, auth_client, keyless, monkeypatch):
         """PostgreSQL: the pass marks the row under its share lock on the record; the lift waits
         for it, then clears the row and deletes the record, and the next pass marks nothing."""
@@ -345,3 +368,43 @@ class TestLiftingALocalRevocation:
         with app.app_context():
             assert issued_lookup.apply_persisted_revocations({row_id}) == []
             db.session.rollback()
+
+
+class TestTheNoteTravelsInBackups:
+    """A restore writes the archive's note, and a merge never turns a published record local."""
+
+    def _archive_row(self, app, refid, real, **changes):
+        from services.backup.export_generic import IdentityIndex, export_section
+        with app.app_context():
+            rows = [r for r in export_section('revoked_serials', IdentityIndex())
+                    if r['caref'] == refid and r['serial_number'] == str(real.serial_number)]
+        assert len(rows) == 1
+        row = dict(rows[0], **changes)
+        return {k: v for k, v in row.items() if v is not _DROP}
+
+    def _restore(self, app, row, merging):
+        from services.backup.backup_service import BackupService
+        with app.app_context():
+            service = BackupService()
+            service._merging = merging
+            service._restore_revoked_serials({'revoked_serials': [row]}, {})
+            db.session.commit()
+
+    @pytest.mark.parametrize('archived, merging, here, after', [
+        (False, False, None, False), (True, False, None, True), (_DROP, False, None, None),
+        (True, True, False, True), (False, True, True, True), (_DROP, True, False, None),
+        (False, True, False, False),
+    ])
+    def test_the_note_is_restored(self, app, keyless, archived, merging, here, after):
+        row_id, real = _leaf_row(app, keyless, 'restore')
+        _record(app, keyless[1], real, reason='superseded', certificate_id=row_id)
+        row = self._archive_row(app, keyless[1], real, published=archived)
+        with app.app_context():
+            query = RevokedSerial.query.filter_by(caref=keyless[1], serial_number=str(real.serial_number))
+            if here is None:
+                query.delete()
+            else:
+                query.update({'published': here})
+            db.session.commit()
+        self._restore(app, row, merging)
+        assert _records(app, keyless[1], real) == [('superseded', after)]

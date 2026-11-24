@@ -102,7 +102,7 @@ def both_archives(app, tmp_path_factory):
         db.session.add(RevokedSerial(caref=issuer[0].refid, serial_number=str(int(leaf.serial_number) + 1),
                                      revoked_at=_STAMP, revoke_reason='keyCompromise',
                                      invalidity_at=_STAMP, valid_to=_STAMP, certificate_id=leaf.id,
-                                     public_key_sha256='ab' * 32))
+                                     public_key_sha256='ab' * 32, published=False))
         db.session.commit()
         rows, _failures, _order, _secrets = _seed_all()
         refused = _fill_nullable(rows)
