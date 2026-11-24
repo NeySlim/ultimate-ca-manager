@@ -4,12 +4,20 @@
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
 Usage: release_version.py <validate|deb|rpm|tar|file|npm|chart|prerelease|assets|notes|latest|line> <version> [CHANGELOG] [--rehearsal]
+`notes` stops the changes on a whole entry past NOTES_CHANGES_BUDGET characters, then links
+`--changelog-url URL` (default CHANGELOG.md) for the rest.
 `matches <version> <file>` exits 1, naming both values, when the file (whitespace stripped) is not that version.
 `latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
 `line` reads them the same way and prints the line tag (the major) to apply, or an empty line.
 """
 import re
 import sys
+
+# GitHub refuses a release body over 125 000 characters (HTTP 422): the changes stop under this
+# budget, which leaves the page's heading and Installation part room under the limit.
+NOTES_CHANGES_BUDGET = 110_000
+_ENTRY_START = re.compile(r'#|[-*+] |[0-9]+[.)] ')
+_FENCE = re.compile(r'\s*(```|~~~)')
 
 VERSION_RE = re.compile(
     r'(?P<major>0|[1-9][0-9]*)\.(?P<minor>0|[1-9][0-9]*)'
@@ -103,14 +111,54 @@ def changelog_section(version, text):
             or _section(re.compile(r'^## ' + re.escape(version) + r'(\s|$)'), text, '## '))
 
 
-def release_notes(version, text, rehearsal=False):
+def _blocks(lines):
+    """Lines grouped by entry: a heading or a list item at the margin opens one, never inside
+    fenced code; indented lines and code blocks stay with their entry."""
+    blocks, fence = [], None
+    for line in lines:
+        if not blocks or (fence is None and _ENTRY_START.match(line)):
+            blocks.append([])
+        blocks[-1].append(line)
+        m = _FENCE.match(line)
+        if m and fence is None:
+            fence = m.group(1)
+        elif m and m.group(1) == fence:
+            fence = None
+    return blocks
+
+
+def cut_changes(body, budget=NOTES_CHANGES_BUDGET, changelog_url='CHANGELOG.md'):
+    """`body` itself within `budget` characters; else its first whole entries and a closing
+    sentence that links the CHANGELOG for the rest, all within `budget`."""
+    if len(body) <= budget:
+        return body
+    blocks = _blocks(body.splitlines()[1:])
+    total = sum(1 for b in blocks if not b[0].startswith('#'))
+
+    def note(kept_entries):
+        return (f'The list stops after {kept_entries} of {total} entries to fit the release page: '
+                f'the rest is in [CHANGELOG.md]({changelog_url}).\n')
+
+    room, kept = budget - len('\n' + '\n') - len(note(total)), []
+    for block in blocks:
+        room -= sum(len(line) + 1 for line in block)
+        if room < 0:
+            break
+        kept.append(block)
+    while kept and kept[-1][0].startswith('#'):
+        kept.pop()  # a sub-heading whose entries all fell past the cut
+    entries = sum(1 for b in kept if not b[0].startswith('#'))
+    return '\n' + ''.join(line + '\n' for b in kept for line in b) + '\n' + note(entries)
+
+
+def release_notes(version, text, rehearsal=False, changelog_url='CHANGELOG.md'):
     """Its own section when it has entries; a RC without one ships `[Unreleased]`, a stable fails.
 
     A rehearsal of a stable runs before its bump commit: it borrows `[Unreleased]` and warns instead.
     """
     body = changelog_section(version, text)
     if body.strip():
-        return body
+        return cut_changes(body, changelog_url=changelog_url)
     if is_stable(version):
         missing = f'CHANGELOG.md has no [{version}] section with entries for {version}'
         if not rehearsal:
@@ -119,7 +167,7 @@ def release_notes(version, text, rehearsal=False):
     body = _section(re.compile(r'^## \[Unreleased\]'), text, '## [')
     if not body.strip():
         raise ValueError(f'CHANGELOG.md has no [{version}] or [Unreleased] section with entries for {version}')
-    return body
+    return cut_changes(body, changelog_url=changelog_url)
 
 
 def _stable_tags(published):
@@ -191,8 +239,17 @@ def main(argv):
                 print(f'::error::{argv[3]} says {found!r} but the tag is {version!r}', file=sys.stderr)
                 return 1
         elif cmd == 'notes':
-            rehearsal = '--rehearsal' in argv[3:]
-            rest = [a for a in argv[3:] if a != '--rehearsal']
+            rehearsal, url, rest, args = False, 'CHANGELOG.md', [], iter(argv[3:])
+            for arg in args:
+                if arg == '--rehearsal':
+                    rehearsal = True
+                elif arg == '--changelog-url':
+                    url = next(args, None)
+                    if not url:
+                        print('--changelog-url needs a URL', file=sys.stderr)
+                        return 2
+                else:
+                    rest.append(arg)
             path = rest[0] if rest else 'CHANGELOG.md'
             try:
                 with open(path, encoding='utf-8') as fh:
@@ -200,7 +257,7 @@ def main(argv):
             except (OSError, ValueError) as exc:
                 print(f'::error::{path} cannot be read: {exc}', file=sys.stderr)
                 return 1
-            sys.stdout.write(release_notes(version, text, rehearsal))
+            sys.stdout.write(release_notes(version, text, rehearsal, url))
         else:
             print(f'Unknown command: {cmd}', file=sys.stderr)
             return 2
