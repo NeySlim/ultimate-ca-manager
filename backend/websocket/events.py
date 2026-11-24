@@ -623,7 +623,7 @@ def handle_connect(auth=None):
         raise _unavailable(exc) from exc
     if not current or connected_clients.get(request.sid) is not state:
         connected_clients.pop(request.sid, None)
-        logger.info("WebSocket connection refused: its session ended during the handshake")
+        logger.info("WebSocket connection refused: its session ended or failed its check during the handshake")
         return False
     emit('connected', {'status': 'ok', 'user_id': user_id, 'timestamp': _timestamp()})
     return True

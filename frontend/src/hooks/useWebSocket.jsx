@@ -238,7 +238,9 @@ export function WebSocketProvider({ children }) {
   
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
-    
+    // A socket still trying is replaced, not left beside the new one with its own timers
+    socketRef.current?.disconnect();
+
     setConnectionState(ConnectionState.CONNECTING);
     
     const socket = io(window.location.origin, {
@@ -254,6 +256,7 @@ export function WebSocketProvider({ children }) {
 
     // The next delay of the schedule, none once it is spent: a rearm alone tries again then
     const retryLater = () => {
+      if (socketRef.current !== socket) return;  // the timers belong to the current socket
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
       if (retryStepRef.current >= SERVER_CUT_RETRY_MS.length) return;
@@ -266,10 +269,12 @@ export function WebSocketProvider({ children }) {
     };
 
     const stopWatchdog = () => {
+      if (socketRef.current !== socket) return;
       clearTimeout(handshakeTimerRef.current);
       handshakeTimerRef.current = null;
     };
     socket.io.on('open', () => {
+      if (socketRef.current !== socket) return;
       stopWatchdog();
       handshakeTimerRef.current = setTimeout(() => {
         handshakeTimerRef.current = null;
