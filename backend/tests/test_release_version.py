@@ -339,11 +339,16 @@ def test_a_rehearsal_does_not_relax_the_notes_of_a_rc_or_a_present_section(tmp_p
 
 
 GITHUB_BODY_LIMIT = 125_000  # a longer release body is refused with HTTP 422
+KEPT_WHOLE = ('Security', 'Upgrade notes')
+SECURITY_PAST_THE_BUDGET = 248  # entries in each of them: together over the budget, under the limit
+_NOTE = re.compile(r'(?P<names>.+) lists? (?P<n>[0-9]+) of (?P<m>[0-9]+) entries to fit the release page: '
+                   r'the rest is in \[CHANGELOG\.md\]\((?P<url>[^)]+)\)\.')
 
 
-def _huge_changelog(entries=900):
+def _huge_changelog(entries=900, last=0, last_words=40):
     """An [Unreleased] section far over the release page's limit: entries of a line, entries
-    carried over indented lines and a fenced block, several sub-headings."""
+    carried over indented lines and a fenced block, several sub-headings; then `last` entries
+    in each of Security and Upgrade notes."""
     lines = ['## [Unreleased]', '']
     for i in range(entries):
         if i % 150 == 0:
@@ -353,6 +358,12 @@ def _huge_changelog(entries=900):
             lines.append('  carried on an indented line ' + 'more ' * 10)
         if i % 11 == 0:
             lines += ['  ```bash', '- a line of the block, not an entry', '# nor a heading', '  ```']
+    for name in KEPT_WHOLE if last else ():
+        lines += ['', f'### {name}']
+        for j in range(last):
+            lines.append(f'- **{name} {j}.** ' + 'word ' * last_words)
+            if j % 5 == 0:
+                lines += ['  ```bash', '- inside the block', '  ```']
     return '\n'.join(lines + ['', '## [3.0] - 2026-12-20', '- Phare thing.', ''])
 
 
@@ -360,13 +371,43 @@ def _entry_lines(text):
     return [line for line in text.splitlines() if line.strip()]
 
 
-def _assert_cut_on_a_whole_entry(kept, section):
-    """The kept lines are the section's first lines and the next one starts an entry or a heading."""
-    assert kept and section[:len(kept)] == kept
-    assert len(kept) < len(section)
-    assert re.match(r'(- |#)', section[len(kept)]), section[len(kept)]
-    assert sum(1 for line in kept if line.lstrip().startswith('```')) % 2 == 0
-    assert not kept[-1].startswith('#')
+def _parts(lines):
+    """[(heading, lines)] by `### ` sub-section, in order; None heads the lines before the first."""
+    parts = []
+    for line in lines:
+        if line.startswith('### ') or not parts:
+            parts.append((line if line.startswith('### ') else None, []))
+            if line.startswith('### '):
+                continue
+        parts[-1][1].append(line)
+    return parts
+
+
+def _assert_each_part_cut_on_a_whole_entry(kept, section):
+    """Each kept sub-section is its own first lines, in the CHANGELOG's order, and the first line it
+    leaves out starts an entry or a heading. Returns the abridged headings, in that order."""
+    order, full, cut = [h for h, _ in _parts(section)], dict(_parts(section)), dict(_parts(kept))
+    assert [h for h in order if h in cut] == list(cut)
+    for heading, lines in cut.items():
+        whole = full[heading]
+        assert lines and whole[:len(lines)] == lines, heading
+        assert sum(1 for line in lines if line.lstrip().startswith('```')) % 2 == 0
+        assert not lines[-1].startswith('#')
+        if len(lines) < len(whole):
+            assert re.match(r'(- |#)', whole[len(lines)]), whole[len(lines)]
+    abridged = [h for h in order if len(cut.get(h, ())) < len(full[h])]
+    assert abridged
+    return abridged
+
+
+def _named(note):
+    m = _NOTE.fullmatch(note)
+    assert m, note
+    return re.split(r', | and ', m['names']), int(m['n']), int(m['m']), m['url']
+
+
+def _whole_size(full):
+    return sum(len(line) + 1 for h in KEPT_WHOLE for line in [f'### {h}', *full[f'### {h}']])
 
 
 def test_notes_over_the_budget_stop_on_a_whole_entry_and_point_to_the_changelog(tmp_path):
@@ -379,22 +420,72 @@ def test_notes_over_the_budget_stop_on_a_whole_entry_and_point_to_the_changelog(
     *kept, note = _entry_lines(r.stdout)
     assert f'[CHANGELOG.md]({url})' in note
     section = _entry_lines(text.split('## [3.0]')[0])[1:]  # [Unreleased], its heading left out
-    _assert_cut_on_a_whole_entry(kept, section)
+    _assert_each_part_cut_on_a_whole_entry(kept, section)
     entries = [line for line in kept if line.startswith('- **Entry')]
     assert f'{len(entries)} of 900 entries' in note
 
 
-def test_the_cut_never_splits_an_entry_or_a_block_whatever_the_budget():
+def test_notes_over_the_budget_keep_security_and_upgrade_notes_whole(tmp_path):
+    """They come last in the CHANGELOG and outgrow a fair share of the room, yet stay whole; the
+    note names each abridged sub-section."""
+    rv, url = _load(), 'https://github.com/o/r/blob/v3.1-rc1/CHANGELOG.md'
+    text = _huge_changelog(last=150)
+    (tmp_path / 'CHANGELOG.md').write_text(text)
+    r = _cli('notes', '3.1-rc1', str(tmp_path / 'CHANGELOG.md'), '--changelog-url', url)
+    assert r.returncode == 0, r.stderr
+    assert len(r.stdout) <= rv.NOTES_CHANGES_BUDGET
+    *kept, note = _entry_lines(r.stdout)
+    section = _entry_lines(text.split('## [3.0]')[0])[1:]
+    full, cut = dict(_parts(section)), dict(_parts(kept))
+    for name in KEPT_WHOLE:
+        assert cut[f'### {name}'] == full[f'### {name}'], name
+    abridged = _assert_each_part_cut_on_a_whole_entry(kept, section)
+    names, n, m, link = _named(note)
+    assert names == [h[4:] for h in abridged] == [f'Part {i}' for i in range(6)]
+    assert (n, m, link) == (sum(line.startswith('- **Entry') for line in kept), 900, url)
+    assert '\u2014' not in note
+
+
+def test_security_and_upgrade_notes_over_the_budget_stay_whole_under_the_limit():
     rv = _load()
-    body = rv.release_notes('3.1-rc1', _huge_changelog(entries=40))  # under the budget: whole
+    body = rv.release_notes('3.1-rc1', _huge_changelog(entries=40, last=20))  # under the budget: whole
+    section = _entry_lines(body)
+    full, whole = dict(_parts(section)), _whole_size(dict(_parts(section)))
+    cut = rv.cut_changes(body, whole // 2, 'CHANGELOG.md', limit=whole + 500)
+    assert len(cut) <= whole + 500
+    *kept, note = _entry_lines(cut)
+    assert dict(_parts(kept)) == {f'### {h}': full[f'### {h}'] for h in KEPT_WHOLE}
+    assert _named(note)[:3] == (['Part 0'], 0, 40)
+
+
+def test_security_and_upgrade_notes_over_the_limit_stop_on_a_whole_entry():
+    rv = _load()
+    body = rv.release_notes('3.1-rc1', _huge_changelog(entries=40, last=20))
+    section = _entry_lines(body)
+    whole = _whole_size(dict(_parts(section)))
+    cut = rv.cut_changes(body, whole // 4, 'CHANGELOG.md', limit=whole // 2)
+    assert len(cut) <= whole // 2
+    *kept, note = _entry_lines(cut)
+    assert _assert_each_part_cut_on_a_whole_entry(kept, section) == ['### Part 0', '### Security',
+                                                                     '### Upgrade notes']
+    assert list(dict(_parts(kept))) == ['### Security', '### Upgrade notes']
+    names, n, m, _ = _named(note)
+    assert names == ['Part 0', *KEPT_WHOLE] and m == 80
+    assert n == sum(line.startswith(('- **Security', '- **Upgrade')) for line in kept) > 0
+
+
+@pytest.mark.parametrize('last', [0, 6])
+def test_the_cut_never_splits_an_entry_or_a_block_whatever_the_budget(last):
+    rv = _load()
+    body = rv.release_notes('3.1-rc1', _huge_changelog(entries=40, last=last))  # under the budget: whole
     section = _entry_lines(body)
     for budget in range(200, len(body), 97):
-        cut = rv.cut_changes(body, budget, 'CHANGELOG.md')
+        cut = rv.cut_changes(body, budget, 'CHANGELOG.md', limit=budget)
         assert len(cut) <= budget
         *kept, note = _entry_lines(cut)
         assert 'CHANGELOG.md' in note
         if kept:
-            _assert_cut_on_a_whole_entry(kept, section)
+            _assert_each_part_cut_on_a_whole_entry(kept, section)
 
 
 def test_notes_under_the_budget_are_the_section_unchanged(tmp_path):
@@ -415,6 +506,36 @@ def test_the_release_page_of_a_huge_changelog_stays_under_githubs_limit(tmp_path
     assert '## Installation' in text and '## Documentation' in text
     assert '[CHANGELOG.md](https://github.com/o/r/blob/v3.1-rc1/CHANGELOG.md)' in text.split('---')[0]
     assert 'Entry 0.' in text and 'Entry 899.' not in text
+
+
+def test_the_release_page_keeps_security_and_upgrade_notes_past_the_budget_under_githubs_limit(tmp_path):
+    """The real notes step, Security and Upgrade notes alone over the budget: whole, page accepted."""
+    rv = _load()
+    text = _huge_changelog(entries=300, last=SECURITY_PAST_THE_BUDGET)
+    section = _entry_lines(text.split('## [3.0]')[0])[1:]
+    full = dict(_parts(section))
+    assert rv.NOTES_CHANGES_BUDGET < _whole_size(full) < rv.NOTES_CHANGES_LIMIT - 1000
+    result, notes = _notes_step(tmp_path, '3.1-rc1', text, env={'TMPDIR': str(tmp_path)})
+    assert result.returncode == 0, result.stderr
+    page = notes.read_text()
+    assert len(page) < GITHUB_BODY_LIMIT and '## Installation' in page
+    *changes, note = _entry_lines(page.split('\n---\n')[0])
+    for name in KEPT_WHOLE:
+        assert dict(_parts(changes))[f'### {name}'] == full[f'### {name}'], name
+    assert _named(note)[0] == ['Part 0', 'Part 1']
+
+
+def test_the_placeholders_of_the_installation_part_leave_the_changes_alone(tmp_path):
+    """The real notes step: VERSION, REPO and the like are filled in the Installation part only."""
+    entry = ('- The el10 package was ucm-el10-VERSION-1.el10.noarch.rpm; REPO, IMAGE, DEB_VERSION and '
+             'RPM_VERSION are words here.')
+    carried = '          carried on a line indented by ten spaces'
+    result, notes = _notes_step(tmp_path, '3.0-rc1', f'## [Unreleased]\n{entry}\n{carried}\n')
+    assert result.returncode == 0, result.stderr
+    text = notes.read_text()
+    assert f'\n{entry}\n{carried}\n' in text
+    assert 'releases/download/v3.0-rc1/ucm-el10-3.0.rc1-1.el10.noarch.rpm' in text
+    assert 'https://github.com/o/r/blob/v3.0-rc1/CHANGELOG.md' in text
 
 # ---- 3b. the branch a tag must sit on -------------------------------------------------------------
 
@@ -642,8 +763,9 @@ def test_smoke_release_accepts_the_exact_version(monkeypatch):
 
 # ---- 7. the manual publisher takes the same section ---------------------------------------------
 
-def _publish(tmp_path, version, changelog, *flags):
-    """Notes the script hands to `gh release edit` (it only edits a release the workflow created)."""
+def _publish(tmp_path, version, changelog, *flags, repo='o/r'):
+    """Notes the script hands to `gh release edit` (it only edits a release the workflow created);
+    `gh repo view` names `repo`, or fails when it is None."""
     bare, work = tmp_path / 'origin.git', tmp_path / 'work'
     # Under the pre-commit hook GIT_DIR points at the real repository: never hand it down
     clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -663,6 +785,8 @@ def _publish(tmp_path, version, changelog, *flags):
     log = tmp_path / 'gh.args'
     (fake / 'gh').write_text(
         '#!/bin/sh\n'
+        + (f'if [ "$1 $2" = "repo view" ]; then echo {repo}; exit 0; fi\n' if repo else
+           'if [ "$1 $2" = "repo view" ]; then echo "no repository" >&2; exit 1; fi\n') +
         'if [ "$1 $2" = "release edit" ]; then\n'
         f'  for a in "$@"; do echo "$a"; done > "{log}"\n'
         f'  while [ $# -gt 0 ]; do [ "$1" = "--notes-file" ] && cp "$2" "{log}.notes"; shift; done\n'
@@ -686,6 +810,20 @@ def test_release_publish_takes_the_section_of_the_workflow(tmp_path, version, ma
     assert marker in notes
     for other in ('Fixed a.b thing.', 'Coming next.', 'Older entry', 'Dots are literal'):
         assert other == marker or other not in notes
+
+
+def test_release_publish_links_the_changelog_of_the_tag(tmp_path):
+    """Past the budget the notes link the rest: a release page resolves only an absolute link."""
+    result, notes = _publish(tmp_path, '3.1-rc1', _huge_changelog())
+    assert result.returncode == 0, result.stderr
+    links = re.findall(r'\]\(([^)]+)\)', notes)
+    assert links == ['https://github.com/o/r/blob/v3.1-rc1/CHANGELOG.md']
+
+
+def test_release_publish_stops_when_the_repository_is_unknown(tmp_path):
+    result, notes = _publish(tmp_path, '3.1-rc1', _huge_changelog(), repo=None)
+    assert result.returncode != 0 and notes is None
+    assert 'repository' in result.stderr
 
 
 def test_release_publish_refuses_a_missing_section(tmp_path):

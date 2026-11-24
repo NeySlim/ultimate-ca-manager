@@ -1120,21 +1120,9 @@ jobs:
           python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md "${NOTES_MODE[@]}" \
             --changelog-url "https://github.com/${REPO}/blob/v${VERSION}/CHANGELOG.md" > "$CHANGES_FILE"
           
-          # Build release notes
-          {
-            if [ -s "$CHANGES_FILE" ]; then
-              echo "## What's Changed"
-              echo ""
-              cat "$CHANGES_FILE"
-              echo ""
-              echo "---"
-              echo ""
-            fi
-            echo "Earlier releases: [CHANGELOG.md](https://github.com/REPO/blob/v${VERSION}/CHANGELOG.md)"
-            echo ""
-            echo "---"
-            echo ""
-            cat << 'INSTALL_EOF'
+          # The placeholders are filled in the Installation part alone: the changes keep their words
+          INSTALL_FILE=$(mktemp)
+          cat > "$INSTALL_FILE" << 'INSTALL_EOF'
           ## Installation
           
           ### Docker (Recommended)
@@ -1221,21 +1209,37 @@ jobs:
           - [API Documentation](https://github.com/REPO/wiki/API)
           
           INSTALL_EOF
-          } > notes.md
           
           # Remove leading whitespace from heredoc
-          sed -i 's/^          //' notes.md
+          sed -i 's/^          //' "$INSTALL_FILE"
           
           # Replace placeholders (specific first, then generic)
           # File names use dots (2.1.0.rc2), not tildes (2.1.0~rc2)
           FILE_VERSION=$(python3 scripts/ci/release_version.py file "$VERSION")
-          sed -i "s|DEB_VERSION|${FILE_VERSION}|g" notes.md
-          sed -i "s|RPM_VERSION|${FILE_VERSION}|g" notes.md
-          sed -i "s|IMAGE|$IMAGE|g" notes.md
-          sed -i "s|REPO|$REPO|g" notes.md
-          sed -i "s|VERSION|$VERSION|g" notes.md
+          sed -i "s|DEB_VERSION|${FILE_VERSION}|g" "$INSTALL_FILE"
+          sed -i "s|RPM_VERSION|${FILE_VERSION}|g" "$INSTALL_FILE"
+          sed -i "s|IMAGE|$IMAGE|g" "$INSTALL_FILE"
+          sed -i "s|REPO|$REPO|g" "$INSTALL_FILE"
+          sed -i "s|VERSION|$VERSION|g" "$INSTALL_FILE"
           
-          rm -f "$CHANGES_FILE"
+          # Build release notes
+          {
+            if [ -s "$CHANGES_FILE" ]; then
+              echo "## What's Changed"
+              echo ""
+              cat "$CHANGES_FILE"
+              echo ""
+              echo "---"
+              echo ""
+            fi
+            echo "Earlier releases: [CHANGELOG.md](https://github.com/${REPO}/blob/v${VERSION}/CHANGELOG.md)"
+            echo ""
+            echo "---"
+            echo ""
+            cat "$INSTALL_FILE"
+          } > notes.md
+          
+          rm -f "$CHANGES_FILE" "$INSTALL_FILE"
           cat notes.md
       
       - name: Publish the full-stop marks of the migrations
