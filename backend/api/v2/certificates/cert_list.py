@@ -76,8 +76,8 @@ def _sort_columns():
         'serial_number': Certificate.serial_number,
         'revoked': Certificate.revoked,
         'descr': Certificate.descr,
-        # No comment sorts as an empty one: NULLs would go first on SQLite and last on PostgreSQL
-        'comment': func.coalesce(Certificate.comment, ''),
+        # An empty comment is stored as NULL, so it comes last in both directions
+        'comment': Certificate.comment,
         'key_algo': Certificate.key_algo,
         # A legacy row without a source is a manual one, as the source filter reads it
         'source': func.coalesce(Certificate.source, 'manual'),

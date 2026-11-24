@@ -134,8 +134,8 @@ def test_the_list_sorts_on_the_comment(app, auth_client, create_cert):
         rows = auth_client.get(BASE, query_string={'sort_by': 'comment', 'sort_order': direction,
                                                    'search': 'sort454-', 'per_page': 100}).get_json()['data']
         return [row['id'] for row in rows]
-    # No comment sorts as an empty one, first, on both backends
-    assert order('asc') == [ids[1], ids[2], ids[0]]
+    # No comment comes last in both directions, on both backends, as in every sorted list
+    assert order('asc') == [ids[2], ids[0], ids[1]]
     assert order('desc') == [ids[0], ids[2], ids[1]]
 
 
