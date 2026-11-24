@@ -22,15 +22,19 @@ from utils.datetime_utils import utc_now
 
 
 @pytest.fixture
-def an_issued_certificate(app):
-    """A row that is a certificate, not a request: `crt` is set."""
+def an_issued_certificate(app, create_ca):
+    """A row that is a certificate, not a request: `crt` is set, under a CA holding its key
+    (a CA held without its key publishes no revocation: its certificates go unrevoked)."""
     from models import CA, Certificate
 
     with app.app_context():
-        authority = CA.query.first()
+        keyed = CA.query.filter(CA.prv.isnot(None), CA.prv != '').order_by(CA.id).first()
+        refid = keyed.refid if keyed is not None else None
+    refid = refid or create_ca(cn='CSR scope CA')['refid']
+    with app.app_context():
         cert = Certificate(
             refid='csr-scope-issued', descr='csr scope issued',
-            caref=authority.refid if authority else None,
+            caref=refid,
             crt=base64.b64encode(b'-----BEGIN CERTIFICATE-----\nx\n'
                                  b'-----END CERTIFICATE-----\n').decode(),
             csr='-----BEGIN CERTIFICATE REQUEST-----\nx\n'

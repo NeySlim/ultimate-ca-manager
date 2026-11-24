@@ -43,6 +43,8 @@ SYSTEM_PREFIX = 'api.v2.system'
 
 # Every route this grid covers, with the scope its decorator must require.
 ROUTES = {
+    # api.v2.certificates
+    'POST /api/v2/certificates/<int:cert_id>/lift-local-revocation': ADMIN_SYSTEM,
     # api.v2.database
     'POST /api/v2/database/migrate': ADMIN_SETTINGS,
     'POST /api/v2/database/switch': ADMIN_SETTINGS,
