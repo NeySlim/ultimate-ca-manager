@@ -152,6 +152,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **An approved revocation that meets a deadlock keeps its approval.** On PostgreSQL, a revocation staged again after a deadlock no longer undoes the approval that triggered it: the request is closed as approved with its vote, where it was left cancelled.
 - **A write refused because the database is busy says so.** When another write holds SQLite, the interface now says the server is busy and to try again in a few seconds, in the page's language, instead of the server's English text; in a bulk CSR signing, the request that met it is listed as busy rather than `Signing failed`, and the requests after it are still signed.
 - Certificates: `PATCH /api/v2/certificates/{id}` answered `500` for a display name holding a lone UTF-16 surrogate, now `400`, and its answer ignored a revocation the CA records for the serial; it now answers the certificate as `GET` does.
 - **A sign-out sent during a session renewal ends the renewed session.** A sign-out or SAML Single Logout carrying the old cookie while a password or factor change moved the session to a new identifier ended only the old one; it now ends the session under its new identifier too, on every session store.

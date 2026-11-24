@@ -368,14 +368,41 @@ _CANCELLED = 'approval_cancellations'
 
 @event.listens_for(Session, 'after_commit')
 def _cancellations_committed(session):
+    # Kept until the outermost transaction commits, never moved at a RELEASE SAVEPOINT
+    if session.in_nested_transaction():
+        return
     pending = session.info.pop(_UNCOMMITTED, None)
     if pending:
-        session.info.setdefault(_CANCELLED, []).extend(pending)
+        session.info.setdefault(_CANCELLED, []).extend(entry for _tx, entry in pending)
+
+
+def _staged_within(tx, ended) -> bool:
+    while tx is not None:
+        if tx is ended:
+            return True
+        tx = tx.parent
+    return False
 
 
 @event.listens_for(Session, 'after_rollback')
 def _cancellations_rolled_back(session):
-    session.info.pop(_UNCOMMITTED, None)
+    if not session.in_nested_transaction():
+        session.info.pop(_UNCOMMITTED, None)
+
+
+@event.listens_for(Session, 'after_soft_rollback')
+def _savepoint_rolled_back(session, previous_transaction):
+    # A rolled-back savepoint drops only the cancellations staged inside it
+    pending = session.info.get(_UNCOMMITTED)
+    if pending and previous_transaction is not None and previous_transaction.nested:
+        pending[:] = [(tx, e) for tx, e in pending if not _staged_within(tx, previous_transaction)]
+
+
+@event.listens_for(Session, 'after_transaction_end')
+def _cancellations_transaction_end(session, transaction):
+    # A root transaction that ends without a commit (close() fires no rollback event) drops the rest
+    if transaction.parent is None and not transaction.nested:
+        session.info.pop(_UNCOMMITTED, None)
 
 
 def record_cancellations() -> None:
@@ -428,8 +455,10 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
             # Nobody approves their own request: it is withdrawn, without a vote
             approval.status = 'cancelled'
             approval.resolved_at = utc_now()
-            db.session.info.setdefault(_UNCOMMITTED, []).append(
-                (approval.id, approval.request_type, username, reason))
+            session = db.session()
+            tx = session.get_nested_transaction() or session.get_transaction()
+            session.info.setdefault(_UNCOMMITTED, []).append(
+                (tx, (approval.id, approval.request_type, username, reason)))
             logger.info("Approval request #%s cancelled by its requester: %s", approval.id, reason)
             continue
         approval.add_approval(user_id=user_id, username=username,

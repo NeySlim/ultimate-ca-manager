@@ -22,6 +22,8 @@ from tests.test_revocation_record_rule import (  # noqa: F401  (issuer is a fixt
     _on_postgresql, _record, _row, _wait_for_a_lock_waiter, issuer)
 from tests.test_restore_held_database import (  # noqa: F401  (busy_app is a fixture)
     _admin_user, _client, busy_app)
+from tests.test_approval_revoke_renew import (  # noqa: F401  (scoped is a fixture)
+    _cert, _json, _login, _request, scoped)
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
@@ -1172,6 +1174,31 @@ class TestARevocationThatMeetsADeadlock:
         assert len(calls) == 2
         assert _row(app, row_id)[0] is False
         assert _records(app, issuer[1], real) == []
+
+    @pytest.mark.usefixtures('drop_new_users')
+    def test_an_approval_keeps_its_vote_and_duplicates(self, app, create_user, scoped, monkeypatch):
+        """Only the revocation's savepoint is rolled back: the vote, the request's lock and the
+        duplicate the approval closed stay, and the revocation is staged once more."""
+        ca, _pid = scoped('rv-deadlock')
+        cid = scoped.cert(ca, 'rv-deadlock.example.test')
+        first, _ = _login(app, create_user)
+        second, approver = _login(app, create_user)
+        one = _json(first, 'post', f'/api/v2/certificates/{cid}/revoke',
+                    {'reason': 'superseded'}).get_json()['data']['approval_id']
+        two = _json(second, 'post', f'/api/v2/certificates/{cid}/revoke',
+                    {'reason': 'superseded'}).get_json()['data']['approval_id']
+        calls = _deadlocks(monkeypatch, 1)
+        r = _json(second, 'post', f'/api/v2/approvals/{one}/approve', {})
+        assert r.status_code == 200, r.get_json()
+        assert len(calls) == 2
+        assert _cert(app, cid)['revoked']
+        ap = _request(app, one)
+        assert ap.status == 'approved' and ap.certificate_id == cid
+        assert [v.get('user_id') for v in ap.get_approvals()] == [approver['id']]
+        dup = _request(app, two)
+        assert dup.status == 'cancelled' and dup.get_approvals() == []
+        with app.app_context():
+            assert AuditLog.query.filter_by(action='approval_cancelled', resource_id=str(two)).count() == 1
 
 
 class TestARevocationToldToItsIssuer:

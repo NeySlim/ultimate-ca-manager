@@ -9,6 +9,12 @@ from models import db
 from utils.response import error_response
 
 
+def is_deadlock(exc) -> bool:
+    """Whether ``exc`` is PostgreSQL's deadlock_detected (40P01)."""
+    orig = getattr(exc, 'orig', None)
+    return (getattr(orig, 'sqlstate', None) or getattr(orig, 'pgcode', None)) == '40P01'
+
+
 def safe_commit(logger_instance, error_msg="Database operation failed", on_conflict=None):
     """
     Attempt db.session.commit(); roll back and return an error response on failure.
