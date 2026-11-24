@@ -21,6 +21,7 @@ import socketio as socketio_pkg
 
 from flask import current_app, has_request_context, request, session
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
+from flask_socketio import ConnectionRefusedError as HandshakeRefused
 
 from auth.password_change_gate import password_change_pending
 from auth.session_epoch import SESSION_KEY as EPOCH_SESSION_KEY
@@ -128,6 +129,11 @@ DEFAULT_REVALIDATE_SECONDS = 60.0
 # The server's own round over its sockets: a socket that only listens is checked within
 # the revalidation delay plus one tick
 REVALIDATE_TICK_SECONDS = 15.0
+# A check that cannot reach the database or the session store keeps the socket this many
+# revalidation delays after the first such failure, then cuts it; a refusal cuts at once
+UNVERIFIED_GRACE_DELAYS = 2
+# What a handshake refused for that reason tells the browser (connect_error), which tries again
+HANDSHAKE_UNAVAILABLE = 'session check unavailable'
 REVALIDATOR_NAME = 'WebSocketRevalidator'
 ALERT_SEVERITIES = frozenset({'info', 'warning', 'error', 'critical'})
 
@@ -245,13 +251,17 @@ def _enrollment_pending() -> bool:
     return bool(session.get(ENROLL_SESSION_KEY))
 
 
+class SessionCheckUnavailable(Exception):
+    """The database or the session store did not answer: neither a valid session nor a refusal."""
+
+
 def _session_identity():
-    """(user_id, permissions) for a full, valid session cookie holding the minimum permission."""
+    """(user_id, permissions) for a full, valid session cookie holding the minimum permission,
+    None for a refusal; SessionCheckUnavailable when the session could not be read."""
     try:
         info = AuthManager().verify_session()
-    except Exception as exc:  # noqa: BLE001  # an unverifiable session is no session
-        logger.warning("WebSocket session check failed, treated as no session: %s", exc)
-        return None
+    except Exception as exc:  # noqa: BLE001
+        raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
     if not info:
         return None
     if _enrollment_pending() or password_change_pending(info):
@@ -294,6 +304,23 @@ def _revalidate_after() -> float:
         return DEFAULT_REVALIDATE_SECONDS
 
 
+def _unverified_grace() -> float:
+    return UNVERIFIED_GRACE_DELAYS * _revalidate_after()
+
+
+def _check_unavailable(state, exc) -> Optional[str]:
+    """A check that could not read the session: the socket stays until the grace, counted from
+    its first such failure, has run out; ``validated_at`` stays, so every round tries again."""
+    now = _monotonic()
+    since = state.get('unverified_since')
+    if since is None:
+        state['unverified_since'] = since = now
+        logger.warning("WebSocket session check unavailable, socket kept for now: %s", exc)
+    if now - since >= _unverified_grace():
+        return 'session check unavailable'
+    return None
+
+
 def _revalidation_failure(state, identity) -> Optional[str]:
     if identity is None:
         return 'session no longer valid'
@@ -329,6 +356,7 @@ def _refresh(sid, state, identity) -> Optional[str]:
         state['rooms'].add(room)
     state['permissions'] = permissions
     state['validated_at'] = _monotonic()
+    state['unverified_since'] = None
     return None
 
 
@@ -341,11 +369,25 @@ def _current_client():
         return None
     if _monotonic() - state['validated_at'] < _revalidate_after():
         return state
-    reason = _refresh(sid, state, _session_identity())
+    try:
+        reason = _refresh(sid, state, _session_identity())
+    except SessionCheckUnavailable as exc:
+        reason = _check_unavailable(state, exc)
     if reason:
         _drop(sid, reason)
         return None
     return state
+
+
+def _stored_identity(app, environ):
+    """``_session_identity()`` of the session the store holds now for the handshake's cookie."""
+    try:
+        with app.request_context(environ):
+            return _session_identity()
+    except SessionCheckUnavailable:
+        raise
+    except Exception as exc:  # noqa: BLE001  # the store did not open the session
+        raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
 
 
 def _check_away(app, sid, state) -> Optional[str]:
@@ -353,12 +395,11 @@ def _check_away(app, sid, state) -> Optional[str]:
     environ = socketio.server.get_environ(sid, namespace='/')
     if environ is None:
         return 'no handshake left'
-    try:
-        with app.request_context(environ):
-            return _refresh(sid, state, _session_identity())
-    except Exception as exc:  # noqa: BLE001  # an unverifiable session is no session
-        logger.warning("WebSocket periodic check failed, treated as no session: %s", exc)
-        return 'session check failed'
+    with app.app_context():
+        try:
+            return _refresh(sid, state, _stored_identity(app, environ))
+        except Exception as exc:  # noqa: BLE001  # neither valid nor refused: checked again next round
+            return _check_unavailable(state, exc)
 
 
 def revalidate_due_sockets(app) -> int:
@@ -463,8 +504,12 @@ def _checked_request(state, data, reply):
 # ================== Socket Event Handlers ==================
 @socketio.on('connect')
 def handle_connect(auth=None):
-    """Session cookie only: the auth payload, query string and API key headers are ignored."""
-    identity = _session_identity()
+    """Session cookie only: the auth payload, query string and API key headers are ignored.
+    A session that could not be read is refused as unavailable, which the browser tries again."""
+    try:
+        identity = _session_identity()
+    except SessionCheckUnavailable as exc:
+        raise _unavailable(exc) from exc
     if identity is None:
         logger.debug("WebSocket connection refused: no valid session")
         return False
@@ -482,6 +527,7 @@ def handle_connect(auth=None):
         'session_version': _int_or_zero(session.get('session_version')),
         'epoch': _int_or_zero(session.get(EPOCH_SESSION_KEY)),
         'validated_at': _monotonic(),
+        'unverified_since': None,
         'ops': deque(maxlen=SUBSCRIPTION_OPS_LIMIT),
     }
     # Listed first, then read again: a cut committed since the check above either finds the
@@ -489,7 +535,12 @@ def handle_connect(auth=None):
     connected_clients[request.sid] = state
     for room in managed:
         join_room(room)
-    if not _still_current(state) or connected_clients.get(request.sid) is not state:
+    try:
+        current = _still_current(state)
+    except SessionCheckUnavailable as exc:
+        connected_clients.pop(request.sid, None)
+        raise _unavailable(exc) from exc
+    if not current or connected_clients.get(request.sid) is not state:
         connected_clients.pop(request.sid, None)
         logger.info("WebSocket connection refused: its session ended during the handshake")
         return False
@@ -497,21 +548,28 @@ def handle_connect(auth=None):
     return True
 
 
+def _unavailable(exc) -> HandshakeRefused:
+    logger.warning("WebSocket connection refused, session check unavailable: %s", exc)
+    return HandshakeRefused(HANDSHAKE_UNAVAILABLE)
+
+
 def _still_current(state) -> bool:
     """The account is still active, at the socket's session version, under its epoch: read in a
-    new transaction (a SQLite snapshot would show the rows as the check read them)."""
+    new transaction (a SQLite snapshot would show the rows as the check read them).
+    SessionCheckUnavailable when they could not be read."""
     from auth.session_epoch import current_epoch
     from models import User, db
     try:
         db.session.rollback()
         row = db.session.execute(db.select(User.active, User.session_version)
                                  .where(User.id == state['user_id'])).first()
-        return (row is not None and bool(row.active)
+        if not (row is not None and bool(row.active)
                 and (row.session_version or 0) == state['session_version']
-                and current_epoch() == state['epoch'])
-    except Exception as exc:  # noqa: BLE001  # an unverifiable session is no session
-        logger.warning("WebSocket session check failed, treated as no session: %s", exc)
-        return False
+                and current_epoch() == state['epoch']):
+            return False
+    except Exception as exc:  # noqa: BLE001
+        raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
+    return True
 
 
 def _int_or_zero(value) -> int:

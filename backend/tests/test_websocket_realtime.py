@@ -322,6 +322,7 @@ class TestRevalidation:
             assert not ws.is_connected()
 
     def test_failing_session_check_cuts(self, app, reader, revalidate_now, monkeypatch, caplog):
+        # No revalidation delay leaves no grace for an unreachable database either
         ws, _ = reader
         sid = _sid(ws)
 

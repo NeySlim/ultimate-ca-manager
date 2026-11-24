@@ -247,3 +247,133 @@ class TestHandshakeRace:
         self._cut_while_checking(app, monkeypatch, lambda uid: None)
         with _socket(app, _session_client(app, user_id)) as ws:
             assert ws.is_connected()
+
+
+def _database_away():
+    from sqlalchemy.exc import OperationalError
+    return OperationalError('SELECT 1', {}, ConnectionError('database unreachable (test)'))
+
+
+@pytest.fixture
+def outage(monkeypatch):
+    """While true, the session check meets a database that does not answer."""
+    from auth.unified import AuthManager
+    down = [True]
+    real = AuthManager.verify_session
+
+    def verify(self):
+        if down[0]:
+            raise _database_away()
+        return real(self)
+    monkeypatch.setattr(AuthManager, 'verify_session', verify)
+    return down
+
+
+@pytest.fixture
+def refusals(app, monkeypatch):
+    """The reason of each handshake the server refuses, as the browser's connect_error reads it."""
+    from socketio import packet
+    server = events.socketio.server
+    seen = []
+
+    class Recording(server.packet_class):
+        def __init__(self, packet_type=packet.EVENT, data=None, *args, **kwargs):
+            if packet_type == packet.CONNECT_ERROR:
+                seen.append(data)
+            super().__init__(packet_type, data, *args, **kwargs)
+    monkeypatch.setattr(server, 'packet_class', Recording)
+    return seen
+
+
+class TestDatabaseOrStoreAway:
+    """A check that cannot reach the database or the session store is no refusal: the socket
+    stays, unverified, for at most twice the revalidation delay, while a refusal cuts at once."""
+
+    @staticmethod
+    def _rounds_until(app, clock, seconds):
+        """Rounds every tick over ``seconds``: the sockets cut."""
+        cut, end = 0, clock[0] + seconds
+        while clock[0] + events.REVALIDATE_TICK_SECONDS <= end:
+            clock[0] += events.REVALIDATE_TICK_SECONDS
+            cut += events.revalidate_due_sockets(app)
+        return cut
+
+    def test_a_round_during_an_outage_cuts_nothing_and_the_socket_stays_once_back(
+            self, app, listening, clock, outage):
+        ws, _user_id, _client = listening
+        state = events.connected_clients[_sid(ws)]
+        validated = state['validated_at']
+        _due(clock)
+        assert events.revalidate_due_sockets(app) == 0
+        assert ws.is_connected() and state['validated_at'] == validated
+        outage[0] = False
+        clock[0] += events.REVALIDATE_TICK_SECONDS
+        assert events.revalidate_due_sockets(app) == 0
+        assert ws.is_connected() and state['validated_at'] == clock[0]
+        # A later outage starts its own allowance
+        outage[0] = True
+        _due(clock)
+        assert self._rounds_until(app, clock, events.DEFAULT_REVALIDATE_SECONDS) == 0
+        assert ws.is_connected()
+
+    def test_a_store_that_does_not_answer_is_an_outage_too(self, app, listening, clock,
+                                                         monkeypatch):
+        ws, _user_id, _client = listening
+
+        def unreachable(_store_id):
+            raise _database_away()
+        with monkeypatch.context() as patched:
+            patched.setattr(app.session_interface, '_retrieve_session_data', unreachable)
+            _due(clock)
+            assert events.revalidate_due_sockets(app) == 0
+            assert ws.is_connected()
+        clock[0] += events.REVALIDATE_TICK_SECONDS
+        assert events.revalidate_due_sockets(app) == 0
+        assert events.connected_clients[_sid(ws)]['validated_at'] == clock[0]
+
+    def test_an_outage_past_twice_the_delay_cuts_the_socket(self, app, listening, clock, outage):
+        ws, _user_id, _client = listening
+        _due(clock)
+        assert events.revalidate_due_sockets(app) == 0
+        bound = 2 * events.DEFAULT_REVALIDATE_SECONDS
+        assert self._rounds_until(app, clock, bound - events.REVALIDATE_TICK_SECONDS) == 0
+        assert ws.is_connected()
+        assert self._rounds_until(app, clock, events.REVALIDATE_TICK_SECONDS) == 1
+        assert not ws.is_connected() and _sid(ws) not in events.connected_clients
+
+    def test_a_refusal_after_an_outage_cuts_at_once(self, app, listening, clock, outage):
+        ws, user_id, _client = listening
+        _due(clock)
+        assert events.revalidate_due_sockets(app) == 0
+        outage[0] = False
+        _deactivate_unseen(app, user_id)
+        clock[0] += events.REVALIDATE_TICK_SECONDS
+        assert events.revalidate_due_sockets(app) == 1
+        assert not ws.is_connected()
+
+    def test_a_message_during_an_outage_is_answered_until_the_bound(self, app, listening, clock,
+                                                                    outage):
+        ws, _user_id, _client = listening
+        _due(clock)
+        ws.emit('ping')
+        assert [m['name'] for m in ws.get_received()] == ['pong']
+        assert ws.is_connected()
+        clock[0] += 2 * events.DEFAULT_REVALIDATE_SECONDS
+        ws.emit('ping')
+        assert not ws.is_connected() and _sid(ws) not in events.connected_clients
+
+    def test_a_handshake_during_an_outage_is_refused_as_unavailable(
+            self, app, make_user, outage, refusals):  # noqa: F811
+        client = _session_client(app, make_user(role_perms=READER))
+        with _socket(app, client) as ws:
+            assert not ws.is_connected()
+        assert refusals == [{'message': events.HANDSHAKE_UNAVAILABLE}]
+        assert events.connected_clients == {}
+        outage[0] = False
+        with _socket(app, client) as ws:
+            assert ws.is_connected()
+
+    def test_a_refused_handshake_keeps_the_plain_refusal(self, app, refusals):
+        with _socket(app, _session_client(app)) as ws:
+            assert not ws.is_connected()
+        assert refusals and refusals[0] != {'message': events.HANDSHAKE_UNAVAILABLE}
