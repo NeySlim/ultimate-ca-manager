@@ -441,3 +441,11 @@ class TestProxyMultiPath:
             json={'proxy_enabled': True, 'proxy_slug': 'directory'},
         )
         assert r.status_code == 400
+
+
+def test_no_account_names_the_section_by_its_screen_title(app, clean_proxy_state):
+    """The error sends the operator to the section as the ACME screen titles it."""
+    with app.app_context():
+        with pytest.raises(RuntimeError) as err:
+            resolve_proxy_account()
+    assert 'ACME → Certificate Authorities (CA)' in str(err.value)

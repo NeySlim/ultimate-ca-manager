@@ -138,5 +138,5 @@ def resolve_proxy_account(explicit_id: Optional[int] = None) -> AcmeClientAccoun
 
     raise RuntimeError(
         "No external ACME CA account configured for the proxy. "
-        "Add a CA account under ACME → External CA Accounts and select it for the proxy."
+        "Add a CA account under ACME → Certificate Authorities (CA) and select it for the proxy."
     )
