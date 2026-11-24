@@ -58,6 +58,18 @@ def _gssapi():
 _PROC_MAPS = '/proc/self/maps'
 
 
+class _Transient(str):
+    """A verdict met on a file that could not be read, or before the extension loads: not kept."""
+
+
+_kept_verdict = ()  # (problem,) once judged on the mapped files: the code they hold no longer changes
+
+
+def forget_fips_verdict():
+    global _kept_verdict
+    _kept_verdict = ()
+
+
 def _gssapi_extension():
     """The file of python-gssapi's compiled extension that acquires credentials, or None."""
     try:
@@ -93,7 +105,7 @@ def _resolve(soname, mapped):
             if dynamic_names(path)[0] == soname:
                 found.append(path)
         except (OSError, ValueError) as e:
-            return None, f'{path} cannot be read ({e})'
+            return None, _Transient(f'{path} cannot be read ({e})')
     if len(found) != 1:
         return None, f'{soname} is not loaded' if not found else f'several files of {soname} are loaded'
     return found[0], None
@@ -104,7 +116,7 @@ def _needed(path):
     try:
         return needed_libraries(path), None
     except (OSError, ValueError) as e:
-        return None, f'{path} cannot be read ({e})'
+        return None, _Transient(f'{path} cannot be read ({e})')
 
 
 def _loaded_k5crypto():
@@ -112,10 +124,10 @@ def _loaded_k5crypto():
     libgssapi_krb5, each resolved by soname among the mapped files; else (None, why not)."""
     extension = _gssapi_extension()
     if not extension:
-        return None, 'the gssapi extension module is not found'
+        return None, _Transient('the gssapi extension module is not found')
     mapped = _mapped_files()
     if mapped is None:
-        return None, f'{_PROC_MAPS} cannot be read'
+        return None, _Transient(f'{_PROC_MAPS} cannot be read')
     real = {os.path.realpath(p): p for p in mapped}
     if os.path.realpath(extension) not in real:
         return None, f'the gssapi extension {extension} is not loaded'
@@ -137,9 +149,21 @@ def _loaded_k5crypto():
 def fips_crypto_problem():
     """None when the libk5crypto python-gssapi runs on hands its cryptography to the system
     OpenSSL (libcrypto among its DT_NEEDED, as RHEL builds it), else why FIPS mode refuses it.
-    Mapped files, not a search path: what this process actually runs; unknown is a refusal."""
+    Mapped files, not a search path: what this process actually runs; unknown is a refusal.
+    The first verdict judged on them is kept, so an update deleting them changes nothing."""
+    global _kept_verdict
+    if _kept_verdict:
+        return _kept_verdict[0]
     if not gssapi_available():
         return MISSING_LIBRARY
+    problem = _judge_k5crypto()
+    if isinstance(problem, _Transient):
+        return str(problem)
+    _kept_verdict = (problem,)
+    return problem
+
+
+def _judge_k5crypto():
     path, problem = _loaded_k5crypto()
     if problem:
         return problem
