@@ -914,6 +914,36 @@ def test_recovery_codes_for_an_account_deleted_meanwhile_answer_404(app, monkeyp
         _cleanup(app, user)
 
 
+def test_an_account_deleted_once_its_key_change_is_audited_keeps_no_session(app, monkeypatch):
+    """The interleaving of the deadlock test below, made deterministic: the deletion commits
+    between the change's audit and the renewal of the caller's session, which is not kept."""
+    import api.v2.webauthn as webauthn_api
+    from websocket import events
+    user = _make_user(app, key=SoftKey())
+    log_action = webauthn_api.AuditService.log_action
+    cuts = []
+
+    def _audit_then_delete(*args, **kwargs):
+        answer = log_action(*args, **kwargs)
+        _delete_account(user['id'])
+        db.session.commit()
+        return answer
+    try:
+        this = _open_session(app, user)
+        old = this.get_cookie('session').value
+        monkeypatch.setattr(webauthn_api.AuditService, 'log_action', _audit_then_delete)
+        monkeypatch.setattr(events, 'end_session_sockets', lambda sid: cuts.append(sid))
+        r = _delete_key(app, this, user)
+        assert r.status_code == 200, r.data
+        assert this.get_cookie('session').value == old  # not moved to a new identifier
+        assert old in cuts  # its sockets closed at the end of the request
+        monkeypatch.undo()
+        assert not _signed_in(this)
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+
+
 @pytest.mark.postgres
 def test_a_key_change_and_the_deletion_of_its_account_never_deadlock(app, auth_client,
                                                                         monkeypatch):

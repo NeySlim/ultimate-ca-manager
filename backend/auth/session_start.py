@@ -75,6 +75,8 @@ def keep_current_session(user) -> bool:
     replaced, new = getattr(user, '_sessions_bump', (None, None))
     if replaced is None or session.get('session_version', 0) != replaced:
         return False
+    if not _account_exists(user):
+        return False  # deleted since the change committed: nothing left to sign in to
     session['session_version'] = new
     try:
         _new_identifier(keep_lock=True)
@@ -86,8 +88,23 @@ def keep_current_session(user) -> bool:
     return True
 
 
+def _account_id(user):
+    """The account's id, never loaded: after a commit, ``user.id`` reloads a row another
+    request may have deleted meanwhile."""
+    from sqlalchemy import inspect
+    identity = inspect(user).identity
+    return identity[0] if identity else user.id
+
+
+def _account_exists(user) -> bool:
+    from models import User, db
+    return db.session.execute(
+        db.select(User.id).where(User.id == _account_id(user))).first() is not None
+
+
 def _acts_on_own_account(user) -> bool:
-    return getattr(g, 'auth_method', None) == 'session' and getattr(g, 'user_id', None) == user.id
+    return (getattr(g, 'auth_method', None) == 'session'
+            and getattr(g, 'user_id', None) == _account_id(user))
 
 
 def keep_own_session(user):
