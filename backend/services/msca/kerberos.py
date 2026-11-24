@@ -58,33 +58,94 @@ def _gssapi():
 _PROC_MAPS = '/proc/self/maps'
 
 
-def _mapped_library(stem):
-    """The path of the first file mapped in this process whose name starts with ``stem``."""
+def _gssapi_extension():
+    """The file of python-gssapi's compiled extension that acquires credentials, or None."""
+    try:
+        from gssapi.raw import creds
+    except ImportError:
+        return None
+    return getattr(creds, '__file__', None)
+
+
+def _mapped_files():
+    """The real paths of the files mapped in this process, in map order; None when unreadable."""
+    files = []
     try:
         with open(_PROC_MAPS, encoding='utf-8', errors='replace') as handle:
             for line in handle:
-                fields = line.split(maxsplit=5)
-                if len(fields) == 6 and os.path.basename(fields[5].rstrip('\n')).startswith(stem):
-                    return fields[5].rstrip('\n')
+                fields = line.rstrip('\n').split(maxsplit=5)
+                if len(fields) == 6 and fields[5].startswith('/') and fields[5] not in files:
+                    files.append(fields[5])
     except OSError:
         return None
-    return None
+    return files
+
+
+def _resolve(soname, mapped):
+    """(the mapped file whose DT_SONAME is ``soname``, None), else (None, why it is unknown)."""
+    from utils.elf_needed import dynamic_names
+    stem = soname.split('.so', 1)[0]
+    found = []
+    for path in mapped:
+        if not os.path.basename(path).startswith(stem):
+            continue
+        try:
+            if dynamic_names(path)[0] == soname:
+                found.append(path)
+        except (OSError, ValueError) as e:
+            return None, f'{path} cannot be read ({e})'
+    if len(found) != 1:
+        return None, f'{soname} is not loaded' if not found else f'several files of {soname} are loaded'
+    return found[0], None
+
+
+def _needed(path):
+    from utils.elf_needed import needed_libraries
+    try:
+        return needed_libraries(path), None
+    except (OSError, ValueError) as e:
+        return None, f'{path} cannot be read ({e})'
+
+
+def _loaded_k5crypto():
+    """(path, None) of the libk5crypto that python-gssapi's extension reaches through its
+    libgssapi_krb5, each resolved by soname among the mapped files; else (None, why not)."""
+    extension = _gssapi_extension()
+    if not extension:
+        return None, 'the gssapi extension module is not found'
+    mapped = _mapped_files()
+    if mapped is None:
+        return None, f'{_PROC_MAPS} cannot be read'
+    real = {os.path.realpath(p): p for p in mapped}
+    if os.path.realpath(extension) not in real:
+        return None, f'the gssapi extension {extension} is not loaded'
+    path = real[os.path.realpath(extension)]
+    for stem in ('libgssapi_krb5', 'libk5crypto'):
+        needed, problem = _needed(path)
+        if problem:
+            return None, problem
+        # a wheel's bundled copy is renamed libgssapi_krb5-<hash>.so.2 by auditwheel
+        soname = next((n for n in needed if n.startswith((stem + '.so', stem + '-'))), None)
+        if soname is None:
+            return None, f'{path} needs no {stem}'
+        path, problem = _resolve(soname, mapped)
+        if problem:
+            return None, problem
+    return path, None
 
 
 def fips_crypto_problem():
-    """None when the libk5crypto python-gssapi loaded hands its cryptography to the system
+    """None when the libk5crypto python-gssapi runs on hands its cryptography to the system
     OpenSSL (libcrypto among its DT_NEEDED, as RHEL builds it), else why FIPS mode refuses it.
-    The mapped file, not a search path: it is the library this process actually runs."""
+    Mapped files, not a search path: what this process actually runs; unknown is a refusal."""
     if not gssapi_available():
         return MISSING_LIBRARY
-    path = _mapped_library('libk5crypto.so')
-    if path is None:
-        return 'no MIT Kerberos crypto library (libk5crypto) is loaded'
-    from utils.elf_needed import needed_libraries
-    try:
-        needed = needed_libraries(path)
-    except (OSError, ValueError) as e:
-        return f'{path} cannot be read ({e})'
+    path, problem = _loaded_k5crypto()
+    if problem:
+        return problem
+    needed, problem = _needed(path)
+    if problem:
+        return problem
     if any(name.startswith('libcrypto.so') for name in needed):
         return None
     return f'{path} does its own cryptography, outside the FIPS module'

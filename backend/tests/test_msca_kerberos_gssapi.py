@@ -83,12 +83,14 @@ def test_an_in_memory_cache_is_destroyed_without_error(realm):
 
 
 def test_fips_mode_judges_the_kerberos_library_this_process_loaded():
-    """Debian builds libk5crypto with its own cryptography (no libcrypto): FIPS mode refuses it."""
+    """Debian builds libk5crypto with its own cryptography (no libcrypto): FIPS mode refuses it.
+    The library judged is the one python-gssapi's extension reaches through libgssapi_krb5."""
     import os
-    from services.msca.kerberos import _mapped_library, fips_crypto_problem
-    from utils.elf_needed import needed_libraries
-    path = _mapped_library('libk5crypto.so')
-    assert path and os.path.isfile(path), path
+    from services.msca.kerberos import _loaded_k5crypto, fips_crypto_problem
+    from utils.elf_needed import dynamic_names, needed_libraries
+    path, problem = _loaded_k5crypto()
+    assert problem is None and os.path.isfile(path), problem
+    assert dynamic_names(path)[0].startswith('libk5crypto.so')
     on_openssl = any(name.startswith('libcrypto.so') for name in needed_libraries(path))
     assert (fips_crypto_problem() is None) is on_openssl
     if os.path.exists('/etc/debian_version'):

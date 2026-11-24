@@ -1,4 +1,4 @@
-"""The DT_NEEDED entries of an ELF shared object, read from its program headers.
+"""The DT_NEEDED and DT_SONAME entries of an ELF shared object, read from its program headers.
 
 Only what the dynamic loader reads (PT_LOAD, PT_DYNAMIC, DT_STRTAB): a stripped library
 without section headers reads the same. Nothing is loaded or executed.
@@ -6,11 +6,16 @@ without section headers reads the same. Nothing is loaded or executed.
 import struct
 
 _PT_LOAD, _PT_DYNAMIC = 1, 2
-_DT_NULL, _DT_NEEDED, _DT_STRTAB, _DT_STRSZ = 0, 1, 5, 10
+_DT_NULL, _DT_NEEDED, _DT_STRTAB, _DT_STRSZ, _DT_SONAME = 0, 1, 5, 10, 14
 
 
 def needed_libraries(path):
     """The sonames ``path`` names in its dynamic section; ValueError for a file that is no ELF."""
+    return dynamic_names(path)[1]
+
+
+def dynamic_names(path):
+    """(its DT_SONAME or None, its DT_NEEDED sonames); ValueError for a file that is no ELF."""
     with open(path, 'rb') as handle:
         data = handle.read()
     try:
@@ -47,8 +52,8 @@ def _needed(path, data):
         elif p_type == _PT_DYNAMIC:
             dynamic = (offset, filesz)
     if dynamic is None:
-        return []
-    entries, strtab, strsz = [], None, None
+        return None, []
+    entries, strtab, strsz, soname = [], None, None, None
     size = struct.calcsize(dyn)
     for position in range(dynamic[0], dynamic[0] + dynamic[1] - size + 1, size):
         tag, value = struct.unpack_from(dyn, data, position)
@@ -60,6 +65,8 @@ def _needed(path, data):
             strtab = value
         elif tag == _DT_STRSZ:
             strsz = value
+        elif tag == _DT_SONAME:
+            soname = value
     if strtab is None:
         raise ValueError(f'{path}: no string table in its dynamic section')
     # DT_STRTAB is an address: the segment that maps it gives its place in the file
@@ -69,10 +76,10 @@ def _needed(path, data):
         raise ValueError(f'{path}: its string table is outside every loaded segment')
     end = min(len(data), base + strsz) if strsz else len(data)
     names = []
-    for value in entries:
+    for value in entries + ([soname] if soname is not None else []):
         start = base + value
         stop = data.find(b'\0', start, end) if start < end else -1
         if stop < 0:
-            raise ValueError(f'{path}: a DT_NEEDED entry lies outside its string table')
+            raise ValueError(f'{path}: a dynamic entry lies outside its string table')
         names.append(data[start:stop].decode('utf-8', errors='replace'))
-    return names
+    return (names.pop() if soname is not None else None), names

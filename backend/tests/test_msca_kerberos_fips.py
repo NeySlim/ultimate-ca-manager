@@ -21,18 +21,20 @@ pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 LIBRARY = '/usr/lib/x86_64-linux-gnu/libk5crypto.so.3.1'
 
 
-def _elf(needed, bits=64, endian='<'):
-    """A shared object holding only what the loader reads: one PT_LOAD, a PT_DYNAMIC, DT_NEEDED."""
+def _elf(needed, bits=64, endian='<', soname=None):
+    """A shared object holding only what the loader reads: one PT_LOAD, a PT_DYNAMIC, DT_NEEDED
+    (and DT_SONAME when given)."""
     ehsize, phentsize = (64, 56) if bits == 64 else (52, 32)
     strtab = b'\0'
     names = []
-    for name in needed:
+    for name in needed + ([soname] if soname else []):
         names.append(len(strtab))
         strtab += name.encode() + b'\0'
     strtab_off = ehsize + 2 * phentsize
     dyn_off = strtab_off + len(strtab) + (-(strtab_off + len(strtab)) % 8)
     entry = endian + ('qQ' if bits == 64 else 'iI')
-    dyn = b''.join(struct.pack(entry, 1, n) for n in names)
+    dyn = b''.join(struct.pack(entry, 14 if soname and i == len(needed) else 1, n)
+                   for i, n in enumerate(names))
     dyn += struct.pack(entry, 5, 0x1000 + strtab_off) + struct.pack(entry, 10, len(strtab))
     dyn += struct.pack(entry, 0, 0)
     total = dyn_off + len(dyn)
@@ -61,6 +63,16 @@ def test_the_needed_libraries_are_read_from_the_dynamic_section(tmp_path, bits, 
     path = tmp_path / 'lib.so'
     path.write_bytes(_elf(['libkrb5support.so.0', 'libcrypto.so.3', 'libc.so.6'], bits, endian))
     assert needed_libraries(str(path)) == ['libkrb5support.so.0', 'libcrypto.so.3', 'libc.so.6']
+
+
+@pytest.mark.parametrize('bits, endian', [(64, '<'), (32, '>')])
+def test_the_soname_is_read_beside_the_needed_libraries(tmp_path, bits, endian):
+    from utils.elf_needed import dynamic_names
+    path = tmp_path / 'lib.so'
+    path.write_bytes(_elf(['libc.so.6'], bits, endian, soname='libk5crypto.so.3'))
+    assert dynamic_names(str(path)) == ('libk5crypto.so.3', ['libc.so.6'])
+    path.write_bytes(_elf(['libc.so.6'], bits, endian))
+    assert dynamic_names(str(path)) == (None, ['libc.so.6'])
 
 
 def test_a_real_extension_names_the_openssl_it_links():
@@ -123,24 +135,48 @@ def test_a_forged_library_is_refused_not_a_crash(loaded):
 
 # --- which Kerberos library is loaded ---------------------------------------------------------
 
+K5 = 'libk5crypto.so.3'
+GSS = 'libgssapi_krb5.so.2'
+
+
 @pytest.fixture
 def loaded(monkeypatch, tmp_path):
-    """Maps a fake libk5crypto into a fake /proc/self/maps: ``loaded(needed)`` or ``loaded(None)``."""
+    """A fake /proc/self/maps holding python-gssapi's extension, libgssapi_krb5 and libk5crypto:
+    ``loaded(needed)`` gives libk5crypto these DT_NEEDED, ``loaded(None)`` maps none."""
     from services.msca import kerberos
     monkeypatch.setattr(kerberos, 'gssapi_available', lambda: True)
     maps = tmp_path / 'maps'
     monkeypatch.setattr(kerberos, '_PROC_MAPS', str(maps))
+    folder = tmp_path / 'lib dir'
+    folder.mkdir()
+    extension = folder / 'creds.cpython-313-x86_64-linux-gnu.so'
+    extension.write_bytes(_elf([GSS, 'libc.so.6']))
+    monkeypatch.setattr(kerberos, '_gssapi_extension', lambda: str(extension))
+    state = {'lines': []}
 
-    def load(needed, name='libk5crypto.so.3.1'):
-        lines = ['7f00-7f10 r-xp 00000000 08:01 11 /usr/lib/x86_64-linux-gnu/libkrb5.so.3.3']
-        if needed is not None:
-            library = tmp_path / 'lib dir' / name
-            library.parent.mkdir(exist_ok=True)
-            library.write_bytes(_elf(needed))
-            lines.append(f'7f20-7f30 r-xp 00000000 08:01 12 {library}')
-            lines.append(f'7f30-7f40 r--p 00010000 08:01 12 {library}')
-        maps.write_text('\n'.join(lines) + '\n')
-        return str(tmp_path / 'lib dir' / name)
+    def mapped(path):
+        state['lines'].append(f'7f{len(state["lines"]):02x}0-7f{len(state["lines"]):02x}f r-xp 00000000 08:01 '
+                              f'{len(state["lines"]) + 10} {path}')
+        maps.write_text('\n'.join(state['lines']) + '\n')
+
+    def library(name, needed, soname, mapped_too=True):
+        path = folder / name
+        path.write_bytes(_elf(needed, soname=soname))
+        if mapped_too:
+            mapped(path)
+        return str(path)
+
+    def load(needed, name='libk5crypto.so.3.1', decoys=()):
+        for decoy in decoys:
+            mapped(decoy)
+        mapped('/usr/lib/x86_64-linux-gnu/libkrb5.so.3.3')
+        mapped(extension)
+        library('libgssapi_krb5.so.2.2', ['libkrb5.so.3', K5, 'libc.so.6'], GSS)
+        if needed is None:
+            maps.write_text('\n'.join(state['lines']) + '\n')
+            return None
+        return library(name, needed, K5)
+    load.library, load.mapped, load.extension, load.folder = library, mapped, str(extension), folder
     return load
 
 
@@ -160,6 +196,48 @@ def test_no_mit_crypto_library_loaded_is_refused(loaded):
     from services.msca.kerberos import fips_crypto_problem
     loaded(None)
     assert 'libk5crypto' in fips_crypto_problem()
+
+
+def test_the_library_judged_is_the_one_gssapi_reaches_not_the_first_mapped(loaded, tmp_path):
+    """A libk5crypto of another soname, built on OpenSSL and mapped first, is not the one judged."""
+    from services.msca.kerberos import fips_crypto_problem
+    decoy = tmp_path / 'other' / 'libk5crypto.so.3.9'
+    decoy.parent.mkdir()
+    decoy.write_bytes(_elf(['libcrypto.so.3'], soname='libk5crypto.so.9'))
+    path = loaded(['libkrb5support.so.0', 'libc.so.6'], decoys=[decoy])
+    assert fips_crypto_problem() == f'{path} does its own cryptography, outside the FIPS module'
+
+
+def test_two_mapped_libraries_of_the_soname_are_refused(loaded, tmp_path):
+    from services.msca.kerberos import fips_crypto_problem
+    twin = tmp_path / 'other' / 'libk5crypto.so.3.1'
+    twin.parent.mkdir()
+    twin.write_bytes(_elf(['libcrypto.so.3'], soname=K5))
+    loaded(['libcrypto.so.3'], decoys=[twin])
+    assert fips_crypto_problem() == f'several files of {K5} are loaded'
+
+
+def test_an_extension_that_is_not_mapped_is_refused(loaded, monkeypatch, tmp_path):
+    from services.msca import kerberos
+    loaded(['libcrypto.so.3'])
+    elsewhere = tmp_path / 'creds.so'
+    elsewhere.write_bytes(_elf([GSS]))
+    monkeypatch.setattr(kerberos, '_gssapi_extension', lambda: str(elsewhere))
+    assert kerberos.fips_crypto_problem() == f'the gssapi extension {elsewhere} is not loaded'
+
+
+def test_an_extension_on_another_gssapi_is_refused(loaded):
+    from services.msca.kerberos import fips_crypto_problem
+    loaded(['libcrypto.so.3'])
+    open(loaded.extension, 'wb').write(_elf(['libgssapi.so.3', 'libc.so.6']))
+    assert fips_crypto_problem() == f'{loaded.extension} needs no libgssapi_krb5'
+
+
+def test_without_the_extension_file_the_library_is_unknown(loaded, monkeypatch):
+    from services.msca import kerberos
+    loaded(['libcrypto.so.3'])
+    monkeypatch.setattr(kerberos, '_gssapi_extension', lambda: None)
+    assert kerberos.fips_crypto_problem() == 'the gssapi extension module is not found'
 
 
 def test_without_gssapi_the_library_is_missing(monkeypatch):
