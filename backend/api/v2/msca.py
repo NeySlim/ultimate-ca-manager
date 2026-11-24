@@ -163,8 +163,10 @@ _SIGN_IN_DEFAULTS = dict(server='', use_ssl=True, verify_ssl=True, ca_bundle=Non
 
 
 def kerberos_error_response(error):
-    """400 naming the Kerberos cause: nothing the CA read, nothing recorded."""
-    return error_response(str(error), 400)
+    """400 naming the Kerberos cause, the FIPS problem type for a refusal of FIPS mode."""
+    from services.msca.kerberos import KerberosFipsRefused
+    fips = isinstance(error, KerberosFipsRefused)
+    return error_response(str(error), 400, problem_type=fips_mode.PROBLEM_TYPE if fips else None)
 
 
 def _text(value):

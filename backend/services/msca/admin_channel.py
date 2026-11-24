@@ -13,6 +13,7 @@ import re
 from models import db
 from models.msca import MicrosoftCA
 from utils.datetime_utils import utc_now
+from services.msca import kerberos as _kerberos
 from services.msca.kerberos import KerberosAuth, MSCAKerberosError, gssapi_available, initiator_credential
 
 logger = logging.getLogger(__name__)
@@ -197,8 +198,13 @@ class MicrosoftCAAdminChannelMixin:
         if fips_mode.enabled():
             # NTLM hashes with MD4/MD5 outside the FIPS module
             if kerberos_transport_available():
+                problem = _kerberos.fips_crypto_problem()
+                if problem is None:
+                    raise MSCAAdminChannelError(
+                        'NTLM is not available in FIPS mode: use the Kerberos transport')
                 raise MSCAAdminChannelError(
-                    'NTLM is not available in FIPS mode: use the Kerberos transport')
+                    f'NTLM is not available in FIPS mode and Kerberos cannot replace it here ({problem}): '
+                    'turn off the WinRM channel of this connection')
             raise MSCAAdminChannelError(
                 'NTLM is not available in FIPS mode and the Kerberos transport is not '
                 'installed (pyspnego[kerberos]): turn off the WinRM channel of this connection')
@@ -226,6 +232,7 @@ class MicrosoftCAAdminChannelMixin:
         credential (preemptive, mutual authentication required, as pywinrm asks), and the message
         encryption is set up as build_session would have.
         """
+        _kerberos.refuse_outside_fips_module()  # before the first WinRM message
         transport = getattr(getattr(session, 'protocol', None), 'transport', None)
         if transport is None or getattr(transport, 'session', True) is not None or not all(
                 hasattr(transport, name) for name in _PYWINRM_TRANSPORT):

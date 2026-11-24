@@ -4409,7 +4409,11 @@
         },
         "msca_winrm_ntlm": {
           "title": "Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode",
-          "remedy": "Turn off the WinRM channel of these connections. Kerberos replaces NTLM only on a native install with pywinrm[kerberos] and a Kerberos library built on the system OpenSSL (RHEL); the Docker image has neither."
+          "remedy": "Turn off the WinRM channel of these connections. Kerberos replaces NTLM only on a native install whose Kerberos library is built on the system OpenSSL (RHEL); the Kerberos library of the Docker image does its own cryptography, so FIPS mode refuses Kerberos there too."
+        },
+        "msca_kerberos_outside_fips": {
+          "title": "Microsoft CA connections that sign in with Kerberos (certsrv or the WinRM channel) on a Kerberos library that does its own cryptography, outside the FIPS module: their sign-in is refused in FIPS mode",
+          "remedy": "Switch these connections to certificate or Basic authentication and turn off their Kerberos WinRM channel, or run UCM from the package on a system whose Kerberos library is built on the system OpenSSL (RHEL); the Kerberos library of the Docker image is not."
         },
         "backup_schedule_argon2id": {
           "title": "Scheduled backups are written with Argon2id: such archives cannot be restored in FIPS mode",

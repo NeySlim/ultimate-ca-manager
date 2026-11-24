@@ -540,12 +540,33 @@ def _short_hmac_secrets():
 @detector('msca.winrm_ntlm', BLOCKER,
           'Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode',
           'Turn off the WinRM channel of these connections. Kerberos replaces NTLM only on a '
-          'native install with pywinrm[kerberos] and a Kerberos library built on the system '
-          'OpenSSL (RHEL); the Docker image has neither.')
+          'native install whose Kerberos library is built on the system OpenSSL (RHEL); the '
+          'Kerberos library of the Docker image does its own cryptography, so FIPS mode refuses '
+          'Kerberos there too.')
 def _msca_ntlm():
     rows = MicrosoftCA.query.filter(MicrosoftCA.winrm_enabled.is_(True)).order_by(MicrosoftCA.id).all()
     return [_named(m.name, m.id) for m in rows
             if (m.winrm_transport or 'kerberos').strip().lower() != 'kerberos']
+
+
+@detector('msca.kerberos_outside_fips', BLOCKER,
+          'Microsoft CA connections that sign in with Kerberos (certsrv or the WinRM channel) on a '
+          'Kerberos library that does its own cryptography, outside the FIPS module: their '
+          'sign-in is refused in FIPS mode',
+          'Switch these connections to certificate or Basic authentication and turn off their '
+          'Kerberos WinRM channel, or run UCM from the package on a system whose Kerberos library '
+          'is built on the system OpenSSL (RHEL); the Kerberos library of the Docker image is not.')
+def _msca_kerberos_outside_fips():
+    from services.msca.kerberos import fips_crypto_problem
+    found = []
+    for m in MicrosoftCA.query.order_by(MicrosoftCA.id).all():
+        uses = ['certsrv'] if (m.auth_method or '').strip().lower() == 'kerberos' else []
+        if m.winrm_enabled and (m.winrm_transport or 'kerberos').strip().lower() == 'kerberos':
+            uses.append('WinRM')
+        if uses:
+            found.append(_named(m.name, m.id, ' and '.join(uses)))
+    # Judged on the library loaded here, as the sign-in judges it
+    return found if found and fips_crypto_problem() else []
 
 
 @detector('backup.schedule_argon2id', WARNING,

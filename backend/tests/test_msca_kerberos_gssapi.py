@@ -80,3 +80,16 @@ def test_a_principal_absent_from_the_keytab_is_a_400_naming_it(app, auth_client,
 def test_an_in_memory_cache_is_destroyed_without_error(realm):
     from services.msca.kerberos import _destroy_ccache
     _destroy_ccache('MEMORY:ucm-msca-test-1')
+
+
+def test_fips_mode_judges_the_kerberos_library_this_process_loaded():
+    """Debian builds libk5crypto with its own cryptography (no libcrypto): FIPS mode refuses it."""
+    import os
+    from services.msca.kerberos import _mapped_library, fips_crypto_problem
+    from utils.elf_needed import needed_libraries
+    path = _mapped_library('libk5crypto.so')
+    assert path and os.path.isfile(path), path
+    on_openssl = any(name.startswith('libcrypto.so') for name in needed_libraries(path))
+    assert (fips_crypto_problem() is None) is on_openssl
+    if os.path.exists('/etc/debian_version'):
+        assert fips_crypto_problem() == f'{path} does its own cryptography, outside the FIPS module'

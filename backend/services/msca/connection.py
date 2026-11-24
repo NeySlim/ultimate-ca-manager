@@ -8,7 +8,7 @@ from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
 from utils.encryption import decrypt_required
 from utils.secret_target import MASKS, changed_targets, keeps_saved_secret
-from .kerberos import KerberosAuth, MSCAKerberosError, initiator_credential
+from .kerberos import KerberosAuth, MSCAKerberosError, initiator_credential, refuse_outside_fips_module
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ class MicrosoftCAConnectionMixin:
                 )
 
             elif msca.auth_method == 'kerberos':
+                refuse_outside_fips_module()  # before the CA receives anything
                 # One credential per saved connection, from its own keytab (A12: never KRB5_KTNAME)
                 keytab = msca.kerberos_keytab_path or None
                 principal = msca.kerberos_principal or None

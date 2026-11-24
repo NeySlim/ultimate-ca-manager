@@ -31,6 +31,10 @@ class MSCAKerberosError(Exception):
     """A Kerberos sign-in to the CA failed: the message names the cause, never a secret."""
 
 
+class KerberosFipsRefused(MSCAKerberosError):
+    """FIPS mode refuses Kerberos here: the Kerberos library does its own cryptography."""
+
+
 def gssapi_available():
     try:
         import gssapi  # noqa: F401
@@ -45,6 +49,52 @@ def _gssapi():
     except ImportError:
         raise MSCAKerberosError(MISSING_LIBRARY) from None
     return gssapi
+
+
+_PROC_MAPS = '/proc/self/maps'
+
+
+def _mapped_library(stem):
+    """The path of the first file mapped in this process whose name starts with ``stem``."""
+    try:
+        with open(_PROC_MAPS, encoding='utf-8', errors='replace') as handle:
+            for line in handle:
+                fields = line.split(maxsplit=5)
+                if len(fields) == 6 and os.path.basename(fields[5].rstrip('\n')).startswith(stem):
+                    return fields[5].rstrip('\n')
+    except OSError:
+        return None
+    return None
+
+
+def fips_crypto_problem():
+    """None when the libk5crypto python-gssapi loaded hands its cryptography to the system
+    OpenSSL (libcrypto among its DT_NEEDED, as RHEL builds it), else why FIPS mode refuses it.
+    The mapped file, not a search path: it is the library this process actually runs."""
+    if not gssapi_available():
+        return MISSING_LIBRARY
+    path = _mapped_library('libk5crypto.so')
+    if path is None:
+        return 'no MIT Kerberos crypto library (libk5crypto) is loaded'
+    from utils.elf_needed import needed_libraries
+    try:
+        needed = needed_libraries(path)
+    except (OSError, ValueError) as e:
+        return f'{path} cannot be read ({e})'
+    if any(name.startswith('libcrypto.so') for name in needed):
+        return None
+    return f'{path} does its own cryptography, outside the FIPS module'
+
+
+def refuse_outside_fips_module():
+    """In FIPS mode, KerberosFipsRefused unless the Kerberos library runs on the system OpenSSL."""
+    import fips_mode
+    if not fips_mode.enabled():
+        return
+    problem = fips_crypto_problem()
+    if problem:
+        raise KerberosFipsRefused(f'Kerberos sign-in not available in FIPS mode: {problem} (FIPS mode '
+                                  'needs a Kerberos library built on the system OpenSSL, as on RHEL)')
 
 
 def gss_cause(err):
@@ -131,6 +181,7 @@ def initiator_credential(connection_id, principal, keytab, channel='certsrv'):
     (a form being tested) keeps nothing. Without a keytab: the tickets the process holds.
     """
     gssapi = _gssapi()
+    refuse_outside_fips_module()
     error = managed_keytab_error(keytab)
     if error:
         raise ValueError(error)
