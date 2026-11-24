@@ -168,10 +168,16 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
 
 def _rebind(key, old_cert_id, new_cert_id) -> bool:
     """Point the responder binding at the new certificate only if it still names the old
-    one: of two runners renewing the same responder, one rebinds and the other rolls back."""
-    return SystemConfig.query.filter(
+    one: of two runners renewing the same responder, one rebinds and the other rolls back.
+    A bulk UPDATE escapes the flush listener: the CA's records are published here (#450)."""
+    rebound = SystemConfig.query.filter(
         SystemConfig.key == key, SystemConfig.value == str(old_cert_id),
     ).update({SystemConfig.value: str(new_cert_id)}, synchronize_session=False) == 1
+    suffix = key[len(RESPONDER_KEY_PREFIX):]
+    if rebound and suffix.isdigit():
+        from services.cert.local_revocation import publish_signed_for
+        publish_signed_for(db.session.get(CA, int(suffix)))
+    return rebound
 
 
 def _archive(cert_id, serial) -> bool:

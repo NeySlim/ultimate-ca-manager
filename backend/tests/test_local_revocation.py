@@ -378,6 +378,97 @@ class TestLiftingALocalRevocation:
             db.session.rollback()
 
 
+    def test_a_lift_meeting_a_locked_copy_refuses_at_once(self, app, auth_client, keyless):
+        """PostgreSQL: a renewal or the SKI/AKI merge holds a copy's row, then asks for the CA
+        rows the lift holds: the lift never waits on a row (no deadlock), it refuses."""
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        row_id, _ = _leaf_row(app, keyless, 'row-held')
+        _revoke(auth_client, row_id)
+        with app.app_context():
+            engine = db.engine
+        holding, release, outcome = threading.Event(), threading.Event(), {}
+
+        def hold_the_row():
+            with app.app_context():
+                try:
+                    db.session.query(Certificate.id).filter(Certificate.id == row_id).with_for_update().first()
+                    holding.set()
+                    release.wait(30)
+                finally:
+                    holding.set()
+                    db.session.rollback()
+                    db.session.remove()
+
+        def release_once_the_lift_waits():
+            with engine.connect() as conn:
+                outcome['waited'] = _wait_for_a_lock_waiter(conn, 3)
+            release.set()
+
+        holder = threading.Thread(target=hold_the_row)
+        holder.start()
+        assert holding.wait(30)
+        releaser = threading.Thread(target=release_once_the_lift_waits)
+        releaser.start()
+        try:
+            r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        finally:
+            release.set()
+            holder.join(30)
+            releaser.join(30)
+        assert r.status_code == 409 and 'try again' in r.get_json()['message'], r.data
+        assert not outcome.get('waited') and _row(app, row_id)[0] is True
+
+
+    def test_a_revocation_holding_its_record_and_a_lift_do_not_deadlock(
+            self, app, auth_client, keyless, monkeypatch):
+        """PostgreSQL: a revocation holds the record and the row, then share locks the CA rows the
+        lift share locked before waiting on that record: both share, so neither waits for the other."""
+        from services.cert import local_revocation
+        from services.cert_service import CertificateService
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        row_id, real = _leaf_row(app, keyless, 'hold-then-final')
+        _revoke(auth_client, row_id, 'certificateHold')
+        with app.app_context():
+            engine = db.engine
+        holds, lift_waits, outcome = threading.Event(), threading.Event(), {}
+        hold = local_revocation._hold_issuer
+
+        def pause_holding_the_record(ca):
+            if threading.current_thread().name == 'revocation':
+                holds.set()
+                lift_waits.wait(30)
+            return hold(ca)
+        monkeypatch.setattr(local_revocation, '_hold_issuer', pause_holding_the_record)
+
+        def revoke_for_good():
+            with app.app_context():
+                try:
+                    CertificateService.revoke_certificate(row_id, 'keyCompromise', username='admin')
+                except Exception as e:  # noqa: BLE001
+                    outcome['revocation'] = repr(e)
+                finally:
+                    holds.set()
+                    db.session.remove()
+
+        def go_on_once_the_lift_waits():
+            with engine.connect() as conn:
+                outcome['waited'] = _wait_for_a_lock_waiter(conn, 10)
+            lift_waits.set()
+
+        revocation = threading.Thread(target=revoke_for_good, name='revocation')
+        revocation.start()
+        assert holds.wait(30)
+        releaser = threading.Thread(target=go_on_once_the_lift_waits)
+        releaser.start()
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        revocation.join(30)
+        releaser.join(30)
+        assert 'revocation' not in outcome and outcome.get('waited'), outcome
+        assert r.status_code in (200, 409), r.data
+
+
 class TestTheNoteTravelsInBackups:
     """A restore writes the archive's note, and a merge never turns a published record local."""
 
@@ -465,8 +556,9 @@ def _drop_key(app, ca_id):
         db.session.commit()
 
 
-class TestAnExternalCrlPublishes:
-    """An external CRL UCM serves for a CA held without its key carries what it lists."""
+class TestAnExternalCrlPublishesWhatItLists:
+    """An external CRL UCM serves for a CA held without its key carries what it lists, and only
+    that: UCM signs nothing for that CA, so a revocation the CRL does not list is local."""
 
     def test_a_revocation_the_external_crl_lists_is_never_lifted(self, app, auth_client, create_ca):
         from services.crl.external import ExternalCRLMixin
@@ -482,21 +574,26 @@ class TestAnExternalCrlPublishes:
         with app.app_context():
             assert ExternalCRLMixin.get_external_revocation(ca[0], real.serial_number) is not None
 
-    def test_a_ca_given_an_external_crl_publishes_what_it_does_not_list(self, app, auth_client, create_ca):
+    def test_what_the_external_crl_does_not_list_is_local(self, app, auth_client, create_ca):
         ca = _keyless_ca(app, create_ca, 'External CRL 450 unlisted')
         row_id, real = _leaf_row(app, ca, 'unlisted')
         _revoke(auth_client, row_id)
-        _install_crl(auth_client, ca[0], _external_crl(ca[2], ca[3], []))
-        assert _records(app, ca[1], real) == [('superseded', False)]
-        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
         valid, _ = _leaf_row(app, ca, 'unlisted-valid')
-        assert _detail(auth_client, valid)['revocation_published'] is True
-        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
-        assert auth_client.delete(f'/api/v2/certificates/{valid}').status_code == 409
+        listed, listed_real = _leaf_row(app, ca, 'listed-valid')
+        _install_crl(auth_client, ca[0], _external_crl(ca[2], ca[3], [listed_real.serial_number]))
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        assert _detail(auth_client, row_id)['local_revocation_lift'] == 'local'
+        assert _detail(auth_client, valid)['revocation_published'] is False
+        # Listed by the CRL relying parties read, though valid here: revoked first
+        assert _detail(auth_client, listed)['revocation_published'] is True
+        assert auth_client.delete(f'/api/v2/certificates/{listed}').status_code == 409
+        assert auth_client.delete(f'/api/v2/certificates/{valid}').status_code == 204
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 200, r.data
+        assert _records(app, ca[1], real) == []
 
-    def test_the_lift_asks_the_served_crl_itself(self, app, auth_client, create_ca, monkeypatch):
-        """Belt and braces: whatever the records say, a serial the served CRL lists stays revoked."""
-        from services.cert import local_revocation
+    def test_the_lift_asks_the_served_crl_itself(self, app, auth_client, create_ca):
+        """Whatever the records say, a serial the served CRL lists stays revoked."""
         ca = _keyless_ca(app, create_ca, 'External CRL 450 served')
         row_id, real = _leaf_row(app, ca, 'served')
         _revoke(auth_client, row_id)
@@ -504,10 +601,89 @@ class TestAnExternalCrlPublishes:
         with app.app_context():
             RevokedSerial.query.filter_by(caref=ca[1]).update({'published': False})
             db.session.commit()
-        monkeypatch.setattr(local_revocation, '_has_external_crl', lambda _ca: False)
+        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
         r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
         assert r.status_code == 409 and 'external CRL' in r.get_json()['message'], r.data
         assert _row(app, row_id)[0] is True
+
+
+def _signed_crl(app, ca_id, this_update, external=False):
+    """A CRL row of ``ca_id`` as UCM stores one it signed (or an external upload), dated ``this_update``."""
+    from sqlalchemy import func
+    from models.crl import CRLMetadata
+    with app.app_context():
+        number = (db.session.query(func.max(CRLMetadata.crl_number)).filter_by(ca_id=ca_id).scalar() or 0) + 1
+        row = CRLMetadata(ca_id=ca_id, crl_number=number, this_update=this_update,
+                          next_update=this_update + timedelta(days=7), crl_pem='-', crl_der=b'-',
+                          is_external=bool(external))
+        db.session.add(row)
+        db.session.flush()
+        if external is None:  # a row older than the column: NULL, not its default
+            CRLMetadata.query.filter_by(id=row.id).update({'is_external': None})
+        db.session.commit()
+
+
+def _revoked_at(app, refid, real):
+    with app.app_context():
+        return RevokedSerial.query.filter_by(caref=refid, serial_number=str(real.serial_number)).one().revoked_at
+
+
+class TestACrlUcmSignedPublishes:
+    """A CRL UCM signed for a record of the issuer's key since the revocation may list it: the
+    revocation was published, whatever its record says (a key held for a while, then gone)."""
+
+    @pytest.mark.parametrize('external, published', [(False, True), (None, True), (True, False)])
+    def test_a_crl_signed_since_the_revocation_publishes_it(
+            self, app, auth_client, create_ca, external, published):
+        ca = _keyless_ca(app, create_ca, f'Signed CRL 450 {external}')
+        row_id, real = _leaf_row(app, ca, f'signed-crl-{external}')
+        _revoke(auth_client, row_id)
+        at = _revoked_at(app, ca[1], real)
+        _signed_crl(app, ca[0], at - timedelta(seconds=1))
+        assert _detail(auth_client, row_id)['local_revocation_lift'] == 'local'
+        _signed_crl(app, ca[0], at, external=external)
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        assert _detail(auth_client, row_id)['local_revocation_lift'] == (None if published else 'local')
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        if published:
+            assert r.status_code == 409 and 'this revocation was published' in r.get_json()['message'], r.data
+            assert _row(app, row_id)[0] is True
+        else:
+            assert r.status_code == 200, r.data
+
+    def test_a_crl_of_a_twin_record_counts(self, app, auth_client, create_ca):
+        ca = _keyless_ca(app, create_ca, 'Signed CRL 450 twin')
+        row_id, real = _leaf_row(app, ca, 'twin-crl')
+        _revoke(auth_client, row_id)
+        now = datetime.now(timezone.utc)
+        again = (x509.CertificateBuilder().subject_name(ca[2].subject).issuer_name(ca[2].subject)
+                 .public_key(ca[3].public_key()).serial_number(x509.random_serial_number())
+                 .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+                 .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                 .sign(ca[3], hashes.SHA256()))
+        with app.app_context():
+            original = db.session.get(CA, ca[0])
+            twin = CA(refid=str(uuid.uuid4()), descr='keyless twin record', serial=0,
+                      crt=base64.b64encode(again.public_bytes(serialization.Encoding.PEM)).decode(),
+                      subject=original.subject, issuer=original.issuer)
+            db.session.add(twin)
+            db.session.commit()
+            twin_id = twin.id
+        assert _detail(auth_client, row_id)['local_revocation_lift'] == 'local'
+        _signed_crl(app, twin_id, _revoked_at(app, ca[1], real))
+        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
+
+    def test_an_unknown_record_a_signed_crl_may_list_is_published(self, app, auth_client, create_ca):
+        ca = _keyless_ca(app, create_ca, 'Signed CRL 450 unknown')
+        row_id, real = _leaf_row(app, ca, 'signed-crl-unknown')
+        _record(app, ca[1], real, reason='superseded', certificate_id=row_id)
+        assert _records(app, ca[1], real) == [('superseded', None)]
+        assert _detail(auth_client, row_id)['local_revocation_lift'] == 'unknown'
+        _signed_crl(app, ca[0], _revoked_at(app, ca[1], real) + timedelta(days=1))
+        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True, 'acknowledge_unknown_publication': True})
+        assert r.status_code == 409 and 'this revocation was published' in r.get_json()['message'], r.data
+        assert _records(app, ca[1], real) == [('superseded', None)]
 
 
 class TestAKeyGainedPublishesTheRecords:
@@ -627,6 +803,93 @@ class TestAKeyGainedPublishesTheRecords:
         r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
         assert r.status_code == 409, r.data
         assert len(calls) == 2 and _row(app, row_id)[0] is True
+
+
+    def test_the_revocation_reads_its_issuer_afresh(self, app, auth_client, create_ca, monkeypatch):
+        """A key another transaction committed after the revocation loaded its CA is seen."""
+        from services.cert.mixins import lifecycle
+        ca = _keyless_ca(app, create_ca, 'Key read afresh 450')
+        row_id, real = _leaf_row(app, ca, 'read-afresh')
+        stored, effective = _stored_key(ca[3]), lifecycle.effective_revocation
+
+        def key_committed_meanwhile(certificate):
+            db.session.execute(CA.__table__.update().where(CA.__table__.c.id == ca[0]).values(prv=stored))
+            return effective(certificate)
+        monkeypatch.setattr(lifecycle, 'effective_revocation', key_committed_meanwhile)
+        _revoke(auth_client, row_id)
+        assert _records(app, ca[1], real) == [('superseded', True)]
+        _drop_key(app, ca[0])
+
+    def test_a_key_imported_while_the_revocation_runs_publishes_its_record(
+            self, app, auth_client, create_ca, monkeypatch):
+        """PostgreSQL: the revocation reads its issuer under the CA rows' share lock, so a key
+        import waits for it and publishes the record (the tests' SQLite is one connection)."""
+        from services.cert import local_revocation
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        ca = _keyless_ca(app, create_ca, 'Key during revocation 450')
+        row_id, real = _leaf_row(app, ca, 'during-revocation')
+        stored, ask, workers, outcome = _stored_key(ca[3]), local_revocation.publishes_revocations, [], {}
+
+        def import_the_key():
+            with app.app_context():
+                try:
+                    db.session.get(CA, ca[0]).prv = stored
+                    db.session.commit()
+                except Exception as e:  # noqa: BLE001
+                    db.session.rollback()
+                    outcome['import'] = repr(e)
+                finally:
+                    db.session.remove()
+
+        def import_while_asked(target):
+            answer = ask(target)
+            if not workers:
+                workers.append(threading.Thread(target=import_the_key))
+                workers[0].start()
+                workers[0].join(2)  # at once, unless the revocation's lock makes it wait
+            return answer
+        monkeypatch.setattr(local_revocation, 'publishes_revocations', import_while_asked)
+        _revoke(auth_client, row_id)
+        workers[0].join(30)
+        assert 'import' not in outcome, outcome
+        assert _records(app, ca[1], real) == [('superseded', True)]
+        _drop_key(app, ca[0])
+        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
+
+    def test_a_responder_given_its_key_later_publishes(self, app, auth_client, create_ca, issuer):
+        ca = _keyless_ca(app, create_ca, 'Responder key later 450')
+        responder, responder_real = _leaf_row(app, issuer, 'keyless-responder')
+        with app.app_context():
+            row = db.session.get(Certificate, responder)
+            key, row.prv = row.prv, None
+            db.session.add(SystemConfig(key=f'ocsp_responder_cert_{ca[0]}', value=str(responder)))
+            db.session.commit()
+        row_id, real = _leaf_row(app, ca, 'responder-later')
+        _revoke(auth_client, row_id)
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        with app.app_context():
+            db.session.get(Certificate, responder).prv = key
+            db.session.commit()
+        assert _records(app, ca[1], real) == [('superseded', True)]
+
+    def test_a_responder_rebound_by_its_renewal_publishes(self, app, auth_client, create_ca, issuer):
+        from services.ocsp_responder_renewal import _rebind
+        ca = _keyless_ca(app, create_ca, 'Responder rebound 450')
+        old, _ = _leaf_row(app, issuer, 'responder-old')
+        new, _ = _leaf_row(app, issuer, 'responder-new')
+        key = f'ocsp_responder_cert_{ca[0]}'
+        with app.app_context():
+            db.session.get(Certificate, old).prv = None
+            db.session.add(SystemConfig(key=key, value=str(old)))
+            db.session.commit()
+        row_id, real = _leaf_row(app, ca, 'responder-rebound')
+        _revoke(auth_client, row_id)
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        with app.app_context():
+            assert _rebind(key, old, new)
+            db.session.commit()
+        assert _records(app, ca[1], real) == [('superseded', True)]
 
 
 class TestARevocationToldToItsIssuer:

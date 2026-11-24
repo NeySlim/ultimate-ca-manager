@@ -444,8 +444,9 @@ class LifecycleMixin:
         rejected_renewals = []
         try:
             # The record is locked before the row is written, the order unholds and the hourly
-            # pass follow (PostgreSQL), so none of them deadlocks. A row the upgrade step 144 left
-            # pending keeps its spelling; records never do
+            # pass follow (PostgreSQL), so none of them deadlocks; the CA rows come last, share
+            # locked by note_publication. A row the upgrade step 144 left pending keeps its
+            # spelling; records never do
             record = RevokedSerial.query.filter_by(
                 caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)
             ).with_for_update().first() if ca is not None else None
@@ -483,7 +484,7 @@ class LifecycleMixin:
                 record.certificate_id = certificate.id
                 record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises
                 from services.cert.local_revocation import note_publication
-                note_publication(record, ca, fresh)
+                note_publication(record, ca, fresh, hold=True)
             elif certificate.caref:
                 logger.warning("Certificate %s: CA %s not found, no revocation record written",
                                cert_id, certificate.caref)
