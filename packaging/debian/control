@@ -30,7 +30,7 @@ Description: Ultimate CA Manager - Certificate Authority Management System
  .
  Python dependencies are installed in a virtual environment during setup.
  All dependencies ship as pre-built wheels - no compilation toolchain needed.
- Kerberos auth for MS CA is optional (pip install requests-kerberos).
+ Kerberos auth for MS CA and Windows autoenrollment needs pyspnego[kerberos].
  .
  Features:
   * Complete CA lifecycle management
