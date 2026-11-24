@@ -409,6 +409,7 @@ class ReportService:
     @classmethod
     def _to_csv(cls, items: list, columns: list) -> str:
         """Convert items to CSV string"""
+        from utils.csv_cells import csv_dict
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=columns, extrasaction='ignore')
         writer.writeheader()
@@ -420,7 +421,7 @@ class ReportService:
                 if isinstance(val, (dict, list)):
                     val = json.dumps(val)
                 flat_item[col] = val
-            writer.writerow(flat_item)
+            writer.writerow(csv_dict(flat_item))
         return output.getvalue()
     
     @classmethod

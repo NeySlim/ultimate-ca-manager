@@ -3,6 +3,7 @@ import { twMerge } from 'tailwind-merge'
 import { getAppTimezone } from '../stores/timezoneStore'
 import { getDateFormat, getShowTime } from '../stores/dateFormatStore'
 import { sanitizeDownloadName } from './filename'
+import { csvCell } from './csv'
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs))
@@ -117,23 +118,10 @@ export function formatDate(date, { time, ...options } = {}) {
 export function exportToCSV(data, columns, filename = 'export') {
   if (!data || data.length === 0) return
   
-  // Build CSV headers
-  const headers = columns.map(col => col.header || col.key)
-  
-  // Build CSV rows
-  const rows = data.map(row => 
-    columns.map(col => {
-      let value = row[col.key]
-      // Handle nested values
-      if (col.accessor) value = col.accessor(row)
-      // Escape quotes and wrap in quotes if contains comma
-      if (value === null || value === undefined) value = ''
-      value = String(value)
-      if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-        value = `"${value.replace(/"/g, '""')}"`
-      }
-      return value
-    }).join(',')
+  const headers = columns.map(col => csvCell(col.header || col.key))
+  // A cell a spreadsheet would run as a formula starts with a quote (csvCell)
+  const rows = data.map(row =>
+    columns.map(col => csvCell(col.accessor ? col.accessor(row) : row[col.key])).join(',')
   )
   
   // Combine and download

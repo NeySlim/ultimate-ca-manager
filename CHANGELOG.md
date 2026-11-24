@@ -316,6 +316,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- CSV exports: a cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return, such as a comment or a scanned subject, ran as a formula in a spreadsheet; the list exports, the audit and discovery exports and the reports now write it with a leading `'` (OWASP CSV Injection).
 - SCEP: opening the CA challenges read the secret of every CA, one audited read each; the list now shows each challenge's state and age without it (`GET /api/v2/scep/challenges`), and a secret is read only by *Show* or *Copy*, one audited read per action.
 - Export: a PEM export with the private key and a password returned the key unencrypted: a certificate or CA export validated the password first, a user certificate export accepted and ignored it. The key is now written as PKCS#8 encrypted with that password, a password too short is refused with `400`, and the audit entry says `password-protected` for the PEM and the hybrid bundle.
 - Microsoft CA: a Kerberos connection could name a file of the UCM data folder, the keytab XCEP and WSTEP accept with among them, as its client keytab, and authenticate under its service principals toward any host. Such a path is now refused with `400` on save and on test, and a connection saved with one fails its Kerberos authentication.

@@ -1,4 +1,5 @@
 /** Figures the overview widgets draw, computed from the /dashboard/* answers (no request here). */
+import { csvCell } from './csv'
 
 // One request each, shared by the strip and the cards: the health card's 30 days (the strip reads
 // the last 14), the strip's 30 days of issuance (the hierarchy counts the last 7)
@@ -125,17 +126,8 @@ export function foldActivity(rows) {
   return out
 }
 
-// A text cell starting with one of these runs as a formula in a spreadsheet (CSV injection)
-const FORMULA = /^[=+\-@\t\r]/
-
-function cell(value) {
-  if (value === null || value === undefined) return ''
-  let text = String(value)
-  if (typeof value === 'string' && FORMULA.test(text)) text = `'${text}`
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
 
 /** RFC 4180 text of a table: a header line, then one CRLF-ended line per row. */
 export function toCsv(columns, rows) {
-  return [columns, ...rows].map((r) => `${r.map(cell).join(',')}\r\n`).join('')
+  return [columns, ...rows].map((r) => `${r.map(csvCell).join(',')}\r\n`).join('')
 }
