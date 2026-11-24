@@ -19,13 +19,13 @@ def dynamic_names(path):
     with open(path, 'rb') as handle:
         data = handle.read()
     try:
-        return _needed(path, data)
+        return _parse(path, data)
     except (struct.error, OverflowError):
         # An offset past the file, or past what an index holds (2^63 and more), is a broken file
         raise ValueError(f'{path}: truncated or malformed ELF headers') from None
 
 
-def _needed(path, data):
+def _parse(path, data):
     if data[:4] != b'\x7fELF' or len(data) < 64:
         raise ValueError(f'{path} is not an ELF file')
     bits = {1: 32, 2: 64}.get(data[4])

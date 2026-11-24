@@ -68,17 +68,17 @@ def _gssapi_extension():
 
 
 def _mapped_files():
-    """The real paths of the files mapped in this process, in map order; None when unreadable."""
-    files = []
+    """The paths of the files mapped in this process, in map order; None when unreadable."""
+    files = {}
     try:
         with open(_PROC_MAPS, encoding='utf-8', errors='replace') as handle:
             for line in handle:
                 fields = line.rstrip('\n').split(maxsplit=5)
-                if len(fields) == 6 and fields[5].startswith('/') and fields[5] not in files:
-                    files.append(fields[5])
+                if len(fields) == 6 and fields[5].startswith('/'):
+                    files.setdefault(fields[5])
     except OSError:
         return None
-    return files
+    return list(files)
 
 
 def _resolve(soname, mapped):
