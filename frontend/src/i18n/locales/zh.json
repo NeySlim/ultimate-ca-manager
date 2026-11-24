@@ -481,10 +481,10 @@
     "otherViews": "其他视图"
   },
   "commandPalette": {
-    "searchPlaceholder": "搜索命令、证书、CA、用户...",
+    "searchPlaceholder": "证书、页面或操作…",
     "searchLabel": "搜索命令或证书",
     "subtitle": "证书、颁发机构和控制台导航",
-    "noCommandsFound": "未找到命令",
+    "noCommandsFound": "无结果。请尝试证书或页面名称。",
     "acmeAccount": "ACME 账户",
     "scepProfile": "SCEP 配置文件",
     "favorites": "收藏",
@@ -3895,7 +3895,7 @@
     "encryptionWarningDesc": "启用加密将在/etc/ucm/master.key生成主密钥文件。没有此文件，所有加密的私钥将永久丢失。私有目录中的明文密钥文件将被删除。任何直接读取它们的组件都必须改用部署钩子或 API。",
     "encryptionCheckKeyFile": "我理解密钥将存储在/etc/ucm/master.key，我会立即备份",
     "encryptionCheckBackup": "我有UCM数据的最近备份",
-    "encryptionCheckLostKeys": "我理解没有此密钥文件，所有私钥将永久丢失",
+    "encryptionCheckLostKeys": "我理解没有此密钥文件，所有私钥将永久丢失：需要完全重新安装并恢复备份",
     "typeToConfirm": "输入{{word}}以确认",
     "disableEncryptionConfirm": "私钥将被解密并以明文形式存储，同时会在磁盘上重新创建明文密钥文件。确定吗？",
     "anomalyDetection": "异常检测",
@@ -3920,7 +3920,7 @@
     "uptime": "运行时长",
     "memory": "内存",
     "serviceStatusUnavailable": "无法获取服务状态。",
-    "dockerRestartNotice": "在 Docker 中，请重启容器以应用更改。",
+    "dockerRestartNotice": "在容器（Docker、Kubernetes）中，请重启容器以应用更改。",
     "settingSavedInBrowser": "此设置保存在您的浏览器中，并在会话之间保持。",
     "smtpConfig": "邮件中继",
     "testEmailSuccess": "测试邮件发送成功",
@@ -3987,7 +3987,7 @@
     "majorUpgradeConfirm": "将 UCM 从 {{current}} 升级到 {{version}}？这是一个新的主版本：请先阅读发行说明并进行备份。服务将重新启动。",
     "majorUpgradeConfirmHa": "将 UCM 从 {{current}} 升级到 {{version}}？这是一个新的主版本：请先阅读发行说明并进行备份。这将启动滚动更新：节点逐个更新。如果该版本的迁移需要停止所有节点，则会拒绝升级，且不会安装任何内容。",
     "majorUpgradeInitiated": "已开始升级到 UCM {{version}}。服务即将重新启动。",
-    "majorUpgradeDocker": "Docker：如需升级，请将镜像标签改为 {{image}} 并重新创建容器。",
+    "majorUpgradeDocker": "容器：如需升级，请部署镜像 {{image}}（更改镜像标签并重新创建容器，或使用它运行 helm upgrade）。",
     "expiryCheckResult": "检查完成：已发送 {{count}} 条提醒",
     "expiryCheckSkipped": "未运行检查：另一个节点正在运行",
     "theme": "主题",
@@ -4052,7 +4052,7 @@
     "syslogTestSuccess": "测试消息发送成功",
     "syslogTestFailed": "测试消息发送失败",
     "syslogCategories": "要转发的事件类型",
-    "syslogCategoriesHelp": "选择要发送到 Syslog 服务器的事件类型。",
+    "syslogCategoriesHelp": "取消勾选某个类别即停止发送其事件；全部不勾选则发送所有事件。“用户”仅涵盖登录和登出，“系统”不含密钥、加密、恢复、数据库和更新设置的更改：这些更改，以及账户、角色、密码和 MFA 更改、syslog 更改、审计清除、API 密钥和这些类别之外的其他事件，始终会发送。",
     "syslogCatCertificates": "证书",
     "syslogCatCAs": "证书颁发机构",
     "syslogCatCSRs": "签名请求",
@@ -4126,7 +4126,7 @@
     "currentReleaseNotes": "发行说明: v{{version}}",
     "updateReleaseNotes": "v{{version}} 新功能",
     "httpProtocolPort": "HTTP协议端口",
-    "httpProtocolPortHelper": "用于CDP/OCSP端点的HTTP明文服务器端口。设为0禁用。需要重启。",
+    "httpProtocolPortHelper": "用于提供 CDP/OCSP 端点的纯 HTTP 服务器端口，启用 SCEP 的纯 HTTP 选项时也用于 SCEP。设为 0 禁用。需要重启。",
     "httpProtocolPortEnvLocked": "由服务环境（ucm.env）中的 HTTP_PROTOCOL_PORT 设置：请在该处移除它，以便在此管理端口。",
     "ct": "证书透明度",
     "ctDescription": "将证书提交到公共CT日志以提高透明度和可审计性。",
@@ -4150,7 +4150,7 @@
       "health": "健康",
       "healthy": "正常",
       "unhealthy": "异常",
-      "dockerHint": "正在 Docker 中运行。要切换后端，请在容器上设置 DATABASE_URL 环境变量。您仍可以在此将数据迁移到新后端，然后更新环境变量并重启容器。",
+      "dockerHint": "正在容器（Docker、Kubernetes）中运行。要切换后端，请在容器上设置 DATABASE_URL 环境变量。您仍可以在此将数据迁移到新后端，然后更新环境变量并重启容器。",
       "switchHint": "测试目标数据库,然后迁移所有数据或切换到新后端。在不迁移的情况下切换时,您的管理员、自定义角色、SSO配置和MFA凭据会自动复制到新后端,以便您保持登录状态。应用程序将在成功时重新启动。",
       "targetUrl": "目标 DATABASE_URL",
       "test": "测试",
@@ -4343,7 +4343,7 @@
           "remedy": "请在切换前创建 RSA 或 ECDSA（P-256/P-384/P-521）颁发机构并将签发迁移过去；颁发机构密钥无法转换。"
         },
         "ca_weak_key": {
-          "title": "使用 DSA 密钥、2048 位以下 RSA 或 P-256/384/521 以外曲线的证书颁发机构",
+          "title": "使用 DSA 密钥、长度为奇数或超出 2048 至 16384 位范围的 RSA 或 P-256/384/521 以外曲线的证书颁发机构",
           "remedy": "请创建使用 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 的颁发机构，并将签发迁移过去。"
         },
         "ca_unapproved_algorithm": {
@@ -4375,7 +4375,7 @@
           "remedy": "请签发新的 RSA 或 ECDSA 时间戳证书，并在 TSA 设置中选择它。"
         },
         "certificates_unapproved_key": {
-          "title": "使用 Ed25519/Ed448 或 ML-DSA 密钥、2048 位以下 RSA 或其他曲线的有效证书",
+          "title": "使用 Ed25519/Ed448 或 ML-DSA 密钥、长度为奇数或超出 2048 至 16384 位范围的 RSA 或其他曲线的有效证书",
           "remedy": "它们仍然有效；请使用新的 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 密钥续期，因为 FIPS 模式下拒绝使用相同密钥续期。"
         },
         "templates_unapproved_key_type": {
@@ -4980,7 +4980,7 @@
     "allowIdpInitiatedHelp": "接受 UCM 未请求的响应，例如从身份提供商门户发起的登录。默认关闭：此类响应无法与在此浏览器中发起的登录关联。",
     "spEntityId": "SP 实体 ID",
     "spMetadata": "服务提供者 (SP) 元数据",
-    "spMetadataHelp": "将这些 URL 复制到您的身份提供者 (IdP) 配置中以建立 SAML 信任关系。",
+    "spMetadataHelp": "将这些 URL 复制到您的身份提供者 (IdP) 配置中，或使用 SP 元数据 XML URL 自动配置。",
     "spSloUrl": "SP 单点登出 URL",
     "ssoAttribute": "SSO 属性",
     "ucmField": "UCM 字段",
@@ -5346,7 +5346,7 @@
     "noDifference": "这些证书之间没有不同的行。",
     "differs": "不同",
     "loadFailed": "无法读取比较中的某个证书。",
-    "identical": "Identical",
+    "identical": "相同",
     "notInAll": "并非每个证书都有"
   },
   "members": {
@@ -6227,7 +6227,7 @@
     "maxSANs": "最大 SAN 数量",
     "maxValidity": "最大有效期（天）",
     "minApprovers": "最少审批人数",
-    "noPolicies": "暂无策略",
+    "noPolicies": "暂无签发策略",
     "noPoliciesDesc": "创建证书策略以强制执行签发规则、密钥要求和审批工作流。",
     "notifyOnViolation": "策略违规时发送通知",
     "notifyHelp": "策略拒绝某项操作或将其挂起等待审批时发送电子邮件",
@@ -8162,9 +8162,9 @@
   },
   "overview": {
     "title": "概览",
-    "allHidden": "所有卡片均已隐藏。请选择一个预设以重新显示。",
+    "allHidden": "选择要显示的卡片，或应用预设。",
     "presets": {
-      "label": "布局预设",
+      "label": "卡片预设",
       "operator": "操作员",
       "manager": "管理者",
       "all": "所有卡片",
@@ -8240,14 +8240,14 @@
       "countdown_other": "30 天中还剩 {{count}} 天"
     },
     "kind": {
-      "acme_order_failed": "ACME 订单失败",
+      "acme_order_failed": "ACME 失败",
       "acme_client_renewal_failed": "ACME 客户端续期失败",
       "approval_pending": "待审批",
       "scep_request_pending": "SCEP 请求待处理",
       "key_recovery_pending": "密钥恢复待处理",
-      "crl_due": "CRL 即将到期",
+      "crl_due": "CRL 发布",
       "crl_missing": "缺少 CRL",
-      "manual_renewal_due": "手动续期到期",
+      "manual_renewal_due": "手动续期",
       "client_renewal_overdue": "客户端续期逾期",
       "auto_renewal_blocked": "自动续期被阻止",
       "renewal_declined": "续期被拒绝",
