@@ -116,6 +116,19 @@ def note_publication(record: RevokedSerial, ca: Optional[CA], fresh: bool, hold:
         record.published = False
 
 
+def publish_before_deletion(ca: CA) -> None:
+    """Before ``ca`` is deleted: when it signs for its key, every record of that key is published,
+    read after the key's CA records are locked for update (PostgreSQL). A revocation in flight
+    holds them share locked: its record is committed, and seen, before the deletion goes on."""
+    from utils.cert_issuer import same_key_refids
+    if not ca.refid or not _signs_for(ca):
+        return
+    db.session.flush()
+    with db.session.no_autoflush:
+        CA.query.filter(CA.refid.in_(same_key_refids(ca))).order_by(CA.id).with_for_update().all()
+    publish_key_records(ca)
+
+
 def publish_key_records(ca: CA, connection=None) -> None:
     """Every record of ``ca``'s key published: UCM signs for it from now on. No commit."""
     from sqlalchemy import or_
