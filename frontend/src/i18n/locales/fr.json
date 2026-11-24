@@ -4402,7 +4402,7 @@
           "remedy": "Émettez un nouveau certificat d’horodatage RSA ou ECDSA et sélectionnez-le dans les paramètres TSA."
         },
         "certificates_unapproved_key": {
-          "title": "Certificats actifs avec une clé Ed25519/Ed448 ou ML-DSA, RSA de moins de 2048 bits ou une autre courbe",
+          "title": "Certificats actifs avec une clé Ed25519/Ed448 ou ML-DSA, RSA de longueur impaire ou hors de 2048 à 16384 bits, ou une autre courbe",
           "remedy": "Ils restent valides ; renouvelez-les avec une nouvelle clé RSA 2048+ ou ECDSA P-256/P-384/P-521, car le renouvellement avec la même clé est refusé en mode FIPS."
         },
         "templates_unapproved_key_type": {
