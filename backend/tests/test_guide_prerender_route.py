@@ -17,6 +17,7 @@ import pytest
 from api import ui_routes
 from models import User, db
 from tests.header_guard import guarded
+from tests.app_disposal import dispose_app
 from tests.session_support import pose_signed_in
 from utils.datetime_utils import utc_now
 
@@ -275,9 +276,7 @@ def _sql_store_app(monkeypatch, url, database_type):
 
 def _dispose(*applications):
     for application in applications:
-        with application.app_context():
-            db.session.remove()
-            db.engine.dispose()
+        dispose_app(application)
 
 
 @pytest.fixture(params=[

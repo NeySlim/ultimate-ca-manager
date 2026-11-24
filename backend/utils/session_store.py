@@ -291,6 +291,14 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
                 self._own_engine = (os.getpid(), create_engine(main.url, **options))
             return self._own_engine[1]
 
+    def dispose(self):
+        """Closes the store's own pool: an application torn down would otherwise keep its
+        connections until garbage collection. The request engine stays the caller's."""
+        with self._engine_lock:
+            cached, self._own_engine = getattr(self, '_own_engine', None), None
+        if cached is not None:
+            cached[1].dispose(close=cached[0] == os.getpid())
+
     def _store(self):
         return sessionmaker(bind=self._engine())()
 

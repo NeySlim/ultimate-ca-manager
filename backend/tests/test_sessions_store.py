@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from tests.header_guard import guarded
+from tests.app_disposal import dispose_app
 
 from config.settings import session_store
 
@@ -88,18 +89,16 @@ def two_nodes(monkeypatch):
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
     # The shared-suite wrapper would give each application its own schema
     pg_app_harness._creating_session_app.append(True)
-    node_a = None
+    created = []
     try:
         from app import create_app
-        node_a = guarded(create_app('testing'))
-        node_b = guarded(create_app('testing'))
-        yield node_a, node_b
+        created.append(guarded(create_app('testing')))
+        created.append(guarded(create_app('testing')))
+        yield created[0], created[1]
     finally:
         pg_app_harness._creating_session_app.pop()
-        from models import db
-        with node_a.app_context():
-            db.session.remove()
-            db.engine.dispose()
+        for node in created:
+            dispose_app(node)
         admin.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
         admin.close()
 
@@ -150,10 +149,7 @@ def sql_store_app(monkeypatch, tmp_path):
     application = guarded(create_app('testing'))
     application.config['PROPAGATE_EXCEPTIONS'] = False
     yield application
-    from models import db
-    with application.app_context():
-        db.session.remove()
-        db.engine.dispose()
+    dispose_app(application)
 
 
 def test_a_failing_request_does_not_commit_its_pending_work_through_the_store(sql_store_app):
@@ -195,7 +191,6 @@ def test_the_store_never_waits_on_the_request_pool(monkeypatch, tmp_path):
     monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
     from app import create_app
-    from models import db
     app = guarded(create_app('testing'))
     app.config['PROPAGATE_EXCEPTIONS'] = False
     try:
@@ -206,9 +201,7 @@ def test_the_store_never_waits_on_the_request_pool(monkeypatch, tmp_path):
         assert login.status_code == 200, login.data
         assert client.get('/api/v2/account/profile').status_code == 200
     finally:
-        with app.app_context():
-            db.session.remove()
-            db.engine.dispose()
+        dispose_app(app)
 
 
 def _expiry_indexed(app):
@@ -286,10 +279,7 @@ def test_a_purge_the_database_refuses_never_fails_the_request_it_rides(monkeypat
             assert app.test_client().get('/health').status_code == 200
         assert attempts == [1] and slept == []
     finally:
-        from models import db
-        with app.app_context():
-            db.session.remove()
-            db.engine.dispose()
+        dispose_app(app)
 
 
 
@@ -309,10 +299,7 @@ def purging_app(monkeypatch, tmp_path):
     application = guarded(create_app('testing'))
     application.config['PROPAGATE_EXCEPTIONS'] = False
     yield application
-    from models import db
-    with application.app_context():
-        db.session.remove()
-        db.engine.dispose()
+    dispose_app(application)
 
 
 @pytest.mark.parametrize('path', ['/health/live', '/api/v2/health/live', '/health/ready'])

@@ -1112,11 +1112,13 @@ jobs:
           REPO="${{ github.repository }}"
           
           # Its own section; a RC without one takes [Unreleased]. A missing stable section stops the
-          # release, and only warns in a rehearsal, which runs before the bump commit.
+          # release, and only warns in a rehearsal, which runs before the bump commit. Past its
+          # budget the list stops on an entry and links the CHANGELOG at the tag (GitHub: 125 000).
           NOTES_MODE=()
           if [ "$REHEARSAL" = true ]; then NOTES_MODE=(--rehearsal); fi
           CHANGES_FILE=$(mktemp)
-          python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md "${NOTES_MODE[@]}" > "$CHANGES_FILE"
+          python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md "${NOTES_MODE[@]}" \
+            --changelog-url "https://github.com/${REPO}/blob/v${VERSION}/CHANGELOG.md" > "$CHANGES_FILE"
           
           # Build release notes
           {

@@ -337,6 +337,85 @@ def test_a_rehearsal_does_not_relax_the_notes_of_a_rc_or_a_present_section(tmp_p
     assert _notes(tmp_path, '3.0-rc1', '## [2.254] - d\n- x\n').returncode == 1
     assert _cli('notes', '3.0-rc1', str(tmp_path / 'CHANGELOG.md'), '--rehearsal').returncode == 1
 
+
+GITHUB_BODY_LIMIT = 125_000  # a longer release body is refused with HTTP 422
+
+
+def _huge_changelog(entries=900):
+    """An [Unreleased] section far over the release page's limit: entries of a line, entries
+    carried over indented lines and a fenced block, several sub-headings."""
+    lines = ['## [Unreleased]', '']
+    for i in range(entries):
+        if i % 150 == 0:
+            lines += ['', f'### Part {i // 150}']
+        lines.append(f'- **Entry {i}.** ' + 'word ' * 40)
+        if i % 7 == 0:
+            lines.append('  carried on an indented line ' + 'more ' * 10)
+        if i % 11 == 0:
+            lines += ['  ```bash', '- a line of the block, not an entry', '# nor a heading', '  ```']
+    return '\n'.join(lines + ['', '## [3.0] - 2026-12-20', '- Phare thing.', ''])
+
+
+def _entry_lines(text):
+    return [line for line in text.splitlines() if line.strip()]
+
+
+def _assert_cut_on_a_whole_entry(kept, section):
+    """The kept lines are the section's first lines and the next one starts an entry or a heading."""
+    assert kept and section[:len(kept)] == kept
+    assert len(kept) < len(section)
+    assert re.match(r'(- |#)', section[len(kept)]), section[len(kept)]
+    assert sum(1 for line in kept if line.lstrip().startswith('```')) % 2 == 0
+    assert not kept[-1].startswith('#')
+
+
+def test_notes_over_the_budget_stop_on_a_whole_entry_and_point_to_the_changelog(tmp_path):
+    rv, url = _load(), 'https://github.com/o/r/blob/v3.1-rc1/CHANGELOG.md'
+    text = _huge_changelog()
+    (tmp_path / 'CHANGELOG.md').write_text(text)
+    r = _cli('notes', '3.1-rc1', str(tmp_path / 'CHANGELOG.md'), '--changelog-url', url)
+    assert r.returncode == 0, r.stderr
+    assert len(r.stdout) <= rv.NOTES_CHANGES_BUDGET
+    *kept, note = _entry_lines(r.stdout)
+    assert f'[CHANGELOG.md]({url})' in note
+    section = _entry_lines(text.split('## [3.0]')[0])[1:]  # [Unreleased], its heading left out
+    _assert_cut_on_a_whole_entry(kept, section)
+    entries = [line for line in kept if line.startswith('- **Entry')]
+    assert f'{len(entries)} of 900 entries' in note
+
+
+def test_the_cut_never_splits_an_entry_or_a_block_whatever_the_budget():
+    rv = _load()
+    body = rv.release_notes('3.1-rc1', _huge_changelog(entries=40))  # under the budget: whole
+    section = _entry_lines(body)
+    for budget in range(200, len(body), 97):
+        cut = rv.cut_changes(body, budget, 'CHANGELOG.md')
+        assert len(cut) <= budget
+        *kept, note = _entry_lines(cut)
+        assert 'CHANGELOG.md' in note
+        if kept:
+            _assert_cut_on_a_whole_entry(kept, section)
+
+
+def test_notes_under_the_budget_are_the_section_unchanged(tmp_path):
+    rv = _load()
+    (tmp_path / 'CHANGELOG.md').write_text(CHANGELOG)
+    r = _cli('notes', '3.0', str(tmp_path / 'CHANGELOG.md'), '--changelog-url', 'https://x/CHANGELOG.md')
+    assert r.returncode == 0, r.stderr
+    assert r.stdout == rv.changelog_section('3.0', CHANGELOG)
+    assert 'CHANGELOG.md' not in r.stdout
+
+
+def test_the_release_page_of_a_huge_changelog_stays_under_githubs_limit(tmp_path):
+    """The real notes step: the changes stop on an entry, the Installation part stays whole."""
+    result, notes = _notes_step(tmp_path, '3.1-rc1', _huge_changelog(), env={'TMPDIR': str(tmp_path)})
+    assert result.returncode == 0, result.stderr
+    text = notes.read_text()
+    assert len(text) < GITHUB_BODY_LIMIT
+    assert '## Installation' in text and '## Documentation' in text
+    assert '[CHANGELOG.md](https://github.com/o/r/blob/v3.1-rc1/CHANGELOG.md)' in text.split('---')[0]
+    assert 'Entry 0.' in text and 'Entry 899.' not in text
+
 # ---- 3b. the branch a tag must sit on -------------------------------------------------------------
 
 def _tagged_checkout(tmp_path, branches, tag_on):
