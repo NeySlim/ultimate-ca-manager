@@ -9,6 +9,7 @@ rule as ``certsrv`` and ``pkilint``.
 """
 import logging
 import re
+import warnings
 
 from models import db
 from models.msca import MicrosoftCA
@@ -33,8 +34,19 @@ _CERTUTIL_REASON = {
 _CERTUTIL_UNREVOKE = -1
 
 _SERIAL_RE = re.compile(r'^[0-9a-fA-F]+$')
+# Captured output is in the console code page (cp1252 on a French CA) whatever chcp says;
+# the assignment can fail without a console, hence the try and the decoding fallback
+_UTF8_OUTPUT = 'try{[Console]::OutputEncoding=New-Object Text.UTF8Encoding $false}catch{};'
 # What the Kerberos sign-in needs of a pywinrm 0.5.0 Transport
 _PYWINRM_TRANSPORT = ('message_encryption', 'endpoint', 'build_session', 'setup_encryption', 'auth_method')
+
+
+def _decode(data):
+    """WinRM output as text: UTF-8 as asked, else the Windows ANSI code page it may still be in."""
+    try:
+        return (data or b'').decode('utf-8').lstrip('\ufeff')
+    except UnicodeDecodeError:
+        return data.decode('cp1252', errors='replace')
 
 
 def kerberos_transport_available() -> bool:
@@ -173,6 +185,9 @@ class MicrosoftCAAdminChannelMixin:
                 '(pip install pywinrm)'
             )
         import winrm
+        # pywinrm warns on every CLIXML progress stream it cannot parse; _run_ps reads stderr itself
+        warnings.filterwarnings('ignore', message='There was a problem converting the Powershell error message',
+                                category=UserWarning, module=r'winrm(\.|$)')
 
         host = msca.winrm_effective_host
         if not host:
@@ -269,7 +284,7 @@ class MicrosoftCAAdminChannelMixin:
         try:
             if (msca.winrm_transport or 'kerberos').lower() == 'kerberos':
                 MicrosoftCAAdminChannelMixin._bind_kerberos(session, msca)
-            result = session.run_ps(script)
+            result = session.run_ps(_UTF8_OUTPUT + script)
         except MSCAAdminChannelError:
             raise
         except MSCAKerberosError as e:
@@ -279,9 +294,9 @@ class MicrosoftCAAdminChannelMixin:
         except Exception as e:
             raise MSCAAdminChannelError(f'WinRM execution failed: {e}')
 
-        stdout = (result.std_out or b'').decode('utf-8', errors='replace')
+        stdout = _decode(result.std_out)
         if result.status_code != 0:
-            stderr = (result.std_err or b'').decode('utf-8', errors='replace')
+            stderr = _decode(result.std_err)
             # Strip the CLIXML noise for a readable error.
             stderr = re.sub(r'#< CLIXML.*', '', stderr, flags=re.S).strip()
             msg = (stderr or stdout).strip()[:400]
