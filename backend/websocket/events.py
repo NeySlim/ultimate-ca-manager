@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 import socketio as socketio_pkg
 
 from flask import current_app, has_request_context, request, session
+from flask.globals import request_ctx
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
 from flask_socketio import ConnectionRefusedError as HandshakeRefused
 
@@ -381,13 +382,18 @@ def _current_client():
 
 def _stored_identity(app, environ):
     """``_session_identity()`` of the session the store holds now for the handshake's cookie."""
+    ctx = app.request_context(environ)
     try:
-        with app.request_context(environ):
-            return _session_identity()
-    except SessionCheckUnavailable:
-        raise
+        ctx.push()
     except Exception as exc:  # noqa: BLE001  # the store did not open the session
+        # A push that fails opening the session leaves its context bound: unbind it here
+        if has_request_context() and request_ctx._get_current_object() is ctx:
+            ctx.pop(exc)
         raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
+    try:
+        return _session_identity()
+    finally:
+        ctx.pop()
 
 
 def _check_away(app, sid, state) -> Optional[str]:

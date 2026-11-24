@@ -8,6 +8,7 @@ cut that lands while the handshake checks the session never misses it.
 import threading
 
 import pytest
+from flask import has_app_context, has_request_context
 
 from models import SystemConfig, User, db
 from tests.test_websocket_realtime import (  # noqa: F401 (fixture)
@@ -354,6 +355,8 @@ class TestDatabaseOrStoreAway:
             _due(clock)
             assert events.revalidate_due_sockets(app) == 0
             assert ws.is_connected()
+            # The context whose session could not open is not left pushed on the timer's thread
+            assert not has_request_context() and not has_app_context()
         clock[0] += events.REVALIDATE_TICK_SECONDS
         assert events.revalidate_due_sockets(app) == 0
         assert events.connected_clients[_sid(ws)]['validated_at'] == clock[0]
@@ -399,6 +402,27 @@ class TestDatabaseOrStoreAway:
         outage[0] = False
         with _socket(app, client) as ws:
             assert ws.is_connected()
+
+    def test_a_store_away_at_the_handshake_second_read_is_refused_as_unavailable(
+            self, app, make_user, refusals, monkeypatch):  # noqa: F811
+        client = _session_client(app, make_user(role_perms=READER))
+        iface = app.session_interface
+        real = iface._retrieve_session_data
+        reads = []
+
+        def first_read_only(store_id):
+            reads.append(store_id)
+            if len(reads) > 1:
+                raise _database_away()
+            return real(store_id)
+        with monkeypatch.context() as patched:
+            patched.setattr(iface, '_retrieve_session_data', first_read_only)
+            with _socket(app, client) as ws:
+                assert not ws.is_connected()
+            assert not has_request_context()
+        assert len(reads) == 2
+        assert refusals == [{'message': events.HANDSHAKE_UNAVAILABLE}]
+        assert events.connected_clients == {}
 
     def test_a_refused_handshake_keeps_the_plain_refusal(self, app, refusals):
         with _socket(app, _session_client(app)) as ws:
