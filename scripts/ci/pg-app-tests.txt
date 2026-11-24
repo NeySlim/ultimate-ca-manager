@@ -11,6 +11,7 @@ tests/test_windows_profile*.py
 tests/test_windows_scale_150.py
 tests/test_certificates*.py
 tests/test_revocation*.py
+tests/test_local_revocation.py
 tests/test_scheduler*.py
 tests/test_cluster_nodes_pg.py
 tests/test_node_identity_pg.py

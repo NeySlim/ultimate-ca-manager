@@ -63,10 +63,10 @@ def ca_state(app, keyless):
         db.session.commit()
 
 
-def _leaf_row(app, issuer, cn, caref=None):
+def _leaf_row(app, issuer, cn):
     _, refid, ca_cert, ca_key = issuer
     real, key = _leaf(f'{cn}-{uuid.uuid4().hex[:6]}.example.test', ca_cert, ca_key, days=200)
-    return _store(app, real, refid if caref is None else caref, key=key), real
+    return _store(app, real, refid, key=key), real
 
 
 def _records(app, refid, real):
@@ -113,10 +113,9 @@ class TestDeletionWithoutRevocation:
         assert not _exists(app, bulk)
 
     def test_a_valid_certificate_linked_to_no_ca_is_deleted(self, app, auth_client, keyless):
-        row_id, _ = _leaf_row(app, keyless, 'unlinked', caref='')
-        with app.app_context():
-            db.session.get(Certificate, row_id).caref = None
-            db.session.commit()
+        _, _, ca_cert, ca_key = keyless
+        real, key = _leaf(f'unlinked-{uuid.uuid4().hex[:6]}.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, None, key=key)
         assert auth_client.delete(f'/api/v2/certificates/{row_id}').status_code == 204
 
     def test_a_ca_holding_its_key_still_refuses_both_routes(self, app, auth_client, issuer):
