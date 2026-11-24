@@ -578,15 +578,17 @@ def _msca_kerberos_outside_fips():
           'the package on a system whose Kerberos library is built on the system OpenSSL (RHEL); '
           'the Kerberos library of the Docker image is not.')
 def _kerberos_acceptor_outside_fips():
+    from services import windows_profiles
     from services.kerberos import negotiate_auth
     from services.msca.kerberos import fips_crypto_problem
-    # Without the library or with the switch off the binding serves nobody already
-    if not negotiate_auth.is_library_available() or not negotiate_auth.is_enabled():
+    # Exactly the profiles the acceptor serves today: the binding set up, then the rule of service
+    if not negotiate_auth.is_library_available() or not negotiate_auth.is_configured():
         return []
-    rows = (WindowsEnrollmentProfile.query
-            .filter(WindowsEnrollmentProfile.keytab.isnot(None), WindowsEnrollmentProfile.enabled.is_(True))
+    key_realms = windows_profiles.served_key_realms()
+    rows = (WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.enabled.is_(True))
             .order_by(WindowsEnrollmentProfile.id).all())
-    found = [_named(p.name, p.id, p.realm or 'no realm') for p in rows]
+    found = [_named(p.name, p.id, p.realm) for p in rows
+             if windows_profiles.kerberos_unserved_reason(p, binding_reason=None, key_realms=key_realms) is None]
     return found if found and fips_crypto_problem() else []
 
 

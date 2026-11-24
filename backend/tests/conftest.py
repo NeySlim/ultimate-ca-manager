@@ -318,6 +318,16 @@ def _reset_acme_proxy_caches():
 
 
 @pytest.fixture(autouse=True)
+def _reset_kerberos_fips_verdict():
+    """The FIPS verdict on the Kerberos library is kept per process: no test may see another's."""
+    from services.msca.kerberos import forget_fips_verdict
+
+    forget_fips_verdict()
+    yield
+    forget_fips_verdict()
+
+
+@pytest.fixture(autouse=True)
 def _reset_intune_clients():
     """The Intune clients (token, endpoint) are process-wide: no test may see another's."""
     from services.scep.intune_client import forget_clients

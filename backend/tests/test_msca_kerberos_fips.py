@@ -5,6 +5,7 @@ the process must hand its cryptography to the system OpenSSL (libcrypto among it
 as RHEL builds it). Debian's does its own, so the Docker image refuses Kerberos in FIPS mode,
 on certsrv and on the WinRM channel, with a 400 naming the library. GSSAPI is faked here.
 """
+import os
 import struct
 import sys
 
@@ -238,6 +239,51 @@ def test_without_the_extension_file_the_library_is_unknown(loaded, monkeypatch):
     loaded(['libcrypto.so.3'])
     monkeypatch.setattr(kerberos, '_gssapi_extension', lambda: None)
     assert kerberos.fips_crypto_problem() == 'the gssapi extension module is not found'
+
+
+@pytest.mark.parametrize('needed', [['libcrypto.so.3'], ['libkrb5support.so.0']], ids=['openssl', 'own'])
+def test_the_first_verdict_outlives_the_files_it_read(loaded, needed):
+    """An update of krb5-libs leaves the mapped library '(deleted)': the verdict read while the files
+    were there is kept for the process, and nothing is read again."""
+    from services.msca import kerberos
+    path = loaded(needed)
+    first = kerberos.fips_crypto_problem()
+    for name in (path, loaded.extension, kerberos._PROC_MAPS):
+        os.remove(name)
+    assert kerberos.fips_crypto_problem() == first
+
+
+def test_a_library_that_cannot_be_read_is_judged_again(loaded):
+    from services.msca import kerberos
+    path = loaded(['libcrypto.so.3'])
+    good = open(path, 'rb').read()
+    open(path, 'wb').write(b'\x7fELF' + b'\xff' * 60)
+    assert kerberos.fips_crypto_problem().startswith(f'{path} cannot be read')
+    open(path, 'wb').write(good)
+    assert kerberos.fips_crypto_problem() is None
+
+
+def test_unreadable_maps_are_read_again(loaded):
+    from services.msca import kerberos
+    loaded(['libcrypto.so.3'])
+    lines = open(kerberos._PROC_MAPS).read()
+    os.remove(kerberos._PROC_MAPS)
+    assert kerberos.fips_crypto_problem() == f'{kerberos._PROC_MAPS} cannot be read'
+    open(kerberos._PROC_MAPS, 'w').write(lines)
+    assert kerberos.fips_crypto_problem() is None
+
+
+def test_a_verdict_before_gssapi_is_importable_is_not_kept(loaded, monkeypatch):
+    from services.msca import kerberos
+    loaded(['libcrypto.so.3'])
+    monkeypatch.setattr(kerberos, 'gssapi_available', lambda: False)
+    assert kerberos.fips_crypto_problem() == kerberos.MISSING_LIBRARY
+    monkeypatch.setattr(kerberos, 'gssapi_available', lambda: True)
+    extension = loaded.extension
+    monkeypatch.setattr(kerberos, '_gssapi_extension', lambda: None)
+    assert kerberos.fips_crypto_problem() == 'the gssapi extension module is not found'
+    monkeypatch.setattr(kerberos, '_gssapi_extension', lambda: extension)
+    assert kerberos.fips_crypto_problem() is None
 
 
 def test_without_gssapi_the_library_is_missing(monkeypatch):

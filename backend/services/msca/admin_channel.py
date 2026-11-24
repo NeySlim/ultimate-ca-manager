@@ -7,6 +7,7 @@ Opt-in per connection. ``pywinrm`` is an OPTIONAL dependency, lazy-imported
 here so the rest of UCM (and installs without AD CS) never require it — same
 rule as ``certsrv`` and ``pkilint``.
 """
+import html
 import logging
 import re
 import warnings
@@ -34,8 +35,8 @@ _CERTUTIL_REASON = {
 _CERTUTIL_UNREVOKE = -1
 
 _SERIAL_RE = re.compile(r'^[0-9a-fA-F]+$')
-# Captured output is in the console code page (cp1252 on a French CA) whatever chcp says;
-# the assignment can fail without a console, hence the try and the decoding fallback
+# Only what PowerShell writes itself turns UTF-8: certutil writes its ANSI code page (cp1252) and
+# the WinRM console is OEM 437. Never capture certutil's output (PowerShell would decode it wrongly)
 _UTF8_OUTPUT = 'try{[Console]::OutputEncoding=New-Object Text.UTF8Encoding $false}catch{};'
 # What the Kerberos sign-in needs of a pywinrm 0.5.0 Transport
 _PYWINRM_TRANSPORT = ('message_encryption', 'endpoint', 'build_session', 'setup_encryption', 'auth_method')
@@ -47,6 +48,26 @@ def _decode(data):
         return (data or b'').decode('utf-8').lstrip('\ufeff')
     except UnicodeDecodeError:
         return data.decode('cp1252', errors='replace')
+
+
+def _decode_stderr(data):
+    """stderr as text: UTF-8 when pywinrm re-encoded it, else the OEM code page of the console."""
+    try:
+        return (data or b'').decode('utf-8').lstrip('\ufeff')
+    except UnicodeDecodeError:
+        return data.decode('cp437')
+
+
+_CLIXML_ERROR = re.compile(r'<S S="Error">(.*?)</S>', re.S)
+_CLIXML_CHAR = re.compile(r'_x([0-9A-Fa-f]{4})_')
+
+
+def _clixml_errors(text):
+    """The lines of the error records in PowerShell's CLIXML stream: a parse error or an
+    exception is only there. XML entities first, then PowerShell's ``_xHHHH_`` escapes."""
+    lines = (_CLIXML_CHAR.sub(lambda m: chr(int(m.group(1), 16)), html.unescape(raw))
+             for raw in _CLIXML_ERROR.findall(text))
+    return ''.join(lines).replace('\r\n', '\n').strip()
 
 
 def kerberos_transport_available() -> bool:
@@ -296,9 +317,10 @@ class MicrosoftCAAdminChannelMixin:
 
         stdout = _decode(result.std_out)
         if result.status_code != 0:
-            stderr = _decode(result.std_err)
-            # Strip the CLIXML noise for a readable error.
+            stderr = _decode_stderr(result.std_err)
+            # The CLIXML stream is dropped but for its error records, never its progress records
+            errors = _clixml_errors(stderr)
             stderr = re.sub(r'#< CLIXML.*', '', stderr, flags=re.S).strip()
-            msg = (stderr or stdout).strip()[:400]
+            msg = ('\n'.join(t for t in (stderr, errors) if t) or stdout).strip()[:400]
             raise MSCAAdminChannelError(f'certutil failed (rc={result.status_code}): {msg}')
         return stdout
