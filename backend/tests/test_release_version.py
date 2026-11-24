@@ -525,6 +525,18 @@ def test_the_release_page_keeps_security_and_upgrade_notes_past_the_budget_under
     assert _named(note)[0] == ['Part 0', 'Part 1']
 
 
+def test_the_placeholders_of_the_installation_part_leave_the_changes_alone(tmp_path):
+    """The real notes step: VERSION, REPO and the like are filled in the Installation part only."""
+    entry = ('- The el10 package was ucm-el10-VERSION-1.el10.noarch.rpm; REPO, IMAGE, DEB_VERSION and '
+             'RPM_VERSION are words here.')
+    carried = '          carried on a line indented by ten spaces'
+    result, notes = _notes_step(tmp_path, '3.0-rc1', f'## [Unreleased]\n{entry}\n{carried}\n')
+    assert result.returncode == 0, result.stderr
+    text = notes.read_text()
+    assert f'\n{entry}\n{carried}\n' in text
+    assert 'releases/download/v3.0-rc1/ucm-el10-3.0.rc1-1.el10.noarch.rpm' in text
+    assert 'https://github.com/o/r/blob/v3.0-rc1/CHANGELOG.md' in text
+
 # ---- 3b. the branch a tag must sit on -------------------------------------------------------------
 
 def _tagged_checkout(tmp_path, branches, tag_on):
