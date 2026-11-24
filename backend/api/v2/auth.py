@@ -86,11 +86,11 @@ def _sign_out():
     except Exception as e:
         logger.warning(f"Non-blocking: failed to emit on_user_logout WebSocket event for {username}: {e}", exc_info=True)
     
-    from auth.session_start import close_session_sockets
-    session_id = getattr(session, 'sid', None)
-    session.clear()
-    close_session_sockets(session_id, username)
-    
+    # Its save removes the record, the one a renewal moved it to meanwhile too, then closes
+    # the session's sockets: after the removal, so no socket reconnects in between
+    from utils.session_store import end_with_its_moves
+    end_with_its_moves(session)
+
     return success_response(message='Logout successful')
 
 

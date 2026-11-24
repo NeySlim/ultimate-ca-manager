@@ -502,20 +502,6 @@ def update_user(user_id):
 
     try:
         db.session.commit()
-        if password_changed:
-            keep_own_session(user)
-        AuditService.log_action(
-            action='user_update',
-            resource_type='user',
-            resource_id=str(user_id),
-            resource_name=user.username,
-            details=f'Updated user: {user.username}',
-            success=True
-        )
-        return success_response(
-            data=user.to_dict(),
-            message=f'User {user.username} updated successfully'
-        )
     except Exception as e:
         db.session.rollback()
         # The local e-mail index refused a change a concurrent request beat this one to
@@ -525,6 +511,22 @@ def update_user(user_id):
                 return taken
         logger.error(f"Failed to update user: {e}", exc_info=True)
         return error_response('Failed to update user', 500)
+
+    AuditService.log_action(
+        action='user_update',
+        resource_type='user',
+        resource_id=str(user_id),
+        resource_name=user.username,
+        details=f'Updated user: {user.username}',
+        success=True
+    )
+    # Committed and audited: a renewal that fails answers that (SessionNotKept)
+    if password_changed:
+        keep_own_session(user)
+    return success_response(
+        data=user.to_dict(),
+        message=f'User {user.username} updated successfully'
+    )
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['DELETE'])

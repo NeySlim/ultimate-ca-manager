@@ -12,7 +12,7 @@ import random
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask_session._utils import retry_query
 from flask_session.filesystem import FileSystemSessionInterface
@@ -118,6 +118,35 @@ def carries_lock(session):
     return is_locked(session)
 
 
+# A move leaves this long, under MOVED_PREFIX + the old store id, the new identifier: a
+# sign-out opened before the move and saved after it ends the session there too
+MOVED_PREFIX = 'moved:'
+MOVED_TTL = 300
+MOVED_HOPS = 5
+
+
+def moved_pointer(sid):
+    """Value of a move's pointer: no user_id, so no count or listing reads it as a session."""
+    return {'moved_to': sid}
+
+
+def moved_target(value):
+    return value.get('moved_to') if isinstance(value, dict) else None
+
+
+def end_with_its_moves(session):
+    """Empty the session as a sign-out does: its save removes the record and, when a renewal
+    moved it meanwhile, the record it moved to."""
+    session.clear()
+    session.follows_moves = True
+
+
+def _close_sockets(sids):
+    from auth.session_start import close_session_sockets
+    for sid in dict.fromkeys(sids):
+        close_session_sockets(sid)
+
+
 class KeepsRemovedRecordsGone:
     """A session opened from a stored record is saved only while that record exists:
     a renewal or revocation served meanwhile is never undone, and no cookie names the
@@ -186,6 +215,23 @@ class KeepsRemovedRecordsGone:
     def should_set_cookie(self, app, session):
         return not self._refused(session) and super().should_set_cookie(app, session)
 
+    def _moved_to(self, store_id):
+        """The identifier a move of ``store_id`` left in its pointer, or None."""
+        raise NotImplementedError
+
+    def _remove_moved(self, store_id):
+        """Follows the pointers a move of ``store_id`` left: the identifiers removed."""
+        removed = []
+        for _hop in range(MOVED_HOPS):
+            sid = self._moved_to(store_id)
+            if not sid:
+                break
+            store_id = self._get_store_id(sid)
+            if self._remove_if_present(store_id):
+                removed.append(sid)
+                break
+        return removed
+
     def save_session(self, app, session, response):
         if self._refused(session):
             return
@@ -194,11 +240,17 @@ class KeepsRemovedRecordsGone:
         if session.accessed:
             response.vary.add('Cookie')
         # Checked and removed at once: a record already removed means the cookie now names
-        # the new identifier, so it is kept
-        if self._remove_if_present(self._get_store_id(session.sid)):
+        # the new identifier, so it is kept, unless a sign-out follows the move there
+        store_id = self._get_store_id(session.sid)
+        ended = [session.sid] if self._remove_if_present(store_id) else []
+        if not ended and getattr(session, 'follows_moves', False):
+            ended = self._remove_moved(store_id)
+        if ended:
             response.delete_cookie(key=self.get_cookie_name(app), domain=self.get_cookie_domain(app),
                                    path=self.get_cookie_path(app))
             response.vary.add('Cookie')
+        # Once the record is gone: a socket reconnecting before would pass the handshake
+        _close_sockets([session.sid, *ended])
 
 
 class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessionInterface):
@@ -256,7 +308,11 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
             return
         keep_stored_lock(session, stored)
         FileSystemSessionInterface._upsert_session(self, session_lifetime, session, store_id)
+        self.cache.set(MOVED_PREFIX + old_id, moved_pointer(session.sid), MOVED_TTL)
         FileSystemSessionInterface._delete_session(self, old_id)
+
+    def _moved_to(self, store_id):
+        return moved_target(self.cache.get(MOVED_PREFIX + store_id))
 
 
 class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInterface):
@@ -419,10 +475,24 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
                 s.rollback()
                 continue
             s.add(model(session_id=store_id, data=self.serializer.encode(session), expiry=expiry))
+            # The pointer commits with the move: a removal finding the old row gone reads it
+            pointer = MOVED_PREFIX + old_id
+            s.query(model).filter_by(session_id=pointer).delete(synchronize_session=False)
+            s.add(model(session_id=pointer, data=self.serializer.encode(moved_pointer(session.sid)),
+                        expiry=datetime.utcnow() + timedelta(seconds=MOVED_TTL)))
             s.commit()
             return
         session.store_refused = 'busy'
         logger.warning("Session not saved: its record kept changing under the move")
+
+    @retry_query()
+    def _moved_to(self, store_id):
+        model = self.sql_session_model
+        with self._store() as s:
+            row = (s.query(model.data)
+                   .filter(model.session_id == MOVED_PREFIX + store_id,
+                           model.expiry > datetime.utcnow()).first())
+        return moved_target(self.serializer.decode(want_bytes(row.data))) if row else None
 
     @retry_query()
     def _upsert_session(self, session_lifetime, session, store_id):

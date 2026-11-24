@@ -67,7 +67,6 @@ def change_password():
     ok, _err = safe_commit(logger, "Failed to update password")
     if not ok:
         return _err
-    keep_current_session(user)
 
     # Audit log
     AuditService.log_action(
@@ -78,5 +77,7 @@ def change_password():
         details=f'Password changed by user: {user.username} (other sessions closed)',
         success=True
     )
+    # After the audit: a renewal that fails answers that the change is saved (SessionNotKept)
+    keep_current_session(user)
 
     return success_response(message='Password changed successfully')

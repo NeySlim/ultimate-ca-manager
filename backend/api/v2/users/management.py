@@ -11,7 +11,7 @@ import logging
 from auth.unified import refuse_api_key_on_own_account, require_auth
 from auth.session_reverify import check_session_password
 from auth.session_start import (
-    closed_sessions_note, end_sessions_on_commit, keep_own_session, sessions_closed_by,
+    closed_sessions_note, end_sessions_on_commit, keep_own_session, other_sessions_closed,
 )
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
@@ -85,32 +85,33 @@ def reset_user_password(user_id):
 
     try:
         db.session.commit()
-        keep_own_session(user)
-
-        AuditService.log_action(
-            action='password_change',
-            resource_type='user',
-            resource_id=str(user_id),
-            resource_name=user.username,
-            details=f'Password reset for user: {user.username}',
-            success=True
-        )
-
-        # Send password changed notification
-        try:
-            from services.notification_service import NotificationService
-            admin_username = g.current_user.username if hasattr(g, 'current_user') else 'admin'
-            NotificationService.on_password_changed(user, admin_username)
-        except Exception:
-            pass  # Non-blocking
-
-        return success_response(
-            message=f'Password reset successfully for user {user.username}'
-        )
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to reset password: {e}", exc_info=True)
         return error_response('Failed to reset password', 500)
+
+    AuditService.log_action(
+        action='password_change',
+        resource_type='user',
+        resource_id=str(user_id),
+        resource_name=user.username,
+        details=f'Password reset for user: {user.username}',
+        success=True
+    )
+
+    # Send password changed notification
+    try:
+        from services.notification_service import NotificationService
+        admin_username = g.current_user.username if hasattr(g, 'current_user') else 'admin'
+        NotificationService.on_password_changed(user, admin_username)
+    except Exception:
+        pass  # Non-blocking
+
+    # The password is committed and audited: a renewal that fails answers that (SessionNotKept)
+    keep_own_session(user)
+    return success_response(
+        message=f'Password reset successfully for user {user.username}'
+    )
 
 
 @bp.route('/api/v2/users/<int:user_id>/reset-2fa', methods=['POST'])
@@ -145,7 +146,6 @@ def reset_user_2fa(user_id):
     ok, _err = safe_commit(logger, "Failed to reset user 2FA")
     if not ok:
         return _err
-    keep_own_session(user)
 
     AuditService.log_action(
         action='mfa_reset',
@@ -155,6 +155,7 @@ def reset_user_2fa(user_id):
         details=f'2FA reset by {g.current_user.username} for user: {user.username}',
         success=True,
     )
+    keep_own_session(user)
     return success_response(message=f'2FA reset for user {user.username}')
 
 
@@ -364,7 +365,7 @@ def attach_user_sso_provider(user_id):
                           on_conflict=held_elsewhere)
     if not ok:
         return err
-    closed = sessions_closed_by(user)
+    closed = other_sessions_closed(user)
     note = ', taking back its orphan of the same IdP' if taken_back is not None else ''
     note += f', expected tenant {expected_tenant}' if expected_tenant else ''
     note += ', local password removed' if drop_password else ''
@@ -377,6 +378,7 @@ def attach_user_sso_provider(user_id):
                  f'(before: {before}{note}, {closed_sessions_note(closed)})'),
         success=True,
     )
+    keep_own_session(user)
     return success_response(
         data=user.to_dict(),
         message=f'Provider {provider.name} attached to the account',
@@ -424,7 +426,7 @@ def reset_user_sso_identity(user_id, identity_id):
     ok, err = safe_commit(logger, f"Failed to reset the SSO identity of user {user_id}")
     if not ok:
         return err
-    closed = sessions_closed_by(user)
+    closed = other_sessions_closed(user)
     AuditService.log_action(
         action='user_sso_reset',
         resource_type='user',
@@ -435,6 +437,7 @@ def reset_user_sso_identity(user_id, identity_id):
                  + f'({where}{_tenant_note(row)}, {closed_sessions_note(closed)})'),
         success=True,
     )
+    keep_own_session(user)
     return success_response(data=user.to_dict(),
                             message='SSO identity reset' if former else 'Expected tenant set',
                             meta={'other_sessions_closed': closed})
@@ -479,7 +482,7 @@ def detach_user_sso_provider(user_id, identity_id):
                           on_conflict=lambda: user_model.local_email_taken(email, uid, taken))
     if not ok:
         return err
-    closed = sessions_closed_by(user)
+    closed = other_sessions_closed(user)
     note = ', now a local account' if last else ''
     note += ' that must set a password' if needs_password else ''
     AuditService.log_action(
@@ -491,6 +494,7 @@ def detach_user_sso_provider(user_id, identity_id):
                  f'{note} ({closed_sessions_note(closed)})'),
         success=True,
     )
+    keep_own_session(user)
     msg = 'Provider detached from the account'
     if needs_password:
         msg += ', set a password for this account'
@@ -784,8 +788,9 @@ def delete_user_security_key(user_id, credential_id):
     ok, message = WebAuthnService.remove_credential(credential)
     if not ok:
         return error_response(message, 500)
-    closed = sessions_closed_by(owner)
+    closed = other_sessions_closed(owner)
     _audit_key('webauthn_admin_delete', user, credential, 'removed', closed)
+    keep_own_session(owner)
     return success_response(message=f'Security key removed from {user.username}',
                             meta={'other_sessions_closed': closed})
 
@@ -825,7 +830,8 @@ def toggle_user_security_key(user_id, credential_id):
     ok, message = WebAuthnService.set_credential_enabled(credential, enabled)
     if not ok:
         return error_response(message, 500)
-    closed = sessions_closed_by(owner)
+    closed = other_sessions_closed(owner)
     _audit_key('webauthn_admin_enable' if enabled else 'webauthn_admin_disable', user, credential,
                'enabled' if enabled else 'disabled', closed)
+    keep_own_session(owner)
     return success_response(data=credential.to_dict(), meta={'other_sessions_closed': closed})

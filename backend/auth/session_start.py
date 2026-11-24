@@ -15,8 +15,14 @@ def _new_identifier(keep_lock=False):
     interface = current_app.session_interface
     renew = getattr(interface, 'rotate' if keep_lock else 'regenerate', None) or getattr(
         interface, 'regenerate', None)
+    # A stored session replaced by a new one (a sign-in) ends: its sockets close once it is gone
+    replaced = None
+    if not keep_lock and getattr(session, 'stored_sid', None) == getattr(session, 'sid', None):
+        replaced = session.sid
     if renew is not None:
         renew(session)
+    if replaced and replaced != getattr(session, 'sid', None):
+        close_session_sockets(replaced)
 
 
 # The account's creation time: an id handed out again (SQLite reuses the last
@@ -48,14 +54,24 @@ def begin_session(user, unlocking=False):
     _new_identifier()
 
 
+class SessionNotKept(Exception):
+    """The change is committed, the caller's session could not move to its new identifier:
+    called after the change's audit, the request answers that the change is saved."""
+    message = 'The change is saved, but this session could not be kept: sign in again'
+
+
 def keep_current_session(user) -> bool:
-    """After ``user.end_sessions()``: this session stays, under a new identifier,
-    only if it held the version that bump replaced; a session already closed stays closed."""
+    """After ``user.end_sessions()`` is committed and audited: this session stays, under a new
+    identifier, only if it held the version that bump replaced; a session already closed stays
+    closed. Raises SessionNotKept when the store fails the move."""
     replaced, new = getattr(user, '_sessions_bump', (None, None))
     if replaced is None or session.get('session_version', 0) != replaced:
         return False
     session['session_version'] = new
-    _new_identifier(keep_lock=True)
+    try:
+        _new_identifier(keep_lock=True)
+    except Exception as exc:
+        raise SessionNotKept() from exc
     return True
 
 
@@ -112,21 +128,19 @@ def _opened_after_creation(data, user) -> bool:
     return created is None or opened >= created
 
 
-def sessions_closed_by(user):
-    """After ``user.end_sessions()`` is committed: the caller's own session stays, and
-    the count of the account's other sessions that ended (None: store not listed).
-    The caller's record is never one of them, even where the store refused to move it."""
-    own = _own_record(user)
-    keep_own_session(user)
+def other_sessions_closed(user):
+    """After ``user.end_sessions()`` is committed: the count of the account's other sessions
+    that ended (None: store not listed), the caller's record never one of them. The caller's
+    own session is kept afterwards, once the change is audited (keep_own_session)."""
     replaced, _new = getattr(user, '_sessions_bump', (None, None))
     if replaced is None:
         return 0
     from utils.session_census import count_sessions
-    return count_sessions(user, replaced, other_than=own)
+    return count_sessions(user, replaced, other_than=_own_record(user))
 
 
 def closed_sessions_note(count):
-    """Audit wording of sessions_closed_by()."""
+    """Audit wording of other_sessions_closed()."""
     if count is None:
         return 'other sessions closed'
     return f"{count} other session{'' if count == 1 else 's'} closed"
