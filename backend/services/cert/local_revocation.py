@@ -122,19 +122,22 @@ def publish_before_deletion(ca: CA) -> None:
     ``_hold_issuer`` holds them share locked and commits first; one that holds its record but not yet
     those rows deadlocks with the update, and the side aborted is staged once more."""
     from utils.cert_issuer import same_key_refids
-    from utils.db_transaction import is_deadlock
+    from utils.db_transaction import deadlock_savepoint, is_deadlock
     if not ca.refid or not _signs_for(ca):
         return
     db.session.flush()
     for attempt in (1, 2):
-        savepoint = db.session.begin_nested()
+        savepoint = deadlock_savepoint()
         try:
             with db.session.no_autoflush:
                 CA.query.filter(CA.refid.in_(same_key_refids(ca))).order_by(CA.id).with_for_update().all()
             publish_key_records(ca)
-            savepoint.commit()
+            if savepoint is not None:
+                savepoint.commit()
             return
         except Exception as e:
+            if savepoint is None:
+                raise
             savepoint.rollback()
             if attempt == 2 or not is_deadlock(e):
                 raise

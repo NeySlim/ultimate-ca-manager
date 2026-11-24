@@ -15,6 +15,14 @@ def is_deadlock(exc) -> bool:
     return (getattr(orig, 'sqlstate', None) or getattr(orig, 'pgcode', None)) == '40P01'
 
 
+def deadlock_savepoint():
+    """A savepoint for work PostgreSQL may abort with a deadlock, else None: SQLite has none, and
+    the RELEASE of a savepoint pysqlite opened outside a transaction would commit it."""
+    if db.session.get_bind().dialect.name != 'postgresql':
+        return None
+    return db.session.begin_nested()
+
+
 def safe_commit(logger_instance, error_msg="Database operation failed", on_conflict=None):
     """
     Attempt db.session.commit(); roll back and return an error response on failure.

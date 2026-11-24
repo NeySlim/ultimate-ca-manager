@@ -29,7 +29,7 @@ from utils.issuance_defaults import default_issue_key_id, template_digest
 from utils.spki_digest import certificate_key_sha256
 from utils.serial_format import canonical_serial
 from utils.revocation_reasons import HOLD_REASONS, revocable
-from utils.db_transaction import is_deadlock
+from utils.db_transaction import deadlock_savepoint, is_deadlock
 from services.cert.issued_lookup import effective_revocation, record_reason_replaceable
 
 logger = logging.getLogger(__name__)
@@ -442,14 +442,14 @@ class LifecycleMixin:
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         is_hold = reason in HOLD_REASONS
         now = utc_now()
-        # Staged in a savepoint: a deadlock (PostgreSQL 40P01, a key import taking the CA rows the
+        # Staged in a savepoint (PostgreSQL): a deadlock (40P01, a key import taking the CA rows the
         # other way) rolls back only it, releasing its locks, the caller's writes kept, and it is
         # staged once more; a second one, or any other error, rolls the whole transaction back
         for attempt in (1, 2):
             rejected_renewals = []
             savepoint = None
             try:
-                savepoint = db.session.begin_nested()
+                savepoint = deadlock_savepoint()
                 # The record is locked before the row is written, the order unholds and the hourly
                 # pass follow (PostgreSQL), so none of them deadlocks; the CA rows come last, share
                 # locked by note_publication. A row the upgrade step 144 left pending keeps its
@@ -508,7 +508,8 @@ class LifecycleMixin:
                         certificate_id=certificate.id, reason='Revoked directly', commit=False)
                 db.session.flush()
                 remember_if_compromised(certificate)
-                savepoint.commit()
+                if savepoint is not None:
+                    savepoint.commit()
                 break
             except Exception as e:
                 if attempt == 1 and savepoint is not None and is_deadlock(e):

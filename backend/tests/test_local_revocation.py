@@ -1154,7 +1154,12 @@ def _deadlocks(monkeypatch, times):
 
 
 class TestARevocationThatMeetsADeadlock:
-    """Nothing is written before the commit: a deadlock while staging is retried once."""
+    """A deadlock while staging rolls back the staging's savepoint only, then it is retried once."""
+
+    @pytest.fixture(autouse=True)
+    def _postgresql_only(self, app):
+        if not _on_postgresql(app):
+            pytest.skip('a deadlock is PostgreSQL behaviour; SQLite has none')
 
     def test_the_revocation_is_staged_again_once(self, app, auth_client, issuer, monkeypatch):
         calls = _deadlocks(monkeypatch, 1)
