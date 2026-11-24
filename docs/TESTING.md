@@ -99,6 +99,7 @@ Each test file covers 3 levels per endpoint:
 - No external dependencies (no Docker, no network)
 - PostgreSQL mode: `UCM_TEST_APP_PG_URL` runs the same fixtures on PostgreSQL, see [testing/postgres-harness.md](testing/postgres-harness.md)
 - A test that restores through a restore route calls `tests/restore_support.post_to_the_end`: it asks for the job with `Prefer: respond-async` and reads its final answer, so a loaded host past the route's bounded wait never turns it into a 202
+- The CI deals the test files to its parts by measured duration (`scripts/ci/test-durations.txt`, longest first, each to the lightest part); when the parts drift apart, regenerate the file from the logs of the shard jobs with `scripts/ci/test_durations.py`
 
 #### Optional backends: SoftHSM, GSSAPI, Redis
 
