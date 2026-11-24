@@ -5,6 +5,7 @@ adapter (each request answered by a Negotiate 401) and a GSSAPI faked at its bou
 renewal, the poll of a pending request, the template list and both connection tests answer
 400 with the Kerberos cause; nothing reached the CA, so nothing is recorded but a failed test.
 """
+import base64
 import json
 
 import pytest
@@ -112,9 +113,41 @@ def test_a_ticket_the_ca_refuses_answers_400(app, auth_client, ca, gss, keytab):
     gss.acquire_error = None  # the ticket is made, the CA answers 401 again
     msca_id = _connection(app, 'krb-refused.test.local', keytab)
     csr_id = _csr(app, 'krb-refused-csr.test.local')
-    _refused(auth_client.post(f'/api/v2/microsoft-cas/{msca_id}/sign/{csr_id}',
-                              data=json.dumps({'template': 'WebServer'}), content_type='application/json'),
-             cause='refused the ticket')
+    r = auth_client.post(f'/api/v2/microsoft-cas/{msca_id}/sign/{csr_id}',
+                         data=json.dumps({'template': 'WebServer'}), content_type='application/json')
+    _refused(r, cause='refused the ticket')
+    assert 'may hold the request' not in get_json(r)['message']  # a 401: the CA did not take it
+
+
+def test_an_answer_that_fails_mutual_authentication_says_the_ca_may_hold_the_request(
+        app, auth_client, gss, keytab, monkeypatch):
+    """The CA answered the authenticated POST, so it may have taken the request: UCM cannot trust
+    the answer, records nothing, and says so instead of claiming the CA never read it."""
+    gss.acquire_error = None
+    forged = 'Negotiate ' + base64.b64encode(b'not the server token').decode()
+    seen = []
+
+    def send(self, request, **kwargs):
+        seen.append(request)
+        signed = 'Authorization' in request.headers
+        response = requests.Response()
+        response.status_code, response.url, response.request = (200 if signed else 401), request.url, request
+        response.headers = CaseInsensitiveDict({'WWW-Authenticate': forged if signed else 'Negotiate'})
+        response._content, response._content_consumed = b'<html>Certificate Pending</html>', True
+        response.raw = type('Raw', (), {'release_conn': lambda self: None})()
+        response.connection = self
+        return response
+
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, 'send', send)
+    msca_id = _connection(app, 'krb-mutual.test.local', keytab)
+    csr_id = _csr(app, 'krb-mutual-csr.test.local')
+    before = _requests(app, msca_id)
+    r = auth_client.post(f'/api/v2/microsoft-cas/{msca_id}/sign/{csr_id}',
+                         data=json.dumps({'template': 'WebServer'}), content_type='application/json')
+    _refused(r, cause='mutual authentication')
+    assert 'the CA may hold the request' in get_json(r)['message']
+    assert any(q.method == 'POST' and 'Authorization' in q.headers for q in seen)
+    assert _requests(app, msca_id) == before
 
 
 @pytest.mark.parametrize('with_csr', [True, False], ids=['resubmit', 'rekey'])

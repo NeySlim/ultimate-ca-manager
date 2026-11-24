@@ -31,6 +31,10 @@ class MSCAKerberosError(Exception):
     """A Kerberos sign-in to the CA failed: the message names the cause, never a secret."""
 
 
+class MSCAKerberosUnverifiedAnswer(MSCAKerberosError):
+    """The server answered the request but failed mutual authentication: it may have acted on it."""
+
+
 class KerberosFipsRefused(MSCAKerberosError):
     """FIPS mode refuses Kerberos here: the Kerberos library does its own cryptography."""
 
@@ -382,14 +386,14 @@ class KerberosAuth(AuthBase):
                     raise MSCAKerberosError('no context')
                 ctx.step(token)
             except (gssapi.exceptions.GSSError, MSCAKerberosError):
-                raise MSCAKerberosError(f'Kerberos sign-in to {host} failed: the server could not be '
-                                        'authenticated (mutual authentication)') from None
+                raise MSCAKerberosUnverifiedAnswer(f'Kerberos sign-in to {host} failed: the server could '
+                                                   'not be authenticated (mutual authentication)') from None
             self.auth_done = True
             return response
         if response.status_code >= 400 or not self.mutual_required:
             return response
-        raise MSCAKerberosError(f'Kerberos sign-in to {host} failed: the server did not authenticate '
-                                'itself (mutual authentication)')
+        raise MSCAKerberosUnverifiedAnswer(f'Kerberos sign-in to {host} failed: the server did not '
+                                           'authenticate itself (mutual authentication)')
 
     # --- WinRM message encryption (pywinrm's Encryption calls these on session.auth) ---
 

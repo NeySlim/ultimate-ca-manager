@@ -3,7 +3,7 @@ from typing import Optional
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
-from .kerberos import MSCAKerberosError
+from .kerberos import MSCAKerberosError, MSCAKerberosUnverifiedAnswer
 from .connection import MicrosoftCAConnectionMixin
 from .requests import MicrosoftCARequestsMixin
 
@@ -97,8 +97,12 @@ class MicrosoftCACertsMixin:
                     'cert_pem': cert_pem,
                 }
 
+            except MSCAKerberosUnverifiedAnswer as e:
+                # An answer UCM cannot trust came back: the CA may hold the request, unrecorded here
+                raise MSCAKerberosUnverifiedAnswer(f'{e}; the CA may hold the request: check it on the CA '
+                                                   'before submitting again') from None
             except MSCAKerberosError:
-                raise  # the CA never read the request: nothing to record
+                raise  # refused before the CA took the request: nothing to record
             except Exception as submit_err:
                 # Locale-independent classification. certsrv only understands
                 # the English "Certificate Pending" page, so on a localized
