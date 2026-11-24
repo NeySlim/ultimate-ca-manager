@@ -52,8 +52,16 @@ if ! git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "$TAG"; then
     exit 1
 fi
 
+# A release page resolves no relative link: the notes link the CHANGELOG of the tag on GitHub.
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)" && [[ -n "$REPO" ]] || {
+    echo "gh names no GitHub repository for this checkout: the notes would link no CHANGELOG." >&2
+    exit 1
+}
+CHANGELOG_URL="https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md"
+
 # Same rule as the workflow (release_version.py): its own section, else [Unreleased] for a RC.
-NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md | sed -e 's/[[:space:]]*$//')" || {
+NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md --changelog-url "$CHANGELOG_URL" \
+    | sed -e 's/[[:space:]]*$//')" || {
     if [[ "$VERSION" == *-rc* ]]; then
         echo "CHANGELOG.md needs '## [${VERSION}]' or '## [Unreleased]' with entries." >&2
     else

@@ -763,8 +763,9 @@ def test_smoke_release_accepts_the_exact_version(monkeypatch):
 
 # ---- 7. the manual publisher takes the same section ---------------------------------------------
 
-def _publish(tmp_path, version, changelog, *flags):
-    """Notes the script hands to `gh release edit` (it only edits a release the workflow created)."""
+def _publish(tmp_path, version, changelog, *flags, repo='o/r'):
+    """Notes the script hands to `gh release edit` (it only edits a release the workflow created);
+    `gh repo view` names `repo`, or fails when it is None."""
     bare, work = tmp_path / 'origin.git', tmp_path / 'work'
     # Under the pre-commit hook GIT_DIR points at the real repository: never hand it down
     clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -784,6 +785,8 @@ def _publish(tmp_path, version, changelog, *flags):
     log = tmp_path / 'gh.args'
     (fake / 'gh').write_text(
         '#!/bin/sh\n'
+        + (f'if [ "$1 $2" = "repo view" ]; then echo {repo}; exit 0; fi\n' if repo else
+           'if [ "$1 $2" = "repo view" ]; then echo "no repository" >&2; exit 1; fi\n') +
         'if [ "$1 $2" = "release edit" ]; then\n'
         f'  for a in "$@"; do echo "$a"; done > "{log}"\n'
         f'  while [ $# -gt 0 ]; do [ "$1" = "--notes-file" ] && cp "$2" "{log}.notes"; shift; done\n'
@@ -807,6 +810,20 @@ def test_release_publish_takes_the_section_of_the_workflow(tmp_path, version, ma
     assert marker in notes
     for other in ('Fixed a.b thing.', 'Coming next.', 'Older entry', 'Dots are literal'):
         assert other == marker or other not in notes
+
+
+def test_release_publish_links_the_changelog_of_the_tag(tmp_path):
+    """Past the budget the notes link the rest: a release page resolves only an absolute link."""
+    result, notes = _publish(tmp_path, '3.1-rc1', _huge_changelog())
+    assert result.returncode == 0, result.stderr
+    links = re.findall(r'\]\(([^)]+)\)', notes)
+    assert links == ['https://github.com/o/r/blob/v3.1-rc1/CHANGELOG.md']
+
+
+def test_release_publish_stops_when_the_repository_is_unknown(tmp_path):
+    result, notes = _publish(tmp_path, '3.1-rc1', _huge_changelog(), repo=None)
+    assert result.returncode != 0 and notes is None
+    assert 'repository' in result.stderr
 
 
 def test_release_publish_refuses_a_missing_section(tmp_path):
