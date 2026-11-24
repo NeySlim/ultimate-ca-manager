@@ -4422,6 +4422,10 @@
           "title": "Microsoft CA connections that sign in with Kerberos (certsrv or the WinRM channel) on a Kerberos library that does its own cryptography, outside the FIPS module: their sign-in is refused in FIPS mode",
           "remedy": "Switch these connections to certificate or Basic authentication and turn off their Kerberos WinRM channel, or run UCM from the package on a system whose Kerberos library is built on the system OpenSSL (RHEL); the Kerberos library of the Docker image is not."
         },
+        "kerberos_acceptor_outside_fips": {
+          "title": "Windows enrollment profiles served over Kerberos (XCEP and WSTEP) on a Kerberos library that does its own cryptography, outside the FIPS module: the Kerberos binding answers 503 in FIPS mode",
+          "remedy": "Enroll these clients over the UsernamePassword or Certificate binding, or run UCM from the package on a system whose Kerberos library is built on the system OpenSSL (RHEL); the Kerberos library of the Docker image is not."
+        },
         "backup_schedule_argon2id": {
           "title": "Scheduled backups are written with Argon2id: such archives cannot be restored in FIPS mode",
           "remedy": "Set the scheduled backup KDF to PBKDF2, and take a manual backup with kdf \"pbkdf2\" before the switch."

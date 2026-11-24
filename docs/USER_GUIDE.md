@@ -377,7 +377,7 @@ UCM can run on two or more nodes that share one PostgreSQL database, started wit
 
 ## FIPS Mode
 
-An instance started with `UCM_FIPS=1` enforces FIPS mode, in force only while the cryptographic libraries run on an active FIPS provider; otherwise it refuses to start. The `-fips` Docker image provides that module. In FIPS mode the algorithms the module does not approve are not offered (Brainpool curves, for example, and ML-DSA or EdDSA when the module does not approve them), and Argon2id backups cannot be restored. Kerberos to a Microsoft CA (certsrv and the WinRM channel) is allowed only when the Kerberos library hands its cryptography to the system OpenSSL, as on RHEL; the Docker images' library does its own, so FIPS mode refuses it there. Before switching, **Settings** > **About** > **Check FIPS readiness** lists what FIPS mode would refuse on the instance, with a remedy for each.
+An instance started with `UCM_FIPS=1` enforces FIPS mode, in force only while the cryptographic libraries run on an active FIPS provider; otherwise it refuses to start. The `-fips` Docker image provides that module. In FIPS mode the algorithms the module does not approve are not offered (Brainpool curves, for example, and ML-DSA or EdDSA when the module does not approve them), and Argon2id backups cannot be restored. Kerberos to a Microsoft CA (certsrv and the WinRM channel) and the Kerberos binding of Windows autoenrollment are allowed only when the Kerberos library hands its cryptography to the system OpenSSL, as on RHEL; the Docker images' library does its own, so FIPS mode refuses them there. Before switching, **Settings** > **About** > **Check FIPS readiness** lists what FIPS mode would refuse on the instance, with a remedy for each.
 
 ---
 

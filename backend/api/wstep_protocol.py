@@ -420,6 +420,10 @@ def issue_kerberos():
             "isn't installed (pip install pyspnego[kerberos])"
         )
         return Response('Kerberos binding not configured', status=503)
+    refusal = negotiate_auth.fips_refusal()
+    if refusal:
+        logger.warning("Kerberos/SPNEGO CES request rejected: %s", refusal)
+        return Response(negotiate_auth.FIPS_REFUSED_BODY, status=503)
     if not negotiate_auth.is_configured():
         logger.warning("Kerberos/SPNEGO CES request rejected: Kerberos not enabled/configured")
         return Response('Kerberos binding not configured', status=503)

@@ -25,7 +25,8 @@ from flask import current_app
 import fips_mode
 from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, DeployTarget,
                     DnsProvider, AcmeClientOrder, HsmKey, HsmProvider, MicrosoftCA,
-                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User, db)
+                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User,
+                    WindowsEnrollmentProfile, db)
 from security import encryption
 from security.encryption import decrypt_text
 from services.backup import container
@@ -566,6 +567,26 @@ def _msca_kerberos_outside_fips():
         if uses:
             found.append(_named(m.name, m.id, ' and '.join(uses)))
     # Judged on the library loaded here, as the sign-in judges it
+    return found if found and fips_crypto_problem() else []
+
+
+@detector('kerberos.acceptor_outside_fips', BLOCKER,
+          'Windows enrollment profiles served over Kerberos (XCEP and WSTEP) on a Kerberos library '
+          'that does its own cryptography, outside the FIPS module: the Kerberos binding answers '
+          '503 in FIPS mode',
+          'Enroll these clients over the UsernamePassword or Certificate binding, or run UCM from '
+          'the package on a system whose Kerberos library is built on the system OpenSSL (RHEL); '
+          'the Kerberos library of the Docker image is not.')
+def _kerberos_acceptor_outside_fips():
+    from services.kerberos import negotiate_auth
+    from services.msca.kerberos import fips_crypto_problem
+    # Without the library or with the switch off the binding serves nobody already
+    if not negotiate_auth.is_library_available() or not negotiate_auth.is_enabled():
+        return []
+    rows = (WindowsEnrollmentProfile.query
+            .filter(WindowsEnrollmentProfile.keytab.isnot(None), WindowsEnrollmentProfile.enabled.is_(True))
+            .order_by(WindowsEnrollmentProfile.id).all())
+    found = [_named(p.name, p.id, p.realm or 'no realm') for p in rows]
     return found if found and fips_crypto_problem() else []
 
 
