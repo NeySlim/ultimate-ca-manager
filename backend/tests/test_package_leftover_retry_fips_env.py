@@ -1,10 +1,10 @@
 """archive-leftovers.sh retried after any fault, the left ucm.env being exactly the line the
 new one is (UCM_FIPS_BUILD=1), on another filesystem (see package_leftover_chaos)."""
 from tests.test_package_leftover_archive import LOCAL, exactly_once, named
-from tests.package_leftover_chaos import ChaosSuite, converged, while_failing
+from tests.package_leftover_chaos import ConvergeSuite, converged, while_failing
 
 
-class TestTheLeftConfigurationIsTheFipsLine(ChaosSuite):
+class TestTheLeftConfigurationIsTheFipsLine(ConvergeSuite):
     layout = 'data and config are mount points'
     env = 'fips only'
     # The renames killed right after and the journal-only mv do not depend on ucm.env
