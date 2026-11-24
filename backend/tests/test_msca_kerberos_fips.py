@@ -81,6 +81,46 @@ def test_a_file_that_is_no_shared_object_is_an_error(tmp_path, cut):
         needed_libraries(str(path))
 
 
+# e_phoff of the ELF header; p_offset of the PT_DYNAMIC header (the second one, at 64 + 56)
+@pytest.mark.parametrize('field', [32, 64 + 56 + 8], ids=['e_phoff', 'dynamic-p_offset'])
+def test_an_offset_beyond_any_file_is_a_value_error(tmp_path, field):
+    from utils.elf_needed import needed_libraries
+    image = bytearray(_elf(['libcrypto.so.3']))
+    image[field:field + 8] = b'\xff' * 8
+    path = tmp_path / 'lib.so'
+    path.write_bytes(bytes(image))
+    with pytest.raises(ValueError):
+        needed_libraries(str(path))
+
+
+def test_damaged_headers_give_names_or_a_value_error_never_another_exception(tmp_path):
+    import random
+    from utils.elf_needed import needed_libraries
+    rng = random.Random(20261124)
+    original = _elf(['libkrb5support.so.0', 'libcrypto.so.3'])
+    path = tmp_path / 'lib.so'
+    for _ in range(400):
+        image = bytearray(original)
+        for _ in range(rng.randint(1, 4)):
+            at = rng.randrange(16, 160)
+            image[at:at + 8] = rng.choice([b'\xff' * 8, b'\x00' * 8, rng.randbytes(8)])
+        path.write_bytes(bytes(image[:len(original)]))
+        try:
+            names = needed_libraries(str(path))
+        except ValueError:
+            continue
+        assert isinstance(names, list) and all(isinstance(n, str) for n in names)
+
+
+def test_a_forged_library_is_refused_not_a_crash(loaded):
+    from services.msca import kerberos
+    path = loaded(['libcrypto.so.3'])
+    image = bytearray(open(path, 'rb').read())
+    image[32:40] = b'\xff' * 8
+    open(path, 'wb').write(bytes(image))
+    assert kerberos.fips_crypto_problem().startswith(f'{path} cannot be read')
+
+
 # --- which Kerberos library is loaded ---------------------------------------------------------
 
 @pytest.fixture
