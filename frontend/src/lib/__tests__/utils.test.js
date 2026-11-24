@@ -246,6 +246,19 @@ describe('utils', () => {
       }
       expect(written[0]).toBe('A,B,C,D,E,F,G,H\n"\'=HYPERLINK(""x"")",-3,\'@SUM(A1),\'+1,\'\tcmd,\'-x,a=b,"\'\rcmd"')
     })
+
+    it('also quotes a line break and the full-width signs in front (OWASP CSV Injection)', () => {
+      const data = [{ a: '\n=SUM(A1)', b: '\uff1dSUM(A1)', c: '\uff0b1', d: '\uff0d1', e: '\uff20SUM(A1)' }]
+      const columns = ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, header: key.toUpperCase() }))
+      const written = []
+      vi.stubGlobal('Blob', class { constructor(parts) { written.push(parts.join('')) } })
+      try {
+        exportToCSV(data, columns)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+      expect(written[0]).toBe('A,B,C,D,E\n"\'\n=SUM(A1)",\'\uff1dSUM(A1),\'\uff0b1,\'\uff0d1,\'\uff20SUM(A1)')
+    })
   })
 
   describe('exportToJSON', () => {

@@ -404,7 +404,7 @@ def _mark_applied(engine, names, is_pg: bool):
 # ---------------------------------------------------------------------------
 
 def mark_all_applied():
-    """Mark every current migration file as applied without running them.
+    """Mark every current migration file, and each upgrade step, as applied without running them.
 
     A fresh install calls it through build_fresh_schema, before create_all, so that
     future migrations (added later) are the only ones that run.

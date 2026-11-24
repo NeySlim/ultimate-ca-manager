@@ -1,7 +1,7 @@
 """Cells of a CSV file a spreadsheet opens: a text it would run as a formula is neutralised."""
 
 # OWASP CSV Injection: a cell starting with one of these is read as a formula
-FORMULA_STARTS = ('=', '+', '-', '@', '\t', '\r')
+FORMULA_STARTS = ('=', '+', '-', '@', '\t', '\r', '\n', '\uff1d', '\uff0b', '\uff0d', '\uff20')
 
 
 def csv_cell(value):

@@ -184,7 +184,8 @@ ucm_carry_old_data_paths() {
 }
 
 # The database itself says whether this start upgrades it: a migration of the image missing from
-# its registry, or the serial step left to run again. Read-only; any doubt counts as an upgrade.
+# its registry, or the serial step left to run again (an upgrade step of 300 added since is not
+# counted: it only adds columns and indexes). Read-only; any doubt counts as an upgrade.
 # A database whose -wal or -journal holds data is not opened (reading it would write); a WAL one
 # is read with immutable=1, since a read-only open would create its -wal and -shm files.
 ucm_sqlite_upgrade_possible() {

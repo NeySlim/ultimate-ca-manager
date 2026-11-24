@@ -31,8 +31,10 @@ def recorded(name):
 
 
 # The steps of 3.0-rc1, the first release with migration 300; no release before step rows
-# recorded any. A 3.0 database whose registry names no step ran these, never a later one.
-UNRECORDED = STEPS[:STEPS.index('170_sso_sign_in_tests') + 1]
+# recorded any. A 3.0 database whose registry names no step ran these, never a later one;
+# 165 changed after rc1 (duplicate types refused, blank names) and runs again (idempotent).
+UNRECORDED = tuple(s for s in STEPS[:STEPS.index('170_sso_sign_in_tests') + 1]
+                   if s != '165_sso_ldap_group_base_dn')
 
 # Every name a 2.254 start leaves in `_migrations` (the migration files of tag v2.254-rc1,
 # 000 to 019 included on PostgreSQL, where they are recorded without running)

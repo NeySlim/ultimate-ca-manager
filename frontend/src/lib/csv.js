@@ -1,5 +1,5 @@
 // A text cell starting with one of these runs as a formula in a spreadsheet (OWASP CSV Injection)
-const FORMULA = /^[=+\-@\t\r]/
+const FORMULA = /^[=+\-@\t\r\n\uff1d\uff0b\uff0d\uff20]/
 
 /**
  * One RFC 4180 cell: a text a spreadsheet would run as a formula gets a leading quote, a number

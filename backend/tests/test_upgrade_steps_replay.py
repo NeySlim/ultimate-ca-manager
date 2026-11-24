@@ -125,6 +125,7 @@ def test_a_rc6_database_runs_the_steps_after_rc1_and_records_every_step(rc6, mon
     assert rc6.upgrade()
     assert ran == [s for s in STEPS if s not in UNRECORDED]
     assert '175_certificate_comment' in ran
+    assert '165_sso_ldap_group_base_dn' in ran  # changed after rc1: runs again
     assert 'comment' in _columns(rc6, 'certificates')
     assert _holds_every_step(rc6)
 
@@ -231,5 +232,6 @@ def test_the_check_of_the_package_scripts_starts_a_database_with_step_rows(diale
 
 def test_the_rc1_steps_are_a_prefix_of_the_steps():
     from migrations._from_2_254 import STEPS, UNRECORDED
-    assert STEPS[:len(UNRECORDED)] == UNRECORDED
+    assert set(UNRECORDED) <= set(STEPS[:STEPS.index('170_sso_sign_in_tests') + 1])
+    assert '165_sso_ldap_group_base_dn' not in UNRECORDED
     assert UNRECORDED[-1] == '170_sso_sign_in_tests' and '175_certificate_comment' not in UNRECORDED

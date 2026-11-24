@@ -9,7 +9,8 @@ import pytest
 from models import DiscoveredCertificate, db
 from utils.csv_cells import csv_cell
 
-FORMULAS = ['=HYPERLINK("http://x.test")', '+1+1', '-2+3', '@SUM(A1)', '\tcmd', '\rcmd']
+FORMULAS = ['=HYPERLINK("http://x.test")', '+1+1', '-2+3', '@SUM(A1)', '\tcmd', '\rcmd', '\n=SUM(A1)',
+            '\uff1dSUM(A1)', '\uff0b1', '\uff0d1', '\uff20SUM(A1)']
 
 
 @pytest.mark.parametrize('value', FORMULAS)
