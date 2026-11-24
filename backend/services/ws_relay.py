@@ -384,9 +384,9 @@ def _engine(app):
 
 
 def _emit_local(room, payload):
-    from websocket.events import SESSION_END_ROOM, cut_session_here, socketio
+    from websocket.events import SESSION_END_ROOM, apply_session_end_here, socketio
     if room == SESSION_END_ROOM:
-        cut_session_here(payload.get('session'))  # a session locked on another node
+        apply_session_end_here(payload)  # sessions ended or moved on another node
         return
     socketio.emit('event', payload, to=room)
 

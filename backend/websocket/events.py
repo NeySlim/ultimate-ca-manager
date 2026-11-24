@@ -22,6 +22,7 @@ from flask import current_app, has_request_context, request, session
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
 
 from auth.password_change_gate import password_change_pending
+from auth.session_epoch import SESSION_KEY as EPOCH_SESSION_KEY
 from auth.twofa_enforcement import ENROLL_SESSION_KEY
 from auth.unified import AuthManager, has_permission
 from config.settings import redis_url as config_redis_url
@@ -95,8 +96,7 @@ def _session_ending(base):
         def _handle_emit(self, message):
             if message.get('event') == SESSION_END_EVENT and message.get('room') == SESSION_END_ROOM:
                 data = message.get('data')
-                data = data[0] if isinstance(data, list) and data else data
-                cut_session_here(data.get('session') if isinstance(data, dict) else None)
+                apply_session_end_here(data[0] if isinstance(data, list) and data else data)
                 return
             super()._handle_emit(message)
     return SessionEndingManager
@@ -394,6 +394,9 @@ def handle_connect(auth=None):
         'connected_at': utc_now(),
         'auth_method': 'session',
         'session': _handshake_session_key(),
+        # What an account's or a restore's end of sessions compares (end_account_sockets)
+        'session_version': _int_or_zero(session.get('session_version')),
+        'epoch': _int_or_zero(session.get(EPOCH_SESSION_KEY)),
         'validated_at': _monotonic(),
         'ops': deque(maxlen=SUBSCRIPTION_OPS_LIMIT),
     }
@@ -401,20 +404,92 @@ def handle_connect(auth=None):
     return True
 
 
-def cut_session_here(key) -> int:
-    """Close this process's sockets of the session ``key`` names; the others are left open."""
-    if not isinstance(key, str) or not key:
-        return 0
-    cut = [sid for sid, state in list(connected_clients.items()) if state.get('session') == key]
-    for sid in cut:
+def _int_or_zero(value) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def _close_here(sids) -> int:
+    for sid in sids:
         connected_clients.pop(sid, None)
         try:
             socketio.server.disconnect(sid, namespace='/', ignore_queue=True)
         except Exception as exc:  # noqa: BLE001  # the local state is already gone
             logger.warning("Could not close WebSocket client: %s", exc)
+    return len(sids)
+
+
+def _cut_where(predicate, what) -> int:
+    cut = _close_here([sid for sid, state in list(connected_clients.items()) if predicate(state)])
     if cut:
-        logger.info("WebSocket: %d socket(s) of an ended session closed", len(cut))
-    return len(cut)
+        logger.info("WebSocket: %d socket(s) of %s closed", cut, what)
+    return cut
+
+
+def cut_session_here(key) -> int:
+    """Close this process's sockets of the session ``key`` names; the others are left open."""
+    if not isinstance(key, str) or not key:
+        return 0
+    return _cut_where(lambda state: state.get('session') == key, 'an ended session')
+
+
+def cut_account_here(user_id, below=None, spare=None) -> int:
+    """Close this process's sockets of account ``user_id`` opened under a session version
+    lower than ``below`` (every one when None), but the one of session key ``spare``."""
+    if not isinstance(user_id, int) or isinstance(user_id, bool):
+        return 0
+    if below is not None and (not isinstance(below, int) or isinstance(below, bool)):
+        return 0
+    return _cut_where(lambda state: (state.get('user_id') == user_id
+                                     and (below is None or state.get('session_version', 0) < below)
+                                     and (spare is None or state.get('session') != spare)),
+                      'an account whose sessions ended')
+
+
+def cut_before_epoch_here(epoch) -> int:
+    """Close this process's sockets opened before the restore that set ``epoch``."""
+    if not isinstance(epoch, int) or isinstance(epoch, bool):
+        return 0
+    return _cut_where(lambda state: state.get('epoch', 0) < epoch, 'sessions a restore ended')
+
+
+def move_session_here(key, new_key, version) -> int:
+    """This process's sockets of session ``key`` now name ``new_key``, where it moved, and its
+    ``version``: a later end of the moved session closes them."""
+    if not (isinstance(key, str) and key and isinstance(new_key, str) and new_key):
+        return 0
+    moved = 0
+    for state in list(connected_clients.values()):
+        if state.get('session') == key:
+            state['session'] = new_key
+            state['session_version'] = _int_or_zero(version)
+            moved += 1
+    return moved
+
+
+def apply_session_end_here(data) -> int:
+    """A session end told by any process, applied to this one's sockets."""
+    if not isinstance(data, dict):
+        return 0
+    if 'moved' in data:
+        return move_session_here(data.get('moved'), data.get('to'), data.get('version'))
+    if 'user' in data:
+        return cut_account_here(data.get('user'), data.get('below'), data.get('spare'))
+    if 'epoch_below' in data:
+        return cut_before_epoch_here(data.get('epoch_below'))
+    return cut_session_here(data.get('session'))
+
+
+def _tell_other_processes(payload):
+    """Through the transport events take (database relay or Redis queue); never raises."""
+    publisher = _relay_publisher
+    try:
+        if publisher is not None:
+            publisher.publish(SESSION_END_ROOM, {'type': SESSION_END_EVENT, **payload})
+        elif _queue_in_use:
+            # The queue's listener on each host applies it instead of emitting (_session_ending)
+            socketio.emit(SESSION_END_EVENT, payload, to=SESSION_END_ROOM)
+    except Exception as exc:  # noqa: BLE001  # the revalidation still closes them later
+        logger.warning("WebSocket session end not told to the other processes: %s", exc)
 
 
 def end_session_sockets(session_id) -> int:
@@ -424,16 +499,32 @@ def end_session_sockets(session_id) -> int:
     if key is None:
         return 0
     cut = cut_session_here(key)
-    publisher = _relay_publisher
-    try:
-        if publisher is not None:
-            publisher.publish(SESSION_END_ROOM, {'type': SESSION_END_EVENT, 'session': key})
-        elif _queue_in_use:
-            # The queue's listener on each host cuts instead of emitting (_session_ending)
-            socketio.emit(SESSION_END_EVENT, {'session': key}, to=SESSION_END_ROOM)
-    except Exception as exc:  # noqa: BLE001  # the revalidation still closes them later
-        logger.warning("WebSocket session end not told to the other processes: %s", exc)
+    _tell_other_processes({'session': key})
     return cut
+
+
+def end_account_sockets(user_id, below=None, spare_session_id=None) -> int:
+    """Close, on every process, the sockets of ``user_id``'s sessions older than version
+    ``below`` (all of them when None), but those of ``spare_session_id``."""
+    spare = session_key(spare_session_id)
+    cut = cut_account_here(user_id, below, spare)
+    _tell_other_processes({'user': user_id, 'below': below, 'spare': spare})
+    return cut
+
+
+def end_sockets_before_epoch(epoch) -> int:
+    cut = cut_before_epoch_here(epoch)
+    _tell_other_processes({'epoch_below': epoch})
+    return cut
+
+
+def move_session_sockets(session_id, new_session_id, version) -> int:
+    key, new_key = session_key(session_id), session_key(new_session_id)
+    if key is None or new_key is None or key == new_key:
+        return 0
+    moved = move_session_here(key, new_key, version)
+    _tell_other_processes({'moved': key, 'to': new_key, 'version': version})
+    return moved
 
 
 @socketio.on('disconnect')

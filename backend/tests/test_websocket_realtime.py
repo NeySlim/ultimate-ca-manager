@@ -104,6 +104,15 @@ def _rooms(ws):
     return set(socketio.server.rooms(sid)) - {sid}
 
 
+def _deactivate_unseen(app, user_id):
+    """Deactivated by plain SQL, which no flush sees (a deactivation through the ORM cuts the
+    sockets at its commit): the revalidation alone closes the socket."""
+    with app.app_context():
+        db.session.execute(db.update(User).where(User.id == user_id).values(active=False))
+        db.session.commit()
+        db.session.remove()
+
+
 def _named(received, name):
     return [msg['args'][0] for msg in received if msg['name'] == name]
 
@@ -267,9 +276,7 @@ class TestRevalidation:
 
     def test_disabled_user_is_cut(self, app, reader, revalidate_now):
         ws, user_id = reader
-        with app.app_context():
-            db.session.get(User, user_id).active = False
-            db.session.commit()
+        _deactivate_unseen(app, user_id)
         ws.emit('subscribe', {'rooms': [f'user:{user_id}']})
         assert not ws.is_connected()
 
@@ -765,9 +772,7 @@ class TestStatus:
         base = events.get_connected_clients_count()
         with _socket(app, client) as ws:
             assert events.get_connected_clients_count() == base + 1
-            with app.app_context():
-                db.session.get(User, user_id).active = False
-                db.session.commit()
+            _deactivate_unseen(app, user_id)
             ws.emit('ping')
             assert not ws.is_connected()
             assert events.get_connected_clients_count() == base
