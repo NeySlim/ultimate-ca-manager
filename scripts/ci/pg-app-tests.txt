@@ -35,6 +35,7 @@ tests/test_websocket_session_lock.py
 tests/test_sign_out_follows_renewal.py
 tests/test_renewal_failure_after_commit.py
 tests/test_session_end_cuts_sockets.py
+tests/test_websocket_periodic_revalidation.py
 tests/test_dashboard*.py
 tests/test_protocol_approval_*.py
 tests/test_approval_decision_rights.py

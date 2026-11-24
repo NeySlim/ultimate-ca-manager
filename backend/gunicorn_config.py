@@ -339,6 +339,8 @@ def worker_exit(server, worker):
     stop_reader()
     from services.backup.restore.invalidate import stop_epoch_watcher
     stop_epoch_watcher()
+    from websocket.events import stop_revalidator
+    stop_revalidator()
 
 def post_worker_init(worker):
     """Post-worker initialization:
@@ -423,6 +425,15 @@ def post_worker_init(worker):
     except Exception as e:
         import logging
         logging.getLogger('ucm.backup').error("Session epoch cache watcher not started: %s", e)
+
+    # This worker's sockets checked on its own timer: one that only listens never asks
+    try:
+        from websocket.events import start_revalidator
+        from wsgi import app as flask_app
+        start_revalidator(flask_app)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.websocket').error("WebSocket revalidation timer not started: %s", e)
 
     # Without Redis: this worker emits to its clients the events of the scheduler process,
     # and in HA those of the other workers and nodes, to which it also publishes its own
