@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { APIRequestContext, APIResponse } from '@playwright/test'
 import { strongPassword } from './password'
 
@@ -80,6 +81,42 @@ const VERSION = readFileSync(new URL('../../../VERSION', import.meta.url), 'utf8
 export async function dismissSupportCard(api: Api) {
   const prefs = (await api.get('/account/preferences')) || {}
   if (prefs.kofi_seen_version !== VERSION) await api.put('/account/preferences', { ...prefs, kofi_seen_version: VERSION })
+}
+
+/** The directory of this run's shared seeds (global-setup sets it, the workers inherit it). */
+export const SEED_DIR_ENV = 'UCM_E2E_SEED_DIR'
+
+/**
+ * `make` run once per run of the suite, by whichever worker asks first; the others wait for its
+ * JSON result. A seed per test made the shared base, and the restore that replays it, grow without end.
+ */
+export async function seedOnce<T>(name: string, make: () => Promise<T>, waitMs = 120_000): Promise<T> {
+  const dir = process.env[SEED_DIR_ENV]
+  if (!dir) return make()
+  const done = join(dir, `${name}.json`)
+  const lock = join(dir, `${name}.lock`)
+  const until = Date.now() + waitMs
+  for (;;) {
+    try {
+      return JSON.parse(readFileSync(done, 'utf8'))
+    } catch { /* not made yet */ }
+    try {
+      mkdirSync(lock)
+    } catch {
+      if (Date.now() > until) throw new Error(`seed ${name}: another worker is still making it`)
+      await new Promise((r) => setTimeout(r, 200))
+      continue
+    }
+    // Made under the lock, published whole; a failed make leaves the lock to the next worker
+    try {
+      const made = await make()
+      writeFileSync(`${done}.tmp`, JSON.stringify(made ?? null))
+      renameSync(`${done}.tmp`, done)
+      return made
+    } finally {
+      rmSync(lock, { recursive: true, force: true })
+    }
+  }
 }
 
 /** A short unique suffix: every test names its own objects. */

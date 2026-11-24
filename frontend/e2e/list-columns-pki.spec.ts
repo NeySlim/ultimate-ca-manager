@@ -1,4 +1,4 @@
-import { test, expect, createCA, issueCert, uid } from './support/fixtures'
+import { test, expect, createCA, issueCert, uid, seedOnce } from './support/fixtures'
 
 // The PKI lists measured where jsdom cannot: certificates, authorities, CSRs (pending and
 // signed), templates, trust store, user certificates, SSH CAs and SSH certificates, at 1000, 1280 and 1600 px dock
@@ -21,8 +21,11 @@ const LISTS: List[] = [
   { name: 'ssh-certificates', url: '/ssh/certificates', region: '#module-scroll', absorber: 'Principals', keep: ['Expiry'] },
 ]
 
-// One of each, with the long texts the review saw cut: a long issuer, a long subject, a long usage
-async function seed(api) {
+// One of each, with the long texts the review saw cut: a long issuer, a long subject, a long usage;
+// made once for every test of the file, which only read them
+const seed = (api) => seedOnce('list-columns-pki', () => make(api))
+
+async function make(api) {
   const ca = await createCA(api, { commonName: `Regional Issuing Authority for the West ${uid('ca')}` })
   await issueCert(api, ca.id, { cn: `${uid('a-long-service-name')}.internal.example.com` })
   const pending = await api.post('/csrs', { cn: `${uid('csr-long-subject-name')}.internal.example.com`, key_type: 'RSA 2048' })
