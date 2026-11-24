@@ -223,3 +223,19 @@ def test_no_script_sent_reads_certutil_output_through_powershell(channel, answer
     verbs = {v for s in answer.scripts for v in re.findall(r'certutil [^;]*?(-ping|-crl|-revoke|-view|-resubmit|-deny)', s)}
     assert verbs == {'-ping', '-crl', '-revoke', '-view', '-resubmit', '-deny'}
     assert [c for s in answer.scripts for c in captured_certutil(s)] == []
+
+
+def test_a_hostile_clixml_stream_is_read_in_linear_time():
+    import time
+    from services.msca.admin_channel import _clixml_errors
+    hostile = '<S S="Error">x' * 100_000  # 1.4 MB of records never closed
+    started = time.monotonic()
+    assert _clixml_errors(hostile) == ''
+    assert time.monotonic() - started < 2
+
+
+def test_a_lone_surrogate_escape_becomes_a_replacement_character():
+    from services.msca.admin_channel import _clixml_errors
+    text = _clixml_errors('<S S="Error">bad _xD800_ char_x000D__x000A_</S>')
+    assert text == 'bad � char'
+    text.encode('utf-8')

@@ -130,6 +130,10 @@ def _loaded_k5crypto():
         return None, _Transient(f'{_PROC_MAPS} cannot be read')
     real = {os.path.realpath(p): p for p in mapped}
     if os.path.realpath(extension) not in real:
+        # replaced on disk since it was loaded: the next call judges again
+        if any(p.endswith(' (deleted)') and os.path.realpath(p[:-len(' (deleted)')]) == os.path.realpath(extension)
+               for p in mapped):
+            return None, _Transient(f'the gssapi extension {extension} was replaced on disk')
         return None, f'the gssapi extension {extension} is not loaded'
     path = real[os.path.realpath(extension)]
     for stem in ('libgssapi_krb5', 'libk5crypto'):

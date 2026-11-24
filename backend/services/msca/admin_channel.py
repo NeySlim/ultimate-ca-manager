@@ -58,14 +58,20 @@ def _decode_stderr(data):
         return data.decode('cp437')
 
 
-_CLIXML_ERROR = re.compile(r'<S S="Error">(.*?)</S>', re.S)
+# XML escapes every '<' of a text node: [^<]* keeps the match linear on a hostile stream
+_CLIXML_ERROR = re.compile(r'<S S="Error">([^<]*)</S>')
 _CLIXML_CHAR = re.compile(r'_x([0-9A-Fa-f]{4})_')
+
+
+def _clixml_char(match):
+    code = int(match.group(1), 16)
+    return '\ufffd' if 0xD800 <= code <= 0xDFFF else chr(code)  # a lone surrogate encodes nowhere
 
 
 def _clixml_errors(text):
     """The lines of the error records in PowerShell's CLIXML stream: a parse error or an
     exception is only there. XML entities first, then PowerShell's ``_xHHHH_`` escapes."""
-    lines = (_CLIXML_CHAR.sub(lambda m: chr(int(m.group(1), 16)), html.unescape(raw))
+    lines = (_CLIXML_CHAR.sub(_clixml_char, html.unescape(raw))
              for raw in _CLIXML_ERROR.findall(text))
     return ''.join(lines).replace('\r\n', '\n').strip()
 

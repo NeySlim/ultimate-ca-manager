@@ -383,3 +383,14 @@ def test_without_gssapi_nothing_is_imported_to_judge_the_library(monkeypatch):
     from services.msca import kerberos
     monkeypatch.setitem(sys.modules, 'gssapi', None)
     assert kerberos.fips_crypto_problem() == kerberos.MISSING_LIBRARY
+
+
+def test_an_extension_replaced_on_disk_is_judged_again(loaded):
+    """A venv replaced before the first Kerberos use maps the extension '(deleted)': not a kept refusal."""
+    from services.msca import kerberos
+    loaded(['libcrypto.so.3'])
+    lines = open(kerberos._PROC_MAPS).read()
+    open(kerberos._PROC_MAPS, 'w').write(lines.replace(loaded.extension, loaded.extension + ' (deleted)'))
+    assert 'replaced on disk' in kerberos.fips_crypto_problem()
+    open(kerberos._PROC_MAPS, 'w').write(lines)
+    assert kerberos.fips_crypto_problem() is None
