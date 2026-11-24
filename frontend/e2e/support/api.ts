@@ -1,8 +1,9 @@
 import { createHmac } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { APIRequestContext, APIResponse } from '@playwright/test'
 import { strongPassword } from './password'
+import { SEED_WAIT_MS, TEST_TIMEOUT_MS } from './timeouts'
 
 export const ADMIN_USER = 'admin'
 export const ADMIN_PASSWORD = process.env.UCM_E2E_ADMIN_PASSWORD || ''
@@ -87,38 +88,60 @@ export async function dismissSupportCard(api: Api) {
   if (prefs.kofi_seen_version !== VERSION) await api.put('/account/preferences', { ...prefs, kofi_seen_version: VERSION })
 }
 
-/** The directory of this run's shared seeds (global-setup sets it, the workers inherit it). */
+/** The directory of this run's shared seeds (global-setup makes it, global-teardown removes it). */
 export const SEED_DIR_ENV = 'UCM_E2E_SEED_DIR'
+export const SEED_DIR_PREFIX = 'ucm-e2e-seed-'
+
+/** The file operations of seedOnce, replaceable by a test that plays another worker. */
+export const seedFs = { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync }
+
+function readSeed<T>(done: string): { value: T } | undefined {
+  try {
+    return { value: JSON.parse(seedFs.readFileSync(done, 'utf8') as string) }
+  } catch { return undefined }
+}
 
 /**
  * `make` run once per run of the suite, by whichever worker asks first; the others wait for its
  * JSON result. A seed per test made the shared base, and the restore that replays it, grow without end.
  */
-export async function seedOnce<T>(name: string, make: () => Promise<T>, waitMs = 120_000): Promise<T> {
+export async function seedOnce<T>(name: string, make: () => Promise<T>,
+  { waitMs = SEED_WAIT_MS, staleMs = TEST_TIMEOUT_MS } = {}): Promise<T> {
   const dir = process.env[SEED_DIR_ENV]
   if (!dir) return make()
   const done = join(dir, `${name}.json`)
   const lock = join(dir, `${name}.lock`)
   const until = Date.now() + waitMs
   for (;;) {
+    const ready = readSeed<T>(done)
+    if (ready) return ready.value
     try {
-      return JSON.parse(readFileSync(done, 'utf8'))
-    } catch { /* not made yet */ }
-    try {
-      mkdirSync(lock)
+      seedFs.mkdirSync(lock)
     } catch {
+      // Older than a test's limit: its maker was stopped with its test, the lock is taken back
+      let age = 0
+      try { age = Date.now() - seedFs.statSync(lock).mtimeMs } catch { continue }
+      if (age > staleMs) {
+        const stale = `${lock}.stale-${process.pid}-${Date.now()}`
+        try { seedFs.renameSync(lock, stale) } catch { continue }
+        seedFs.rmSync(stale, { recursive: true, force: true })
+        continue
+      }
       if (Date.now() > until) throw new Error(`seed ${name}: another worker is still making it`)
       await new Promise((r) => setTimeout(r, 200))
       continue
     }
     // Made under the lock, published whole; a failed make leaves the lock to the next worker
     try {
-      const made = await make()
-      writeFileSync(`${done}.tmp`, JSON.stringify(made ?? null))
-      renameSync(`${done}.tmp`, done)
-      return made
+      // The worker that held the lock may have published it since it was read above
+      const made = readSeed<T>(done)
+      if (made) return made.value
+      const value = await make()
+      seedFs.writeFileSync(`${done}.tmp`, JSON.stringify(value ?? null))
+      seedFs.renameSync(`${done}.tmp`, done)
+      return value
     } finally {
-      rmSync(lock, { recursive: true, force: true })
+      seedFs.rmSync(lock, { recursive: true, force: true })
     }
   }
 }
