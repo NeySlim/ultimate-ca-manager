@@ -325,9 +325,9 @@ class TestBeforeTheUpgrade:
         assert report['errors'] == []
 
     def test_an_upgraded_database_runs_every_check(self, instance_db, monkeypatch, capsys):
-        from migration_runner import _list_migration_names
+        from migration_runner import fresh_registry_names
         engine, config = instance_db
-        _registry(engine, _list_migration_names())
+        _registry(engine, fresh_registry_names())
         code, out = self._run(monkeypatch, capsys, config, '--json')
         report = json.loads(out)
         assert code == 0, out
