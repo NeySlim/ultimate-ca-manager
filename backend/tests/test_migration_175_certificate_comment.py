@@ -17,9 +17,8 @@ def _migration():
     return importlib.import_module('migrations._from_2_254.175_certificate_comment')
 
 
-def test_the_step_is_the_last_of_the_upgrade():
+def test_the_step_follows_174_in_the_upgrade():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == '175_certificate_comment'
     assert STEPS.index('175_certificate_comment') > STEPS.index('174_windows_profile_renewal_cas')
 
 

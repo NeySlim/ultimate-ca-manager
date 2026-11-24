@@ -56,6 +56,21 @@ def _revocation_key(holder):
     return reason_rank(holder.revoke_reason), holder.revoked_at or datetime.max
 
 
+def _archived_publication(rs_data):
+    """``published`` as the archive says it: an archive older than upgrade step 176, or a value
+    that is not a boolean, says nothing (NULL, unknown)."""
+    value = rs_data.get('published')
+    return value if isinstance(value, bool) else None
+
+
+def _merged_publication(here, rs_data):
+    """Published if either side says so, unknown if either does not know, else local."""
+    archived = _archived_publication(rs_data)
+    if here is True or archived is True:
+        return True
+    return None if here is None or archived is None else False
+
+
 def _kept_revocation(service, here):
     """In a merge, the revocation a certificate or CA row holds here, final or suspension, which
     only a graver archive replaces (lifting a hold is an act of its own); None otherwise.
@@ -1148,6 +1163,7 @@ class RestoreCoreMixin:
                 existing.certificate_id = certificate_id
                 # An archive older than the column says nothing of the key
                 existing.public_key_sha256 = rs_data.get('public_key_sha256') or existing.public_key_sha256
+                existing.published = _merged_publication(existing.published, rs_data)
                 plan.place('revoked_serials', rs_data, existing)
             else:
                 existing = RevokedSerial(
@@ -1159,6 +1175,7 @@ class RestoreCoreMixin:
                     valid_to=valid_to,
                     certificate_id=certificate_id,
                     public_key_sha256=rs_data.get('public_key_sha256'),
+                    published=_archived_publication(rs_data),
                 )
                 db.session.add(existing)
                 plan.place('revoked_serials', rs_data, existing)

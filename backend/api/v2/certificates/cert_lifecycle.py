@@ -467,6 +467,54 @@ def unhold_certificate(cert_id):
         return error_response('Failed to remove certificate hold', 500)
 
 
+@bp.route('/api/v2/certificates/<int:cert_id>/lift-local-revocation', methods=['POST'])
+@require_auth(['admin:system'])
+def lift_local_revocation(cert_id):
+    """Lift a revocation no CRL or OCSP answer ever carried (issue #450): every copy of the
+    certificate valid again, its serial's records deleted. Administrators only, confirmed."""
+    from services.cert.local_revocation import LiftRefused, lift_local_revocation as lift
+
+    cert = db.session.get(Certificate, cert_id)
+    if not cert:
+        return error_response('Certificate not found', 404)
+    body = request.get_json(silent=True) if request.get_data(cache=True) else {}
+    if not isinstance(body, dict):
+        return error_response('Request body must be a JSON object', 400)
+    try:
+        confirmed = json_boolean(body, 'confirm', False)
+        acknowledged = json_boolean(body, 'acknowledge_unknown_publication', False)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    if not confirmed:
+        return error_response('Lifting a local revocation must be confirmed (confirm: true)', 400)
+
+    try:
+        rows = lift(cert, acknowledge_unknown=acknowledged)
+        lifted = [(row.id, row.descr or row.refid) for row in rows]
+        db.session.commit()
+    except LiftRefused as e:
+        db.session.rollback()
+        return error_response(e.message, e.status)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to lift the local revocation of certificate {cert_id}: {e}", exc_info=True)
+        return error_response('Failed to lift the local revocation', 500)
+
+    for row_id, name in lifted:
+        AuditService.log_action(
+            action='certificate_local_revocation_lifted',
+            resource_type='certificate',
+            resource_id=str(row_id),
+            resource_name=name,
+            details=('Local revocation lifted (its CA publishes no CRL or OCSP answer in UCM); '
+                     + ('publication unknown, risk acknowledged' if acknowledged else 'never published')),
+            success=True,
+        )
+    from .cert_get import certificate_detail
+    return success_response(data=certificate_detail(db.session.get(Certificate, cert_id)),
+                            message='Local revocation lifted')
+
+
 def _unhold_data(cert, partner):
     data = cert.to_dict()
     if partner is not None:

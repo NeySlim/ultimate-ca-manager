@@ -887,6 +887,8 @@ def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=No
     row.valid_to = old_valid_to or now + _SUPERSEDED_FALLBACK
     row.certificate_id = cert_id
     row.public_key_sha256 = old_digest
+    from services.cert.local_revocation import note_publication
+    note_publication(row, ca, fresh)
 
 
 def _record_scts(cert_id, scts) -> None:

@@ -197,6 +197,7 @@ class ExportCoreMixin:
             'valid_to': rs.valid_to.isoformat() if rs.valid_to else None,
             'certificate_id': rs.certificate_id,
             'public_key_sha256': rs.public_key_sha256,
+            'published': rs.published,
         }
 
     def _export_certificates(self, include: bool) -> List[Dict[str, Any]]:

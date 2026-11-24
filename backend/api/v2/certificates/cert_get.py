@@ -36,6 +36,10 @@ def certificate_detail(cert):
     from services.cert.related_pair import unhold_partner
     partner = unhold_partner(cert)
     data['related_on_hold_id'] = partner.id if partner is not None else None
+    # Whether a revocation reaches relying parties, and what an administrator may lift (#450)
+    from services.cert.local_revocation import issuer_publishes, local_lift_state
+    data['revocation_published'] = issuer_publishes(cert)
+    data['local_revocation_lift'] = local_lift_state(cert)
 
     # Parse X.509 extensions from PEM
     from utils.cert_extensions import parse_certificate_extensions

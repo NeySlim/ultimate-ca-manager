@@ -209,6 +209,8 @@ def _record_replaced_serial(replaced):
     row.certificate_id = replaced.id
     # The row now holds the new key: the digest comes from the replaced certificate
     row.public_key_sha256 = certificate_key_sha256(base64.b64encode(replaced.pem))
+    from services.cert.local_revocation import note_publication
+    note_publication(row, ca, fresh)
     commit_or_rollback(logger, f"Revocation record of serial {replaced.serial} not saved")
 
 
