@@ -71,7 +71,7 @@ export default {
       '启用 WinRM 管理通道，可将吊销传播到 CA 并在 UCM 中管理待处理请求。',
     ],
     warnings: [
-      'Kerberos 要求机器已加入域或已配置 keytab：在 Docker 中不可用。',
+      'Kerberos 要求机器已加入域或已配置 keytab。Docker 镜像已包含它，但在 FIPS 模式下会在其中被拒绝（其 Kerberos 库在模块之外自行实现加密）；在 RHEL 上通过软件包安装时，FIPS 模式下允许使用。',
       'EOBO 需要在 AD CS 服务器上配置注册代理证书。',
       '没有 WinRM 管理通道时，吊销 AD CS 证书仅在 UCM 中标记为已吊销：Windows CA 不会收到通知。',
     ],

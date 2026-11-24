@@ -4422,6 +4422,10 @@
           "title": "独自の暗号処理を FIPS モジュール外で行う Kerberos ライブラリ上で Kerberos サインイン (certsrv または WinRM チャネル) を行う Microsoft CA 接続：FIPS モードではサインインが拒否されます",
           "remedy": "これらの接続を証明書または Basic 認証に切り替え、Kerberos の WinRM チャネルをオフにするか、Kerberos ライブラリがシステムの OpenSSL でビルドされたシステム (RHEL) でパッケージから UCM を実行してください。Docker イメージのライブラリはそうではありません。"
         },
+        "kerberos_acceptor_outside_fips": {
+          "title": "FIPS モジュール外で独自の暗号処理を行う Kerberos ライブラリ上で Kerberos (XCEP および WSTEP) により提供される Windows 登録プロファイル：FIPS モードでは Kerberos バインディングが 503 を返します",
+          "remedy": "これらのクライアントを UsernamePassword または Certificate バインディングで登録するか、Kerberos ライブラリがシステムの OpenSSL でビルドされたシステム (RHEL) でパッケージから UCM を実行してください。Docker イメージのライブラリはそうではありません。"
+        },
         "backup_schedule_argon2id": {
           "title": "スケジュールバックアップが Argon2id で書き込まれています：FIPS モードではこのアーカイブを復元できません",
           "remedy": "スケジュールバックアップの KDF を PBKDF2 に設定し、切り替え前に kdf \"pbkdf2\" で手動バックアップを取得してください。"

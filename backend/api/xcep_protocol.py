@@ -170,9 +170,7 @@ def _handle_get_policies(parsed, ad_identity, profile):
             (AUTH_USERNAME_PASSWORD, f'{base}{CES_USERNAME_PASSWORD_PATH}', False),
             (AUTH_CLIENT_CERTIFICATE, f'{base}{CES_CERTIFICATE_PATH}', True),
         ]
-        from services.windows_profiles import kerberos_refusal
-        if (negotiate_auth.is_library_available() and negotiate_auth.is_configured()
-                and kerberos_refusal(profile) is None):
+        if kerberos_binding_offered(profile):
             enrollment_uris.append((AUTH_KERBEROS, f'{base}{CES_KERBEROS_PATH}', False))
         xml_body = build_get_policies_response(
             ca, templates, enrollment_uris=enrollment_uris, message_id=parsed.message_id,
@@ -182,6 +180,13 @@ def _handle_get_policies(parsed, ad_identity, profile):
     except Exception as e:
         logger.error(f"XCEP GetPolicies failed: {e}")
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
+
+
+def kerberos_binding_offered(profile):
+    """Whether the CEP answer lists the Kerberos binding: only where it would serve *profile*."""
+    from services.windows_profiles import kerberos_refusal
+    return bool(negotiate_auth.is_library_available() and negotiate_auth.is_configured()
+                and negotiate_auth.fips_refusal() is None and kerberos_refusal(profile) is None)
 
 
 @bp.route('/ADPolicyProvider_CEP_UsernamePassword/service.svc', methods=['GET', 'POST', 'HEAD'])
@@ -240,6 +245,10 @@ def get_policies_kerberos():
             "isn't installed (pip install pyspnego[kerberos])"
         )
         return Response('Kerberos binding not configured', status=503)
+    refusal = negotiate_auth.fips_refusal()
+    if refusal:
+        logger.warning("Kerberos/SPNEGO CEP request rejected: %s", refusal)
+        return Response(negotiate_auth.FIPS_REFUSED_BODY, status=503)
     if not negotiate_auth.is_configured():
         logger.warning("Kerberos/SPNEGO CEP request rejected: Kerberos not enabled/configured")
         return Response('Kerberos binding not configured', status=503)

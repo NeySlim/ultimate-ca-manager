@@ -87,11 +87,12 @@ def kerberos_refusal(profile=None):
 
 
 def kerberos_binding_reason():
-    """Why the Kerberos binding authenticates nobody (library, switch, SPN, keytab), None when set up."""
+    """Why the Kerberos binding authenticates nobody (library, FIPS mode, switch, SPN, keytab), None
+    when set up."""
     from services.kerberos import negotiate_auth
     if not negotiate_auth.is_library_available():
         return 'the Kerberos library is not installed'
-    return negotiate_auth.not_configured_reason()
+    return negotiate_auth.fips_refusal() or negotiate_auth.not_configured_reason()
 
 
 def served_key_realms():

@@ -114,6 +114,21 @@ def is_library_available():
     return True
 
 
+# The 503 body of both Kerberos endpoints in FIPS mode; the log line names the library
+FIPS_REFUSED_BODY = 'Kerberos binding not available in FIPS mode'
+
+
+def fips_refusal():
+    """In FIPS mode, why the acceptor may not run, else None: the service key decrypts each
+    ticket inside the Kerberos library, which must hand its cryptography to the system OpenSSL."""
+    import fips_mode
+    if not fips_mode.enabled():
+        return None
+    from services.msca import kerberos
+    problem = kerberos.fips_crypto_problem()
+    return f'Kerberos binding not available in FIPS mode: {problem}' if problem else None
+
+
 def _config(key, default=None):
     row = SystemConfig.query.filter_by(key=key).first()
     return row.value if row and row.value is not None else default
@@ -515,6 +530,10 @@ def authenticate_negotiate(auth_header, connection_key):
     reachable in practice, since this acceptor only ever has a Kerberos
     keytab, never an NTLM credential.
     """
+    refusal = fips_refusal()
+    if refusal:
+        return NegotiateResult(status='failed', error=refusal)
+
     import base64
 
     import spnego

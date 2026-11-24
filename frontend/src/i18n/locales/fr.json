@@ -4449,6 +4449,10 @@
           "title": "Connexions à une AC Microsoft qui s’authentifient en Kerberos (certsrv ou canal WinRM) sur une bibliothèque Kerberos qui fait sa propre cryptographie, hors du module FIPS : leur authentification est refusée en mode FIPS",
           "remedy": "Passez ces connexions à l’authentification par certificat ou Basic et désactivez leur canal WinRM Kerberos, ou exécutez UCM depuis le paquet sur un système dont la bibliothèque Kerberos est construite sur l’OpenSSL du système (RHEL) ; celle de l’image Docker ne l’est pas."
         },
+        "kerberos_acceptor_outside_fips": {
+          "title": "Profils d’inscription Windows servis en Kerberos (XCEP et WSTEP) sur une bibliothèque Kerberos qui fait sa propre cryptographie, hors du module FIPS : la liaison Kerberos répond 503 en mode FIPS",
+          "remedy": "Inscrivez ces clients par la liaison UsernamePassword ou Certificate, ou exécutez UCM depuis le paquet sur un système dont la bibliothèque Kerberos est construite sur l’OpenSSL du système (RHEL) ; celle de l’image Docker ne l’est pas."
+        },
         "backup_schedule_argon2id": {
           "title": "Les sauvegardes planifiées sont écrites avec Argon2id : ces archives ne peuvent pas être restaurées en mode FIPS",
           "remedy": "Réglez la KDF des sauvegardes planifiées sur PBKDF2, et faites une sauvegarde manuelle avec kdf \"pbkdf2\" avant la bascule."

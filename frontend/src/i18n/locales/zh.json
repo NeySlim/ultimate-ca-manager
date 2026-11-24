@@ -4422,6 +4422,10 @@
           "title": "通过自行实现加密（在 FIPS 模块之外）的 Kerberos 库以 Kerberos 登录（certsrv 或 WinRM 通道）的 Microsoft CA 连接：FIPS 模式下其登录将被拒绝",
           "remedy": "请将这些连接改为证书或 Basic 认证并关闭其 Kerberos WinRM 通道，或在 Kerberos 库基于系统 OpenSSL 构建的系统（RHEL）上通过软件包运行 UCM；Docker 镜像中的 Kerberos 库并非如此。"
         },
+        "kerberos_acceptor_outside_fips": {
+          "title": "通过自行实现加密（在 FIPS 模块之外）的 Kerberos 库以 Kerberos（XCEP 和 WSTEP）提供服务的 Windows 注册配置文件：FIPS 模式下 Kerberos 绑定返回 503",
+          "remedy": "请改用 UsernamePassword 或 Certificate 绑定为这些客户端注册，或在 Kerberos 库基于系统 OpenSSL 构建的系统（RHEL）上通过软件包运行 UCM；Docker 镜像中的 Kerberos 库并非如此。"
+        },
         "backup_schedule_argon2id": {
           "title": "计划备份使用 Argon2id 写入：此类归档在 FIPS 模式下无法恢复",
           "remedy": "请将计划备份的 KDF 设为 PBKDF2，并在切换前使用 kdf \"pbkdf2\" 手动备份一次。"
