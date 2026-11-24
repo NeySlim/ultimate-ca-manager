@@ -78,18 +78,19 @@ def certificates(app):
         ('Gamma', 'zulu', 'CN=Alpha', D(2027, 1, 1), D(2020, 1, 1), D(2025, 1, 1), 'A', 'EC P-256', 'scep', True),
         ('Éclair', 'Écho', 'CN=Éa', D(2029, 1, 1), D(2022, 1, 1), None, 'd', 'Ed25519', 'acme', False),
     ]
+    comments = ['Kilo', None, 'alpha', 'zulu', 'Écho']    # no comment is stored as NULL (#454)
     ids = []
     with app.app_context():
-        for cn, descr, issuer, valid_to, valid_from, created, serial, algo, source, revoked in rows:
+        for (cn, descr, issuer, valid_to, valid_from, created, serial, algo, source, revoked), comment in zip(rows, comments):
             cert = Certificate(refid=str(uuid.uuid4()), subject=f'CN={tag}', subject_cn=cn, descr=descr,
                                issuer=issuer, valid_to=valid_to, valid_from=valid_from, created_at=created,
                                serial_number=f'{tag}{serial}', key_algo=algo, source=source,
-                               revoked=revoked, crt='Zm9v')
+                               revoked=revoked, crt='Zm9v', comment=comment)
             ids.append(_keep_nulls(cert, 'created_at', 'source'))
         db.session.commit()
     names = [r[0] or r[1] for r in rows]
     values = _by_key(ids, {
-        'subject': names, 'subject_cn': names, 'descr': [r[1] for r in rows],
+        'subject': names, 'subject_cn': names, 'descr': [r[1] for r in rows], 'comment': comments,
         'issuer': [r[2] for r in rows], 'valid_to': [r[3] for r in rows], 'valid_from': [r[4] for r in rows],
         'created_at': [r[5] for r in rows], 'serial_number': [f'{tag}{r[6]}' for r in rows],
         'key_algo': [r[7] for r in rows], 'source': [r[8] or 'manual' for r in rows],
@@ -506,7 +507,7 @@ def windows_profiles(app):
 
 
 ROUTES = {
-    'certificates': ('subject', 'subject_cn', 'descr', 'issuer', 'valid_to', 'valid_from', 'created_at',
+    'certificates': ('subject', 'subject_cn', 'descr', 'comment', 'issuer', 'valid_to', 'valid_from', 'created_at',
                      'serial_number', 'key_algo', 'source', 'revoked'),
     'csrs': ('cn', 'requester', 'created_at', 'key_type', 'signed_at', 'valid_to', 'id'),
     'csrs_history': ('cn', 'requester', 'created_at', 'key_type', 'signed_at', 'valid_to', 'id'),
