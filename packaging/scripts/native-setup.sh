@@ -376,10 +376,12 @@ cmd_venv() {
     local had_kerberos=""
 
     # pyspnego[kerberos] is optional and admin-installed: the venv is recreated on every
-    # upgrade, so it is reinstalled when it was there, or requests-kerberos (2.x, MS CA Kerberos)
+    # upgrade, so it is reinstalled when it was there, or what 2.x used for MS CA Kerberos:
+    # requests-kerberos (certsrv) or pykerberos alone (pywinrm[kerberos], the WinRM channel)
     if [ -x "$venv/bin/pip" ]; then
         "$venv/bin/pip" show gssapi >/dev/null 2>&1 && had_kerberos=1 || true
         "$venv/bin/pip" show requests-kerberos >/dev/null 2>&1 && had_kerberos=1 || true
+        "$venv/bin/pip" show pykerberos >/dev/null 2>&1 && had_kerberos=1 || true
     fi
 
     if fips_requested "$envfile"; then

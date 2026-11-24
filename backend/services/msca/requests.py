@@ -62,7 +62,7 @@ def supersede(req_ids, *, username=None, commit=True, states=('submitted', 'pend
         changed = (MSCARequest.query
                    .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
                            MSCARequest.status.in_(states))
-                   .update({MSCARequest.status: SUPERSEDED,
+                   .update({MSCARequest.status: SUPERSEDED, MSCARequest.disposition_message: None,
                             MSCARequest.error_message: 'CSR signed elsewhere'},
                            synchronize_session=False))
         if changed != 1:
@@ -136,6 +136,7 @@ class MicrosoftCARequestsMixin:
             req.status = 'issued'
             req.issued_at = utc_now()
             req.cert_pem = cert_pem
+            req.disposition_message = None  # the wait is over
             try:
                 db.session.commit()
             except Exception as db_err:
@@ -160,6 +161,7 @@ class MicrosoftCARequestsMixin:
             elif status == 'denied':
                 req.status = 'denied'
                 req.error_message = str(e)[:500]
+                req.disposition_message = None
                 try:
                     db.session.commit()
                 except Exception as db_err:

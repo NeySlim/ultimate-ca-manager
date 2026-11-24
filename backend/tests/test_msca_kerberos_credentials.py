@@ -262,6 +262,41 @@ def test_a_preemptive_sign_in_sends_the_ticket_first(gss, keytabs):
     assert auth.auth_done
 
 
+def _bound(monkeypatch, binding):
+    from services.msca import kerberos
+    monkeypatch.setattr(kerberos, '_channel_bindings', lambda response: binding)
+
+
+def test_a_refused_preemptive_ticket_is_sent_again_once_with_the_channel_binding(gss, keytabs, monkeypatch):
+    """The preemptive ticket leaves before the TLS socket exists, so without binding: a server that
+    requires one (WinRM CbtHardeningLevel=Strict) refuses it and takes the bound one."""
+    _bound(monkeypatch, 'tls-server-end-point')
+    server = _Server((401, 'Negotiate'), (200, TOKEN))
+    auth = _auth(gss, keytabs, preemptive=True, mutual_required=True)
+    assert _session(server, auth).post('https://ca.example/wsman', data=b'x').status_code == 200
+    assert [r.headers['Authorization'].startswith('Negotiate ') for r in server.requests] == [True, True]
+    assert gss.bindings == [None, 'tls-server-end-point']
+    assert auth.auth_done
+
+
+def test_a_bound_ticket_refused_after_the_preemptive_one_is_an_error(gss, keytabs, monkeypatch):
+    from services.msca.kerberos import MSCAKerberosError
+    _bound(monkeypatch, 'tls-server-end-point')
+    server = _Server((401, 'Negotiate'), (401, 'Negotiate'))
+    with pytest.raises(MSCAKerberosError, match='refused the ticket'):
+        _session(server, _auth(gss, keytabs, preemptive=True)).post('https://ca.example/wsman', data=b'x')
+    assert len(server.requests) == 2
+
+
+def test_a_refused_preemptive_ticket_without_binding_to_add_is_an_error(gss, keytabs):
+    """Over HTTP there is no binding: the same ticket again would be refused the same way."""
+    from services.msca.kerberos import MSCAKerberosError
+    server = _Server((401, 'Negotiate'), (200, TOKEN))
+    with pytest.raises(MSCAKerberosError, match='refused the ticket'):
+        _session(server, _auth(gss, keytabs, preemptive=True)).post('https://ca.example/wsman', data=b'x')
+    assert len(server.requests) == 1
+
+
 def test_the_credential_is_acquired_at_the_first_ticket(gss, keytabs):
     auth = _auth(gss, keytabs)
     assert gss.acquired == []

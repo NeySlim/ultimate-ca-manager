@@ -1,0 +1,221 @@
+"""Kerberos to a Microsoft CA in FIPS mode: allowed only on a Kerberos library built on OpenSSL.
+
+FIPS 140-3 keeps the security functions in the validated module: the MIT libk5crypto loaded in
+the process must hand its cryptography to the system OpenSSL (libcrypto among its DT_NEEDED,
+as RHEL builds it). Debian's does its own, so the Docker image refuses Kerberos in FIPS mode,
+on certsrv and on the WinRM channel, with a 400 naming the library. GSSAPI is faked here.
+"""
+import struct
+import sys
+
+import pytest
+
+import fips_mode
+from tests.conftest import get_json
+from tests.msca_kerberos_support import FakeGssapi
+from tests.test_msca_kerberos_failure import _connection, _csr, ca, keytab  # noqa: F401 - fixtures
+from tests.test_msca_kerberos_keytab import _channel_row, _run_ps, kerberos, pywinrm  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+LIBRARY = '/usr/lib/x86_64-linux-gnu/libk5crypto.so.3.1'
+
+
+def _elf(needed, bits=64, endian='<'):
+    """A shared object holding only what the loader reads: one PT_LOAD, a PT_DYNAMIC, DT_NEEDED."""
+    ehsize, phentsize = (64, 56) if bits == 64 else (52, 32)
+    strtab = b'\0'
+    names = []
+    for name in needed:
+        names.append(len(strtab))
+        strtab += name.encode() + b'\0'
+    strtab_off = ehsize + 2 * phentsize
+    dyn_off = strtab_off + len(strtab) + (-(strtab_off + len(strtab)) % 8)
+    entry = endian + ('qQ' if bits == 64 else 'iI')
+    dyn = b''.join(struct.pack(entry, 1, n) for n in names)
+    dyn += struct.pack(entry, 5, 0x1000 + strtab_off) + struct.pack(entry, 10, len(strtab))
+    dyn += struct.pack(entry, 0, 0)
+    total = dyn_off + len(dyn)
+    if bits == 64:
+        phdr = endian + 'IIQQQQQQ'
+        load = struct.pack(phdr, 1, 5, 0, 0x1000, 0x1000, total, total, 0x1000)
+        dynamic = struct.pack(phdr, 2, 6, dyn_off, 0x1000 + dyn_off, 0, len(dyn), len(dyn), 8)
+        header = struct.pack(endian + 'HHIQQQIHHHHHH', 3, 62, 1, 0, ehsize, 0, 0, ehsize, phentsize, 2, 0, 0, 0)
+    else:
+        phdr = endian + 'IIIIIIII'
+        load = struct.pack(phdr, 1, 0, 0x1000, 0x1000, total, total, 5, 0x1000)
+        dynamic = struct.pack(phdr, 2, dyn_off, 0x1000 + dyn_off, 0, len(dyn), len(dyn), 6, 4)
+        header = struct.pack(endian + 'HHIIIIIHHHHHH', 3, 3, 1, 0, ehsize, 0, 0, ehsize, phentsize, 2, 0, 0, 0)
+    ident = b'\x7fELF' + bytes([1 if bits == 32 else 2, 1 if endian == '<' else 2, 1]) + b'\0' * 9
+    image = bytearray(total)
+    image[:ehsize] = ident + header
+    image[ehsize:ehsize + 2 * phentsize] = load + dynamic
+    image[strtab_off:strtab_off + len(strtab)] = strtab
+    image[dyn_off:total] = dyn
+    return bytes(image)
+
+
+@pytest.mark.parametrize('bits, endian', [(64, '<'), (32, '<'), (64, '>'), (32, '>')])
+def test_the_needed_libraries_are_read_from_the_dynamic_section(tmp_path, bits, endian):
+    from utils.elf_needed import needed_libraries
+    path = tmp_path / 'lib.so'
+    path.write_bytes(_elf(['libkrb5support.so.0', 'libcrypto.so.3', 'libc.so.6'], bits, endian))
+    assert needed_libraries(str(path)) == ['libkrb5support.so.0', 'libcrypto.so.3', 'libc.so.6']
+
+
+def test_a_real_extension_names_the_openssl_it_links():
+    import _ssl
+    from utils.elf_needed import needed_libraries
+    if not getattr(_ssl, '__file__', None):
+        pytest.skip('_ssl is built into this interpreter')
+    assert any(name.startswith('libcrypto.so') for name in needed_libraries(_ssl.__file__))
+
+
+@pytest.mark.parametrize('cut', [None, 100], ids=['not-elf', 'truncated'])
+def test_a_file_that_is_no_shared_object_is_an_error(tmp_path, cut):
+    from utils.elf_needed import needed_libraries
+    path = tmp_path / 'lib.so'
+    path.write_bytes(b'not an elf at all, long enough to be read as one ' * 2 if cut is None
+                     else _elf(['libcrypto.so.3'])[:cut])
+    with pytest.raises(ValueError):
+        needed_libraries(str(path))
+
+
+# --- which Kerberos library is loaded ---------------------------------------------------------
+
+@pytest.fixture
+def loaded(monkeypatch, tmp_path):
+    """Maps a fake libk5crypto into a fake /proc/self/maps: ``loaded(needed)`` or ``loaded(None)``."""
+    from services.msca import kerberos
+    monkeypatch.setattr(kerberos, 'gssapi_available', lambda: True)
+    maps = tmp_path / 'maps'
+    monkeypatch.setattr(kerberos, '_PROC_MAPS', str(maps))
+
+    def load(needed, name='libk5crypto.so.3.1'):
+        lines = ['7f00-7f10 r-xp 00000000 08:01 11 /usr/lib/x86_64-linux-gnu/libkrb5.so.3.3']
+        if needed is not None:
+            library = tmp_path / 'lib dir' / name
+            library.parent.mkdir(exist_ok=True)
+            library.write_bytes(_elf(needed))
+            lines.append(f'7f20-7f30 r-xp 00000000 08:01 12 {library}')
+            lines.append(f'7f30-7f40 r--p 00010000 08:01 12 {library}')
+        maps.write_text('\n'.join(lines) + '\n')
+        return str(tmp_path / 'lib dir' / name)
+    return load
+
+
+def test_a_library_on_openssl_is_allowed(loaded):
+    from services.msca.kerberos import fips_crypto_problem
+    loaded(['libkrb5support.so.0', 'libcrypto.so.3', 'libc.so.6'])
+    assert fips_crypto_problem() is None
+
+
+def test_a_library_with_its_own_cryptography_is_named(loaded):
+    from services.msca.kerberos import fips_crypto_problem
+    path = loaded(['libkrb5support.so.0', 'libc.so.6'])
+    assert fips_crypto_problem() == f'{path} does its own cryptography, outside the FIPS module'
+
+
+def test_no_mit_crypto_library_loaded_is_refused(loaded):
+    from services.msca.kerberos import fips_crypto_problem
+    loaded(None)
+    assert 'libk5crypto' in fips_crypto_problem()
+
+
+def test_without_gssapi_the_library_is_missing(monkeypatch):
+    from services.msca import kerberos
+    monkeypatch.setattr(kerberos, 'gssapi_available', lambda: False)
+    assert kerberos.fips_crypto_problem() == kerberos.MISSING_LIBRARY
+
+
+# --- the sign-in refused in FIPS mode -----------------------------------------------------------
+
+PROBLEM = f'{LIBRARY} does its own cryptography, outside the FIPS module'
+
+
+@pytest.fixture
+def outside(monkeypatch):
+    from services.msca import kerberos
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    monkeypatch.setattr(kerberos, 'fips_crypto_problem', lambda: PROBLEM)
+
+
+def _refusal_text(message):
+    assert message.startswith('Kerberos sign-in not available in FIPS mode: '), message
+    assert PROBLEM in message and 'system OpenSSL' in message, message
+
+
+def test_fips_mode_refuses_the_credential_before_any_acquisition(monkeypatch, outside, tmp_path):
+    from services.msca.kerberos import KerberosFipsRefused, initiator_credential
+    gss = FakeGssapi().install(monkeypatch)
+    path = tmp_path / 'svc.keytab'
+    path.write_bytes(b'\x05\x02')
+    with pytest.raises(KerberosFipsRefused) as raised:
+        initiator_credential(1, 'svc@ONE.TEST', str(path))
+    _refusal_text(str(raised.value))
+    assert gss.acquired == []
+
+
+@pytest.mark.parametrize('fips, problem', [(False, PROBLEM), (True, None)])
+def test_outside_fips_mode_or_on_openssl_the_credential_is_acquired(monkeypatch, tmp_path, fips, problem):
+    from services.msca import kerberos
+    gss = FakeGssapi().install(monkeypatch)
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: fips)
+    monkeypatch.setattr(kerberos, 'fips_crypto_problem', lambda: problem)
+    path = tmp_path / 'svc.keytab'
+    path.write_bytes(b'\x05\x02')
+    kerberos.initiator_credential(1, 'svc@ONE.TEST', str(path))
+    assert gss.principals == ['svc@ONE.TEST']
+
+
+def test_signing_through_certsrv_answers_the_fips_400(app, auth_client, ca, keytab, monkeypatch, outside):  # noqa: F811
+    import json
+    from models.msca import MSCARequest
+    gss = FakeGssapi().install(monkeypatch)
+    msca_id = _connection(app, 'krb-fips-sign.test.local', keytab)
+    csr_id = _csr(app, 'krb-fips-sign.test.local')
+    r = auth_client.post(f'/api/v2/microsoft-cas/{msca_id}/sign/{csr_id}',
+                         data=json.dumps({'template': 'WebServer'}), content_type='application/json')
+    assert r.status_code == 400, r.data
+    body = get_json(r)
+    _refusal_text(body['message'])
+    assert body['type'] == fips_mode.PROBLEM_TYPE
+    assert gss.acquired == [] and gss.tokens == [] and ca == []
+    with app.app_context():
+        assert MSCARequest.query.filter_by(msca_id=msca_id, csr_id=csr_id).count() == 0
+
+
+def test_the_winrm_channel_is_refused_before_any_message(pywinrm, kerberos, outside):  # noqa: F811
+    from services.msca.admin_channel import MSCAAdminChannelError
+    with pytest.raises(MSCAAdminChannelError) as raised:
+        _run_ps(_channel_row(kerberos.keytab))
+    _refusal_text(str(raised.value))
+    assert kerberos.acquired == [] and pywinrm.sent == []
+
+
+@pytest.mark.parametrize('problem, advice', [
+    (None, 'use the Kerberos transport'),
+    (PROBLEM, f'Kerberos cannot replace it here ({PROBLEM}): turn off the WinRM channel'),
+])
+def test_the_ntlm_refusal_offers_kerberos_only_where_fips_mode_allows_it(app, monkeypatch, problem, advice):
+    from services.msca import admin_channel, kerberos
+    from services.msca.admin_channel import MicrosoftCAAdminChannelMixin, MSCAAdminChannelError
+    from tests.test_msca_admin_channel import _make_msca_cert
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    monkeypatch.setattr(admin_channel, 'kerberos_transport_available', lambda: True)
+    monkeypatch.setattr(kerberos, 'fips_crypto_problem', lambda: problem)
+    msca_id, _, _ = _make_msca_cert(app, ('outside' if problem else 'onssl') + '-advice.fips.local')
+    with app.app_context():
+        from models import db
+        from models.msca import MicrosoftCA
+        msca = db.session.get(MicrosoftCA, msca_id)
+        msca.winrm_host = 'dc.fips.local'
+        with pytest.raises(MSCAAdminChannelError, match='NTLM is not available in FIPS mode') as exc:
+            MicrosoftCAAdminChannelMixin._build_session(msca)
+    assert advice in str(exc.value)
+
+
+def test_without_gssapi_nothing_is_imported_to_judge_the_library(monkeypatch):
+    from services.msca import kerberos
+    monkeypatch.setitem(sys.modules, 'gssapi', None)
+    assert kerberos.fips_crypto_problem() == kerberos.MISSING_LIBRARY

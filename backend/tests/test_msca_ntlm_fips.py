@@ -55,8 +55,10 @@ def test_saving_an_ntlm_channel_is_refused_and_nothing_changes(app, auth_client,
 ])
 def test_a_stored_ntlm_connection_is_not_opened(app, fips, monkeypatch, kerberos, advice):
     from services.msca import admin_channel
+    from services.msca import kerberos as kerberos_module
     from services.msca.admin_channel import MicrosoftCAAdminChannelMixin, MSCAAdminChannelError
     monkeypatch.setattr(admin_channel, 'kerberos_transport_available', lambda: kerberos)
+    monkeypatch.setattr(kerberos_module, 'fips_crypto_problem', lambda: None)  # a library on OpenSSL
     msca_id, _, _ = _make_msca_cert(app, ('krb' if kerberos else 'nokrb') + '-ntlm.fips.local')
     with app.app_context():
         from models import db

@@ -4416,7 +4416,11 @@
         },
         "msca_winrm_ntlm": {
           "title": "WinRM チャネルが NTLM を使う Microsoft CA 接続：FIPS モードではチャネルが拒否されます",
-          "remedy": "これらの接続の WinRM チャネルをオフにしてください。NTLM を Kerberos に置き換えられるのは、pywinrm[kerberos] とシステムの OpenSSL でビルドされた Kerberos ライブラリ (RHEL) を使うネイティブインストールのみです。Docker イメージはどちらも備えていません。"
+          "remedy": "これらの接続の WinRM チャネルをオフにしてください。NTLM を Kerberos に置き換えられるのは、Kerberos ライブラリがシステムの OpenSSL でビルドされたネイティブインストール (RHEL) のみです。Docker イメージの Kerberos ライブラリは独自の暗号処理を行うため、FIPS モードではそこでも Kerberos が拒否されます。"
+        },
+        "msca_kerberos_outside_fips": {
+          "title": "独自の暗号処理を FIPS モジュール外で行う Kerberos ライブラリ上で Kerberos サインイン (certsrv または WinRM チャネル) を行う Microsoft CA 接続：FIPS モードではサインインが拒否されます",
+          "remedy": "これらの接続を証明書または Basic 認証に切り替え、Kerberos の WinRM チャネルをオフにするか、Kerberos ライブラリがシステムの OpenSSL でビルドされたシステム (RHEL) でパッケージから UCM を実行してください。Docker イメージのライブラリはそうではありません。"
         },
         "backup_schedule_argon2id": {
           "title": "スケジュールバックアップが Argon2id で書き込まれています：FIPS モードではこのアーカイブを復元できません",

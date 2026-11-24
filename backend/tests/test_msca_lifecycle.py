@@ -165,7 +165,7 @@ class TestMscaRenew:
 
         def fake_submit_csr(**kwargs):
             return {'status': 'pending', 'request_id': None, 'ms_request_id': 42,
-                    'message': 'Request pending manager approval'}
+                    'message': 'Pending approval on the CA'}
 
         from services.msca_service import MicrosoftCAService
         monkeypatch.setattr(MicrosoftCAService, 'submit_csr', staticmethod(fake_submit_csr))
@@ -221,7 +221,7 @@ class TestMscaRenew:
 
         def fake_submit_csr(**kwargs):
             return {'status': 'pending', 'request_id': None, 'ms_request_id': 77,
-                    'message': 'Request pending manager approval'}
+                    'message': 'Pending approval on the CA'}
 
         from services.msca_service import MicrosoftCAService
         monkeypatch.setattr(MicrosoftCAService, 'submit_csr', staticmethod(fake_submit_csr))

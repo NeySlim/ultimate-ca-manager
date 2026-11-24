@@ -409,7 +409,8 @@ class MicrosoftCAInventoryMixin:
             MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
             MSCARequest.status == 'pending',
         ).update({MSCARequest.status: 'issued', MSCARequest.cert_id: cert_id,
-                  MSCARequest.issued_at: utc_now()}, synchronize_session=False)
+                  MSCARequest.issued_at: utc_now(), MSCARequest.disposition_message: None},
+                 synchronize_session=False)
         # Committed now: a later completion's rollback in the same run must not undo it
         db.session.commit()
         logger.info(
@@ -438,6 +439,7 @@ class MicrosoftCAInventoryMixin:
             if rid in refused:
                 req.status = 'denied'
                 req.error_message = 'Denied on the CA'
+                req.disposition_message = None
                 count += 1
         return count
 

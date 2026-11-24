@@ -43,6 +43,7 @@ class FakeGssapi:
     def __init__(self):
         self.acquired = []      # (principal, store) per acquisition
         self.tokens = []        # (target, credentials) per token sent
+        self.bindings = []      # channel bindings of each security context
         self.destroyed = []     # memory caches destroyed (krb5.cc_destroy)
         self.acquire_error = None
         self.step_error = None
@@ -61,6 +62,7 @@ class FakeGssapi:
             return FakeCredentials(name, usage, mechs, store)
 
         def context(name=None, creds=None, usage=None, mech=None, flags=None, channel_bindings=None):
+            fake.bindings.append(channel_bindings)
             return FakeContext(fake, name[1], creds, usage, mech, flags, channel_bindings)
 
         module = types.ModuleType('gssapi')

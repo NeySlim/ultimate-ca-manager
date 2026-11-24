@@ -546,8 +546,29 @@ def test_msca_winrm_ntlm(session):
                                 winrm_enabled=enabled, winrm_transport=transport))
     session.flush()
     finding = _assert_found('msca.winrm_ntlm', 1, 'ntlm-ca')
-    # Kerberos is no way out in the Docker image (no pykerberos, Kerberos crypto outside OpenSSL)
+    # Kerberos is no way out in the Docker image: its Kerberos library does its own cryptography
     assert finding['remedy'].startswith('Turn off the WinRM channel')
+
+
+@pytest.mark.parametrize('problem', ['/lib/libk5crypto.so.3 does its own cryptography', None])
+def test_msca_kerberos_outside_fips(session, monkeypatch, problem):
+    from services.msca import kerberos
+    monkeypatch.setattr(kerberos, 'fips_crypto_problem', lambda: problem)
+    for name, auth, transport, enabled in (('krb-certsrv', 'kerberos', 'ntlm', False),
+                                           ('krb-winrm', 'basic', None, True),
+                                           ('krb-both', 'kerberos', 'kerberos', True),
+                                           ('krb-none', 'basic', 'ntlm', True),
+                                           ('krb-off', 'certificate', 'kerberos', False)):
+        session.add(MicrosoftCA(name=name, server='adcs', auth_method=auth,
+                                winrm_enabled=enabled, winrm_transport=transport))
+    session.flush()
+    if problem is None:
+        assert _finding(fips_preflight.run(), 'msca.kerberos_outside_fips') is None
+        return
+    finding = _assert_found('msca.kerberos_outside_fips', 3, 'krb-certsrv', 'krb-winrm', 'krb-both')
+    assert finding['severity'] == 'blocker'
+    assert sorted(e.split(' (#')[0] + ':' + e.split(': ')[1] for e in finding['examples']) == [
+        'krb-both:certsrv and WinRM', 'krb-certsrv:certsrv', 'krb-winrm:WinRM']
 
 
 @pytest.mark.parametrize('kdf, flagged', [('argon2id', True), ('pbkdf2', False)])
