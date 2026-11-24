@@ -46,13 +46,15 @@ def outbound(monkeypatch):
         client.session.get.return_value.text = '<Option Value="E;WebServer">'
         return client
 
-    class HTTPKerberosAuth:
-        def __init__(self, **kwargs):
-            calls.append({'principal': kwargs.get('principal')})
+    class KerberosAuth:  # acquires as it is built: the principal is recorded with the client
+        def __init__(self, credential, **kwargs):
+            credential()
 
+    from services.msca import connection
     monkeypatch.setitem(sys.modules, 'certsrv', SimpleNamespace(Certsrv=factory))
-    monkeypatch.setitem(sys.modules, 'requests_kerberos',
-                        SimpleNamespace(HTTPKerberosAuth=HTTPKerberosAuth, OPTIONAL=1))
+    monkeypatch.setattr(connection, 'KerberosAuth', KerberosAuth)
+    monkeypatch.setattr(connection, 'initiator_credential',
+                        lambda kept, principal, keytab, channel='certsrv': calls.append({'principal': principal}))
     return calls
 
 
@@ -428,7 +430,7 @@ def test_a_moved_server_needs_the_saved_secret_retyped(app, auth_client, method,
     assert _send(auth_client, 'put', f'{BASE}/{row_id}', {'server': 'new.corp.local', **secret}).status_code == 200
 
 
-# --- A Kerberos sign-in that cannot start now: nothing was sent, nothing is recorded ---
+# --- A Kerberos sign-in that fails: the CA read nothing, nothing is recorded ---
 
 def _signing_fails_with(app, monkeypatch, error):
     """A Kerberos connection and a CSR whose submission raises ``error``: (connection id, CSR id)."""
@@ -440,9 +442,6 @@ def _signing_fails_with(app, monkeypatch, error):
         return client
 
     monkeypatch.setitem(sys.modules, 'certsrv', SimpleNamespace(Certsrv=factory))
-    monkeypatch.setitem(sys.modules, 'requests_kerberos',
-                        SimpleNamespace(HTTPKerberosAuth=type('Auth', (), {'__init__': lambda self, **kw: None}),
-                                        OPTIONAL=1))
     row_id = _row(app)
     with app.app_context():
         csr_id = CertificateService.generate_csr(descr='krb-sign', dn={'CN': f'krb-{uuid.uuid4().hex[:8]}.test.local'},
@@ -461,27 +460,13 @@ def test_another_signing_error_keeps_its_failed_request(app, operator_client, mo
             ('failed', 'CA unreachable')]
 
 
-def test_a_busy_kerberos_sign_in_at_signing_is_a_503_without_a_request(app, operator_client, monkeypatch):
+def test_a_failed_kerberos_sign_in_at_signing_is_a_400_without_a_request(app, operator_client, monkeypatch):
     from models.msca import MSCARequest
-    from services.cert_service import CertificateService
-    from services.msca.client_keytab import KerberosBusy
-
-    def factory(**kwargs):
-        client = MagicMock()
-        client.get_cert.side_effect = KerberosBusy('Another Kerberos sign-in is in progress: try again')
-        return client
-
-    monkeypatch.setitem(sys.modules, 'certsrv', SimpleNamespace(Certsrv=factory))
-    monkeypatch.setitem(sys.modules, 'requests_kerberos',
-                        SimpleNamespace(HTTPKerberosAuth=type('Auth', (), {'__init__': lambda self, **kw: None}),
-                                        OPTIONAL=1))
-    row_id = _row(app)
-    with app.app_context():
-        csr_id = CertificateService.generate_csr(descr='krb-busy', dn={'CN': 'krb-busy.test.local'},
-                                                 key_type='2048').id
-        db.session.commit()
+    from services.msca.kerberos import MSCAKerberosError
+    row_id, csr_id = _signing_fails_with(
+        app, monkeypatch, MSCAKerberosError('Kerberos sign-in failed: Preauthentication failed'))
     r = _send(operator_client, 'post', f'{BASE}/{row_id}/sign/{csr_id}', {'template': 'WebServer'})
-    assert r.status_code == 503, r.data
-    assert 'Kerberos' in get_json(r)['message'] and r.headers.get('Retry-After')
+    assert r.status_code == 400, r.data
+    assert get_json(r)['message'] == 'Kerberos sign-in failed: Preauthentication failed'
     with app.app_context():
         assert MSCARequest.query.filter_by(msca_id=row_id).count() == 0

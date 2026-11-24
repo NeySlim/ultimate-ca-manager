@@ -2068,7 +2068,7 @@ export const helpContent = {
         items: [
           { label: 'Client Certificate (mTLS)', text: 'Most secure. Generate a client cert on your MS CA, export as PFX, upload cert and key PEM.' },
           { label: 'Basic Auth', text: 'Username/password over HTTPS. Works without domain join. Enable basic auth in IIS certsrv.' },
-          { label: 'Kerberos', text: 'Requires requests-kerberos package and domain-joined machine or keytab configured.' },
+          { label: 'Kerberos', text: 'Requires pyspnego[kerberos] package and domain-joined machine or keytab configured.' },
         ]
       },
       {

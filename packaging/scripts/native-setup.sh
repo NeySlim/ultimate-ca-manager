@@ -373,13 +373,13 @@ switch_venv() {
 
 cmd_venv() {
     local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs=""
-    local had_requests_kerberos="" had_pyspnego_kerberos=""
+    local had_kerberos=""
 
-    # requests-kerberos and pyspnego[kerberos] are optional and admin-installed:
-    # the venv is recreated on every upgrade, so reinstall whatever was there.
+    # pyspnego[kerberos] is optional and admin-installed: the venv is recreated on every
+    # upgrade, so it is reinstalled when it was there, or requests-kerberos (2.x, MS CA Kerberos)
     if [ -x "$venv/bin/pip" ]; then
-        "$venv/bin/pip" show requests-kerberos >/dev/null 2>&1 && had_requests_kerberos=1 || true
-        "$venv/bin/pip" show gssapi >/dev/null 2>&1 && had_pyspnego_kerberos=1 || true
+        "$venv/bin/pip" show gssapi >/dev/null 2>&1 && had_kerberos=1 || true
+        "$venv/bin/pip" show requests-kerberos >/dev/null 2>&1 && had_kerberos=1 || true
     fi
 
     if fips_requested "$envfile"; then
@@ -416,15 +416,10 @@ cmd_venv() {
         "$venv.next/bin/pip" install --quiet --no-deps pyjks==20.0.0
     fi
 
-    if [ -n "$had_requests_kerberos" ]; then
-        say "Reinstalling requests-kerberos (was present before upgrade)..."
-        "$venv.next/bin/pip" install --quiet requests-kerberos || \
-            say "WARNING: requests-kerberos reinstall failed, Kerberos auth to the upstream CA is unavailable until 'pip install requests-kerberos' is run manually in $venv"
-    fi
-    if [ -n "$had_pyspnego_kerberos" ]; then
-        say "Reinstalling pyspnego[kerberos] (was present before upgrade)..."
+    if [ -n "$had_kerberos" ]; then
+        say "Reinstalling pyspnego[kerberos] (Kerberos support was present before upgrade)..."
         "$venv.next/bin/pip" install --quiet 'pyspnego[kerberos]' || \
-            say "WARNING: pyspnego[kerberos] reinstall failed (needs libkrb5-dev/gcc), Autoenrollment's Kerberos/SPNEGO binding is unavailable until 'pip install pyspnego[kerberos]' is run manually in $venv"
+            say "WARNING: pyspnego[kerberos] reinstall failed (needs libkrb5-dev/gcc), Kerberos auth to a Microsoft CA and Autoenrollment's Kerberos/SPNEGO binding are unavailable until 'pip install pyspnego[kerberos]' is run manually in $venv"
     fi
 
     switch_venv "$venv"

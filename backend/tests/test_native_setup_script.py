@@ -544,14 +544,32 @@ def test_the_service_runs_during_the_whole_build(tmp_path, fips):
     home, envfile = _home(tmp_path)
     if not fips:
         envfile.write_text('SECRET_KEY=a\n')
-    _stub(home / 'venv' / 'bin' / 'pip')  # `pip show requests-kerberos` succeeds: reinstalled too
+    _stub(home / 'venv' / 'bin' / 'pip')  # `pip show gssapi` succeeds: reinstalled too
     extra = _systemd(tmp_path, bin_dir, record)
     result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, extra))
     assert result.returncode == 0, result.stderr
     lines = record.read_text().splitlines()
-    # pip, requirements, pyjks, then the two Kerberos reinstalls
-    assert [line for line in lines if line.startswith('UCM')] == ['UCM active'] * 5
-    assert 'ARGS install --quiet requests-kerberos' in lines and "ARGS install --quiet pyspnego[kerberos]" in lines
+    # pip, requirements, pyjks, then the Kerberos reinstall
+    assert [line for line in lines if line.startswith('UCM')] == ['UCM active'] * 4
+    assert "ARGS install --quiet pyspnego[kerberos]" in lines
+    calls = _calls(record)
+    assert calls[-2:] == ['SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm']
+    assert all(c.startswith('ARGS') for c in calls[:-2])
+
+
+def test_requests_kerberos_of_a_2x_venv_becomes_pyspnego_kerberos(tmp_path):
+    """A 2.254 venv with requests-kerberos only: the Microsoft CA Kerberos sign-in now needs gssapi."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, record = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    _stub(home / 'venv' / 'bin' / 'pip', 'case "$*" in "show gssapi") exit 1;; esac; exit 0')
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
+    assert result.returncode == 0, result.stderr
+    lines = record.read_text().splitlines()
+    assert "ARGS install --quiet pyspnego[kerberos]" in lines
+    assert not any('requests-kerberos' in line for line in lines if line.startswith('ARGS install'))
     calls = _calls(record)
     assert calls[-2:] == ['SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm']
     assert all(c.startswith('ARGS') for c in calls[:-2])
@@ -878,7 +896,7 @@ def test_a_dead_terminal_does_not_cut_the_recovery_short(tmp_path, trigger):
 def test_a_closed_session_does_not_cost_the_service(tmp_path, case):
     """ssh without a tty, or a pipe reader that dies: every later write raises SIGPIPE.
 
-    With requests-kerberos in the previous venv, bash writes before the switch."""
+    With Kerberos support in the previous venv, bash writes before the switch."""
     fips = case == 'fips build succeeds'
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
     started, go = tmp_path / 'pip-started', tmp_path / 'go'
@@ -892,7 +910,7 @@ def test_a_closed_session_does_not_cost_the_service(tmp_path, case):
     shutil.rmtree(home / 'venv')
     _venv_dir(home / 'venv')
     if case == 'kerberos reinstall':
-        _stub(home / 'venv' / 'bin' / 'pip')  # `pip show requests-kerberos` succeeds
+        _stub(home / 'venv' / 'bin' / 'pip')  # `pip show gssapi` succeeds
     extra = _systemd(tmp_path, bin_dir, record)
     proc = _spawn(tmp_path, home, python, envfile, extra)
     _wait_for(started, proc)

@@ -79,7 +79,7 @@ def test_with_the_variable_every_skip_of_a_marked_test_fails(tmp_path):
 SOFTHSM_FILES = ('test_hsm_brainpool.py', 'test_hsm_pss.py', 'test_hsm_sync_and_listing.py',
                  'test_pkcs11_fork.py', 'test_issue_366_hsm_ecdsa_der.py', 'test_hsm_pkcs11_mldsa.py',
                  'test_hsm_fips_softhsm.py')
-GSSAPI_FILES = ('test_kerberos_keytab_validation.py', 'test_keytab_composed.py')
+GSSAPI_FILES = ('test_kerberos_keytab_validation.py', 'test_keytab_composed.py', 'test_msca_kerberos_gssapi.py')
 REDIS_FILES = ('test_redis_sessions.py', 'test_redis_events.py', 'test_factor_change_sessions.py',
                'test_websocket_handshake.py')
 

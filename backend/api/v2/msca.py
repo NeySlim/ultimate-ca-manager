@@ -14,7 +14,7 @@ from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
 from services.msca.connection import saved_credential_retargets, tested_values
-from services.msca.client_keytab import KerberosBusy, managed_keytab_error
+from services.msca.kerberos import MSCAKerberosError, forget as forget_kerberos, managed_keytab_error
 from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
                                     SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
 from services.audit import AuditService
@@ -155,9 +155,6 @@ KERBEROS_ADMIN_MESSAGE = ('A Kerberos connection signs in as an identity of this
                           'moving it, changing its keytab or principal, or testing it against another '
                           'target requires the admin:system permission')
 
-# Retry-After of a sign-in that waited its bound for another connection's Kerberos acquisition
-KERBEROS_RETRY_SECONDS = 5
-
 # What create and update read of a connection to know where it signs in with Kerberos, and the defaults
 _SIGN_IN_DEFAULTS = dict(server='', use_ssl=True, verify_ssl=True, ca_bundle=None, auth_method='certificate',
                          username=None, kerberos_principal=None, kerberos_keytab_path=None,
@@ -165,11 +162,9 @@ _SIGN_IN_DEFAULTS = dict(server='', use_ssl=True, verify_ssl=True, ca_bundle=Non
                          winrm_verify_ssl=True, winrm_transport='kerberos', winrm_username=None)
 
 
-def kerberos_busy_response(error):
-    """503 with Retry-After: the sign-in waited its bound for another one and nothing reached the CA."""
-    response, code = error_response(str(error), 503)
-    response.headers['Retry-After'] = str(KERBEROS_RETRY_SECONDS)
-    return response, code
+def kerberos_error_response(error):
+    """400 naming the Kerberos cause: nothing the CA read, nothing recorded."""
+    return error_response(str(error), 400)
 
 
 def _text(value):
@@ -675,6 +670,7 @@ def delete_connection(msca_id):
         snapshot = type('S', (), {'id': snapshot_id, 'name': name})()
         db.session.delete(msca)
         db.session.commit()
+        forget_kerberos(snapshot_id)
         _audit('msca.delete', snapshot, "")
         logger.info(f"Microsoft CA connection deleted: {name}")
         return no_content_response()
@@ -698,10 +694,8 @@ def test_connection_inline():
     err = _kerberos_test_forbidden(None, data) or _keytab_error(data)
     if err:
         return err
-    try:
-        result = MicrosoftCAService.test_connection_inline(data)
-    except KerberosBusy as e:
-        return kerberos_busy_response(e)
+    # A failed sign-in, Kerberos included, is a result with its cause, answered 400 below
+    result = MicrosoftCAService.test_connection_inline(data)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
     return error_response(result.get('error', 'Connection test failed'), 400)
@@ -754,10 +748,7 @@ def test_connection(msca_id):
         overrides, err = _test_overrides(msca, data)
         if err:
             return err
-    try:
-        result = MicrosoftCAService.test_connection(msca_id, overrides)
-    except KerberosBusy as e:
-        return kerberos_busy_response(e)
+    result = MicrosoftCAService.test_connection(msca_id, overrides)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
     return error_response(result.get('error', 'Connection test failed'), 400)
@@ -1019,8 +1010,8 @@ def list_templates(msca_id):
     try:
         templates = MicrosoftCAService.list_templates(msca_id)
         return success_response(data=templates)
-    except KerberosBusy as e:
-        return kerberos_busy_response(e)
+    except MSCAKerberosError as e:
+        return kerberos_error_response(e)
     except Exception as e:
         logger.error(f"Failed to list templates: {e}")
         return error_response("Failed to retrieve templates", 500)
@@ -1169,9 +1160,9 @@ def sign_csr(msca_id, csr_id):
 
         return success_response(data=result)
 
-    except KerberosBusy as e:
+    except MSCAKerberosError as e:
         _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
-        return kerberos_busy_response(e)
+        return kerberos_error_response(e)
     except ValueError as e:
         logger.error(f"Validation error signing CSR via MS CA: {e}", exc_info=True)
         _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
@@ -1192,8 +1183,8 @@ def check_request_status(msca_id, request_id):
         if result.get('status') == SUPERSEDED:
             return success_response(data=result, message=SUPERSEDED_MESSAGE)
         return success_response(data=result)
-    except KerberosBusy as e:
-        return kerberos_busy_response(e)
+    except MSCAKerberosError as e:
+        return kerberos_error_response(e)
     except MSCAImportError as e:
         logger.error(f"MS CA request {request_id} issued but UCM import failed: {e}")
         return error_response(

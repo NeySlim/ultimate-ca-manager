@@ -6919,7 +6919,7 @@
     "title": "Microsoft AD CS",
     "subtitle": "Gérer les connexions Microsoft Active Directory Certificate Services.",
     "helpTitle": "Intégration AC Microsoft",
-    "helpDescription": "Connectez-vous à Microsoft AD CS pour signer des certificats via votre autorité de certification Windows. Trois méthodes d’authentification disponibles :\n\n- **Certificat client (recommandé)** : Le plus sécurisé et autonome. Pas besoin de joindre le domaine. Générez un certificat client sur votre AC Microsoft, exportez en PFX, puis importez le certificat et la clé ici.\n- **Auth basique** : Simple identifiant/mot de passe en HTTPS. Fonctionne sans jonction au domaine. Assurez-vous que le certsrv accepte l’authentification basique dans IIS.\n- **Kerberos (optionnel)** : Nécessite le paquet pip requests-kerberos et que la machine soit jointe au domaine AD (ou un keytab configuré). Seulement si les autres méthodes sont désactivées sur l’AC.",
+    "helpDescription": "Connectez-vous à Microsoft AD CS pour signer des certificats via votre autorité de certification Windows. Trois méthodes d’authentification disponibles :\n\n- **Certificat client (recommandé)** : Le plus sécurisé et autonome. Pas besoin de joindre le domaine. Générez un certificat client sur votre AC Microsoft, exportez en PFX, puis importez le certificat et la clé ici.\n- **Auth basique** : Simple identifiant/mot de passe en HTTPS. Fonctionne sans jonction au domaine. Assurez-vous que le certsrv accepte l’authentification basique dans IIS.\n- **Kerberos (optionnel)** : Nécessite le paquet pip pyspnego[kerberos] et que la machine soit jointe au domaine AD (ou un keytab configuré). Seulement si les autres méthodes sont désactivées sur l’AC.",
     "addConnection": "Ajouter une connexion",
     "editConnection": "Modifier la connexion",
     "connectionName": "Nom de la connexion",
@@ -7027,7 +7027,7 @@
     "signMicrosoft": "AC Microsoft",
     "notConfigured": "Non configuré",
     "configured": "Configuré",
-    "kerberosOptionalNote": "Kerberos nécessite le paquet requests-kerberos (pip install requests-kerberos) et la machine doit être jointe au domaine Active Directory ou avoir un keytab Kerberos configuré.",
+    "kerberosOptionalNote": "Kerberos nécessite le paquet pyspnego[kerberos] (pip install pyspnego[kerberos]) et la machine doit être jointe au domaine Active Directory ou avoir un keytab Kerberos configuré.",
     "eobo": {
       "enable": "Inscription pour le compte de (EOBO)",
       "enrolleeName": "DN du bénéficiaire",

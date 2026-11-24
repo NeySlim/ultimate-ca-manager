@@ -131,6 +131,9 @@ class TestMicrosoftCAAdminChannelTest:
                 return type('R', (), {'status_code': 0, 'std_out': b'UCM_CERTSVC=Running', 'std_err': b''})()
 
         monkeypatch.setattr(winrm, 'Session', FakeSession)
+        # The Kerberos sign-in itself (no password at all) is tested in test_msca_kerberos_keytab.py
+        from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+        monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_bind_kerberos', staticmethod(lambda session, msca: None))
         r = self._test(auth_client, msca_id, {'winrm_transport': 'kerberos', 'winrm_host': 'other.example'})
         assert r.status_code == 200, r.data
         assert sessions == [('https://other.example:5986/wsman', ('u', ''), 'kerberos')]

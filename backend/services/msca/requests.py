@@ -4,6 +4,7 @@ from typing import Optional
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
+from .kerberos import MSCAKerberosError
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +148,7 @@ class MicrosoftCARequestsMixin:
             )
             return req.to_dict()
 
-        except MSCAImportError:
+        except (MSCAImportError, MSCAKerberosError):
             raise
         except Exception as e:
             # Locale-independent classification: a French/localized AD CS

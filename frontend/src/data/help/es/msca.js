@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Certificado cliente (mTLS)', text: 'El más seguro. Genere un certificado cliente en su CA de Microsoft, expórtelo como PFX y suba el certificado y la clave en PEM.' },
           { label: 'Auth básica', text: 'Usuario y contraseña sobre HTTPS. Funciona sin unir al dominio. Active la autenticación básica en certsrv de IIS.' },
-          { label: 'Kerberos', text: 'Requiere el paquete requests-kerberos y una máquina unida al dominio o un keytab configurado.' },
+          { label: 'Kerberos', text: 'Requiere el paquete pyspnego[kerberos] y una máquina unida al dominio o un keytab configurado.' },
         ]
       },
       {

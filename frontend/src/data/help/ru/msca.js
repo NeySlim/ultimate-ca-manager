@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Клиентский сертификат (mTLS)', text: 'Самый безопасный способ. Создайте клиентский сертификат в вашем ЦС Microsoft, экспортируйте его в PFX и загрузите сертификат и ключ в формате PEM.' },
           { label: 'Basic Auth', text: 'Имя пользователя и пароль по HTTPS. Работает без ввода в домен. Включите basic auth в IIS certsrv.' },
-          { label: 'Kerberos', text: 'Требуется пакет requests-kerberos и компьютер, введённый в домен, либо настроенный keytab.' },
+          { label: 'Kerberos', text: 'Требуется пакет pyspnego[kerberos] и компьютер, введённый в домен, либо настроенный keytab.' },
         ]
       },
       {

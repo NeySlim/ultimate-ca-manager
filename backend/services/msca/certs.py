@@ -3,11 +3,13 @@ from typing import Optional
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
-from .client_keytab import KerberosBusy
+from .kerberos import MSCAKerberosError
 from .connection import MicrosoftCAConnectionMixin
 from .requests import MicrosoftCARequestsMixin
 
 logger = logging.getLogger(__name__)
+
+PENDING_MESSAGE = 'Pending approval on the CA'
 
 
 class MicrosoftCACertsMixin:
@@ -95,8 +97,8 @@ class MicrosoftCACertsMixin:
                     'cert_pem': cert_pem,
                 }
 
-            except KerberosBusy:
-                raise  # nothing reached the CA: no request to record
+            except MSCAKerberosError:
+                raise  # the CA never read the request: nothing to record
             except Exception as submit_err:
                 # Locale-independent classification. certsrv only understands
                 # the English "Certificate Pending" page, so on a localized
@@ -115,7 +117,8 @@ class MicrosoftCACertsMixin:
                             request_id=ms_request_id,
                             template=template,
                             status='pending',
-                            disposition_message=str(submit_err)[:500],
+                            # certsrv's text for a page it cannot read is no disposition
+                            disposition_message=PENDING_MESSAGE,
                             submitted_at=utc_now(),
                             submitted_by=submitted_by,
                             enrollee_name=enrollee_name,

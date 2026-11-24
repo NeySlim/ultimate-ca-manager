@@ -7235,7 +7235,7 @@
     "title": "Microsoft AD CS",
     "subtitle": "Керування підключеннями Microsoft Active Directory Certificate Services",
     "helpTitle": "Інтеграція ЦС Microsoft",
-    "helpDescription": "Підключіться до Microsoft AD CS для підпису сертифікатів через ваш ЦС Windows. Три методи автентифікації:\n\n- **Сертифікат клієнта (рекомендовано)**: Найбезпечніший та автономний. Не потрібно приєднувати машину до домену. Згенеруйте клієнтський сертифікат на вашому MS ЦС, експортуйте як PFX та завантажте сертифікат і ключ тут.\n- **Basic Auth**: Простий логін/пароль через HTTPS. Працює без приєднання до домену. Переконайтесь, що certsrv приймає Basic автентифікацію в IIS.\n- **Kerberos (необов'язково)**: Потрібен pip пакет requests-kerberos і машина повинна бути в домені AD (або налаштований keytab). Тільки якщо інші методи вимкнені на ЦС.",
+    "helpDescription": "Підключіться до Microsoft AD CS для підпису сертифікатів через ваш ЦС Windows. Три методи автентифікації:\n\n- **Сертифікат клієнта (рекомендовано)**: Найбезпечніший та автономний. Не потрібно приєднувати машину до домену. Згенеруйте клієнтський сертифікат на вашому MS ЦС, експортуйте як PFX та завантажте сертифікат і ключ тут.\n- **Basic Auth**: Простий логін/пароль через HTTPS. Працює без приєднання до домену. Переконайтесь, що certsrv приймає Basic автентифікацію в IIS.\n- **Kerberos (необов'язково)**: Потрібен pip пакет pyspnego[kerberos] і машина повинна бути в домені AD (або налаштований keytab). Тільки якщо інші методи вимкнені на ЦС.",
     "addConnection": "Додати підключення",
     "editConnection": "Редагувати підключення",
     "connectionName": "Назва підключення",
@@ -7343,7 +7343,7 @@
     "signMicrosoft": "ЦС Microsoft",
     "notConfigured": "Не налаштовано",
     "configured": "Налаштовано",
-    "kerberosOptionalNote": "Kerberos потребує пакет requests-kerberos (pip install requests-kerberos), а машина має бути приєднана до домену Active Directory або мати налаштований Kerberos keytab.",
+    "kerberosOptionalNote": "Kerberos потребує пакет pyspnego[kerberos] (pip install pyspnego[kerberos]), а машина має бути приєднана до домену Active Directory або мати налаштований Kerberos keytab.",
     "eobo": {
       "enable": "Реєстрація від імені (EOBO)",
       "enrolleeName": "DN отримувача",

@@ -87,14 +87,13 @@ matplotlib>=3.8
 
 # Microsoft AD CS Integration
 certsrv>=2.1.0
-# requests-kerberos is optional: only needed for Kerberos auth to MS CA
-# Install manually if needed: pip install requests-kerberos
-# (it pulls C-extension Kerberos deps, so it stays out of the default set)
+# Kerberos auth to MS CA (certsrv and the WinRM channel) uses python-gssapi,
+# from pyspnego[kerberos] below: the Docker images ship it, other installs add it.
 # WinRM admin channel (revoke/unrevoke/publish CRL/inventory on the CA).
 # Pure-python wheels, bundled so air-gapped/policy-restricted deployments get
 # the admin channel out of the box (#159). Still lazy-imported in
 # services/msca/admin_channel.py and the feature degrades gracefully.
-# The Kerberos keytab wrapper is checked against 0.5's Transport; the next minor gets the same check
+# The Kerberos sign-in replaces the auth of 0.5's Transport; the next minor gets the same check
 pywinrm>=0.5.0,<0.6
 requests-ntlm>=1.3.0
 # JKS export support (Java KeyStore).
@@ -137,7 +136,7 @@ pkilint>=0.12
 # Integrated Auth or Apache mod_auth_gssapi. pyspnego's Kerberos support
 # always goes through the system GSSAPI implementation (there is no pure-
 # Python Kerberos crypto), which needs its 'kerberos' extra — a C extension
-# (gssapi) requiring libkrb5-dev at build time. Kept out of the default set
-# for the same reason as requests-kerberos above. Install manually if
-# needed: pip install pyspnego[kerberos]
+# (gssapi) requiring libkrb5-dev at build time, so it is kept out of the
+# default set. Install manually if needed: pip install pyspnego[kerberos]
+# It is also what Kerberos auth to MS CA needs (see above).
 # Both Kerberos-bound endpoints 503 cleanly if this isn't installed.

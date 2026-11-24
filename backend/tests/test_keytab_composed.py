@@ -191,33 +191,25 @@ def test_the_acceptor_reads_the_composed_file_whatever_krb5_ktname_says(app, pro
     assert seen == [f'HTTP/{HOST}@ONE.TEST'] * 2
 
 
-def test_a_kerberos_msca_connection_leaves_krb5_ktname_alone(monkeypatch):
-    """The acceptor's KRB5_KTNAME is the same before, during and after the client's acquisition."""
+def test_a_kerberos_msca_connection_leaves_krb5_ktname_alone(monkeypatch, tmp_path):
+    """The acceptor's KRB5_KTNAME is the same before, during and after the client's acquisition,
+    which names its keytab in its own credential store."""
     import os
     from services.msca.connection import MicrosoftCAConnectionMixin
-    seen = []
-
-    class HTTPKerberosAuth:
-        def __init__(self, **kwargs):
-            pass
-
-        def generate_request_header(self, response, host, is_preemptive=False):
-            seen.append((os.environ.get('KRB5_KTNAME'), os.environ.get('KRB5_CLIENT_KTNAME')))
-            return 'Negotiate x'
-
+    from tests.msca_kerberos_support import FakeGssapi, sign_in
+    gss = FakeGssapi().install(monkeypatch)
+    keytab_path = tmp_path / 'msca.keytab'
+    keytab_path.write_bytes(b'')
     monkeypatch.setitem(sys.modules, 'certsrv', types.SimpleNamespace(
         Certsrv=lambda **kw: types.SimpleNamespace(session=types.SimpleNamespace(auth=None, verify=True))))
-    monkeypatch.setitem(sys.modules, 'requests_kerberos', types.SimpleNamespace(
-        HTTPKerberosAuth=HTTPKerberosAuth, OPTIONAL=1))
     monkeypatch.setenv('KRB5_KTNAME', 'FILE:/acceptor.keytab')
     msca = types.SimpleNamespace(id=1, server='ca.example.test', verify_ssl=True, ca_bundle=None,
-                                 auth_method='kerberos', kerberos_keytab_path='/msca.keytab',
+                                 auth_method='kerberos', kerberos_keytab_path=str(keytab_path),
                                  kerberos_principal='svc@EXAMPLE.TEST')
     client = MicrosoftCAConnectionMixin._get_client(msca)
+    sign_in(client.session.auth, 'ca.example.test')
     assert os.environ['KRB5_KTNAME'] == 'FILE:/acceptor.keytab'
-    client.session.auth.generate_request_header(None, 'ca.example.test')
-    assert seen == [('FILE:/acceptor.keytab', '/msca.keytab')]
-    assert os.environ['KRB5_KTNAME'] == 'FILE:/acceptor.keytab'
+    assert gss.acquired[0][1]['client_keytab'] == str(keytab_path)
 
 
 @requires_gssapi
