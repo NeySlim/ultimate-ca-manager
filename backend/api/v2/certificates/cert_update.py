@@ -16,11 +16,26 @@ COMMENT_MAX_LENGTH = 4000
 COMMENT_CONTROLS_ALLOWED = frozenset('\n\t')
 
 
+# Unicode Bidi_Control (UAX #9): a comment shown in the inspector must read as it is stored
+BIDI_CONTROLS = frozenset('\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069')
+
+
+def _unencodable(value):
+    """A lone surrogate (half a UTF-16 pair): no UTF-8 spelling, the database refuses it."""
+    try:
+        value.encode('utf-8')
+    except UnicodeEncodeError:
+        return True
+    return False
+
+
 def _descr_error(value):
     if not isinstance(value, str) or not value.strip():
         return 'descr must be a non-empty string'
     if len(value.strip()) > 255:
         return 'descr must be 255 characters or fewer'
+    if _unencodable(value):
+        return 'descr may not hold a lone surrogate'
     return None
 
 
@@ -33,6 +48,10 @@ def _comment_error(value):
         return f'comment must be {COMMENT_MAX_LENGTH} characters or fewer'
     if any(unicodedata.category(ch) == 'Cc' and ch not in COMMENT_CONTROLS_ALLOWED for ch in value):
         return 'comment may not hold control characters other than line feed and tab'
+    if _unencodable(value):
+        return 'comment may not hold a lone surrogate'
+    if any(ch in BIDI_CONTROLS for ch in value):
+        return 'comment may not hold text direction controls'
     return None
 
 
@@ -59,7 +78,8 @@ def update_certificate(cert_id):
         cert.descr = data['descr'].strip()
     new_comment = old_comment
     if 'comment' in data:
-        new_comment = data['comment'] or ''
+        # Blanks alone are no comment: stored as none, as an empty text is
+        new_comment = data['comment'] if data['comment'] and data['comment'].strip() else ''
         cert.comment = new_comment or None
     ok, err = safe_commit(logger, "Failed to update certificate")
     if not ok:
@@ -86,4 +106,5 @@ def update_certificate(cert_id):
             success=True
         )
 
-    return success_response(data=cert.to_dict(), message='Certificate updated')
+    from .cert_get import certificate_detail
+    return success_response(data=certificate_detail(cert), message='Certificate updated')

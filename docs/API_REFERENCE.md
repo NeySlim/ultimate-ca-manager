@@ -1270,7 +1270,7 @@ Content-Type: application/json
 
 { "descr": "Web server", "comment": "Owner: PKI team\nTicket INC-1234" }
 ```
-Permission `write:certificates`. The display name and the comment change apart or together, and at least one of them is required. `descr` is a non-empty string of at most 255 characters. `comment` is plain text of at most 4,000 characters, kept as sent, with line feeds and tabs as its only control characters; `""` or `null` removes it. An invalid field refuses the whole request with `400` and changes nothing; `404` for an unknown certificate. Every certificate read carries `comment` (`""` when there is none). A changed comment is audited as `certificate_comment_updated` with its former and new lengths, never its text.
+Permission `write:certificates`. The display name and the comment change apart or together, and at least one of them is required. `descr` is a non-empty string of at most 255 characters. `comment` is plain text of at most 4,000 characters, kept as sent, with line feeds and tabs as its only control characters and no text direction control (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069); `""`, `null` or a text of blanks only removes it. Neither field may hold a lone UTF-16 surrogate. An invalid field refuses the whole request with `400` and changes nothing; `404` for an unknown certificate. The answer is the certificate as `GET /api/v2/certificates/{id}` gives it. Every certificate read carries `comment` (`""` when there is none), and so does the `certificate` of every webhook event. A changed comment is audited as `certificate_comment_updated` with its former and new lengths, never its text.
 
 ```http
 GET /api/v2/certificates/{cert_id}/lint?profile=rfc5280
@@ -5079,6 +5079,8 @@ Returns `events` (the accepted names) and a `descriptions` map.
 GET /api/v2/webhooks/{endpoint_id}/deliveries?status=failed&page=1&per_page=25
 ```
 Delivery history of one endpoint, newest first. `status` is `pending`, `delivered` or `failed`; `per_page` is at most 100. `404` for an unknown endpoint.
+
+The `certificate` of a `certificate.*` event is the certificate as the API reads it, its `comment` included: a comment written for operators reaches every endpoint subscribed to the event.
 
 ### Retry Delivery
 ```http

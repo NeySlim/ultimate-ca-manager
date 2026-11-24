@@ -156,3 +156,85 @@ def test_the_global_search_reads_no_comment_without_the_read_permission(app, aut
                         lambda permission, granted: permission != 'read:certificates' and real(permission, granted))
     found = auth_client.get('/api/v2/search', query_string={'q': token}).get_json()['data']
     assert found['certificates'] == []
+
+
+def _raw_patch(auth_client, cert_id, body):
+    """A JSON body written by hand: json.dumps cannot spell a lone surrogate escape for us."""
+    return auth_client.patch(f'{BASE}/{cert_id}', data=body, content_type='application/json')
+
+
+@pytest.mark.parametrize('body', [
+    '{"comment": "half \\ud800 a pair"}', '{"comment": "\\udfff"}', '{"descr": "half \\ud800"}',
+    '{"descr": "Renamed", "comment": "\\ud83d"}',
+])
+def test_a_lone_surrogate_is_refused_with_400(app, auth_client, commented_cert, body):
+    response = _raw_patch(auth_client, commented_cert, body)
+    assert response.status_code == 400, response.data
+    assert _stored(app, commented_cert) == ('Comment test', 'Before')
+
+
+def test_a_surrogate_pair_is_one_character_and_kept(auth_client, commented_cert):
+    response = _raw_patch(auth_client, commented_cert, '{"comment": "rack \\ud83d\\udd12 B12"}')
+    assert response.status_code == 200, response.data
+    assert response.get_json()['data']['comment'] == 'rack \U0001F512 B12'
+
+
+@pytest.mark.parametrize('mark', ['‮', '‪', '‫', '‬', '‭', '⁦', '⁧',
+                                  '⁨', '⁩', '‎', '‏', '؜'])
+def test_a_direction_control_is_refused_with_400(app, auth_client, commented_cert, mark):
+    response = auth_client.patch(f'{BASE}/{commented_cert}', json={'comment': f'invoice{mark}fdp.exe'})
+    assert response.status_code == 400, response.data
+    assert _stored(app, commented_cert) == ('Comment test', 'Before')
+
+
+def test_a_joiner_is_no_direction_control(auth_client, commented_cert):
+    # ZWJ inside an emoji sequence, ZWNJ in Persian: format characters a comment keeps
+    value = 'team \U0001F469‍\U0001F4BB می‌خواهم'
+    response = auth_client.patch(f'{BASE}/{commented_cert}', json={'comment': value})
+    assert response.status_code == 200, response.data
+    assert response.get_json()['data']['comment'] == value
+
+
+@pytest.mark.parametrize('value', [' ', '   \n\t  ', ' 　'])
+def test_a_comment_of_blanks_only_is_cleared(app, auth_client, commented_cert, value):
+    response = auth_client.patch(f'{BASE}/{commented_cert}', json={'comment': value})
+    assert response.status_code == 200, response.data
+    assert response.get_json()['data']['comment'] == ''
+    assert _stored(app, commented_cert) == ('Comment test', None)
+    assert [details for _a, details in _comment_audits(app, commented_cert)] == [
+        'Comment cleared: 6 -> 0 characters']
+
+
+def test_a_comment_with_text_keeps_its_blanks(auth_client, commented_cert):
+    response = auth_client.patch(f'{BASE}/{commented_cert}', json={'comment': '  indented\n'})
+    assert response.get_json()['data']['comment'] == '  indented\n'
+
+
+@pytest.fixture
+def revoked_by_record(app, commented_cert):
+    """The certificate's CA holds a revocation of its serial that the row does not carry."""
+    from datetime import timedelta
+    from models.revoked_serial import RevokedSerial
+    from utils.datetime_utils import utc_now
+    with app.app_context():
+        cert = db.session.get(Certificate, commented_cert)
+        assert not cert.revoked
+        record = RevokedSerial(caref=cert.caref, serial_number=cert.serial_number, revoked_at=utc_now(),
+                               revoke_reason='keyCompromise', valid_to=utc_now() + timedelta(days=30),
+                               certificate_id=cert.id)
+        db.session.add(record)
+        db.session.commit()
+        record_id = record.id
+    yield commented_cert
+    with app.app_context():
+        db.session.delete(db.session.get(RevokedSerial, record_id))
+        db.session.commit()
+
+
+def test_the_patch_answers_what_the_get_answers(auth_client, revoked_by_record):
+    response = auth_client.patch(f'{BASE}/{revoked_by_record}', json={'comment': 'After'})
+    assert response.status_code == 200, response.data
+    patched = response.get_json()['data']
+    shown = auth_client.get(f'{BASE}/{revoked_by_record}').get_json()['data']
+    assert shown['revoked'] is True and shown['revoke_reason'] == 'keyCompromise'
+    assert patched == shown
