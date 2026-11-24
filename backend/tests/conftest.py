@@ -453,7 +453,7 @@ _LEAK_TABLES = (
     'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
     'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
     'windows_enrollment_profiles', 'hsm_providers', 'pro_sso_providers', 'user_sso_identities',
-    'ssh_cas', 'ssh_certificates',
+    'ssh_cas', 'ssh_certificates', 'acme_accounts',
 )
 # Tables whose rows are compared too: a default profile edited in place keeps the count.
 _LEAK_CONTENT = {'windows_enrollment_profiles': ('updated_at', 'updated_by')}
@@ -528,13 +528,37 @@ def _detach_orphan_records():
             db.session.remove()
 
 
+def _acme_account_ids():
+    """The ACME accounts of the shared database, or None without one (a file resets or migrates it)."""
+    from tests.acme_accounts_support import account_ids
+    try:
+        return account_ids(_SESSION_APP[0]) if _SESSION_APP else None
+    except Exception:
+        return None
+
+
+def _drop_new_acme_accounts(kept):
+    """The ACME accounts a file created leave with it: a later file that lists, counts or pages
+    through the accounts sees its own only."""
+    from tests.acme_accounts_support import drop_accounts_but
+    if kept is None:
+        return
+    try:
+        drop_accounts_but(_SESSION_APP[0], kept)
+    except Exception as exc:
+        import warnings
+        warnings.warn(f'ACME accounts of this file not removed: {type(exc).__name__}: {exc}', stacklevel=1)
+
+
 @pytest.fixture(autouse=True, scope='module')
 def _shared_tables_stay_in_their_module(request):
-    """Row counts of the shared tables before and after each file. UCM_TEST_LEAK_MODE
-    is `warn` (default) or `fail`; a file in _LEAK_EXEMPT is never checked."""
+    """Row counts of the shared tables before and after each file, its ACME accounts removed first.
+    UCM_TEST_LEAK_MODE is `warn` (default) or `fail`; a file in _LEAK_EXEMPT is never checked."""
     name = os.path.basename(str(request.fspath))
     before = _leak_counts()
+    accounts = _acme_account_ids()
     yield
+    _drop_new_acme_accounts(accounts)
     after = _leak_counts() or {}
     _detach_orphan_records()
     if name in _LEAK_EXEMPT or before is None:

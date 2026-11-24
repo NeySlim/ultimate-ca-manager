@@ -102,10 +102,12 @@ def test_the_figures_are_those_of_the_period(app, journal, frozen):
         stats = AuditService.get_stats(30)
         since = frozen - timedelta(days=30)
         rows = db.session.query(AuditLog.username, AuditLog.success).filter(AuditLog.timestamp >= since).all()
-        nulls_first = db.engine.dialect.name == 'sqlite'
+        # Ties by name as the database collates it (PostgreSQL's locale is not byte order), NULL included
+        by_name = [u for (u,) in db.session.query(AuditLog.username).filter(AuditLog.timestamp >= since)
+                   .distinct().order_by(AuditLog.username)]
     users = Counter(u for u, _ in rows)
-    # Ties by name, a missing name where each engine sorts NULL
-    expected = sorted(users.items(), key=lambda item: (-item[1], (item[0] is None) != nulls_first, item[0] or ''))[:10]
+    rank = {u: i for i, u in enumerate(by_name)}
+    expected = sorted(users.items(), key=lambda item: (-item[1], rank[item[0]]))[:10]
     assert [(u['username'], u['count']) for u in stats['top_users']] == expected
     assert stats['unique_users'] == len({u for u, _ in rows if u is not None})
     assert stats['total_logs'] == len(rows)

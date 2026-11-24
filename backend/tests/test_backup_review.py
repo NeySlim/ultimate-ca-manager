@@ -8,6 +8,7 @@ import pytest
 from models import db, CA, Certificate, SystemConfig
 
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -201,7 +202,8 @@ class TestRestoreWrongPassword:
         # aborts the backup instead of yielding empty sections.
         with app.app_context():
             blob = _service().create_backup('Correct-Horse-Battery-9')
-        r = auth_client.post('/api/v2/system/restore', data={'password': 'Wrong-Horse-Battery-9',
-                             'file': (io.BytesIO(blob), 'b.ucmbkp')}, content_type='multipart/form-data')
+        r = post_to_the_end(auth_client, '/api/v2/system/restore',
+                            data={'password': 'Wrong-Horse-Battery-9', 'file': (io.BytesIO(blob), 'b.ucmbkp')},
+                            content_type='multipart/form-data')
         assert r.status_code == 400, r.data
         assert 'password' in json.loads(r.data)['message'].lower()

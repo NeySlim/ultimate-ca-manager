@@ -18,6 +18,7 @@ from services.backup.container import ContainerError
 
 from tests.backup_v3 import as_v3
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -421,8 +422,8 @@ class TestReviewOfTheReader:
                 json.dumps(payload, indent=2, sort_keys=True).encode())
             blob = header + AESGCM(key).encrypt(nonce, plaintext, header)
 
-        response = auth_client.post(
-            '/api/v2/system/restore',
+        response = post_to_the_end(
+            auth_client, '/api/v2/system/restore',
             data={'password': PASSWORD, 'file': (io.BytesIO(blob), 'future.ucmbkp')},
             content_type='multipart/form-data')
 

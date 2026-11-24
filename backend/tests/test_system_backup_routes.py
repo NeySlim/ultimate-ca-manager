@@ -16,6 +16,7 @@ from config.settings import Config
 from services.backup import manifest, storage
 from services.backup.locking import backup_operation_lock
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -609,7 +610,7 @@ def _restore(client, blob=b'x', password=PASSWORD, url='/api/v2/system/restore',
              **fields):
     data = {'file': (io.BytesIO(blob), 'r.ucmbkp'), 'password': password}
     data.update(fields)
-    return client.post(url, data=data, content_type='multipart/form-data')
+    return post_to_the_end(client, url, data=data, content_type='multipart/form-data')
 
 
 @pytest.fixture

@@ -23,6 +23,7 @@ from models import db
 from services.backup import manifest
 
 from tests.fresh_app import fresh_app_fixtures
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
@@ -252,8 +253,8 @@ class TestTheRouteSaysItToo:
             blob = _service().create_backup(
                 PASSWORD, include=_only('certificate_authorities'))
 
-        response = auth_client.post(
-            '/api/v2/system/restore',
+        response = post_to_the_end(
+            auth_client, '/api/v2/system/restore',
             data={'password': PASSWORD, 'mode': 'merge',
                   'file': (io.BytesIO(blob), 'b.ucmbkp')},
             content_type='multipart/form-data')
@@ -277,8 +278,8 @@ class TestAnArchiveThatRestoresNothing:
             blob = _service().create_backup(
                 PASSWORD, include={name: False for name in manifest.SECTIONS})
 
-        response = auth_client.post(
-            '/api/v2/system/restore',
+        response = post_to_the_end(
+            auth_client, '/api/v2/system/restore',
             data={'password': PASSWORD, 'mode': 'merge',
                   'file': (io.BytesIO(blob), 'b.ucmbkp')},
             content_type='multipart/form-data')

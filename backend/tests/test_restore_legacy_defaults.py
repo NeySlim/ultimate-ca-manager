@@ -7,31 +7,23 @@ import pytest
 from services.backup.restore.apply import legacy_defaults
 
 from tests.fresh_app import fresh_app_fixtures
-from tests.job_dispatch_support import DeferredDispatch
+from tests.restore_support import post_to_the_end
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
 
 @pytest.fixture
-def restore_to_the_end(app, auth_client, monkeypatch):
-    """Restore ``blob``, return the job's final status code. Asked asynchronously and run once
-    the route has answered: no dependence on the route's bounded wait, no job left behind."""
+def restore_to_the_end(app, auth_client):
+    """Restore ``blob``, return the final status code of its job (tests.restore_support)."""
     from services.jobs import restore as restore_job
-    from services.jobs import runner
     from tests.test_backup_hostile_corpus import PASSWORD, RESTORE_URL
-    deferred = DeferredDispatch(app, monkeypatch)
 
     def restore(blob):
-        r = auth_client.post(RESTORE_URL, headers={'Prefer': 'respond-async'},
-                             data={'password': PASSWORD, 'file': (io.BytesIO(blob), 'legacy.ucmbkp')},
-                             content_type='multipart/form-data')
-        assert r.status_code == 202, r.data
-        assert runner.join_local(r.headers['Location'].rsplit('/', 1)[1], 300)
-        shown = auth_client.get(r.headers['Location']).get_json()['data']
-        assert shown['state'] == 'succeeded', shown
-        return shown['result']['code']
+        r = post_to_the_end(auth_client, RESTORE_URL, content_type='multipart/form-data',
+                            data={'password': PASSWORD, 'file': (io.BytesIO(blob), 'legacy.ucmbkp')})
+        assert r.status_code < 400, r.data
+        return r.status_code
     yield restore
-    deferred.conclude_leftovers()
     restore_job.remove_state()
 
 

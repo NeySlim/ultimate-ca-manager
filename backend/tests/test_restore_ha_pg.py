@@ -13,6 +13,7 @@ from models import db
 from services import cluster_commands as cc
 from services import cluster_maintenance as cm
 from tests import pg_app_harness
+from tests.restore_support import post_to_the_end
 from tests.test_cluster_maintenance_pg import (  # noqa: F401  (cluster: fixture)
     PREFIX, _add_user, _archive, _back, _restore, _row, _sql, _user_exists, cluster, wait_for,
 )
@@ -201,9 +202,9 @@ def test_an_archive_refused_before_decryption_never_sets_the_maintenance(
     try:
         assert wait_for(lambda: 201 in outcomes)
         if case == 'wrong_password':
-            r = auth_client.post(path, data={'file': (io.BytesIO(blob), 'hd1.ucmbkp'),
-                                             'password': 'not-the-password'},
-                                 content_type='multipart/form-data')
+            r = post_to_the_end(auth_client, path, data={'file': (io.BytesIO(blob), 'hd1.ucmbkp'),
+                                                         'password': 'not-the-password'},
+                                content_type='multipart/form-data')
         else:
             r = _restore(auth_client, secrets.token_bytes(4096), path)
         time.sleep(0.2)

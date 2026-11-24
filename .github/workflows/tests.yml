@@ -98,7 +98,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
   
-  # Four quarters of the file list (scripts/ci/shard-tests.sh), four workers each.
+  # Four parts of the file list balanced by measured duration (scripts/ci/shard-tests.sh), four workers each.
   test-backend:
     name: Backend Tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
