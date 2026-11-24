@@ -142,7 +142,7 @@ class MicrosoftCACertsMixin:
                         'status': 'pending',
                         'request_id': getattr(req, 'id', None),
                         'ms_request_id': ms_request_id,
-                        'message': 'Request pending manager approval',
+                        'message': PENDING_MESSAGE,
                     }
 
                 if is_denied:

@@ -128,7 +128,8 @@ class MicrosoftCACAControlMixin:
         claimed = (MSCARequest.query
                    .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
                            MSCARequest.status.notin_(('issued', SUPERSEDED)))
-                   .update({MSCARequest.status: 'issued', MSCARequest.cert_pem: pem},
+                   .update({MSCARequest.status: 'issued', MSCARequest.cert_pem: pem,
+                            MSCARequest.disposition_message: None},
                            synchronize_session=False))
         if claimed != 1:
             db.session.rollback()
