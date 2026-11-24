@@ -254,9 +254,13 @@ class TestRevalidation:
         with _socket(app, client) as ws:
             sid = _sid(ws)
             assert sid in events.connected_clients
-            # Ended in the store without the sign-out route, which cuts the socket itself
-            with client.session_transaction() as stored:
-                stored.clear()
+            # Gone from the store without a request ending it (a request's save cuts the socket
+            # itself): only the revalidation sees it
+            iface = app.session_interface
+            cookie = client.get_cookie('session').value
+            sid_ = iface._unsign(app, cookie) if iface.use_signer else cookie
+            with app.app_context():
+                iface._delete_session(iface._get_store_id(sid_))
             ws.emit('ping')
             assert not ws.is_connected()
             assert sid not in events.connected_clients

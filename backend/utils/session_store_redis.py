@@ -6,8 +6,9 @@ from flask_session._utils import total_seconds
 from flask_session.redis import RedisSessionInterface
 from redis.exceptions import WatchError
 
-from utils.session_store import (LOCK_MERGE_ATTEMPTS, KeepsRemovedRecordsGone, carries_lock,
-                                 keep_stored_lock)
+from utils.session_store import (LOCK_MERGE_ATTEMPTS, MOVED_PREFIX, MOVED_TTL,
+                                 KeepsRemovedRecordsGone, carries_lock, keep_stored_lock,
+                                 moved_pointer, moved_target)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,10 @@ class GuardedRedisSessionInterface(KeepsRemovedRecordsGone, RedisSessionInterfac
         session.store_refused = 'busy'
         logger.warning("Session not saved: its record kept changing under the save")
 
+    def _moved_to(self, store_id):
+        value = self.client.get(MOVED_PREFIX + store_id)
+        return moved_target(self.serializer.decode(value)) if value else None
+
     def _move(self, session, old_id, store_id, ttl):
         """The old key is watched while it is read: a lock stored in between fails the
         transaction, is read again and moves too; a key removed meanwhile is not written back."""
@@ -75,6 +80,8 @@ class GuardedRedisSessionInterface(KeepsRemovedRecordsGone, RedisSessionInterfac
                     keep_stored_lock(session, self.serializer.decode(stored))
                     pipe.multi()
                     pipe.set(name=store_id, value=self.serializer.encode(session), ex=ttl)
+                    pipe.set(name=MOVED_PREFIX + old_id, ex=MOVED_TTL,
+                             value=self.serializer.encode(moved_pointer(session.sid)))
                     pipe.delete(old_id)
                     pipe.execute()
                     return

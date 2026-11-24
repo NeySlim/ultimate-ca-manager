@@ -15,8 +15,14 @@ def _new_identifier(keep_lock=False):
     interface = current_app.session_interface
     renew = getattr(interface, 'rotate' if keep_lock else 'regenerate', None) or getattr(
         interface, 'regenerate', None)
+    # A stored session replaced by a new one (a sign-in) ends: its sockets close once it is gone
+    replaced = None
+    if not keep_lock and getattr(session, 'stored_sid', None) == getattr(session, 'sid', None):
+        replaced = session.sid
     if renew is not None:
         renew(session)
+    if replaced and replaced != getattr(session, 'sid', None):
+        close_session_sockets(replaced)
 
 
 # The account's creation time: an id handed out again (SQLite reuses the last
