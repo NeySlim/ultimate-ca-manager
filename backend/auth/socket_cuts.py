@@ -26,7 +26,7 @@ def _websocket():
 
 
 def _callers_session(user_id, replaced):
-    """The caller's own session id when ``keep_current_session`` may keep it, else None."""
+    """The caller's own session id when ``keep_current_session`` may renew it, else None."""
     from flask import g, has_request_context, session
     if not has_request_context():
         return None
@@ -38,7 +38,8 @@ def _callers_session(user_id, replaced):
 
 
 def _owe(session_id):
-    """The spared caller's session: cut at the end of the request unless it moved (kept)."""
+    """The spared caller's session: every socket of it closes at the end of the request, once a
+    renewal moved the record (a stolen copy's too; the caller's tabs reconnect with the new cookie)."""
     from flask import after_this_request, g, has_request_context
     if not session_id or not has_request_context():
         return
@@ -59,24 +60,14 @@ def _owe(session_id):
 
 def account_sessions_ended(db_session, user_id, new_version):
     """``user_id``'s sessions under ``new_version`` end with ``db_session``'s transaction:
-    their sockets close at its commit, but the caller's, which keep_current_session may keep."""
+    their sockets close at its commit, but the caller's, which close at the end of the request,
+    after keep_current_session renewed it or not (_owe)."""
     spare = _callers_session(user_id, new_version - 1)
 
     def cut():
         _owe(spare)
         _websocket().end_account_sockets(user_id, below=new_version, spare_session_id=spare)
     _on_commit(db_session, cut)
-
-
-def session_moved(session_id, new_session_id, version):
-    """A kept session moved to a new identifier: its sockets follow it, none is owed a cut."""
-    from flask import g, has_request_context
-    if has_request_context():
-        (g.get(_OWED) or set()).discard(session_id)
-    try:
-        _websocket().move_session_sockets(session_id, new_session_id, version)
-    except Exception as exc:  # noqa: BLE001  # the socket then dies at its revalidation
-        logger.warning("WebSocket sockets not moved with their session: %s", exc)
 
 
 def epoch_advanced(db_session, epoch):

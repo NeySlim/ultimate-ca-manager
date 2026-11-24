@@ -452,26 +452,10 @@ def cut_before_epoch_here(epoch) -> int:
     return _cut_where(lambda state: state.get('epoch', 0) < epoch, 'sessions a restore ended')
 
 
-def move_session_here(key, new_key, version) -> int:
-    """This process's sockets of session ``key`` now name ``new_key``, where it moved, and its
-    ``version``: a later end of the moved session closes them."""
-    if not (isinstance(key, str) and key and isinstance(new_key, str) and new_key):
-        return 0
-    moved = 0
-    for state in list(connected_clients.values()):
-        if state.get('session') == key:
-            state['session'] = new_key
-            state['session_version'] = _int_or_zero(version)
-            moved += 1
-    return moved
-
-
 def apply_session_end_here(data) -> int:
     """A session end told by any process, applied to this one's sockets."""
     if not isinstance(data, dict):
         return 0
-    if 'moved' in data:
-        return move_session_here(data.get('moved'), data.get('to'), data.get('version'))
     if 'user' in data:
         return cut_account_here(data.get('user'), data.get('below'), data.get('spare'))
     if 'epoch_below' in data:
@@ -516,15 +500,6 @@ def end_sockets_before_epoch(epoch) -> int:
     cut = cut_before_epoch_here(epoch)
     _tell_other_processes({'epoch_below': epoch})
     return cut
-
-
-def move_session_sockets(session_id, new_session_id, version) -> int:
-    key, new_key = session_key(session_id), session_key(new_session_id)
-    if key is None or new_key is None or key == new_key:
-        return 0
-    moved = move_session_here(key, new_key, version)
-    _tell_other_processes({'moved': key, 'to': new_key, 'version': version})
-    return moved
 
 
 @socketio.on('disconnect')

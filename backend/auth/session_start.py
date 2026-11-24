@@ -22,14 +22,9 @@ def _new_identifier(keep_lock=False):
         replaced = session.sid
     if renew is not None:
         renew(session)
+    # A kept session's sockets follow it nowhere: the request closes those of its old identifier
     if replaced and replaced != getattr(session, 'sid', None):
         close_session_sockets(replaced)
-    elif (keep_lock and before and before != getattr(session, 'sid', None)
-          and not getattr(session, 'store_refused', None)
-          and not getattr(session, 'record_gone', False)):
-        # A kept session's sockets follow it to its new identifier
-        from auth.socket_cuts import session_moved
-        session_moved(before, session.sid, session.get('session_version', 0))
 
 
 # The account's creation time: an id handed out again (SQLite reuses the last
