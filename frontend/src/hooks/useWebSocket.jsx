@@ -68,6 +68,10 @@ export const ConnectionState = {
 
 const WebSocketContext = createContext(null);
 
+// A session renewal closes every socket of the old identifier: one reconnection, after its
+// answer set the new cookie; a refused handshake (a stolen copy, a session gone) is not retried
+export const SERVER_CUT_RECONNECT_MS = 1500;
+
 // A server event means somebody else changed the data. The pages refresh on
 // the in-app `ucm:data-changed` bus, which only the acting tab used to fire,
 // so another operator's revocation showed a toast beside a stale table.
@@ -220,6 +224,7 @@ export function WebSocketProvider({ children }) {
   tRef.current = t;
   const muteUntilRef = useRef(0);
   const hasConnectedRef = useRef(false);
+  const reconnectTimerRef = useRef(null);
   
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
@@ -247,6 +252,12 @@ export function WebSocketProvider({ children }) {
     socket.on('disconnect', (reason) => {
       if (import.meta.env.DEV) console.log('[WebSocket] Disconnected:', reason);
       setConnectionState(ConnectionState.DISCONNECTED);
+      if (reason !== 'io server disconnect') return;
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (socketRef.current === socket && !socket.connected) socket.connect();
+      }, SERVER_CUT_RECONNECT_MS);
     });
     
     socket.on('connect_error', (error) => {
@@ -285,6 +296,8 @@ export function WebSocketProvider({ children }) {
   }, []);
   
   const disconnect = useCallback(() => {
+    clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = null;
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current = null;

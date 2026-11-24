@@ -2,13 +2,14 @@
 
 A socket that only listens never revalidates: without this cut, a session closed by a
 credential change, a factor change, an administrator or a restore would keep receiving
-events. Registered at the change, run after the commit (a reconnecting socket then meets
-the ended session), forgotten on a rollback.
+events. Registered at the change, run after the root commit (a reconnecting socket then meets
+the ended session), forgotten with the transaction or savepoint that registered it when it
+rolls back.
 """
 import logging
 
 from sqlalchemy import event, inspect
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, scoped_session
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,19 @@ _OWED = '_ucm_owed_socket_cuts'
 
 
 def _on_commit(db_session, cut):
-    db_session.info.setdefault(_PENDING, []).append(cut)
+    """``cut`` runs at the root commit, unless the innermost transaction open now rolls back."""
+    if isinstance(db_session, scoped_session):
+        db_session = db_session()
+    registered_in = db_session.get_nested_transaction() or db_session.get_transaction()
+    db_session.info.setdefault(_PENDING, []).append((registered_in, cut))
+
+
+def _within(transaction, ancestor) -> bool:
+    while transaction is not None:
+        if transaction is ancestor:
+            return True
+        transaction = transaction.parent
+    return False
 
 
 def _websocket():
@@ -26,7 +39,7 @@ def _websocket():
 
 
 def _callers_session(user_id, replaced):
-    """The caller's own session id when ``keep_current_session`` may keep it, else None."""
+    """The caller's own session id when ``keep_current_session`` may renew it, else None."""
     from flask import g, has_request_context, session
     if not has_request_context():
         return None
@@ -38,7 +51,8 @@ def _callers_session(user_id, replaced):
 
 
 def _owe(session_id):
-    """The spared caller's session: cut at the end of the request unless it moved (kept)."""
+    """The spared caller's session: every socket of it closes at the end of the request, once a
+    renewal moved the record (a stolen copy's too; the caller's tabs reconnect with the new cookie)."""
     from flask import after_this_request, g, has_request_context
     if not session_id or not has_request_context():
         return
@@ -59,24 +73,14 @@ def _owe(session_id):
 
 def account_sessions_ended(db_session, user_id, new_version):
     """``user_id``'s sessions under ``new_version`` end with ``db_session``'s transaction:
-    their sockets close at its commit, but the caller's, which keep_current_session may keep."""
+    their sockets close at its commit, but the caller's, which close at the end of the request,
+    after keep_current_session renewed it or not (_owe)."""
     spare = _callers_session(user_id, new_version - 1)
 
     def cut():
         _owe(spare)
         _websocket().end_account_sockets(user_id, below=new_version, spare_session_id=spare)
     _on_commit(db_session, cut)
-
-
-def session_moved(session_id, new_session_id, version):
-    """A kept session moved to a new identifier: its sockets follow it, none is owed a cut."""
-    from flask import g, has_request_context
-    if has_request_context():
-        (g.get(_OWED) or set()).discard(session_id)
-    try:
-        _websocket().move_session_sockets(session_id, new_session_id, version)
-    except Exception as exc:  # noqa: BLE001  # the socket then dies at its revalidation
-        logger.warning("WebSocket sockets not moved with their session: %s", exc)
 
 
 def epoch_advanced(db_session, epoch):
@@ -101,11 +105,19 @@ def _accounts_closed(db_session, _flush_context, _instances):
 def _cut_after_commit(db_session):
     if db_session.in_nested_transaction():
         return  # a savepoint: the root transaction may still roll back
-    for cut in db_session.info.pop(_PENDING, None) or ():
+    for _registered_in, cut in db_session.info.pop(_PENDING, None) or ():
         try:
             cut()
         except Exception as exc:  # noqa: BLE001  # never fails the committed change
             logger.warning("WebSocket sockets of ended sessions not closed: %s", exc)
+
+
+@event.listens_for(Session, 'after_soft_rollback')
+def _forget_savepoint_cuts(db_session, previous_transaction):
+    """A savepoint rolled back: the cuts it, or a savepoint released inside it, registered go."""
+    pending = db_session.info.get(_PENDING)
+    if pending and previous_transaction.nested:
+        pending[:] = [(tx, cut) for tx, cut in pending if not _within(tx, previous_transaction)]
 
 
 @event.listens_for(Session, 'after_transaction_end')

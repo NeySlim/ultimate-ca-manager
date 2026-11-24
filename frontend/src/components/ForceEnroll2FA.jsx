@@ -8,10 +8,11 @@
  * reloads because AuthContext.checkSession re-reads the flag from /auth/verify.
  * Drawn in the mockup's authPage() card, the step that follows the sign-in.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth, useNotification } from '../contexts'
 import { accountService } from '../services'
+import { holdSignOut } from '../services/apiClient'
 import { AuthFrame, AuthField } from './auth/AuthFrame'
 import { Icon } from './atelier/Icon'
 
@@ -26,6 +27,15 @@ export function ForceEnroll2FA({ onComplete }) {
   const [keyName, setKeyName] = useState('')
   const [registeringKey, setRegisteringKey] = useState(false)
   const [closedSessions, setClosedSessions] = useState(undefined)
+  // Codes of an enrolment saved without its session: no 401 signs out before they are acknowledged
+  const holdingSignOut = useRef(false)
+  const releaseSignOut = () => {
+    if (!holdingSignOut.current) return false
+    holdingSignOut.current = false
+    holdSignOut(false)
+    return true
+  }
+  useEffect(() => () => { releaseSignOut() }, [])
   // The other sessions are mentioned unless the server reports it closed none
   const enrolled = (key, closed) => showSuccess(closed === 0
     ? t(key) : `${t(key)} ${t('account.otherSessionsClosed')}`)
@@ -52,7 +62,11 @@ export function ForceEnroll2FA({ onComplete }) {
     } catch (error) {
       // Saved but the session not kept: the stored codes come with the error, shown once
       const codes = error?.data?.data?.backup_codes
-      if (codes?.length) setBackupCodes(codes)
+      if (codes?.length) {
+        holdSignOut()
+        holdingSignOut.current = true
+        setBackupCodes(codes)
+      }
       showError(error.message || t('auth.invalidTotpCode'))
       setCode('')
     } finally {
@@ -77,7 +91,8 @@ export function ForceEnroll2FA({ onComplete }) {
   }
 
   const handleDone = async () => {
-    enrolled('account.twoFaEnabled', closedSessions)
+    // A session gone: the check below finds no session and the sign-in page follows
+    if (!releaseSignOut()) enrolled('account.twoFaEnabled', closedSessions)
     // Re-check the session: the backend has lifted the enrolment gate, so this
     // promotes the session to full access and clears must_enroll_2fa.
     await onComplete?.()

@@ -292,6 +292,14 @@ def _kek_refusal_ends_with_its_test():
 
 
 @pytest.fixture(autouse=True)
+def _no_socket_timer_after_its_test():
+    # post_worker_init starts the WebSocket revalidation timer: it never outlives its test
+    yield
+    from websocket.events import stop_revalidator
+    stop_revalidator()
+
+
+@pytest.fixture(autouse=True)
 def _no_web_worker_mode_after_its_test():
     # post_worker_init, called by a few tests, marks the process as the gunicorn web worker
     yield

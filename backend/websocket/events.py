@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import socket
+import threading
 import time
 from collections import deque
 from enum import Enum
@@ -124,6 +125,10 @@ MAX_ROOMS_PER_REQUEST = 25
 SUBSCRIPTION_OPS_LIMIT = 30
 SUBSCRIPTION_WINDOW_SECONDS = 60.0
 DEFAULT_REVALIDATE_SECONDS = 60.0
+# The server's own round over its sockets: a socket that only listens is checked within
+# the revalidation delay plus one tick
+REVALIDATE_TICK_SECONDS = 15.0
+REVALIDATOR_NAME = 'WebSocketRevalidator'
 ALERT_SEVERITIES = frozenset({'info', 'warning', 'error', 'critical'})
 
 # Detail keys and values never forwarded with a critical audit event.
@@ -311,6 +316,22 @@ def _drop(sid, reason):
         logger.warning("Could not close WebSocket client: %s", exc)
 
 
+def _refresh(sid, state, identity) -> Optional[str]:
+    """Why the socket must close under its session's ``identity`` as it is now, else None
+    once the scope rooms of its new permissions are joined."""
+    reason = _revalidation_failure(state, identity)
+    if reason:
+        return reason
+    permissions = identity[1]
+    for room in _scope_rooms(permissions) - state['managed_rooms']:
+        join_room(room, sid=sid, namespace='/')
+        state['managed_rooms'].add(room)
+        state['rooms'].add(room)
+    state['permissions'] = permissions
+    state['validated_at'] = _monotonic()
+    return None
+
+
 def _current_client():
     """State of the calling socket, revalidated when due; None once it has been cut."""
     sid = request.sid
@@ -320,19 +341,84 @@ def _current_client():
         return None
     if _monotonic() - state['validated_at'] < _revalidate_after():
         return state
-    identity = _session_identity()
-    reason = _revalidation_failure(state, identity)
+    reason = _refresh(sid, state, _session_identity())
     if reason:
         _drop(sid, reason)
         return None
-    permissions = identity[1]
-    for room in _scope_rooms(permissions) - state['managed_rooms']:
-        join_room(room)
-        state['managed_rooms'].add(room)
-        state['rooms'].add(room)
-    state['permissions'] = permissions
-    state['validated_at'] = _monotonic()
     return state
+
+
+def _check_away(app, sid, state) -> Optional[str]:
+    """``_refresh`` outside any message: the session read again from the socket's handshake."""
+    environ = socketio.server.get_environ(sid, namespace='/')
+    if environ is None:
+        return 'no handshake left'
+    try:
+        with app.request_context(environ):
+            return _refresh(sid, state, _session_identity())
+    except Exception as exc:  # noqa: BLE001  # an unverifiable session is no session
+        logger.warning("WebSocket periodic check failed, treated as no session: %s", exc)
+        return 'session check failed'
+
+
+def revalidate_due_sockets(app) -> int:
+    """This process's sockets due for revalidation, checked against their session as it is now,
+    as their next message would be: one that only listens sends none. Returns the count cut."""
+    with app.app_context():
+        after = _revalidate_after()
+    cut = 0
+    for sid, state in list(connected_clients.items()):
+        if _monotonic() - state['validated_at'] < after:
+            continue
+        reason = _check_away(app, sid, state)
+        if reason and connected_clients.get(sid) is state:
+            logger.info("WebSocket client disconnected by the server: %s", reason)
+            cut += _close_here([sid])
+        socketio.sleep(0)  # under gevent: the requests run between two sockets
+    return cut
+
+
+class _Revalidator:
+    """The process's one timer over its sockets; a thread that gevent's patching makes a greenlet."""
+
+    def __init__(self, app, tick):
+        self.app, self.tick = app, tick
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True, name=REVALIDATOR_NAME)
+
+    def _loop(self):
+        while not self._stop.wait(self.tick):
+            try:
+                revalidate_due_sockets(self.app)
+            except Exception as exc:  # noqa: BLE001  # the next tick tries again
+                logger.error("WebSocket sockets not revalidated: %s", type(exc).__name__)
+
+    def start(self):
+        self._thread.start()
+        return self
+
+    def stop(self, timeout=5.0):
+        self._stop.set()
+        if self._thread is not threading.current_thread():
+            self._thread.join(timeout)
+
+
+_revalidator: Optional[_Revalidator] = None
+
+
+def start_revalidator(app, tick=REVALIDATE_TICK_SECONDS) -> _Revalidator:
+    """Web worker (post_worker_init): one per process, whatever the event transport."""
+    global _revalidator
+    if _revalidator is None:
+        _revalidator = _Revalidator(app, tick).start()
+    return _revalidator
+
+
+def stop_revalidator():
+    global _revalidator
+    revalidator, _revalidator = _revalidator, None
+    if revalidator is not None:
+        revalidator.stop()
 
 
 def _rate_limited(state) -> bool:
@@ -384,9 +470,7 @@ def handle_connect(auth=None):
         return False
     user_id, permissions = identity
     managed = {_user_room(user_id)} | _scope_rooms(permissions)
-    for room in managed:
-        join_room(room)
-    connected_clients[request.sid] = {
+    state = {
         'user_id': user_id,
         'permissions': permissions,
         'managed_rooms': set(managed),
@@ -400,8 +484,34 @@ def handle_connect(auth=None):
         'validated_at': _monotonic(),
         'ops': deque(maxlen=SUBSCRIPTION_OPS_LIMIT),
     }
+    # Listed first, then read again: a cut committed since the check above either finds the
+    # socket listed or shows here
+    connected_clients[request.sid] = state
+    for room in managed:
+        join_room(room)
+    if not _still_current(state) or connected_clients.get(request.sid) is not state:
+        connected_clients.pop(request.sid, None)
+        logger.info("WebSocket connection refused: its session ended during the handshake")
+        return False
     emit('connected', {'status': 'ok', 'user_id': user_id, 'timestamp': _timestamp()})
     return True
+
+
+def _still_current(state) -> bool:
+    """The account is still active, at the socket's session version, under its epoch: read in a
+    new transaction (a SQLite snapshot would show the rows as the check read them)."""
+    from auth.session_epoch import current_epoch
+    from models import User, db
+    try:
+        db.session.rollback()
+        row = db.session.execute(db.select(User.active, User.session_version)
+                                 .where(User.id == state['user_id'])).first()
+        return (row is not None and bool(row.active)
+                and (row.session_version or 0) == state['session_version']
+                and current_epoch() == state['epoch'])
+    except Exception as exc:  # noqa: BLE001  # an unverifiable session is no session
+        logger.warning("WebSocket session check failed, treated as no session: %s", exc)
+        return False
 
 
 def _int_or_zero(value) -> int:
@@ -452,26 +562,10 @@ def cut_before_epoch_here(epoch) -> int:
     return _cut_where(lambda state: state.get('epoch', 0) < epoch, 'sessions a restore ended')
 
 
-def move_session_here(key, new_key, version) -> int:
-    """This process's sockets of session ``key`` now name ``new_key``, where it moved, and its
-    ``version``: a later end of the moved session closes them."""
-    if not (isinstance(key, str) and key and isinstance(new_key, str) and new_key):
-        return 0
-    moved = 0
-    for state in list(connected_clients.values()):
-        if state.get('session') == key:
-            state['session'] = new_key
-            state['session_version'] = _int_or_zero(version)
-            moved += 1
-    return moved
-
-
 def apply_session_end_here(data) -> int:
     """A session end told by any process, applied to this one's sockets."""
     if not isinstance(data, dict):
         return 0
-    if 'moved' in data:
-        return move_session_here(data.get('moved'), data.get('to'), data.get('version'))
     if 'user' in data:
         return cut_account_here(data.get('user'), data.get('below'), data.get('spare'))
     if 'epoch_below' in data:
@@ -516,15 +610,6 @@ def end_sockets_before_epoch(epoch) -> int:
     cut = cut_before_epoch_here(epoch)
     _tell_other_processes({'epoch_below': epoch})
     return cut
-
-
-def move_session_sockets(session_id, new_session_id, version) -> int:
-    key, new_key = session_key(session_id), session_key(new_session_id)
-    if key is None or new_key is None or key == new_key:
-        return 0
-    moved = move_session_here(key, new_key, version)
-    _tell_other_processes({'moved': key, 'to': new_key, 'version': version})
-    return moved
 
 
 @socketio.on('disconnect')

@@ -47,7 +47,8 @@ def test_a_session_closed_by_a_credential_change_cuts_its_socket_at_its_next_req
     assert _post(second, '/api/v2/account/sessions/revoke-all').status_code == 200
     assert first.get('/api/v2/account/profile').status_code == 401
     assert not ws_first.is_connected()
-    assert _sid(ws_second) in events.connected_clients and ws_second.is_connected()
+    # The caller's renewed session opens its socket again with its new cookie
+    assert not ws_second.is_connected() and _reconnects(app, second) is not None
 
 
 def test_an_expired_session_cuts_its_socket_at_its_next_request(app, two_sessions, monkeypatch):
@@ -126,6 +127,21 @@ def _still_live(ws):
     return [m['name'] for m in ws.get_received()][-1:] == ['pong']
 
 
+def _copy_of(app, client):
+    """Another client holding the same session cookie, as a stolen copy would."""
+    copy = app.test_client()
+    copy.set_cookie('session', client.get_cookie('session').value)
+    return copy
+
+
+def _reconnects(app, client):
+    """A fresh socket on the client's cookie, as the browser's one reconnection opens; None
+    when the handshake refuses it."""
+    from websocket import socketio
+    ws = socketio.test_client(app, flask_test_client=client)
+    return ws if ws.is_connected() else None
+
+
 @pytest.mark.parametrize('gesture', sorted(GESTURES))
 def test_a_gesture_that_closes_the_account_sessions_cuts_their_sockets_at_once(
         app, make_user, two_sessions, gesture):  # noqa: F811
@@ -139,23 +155,49 @@ def test_a_gesture_that_closes_the_account_sessions_cuts_their_sockets_at_once(
         assert r.status_code == 200, r.data
         assert not ws_first.is_connected()
         assert _sid(ws_first) not in events.connected_clients
+        assert not ws_second.is_connected()
         if own:
-            assert ws_second.is_connected() and _still_live(ws_second)
+            # The renewed session keeps no socket of its old key: its tabs reconnect once
+            assert not ws_actor.is_connected()
+            ws_back = _reconnects(app, second)
+            assert ws_back is not None and _still_live(ws_back)
             socketio.emit('event', {'type': 'probe'}, to=f"user:{user['id']}")
-            assert [m['name'] for m in ws_second.get_received()] == ['event']
+            assert [m['name'] for m in ws_back.get_received()] == ['event']
+            ws_back.disconnect()
         else:
-            assert not ws_second.is_connected()
-        assert _still_live(ws_actor)
+            assert _still_live(ws_actor)
 
 
-def test_the_kept_session_socket_moves_with_it_and_its_sign_out_cuts_it(app, two_sessions):
-    """Spared by the change, the caller's socket follows its session to the new identifier."""
+@pytest.mark.parametrize('gesture', ['revoke-all', 'own-password'])
+def test_a_renewal_cuts_a_stolen_copy_of_the_kept_session_and_refuses_its_return(
+        app, two_sessions, gesture):
+    """The copy holds the caller's old cookie: its socket goes with the caller's, and only the
+    renewed cookie opens one again."""
+    from websocket import socketio
+    user, (_first, _ws_first), (second, ws_second) = two_sessions
+    thief = _copy_of(app, second)
+    with _socket(app, thief) as ws_thief:
+        assert ws_thief.is_connected() and _key_of(ws_thief) == _key_of(ws_second)
+        assert GESTURES[gesture][1](second, user['id']).status_code == 200
+        assert not ws_thief.is_connected() and not ws_second.is_connected()
+        assert _reconnects(app, thief) is None
+        assert thief.get('/api/v2/account/profile').status_code == 401
+        ws_back = _reconnects(app, second)
+        assert ws_back is not None
+        socketio.emit('event', {'type': 'probe'}, to=f"user:{user['id']}")
+        assert [m['name'] for m in ws_back.get_received()][-1:] == ['event']
+        ws_back.disconnect()
+
+
+def test_the_renewed_session_socket_reopens_and_its_sign_out_cuts_it(app, two_sessions):
     _user, (_first, ws_first), (second, ws_second) = two_sessions
     _own_password = GESTURES['own-password'][1]
     assert _own_password(second, None).status_code == 200
-    assert not ws_first.is_connected() and ws_second.is_connected()
+    assert not ws_first.is_connected() and not ws_second.is_connected()
+    ws_back = _reconnects(app, second)
+    assert ws_back is not None
     assert _post(second, '/api/v2/auth/logout').status_code == 200
-    assert not ws_second.is_connected()
+    assert not ws_back.is_connected()
 
 
 def test_the_caller_socket_is_cut_when_its_session_is_not_kept(app, two_sessions, monkeypatch):
@@ -184,6 +226,41 @@ def test_a_bump_rolled_back_cuts_nothing(app, two_sessions):
     assert ws_first.is_connected() and ws_second.is_connected()
 
 
+class _Undone(Exception):
+    pass
+
+
+@pytest.mark.parametrize('nesting', ['savepoint', 'savepoint-in-savepoint'])
+def test_a_bump_in_a_savepoint_rolled_back_cuts_nothing(app, two_sessions, nesting):
+    """The root transaction commits, the savepoint that ended the sessions did not."""
+    from models import User, db
+    user, (_first, ws_first), (_second, ws_second) = two_sessions
+    with app.app_context():
+        with pytest.raises(_Undone):
+            with db.session.begin_nested():
+                if nesting == 'savepoint':
+                    db.session.get(User, user['id']).end_sessions()
+                else:
+                    with db.session.begin_nested():  # released, then undone with its parent
+                        db.session.get(User, user['id']).end_sessions()
+                raise _Undone()
+        db.session.commit()
+        db.session.remove()
+    assert ws_first.is_connected() and ws_second.is_connected()
+
+
+def test_a_bump_in_a_savepoint_released_cuts_at_the_root_commit(app, two_sessions):
+    from models import User, db
+    user, (_first, ws_first), (_second, ws_second) = two_sessions
+    with app.app_context():
+        with db.session.begin_nested():
+            db.session.get(User, user['id']).end_sessions()
+        assert ws_first.is_connected()  # the root may still roll back
+        db.session.commit()
+        db.session.remove()
+    assert not ws_first.is_connected() and not ws_second.is_connected()
+
+
 def test_a_restore_epoch_cuts_every_socket_opened_before_it(app, two_sessions):
     from auth.session_epoch import advance_epoch
     from models import db
@@ -207,20 +284,56 @@ class TestAccountCutOnOtherProcesses:
         monkeypatch.setattr(events, '_relay_emits_here', True)
         return published
 
-    def test_the_relay_hears_the_account_and_the_spared_session_key_only(
+    def test_the_relay_hears_the_account_then_the_cut_of_the_renewed_session_old_key(
             self, app, two_sessions, monkeypatch):
         user, (_first, _ws_first), (second, ws_second) = two_sessions
         spared = _key_of(ws_second)
         published = self._publisher(monkeypatch)
         assert _post(second, '/api/v2/account/sessions/revoke-all').status_code == 200
-        ended = [p for room, p in published if room == events.SESSION_END_ROOM and 'user' in p]
-        assert len(ended) == 1
+        ended = [p for room, p in published if room == events.SESSION_END_ROOM]
+        assert len([p for p in ended if 'user' in p]) == 1
         assert ended[0]['user'] == user['id'] and ended[0]['spare'] == spared
         assert isinstance(ended[0]['below'], int)
-        moved = [p for room, p in published if room == events.SESSION_END_ROOM and 'moved' in p]
-        assert [p['moved'] for p in moved] == [spared]
+        # Every node then closes the old key's sockets, a stolen copy's among them; none moves
+        assert {'type': events.SESSION_END_EVENT, 'session': spared} in ended[1:]
+        assert not [p for p in ended if 'moved' in p]
         # No session id, a credential, reaches the shared table
         assert second.get_cookie('session').value not in str(published)
+
+    def test_a_relayed_cut_of_an_old_key_closes_every_socket_of_it_here(
+            self, app, two_sessions):
+        """A stolen copy's socket on another node: the relayed cut of the old key closes it."""
+        from services import ws_relay
+        from tests.test_websocket_session_lock import _wait_for
+        _user, (_first, ws_first), (second, ws_second) = two_sessions
+        with _socket(app, _copy_of(app, second)) as ws_thief:
+            ws_relay._emit_local(events.SESSION_END_ROOM, {
+                'type': events.SESSION_END_EVENT, 'session': _key_of(ws_second)})
+            assert _wait_for(lambda: not ws_thief.is_connected())
+            assert not ws_second.is_connected() and ws_first.is_connected()
+
+    def test_the_redis_queue_carries_the_cut_of_an_old_key(self, app, two_sessions):
+        _user, (_first, ws_first), (second, ws_second) = two_sessions
+        sent = []
+
+        class Base:
+            def _handle_emit(self, message):
+                sent.append(message)
+
+        with _socket(app, _copy_of(app, second)) as ws_thief:
+            events._session_ending(Base)()._handle_emit({
+                'method': 'emit', 'event': events.SESSION_END_EVENT,
+                'data': [{'session': _key_of(ws_second)}], 'room': events.SESSION_END_ROOM,
+                'namespace': '/'})
+            assert not ws_thief.is_connected() and not ws_second.is_connected()
+            assert ws_first.is_connected() and sent == []
+
+    def test_a_moved_notice_moves_no_socket(self, app, two_sessions):
+        """The notice that once renamed a session's sockets is not honoured: nothing follows."""
+        _user, (_first, ws_first), (_second, _ws_second) = two_sessions
+        key = _key_of(ws_first)
+        assert events.apply_session_end_here({'moved': key, 'to': 'f' * 32, 'version': 99}) == 0
+        assert _key_of(ws_first) == key
 
     def test_a_relayed_account_cut_closes_the_sockets_here_but_the_spared_one(
             self, app, two_sessions):

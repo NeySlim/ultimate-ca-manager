@@ -8,6 +8,7 @@ import json
 import sqlite3
 
 from services import jobs
+from tests.test_session_lock_and_info import make_user  # noqa: F401 (fixture)
 from tests.test_restore_held_database import (  # noqa: F401 (fixture)
     PASSWORD, _admin_user, _api_key, busy_app, writing)
 
@@ -84,3 +85,28 @@ def test_a_mark_made_before_the_block_stays(app):
         with lock_not_marked():
             pass
         assert _marked()
+
+
+def test_a_change_saved_but_its_session_not_kept_keeps_its_500_and_its_codes(app, make_user,
+                                                                             monkeypatch):
+    """A lock met by the request does not turn that answer into a bodiless 503: the recovery
+    codes it alone carries would be lost, and the change it reports is committed."""
+    import pyotp
+    import api.v2.account.twofa as twofa
+    from auth.session_start import SessionNotKept
+    from tests.test_session_lock_and_info import _password_session, _post
+    client = _password_session(app, make_user())
+    r = _post(client, '/api/v2/account/2fa/enable')
+    assert r.status_code == 200, r.data
+    secret = r.get_json()['data']['secret']
+
+    def not_kept_after_a_lock(user):
+        _mark()
+        raise SessionNotKept()
+    monkeypatch.setattr(twofa, 'keep_own_session', not_kept_after_a_lock)
+    r = _post(client, '/api/v2/account/2fa/confirm', {'code': pyotp.TOTP(secret).now()})
+    assert r.status_code == 500, r.data
+    body = r.get_json()
+    assert body['message'] == twofa.CODES_ENABLED_NOT_KEPT
+    assert len(body['data']['backup_codes']) == 8
+    assert 'Retry-After' not in r.headers
