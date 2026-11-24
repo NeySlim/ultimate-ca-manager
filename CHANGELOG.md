@@ -265,6 +265,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A Microsoft CA request held for approval says so.** Its `disposition_message` is `Pending approval on the CA` instead of the `An unknown error occured` that the certsrv library gives for a page it cannot read.
 - **A long server name no longer breaks the HTTPS settings on a phone.** The common name and issuer of the HTTPS certificate wrap after their dots and go under their term, instead of being cut mid-word.
 - **A certificate opened while a search is still pending stays open.** The search that lands a moment later keeps it in the address and in the inspector instead of closing it.
 - **Live updates behind a reverse proxy on port 443.** The WebSocket accepts the origin of the admin base URL as soon as it is saved, on every node, a default port making no difference (`https://host:443` is `https://host`), and refuses any other origin, as any address outside the admin allowlist, with 403 before the upgrade and a warning in the log, instead of a 101 closed at once (#453).

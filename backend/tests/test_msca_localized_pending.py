@@ -114,6 +114,23 @@ class TestSubmitAndPollLocalized:
             assert result['status'] == 'pending'
             assert result['ms_request_id'] == 25
 
+    def test_a_pending_request_says_so_not_the_library_text(self, app, monkeypatch):
+        """The stored disposition is UCM's, never certsrv's fallback text for a page it cannot read."""
+        msca_id = _make_conn(app)
+        from services.msca.connection import MicrosoftCAConnectionMixin
+        from models import db
+        from models.msca import MSCARequest
+        err = _CertsrvErr('An unknown error occured', FR_SUBMIT_PENDING)
+        monkeypatch.setattr(MicrosoftCAConnectionMixin, '_get_client',
+                            staticmethod(lambda msca: _FakeClient(on_get_cert=err)))
+        monkeypatch.setattr(MicrosoftCAConnectionMixin, '_cleanup_client',
+                            staticmethod(lambda c: None))
+        with app.app_context():
+            csr_pem = '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----\n'
+            result = MicrosoftCAService.submit_csr(msca_id, csr_pem, 'WebServer')
+            row = db.session.get(MSCARequest, result['request_id'])
+            assert row.to_dict()['disposition_message'] == 'Pending approval on the CA'
+
     def test_poll_still_pending_on_french_ca(self, app, monkeypatch):
         """Polling a still-pending request on a French CA must not raise (was 500)."""
         msca_id = _make_conn(app)

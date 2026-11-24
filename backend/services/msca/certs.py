@@ -9,6 +9,8 @@ from .requests import MicrosoftCARequestsMixin
 
 logger = logging.getLogger(__name__)
 
+PENDING_MESSAGE = 'Pending approval on the CA'
+
 
 class MicrosoftCACertsMixin:
 
@@ -115,7 +117,8 @@ class MicrosoftCACertsMixin:
                             request_id=ms_request_id,
                             template=template,
                             status='pending',
-                            disposition_message=str(submit_err)[:500],
+                            # certsrv's text for a page it cannot read is no disposition
+                            disposition_message=PENDING_MESSAGE,
                             submitted_at=utc_now(),
                             submitted_by=submitted_by,
                             enrollee_name=enrollee_name,
