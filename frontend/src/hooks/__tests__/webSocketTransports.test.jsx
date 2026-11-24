@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 
-const fakeSocket = { on: vi.fn(), emit: vi.fn(), disconnect: vi.fn(), connected: false }
+const fakeSocket = { on: vi.fn(), emit: vi.fn(), disconnect: vi.fn(), connected: false, io: { on: vi.fn() } }
 const socketIo = vi.hoisted(() => ({ io: vi.fn() }))
 vi.mock('socket.io-client', () => ({ io: (...a) => { socketIo.io(...a); return fakeSocket } }))
 

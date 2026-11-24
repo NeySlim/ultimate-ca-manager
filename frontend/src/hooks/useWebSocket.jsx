@@ -73,6 +73,9 @@ const WebSocketContext = createContext(null);
 // unavailable, cookie not there yet) is tried again after each delay, then left to a rearm
 export const SERVER_CUT_RETRY_MS = [1500, 5000, 15000];
 export const SERVER_CUT_RECONNECT_MS = SERVER_CUT_RETRY_MS[0];
+// A handshake the server never answers (neither connect nor connect_error) once the transport
+// is open is given up after this delay, then tried again on the schedule above
+export const HANDSHAKE_WATCHDOG_MS = 20000;
 // A rearm (an API answer, the tab shown again) tries once, at most once per this interval
 export const REARM_MIN_INTERVAL_MS = 15000;
 
@@ -231,6 +234,7 @@ export function WebSocketProvider({ children }) {
   const reconnectTimerRef = useRef(null);
   const retryStepRef = useRef(0);
   const lastRearmRef = useRef(-Infinity);
+  const handshakeTimerRef = useRef(null);
   
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
@@ -260,9 +264,27 @@ export function WebSocketProvider({ children }) {
         if (socketRef.current === socket && !socket.connected) socket.connect();
       }, delay);
     };
+
+    const stopWatchdog = () => {
+      clearTimeout(handshakeTimerRef.current);
+      handshakeTimerRef.current = null;
+    };
+    socket.io.on('open', () => {
+      stopWatchdog();
+      handshakeTimerRef.current = setTimeout(() => {
+        handshakeTimerRef.current = null;
+        if (socketRef.current !== socket || socket.connected) return;
+        socket.disconnect();
+        setConnectionState(ConnectionState.ERROR);
+        retryLater();
+      }, HANDSHAKE_WATCHDOG_MS);
+    });
+    // A transport lost before the answer: the library reconnects, and its next open re-arms
+    socket.io.on('close', stopWatchdog);
     
     socket.on('connect', () => {
       if (import.meta.env.DEV) console.log('[WebSocket] Connected');
+      stopWatchdog();
       setConnectionState(ConnectionState.CONNECTED);
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -281,6 +303,7 @@ export function WebSocketProvider({ children }) {
     
     socket.on('connect_error', (error) => {
       if (import.meta.env.DEV) console.error('[WebSocket] Connection error:', error);
+      stopWatchdog();
       setConnectionState(ConnectionState.ERROR);
       // Still active: a transport failure the library retries itself; else the server refused
       if (!socket.active) retryLater();
@@ -319,6 +342,8 @@ export function WebSocketProvider({ children }) {
   const disconnect = useCallback(() => {
     clearTimeout(reconnectTimerRef.current);
     reconnectTimerRef.current = null;
+    clearTimeout(handshakeTimerRef.current);
+    handshakeTimerRef.current = null;
     retryStepRef.current = 0;
     if (socketRef.current) {
       socketRef.current.disconnect();
