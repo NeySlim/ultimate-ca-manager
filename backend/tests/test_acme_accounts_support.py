@@ -57,4 +57,15 @@ def test_the_new_accounts_leave_with_their_rows_and_the_old_stay(app):
 
 
 def test_nothing_new_is_nothing_removed(app):
-    assert drop_accounts_but(app, account_ids(app)) == 0
+    # A base that holds accounts: one that removed everything would show here, not on an empty base
+    with app.app_context():
+        held = [_account('held-a'), _account('held-b')]
+        db.session.commit()
+    try:
+        assert drop_accounts_but(app, account_ids(app)) == 0
+        with app.app_context():
+            assert AcmeAccount.query.filter(AcmeAccount.account_id.in_(held)).count() == 2
+    finally:
+        with app.app_context():
+            AcmeAccount.query.filter(AcmeAccount.account_id.in_(held)).delete(synchronize_session=False)
+            db.session.commit()
