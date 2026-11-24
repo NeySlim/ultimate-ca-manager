@@ -197,11 +197,14 @@ test.describe('the account menu', () => {
 
   test('opens on the account card: the avatar beside the name, the facts, Lock and Sign out apart', async ({ page, api }) => {
     await page.goto('/certificates')
-    await page.locator('#user-button').click()
+    const button = page.locator('#user-button')
+    // Until the profile arrives the button shows the initials of the fallback name
+    await expect(button).not.toHaveText('US')
+    await button.click()
     const menu = page.locator('#user-menu')
     const avatar = menu.locator('.auth-user .avatar')
     const name = menu.locator('#user-name')
-    await expect(avatar).toHaveText(await page.locator('#user-button').innerText())
+    await expect(avatar).toHaveText(await button.innerText())
     const a = await box(avatar)
     const n = await box(name)
     expect(a.x + a.width).toBeLessThan(n.x)

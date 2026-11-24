@@ -96,14 +96,25 @@ for (const width of [1600, 3440]) {
       const notice = page.locator('.notice').filter({ hasText: 'one-time Azure setup' })
       await expect(notice).toBeVisible()
       const link = notice.locator('a.text-link')
-      const l = await link.boundingBox() as Box
       // The steps' text node as a whole (the box a reader of overlaps compares) and line by line
-      const steps = await notice.locator('.pre-line').evaluate((el) => {
-        const r = document.createRange()
-        r.selectNodeContents(el)
-        const all = r.getBoundingClientRect()
-        return { bottom: all.bottom, left: all.left, right: all.right, lines: [...r.getClientRects()].map((c) => ({ top: c.top, bottom: c.bottom, left: c.left, right: c.right })) }
+      const measure = async () => ({
+        l: await link.boundingBox() as Box,
+        steps: await notice.locator('.pre-line').evaluate((el) => {
+          const r = document.createRange()
+          r.selectNodeContents(el)
+          const all = r.getBoundingClientRect()
+          return { bottom: all.bottom, left: all.left, right: all.right, lines: [...r.getClientRects()].map((c) => ({ top: c.top, bottom: c.bottom, left: c.left, right: c.right })) }
+        }),
       })
+      // Measured once the layout settles: two readings a frame apart agree
+      let m = await measure()
+      await expect.poll(async () => {
+        const prev = JSON.stringify(m)
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+        m = await measure()
+        return JSON.stringify(m) === prev
+      }).toBe(true)
+      const { l, steps } = m
       for (const line of steps.lines) {
         const apart = line.right <= l.x + 0.5 || line.left >= l.x + l.width - 0.5 || line.bottom <= l.y + 0.5 || line.top >= l.y + l.height - 0.5
         expect(apart).toBe(true)
