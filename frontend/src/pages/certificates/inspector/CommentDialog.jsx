@@ -11,7 +11,7 @@ import { certificatesService } from '../../../services/certificates.service'
 
 export const COMMENT_MAX = 4000
 
-export function CommentDialog({ cert, onClose, onSaved, returnTo }) {
+export function CommentDialog({ cert, onClose, onSaved, returnTo, idPrefix = '' }) {
   const { t } = useTranslation()
   const { showSuccess } = useNotification()
   const [text, setText] = useState(cert.comment || '')
@@ -34,10 +34,10 @@ export function CommentDialog({ cert, onClose, onSaved, returnTo }) {
   }
 
   return (
-    <AtelierDialog size="narrow" title={t('certificates.editComment')} onClose={() => { if (!saving) onClose() }} returnTo={returnTo}>
+    <AtelierDialog size="narrow" title={t(cert.comment ? 'certificates.editComment' : 'certificates.addComment')} onClose={() => { if (!saving) onClose() }} returnTo={returnTo}>
       <form onSubmit={save}>
         <div className="form-fields">
-          <Textarea id={`cert-comment-${cert.id}`} label={t('certificates.comment')} value={text} rows={6} maxLength={COMMENT_MAX}
+          <Textarea id={`${idPrefix}cert-comment-${cert.id}`} label={t('certificates.comment')} value={text} rows={6} maxLength={COMMENT_MAX}
             data-autofocus disabled={saving} onChange={(e) => setText(e.target.value)}
             hint={`${t('certificates.commentHint')} ${t('certificates.commentCount', { length: text.length, max: COMMENT_MAX })}`} />
           {error && <Notice tone="bad">{error}</Notice>}

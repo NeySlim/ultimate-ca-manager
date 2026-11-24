@@ -126,12 +126,13 @@ function Validity({ cert }) {
   )
 }
 
-function Identity({ cert, onOpenRelated, onChanged }) {
+function Identity({ cert, onOpenRelated, onChanged, idPrefix = '' }) {
   const { t } = useTranslation()
   const { hasPermission } = usePermission()
   const [editing, setEditing] = useState(false)
   const canComment = hasPermission('write:certificates')
-  const editId = `cert-comment-edit-${cert.id}`
+  // A detached window shows the same certificate as the dock: its ids carry the window's prefix
+  const editId = `${idPrefix}cert-comment-edit-${cert.id}`
   const sans = sanLines(cert)
   const sig = cert.signature_algorithm ? signatureHashName(cert.signature_algorithm) : null
   const weakSig = /sha-?1|md5/i.test(cert.signature_algorithm || '')
@@ -177,7 +178,7 @@ function Identity({ cert, onOpenRelated, onChanged }) {
         grade && [t('inspector.cert.compliance'), <><span className={`grade ${GRADE_TONES[grade] || 'bad'}`}>{grade}</span> <span className="muted">· {cert.compliance.score}/100</span></>],
       ]} />
       {editing && (
-        <CommentDialog cert={cert} returnTo={editId} onClose={() => setEditing(false)} onSaved={(updated) => {
+        <CommentDialog cert={cert} returnTo={editId} idPrefix={idPrefix} onClose={() => setEditing(false)} onSaved={(updated) => {
           setEditing(false)
           onChanged?.({ ...cert, ...updated })
           window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'certificate', id: cert.id } }))
@@ -252,13 +253,13 @@ function MoreDetails({ cert }) {
   )
 }
 
-export function OverviewPanel({ cert, title, openCa, onOpenRelated, onChanged }) {
+export function OverviewPanel({ cert, title, openCa, onOpenRelated, onChanged, idPrefix }) {
   const { t } = useTranslation()
   return (
     <>
       <div className="detail-overview" data-testid="certificate-overview">
         <Validity cert={cert} />
-        <Identity cert={cert} onOpenRelated={onOpenRelated} onChanged={onChanged} />
+        <Identity cert={cert} onOpenRelated={onOpenRelated} onChanged={onChanged} idPrefix={idPrefix} />
         <section className="overview-chain">
           <h3 className="section-title">{t('inspector.cert.chainOfTrust')}</h3>
           <MiniChain cert={cert} title={title} openCa={openCa} />
