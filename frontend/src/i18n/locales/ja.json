@@ -871,6 +871,7 @@
     "liftLocalRevocationTitle": "ローカル失効の解除",
     "liftLocalRevocationWarning": "UCM はこの失効を公開していません。この CA は秘密鍵なしで保持されており、ここでは CRL も OCSP 応答も署名しません。解除すると、UCM 上で証明書は再び有効になり、失効記録が削除されるため、再インポートしても有効のままです。解除は監査ログに記録されます。",
     "liftLocalRevocationUnknownRisk": "この失効は、UCM が公開の有無を記録する前に登録されました。当時この CA が UCM 内に秘密鍵を保持していた場合、この失効は CRL または OCSP レスポンダーで公開されている可能性があり、クライアントは証明書を失効済みとして扱い続ける場合があります。解除すると、UCM 上で証明書は再び有効になり、失効記録が削除されます。解除は監査ログに記録されます。",
+    "liftLocalRevocationKeyStaysRefused": "この鍵は侵害として失効されています。失効を解除した後も、UCM はこの鍵を拒否し続けます。",
     "localRevocationLifted": "失効を解除しました",
     "liftLocalRevocationFailed": "失効の解除に失敗しました",
     "deleteWithoutRevocation": "UCM はこの証明書の失効を公開しません。この CA は秘密鍵なしで保持されているか、UCM に存在しません。削除しても失効にはならず、信頼されている場所では有効のままです。",

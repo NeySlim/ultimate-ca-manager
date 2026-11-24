@@ -871,6 +871,7 @@
     "liftLocalRevocationTitle": "Lokalen Widerruf aufheben",
     "liftLocalRevocationWarning": "UCM hat diesen Widerruf nie veröffentlicht: Die zugehörige CA liegt ohne Schlüssel vor und signiert hier weder CRL noch OCSP-Antworten. Beim Aufheben wird das Zertifikat in UCM wieder gültig und sein Widerrufseintrag gelöscht, sodass ein erneuter Import es gültig lässt. Die Aufhebung wird im Audit-Protokoll festgehalten.",
     "liftLocalRevocationUnknownRisk": "Dieser Widerruf wurde erfasst, bevor UCM festhielt, ob er veröffentlicht wurde. Falls diese CA ihren Schlüssel damals in UCM hielt, wurde der Widerruf möglicherweise in ihrer CRL oder von ihrem OCSP-Responder veröffentlicht, und Clients behandeln das Zertifikat womöglich weiterhin als widerrufen. Beim Aufheben wird das Zertifikat in UCM wieder gültig und sein Widerrufseintrag gelöscht. Die Aufhebung wird im Audit-Protokoll festgehalten.",
+    "liftLocalRevocationKeyStaysRefused": "Sein Schlüssel wurde als kompromittiert widerrufen: UCM lehnt diesen Schlüssel auch nach dem Aufheben weiterhin ab.",
     "localRevocationLifted": "Widerruf aufgehoben",
     "liftLocalRevocationFailed": "Widerruf konnte nicht aufgehoben werden",
     "deleteWithoutRevocation": "UCM veröffentlicht für dieses Zertifikat keinen Widerruf: Die zugehörige CA liegt ohne Schlüssel vor oder ist nicht in UCM vorhanden. Das Löschen widerruft es nicht: Es bleibt überall gültig, wo ihm vertraut wird.",

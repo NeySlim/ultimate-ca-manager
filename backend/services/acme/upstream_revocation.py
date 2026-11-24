@@ -106,9 +106,16 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
         logger.error("Upstream revocation of %s raised: %s", label, exc)
         error = _error_text(exc)
     if error is None:
+        _note_told(cert)
         return REVOKED, None
     logger.warning("Upstream revocation of %s failed: %s", label, error)
     return _owe(cert, order.id, reason, error)
+
+
+def _note_told(cert) -> None:
+    # Told, or owed and sent again until told: the CA publishes it, it is never lifted (#450)
+    from services.cert.local_revocation import note_told_issuer
+    note_told_issuer(cert)
 
 
 def _error_text(exc) -> str:
@@ -139,6 +146,7 @@ def _owe(cert, order_id, reason, error):
         logger.error("Revocation owed by the CA for %s not kept: %s", label, exc)
         kept = False
     if kept:
+        _note_told(cert)
         return OWED, error
     return UNRESOLVED, f'{error}; the retry could not be recorded'
 

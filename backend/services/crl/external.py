@@ -73,7 +73,8 @@ class ExternalCRLMixin:
         and ExternalCRLConflict when the CA can sign for itself or the CRL is
         not newer than the one currently served.
         """
-        ca = db.session.get(CA, ca_id)
+        # Locked as a lift locks it (PostgreSQL): a lift never runs between this check and the commit
+        ca = CA.query.filter_by(id=ca_id).with_for_update().populate_existing().first()
         if not ca:
             raise ValueError(f"CA with id {ca_id} not found")
 
@@ -183,6 +184,9 @@ class ExternalCRLMixin:
             is_external=True,
         )
         db.session.add(crl_metadata)
+        # What this CRL lists reaches relying parties: its records may never be lifted (#450)
+        from services.cert.local_revocation import publish_serials
+        publish_serials(ca, [entry.serial_number for entry in crl])
 
         # Drop the CA's cached OCSP responses in the same transaction: a
         # pre-generated 'good' answer must not outlive a CRL that revokes the

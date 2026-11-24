@@ -231,6 +231,14 @@ describe('certificates of a CA whose revocations UCM does not publish', () => {
     expect(notify.showConfirm.mock.calls[0][0]).toBe('certificates.liftLocalRevocationUnknownRisk')
     expect(svc.certs.liftLocalRevocation).toHaveBeenCalledWith(4, { acknowledgeUnknown: true })
   })
+
+  it('says that a key revoked as compromised stays refused after the lift', async () => {
+    notify.showConfirm.mockResolvedValueOnce(false)
+    const r = run('certificate', { ...REVOKED, revoke_reason: 'keyCompromise', local_revocation_lift: 'local' }, ADMIN)
+    await act(async () => { await r.actions.find(a => a.id === 'liftLocalRevocation').onClick() })
+    expect(notify.showConfirm.mock.calls[0][0]).toBe(
+      'certificates.liftLocalRevocationWarning certificates.liftLocalRevocationKeyStaysRefused')
+  })
 })
 
 describe('key export', () => {

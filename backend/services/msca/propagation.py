@@ -89,4 +89,7 @@ def propagate_revocation(cert, reason) -> Tuple[str, Optional[str]]:
         details=f"Revocation propagated to Microsoft CA '{msca_name}' (reason={reason})",
         success=True,
     )
+    # The Microsoft CA publishes it now: it is never lifted (#450)
+    from services.cert.local_revocation import note_told_issuer
+    note_told_issuer(cert)
     return PROPAGATED, None

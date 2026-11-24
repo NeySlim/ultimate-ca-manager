@@ -1630,6 +1630,7 @@
     "liftLocalRevocationTitle": "Lever une révocation locale",
     "liftLocalRevocationWarning": "UCM n’a jamais publié cette révocation : son AC est détenue sans sa clé et ne signe ici ni CRL ni réponse OCSP. La lever rend le certificat de nouveau valide dans UCM et supprime son enregistrement de révocation, si bien qu’un nouvel import le laisse valide. La levée est consignée au journal d’audit.",
     "liftLocalRevocationUnknownRisk": "Cette révocation a été enregistrée avant qu’UCM ne note si elle était publiée. Si cette AC a eu sa clé dans UCM à ce moment, cette révocation a pu être publiée dans sa CRL ou par son répondeur OCSP, et des clients peuvent encore tenir le certificat pour révoqué. La lever rend le certificat de nouveau valide dans UCM et supprime son enregistrement de révocation. La levée est consignée au journal d’audit.",
+    "liftLocalRevocationKeyStaysRefused": "Sa clé a été révoquée comme compromise : UCM continue de refuser cette clé après la levée.",
     "localRevocationLifted": "Révocation levée",
     "liftLocalRevocationFailed": "Échec de la levée de la révocation",
     "deleteWithoutRevocation": "UCM ne publie aucune révocation pour ce certificat : son AC est détenue sans sa clé, ou n’est pas dans UCM. Le supprimer ne le révoque pas : il reste valide partout où il est approuvé.",
