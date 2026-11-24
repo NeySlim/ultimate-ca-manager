@@ -1155,6 +1155,10 @@ def sign_csr(csr_id):
             validity_notice=validity_notice, extra_san=extra_san, custom_extensions=custom_extensions,
             override=override)
     except Exception as e:
+        refused = locked_refusal(e)
+        if refused is not None:
+            logger.warning(f"CSR {csr_id} not signed: the database is busy with another write")
+            return refused
         logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the request was not signed', 500)
     if approval is not None:
@@ -1335,6 +1339,12 @@ def bulk_sign_csrs():
                     g.current_user, ca, cert, data, item_validity, 'server_cert', None,
                     validity_notice=_item_notice)
             except Exception as e:
+                # Rolled back: a failed flush would otherwise fail every request after this one
+                db.session.rollback()
+                if is_locked(e):
+                    logger.warning(f"Bulk sign: CSR {csr_id} not evaluated, the database is busy with another write")
+                    results['failed'].append({'id': csr_id, 'error': BUSY_MESSAGE})
+                    continue
                 logger.error(f"Policy evaluation failed for CSR {csr_id}: {e}", exc_info=True)
                 results['failed'].append({'id': csr_id, 'error': 'Policy evaluation failed'})
                 continue
@@ -1360,9 +1370,9 @@ def bulk_sign_csrs():
         except (FipsRestricted, TemplateConfigError, RequestRejected) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:
+            # Rolled back: the next requests go on, this one is sent again by its caller
+            db.session.rollback()
             if is_locked(e):
-                # Rolled back: the next requests go on, this one is sent again by its caller
-                db.session.rollback()
                 logger.warning(f"Bulk sign: CSR {csr_id} not signed, the database is busy with another write")
                 results['failed'].append({'id': csr_id, 'error': BUSY_MESSAGE})
                 continue

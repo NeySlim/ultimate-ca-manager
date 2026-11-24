@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { TEST_TIMEOUT_MS } from './e2e/support/timeouts'
 
 // The suite runs against the instance scripts/ci/e2e.sh starts (UCM_E2E_BASE_URL, UCM_E2E_MANAGED=1).
 // e2e/lab needs external services: it runs only when UCM_LAB=1 is set.
@@ -14,12 +15,13 @@ const LAB = lab ? [] : ['lab/**']
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/support/global-setup.ts',
+  globalTeardown: './e2e/support/global-teardown.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // A flaky test is fixed, never replayed
   retries: 0,
   workers: process.env.CI ? 4 : 2,
-  timeout: 60_000,
+  timeout: TEST_TIMEOUT_MS,
   expect: { timeout: 15_000 },
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   outputDir: 'test-results',

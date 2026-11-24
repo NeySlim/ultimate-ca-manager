@@ -68,6 +68,10 @@ class CAcrudMixin:
         _ca_descr = ca.descr
         _ca_name = _ca_descr or getattr(ca, 'subject', None) or f'CA #{_ca_id}'
 
+        # A record that signs for its key may have published any revocation of that key (#450)
+        from services.cert.local_revocation import publish_before_deletion
+        publish_before_deletion(ca)
+
         # Rows that must not outlive the authority. This used to sit in the
         # unit route, which is why the bulk route -- the other caller of this
         # service -- orphaned every one of them.

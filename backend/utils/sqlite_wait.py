@@ -34,6 +34,8 @@ _KEPT = 'ucm_500_kept'
 _WAL = 'ucm_wal'
 SQLITE_BUSY_SNAPSHOT = getattr(sqlite3, 'SQLITE_BUSY_SNAPSHOT', 517)
 BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
+# The mark clients know the answer by (contracts/database_busy.json)
+BUSY_PROBLEM = 'urn:ucm:problem:database-busy'
 
 
 def is_locked(exc) -> bool:
@@ -276,7 +278,7 @@ def _refusal(serve_job=True):
         return cluster_maintenance.refusal(message=cluster_maintenance.HELD_MESSAGE)
     from flask import jsonify
     from utils.response import PROBLEM_CONTENT_TYPE, build_problem
-    response = jsonify(build_problem(BUSY_MESSAGE, 503))
+    response = jsonify(build_problem(BUSY_MESSAGE, 503, problem_type=BUSY_PROBLEM))
     response.mimetype = PROBLEM_CONTENT_TYPE
     response.status_code = 503
     response.headers['Retry-After'] = str(BUSY_RETRY_AFTER_SECONDS)

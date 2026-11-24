@@ -20,6 +20,8 @@ from models.audit_log import AuditLog
 from tests.test_import_issuer_signature import _leaf, _store
 from tests.test_revocation_record_rule import (  # noqa: F401  (issuer is a fixture)
     _on_postgresql, _record, _row, _wait_for_a_lock_waiter, issuer)
+from tests.test_restore_held_database import (  # noqa: F401  (busy_app is a fixture)
+    _admin_user, _client, busy_app)
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
@@ -908,6 +910,268 @@ class TestAKeyGainedPublishesTheRecords:
             assert _rebind(key, old, new)
             db.session.commit()
         assert _records(app, ca[1], real) == [('superseded', True)]
+
+
+def _twin_row(ca):
+    """A second record of ``ca``'s subject and key, holding the key (a re-signed root)."""
+    ca_id, _, ca_cert, ca_key = ca
+    now = datetime.now(timezone.utc)
+    again = (x509.CertificateBuilder().subject_name(ca_cert.subject).issuer_name(ca_cert.subject)
+             .public_key(ca_key.public_key()).serial_number(x509.random_serial_number())
+             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+             .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+             .add_extension(x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()), critical=False)
+             .sign(ca_key, hashes.SHA256()))
+    original = db.session.get(CA, ca_id)
+    return dict(refid=str(uuid.uuid4()), descr='twin record 450', serial=0, prv=_stored_key(ca_key),
+                crt=base64.b64encode(again.public_bytes(serialization.Encoding.PEM)).decode(),
+                subject=original.subject, issuer=original.issuer)
+
+
+def _while_asked(app, monkeypatch, work):
+    """``work`` runs in another thread the first time the revocation asks whether its CA
+    publishes, after its share locks; it is given 2 s, then the revocation goes on."""
+    from services.cert import local_revocation
+    ask, workers, outcome = local_revocation.publishes_revocations, [], {}
+
+    def run():
+        with app.app_context():
+            try:
+                work()
+                db.session.commit()
+            except Exception as e:  # noqa: BLE001
+                db.session.rollback()
+                outcome['work'] = repr(e)
+            finally:
+                db.session.remove()
+
+    def asked(target):
+        answer = ask(target)
+        if not workers:
+            workers.append(threading.Thread(target=run))
+            workers[0].start()
+            workers[0].join(2)  # at once, unless the revocation's lock makes it wait
+        return answer
+    monkeypatch.setattr(local_revocation, 'publishes_revocations', asked)
+    return workers, outcome
+
+
+def _intermediate(app, auth_client, root_id):
+    r = _post(auth_client, '/api/v2/cas', {
+        'type': 'intermediate', 'parentCAId': root_id, 'commonName': f'Sub 450 {uuid.uuid4().hex[:6]}',
+        'keyAlgo': 'RSA', 'keySize': 2048, 'validityYears': 2})
+    assert r.status_code in (200, 201), r.data
+    return r.get_json()['data']['id']
+
+
+class TestARecordOfTheKeyInsertedOrDeleted:
+    """A record of the CA's key that signs publishes the key's records when it is inserted, and
+    again when it is deleted: one inserted while a revocation ran cannot leave it local."""
+
+    def test_a_record_inserted_with_the_key_publishes_the_records(self, app, auth_client, create_ca):
+        ca = _keyless_ca(app, create_ca, 'Twin inserted 450')
+        row_id, real = _leaf_row(app, ca, 'twin-inserted')
+        _revoke(auth_client, row_id)
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        with app.app_context():
+            twin = CA(**_twin_row(ca))
+            db.session.add(twin)
+            db.session.commit()
+            twin_id = twin.id
+        assert _records(app, ca[1], real) == [('superseded', True)]
+        from services.ca_service import CAService
+        with app.app_context():
+            CAService.delete_ca(twin_id)
+        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
+
+    def test_a_signing_record_deleted_publishes_what_it_may_have_signed(self, app, auth_client, create_ca):
+        """A record inserted without its listener (as one whose flush ran before the revocation
+        committed) still publishes the key's records once it is deleted."""
+        from services.ca_service import CAService
+        ca = _keyless_ca(app, create_ca, 'Twin deleted 450')
+        row_id, real = _leaf_row(app, ca, 'twin-deleted')
+        _revoke(auth_client, row_id)
+        with app.app_context():
+            db.session.execute(CA.__table__.insert().values(**_twin_row(ca)))
+            db.session.commit()
+            twin_id = CA.query.filter_by(descr='twin record 450', subject=db.session.get(CA, ca[0]).subject).one().id
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        with app.app_context():
+            assert CAService.delete_ca(twin_id)
+        assert _records(app, ca[1], real) == [('superseded', True)]
+        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
+        assert _row(app, row_id)[0] is True
+
+    def test_a_signing_record_inserted_and_deleted_during_a_revocation_publishes_it(
+            self, app, auth_client, create_ca, monkeypatch):
+        """PostgreSQL: the deletion waits for the revocation's share lock, then sees its record."""
+        from services.ca_service import CAService
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        ca = _keyless_ca(app, create_ca, 'Twin during revocation 450')
+        row_id, real = _leaf_row(app, ca, 'twin-during')
+        with app.app_context():
+            values = _twin_row(ca)
+
+        def insert_then_delete():
+            twin = CA(**values)
+            db.session.add(twin)
+            db.session.commit()
+            assert CAService.delete_ca(twin.id)
+        workers, outcome = _while_asked(app, monkeypatch, insert_then_delete)
+        _revoke(auth_client, row_id)
+        workers[0].join(30)
+        assert 'work' not in outcome, outcome
+        assert _records(app, ca[1], real) == [('superseded', True)]
+        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
+
+    def test_a_key_imported_while_a_ca_is_revoked_publishes_its_record(
+            self, app, auth_client, create_ca, monkeypatch):
+        """PostgreSQL: revoke_ca reads its issuer under the share lock (``hold``)."""
+        from services.ca_service import CAService
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        root = _keyless_ca(app, create_ca, 'Parent during CA revocation 450')
+        with app.app_context():
+            db.session.get(CA, root[0]).prv = _stored_key(root[3])
+            db.session.commit()
+        sub_id = _intermediate(app, auth_client, root[0])
+        _drop_key(app, root[0])
+        stored = _stored_key(root[3])
+
+        def import_the_key():
+            db.session.get(CA, root[0]).prv = stored
+        workers, outcome = _while_asked(app, monkeypatch, import_the_key)
+        with app.app_context():
+            CAService.revoke_ca(sub_id, reason='superseded')
+            serial = db.session.get(CA, sub_id).serial_number
+        workers[0].join(30)
+        assert 'work' not in outcome, outcome
+        with app.app_context():
+            assert [r.published for r in RevokedSerial.query.filter_by(caref=root[1], serial_number=serial)] == [True]
+        _drop_key(app, root[0])
+
+    def test_a_key_imported_while_a_cross_certificate_is_revoked_publishes_its_record(
+            self, app, auth_client, create_ca, monkeypatch):
+        """PostgreSQL: the cross-certificate's revocation reads its issuer under the share lock."""
+        from models.ca_cross_certificate import CACrossCertificate
+        from services.ca import cross_certs
+        from services.smart_import.importer import SmartImporter
+        from tests.fixtures.cross_pki import make_cert, new_key, pem
+        from cryptography.x509.oid import NameOID
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        issuer = _keyless_ca(app, create_ca, 'Cross issuer 450')
+        tag = uuid.uuid4().hex[:8]
+        key_b = new_key()
+        with app.app_context():
+            SmartImporter().execute(pem(make_cert(f'Cross B 450 {tag}', key_b)))
+            b_id = CA.query.filter_by(descr=f'Cross B 450 {tag}').one().id
+        now = datetime.now(timezone.utc)
+        cross = (x509.CertificateBuilder()
+                 .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Cross B 450 {tag}')]))
+                 .issuer_name(issuer[2].subject).public_key(key_b.public_key())
+                 .serial_number(x509.random_serial_number())
+                 .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=300))
+                 .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                 .add_extension(x509.SubjectKeyIdentifier.from_public_key(key_b.public_key()), critical=False)
+                 .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer[3].public_key()),
+                                critical=False)
+                 .sign(issuer[3], hashes.SHA256()))
+        r = auth_client.post(f'/api/v2/cas/{b_id}/cross-certificates', json={'certificate': pem(cross)})
+        assert r.status_code == 201, r.data
+        xid = r.get_json()['data']['id']
+        stored = _stored_key(issuer[3])
+
+        def import_the_key():
+            db.session.get(CA, issuer[0]).prv = stored
+        workers, outcome = _while_asked(app, monkeypatch, import_the_key)
+        with app.app_context():
+            cross_certs.revoke(db.session.get(CACrossCertificate, xid), reason='superseded')
+        workers[0].join(30)
+        assert 'work' not in outcome, outcome
+        with app.app_context():
+            assert [r.published for r in RevokedSerial.query.filter_by(
+                caref=issuer[1], serial_number=str(cross.serial_number))] == [True]
+        _drop_key(app, issuer[0])
+
+
+def test_a_revocation_holds_the_sqlite_write_lock_while_it_reads_its_issuer(busy_app, monkeypatch):
+    """SQLite file: the revocation's writes are flushed before it reads its issuer, so another
+    connection cannot import the key between that read and its commit."""
+    import sqlite3
+    from services.cert import local_revocation
+    app, path = busy_app
+    client = _client(app, _admin_user(app)['username'])
+    r = _post(client, '/api/v2/cas', {'type': 'root', 'commonName': f'Hold flush 450 {uuid.uuid4().hex[:6]}',
+                                      'keyAlgo': 'RSA', 'keySize': 2048, 'validityYears': 5})
+    assert r.status_code in (200, 201), r.data
+    with app.app_context():
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        row = db.session.get(CA, r.get_json()['data']['id'])
+        ca = (row.id, row.refid, x509.load_pem_x509_certificate(base64.b64decode(row.crt)),
+              get_ca_signing_key(row))
+        row.prv = None
+        db.session.commit()
+    row_id, real = _leaf_row(app, ca, 'hold-flush')
+    ask, seen = local_revocation.publishes_revocations, []
+
+    def other_writer_meanwhile(target):
+        other = sqlite3.connect(path, timeout=0, isolation_level=None)
+        try:
+            other.execute('BEGIN IMMEDIATE')
+            other.execute('ROLLBACK')
+            seen.append('written')
+        except sqlite3.OperationalError as e:
+            seen.append(str(e))
+        finally:
+            other.close()
+        return ask(target)
+    monkeypatch.setattr(local_revocation, 'publishes_revocations', other_writer_meanwhile)
+    _revoke(client, row_id)
+    assert seen and seen[0] == 'database is locked', seen
+    assert _records(app, ca[1], real) == [('superseded', False)]
+
+
+def _deadlocks(monkeypatch, times):
+    """The revocation's issuer lock deadlocks (PostgreSQL 40P01) its first ``times`` attempts."""
+    from sqlalchemy.exc import OperationalError
+    from services.cert import local_revocation
+    real, calls = local_revocation.note_publication, []
+
+    class Deadlock(Exception):
+        sqlstate = '40P01'
+
+    def note(*args, **kwargs):
+        calls.append(1)
+        if len(calls) <= times:
+            raise OperationalError('SELECT ... FOR SHARE', {}, Deadlock('deadlock detected'))
+        return real(*args, **kwargs)
+    monkeypatch.setattr(local_revocation, 'note_publication', note)
+    return calls
+
+
+class TestARevocationThatMeetsADeadlock:
+    """Nothing is written before the commit: a deadlock while staging is retried once."""
+
+    def test_the_revocation_is_staged_again_once(self, app, auth_client, issuer, monkeypatch):
+        calls = _deadlocks(monkeypatch, 1)
+        row_id, real = _leaf_row(app, issuer, 'deadlock-once')
+        _revoke(auth_client, row_id)
+        assert len(calls) == 2
+        assert _row(app, row_id)[:2] == (True, 'superseded')
+        assert _records(app, issuer[1], real) == [('superseded', True)]
+        with app.app_context():
+            assert AuditLog.query.filter_by(action='cert_revoked', resource_id=str(row_id)).count() == 1
+
+    def test_a_second_deadlock_fails_the_revocation(self, app, auth_client, issuer, monkeypatch):
+        calls = _deadlocks(monkeypatch, 2)
+        row_id, real = _leaf_row(app, issuer, 'deadlock-twice')
+        r = _post(auth_client, f'/api/v2/certificates/{row_id}/revoke', {'reason': 'superseded'})
+        assert r.status_code >= 500, r.data
+        assert len(calls) == 2
+        assert _row(app, row_id)[0] is False
+        assert _records(app, issuer[1], real) == []
 
 
 class TestARevocationToldToItsIssuer:

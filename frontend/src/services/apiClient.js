@@ -53,10 +53,13 @@ const HTTP_ERROR_MESSAGES = {
   504: 'The server took too long to respond. Please try again.',
 }
 
-// The server's answer to a write that met another one on SQLite (backend utils/sqlite_wait.BUSY_MESSAGE)
+// The server's answer to a write that met another one on SQLite (contracts/database_busy.json):
+// known by its type, its text only from a server that sends no type
+export const BUSY_PROBLEM = 'urn:ucm:problem:database-busy'
 export const BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
 
-export const isBusyRefusal = (status, data) => status === 503 && data?.detail === BUSY_MESSAGE
+export const isBusyRefusal = (status, data) => status === 503
+  && (data?.type === BUSY_PROBLEM || ((!data?.type || data.type === 'about:blank') && data?.detail === BUSY_MESSAGE))
 
 // Retry-After in seconds (RFC 9110 §10.2.3: delay or HTTP date), undefined when absent
 export function parseRetryAfter(value) {

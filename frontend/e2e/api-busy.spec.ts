@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { test, expect } from '@playwright/test'
 import type { APIRequestContext } from '@playwright/test'
-import { Api, ApiError, BUSY_MESSAGE } from './support/api'
+import { Api, ApiError, BUSY_MESSAGE, isBusy } from './support/api'
+
+// What the server writes (backend/tests/test_csr_sign_meets_a_lock.py holds it to the same file)
+const { _doc, ...CONTRACT } = JSON.parse(readFileSync(new URL('../../contracts/database_busy.json', import.meta.url), 'utf8'))
 
 // The seeding API sends again the server's « busy, retry shortly » answer, and only that one, a bounded
 // number of times: checked on a stand-in for the request context, no browser and no instance needed
@@ -85,4 +89,12 @@ test('the sign-in is sent again on a busy answer too', async () => {
   Object.assign(api, { request: busy })
   await api.status('GET', '/certificates')
   expect(waits).toEqual([250, 250, 500, 1000, 2000, 4000])
+})
+
+test('the busy answer is known by its type, whatever its text; its text alone only without a type', () => {
+  expect(isBusy({ status: 503, body: CONTRACT })).toBe(true)
+  expect(isBusy({ status: 503, body: { ...CONTRACT, detail: 'Base occupee' } })).toBe(true)
+  expect(isBusy({ status: 503, body: { detail: BUSY_MESSAGE } })).toBe(true)
+  expect(isBusy({ status: 503, body: { type: 'urn:ucm:problem:cluster-maintenance', detail: BUSY_MESSAGE } })).toBe(false)
+  expect(isBusy({ status: 500, body: CONTRACT })).toBe(false)
 })
