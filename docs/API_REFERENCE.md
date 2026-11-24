@@ -1150,9 +1150,9 @@ Content-Type: application/json
 ```
 
 Requires `admin:system`. Lifts a revocation no relying party ever saw: the issuing CA is held in UCM
-without its key (an imported public CA), is not offline, has no delegated OCSP responder and no external
-CRL, and held none of them when the revocation was recorded or since, so UCM never signed or served a
-CRL or an OCSP answer carrying it. Every stored copy of the certificate (same serial
+without its key (an imported public CA), is not offline, has no delegated OCSP responder, and held none
+of them when the revocation was recorded or since, so UCM never signed a CRL or an OCSP answer carrying
+it; an external CRL UCM serves for the CA does not list it. Every stored copy of the certificate (same serial
 under the CA or a record of its key) becomes valid again and the serial's revocation records are
 deleted, so neither an import nor the hourly repair revokes it again. Each lifted copy is audited
 `certificate_local_revocation_lifted`. The answer is the certificate as `GET` returns it.
@@ -1162,16 +1162,18 @@ deleted, so neither an import nor the hourly repair revokes it again. Each lifte
   whether it was published (an upgraded installation) is lifted only with it, since the CA may have held
   its key at the time; without it the answer is `409` and says the risk.
 - `409` for a published revocation (the CA, or a record of its key, holds its key in UCM, software, HSM or
-  key provider, is offline, has a delegated OCSP responder or an external CRL; or did at the write or
-  since; or an external CRL it serves lists the serial): RFC 6960 §2.2 and RFC 5280 §5.3.1 lift only a
-  `certificateHold`, through unhold. Also `409` for a copy obtained from a Microsoft CA or over ACME (UCM
-  tells that CA of the revocation), for a revoked certificate with no revocation record, for one linked
-  to no CA in UCM, or revoked again while the lift ran; `400` for one not revoked. A key revoked as
+  key provider, is offline or has a delegated OCSP responder; or did at the write or since; or UCM signed
+  a CRL for one of them after the revocation; or an external CRL it serves lists the serial): RFC 6960
+  §2.2 and RFC 5280 §5.3.1 lift only a `certificateHold`, through unhold. Also `409` for a copy obtained
+  from a Microsoft CA or over ACME (UCM tells that CA of the revocation), for a revoked certificate with no
+  revocation record, for one linked to no CA in UCM, revoked again while the lift ran, or with a copy
+  another operation is changing (try again); `400` for one not revoked. A key revoked as
   compromised stays refused after the lift; `500` when it could not be kept, nothing lifted.
 
 `GET /api/v2/certificates/{cert_id}` reports `revocation_published` (whether a revocation reaches relying
-parties: the issuing CA publishes revocations, or the certificate comes from a Microsoft CA or over ACME;
-`false` lets a valid certificate be deleted without revocation) and `local_revocation_lift`:
+parties: the issuing CA publishes revocations, the external CRL UCM serves for it lists the serial, or
+the certificate comes from a Microsoft CA or over ACME; `false` lets a valid certificate be deleted
+without revocation) and `local_revocation_lift`:
 `local`, `unknown` (lift needs `acknowledge_unknown_publication`) or `null` (nothing to lift).
 
 ### Import Certificate
