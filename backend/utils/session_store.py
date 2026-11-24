@@ -118,8 +118,9 @@ def carries_lock(session):
     return is_locked(session)
 
 
-# A move leaves this long, under MOVED_PREFIX + the old store id, the new identifier: a
-# sign-out opened before the move and saved after it ends the session there too
+# A move leaves this long, under the store prefix + MOVED_PREFIX + the old identifier, the new
+# one: a sign-out opened before the move and saved after it ends the session there too. A
+# generated identifier never holds a colon, and a cookie starting with MOVED_PREFIX opens nothing
 MOVED_PREFIX = 'moved:'
 MOVED_TTL = 300
 MOVED_HOPS = 5
@@ -154,15 +155,25 @@ class KeepsRemovedRecordsGone:
     session that moves to a new identifier (rotate)."""
 
     def open_session(self, app, request):
-        opened = super().open_session(app, request)
         sid = request.cookies.get(app.config['SESSION_COOKIE_NAME'])
         if sid and self.use_signer:
             try:
                 sid = self._unsign(app, sid)
             except BadSignature:
                 sid = None
+        if sid and sid.startswith(MOVED_PREFIX):
+            # A move's pointer, never a session: read as no cookie
+            opened = self.session_class(sid=self._generate_sid(self.sid_length),
+                                        permanent=self.permanent)
+        else:
+            opened = super().open_session(app, request)
         opened.stored_sid = sid if sid and opened.sid == sid else None
         return opened
+
+    def _pointer_id(self, store_id):
+        """Where a move of ``store_id`` leaves its pointer, under the store's own prefix."""
+        sid = store_id[len(self.key_prefix):] if store_id.startswith(self.key_prefix) else store_id
+        return self._get_store_id(MOVED_PREFIX + sid)
 
     @staticmethod
     def _opened_from_store(session):
@@ -308,11 +319,11 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
             return
         keep_stored_lock(session, stored)
         FileSystemSessionInterface._upsert_session(self, session_lifetime, session, store_id)
-        self.cache.set(MOVED_PREFIX + old_id, moved_pointer(session.sid), MOVED_TTL)
+        self.cache.set(self._pointer_id(old_id), moved_pointer(session.sid), MOVED_TTL)
         FileSystemSessionInterface._delete_session(self, old_id)
 
     def _moved_to(self, store_id):
-        return moved_target(self.cache.get(MOVED_PREFIX + store_id))
+        return moved_target(self.cache.get(self._pointer_id(store_id)))
 
 
 class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInterface):
@@ -476,7 +487,7 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
                 continue
             s.add(model(session_id=store_id, data=self.serializer.encode(session), expiry=expiry))
             # The pointer commits with the move: a removal finding the old row gone reads it
-            pointer = MOVED_PREFIX + old_id
+            pointer = self._pointer_id(old_id)
             s.query(model).filter_by(session_id=pointer).delete(synchronize_session=False)
             s.add(model(session_id=pointer, data=self.serializer.encode(moved_pointer(session.sid)),
                         expiry=datetime.utcnow() + timedelta(seconds=MOVED_TTL)))
@@ -490,7 +501,7 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
         model = self.sql_session_model
         with self._store() as s:
             row = (s.query(model.data)
-                   .filter(model.session_id == MOVED_PREFIX + store_id,
+                   .filter(model.session_id == self._pointer_id(store_id),
                            model.expiry > datetime.utcnow()).first())
         return moved_target(self.serializer.decode(want_bytes(row.data))) if row else None
 
