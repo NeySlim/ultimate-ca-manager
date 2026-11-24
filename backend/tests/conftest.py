@@ -453,7 +453,7 @@ _LEAK_TABLES = (
     'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
     'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
     'windows_enrollment_profiles', 'hsm_providers', 'pro_sso_providers', 'user_sso_identities',
-    'ssh_cas', 'ssh_certificates',
+    'ssh_cas', 'ssh_certificates', 'acme_accounts',
 )
 # Tables whose rows are compared too: a default profile edited in place keeps the count.
 _LEAK_CONTENT = {'windows_enrollment_profiles': ('updated_at', 'updated_by')}
@@ -548,6 +548,26 @@ def _shared_tables_stay_in_their_module(request):
         pytest.fail(message)
     import warnings
     warnings.warn(message, stacklevel=1)
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _acme_accounts_stay_in_their_module():
+    """The ACME accounts a file created leave with it, before the leak check above: a later
+    file that lists, counts or pages through the accounts sees its own only."""
+    from tests.acme_accounts_support import account_ids, drop_accounts_but
+    app = _SESSION_APP[0] if _SESSION_APP else None
+    try:
+        before = account_ids(app) if app is not None else None
+    except Exception:
+        before = None  # no ACME table in this database (a file that resets or migrates it)
+    yield
+    if before is None:
+        return
+    try:
+        drop_accounts_but(app, before)
+    except Exception as exc:
+        import warnings
+        warnings.warn(f'ACME accounts of this file not removed: {type(exc).__name__}: {exc}', stacklevel=1)
 
 
 def _drop_planner_statistics():
