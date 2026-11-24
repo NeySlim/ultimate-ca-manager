@@ -22,6 +22,8 @@ from tests.test_revocation_record_rule import (  # noqa: F401  (issuer is a fixt
     _on_postgresql, _record, _row, _wait_for_a_lock_waiter, issuer)
 from tests.test_restore_held_database import (  # noqa: F401  (busy_app is a fixture)
     _admin_user, _client, busy_app)
+from tests.test_approval_revoke_renew import (  # noqa: F401  (scoped is a fixture)
+    _cert, _json, _login, _request, scoped)
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
@@ -1152,7 +1154,12 @@ def _deadlocks(monkeypatch, times):
 
 
 class TestARevocationThatMeetsADeadlock:
-    """Nothing is written before the commit: a deadlock while staging is retried once."""
+    """A deadlock while staging rolls back the staging's savepoint only, then it is retried once."""
+
+    @pytest.fixture(autouse=True)
+    def _postgresql_only(self, app):
+        if not _on_postgresql(app):
+            pytest.skip('a deadlock is PostgreSQL behaviour; SQLite has none')
 
     def test_the_revocation_is_staged_again_once(self, app, auth_client, issuer, monkeypatch):
         calls = _deadlocks(monkeypatch, 1)
@@ -1172,6 +1179,76 @@ class TestARevocationThatMeetsADeadlock:
         assert len(calls) == 2
         assert _row(app, row_id)[0] is False
         assert _records(app, issuer[1], real) == []
+
+    @pytest.mark.usefixtures('drop_new_users')
+    def test_an_approval_keeps_its_vote_and_duplicates(self, app, create_user, scoped, monkeypatch):
+        """Only the revocation's savepoint is rolled back: the vote, the request's lock and the
+        duplicate the approval closed stay, and the revocation is staged once more."""
+        ca, _pid = scoped('rv-deadlock')
+        cid = scoped.cert(ca, 'rv-deadlock.example.test')
+        first, _ = _login(app, create_user)
+        second, approver = _login(app, create_user)
+        one = _json(first, 'post', f'/api/v2/certificates/{cid}/revoke',
+                    {'reason': 'superseded'}).get_json()['data']['approval_id']
+        two = _json(second, 'post', f'/api/v2/certificates/{cid}/revoke',
+                    {'reason': 'superseded'}).get_json()['data']['approval_id']
+        calls = _deadlocks(monkeypatch, 1)
+        r = _json(second, 'post', f'/api/v2/approvals/{one}/approve', {})
+        assert r.status_code == 200, r.get_json()
+        assert len(calls) == 2
+        assert _cert(app, cid)['revoked']
+        ap = _request(app, one)
+        assert ap.status == 'approved' and ap.certificate_id == cid
+        assert [v.get('user_id') for v in ap.get_approvals()] == [approver['id']]
+        dup = _request(app, two)
+        assert dup.status == 'cancelled' and dup.get_approvals() == []
+        with app.app_context():
+            assert AuditLog.query.filter_by(action='approval_cancelled', resource_id=str(two)).count() == 1
+
+
+def test_a_ca_deletion_that_meets_a_revocation_holding_its_record_goes_on(
+        app, auth_client, create_ca, monkeypatch):
+    """PostgreSQL: the deletion's update waits on the record a revocation holds, which then asks
+    for the CA rows the deletion holds; the deletion, aborted by the deadlock, is staged again."""
+    from services.ca_service import CAService
+    from services.cert import local_revocation
+    if not _on_postgresql(app):
+        pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+    ca = _keyless_ca(app, create_ca, 'Deleted during revocation 450')
+    row_id, real = _leaf_row(app, ca, 'delete-deadlock')
+    _record(app, ca[1], real, reason='certificateHold', certificate_id=row_id)
+    with app.app_context():
+        db.session.execute(CA.__table__.insert().values(**_twin_row(ca)))
+        db.session.commit()
+        twin_id = CA.query.filter_by(descr='twin record 450', subject=db.session.get(CA, ca[0]).subject).one().id
+        engine = db.engine
+    real_note, workers, outcome = local_revocation.note_publication, [], {}
+
+    def delete_twin():
+        with app.app_context():
+            try:
+                outcome['deleted'] = CAService.delete_ca(twin_id)
+            except Exception as e:  # noqa: BLE001
+                db.session.rollback()
+                outcome['error'] = repr(e)
+            finally:
+                db.session.remove()
+
+    def note(*args, **kwargs):
+        if not workers:
+            workers.append(threading.Thread(target=delete_twin))
+            workers[0].start()
+            with engine.connect() as conn:
+                outcome['waited'] = _wait_for_a_lock_waiter(conn)
+        return real_note(*args, **kwargs)
+    monkeypatch.setattr(local_revocation, 'note_publication', note)
+    _revoke(auth_client, row_id)
+    workers[0].join(30)
+    assert outcome.get('waited') and 'error' not in outcome, outcome
+    assert outcome.get('deleted') is True, outcome
+    assert _records(app, ca[1], real) == [('superseded', True)]
+    with app.app_context():
+        assert db.session.get(CA, twin_id) is None
 
 
 class TestARevocationToldToItsIssuer:

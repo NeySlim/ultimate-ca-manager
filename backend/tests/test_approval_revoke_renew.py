@@ -305,6 +305,31 @@ class TestRevocation:
                                          AuditLog.action == 'approval_cancelled').count() == 0
         assert _request(app, approval_id).status == 'pending'
 
+    def test_a_cancellation_released_by_a_savepoint_waits_for_the_outer_commit(
+            self, app, create_user, scoped):
+        from models import AuditLog
+        from services.approval_gate import record_cancellations, resolve_moot_requests
+        ca, _pid = scoped('rv-savepoint')
+        cid = scoped.cert(ca, 'rv-savepoint.example.test')
+        operator, user = _login(app, create_user)
+        approval_id = _json(operator, 'post', f'/api/v2/certificates/{cid}/revoke',
+                            {'reason': 'superseded'}).get_json()['data']['approval_id']
+        with app.app_context():
+            last = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+            # The caller wrote first, as an approval does: the savepoint is not the outermost one
+            db.session.execute(db.update(ApprovalRequest).where(ApprovalRequest.id == approval_id)
+                               .values(status='pending'))
+            with db.session.begin_nested():
+                resolve_moot_requests('revocation', 'certificate_id', cid, outcome='approved',
+                                      username=user['username'], user_id=user['id'],
+                                      reason='Revoked directly', commit=False)
+            db.session.rollback()
+            db.session.commit()
+            record_cancellations()
+            assert AuditLog.query.filter(AuditLog.id > last,
+                                         AuditLog.action == 'approval_cancelled').count() == 0
+        assert _request(app, approval_id).status == 'pending'
+
     def test_a_duplicate_of_the_approver_is_cancelled(self, app, auth_client, create_user, scoped):
         ca, _pid = scoped('rv-dup')
         cid = scoped.cert(ca, 'rv-dup.example.test')

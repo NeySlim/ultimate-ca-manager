@@ -5608,7 +5608,7 @@ The routes are always served; a protocol turned off in Settings refuses its requ
 | 409 | Conflict (resource already exists) |
 | 422 | Unprocessable Entity (validation error) |
 | 500 | Internal Server Error |
-| 503 | Service Unavailable. A write that met another one on SQLite answers with `Retry-After: 5` and the problem type `urn:ucm:problem:database-busy`: nothing was stored, send it again |
+| 503 | Service Unavailable. A write that met another one on SQLite answers with `Retry-After: 5` and the problem type `urn:ucm:problem:database-busy`: the request may be sent again |
 
 ---
 
