@@ -5,6 +5,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm.attributes import set_committed_value
 
 from utils.password_hash import hash_password, needs_rehash, verify_password
+from auth.socket_cuts import account_sessions_ended
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -143,6 +144,7 @@ class User(db.Model):
         new = db.session.execute(select(User.session_version).where(User.id == self.id)).scalar_one()
         set_committed_value(self, 'session_version', new)
         self._sessions_bump = (new - 1, new)
+        account_sessions_ended(db.session, self.id, new)
 
     def reserve_login_attempt(self, max_attempts: int, lockout_seconds: int):
         """Count one login attempt before its secret is checked: ``(rank, armed)``, rank

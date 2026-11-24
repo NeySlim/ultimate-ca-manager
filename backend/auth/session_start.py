@@ -17,12 +17,19 @@ def _new_identifier(keep_lock=False):
         interface, 'regenerate', None)
     # A stored session replaced by a new one (a sign-in) ends: its sockets close once it is gone
     replaced = None
-    if not keep_lock and getattr(session, 'stored_sid', None) == getattr(session, 'sid', None):
+    before = getattr(session, 'sid', None)
+    if not keep_lock and getattr(session, 'stored_sid', None) == before:
         replaced = session.sid
     if renew is not None:
         renew(session)
     if replaced and replaced != getattr(session, 'sid', None):
         close_session_sockets(replaced)
+    elif (keep_lock and before and before != getattr(session, 'sid', None)
+          and not getattr(session, 'store_refused', None)
+          and not getattr(session, 'record_gone', False)):
+        # A kept session's sockets follow it to its new identifier
+        from auth.socket_cuts import session_moved
+        session_moved(before, session.sid, session.get('session_version', 0))
 
 
 # The account's creation time: an id handed out again (SQLite reuses the last
@@ -56,8 +63,14 @@ def begin_session(user, unlocking=False):
 
 class SessionNotKept(Exception):
     """The change is committed, the caller's session could not move to its new identifier:
-    called after the change's audit, the request answers that the change is saved."""
+    called after the change's audit, the request answers that the change is saved, with
+    ``data`` a secret the change shows only once (new recovery codes)."""
     message = 'The change is saved, but this session could not be kept: sign in again'
+
+    def __init__(self, message=None, data=None):
+        super().__init__(message or SessionNotKept.message)
+        self.message = message or SessionNotKept.message
+        self.data = data
 
 
 def keep_current_session(user) -> bool:
@@ -72,6 +85,9 @@ def keep_current_session(user) -> bool:
         _new_identifier(keep_lock=True)
     except Exception as exc:
         raise SessionNotKept() from exc
+    # A move the store refused (held, writes paused) sends no cookie; a record gone is a sign-out
+    if getattr(session, 'store_refused', None):
+        raise SessionNotKept()
     return True
 
 

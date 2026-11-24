@@ -85,6 +85,8 @@ def advance_epoch() -> int:
         # read under the row lock: after the commit the row may already be another node's
         epoch = int(row.value or 0) + 1
         row.value = str(epoch)
+        from auth.socket_cuts import epoch_advanced
+        epoch_advanced(db.session, epoch)
         db.session.commit()
         return epoch
     except Exception:

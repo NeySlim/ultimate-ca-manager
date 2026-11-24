@@ -6,7 +6,7 @@ from flask_session._utils import total_seconds
 from flask_session.redis import RedisSessionInterface
 from redis.exceptions import WatchError
 
-from utils.session_store import (LOCK_MERGE_ATTEMPTS, MOVED_PREFIX, MOVED_TTL,
+from utils.session_store import (LOCK_MERGE_ATTEMPTS, MOVED_TTL,
                                  KeepsRemovedRecordsGone, carries_lock, keep_stored_lock,
                                  moved_pointer, moved_target)
 
@@ -63,7 +63,7 @@ class GuardedRedisSessionInterface(KeepsRemovedRecordsGone, RedisSessionInterfac
         logger.warning("Session not saved: its record kept changing under the save")
 
     def _moved_to(self, store_id):
-        value = self.client.get(MOVED_PREFIX + store_id)
+        value = self.client.get(self._pointer_id(store_id))
         return moved_target(self.serializer.decode(value)) if value else None
 
     def _move(self, session, old_id, store_id, ttl):
@@ -80,7 +80,7 @@ class GuardedRedisSessionInterface(KeepsRemovedRecordsGone, RedisSessionInterfac
                     keep_stored_lock(session, self.serializer.decode(stored))
                     pipe.multi()
                     pipe.set(name=store_id, value=self.serializer.encode(session), ex=ttl)
-                    pipe.set(name=MOVED_PREFIX + old_id, ex=MOVED_TTL,
+                    pipe.set(name=self._pointer_id(old_id), ex=MOVED_TTL,
                              value=self.serializer.encode(moved_pointer(session.sid)))
                     pipe.delete(old_id)
                     pipe.execute()

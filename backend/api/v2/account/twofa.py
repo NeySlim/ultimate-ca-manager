@@ -15,7 +15,8 @@ from utils.backup_codes import (
 )
 from auth.unified import require_auth
 from auth.session_reverify import check_session_password
-from auth.session_start import closed_sessions_note, keep_own_session, other_sessions_closed
+from auth.session_start import (
+    SessionNotKept, closed_sessions_note, keep_own_session, other_sessions_closed)
 from auth.twofa_enforcement import (
     enforcement_active_for, has_security_key, last_factor_refusal, lock_for_factor_change,
     lock_user,
@@ -92,6 +93,20 @@ def enable_2fa():
     )
 
 
+CODES_ENABLED_NOT_KEPT = ('2FA is enabled with these recovery codes, but this session could not be '
+                          'kept: save the codes, then sign in again')
+CODES_REPLACED_NOT_KEPT = ('These recovery codes replace the former ones, but this session could not '
+                           'be kept: save the codes, then sign in again')
+
+
+def _keep_handing_over(user, codes, message):
+    """keep_own_session, whose failure still hands over the codes it stored the hashes of."""
+    try:
+        keep_own_session(user)
+    except SessionNotKept as exc:
+        raise SessionNotKept(message, data={'backup_codes': codes}) from (exc.__cause__ or exc)
+
+
 @bp.route('/api/v2/account/2fa/confirm', methods=['POST'])
 @require_auth(session_only=True)
 def confirm_2fa():
@@ -140,7 +155,7 @@ def confirm_2fa():
         details=f'2FA enabled for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
-    keep_own_session(user)
+    _keep_handing_over(user, backup_codes, CODES_ENABLED_NOT_KEPT)
 
     return success_response(
         data={'backup_codes': backup_codes},
@@ -375,7 +390,7 @@ def regenerate_recovery_codes():
         details=f'Recovery codes regenerated for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
-    keep_own_session(user)
+    _keep_handing_over(user, new_codes, CODES_REPLACED_NOT_KEPT)
     return success_response(
         data={'backup_codes': new_codes},
         message='Recovery codes regenerated. Save them now!',

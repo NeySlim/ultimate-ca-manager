@@ -15,16 +15,30 @@ NEW_PASSWORD = 'Renewal-Fails-After-0k!'
 NOT_KEPT = 'The change is saved, but this session could not be kept: sign in again'
 
 
-def _renewal_fails(monkeypatch, application):
-    """The store refuses the move of the caller's record, as rotate() does when it raises."""
+def _renewal_fails(monkeypatch, application, how='raises'):
+    """The store fails the move of the caller's record: rotate() raises ('raises'), or the
+    store refuses the write without raising ('busy': held, or paused by an HA maintenance)."""
     calls = []
+    interface = type(application.session_interface)
+    if how == 'raises':
+        def rotate(self, session):
+            calls.append(session.sid)
+            session.store_refused = 'busy'
+            raise RuntimeError('session store unreachable (test)')
 
-    def rotate(self, session):
-        calls.append(session.sid)
-        session.store_refused = 'busy'
-        raise RuntimeError('session store unreachable (test)')
+        monkeypatch.setattr(interface, 'rotate', rotate)
+        return calls
+    upsert = interface._upsert_session
 
-    monkeypatch.setattr(type(application.session_interface), 'rotate', rotate)
+    def refusing(self, lifetime, session, store_id):
+        if getattr(session, 'rotated_from', None):
+            calls.append(session.sid)
+            setattr(session, 'store_refused' if how == 'busy' else 'record_gone',
+                    'busy' if how == 'busy' else True)
+            return None
+        return upsert(self, lifetime, session, store_id)
+
+    monkeypatch.setattr(interface, '_upsert_session', refusing)
     return calls
 
 
@@ -82,6 +96,51 @@ def _admin_key(method):
     return _call
 
 
+def _admin_sso(path):
+    """An administrator's change of who opens its own account: attach, reset or detach."""
+    def _call(application, c, user):
+        if path == 'attach':
+            return _post(c, f"/api/v2/users/{user['id']}/sso-identities",
+                         {'provider_id': user['provider_id']})
+        url = f"/api/v2/users/{user['id']}/sso-identities/{user['identity_id']}"
+        return _post(c, f'{url}/reset') if path == 'reset' else c.delete(url)
+    return _call
+
+
+def _sso_setup(application, user, attached):
+    """A provider, and unless ``attached`` is None an attachment of the account, bound when
+    ``attached`` is 'bound' (only a bound identity is reset)."""
+    import uuid
+    from models import UserSSOIdentity
+    from models.sso import SSOProvider
+    with application.app_context():
+        provider = SSOProvider(name=f'renewal-{uuid.uuid4().hex[:8]}', provider_type='oauth2',
+                               enabled=False, oauth2_issuer=f'https://{uuid.uuid4().hex[:8]}.example')
+        db.session.add(provider)
+        db.session.flush()
+        user['provider_id'] = provider.id
+        if attached is not None:
+            row = UserSSOIdentity(user_id=user['id'], provider_id=provider.id,
+                                  external_id='sub-renewal' if attached == 'bound' else None)
+            db.session.add(row)
+            db.session.flush()
+            user['identity_id'] = row.id
+        db.session.commit()
+        db.session.remove()
+
+
+def _sso_cleanup(application, user):
+    from models import UserSSOIdentity
+    from models.sso import SSOProvider
+    if 'provider_id' not in user:
+        return
+    with application.app_context():
+        UserSSOIdentity.query.filter_by(provider_id=user['provider_id']).delete()
+        SSOProvider.query.filter_by(id=user['provider_id']).delete()
+        db.session.commit()
+        db.session.remove()
+
+
 # operation: (user it starts from, administrator, request, audit action, password it sets)
 CHANGES = {name: (start, False, call, action, None)
            for name, (start, call, action) in OPERATIONS.items()}
@@ -97,32 +156,85 @@ CHANGES.update({
                              None),
     'admin-disable-own-key': ({'key': True}, True, _admin_key('patch'), 'webauthn_admin_disable',
                               None),
+    'admin-attach-own-sso': ({'sso': None}, True, _admin_sso('attach'), 'user_sso_attach', None),
+    'admin-reset-own-sso': ({'sso': 'bound'}, True, _admin_sso('reset'), 'user_sso_reset', None),
+    'admin-detach-own-sso': ({'sso': 'unbound'}, True, _admin_sso('detach'), 'user_sso_detach',
+                             None),
 })
 
 
+# Operations that show new recovery codes once: their failed renewal still hands them over
+WITH_CODES = ('confirm-totp', 'regenerate-recovery-codes')
+
+
+@pytest.mark.parametrize('how', ['raises', 'busy'])
 @pytest.mark.parametrize('operation', sorted(CHANGES))
 def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
-        app, monkeypatch, operation):
+        app, monkeypatch, operation, how):
     start, admin, call, action, password = CHANGES[operation]
     start = dict(start)
     if start.pop('key', False):
         start['key'] = SoftKey()
+    sso = start.pop('sso', False)
     user = _make_user(app, **start)
     try:
+        if sso is not False:
+            _sso_setup(app, user, sso)
         if admin:
             _admin(app, user)
         this = _open_session(app, user)
-        renewals = _renewal_fails(monkeypatch, app)
+        renewals = _renewal_fails(monkeypatch, app, how)
         r = call(app, this, user)
         assert renewals, 'the operation never renewed the session'
         assert r.status_code == 500, r.data
-        assert r.get_json()['message'] == NOT_KEPT
+        if operation not in WITH_CODES:
+            assert r.get_json()['message'] == NOT_KEPT
         assert _audited(app, action, user) == 1
         if password:
             assert _password_is(app, user, password)
         # The record left at its replaced version serves no more
         monkeypatch.undo()
         assert not _signed_in(this)
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+        _sso_cleanup(app, user)
+
+
+def test_a_session_signed_out_during_its_renewal_is_not_a_failure(app, monkeypatch):
+    """The record gone meanwhile is a concurrent sign-out: the change answers saved."""
+    user = _make_user(app)
+    try:
+        this = _open_session(app, user)
+        renewals = _renewal_fails(monkeypatch, app, 'gone')
+        r = _change_password(app, this, user)
+        assert renewals and r.status_code == 200, r.data
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+
+
+@pytest.mark.parametrize('how', ['raises', 'busy'])
+@pytest.mark.parametrize('operation', WITH_CODES)
+def test_new_recovery_codes_come_with_the_answer_of_a_failed_renewal(
+        app, monkeypatch, operation, how):
+    """Their hashes are stored and the former codes no longer work: the 500 carries the codes."""
+    from utils.backup_codes import verify_code_only
+    start, _admin_role, call, _action, _password = CHANGES[operation]
+    user = _make_user(app, **start)
+    try:
+        this = _open_session(app, user)
+        _renewal_fails(monkeypatch, app, how)
+        r = call(app, this, user)
+        assert r.status_code == 500, r.data
+        body = r.get_json()
+        codes = body['data']['backup_codes']
+        assert len(codes) == 8
+        assert 'recovery codes' in body['message'] and 'sign in again' in body['message']
+        with app.app_context():
+            stored = db.session.get(User, user['id']).backup_codes
+            assert all(verify_code_only(stored, code) for code in codes)
+            db.session.remove()
     finally:
         monkeypatch.undo()
         _cleanup(app, user)

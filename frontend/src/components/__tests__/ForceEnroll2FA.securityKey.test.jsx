@@ -108,5 +108,16 @@ describe('ForceEnroll2FA: security key', () => {
     expect([...codes.querySelectorAll('li')].map(li => li.textContent)).toEqual(['AAAA-1111', 'BBBB-2222'])
     expect(codes.closest('section')).toHaveClass('auth-card')
   })
+
+  it('still lists the codes when 2FA is saved but the session could not be kept', async () => {
+    mocks.confirm2FA.mockRejectedValue(Object.assign(new Error('saved, sign in again'),
+      { status: 500, data: { data: { backup_codes: ['AAAA-1111', 'BBBB-2222'] } } }))
+    render(<ForceEnroll2FA onComplete={vi.fn()} />)
+    fireEvent.change(await screen.findByPlaceholderText('account.codePlaceholder'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByText('account.verifyAndEnable'))
+    const codes = await screen.findByRole('list')
+    expect([...codes.querySelectorAll('li')].map(li => li.textContent)).toEqual(['AAAA-1111', 'BBBB-2222'])
+    expect(mocks.showError).toHaveBeenCalledWith('saved, sign in again')
+  })
 })
 

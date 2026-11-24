@@ -103,3 +103,46 @@ def test_the_pointer_left_by_a_move_is_never_a_session(nodes):
             db.session.remove()
     finally:
         _cleanup(first_node, user)
+
+
+def _stored_names(node):
+    """Every key or row id the store holds, or None for the file store (hashed names)."""
+    interface = node.session_interface
+    if hasattr(interface, 'sql_session_model'):
+        model = interface.sql_session_model
+        with interface._store() as s:
+            return [row.session_id for row in s.query(model.session_id)]
+    client = getattr(interface, 'client', None)
+    if client is not None and hasattr(client, 'keys'):
+        return [k.decode() if isinstance(k, bytes) else k for k in client.keys('*')]
+    return None
+
+
+def test_the_pointer_lies_under_the_store_prefix_and_no_cookie_names_it(nodes):
+    """A Redis ACL on the prefix covers the pointer; a cookie spelling its name opens nothing,
+    and its sign-in leaves the pointer that a sign-out with the old cookie then follows."""
+    first_node, second_node = nodes
+    user = _make_user(first_node)
+    try:
+        this = _open_session(first_node, user)
+        old = this.get_cookie('session').value
+
+        def renewal_then_forged_cookie():
+            _change_password(this, 'Renewed-Under-Prefix-0k!')
+            names = _stored_names(first_node)
+            prefix = first_node.session_interface.key_prefix
+            if names is not None:
+                assert names and all(name.startswith(prefix) for name in names), names
+            forged = first_node.test_client()
+            forged.set_cookie('session', f'moved:{old}')
+            assert forged.get('/api/v2/account/profile').status_code == 401
+            # A sign-in replaces the session its cookie names: never the pointer
+            r = _post(forged, '/api/v2/auth/login/password',
+                      {'username': user['username'], 'password': 'Renewed-Under-Prefix-0k!'})
+            assert r.status_code == 200, r.data
+
+        response = _sign_out_opened_before(second_node, old, renewal_then_forged_cookie)
+        assert _cookie_deleted(response)
+        assert not _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
