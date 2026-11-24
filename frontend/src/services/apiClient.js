@@ -19,6 +19,17 @@ import { adoptSharedLock, adoptServerLock, SESSION_LOCKED_PROBLEM } from '../lib
 
 const API_BASE_URL = '/api/v2'
 
+// Fired on window at each successful answer: a real-time socket the server refused tries again
+export const API_ANSWERED_EVENT = 'ucm:api-answered'
+
+function announceAnswered() {
+  try {
+    window.dispatchEvent(new CustomEvent(API_ANSWERED_EVENT))
+  } catch {
+    // a listener's failure never fails the call
+  }
+}
+
 // CSRF token storage key
 const CSRF_TOKEN_KEY = 'ucm_csrf_token'
 
@@ -271,6 +282,7 @@ class APIClient {
       }
 
       if (import.meta.env.DEV) console.log(`✅ API response:`, data)
+      announceAnswered()
       return data
     } catch (error) {
       // Network errors or fetch failures
@@ -354,6 +366,7 @@ class APIClient {
         throw error
       }
 
+      announceAnswered()
       return data
     } catch (error) {
       if (!error.status) {

@@ -936,7 +936,8 @@ def test_an_account_deleted_once_its_key_change_is_audited_keeps_no_session(app,
         r = _delete_key(app, this, user)
         assert r.status_code == 200, r.data
         assert this.get_cookie('session').value == old  # not moved to a new identifier
-        assert old in cuts  # its sockets closed at the end of the request
+        r.close()
+        assert old in cuts  # its sockets closed once the answer is sent
         monkeypatch.undo()
         assert not _signed_in(this)
     finally:

@@ -25,6 +25,12 @@ def two_sessions(app, make_user):  # noqa: F811
         yield user, (first, ws_first), (second, ws_second)
 
 
+def _sent(response):
+    """The answer closed, as the server closes it once sent: the caller's old key is cut then."""
+    response.close()
+    return response
+
+
 @contextmanager
 def _cuts_seen(app, monkeypatch):
     """Each cut asked, with whether the session's record was still stored at that moment."""
@@ -44,7 +50,7 @@ def _cuts_seen(app, monkeypatch):
 def test_a_session_closed_by_a_credential_change_cuts_its_socket_at_its_next_request(
         app, two_sessions):
     _user, (first, ws_first), (second, ws_second) = two_sessions
-    assert _post(second, '/api/v2/account/sessions/revoke-all').status_code == 200
+    assert _sent(_post(second, '/api/v2/account/sessions/revoke-all')).status_code == 200
     assert first.get('/api/v2/account/profile').status_code == 401
     assert not ws_first.is_connected()
     # The caller's renewed session opens its socket again with its new cookie
@@ -151,7 +157,7 @@ def test_a_gesture_that_closes_the_account_sessions_cuts_their_sockets_at_once(
     own, call = GESTURES[gesture]
     actor = second if own else _admin_session(app, make_user)
     with _socket(app, actor) as ws_actor:
-        r = call(actor, user['id'])
+        r = _sent(call(actor, user['id']))
         assert r.status_code == 200, r.data
         assert not ws_first.is_connected()
         assert _sid(ws_first) not in events.connected_clients
@@ -178,7 +184,7 @@ def test_a_renewal_cuts_a_stolen_copy_of_the_kept_session_and_refuses_its_return
     thief = _copy_of(app, second)
     with _socket(app, thief) as ws_thief:
         assert ws_thief.is_connected() and _key_of(ws_thief) == _key_of(ws_second)
-        assert GESTURES[gesture][1](second, user['id']).status_code == 200
+        assert _sent(GESTURES[gesture][1](second, user['id'])).status_code == 200
         assert not ws_thief.is_connected() and not ws_second.is_connected()
         assert _reconnects(app, thief) is None
         assert thief.get('/api/v2/account/profile').status_code == 401
@@ -192,7 +198,7 @@ def test_a_renewal_cuts_a_stolen_copy_of_the_kept_session_and_refuses_its_return
 def test_the_renewed_session_socket_reopens_and_its_sign_out_cuts_it(app, two_sessions):
     _user, (_first, ws_first), (second, ws_second) = two_sessions
     _own_password = GESTURES['own-password'][1]
-    assert _own_password(second, None).status_code == 200
+    assert _sent(_own_password(second, None)).status_code == 200
     assert not ws_first.is_connected() and not ws_second.is_connected()
     ws_back = _reconnects(app, second)
     assert ws_back is not None
@@ -208,7 +214,7 @@ def test_the_caller_socket_is_cut_when_its_session_is_not_kept(app, two_sessions
         raise RuntimeError('session store unreachable (test)')
 
     monkeypatch.setattr(type(app.session_interface), 'rotate', rotate)
-    r = _post(second, '/api/v2/account/sessions/revoke-all')
+    r = _sent(_post(second, '/api/v2/account/sessions/revoke-all'))
     assert r.status_code == 500, r.data
     assert not ws_first.is_connected()
     assert not ws_second.is_connected()
@@ -289,7 +295,7 @@ class TestAccountCutOnOtherProcesses:
         user, (_first, _ws_first), (second, ws_second) = two_sessions
         spared = _key_of(ws_second)
         published = self._publisher(monkeypatch)
-        assert _post(second, '/api/v2/account/sessions/revoke-all').status_code == 200
+        assert _sent(_post(second, '/api/v2/account/sessions/revoke-all')).status_code == 200
         ended = [p for room, p in published if room == events.SESSION_END_ROOM]
         assert len([p for p in ended if 'user' in p]) == 1
         assert ended[0]['user'] == user['id'] and ended[0]['spare'] == spared
@@ -369,3 +375,37 @@ class TestAccountCutOnOtherProcesses:
         assert events.apply_session_end_here(
             {'user': user['id'], 'below': version, 'spare': None}) == 0
         assert ws_first.is_connected() and ws_second.is_connected()
+
+
+# ---- The caller's renewed session: its old key is cut once the answer carrying the cookie is sent ----
+
+@pytest.mark.parametrize('gesture', ['revoke-all', 'own-password'])
+def test_the_renewed_session_old_key_is_cut_after_its_answer_is_sent(
+        app, two_sessions, monkeypatch, gesture):
+    """Cut before the answer, the tab would reconnect with the old cookie while the store still
+    writes the new one; the server closes the answer even when the client went away."""
+    user, (_first, _ws_first), (second, ws_second) = two_sessions
+    old_key = _key_of(ws_second)
+    order = []
+    iface = app.session_interface
+    save = iface.save_session
+
+    def saving(application, session, response):
+        result = save(application, session, response)
+        order.append('saved')
+        return result
+    monkeypatch.setattr(iface, 'save_session', saving)
+    cut = events.end_session_sockets
+
+    def cutting(session_id):
+        order.append(events.session_key(session_id))
+        return cut(session_id)
+    monkeypatch.setattr(events, 'end_session_sockets', cutting)
+
+    r = GESTURES[gesture][1](second, user['id'])
+    assert r.status_code == 200, r.data
+    assert 'saved' in order and old_key not in order
+    assert ws_second.is_connected()
+    r.close()  # what the server does once the answer is sent, or the client gone
+    assert old_key in order and order.index('saved') < order.index(old_key)
+    assert not ws_second.is_connected()

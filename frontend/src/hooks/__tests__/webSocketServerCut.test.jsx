@@ -1,6 +1,7 @@
 /**
- * A session renewal closes every socket of the old session: the tab opens it again once,
- * with the cookie the renewal set, and a handshake the server refuses is not retried.
+ * A socket the server closes (a session renewal) or a handshake it refuses (its session check
+ * could not run, a cookie not there yet) is tried again on a bounded schedule, then once more at
+ * the next answer of the API or when the tab is shown again: never in an unbounded loop.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render } from '@testing-library/react'
@@ -13,6 +14,7 @@ const fakeSocket = {
   connect: vi.fn(),
   disconnect: vi.fn(),
   connected: false,
+  active: false,
 }
 vi.mock('socket.io-client', () => ({ io: vi.fn(() => fakeSocket) }))
 
@@ -25,22 +27,39 @@ vi.mock('../../contexts/AuthContext', () => ({
   AuthProvider: ({ children }) => children,
 }))
 
-import { SERVER_CUT_RECONNECT_MS, WebSocketProvider } from '../useWebSocket'
+import { REARM_MIN_INTERVAL_MS, SERVER_CUT_RECONNECT_MS, SERVER_CUT_RETRY_MS, WebSocketProvider } from '../useWebSocket'
+import { API_ANSWERED_EVENT } from '../../services/apiClient'
 
 const fire = (evt, ...args) => act(() => { socketHandlers.get(evt)(...args) })
 const elapse = (ms) => act(() => { vi.advanceTimersByTime(ms) })
+const refused = () => fire('connect_error', new Error('session check unavailable'))
+const apiAnswered = () => act(() => { window.dispatchEvent(new CustomEvent(API_ANSWERED_EVENT)) })
+const setVisibility = (state) => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
+  act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+}
+const total = SERVER_CUT_RETRY_MS.reduce((a, b) => a + b, 0)
+
+// Every scheduled attempt refused, as a session check that cannot run would answer
+function refuseEveryAttempt() {
+  for (const delay of SERVER_CUT_RETRY_MS) {
+    elapse(delay)
+    refused()
+  }
+}
 
 describe('a socket closed by the server', () => {
   beforeEach(() => {
     socketHandlers.clear()
     fakeSocket.connect.mockClear()
     fakeSocket.connected = false
+    fakeSocket.active = false
     auth.value = { isAuthenticated: true }
     vi.useFakeTimers()
   })
   afterEach(() => vi.useRealTimers())
 
-  it('reconnects once, after the renewal answer had time to set its cookie', () => {
+  it('reconnects after the renewal answer had time to set its cookie', () => {
     render(<WebSocketProvider><div /></WebSocketProvider>)
     fire('connect')
     fire('disconnect', 'io server disconnect')
@@ -49,32 +68,106 @@ describe('a socket closed by the server', () => {
     expect(fakeSocket.connect).toHaveBeenCalledTimes(1)
   })
 
-  it('does not retry a handshake the server refuses', () => {
+  it('tries a refused handshake again on the bounded schedule, then stops', () => {
+    expect(SERVER_CUT_RETRY_MS.length).toBeGreaterThan(1)
     render(<WebSocketProvider><div /></WebSocketProvider>)
     fire('connect')
     fire('disconnect', 'io server disconnect')
-    elapse(SERVER_CUT_RECONNECT_MS)
-    fire('connect_error', new Error('refused'))
-    elapse(10 * SERVER_CUT_RECONNECT_MS)
+    refuseEveryAttempt()
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(SERVER_CUT_RETRY_MS.length)
+    elapse(100 * total)
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(SERVER_CUT_RETRY_MS.length)
+  })
+
+  it('tries a first handshake the server refuses again too', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    refused()
+    elapse(SERVER_CUT_RETRY_MS[0])
     expect(fakeSocket.connect).toHaveBeenCalledTimes(1)
   })
 
-  it('reconnects once per cut: a socket back and cut again reconnects again', () => {
+  it('starts the schedule again once a socket is back and cut again', () => {
     render(<WebSocketProvider><div /></WebSocketProvider>)
     fire('connect')
     fire('disconnect', 'io server disconnect')
-    elapse(SERVER_CUT_RECONNECT_MS)
+    refuseEveryAttempt()
     fire('connect')
     fire('disconnect', 'io server disconnect')
-    elapse(SERVER_CUT_RECONNECT_MS)
-    expect(fakeSocket.connect).toHaveBeenCalledTimes(2)
+    elapse(SERVER_CUT_RETRY_MS[0])
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(SERVER_CUT_RETRY_MS.length + 1)
+  })
+
+  it('starts from the first delay for a refusal once the socket was back', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    fire('connect')
+    fire('disconnect', 'io server disconnect')
+    refuseEveryAttempt()
+    fire('connect')
+    // The library reconnects after a transport loss, and the server refuses that handshake
+    fakeSocket.active = true
+    fire('disconnect', 'transport close')
+    fakeSocket.active = false
+    refused()
+    elapse(SERVER_CUT_RETRY_MS[0])
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(SERVER_CUT_RETRY_MS.length + 1)
+  })
+
+  it('tries once more at the next answer of the API, at most once per interval', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    fire('connect')
+    fire('disconnect', 'io server disconnect')
+    refuseEveryAttempt()
+    const scheduled = SERVER_CUT_RETRY_MS.length
+    apiAnswered()
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(scheduled + 1)
+    refused()
+    apiAnswered()
+    elapse(REARM_MIN_INTERVAL_MS - 1)
+    apiAnswered()
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(scheduled + 1)
+    elapse(1)
+    apiAnswered()
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(scheduled + 2)
+    // A rearmed try refused schedules nothing more
+    refused()
+    elapse(100 * total)
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(scheduled + 2)
+  })
+
+  it('tries once more when the tab is shown again', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    fire('connect')
+    fire('disconnect', 'io server disconnect')
+    refuseEveryAttempt()
+    const scheduled = SERVER_CUT_RETRY_MS.length
+    setVisibility('hidden')
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(scheduled)
+    setVisibility('visible')
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(scheduled + 1)
+  })
+
+  it('does not rearm a socket that is connected, connecting or waiting for its next try', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    fire('connect')
+    fakeSocket.connected = true
+    apiAnswered()
+    fakeSocket.connected = false
+    fire('disconnect', 'io server disconnect')
+    apiAnswered()
+    expect(fakeSocket.connect).not.toHaveBeenCalled()
+    elapse(SERVER_CUT_RETRY_MS[0])
+    fakeSocket.active = true
+    apiAnswered()
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(1)
   })
 
   it('leaves a transport loss to the client library', () => {
     render(<WebSocketProvider><div /></WebSocketProvider>)
     fire('connect')
+    fakeSocket.active = true
     fire('disconnect', 'transport close')
-    elapse(10 * SERVER_CUT_RECONNECT_MS)
+    fire('connect_error', new Error('xhr poll error'))
+    elapse(100 * total)
     expect(fakeSocket.connect).not.toHaveBeenCalled()
   })
 
@@ -84,7 +177,9 @@ describe('a socket closed by the server', () => {
     fire('disconnect', 'io server disconnect')
     auth.value = { isAuthenticated: false }
     view.rerender(<WebSocketProvider><div /></WebSocketProvider>)
-    elapse(10 * SERVER_CUT_RECONNECT_MS)
+    elapse(100 * total)
+    apiAnswered()
+    setVisibility('visible')
     expect(fakeSocket.connect).not.toHaveBeenCalled()
   })
 })
