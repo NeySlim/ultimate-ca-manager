@@ -213,8 +213,11 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   // Issue #450: a revocation no CRL or OCSP answer of UCM carried is lifted by an administrator
   const handleLiftLocalRevocation = async () => {
     const unknown = data?.local_revocation_lift === 'unknown'
+    const warning = t(unknown ? 'certificates.liftLocalRevocationUnknownRisk' : 'certificates.liftLocalRevocationWarning')
+    // A key revoked as compromised stays refused by UCM after the lift
+    const compromised = data?.revoke_reason === 'keyCompromise'
     const confirmed = await showConfirm(
-      t(unknown ? 'certificates.liftLocalRevocationUnknownRisk' : 'certificates.liftLocalRevocationWarning'),
+      compromised ? `${warning} ${t('certificates.liftLocalRevocationKeyStaysRefused')}` : warning,
       {
         title: t('certificates.liftLocalRevocationTitle'),
         confirmText: t('certificates.liftLocalRevocation'),

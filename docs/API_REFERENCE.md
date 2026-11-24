@@ -1150,8 +1150,9 @@ Content-Type: application/json
 ```
 
 Requires `admin:system`. Lifts a revocation no relying party ever saw: the issuing CA is held in UCM
-without its key (an imported public CA), is not offline and has no delegated OCSP responder, so UCM
-never signed a CRL or an OCSP answer carrying it. Every stored copy of the certificate (same serial
+without its key (an imported public CA), is not offline, has no delegated OCSP responder and no external
+CRL, and held none of them when the revocation was recorded or since, so UCM never signed or served a
+CRL or an OCSP answer carrying it. Every stored copy of the certificate (same serial
 under the CA or a record of its key) becomes valid again and the serial's revocation records are
 deleted, so neither an import nor the hourly repair revokes it again. Each lifted copy is audited
 `certificate_local_revocation_lifted`. The answer is the certificate as `GET` returns it.
@@ -1161,12 +1162,16 @@ deleted, so neither an import nor the hourly repair revokes it again. Each lifte
   whether it was published (an upgraded installation) is lifted only with it, since the CA may have held
   its key at the time; without it the answer is `409` and says the risk.
 - `409` for a published revocation (the CA, or a record of its key, holds its key in UCM, software, HSM or
-  key provider, is offline, or has a delegated OCSP responder; or the record was written while it did):
-  RFC 6960 §2.2 and RFC 5280 §5.3.1 lift only a `certificateHold`, through unhold. Also `409` for a
-  certificate linked to no CA in UCM, or revoked again while the lift ran; `400` for one not revoked.
+  key provider, is offline, has a delegated OCSP responder or an external CRL; or did at the write or
+  since; or an external CRL it serves lists the serial): RFC 6960 §2.2 and RFC 5280 §5.3.1 lift only a
+  `certificateHold`, through unhold. Also `409` for a copy obtained from a Microsoft CA or over ACME (UCM
+  tells that CA of the revocation), for a revoked certificate with no revocation record, for one linked
+  to no CA in UCM, or revoked again while the lift ran; `400` for one not revoked. A key revoked as
+  compromised stays refused after the lift; `500` when it could not be kept, nothing lifted.
 
-`GET /api/v2/certificates/{cert_id}` reports `revocation_published` (whether the issuing CA publishes
-revocations; `false` lets a valid certificate be deleted without revocation) and `local_revocation_lift`:
+`GET /api/v2/certificates/{cert_id}` reports `revocation_published` (whether a revocation reaches relying
+parties: the issuing CA publishes revocations, or the certificate comes from a Microsoft CA or over ACME;
+`false` lets a valid certificate be deleted without revocation) and `local_revocation_lift`:
 `local`, `unknown` (lift needs `acknowledge_unknown_publication`) or `null` (nothing to lift).
 
 ### Import Certificate
@@ -1204,8 +1209,9 @@ DELETE /api/v2/certificates/{cert_id}
 ```
 
 A valid certificate is refused with `409` until it is revoked (by its row or by its serial's
-revocation record), when its CA publishes revocations; a certificate of a CA held without its key, or
-linked to no CA, is deleted without revocation: no CRL or OCSP answer of UCM would carry one.
+revocation record), when its CA publishes revocations or it comes from a Microsoft CA or over ACME (UCM
+tells that CA); any other certificate of a CA held without its key, or linked to no CA, is deleted
+without revocation: no revocation would reach a relying party.
 `POST /api/v2/certificates/bulk/delete` applies the same rule per id.
 
 ### Certificate Statistics

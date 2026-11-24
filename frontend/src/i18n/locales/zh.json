@@ -871,6 +871,7 @@
     "liftLocalRevocationTitle": "解除本地吊销",
     "liftLocalRevocationWarning": "UCM 从未发布此吊销：其 CA 仅被保存而没有密钥，在此不会签发任何 CRL 或 OCSP 响应。解除吊销后，该证书在 UCM 中重新有效，并删除其吊销记录，因此再次导入时仍保持有效。此操作会记录在审计日志中。",
     "liftLocalRevocationUnknownRisk": "此吊销记录于 UCM 标注其是否已发布之前。若当时该 CA 的密钥保存在 UCM 中，此吊销可能已发布在其 CRL 中或由其 OCSP 响应器发布，客户端可能仍将该证书视为已吊销。解除吊销后，该证书在 UCM 中重新有效，并删除其吊销记录。此操作会记录在审计日志中。",
+    "liftLocalRevocationKeyStaysRefused": "其密钥已因泄露而被吊销：解除吊销后，UCM 仍会继续拒绝该密钥。",
     "localRevocationLifted": "已解除吊销",
     "liftLocalRevocationFailed": "解除吊销失败",
     "deleteWithoutRevocation": "UCM 不会为此证书发布吊销：其 CA 仅被保存而没有密钥，或不在 UCM 中。删除并不会吊销该证书：在任何信任它的地方它仍然有效。",

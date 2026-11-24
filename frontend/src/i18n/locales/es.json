@@ -871,6 +871,7 @@
     "liftLocalRevocationTitle": "Levantar una revocación local",
     "liftLocalRevocationWarning": "UCM nunca publicó esta revocación: su CA se conserva sin su clave y aquí no firma ninguna CRL ni respuesta OCSP. Al levantarla, el certificado vuelve a ser válido en UCM y se elimina su registro de revocación, de modo que una nueva importación lo mantiene válido. El levantamiento queda registrado en el registro de auditoría.",
     "liftLocalRevocationUnknownRisk": "Esta revocación se registró antes de que UCM anotara si se había publicado. Si esta CA tenía su clave en UCM en ese momento, es posible que la revocación se haya publicado en su CRL o mediante su respondedor OCSP, y los clientes aún podrían considerar el certificado como revocado. Al levantarla, el certificado vuelve a ser válido en UCM y se elimina su registro de revocación. El levantamiento queda registrado en el registro de auditoría.",
+    "liftLocalRevocationKeyStaysRefused": "Su clave se revocó como comprometida: UCM sigue rechazando esa clave tras levantar la revocación.",
     "localRevocationLifted": "Revocación levantada",
     "liftLocalRevocationFailed": "Error al levantar la revocación",
     "deleteWithoutRevocation": "UCM no publica ninguna revocación para este certificado: su CA se conserva sin su clave o no está en UCM. Eliminarlo no lo revoca: sigue siendo válido allí donde es de confianza.",

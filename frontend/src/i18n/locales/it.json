@@ -871,6 +871,7 @@
     "liftLocalRevocationTitle": "Annulla una revoca locale",
     "liftLocalRevocationWarning": "UCM non ha mai pubblicato questa revoca: la sua CA è presente senza la chiave e qui non firma alcuna CRL né risposta OCSP. Annullandola, il certificato torna valido in UCM e il suo record di revoca viene eliminato, quindi una nuova importazione lo mantiene valido. L'annullamento viene registrato nel log di audit.",
     "liftLocalRevocationUnknownRisk": "Questa revoca è stata registrata prima che UCM annotasse se fosse stata pubblicata. Se all'epoca questa CA possedeva la propria chiave in UCM, la revoca potrebbe essere stata pubblicata nella sua CRL o dal suo responder OCSP e i client potrebbero ancora considerare il certificato revocato. Annullandola, il certificato torna valido in UCM e il suo record di revoca viene eliminato. L'annullamento viene registrato nel log di audit.",
+    "liftLocalRevocationKeyStaysRefused": "La sua chiave è stata revocata come compromessa: UCM continua a rifiutare questa chiave anche dopo l'annullamento della revoca.",
     "localRevocationLifted": "Revoca annullata",
     "liftLocalRevocationFailed": "Annullamento della revoca non riuscito",
     "deleteWithoutRevocation": "UCM non pubblica alcuna revoca per questo certificato: la sua CA è presente senza la chiave oppure non è in UCM. L'eliminazione non lo revoca: resta valido ovunque sia considerato attendibile.",
