@@ -265,6 +265,8 @@ class KerberosAuth(AuthBase):
     def __call__(self, request):
         if self.force_preemptive and not self.auth_done:
             request.headers['Authorization'] = self._token(urlparse(request.url).hostname)
+            # Sent before the TLS socket exists: a refusal may be for the missing channel binding
+            request.ucm_unbound_preemptive = self.send_cbt and self._cbt is None
         request.register_hook('response', self.handle_response)
         try:
             self.pos = request.body.tell()
@@ -285,7 +287,9 @@ class KerberosAuth(AuthBase):
     def _handle_401(self, response, **kwargs):
         host = urlparse(response.url).hostname
         offered = _negotiate_token(response)
-        if (response.request.headers.get('Authorization') or '').startswith('Negotiate '):
+        sent = (response.request.headers.get('Authorization') or '').startswith('Negotiate ')
+        # One bound ticket after a refused unbound preemptive one, as requests-kerberos retried
+        if sent and not (getattr(response.request, 'ucm_unbound_preemptive', False) and self._cbt is not None):
             raise MSCAKerberosError(self._refusal(host, offered))
         if offered is None:
             raise MSCAKerberosError(f'Kerberos sign-in to {host} failed: the server does not offer '
