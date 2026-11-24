@@ -179,3 +179,26 @@ test('a SHA-1 in a column of 200 px takes equal lines that fit it, and copies wh
   await value.evaluate((dd: HTMLElement) => { dd.style.width = '400px'; dd.style.maxWidth = '400px' })
   await expect.poll(async () => (await lines()).map((l) => l.bytes)).toEqual([10, 10])
 })
+
+test('a comment written in the inspector is kept as typed and found by the list search (#454)', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  const panel = await openInInspector(page, cert.common_name)
+  const token = uid('rack')
+  const comment = `Rack ${token}\nOwner: PKI team`
+  await panel.getByRole('button', { name: 'Add comment', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Edit comment' })
+  await dialog.getByRole('textbox', { name: 'Comment' }).fill(comment)
+  await expect(dialog).toContainText(`${comment.length} / 4000 characters`)
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  // The overview shows it on its two lines; the API holds it whole
+  await expect(panel.locator('.cert-comment')).toHaveText(comment)
+  await expect.poll(async () => (await api.get(`/certificates/${cert.id}`)).comment).toBe(comment)
+  await expect(panel.getByRole('button', { name: 'Edit comment', exact: true })).toBeVisible()
+
+  // The list search reads the comment: its token alone finds the certificate
+  await page.getByRole('main').getByRole('searchbox').fill(token)
+  const table = page.getByRole('region', { name: 'Certificates table' })
+  await expect(table.getByRole('button', { name: cert.common_name, exact: true })).toBeVisible()
+  await expect(table.locator('tbody tr')).toHaveCount(1)
+})

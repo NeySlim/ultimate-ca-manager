@@ -355,10 +355,10 @@ describe('the fixed columns and the rows', () => {
 })
 
 describe('the certificates declare the contract', () => {
-  it('fold the description first, then the qualifiers from the right, the expiry and the issuer last', () => {
+  it('fold the comment and the description first, then the qualifiers from the right, the expiry and the issuer last', () => {
     const cols = certificateColumns((k) => k)
     expect(columnErrors(cols)).toEqual([])
-    expect(foldOrder(cols)).toEqual(['description', 'created', 'pair', 'grade', 'key', 'source', 'expiry', 'ca'])
+    expect(foldOrder(cols)).toEqual(['comment', 'description', 'created', 'pair', 'grade', 'key', 'source', 'expiry', 'ca'])
     expect(foldOrder(cols, 'days')).not.toContain('expiry')
   })
 })

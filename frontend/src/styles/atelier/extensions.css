@@ -60,6 +60,8 @@
 .atl .form-fields>.notice,.atl .form-fields>.field-error{grid-column:1/-1;margin:0}
 /* A log line is shown as the file wrote it: its spacing kept, a long token broken rather than widening the table. */
 .atl .log-message{white-space:pre-wrap;overflow-wrap:anywhere}
+/* A certificate's comment (#454) keeps its line breaks and tabs, as typed */
+.atl .cert-comment{white-space:pre-wrap;overflow-wrap:anywhere;tab-size:4}
 /* A command to paste: one line that scrolls on its own, then its copy button. A public key wraps whole. */
 .atl .command-line{display:flex;align-items:center;gap:8px;margin:8px 0 12px}
 .atl .command-line code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;padding:8px 10px;background:var(--raised);border-radius:4px;font-size:12px}
