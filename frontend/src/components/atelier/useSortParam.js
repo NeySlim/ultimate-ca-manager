@@ -4,8 +4,9 @@
  * sorted one reverses; there is no unsorted state, and every change goes back to page one (`page` removed).
  * An unknown key falls back on the default without an error. A reload, a shared link and Back give the same order.
  */
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useLatestLocation } from './useLatestLocation'
 
 /**
  * @param {{key: string, asc: boolean}} initial  the list's default sort: required
@@ -20,9 +21,8 @@ export function useSortParam(initial, keys, { scope } = {}) {
   const ORDER = scope ? `${scope}-order` : 'order'
   const location = useLocation()
   const navigate = useNavigate()
-  // Several writes in one handler build on each other, and keep the dock's state and the hash
-  const pending = useRef(location)
-  pending.current = location
+  // A write builds on the URL as it is now (another write in the same moment, the dock's state, the hash)
+  const latest = useLatestLocation()
   const params = new URLSearchParams(location.search)
   const asked = params.get(SORT)
   const known = asked !== null && keys.includes(asked)
@@ -31,7 +31,7 @@ export function useSortParam(initial, keys, { scope } = {}) {
   const sort = useMemo(() => ({ key, asc }), [key, asc])
 
   const setSort = useCallback((next) => {
-    const at = pending.current
+    const at = latest()
     const current = new URLSearchParams(at.search)
     const was = current.get(SORT) !== null && keys.includes(current.get(SORT))
       ? { key: current.get(SORT), asc: current.get(ORDER) !== 'desc' } : { key: initial.key, asc: initial.asc !== false }
@@ -42,9 +42,8 @@ export function useSortParam(initial, keys, { scope } = {}) {
     if (!scope) current.delete('page')
     if (!plain) { current.set(SORT, s.key); current.set(ORDER, s.asc ? 'asc' : 'desc') }
     const qs = current.toString()
-    pending.current = { ...at, search: qs ? `?${qs}` : '' }
-    navigate({ pathname: at.pathname, search: pending.current.search, hash: at.hash }, { replace: true, state: at.state })
-  }, [navigate, initial.key, initial.asc, keys.join(','), SORT, ORDER]) // eslint-disable-line react-hooks/exhaustive-deps
+    navigate({ pathname: at.pathname, search: qs ? `?${qs}` : '', hash: at.hash }, { replace: true, state: at.state })
+  }, [navigate, latest, initial.key, initial.asc, keys.join(','), SORT, ORDER]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSort = useCallback((k) => setSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true })), [setSort])
   return { sort, onSort, setSort }

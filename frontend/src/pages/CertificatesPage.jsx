@@ -24,6 +24,7 @@ import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { useLatestLocation } from '../components/atelier/useLatestLocation'
 import { IssueCertificateDialog } from './certificates/IssueCertificateDialog'
 import { certificateColumns, certificateCard, issuerOf, SORT_FIELDS } from './certificates/certificateRows'
 import { sourceLabel, sourceOf } from './certificates/certificateSources'
@@ -108,24 +109,22 @@ export default function CertificatesPage() {
   useEffect(() => { try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)) } catch { /* private mode */ } }, [presets])
 
   // The list's search, sort, page and filters live in the URL, as the mockup's (M:157-158): `q`, `sort`,
-  // `order`, `page`, `ca`, `source`, `template`. Every write builds on the latest URL, even one made in the same
-  // handler, so it keeps the dock's item and section.
+  // `order`, `page`, `ca`, `source`, `template`. Every write builds on the URL as it is now, even one the dock
+  // made since the last render (a search landing after a row was opened), so it keeps the dock's item and section.
   const query = useMemo(() => new URLSearchParams(location.search), [location.search])
-  const pending = useRef(null)
-  pending.current = { search: location.search, state: location.state }
+  const latest = useLatestLocation()
   const goSearch = useCallback((search) => {
     const qs = new URLSearchParams(search).toString()
-    pending.current = { ...pending.current, search: qs ? `?${qs}` : '' }
-    navigate({ pathname: location.pathname, search: pending.current.search }, { replace: true, state: pending.current.state })
-  }, [location.pathname, navigate])
+    navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true, state: latest().state })
+  }, [location.pathname, navigate, latest])
   const patchList = useCallback((patch) => {
-    const p = new URLSearchParams(pending.current.search)
+    const p = new URLSearchParams(latest().search)
     for (const [k, v] of Object.entries(patch)) {
       p.delete(k)
       for (const x of [].concat(v ?? [])) if (x !== '') p.append(k, String(x))
     }
     goSearch(p.toString())
-  }, [goSearch])
+  }, [goSearch, latest])
 
   const page = Math.max(1, parseInt(query.get('page'), 10) || 1)
   const setPage = useCallback((n) => patchList({ page: n > 1 ? n : '' }), [patchList])
@@ -331,7 +330,7 @@ export default function CertificatesPage() {
     const linked = parseOverviewFilters(typeof filters.link === 'string' ? filters.link : '')
     clearList()
     if (linked.length > 0) {
-      const p = new URLSearchParams(pending.current.search)
+      const p = new URLSearchParams(latest().search)
       for (const [k, v] of linked) p.append(k, v)
       goSearch(p.toString())
       return
@@ -384,13 +383,13 @@ export default function CertificatesPage() {
   }, [urlFilters, linkView, viewStatus, savedTemplate, cas, t, i18n.language])
   const removeUrlFilter = useCallback(([key, value]) => {
     if (key === 'template') { setFilterTemplate([]); return }
-    const cur = withoutFilter(pending.current.search, 'page')
+    const cur = withoutFilter(latest().search, 'page')
     const interval = INTERVALS[String(key).replace(/^interval-/, '')]
     if (String(key).startsWith('interval-') && interval) { goSearch(withoutFilter(withoutFilter(cur, interval[0]), interval[1])); return }
     goSearch(key === WEAK_KEY
       ? withoutFilter(withoutFilter(cur, 'key_algo_prefix'), 'key_bits_below')
       : withoutFilter(cur, key, value))
-  }, [goSearch, setFilterTemplate])
+  }, [goSearch, setFilterTemplate, latest])
   const liveScope = urlFilters.some(([k]) => k === 'live')
 
   // Selection: the ticked rows of the page, or every result

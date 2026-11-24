@@ -265,6 +265,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A long server name no longer breaks the HTTPS settings on a phone.** The common name and issuer of the HTTPS certificate wrap after their dots and go under their term, instead of being cut mid-word.
+- **A certificate opened while a search is still pending stays open.** The search that lands a moment later keeps it in the address and in the inspector instead of closing it.
 - **Live updates behind a reverse proxy on port 443.** The WebSocket accepts the origin of the admin base URL as soon as it is saved, on every node, a default port making no difference (`https://host:443` is `https://host`), and refuses any other origin, as any address outside the admin allowlist, with 403 before the upgrade and a warning in the log, instead of a 101 closed at once (#453).
 - **The base URL hostname check says what to do.** Its refusal explains that the name is checked from inside the server or container, and how to make it resolve there (DNS, hosts entry, network alias) or apply it with `"force": true` (#453).
 - **The audit clean-up never deletes logs the operator kept.** The dialog lowered a retention above 365 days to 365 without saying so; it now sends the number typed, from 30 to 3650 days, and `POST /api/v2/audit/cleanup` refuses a retention above 3650 days instead of lowering it.
