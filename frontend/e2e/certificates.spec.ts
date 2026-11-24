@@ -186,7 +186,8 @@ test('a comment written in the inspector is kept as typed and found by the list 
   const token = uid('rack')
   const comment = `Rack ${token}\nOwner: PKI team`
   await panel.getByRole('button', { name: 'Add comment', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Edit comment' })
+  // A certificate without a comment opens the dialog under the title of the button
+  const dialog = page.getByRole('dialog', { name: 'Add comment' })
   await dialog.getByRole('textbox', { name: 'Comment' }).fill(comment)
   await expect(dialog).toContainText(`${comment.length} / 4000 characters`)
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
@@ -194,7 +195,11 @@ test('a comment written in the inspector is kept as typed and found by the list 
   // The overview shows it on its two lines; the API holds it whole
   await expect(panel.locator('.cert-comment')).toHaveText(comment)
   await expect.poll(async () => (await api.get(`/certificates/${cert.id}`)).comment).toBe(comment)
-  await expect(panel.getByRole('button', { name: 'Edit comment', exact: true })).toBeVisible()
+  await panel.getByRole('button', { name: 'Edit comment', exact: true }).click()
+  const editing = page.getByRole('dialog', { name: 'Edit comment' })
+  await expect(editing.getByRole('textbox', { name: 'Comment' })).toHaveValue(comment)
+  await editing.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(editing).toBeHidden()
 
   // The list search reads the comment: its token alone finds the certificate
   await page.getByRole('main').getByRole('searchbox').fill(token)

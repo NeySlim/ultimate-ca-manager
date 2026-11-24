@@ -426,6 +426,20 @@ def dek_retire_at_once(monkeypatch):
 _SESSION_APP = []
 
 
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_teardown(item, nextitem):
+    """After every fixture's teardown: monkeypatch.setattr on an instance restores a bound copy
+    of the method there, which would hide any later patch of the shared session store's class."""
+    try:
+        return (yield)
+    finally:
+        for application in _SESSION_APP:
+            interface = application.session_interface
+            for name, value in list(vars(interface).items()):
+                if getattr(value, '__self__', None) is interface and callable(value):
+                    delattr(interface, name)
+
+
 def _admin_api_key_ids():
     """Ids of the session admin's API keys, or None before the app exists."""
     if not _SESSION_APP:

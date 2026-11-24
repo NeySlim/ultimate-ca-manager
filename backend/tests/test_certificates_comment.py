@@ -179,8 +179,8 @@ def test_a_surrogate_pair_is_one_character_and_kept(auth_client, commented_cert)
     assert response.get_json()['data']['comment'] == 'rack \U0001F512 B12'
 
 
-@pytest.mark.parametrize('mark', ['‮', '‪', '‫', '‬', '‭', '⁦', '⁧',
-                                  '⁨', '⁩', '‎', '‏', '؜'])
+@pytest.mark.parametrize('mark', ['\u202e', '\u202a', '\u202b', '\u202c', '\u202d', '\u2066',
+                                  '\u2067', '\u2068', '\u2069', '\u200e', '\u200f', '\u061c'])
 def test_a_direction_control_is_refused_with_400(app, auth_client, commented_cert, mark):
     response = auth_client.patch(f'{BASE}/{commented_cert}', json={'comment': f'invoice{mark}fdp.exe'})
     assert response.status_code == 400, response.data
