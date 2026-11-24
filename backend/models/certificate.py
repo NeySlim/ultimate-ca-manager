@@ -26,6 +26,8 @@ class Certificate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
     descr = db.Column(db.String(255), nullable=False)
+    # Plain text beside the display name (issue #454, upgrade step 175); NULL when there is none
+    comment = db.Column(db.Text, nullable=True)
     caref = db.Column(db.String(36), db.ForeignKey("certificate_authorities.refid"), index=True)
     crt = db.Column(db.Text)  # Nullable - CSR doesn't have cert yet
     csr = db.Column(db.Text)  # Base64 encoded CSR
@@ -446,6 +448,7 @@ class Certificate(db.Model):
             "id": self.id,
             "refid": self.refid,
             "descr": self.descr,
+            "comment": self.comment or "",
             "caref": self.caref,
             "cert_type": self.cert_type,
             "subject": self.subject,

@@ -5,7 +5,7 @@
  */
 import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Icon, Facts, CodeValue } from '../../../components/atelier'
+import { Icon, Facts, CodeValue, RowAction } from '../../../components/atelier'
 import { Breakable } from '../../../components/atelier/Breakable'
 import { formatDate, extractCN } from '../../../lib/utils'
 import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex, certTypeLabel, originLabel, complianceReasonLabel } from '../../../lib/certificateDetail'
@@ -17,6 +17,7 @@ import { acmeService } from '../../../services/acme.service'
 import { CertDeploySection } from '../../../components/deploy/CertDeploySection'
 import { CertBadge } from '../CertBadge'
 import { stateOf } from '../certState'
+import { CommentDialog } from './CommentDialog'
 
 const GRADE_TONES = { 'A+': 'good', A: 'good', B: 'good', C: 'warn', D: 'warn', F: 'bad' }
 const ACME_CLIENT_SOURCES = ['acme_client', 'letsencrypt']
@@ -125,8 +126,12 @@ function Validity({ cert }) {
   )
 }
 
-function Identity({ cert, onOpenRelated }) {
+function Identity({ cert, onOpenRelated, onChanged }) {
   const { t } = useTranslation()
+  const { hasPermission } = usePermission()
+  const [editing, setEditing] = useState(false)
+  const canComment = hasPermission('write:certificates')
+  const editId = `cert-comment-edit-${cert.id}`
   const sans = sanLines(cert)
   const sig = cert.signature_algorithm ? signatureHashName(cert.signature_algorithm) : null
   const weakSig = /sha-?1|md5/i.test(cert.signature_algorithm || '')
@@ -145,6 +150,14 @@ function Identity({ cert, onOpenRelated }) {
       <h3 className="section-title">{t('inspector.cert.identity')}</h3>
       <Facts items={[
         cert.descr && cert.descr !== cert.common_name ? [t('common.description'), cert.descr] : { label: t('common.description'), absent: none },
+        // The product's comment (#454): plain text, its line breaks kept; a writer edits it in a dialog
+        {
+          label: t('certificates.comment'), product: true, long: !!cert.comment,
+          ...(cert.comment ? { value: <span className="cert-comment">{cert.comment}</span> } : { absent: none }),
+          action: canComment && (
+            <RowAction id={editId} onClick={() => setEditing(true)}>{t(cert.comment ? 'certificates.editComment' : 'certificates.addComment')}</RowAction>
+          ),
+        },
         sans.length
           ? { label: t('inspector.cert.altName'), value: sans.map((s, i) => <Fragment key={i}>{i > 0 && <br />}<Breakable text={s} /></Fragment>) }
           : { label: t('inspector.cert.altName'), absent: none },
@@ -163,6 +176,13 @@ function Identity({ cert, onOpenRelated }) {
         )],
         grade && [t('inspector.cert.compliance'), <><span className={`grade ${GRADE_TONES[grade] || 'bad'}`}>{grade}</span> <span className="muted">· {cert.compliance.score}/100</span></>],
       ]} />
+      {editing && (
+        <CommentDialog cert={cert} returnTo={editId} onClose={() => setEditing(false)} onSaved={(updated) => {
+          setEditing(false)
+          onChanged?.({ ...cert, ...updated })
+          window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'certificate', id: cert.id } }))
+        }} />
+      )}
     </section>
   )
 }
@@ -232,13 +252,13 @@ function MoreDetails({ cert }) {
   )
 }
 
-export function OverviewPanel({ cert, title, openCa, onOpenRelated }) {
+export function OverviewPanel({ cert, title, openCa, onOpenRelated, onChanged }) {
   const { t } = useTranslation()
   return (
     <>
       <div className="detail-overview" data-testid="certificate-overview">
         <Validity cert={cert} />
-        <Identity cert={cert} onOpenRelated={onOpenRelated} />
+        <Identity cert={cert} onOpenRelated={onOpenRelated} onChanged={onChanged} />
         <section className="overview-chain">
           <h3 className="section-title">{t('inspector.cert.chainOfTrust')}</h3>
           <MiniChain cert={cert} title={title} openCa={openCa} />

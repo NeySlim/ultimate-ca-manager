@@ -1,7 +1,7 @@
 /**
  * A certificate as the mockup's tableView() draws it: the columns of its table (same ids, so the
  * same `col-*` classes), the phone record, the state badge and the expiry cell. The product's own
- * columns (linked pair, creation date) come last, hidden by default.
+ * columns (linked pair, creation date, comment) come last, hidden by default.
  */
 import { Icon } from '../../components/atelier'
 import { cardFacts, labelledFact } from '../../components/atelier/cardFacts'
@@ -52,12 +52,15 @@ export function certificateColumns(t) {
       cell: (r) => (r.related_certificate_id == null ? '—' : <span title={t(roleKey(r))}>{t('certificates.hybrid.linked')}</span>) },
     { id: 'created', label: t('certificates.creationColumn'), sort: 'created', kind: 'fit', priority: 3, defaultHidden: true, tone: ['small', 'muted'], skeleton: { width: '70px' },
       cell: (r) => formatDate(r.created_at, { time: false }) },
+    // A multiline comment on one line (nowrap folds its breaks), the whole text in the title (#454)
+    { id: 'comment', label: t('certificates.comment'), sort: 'comment', kind: 'text', priority: 4, defaultHidden: true, tone: 'muted',
+      cell: (r) => r.comment || '—', title: (r) => r.comment || '', skeleton: { base: 40, spread: 40 } },
   ]
 }
 
 // The header's order and the server's field
 export const SORT_FIELDS = {
-  name: 'subject', description: 'descr', status: 'status', ca: 'issuer', source: 'source', days: 'valid_to', key: 'key_algo', grade: 'compliance_grade', created: 'created_at',
+  name: 'subject', description: 'descr', status: 'status', ca: 'issuer', source: 'source', days: 'valid_to', key: 'key_algo', grade: 'compliance_grade', created: 'created_at', comment: 'comment',
 }
 
 /**

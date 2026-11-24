@@ -252,10 +252,26 @@ describe('CertificatesPage: the toolbar (tableView)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'table.columns' }))
     const dialog = await screen.findByRole('dialog')
     const boxes = within(dialog).getAllByRole('checkbox')
-    expect(boxes.map((b) => b.dataset.column)).toEqual(['description', 'ca', 'source', 'expiry', 'key', 'grade', 'pair', 'created'])
+    expect(boxes.map((b) => b.dataset.column)).toEqual(['description', 'ca', 'source', 'expiry', 'key', 'grade', 'pair', 'created', 'comment'])
     expect(within(dialog).getByRole('checkbox', { name: 'common.keyAlgorithm' })).toHaveAttribute('data-column', 'key')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'certificates.complianceColumn' }))
     expect(headers()).toContain('certificates.complianceColumn')
+  })
+
+  it('shows a chosen Comment column on one line, the whole text as its title, sorted on the server (#454)', async () => {
+    await mount('/certificates', [{ ...WEB, comment: 'Rack 12\nowner: ops' }, SOON])
+    expect(headers()).not.toContain('certificates.comment')
+    fireEvent.click(screen.getByRole('button', { name: 'table.columns' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('checkbox', { name: 'certificates.comment' }))
+    expect(headers()).toContain('certificates.comment')
+    // The cells follow the headers, the selection box first
+    const at = [...zone().querySelectorAll('thead th')].findIndex((th) => th.classList.contains('col-comment'))
+    const cell = (cn) => row(cn).children[at]
+    expect(cell('web.example.com')).toHaveTextContent('Rack 12 owner: ops')
+    expect(cell('web.example.com').getAttribute('title')).toBe('Rack 12\nowner: ops')
+    expect(cell('soon.example.com')).toHaveTextContent('—')
+    fireEvent.click(zone().querySelector('th.col-comment button'))
+    await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'comment', sort_order: 'asc' }))
   })
 
   it('sorts on the server: the same header twice reverses, every shown column sorts', async () => {
@@ -466,12 +482,15 @@ describe('CertificatesPage: the selection (batchbar, largeBatch)', () => {
     const dialog = await screen.findByTestId('bulk-export-dialog')
     expect(within(dialog).getByRole('radio', { name: /CSV/ })).toBeChecked()
     expect(dialog.querySelector('#bulk-count')).toHaveTextContent('certificates.bulkExport.all')
-    svc.getAll.mockResolvedValue({ data: [WEB], meta: { total: 1 } })
+    svc.getAll.mockResolvedValue({ data: [{ ...WEB, comment: 'Rack 12\nowner: ops' }], meta: { total: 1 } })
     fireEvent.click(within(dialog).getByRole('button', { name: /bulkExport\.confirm/ }))
     await waitFor(() => expect(created.length).toBe(1))
     const text = await new Promise((r) => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsText(created[0]) })
     expect(text.split('\n')[0]).toContain('common.commonName,common.description')
+    expect(text.split('\n')[0]).toMatch(/,certificates\.comment$/)
     expect(text).toContain('web.example.com,Front door')
+    // The comment whole, its line break kept inside the quoted field (#454)
+    expect(text).toMatch(/,"Rack 12\nowner: ops"$/)
   })
 
   it('drops from the selection a row the list no longer shows', async () => {

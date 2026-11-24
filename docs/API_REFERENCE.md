@@ -950,8 +950,8 @@ GET /api/v2/certificates?search=example.com
 |-----------|------|-------------|
 | `status` | string | Filter, repeatable: `valid`, `expiring`, `expired`, `revoked`, `orphan`, `archived` |
 | `ca_id` | integer | Filter by issuing CA |
-| `search` | string | Search in CN, SANs |
-| `sort_by` | string | `subject` (default; the CN, else the description), `subject_cn`, `descr`, `issuer`, `valid_to`, `valid_from`, `created_at`, `serial_number`, `key_algo`, `source` (none reads `manual`), `revoked`, `status` (revoked, expired, expiring, valid), `compliance_grade`; see [Sorting](#sorting) |
+| `search` | string | Contained in the subject, issuer, display name (`descr`), comment or serial number, or a whole serial in hex |
+| `sort_by` | string | `subject` (default; the CN, else the description), `subject_cn`, `descr`, `comment`, `issuer`, `valid_to`, `valid_from`, `created_at`, `serial_number`, `key_algo`, `source` (none reads `manual`), `revoked`, `status` (revoked, expired, expiring, valid), `compliance_grade`; see [Sorting](#sorting) |
 | `sort_order` | string | `asc` (default) or `desc` |
 | `page` | integer | Page number (default: 1) |
 | `per_page` | integer | Items per page (default: 50, max: 100) |
@@ -1268,9 +1268,9 @@ An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificat
 PATCH /api/v2/certificates/{cert_id}
 Content-Type: application/json
 
-{ "descr": "Web server" }
+{ "descr": "Web server", "comment": "Owner: PKI team\nTicket INC-1234" }
 ```
-Permission `write:certificates`. Only the display name is mutable: `descr` is required, a non-empty string of at most 255 characters (`400` otherwise); `404` for an unknown certificate.
+Permission `write:certificates`. The display name and the comment change apart or together, and at least one of them is required. `descr` is a non-empty string of at most 255 characters. `comment` is plain text of at most 4,000 characters, kept as sent, with line feeds and tabs as its only control characters; `""` or `null` removes it. An invalid field refuses the whole request with `400` and changes nothing; `404` for an unknown certificate. Every certificate read carries `comment` (`""` when there is none). A changed comment is audited as `certificate_comment_updated` with its former and new lengths, never its text.
 
 ```http
 GET /api/v2/certificates/{cert_id}/lint?profile=rfc5280
@@ -4156,6 +4156,8 @@ GET /api/v2/search?q=example.com&limit=20
 |-----------|------|-------------|
 | `q` | string | Search query (required) |
 | `limit` | integer | Max results per category (default: 5) |
+
+Certificates match on their subject, issuer, display name and serial number, and on their comment for a user with `read:certificates`.
 
 **Response:**
 ```json

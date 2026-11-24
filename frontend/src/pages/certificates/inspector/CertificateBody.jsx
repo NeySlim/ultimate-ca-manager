@@ -124,7 +124,7 @@ export function CertificateBody({ entry, onOpenCa, section, onSection: setSectio
         )}
         sections={SECTIONS.map((s) => [s, t(`inspector.sections.${s}`)])} section={section} onSection={setSection} sectionsLabel={t('inspector.certificateSections')}
         idPrefix={idPrefix}>
-        {section === 'overview' && <OverviewPanel cert={cert} title={title} openCa={openCa} onOpenRelated={(id) => openEntity('certificate', id)} />}
+        {section === 'overview' && <OverviewPanel cert={cert} title={title} openCa={openCa} onOpenRelated={(id) => openEntity('certificate', id)} onChanged={setCert} />}
         {section === 'chain' && <ChainPanel cert={cert} title={title} openCa={openCa} onChanged={setCert} />}
         {section === 'extensions' && <ExtensionsPanel cert={cert} />}
         {section === 'history' && <HistoryPanel cert={cert} />}

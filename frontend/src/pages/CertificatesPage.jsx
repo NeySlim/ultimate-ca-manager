@@ -413,11 +413,13 @@ export default function CertificatesPage() {
   const metadata = (r) => ({
     id: r.id, common_name: r.cn, description: r.subtitle || '', issuer: issuerOf(r), source: sourceLabel(sourceOf(r), t),
     status: r.status, expires: r.valid_to, algorithm: certificateKeyLabel(r, t) || '', serial: r.serial_number || '', template: r.template_name || '',
+    comment: r.comment || '',
   })
   const csvColumns = [
     ['id', 'ID'], ['common_name', t('common.commonName')], ['description', t('common.description')], ['issuer', t('common.issuer')],
     ['source', t('certificates.source')], ['status', t('certificates.state')], ['expires', t('certificates.expiry')],
     ['algorithm', t('common.keyAlgorithm')], ['serial', t('inspector.cert.serial')], ['template', t('certificates.template')],
+    ['comment', t('certificates.comment')],
   ].map(([key, header]) => ({ key, header }))
   // all: the toolbar's export (every result); otherwise the selection, or every result once « all » is chosen
   const runBulkExport = async (format, all) => {

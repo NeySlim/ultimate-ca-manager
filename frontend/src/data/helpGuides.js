@@ -412,11 +412,11 @@ Tick two to four certificates in the list and click **Compare** in the selection
 - **CA filter**: Show certificates from a specific CA
 - **Source filter**: Filter by how the certificate entered UCM (issued, imported, ACME, SCEP, etc.)
 - **Template filter** (in the **Filters** dialog at the end of the toolbar, a chip once on): Find certificates **modified from template**: issued from a template but with the key type or validity explicitly overridden at request time. The divergent fields are listed on the certificate detail; the record is frozen at issuance
-- **Text search**: Search by subject, issuer, display name or serial number (SANs are not searched); the search runs once you stop typing and says how many results it found
+- **Text search**: Search by subject, issuer, display name, comment or serial number (SANs are not searched); the search runs once you stop typing and says how many results it found
 - **Saved filters**: the **Filters** dialog at the end of the toolbar saves the search, the state and the filters under a name in this browser, and applies a saved set again
 - **Export the list**: the export button of the toolbar exports every result, the selection bar's **Export…** the ticked certificates: in PEM, or their metadata in CSV or JSON. Once the whole page is ticked, **Select all N results** extends the selection to every result
 - **Sorting**: By name, expiry date, creation date, status
-- **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date
+- **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link, the creation date and the comment
 - **Row actions**: Export on the row; the other actions in the inspector a click on the row opens: Export and Renew in its heading, Rename, Revoke, Delete and the rest in its ⋯ menu
 - **Inspector**: opens under the list, inside the page margins, or on its right from 1200 px wide; its place and size follow your account on every page. A certificate opened from another page (the search, an approval, an authority) comes here, in this inspector. Drag its edge or use the arrow keys on it to resize it, fold it to its tab strip, enlarge it. Open certificates stay as tabs; those that do not fit go into a +N menu. Its tabs are Overview, Chain, Extensions, History and PEM; History lists the dates of the record and, with read:audit, the audit entries of this certificate among the latest 100 on certificates
 

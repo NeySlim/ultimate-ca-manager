@@ -76,6 +76,8 @@ def _sort_columns():
         'serial_number': Certificate.serial_number,
         'revoked': Certificate.revoked,
         'descr': Certificate.descr,
+        # An empty comment is stored as NULL, so it comes last in both directions
+        'comment': Certificate.comment,
         'key_algo': Certificate.key_algo,
         # A legacy row without a source is a manual one, as the source filter reads it
         'source': func.coalesce(Certificate.source, 'manual'),
@@ -183,6 +185,7 @@ def list_certificates():
                 Certificate.subject.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.issuer.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.descr.ilike(f'%{safe_search}%', escape='\\'),
+                Certificate.comment.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.serial_number.ilike(f'%{safe_search}%', escape='\\'),
                 # A whole serial typed in hex or colon hex, as the UI shows it
                 Certificate.serial_number.in_(serial_search_forms(search)),

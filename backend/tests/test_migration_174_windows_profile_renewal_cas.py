@@ -41,7 +41,6 @@ def _migration():
 def test_the_step_is_part_of_the_upgrade_after_171():
     from migrations._from_2_254 import STEPS
     assert STEPS.index('174_windows_profile_renewal_cas') > STEPS.index('171_acme_purge_indexes')
-    assert STEPS[-1] == '174_windows_profile_renewal_cas'
 
 
 def _lists(rows):

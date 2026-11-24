@@ -25,6 +25,11 @@ export const certificatesService = {
     return apiClient.patch(`/certificates/${id}`, { descr })
   },
 
+  // An empty comment removes it (#454)
+  async updateComment(id, comment) {
+    return apiClient.patch(`/certificates/${id}`, { comment })
+  },
+
   // revokeRelated: also revoke the other member of a hybrid pair (server default: true)
   async revoke(id, reason, { revokeRelated } = {}) {
     return apiClient.post(`/certificates/${id}/revoke`, {
