@@ -1,0 +1,6 @@
+{
+  "_doc": "The server's answer to a write that met another one on SQLite (backend/utils/sqlite_wait.py _refusal). Clients recognise it by `type`; `detail` is the fallback for a server that sends none.",
+  "status": 503,
+  "type": "urn:ucm:problem:database-busy",
+  "detail": "The database is busy with another write: retry shortly."
+}

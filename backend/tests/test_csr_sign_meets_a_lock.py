@@ -5,6 +5,7 @@ A second sqlite3 connection really writes, as in tests/test_restore_held_databas
 """
 import json
 import logging
+import os
 import sqlite3
 
 from models import Certificate, SystemConfig, db
@@ -12,6 +13,11 @@ from services.trust_store import TrustStoreService
 from utils import sqlite_wait
 from tests.test_restore_held_database import (  # noqa: F401 (fixture)
     _admin_user, _client, busy_app)
+
+_REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# The busy answer as the clients recognise it (frontend apiClient.js and e2e/support/api.ts)
+with open(os.path.join(_REPO, 'contracts', 'database_busy.json')) as _fh:
+    BUSY_CONTRACT = json.load(_fh)
 
 
 def _post(client, url, body):
@@ -73,6 +79,8 @@ def test_a_csr_signing_that_meets_a_writer_answers_busy_and_signs_on_retry(busy_
     assert refused.status_code == 503, refused.data
     assert refused.headers['Retry-After'] == str(sqlite_wait.BUSY_RETRY_AFTER_SECONDS)
     assert refused.get_json()['detail'] == sqlite_wait.BUSY_MESSAGE
+    assert {k: refused.get_json()[k] for k in ('status', 'type', 'detail')} == \
+        {k: BUSY_CONTRACT[k] for k in ('status', 'type', 'detail')}
     # A lock is the server's load, not a failure of the signing: no error with its traceback
     assert not [r for r in caplog.records if r.levelno >= logging.ERROR and 'CSR Sign Error' in r.getMessage()]
     with app.app_context():
@@ -205,5 +213,6 @@ def test_a_signing_whose_approval_meets_a_writer_answers_busy_without_an_error(
     with caplog.at_level(logging.WARNING):
         refused = _post(client, f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca_id, 'validity_days': 30})
     assert refused.status_code == 503, refused.data
+    assert refused.get_json()['type'] == BUSY_CONTRACT['type']
     assert refused.get_json()['detail'] == sqlite_wait.BUSY_MESSAGE
     assert not [r for r in caplog.records if r.levelno >= logging.ERROR and 'CSR' in r.getMessage()]

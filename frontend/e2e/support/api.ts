@@ -13,7 +13,8 @@ export class ApiError extends Error {
   }
 }
 
-/** The server's answer to a write that met another one on SQLite (backend utils/sqlite_wait.BUSY_MESSAGE). */
+/** The server's answer to a write that met another one on SQLite (contracts/database_busy.json). */
+export const BUSY_PROBLEM = 'urn:ucm:problem:database-busy'
 export const BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
 
 export type Backoff = { delays: readonly number[], sleep: (ms: number) => Promise<void> }
@@ -28,9 +29,12 @@ async function read(r: APIResponse): Promise<Read> {
   return { status: r.status(), ok: r.ok(), body, headers: r.headers() }
 }
 
-/** Only the busy answer of the server is sent again ("retry shortly"); any other 503 (restore, CRL) is the test's. */
+/** Only the busy answer of the server is sent again, known by its type (its text from a server
+ * that sends none); any other 503 (restore, CRL) is the test's. */
 export function isBusy(r: { status: number, body: unknown }) {
-  return r.status === 503 && !!r.body && typeof r.body === 'object' && (r.body as { detail?: unknown }).detail === BUSY_MESSAGE
+  if (r.status !== 503 || !r.body || typeof r.body !== 'object') return false
+  const { type, detail } = r.body as { type?: unknown, detail?: unknown }
+  return type === BUSY_PROBLEM || ((!type || type === 'about:blank') && detail === BUSY_MESSAGE)
 }
 
 async function untilNotBusy(what: string, send: () => Promise<APIResponse>, backoff: Backoff): Promise<Read> {

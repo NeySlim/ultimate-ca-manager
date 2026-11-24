@@ -3501,7 +3501,7 @@ the wait ends answers `202` with the job as its local state shows it. Every othe
 holds the database: only the health checks and the restore job are served until it ends. Retry
 later.`; OCSP answers the `tryLater` status (RFC 6960 section 2.3). A request that meets a SQLite
 lock outside a restore and would answer `500`, whether or not its route caught the error, answers
-`503` with `Retry-After: 5` instead; a route that answers another status for it keeps that status. Another
+`503` with `Retry-After: 5` and the problem type `urn:ucm:problem:database-busy` instead; a route that answers another status for it keeps that status. Another
 job, or a second restore, answers `409` naming the active job, and no archive file is kept.
 
 ```http
@@ -5608,6 +5608,7 @@ The routes are always served; a protocol turned off in Settings refuses its requ
 | 409 | Conflict (resource already exists) |
 | 422 | Unprocessable Entity (validation error) |
 | 500 | Internal Server Error |
+| 503 | Service Unavailable. A write that met another one on SQLite answers with `Retry-After: 5` and the problem type `urn:ucm:problem:database-busy`: nothing was stored, send it again |
 
 ---
 
