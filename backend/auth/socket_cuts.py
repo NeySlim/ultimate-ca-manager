@@ -51,22 +51,28 @@ def _callers_session(user_id, replaced):
 
 
 def _owe(session_id):
-    """The spared caller's session: every socket of it closes at the end of the request, once a
-    renewal moved the record (a stolen copy's too; the caller's tabs reconnect with the new cookie)."""
-    from flask import after_this_request, g, has_request_context
+    """The spared caller's session: every socket of it closes, renewed or not (a stolen copy's
+    too), once the answer that carries the new cookie is sent; the server closes the answer
+    even when the client went away, and the caller's tabs then reconnect with that cookie."""
+    from flask import after_this_request, current_app, g, has_request_context
     if not session_id or not has_request_context():
         return
     owed = g.get(_OWED)
     if owed is None:
         owed = set()
         setattr(g, _OWED, owed)
+        app = current_app._get_current_object()
+
+        def _cut_owed():
+            from auth.session_start import close_session_sockets
+            with app.app_context():
+                for sid in list(owed):
+                    close_session_sockets(sid)
+            owed.clear()
 
         @after_this_request
-        def _cut_owed(response):
-            from auth.session_start import close_session_sockets
-            for sid in list(g.get(_OWED) or ()):
-                close_session_sockets(sid)
-            g.get(_OWED, set()).clear()
+        def _after_the_answer(response):
+            response.call_on_close(_cut_owed)
             return response
     owed.add(session_id)
 
