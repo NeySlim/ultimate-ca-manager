@@ -75,7 +75,6 @@ def revoke_all_sessions():
     ok, _err = safe_commit(logger, "Failed to revoke other sessions")
     if not ok:
         return _err
-    keep_current_session(user)
 
     AuditService.log_action(
         action='session_revoke_all',
@@ -84,6 +83,7 @@ def revoke_all_sessions():
         details=f'Other sessions closed by user: {user.username}',
         success=True
     )
+    keep_current_session(user)
     return success_response(message='All other sessions revoked')
 
 

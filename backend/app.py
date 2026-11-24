@@ -1328,6 +1328,15 @@ def create_app(config_name=None):
         from auth.session_lock import locked_refusal
         return locked_refusal()
 
+    from auth.session_start import SessionNotKept
+
+    @app.errorhandler(SessionNotKept)
+    def handle_session_not_kept(e):
+        app.logger.error("Session not renewed after a committed change (path: %s)", request.path,
+                         exc_info=e.__cause__ or e)
+        from utils.response import error_response
+        return error_response(SessionNotKept.message, 500)
+
     @app.errorhandler(404)
     def handle_404(e):
         if request.path.startswith('/api/'):

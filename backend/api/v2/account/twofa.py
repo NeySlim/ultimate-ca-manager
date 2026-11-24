@@ -15,7 +15,7 @@ from utils.backup_codes import (
 )
 from auth.unified import require_auth
 from auth.session_reverify import check_session_password
-from auth.session_start import closed_sessions_note, sessions_closed_by
+from auth.session_start import closed_sessions_note, keep_own_session, other_sessions_closed
 from auth.twofa_enforcement import (
     enforcement_active_for, has_security_key, last_factor_refusal, lock_for_factor_change,
     lock_user,
@@ -124,7 +124,7 @@ def confirm_2fa():
     ok, _err = safe_commit(logger, "Failed to enable 2FA")
     if not ok:
         return _err
-    closed = sessions_closed_by(user)
+    closed = other_sessions_closed(user)
 
     # If this confirmation satisfied a forced-enrolment session (#141), lift the
     # gate so the now-enrolled user gets a full session.
@@ -140,6 +140,7 @@ def confirm_2fa():
         details=f'2FA enabled for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
+    keep_own_session(user)
 
     return success_response(
         data={'backup_codes': backup_codes},
@@ -225,7 +226,7 @@ def disable_2fa():
     if not changed:
         return success_response(message='2FA disabled successfully',
                                 meta={'other_sessions_closed': 0})
-    closed = sessions_closed_by(user)
+    closed = other_sessions_closed(user)
     if counted:
         _clear_code_checks(user.id)
 
@@ -237,6 +238,7 @@ def disable_2fa():
         details=f'2FA disabled for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
+    keep_own_session(user)
 
     return success_response(message='2FA disabled successfully',
                             meta={'other_sessions_closed': closed})
@@ -294,7 +296,7 @@ def set_webauthn_second_factor():
     ok, _err = safe_commit(logger, "Failed to update the security key second factor")
     if not ok:
         return _err
-    closed = sessions_closed_by(user)
+    closed = other_sessions_closed(user)
 
     AuditService.log_action(
         action='mfa_webauthn_enable' if enabled else 'mfa_webauthn_disable',
@@ -305,6 +307,7 @@ def set_webauthn_second_factor():
                  f'for {user.username} ({closed_sessions_note(closed)})'),
         success=True
     )
+    keep_own_session(user)
     return success_response(data={'webauthn_2fa': enabled}, meta={'other_sessions_closed': closed})
 
 
@@ -361,7 +364,7 @@ def regenerate_recovery_codes():
     ok, _err = safe_commit(logger, "Failed to regenerate backup codes")
     if not ok:
         return _err
-    closed = sessions_closed_by(user)
+    closed = other_sessions_closed(user)
     _clear_code_checks(user.id)
 
     AuditService.log_action(
@@ -372,6 +375,7 @@ def regenerate_recovery_codes():
         details=f'Recovery codes regenerated for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
+    keep_own_session(user)
     return success_response(
         data={'backup_codes': new_codes},
         message='Recovery codes regenerated. Save them now!',

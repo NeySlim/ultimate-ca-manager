@@ -16,7 +16,9 @@ from models.webauthn import WebAuthnCredential
 from services.webauthn_service import WebAuthnService
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
-from auth.session_start import closed_sessions_note, end_sessions_on_commit, sessions_closed_by
+from auth.session_start import (
+    closed_sessions_note, end_sessions_on_commit, keep_own_session, other_sessions_closed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,7 @@ def delete_credential(credential_id):
     if not success:
         db.session.rollback()
         return error_response(message, 404)
-    closed = sessions_closed_by(owner)
+    closed = other_sessions_closed(owner)
 
     AuditService.log_action(
         action='webauthn_delete',
@@ -75,6 +77,7 @@ def delete_credential(credential_id):
         details=f'Deleted WebAuthn credential {credential_id} ({closed_sessions_note(closed)})',
         success=True
     )
+    keep_own_session(owner)
 
     return success_response(message=message, meta={'other_sessions_closed': closed})
 
@@ -102,7 +105,7 @@ def toggle_credential(credential_id):
     if not success:
         db.session.rollback()
         return error_response(message, 404)
-    closed = sessions_closed_by(owner)
+    closed = other_sessions_closed(owner)
 
     AuditService.log_action(
         action='webauthn_toggle',
@@ -113,6 +116,7 @@ def toggle_credential(credential_id):
                  f'({closed_sessions_note(closed)})'),
         success=True
     )
+    keep_own_session(owner)
 
     return success_response(message=message, meta={'other_sessions_closed': closed})
 
@@ -156,7 +160,7 @@ def verify_registration():
     if enrolling:
         session.pop(ENROLL_SESSION_KEY, None)
         session.modified = True
-    closed = sessions_closed_by(owner)
+    closed = other_sessions_closed(owner)
 
     AuditService.log_action(
         action='webauthn_register',
@@ -166,6 +170,7 @@ def verify_registration():
         details=f'Registered WebAuthn credential: {credential_name} ({closed_sessions_note(closed)})',
         success=True
     )
+    keep_own_session(owner)
 
     return success_response(data=credential.to_dict() if credential else None, message=message,
                             meta={'other_sessions_closed': closed})
