@@ -34,7 +34,7 @@ def test_pg_gated_tests_run_in_the_pg_application_step():
     assert not missing, missing
 
 
-@pytest.mark.parametrize('n', [1, 2, 3])
+@pytest.mark.parametrize('n', [1, 2, 3, 4])
 def test_the_shards_together_are_every_test_file_once(n):
     every = sorted(f'tests/{f.relative_to(ROOT / "backend" / "tests")}'
                    for f in (ROOT / 'backend' / 'tests').rglob('test_*.py'))

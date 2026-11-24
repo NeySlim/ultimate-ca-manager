@@ -24,6 +24,7 @@ def _runs(event, ref):
 @pytest.mark.parametrize('event,ref,expected', [
     ('push', 'refs/heads/dev', True),
     ('push', 'refs/heads/sextant', False),
+    ('push', 'refs/heads/test', True),  # the run a release candidate is read from
     ('pull_request', 'refs/pull/12/merge', True),
     ('workflow_dispatch', 'refs/heads/feature/x', True),
     ('push', 'refs/heads/feature/x', False),

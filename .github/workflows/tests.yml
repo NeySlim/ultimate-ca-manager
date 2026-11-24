@@ -98,15 +98,15 @@ jobs:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
   
-  # Two halves of the file list (scripts/ci/shard-tests.sh), four workers each.
+  # Four quarters of the file list (scripts/ci/shard-tests.sh), four workers each.
   test-backend:
-    name: Backend Tests (${{ matrix.shard }}/2)
+    name: Backend Tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     
     steps:
       - name: Checkout code
@@ -139,18 +139,17 @@ jobs:
         run: |
           cd backend
           # A failed or empty list stops the step: pytest without files runs the whole suite
-          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 2)
+          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 4)
           [ -n "$files" ]
           pytest -v --tb=short -n 4 --dist loadfile $files
 
-  # One database for the whole suite, as a user runs it: the integration judge.
-  # Release branches, the nightly run of dev, and on demand. A schedule runs only
-  # the default branch's copy, so the 3.0 line runs it on a manual run of its
-  # integration branch instead, each push having played it in one process before.
+  # One database for the whole suite, as a user runs it: the nightly run of dev and
+  # on demand only. Every push is validated in one process before it leaves, so a
+  # push run never plays it a second time.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 150
     # On the 3.0 integration branch one run at a time: the running one finishes, the
     # newest manual run waits and replaces any older waiting one; elsewhere one group per commit
@@ -646,7 +645,7 @@ jobs:
   test-e2e:
     name: End-to-end (browser)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/test'))
     timeout-minutes: 30
     permissions:
       contents: read

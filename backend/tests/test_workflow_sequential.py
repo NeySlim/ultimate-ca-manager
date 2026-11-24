@@ -1,8 +1,6 @@
-"""The one-process suite runs on the integration branch of the 3.0 line.
+"""The one-process suite runs at night and on demand, never on a push.
 
-A schedule only runs from the default branch's copy of the workflow, so this line gets the run
-on each manual run of its integration branch instead: the suite is played in one process before
-every push already, and a push would only play it a second time.
+Every push is validated in one process before it leaves: a push run would only play it a second time.
 """
 import pytest
 
@@ -24,8 +22,8 @@ def _ctx(event, ref):
 @pytest.mark.parametrize('event, ref, runs', [
     ('workflow_dispatch', f'refs/heads/{LINE_BRANCH}', True),
     ('push', f'refs/heads/{LINE_BRANCH}', False),
-    ('push', 'refs/heads/test', True),
-    ('push', 'refs/heads/main', True),
+    ('push', 'refs/heads/test', False),
+    ('push', 'refs/heads/main', False),
     ('schedule', 'refs/heads/main', True),
     ('workflow_dispatch', 'refs/heads/feature/x', True),
     ('push', 'refs/heads/feature/x', False),
@@ -45,7 +43,7 @@ def _checkout_ref(event, ref, sha='c0ffee'):
 def test_a_manual_run_of_the_line_branch_tests_its_own_commit():
     """Not the branch: a job that waited in its group would find a newer tip there."""
     assert _checkout_ref('workflow_dispatch', f'refs/heads/{LINE_BRANCH}', 'a1b2c3') == 'a1b2c3'
-    assert _checkout_ref('push', 'refs/heads/main', 'd4e5f6') == 'd4e5f6'
+    assert _checkout_ref('workflow_dispatch', 'refs/heads/main', 'd4e5f6') == 'd4e5f6'
 
 
 def test_the_nightly_run_tests_dev():
@@ -121,12 +119,6 @@ def test_a_manual_run_of_the_retired_branch_gets_one_group_per_commit():
     ref = f'refs/heads/{RETIRED_BRANCH}'
     (g1, _), (g2, _) = (_job_concurrency(ref, 'a1', 'workflow_dispatch'),
                         _job_concurrency(ref, 'b2', 'workflow_dispatch'))
-    assert g1 != g2
-
-
-@pytest.mark.parametrize('ref', ['refs/heads/test', 'refs/heads/main'])
-def test_every_release_commit_keeps_its_sequential_run(ref):
-    (g1, _), (g2, _) = _job_concurrency(ref, 'a1'), _job_concurrency(ref, 'b2')
     assert g1 != g2
 
 
