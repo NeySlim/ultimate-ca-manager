@@ -32,6 +32,9 @@ const cutWords = (scope: Locator) => scope.evaluate((root) => {
   return out
 })
 
+// A runner's name in a public cloud: one word for the line breaker but for its dots
+const LONG_HOST = 'runnervm0hi8g.xzi531oxwoauxd4ge3usvb0tpb.bx.internal.cloudapp.ne'
+
 // The latest journal entry that recorded an address, opened from its row
 async function openEventWithIp(page: Page, api: any) {
   const data = await api.get('/audit/logs?page=1&per_page=50')
@@ -71,9 +74,17 @@ test.describe('a phone of 360 px', () => {
   test.use({ viewport: { width: 360, height: 800 } })
 
   test('the settings and the event dialog cut no word and scroll not sideways', async ({ page, api }) => {
+    // The HTTPS certificate named after a cloud host of 63 characters, whatever this machine is called
+    await page.route('**/api/v2/system/https/cert-info', async (route) => {
+      const response = await route.fetch()
+      const body = await response.json()
+      body.data = { ...body.data, common_name: LONG_HOST, issuer: LONG_HOST }
+      await route.fulfill({ response, json: body })
+    })
     await page.goto('/settings?tab=security')
     const main = page.getByRole('main')
     await expect(main.locator('dl.kv').first()).toBeVisible()
+    await expect(row(main, 'Common Name').locator('dd.v')).toHaveText(LONG_HOST)
     expect(await cutWords(main)).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
     const { dialog } = await openEventWithIp(page, api)

@@ -71,6 +71,17 @@ describe('the HTTPS certificate', () => {
     expect(issuer).toHaveTextContent('—')
   })
 
+  it('lets a long host name wrap after its dots, under its term on a phone', () => {
+    const host = 'runnervm0hi8g.xzi531oxwoauxd4ge3usvb0tpb.bx.internal.cloudapp.ne'
+    show({ common_name: host, issuer: host, fingerprint: FP })
+    for (const term of ['common.commonName', 'common.issuer']) {
+      expect(row(term)).toHaveClass('long')
+      const value = row(term).querySelector('dd.v')
+      expect(value).toHaveTextContent(host)
+      expect(value.querySelectorAll('wbr')).toHaveLength(5)
+    }
+  })
+
   it('offers no copy of a fingerprint the API could not read', () => {
     show({ common_name: 'Error reading certificate', issuer: 'Unknown', fingerprint: '-' })
     expect(row('settings.fingerprintSha256').querySelector('dd')).toHaveClass('absent')

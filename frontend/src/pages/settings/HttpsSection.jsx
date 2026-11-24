@@ -3,9 +3,12 @@ import { Btn, Facts, IconBtn, Notice, RecordList, RecordRow } from '../../compon
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { formatDate, certificateLabel } from '../../lib/utils'
 import { fact } from '../../components/atelier/facts'
+import { Breakable } from '../../components/atelier/Breakable'
 
 // The API says « - » for what it could not read
 const given = (value) => (value && value !== '-' ? value : null)
+// A host name (a cloud runner's runs to 63 characters) wraps after its dots and goes under its term on a phone
+const host = (label, value) => fact(label, value && <Breakable text={value} />, { long: true })
 
 export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelectedHttpsCert, setShowCertPicker, handleApplyUcmCert, handleRegenerateHttpsCert, setShowHttpsImportModal, onUnbindHttpsCert }) {
   const { t } = useTranslation()
@@ -17,8 +20,8 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
     <>
       <SettingsGroup legend={t('settings.currentCertificate')} grid={false}>
         <Facts items={[
-          [t('common.commonName'), httpsInfo?.common_name || window.location.hostname],
-          fact(t('common.issuer'), given(httpsInfo?.issuer)),
+          host(t('common.commonName'), httpsInfo?.common_name || window.location.hostname),
+          host(t('common.issuer'), given(httpsInfo?.issuer)),
           fact(t('common.validFrom'), httpsInfo?.valid_from && formatDate(httpsInfo.valid_from)),
           fact(t('common.validUntil'), httpsInfo?.valid_to && formatDate(httpsInfo.valid_to)),
           fact(t('settings.fingerprintSha256'), given(httpsInfo?.fingerprint), { kind: 'hex' }),
