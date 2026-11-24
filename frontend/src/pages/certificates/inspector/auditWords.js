@@ -3,7 +3,7 @@ export const AUDIT_WINDOW = 100
 // What an audit action did, as a sentence of the history; the first match wins
 const AUDIT_WORDS = [
   [/renewal_failed/, 'renewFailed'], [/creat|issu/, 'issued'], [/import/, 'imported'], [/renew/, 'renewed'],
-  [/unhold|unheld/, 'unheld'], [/hold/, 'held'], [/revok/, 'revokedPlain'], [/delet/, 'deleted'], [/renam/, 'renamed'],
+  [/unhold|unheld/, 'unheld'], [/hold/, 'held'], [/revocation_lifted/, 'revocationLifted'], [/revok/, 'revokedPlain'], [/delet/, 'deleted'], [/renam/, 'renamed'],
   [/key_upload/, 'keyUploaded'], [/export|\.(pem|der|jks|p12|pfx)$/, 'exported'], [/updat/, 'updated'],
 ]
 /** The i18n key under inspector.history that words an audit action, or null for an action it does not know. */

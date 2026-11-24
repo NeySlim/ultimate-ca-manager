@@ -110,6 +110,7 @@ export default {
     warnings: [
       'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée (unhold) ou rendue permanente avec un autre motif',
       'Un certificat valide non révoqué ne peut pas être supprimé seul : Supprimer explique pourquoi et propose « Révoquer, puis supprimer », pour que la révocation atteigne la CRL/OCSP ; les révocations survivent à la suppression',
+      'Sous une AC détenue sans sa clé (une AC publique importée), ou sans AC, UCM ne publie aucune révocation : Supprimer retire un certificat valide sans le révoquer, et un administrateur lève une révocation faite là par Lever la révocation, après une confirmation consignée au journal d’audit. La révocation d’une AC dont UCM détient la clé ne se lève jamais, sauf une suspension par Lever la suspension',
       'UCM signe uniquement en SHA-256, SHA-384 ou SHA-512 : SHA-224 et les noms de hachage inconnus sont refusés au lieu d’être remplacés par SHA-256',
     ],
   },
@@ -164,7 +165,7 @@ Depuis la v2.214, le renouvellement met à jour le certificat **en place** :
 - **Renouveler** demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques d’émission et l’expiration de l’AC la plafonnent toujours
 - **Renouvellement par EST, SCEP ou WSTEP** enregistre un nouveau certificat : ses déploiements et la liaison HTTPS se déplacent vers lui. Un déploiement qui envoie la clé privée, ainsi que la liaison HTTPS, restent sur le certificat précédent quand UCM ne détient pas la nouvelle clé : le déploiement affiche **Ne suit pas le renouvellement**, la cloche et la vue d’ensemble le listent, et l’événement \`certificate.binding_left_behind\` est envoyé. **Rattacher au certificat renouvelé** dès qu’UCM détient sa clé ou que le déploiement cesse d’envoyer la clé ; importer la clé du certificat renouvelé les déplace de lui-même
 
-**Suppression** : un certificat valide non révoqué ne peut pas être supprimé seul : **Supprimer** explique pourquoi et propose **Révoquer, puis supprimer**, pour que les parties utilisatrices voient le changement. Les révocations sont persistées indépendamment de l’enregistrement du certificat et survivent à la suppression.
+**Suppression** : un certificat valide non révoqué ne peut pas être supprimé seul : **Supprimer** explique pourquoi et propose **Révoquer, puis supprimer**, pour que les parties utilisatrices voient le changement. Les révocations sont persistées indépendamment de l’enregistrement du certificat et survivent à la suppression. Sous une AC détenue sans sa clé (une AC publique importée), ou pour un certificat lié à aucune AC, UCM ne signe ni CRL ni réponse OCSP : **Supprimer** retire un certificat valide sans le révoquer, et le dit.
 
 ## Révoquer un certificat
 
@@ -188,6 +189,10 @@ Si un certificat a été révoqué avec le motif **Suspension de certificat**, i
 4. Le certificat retrouve le statut valide, la CRL est régénérée et le cache OCSP est mis à jour
 
 > 💡 La suspension de certificat est utile pour les suspensions temporaires (par exemple, appareil perdu, enquête en cours).
+
+### Lever une révocation locale
+
+Une révocation faite sous une AC détenue sans sa clé n’a jamais été publiée. Un administrateur (\`admin:system\`) la lève depuis les actions du certificat par **Lever la révocation**, après une confirmation : chaque copie enregistrée du certificat redevient valide et son enregistrement de révocation est supprimé, si bien qu’un nouvel import et la réparation horaire le laissent valide. Le journal d’audit consigne \`certificate_local_revocation_lifted\`. Une révocation enregistrée par une version antérieure a pu être publiée si l’AC détenait alors sa clé dans UCM : la confirmation le dit. Une AC dont UCM détient la clé (logicielle, HSM ou fournisseur de clés), une AC hors ligne ou une AC dotée d’un répondeur OCSP délégué publie ses révocations : elles ne se lèvent jamais, sauf une **Suspension de certificat** par **Lever la suspension** (RFC 5280 §5.3.1).
 
 ### Révoquer définitivement un certificat suspendu
 

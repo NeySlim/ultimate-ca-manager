@@ -30,6 +30,9 @@ class RevokedSerial(db.Model):
     certificate_id = db.Column(db.Integer, index=True)
     # SHA-256 of the revoked key's SubjectPublicKeyInfo: a compromise outlives the certificate row
     public_key_sha256 = db.Column(db.String(64), index=True)
+    # True: UCM signed for the CA at a write (CRL or OCSP may carry it); False: nothing published
+    # it, it may be lifted; NULL: written before upgrade step 176, unknown (issue #450)
+    published = db.Column(db.Boolean, nullable=True)
 
     @validates('serial_number')
     def _canonical_serial_number(self, key, value):
@@ -48,6 +51,7 @@ class RevokedSerial(db.Model):
             'valid_to': utc_isoformat(self.valid_to),
             'certificate_id': self.certificate_id,
             'public_key_sha256': self.public_key_sha256,
+            'published': self.published,
             'created_at': utc_isoformat(self.created_at),
         }
 

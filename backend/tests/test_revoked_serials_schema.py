@@ -20,7 +20,8 @@ INDEXES = {
     'ix_revoked_serials_public_key_sha256': ['public_key_sha256'],
 }
 COLUMNS = ['id', 'caref', 'serial_number', 'revoked_at', 'revoke_reason',
-           'invalidity_at', 'valid_to', 'created_at', 'certificate_id', 'public_key_sha256']
+           'invalidity_at', 'valid_to', 'created_at', 'certificate_id', 'public_key_sha256',
+           'published']
 NOT_NULL = {'id', 'caref', 'serial_number', 'revoked_at', 'valid_to'}
 
 # A CA and one of its certificates, for the records the constraint checks write
@@ -246,7 +247,7 @@ class _PgExec:
 # --------------------------------------------------------------------------
 
 class TestRevokedSerialModel:
-    def test_to_dict_carries_the_ten_keys_with_iso_dates(self):
+    def test_to_dict_carries_every_column_with_iso_dates(self):
         from models.revoked_serial import RevokedSerial
 
         row = RevokedSerial(
@@ -255,7 +256,7 @@ class TestRevokedSerialModel:
             valid_to=datetime(2027, 1, 2, 3, 4, 5), certificate_id=None,
             created_at=datetime(2026, 1, 2, 3, 4, 6))
         data = row.to_dict()
-        assert set(data) == set(COLUMNS) | {'public_key_sha256'}
+        assert set(data) == set(COLUMNS)
         assert data['revoked_at'] == '2026-01-02T03:04:05Z'
         assert data['valid_to'] == '2027-01-02T03:04:05Z'
         assert data['created_at'] == '2026-01-02T03:04:06Z'

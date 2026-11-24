@@ -482,6 +482,8 @@ class LifecycleMixin:
                 record.valid_to = valid_to
                 record.certificate_id = certificate.id
                 record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises
+                from services.cert.local_revocation import note_publication
+                note_publication(record, ca, fresh)
             elif certificate.caref:
                 logger.warning("Certificate %s: CA %s not found, no revocation record written",
                                cert_id, certificate.caref)

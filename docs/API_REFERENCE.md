@@ -1141,6 +1141,34 @@ a `certificate.unheld` event. A request body that is not a JSON object is refuse
 non-JSON media type). `GET /api/v2/certificates/{cert_id}` reports in `related_on_hold_id` the partner an
 unhold would lift, or `null`.
 
+### Lift a Local Revocation
+```http
+POST /api/v2/certificates/{cert_id}/lift-local-revocation
+Content-Type: application/json
+
+{"confirm": true}
+```
+
+Requires `admin:system`. Lifts a revocation no relying party ever saw: the issuing CA is held in UCM
+without its key (an imported public CA), is not offline and has no delegated OCSP responder, so UCM
+never signed a CRL or an OCSP answer carrying it. Every stored copy of the certificate (same serial
+under the CA or a record of its key) becomes valid again and the serial's revocation records are
+deleted, so neither an import nor the hourly repair revokes it again. Each lifted copy is audited
+`certificate_local_revocation_lifted`. The answer is the certificate as `GET` returns it.
+
+- `confirm` (JSON boolean, required `true`): `400` without it.
+- `acknowledge_unknown_publication` (JSON boolean, default `false`): a record written before UCM noted
+  whether it was published (an upgraded installation) is lifted only with it, since the CA may have held
+  its key at the time; without it the answer is `409` and says the risk.
+- `409` for a published revocation (the CA, or a record of its key, holds its key in UCM, software, HSM or
+  key provider, is offline, or has a delegated OCSP responder; or the record was written while it did):
+  RFC 6960 §2.2 and RFC 5280 §5.3.1 lift only a `certificateHold`, through unhold. Also `409` for a
+  certificate linked to no CA in UCM, or revoked again while the lift ran; `400` for one not revoked.
+
+`GET /api/v2/certificates/{cert_id}` reports `revocation_published` (whether the issuing CA publishes
+revocations; `false` lets a valid certificate be deleted without revocation) and `local_revocation_lift`:
+`local`, `unknown` (lift needs `acknowledge_unknown_publication`) or `null` (nothing to lift).
+
 ### Import Certificate
 ```http
 POST /api/v2/certificates/import
@@ -1174,6 +1202,11 @@ certificate clears the state.
 ```http
 DELETE /api/v2/certificates/{cert_id}
 ```
+
+A valid certificate is refused with `409` until it is revoked (by its row or by its serial's
+revocation record), when its CA publishes revocations; a certificate of a CA held without its key, or
+linked to no CA, is deleted without revocation: no CRL or OCSP answer of UCM would carry one.
+`POST /api/v2/certificates/bulk/delete` applies the same rule per id.
 
 ### Certificate Statistics
 ```http

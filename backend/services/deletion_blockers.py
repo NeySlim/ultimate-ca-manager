@@ -213,8 +213,13 @@ def certificate_deletion_blockers(cert) -> Iterator[DeletionBlocker]:
     A certificate still trusted by relying parties must be revoked first, so
     that the CRL and the OCSP responder carry the withdrawal. Deleting it
     instead makes it disappear from UCM while remaining valid everywhere else.
+    Under a CA UCM signs nothing for, a revocation would reach no relying
+    party: the certificate goes without one (issue #450).
     """
-    if cert.crt and not cert.revoked:
+    from services.cert.issued_lookup import row_revoked
+    from services.cert.local_revocation import issuer_publishes
+    # Revoked by its row or by its serial's record, as the Revoke action reads it
+    if cert.crt and not row_revoked(cert) and issuer_publishes(cert):
         if not cert.valid_to or cert.valid_to >= utc_now():
             yield DeletionBlocker(
                 409,

@@ -134,13 +134,15 @@ class CAOperationsMixin:
         existing = RevokedSerial.query.filter_by(
             caref=parent.refid, serial_number=serial_decimal
         ).first()
+        from services.cert.local_revocation import note_publication
         if existing:
             existing.revoked_at = now
             existing.revoke_reason = reason
             existing.invalidity_at = invalidity_at
             existing.valid_to = valid_to
+            note_publication(existing, parent, False)
         else:
-            db.session.add(RevokedSerial(
+            record = RevokedSerial(
                 caref=parent.refid,
                 serial_number=serial_decimal,
                 revoked_at=now,
@@ -148,7 +150,9 @@ class CAOperationsMixin:
                 invalidity_at=invalidity_at,
                 valid_to=valid_to,
                 certificate_id=None,
-            ))
+            )
+            note_publication(record, parent, True)
+            db.session.add(record)
         # A revocation of this CA waiting for approval is closed by this one
         from services.approval_gate import resolve_moot_requests
         resolve_moot_requests('ca_revocation', 'target_ca_id', ca.id, outcome='approved',

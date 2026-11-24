@@ -326,9 +326,12 @@ def revoke(row: CACrossCertificate, reason: str = 'unspecified', username: str =
         return ['The issuing CA already published this revocation: its date and reason were kept.']
     now = utc_now()
     row.revoked, row.revoked_at, row.revoke_reason, row.served = True, now, reason, False
-    db.session.add(RevokedSerial(caref=issuer.refid, serial_number=row.serial_number, revoked_at=now,
-                                 revoke_reason=reason, invalidity_at=invalidity_at,
-                                 valid_to=row.valid_to, certificate_id=None))
+    from services.cert.local_revocation import note_publication
+    record = RevokedSerial(caref=issuer.refid, serial_number=row.serial_number, revoked_at=now,
+                           revoke_reason=reason, invalidity_at=invalidity_at,
+                           valid_to=row.valid_to, certificate_id=None)
+    note_publication(record, issuer, True)
+    db.session.add(record)
     _close_pending_requests(row, username)
     db.session.commit()
     from models.ca import clear_request_caches

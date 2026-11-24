@@ -10,7 +10,7 @@ const notify = vi.hoisted(() => ({
   showConfirm: vi.fn(), showPrompt: vi.fn(),
 }))
 const svc = vi.hoisted(() => ({
-  certs: { delete: vi.fn(), revoke: vi.fn(), unhold: vi.fn(), export: vi.fn(), renew: vi.fn(), rename: vi.fn(), getById: vi.fn() },
+  certs: { delete: vi.fn(), revoke: vi.fn(), unhold: vi.fn(), liftLocalRevocation: vi.fn(), export: vi.fn(), renew: vi.fn(), rename: vi.fn(), getById: vi.fn() },
   cas: { delete: vi.fn(), revoke: vi.fn(), export: vi.fn(), getById: vi.fn(), renewCsr: vi.fn(), downloadCsr: vi.fn() },
 }))
 
@@ -184,6 +184,52 @@ describe('what a list row leaves to the detail', () => {
     await act(async () => { await r.actions.find(a => a.id === 'delete').onClick() })
     expect(notify.showConfirm.mock.calls[0][0]).toBe('certificates.deleteNeedsRevoke')
     expect(svc.certs.delete).not.toHaveBeenCalled()
+  })
+})
+
+// Issue #450: a CA held without its key publishes no revocation
+describe('certificates of a CA whose revocations UCM does not publish', () => {
+  const ALL = rights(['write:certificates', 'delete:certificates'])
+  const ADMIN = rights(['write:certificates', 'delete:certificates'], ['admin:system'])
+  const REVOKED = { ...CERT, revoked: true, status: 'revoked', revoke_reason: 'superseded', revocation_published: false }
+
+  it('deletes a still-valid certificate without sending it to the revocation dialog', async () => {
+    notify.showConfirm.mockResolvedValueOnce(true)
+    svc.certs.delete.mockResolvedValue({})
+    const r = run('certificate', { ...CERT, revocation_published: false }, ALL)
+    await act(async () => { await r.actions.find(a => a.id === 'delete').onClick() })
+    expect(notify.showConfirm.mock.calls[0][0]).toBe('certificates.deleteWithoutRevocation')
+    expect(svc.certs.delete).toHaveBeenCalledWith(4)
+    expect(svc.certs.revoke).not.toHaveBeenCalled()
+  })
+
+  it('offers the lift to an administrator only, and only when the server allows it', () => {
+    expect(visible(run('certificate', { ...REVOKED, local_revocation_lift: 'local' }, ADMIN))).toContain('liftLocalRevocation')
+    expect(visible(run('certificate', { ...REVOKED, local_revocation_lift: 'local' }, ALL))).not.toContain('liftLocalRevocation')
+    expect(visible(run('certificate', { ...REVOKED, local_revocation_lift: null }, ADMIN))).not.toContain('liftLocalRevocation')
+  })
+
+  it('lifts a local revocation once confirmed, and nothing when the dialog is dismissed', async () => {
+    notify.showConfirm.mockResolvedValueOnce(false)
+    let r = run('certificate', { ...REVOKED, local_revocation_lift: 'local' }, ADMIN)
+    await act(async () => { await r.actions.find(a => a.id === 'liftLocalRevocation').onClick() })
+    expect(svc.certs.liftLocalRevocation).not.toHaveBeenCalled()
+    notify.showConfirm.mockResolvedValueOnce(true)
+    svc.certs.liftLocalRevocation.mockResolvedValue({ data: { ...CERT } })
+    r = run('certificate', { ...REVOKED, local_revocation_lift: 'local' }, ADMIN)
+    await act(async () => { await r.actions.find(a => a.id === 'liftLocalRevocation').onClick() })
+    expect(notify.showConfirm.mock.calls[1][0]).toBe('certificates.liftLocalRevocationWarning')
+    expect(svc.certs.liftLocalRevocation).toHaveBeenCalledWith(4, { acknowledgeUnknown: false })
+    expect(notify.showSuccess).toHaveBeenCalledWith('certificates.localRevocationLifted')
+  })
+
+  it('says the risk of a revocation of unknown publication, and acknowledges it once confirmed', async () => {
+    notify.showConfirm.mockResolvedValueOnce(true)
+    svc.certs.liftLocalRevocation.mockResolvedValue({ data: { ...CERT } })
+    const r = run('certificate', { ...REVOKED, local_revocation_lift: 'unknown' }, ADMIN)
+    await act(async () => { await r.actions.find(a => a.id === 'liftLocalRevocation').onClick() })
+    expect(notify.showConfirm.mock.calls[0][0]).toBe('certificates.liftLocalRevocationUnknownRisk')
+    expect(svc.certs.liftLocalRevocation).toHaveBeenCalledWith(4, { acknowledgeUnknown: true })
   })
 })
 
