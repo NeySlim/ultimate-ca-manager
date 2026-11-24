@@ -71,7 +71,7 @@ export default {
       'Active el canal de administración WinRM para propagar las revocaciones a la CA y gestionar las solicitudes pendientes desde UCM.',
     ],
     warnings: [
-      'Kerberos requiere que la máquina esté unida al dominio o un keytab configurado, no disponible en Docker.',
+      'Kerberos requiere que la máquina esté unida al dominio o un keytab configurado. Las imágenes Docker lo incluyen, pero el modo FIPS lo rechaza en ellas (su biblioteca Kerberos hace su propia criptografía, fuera del módulo); una instalación por paquete en RHEL en modo FIPS lo permite.',
       'EOBO requiere un certificado de agente de inscripción configurado en el servidor AD CS.',
       'Sin el canal de administración WinRM, revocar un certificado de AD CS solo lo marca como revocado en UCM: la CA de Windows no recibe ningún aviso.',
     ],

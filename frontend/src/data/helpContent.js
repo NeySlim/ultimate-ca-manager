@@ -2137,7 +2137,7 @@ export const helpContent = {
       'Enable the WinRM admin channel to propagate revocations to the CA and manage pending requests from UCM.',
     ],
     warnings: [
-      'Kerberos requires the machine to be domain-joined or a keytab configured, not available in Docker.',
+      'Kerberos requires the machine to be domain-joined or a keytab configured. The Docker images ship it, but FIPS mode refuses it there (their Kerberos library does its own cryptography, outside the module); a package install on RHEL in FIPS mode allows it.',
       'EOBO requires an enrollment agent certificate configured on the AD CS server.',
       'Without the WinRM admin channel, revoking an AD CS certificate only marks it revoked in UCM: the Windows CA is not notified.',
     ],
