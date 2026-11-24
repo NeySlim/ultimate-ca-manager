@@ -43,10 +43,10 @@ test('a queue entry opens the object it names', async ({ page, api }) => {
 const DEFAULT_ORDER = ['queue', 'health', 'issuance', 'horizon', 'compliance', 'revocation', 'hierarchy', 'activity', 'authorities']
 const shownOrder = (page: Page) => page.locator('.dash-cards > .dash-card').evaluateAll(cards => cards.map(c => c.getAttribute('data-card')))
 
-/** Runs `body` on the default layout, then puts the administrator's own preference back. */
-async function withDefaultLayout(api: Api, body: () => Promise<void>) {
+/** Runs `body` on the cards in `order`, then puts the administrator's own preference back. */
+async function withLayout(api: Api, order: string[], body: () => Promise<void>) {
   const before = (await api.get('/account/preferences')) || {}
-  await api.put('/account/preferences', { ...before, dashboard: { order: DEFAULT_ORDER, hidden: [], queueShowAll: false } })
+  await api.put('/account/preferences', { ...before, dashboard: { order, hidden: [], queueShowAll: false } })
   try {
     await body()
   } finally {
@@ -55,6 +55,19 @@ async function withDefaultLayout(api: Api, body: () => Promise<void>) {
   }
   expect(((await api.get('/account/preferences')) || {}).dashboard).toEqual(before.dashboard)
 }
+const withDefaultLayout = (api: Api, body: () => Promise<void>) => withLayout(api, DEFAULT_ORDER, body)
+
+/** Each card's box in the grid, and the grid's width */
+const cardBoxes = (page: Page) => page.evaluate(() => {
+  const grid = document.querySelector('.atl .dash-cards')!.getBoundingClientRect()
+  return {
+    width: grid.width,
+    cards: Object.fromEntries([...document.querySelectorAll('.atl .dash-cards > .dash-card')].map(c => {
+      const r = c.getBoundingClientRect()
+      return [c.getAttribute('data-card'), { x: r.left - grid.left, y: r.top, w: r.width }]
+    })) as Record<string, { x: number, y: number, w: number }>,
+  }
+})
 
 test('the cards follow the mockup widths: the queue on its own line, then pairs of unequal width', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
@@ -62,17 +75,7 @@ test('the cards follow the mockup widths: the queue on its own line, then pairs 
     await page.goto('/')
     await expect(page.locator('.dash-cards > .dash-card')).toHaveCount(DEFAULT_ORDER.length)
     for (const name of CARDS) await expect(page.getByRole('region', { name }).locator('.sk-body')).toHaveCount(0)
-    const boxes = await page.evaluate(() => {
-      const grid = document.querySelector('.atl .dash-cards')!.getBoundingClientRect()
-      return {
-        width: grid.width,
-        cards: Object.fromEntries([...document.querySelectorAll('.atl .dash-cards > .dash-card')].map(c => {
-          const r = c.getBoundingClientRect()
-          return [c.getAttribute('data-card'), { x: r.left - grid.left, y: r.top, w: r.width }]
-        })),
-      }
-    })
-    const { cards, width } = boxes
+    const { cards, width } = await cardBoxes(page)
     expect(Math.abs(cards.queue.w - width)).toBeLessThanOrEqual(1)
     // Pairs of unequal width, the horizon and the tiles on their own line; reading order is the saved order
     for (const [a, b] of [['health', 'issuance'], ['compliance', 'revocation'], ['hierarchy', 'activity']]) {
@@ -83,6 +86,21 @@ test('the cards follow the mockup widths: the queue on its own line, then pairs 
     expect(cards.revocation.w).toBeLessThan(cards.compliance.w)
     for (const id of ['horizon', 'authorities']) expect(cards[id].w, id).toBeGreaterThan(width - 1)
     expect(await shownOrder(page)).toEqual(DEFAULT_ORDER)
+  })
+})
+
+test('the authorities first, then compliance before another card than revocation, share a line at 62 and 38 %', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const order = ['authorities', 'compliance', 'health', 'issuance', 'horizon', 'revocation', 'hierarchy', 'activity', 'queue']
+  await withLayout(api, order, async () => {
+    await page.goto('/')
+    await expect(page.locator('.dash-cards > .dash-card')).toHaveCount(order.length)
+    for (const name of CARDS) await expect(page.getByRole('region', { name }).locator('.sk-body')).toHaveCount(0)
+    expect(await shownOrder(page)).toEqual(order)
+    const { cards, width } = await cardBoxes(page)
+    expect(cards.compliance.y, 'compliance beside the authorities').toBe(cards.authorities.y)
+    expect(cards.authorities.w + cards.compliance.w).toBeGreaterThan(width - 30)
+    expect(cards.authorities.w / cards.compliance.w).toBeGreaterThan(1.5)
   })
 })
 
