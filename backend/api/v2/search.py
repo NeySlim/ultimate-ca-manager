@@ -52,16 +52,17 @@ def global_search():
     search_pattern = f'%{safe_query}%'
     results = {}
     
-    # Search certificates
-    certs = Certificate.query.filter(
-        or_(
-            Certificate.subject.ilike(search_pattern, escape='\\'),
-            Certificate.issuer.ilike(search_pattern, escape='\\'),
-            Certificate.descr.ilike(search_pattern, escape='\\'),
-            Certificate.serial_number.ilike(search_pattern, escape='\\'),
-            Certificate.serial_number.in_(serial_search_forms(query)),
-        )
-    ).limit(limit).all()
+    # Search certificates; the comment only for a user who may read the certificates
+    cert_terms = [
+        Certificate.subject.ilike(search_pattern, escape='\\'),
+        Certificate.issuer.ilike(search_pattern, escape='\\'),
+        Certificate.descr.ilike(search_pattern, escape='\\'),
+        Certificate.serial_number.ilike(search_pattern, escape='\\'),
+        Certificate.serial_number.in_(serial_search_forms(query)),
+    ]
+    if has_permission('read:certificates', g.permissions):
+        cert_terms.append(Certificate.comment.ilike(search_pattern, escape='\\'))
+    certs = Certificate.query.filter(or_(*cert_terms)).limit(limit).all()
     
     from datetime import datetime
     
