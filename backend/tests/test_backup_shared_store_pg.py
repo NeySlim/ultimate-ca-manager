@@ -146,10 +146,48 @@ def test_an_archive_made_on_a_downloads_from_b_after_a_is_gone(app, auth_client,
         assert auth_client.get('/api/v2/system/backup/..%2Fx.ucmbkp/download').status_code in (400, 404)
 
 
+# id(connection record) -> the thread that checked it out, on the pools listened to
+_OWNERS = {}
+_LISTENED = set()
+
+
 def _checked_out(app):
+    """Connections of the pool that this thread holds. The pool's own figure counts every
+    thread's: a background thread another test left running holds one now and then."""
+    from sqlalchemy import event
     from models import db
     with app.app_context():
-        return db.engine.pool.checkedout()
+        pool = db.engine.pool
+    if id(pool) not in _LISTENED:
+        _LISTENED.add(id(pool))
+        event.listen(pool, 'checkout',
+                     lambda _conn, record, _proxy: _OWNERS.__setitem__(id(record), threading.get_ident()))
+        event.listen(pool, 'checkin', lambda _conn, record: _OWNERS.pop(id(record), None))
+    me = threading.get_ident()
+    return sum(1 for owner in list(_OWNERS.values()) if owner == me)
+
+
+def test_the_connections_counted_are_this_threads_own(app):
+    """Guard of _checked_out: a connection another thread holds is not counted, this thread's is."""
+    from models import db
+    before = _checked_out(app)
+    held, release = threading.Event(), threading.Event()
+
+    def other():
+        with app.app_context(), db.engine.connect():
+            held.set()
+            release.wait(10)
+    thread = threading.Thread(target=other)
+    thread.start()
+    try:
+        assert held.wait(10)
+        assert _checked_out(app) == before
+        with app.app_context(), db.engine.connect():
+            assert _checked_out(app) == before + 1
+    finally:
+        release.set()
+        thread.join(10)
+    assert _checked_out(app) == before
 
 
 def _closes(monkeypatch):
