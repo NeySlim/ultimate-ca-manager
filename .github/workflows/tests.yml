@@ -143,9 +143,8 @@ jobs:
           [ -n "$files" ]
           pytest -v --tb=short -n 4 --dist loadfile $files
 
-  # One database for the whole suite, as a user runs it: the nightly run of dev and
-  # on demand only. Every push is validated in one process before it leaves, so a
-  # push run never plays it a second time.
+  # One database for the whole suite, as a user runs it: nightly and on demand;
+  # no push run plays it.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest

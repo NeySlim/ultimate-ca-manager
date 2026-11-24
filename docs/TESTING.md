@@ -227,7 +227,7 @@ Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, and always wit
 
 ## CI/CD Integration
 
-The "End-to-end (browser)" job of `tests.yml` runs on pull requests, on each push of the 3.0 integration branch and on a manual run. It installs the backend and frontend dependencies and the browser libraries, then calls `scripts/ci/e2e.sh`; on failure the Playwright report and the traces are kept as the `e2e-report` artifact. `backend/tests/test_workflow_e2e.py` pins when the job runs and what it runs.
+The "End-to-end (browser)" job of `tests.yml` runs on pull requests, on each push of the 3.0 integration branch and of `test`, and on a manual run. It installs the backend and frontend dependencies and the browser libraries, then calls `scripts/ci/e2e.sh`; on failure the Playwright report and the traces are kept as the `e2e-report` artifact. `backend/tests/test_workflow_e2e.py` pins when the job runs and what it runs.
 
 ## Troubleshooting
 

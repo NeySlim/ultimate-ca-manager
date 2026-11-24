@@ -1,7 +1,4 @@
-"""The one-process suite runs at night and on demand, never on a push.
-
-Every push is validated in one process before it leaves: a push run would only play it a second time.
-"""
+"""The one-process suite runs at night and on demand, never on a push."""
 import pytest
 
 from tests.workflow_support import evaluate, github_context, load, render

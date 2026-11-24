@@ -5,7 +5,7 @@
 #
 # git feeds "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin.
 # Only a push to refs/heads/dev runs the suites: test, main and tags carry
-# content that is already green on dev, and the CI judges them sequentially.
+# content that is already green on dev.
 # One suite at a time on the machine (flock), workers capped by UCM_PYTEST_WORKERS.
 
 set -e
