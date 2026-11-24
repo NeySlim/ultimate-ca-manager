@@ -1602,10 +1602,12 @@ Content-Type: application/json
 {
   "data": {
     "success": [1, 2],
-    "failed": [3]
+    "failed": [{"id": 3, "error": "Already signed"}]
   }
 }
 ```
+
+A request that met another write on SQLite is listed in `failed` with the error `The database is busy with another write: retry shortly.`: nothing was stored for it, and the requests after it are still signed. Send it again.
 
 ### Bulk Delete CSRs
 ```http
