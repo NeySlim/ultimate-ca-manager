@@ -6371,7 +6371,7 @@
       "validation": {
         "requiredField": "Ce champ est obligatoire"
       },
-      "serverBusy": "The server is busy with another change: try again in a few seconds."
+      "serverBusy": "Le serveur est occupé par une autre modification : réessayez dans quelques secondes."
     },
     "success": {
       "create": {

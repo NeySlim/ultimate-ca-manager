@@ -6096,7 +6096,7 @@
       "validation": {
         "requiredField": "Dieses Feld ist erforderlich"
       },
-      "serverBusy": "The server is busy with another change: try again in a few seconds."
+      "serverBusy": "Der Server ist mit einer anderen Änderung beschäftigt: Versuchen Sie es in einigen Sekunden erneut."
     },
     "success": {
       "backup": {

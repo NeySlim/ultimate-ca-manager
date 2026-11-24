@@ -6096,7 +6096,7 @@
       "validation": {
         "requiredField": "此字段为必填项"
       },
-      "serverBusy": "The server is busy with another change: try again in a few seconds."
+      "serverBusy": "服务器正在处理另一项更改：请几秒钟后重试。"
     },
     "success": {
       "backup": {
