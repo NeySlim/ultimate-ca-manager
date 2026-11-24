@@ -1133,6 +1133,47 @@ def test_a_revocation_holds_the_sqlite_write_lock_while_it_reads_its_issuer(busy
     assert _records(app, ca[1], real) == [('superseded', False)]
 
 
+def _deadlocks(monkeypatch, times):
+    """The revocation's issuer lock deadlocks (PostgreSQL 40P01) its first ``times`` attempts."""
+    from sqlalchemy.exc import OperationalError
+    from services.cert import local_revocation
+    real, calls = local_revocation.note_publication, []
+
+    class Deadlock(Exception):
+        sqlstate = '40P01'
+
+    def note(*args, **kwargs):
+        calls.append(1)
+        if len(calls) <= times:
+            raise OperationalError('SELECT ... FOR SHARE', {}, Deadlock('deadlock detected'))
+        return real(*args, **kwargs)
+    monkeypatch.setattr(local_revocation, 'note_publication', note)
+    return calls
+
+
+class TestARevocationThatMeetsADeadlock:
+    """Nothing is written before the commit: a deadlock while staging is retried once."""
+
+    def test_the_revocation_is_staged_again_once(self, app, auth_client, issuer, monkeypatch):
+        calls = _deadlocks(monkeypatch, 1)
+        row_id, real = _leaf_row(app, issuer, 'deadlock-once')
+        _revoke(auth_client, row_id)
+        assert len(calls) == 2
+        assert _row(app, row_id)[:2] == (True, 'superseded')
+        assert _records(app, issuer[1], real) == [('superseded', True)]
+        with app.app_context():
+            assert AuditLog.query.filter_by(action='cert_revoked', resource_id=str(row_id)).count() == 1
+
+    def test_a_second_deadlock_fails_the_revocation(self, app, auth_client, issuer, monkeypatch):
+        calls = _deadlocks(monkeypatch, 2)
+        row_id, real = _leaf_row(app, issuer, 'deadlock-twice')
+        r = _post(auth_client, f'/api/v2/certificates/{row_id}/revoke', {'reason': 'superseded'})
+        assert r.status_code >= 500, r.data
+        assert len(calls) == 2
+        assert _row(app, row_id)[0] is False
+        assert _records(app, issuer[1], real) == []
+
+
 class TestARevocationToldToItsIssuer:
     """A Microsoft CA or an ACME CA is told of the revocation: it publishes it, UCM cannot lift it."""
 

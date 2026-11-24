@@ -38,6 +38,11 @@ from security.encryption import decrypt_private_key, encrypt_private_key
 _REVOCATION_FIELDS = ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')
 
 
+def _deadlocked(exc) -> bool:
+    orig = getattr(exc, 'orig', None)
+    return (getattr(orig, 'sqlstate', None) or getattr(orig, 'pgcode', None)) == '40P01'
+
+
 class _AlreadyRevoked(ValueError):
     """The refusal met under the lock: answered to the caller, not an error to log."""
 
@@ -441,71 +446,78 @@ class LifecycleMixin:
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         is_hold = reason in HOLD_REASONS
         now = utc_now()
-        rejected_renewals = []
-        try:
-            # The record is locked before the row is written, the order unholds and the hourly
-            # pass follow (PostgreSQL), so none of them deadlocks; the CA rows come last, share
-            # locked by note_publication. A row the upgrade step 144 left pending keeps its
-            # spelling; records never do
-            record = RevokedSerial.query.filter_by(
-                caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)
-            ).with_for_update().first() if ca is not None else None
-            # The row as it stands under its own lock: an unhold or a revocation committed
-            # while this one waited is seen, and only changed columns are sent
-            db.session.refresh(certificate, with_for_update=True)
-            if not revocable(certificate, reason):
-                raise _AlreadyRevoked("Certificate already revoked")
-            # A hold made final: dated now, so the delta lists the change; invalid since the hold
-            # (the row's, or its record's when only the record holds it)
-            held = effective_revocation(certificate)
-            held_since = held.revoked_at if held is not None else None
-            previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
-            certificate.revoked = True
-            certificate.revoked_at = now
-            certificate.revoke_reason = reason
-            if invalidity_at is not None:
-                certificate.invalidity_at = invalidity_at
-            elif held_since is not None and certificate.invalidity_at is None:
-                certificate.invalidity_at = held_since
+        # Nothing is written before the commit: a deadlock (PostgreSQL 40P01, a key import taking
+        # the CA rows the other way) rolls it all back, and it is staged once more
+        for attempt in (1, 2):
+            rejected_renewals = []
+            try:
+                # The record is locked before the row is written, the order unholds and the hourly
+                # pass follow (PostgreSQL), so none of them deadlocks; the CA rows come last, share
+                # locked by note_publication. A row the upgrade step 144 left pending keeps its
+                # spelling; records never do
+                record = RevokedSerial.query.filter_by(
+                    caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)
+                ).with_for_update().first() if ca is not None else None
+                # The row as it stands under its own lock: an unhold or a revocation committed
+                # while this one waited is seen, and only changed columns are sent
+                db.session.refresh(certificate, with_for_update=True)
+                if not revocable(certificate, reason):
+                    raise _AlreadyRevoked("Certificate already revoked")
+                # A hold made final: dated now, so the delta lists the change; invalid since the hold
+                # (the row's, or its record's when only the record holds it)
+                held = effective_revocation(certificate)
+                held_since = held.revoked_at if held is not None else None
+                previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
+                certificate.revoked = True
+                certificate.revoked_at = now
+                certificate.revoke_reason = reason
+                if invalidity_at is not None:
+                    certificate.invalidity_at = invalidity_at
+                elif held_since is not None and certificate.invalidity_at is None:
+                    certificate.invalidity_at = held_since
 
-            # A Microsoft certificate has no caref: nothing for a UCM CRL to publish
-            if ca is not None:
-                valid_to = to_naive_utc(certificate.valid_to) or now + timedelta(days=365)
-                fresh = record is None
-                if fresh:
-                    record = RevokedSerial(caref=certificate.caref,
-                                           serial_number=certificate.serial_number)
-                    db.session.add(record)
-                if fresh or record_reason_replaceable(record, reason):
-                    record.revoked_at = now
-                    record.revoke_reason = reason
-                    record.invalidity_at = certificate.invalidity_at
-                record.valid_to = valid_to
-                record.certificate_id = certificate.id
-                record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises
-                from services.cert.local_revocation import note_publication
-                note_publication(record, ca, fresh, hold=True)
-            elif certificate.caref:
-                logger.warning("Certificate %s: CA %s not found, no revocation record written",
-                               cert_id, certificate.caref)
+                # A Microsoft certificate has no caref: nothing for a UCM CRL to publish
+                if ca is not None:
+                    valid_to = to_naive_utc(certificate.valid_to) or now + timedelta(days=365)
+                    fresh = record is None
+                    if fresh:
+                        record = RevokedSerial(caref=certificate.caref,
+                                               serial_number=certificate.serial_number)
+                        db.session.add(record)
+                    if fresh or record_reason_replaceable(record, reason):
+                        record.revoked_at = now
+                        record.revoke_reason = reason
+                        record.invalidity_at = certificate.invalidity_at
+                    record.valid_to = valid_to
+                    record.certificate_id = certificate.id
+                    record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises
+                    from services.cert.local_revocation import note_publication
+                    note_publication(record, ca, fresh, hold=True)
+                elif certificate.caref:
+                    logger.warning("Certificate %s: CA %s not found, no revocation record written",
+                                   cert_id, certificate.caref)
 
-            # A hold is temporary: the requests about the certificate stay open
-            if not is_hold:
-                rejected_renewals = resolve_moot_requests(
-                    'renewal', 'certificate_id', certificate.id, outcome='rejected',
-                    username=username, user_id=_request_user_id(username),
-                    reason='Certificate revoked', commit=False)
-                resolve_moot_requests(
-                    'revocation', 'certificate_id', certificate.id, outcome='approved',
-                    username=username, user_id=_request_user_id(username),
-                    certificate_id=certificate.id, reason='Revoked directly', commit=False)
-            db.session.flush()
-            remember_if_compromised(certificate)
-        except Exception as e:
-            db.session.rollback()
-            if not isinstance(e, _AlreadyRevoked):
-                logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
-            raise
+                # A hold is temporary: the requests about the certificate stay open
+                if not is_hold:
+                    rejected_renewals = resolve_moot_requests(
+                        'renewal', 'certificate_id', certificate.id, outcome='rejected',
+                        username=username, user_id=_request_user_id(username),
+                        reason='Certificate revoked', commit=False)
+                    resolve_moot_requests(
+                        'revocation', 'certificate_id', certificate.id, outcome='approved',
+                        username=username, user_id=_request_user_id(username),
+                        certificate_id=certificate.id, reason='Revoked directly', commit=False)
+                db.session.flush()
+                remember_if_compromised(certificate)
+                break
+            except Exception as e:
+                db.session.rollback()
+                if attempt == 1 and _deadlocked(e):
+                    logger.warning("Revocation of certificate %s met a deadlock, staged again", cert_id)
+                    continue
+                if not isinstance(e, _AlreadyRevoked):
+                    logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
+                raise
         rejected_snapshots = request_snapshots(rejected_renewals)
 
         try:
