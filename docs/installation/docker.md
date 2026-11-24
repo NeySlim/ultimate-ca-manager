@@ -377,13 +377,13 @@ server {
 }
 ```
 
-**Origin of the browser:** the WebSocket and the API accept the origin of the admin base URL. Set it in Settings › General to the address the browsers use (`https://ucm.example.com`); a default port is ignored, so `https://ucm.example.com:443` is the same origin. The setting is read at each connection, so it applies without a restart. The origin of the protocol base URL, `localhost` and the host's own names on `HTTPS_PORT` are accepted too. For any other address the browsers use, list it in `CORS_EXTRA_ORIGINS` (comma separated, no wildcard):
+**Origin of the browser:** the WebSocket and the API accept the origin of the admin base URL. Set it in Settings › General to the address the browsers use (`https://ucm.example.com`); a default port is ignored, so `https://ucm.example.com:443` is the same origin. The setting is read at each connection, so it applies without a restart. `localhost` is accepted too, and the WebSocket also accepts the host's own names on `HTTPS_PORT`. For any other address the browsers use, list it in `CORS_EXTRA_ORIGINS` (comma separated, no wildcard):
 ```bash
 # In .env or docker-compose environment
 CORS_EXTRA_ORIGINS=https://ucm-alias.example.com
 ```
 
-The allowed origins are listed under `cors_origins` in `GET /api/v2/settings/public-endpoints`. Any other origin gets `403` on `/socket.io/`, before the WebSocket upgrade, and the log says `Rejected WebSocket origin '<origin>'` once per origin every five minutes. A request without `Origin` (a client that is not a browser) is not checked.
+The origins the API accepts are listed under `cors_origins` in `GET /api/v2/settings/public-endpoints`; the WebSocket accepts them and the host's own names. Any other origin gets `403` on `/socket.io/`, before the WebSocket upgrade, and the log says `Rejected WebSocket origin '<origin>'` once per origin every five minutes, for ten origins at most, then counts the others in one line. A request without `Origin` (a client that is not a browser) is not checked.
 
 **Hostname check of the base URL:** before saving the admin base URL, UCM resolves the name and opens a connection to it from where it runs, inside the container. On a Docker network without outside DNS, the check fails for a name that works in the browsers. Make the name resolve inside the container, for example as a network alias of the reverse proxy container or an `extra_hosts` entry, or send the change through the API with `"force": true`.
 

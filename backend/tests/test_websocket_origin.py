@@ -1,15 +1,18 @@
-"""Origins of the Socket.IO channel (#453): the admin base URL and the protocol base URL count as
-soon as they are stored, a default port is the same origin as none, a refused origin answers 403
-before any upgrade (polling and websocket) with one warning per origin, a request without Origin
-is unchanged, and no origin is ever taken from Host or X-Forwarded-Host."""
+"""Origins of the Socket.IO channel (#453): the admin base URL counts as soon as it is stored, a
+default port is the same origin as none, a refused origin answers 403 before any upgrade (polling
+and websocket) with a bounded number of warnings, a request without Origin is unchanged, and no
+origin is ever taken from Host, X-Forwarded-Host or the protocol base URL. The API's CORS takes
+the same live origins without this host's start names."""
 import base64
 import logging
 import os
 import socket
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import event
 from gevent import pywsgi
 
 from models import SystemConfig, db
@@ -58,8 +61,10 @@ def setting(app):
 @pytest.fixture(autouse=True)
 def fresh_warnings():
     origin_gate._rejections.clear()
+    origin_gate._window.clear()
     yield
     origin_gate._rejections.clear()
+    origin_gate._window.clear()
 
 
 def _poll(client, origin=None, **headers):
@@ -79,6 +84,23 @@ def _origins(app):
     with app.test_request_context('/'):
         from utils.public_endpoints import get_cors_origins
         return get_cors_origins()
+
+
+def _ws_origins(app):
+    with app.test_request_context('/'):
+        from utils.public_endpoints import get_websocket_origins
+        return get_websocket_origins()
+
+
+def _api_allows(client, origin):
+    r = client.options('/api/v2/settings/general', headers={
+        'Origin': origin, 'Access-Control-Request-Method': 'PATCH'})
+    allowed = r.headers.get('Access-Control-Allow-Origin')
+    if allowed is not None:
+        assert r.headers.get('Access-Control-Allow-Credentials') == 'true'
+    else:
+        assert r.headers.get('Access-Control-Allow-Credentials') is None
+    return allowed == origin
 
 
 @pytest.mark.parametrize('raw, expected', [
@@ -117,29 +139,46 @@ def test_a_base_url_set_after_the_start_is_accepted_and_one_replaced_is_refused(
 def test_a_default_port_is_the_same_origin(app, client, setting, monkeypatch):
     setting('base_url', PROXY + ':443')
     monkeypatch.setenv('CORS_EXTRA_ORIGINS', f'{EXTRA}:443/, *, https://.*\\.example\\.test')
-    setting('protocol_base_url', PROTOCOL + ':80')
-    for origin in (PROXY, PROXY + ':443', EXTRA, EXTRA + ':443', PROTOCOL, PROTOCOL + ':80'):
+    for origin in (PROXY, PROXY + ':443', EXTRA, EXTRA + ':443'):
         assert _poll(client, origin).status_code == 200, origin
-    listed = _origins(app)
-    assert {PROXY, EXTRA, PROTOCOL} <= set(listed)
-    assert not [o for o in listed if o.endswith((':443', ':80')) or '*' in o], listed
+    for listed in (_origins(app), _ws_origins(app)):
+        assert {PROXY, EXTRA} <= set(listed)
+        assert not [o for o in listed if o.endswith((':443', ':80')) or '*' in o], listed
 
 
-def test_an_ipv6_origin_stays_out_of_both_lists(app, client, monkeypatch):
-    # UPGRADE.md: an IPv6 origin in brackets is ignored, by the API CORS and the WebSocket alike
-    monkeypatch.setenv('CORS_EXTRA_ORIGINS', 'https://[2001:db8::1]:8443')
+def test_an_ipv6_extra_origin_opens_the_websocket_and_not_the_api(app, client, monkeypatch):
+    # Flask-CORS reads brackets as a pattern: only the WebSocket compares an IPv6 origin
+    monkeypatch.setenv('CORS_EXTRA_ORIGINS', 'https://[2001:DB8:0::1]:8443')
+    v6 = 'https://[2001:db8::1]:8443'
+    assert v6 in _ws_origins(app)
+    assert _poll(client, v6).status_code == 200
     assert not [o for o in _origins(app) if '[' in o]
-    assert _poll(client, 'https://[2001:db8::1]:8443').status_code == 403
+    assert not _api_allows(client, v6)
 
 
-def test_the_protocol_base_url_counts_only_while_it_is_set(app, client, setting):
+def test_no_http_origin_comes_from_the_settings(app, client, setting, monkeypatch):
+    monkeypatch.delenv('CORS_EXTRA_ORIGINS', raising=False)
     setting('protocol_base_url', PROTOCOL)
-    assert _poll(client, PROTOCOL).status_code == 200
-    setting('protocol_base_url', '')
     assert _poll(client, PROTOCOL).status_code == 403
+    assert not _api_allows(client, PROTOCOL)
+    # A row written outside the API (restore, import) is not trusted to be HTTPS
+    setting('base_url', 'http://proxy.ws-origin.example.test')
+    assert _poll(client, 'http://proxy.ws-origin.example.test').status_code == 403
+    for listed in (_origins(app), _ws_origins(app)):
+        assert not [o for o in listed if o.startswith('http://')], listed
 
 
-def test_the_api_cors_allows_the_same_origins(app, client, setting, monkeypatch):
+def test_a_start_name_opens_the_websocket_and_not_the_api(app, client, monkeypatch):
+    # FQDN, short name and $HOSTNAME (a container id, a pod name) never widen the API's CORS
+    start = 'https://ucm-7f9c4.ws-origin.example.test:8443'
+    monkeypatch.setitem(app.config, 'CORS_ORIGINS', list(app.config['CORS_ORIGINS']) + [start])
+    assert _poll(client, start).status_code == 200
+    assert start in _ws_origins(app)
+    assert start not in _origins(app)
+    assert not _api_allows(client, start)
+
+
+def test_the_api_cors_allows_the_base_url_and_the_extras(app, client, setting, monkeypatch):
     setting('base_url', PROXY)
     monkeypatch.setenv('CORS_EXTRA_ORIGINS', EXTRA + ':443')
     for origin in (PROXY, EXTRA):
@@ -165,12 +204,60 @@ def test_a_foreign_origin_gets_403_before_any_upgrade_and_one_warning(app, clien
     assert OTHER in warned[1]
 
 
+def test_the_warnings_have_one_ceiling_for_every_origin(app, client, setting, monkeypatch,
+                                                         caplog):
+    clock = [1000.0]
+    monkeypatch.setattr(origin_gate, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
+    setting('base_url', PROXY)
+    with caplog.at_level(logging.WARNING, logger='websocket.origin_gate'):
+        for i in range(60):
+            assert _poll(client, f'https://flood{i}.ws-origin.example.test').status_code == 403
+        warned = [r.getMessage() for r in caplog.records if r.name == 'websocket.origin_gate']
+        assert len(warned) == origin_gate._MAX_WARNINGS_PER_WINDOW == 10, len(warned)
+        clock[0] += origin_gate._REJECTION_LOG_INTERVAL + 1
+        assert _poll(client, FOREIGN).status_code == 403
+    warned = [r.getMessage() for r in caplog.records if r.name == 'websocket.origin_gate']
+    assert len(warned) == 12, warned[10:]
+    assert '50 more' in warned[10]
+    assert FOREIGN in warned[11]
+
+
+def _base_url_reads(app):
+    """Counts the SELECTs of the base_url row while the block runs."""
+    table = SystemConfig.__tablename__
+    reads = []
+
+    def seen(conn, cursor, statement, parameters, context, executemany):
+        values = parameters.values() if isinstance(parameters, dict) else parameters or ()
+        if table in statement and 'base_url' in values:
+            reads.append(statement)
+    with app.app_context():
+        engine = db.engine
+    event.listen(engine, 'before_cursor_execute', seen)
+    return reads, lambda: event.remove(engine, 'before_cursor_execute', seen)
+
+
+def test_each_list_reads_the_base_url_once(app, setting):
+    setting('base_url', PROXY)
+    reads, stop = _base_url_reads(app)
+    try:
+        assert PROXY in _origins(app)
+        api_reads = len(reads)
+        reads.clear()
+        assert PROXY in _ws_origins(app)
+        ws_reads = len(reads)
+    finally:
+        stop()
+    assert (api_reads, ws_reads) == (1, 1)
+
+
 def test_a_request_without_origin_is_unchanged_and_reads_no_list(app, client, monkeypatch):
     import utils.public_endpoints as public_endpoints
 
     def refused():
         raise AssertionError('the origin list was read for a request without Origin')
     monkeypatch.setattr(public_endpoints, 'get_cors_origins', refused)
+    monkeypatch.setattr(public_endpoints, 'get_websocket_origins', refused)
     r = _poll(client)
     assert r.status_code == 200
     assert r.get_data(as_text=True).startswith('0{')
@@ -182,13 +269,13 @@ def test_no_origin_is_taken_from_host_or_forwarded_host(app, client, setting):
     r = _poll(client, FOREIGN, Host=host, **{'X-Forwarded-Host': host, 'X-Forwarded-Proto': 'https'})
     assert r.status_code == 403
     with app.test_request_context('/', headers={'Host': host, 'X-Forwarded-Host': host}):
-        from utils.public_endpoints import get_cors_origins
-        assert not [o for o in get_cors_origins() if host in o]
+        from utils.public_endpoints import get_cors_origins, get_websocket_origins
+        assert not [o for o in get_cors_origins() + get_websocket_origins() if host in o]
 
 
 # ------------------------------------------------ the gunicorn worker's handler
 
-def _gated_server(app, seen):
+def _gated_server(app, seen, allowlist=False):
     from workers import MTLSWebSocketHandler
 
     def inner(environ, start_response):
@@ -201,6 +288,9 @@ def _gated_server(app, seen):
         return []
 
     gate = origin_gate.SocketIOOriginGate(inner, app)
+    if allowlist:
+        from utils.admin_allowlist import SocketIOAllowlistGate
+        gate = SocketIOAllowlistGate(gate, app)
     ready, holder = threading.Event(), {}
 
     def run():
@@ -234,7 +324,57 @@ def _handshake(address, origin):
     return data.split(b'\r\n', 1)[0]
 
 
-def test_the_worker_refuses_before_switching_protocols(app, monkeypatch):
+def _wait_for(seen, count):
+    # The application runs after the 101 has gone out
+    deadline = time.monotonic() + 5
+    while len(seen) < count and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+
+@pytest.fixture
+def gate_registry(monkeypatch):
+    """The gates register themselves for the worker: the test's ones are dropped afterwards."""
+    from utils import admin_allowlist
+    monkeypatch.setattr(origin_gate, '_flask_app', origin_gate._flask_app)
+    monkeypatch.setattr(admin_allowlist, '_socketio_gate', admin_allowlist._socketio_gate)
+    return admin_allowlist
+
+
+def test_the_worker_reads_the_origin_list_once_per_upgrade(app, monkeypatch, gate_registry):
+    import utils.public_endpoints as public_endpoints
+    reads = []
+
+    def listed():
+        reads.append(1)
+        return [PROXY]
+    monkeypatch.setattr(public_endpoints, 'get_websocket_origins', listed)
+    seen = []
+    address = _gated_server(app, seen)
+    assert _handshake(address, PROXY).startswith(b'HTTP/1.1 101')
+    _wait_for(seen, 1)
+    assert seen == [PROXY]
+    assert len(reads) == 1
+
+
+def test_the_worker_refuses_an_address_off_the_allowlist_before_switching_protocols(
+        app, monkeypatch, gate_registry):
+    allowed = [False]
+    monkeypatch.setattr(gate_registry, 'disabled_by_env', lambda: False)
+    monkeypatch.setattr(gate_registry, 'is_allowed', lambda addr: allowed[0])
+    monkeypatch.setattr(origin_gate, 'origin_accepted', lambda origin: origin == PROXY)
+    seen = []
+    address = _gated_server(app, seen, allowlist=True)
+    assert _handshake(address, PROXY).startswith(b'HTTP/1.1 403')
+    assert _handshake(address, None).startswith(b'HTTP/1.1 403')
+    assert seen == []
+    allowed[0] = True
+    assert _handshake(address, FOREIGN).startswith(b'HTTP/1.1 403')
+    assert _handshake(address, PROXY).startswith(b'HTTP/1.1 101')
+    _wait_for(seen, 1)
+    assert seen == [PROXY]
+
+
+def test_the_worker_refuses_before_switching_protocols(app, monkeypatch, gate_registry):
     monkeypatch.setattr(origin_gate, 'origin_accepted', lambda origin: origin == PROXY)
     seen = []
     address = _gated_server(app, seen)
@@ -242,8 +382,5 @@ def test_the_worker_refuses_before_switching_protocols(app, monkeypatch):
     assert seen == []
     assert _handshake(address, PROXY).startswith(b'HTTP/1.1 101')
     assert _handshake(address, None).startswith(b'HTTP/1.1 101')
-    # The application runs after the 101 has gone out: wait for it
-    deadline = time.monotonic() + 5
-    while len(seen) < 2 and time.monotonic() < deadline:
-        time.sleep(0.02)
+    _wait_for(seen, 2)
     assert sorted(seen, key=str) == sorted([PROXY, None], key=str)

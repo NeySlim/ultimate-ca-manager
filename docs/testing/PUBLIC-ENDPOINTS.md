@@ -56,7 +56,7 @@ wildcard rejected for `acme_public_vhost` (TLS SAN only).
 | `FQDN` / `UCM_FQDN` | Fallback admin host when `base_url` empty; GUI hint when env-locked |
 | `HTTPS_PORT` | Default admin/ACME port when URL has no `:port` |
 | `HTTP_PROTOCOL_PORT` | Default protocol HTTP port |
-| `CORS_EXTRA_ORIGINS` | Comma-separated extra origins for the API CORS and the WebSocket |
+| `CORS_EXTRA_ORIGINS` | Comma-separated extra origins for the API CORS and the WebSocket (an IPv6 origin: the WebSocket only) |
 | `UCM_CORPORATE_DNS_SERVERS` | Internal resolvers for preflight **DNS (interne)** (comma-separated IPs) |
 | `UCM_BEHIND_PROXY` / `UCM_TRUSTED_PROXY_HOPS` | Enable ProxyFix for `X-Forwarded-*` |
 | `UCM_TRUSTED_PROXIES` | Immediate peers allowed to set forwarded headers: IPs or CIDR networks, comma-separated (default: `127.0.0.1`, `::1`) |

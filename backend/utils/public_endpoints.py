@@ -541,7 +541,10 @@ def get_acme_public_port() -> int:
 
 def get_admin_canonical_origin() -> Optional[str]:
     """Effective https://admin.example.com[:port] for redirects and GUI."""
-    raw = _config_value('base_url')
+    return _admin_canonical_origin_for(_config_value('base_url'))
+
+
+def _admin_canonical_origin_for(raw: str) -> Optional[str]:
     if raw:
         parsed = parse_public_url(raw, default_scheme='https')
         if parsed:
@@ -697,31 +700,49 @@ def normalize_origin(raw) -> Optional[str]:
     return f'{scheme}://{host}' if port is None else f'{scheme}://{host}:{port}'
 
 
-def get_cors_origins() -> list[str]:
-    """Origins the API CORS and the WebSocket accept, read live from the database (#453).
+def _live_origin_candidates() -> list:
+    """localhost, the admin base URL as written and as served, CORS_EXTRA_ORIGINS (#453).
 
-    localhost, the start list (this host's names), the admin base URL as written and as
-    served, the protocol base URL, CORS_EXTRA_ORIGINS; never an origin taken from the request.
+    base_url is read once; only an https:// base URL counts, the admin interface being HTTPS only.
     """
     https_port = _https_port()
     candidates = [f'https://localhost:{https_port}', f'https://127.0.0.1:{https_port}']
+    raw = _config_value('base_url')
+    parsed = parse_public_url(raw, default_scheme='https')
+    if parsed and parsed.scheme == 'https':
+        candidates.append(parsed.normalized)
+    candidates.append(_admin_canonical_origin_for(raw))
+    candidates += os.getenv('CORS_EXTRA_ORIGINS', '').split(',')
+    return candidates
+
+
+def _serialized_origins(candidates, *, brackets: bool) -> list[str]:
+    origins = []
+    for candidate in candidates:
+        origin = normalize_origin(candidate)
+        if origin and (brackets or '[' not in origin) and origin not in origins:
+            origins.append(origin)
+    return origins
+
+
+def get_cors_origins() -> list[str]:
+    """Origins the API's CORS answers, read live from the database (#453).
+
+    Never this host's start names, an origin taken from the request or the protocol base URL;
+    an IPv6 origin is left out, Flask-CORS reading its brackets as a pattern.
+    """
+    return _serialized_origins(_live_origin_candidates(), brackets=False)
+
+
+def get_websocket_origins() -> list[str]:
+    """Origins the Socket.IO channel accepts: the API's plus the start list (FQDN, short name,
+    $HOSTNAME) and IPv6 origins, compared literally (#453)."""
+    candidates = _live_origin_candidates()
     try:
         candidates += list(current_app.config.get('CORS_ORIGINS') or ())
     except (RuntimeError, TypeError):
         pass
-    for key, scheme in (('base_url', 'https'), ('protocol_base_url', 'http')):
-        parsed = parse_public_url(_config_value(key), default_scheme=scheme)
-        if parsed:
-            candidates.append(parsed.normalized)
-    candidates.append(get_admin_canonical_origin())
-    candidates += os.getenv('CORS_EXTRA_ORIGINS', '').split(',')
-    origins = []
-    for candidate in candidates:
-        origin = normalize_origin(candidate)
-        # Flask-CORS reads brackets as a pattern: an IPv6 origin is left out of both lists
-        if origin and '[' not in origin and origin not in origins:
-            origins.append(origin)
-    return origins
+    return _serialized_origins(candidates, brackets=True)
 
 
 def env_locked_fields() -> dict[str, bool]:
