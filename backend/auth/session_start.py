@@ -79,6 +79,9 @@ def keep_current_session(user) -> bool:
         _new_identifier(keep_lock=True)
     except Exception as exc:
         raise SessionNotKept() from exc
+    # A move the store refused (held, writes paused) sends no cookie; a record gone is a sign-out
+    if getattr(session, 'store_refused', None):
+        raise SessionNotKept()
     return True
 
 

@@ -15,16 +15,30 @@ NEW_PASSWORD = 'Renewal-Fails-After-0k!'
 NOT_KEPT = 'The change is saved, but this session could not be kept: sign in again'
 
 
-def _renewal_fails(monkeypatch, application):
-    """The store refuses the move of the caller's record, as rotate() does when it raises."""
+def _renewal_fails(monkeypatch, application, how='raises'):
+    """The store fails the move of the caller's record: rotate() raises ('raises'), or the
+    store refuses the write without raising ('busy': held, or paused by an HA maintenance)."""
     calls = []
+    interface = type(application.session_interface)
+    if how == 'raises':
+        def rotate(self, session):
+            calls.append(session.sid)
+            session.store_refused = 'busy'
+            raise RuntimeError('session store unreachable (test)')
 
-    def rotate(self, session):
-        calls.append(session.sid)
-        session.store_refused = 'busy'
-        raise RuntimeError('session store unreachable (test)')
+        monkeypatch.setattr(interface, 'rotate', rotate)
+        return calls
+    upsert = interface._upsert_session
 
-    monkeypatch.setattr(type(application.session_interface), 'rotate', rotate)
+    def refusing(self, lifetime, session, store_id):
+        if getattr(session, 'rotated_from', None):
+            calls.append(session.sid)
+            setattr(session, 'store_refused' if how == 'busy' else 'record_gone',
+                    'busy' if how == 'busy' else True)
+            return None
+        return upsert(self, lifetime, session, store_id)
+
+    monkeypatch.setattr(interface, '_upsert_session', refusing)
     return calls
 
 
@@ -100,9 +114,10 @@ CHANGES.update({
 })
 
 
+@pytest.mark.parametrize('how', ['raises', 'busy'])
 @pytest.mark.parametrize('operation', sorted(CHANGES))
 def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
-        app, monkeypatch, operation):
+        app, monkeypatch, operation, how):
     start, admin, call, action, password = CHANGES[operation]
     start = dict(start)
     if start.pop('key', False):
@@ -112,7 +127,7 @@ def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
         if admin:
             _admin(app, user)
         this = _open_session(app, user)
-        renewals = _renewal_fails(monkeypatch, app)
+        renewals = _renewal_fails(monkeypatch, app, how)
         r = call(app, this, user)
         assert renewals, 'the operation never renewed the session'
         assert r.status_code == 500, r.data
@@ -123,6 +138,19 @@ def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
         # The record left at its replaced version serves no more
         monkeypatch.undo()
         assert not _signed_in(this)
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+
+
+def test_a_session_signed_out_during_its_renewal_is_not_a_failure(app, monkeypatch):
+    """The record gone meanwhile is a concurrent sign-out: the change answers saved."""
+    user = _make_user(app)
+    try:
+        this = _open_session(app, user)
+        renewals = _renewal_fails(monkeypatch, app, 'gone')
+        r = _change_password(app, this, user)
+        assert renewals and r.status_code == 200, r.data
     finally:
         monkeypatch.undo()
         _cleanup(app, user)
