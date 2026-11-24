@@ -2,7 +2,7 @@
 next message: an account deactivated, a session ended, expired or bumped, a restore's epoch or a
 permission withdrawn cut it within the revalidation delay; a permission granted joins its room.
 
-The handshake registers the socket before it reads the session version and epoch again, so a
+The handshake registers the socket before it reads its session again from the store, so a
 cut that lands while the handshake checks the session never misses it.
 """
 import threading
@@ -239,6 +239,33 @@ class TestHandshakeRace:
                 advance_epoch()
                 db.session.remove()
         self._cut_while_checking(app, monkeypatch, restore)
+        with _socket(app, client) as ws:
+            assert not ws.is_connected()
+
+    def test_a_sign_out_meanwhile_refuses_the_socket(self, app, make_user, monkeypatch):  # noqa: F811
+        """The record removed and its cut sent before the listing: only the record tells."""
+        client = _session_client(app, make_user(role_perms=READER))
+        iface = app.session_interface
+        sid = client.get_cookie('session').value
+
+        def sign_out(_uid):
+            with app.app_context():
+                iface._delete_session(iface._get_store_id(sid))
+            events.end_session_sockets(sid)
+        self._cut_while_checking(app, monkeypatch, sign_out)
+        with _socket(app, client) as ws:
+            assert not ws.is_connected()
+            assert events.connected_clients == {}
+
+    def test_a_lock_meanwhile_refuses_the_socket(self, app, make_user, monkeypatch):  # noqa: F811
+        from auth.session_lock import LOCK_KEY
+        client = _session_client(app, make_user(role_perms=READER))
+
+        def lock(_uid):
+            with client.session_transaction() as sess:
+                sess[LOCK_KEY] = {'at': '2026-01-01T00:00:00', 'reason': 'manual'}
+            events.end_session_sockets(client.get_cookie('session').value)
+        self._cut_while_checking(app, monkeypatch, lock)
         with _socket(app, client) as ws:
             assert not ws.is_connected()
 

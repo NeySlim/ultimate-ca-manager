@@ -554,9 +554,10 @@ def _unavailable(exc) -> HandshakeRefused:
 
 
 def _still_current(state) -> bool:
-    """The account is still active, at the socket's session version, under its epoch: read in a
-    new transaction (a SQLite snapshot would show the rows as the check read them).
-    SessionCheckUnavailable when they could not be read."""
+    """The account is still active, at the socket's session version, under its epoch, read in a
+    new transaction (a SQLite snapshot would show the rows as the check read them), and its
+    session as the store holds it now (signed out, locked or replaced meanwhile) still valid
+    for the same identity. SessionCheckUnavailable when either could not be read."""
     from auth.session_epoch import current_epoch
     from models import User, db
     try:
@@ -569,7 +570,8 @@ def _still_current(state) -> bool:
             return False
     except Exception as exc:  # noqa: BLE001
         raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
-    return True
+    identity = _stored_identity(current_app._get_current_object(), request.environ)
+    return _revalidation_failure(state, identity) is None
 
 
 def _int_or_zero(value) -> int:
