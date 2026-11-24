@@ -262,6 +262,9 @@ export default function AccountPage() {
       setConfirmCode('')
       await loadAccount()
     } catch (error) {
+      // Saved but the session not kept: the stored codes come with the error, shown once
+      const codes = error?.data?.data?.backup_codes
+      if (codes?.length) setQrData(prev => ({ ...prev, backup_codes: codes, confirmed: true }))
       showError(error.message || t('messages.errors.validation.requiredField'))
     }
   }

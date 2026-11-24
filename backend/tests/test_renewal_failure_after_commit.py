@@ -114,6 +114,10 @@ CHANGES.update({
 })
 
 
+# Operations that show new recovery codes once: their failed renewal still hands them over
+WITH_CODES = ('confirm-totp', 'regenerate-recovery-codes')
+
+
 @pytest.mark.parametrize('how', ['raises', 'busy'])
 @pytest.mark.parametrize('operation', sorted(CHANGES))
 def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
@@ -131,7 +135,8 @@ def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
         r = call(app, this, user)
         assert renewals, 'the operation never renewed the session'
         assert r.status_code == 500, r.data
-        assert r.get_json()['message'] == NOT_KEPT
+        if operation not in WITH_CODES:
+            assert r.get_json()['message'] == NOT_KEPT
         assert _audited(app, action, user) == 1
         if password:
             assert _password_is(app, user, password)
@@ -151,6 +156,32 @@ def test_a_session_signed_out_during_its_renewal_is_not_a_failure(app, monkeypat
         renewals = _renewal_fails(monkeypatch, app, 'gone')
         r = _change_password(app, this, user)
         assert renewals and r.status_code == 200, r.data
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+
+
+@pytest.mark.parametrize('how', ['raises', 'busy'])
+@pytest.mark.parametrize('operation', WITH_CODES)
+def test_new_recovery_codes_come_with_the_answer_of_a_failed_renewal(
+        app, monkeypatch, operation, how):
+    """Their hashes are stored and the former codes no longer work: the 500 carries the codes."""
+    from utils.backup_codes import verify_code_only
+    start, _admin_role, call, _action, _password = CHANGES[operation]
+    user = _make_user(app, **start)
+    try:
+        this = _open_session(app, user)
+        _renewal_fails(monkeypatch, app, how)
+        r = call(app, this, user)
+        assert r.status_code == 500, r.data
+        body = r.get_json()
+        codes = body['data']['backup_codes']
+        assert len(codes) == 8
+        assert 'recovery codes' in body['message'] and 'sign in again' in body['message']
+        with app.app_context():
+            stored = db.session.get(User, user['id']).backup_codes
+            assert all(verify_code_only(stored, code) for code in codes)
+            db.session.remove()
     finally:
         monkeypatch.undo()
         _cleanup(app, user)

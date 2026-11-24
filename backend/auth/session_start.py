@@ -63,8 +63,14 @@ def begin_session(user, unlocking=False):
 
 class SessionNotKept(Exception):
     """The change is committed, the caller's session could not move to its new identifier:
-    called after the change's audit, the request answers that the change is saved."""
+    called after the change's audit, the request answers that the change is saved, with
+    ``data`` a secret the change shows only once (new recovery codes)."""
     message = 'The change is saved, but this session could not be kept: sign in again'
+
+    def __init__(self, message=None, data=None):
+        super().__init__(message or SessionNotKept.message)
+        self.message = message or SessionNotKept.message
+        self.data = data
 
 
 def keep_current_session(user) -> bool:

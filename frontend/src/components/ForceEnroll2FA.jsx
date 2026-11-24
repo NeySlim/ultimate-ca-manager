@@ -50,6 +50,9 @@ export function ForceEnroll2FA({ onComplete }) {
       setClosedSessions(res?.meta?.other_sessions_closed)
       setBackupCodes(data.backup_codes || [])
     } catch (error) {
+      // Saved but the session not kept: the stored codes come with the error, shown once
+      const codes = error?.data?.data?.backup_codes
+      if (codes?.length) setBackupCodes(codes)
       showError(error.message || t('auth.invalidTotpCode'))
       setCode('')
     } finally {

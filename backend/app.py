@@ -1335,7 +1335,7 @@ def create_app(config_name=None):
         app.logger.error("Session not renewed after a committed change (path: %s)", request.path,
                          exc_info=e.__cause__ or e)
         from utils.response import error_response
-        return error_response(SessionNotKept.message, 500)
+        return error_response(e.message, 500, data=e.data)
 
     @app.errorhandler(404)
     def handle_404(e):

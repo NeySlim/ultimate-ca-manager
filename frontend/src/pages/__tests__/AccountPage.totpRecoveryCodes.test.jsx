@@ -97,4 +97,17 @@ describe('AccountPage: TOTP recovery codes', () => {
     fireEvent.click(screen.getByText('account.backupCodesSaved'))
     await waitFor(() => expect(screen.queryByLabelText('account.backupCodes')).not.toBeInTheDocument())
   })
+
+  it('still shows the codes when 2FA is saved but the session could not be kept', async () => {
+    const saved = Object.assign(new Error('2FA is enabled with these recovery codes, but...'),
+      { status: 500, data: { data: { backup_codes: CODES } } })
+    m.confirm2FA.mockRejectedValue(saved)
+    render(<MemoryRouter><AccountPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByText('common.security'))[0])
+    fireEvent.click(await screen.findByText('common.enable2FA'))
+    fireEvent.change(await screen.findByPlaceholderText('account.codePlaceholder'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByText('account.verifyAndEnable'))
+    const box = await screen.findByLabelText('account.backupCodes')
+    expect(box.value.split('\n')).toEqual(CODES)
+  })
 })
