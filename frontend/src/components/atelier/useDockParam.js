@@ -6,8 +6,8 @@
  * A dock with several open objects (`list`) also keeps them, as the mockup's `open=1,2,3`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useLatestLocation } from './useLatestLocation'
+import { useLocation, useSearchParams } from 'react-router-dom'
+import { useLatestLocation, useLatestNavigate } from './useLatestLocation'
 
 export const ITEM_PARAM = 'item'
 export const SECTION_PARAM = 'section'
@@ -31,7 +31,7 @@ export const asId = (v) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v)
 export function useDockParam({ sections, fallback = 'overview', aliases = [], list: withList = false } = {}) {
   const [params] = useSearchParams()
   const latest = useLatestLocation()
-  const navigate = useNavigate()
+  const navigate = useLatestNavigate()
   const names = [ITEM_PARAM, ...aliases]
   const item = names.map((n) => params.get(n)).find((v) => v) ?? null
   const raw = params.get(SECTION_PARAM)
