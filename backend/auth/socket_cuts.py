@@ -2,13 +2,14 @@
 
 A socket that only listens never revalidates: without this cut, a session closed by a
 credential change, a factor change, an administrator or a restore would keep receiving
-events. Registered at the change, run after the commit (a reconnecting socket then meets
-the ended session), forgotten on a rollback.
+events. Registered at the change, run after the root commit (a reconnecting socket then meets
+the ended session), forgotten with the transaction or savepoint that registered it when it
+rolls back.
 """
 import logging
 
 from sqlalchemy import event, inspect
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, scoped_session
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,19 @@ _OWED = '_ucm_owed_socket_cuts'
 
 
 def _on_commit(db_session, cut):
-    db_session.info.setdefault(_PENDING, []).append(cut)
+    """``cut`` runs at the root commit, unless the innermost transaction open now rolls back."""
+    if isinstance(db_session, scoped_session):
+        db_session = db_session()
+    registered_in = db_session.get_nested_transaction() or db_session.get_transaction()
+    db_session.info.setdefault(_PENDING, []).append((registered_in, cut))
+
+
+def _within(transaction, ancestor) -> bool:
+    while transaction is not None:
+        if transaction is ancestor:
+            return True
+        transaction = transaction.parent
+    return False
 
 
 def _websocket():
@@ -92,11 +105,19 @@ def _accounts_closed(db_session, _flush_context, _instances):
 def _cut_after_commit(db_session):
     if db_session.in_nested_transaction():
         return  # a savepoint: the root transaction may still roll back
-    for cut in db_session.info.pop(_PENDING, None) or ():
+    for _registered_in, cut in db_session.info.pop(_PENDING, None) or ():
         try:
             cut()
         except Exception as exc:  # noqa: BLE001  # never fails the committed change
             logger.warning("WebSocket sockets of ended sessions not closed: %s", exc)
+
+
+@event.listens_for(Session, 'after_soft_rollback')
+def _forget_savepoint_cuts(db_session, previous_transaction):
+    """A savepoint rolled back: the cuts it, or a savepoint released inside it, registered go."""
+    pending = db_session.info.get(_PENDING)
+    if pending and previous_transaction.nested:
+        pending[:] = [(tx, cut) for tx, cut in pending if not _within(tx, previous_transaction)]
 
 
 @event.listens_for(Session, 'after_transaction_end')

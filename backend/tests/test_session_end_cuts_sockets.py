@@ -226,6 +226,41 @@ def test_a_bump_rolled_back_cuts_nothing(app, two_sessions):
     assert ws_first.is_connected() and ws_second.is_connected()
 
 
+class _Undone(Exception):
+    pass
+
+
+@pytest.mark.parametrize('nesting', ['savepoint', 'savepoint-in-savepoint'])
+def test_a_bump_in_a_savepoint_rolled_back_cuts_nothing(app, two_sessions, nesting):
+    """The root transaction commits, the savepoint that ended the sessions did not."""
+    from models import User, db
+    user, (_first, ws_first), (_second, ws_second) = two_sessions
+    with app.app_context():
+        with pytest.raises(_Undone):
+            with db.session.begin_nested():
+                if nesting == 'savepoint':
+                    db.session.get(User, user['id']).end_sessions()
+                else:
+                    with db.session.begin_nested():  # released, then undone with its parent
+                        db.session.get(User, user['id']).end_sessions()
+                raise _Undone()
+        db.session.commit()
+        db.session.remove()
+    assert ws_first.is_connected() and ws_second.is_connected()
+
+
+def test_a_bump_in_a_savepoint_released_cuts_at_the_root_commit(app, two_sessions):
+    from models import User, db
+    user, (_first, ws_first), (_second, ws_second) = two_sessions
+    with app.app_context():
+        with db.session.begin_nested():
+            db.session.get(User, user['id']).end_sessions()
+        assert ws_first.is_connected()  # the root may still roll back
+        db.session.commit()
+        db.session.remove()
+    assert not ws_first.is_connected() and not ws_second.is_connected()
+
+
 def test_a_restore_epoch_cuts_every_socket_opened_before_it(app, two_sessions):
     from auth.session_epoch import advance_epoch
     from models import db
