@@ -344,7 +344,7 @@ Since v2.214, renewal updates the certificate **in place**:
 - **Renew** asks for the validity of the new certificate in days, prefilled with the current duration; issuance policies and the CA's expiry still cap it
 - **Renewal through EST, SCEP or WSTEP** stores a new certificate: its deployments and the HTTPS binding move to it. A deployment that sends the private key, and the HTTPS binding, stay on the previous certificate when UCM does not hold the new key: the deployment shows **Not following the renewal**, the bell and the overview list it, and the \`certificate.binding_left_behind\` event is sent. **Reattach to the renewed certificate** once UCM holds its key or the deployment stops sending the key; importing the key of the renewed certificate moves them on its own
 
-**Deleting**: a valid, non-revoked certificate cannot be deleted on its own: **Delete** explains why and offers **Revoke, then delete**, so relying parties see the change. Revocations are persisted independently of the certificate record and survive deletion.
+**Deleting**: a valid, non-revoked certificate cannot be deleted on its own: **Delete** explains why and offers **Revoke, then delete**, so relying parties see the change. Revocations are persisted independently of the certificate record and survive deletion. Under a CA held without its key (an imported public CA), or for a certificate linked to no CA, UCM signs no CRL or OCSP answer: **Delete** removes a valid certificate without revoking it, and says so.
 
 ## Revoking a Certificate
 
@@ -368,6 +368,10 @@ If a certificate was revoked with the **Certificate Hold** reason, it can be res
 4. The certificate returns to valid status, the CRL is regenerated, and the OCSP cache is updated
 
 > 💡 Certificate Hold is useful for temporary suspensions (e.g., lost device, pending investigation).
+
+### Lift a Local Revocation
+
+A revocation made under a CA held without its key was never published. An administrator (\`admin:system\`) lifts it from the certificate's actions with **Lift revocation**, after a confirmation: every stored copy of the certificate becomes valid again and its revocation record is deleted, so a new import and the hourly repair keep it valid. The audit log records \`certificate_local_revocation_lifted\`. A revocation recorded by an earlier release may have been published while the CA held its key in UCM: the confirmation says so. A CA whose key UCM holds (software, HSM or key provider), an offline CA, or one with a delegated OCSP responder publishes its revocations: they are never lifted, except a **Certificate Hold** with **Remove Hold** (RFC 5280 §5.3.1).
 
 ### Revoking a Held Certificate for Good
 

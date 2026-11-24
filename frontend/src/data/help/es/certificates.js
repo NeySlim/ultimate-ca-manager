@@ -109,6 +109,7 @@ export default {
     warnings: [
       "La revocación es generalmente permanente: excepto «Suspensión (temporal)», que puede eliminarse o hacerse permanente con otro motivo",
       "Un certificado válido no revocado no puede eliminarse por sí solo: Eliminar explica el motivo y ofrece «Revocar y luego eliminar», para que la revocación llegue a la CRL/OCSP; las revocaciones sobreviven a la eliminación",
+      "Bajo una CA guardada sin su clave (una CA pública importada), o sin CA, UCM no publica ninguna revocación: Eliminar quita un certificado válido sin revocarlo, y un administrador levanta una revocación hecha allí con Levantar la revocación, tras una confirmación registrada en el registro de auditoría. La revocación de una CA cuya clave guarda UCM nunca se levanta, salvo una suspensión con Eliminar suspensión",
       "UCM firma solo con SHA-256, SHA-384 o SHA-512: SHA-224 y los nombres de hash desconocidos se rechazan en lugar de sustituirse por SHA-256",
     ],
   },
@@ -163,7 +164,7 @@ Desde v2.214, la renovación actualiza el certificado **in situ**:
 - **Renovar** pide la validez del nuevo certificado en días, rellenada con la duración actual; las políticas de emisión y la expiración de la CA siguen limitándola
 - **La renovación mediante EST, SCEP o WSTEP** almacena un certificado nuevo: sus despliegues y el enlace HTTPS pasan a él. Un despliegue que envía la clave privada, y el enlace HTTPS, se quedan en el certificado anterior cuando UCM no posee la clave nueva: el despliegue muestra **No sigue la renovación**, la campana y el resumen lo listan, y se envía el evento \`certificate.binding_left_behind\`. **Vincular al certificado renovado** cuando UCM posea su clave o el despliegue deje de enviarla; importar la clave del certificado renovado los mueve por sí solo
 
-**Eliminación**: un certificado válido no revocado no puede eliminarse por sí solo: **Eliminar** explica el motivo y ofrece **Revocar y luego eliminar**, para que las partes que confían vean el cambio. Las revocaciones se persisten independientemente del registro del certificado y sobreviven a la eliminación.
+**Eliminación**: un certificado válido no revocado no puede eliminarse por sí solo: **Eliminar** explica el motivo y ofrece **Revocar y luego eliminar**, para que las partes que confían vean el cambio. Las revocaciones se persisten independientemente del registro del certificado y sobreviven a la eliminación. Bajo una CA guardada sin su clave (una CA pública importada), o para un certificado no vinculado a ninguna CA, UCM no firma ni CRL ni respuestas OCSP: **Eliminar** quita un certificado válido sin revocarlo, y lo indica.
 
 ## Revocar un certificado
 
@@ -187,6 +188,10 @@ Si un certificado fue revocado con el motivo **Suspensión (temporal)**, puede r
 4. El certificado vuelve al estado válido, la CRL se regenera y la caché OCSP se actualiza
 
 > 💡 La suspensión es útil para interrupciones temporales (por ejemplo, dispositivo perdido, investigación en curso).
+
+### Levantar una revocación local
+
+Una revocación hecha bajo una CA guardada sin su clave nunca se publicó. Un administrador (\`admin:system\`) la levanta desde las acciones del certificado con **Levantar la revocación**, tras una confirmación: cada copia guardada del certificado vuelve a ser válida y su registro de revocación se elimina, de modo que una nueva importación y la reparación horaria lo dejan válido. El registro de auditoría anota \`certificate_local_revocation_lifted\`. Una revocación registrada por una versión anterior pudo publicarse si la CA guardaba entonces su clave en UCM: la confirmación lo indica. Una CA cuya clave guarda UCM (software, HSM o proveedor de claves), una CA fuera de línea o una CA con un respondedor OCSP delegado publica sus revocaciones: nunca se levantan, salvo una **Suspensión** con **Eliminar suspensión** (RFC 5280 §5.3.1).
 
 ### Revocar definitivamente un certificado suspendido
 

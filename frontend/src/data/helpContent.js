@@ -399,6 +399,7 @@ export const helpContent = {
     warnings: [
       'Revocation is generally permanent: except for "Certificate Hold" which can be removed (unhold) or made permanent with another reason',
       'A valid, non-revoked certificate cannot be deleted on its own: Delete explains why and offers "Revoke, then delete", so the revocation reaches CRL/OCSP; revocations survive deletion',
+      'Under a CA held without its key (an imported public CA), or under no CA, UCM publishes no revocation: Delete removes a valid certificate without revoking it, and an administrator lifts a revocation made there with Lift revocation, after a confirmation recorded in the audit log. A revocation by a CA whose key UCM holds is never lifted, except a hold with Remove Hold',
       'UCM signs with SHA-256, SHA-384 or SHA-512 only: SHA-224 and unknown hash names are refused instead of being replaced by SHA-256',
     ],
     related: ['CAs', 'CSRs', 'Templates', 'CRL/OCSP']

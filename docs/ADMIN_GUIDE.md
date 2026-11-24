@@ -717,6 +717,7 @@ openssl x509 -in intermediate.pem -noout -text | grep -A1 'Subject Key Identifie
 - Reason `unspecified` is omitted; `removeFromCRL` appears only on delta CRLs (§5.3.1).
 - Optional revoke field **`invalidity_date`** is emitted as CRL entry `invalidityDate` (§5.3.2).
 - Lifting a **certificateHold** (unhold) regenerates the full CRL; with delta CRL enabled, UCM first emits a delta entry with reason `removeFromCRL`. Until the hold is lifted, OCSP and any full CRL generated meanwhile still answer `certificateHold` with the date of the hold.
+- A revocation record says whether UCM published it (`revoked_serials.published`): yes when, at the write, the CA or a record of its key held its key in UCM (software, HSM or key provider), was offline, or had a delegated OCSP responder whose key UCM holds; no under any other CA (an imported public CA); unknown for records older than the column. Only a record that is not published is lifted, by `POST /api/v2/certificates/{id}/lift-local-revocation` (`admin:system`, audited `certificate_local_revocation_lifted`), and only while the CA still publishes nothing; an unknown one needs `acknowledge_unknown_publication`. A published revocation is never lifted (RFC 6960 §2.2, RFC 5280 §5.3.1), except a hold through unhold. The column travels in backups; a merge keeps a record published when either side says so.
 
 **Certificate issuance profile:**
 - CSR-supplied SKI/AKI extensions are **ignored**; SKI comes from the subject public key and AKI from the issuing CA’s SKI.

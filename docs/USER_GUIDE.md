@@ -74,6 +74,8 @@ Open **Modules** > **PKI** > **Certificates**, or **Certificates** in the top ba
 
 **Revoking.** Select the certificate, click **Revoke** and choose a reason. The certificate appears in the CRL and answers OCSP as revoked. A certificate revoked with the reason Certificate Hold can be released with **Remove Hold**.
 
+**Certificates of a CA held without its key.** UCM signs no CRL or OCSP answer for a CA imported without its key (a public CA), nor for a certificate linked to no CA: **Delete** removes a valid certificate of such a CA without revoking it, and says so. A revocation made there was never published: an administrator lifts it with **Lift revocation** in the certificate's actions, after a confirmation, recorded in the audit log, and the certificate stays valid when it is imported again. A revocation recorded by an earlier release asks to acknowledge that it may have been published. Under a CA whose key UCM holds, an offline CA or one with a delegated OCSP responder, a revocation is never lifted, except a hold with **Remove Hold**.
+
 ### Certificate Authorities
 
 Open **Modules** > **PKI** > **Certificate Authorities**, or **Certificate Authorities** in the top bar.
