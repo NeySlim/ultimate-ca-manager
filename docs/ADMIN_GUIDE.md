@@ -948,7 +948,7 @@ For a DEB/RPM install, run `pip install` inside `/opt/ucm/venv` (e.g. `/opt/ucm/
 systemctl restart ucm
 ```
 
-In FIPS mode the binding follows the rule of the Microsoft CA connections below: the service key decrypts each client ticket in the Kerberos library, so both Kerberos endpoints (XCEP and WSTEP) answer `503` and the policy stops offering the binding unless that library hands its cryptography to the system OpenSSL, as on RHEL. With the Docker images, whose library does its own, enroll over the UsernamePassword or Certificate binding; the profiles show the reason, and the FIPS readiness check lists the enabled profiles holding a keytab under `kerberos.acceptor_outside_fips`.
+In FIPS mode the binding follows the rule of the Microsoft CA connections below: the service key decrypts each client ticket in the Kerberos library, so both Kerberos endpoints (XCEP and WSTEP) answer `503` and the policy stops offering the binding unless that library hands its cryptography to the system OpenSSL, as on RHEL. With the Docker images, whose library does its own, enroll over the UsernamePassword or Certificate binding; the profiles show the reason, and the FIPS readiness check lists the profiles the binding serves (enabled, with a realm and a key for it, in their own keytab or the served file) under `kerberos.acceptor_outside_fips`.
 
 Once installed, `gssapi`/`spnego` are importable and the warning clears without any further configuration. The same extra serves the Kerberos authentication of a Microsoft CA connection (certsrv and the WinRM admin channel); `requests-kerberos` and `pykerberos` are no longer used.
 
