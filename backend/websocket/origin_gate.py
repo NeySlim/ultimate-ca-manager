@@ -72,8 +72,9 @@ def log_rejection(origin: str, path: str) -> None:
             return
         if 'start' not in _window or now - _window['start'] >= _REJECTION_LOG_INTERVAL:
             if _window.get('suppressed'):
-                logger.warning('%d more WebSocket origins refused in the previous %d s, not '
-                               'logged one by one', _window['suppressed'], _REJECTION_LOG_INTERVAL)
+                logger.warning('%d more WebSocket origins refused in an earlier %d s window, '
+                               'not logged one by one', _window['suppressed'],
+                               _REJECTION_LOG_INTERVAL)
             _window.update(start=now, warned=0, suppressed=0)
         if last is None and len(_rejections) >= _MAX_TRACKED_REJECTIONS:
             _rejections.clear()

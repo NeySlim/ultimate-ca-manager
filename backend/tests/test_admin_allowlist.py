@@ -253,6 +253,15 @@ def test_socket_gate_resolves_the_client_behind_a_trusted_proxy(app):
     assert _socket_gate_call(app, 0, '127.0.0.1', INSIDE).status_code == 403
 
 
+def test_socket_gate_logs_a_mapped_peer_as_ipv4(app, monkeypatch, caplog):
+    _store(app, '10.0.0.0/8')
+    monkeypatch.setattr(admin_allowlist, '_refusals', {})
+    with caplog.at_level('WARNING', logger=admin_allowlist.logger.name):
+        assert _socket_gate_call(app, 0, '::ffff:198.51.100.77').status_code == 403
+    refused = [r.getMessage() for r in caplog.records if 'Admin access refused' in r.getMessage()]
+    assert refused and 'for 198.51.100.77 on' in refused[0], refused
+
+
 def test_verify_is_refused_from_outside_without_a_proxy(app, client):
     _store(app, '10.0.0.0/8')
     assert _refused(_get(client, '/api/v2/auth/verify', OUTSIDE))

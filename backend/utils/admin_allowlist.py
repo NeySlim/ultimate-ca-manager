@@ -15,6 +15,8 @@ import re
 import threading
 import time
 
+from listen_address import normalize_peer_address
+
 logger = logging.getLogger(__name__)
 
 CONFIG_KEY = 'admin_allowed_networks'
@@ -270,7 +272,8 @@ class SocketIOAllowlistGate:
             return False
         if not environ.get('PATH_INFO', '').startswith('/socket.io/') or disabled_by_env():
             return False
-        addr = self._client_addr(environ)
+        # The worker decides before PeerAddressNormalizer runs: log the peer as the API does.
+        addr = normalize_peer_address(self._client_addr(environ))
         with self.flask_app.app_context():
             allowed = is_allowed(addr)
         environ[SOCKETIO_ALLOWED_KEY if allowed else SOCKETIO_REFUSED_KEY] = addr

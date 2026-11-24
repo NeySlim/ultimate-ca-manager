@@ -218,7 +218,7 @@ def test_the_warnings_have_one_ceiling_for_every_origin(app, client, setting, mo
         assert _poll(client, FOREIGN).status_code == 403
     warned = [r.getMessage() for r in caplog.records if r.name == 'websocket.origin_gate']
     assert len(warned) == 12, warned[10:]
-    assert '50 more' in warned[10]
+    assert '50 more' in warned[10] and 'earlier 300 s window' in warned[10], warned[10]
     assert FOREIGN in warned[11]
 
 
