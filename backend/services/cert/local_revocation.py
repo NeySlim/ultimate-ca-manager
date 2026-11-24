@@ -117,16 +117,27 @@ def note_publication(record: RevokedSerial, ca: Optional[CA], fresh: bool, hold:
 
 
 def publish_before_deletion(ca: CA) -> None:
-    """Before ``ca`` is deleted: when it signs for its key, every record of that key is published,
-    read after the key's CA records are locked for update (PostgreSQL). A revocation in flight
-    holds them share locked: its record is committed, and seen, before the deletion goes on."""
+    """Before ``ca`` is deleted: when it signs for its key, every record of that key is published
+    after the key's CA records are locked for update (PostgreSQL), in a savepoint. A revocation past
+    ``_hold_issuer`` holds them share locked and commits first; one that holds its record but not yet
+    those rows deadlocks with the update, and the side aborted is staged once more."""
     from utils.cert_issuer import same_key_refids
+    from utils.db_transaction import is_deadlock
     if not ca.refid or not _signs_for(ca):
         return
     db.session.flush()
-    with db.session.no_autoflush:
-        CA.query.filter(CA.refid.in_(same_key_refids(ca))).order_by(CA.id).with_for_update().all()
-    publish_key_records(ca)
+    for attempt in (1, 2):
+        savepoint = db.session.begin_nested()
+        try:
+            with db.session.no_autoflush:
+                CA.query.filter(CA.refid.in_(same_key_refids(ca))).order_by(CA.id).with_for_update().all()
+            publish_key_records(ca)
+            savepoint.commit()
+            return
+        except Exception as e:
+            savepoint.rollback()
+            if attempt == 2 or not is_deadlock(e):
+                raise
 
 
 def publish_key_records(ca: CA, connection=None) -> None:

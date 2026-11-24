@@ -1201,6 +1201,51 @@ class TestARevocationThatMeetsADeadlock:
             assert AuditLog.query.filter_by(action='approval_cancelled', resource_id=str(two)).count() == 1
 
 
+def test_a_ca_deletion_that_meets_a_revocation_holding_its_record_goes_on(
+        app, auth_client, create_ca, monkeypatch):
+    """PostgreSQL: the deletion's update waits on the record a revocation holds, which then asks
+    for the CA rows the deletion holds; the deletion, aborted by the deadlock, is staged again."""
+    from services.ca_service import CAService
+    from services.cert import local_revocation
+    if not _on_postgresql(app):
+        pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+    ca = _keyless_ca(app, create_ca, 'Deleted during revocation 450')
+    row_id, real = _leaf_row(app, ca, 'delete-deadlock')
+    _record(app, ca[1], real, reason='certificateHold', certificate_id=row_id)
+    with app.app_context():
+        db.session.execute(CA.__table__.insert().values(**_twin_row(ca)))
+        db.session.commit()
+        twin_id = CA.query.filter_by(descr='twin record 450', subject=db.session.get(CA, ca[0]).subject).one().id
+        engine = db.engine
+    real_note, workers, outcome = local_revocation.note_publication, [], {}
+
+    def delete_twin():
+        with app.app_context():
+            try:
+                outcome['deleted'] = CAService.delete_ca(twin_id)
+            except Exception as e:  # noqa: BLE001
+                db.session.rollback()
+                outcome['error'] = repr(e)
+            finally:
+                db.session.remove()
+
+    def note(*args, **kwargs):
+        if not workers:
+            workers.append(threading.Thread(target=delete_twin))
+            workers[0].start()
+            with engine.connect() as conn:
+                outcome['waited'] = _wait_for_a_lock_waiter(conn)
+        return real_note(*args, **kwargs)
+    monkeypatch.setattr(local_revocation, 'note_publication', note)
+    _revoke(auth_client, row_id)
+    workers[0].join(30)
+    assert outcome.get('waited') and 'error' not in outcome, outcome
+    assert outcome.get('deleted') is True, outcome
+    assert _records(app, ca[1], real) == [('superseded', True)]
+    with app.app_context():
+        assert db.session.get(CA, twin_id) is None
+
+
 class TestARevocationToldToItsIssuer:
     """A Microsoft CA or an ACME CA is told of the revocation: it publishes it, UCM cannot lift it."""
 
