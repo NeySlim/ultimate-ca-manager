@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import {
   Zone, PageHead, Btn, IconBtn, TextLink, StateFilters, TableView, SearchField, FilterSelect, AppliedFilters, BatchBar,
   TableFooter, LoadError, LoadCause, EmptyBlock, NoMatch, useSortParam,
@@ -24,7 +24,7 @@ import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import { useLatestLocation } from '../components/atelier/useLatestLocation'
+import { useLatestLocation, useLatestNavigate } from '../components/atelier/useLatestLocation'
 import { IssueCertificateDialog } from './certificates/IssueCertificateDialog'
 import { certificateColumns, certificateCard, issuerOf, SORT_FIELDS } from './certificates/certificateRows'
 import { sourceLabel, sourceOf } from './certificates/certificateSources'
@@ -76,7 +76,8 @@ const SORT_KEYS = Object.keys(SORT_FIELDS)
 export default function CertificatesPage() {
   const { t, i18n } = useTranslation()
   const { id: urlCertId } = useParams()
-  const navigate = useNavigate()
+  // Its writes are noted, so a second write in the same moment builds on the first
+  const navigate = useLatestNavigate()
   const location = useLocation()
   const openEntity = useOpenEntity()
   const { opened = [], activeKey, closeOnNav } = useInspector()

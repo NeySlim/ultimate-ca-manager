@@ -5,8 +5,8 @@
  * An unknown key falls back on the default without an error. A reload, a shared link and Back give the same order.
  */
 import { useCallback, useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { useLatestLocation } from './useLatestLocation'
+import { useLocation } from 'react-router-dom'
+import { useLatestLocation, useLatestNavigate } from './useLatestLocation'
 
 /**
  * @param {{key: string, asc: boolean}} initial  the list's default sort: required
@@ -20,7 +20,7 @@ export function useSortParam(initial, keys, { scope } = {}) {
   const SORT = scope ? `${scope}-sort` : 'sort'
   const ORDER = scope ? `${scope}-order` : 'order'
   const location = useLocation()
-  const navigate = useNavigate()
+  const navigate = useLatestNavigate()
   // A write builds on the URL as it is now (another write in the same moment, the dock's state, the hash)
   const latest = useLatestLocation()
   const params = new URLSearchParams(location.search)

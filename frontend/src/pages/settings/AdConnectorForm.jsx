@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Btn, Facts, Icon } from '../../components/atelier'
+import { Breakable } from '../../components/atelier/Breakable'
 import { Input, NumberInput, SecretInput, Textarea, ToggleSwitch } from '../../components/atelier/Form'
 import { formatDate } from '../../lib/utils'
 import { adConnectorsService } from '../../services'
@@ -118,7 +119,7 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
         {config?.id && (
           <div className="field full">
             <Facts items={[
-              config.realm ? [t('adConnector.realm'), <span key="r" className="mono">{config.realm}</span>] : { label: t('adConnector.realm'), absent: '—' },
+              config.realm ? [t('adConnector.realm'), <span key="r" className="mono"><Breakable text={config.realm} /></span>] : { label: t('adConnector.realm'), absent: '—' },
               config.domain_sid ? [t('adConnector.domainSid'), <span key="s" className="mono">{config.domain_sid}</span>]
                 : { label: t('adConnector.domainSid'), absent: t('adConnector.domainSidUnknown') },
             ]} />

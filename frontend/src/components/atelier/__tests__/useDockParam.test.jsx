@@ -2,10 +2,10 @@
  * The object open in a dock and its section live in the URL (`?item=`, `?section=`): a reload or a
  * shared link reopens them, the browser's Back closes the dock, a section change adds no step.
  */
-import { useState } from 'react'
+import { useContext, useMemo, useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
-import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, UNSAFE_NavigationContext, useLocation, useNavigate } from 'react-router-dom'
 import { useDockParam, useDockSelection, useDockId } from '../useDockParam'
 import { useSortParam } from '../useSortParam'
 
@@ -64,6 +64,28 @@ const at = (url, ui) => render(
 )
 const url = () => screen.getByTestId('url').textContent
 
+// The browser's history.go(): the step back lands later, after the handler that asked for it
+function DeferredGo({ children }) {
+  const ctx = useContext(UNSAFE_NavigationContext)
+  const value = useMemo(() => {
+    const h = ctx.navigator
+    const navigator = Object.create(h)
+    navigator.go = (n) => { setTimeout(() => h.go(n), 0) }
+    return { ...ctx, navigator }
+  }, [ctx])
+  return <UNSAFE_NavigationContext.Provider value={value}>{children}</UNSAFE_NavigationContext.Provider>
+}
+
+function ClosedTwice() {
+  const d = useDockParam({})
+  return (
+    <div>
+      <button type="button" onClick={() => d.open(7)}>open7</button>
+      <button type="button" onClick={() => { d.close(); d.close() }}>closeTwice</button>
+    </div>
+  )
+}
+
 describe('useDockParam', () => {
   it('reads the object and its section from the URL', () => {
     at('/templates?item=3&section=subject', <Probe opts={{ sections: ['overview', 'subject'] }} />)
@@ -116,6 +138,20 @@ describe('useDockParam', () => {
     await waitFor(() => expect(url()).toBe('/x?q=a'))
     act(() => nav(-1))
     await waitFor(() => expect(url()).toBe('/elsewhere'))
+  })
+
+  it('a second close before the browser steps back takes no second step', async () => {
+    render(
+      <MemoryRouter initialEntries={['/elsewhere', '/x?q=a']} initialIndex={1}>
+        <DeferredGo><Routes><Route path="*" element={<><ClosedTwice /><Where /></>} /></Routes></DeferredGo>
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByText('open7'))
+    expect(url()).toBe('/x?q=a&item=7')
+    fireEvent.click(screen.getByText('closeTwice'))
+    await waitFor(() => expect(url()).toBe('/x?q=a'))
+    await act(() => new Promise((r) => setTimeout(r, 20)))
+    expect(url()).toBe('/x?q=a')
   })
 
   it('closing keeps a sort chosen while the dock was open', async () => {

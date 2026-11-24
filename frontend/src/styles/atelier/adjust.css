@@ -515,9 +515,10 @@
   :root .atl .dash-cards>:is(.card-health,.card-compliance,.card-revocation,.card-activity)+:is(.card-horizon,.card-authorities,:where(.card-queue:not(:has(.queue-list:not([hidden])>li:nth-child(5):not([hidden]))))),
   :root .atl .dash-cards>:first-child:is(.card-horizon,.card-authorities):has(+:is(.card-health,.card-compliance,.card-revocation,.card-activity)){flex-basis:calc(56% - 10px)}
   /* Compliance beside the horizon or the authorities narrows to 38 %: its gauges grow taller, nearer their height. */
+  /* :has() never nests in :has() (Selectors 4): « compliance not before revocation » is « last, or before another card ». */
   :root .atl .dash-cards>.card-compliance:has(+:is(.card-horizon,.card-authorities)),
   :root .atl .dash-cards>.card-authorities:first-child+.card-compliance:not(:has(+.card-revocation)){flex-basis:calc(38% - 10px)}
   :root .atl .dash-cards>.card-compliance+:is(.card-horizon,.card-authorities),
-  :root .atl .dash-cards>.card-authorities:first-child:has(+.card-compliance:not(:has(+.card-revocation))){flex-basis:calc(62% - 10px)}
+  :root .atl .dash-cards>.card-authorities:first-child:is(:has(+.card-compliance:last-child),:has(+.card-compliance+:not(.card-revocation))){flex-basis:calc(62% - 10px)}
   :root .atl .dash-cards>.card-horizon:has(.wk-row>.wk:nth-child(27)){flex-basis:100%}
 }
