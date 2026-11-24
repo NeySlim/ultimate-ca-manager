@@ -575,6 +575,35 @@ def test_requests_kerberos_of_a_2x_venv_becomes_pyspnego_kerberos(tmp_path):
     assert all(c.startswith('ARGS') for c in calls[:-2])
 
 
+def test_pykerberos_of_a_2x_venv_becomes_pyspnego_kerberos(tmp_path):
+    """A 2.254 venv whose WinRM Kerberos came from pywinrm[kerberos] holds pykerberos alone."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, record = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    _stub(home / 'venv' / 'bin' / 'pip', 'case "$*" in "show pykerberos") exit 0;; "show "*) exit 1;; esac; exit 0')
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, {'PATH': str(bin_dir)}))
+    assert result.returncode == 0, result.stderr
+    installs = [line for line in record.read_text().splitlines() if line.startswith('ARGS install')]
+    assert installs == [
+        'ARGS install --quiet --upgrade pip',
+        f'ARGS install --quiet -r {home}/requirements.txt',
+        'ARGS install --quiet --no-deps pyjks==20.0.0',
+        'ARGS install --quiet pyspnego[kerberos]',
+    ]
+
+
+def test_a_venv_without_any_kerberos_library_gets_none(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, record = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    _stub(home / 'venv' / 'bin' / 'pip', 'case "$*" in "show "*) exit 1;; esac; exit 0')
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, {'PATH': str(bin_dir)}))
+    assert result.returncode == 0, result.stderr
+    assert not any('pyspnego' in line for line in record.read_text().splitlines())
+
+
 @pytest.mark.parametrize('fips', [True, False])
 def test_a_failed_build_never_stops_the_service(tmp_path, fips):
     """PyPI unreachable or a failed compilation: ucm goes on running the venv it had."""

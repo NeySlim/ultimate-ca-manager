@@ -942,7 +942,7 @@ dnf install -y krb5-devel gcc python3-devel
 pip install pyspnego[kerberos]
 ```
 
-For a DEB/RPM install, run `pip install` inside `/opt/ucm/venv` (e.g. `/opt/ucm/venv/bin/pip install pyspnego[kerberos]`) as the `ucm` user; a package upgrade reinstalls it, and also installs it in place of a `requests-kerberos` added by hand to a 2.x venv. The Docker images ship it.
+For a DEB/RPM install, run `pip install` inside `/opt/ucm/venv` (e.g. `/opt/ucm/venv/bin/pip install pyspnego[kerberos]`) as the `ucm` user; a package upgrade reinstalls it, and also installs it in place of a `requests-kerberos` or `pykerberos` (from `pywinrm[kerberos]`) added by hand to a 2.x venv. The Docker images ship it.
 
 ```bash
 systemctl restart ucm
