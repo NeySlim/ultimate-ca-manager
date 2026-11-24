@@ -30,6 +30,7 @@ _BUSY_INFO = 'ucm_busy_timeout'
 _LOCK_MET = 'ucm_lock_met'
 _WAITED = 'ucm_lock_waited'
 _BUILT = 'ucm_lock_response_built'
+_KEPT = 'ucm_500_kept'
 _WAL = 'ucm_wal'
 SQLITE_BUSY_SNAPSHOT = getattr(sqlite3, 'SQLITE_BUSY_SNAPSHOT', 517)
 BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
@@ -238,10 +239,18 @@ def locked_refusal(exc):
     return _refusal()
 
 
+def keep_this_500():
+    """The request's 500 reports a committed change and may carry a secret shown once (new
+    recovery codes): never rewritten into a 503, whatever lock the request met."""
+    from flask import g
+    setattr(g, _KEPT, True)
+
+
 def answer_locked_500(response):
     """after_request: a 500 from a request that met a SQLite lock, whatever route caught it,
     becomes the 503 with Retry-After of locked_refusal, rewritten in place (headers kept)."""
-    if response.status_code != 500 or not _met_lock():
+    from flask import g
+    if response.status_code != 500 or g.get(_KEPT) or not _met_lock():
         return response
     refused = _refusal(serve_job=False)
     response.set_data(refused.get_data())
