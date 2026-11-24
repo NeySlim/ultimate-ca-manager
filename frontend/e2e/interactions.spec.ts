@@ -94,7 +94,9 @@ test.describe('the ACME views beside the right dock at 1406 px', () => {
     expect(m.x + m.width).toBeLessThanOrEqual(frame.x + frame.width + EPS)
     await more.click()
     const menu = page.getByRole('menu', { name: 'Other views' })
-    await expect(menu.getByRole('menuitem')).toHaveCount(11 - shown)
+    // The row settles once the dock's transition ends: every view is either in it or in the menu
+    await expect.poll(async () => (await tabs.getByRole('tab').count()) + (await menu.getByRole('menuitem').count())).toBe(11)
+    await expect(menu.getByRole('menuitem')).not.toHaveCount(0)
     expect(await onTop(menu)).toBe(true)
     await menu.getByRole('menuitem', { name: /^Issued certificates/ }).click()
     await expect(tabs.getByRole('tab', { name: /^Issued certificates/ })).toHaveAttribute('aria-selected', 'true')
