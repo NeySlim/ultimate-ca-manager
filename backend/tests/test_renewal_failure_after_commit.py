@@ -96,6 +96,51 @@ def _admin_key(method):
     return _call
 
 
+def _admin_sso(path):
+    """An administrator's change of who opens its own account: attach, reset or detach."""
+    def _call(application, c, user):
+        if path == 'attach':
+            return _post(c, f"/api/v2/users/{user['id']}/sso-identities",
+                         {'provider_id': user['provider_id']})
+        url = f"/api/v2/users/{user['id']}/sso-identities/{user['identity_id']}"
+        return _post(c, f'{url}/reset') if path == 'reset' else c.delete(url)
+    return _call
+
+
+def _sso_setup(application, user, attached):
+    """A provider, and unless ``attached`` is None an attachment of the account, bound when
+    ``attached`` is 'bound' (only a bound identity is reset)."""
+    import uuid
+    from models import UserSSOIdentity
+    from models.sso import SSOProvider
+    with application.app_context():
+        provider = SSOProvider(name=f'renewal-{uuid.uuid4().hex[:8]}', provider_type='oauth2',
+                               enabled=False, oauth2_issuer=f'https://{uuid.uuid4().hex[:8]}.example')
+        db.session.add(provider)
+        db.session.flush()
+        user['provider_id'] = provider.id
+        if attached is not None:
+            row = UserSSOIdentity(user_id=user['id'], provider_id=provider.id,
+                                  external_id='sub-renewal' if attached == 'bound' else None)
+            db.session.add(row)
+            db.session.flush()
+            user['identity_id'] = row.id
+        db.session.commit()
+        db.session.remove()
+
+
+def _sso_cleanup(application, user):
+    from models import UserSSOIdentity
+    from models.sso import SSOProvider
+    if 'provider_id' not in user:
+        return
+    with application.app_context():
+        UserSSOIdentity.query.filter_by(provider_id=user['provider_id']).delete()
+        SSOProvider.query.filter_by(id=user['provider_id']).delete()
+        db.session.commit()
+        db.session.remove()
+
+
 # operation: (user it starts from, administrator, request, audit action, password it sets)
 CHANGES = {name: (start, False, call, action, None)
            for name, (start, call, action) in OPERATIONS.items()}
@@ -111,6 +156,10 @@ CHANGES.update({
                              None),
     'admin-disable-own-key': ({'key': True}, True, _admin_key('patch'), 'webauthn_admin_disable',
                               None),
+    'admin-attach-own-sso': ({'sso': None}, True, _admin_sso('attach'), 'user_sso_attach', None),
+    'admin-reset-own-sso': ({'sso': 'bound'}, True, _admin_sso('reset'), 'user_sso_reset', None),
+    'admin-detach-own-sso': ({'sso': 'unbound'}, True, _admin_sso('detach'), 'user_sso_detach',
+                             None),
 })
 
 
@@ -126,8 +175,11 @@ def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
     start = dict(start)
     if start.pop('key', False):
         start['key'] = SoftKey()
+    sso = start.pop('sso', False)
     user = _make_user(app, **start)
     try:
+        if sso is not False:
+            _sso_setup(app, user, sso)
         if admin:
             _admin(app, user)
         this = _open_session(app, user)
@@ -146,6 +198,7 @@ def test_a_renewal_that_fails_after_the_commit_keeps_the_audit_and_says_saved(
     finally:
         monkeypatch.undo()
         _cleanup(app, user)
+        _sso_cleanup(app, user)
 
 
 def test_a_session_signed_out_during_its_renewal_is_not_a_failure(app, monkeypatch):
