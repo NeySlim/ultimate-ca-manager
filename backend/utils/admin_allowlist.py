@@ -223,6 +223,18 @@ def log_refusal(addr: str, path: str) -> None:
 
 REFUSAL_MESSAGE = 'Access to the administration interface is not allowed from this address'
 
+# The decision for a /socket.io/ request, set in the environ by whoever takes it first (the
+# gunicorn worker's handler before an upgrade, else the gate): HTTP headers cannot set these keys.
+SOCKETIO_REFUSED_KEY = 'ucm.admin_allowlist_refused'
+SOCKETIO_ALLOWED_KEY = 'ucm.admin_allowlist_allowed'
+_socketio_gate = None
+
+
+def socketio_refused(environ) -> bool:
+    """The gate's answer for a WebSocket upgrade, taken before geventwebsocket sends its 101."""
+    gate = _socketio_gate
+    return gate is not None and gate.refused(environ)
+
 
 class SocketIOAllowlistGate:
     """WSGI gate for /socket.io/, which Flask-SocketIO serves before any Flask hook.
@@ -232,6 +244,7 @@ class SocketIOAllowlistGate:
     """
 
     def __init__(self, app, flask_app, trusted_hops: int = 0):
+        global _socketio_gate
         self.app = app
         self.flask_app = flask_app
         self._resolver = None
@@ -240,6 +253,7 @@ class SocketIOAllowlistGate:
             from utils.trusted_proxy import ForwardedHeadersGate
             self._resolver = ForwardedHeadersGate(
                 ProxyFix(lambda environ, start_response: [], x_for=trusted_hops))
+        _socketio_gate = self
 
     def _client_addr(self, environ) -> str:
         if self._resolver is None:
@@ -248,18 +262,27 @@ class SocketIOAllowlistGate:
         self._resolver(copy, lambda *args, **kwargs: None)
         return copy.get('REMOTE_ADDR') or ''
 
+    def refused(self, environ) -> bool:
+        """True for a /socket.io/ request from an address off the list; decided once per request."""
+        if SOCKETIO_REFUSED_KEY in environ:
+            return True
+        if SOCKETIO_ALLOWED_KEY in environ:
+            return False
+        if not environ.get('PATH_INFO', '').startswith('/socket.io/') or disabled_by_env():
+            return False
+        addr = self._client_addr(environ)
+        with self.flask_app.app_context():
+            allowed = is_allowed(addr)
+        environ[SOCKETIO_ALLOWED_KEY if allowed else SOCKETIO_REFUSED_KEY] = addr
+        return not allowed
+
     def __call__(self, environ, start_response):
-        path = environ.get('PATH_INFO', '')
-        if path.startswith('/socket.io/') and not disabled_by_env():
-            addr = self._client_addr(environ)
-            with self.flask_app.app_context():
-                allowed = is_allowed(addr)
-            if not allowed:
-                log_refusal(addr, path)
-                body = REFUSAL_MESSAGE.encode()
-                start_response('403 Forbidden', [
-                    ('Content-Type', 'text/plain; charset=utf-8'),
-                    ('Content-Length', str(len(body))),
-                ])
-                return [body]
+        if self.refused(environ):
+            log_refusal(environ[SOCKETIO_REFUSED_KEY], environ.get('PATH_INFO', ''))
+            body = REFUSAL_MESSAGE.encode()
+            start_response('403 Forbidden', [
+                ('Content-Type', 'text/plain; charset=utf-8'),
+                ('Content-Length', str(len(body))),
+            ])
+            return [body]
         return self.app(environ, start_response)

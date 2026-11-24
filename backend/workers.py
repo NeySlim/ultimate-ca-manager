@@ -104,12 +104,12 @@ class MTLSWebSocketHandler(WebSocketHandler, PyWSGIHandler):
                 pass
 
     def run_application(self):
-        # geventwebsocket answers 101 before the application runs: a refused origin must
-        # take the plain HTTP path, where the origin gate answers 403 (#453)
+        # geventwebsocket answers 101 before the application runs: a refused address or origin
+        # takes the plain HTTP path, where its gate answers 403 from the mark left here (#453)
         if self.environ.get('HTTP_UPGRADE', '').lower() == 'websocket':
-            from websocket.origin_gate import REFUSED_KEY, refused
-            if refused(self.environ):
-                self.environ[REFUSED_KEY] = True
+            from utils.admin_allowlist import socketio_refused
+            from websocket.origin_gate import refused
+            if socketio_refused(self.environ) or refused(self.environ):
                 return super(WebSocketHandler, self).run_application()
         return super().run_application()
 
