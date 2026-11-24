@@ -24,7 +24,11 @@ def get_certificate(cert_id):
     cert = db.session.get(Certificate, cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
+    return success_response(data=certificate_detail(cert))
 
+
+def certificate_detail(cert):
+    """What GET /api/v2/certificates/<id> answers for *cert*; a PATCH answers the same."""
     # The revocation a record of its CA makes counts as OCSP and the CRL answer it
     from services.cert.issued_lookup import row_persisted_revocation, show_effective_revocation
     data = show_effective_revocation(cert.to_dict(), cert, row_persisted_revocation(cert))
@@ -47,7 +51,7 @@ def get_certificate(cert_id):
 
     # CT SCT info
     from models import SystemConfig
-    sct_config = SystemConfig.query.filter_by(key=f'cert_scts_{cert_id}').first()
+    sct_config = SystemConfig.query.filter_by(key=f'cert_scts_{cert.id}').first()
     if sct_config and sct_config.value:
         try:
             data['ct_scts'] = json.loads(sct_config.value)
@@ -55,8 +59,7 @@ def get_certificate(cert_id):
             data['ct_scts'] = None
     else:
         data['ct_scts'] = None
-
-    return success_response(data=data)
+    return data
 
 
 def _validate_cert_chain(cert):

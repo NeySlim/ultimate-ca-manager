@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
+from migration_runner import fresh_registry_names
 from tests.upgrade_2254_support import (BACKENDS, differences, fresh_metadata, make_base, schema_2254,
                                         snapshot)
 
@@ -134,7 +135,7 @@ def test_a_fresh_sqlite_install_never_hands_a_deleted_id_out_again(table, tmp_pa
 def test_the_registry_of_both_ends_names_the_upgrade(base, fresh):
     assert base.upgrade()
     assert '300_upgrade_from_2_254' in base.registry()
-    assert fresh.registry() == ['300_upgrade_from_2_254']
+    assert fresh.registry() == fresh_registry_names()
 
 
 # --- Data steps on a populated 2.254 database ---------------------------------------------------
@@ -725,7 +726,7 @@ def test_a_fresh_install_cut_after_its_tables_is_never_taken_for_an_old_database
             migration_runner.build_fresh_schema(create_all)
         assert db.upgrade() is True, capsys.readouterr().out
         migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
-        assert db.registry() == ['300_upgrade_from_2_254']
+        assert db.registry() == fresh_registry_names()
         assert db.upgrade() is True
 
 
@@ -738,7 +739,7 @@ def test_a_3_0_registry_without_tables_is_accepted_and_completed(dialect, tmp_pa
         assert db.tables() == {'_migrations'}
         assert db.upgrade() is True, capsys.readouterr().out
         migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
-        assert db.registry() == ['300_upgrade_from_2_254']
+        assert db.registry() == fresh_registry_names()
         assert {'users', 'certificate_authorities'} <= db.tables()
         assert db.upgrade() is True
 
@@ -759,7 +760,7 @@ def test_a_fresh_install_that_cannot_record_its_registry_stops_then_starts_fresh
         monkeypatch.setattr(migration_runner, '_mark_applied', real)
         assert db.upgrade() is True, capsys.readouterr().out
         migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
-        assert db.registry() == ['300_upgrade_from_2_254']
+        assert db.registry() == fresh_registry_names()
         assert {'users', 'certificate_authorities'} <= db.tables()
         assert db.upgrade() is True
 
@@ -776,7 +777,7 @@ def test_a_database_reset_keeps_its_3_0_registry_and_starts(fresh, capsys):
     before = fresh.registry()
     fresh_metadata().drop_all(fresh.engine)
     fresh_metadata().create_all(fresh.engine)
-    assert fresh.registry() == before == ['300_upgrade_from_2_254']
+    assert fresh.registry() == before == fresh_registry_names()
     assert fresh.upgrade() is True, capsys.readouterr().out
 
 

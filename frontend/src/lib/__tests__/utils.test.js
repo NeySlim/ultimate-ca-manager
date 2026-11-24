@@ -232,6 +232,20 @@ describe('utils', () => {
       exportToCSV(data, columns)
       expect(mockClick).toHaveBeenCalled()
     })
+
+    it('puts a quote before a text a spreadsheet would run as a formula, and keeps numbers', () => {
+      const data = [{ a: '=HYPERLINK("x")', b: -3, c: '@SUM(A1)', d: '+1', e: '\tcmd', f: '-x', g: 'a=b' }]
+      const columns = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((key) => ({ key, header: key.toUpperCase() }))
+      columns.push({ key: 'h', header: 'H', accessor: () => '\rcmd' })
+      const written = []
+      vi.stubGlobal('Blob', class { constructor(parts) { written.push(parts.join('')) } })
+      try {
+        exportToCSV(data, columns)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+      expect(written[0]).toBe('A,B,C,D,E,F,G,H\n"\'=HYPERLINK(""x"")",-3,\'@SUM(A1),\'+1,\'\tcmd,\'-x,a=b,"\'\rcmd"')
+    })
   })
 
   describe('exportToJSON', () => {

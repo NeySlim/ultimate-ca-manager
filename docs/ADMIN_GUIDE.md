@@ -1194,6 +1194,8 @@ Before relying on a schedule, send a test report:
 
 See [UPGRADE.md](../UPGRADE.md) for version-specific migration steps.
 
+Migrations run at startup, under the startup lock (one node at a time in HA), on SQLite and PostgreSQL. The upgrade from 2.254 (migration 300) records each of its steps in `_migrations` as `300_upgrade_from_2_254/<step>`; a 3.0 database runs at its next start the steps a later release adds to it, each recorded once done; `migration_runner.py status` and `dry-run` list a step not run yet as pending.
+
 ---
 
 ## Troubleshooting

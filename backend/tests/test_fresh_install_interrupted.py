@@ -5,6 +5,7 @@ import re
 import pytest
 from sqlalchemy import event, inspect
 
+from migration_runner import fresh_registry_names
 from tests.upgrade_2254_support import BACKENDS, differences, fresh_metadata, make_base, snapshot
 
 
@@ -58,4 +59,4 @@ def test_a_fresh_install_cut_before_an_index_has_its_whole_schema_at_the_next_st
         _start(db, lambda: fresh_metadata().create_all(db.engine))
         assert expected_indexes - _indexes(db.engine) == set()
         assert list(differences(snapshot(db.engine), expected)) == []
-        assert db.registry() == ['300_upgrade_from_2_254']
+        assert db.registry() == fresh_registry_names()

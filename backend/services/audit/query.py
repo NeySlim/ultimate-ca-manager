@@ -192,12 +192,13 @@ class AuditQueryMixin:
             writer = csv.writer(output)
             writer.writerow(['id', 'timestamp', 'username', 'action', 'resource_type',
                              'resource_id', 'details', 'ip_address', 'success'])
+            from utils.csv_cells import csv_row
             for log in logs:
-                writer.writerow([
+                writer.writerow(csv_row([
                     log.id, log.timestamp, log.username, log.action,
                     log.resource_type, log.resource_id, log.details,
                     log.ip_address, log.success
-                ])
+                ]))
             return output.getvalue()
 
         return ''

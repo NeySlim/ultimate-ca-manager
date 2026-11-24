@@ -1270,7 +1270,7 @@ Content-Type: application/json
 
 { "descr": "Web server", "comment": "Owner: PKI team\nTicket INC-1234" }
 ```
-Permission `write:certificates`. The display name and the comment change apart or together, and at least one of them is required. `descr` is a non-empty string of at most 255 characters. `comment` is plain text of at most 4,000 characters, kept as sent, with line feeds and tabs as its only control characters; `""` or `null` removes it. An invalid field refuses the whole request with `400` and changes nothing; `404` for an unknown certificate. Every certificate read carries `comment` (`""` when there is none). A changed comment is audited as `certificate_comment_updated` with its former and new lengths, never its text.
+Permission `write:certificates`. The display name and the comment change apart or together, and at least one of them is required. `descr` is a non-empty string of at most 255 characters. `comment` is plain text of at most 4,000 characters, kept as sent, with line feeds and tabs as its only control characters and no text direction control (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069); `""`, `null` or a text of blanks only removes it. Neither field may hold a lone UTF-16 surrogate. An invalid field refuses the whole request with `400` and changes nothing; `404` for an unknown certificate. The answer is the certificate as `GET /api/v2/certificates/{id}` gives it. Every certificate read carries `comment` (`""` when there is none), and so does the `certificate` of every webhook event. A changed comment is audited as `certificate_comment_updated` with its former and new lengths, never its text.
 
 ```http
 GET /api/v2/certificates/{cert_id}/lint?profile=rfc5280
@@ -2323,7 +2323,7 @@ POST /api/v2/discovery/bulk-resolve-dns
 - The list returns `items` and `total`; it pages with `limit` (default 50, 200 at most) and `offset`, or with `page` and `per_page` when either is given. `status` may be repeated. `sort_by`: `last_seen` (default, most recent first), `first_seen`, `not_after`, `target`, `issuer`, `subject`, `status` (error, unmanaged, managed); see [Sorting](#sorting).
 - `GET /{disc_id}` adds the parsed `extensions`, key and signature details and the SHA-1 and SHA-256 fingerprints; `404` when unknown. `DELETE /{disc_id}` answers `204`.
 - `DELETE /api/v2/discovery` (`admin:system`) deletes every record, or those of `profile_id`, and returns `deleted`.
-- `export` returns CSV (default) or JSON (`format=json`) as a download, for the same `profile_id`, `status` and `search` filters as the list (10 000 rows at most).
+- `export` returns CSV (default) or JSON (`format=json`) as a download, for the same `profile_id`, `status` and `search` filters as the list (10 000 rows at most). A CSV text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading `'`, so a spreadsheet does not run it as a formula.
 - `bulk-resolve-dns` (`admin:system`) re-resolves reverse DNS for every record and returns the counts `updated` and `total`.
 
 ### Scan Profiles and Runs
@@ -2967,7 +2967,7 @@ GET /api/v2/audit/export?format=json&limit=10000
 GET /api/v2/audit/export?format=csv&date_from=2026-01-01
 ```
 
-The export takes the filters of the list (`username`, `action` and `resource_type`, repeatable, `category`, `success`, `search`, `date_from`, `date_to`) and holds only the rows they select.
+The export takes the filters of the list (`username`, `action` and `resource_type`, repeatable, `category`, `success`, `search`, `date_from`, `date_to`) and holds only the rows they select. A CSV text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading `'`, so a spreadsheet does not run it as a formula.
 
 ### Cleanup Old Logs
 ```http
@@ -5081,6 +5081,8 @@ GET /api/v2/webhooks/{endpoint_id}/deliveries?status=failed&page=1&per_page=25
 ```
 Delivery history of one endpoint, newest first. `status` is `pending`, `delivered` or `failed`; `per_page` is at most 100. `404` for an unknown endpoint.
 
+The `certificate` of a `certificate.*` event is the certificate as the API reads it, its `comment` included: a comment written for operators reaches every endpoint subscribed to the event.
+
 ### Retry Delivery
 ```http
 POST /api/v2/webhooks/{endpoint_id}/deliveries/{delivery_id}/retry
@@ -5402,7 +5404,7 @@ GET /api/v2/reports/download/{report_type}?format=csv&days=30
 GET /api/v2/reports/pdf/templates
 POST /api/v2/reports/pdf/generate
 ```
-- `download` needs `read:audit` and `export:audit`. `format` is `csv` (default) or `json`, `days` an integer from 1 to 3650 (default 30); `400` for an unknown `report_type` or invalid value. Returns the report as a download.
+- `download` needs `read:audit` and `export:audit`. `format` is `csv` (default) or `json`, `days` an integer from 1 to 3650 (default 30); `400` for an unknown `report_type` or invalid value. Returns the report as a download. A CSV text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading `'`, so a spreadsheet does not run it as a formula.
 - `pdf/templates` (`read:audit`) lists the PDF templates and sections.
 - `pdf/generate` (`read:audit` and `export:audit`) builds a PDF from `template` (a template name) or an explicit `sections` list; `400` when no valid section results, `500` when PDF generation is not available.
 

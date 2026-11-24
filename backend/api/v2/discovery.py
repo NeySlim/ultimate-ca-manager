@@ -415,6 +415,7 @@ def export_discovered():
     import csv
     import io
     from flask import Response
+    from utils.csv_cells import csv_dict
 
     fmt = request.args.get('format', 'csv')
     profile_id = request.args.get('profile_id', type=int)
@@ -447,7 +448,7 @@ def export_discovered():
         # Flatten SAN lists for CSV
         row['san_dns_names'] = ', '.join(row.get('san_dns_names') or [])
         row['san_ip_addresses'] = ', '.join(row.get('san_ip_addresses') or [])
-        writer.writerow(row)
+        writer.writerow(csv_dict(row))
 
     _audit('discovery_export', details=f"CSV export: {total} certificates")
     return Response(

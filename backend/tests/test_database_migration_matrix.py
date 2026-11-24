@@ -370,7 +370,7 @@ def a_3_0_source(app):
         migration_runner._ensure_tracking_table(engine, pg)
         with engine.connect() as conn:
             present = {r[0] for r in conn.execute(text('SELECT name FROM _migrations'))}
-        added = [n for n in migration_runner._list_migration_names() if n not in present]
+        added = [n for n in migration_runner.fresh_registry_names() if n not in present]
         migration_runner._mark_applied(engine, added, pg)
     yield
     with app.app_context():
@@ -401,7 +401,7 @@ class TestASwitchedTargetStarts:
                 registry = sorted(r[0] for r in conn.execute(text('SELECT name FROM _migrations')))
         finally:
             engine.dispose()
-        assert registry == migration_runner._list_migration_names()
+        assert registry == migration_runner.fresh_registry_names()
 
         monkeypatch.setattr(migration_runner, '_get_db_url', lambda: target)
         assert migration_runner.run_all_migrations() is True
@@ -982,7 +982,7 @@ def _pivot_registry_but(missing):
 
 def _the_3_0_registry():
     import migration_runner
-    return set(migration_runner._list_migration_names())
+    return set(migration_runner.fresh_registry_names())
 
 
 class TestASwitchNeverNamesATargetTheStartRefuses:

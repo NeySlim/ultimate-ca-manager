@@ -34,7 +34,7 @@ const base = {
 }
 const ident = () => screen.getByText(en.inspector.cert.identity).closest('section')
 const value = () => within(ident()).getByText(C.comment).nextElementSibling
-const dialog = () => screen.getByRole('dialog', { name: C.editComment })
+const dialog = () => screen.getByRole('dialog')
 const field = () => within(dialog()).getByRole('textbox', { name: C.comment })
 
 beforeEach(() => {
@@ -92,6 +92,36 @@ describe('the comment of a certificate in Aperçu', () => {
     fireEvent.change(field(), { target: { value: '' } })
     fireEvent.click(within(dialog()).getByRole('button', { name: en.common.save }))
     await waitFor(() => expect(svc.updateComment).toHaveBeenCalledWith(7, ''))
+  })
+
+  it('titles the dialog by what it does: add a comment, or edit the one there', () => {
+    perms.granted = ['write:certificates']
+    const { unmount } = render(<OverviewPanel cert={{ ...base, comment: '' }} title="pc" />)
+    fireEvent.click(screen.getByRole('button', { name: C.addComment }))
+    expect(screen.getByRole('dialog', { name: C.addComment })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: C.editComment })).toBeNull()
+    unmount()
+    render(<OverviewPanel cert={{ ...base, comment: 'Old' }} title="pc" />)
+    fireEvent.click(screen.getByRole('button', { name: C.editComment }))
+    expect(screen.getByRole('dialog', { name: C.editComment })).toBeInTheDocument()
+  })
+
+  it('prefixes its ids in a detached window, so they never clash with the dock showing the same certificate', () => {
+    perms.granted = ['write:certificates']
+    render(<OverviewPanel cert={{ ...base, comment: 'Old' }} title="pc" idPrefix="float-3-" />)
+    const button = screen.getByRole('button', { name: C.editComment })
+    expect(button).toHaveAttribute('id', 'float-3-cert-comment-edit-7')
+    fireEvent.click(button)
+    expect(field()).toHaveAttribute('id', 'float-3-cert-comment-7')
+  })
+
+  it('keeps the ids of the dock unprefixed', () => {
+    perms.granted = ['write:certificates']
+    render(<OverviewPanel cert={{ ...base, comment: 'Old' }} title="pc" />)
+    const button = screen.getByRole('button', { name: C.editComment })
+    expect(button).toHaveAttribute('id', 'cert-comment-edit-7')
+    fireEvent.click(button)
+    expect(field()).toHaveAttribute('id', 'cert-comment-7')
   })
 
   it('keeps the text and says why when the save fails', async () => {

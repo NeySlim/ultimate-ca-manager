@@ -34,6 +34,9 @@ Numbered from 300. Every migration is multi-backend:
 
 Files and packages whose name starts with ``_`` are not migrations.
 
+Migration 300 records each of its steps (``300_upgrade_from_2_254/<step>``); a 3.0 database
+runs, at its next start and under the same lock, the steps added to 300 since (pending_steps).
+
 A migration only adds to what the release before it reads or writes (CONTRIBUTING.md,
 "Migrations and rolling updates"). One that removes or narrows sets ``requires_full_stop = "<why>"``
 (``migration_marks``): in HA the runner refuses to apply it while another node beats fresh on
@@ -167,7 +170,8 @@ def unknown_migrations(applied):
     """Registry names neither 2.254 (2.254.N adds none) nor this release knows: a later release
     or a hand edit wrote them."""
     from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
-    return sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+    return sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names())
+                  - set(_step_rows()))
 
 
 def pivot_refusal(state, applied):
@@ -415,9 +419,15 @@ def mark_all_applied():
 
 
 def record_fresh_registry(engine, is_pg: bool):
-    """The registry of a fresh 3.0 database on *engine*: every current migration, applied."""
+    """The registry of a fresh 3.0 database on *engine*: every current migration and upgrade
+    step, applied."""
     _ensure_tracking_table(engine, is_pg)
-    _mark_applied(engine, _list_migration_names(), is_pg)
+    _mark_applied(engine, fresh_registry_names(), is_pg)
+
+
+def fresh_registry_names() -> list[str]:
+    """What the registry of a 3.0 database holds once every migration and step ran, sorted."""
+    return sorted(_list_migration_names() + _step_rows())
 
 
 def build_fresh_schema(create_all):
@@ -479,12 +489,30 @@ def _pending(applied):
 
 
 def pending_migrations(engine) -> list[str]:
-    """What this release applies at its next start to the database of *engine*: none for a
-    fresh one (built whole) or one it refuses."""
+    """What this release applies at its next start to the database of *engine*, upgrade steps
+    by their registry row: none for a fresh one (built whole) or one it refuses."""
     state, applied = _get_state(engine)
     if state == "fresh" or pivot_refusal(state, applied):
         return []
-    return _pending(applied)
+    from migrations._from_2_254 import recorded
+    return [recorded(s) for s in pending_steps(applied)] + _pending(applied)
+
+
+def _step_rows() -> list[str]:
+    from migrations._from_2_254 import STEPS, recorded
+    return [recorded(s) for s in STEPS]
+
+
+def pending_steps(applied) -> list[str]:
+    """The steps of migration 300 a 3.0 database has not run, in order: a step added to 300
+    after the database was upgraded or built. A registry naming no step ran those of 3.0-rc1."""
+    from migrations._from_2_254 import STEPS, UNRECORDED, recorded
+    if UPGRADE_MIGRATION not in applied:
+        return []
+    done = {s for s in STEPS if recorded(s) in applied} or set(UNRECORDED)
+    return [s for s in STEPS if s not in done]
+
+
 def start_schema(engine, metadata, create_all) -> bool:
     """The schema step of a start, after the migrations: a database without its core tables is
     built fresh (True); any other is a 3.0 one, where create_all and the index pass add only
@@ -566,13 +594,23 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
             say(f"✗ {refusal}")
             return False
         serial_replay = UPGRADE_MIGRATION in applied and _serial_steps_pending(engine)
+        steps = pending_steps(applied)
         # Pass the SQLite path derived from db_url so DATABASE_URL stays the
         # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
         sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
 
-        if not pending and not serial_replay:
+        if not pending and not serial_replay and not steps:
             say(f"✓ {backend} database up to date (no pending migrations)")
             return True
+
+        # The steps belong to 300: they run before any later migration
+        if steps:
+            say(f"Found {len(steps)} upgrade step(s) of {UPGRADE_MIGRATION} not run on this {backend} database:")
+            if dry_run:
+                for name in steps:
+                    say(f"  → step {name}: (dry run)")
+            elif not _run_steps(engine, is_pg, sqlite_path, applied, steps):
+                return False
 
         if pending:
             say(f"Found {len(pending)} pending migration(s) for {backend}:")
@@ -648,23 +686,74 @@ def _serial_steps_pending(engine) -> bool:
 
 def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
     """Step 144 alone, idempotent; the 300 row and its date stay as they are."""
-    from migrations._from_2_254 import step
     say(f"  → serial_unique_index_pending is set: upgrade step {SERIAL_STEP} runs again: started")
+    return _run_step(engine, is_pg, sqlite_path, SERIAL_STEP, record=False)
+
+
+@contextmanager
+def _step_connection(engine, is_pg: bool, sqlite_path):
+    """What a step is handed: one PostgreSQL transaction, committed on exit, or a sqlite3
+    connection, which the step commits itself."""
+    if is_pg:
+        with engine.begin() as conn:
+            yield conn
+        return
+    conn = sqlite3.connect(_sqlite_file(sqlite_path))
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def _record_step_sql(is_pg: bool) -> str:
+    return (f"INSERT INTO _migrations (name, applied_at) VALUES (:n, {_PG_NOW_UTC}) ON CONFLICT (name) DO NOTHING"
+            if is_pg else "INSERT OR IGNORE INTO _migrations (name) VALUES (?)")
+
+
+def _run_step(engine, is_pg: bool, sqlite_path, name, record: bool) -> bool:
+    """One idempotent step of 300; *record* writes its row with it (PostgreSQL: one transaction;
+    SQLite: once the step committed, so a cut in between runs it again at the next start)."""
+    from migrations._from_2_254 import recorded, step
     started = time.monotonic()
     try:
-        if is_pg:
-            with engine.begin() as conn:
-                step(SERIAL_STEP).upgrade(conn)
-        else:
-            conn = sqlite3.connect(sqlite_path or os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db"))
-            try:
-                step(SERIAL_STEP).upgrade(conn)
-            finally:
-                conn.close()
+        with _step_connection(engine, is_pg, sqlite_path) as conn:
+            step(name).upgrade(conn)
+            if record and is_pg:
+                conn.execute(text(_record_step_sql(True)), {"n": recorded(name)})
+            elif record:
+                conn.execute(_record_step_sql(False), (recorded(name),))
+                conn.commit()
     except Exception as exc:  # noqa: BLE001
-        say(f"  ✗ {SERIAL_STEP}: failed after {time.monotonic() - started:.1f} s: {exc}")
+        say(f"  ✗ {name}: failed after {time.monotonic() - started:.1f} s: {exc}")
         return False
-    say(f"  ✓ {SERIAL_STEP}: done in {time.monotonic() - started:.1f} s")
+    say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
+    return True
+
+
+def _run_steps(engine, is_pg: bool, sqlite_path, applied, steps) -> bool:
+    """The steps of 300 a 3.0 database has not run (pending_steps), each recorded once done;
+    the 300 row stays. Their refusals are read before the first one writes. A registry naming
+    no step first records the steps pending_steps deems done, so the next start reads them."""
+    from migrations._from_2_254 import STEPS, recorded, step
+    try:
+        with _step_connection(engine, is_pg, sqlite_path) as conn:
+            for name in steps:
+                check = getattr(step(name), "refusal", None)
+                message = check(conn) if check else None
+                if message:
+                    say(f"✗ {message}")
+                    return False
+    except Exception as exc:  # noqa: BLE001
+        say(f"✗ upgrade steps not read: {exc}")
+        return False
+    deduced = [recorded(s) for s in STEPS if s not in steps and recorded(s) not in applied]
+    if deduced:
+        _mark_applied(engine, deduced, is_pg)
+    for name in steps:
+        say(f"  → step {name}: started")
+        if not _run_step(engine, is_pg, sqlite_path, name, record=True):
+            say("✗ Upgrade step failed, stopping")
+            return False
     return True
 
 
@@ -691,6 +780,11 @@ def _run_pending_sqlite(pending, dry_run, db_path: str = None) -> bool:
         return True
     finally:
         conn.close()
+
+
+def _registry_rows(name) -> list[str]:
+    """The rows a migration that ran writes: 300 records each of its steps with its own."""
+    return [name] + (_step_rows() if name == UPGRADE_MIGRATION else [])
 
 
 def _load_module(path: Path):
@@ -730,7 +824,8 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
         if name == UPGRADE_MIGRATION:
             import pre_upgrade_copy
             pre_upgrade_copy.clear_started(conn)
-        conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,))
+        for row in _registry_rows(name):
+            conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (row,))
         conn.commit()
         say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
         return True
@@ -798,13 +893,8 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
                     mod.upgrade(conn)
                 else:
                     say(f"    {name}: SQLite-only, skipped")
-                conn.execute(
-                    text(
-                        f"INSERT INTO _migrations (name, applied_at) VALUES (:n, {_PG_NOW_UTC}) "
-                        "ON CONFLICT (name) DO NOTHING"
-                    ),
-                    {"n": name},
-                )
+                for row in _registry_rows(name):
+                    conn.execute(text(_record_step_sql(True)), {"n": row})
             # After the commit: on PostgreSQL the step and its registry row land together
             say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
         except Exception as e:  # noqa: BLE001
@@ -841,6 +931,7 @@ def show_status():
             say(f"Refused: {refusal}")
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
+        steps = [] if refusal else pending_steps(applied)
         if not refusal:
             try:
                 held = full_stop_refusal(engine, pending)
@@ -849,10 +940,11 @@ def show_status():
             if held:
                 say(f"Refused: {held}")
         say(f"Applied: {len(applied)}")
-        say(f"Pending: {len(pending)}")
+        say(f"Pending: {len(pending) + len(steps)}")
         for n in sorted(applied):
             say(f"  ✓ {n}")
-        for n in pending:
+        from migrations._from_2_254 import recorded
+        for n in [recorded(s) for s in steps] + pending:
             say(f"  ○ {n}")
         if not refusal and UPGRADE_MIGRATION in pending:
             import pre_upgrade_copy

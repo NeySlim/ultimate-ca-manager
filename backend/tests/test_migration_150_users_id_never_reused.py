@@ -267,7 +267,8 @@ def test_the_runner_applies_it_to_a_database_file(tmp_path):
     assert conn.execute("SELECT COUNT(*) FROM user_sso_identities").fetchone() == (0,)
     assert conn.execute(f"SELECT * FROM {TABLE} ORDER BY id").fetchall() == \
         [row[:3] + row[4:] + (0,) for row in _USERS]
-    assert conn.execute("SELECT name FROM _migrations").fetchall() == [('300_upgrade_from_2_254',)]
+    assert sorted(r[0] for r in conn.execute("SELECT name FROM _migrations")) == \
+        migration_runner.fresh_registry_names()
 
 
 def test_a_2254_install_upgraded_by_the_runner_never_reuses_an_id(tmp_path):

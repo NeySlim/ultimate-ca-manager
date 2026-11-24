@@ -1,7 +1,7 @@
 """(e) Both nodes started together on an empty schema: the schema is built once, both serve."""
 import pytest
 
-from migration_runner import _list_migration_names
+from migration_runner import fresh_registry_names
 
 pytestmark = pytest.mark.ha
 
@@ -15,7 +15,7 @@ def test_simultaneous_start_builds_the_schema_once(cluster):
     assert all('Database tables already exist' in text for text in logs.values())
 
     applied = [name for (name,) in cluster.sql('SELECT name FROM _migrations')]
-    assert sorted(applied) == sorted(_list_migration_names())
+    assert sorted(applied) == fresh_registry_names()
     assert cluster.sql("SELECT count(*) FROM users WHERE username = 'admin'") == [(1,)]
     for node in cluster.nodes:
         assert node.ready()['status'] == 'ready'
