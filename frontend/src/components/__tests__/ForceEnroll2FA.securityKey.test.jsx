@@ -33,7 +33,12 @@ vi.mock('../../services', () => ({
   accountService: { enable2FA: mocks.enable2FA, confirm2FA: mocks.confirm2FA, registerWebAuthnKey: mocks.registerWebAuthnKey },
 }))
 
+vi.mock('../../services/apiClient', async (importOriginal) => ({
+  ...(await importOriginal()), holdSignOut: vi.fn(),
+}))
+
 import { ForceEnroll2FA } from '../ForceEnroll2FA'
+import { holdSignOut } from '../../services/apiClient'
 
 // The gate is the sign-in card, in the router and theme the application gives it
 const render = (ui) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>)
@@ -121,3 +126,38 @@ describe('ForceEnroll2FA: security key', () => {
   })
 })
 
+
+describe('ForceEnroll2FA: recovery codes of an enrolment whose session was not kept', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.enable2FA.mockResolvedValue({ data: { qr_code: 'data:image/png;base64,AA==' } })
+    mocks.confirm2FA.mockRejectedValue(Object.assign(new Error('saved, sign in again'),
+      { status: 500, data: { data: { backup_codes: ['AAAA-BBBB', 'CCCC-DDDD'] } } }))
+  })
+
+  const confirm = async (onComplete) => {
+    const view = render(<ForceEnroll2FA onComplete={onComplete} />)
+    fireEvent.change(await screen.findByPlaceholderText('account.codePlaceholder'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByText('account.verifyAndEnable'))
+    await screen.findByText('AAAA-BBBB')
+    return view
+  }
+
+  it('keeps the codes on screen, the sign-out held, until they are acknowledged', async () => {
+    const onComplete = vi.fn()
+    await confirm(onComplete)
+    expect(holdSignOut).toHaveBeenLastCalledWith()
+    expect(onComplete).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('account.backupCodesSaved'))
+    await waitFor(() => expect(onComplete).toHaveBeenCalled())
+    expect(holdSignOut).toHaveBeenLastCalledWith(false)
+    // No success is announced for a session that is gone
+    expect(mocks.showSuccess).not.toHaveBeenCalled()
+  })
+
+  it('releases the hold when the gate goes', async () => {
+    const view = await confirm(vi.fn())
+    view.unmount()
+    expect(holdSignOut).toHaveBeenLastCalledWith(false)
+  })
+})

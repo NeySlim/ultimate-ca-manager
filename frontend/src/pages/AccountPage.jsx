@@ -9,6 +9,8 @@ import { accountService, casService, userCertificatesService } from '../services
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useAuth, useNotification, useInspector } from '../contexts'
+import { holdSignOut } from '../services/apiClient'
+import { loginUrl } from '../navigation/safeNext'
 import { useClipboard, usePermission } from '../hooks'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -83,6 +85,15 @@ export default function AccountPage() {
 
   const [qrData, setQrData] = useState(null)
   const [confirmCode, setConfirmCode] = useState('')
+  // Codes of a change saved without its session: no 401 signs out before they are acknowledged
+  const holdingSignOut = useRef(false)
+  const releaseSignOut = () => {
+    if (!holdingSignOut.current) return false
+    holdingSignOut.current = false
+    holdSignOut(false)
+    return true
+  }
+  useEffect(() => () => { releaseSignOut() }, [])
 
   const [webauthnName, setWebauthnName] = useState('')
   const hasEnabledKey = webauthnCredentials.some(c => c.enabled)
@@ -264,7 +275,11 @@ export default function AccountPage() {
     } catch (error) {
       // Saved but the session not kept: the stored codes come with the error, shown once
       const codes = error?.data?.data?.backup_codes
-      if (codes?.length) setQrData(prev => ({ ...prev, backup_codes: codes, confirmed: true }))
+      if (codes?.length) {
+        holdSignOut()
+        holdingSignOut.current = true
+        setQrData(prev => ({ ...prev, backup_codes: codes, confirmed: true }))
+      }
       showError(error.message || t('messages.errors.validation.requiredField'))
     }
   }
@@ -536,7 +551,14 @@ export default function AccountPage() {
   }
   const changeLanguage = (code) => chooseLanguage(i18n, code)
   const closeKeyModal = () => { setShowApiKeyModal(false); setApiKeyForm(NO_KEY_FORM) }
-  const close2FA = () => { setShow2FAModal(false); setQrData(null); setConfirmCode('') }
+  const close2FA = () => {
+    setShow2FAModal(false); setQrData(null); setConfirmCode('')
+    // The session is gone: sign in again, back to this page
+    if (releaseSignOut()) {
+      const { pathname, search, hash } = window.location
+      window.location.href = loginUrl(pathname, search, hash)
+    }
+  }
   const closeWebAuthn = () => { setShowWebAuthnModal(false); setWebauthnName('') }
   const openMtlsWay = (way) => { setMtlsTab(way); if (way === 'assign') loadAvailableCerts() }
   const onOff = (on) => <Pill tone={on ? 'good' : 'muted'} label={on ? t('common.enabled') : t('common.disabled')} />
