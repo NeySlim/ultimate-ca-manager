@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pyotp
 import pytest
 
+from auth.session_start import SessionNotKept
 from models import AuditLog, User, db
 from utils.datetime_utils import utc_now
 from tests.test_factor_change_sessions import (  # noqa: F401 (fixtures)
@@ -1300,7 +1301,8 @@ def _move_refused_as_busy(application, monkeypatch):
 def test_a_renewal_refused_by_the_store_counts_only_the_other_sessions(
         nodes, make_user, factors, monkeypatch):
     """The move refused as 'busy' leaves the caller's record at the replaced version: the
-    answer and the audit count the account's other sessions only."""
+    answer says the change is saved but the session not kept, and the audit counts the
+    account's other sessions only."""
     first, second = nodes
     user = make_user(first)
     other = _password_session(second, user)
@@ -1308,9 +1310,9 @@ def test_a_renewal_refused_by_the_store_counts_only_the_other_sessions(
     method, url, body, _password = _renewal(first, user, 'delete-passkey', factors)
     with _move_refused_as_busy(first, monkeypatch):
         r = c.open(url, method=method, data=json.dumps(body or {}), content_type='application/json')
-    assert r.status_code == 200, r.data
+    assert r.status_code == 500, r.data
+    assert r.get_json()['message'] == SessionNotKept.message
     assert not _session_cookie_sent(r)
-    assert r.get_json()['meta']['other_sessions_closed'] == 1
     [(success, details)] = _audits(first, 'webauthn_delete', user['username'])
     assert success and '(1 other session closed)' in details, details
     assert _profile(other).status_code == 401
