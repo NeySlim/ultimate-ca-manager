@@ -36,8 +36,59 @@ from utils.datetime_utils import utc_isoformat, utc_now
 
 logger = logging.getLogger(__name__)
 
+
+def _infrastructure_errors() -> tuple:
+    from sqlalchemy import exc as sa_exc
+    errors = [sa_exc.OperationalError, sa_exc.InterfaceError, sa_exc.DisconnectionError,
+              sa_exc.TimeoutError, sa_exc.PendingRollbackError, OSError]
+    try:
+        from redis import exceptions as redis_exc
+    except ImportError:
+        pass
+    else:
+        errors += [redis_exc.ConnectionError, redis_exc.TimeoutError]
+    return tuple(errors)
+
+
+INFRASTRUCTURE_ERRORS = _infrastructure_errors()
+
+
+def infrastructure_error(exc) -> bool:
+    """The database or the session store did not answer: an outage, not a refusal."""
+    return isinstance(exc, INFRASTRUCTURE_ERRORS)
+
+
+class _StoreFailureSafeSocketIO(SocketIO):
+    """An event whose session the store could not open or save around its handler: a handshake
+    is refused (as unavailable when the store did not answer), never left with neither CONNECT
+    nor CONNECT_ERROR; a disconnect still completes; the failed context is never left bound."""
+
+    def _handle_event(self, handler, message, namespace, sid, *args):
+        outer = request_ctx._get_current_object() if has_request_context() else None
+        try:
+            return super()._handle_event(handler, message, namespace, sid, *args)
+        except HandshakeRefused:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            # A push that failed opening its session stays bound: unbind it here
+            if has_request_context() and request_ctx._get_current_object() is not outer:
+                request_ctx._get_current_object().pop(exc)
+            if message == 'disconnect':
+                connected_clients.pop(sid, None)
+                logger.warning("WebSocket disconnect handled without its session: %s",
+                               type(exc).__name__)
+                return None
+            if message != 'connect':
+                raise
+            connected_clients.pop(sid, None)
+            if infrastructure_error(exc):
+                raise _unavailable(exc) from exc
+            logger.exception("WebSocket connection refused, handshake failed")
+            raise HandshakeRefused() from exc
+
+
 # SocketIO instance - initialized in init_websocket()
-socketio = SocketIO()
+socketio = _StoreFailureSafeSocketIO()
 
 # Worker-local socket state; counts and rooms are per worker by design.
 connected_clients: Dict[str, Dict[str, Any]] = {}
@@ -256,13 +307,21 @@ class SessionCheckUnavailable(Exception):
     """The database or the session store did not answer: neither a valid session nor a refusal."""
 
 
+def _unavailable_or_refused(exc, what):
+    """SessionCheckUnavailable for an infrastructure error; any other error is a refusal."""
+    if infrastructure_error(exc):
+        raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
+    logger.exception("WebSocket %s failed, refused", what)
+
+
 def _session_identity():
     """(user_id, permissions) for a full, valid session cookie holding the minimum permission,
     None for a refusal; SessionCheckUnavailable when the session could not be read."""
     try:
         info = AuthManager().verify_session()
     except Exception as exc:  # noqa: BLE001
-        raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
+        _unavailable_or_refused(exc, 'session check')
+        return None
     if not info:
         return None
     if _enrollment_pending() or password_change_pending(info):
@@ -309,14 +368,15 @@ def _unverified_grace() -> float:
     return UNVERIFIED_GRACE_DELAYS * _revalidate_after()
 
 
-def _check_unavailable(state, exc) -> Optional[str]:
+def _check_unavailable(state, exc, log=True) -> Optional[str]:
     """A check that could not read the session: the socket stays until the grace, counted from
     its first such failure, has run out; ``validated_at`` stays, so every round tries again."""
     now = _monotonic()
     since = state.get('unverified_since')
     if since is None:
         state['unverified_since'] = since = now
-        logger.warning("WebSocket session check unavailable, socket kept for now: %s", exc)
+        if log:
+            logger.warning("WebSocket session check unavailable, socket kept for now: %s", exc)
     if now - since >= _unverified_grace():
         return 'session check unavailable'
     return None
@@ -389,7 +449,8 @@ def _stored_identity(app, environ):
         # A push that fails opening the session leaves its context bound: unbind it here
         if has_request_context() and request_ctx._get_current_object() is ctx:
             ctx.pop(exc)
-        raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
+        _unavailable_or_refused(exc, 'session store read')
+        return None
     try:
         return _session_identity()
     finally:
@@ -397,30 +458,44 @@ def _stored_identity(app, environ):
 
 
 def _check_away(app, sid, state) -> Optional[str]:
-    """``_refresh`` outside any message: the session read again from the socket's handshake."""
+    """``_refresh`` outside any message: the session read again from the socket's handshake.
+    SessionCheckUnavailable when the session could not be read."""
     environ = socketio.server.get_environ(sid, namespace='/')
     if environ is None:
         return 'no handshake left'
     with app.app_context():
-        try:
-            return _refresh(sid, state, _stored_identity(app, environ))
-        except Exception as exc:  # noqa: BLE001  # neither valid nor refused: checked again next round
-            return _check_unavailable(state, exc)
+        return _refresh(sid, state, _stored_identity(app, environ))
 
 
 def revalidate_due_sockets(app) -> int:
     """This process's sockets due for revalidation, checked against their session as it is now,
-    as their next message would be: one that only listens sends none. Returns the count cut."""
+    as their next message would be: one that only listens sends none. Returns the count cut.
+    The first check that cannot read its session ends the round: the sockets left keep their
+    state for the next round, so an outage costs one store timeout per round, not per socket."""
     with app.app_context():
         after = _revalidate_after()
     cut = 0
     for sid, state in list(connected_clients.items()):
         if _monotonic() - state['validated_at'] < after:
             continue
-        reason = _check_away(app, sid, state)
+        stop = False
+        try:
+            reason = _check_away(app, sid, state)
+        except Exception as exc:  # noqa: BLE001
+            stop = isinstance(exc, SessionCheckUnavailable) or infrastructure_error(exc)
+            if stop:
+                logger.warning("WebSocket revalidation round stopped, session check "
+                               "unavailable: %s", exc)
+                with app.app_context():
+                    reason = _check_unavailable(state, exc, log=False)
+            else:  # no outage: the socket is refused
+                logger.exception("WebSocket session check failed, socket refused")
+                reason = 'session check failed'
         if reason and connected_clients.get(sid) is state:
             logger.info("WebSocket client disconnected by the server: %s", reason)
             cut += _close_here([sid])
+        if stop:
+            break
         socketio.sleep(0)  # under gevent: the requests run between two sockets
     return cut
 
@@ -575,7 +650,8 @@ def _still_current(state) -> bool:
                 and current_epoch() == state['epoch']):
             return False
     except Exception as exc:  # noqa: BLE001
-        raise SessionCheckUnavailable(f'{type(exc).__name__}: {exc}') from exc
+        _unavailable_or_refused(exc, 'handshake account check')
+        return False
     identity = _stored_identity(current_app._get_current_object(), request.environ)
     return _revalidation_failure(state, identity) is None
 

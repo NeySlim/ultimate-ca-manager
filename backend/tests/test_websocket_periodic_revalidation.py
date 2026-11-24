@@ -315,7 +315,8 @@ def refusals(app, monkeypatch):
 
 class TestDatabaseOrStoreAway:
     """A check that cannot reach the database or the session store is no refusal: the socket
-    stays, unverified, for at most twice the revalidation delay, while a refusal cuts at once."""
+    stays, unverified, for twice the revalidation delay from its first failed check, while a
+    refusal cuts at once."""
 
     @staticmethod
     def _rounds_until(app, clock, seconds):
@@ -428,3 +429,238 @@ class TestDatabaseOrStoreAway:
         with _socket(app, _session_client(app)) as ws:
             assert not ws.is_connected()
         assert refusals and refusals[0] != {'message': events.HANDSHAKE_UNAVAILABLE}
+
+
+class TestHandshakeStoreAway:
+    """The store read or write that flask_socketio does around the connect handler: a failure
+    there is answered (connect_error), never left without CONNECT nor CONNECT_ERROR."""
+
+    def test_a_store_away_at_the_first_read_is_refused_as_unavailable(
+            self, app, make_user, refusals, monkeypatch):  # noqa: F811
+        client = _session_client(app, make_user(role_perms=READER))
+
+        def unreachable(_store_id):
+            raise _database_away()
+        with monkeypatch.context() as patched:
+            patched.setattr(app.session_interface, '_retrieve_session_data', unreachable)
+            with _socket(app, client) as ws:
+                assert not ws.is_connected()
+            assert not has_request_context() and not has_app_context()
+        assert refusals == [{'message': events.HANDSHAKE_UNAVAILABLE}]
+        assert events.connected_clients == {}
+        with _socket(app, client) as ws:
+            assert ws.is_connected()
+
+    def test_a_store_write_away_after_the_handler_is_refused_as_unavailable(
+            self, app, make_user, refusals, monkeypatch):  # noqa: F811
+        client = _session_client(app, make_user(role_perms=READER))
+
+        def unwritable(*_args, **_kwargs):
+            raise _database_away()
+        with monkeypatch.context() as patched:
+            patched.setattr(app.session_interface, '_upsert_session', unwritable)
+            with _socket(app, client) as ws:
+                assert not ws.is_connected()
+            assert not has_request_context()
+        assert refusals == [{'message': events.HANDSHAKE_UNAVAILABLE}]
+        assert events.connected_clients == {}
+
+    def test_a_corrupt_record_is_a_plain_refusal(self, app, make_user, refusals, monkeypatch):  # noqa: F811
+        import pickle
+        client = _session_client(app, make_user(role_perms=READER))
+
+        def corrupt(_store_id):
+            raise pickle.UnpicklingError('corrupt record (test)')
+        with monkeypatch.context() as patched:
+            patched.setattr(app.session_interface, '_retrieve_session_data', corrupt)
+            with _socket(app, client) as ws:
+                assert not ws.is_connected()
+            assert not has_request_context() and not has_app_context()
+        assert refusals and refusals[0] != {'message': events.HANDSHAKE_UNAVAILABLE}
+        assert events.connected_clients == {}
+
+
+@pytest.mark.parametrize('error', [
+    'sqlalchemy.exc.OperationalError', 'sqlalchemy.exc.InterfaceError',
+    'sqlalchemy.exc.DisconnectionError', 'sqlalchemy.exc.TimeoutError',
+    'sqlalchemy.exc.PendingRollbackError', 'redis.exceptions.ConnectionError',
+    'redis.exceptions.TimeoutError', 'builtins.OSError', 'builtins.ConnectionResetError'])
+def test_an_infrastructure_error_is_an_outage(error):
+    import importlib
+    module, name = error.rsplit('.', 1)
+    cls = getattr(importlib.import_module(module), name)
+    exc = cls('SELECT 1', {}, OSError('down')) if module == 'sqlalchemy.exc' and name in (
+        'OperationalError', 'InterfaceError') else cls('down (test)')
+    assert events.infrastructure_error(exc)
+
+
+@pytest.mark.parametrize('exc', [KeyError('user_id'), ValueError('bad'), TypeError('bug'),
+                                 __import__('pickle').UnpicklingError('corrupt')])
+def test_any_other_error_is_no_outage(exc):
+    from sqlalchemy.exc import IntegrityError, ProgrammingError
+    assert not events.infrastructure_error(exc)
+    assert not events.infrastructure_error(IntegrityError('INSERT', {}, Exception('dup')))
+    assert not events.infrastructure_error(ProgrammingError('SELECT', {}, Exception('typo')))
+
+
+@pytest.fixture
+def failing_check(monkeypatch):
+    """The session check raises what ``failing_check[0]`` builds (None: it runs as usual)."""
+    from auth.unified import AuthManager
+    raised = [None]
+    real = AuthManager.verify_session
+
+    def verify(self):
+        if raised[0] is not None:
+            raise raised[0]()
+        return real(self)
+    monkeypatch.setattr(AuthManager, 'verify_session', verify)
+    return raised
+
+
+class TestOnlyInfrastructureIsAnOutage:
+    """A bug or a corrupt record is no outage: the socket closes at once, the handshake is
+    refused; only an unreachable database or store keeps the socket for the grace."""
+
+    def test_a_key_error_in_a_round_cuts_at_once(self, app, listening, clock, failing_check):
+        ws, _user_id, _client = listening
+        failing_check[0] = lambda: KeyError('permissions')
+        _due(clock)
+        assert events.revalidate_due_sockets(app) == 1
+        assert not ws.is_connected() and _sid(ws) not in events.connected_clients
+
+    def test_an_operational_error_in_a_round_keeps_the_socket(self, app, listening, clock,
+                                                             failing_check):
+        ws, _user_id, _client = listening
+        failing_check[0] = _database_away
+        _due(clock)
+        assert events.revalidate_due_sockets(app) == 0
+        assert ws.is_connected()
+
+    def test_a_corrupt_record_in_a_round_cuts_at_once(self, app, listening, clock, monkeypatch):
+        import pickle
+        ws, _user_id, _client = listening
+
+        def corrupt(_store_id):
+            raise pickle.UnpicklingError('corrupt record (test)')
+        with monkeypatch.context() as patched:
+            patched.setattr(app.session_interface, '_retrieve_session_data', corrupt)
+            _due(clock)
+            assert events.revalidate_due_sockets(app) == 1
+            assert not has_request_context() and not has_app_context()
+        assert not ws.is_connected()
+
+    def test_an_error_past_the_session_check_cuts_at_once(self, app, listening, clock,
+                                                         monkeypatch):
+        ws, _user_id, _client = listening
+
+        def broken(*_args, **_kwargs):
+            raise RuntimeError('bug (test)')
+        monkeypatch.setattr(events, '_refresh', broken)
+        _due(clock)
+        assert events.revalidate_due_sockets(app) == 1
+        assert not ws.is_connected()
+
+    def test_a_value_error_at_a_message_cuts_at_once(self, app, listening, clock, failing_check):
+        ws, _user_id, _client = listening
+        failing_check[0] = lambda: ValueError('bad record')
+        _due(clock)
+        ws.emit('ping')
+        assert not ws.is_connected() and _sid(ws) not in events.connected_clients
+
+    def test_a_key_error_at_the_handshake_is_a_plain_refusal(self, app, make_user, refusals,
+                                                            failing_check):  # noqa: F811
+        client = _session_client(app, make_user(role_perms=READER))
+        failing_check[0] = lambda: KeyError('permissions')
+        with _socket(app, client) as ws:
+            assert not ws.is_connected()
+        assert refusals and refusals[0] != {'message': events.HANDSHAKE_UNAVAILABLE}
+        assert events.connected_clients == {}
+
+    def test_a_bug_in_the_second_check_is_a_plain_refusal(self, app, make_user, refusals,
+                                                          monkeypatch):  # noqa: F811
+        import auth.session_epoch as session_epoch
+        client = _session_client(app, make_user(role_perms=READER))
+        real_identity, real_epoch = events._session_identity, session_epoch.current_epoch
+        listed = []
+
+        def identity_then_listed():
+            identity = real_identity()
+            listed.append(1)
+            return identity
+
+        def epoch():
+            if listed:
+                raise ValueError('bad epoch (test)')
+            return real_epoch()
+        monkeypatch.setattr(events, '_session_identity', identity_then_listed)
+        monkeypatch.setattr(session_epoch, 'current_epoch', epoch)
+        with _socket(app, client) as ws:
+            assert not ws.is_connected()
+        assert listed and refusals and refusals[0] != {'message': events.HANDSHAKE_UNAVAILABLE}
+        assert events.connected_clients == {}
+
+
+class TestARoundDuringAnOutage:
+    """The first check of a round that cannot reach the store ends the round: the sockets left
+    keep their state for the next one, and the round logs one line."""
+
+    def test_the_round_stops_at_its_first_unavailable_check(self, app, make_user, clock,
+                                                            monkeypatch, caplog):  # noqa: F811
+        import logging
+        clients = [_session_client(app, make_user(role_perms=READER)) for _ in range(3)]
+        with _socket(app, clients[0]) as first, _socket(app, clients[1]) as second, \
+                _socket(app, clients[2]) as third:
+            sockets = [first, second, third]
+            assert all(ws.is_connected() for ws in sockets)
+            states = [events.connected_clients[_sid(ws)] for ws in sockets]
+            reads = []
+
+            def unreachable(_store_id):
+                reads.append(1)
+                raise _database_away()
+            with monkeypatch.context() as patched:
+                patched.setattr(app.session_interface, '_retrieve_session_data', unreachable)
+                _due(clock)
+                caplog.clear()
+                with caplog.at_level(logging.INFO, logger=events.logger.name):
+                    assert events.revalidate_due_sockets(app) == 0
+                assert len(reads) == 1
+                assert len([r for r in caplog.records if r.name == events.logger.name]) == 1
+                assert states[0]['unverified_since'] is not None
+                assert [s['unverified_since'] for s in states[1:]] == [None, None]
+                clock[0] += events.REVALIDATE_TICK_SECONDS
+                caplog.clear()
+                with caplog.at_level(logging.INFO, logger=events.logger.name):
+                    assert events.revalidate_due_sockets(app) == 0
+                assert len(reads) == 2
+                assert len([r for r in caplog.records if r.name == events.logger.name]) == 1
+            assert all(ws.is_connected() for ws in sockets)
+            clock[0] += events.REVALIDATE_TICK_SECONDS
+            assert events.revalidate_due_sockets(app) == 0
+            assert [s['validated_at'] for s in states] == [clock[0]] * 3
+            assert [s['unverified_since'] for s in states] == [None] * 3
+
+    def test_a_store_still_away_when_the_grace_runs_out_closes_the_socket(
+            self, app, listening, clock, monkeypatch):
+        """The cut's own disconnect event cannot open the session either: it completes."""
+        ws, _user_id, _client = listening
+        sid = _sid(ws)
+
+        def unreachable(_store_id):
+            raise _database_away()
+        with monkeypatch.context() as patched:
+            patched.setattr(app.session_interface, '_retrieve_session_data', unreachable)
+            _due(clock)
+            cut = 0
+            for _ in range(int(2 * events.DEFAULT_REVALIDATE_SECONDS
+                               // events.REVALIDATE_TICK_SECONDS) + 1):
+                cut += events.revalidate_due_sockets(app)
+                clock[0] += events.REVALIDATE_TICK_SECONDS
+            assert cut == 1
+            assert not has_request_context() and not has_app_context()
+        assert sid not in events.connected_clients
+        manager = events.socketio.server.manager
+        assert manager.get_rooms(sid, '/') == []
+        assert sid not in manager.pending_disconnect.get('/', [])
+        assert not ws.is_connected()

@@ -8,6 +8,7 @@ import { act, render } from '@testing-library/react'
 
 const auth = vi.hoisted(() => ({ value: { isAuthenticated: true } }))
 const socketHandlers = new Map()
+const managerHandlers = new Map()
 const fakeSocket = {
   on: (evt, cb) => { socketHandlers.set(evt, cb) },
   emit: vi.fn(),
@@ -15,6 +16,7 @@ const fakeSocket = {
   disconnect: vi.fn(),
   connected: false,
   active: false,
+  io: { on: (evt, cb) => { managerHandlers.set(evt, cb) } },
 }
 vi.mock('socket.io-client', () => ({ io: vi.fn(() => fakeSocket) }))
 
@@ -27,10 +29,14 @@ vi.mock('../../contexts/AuthContext', () => ({
   AuthProvider: ({ children }) => children,
 }))
 
-import { REARM_MIN_INTERVAL_MS, SERVER_CUT_RECONNECT_MS, SERVER_CUT_RETRY_MS, WebSocketProvider } from '../useWebSocket'
+import {
+  HANDSHAKE_WATCHDOG_MS, REARM_MIN_INTERVAL_MS, SERVER_CUT_RECONNECT_MS, SERVER_CUT_RETRY_MS, WebSocketProvider,
+} from '../useWebSocket'
 import { API_ANSWERED_EVENT } from '../../services/apiClient'
 
 const fire = (evt, ...args) => act(() => { socketHandlers.get(evt)(...args) })
+// The transport is open: the handshake (CONNECT of the namespace) is on its way
+const transportOpen = () => act(() => { managerHandlers.get('open')() })
 const elapse = (ms) => act(() => { vi.advanceTimersByTime(ms) })
 const refused = () => fire('connect_error', new Error('session check unavailable'))
 const apiAnswered = () => act(() => { window.dispatchEvent(new CustomEvent(API_ANSWERED_EVENT)) })
@@ -51,7 +57,9 @@ function refuseEveryAttempt() {
 describe('a socket closed by the server', () => {
   beforeEach(() => {
     socketHandlers.clear()
+    managerHandlers.clear()
     fakeSocket.connect.mockClear()
+    fakeSocket.disconnect.mockClear()
     fakeSocket.connected = false
     fakeSocket.active = false
     auth.value = { isAuthenticated: true }
@@ -181,5 +189,50 @@ describe('a socket closed by the server', () => {
     apiAnswered()
     setVisibility('visible')
     expect(fakeSocket.connect).not.toHaveBeenCalled()
+  })
+
+  it('gives up a handshake the server never answers, then tries on the bounded schedule', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    transportOpen()
+    elapse(HANDSHAKE_WATCHDOG_MS - 1)
+    expect(fakeSocket.disconnect).not.toHaveBeenCalled()
+    elapse(1)
+    expect(fakeSocket.disconnect).toHaveBeenCalledTimes(1)
+    elapse(SERVER_CUT_RETRY_MS[0])
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops once the schedule is spent, every handshake left unanswered', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    transportOpen()
+    for (const delay of SERVER_CUT_RETRY_MS) {
+      elapse(HANDSHAKE_WATCHDOG_MS)
+      elapse(delay)
+      transportOpen()
+    }
+    elapse(HANDSHAKE_WATCHDOG_MS)
+    expect(fakeSocket.disconnect).toHaveBeenCalledTimes(SERVER_CUT_RETRY_MS.length + 1)
+    elapse(100 * total)
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(SERVER_CUT_RETRY_MS.length)
+  })
+
+  it('leaves an answered handshake alone', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    transportOpen()
+    fire('connect')
+    elapse(10 * HANDSHAKE_WATCHDOG_MS)
+    expect(fakeSocket.disconnect).not.toHaveBeenCalled()
+    transportOpen()
+    refused()
+    elapse(HANDSHAKE_WATCHDOG_MS)
+    expect(fakeSocket.disconnect).not.toHaveBeenCalled()
+  })
+
+  it('leaves a transport that closed before the answer to the client library', () => {
+    render(<WebSocketProvider><div /></WebSocketProvider>)
+    transportOpen()
+    act(() => { managerHandlers.get('close')('transport close') })
+    elapse(10 * HANDSHAKE_WATCHDOG_MS)
+    expect(fakeSocket.disconnect).not.toHaveBeenCalled()
   })
 })
