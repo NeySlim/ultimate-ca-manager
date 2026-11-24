@@ -48,6 +48,8 @@ function SortedProbe() {
       <button type="button" onClick={() => d.open(7)}>open7</button>
       <button type="button" onClick={() => onSort('name')}>sortName</button>
       <button type="button" onClick={search}>search</button>
+      <button type="button" onClick={() => { d.open(7); onSort('name') }}>openAndSort</button>
+      <button type="button" onClick={() => { onSort('name'); d.open(7) }}>sortAndOpen</button>
       <button type="button" onClick={d.close}>close</button>
     </div>
   )
@@ -131,6 +133,22 @@ describe('useDockParam', () => {
     fireEvent.click(screen.getByText('search'))
     fireEvent.click(screen.getByText('close'))
     await waitFor(() => expect(url()).toBe('/x?q=b&page=2'))
+  })
+
+  // Two writers before the next render (the browser router draws a new URL in a transition):
+  // each builds on the URL as it is, not as last drawn
+  it('a dock opened and a sort written in one moment keep each other, whichever comes first', async () => {
+    at('/x?q=a', <SortedProbe />)
+    fireEvent.click(screen.getByText('openAndSort'))
+    expect(url()).toBe('/x?q=a&item=7&sort=name&order=asc')
+    fireEvent.click(screen.getByText('close'))
+    await waitFor(() => expect(url()).toBe('/x?q=a&sort=name&order=asc'))
+  })
+
+  it('a sort and a dock written in one moment, the sort first, keep each other', () => {
+    at('/x?q=a', <SortedProbe />)
+    fireEvent.click(screen.getByText('sortAndOpen'))
+    expect(url()).toBe('/x?q=a&sort=name&order=asc&item=7')
   })
 
   it('closing a dock that came with the link only drops the object', () => {

@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useLatestLocation } from './useLatestLocation'
 
 export const ITEM_PARAM = 'item'
 export const SECTION_PARAM = 'section'
@@ -29,7 +30,7 @@ export const asId = (v) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v)
  */
 export function useDockParam({ sections, fallback = 'overview', aliases = [], list: withList = false } = {}) {
   const [params] = useSearchParams()
-  const location = useLocation()
+  const latest = useLatestLocation()
   const navigate = useNavigate()
   const names = [ITEM_PARAM, ...aliases]
   const item = names.map((n) => params.get(n)).find((v) => v) ?? null
@@ -38,10 +39,14 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [], li
   const listRaw = withList ? params.get(LIST_PARAM) : null
   const list = useMemo(() => (listRaw ? [...new Set(listRaw.split(',').filter(Boolean))] : NONE), [listRaw])
 
-  // The latest URL, so callbacks stay stable while writing on top of it
-  const now = useRef(null)
-  now.current = { params, location, item }
   const aliasKey = aliases.join(',')
+  // The URL as it is now, a write since the last render included (another hook's, or this one's in the same handler)
+  const now = useCallback(() => {
+    const loc = latest()
+    const p = new URLSearchParams(loc.search)
+    const at = [ITEM_PARAM, ...aliasKey.split(',').filter(Boolean)].map((n) => p.get(n)).find((v) => v) ?? null
+    return { params: p, location: loc, item: at }
+  }, [latest, aliasKey])
 
   // The URL's parameters that are not the dock's, in a stable order
   const pageOf = useCallback((search) => {
@@ -52,7 +57,7 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [], li
   }, [aliasKey, withList])
 
   const write = useCallback((patch, { push = false } = {}) => {
-    const { params: cur, location: loc } = now.current
+    const { params: cur, location: loc } = now()
     const next = new URLSearchParams(cur)
     for (const n of [ITEM_PARAM, ...aliasKey.split(',').filter(Boolean)]) next.delete(n)
     next.delete(SECTION_PARAM)
@@ -69,37 +74,39 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [], li
     const to = { pathname: loc.pathname, search: qs ? `?${qs}` : '', hash: loc.hash }
     const state = push ? { ...(loc.state || {}), [OPENED]: pageOf(loc.search) } : loc.state
     navigate(to, { replace: !push, state })
-    // A second write in the same handler builds on this one, not on the URL still rendered
-    now.current = { params: next, location: { ...loc, search: to.search, state }, item: patch.item != null ? String(patch.item) : null }
-  }, [navigate, fallback, aliasKey, withList, pageOf])
+  }, [navigate, now, fallback, aliasKey, withList, pageOf])
 
   const open = useCallback((id, { section: asked, list: ids } = {}) => {
     if (id == null) return
-    const cur = now.current.item
-    const keep = sameId(cur, id) && !asked ? now.current.params.get(SECTION_PARAM) : asked
+    const { item: cur, params: p } = now()
+    const keep = sameId(cur, id) && !asked ? p.get(SECTION_PARAM) : asked
     write({ item: id, section: keep, list: ids }, { push: cur == null })
-  }, [write])
+  }, [write, now])
 
+  // The entry a step back is leaving: the browser moves back later, a second close meanwhile does nothing
+  const leaving = useRef(null)
+  const drawnKey = useLocation().key
+  useEffect(() => { leaving.current = null }, [drawnKey])
   const close = useCallback(() => {
-    const { item: cur, location: loc } = now.current
-    if (cur == null) return
+    const { item: cur, location: loc } = now()
+    if (cur == null || (loc.key && leaving.current === loc.key)) return
     const mark = loc.state?.[OPENED]
     if (typeof mark === 'string' && loc.key !== 'default' && mark === pageOf(loc.search)) {
+      leaving.current = loc.key
       navigate(-1)
-      now.current = { ...now.current, item: null }
     } else write({})
-  }, [navigate, write, pageOf])
+  }, [navigate, write, now, pageOf])
 
   const setSection = useCallback((id) => {
-    const cur = now.current.item
+    const cur = now().item
     if (cur != null) write({ item: cur, section: id })
-  }, [write])
+  }, [write, now])
 
   // The open objects changed, the shown one did not
   const setList = useCallback((ids) => {
-    const cur = now.current.item
-    if (cur != null) write({ item: cur, section: now.current.params.get(SECTION_PARAM), list: ids })
-  }, [write])
+    const { item: cur, params: p } = now()
+    if (cur != null) write({ item: cur, section: p.get(SECTION_PARAM), list: ids })
+  }, [write, now])
 
   return { item, section, list, open, close, setSection, setList }
 }
