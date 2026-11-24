@@ -18,6 +18,7 @@ DURATION = re.compile(r'^\s*(\d+(?:\.\d+)?)s\s+(?:setup|call|teardown)\s+(tests/
 STAMP = r'(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?Z '
 WORKERS_UP = re.compile('^' + STAMP + r'\d+ workers \[\d+ items?\]')
 RESULT = re.compile('^' + STAMP + r'\[(gw\d+)\] \[\s*\d+%\] [A-Z]+ (tests/\S+?\.py)::')
+HA_MARK = re.compile(r'^pytestmark\s*=.*\bpytest\.mark\.ha\b', re.M)
 HEADER = ('# Seconds per backend test file, read by shard-tests.sh to balance the CI shards.\n'
           '# Regenerate with scripts/ci/test_durations.py from the logs of the shard jobs.\n')
 
@@ -53,6 +54,13 @@ def from_ci_log(lines):
     return dict(totals)
 
 
+def deselected_files(backend):
+    """{path: 0.0} of the HA bench files `-m 'not ha'` only collects: no result line ever weighs them."""
+    ha = backend / 'tests' / 'ha'
+    return {f'tests/ha/{p.name}': 0.0 for p in sorted(ha.glob('test_*.py'))
+            if HA_MARK.search(p.read_text(encoding='utf-8'))}
+
+
 def render(totals):
     return HEADER + ''.join(f'{max(seconds, 0.01):.2f} {path}\n' for path, seconds in sorted(totals.items()))
 
@@ -69,6 +77,8 @@ def main(argv=None):
             totals[path] += seconds
     if not totals:
         parser.error('no result or duration line in the logs')
+    for path, seconds in deselected_files(Path(__file__).resolve().parents[2] / 'backend').items():
+        totals.setdefault(path, seconds)
     args.out.write_text(render(totals), encoding='utf-8')
     print(f'{args.out}: {len(totals)} files, {sum(totals.values()):.0f} s')
 

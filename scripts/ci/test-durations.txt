@@ -1,7 +1,32 @@
 # Seconds per backend test file, read by shard-tests.sh to balance the CI shards.
 # Regenerate with scripts/ci/test_durations.py from the logs of the shard jobs.
+0.01 tests/ha/test_backups.py
+0.01 tests/ha/test_bench.py
 0.06 tests/ha/test_bench_addressing.py
+0.01 tests/ha/test_clean_stop.py
 0.44 tests/ha/test_cluster_naming.py
+0.01 tests/ha/test_crash_crl.py
+0.01 tests/ha/test_crash_issuance.py
+0.01 tests/ha/test_database_cut.py
+0.01 tests/ha/test_database_silent.py
+0.01 tests/ha/test_health.py
+0.01 tests/ha/test_https.py
+0.01 tests/ha/test_integration_secrets.py
+0.01 tests/ha/test_issuance.py
+0.01 tests/ha/test_jobs.py
+0.01 tests/ha/test_leader.py
+0.01 tests/ha/test_pool_recovery.py
+0.01 tests/ha/test_realtime.py
+0.01 tests/ha/test_registry_replacement.py
+0.01 tests/ha/test_restore.py
+0.01 tests/ha/test_restore_files.py
+0.01 tests/ha/test_restore_files_task.py
+0.01 tests/ha/test_revocation_crl.py
+0.01 tests/ha/test_rolling_restart.py
+0.01 tests/ha/test_session_key.py
+0.01 tests/ha/test_sessions.py
+0.01 tests/ha/test_startup.py
+0.01 tests/ha/test_ws_origin.py
 2.73 tests/test_2fa_enforcement.py
 3.80 tests/test_2fa_security_key_enforcement.py
 0.12 tests/test_access_log_redaction.py
