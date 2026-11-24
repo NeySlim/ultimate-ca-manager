@@ -72,6 +72,28 @@ describe('useLatestLocation', () => {
     expect(url()).toBe('/x?q=a&item=7&sort=name&order=asc')
   })
 
+  it('without the history\'s address, a step back drops the write noted over the entry it returns to', () => {
+    function OpenBackSort() {
+      const d = useDockParam({})
+      const { onSort } = useSortParam({ key: 'created', asc: false }, ['created', 'name'])
+      const navigate = useNavigate()
+      return (
+        <>
+          <button type="button" onClick={() => d.open(7)}>open</button>
+          <button type="button" onClick={() => navigate(-1)}>back</button>
+          <button type="button" onClick={() => onSort('name')}>sort</button>
+        </>
+      )
+    }
+    render(<MemoryRouter initialEntries={['/x?q=a']}><WithoutLocation>{page(<OpenBackSort />)}</WithoutLocation></MemoryRouter>)
+    fireEvent.click(screen.getByText('open'))
+    expect(url()).toBe('/x?q=a&item=7')
+    fireEvent.click(screen.getByText('back'))
+    expect(url()).toBe('/x?q=a')
+    fireEvent.click(screen.getByText('sort'))
+    expect(url()).toBe('/x?q=a&sort=name&order=asc')
+  })
+
   for (const [button, expected] of [['openAndSort', '/x?q=a&item=7&sort=name&order=asc'], ['sortAndOpen', '/x?q=a&sort=name&order=asc&item=7']]) {
     it(`without the history's address, the last write noted stands for it (${button})`, () => {
       render(<MemoryRouter initialEntries={['/x?q=a']}><WithoutLocation>{page(<SortAndOpen />)}</WithoutLocation></MemoryRouter>)
@@ -80,7 +102,7 @@ describe('useLatestLocation', () => {
     })
   }
 
-  it('strips a base name as the router does, whatever its case', () => {
+  it('reads the page under a base name', () => {
     render(<MemoryRouter basename="/App" initialEntries={['/app/x?q=a']}>{page(<SortAndOpen />)}</MemoryRouter>)
     expect(url()).toBe('/x?q=a')
     fireEvent.click(screen.getByText('openAndSort'))

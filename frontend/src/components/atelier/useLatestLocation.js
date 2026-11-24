@@ -3,7 +3,7 @@
  * transition: until then useLocation() is the last one drawn, and a write built on it drops what
  * another component (the dock, the page's search) wrote meanwhile.
  */
-import { useCallback, useContext, useRef } from 'react'
+import { useCallback, useContext, useEffect, useRef } from 'react'
 import { UNSAFE_NavigationContext, parsePath, useLocation, useNavigate } from 'react-router-dom'
 
 // Per history: the last address written through useLatestNavigate and the drawn address it was written over
@@ -45,6 +45,11 @@ export function useLatestNavigate() {
   const { navigator } = useContext(UNSAFE_NavigationContext)
   const drawn = useRef(rendered)
   drawn.current = rendered
+  // A new entry drawn ends the note: a step back to the entry it was written over must not bring it back
+  useEffect(() => {
+    const note = navigator && written.get(navigator)
+    if (note && note.over !== rendered.key) written.delete(navigator)
+  }, [navigator, rendered.key])
   return useCallback((to, options = {}) => {
     if (navigator) {
       if (typeof to === 'number') written.delete(navigator)
