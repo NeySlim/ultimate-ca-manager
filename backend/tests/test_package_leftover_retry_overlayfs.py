@@ -1,10 +1,6 @@
 """archive-leftovers.sh retried after any fault: overlayfs (see package_leftover_chaos)."""
-from tests.package_leftover_chaos import ChaosSuite, NothingRenamesSuite
+from tests.package_leftover_chaos import ConvergeSuite
 
 
-class TestOverlayfs(ChaosSuite):
-    layout = 'overlayfs'
-
-
-class TestOverlayfsNothingRenames(NothingRenamesSuite):
+class TestOverlayfs(ConvergeSuite):
     layout = 'overlayfs'

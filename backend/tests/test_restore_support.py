@@ -42,3 +42,20 @@ def test_a_refusal_before_any_job_comes_back_as_answered(app, auth_client, empty
     assert response.status_code == 400, response.data
     with app.app_context():
         assert store.active_jobs(db.session) == []
+
+
+def test_a_job_noted_before_a_refusal_is_started_when_the_answer_comes_back(app, monkeypatch):
+    """A route that dispatched a job and then answered something else leaves no job unstarted."""
+    from types import SimpleNamespace
+    from services.jobs import runner
+    started = []
+    monkeypatch.setattr(runner, 'dispatch_job', started.append)
+
+    class Client:
+        application = app
+
+        def post(self, url, **kwargs):
+            runner.dispatch_job('job-noted')
+            return SimpleNamespace(status_code=409)
+    assert post_to_the_end(Client(), URL).status_code == 409
+    assert started == ['job-noted']

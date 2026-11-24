@@ -159,8 +159,8 @@ class Box:
             f'fs() {{ case $1 in\n{fs}    esac; echo 0; }}\n'
             f'refuse() {{ echo "OSError: [Errno 18] Invalid cross-device link" >&2; exit 1; }}\n'
             f'[ "$(fs "${{src%/*}}")" = "$(fs "${{dst%/*}}")" ] || refuse\n{overlay}'
-            f'! grep -qxF -- "$src" {self.state}/refused || refuse\n'
-            f'exec {sys.executable} "$@"\n')
+            f'while IFS= read -r line; do [ "$line" != "$src" ] || refuse; done < {self.state}/refused\n'
+            f'exec {sys.executable} -S "$@"\n')
         journal = (f'"{self.parent}"/*/.journal', f'"{self.parent}"/*/.journal.new')
         readme = (f'"{self.parent}"/*/.README.txt.new', f'"{self.parent}"/*/README.txt')
         # The ucm.env the script wrote (UCM_FIPS_BUILD=1, or the start of it), absent or whole

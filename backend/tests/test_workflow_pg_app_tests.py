@@ -2,6 +2,7 @@
 import fnmatch
 import os
 import pathlib
+import re
 import statistics
 import subprocess
 
@@ -207,3 +208,29 @@ def test_every_weighed_file_still_exists():
     """A weight left for a removed file is a list nobody refreshes."""
     gone = [p for p in _weights(DURATIONS) if not (ROOT / 'backend' / p).is_file()]
     assert not gone, gone
+
+
+def _ha_files_the_marker_deselects():
+    return sorted(p for p in (ROOT / 'backend' / 'tests' / 'ha').glob('test_*.py')
+                  if re.search(r'^pytestmark\s*=.*\bpytest\.mark\.ha\b', p.read_text(), re.M))
+
+
+def test_a_file_the_ha_marker_deselects_weighs_next_to_nothing():
+    """pytest runs with -m 'not ha': these files are only collected, so the median would be a
+    weight nothing measures (the shard job's log has no result line for them)."""
+    files = _ha_files_the_marker_deselects()
+    assert len(files) > 20, files
+    weights = _weights(DURATIONS)
+    heavy = {p.name: weights.get(f'tests/ha/{p.name}') for p in files
+             if weights.get(f'tests/ha/{p.name}', 99) > 0.1}
+    assert not heavy, heavy
+
+
+def test_the_regenerated_weights_keep_the_deselected_ha_files(tmp_path):
+    module = _durations_module()
+    backend = tmp_path / 'backend'
+    (backend / 'tests' / 'ha').mkdir(parents=True)
+    (backend / 'tests' / 'ha' / 'test_marked.py').write_text('pytestmark = [pytest.mark.ha, node_counts(3)]\n')
+    (backend / 'tests' / 'ha' / 'test_plain.py').write_text('pytestmark = pytest.mark.ha\n')
+    (backend / 'tests' / 'ha' / 'test_unit.py').write_text('def test_x(): pass\n')
+    assert module.deselected_files(backend) == {'tests/ha/test_marked.py': 0.0, 'tests/ha/test_plain.py': 0.0}

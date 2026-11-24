@@ -5,7 +5,8 @@ Every file command the script runs is wrapped: one sequence numbers all their ca
 a plan fails ('fail'), kills the run (SIGKILL to its process group, no clean-up: 'kill'),
 or kills it right after the call ('done') at the calls it names. The journal is written
 through tee and drop_line's mv, so its writes are calls like the others. The suite runs
-once per layout, one test file each (test_package_leftover_retry_*.py), in parallel.
+once per layout, one test file each (test_package_leftover_retry_*.py), in parallel; the longest
+layouts run in two files, ConvergeSuite and AbsentSuite (the second also NothingRenamesSuite).
 """
 import os
 import random
@@ -205,8 +206,8 @@ def converged(box, out, data, config, why):
     assert (box.config / 'ucm.env').read_text() == FIPS, why
 
 
-class ChaosSuite:
-    """Subclassed once per layout, which sets `layout`."""
+class _ChaosBase:
+    """What both halves of a layout's suite share; `layout` is set by the subclass."""
 
     # Every fault at every step: minutes per layout, left to the suites
     pytestmark = pytest.mark.slow
@@ -238,6 +239,11 @@ class ChaosSuite:
 
     def _calls(self, lab, plan=()):
         return lab.first_run(plan).count
+
+
+class ConvergeSuite(_ChaosBase):
+    """Every fault at every call of the archiving run and of the put-back that follows, a kill right after
+    a rename, an archived item removed."""
 
     def test_a_retry_converges_after_one_fault_at_any_call(self, lab):
         """Each call of the archiving run fails, or kills it, in turn; then a run without fault."""
@@ -299,6 +305,18 @@ class ChaosSuite:
         for first, second in draw.sample(product, PAIRS):
             self._scenario(lab, first, second)
 
+    def test_only_the_journal_is_ever_moved_and_nothing_copied(self, lab):
+        """cp never runs; mv only renames the journal or the README into place (the guard of
+        Box fails any other call that names an item, whatever the run)."""
+        runs = [lab.first_run()] + [lab.chain([(at, 'fail')], ())[4][-1]
+                                    for at in range(1, self._calls(lab) + 1, 3)]
+        assert all(r.out.returncode in (0, 1, 2) for r in runs)
+        assert not any(name == 'cp' for r in runs for _n, name, _a in r.calls)
+        moves = [args[-2:] for r in runs for _n, name, args in r.calls if name == 'mv']
+        assert all(dst.endswith('/.journal') and src == f'{dst}.new'
+                   or dst.endswith('/README.txt') and src == f'{dst[:-len("README.txt")]}.README.txt.new'
+                   for src, dst in moves), moves
+
     def test_a_retry_converges_after_a_kill_right_after_any_rename(self, lab):
         """Killed once rename(2) moved an item into an archive, or back out of it."""
         for at in lab.first_run().steps().get('rename', []):
@@ -339,6 +357,10 @@ class ChaosSuite:
                 run = Run(box, *_chaos_run(box, [(at, mode)]))
                 while_failing(box, run.out, before, data, config, why)
                 converged(box, Run(box, *_chaos_run(box)).out, data, config, why)
+
+
+class AbsentSuite(_ChaosBase):
+    """The data, an empty mount point or the database's mount absent, then back."""
 
     def _absent_data_then_any_fault(self, lab, empty):
         """Killed once the journal names the first rename of data/https_key.pem, before it ran;
@@ -418,17 +440,9 @@ class ChaosSuite:
                 while_failing(box, run.out, before, data, config, why)
                 converged(box, Run(box, *_chaos_run(box)).out, data, config, why)
 
-    def test_only_the_journal_is_ever_moved_and_nothing_copied(self, lab):
-        """cp never runs; mv only renames the journal or the README into place (the guard of
-        Box fails any other call that names an item, whatever the run)."""
-        runs = [lab.first_run()] + [lab.chain([(at, 'fail')], ())[4][-1]
-                                    for at in range(1, self._calls(lab) + 1, 3)]
-        assert all(r.out.returncode in (0, 1, 2) for r in runs)
-        assert not any(name == 'cp' for r in runs for _n, name, _a in r.calls)
-        moves = [args[-2:] for r in runs for _n, name, args in r.calls if name == 'mv']
-        assert all(dst.endswith('/.journal') and src == f'{dst}.new'
-                   or dst.endswith('/README.txt') and src == f'{dst[:-len("README.txt")]}.README.txt.new'
-                   for src, dst in moves), moves
+
+class ChaosSuite(ConvergeSuite, AbsentSuite):
+    """Both halves in one file: a layout whose file is short enough to run whole."""
 
 
 class NothingRenamesSuite:
