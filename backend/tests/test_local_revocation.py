@@ -9,9 +9,11 @@ import base64
 import json
 import threading
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
 
 from models import CA, Certificate, RevokedSerial, SystemConfig, db
 from models.audit_log import AuditLog
@@ -257,7 +259,9 @@ class TestLiftingALocalRevocation:
             RevokedSerial.query.filter_by(certificate_id=row_id).update({'published': True})
             db.session.commit()
         assert _detail(auth_client, row_id)['local_revocation_lift'] is None
-        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 409 and 'this revocation was published' in r.get_json()['message']
+        assert 'signs CRLs' not in r.get_json()['message']
         assert _records(app, keyless[1], real) == [('superseded', True)]
 
     def test_a_ca_that_publishes_now_refuses_a_local_record(self, app, auth_client, keyless, issuer, ca_state):
@@ -265,7 +269,8 @@ class TestLiftingALocalRevocation:
         _revoke(auth_client, row_id)
         _responder(app, keyless[0], issuer)
         assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
-        assert _records(app, keyless[1], real) == [('superseded', False)]
+        # The responder answers for it from now on: published
+        assert _records(app, keyless[1], real) == [('superseded', True)]
 
     def test_an_existing_record_of_unknown_publication_needs_the_risk_acknowledged(
             self, app, auth_client, keyless):
@@ -280,13 +285,17 @@ class TestLiftingALocalRevocation:
         assert r.status_code == 200, r.data
         assert _records(app, keyless[1], real) == []
 
-    def test_a_row_revoked_without_a_record_is_of_unknown_publication(self, app, auth_client, keyless):
+    def test_a_row_revoked_without_a_record_is_never_lifted(self, app, auth_client, keyless):
+        # Its records may have gone with a deleted CA of the same key, which published them
         row_id, _ = _leaf_row(app, keyless, 'row-only')
         with app.app_context():
             row = db.session.get(Certificate, row_id)
             row.revoked, row.revoke_reason = True, 'superseded'
             db.session.commit()
-        assert _detail(auth_client, row_id)['local_revocation_lift'] == 'unknown'
+        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True, 'acknowledge_unknown_publication': True})
+        assert r.status_code == 409 and 'no record' in r.get_json()['message'], r.data
+        assert _row(app, row_id)[0] is True
 
     def test_an_unrevoked_certificate_has_nothing_to_lift(self, app, auth_client, keyless):
         row_id, _ = _leaf_row(app, keyless, 'valid')
@@ -407,3 +416,332 @@ class TestTheNoteTravelsInBackups:
             db.session.commit()
         self._restore(app, row, merging)
         assert _records(app, keyless[1], real) == [('superseded', after)]
+
+
+def _keyless_ca(app, create_ca, name):
+    """A CA of its own held without its key, for a test that changes what it publishes."""
+    data = create_ca(cn=f'{name} {uuid.uuid4().hex[:6]}',
+                     keyUsage=['digitalSignature', 'keyCertSign', 'cRLSign'])
+    with app.app_context():
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        row = db.session.get(CA, data['id'])
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        key = get_ca_signing_key(row)
+        row.prv = None
+        db.session.commit()
+        return row.id, row.refid, cert, key
+
+
+def _key_pem(key):
+    return key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                             serialization.NoEncryption())
+
+
+def _stored_key(key):
+    from security.encryption import encrypt_private_key
+    return encrypt_private_key(base64.b64encode(_key_pem(key)).decode())
+
+
+def _external_crl(ca_cert, ca_key, serials, number=1):
+    now = datetime.now(timezone.utc)
+    builder = (x509.CertificateRevocationListBuilder().issuer_name(ca_cert.subject)
+               .last_update(now - timedelta(minutes=1)).next_update(now + timedelta(days=7))
+               .add_extension(x509.CRLNumber(number), critical=False))
+    for serial in serials:
+        builder = builder.add_revoked_certificate(
+            x509.RevokedCertificateBuilder().serial_number(serial)
+            .revocation_date(now - timedelta(minutes=2)).build())
+    return builder.sign(ca_key, hashes.SHA256()).public_bytes(serialization.Encoding.PEM)
+
+
+def _install_crl(auth_client, ca_id, pem):
+    r = auth_client.post(f'/api/v2/cas/{ca_id}/crl', json={'pem_content': pem.decode()})
+    assert r.status_code in (200, 201), r.data
+
+
+def _drop_key(app, ca_id):
+    with app.app_context():
+        db.session.get(CA, ca_id).prv = None
+        db.session.commit()
+
+
+class TestAnExternalCrlPublishes:
+    """An external CRL UCM serves for a CA held without its key carries what it lists."""
+
+    def test_a_revocation_the_external_crl_lists_is_never_lifted(self, app, auth_client, create_ca):
+        from services.crl.external import ExternalCRLMixin
+        ca = _keyless_ca(app, create_ca, 'External CRL 450')
+        row_id, real = _leaf_row(app, ca, 'listed')
+        _revoke(auth_client, row_id, 'keyCompromise')
+        assert _records(app, ca[1], real) == [('keyCompromise', False)]
+        _install_crl(auth_client, ca[0], _external_crl(ca[2], ca[3], [real.serial_number]))
+        assert _records(app, ca[1], real) == [('keyCompromise', True)]
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True, 'acknowledge_unknown_publication': True})
+        assert r.status_code == 409, r.data
+        assert _row(app, row_id)[0] is True
+        with app.app_context():
+            assert ExternalCRLMixin.get_external_revocation(ca[0], real.serial_number) is not None
+
+    def test_a_ca_given_an_external_crl_publishes_what_it_does_not_list(self, app, auth_client, create_ca):
+        ca = _keyless_ca(app, create_ca, 'External CRL 450 unlisted')
+        row_id, real = _leaf_row(app, ca, 'unlisted')
+        _revoke(auth_client, row_id)
+        _install_crl(auth_client, ca[0], _external_crl(ca[2], ca[3], []))
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
+        valid, _ = _leaf_row(app, ca, 'unlisted-valid')
+        assert _detail(auth_client, valid)['revocation_published'] is True
+        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
+        assert auth_client.delete(f'/api/v2/certificates/{valid}').status_code == 409
+
+    def test_the_lift_asks_the_served_crl_itself(self, app, auth_client, create_ca, monkeypatch):
+        """Belt and braces: whatever the records say, a serial the served CRL lists stays revoked."""
+        from services.cert import local_revocation
+        ca = _keyless_ca(app, create_ca, 'External CRL 450 served')
+        row_id, real = _leaf_row(app, ca, 'served')
+        _revoke(auth_client, row_id)
+        _install_crl(auth_client, ca[0], _external_crl(ca[2], ca[3], [real.serial_number]))
+        with app.app_context():
+            RevokedSerial.query.filter_by(caref=ca[1]).update({'published': False})
+            db.session.commit()
+        monkeypatch.setattr(local_revocation, '_has_external_crl', lambda _ca: False)
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 409 and 'external CRL' in r.get_json()['message'], r.data
+        assert _row(app, row_id)[0] is True
+
+
+class TestAKeyGainedPublishesTheRecords:
+    """Once UCM holds a CA's key it signs its records: they stay published after the key goes."""
+
+    def test_a_key_imported_then_lost_keeps_the_revocation(self, app, auth_client, create_ca):
+        ca = _keyless_ca(app, create_ca, 'Key gained 450')
+        row_id, real = _leaf_row(app, ca, 'key-route')
+        _revoke(auth_client, row_id)
+        assert _records(app, ca[1], real) == [('superseded', False)]
+        r = _post(auth_client, f'/api/v2/cas/{ca[0]}/key', {'key': _key_pem(ca[3]).decode()})
+        assert r.status_code == 200, r.data
+        assert _records(app, ca[1], real) == [('superseded', True)]
+        _drop_key(app, ca[0])
+        assert _post(auth_client, LIFT.format(row_id), {'confirm': True}).status_code == 409
+        assert _row(app, row_id)[0] is True
+
+    def test_a_reimport_with_the_key_publishes_too(self, app, auth_client, create_ca):
+        ca = _keyless_ca(app, create_ca, 'Key reimported 450')
+        row_id, real = _leaf_row(app, ca, 'reimport')
+        _revoke(auth_client, row_id)
+        pem = ca[2].public_bytes(serialization.Encoding.PEM).decode() + _key_pem(ca[3]).decode()
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem})
+        assert r.status_code in (200, 201), r.data
+        with app.app_context():
+            assert db.session.get(CA, ca[0]).has_private_key
+        assert _records(app, ca[1], real) == [('superseded', True)]
+
+    @pytest.mark.parametrize('gain', ['prv', 'offline', 'responder'])
+    def test_every_way_of_signing_for_the_ca_publishes(self, app, auth_client, create_ca, issuer, gain):
+        ca = _keyless_ca(app, create_ca, f'Signs now 450 {gain}')
+        row_id, real = _leaf_row(app, ca, f'gain-{gain}')
+        _revoke(auth_client, row_id)
+        responder = _leaf_row(app, issuer, 'gain-responder')[0] if gain == 'responder' else None
+        with app.app_context():
+            row = db.session.get(CA, ca[0])
+            if gain == 'prv':
+                row.prv = _stored_key(ca[3])
+            elif gain == 'offline':
+                row.offline, row.offline_mode = True, 'file_exported'
+            else:
+                db.session.add(SystemConfig(key=f'ocsp_responder_cert_{ca[0]}', value=str(responder)))
+            db.session.commit()
+        assert _records(app, ca[1], real) == [('superseded', True)]
+
+    def test_a_key_imported_while_the_lift_runs_refuses_it(self, app, auth_client, create_ca):
+        """PostgreSQL: the import holds the CA row and its records; the lift waits, then refuses."""
+        self._race(app, auth_client, create_ca, orm=True)
+
+    def test_a_key_written_by_sql_while_the_lift_runs_refuses_it(self, app, auth_client, create_ca):
+        """PostgreSQL: a writer that leaves the records alone still holds the CA row the lift locks."""
+        self._race(app, auth_client, create_ca, orm=False)
+
+    def _race(self, app, auth_client, create_ca, orm):
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        ca = _keyless_ca(app, create_ca, f'Key race 450 {orm}')
+        row_id, real = _leaf_row(app, ca, f'race-{orm}')
+        _revoke(auth_client, row_id)
+        with app.app_context():
+            engine = db.engine
+        holding, release, outcome = threading.Event(), threading.Event(), {}
+        stored = _stored_key(ca[3])
+
+        def import_the_key():
+            with app.app_context():
+                try:
+                    if orm:
+                        db.session.get(CA, ca[0]).prv = stored
+                        db.session.flush()
+                    else:
+                        db.session.execute(CA.__table__.update().where(CA.__table__.c.id == ca[0])
+                                           .values(prv=stored))
+                    holding.set()
+                    release.wait(30)
+                    db.session.commit()
+                except Exception as e:  # noqa: BLE001
+                    db.session.rollback()
+                    outcome['import'] = repr(e)
+                finally:
+                    holding.set()
+                    db.session.remove()
+
+        def release_once_the_lift_waits():
+            with engine.connect() as conn:
+                outcome['waited'] = _wait_for_a_lock_waiter(conn, 10)
+            release.set()
+
+        worker = threading.Thread(target=import_the_key)
+        worker.start()
+        assert holding.wait(30)
+        releaser = threading.Thread(target=release_once_the_lift_waits)
+        releaser.start()
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        worker.join(30)
+        releaser.join(30)
+        assert 'import' not in outcome and outcome.get('waited'), outcome
+        assert r.status_code == 409, r.data
+        assert _row(app, row_id)[0] is True
+        _drop_key(app, ca[0])
+
+    def test_a_key_written_while_the_lift_runs_is_seen_under_the_rows_lock(
+            self, app, auth_client, create_ca, monkeypatch):
+        """SQLite takes its write lock at the rows' UPDATE: what the CA gained before is read then."""
+        from services.cert import issued_lookup
+        ca = _keyless_ca(app, create_ca, 'Key meanwhile 450')
+        row_id, _ = _leaf_row(app, ca, 'key-meanwhile')
+        _revoke(auth_client, row_id)
+        stored, lock, calls = _stored_key(ca[3]), issued_lookup.lock_serial_records, []
+
+        def lock_then_gain_the_key(targets):
+            calls.append(1)
+            if len(calls) == 2:
+                db.session.execute(CA.__table__.update().where(CA.__table__.c.id == ca[0]).values(prv=stored))
+            return lock(targets)
+        monkeypatch.setattr(issued_lookup, 'lock_serial_records', lock_then_gain_the_key)
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 409, r.data
+        assert len(calls) == 2 and _row(app, row_id)[0] is True
+
+
+class TestARevocationToldToItsIssuer:
+    """A Microsoft CA or an ACME CA is told of the revocation: it publishes it, UCM cannot lift it."""
+
+    @pytest.mark.parametrize('source', ['msca', 'acme_client'])
+    def test_a_copy_of_such_a_source_is_never_lifted(self, app, auth_client, keyless, source):
+        row_id, real = _leaf_row(app, keyless, f'told-{source}')
+        with app.app_context():
+            db.session.get(Certificate, row_id).source = source
+            db.session.commit()
+        _revoke(auth_client, row_id)
+        assert _detail(auth_client, row_id)['local_revocation_lift'] is None
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 409 and 'outside UCM' in r.get_json()['message'], r.data
+        assert _row(app, row_id)[0] is True
+
+    def _revoked(self, app, auth_client, keyless, source):
+        row_id, real = _leaf_row(app, keyless, f'propagated-{source}')
+        _record(app, keyless[1], real, reason='superseded', certificate_id=row_id)
+        with app.app_context():
+            RevokedSerial.query.filter_by(certificate_id=row_id).update({'published': False})
+            row = db.session.get(Certificate, row_id)
+            row.source, row.revoked, row.revoke_reason = source, True, 'superseded'
+            db.session.commit()
+        return row_id, real
+
+    @pytest.mark.parametrize('sent, outcome', [(None, 'revoked'), ('CA unreachable', 'owed')])
+    def test_a_revocation_sent_or_owed_to_the_acme_ca_is_published(
+            self, app, auth_client, keyless, monkeypatch, sent, outcome):
+        from types import SimpleNamespace
+        from services import acme_renewal_service
+        from services.acme import upstream_revocation
+        row_id, real = self._revoked(app, auth_client, keyless, 'acme_client')
+        monkeypatch.setattr(upstream_revocation, '_order_for', lambda cert: SimpleNamespace(id=1))
+        monkeypatch.setattr(upstream_revocation, '_client_for', lambda order: object())
+        monkeypatch.setattr(acme_renewal_service, 'send_upstream_revocation', lambda *a: sent)
+        monkeypatch.setattr(acme_renewal_service, '_owe_upstream_revocation', lambda *a: True)
+        with app.app_context():
+            result = upstream_revocation.propagate_acme_revocation(
+                db.session.get(Certificate, row_id), 'superseded')
+        assert result[0] == outcome
+        assert _records(app, keyless[1], real) == [('superseded', True)]
+
+    def test_a_revocation_propagated_to_the_microsoft_ca_is_published(
+            self, app, auth_client, keyless, monkeypatch):
+        from types import SimpleNamespace
+        from services.msca import propagation
+        from services.msca_service import MicrosoftCAService
+        row_id, real = self._revoked(app, auth_client, keyless, 'msca')
+        monkeypatch.setattr(propagation, 'find_msca_for_cert', lambda cert: SimpleNamespace(name='AD CS'))
+        monkeypatch.setattr(MicrosoftCAService, 'admin_channel_available', staticmethod(lambda msca: True))
+        monkeypatch.setattr(MicrosoftCAService, 'revoke_on_ca', staticmethod(lambda *a, **k: None))
+        with app.app_context():
+            outcome, _ = propagation.propagate_revocation(db.session.get(Certificate, row_id), 'superseded')
+        assert outcome == propagation.PROPAGATED
+        assert _records(app, keyless[1], real) == [('superseded', True)]
+
+
+class TestDeletingACertificateItsIssuerIsToldOf:
+    @pytest.mark.parametrize('source', ['msca', 'acme_client'])
+    def test_a_valid_one_linked_to_no_ca_is_revoked_first(self, app, auth_client, keyless, source):
+        _, _, ca_cert, ca_key = keyless
+        real, key = _leaf(f'unlinked-{source}-{uuid.uuid4().hex[:6]}.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, None, key=key)
+        with app.app_context():
+            db.session.get(Certificate, row_id).source = source
+            db.session.commit()
+        assert _detail(auth_client, row_id)['revocation_published'] is True
+        r = auth_client.delete(f'/api/v2/certificates/{row_id}')
+        assert r.status_code == 409 and b'revoke it first' in r.data
+        bulk = _post(auth_client, '/api/v2/certificates/bulk/delete', {'ids': [row_id]})
+        assert bulk.get_json()['data']['failed'][0]['id'] == row_id
+        assert _exists(app, row_id)
+
+    def test_the_bulk_route_asks_once_per_ca(self, app, auth_client, keyless, monkeypatch):
+        from services.cert import local_revocation
+        ids = [_leaf_row(app, keyless, f'bulk-once-{i}')[0] for i in range(3)]
+        asked, ask = [], local_revocation.publishes_revocations
+
+        def counted(ca):
+            asked.append(ca.refid if ca is not None else None)
+            return ask(ca)
+        monkeypatch.setattr(local_revocation, 'publishes_revocations', counted)
+        r = _post(auth_client, '/api/v2/certificates/bulk/delete', {'ids': ids})
+        assert r.get_json()['data']['success'] == ids, r.data
+        assert asked == [keyless[1]]
+
+
+class TestALiftedCompromiseKeepsItsKeyRefused:
+    def test_the_key_stays_refused_once_its_records_go(self, app, auth_client, keyless):
+        from services.acme.compromised_keys import key_revoked_as_compromised
+        from utils.spki_digest import public_key_sha256
+        row_id, real = _leaf_row(app, keyless, 'compromise-kept')
+        _record(app, keyless[1], real, reason='keyCompromise', certificate_id=row_id)
+        with app.app_context():
+            RevokedSerial.query.filter_by(certificate_id=row_id).update(
+                {'published': False, 'public_key_sha256': public_key_sha256(real.public_key())})
+            db.session.commit()
+            assert key_revoked_as_compromised(real.public_key())
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 200, r.data
+        assert _records(app, keyless[1], real) == [] and _row(app, row_id)[0] is False
+        with app.app_context():
+            assert key_revoked_as_compromised(real.public_key())
+
+    def test_a_key_that_cannot_be_kept_refuses_the_lift(self, app, auth_client, keyless, monkeypatch):
+        from models import compromised_key
+        row_id, real = _leaf_row(app, keyless, 'compromise-unkept')
+        _revoke(auth_client, row_id, 'keyCompromise')
+        with app.app_context():
+            compromised_key.CompromisedKeyRecord.query.filter_by(cert_refid=db.session.get(
+                Certificate, row_id).refid).delete()
+            db.session.commit()
+        monkeypatch.setattr(compromised_key, 'remember_compromised_key', lambda *a, **k: False)
+        r = _post(auth_client, LIFT.format(row_id), {'confirm': True})
+        assert r.status_code == 500 and 'compromised' in r.get_json()['message'], r.data
+        assert _row(app, row_id)[0] is True

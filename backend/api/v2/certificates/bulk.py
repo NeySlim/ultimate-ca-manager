@@ -266,6 +266,8 @@ def bulk_delete_certificates():
         return err
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
     results = {'success': [], 'failed': []}
+    # Whether each CA publishes, asked once per CA
+    published = {}
 
     for cert_id in ids:
         try:
@@ -274,7 +276,7 @@ def bulk_delete_certificates():
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
 
-            blocker = first_blocker(certificate_deletion_blockers(cert))
+            blocker = first_blocker(certificate_deletion_blockers(cert, published))
             if blocker:
                 results['failed'].append({'id': cert_id, 'error': blocker.brief})
             # Delegate to the service so cert/key/csr files on disk are

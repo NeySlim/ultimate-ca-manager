@@ -57,3 +57,19 @@ class RevokedSerial(db.Model):
 
     def __repr__(self):
         return f'<RevokedSerial {self.caref}:{self.serial_number}>'
+
+
+def _published_on_flush(session, flush_context):
+    # A CA that comes to sign for its key publishes every record of that key (issue #450)
+    from services.cert.local_revocation import publish_on_flush
+    publish_on_flush(session)
+
+
+def _listen():
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+    if not event.contains(Session, 'after_flush', _published_on_flush):
+        event.listen(Session, 'after_flush', _published_on_flush)
+
+
+_listen()
