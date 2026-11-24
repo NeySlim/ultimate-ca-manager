@@ -140,7 +140,7 @@ class CAOperationsMixin:
             existing.revoke_reason = reason
             existing.invalidity_at = invalidity_at
             existing.valid_to = valid_to
-            note_publication(existing, parent, False)
+            note_publication(existing, parent, False, hold=True)
         else:
             record = RevokedSerial(
                 caref=parent.refid,
@@ -151,7 +151,7 @@ class CAOperationsMixin:
                 valid_to=valid_to,
                 certificate_id=None,
             )
-            note_publication(record, parent, True)
+            note_publication(record, parent, True, hold=True)
             db.session.add(record)
         # A revocation of this CA waiting for approval is closed by this one
         from services.approval_gate import resolve_moot_requests

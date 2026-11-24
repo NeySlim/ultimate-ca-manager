@@ -330,7 +330,7 @@ def revoke(row: CACrossCertificate, reason: str = 'unspecified', username: str =
     record = RevokedSerial(caref=issuer.refid, serial_number=row.serial_number, revoked_at=now,
                            revoke_reason=reason, invalidity_at=invalidity_at,
                            valid_to=row.valid_to, certificate_id=None)
-    note_publication(record, issuer, True)
+    note_publication(record, issuer, True, hold=True)
     db.session.add(record)
     _close_pending_requests(row, username)
     db.session.commit()
