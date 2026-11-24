@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { io } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { API_ANSWERED_EVENT } from '../services/apiClient';
 
 // Event type constants (matches backend EventType enum)
 export const EventType = {
@@ -68,9 +69,12 @@ export const ConnectionState = {
 
 const WebSocketContext = createContext(null);
 
-// A session renewal closes every socket of the old identifier: one reconnection, after its
-// answer set the new cookie; a refused handshake (a stolen copy, a session gone) is not retried
-export const SERVER_CUT_RECONNECT_MS = 1500;
+// A socket the server closed (a session renewal) or a handshake it refused (session check
+// unavailable, cookie not there yet) is tried again after each delay, then left to a rearm
+export const SERVER_CUT_RETRY_MS = [1500, 5000, 15000];
+export const SERVER_CUT_RECONNECT_MS = SERVER_CUT_RETRY_MS[0];
+// A rearm (an API answer, the tab shown again) tries once, at most once per this interval
+export const REARM_MIN_INTERVAL_MS = 15000;
 
 // A server event means somebody else changed the data. The pages refresh on
 // the in-app `ucm:data-changed` bus, which only the acting tab used to fire,
@@ -225,6 +229,8 @@ export function WebSocketProvider({ children }) {
   const muteUntilRef = useRef(0);
   const hasConnectedRef = useRef(false);
   const reconnectTimerRef = useRef(null);
+  const retryStepRef = useRef(0);
+  const lastRearmRef = useRef(-Infinity);
   
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
@@ -241,10 +247,26 @@ export function WebSocketProvider({ children }) {
       reconnectionDelayMax: 5000,
       timeout: 20000,
     });
+
+    // The next delay of the schedule, none once it is spent: a rearm alone tries again then
+    const retryLater = () => {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+      if (retryStepRef.current >= SERVER_CUT_RETRY_MS.length) return;
+      const delay = SERVER_CUT_RETRY_MS[retryStepRef.current];
+      retryStepRef.current += 1;
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (socketRef.current === socket && !socket.connected) socket.connect();
+      }, delay);
+    };
     
     socket.on('connect', () => {
       if (import.meta.env.DEV) console.log('[WebSocket] Connected');
       setConnectionState(ConnectionState.CONNECTED);
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+      retryStepRef.current = 0;
       if (hasConnectedRef.current) announceEverythingChanged();
       hasConnectedRef.current = true;
     });
@@ -253,16 +275,15 @@ export function WebSocketProvider({ children }) {
       if (import.meta.env.DEV) console.log('[WebSocket] Disconnected:', reason);
       setConnectionState(ConnectionState.DISCONNECTED);
       if (reason !== 'io server disconnect') return;
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = setTimeout(() => {
-        reconnectTimerRef.current = null;
-        if (socketRef.current === socket && !socket.connected) socket.connect();
-      }, SERVER_CUT_RECONNECT_MS);
+      retryStepRef.current = 0;
+      retryLater();
     });
     
     socket.on('connect_error', (error) => {
       if (import.meta.env.DEV) console.error('[WebSocket] Connection error:', error);
       setConnectionState(ConnectionState.ERROR);
+      // Still active: a transport failure the library retries itself; else the server refused
+      if (!socket.active) retryLater();
     });
     
     socket.on('connected', (data) => {
@@ -298,6 +319,7 @@ export function WebSocketProvider({ children }) {
   const disconnect = useCallback(() => {
     clearTimeout(reconnectTimerRef.current);
     reconnectTimerRef.current = null;
+    retryStepRef.current = 0;
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current = null;
@@ -349,6 +371,28 @@ export function WebSocketProvider({ children }) {
     }
     return () => disconnect();
   }, [ready, connect, disconnect]);
+
+  // A socket left closed by the server tries once more at an API answer or when the tab shows
+  useEffect(() => {
+    if (!ready) return undefined;
+    const rearm = () => {
+      const socket = socketRef.current;
+      if (!socket || socket.connected || socket.active || reconnectTimerRef.current) return;
+      const now = Date.now();
+      if (now - lastRearmRef.current < REARM_MIN_INTERVAL_MS) return;
+      lastRearmRef.current = now;
+      socket.connect();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') rearm();
+    };
+    window.addEventListener(API_ANSWERED_EVENT, rearm);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener(API_ANSWERED_EVENT, rearm);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [ready]);
   
   const value = {
     connectionState,

@@ -46,6 +46,33 @@ describe('API Client', () => {
     )
   })
 
+  it('announces each successful answer, which the real-time socket waits for to try again', async () => {
+    const { apiClient, API_ANSWERED_EVENT } = await import('../apiClient')
+    const heard = vi.fn()
+    window.addEventListener(API_ANSWERED_EVENT, heard)
+    try {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ data: [] })
+      })
+      await apiClient.get('/certificates')
+      expect(heard).toHaveBeenCalledTimes(1)
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ error: 'Forbidden' })
+      })
+      await expect(apiClient.get('/certificates')).rejects.toMatchObject({ status: 403 })
+      global.fetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: {} }) })
+      await apiClient.upload('/import', new FormData())
+      expect(heard).toHaveBeenCalledTimes(2)
+    } finally {
+      window.removeEventListener(API_ANSWERED_EVENT, heard)
+    }
+  })
+
   it('keeps the Retry-After of a 429 on the error', async () => {
     global.fetch.mockResolvedValueOnce({
       ok: false,
