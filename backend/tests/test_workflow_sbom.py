@@ -376,7 +376,7 @@ def test_the_publish_script_never_creates_a_release(tmp_path):
     calls = tmp_path / 'gh.calls'
     bindir = _stub_bin(tmp_path, {
         'git': f'case "$1" in rev-parse) echo {ROOT};; ls-remote) printf "x\\trefs/tags/v3.0-rc1\\n";; esac',
-        'gh': f'echo "$@" >> {calls}; case "$1 $2" in "release view") exit 1;; esac; exit 0',
+        'gh': f'echo "$@" >> {calls}; case "$1 $2" in "release view") exit 1;; "repo view") echo o/r;; esac; exit 0',
         'python3': f'exec {sys.executable} "$@"',
     })
     for tool in ('sed', 'tr', 'mktemp', 'bash'):
@@ -393,7 +393,7 @@ def test_the_publish_script_still_edits_the_notes_of_a_release(tmp_path):
     calls = tmp_path / 'gh.calls'
     bindir = _stub_bin(tmp_path, {
         'git': f'case "$1" in rev-parse) echo {ROOT};; ls-remote) printf "x\\trefs/tags/v3.0-rc1\\n";; esac',
-        'gh': f'echo "$@" >> {calls}; exit 0',
+        'gh': f'echo "$@" >> {calls}; case "$1 $2" in "repo view") echo o/r;; esac; exit 0',
         'python3': f'exec {sys.executable} "$@"',
     })
     for tool in ('sed', 'tr', 'mktemp', 'bash'):
