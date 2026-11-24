@@ -4,8 +4,9 @@
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
 Usage: release_version.py <validate|deb|rpm|tar|file|npm|chart|prerelease|assets|notes|latest|line> <version> [CHANGELOG] [--rehearsal]
-`notes` stops the changes on a whole entry past NOTES_CHANGES_BUDGET characters, then links
-`--changelog-url URL` (default CHANGELOG.md) for the rest.
+`notes` keeps Security and Upgrade notes whole and, past NOTES_CHANGES_BUDGET characters, stops
+the other sub-sections on a whole entry, then names them and links `--changelog-url URL`
+(default CHANGELOG.md) for the rest.
 `matches <version> <file>` exits 1, naming both values, when the file (whitespace stripped) is not that version.
 `latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
 `line` reads them the same way and prints the line tag (the major) to apply, or an empty line.
@@ -15,7 +16,12 @@ import sys
 
 # GitHub refuses a release body over 125 000 characters (HTTP 422): the changes stop under this
 # budget, which leaves the page's heading and Installation part room under the limit.
+GITHUB_BODY_LIMIT = 125_000
 NOTES_CHANGES_BUDGET = 110_000
+# Security and Upgrade notes alone may pass the budget up to this limit, the page's other parts
+# (under 5 000 characters) keeping room; past it they stop on an entry too.
+NOTES_CHANGES_LIMIT = GITHUB_BODY_LIMIT - 8_000
+KEPT_WHOLE = ('security', 'upgrade notes')
 _ENTRY_START = re.compile(r'#|[-*+] |[0-9]+[.)] ')
 _FENCE = re.compile(r'\s*(```|~~~)')
 
@@ -127,28 +133,97 @@ def _blocks(lines):
     return blocks
 
 
-def cut_changes(body, budget=NOTES_CHANGES_BUDGET, changelog_url='CHANGELOG.md'):
-    """`body` itself within `budget` characters; else its first whole entries and a closing
-    sentence that links the CHANGELOG for the rest, all within `budget`."""
+def _size(blocks):
+    return sum(len(line) + 1 for block in blocks for line in block)
+
+
+def _subsections(blocks):
+    """[(name, heading, units)] by `### ` heading. A unit is one entry with the headings before it;
+    headings left after the last entry join the last unit. The blocks before any `###` are named
+    "The list"."""
+    subs = []
+    for block in blocks:
+        if block[0].startswith('### ') or not subs:
+            heading = [block] if block[0].startswith('### ') else []
+            name = block[0][4:].strip() if heading else 'The list'
+            subs.append((name, heading, []))
+            if heading:
+                continue
+        units = subs[-1][2]
+        if not units or not units[-1][-1][0].startswith('#'):
+            units.append([])
+        units[-1].append(block)
+    for _, _, units in subs:
+        if len(units) > 1 and all(b[0].startswith('#') for b in units[-1]):
+            units[-2].extend(units.pop())
+    return subs
+
+
+def _entries(units):
+    return sum(1 for unit in units for block in unit if not block[0].startswith('#'))
+
+
+def _fill(subs, room):
+    """Units taken in turn, one per sub-section a round, each sub-section stopping at the first
+    unit (with its heading) past the room left: every one keeps its first entries."""
+    taken, open_ = [0] * len(subs), list(range(len(subs)))
+    while open_:
+        for i in list(open_):
+            _, heading, units = subs[i]
+            if taken[i] == len(units):
+                open_.remove(i)
+                continue
+            cost = _size(units[taken[i]]) + (_size(heading) if taken[i] == 0 else 0)
+            if cost > room:
+                open_.remove(i)
+                continue
+            room -= cost
+            taken[i] += 1
+    return taken
+
+
+def _note(names, kept, total, changelog_url):
+    names = list(dict.fromkeys(names))
+    named = names[0] if len(names) == 1 else ', '.join(names[:-1]) + ' and ' + names[-1]
+    verb = 'lists' if len(names) == 1 else 'list'
+    return (f'{named} {verb} {kept} of {total} entries to fit the release page: '
+            f'the rest is in [CHANGELOG.md]({changelog_url}).\n')
+
+
+def cut_changes(body, budget=NOTES_CHANGES_BUDGET, changelog_url='CHANGELOG.md', limit=NOTES_CHANGES_LIMIT):
+    """`body` itself within `budget` characters. Else Security and Upgrade notes whole and the other
+    sub-sections stopped on a whole entry, in their order, with a closing sentence that names those
+    abridged and links the CHANGELOG, all within `budget`; Security and Upgrade notes alone past
+    `budget` stay whole within `limit`, and past it are stopped on an entry too."""
     if len(body) <= budget:
         return body
-    blocks = _blocks(body.splitlines()[1:])
-    total = sum(1 for b in blocks if not b[0].startswith('#'))
-
-    def note(kept_entries):
-        return (f'The list stops after {kept_entries} of {total} entries to fit the release page: '
-                f'the rest is in [CHANGELOG.md]({changelog_url}).\n')
-
-    room, kept = budget - len('\n' + '\n') - len(note(total)), []
-    for block in blocks:
-        room -= sum(len(line) + 1 for line in block)
-        if room < 0:
-            break
-        kept.append(block)
-    while kept and kept[-1][0].startswith('#'):
-        kept.pop()  # a sub-heading whose entries all fell past the cut
-    entries = sum(1 for b in kept if not b[0].startswith('#'))
-    return '\n' + ''.join(line + '\n' for b in kept for line in b) + '\n' + note(entries)
+    subs = _subsections(_blocks(body.splitlines()[1:]))
+    total = sum(_entries(units) for _, _, units in subs)
+    # The longest note this cut can end with: every name, the largest counts
+    fixed = len('\n\n') + len(_note([name for name, _, _ in subs], total, total, changelog_url))
+    whole = [i for i, (name, _, _) in enumerate(subs) if name.lower() in KEPT_WHOLE]
+    others = [i for i in range(len(subs)) if i not in whole]
+    whole_size = sum(_size(subs[i][1]) + sum(_size(unit) for unit in subs[i][2]) for i in whole)
+    taken = [len(units) for _, _, units in subs]
+    if whole_size <= budget - fixed:
+        for i, n in zip(others, _fill([subs[i] for i in others], budget - fixed - whole_size)):
+            taken[i] = n
+    else:  # whole when they fit within `limit`, else each stopped on an entry
+        for i, n in zip(whole, _fill([subs[i] for i in whole], limit - fixed)):
+            taken[i] = n
+        for i in others:
+            taken[i] = 0
+    abridged = [i for i, (_, _, units) in enumerate(subs) if taken[i] < len(units)]
+    if not abridged:
+        return body
+    out = []
+    for i, (_, heading, units) in enumerate(subs):
+        if taken[i]:
+            out += heading + [block for unit in units[:taken[i]] for block in unit]
+    kept = sum(_entries(subs[i][2][:taken[i]]) for i in abridged)
+    in_all = sum(_entries(subs[i][2]) for i in abridged)
+    note = _note([subs[i][0] for i in abridged], kept, in_all, changelog_url)
+    return '\n' + ''.join(line + '\n' for block in out for line in block) + '\n' + note
 
 
 def release_notes(version, text, rehearsal=False, changelog_url='CHANGELOG.md'):
