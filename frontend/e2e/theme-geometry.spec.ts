@@ -11,33 +11,36 @@ const CERTIFICATES = [
   'table.cert-table tbody tr', 'table.cert-table tbody td', '.badge', '#inspector', '.detail-tabs [role=tab]', '.open-tab',
 ]
 
-test('a change of theme moves nothing in the Certificates zone, its inspector open on a row', async ({ api, signIn }) => {
-  const cert = await issueCert(api, (await createCA(api)).id)
-  const user = await createUser(api, 'viewer')
-  const measured: Record<string, Record<string, number[][]>> = {}
-  // The view counters and the expiry count follow what other tests issue: every palette reads the first one's answers
-  const kept: Frozen = new Map()
-  for (const [family, mode] of PALETTES) {
-    const { page } = await signIn(user.username, user.password)
-    await freezeApi(page.context(), kept)
-    await usePalette(page, family, mode)
-    await page.goto('/certificates')
-    await expectPalette(page, family, mode)
-    const main = page.getByRole('main')
-    await main.getByRole('searchbox').fill(cert.common_name)
-    await main.getByRole('button', { name: cert.common_name, exact: true }).click()
-    await expect(page.locator('#inspector').getByRole('heading', { name: cert.common_name })).toBeVisible()
-    await expect(main.locator('table.cert-table tbody tr.opened')).toHaveCount(1)
-    await expect(main.locator('table.measuring')).toHaveCount(0)
-    measured[`${family}-${mode}`] = await boxes(page, CERTIFICATES)
-    await page.context().close()
-  }
-  const reference = measured['atelier-dark']
-  // Every selector found something: the pills, the sorted column and the open row are among the boxes
-  for (const s of CERTIFICATES) expect(reference[s].length, s).toBeGreaterThan(0)
-  expect(new Set(reference['table.cert-table tbody tr'].map((b) => b[3]))).toEqual(new Set([36]))
-  for (const [key, got] of Object.entries(measured)) expect(got, key).toEqual(reference)
-})
+// One test per palette against Atelier dark: four palettes in one test took most of the time limit on two cores
+for (const [family, mode] of PALETTES.slice(1)) {
+  test(`a change of theme to ${family} ${mode} moves nothing in the Certificates zone, its inspector open on a row`, async ({ api, signIn }) => {
+    const cert = await issueCert(api, (await createCA(api)).id)
+    const user = await createUser(api, 'viewer')
+    const measured: Record<string, Record<string, number[][]>> = {}
+    // The view counters and the expiry count follow what other tests issue: both palettes read the first one's answers
+    const kept: Frozen = new Map()
+    for (const [f, m] of [PALETTES[0], [family, mode] as const]) {
+      const { page } = await signIn(user.username, user.password)
+      await freezeApi(page.context(), kept)
+      await usePalette(page, f, m)
+      await page.goto('/certificates')
+      await expectPalette(page, f, m)
+      const main = page.getByRole('main')
+      await main.getByRole('searchbox').fill(cert.common_name)
+      await main.getByRole('button', { name: cert.common_name, exact: true }).click()
+      await expect(page.locator('#inspector').getByRole('heading', { name: cert.common_name })).toBeVisible()
+      await expect(main.locator('table.cert-table tbody tr.opened')).toHaveCount(1)
+      await expect(main.locator('table.measuring')).toHaveCount(0)
+      measured[`${f}-${m}`] = await boxes(page, CERTIFICATES)
+      await page.context().close()
+    }
+    const reference = measured['atelier-dark']
+    // Every selector found something: the pills, the sorted column and the open row are among the boxes
+    for (const s of CERTIFICATES) expect(reference[s].length, s).toBeGreaterThan(0)
+    expect(new Set(reference['table.cert-table tbody tr'].map((b) => b[3]))).toEqual(new Set([36]))
+    expect(measured[`${family}-${mode}`]).toEqual(reference)
+  })
+}
 
 // The glow of the focus ring: a shadow with a blur, in the colour of --glow, beside the halo
 async function focusModules(page) {

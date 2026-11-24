@@ -94,17 +94,18 @@ for (const width of [1000, 1280, 1600]) {
   test.describe(`at ${width} px, dock closed`, () => {
     test.use({ viewport: { width, height: 900 } })
 
-    test('no list scrolls sideways, no header is clipped, no text cut without its title, one column sorted', async ({ page, api }) => {
-      await seed(api)
-      for (const list of LISTS) {
+    // One test per list: a page visit costs seconds on two cores, a loop over every list overran the timeout
+    for (const list of LISTS) {
+      test(`${list.name}: no scroll sideways, no header clipped, no text cut without its title, one column sorted`, async ({ page, api }) => {
+        await seed(api)
         await open(page, list)
         await expect.poll(() => geometry(page, list.region, list.journal).then((g) => g.over), { message: list.name }).toBeLessThanOrEqual(1)
         const g = await geometry(page, list.region, list.journal)
         expect(g, list.name).toMatchObject({ clippedHeads: [], fitCut: [], noTitle: [], sorted: [list.sorted] })
         expect(g.page, list.name).toBeLessThanOrEqual(0)
         if (g.check !== null) expect(g.check, list.name).toBe(40)
-      }
-    })
+      })
+    }
   })
 }
 
@@ -139,21 +140,29 @@ test.describe('at 1406 px, the dock at the right', () => {
 test.describe('the columns at 1600 px', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('the absorbing column is free text or the name; counts read at the right; the settings rows are 36 px', async ({ page, api }) => {
-    await seed(api)
-    const absorbers = {}
-    for (const list of LISTS.filter((l) => !l.journal)) {
+  const ABSORBERS = {
+    users: ['Email'], groups: ['Description'], roles: ['Description'], policies: ['Name'], hsm: ['Name'], scans: ['Range'],
+    discovered: ['Issuer'], runs: ['Name'], operations: ['Common Name'], scheduler: ['Last result'], backups: ['Name'],
+  }
+  for (const list of LISTS.filter((l) => !l.journal)) {
+    test(`${list.name}: the absorbing column is free text or the name`, async ({ page, api }) => {
+      await seed(api)
       await open(page, list)
-      absorbers[list.name] = await page.locator(`${list.region} thead th`).evaluateAll((ths) => ths
+      const absorber = await page.locator(`${list.region} thead th`).evaluateAll((ths) => ths
         .filter((th) => !th.classList.contains('fit') && !th.querySelector('input, .sr-only')).map((th) => th.textContent))
-    }
-    expect(absorbers).toEqual({
-      users: ['Email'], groups: ['Description'], roles: ['Description'], policies: ['Name'], hsm: ['Name'], scans: ['Range'],
-      discovered: ['Issuer'], runs: ['Name'], operations: ['Common Name'], scheduler: ['Last result'], backups: ['Name'],
+      expect(absorber).toEqual(ABSORBERS[list.name])
     })
+  }
+
+  test('counts read at the right', async ({ page, api }) => {
+    await seed(api)
     await open(page, LISTS[2])
     const users = page.locator('#module-scroll thead th').filter({ hasText: 'Users' })
     expect(await users.evaluate((th) => [getComputedStyle(th).textAlign, getComputedStyle(th).fontVariantNumeric])).toEqual(['right', 'tabular-nums'])
+  })
+
+  test('the settings rows are 36 px', async ({ page, api }) => {
+    await seed(api)
     await open(page, LISTS.find((l) => l.name === 'scheduler'))
     const heights = await page.locator('#scheduler-scroll tbody tr').evaluateAll((trs) => trs.map((tr) => Math.round(tr.getBoundingClientRect().height)))
     expect(new Set(heights)).toEqual(new Set([36]))

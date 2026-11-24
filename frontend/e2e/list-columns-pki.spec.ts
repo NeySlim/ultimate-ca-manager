@@ -119,32 +119,31 @@ for (const width of [1000, 1280, 1600]) {
   test.describe(`at ${width} px, dock closed`, () => {
     test.use({ viewport: { width, height: 900 } })
 
-    test('every PKI list fits, keeps its chevrons, cuts nothing without a title, shows one sort', async ({ page, api }) => {
-      test.setTimeout(180_000)
-      await seed(api)
-      for (const list of LISTS) {
+    // One test per list: a loop over every list overran the timeout on two cores
+    for (const list of LISTS) {
+      test(`${list.name}: fits, keeps its chevrons, cuts nothing without a title, shows one sort`, async ({ page, api }) => {
+        await seed(api)
         await open(page, list)
         await soft.poll(() => measure(page, list.region).then((m) => m.over), { message: list.name, timeout: 3000 }).toBeLessThanOrEqual(1)
         const m = await measure(page, list.region)
         console.log(`COLP1 ${JSON.stringify({ width, dock: 'closed', list: list.name, ...m })}`)
         check(m, list, `${width}`)
         if (width === 1600) soft(m.absorbing, list.name).toEqual([list.absorber])
-      }
-    })
+      })
+    }
   })
 }
 
 test.describe('at 1406 px beside the dock at the right', () => {
   test.use({ viewport: { width: 1406, height: 809 } })
 
-  test('every PKI list fits beside the dock and keeps its urgent date, a long text folding first', async ({ page, api }) => {
-    test.setTimeout(180_000)
-    await seed(api)
-    await dockRight(page)
-    for (const list of LISTS) {
+  for (const list of LISTS) {
+    test(`${list.name}: fits beside the dock and keeps its urgent date, a long text folding first`, async ({ page, api }) => {
+      await seed(api)
+      await dockRight(page)
       await open(page, list)
       // A list the instance could not fill (user certificates need an mTLS enrolment) is said, not measured beside a dock
-      if (!await page.locator(`${list.region} tbody .entity-name`).count()) { console.log(`COLP1 empty ${list.name}`); continue }
+      if (!await page.locator(`${list.region} tbody .entity-name`).count()) { console.log(`COLP1 empty ${list.name}`); return }
       await page.locator(`${list.region} tbody .entity-name`).first().click()
       // The authorities open in their own panel beside the list, the other lists in the dock
       if (list.name === 'authorities') await expect(page).toHaveURL(/authority=/)
@@ -154,23 +153,22 @@ test.describe('at 1406 px beside the dock at the right', () => {
       console.log(`COLP1 ${JSON.stringify({ width: 1406, dock: 'right', list: list.name, ...m })}`)
       check(m, list, '1406 dock right')
       for (const head of list.keep || []) soft(m.heads, `${list.name} keeps ${head}`).toContain(head)
-    }
-  })
+    })
+  }
 })
 
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('every PKI list draws records: chevron in view, no empty fact, a lone date or number named, the sort select', async ({ page, api }) => {
-    test.setTimeout(180_000)
-    await seed(api)
-    for (const list of LISTS) {
+  for (const list of LISTS) {
+    test(`${list.name}: draws records, chevron in view, no empty fact, a lone date or number named, the sort select`, async ({ page, api }) => {
+      await seed(api)
       if (list.name === 'authorities') await page.addInitScript(() => localStorage.setItem('ucm-ca-view-mode', 'list'))
       await page.goto(list.url)
       const records = page.locator('.atl article.mobile-record:not(.sk-record)')
       await expect(records.first().or(page.locator('.atl .mobile-list .empty'))).toBeVisible()
       await expect(page.locator('.atl article.sk-record')).toHaveCount(0)
-      if (!await records.count()) { console.log(`COLP1 empty ${list.name}`); continue }
+      if (!await records.count()) { console.log(`COLP1 empty ${list.name}`); return }
       // The sort select is drawn with the records of a sortable list
       await soft(page.locator('.atl .mobile-sort select'), list.name).toBeVisible()
       const m = await page.evaluate(() => {
@@ -195,6 +193,6 @@ test.describe('phone', () => {
       console.log(`COLP1 ${JSON.stringify({ width: 390, list: list.name, ...m })}`)
       soft(m, list.name).toMatchObject({ lost: 0, empty: [], unnamed: [], sort: true })
       soft(m.records, list.name).toBeGreaterThan(0)
-    }
-  })
+    })
+  }
 })

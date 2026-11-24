@@ -212,12 +212,11 @@ for (const [width, dock] of [[1600, false], [1406, true], [1280, false], [1000, 
   test.describe(`protocol lists at ${width} px${dock ? ', dock on the right' : ''}`, () => {
     test.use({ viewport: { width, height: dock ? 809 : 900 } })
 
-    test('no sideways scroll, chevrons in view, headers whole, fit cells whole, cut text titled, one column sorted', async ({ page, api }) => {
-      // Sixteen lists opened in turn: the budget list-columns-pki.spec.ts gives its nine
-      test.setTimeout(180_000)
-      await seed(api)
-      await feed(page, dock)
-      for (const list of LISTS) {
+    // One test per list: sixteen lists opened in turn overran the default timeout
+    for (const list of LISTS) {
+      test(`${list.name}: no sideways scroll, chevrons in view, headers whole, fit cells whole, cut text titled, one column sorted`, async ({ page, api }) => {
+        await seed(api)
+        await feed(page, dock)
         await open(page, list)
         if (dock) {
           await page.locator(`${REGION} tbody tr .entity-name`).first().click()
@@ -238,36 +237,34 @@ for (const [width, dock] of [[1600, false], [1406, true], [1280, false], [1000, 
           // At 1600 px nothing folds and nothing is cut
           expect.soft({ folded: m.folded, cut: m.cut }, list.name).toEqual({ folded: '', cut: 0 })
         }
-      }
-    })
+      })
+    }
   })
 }
 
 test.describe('protocol lists in French at 1600 px', () => {
   test.use({ viewport: { width: 1600, height: 900 } })
 
-  test('a short header stays near its values in the longest of the written languages', async ({ page, api }) => {
-    test.setTimeout(180_000)
-    await page.addInitScript(() => { try { localStorage.setItem('i18nextLng', 'fr') } catch { /* noop */ } })
-    await seed(api)
-    await feed(page)
-    for (const list of LISTS) {
+  for (const list of LISTS) {
+    test(`${list.name}: a short header stays near its values in the longest of the written languages`, async ({ page, api }) => {
+      await page.addInitScript(() => { try { localStorage.setItem('i18nextLng', 'fr') } catch { /* noop */ } })
+      await seed(api)
+      await feed(page)
       await open(page, list)
       const m = await measure(page)
       console.log(`MEASURE 1600fr ${list.name} ${JSON.stringify({ wideHeads: m.wideHeads, clipped: m.clipped, widths: m.widths })}`)
       expect.soft({ wide: wide(list, m.wideHeads), clipped: m.clipped }, list.name).toEqual({ wide: [], clipped: [] })
-    }
-  })
+    })
+  }
 })
 
 test.describe('protocol lists on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('every record keeps its chevron, no fact is a dash, a date or a number follows its label, a sortable list sorts', async ({ page, api }) => {
-    test.setTimeout(180_000)
-    await seed(api)
-    await feed(page)
-    for (const list of LISTS) {
+  for (const list of LISTS) {
+    test(`${list.name}: every record keeps its chevron, no fact is a dash, a date or a number follows its label, a sortable list sorts`, async ({ page, api }) => {
+      await seed(api)
+      await feed(page)
       await page.goto(list.url)
       const records = page.locator('.atl .mobile-list article.mobile-record.opens')
       await expect(records.first(), list.name).toBeVisible()
@@ -288,8 +285,8 @@ test.describe('protocol lists on a phone', () => {
       const select = page.getByRole('combobox', { name: 'Sort by' })
       if (list.sorted) await expect.soft(select, list.name).toBeVisible()
       else await expect.soft(select, list.name).toHaveCount(0)
-    }
-  })
+    })
+  }
 })
 
 test.describe('the sort of a protocol list', () => {
