@@ -191,3 +191,19 @@ def test_a_failed_or_empty_shard_list_stops_the_step(tmp_path, job, shard_out, s
     assert called.exists() is runs_pytest
     if runs_pytest:
         assert called.read_text().split()[-2:] == ['tests/test_a.py', 'tests/test_b.py']
+
+
+@pytest.mark.parametrize('content', [None, 'abc tests/test_a.py\n', '1.5\n'])
+def test_a_missing_or_malformed_durations_file_stops_the_dealing(tmp_path, content):
+    path = tmp_path / 'durations.txt'
+    if content is not None:
+        path.write_text(content)
+    run = subprocess.run([str(SHARD), '1', '4'], cwd=ROOT / 'backend', capture_output=True, text=True,
+                         env={**os.environ, 'SHARD_DURATIONS': str(path)})
+    assert run.returncode == 2 and 'durations' in run.stderr and not run.stdout
+
+
+def test_every_weighed_file_still_exists():
+    """A weight left for a removed file is a list nobody refreshes."""
+    gone = [p for p in _weights(DURATIONS) if not (ROOT / 'backend' / p).is_file()]
+    assert not gone, gone

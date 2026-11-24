@@ -684,8 +684,6 @@
 0.08 tests/test_msca_inline_connection.py
 0.33 tests/test_msca_inventory.py
 1.12 tests/test_msca_issuance_events.py
-0.66 tests/test_msca_kerberos_busy.py
-0.41 tests/test_msca_kerberos_busy_templates.py
 0.91 tests/test_msca_kerberos_keytab.py
 2.15 tests/test_msca_kerberos_permission.py
 1.31 tests/test_msca_lifecycle.py

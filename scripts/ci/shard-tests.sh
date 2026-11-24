@@ -17,7 +17,10 @@ if [ -n "$list" ]; then
 else
   files=$(find tests -name 'test_*.py')
 fi
-[ -f "$durations" ] || durations=/dev/null
+# A missing or malformed weights file would deal by name without a word: refuse it
+[ -f "$durations" ] || { echo "shard: no durations file $durations" >&2; exit 2; }
+bad=$(grep -v -e '^#' -e '^[[:space:]]*$' "$durations" | awk 'NF != 2 || $1 !~ /^[0-9]+(\.[0-9]+)?$/' | head -1)
+[ -z "$bad" ] || { echo "shard: malformed line in $durations: $bad" >&2; exit 2; }
 default=$(grep -v -e '^#' -e '^[[:space:]]*$' "$durations" | awk '{ print $1 }' | LC_ALL=C sort -g \
   | awk '{ v[NR] = $1 } END { if (NR == 0) print 1; else if (NR % 2) print v[(NR + 1) / 2]; else print (v[NR / 2] + v[NR / 2 + 1]) / 2 }')
 printf '%s\n' "$files" | LC_ALL=C sort -u \
