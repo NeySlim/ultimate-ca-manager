@@ -42,6 +42,14 @@ export const certificatesService = {
     return apiClient.post(`/certificates/${id}/unhold`)
   },
 
+  // A revocation no CRL or OCSP answer carried (#450); acknowledgeUnknown for one older than the record of it
+  async liftLocalRevocation(id, { acknowledgeUnknown = false } = {}) {
+    return apiClient.post(`/certificates/${id}/lift-local-revocation`, {
+      confirm: true,
+      ...(acknowledgeUnknown && { acknowledge_unknown_publication: true }),
+    })
+  },
+
   async renew(id, body = {}) {
     return apiClient.post(`/certificates/${id}/renew`, body)
   },

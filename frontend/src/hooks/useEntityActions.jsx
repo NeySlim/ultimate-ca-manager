@@ -210,6 +210,29 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
     }
   }
 
+  // Issue #450: a revocation no CRL or OCSP answer of UCM carried is lifted by an administrator
+  const handleLiftLocalRevocation = async () => {
+    const unknown = data?.local_revocation_lift === 'unknown'
+    const confirmed = await showConfirm(
+      t(unknown ? 'certificates.liftLocalRevocationUnknownRisk' : 'certificates.liftLocalRevocationWarning'),
+      {
+        title: t('certificates.liftLocalRevocationTitle'),
+        confirmText: t('certificates.liftLocalRevocation'),
+        variant: unknown ? 'danger' : 'warning'
+      }
+    )
+    if (!confirmed) return
+    try {
+      onMutate?.()
+      await certificatesService.liftLocalRevocation(id, { acknowledgeUnknown: unknown })
+      showSuccess(t('certificates.localRevocationLifted'))
+      refresh()
+      await settle()
+    } catch (err) {
+      showError(err.message || t('certificates.liftLocalRevocationFailed'))
+    }
+  }
+
   const handleRenew = async () => {
     // A certificate UCM signed renews through the issue form; a Microsoft CA sets its own duration
     if (data?.source !== 'msca') {
@@ -254,7 +277,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
     // or it leaves UCM while staying valid everywhere else. Say so here rather
     // than let the route refuse afterwards, and offer to do both.
     const status = data?.revoked ? 'revoked' : data?.status
-    if ((isCert || isUserCert) && data && status !== 'revoked' && status !== 'expired') {
+    // A CA held without its key, or none: no revocation would reach anyone (#450)
+    const unpublished = isCert && data?.revocation_published === false
+    if ((isCert || isUserCert) && data && status !== 'revoked' && status !== 'expired' && !unpublished) {
       const revokeFirst = await showConfirm(t('certificates.deleteNeedsRevoke'), {
         title: t('common.deleteCertificate'),
         confirmText: t('certificates.revokeThenDelete'),
@@ -265,8 +290,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       setRevokeOpen(true)
       return
     }
+    const stillValid = unpublished && status !== 'revoked' && status !== 'expired'
     const confirmed = await showConfirm(
-      t(`messages.confirm.delete.${CONFIRM_DELETE_KEY[type] || 'generic'}`),
+      stillValid ? t('certificates.deleteWithoutRevocation') : t(`messages.confirm.delete.${CONFIRM_DELETE_KEY[type] || 'generic'}`),
       {
         title: t('common.confirmDelete', 'Confirm Delete'),
         confirmText: t('common.delete', 'Delete'),
@@ -359,6 +385,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
           && !data.is_root && data.type !== 'root' && !!data.parent_id) }),
     row({ id: 'unhold', label: t('certificates.removeHold', 'Remove Hold'), icon: ArrowsClockwise, tone: 'success',
       onClick: handleUnhold, visible: isCert && canWrite('certificates') && onHold }),
+    // Shown when the server says the revocation was never published and may be lifted (#450)
+    row({ id: 'liftLocalRevocation', label: t('certificates.liftLocalRevocation'), icon: ArrowsClockwise, tone: 'warning',
+      onClick: handleLiftLocalRevocation, visible: isCert && hasPermission('admin:system') && !!data.local_revocation_lift }),
     // Offline needs the key in UCM's own store, and a revoked CA stays visibly revoked (#348)
     row({ id: 'offline', label: t('cas.takeOffline', 'Take Offline'), icon: ShieldWarning, tone: 'warning',
       onClick: () => setOfflineOpen(true),

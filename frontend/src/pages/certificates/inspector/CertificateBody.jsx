@@ -31,7 +31,7 @@ import { SECTIONS } from './certificateSections'
 
 const DIALOGS = { Export: ExportDialog, Revoke: RevokeDialog, Issue: IssueCertificateDialog }
 // The menu icons of the product's own actions, after the mockup's three
-const MENU_ICONS = { lint: 'policy', uploadKey: 'upload', rename: 'file', unhold: 'refresh', keyRecovery: 'key', delete: 'close' }
+const MENU_ICONS = { lint: 'policy', uploadKey: 'upload', rename: 'file', unhold: 'refresh', liftLocalRevocation: 'refresh', keyRecovery: 'key', delete: 'close' }
 const MENU_ORDER = ['lint', 'uploadKey', 'rename']
 const menuRank = (id) => (MENU_ORDER.includes(id) ? MENU_ORDER.indexOf(id) : MENU_ORDER.length)
 
