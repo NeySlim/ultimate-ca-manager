@@ -14,6 +14,7 @@
  *   retry     - Not implemented
  */
 
+import i18next from 'i18next'
 import { loginUrl } from '../navigation/safeNext'
 import { adoptSharedLock, adoptServerLock, SESSION_LOCKED_PROBLEM } from '../lib/sessionLock'
 
@@ -51,6 +52,11 @@ const HTTP_ERROR_MESSAGES = {
   503: 'The service is currently unavailable. Please try again later.',
   504: 'The server took too long to respond. Please try again.',
 }
+
+// The server's answer to a write that met another one on SQLite (backend utils/sqlite_wait.BUSY_MESSAGE)
+export const BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
+
+export const isBusyRefusal = (status, data) => status === 503 && data?.detail === BUSY_MESSAGE
 
 // Retry-After in seconds (RFC 9110 §10.2.3: delay or HTTP date), undefined when absent
 export function parseRetryAfter(value) {
@@ -232,9 +238,12 @@ class APIClient {
       }
 
       if (!response.ok) {
-        const msg = buildErrorMessage(response.status, data)
+        const busy = isBusyRefusal(response.status, data)
+        // Busy: nothing was written, the page's language says so and asks to send it again
+        const msg = busy && i18next.isInitialized ? i18next.t('messages.errors.serverBusy') : buildErrorMessage(response.status, data)
         const error = new Error(msg)
         error.status = response.status
+        if (busy) error.busy = true
         // What was asked, for a cause the page can show ("GET /api/v2/certificates")
         error.request = `${config.method} ${url.split('?')[0]}`
         error.data = data

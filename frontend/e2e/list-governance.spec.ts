@@ -1,4 +1,4 @@
-import { test, expect, createCA, issueCert, createUser, uid } from './support/fixtures'
+import { test, expect, createCA, issueCert, strongPassword } from './support/fixtures'
 
 // The governance and administration lists on the column template, measured where jsdom
 // cannot: no list scrolls sideways at any desktop width, dock closed or at the right; no header is clipped, no fitted
@@ -21,16 +21,55 @@ const LISTS = [
   { name: 'backups', url: '/settings?tab=backup', region: '#backup-scroll', sorted: 'Created', empty: true },
 ]
 
-async function seed(api) {
-  const ca = await createCA(api, { commonName: `Regional Issuing Authority for the West ${uid('ca')}` })
-  await issueCert(api, ca.id, { cn: `${uid('a-long-service-name')}.internal.example.com` })
+// Fixed names, created once per base and reused by every test: a seed per test grew the shared lists without end
+const SEED = {
+  ca: 'Regional Issuing Authority for the West (list fixture)',
+  cert: 'a-long-service-name-of-the-list-fixture.internal.example.com',
   // A journal entry whose resource is as long as a name may be: 64 characters
-  await issueCert(api, ca.id, { cn: `${uid('svc')}.the-longest-internal-subdomain.example.com`.padEnd(64, 'x').slice(0, 64) })
-  await createUser(api, 'operator')
-  await api.post('/groups', { name: uid('group'), description: 'The operators of the issuing authorities of the western region, on call' })
+  longCert: 'svc-list-fixture.the-longest-internal-subdomain.example.com'.padEnd(64, 'x').slice(0, 64),
+  user: 'operator_list_fixture',
+  group: 'group-list-fixture',
   // A journal entry whose resource is as long as a group name may be: 100 characters
-  await api.post('/groups', { name: `${uid('group')}-operators-of-the-issuing-authorities-of-the-western-region-on-call`.padEnd(100, 'x').slice(0, 100) })
-  await api.post('/policies', { name: uid('policy'), operations: ['issuance'], priority: 20, ca_id: ca.id, requires_approval: false })
+  longGroup: 'group-list-fixture-operators-of-the-issuing-authorities-of-the-western-region-on-call'.padEnd(100, 'x').slice(0, 100),
+  policy: 'policy-list-fixture',
+}
+
+const items = (data) => (Array.isArray(data) ? data : data?.items || data?.certificates || data?.users || []) as any[]
+
+// Found, else created; a create refused because another worker made it meanwhile finds it again
+async function ensure(find: () => Promise<any>, create: () => Promise<any>) {
+  const found = await find()
+  if (found) return found
+  try {
+    return await create()
+  } catch (e) {
+    const again = await find()
+    if (again) return again
+    throw e
+  }
+}
+
+async function seed(api, { journal = false } = {}) {
+  const q = encodeURIComponent
+  const ca = await ensure(async () => items(await api.get(`/cas?search=${q(SEED.ca)}`)).find((c) => c.common_name === SEED.ca),
+    () => createCA(api, { commonName: SEED.ca }))
+  const cert = (cn) => ensure(async () => items(await api.get(`/certificates?search=${q(cn)}&per_page=100`)).find((c) => c.common_name === cn),
+    () => issueCert(api, ca.id, { cn }))
+  await cert(SEED.cert)
+  const longCert = await cert(SEED.longCert)
+  await ensure(async () => items(await api.get(`/users?search=${q(SEED.user)}`)).find((u) => u.username === SEED.user),
+    () => api.post('/users', { username: SEED.user, password: strongPassword(), email: `${SEED.user}@example.test`, role: 'operator' }))
+  const group = (name, extra = {}) => ensure(async () => items(await api.get(`/groups?search=${q(name)}`)).find((g) => g.name === name),
+    () => api.post('/groups', { name, ...extra }))
+  await group(SEED.group, { description: 'The operators of the issuing authorities of the western region, on call' })
+  const longGroup = await group(SEED.longGroup)
+  await ensure(async () => items(await api.get('/policies')).find((p) => p.name === SEED.policy),
+    () => api.post('/policies', { name: SEED.policy, operations: ['issuance'], priority: 20, ca_id: ca.id, requires_approval: false }))
+  if (journal) {
+    // Fresh journal entries naming the long resources, without a new object
+    await api.patch(`/certificates/${longCert.id}`, { descr: SEED.longCert })
+    await api.put(`/groups/${longGroup.id}`, { description: 'The long-named group of the list fixture' })
+  }
 }
 
 async function open(page, list) {
@@ -97,7 +136,7 @@ for (const width of [1000, 1280, 1600]) {
     // One test per list: a page visit costs seconds on two cores, a loop over every list overran the timeout
     for (const list of LISTS) {
       test(`${list.name}: no scroll sideways, no header clipped, no text cut without its title, one column sorted`, async ({ page, api }) => {
-        await seed(api)
+        await seed(api, { journal: list.journal })
         await open(page, list)
         await expect.poll(() => geometry(page, list.region, list.journal).then((g) => g.over), { message: list.name }).toBeLessThanOrEqual(1)
         const g = await geometry(page, list.region, list.journal)

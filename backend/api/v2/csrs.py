@@ -45,6 +45,7 @@ from utils.validity import (MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS,
                             coerce_validity_days, validity_days_in_range)
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
+from utils.sqlite_wait import BUSY_MESSAGE, is_locked, locked_refusal
 from utils.cert_status import (
     awaits_certificate, pending_requests, signed_requests)
 from services.import_service import KeyPasswordError, load_import_private_key
@@ -1241,6 +1242,11 @@ def sign_csr(csr_id):
         logger.error(f"CSR Sign Error: {e}", exc_info=True)
         return error_response("Failed to sign CSR", 500)
     except Exception as e:
+        # Another writer held SQLite: nothing was stored, the busy 503 asks to send it again
+        refused = locked_refusal(e)
+        if refused is not None:
+            logger.warning(f"CSR {csr_id} not signed: the database is busy with another write")
+            return refused
         logger.error(f"CSR Sign Error: {e}", exc_info=True)
         return error_response("Failed to sign CSR", 500)
 
@@ -1354,6 +1360,12 @@ def bulk_sign_csrs():
         except (FipsRestricted, TemplateConfigError, RequestRejected) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:
+            if is_locked(e):
+                # Rolled back: the next requests go on, this one is sent again by its caller
+                db.session.rollback()
+                logger.warning(f"Bulk sign: CSR {csr_id} not signed, the database is busy with another write")
+                results['failed'].append({'id': csr_id, 'error': BUSY_MESSAGE})
+                continue
             logger.error(f"Bulk sign: CSR {csr_id} failed (template {data.get('template_id')}): {e}", exc_info=True)
             results['failed'].append({'id': csr_id, 'error': 'Signing failed'})
 

@@ -37,7 +37,9 @@ test('a user created on screen can sign in with its role', async ({ page, api, r
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).toBeHidden()
 
-  await expect(page.getByRole('main').getByText(username).first()).toBeVisible()
+  // Other tests add accounts: the list is paged, the new one is found as a user finds it, by the search
+  await page.getByRole('main').getByRole('searchbox').fill(username)
+  await expect(page.getByRole('main').getByRole('button', { name: username, exact: true })).toBeVisible()
   const own = await Api.login(request, username, password)
   expect((await own.get('/auth/verify')).user).toMatchObject({ username, role: 'operator' })
 })
@@ -53,6 +55,7 @@ test('a group created on screen is stored', async ({ page, api }) => {
   await dialog.getByRole('button', { name: /^Create/ }).click()
   await expect(dialog).toBeHidden()
 
+  await page.getByRole('main').getByRole('searchbox').fill(name)
   await expect(page.getByRole('main').getByRole('cell', { name }).first()).toBeVisible()
   const groups = await api.get('/groups')
   expect(JSON.stringify(groups)).toContain(name)
@@ -69,6 +72,7 @@ test('a custom role created on screen is stored', async ({ page, api }) => {
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).toBeHidden()
 
+  await page.getByRole('main').getByRole('searchbox').fill(name)
   await expect(page.getByRole('main').getByText(name).first()).toBeVisible()
   expect(JSON.stringify(await api.get('/rbac/roles'))).toContain(name)
 })

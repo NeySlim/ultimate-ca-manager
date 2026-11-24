@@ -1,4 +1,4 @@
-import { test, expect, createCA, type Api } from './support/fixtures'
+import { test, expect, createCA, seedOnce, type Api } from './support/fixtures'
 import type { Page } from '@playwright/test'
 
 // The protocol lists (ACME, SCEP, EST, TSA, CRL / OCSP) measured on the list template: at
@@ -200,7 +200,10 @@ const measure = (page: Page) => page.locator(REGION).evaluate((el) => {
   }
 })
 
-async function seed(api: Api) {
+// Made once for every test of the file, which only read them
+const seed = (api: Api) => seedOnce('protocol-lists', () => make(api))
+
+async function make(api: Api) {
   // Two real authorities with a published CRL, for the CRL / OCSP and SCEP challenge lists
   for (const ca of [await createCA(api, { commonName: 'Regional Issuing Authority for the West' }), await createCA(api)]) {
     await api.post(`/crl/${ca.id}/regenerate`)
