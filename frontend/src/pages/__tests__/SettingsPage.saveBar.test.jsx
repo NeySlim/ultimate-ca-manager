@@ -38,9 +38,11 @@ vi.mock('../settings/AuditSection', () => ({
   ),
 }))
 
+// `perm.write`: false for a reader of the settings who may not change them
+const perm = vi.hoisted(() => ({ write: true }))
 vi.mock('../../hooks/usePermission', () => ({
   usePermission: () => ({
-    hasPermission: () => true, canRead: () => true, canWrite: () => true, canDelete: () => true,
+    hasPermission: () => true, canRead: () => true, canWrite: () => perm.write, canDelete: () => true,
     isAdmin: () => true, permissions: ['*'],
   }),
 }))
@@ -75,7 +77,7 @@ beforeEach(() => {
   notificationSpies.showConfirm = vi.fn().mockResolvedValue(false)
   window.history.replaceState(null, '', '/settings')
 })
-afterEach(() => { vi.clearAllMocks(); dropAllDrafts() })
+afterEach(() => { vi.clearAllMocks(); dropAllDrafts(); perm.write = true })
 
 async function loaded(entry) {
   renderPage(entry)
@@ -138,6 +140,25 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
       input.focus()
       screenSize.resize(true)
       expect(document.activeElement).toBe(input)
+    } finally {
+      screenSize.restore()
+    }
+  })
+
+  it('puts nothing in the page head for a reader who may not change the settings, the announcement in the form', async () => {
+    perm.write = false
+    const screenSize = phoneScreen(false)
+    try {
+      await loaded()
+      expect(bar()).toBeNull()
+      expect(document.querySelector('.page-head').querySelector('#settings-savebar, #settings-state, #settings-save, #settings-announce')).toBeNull()
+      const announce = document.querySelectorAll('#settings-announce')
+      expect(announce).toHaveLength(1)
+      expect(document.getElementById('settings-form')).toContainElement(announce[0])
+      expect(announce[0]).toHaveClass('sr-only')
+      screenSize.resize(true)
+      expect(bar()).toBeNull()
+      expect(document.getElementById('settings-form')).toContainElement(document.getElementById('settings-announce'))
     } finally {
       screenSize.restore()
     }
