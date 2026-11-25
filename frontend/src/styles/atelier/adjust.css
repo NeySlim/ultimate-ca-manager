@@ -330,21 +330,21 @@
 /* The cap is a switch on the column's own width: --form-max under 1280 px, none from 1280 px. */
 @media(min-width:801px){:root .atl .settings-layout:not(.guide-layout) :is(.settings-main,.settings-form)>:not(.settings-form,.settings-wide){max-width:max(var(--form-max),(100% - 1279.99px)*1000000)}}
 :root .atl .settings-body :is(small,p:not(.field-error,.notice)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
-/* A card of 1280 px or more: its groups of fields in two independent columns, 48 px apart, balanced by the browser;
-   a group alone stays in the first. What is not a group of fields (a table, a notice, a test line) and a group
-   marked .wide (it holds a table or a list, or is the card's only one) keep the whole card. */
+/* A card of 1280 px or more: its groups of fields in two independent columns, 48 px apart, balanced by the browser.
+   The rest keeps the whole card: what is not a group of fields (a table, a notice, a test line), a group marked .wide
+   or .stacked, and a group alone in its run (no other group of fields beside it, a closed dialog not counted). */
 @container (min-width:1280px){
   :root .atl .settings-body{display:block;columns:2;column-gap:48px}
   :root .atl .settings-body>:not(dialog){break-inside:avoid}
   :root .atl .settings-body>:not(:first-child,dialog){margin-top:20px}
-  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide){column-span:all}
+  :root .atl .settings-body>:not(dialog,.settings-group:not(.wide,.stacked):is(.settings-group:not(.wide,.stacked)+*,.settings-group:not(.wide,.stacked)+dialog+*,:has(+.settings-group:not(.wide,.stacked),+dialog+.settings-group:not(.wide,.stacked)))){column-span:all}
   /* The first block of a column loses its top margin: what follows a block on the whole card takes it from that block. */
-  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide):not(:last-child){margin-bottom:20px}
-  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide)+:not(dialog){margin-top:0}
+  :root .atl .settings-body>:not(dialog,.settings-group:not(.wide,.stacked):is(.settings-group:not(.wide,.stacked)+*,.settings-group:not(.wide,.stacked)+dialog+*,:has(+.settings-group:not(.wide,.stacked),+dialog+.settings-group:not(.wide,.stacked)))):not(:last-child){margin-bottom:20px}
+  :root .atl .settings-body>:not(dialog,.settings-group:not(.wide,.stacked):is(.settings-group:not(.wide,.stacked)+*,.settings-group:not(.wide,.stacked)+dialog+*,:has(+.settings-group:not(.wide,.stacked),+dialog+.settings-group:not(.wide,.stacked))))+:not(dialog){margin-top:0}
   /* A group on half a card: two columns of fields under 700 px of group, four from there. On the whole card: four
      columns 48 px apart, a long field on a half. No field grows: a long one stops at 640 px, a short one at 220 px. */
   :root .atl .settings-body{--sg-cols:2;--sg-gap:16px;--sg-span:1;--sg-full:1/-1;--sg-short-help:1;--sg-short-max:var(--field-short)}
-  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide){--sg-cols:4;--sg-gap:48px;--sg-span:2;--sg-full:span 2;--sg-short-help:2;--sg-short-max:var(--field-short)}
+  :root .atl .settings-body>:not(dialog,.settings-group:not(.wide,.stacked):is(.settings-group:not(.wide,.stacked)+*,.settings-group:not(.wide,.stacked)+dialog+*,:has(+.settings-group:not(.wide,.stacked),+dialog+.settings-group:not(.wide,.stacked)))){--sg-cols:4;--sg-gap:48px;--sg-span:2;--sg-full:span 2;--sg-short-help:2;--sg-short-max:var(--field-short)}
   :root .atl .settings-body .settings-grid{grid-template-columns:repeat(var(--sg-cols),minmax(0,1fr));column-gap:var(--sg-gap)}
   :root .atl .settings-body .settings-grid>.field{grid-column:span var(--sg-span)}
   :root .atl .settings-body .settings-grid>.field.short{grid-column:span 1}

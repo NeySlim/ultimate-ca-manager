@@ -91,5 +91,12 @@ describe('certificate tools results', () => {
     expect(row(en.common.status).querySelector('dd.v .badge.good')).toHaveTextContent('valid')
     expect(row(en.common.sha256).querySelectorAll('.code-value.hex .line')).toHaveLength(4)
     expect(row(en.common.commonName).querySelector('dd.v .code-value')).toHaveTextContent('tool.example.com')
+    // a result keeps the whole card on a wide screen, never half of it beside the form
+    expect(document.querySelector('dl.kv').closest('fieldset.settings-group')).toHaveClass('wide')
+  })
+
+  it('lays a decoded certificate on the whole card', async () => {
+    await decode(CERT)
+    expect(document.querySelector('dl.kv').closest('fieldset.settings-group')).toHaveClass('wide')
   })
 })

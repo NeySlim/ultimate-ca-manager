@@ -364,7 +364,7 @@ export default function CertificateToolsPage() {
   const statusPill = (ok, words) => <Pill tone={ok ? 'good' : 'bad'} label={words} />
 
   const renderSSLResult = (d) => (
-    <SettingsGroup legend={t('tools.sslCheckResult')} grid={false}>
+    <SettingsGroup legend={t('tools.sslCheckResult')} grid={false} wide>
       {d.issues?.length > 0 && <Notice tone="bad">{d.issues.join(' · ')}</Notice>}
       <Facts items={[
         copyRow(t('common.commonName'), d.subject?.commonName),
@@ -384,7 +384,7 @@ export default function CertificateToolsPage() {
   )
 
   const renderCSRResult = (d) => (
-    <SettingsGroup legend={t('common.csrDetails')} grid={false}>
+    <SettingsGroup legend={t('common.csrDetails')} grid={false} wide>
       <Facts items={[
         copyRow(t('common.commonName'), d.subject?.commonName),
         fact(t('common.organization'), d.subject?.organizationName),
@@ -398,7 +398,7 @@ export default function CertificateToolsPage() {
   )
 
   const renderCertResult = (d) => (
-    <SettingsGroup legend={t('common.certificateDetails')} grid={false}>
+    <SettingsGroup legend={t('common.certificateDetails')} grid={false} wide>
       <Facts items={[
         copyRow(t('tools.subjectCn'), d.subject?.commonName),
         fact(t('tools.issuerCn'), d.issuer?.commonName),
@@ -422,7 +422,7 @@ export default function CertificateToolsPage() {
 
   const ITEM_WORDS = { certificate: 'common.certificate', private_key: 'common.privateKey', csr: 'common.csr' }
   const renderMatchResult = (d) => (
-    <SettingsGroup legend={t('tools.keyMatchResults')} grid={false}>
+    <SettingsGroup legend={t('tools.keyMatchResults')} grid={false} wide>
       <RecordList empty={t('tools.noParsedItems')}>
         {(d.items || []).map((item, i) => (
           <RecordRow key={`item-${i}`} title={ITEM_WORDS[item.type] ? t(ITEM_WORDS[item.type]) : item.type}
@@ -440,7 +440,7 @@ export default function CertificateToolsPage() {
   )
 
   const renderConvertResult = (d) => (
-    <SettingsGroup legend={t('tools.conversionResult')} grid={false}>
+    <SettingsGroup legend={t('tools.conversionResult')} grid={false} wide>
       {(d.format === 'pem' || d.format === 'pkcs7') && (
         <div className="field full">
           <Textarea id="tool-convert-output" mono readOnly rows={8} label={d.filename} value={d.data || ''} />

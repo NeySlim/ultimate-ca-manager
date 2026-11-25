@@ -144,7 +144,8 @@ const FIELD = 640
 const SHORT = 220
 const column = (w: number) => Math.min(w, 1920) - 2 * side(Math.min(w, 1920)) - 224
 
-// Every card of the page: its box, the blocks of its body (a plain group of fields, or what keeps the whole card), its fields
+// Every card of the page: its box, the blocks of its body (a plain group of fields beside another one, or what keeps the
+// whole card: anything else, a group marked wide or stacked, a group alone in its run between two such blocks), its fields
 const cardsOf = (page) => page.locator('.atl .settings-layout .settings-section').evaluateAll((els) => els.map((el) => {
   const r = el.getBoundingClientRect()
   const body = el.querySelector(':scope > .settings-body') as HTMLElement
@@ -152,14 +153,17 @@ const cardsOf = (page) => page.locator('.atl .settings-layout .settings-section'
   const inner = { x: body.getBoundingClientRect().x + parseFloat(c.paddingLeft), width: body.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight) }
   const blocks = [...body.children].filter((k) => (k as HTMLElement).offsetParent && getComputedStyle(k).position === 'static').map((k) => {
     const b = k.getBoundingClientRect()
-    return { plain: k.matches('.settings-group:not(.wide)'), what: `${k.tagName.toLowerCase()}.${k.className}`, x: b.x, y: b.y, width: b.width, bottom: b.bottom }
+    const grid = k.matches('.settings-group') && k.querySelector(':scope > .settings-grid')
+    return {
+      group: k.matches('.settings-group:not(.wide,.stacked)'), plain: false, what: `${k.tagName.toLowerCase()}.${k.className}`,
+      x: b.x, y: b.y, width: b.width, bottom: b.bottom, grid: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0,
+    }
   })
+  blocks.forEach((b, i) => { b.plain = b.group && !!(blocks[i - 1]?.group || blocks[i + 1]?.group) })
   const fields = [...body.querySelectorAll('.field > :is(input:not([type=checkbox],[type=radio],[type=file]), select, textarea)')]
     .filter((f) => (f as HTMLElement).offsetParent && !f.closest('dialog'))
     .map((f) => ({ id: f.id, short: !!f.closest('.field.short'), width: f.getBoundingClientRect().width }))
-  const grids = [...body.querySelectorAll(':scope > .settings-group:not(.wide) > .settings-grid')]
-    .map((g) => getComputedStyle(g).gridTemplateColumns.split(' ').length)
-  return { id: el.id, x: r.x, width: r.width, inner, blocks, fields, grids }
+  return { id: el.id, x: r.x, width: r.width, inner, blocks, fields }
 }))
 
 // Texts wider than `measure` characters of their own font
@@ -209,8 +213,10 @@ const expectCards = async (page, width: number, where: string) => {
       }
       for (const b of c.blocks) { if (b.plain) run.push(b); else close() }
       close()
-      // a group on half a card: two columns of fields under 700 px, four from there
-      for (const n of c.grids) expect(n, `${where} ${c.id}: columns of a group of ${Math.round(half)} px`).toBe(half < 700 ? 2 : 4)
+      // a group on half a card: two columns of fields under 700 px, four from there; on the whole card, four
+      for (const b of c.blocks.filter((k) => k.grid)) {
+        expect(b.grid, `${where} ${c.id} ${b.what}: columns of a group of ${Math.round(b.width)} px`).toBe(b.plain && half < 700 ? 2 : 4)
+      }
       for (const f of c.fields) expect(f.width, `${where} ${c.id} #${f.id}`).toBeLessThanOrEqual((f.short ? SHORT : FIELD) + EPS)
     }
   }
@@ -229,6 +235,9 @@ for (const width of [1280, 1440, 1600, 1920, 2560, 3440]) {
     const general = cards.find((c) => c.id === 'set-sec-general')!
     expect(general.blocks.filter((b) => b.plain).length).toBeGreaterThanOrEqual(4)
     if (wide) near(general.fields.find((f) => f.id === 'set-base_url')!.width, Math.min(FIELD, (general.inner.width - GUTTER) / 2), 'public URL')
+    // the restore of a backup, alone after the list of archives, takes the card
+    const backup = cards.find((c) => c.id === 'set-sec-backup')!
+    near(backup.blocks[backup.blocks.length - 1].width, backup.inner.width, 'restore from backup')
     // The save state is in the page head, centred over the cards' column (#455)
     const bar = await box(page.locator('.page-head #settings-savebar'))
     near(bar.x + bar.width / 2, toc.x + 200 + 24 + (wide ? col : Math.min(FORM, col)) / 2, 'save state over the middle of the cards')
@@ -251,10 +260,26 @@ for (const width of [1280, 1600, 1920, 2560]) {
       await open(page, path)
       await expect(page.locator('.atl .settings-layout .settings-section').first()).toBeVisible()
       const { cards, wide } = await expectCards(page, width, path)
-      // a card of one group of fields keeps it in the first column
+      // a group alone in its run takes the whole card (expectCards), never half of it with the other half empty
       if (wide) for (const c of cards) {
-        const plain = c.blocks.filter((b) => b.plain)
-        if (plain.length === 1) near(plain[0].x, c.inner.x, `${path} ${c.id}: its only group at the left`)
+        for (const b of c.blocks.filter((k) => k.group && !k.plain)) near(b.width, c.inner.width, `${path} ${c.id} ${b.what}: alone, on the card`)
+      }
+      if (path === '/acme?tab=config') {
+        // the profiles editor holds its stacked group's width: never narrower than in a card of 960 px
+        const profiles = cards.find((c) => c.id === 'set-sec-profiles')!
+        const editor = await box(page.locator('#set-sec-profiles .profiles-editor'))
+        near(editor.width, profiles.inner.width, 'profiles editor on its card')
+        expect(editor.width).toBeGreaterThanOrEqual(Math.min(FORM, column(width)) - 2 - 40 - EPS)
+        // a stacked group keeps the card even beside a group of fields (none does today: one is set beside it)
+        if (wide) {
+          const stacked = await page.locator('#set-sec-profiles .settings-group.stacked').evaluate((el) => {
+            el.before(document.querySelector('#set-sec-server .settings-group')!.cloneNode(true))
+            const w = el.getBoundingClientRect().width
+            el.previousElementSibling!.remove()
+            return w
+          })
+          near(stacked, profiles.inner.width, 'stacked group beside a group of fields')
+        }
       }
     }
   })
