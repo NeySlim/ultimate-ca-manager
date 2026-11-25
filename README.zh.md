@@ -4,8 +4,9 @@
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)
-![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&color=blue)
+![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&sort=semver&color=blue)
 ![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/ucm)](https://artifacthub.io/packages/helm/ucm/ucm)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20UCM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/neyslim)
 
 **Ultimate Certificate Manager (UCM)** 是一个基于 Web 的证书颁发机构（CA）管理平台，支持 PKI 协议（ACME、SCEP、EST、OCSP、CRL/CDP），集成 Microsoft ADCS，提供多因素认证和证书全生命周期管理。

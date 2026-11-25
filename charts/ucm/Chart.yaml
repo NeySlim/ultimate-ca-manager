@@ -23,3 +23,4 @@ maintainers:
 icon: https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/logo.png
 annotations:
   category: Security
+  artifacthub.io/license: AGPL-3.0-only

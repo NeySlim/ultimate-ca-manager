@@ -4,8 +4,9 @@
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)
-![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&color=blue)
+![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&sort=semver&color=blue)
 ![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/ucm)](https://artifacthub.io/packages/helm/ucm/ucm)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20UCM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/neyslim)
 
 **Ultimate Certificate Manager (UCM)** は、PKI プロトコル (ACME、SCEP、EST、OCSP、CRL/CDP)、Microsoft ADCS 連携、多要素認証、証明書のライフサイクル管理に対応した、Web ベースの認証局 (CA) 管理プラットフォームです。

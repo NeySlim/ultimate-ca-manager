@@ -154,7 +154,7 @@ dnsUpdate:
 - Keep `dnsUpdate.service.type: ClusterIP` unless clients outside the cluster must reach it. A `LoadBalancer` with UDP and TCP on the same port needs mixed-protocol support from your cloud or load balancer. Check the documentation of your provider.
 - kube-proxy can replace the client IP with a node IP (SNAT). UCM then sees many clients as one source, and its limits per source address apply to all of them together.
 - `dnsUpdate.networkPolicy.enabled: true` adds a NetworkPolicy that accepts the listener ports only from the peers in `dnsUpdate.networkPolicy.from`. The policy allows from all sources only the HTTPS port, the HTTP port and the ports in `dnsUpdate.networkPolicy.extraPorts` (list of `{port, protocol}`). Every other port of the pod is closed while the policy is enabled. For example, add the port of the ACME client TLS-ALPN-01 proof listener, or a port that you add through `extraEnv`, to `extraPorts`. The policy works only with a CNI that enforces NetworkPolicy.
-- The TSIG keys are created per proxy account in the UCM web interface. See [`docs/integrations/acme-proxy-dns-update.md`](../../docs/integrations/acme-proxy-dns-update.md) and the [Admin Guide](../../docs/ADMIN_GUIDE.md).
+- The TSIG keys are created per proxy account in the UCM web interface. See [`docs/integrations/acme-proxy-dns-update.md`](https://github.com/NeySlim/ultimate-ca-manager/blob/main/docs/integrations/acme-proxy-dns-update.md) and the [Admin Guide](https://github.com/NeySlim/ultimate-ca-manager/blob/main/docs/ADMIN_GUIDE.md).
 
 ## Uninstall
 
