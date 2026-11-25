@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **The Settings and Account save bar no longer shows fields in a band under it (#455).** On wide screens the floating bar now sits flush on the bottom of the page instead of 24 px above it.
+
 ## [3.0] - 2026-11-25
 
 ### Added
