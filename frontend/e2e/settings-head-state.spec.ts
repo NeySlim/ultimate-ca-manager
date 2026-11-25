@@ -42,8 +42,8 @@ const layout = (page) => page.evaluate(() => {
     head: r(head) as Rect,
     title: r(head.firstElementChild) as Rect,
     bar: r(bar),
-    // A card of the form: the column the state is centred over
-    form: r(document.querySelector('#settings-form .settings-section')) as Rect,
+    // A card of the form measure: the column the state is centred over
+    form: r(document.querySelector('#settings-form .settings-section:not(.settings-wide)')) as Rect,
     frame: css && {
       border: ['Top', 'Right', 'Bottom', 'Left'].reduce((n, side) => n + parseFloat(css[`border${side}Width`]), 0),
       background: css.backgroundColor,

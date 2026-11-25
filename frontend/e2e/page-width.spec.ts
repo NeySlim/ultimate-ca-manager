@@ -135,7 +135,7 @@ test('under 1100 px of inspector an extension keeps its value at the right of it
 })
 
 // The form pages (Settings, Account, the tools, the operations, the protocols' configuration): a card holds 960 px beside the
-// contents while its column is narrower than 1280 px; from 1280 px it takes the column and lays its groups of
+// contents while its column is narrower than 1280 px (the scheduler's, a dense table, the column); from 1280 px it takes the column and lays its groups of
 // fields in two columns 48 px apart. No field nor text grows: helps 62ch, notices 78ch, fields 640 px (220 px short).
 const FORM = 960
 const WIDE = 1280
@@ -187,7 +187,8 @@ const expectCards = async (page, width: number, where: string) => {
   expect(cards.length, where).toBeGreaterThan(0)
   for (const c of cards) {
     near(c.x, toc.x + 200 + 24, `${where} ${c.id} beside the contents`)
-    near(c.width, wide ? col : Math.min(FORM, col), `${where} ${c.id} width`)
+    // under 1280 px of column the scheduler's table of nine columns is the exception: it keeps the whole column
+    near(c.width, wide || c.id === 'set-sec-scheduler' ? col : Math.min(FORM, col), `${where} ${c.id} width`)
     const half = (c.inner.width - GUTTER) / 2
     const plain = c.blocks.filter((b) => b.plain)
     for (const b of c.blocks) {
@@ -268,7 +269,7 @@ for (const width of [820, 1024]) {
     const cards = await cardsOf(page)
     expect(cards.length).toBeGreaterThan(10)
     for (const c of cards) {
-      near(c.width, Math.min(FORM, width - 2 * m - 224), `${c.id} width`)
+      near(c.width, c.id === 'set-sec-scheduler' ? width - 2 * m - 224 : Math.min(FORM, width - 2 * m - 224), `${c.id} width`)
       for (const b of c.blocks) near(b.width, c.inner.width, `${c.id} ${b.what} width`)
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)

@@ -83,12 +83,13 @@ class SectionBoundary extends Component {
 
 /**
  * The frame of a section (settingsSection()): its heading, the refusal of its last save, then its
- * body. `aside` sits at the right of the heading (a state of the section).
+ * body. `aside` sits at the right of the heading (a state of the section). `wide`: a table too dense
+ * for the 960 px of a card in a narrow column keeps the whole column there too (adjust.css, .settings-wide).
  */
-export function SettingsFrame({ id, label, desc, error, aside, children }) {
+export function SettingsFrame({ id, label, desc, error, aside, wide = false, children }) {
   const { t } = useTranslation()
   return (
-    <section className="panel settings-section" id={`set-sec-${id}`} aria-labelledby={`set-title-${id}`}>
+    <section className={wide ? 'panel settings-section settings-wide' : 'panel settings-section'} id={`set-sec-${id}`} aria-labelledby={`set-title-${id}`}>
       <header className="panel-heading">
         <div>
           <h2 id={`set-title-${id}`} tabIndex={-1}>{label}</h2>
