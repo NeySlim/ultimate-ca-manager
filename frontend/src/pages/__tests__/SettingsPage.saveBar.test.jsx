@@ -119,6 +119,30 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
     }
   })
 
+  it('gives the focus back to the same control of the bar when the window crosses 800 px', async () => {
+    const screenSize = phoneScreen(false)
+    try {
+      await loaded()
+      fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+      for (const id of ['settings-save', 'settings-reset', 'settings-state']) {
+        document.getElementById(id).focus()
+        screenSize.resize(true)
+        expect(document.getElementById('settings-form')).toContainElement(bar())
+        expect(document.activeElement?.id).toBe(id)
+        screenSize.resize(false)
+        expect(document.querySelector('.page-head')).toContainElement(bar())
+        expect(document.activeElement?.id).toBe(id)
+      }
+      // a focus elsewhere stays where it is
+      const input = screen.getByLabelText('system-name')
+      input.focus()
+      screenSize.resize(true)
+      expect(document.activeElement).toBe(input)
+    } finally {
+      screenSize.restore()
+    }
+  })
+
   it('shows every section in a frame of its own, listed by group', async () => {
     await loaded()
     for (const id of ['general', 'email', 'audit', 'security', 'backup', 'about']) {

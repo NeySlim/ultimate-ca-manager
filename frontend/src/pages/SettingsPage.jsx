@@ -61,6 +61,7 @@ import { usePhoneWidth } from '../hooks/useMediaQuery'
 import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Pill, SkeletonPanel, jumpTo } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsSaveBar } from '../components/atelier/SettingsView'
+import { useSaveBarFocus } from '../hooks/useSaveBarFocus'
 import { DockSlot, DockSlotProvider } from './protocols/dockSlot'
 import SettingsHistory from './settings/SettingsHistory'
 import { fieldProblems, fieldSection } from './settings/fieldChecks'
@@ -174,6 +175,7 @@ export default function SettingsPage() {
   const { isMobile } = useMobile()
   // A wide screen holds the save state in the page head; a phone keeps the bar under the form
   const phone = usePhoneWidth()
+  useSaveBarFocus(phone)
   const [searchParams, setSearchParams] = useSearchParams()
   const { reconnecting, status: reconnectStatus, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
   

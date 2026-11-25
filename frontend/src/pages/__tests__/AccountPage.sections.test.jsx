@@ -124,6 +124,26 @@ describe('AccountPage sections', () => {
     }
   })
 
+  it('gives the focus back to the same control of the bar when the window crosses 800 px', async () => {
+    const screenSize = phoneScreen(false)
+    try {
+      open()
+      await screen.findByRole('region', { name: 'account.profile' })
+      fireEvent.change(screen.getByLabelText('account.fullName'), { target: { value: 'Alice B.' } })
+      for (const id of ['settings-save', 'settings-reset', 'settings-state']) {
+        document.getElementById(id).focus()
+        screenSize.resize(true)
+        expect(document.getElementById('settings-form')).toContainElement(document.getElementById('settings-savebar'))
+        expect(document.activeElement?.id).toBe(id)
+        screenSize.resize(false)
+        expect(document.querySelector('.page-head')).toContainElement(document.getElementById('settings-savebar'))
+        expect(document.activeElement?.id).toBe(id)
+      }
+    } finally {
+      screenSize.restore()
+    }
+  })
+
   it('carries the language of the account in its profile, saved with the preferences', async () => {
     open()
     const select = await screen.findByRole('combobox', { name: 'settings.interfaceLanguage' })
