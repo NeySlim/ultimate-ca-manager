@@ -316,3 +316,33 @@ def test_a_line_of_repeated_armour_openers_is_scanned_in_linear_time():
 def test_a_long_upper_case_label_is_still_taken_for_a_key():
     from utils.trust_pem import holds_private_key
     assert holds_private_key(b'-----BEGIN ' + b'A' * 65 + b' PRIVATE KEY-----\nAAAA\n')
+
+
+def _headered(cert):
+    return _pem(cert).replace(b'-----BEGIN CERTIFICATE-----\n', b'-----BEGIN CERTIFICATE-----\nComment: x\n\n')
+
+
+def test_a_headered_block_beside_a_plain_one_is_handed_out_with_it(app, auth_client, drop):
+    """A row 2.254.4 stored as sent keeps every certificate it holds, not only the blocks without headers."""
+    _, first = _issue('headered-first')
+    _, second = _issue('plain-second')
+    drop(first)
+    with app.app_context():
+        row = TrustedCertificate(name='headered and plain', certificate_pem=(_headered(first) + _pem(second)).decode(),
+                                 fingerprint_sha256=first.fingerprint(hashes.SHA256()).hex(),
+                                 subject=first.subject.rfc4514_string(), purpose='custom')
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    detail = auth_client.get(f'{TS}/{row_id}')
+    assert detail.status_code == 200
+    assert detail.get_json()['data']['certificate_pem'].encode() == _pem(first) + _pem(second)
+    bundle = auth_client.get(f'{TS}/export?format=pem')
+    assert bundle.status_code == 200 and _pem(first).strip() in bundle.data and b'Comment: x' not in bundle.data
+
+
+def test_a_row_cryptography_cannot_read_still_hands_out_its_plain_blocks():
+    from utils.trust_pem import certificate_blocks
+    _, cert = _issue('plain-beside-broken')
+    broken = b'-----BEGIN CERTIFICATE-----\nComment: x\n\nAAAA\n-----END CERTIFICATE-----\n'
+    assert certificate_blocks(broken + _pem(cert)) == _pem(cert)

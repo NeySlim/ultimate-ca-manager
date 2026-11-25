@@ -57,10 +57,21 @@ def opens_a_pem_certificate(data) -> bool:
 
 
 def certificate_blocks(data) -> bytes:
-    """The certificate blocks of *data*, in order and under the `CERTIFICATE` label; empty when there is none."""
-    return b''.join(m.group(0) if m.group('label') == b'CERTIFICATE'
-                    else m.group(0).replace(b'X509 CERTIFICATE', b'CERTIFICATE')
-                    for m in _CERTIFICATE_BLOCK.finditer(_bytes(data)))
+    """The certificate blocks of *data*, in order and under the `CERTIFICATE` label; empty when there is none.
+
+    The blocks are taken as they are only when the pattern matched every opening line; text where some
+    carry RFC 1421 headers gives the certificates cryptography reads in it, or its plain blocks if none."""
+    data = _bytes(data)
+    found = list(_CERTIFICATE_BLOCK.finditer(data))
+    blocks = b''.join(m.group(0) if m.group('label') == b'CERTIFICATE'
+                      else m.group(0).replace(b'X509 CERTIFICATE', b'CERTIFICATE') for m in found)
+    if len(found) == len(_CERTIFICATE_OPENING.findall(data)):
+        return blocks
+    try:
+        certs = x509.load_pem_x509_certificates(data)
+    except Exception:
+        return blocks
+    return b''.join(c.public_bytes(serialization.Encoding.PEM) for c in certs)
 
 
 def canonical_certificates(data):

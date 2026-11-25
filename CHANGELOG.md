@@ -17,6 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - CA export: a password given with the `pem` (with `include_key`) or `key` export of an offline CA kept under its offline password answered 500; it now answers 409, and the export without a password still returns the key encrypted under the offline password.
 - ACME: a finalize refused on the server side (issuing CA without key, offline or outside its window) whose message held the word `caa`, a domain such as `caa.example.com` for instance, was answered as a CAA denial carrying that message; it now answers `serverInternal`, the cause kept for the log and the audit.
+- Trust store: an entry stored by 2.254.4 or earlier with a certificate block carrying RFC 1421 headers beside plain blocks lost that certificate at the upgrade and in every read; it is now kept, re-serialized.
 
 ## [3.0] - 2026-11-25
 

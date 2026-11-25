@@ -156,3 +156,14 @@ def test_the_next_start_reports_each_removed_key_once(app, caplog):
 def test_the_list_never_leaves_the_installation():
     from services.backup import installation
     assert installation.is_local_setting(REMOVED_KEY)
+
+
+def test_the_step_keeps_a_headered_certificate_beside_a_plain_one():
+    """A block with RFC 1421 headers stays with the plain blocks of its row once the key is removed."""
+    step = importlib.import_module(f'migrations._from_2_254.{STEP}')
+    first, key, first_fp = _issue('headered-first')
+    second, _, _ = _issue('plain-second')
+    headered = first.replace('-----BEGIN CERTIFICATE-----\n', '-----BEGIN CERTIFICATE-----\nComment: x\n\n')
+    updates, removed = step.plan([(7, 'headered', headered + key + second)])
+    assert updates == [(7, first + second)]
+    assert [entry['fingerprint_sha256'] for entry in removed] == [first_fp]
