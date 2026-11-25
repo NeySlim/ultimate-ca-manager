@@ -140,3 +140,10 @@ def test_an_offline_ca_key_is_not_sealed_under_a_second_password(auth_client, cr
     assert kept.status_code == 200, kept.data[:300]
     blocks = re.findall(rb'-----BEGIN ([A-Z ]*)PRIVATE KEY-----', kept.data)
     assert blocks == [b'ENCRYPTED '], blocks
+
+
+@pytest.mark.parametrize('body', [{'format': 'pem', 'include_key': True}, {'format': 'key'}])
+def test_a_ca_key_export_password_follows_the_export_password_rule(auth_client, ca_id, body):
+    r = auth_client.post(_url('ca', ca_id), json={**body, 'password': 'short'})
+    assert r.status_code == 400, r.data[:300]
+    assert KEY_MARK not in r.data and 'between 8 and' in r.get_json()['message']
