@@ -458,3 +458,23 @@ def test_the_issued_certificate_is_readable(app, client, served):
         row = db.session.get(Certificate, order.certificate_id)
         assert row.caref == db.session.get(CA, ca_id).refid
         x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+
+
+def test_an_ip_address_cn_is_not_a_dns_name(app, client, served):
+    """A CN holding the IP identifier of the order is not counted as a DNS name."""
+    import ipaddress
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.x509.oid import NameOID
+    account, ca_id, domain = served
+    ip = '192.0.2.7'
+    _max_one_dns_name(app, ca_id)
+    order_id = _ready_order(app, account, [{'type': 'dns', 'value': domain}, {'type': 'ip', 'value': ip}])
+    key = ec.generate_private_key(ec.SECP256R1())
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, ip)]))
+           .add_extension(x509.SubjectAlternativeName(
+               [x509.DNSName(domain), x509.IPAddress(ipaddress.ip_address(ip))]), False)
+           .sign(key, hashes.SHA256()))
+    r = _signed(client, account, f'/acme/order/{order_id}/finalize',
+                {'csr': _b64u(csr.public_bytes(serialization.Encoding.DER))})
+    _assert_issued(client, account, order_id, r)
