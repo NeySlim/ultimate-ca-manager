@@ -86,7 +86,7 @@
 - **数据库** -- SQLite（默认）或**原生 PostgreSQL 后端**，带双向迁移界面
 - **响应式界面** -- React 18 + Radix UI，对移动设备友好
 - **实时** -- WebSocket 实时更新：其他操作员所做的更改会刷新显示它的列表，中断后重新连接会重新加载列表，而不是让过期的行留在屏幕上
-- **多平台** -- Docker、Debian/Ubuntu（.deb）、RHEL/Rocky/Fedora（.rpm）；软件包会为访问日志和错误日志安装日志轮转
+- **多平台** -- Docker、Debian/Ubuntu（.deb）、RHEL/Rocky/Fedora（.rpm）、通过 Helm chart 部署到 Kubernetes（`oci://ghcr.io/neyslim/charts/ucm`）；软件包会为访问日志和错误日志安装日志轮转
 - **支持反向代理** -- 公共端口独立于监听端口（Base URL 中显式的 `:80` 或 `:443` 按输入原样公布）、按 IP 或 CIDR 网络设置的可信代理，以及用于 UCM 前端 Ingress 的 Helm chart `proxy.*` 值
 
 ---
@@ -105,7 +105,7 @@ docker run -d --restart=unless-stopped \
   neyslim/ultimate-ca-manager:latest
 ```
 
-也可从 GitHub Container Registry 获取：`ghcr.io/neyslim/ultimate-ca-manager`。FIPS 变体的标签为 `<version>-fips`（使用 `UCM_FIPS=1` 运行）。
+也可从 GitHub Container Registry 获取：`ghcr.io/neyslim/ultimate-ca-manager`。FIPS 变体的标签为 `<version>-fips`（使用 `UCM_FIPS=1` 运行）。固定使用 `3`（或 `3-fips`）标签即可只跟随 3.x 版本。
 
 ### Debian/Ubuntu
 
@@ -153,7 +153,7 @@ sudo systemctl enable --now ucm
 
 | 组件 | 技术 |
 |------|------|
-| 前端 | React 18、Vite、Radix UI、Recharts |
+| 前端 | React 18、Vite、Radix UI |
 | 后端 | Python 3.11+、Flask、SQLAlchemy |
 | 数据库 | SQLite 或 PostgreSQL |
 | 服务器 | Gunicorn + gevent WebSocket |
