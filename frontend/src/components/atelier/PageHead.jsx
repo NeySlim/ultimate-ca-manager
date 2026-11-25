@@ -11,7 +11,7 @@ import { useDisclosure, moveFocus } from '../shell/useDisclosure'
 /**
  * `more`: the head's secondary actions ({ id, icon, label, onClick, disabled }), which a phone hides from the head
  * (the mockup's rule): under 800 px they are reached from a « ⋯ » menu instead, as the journal's actions.
- * `bar`: a form's save state and buttons, held at the right of the head while the page scrolls.
+ * `bar`: a form's save state and buttons, held in the head, over the form column, while the page scrolls.
  */
 export function PageHead({ title, total, intent, actions, more, bar }) {
   const items = (more || []).filter(Boolean)

@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- **The Settings and Account save bar no longer covers the form (#455).** On wide screens the save state and its Undo changes and Save buttons sit in the page head, right of the title; a phone keeps the bar at the bottom of the page.
+- **The Settings and Account save bar no longer covers the form (#455).** On wide screens the save state and its Undo changes and Save buttons sit in the page head, centered above the form; a phone keeps the bar at the bottom of the page.
 
 ## [3.0] - 2026-11-25
 

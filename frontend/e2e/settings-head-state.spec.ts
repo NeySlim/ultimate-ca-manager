@@ -1,9 +1,13 @@
 import { test, expect, createUser } from './support/fixtures'
 
-// Settings and Account (#455): on a wide screen the save state and its buttons sit in the page head,
-// right of the title, whatever the scroll; nothing of the save is left over the form. A phone keeps
-// the bar at the foot of the form, static while clean, sticky while a change waits.
+// Settings and Account (#455): on a wide screen the save state and its buttons belong to the page head,
+// centred over the form column, as head text without a frame, whatever the scroll; nothing of the save
+// is left over the form. A phone keeps the bar at the foot of the form, static while clean, sticky while a change waits.
 const EPS = 1
+// How far the centre of the state and its buttons may sit from the centre of the form column
+const CENTRE = 8
+// The room kept between the title and the state when the head is short of it
+const BESIDE = 20
 const PAGES = [
   { path: '/settings', field: 'Syslog hostname', route: /\/api\/v2\/settings\/general$/ },
   { path: '/account', field: 'Full Name', route: /\/api\/v2\/account\/profile$/ },
@@ -17,7 +21,7 @@ const scrollTo = (page, where: 'top' | 'middle' | 'end') => page.evaluate((w) =>
   return { scrolls: max > 0, top: view.scrollTop }
 }, where)
 
-// The head, its title block and the bar, as drawn; `leftover`: save elements found under the head
+// The head, its title block, the bar and the form column under them, as drawn; `leftover`: save elements found under the head
 const layout = (page) => page.evaluate(() => {
   const r = (el: Element | null) => {
     if (!el) return null
@@ -26,10 +30,30 @@ const layout = (page) => page.evaluate(() => {
   }
   const head = document.querySelector('.page-head') as HTMLElement
   const bar = document.querySelector('#settings-savebar')
+  const state = document.querySelector('#settings-state')
+  const intent = head.querySelector(':scope > div:first-child > p')
+  const css = bar && getComputedStyle(bar)
+  const text = (el: Element | null) => {
+    if (!el) return null
+    const c = getComputedStyle(el)
+    return { size: c.fontSize, family: c.fontFamily, color: c.color }
+  }
   return {
     head: r(head) as Rect,
     title: r(head.firstElementChild) as Rect,
     bar: r(bar),
+    // A card of the form measure: the column the state is centred over
+    form: r(document.querySelector('#settings-form .settings-section:not(.settings-wide)')) as Rect,
+    frame: css && {
+      border: ['Top', 'Right', 'Bottom', 'Left'].reduce((n, side) => n + parseFloat(css[`border${side}Width`]), 0),
+      background: css.backgroundColor,
+      image: css.backgroundImage,
+      shadow: css.boxShadow,
+      radius: parseFloat(css.borderTopLeftRadius),
+      outline: css.outlineStyle,
+    },
+    stateText: text(state),
+    intentText: text(intent),
     inHead: !!bar && head.contains(bar),
     leftover: document.querySelectorAll('#view-scroll .settings-savebar, #view-scroll #settings-save, #view-scroll #settings-state').length,
     headOverflow: head.scrollWidth - head.clientWidth,
@@ -38,16 +62,28 @@ const layout = (page) => page.evaluate(() => {
   }
 })
 
-const expectInHead = (m) => {
+const mid = (b: Rect) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 })
+
+// `centred`: over the form column; else (a state too long to centre) just right of the title, from the column's edge at least
+const expectInHead = (m, centred = true) => {
   expect(m.inHead).toBe(true)
   expect(m.leftover).toBe(0)
   const bar = m.bar as Rect
-  // inside the head, on screen, right of the title and at the right edge of the head
+  // inside the head, on screen, level with the title block
   expect(bar.y).toBeGreaterThanOrEqual(m.head.y - EPS)
   expect(bar.bottom).toBeLessThanOrEqual(m.head.bottom + EPS)
   expect(bar.y).toBeGreaterThanOrEqual(0)
+  expect(Math.abs(mid(bar).y - mid(m.title).y)).toBeLessThanOrEqual(EPS)
+  // clear of the title and within the form column
   expect(bar.x).toBeGreaterThanOrEqual(m.title.right - EPS)
-  expect(Math.abs(bar.right - m.head.right)).toBeLessThanOrEqual(EPS)
+  expect(bar.x).toBeGreaterThanOrEqual(m.form.x - EPS)
+  expect(bar.right).toBeLessThanOrEqual(m.form.right + EPS)
+  if (centred) expect(Math.abs(mid(bar).x - mid(m.form).x), `state centre ${mid(bar).x} for form centre ${mid(m.form).x}`).toBeLessThanOrEqual(CENTRE)
+  else expect(bar.x - Math.max(m.title.right, m.form.x)).toBeLessThanOrEqual(BESIDE + EPS)
+  // head text, not a capsule: no border, ground, shadow nor rounded corner
+  expect(m.frame).toEqual({ border: 0, background: 'rgba(0, 0, 0, 0)', image: 'none', shadow: 'none', radius: 0, outline: 'none' })
+  expect(m.stateText.size).toBe(m.intentText.size)
+  expect(m.stateText.family).toBe(m.intentText.family)
   expect(m.headOverflow).toBeLessThanOrEqual(0)
   expect(m.pageOverflow).toBeLessThanOrEqual(0)
 }
@@ -56,7 +92,7 @@ for (const width of [1912, 1280]) {
   test.describe(`at ${width} px`, () => {
     test.use({ viewport: { width, height: 867 } })
     for (const { path, field, route } of PAGES) {
-      test(`${path}: the state and its buttons stay in the page head as the page scrolls`, async ({ page, api: _api }) => {
+      test(`${path}: the state and its buttons stay centred over the form in the page head as the page scrolls`, async ({ page, api: _api }) => {
         await page.goto(path)
         const state = page.locator('.page-head #settings-state')
         await expect(state).toBeVisible()
@@ -66,6 +102,8 @@ for (const width of [1912, 1280]) {
           if (where !== 'top') expect(s.scrolls).toBe(true)
           const m = await layout(page)
           expectInHead(m)
+          // clean: the colour of the description under the title
+          expect(m.stateText.color).toBe(m.intentText.color)
           // the head does not scroll with the form
           expect(Math.abs(m.head.y - headY)).toBeLessThanOrEqual(EPS)
         }
@@ -94,7 +132,10 @@ for (const width of [1912, 1280]) {
         await expect(bar).toHaveClass(/dirty/)
         await expect(bar.locator('#settings-state')).toContainText(`Modified, not saved: ${field}.`)
         await scrollTo(page, 'middle')
-        expectInHead(await layout(page))
+        const dirty = await layout(page)
+        expectInHead(dirty)
+        // modified: the warning colour on the state alone, no frame around it
+        expect(dirty.stateText.color).not.toBe(dirty.intentText.color)
         await undo.click()
         await expect(input).toHaveValue(before)
         await expect(bar).not.toHaveClass(/dirty/)
@@ -113,19 +154,22 @@ for (const width of [1912, 1280]) {
       })
     }
 
-    test('/settings: a state too long for the head is cut to two lines, whole in its title', async ({ page, api: _api }) => {
-      await page.goto('/settings')
-      const text = page.locator('.page-head #settings-state .settings-state-text')
-      await expect(text).toBeVisible()
-      const m = await text.evaluate((el) => {
-        el.textContent = 'Modified, not saved: '.concat(Array.from({ length: 40 }, (_, i) => `Field number ${i}`).join(', '))
-        const lh = parseFloat(getComputedStyle(el).lineHeight)
-        return { height: el.getBoundingClientRect().height, lines: el.scrollHeight / lh, lh }
+    // The title of /account runs past the contents column, that of /settings stops short of it
+    for (const { path } of PAGES) {
+      test(`${path}: a state too long to centre sits right of the title, cut to two lines, whole in its title`, async ({ page, api: _api }) => {
+        await page.goto(path)
+        const text = page.locator('.page-head #settings-state .settings-state-text')
+        await expect(text).toBeVisible()
+        const m = await text.evaluate((el) => {
+          el.textContent = 'Modified, not saved: '.concat(Array.from({ length: 40 }, (_, i) => `Field number ${i}`).join(', '))
+          const lh = parseFloat(getComputedStyle(el).lineHeight)
+          return { height: el.getBoundingClientRect().height, lines: el.scrollHeight / lh, lh }
+        })
+        expect(m.lines).toBeGreaterThan(2)
+        expect(m.height).toBeLessThanOrEqual(2 * m.lh + EPS)
+        expectInHead(await layout(page), false)
       })
-      expect(m.lines).toBeGreaterThan(2)
-      expect(m.height).toBeLessThanOrEqual(2 * m.lh + EPS)
-      expectInHead(await layout(page))
-    })
+    }
   })
 }
 

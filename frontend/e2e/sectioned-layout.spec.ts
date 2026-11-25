@@ -40,17 +40,18 @@ for (const { path, toc, first } of PAGES) {
   })
 }
 
-test('the settings save state sits in the page head, right of the title, and counts a change', async ({ page, api }) => {
+test('the settings save state sits in the page head, centred over the form, and counts a change', async ({ page, api }) => {
   await page.goto('/settings')
   const bar = page.locator('.page-head #settings-savebar')
   await expect(bar).toBeVisible()
   const b = await box(bar)
   const head = await box(page.locator('.page-head'))
   const title = await box(page.locator('#main-title'))
-  // in the head, at its right edge, beside the title: nothing of the save over the form (#455)
+  const form = await box(page.getByRole('region', { name: 'General', exact: true }))
+  // in the head, past the title, its centre on the form column's: nothing of the save over the form (#455)
   expect(b.y).toBeGreaterThanOrEqual(head.y - EPS)
   expect(b.y + b.height).toBeLessThanOrEqual(head.y + head.height + EPS)
-  expect(Math.abs(b.x + b.width - (head.x + head.width))).toBeLessThanOrEqual(EPS)
+  expect(Math.abs(b.x + b.width / 2 - (form.x + form.width / 2))).toBeLessThanOrEqual(EPS)
   expect(b.x).toBeGreaterThan(title.x + title.width)
   await expect(page.locator('#settings-form #settings-savebar')).toHaveCount(0)
   await expect(bar.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
