@@ -86,7 +86,7 @@
 - **Base de datos** -- SQLite (por defecto) o **backend nativo de PostgreSQL** con interfaz de migración bidireccional
 - **Interfaz adaptable** -- React 18 + Radix UI, apta para móviles
 - **Tiempo real** -- Actualizaciones en vivo por WebSocket: un cambio hecho por otro operador actualiza las listas que lo muestran, y una reconexión tras una interrupción las recarga en lugar de dejar filas obsoletas en pantalla
-- **Multiplataforma** -- Docker, Debian/Ubuntu (.deb), RHEL/Rocky/Fedora (.rpm); los paquetes instalan la rotación de registros para los registros de acceso y de errores
+- **Multiplataforma** -- Docker, Debian/Ubuntu (.deb), RHEL/Rocky/Fedora (.rpm), Kubernetes mediante el chart de Helm (`oci://ghcr.io/neyslim/charts/ucm`); los paquetes instalan la rotación de registros para los registros de acceso y de errores
 - **Listo para proxy inverso** -- Puertos públicos independientes de los de escucha (un `:80` o `:443` explícito en las URL base se anuncia tal cual se escribe), proxies de confianza por IP o red CIDR, y valores `proxy.*` del chart de Helm para un Ingress delante de UCM
 
 ---
@@ -105,7 +105,7 @@ docker run -d --restart=unless-stopped \
   neyslim/ultimate-ca-manager:latest
 ```
 
-También disponible en GitHub Container Registry: `ghcr.io/neyslim/ultimate-ca-manager`. La variante FIPS lleva la etiqueta `<version>-fips` (se ejecuta con `UCM_FIPS=1`).
+También disponible en GitHub Container Registry: `ghcr.io/neyslim/ultimate-ca-manager`. La variante FIPS lleva la etiqueta `<version>-fips` (se ejecuta con `UCM_FIPS=1`). Fije `3` (o `3-fips`) para seguir solo las versiones 3.x.
 
 ### Debian/Ubuntu
 
@@ -153,7 +153,7 @@ Consulta la [Guía de instalación](docs/installation/README.md) para todos los 
 
 | Componente | Tecnología |
 |-----------|------------|
-| Frontend | React 18, Vite, Radix UI, Recharts |
+| Frontend | React 18, Vite, Radix UI |
 | Backend | Python 3.11+, Flask, SQLAlchemy |
 | Base de datos | SQLite o PostgreSQL |
 | Servidor | Gunicorn + gevent WebSocket |

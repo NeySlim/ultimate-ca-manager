@@ -86,7 +86,7 @@
 - **データベース** -- SQLite (既定) または、双方向マイグレーション UI を備えた**ネイティブ PostgreSQL バックエンド**
 - **レスポンシブ UI** -- React 18 + Radix UI、モバイル対応
 - **リアルタイム** -- WebSocket によるライブ更新: 別のオペレーターによる変更はそれを表示する一覧に反映され、障害後の再接続では古い行を画面に残さず再読み込みされます
-- **マルチプラットフォーム** -- Docker、Debian/Ubuntu (.deb)、RHEL/Rocky/Fedora (.rpm)。パッケージはアクセスログとエラーログのログローテーションをインストールします
+- **マルチプラットフォーム** -- Docker、Debian/Ubuntu (.deb)、RHEL/Rocky/Fedora (.rpm)、Helm チャートによる Kubernetes (`oci://ghcr.io/neyslim/charts/ucm`)。パッケージはアクセスログとエラーログのログローテーションをインストールします
 - **リバースプロキシ対応** -- リッスンポートから独立した公開ポート (ベース URL で明示した `:80` や `:443` は入力どおりに通知されます)、IP または CIDR ネットワークによる信頼プロキシ、UCM の前段に置く Ingress 向けの Helm チャート `proxy.*` 値
 
 ---
@@ -105,7 +105,7 @@ docker run -d --restart=unless-stopped \
   neyslim/ultimate-ca-manager:latest
 ```
 
-GitHub Container Registry からも入手できます: `ghcr.io/neyslim/ultimate-ca-manager`。FIPS 版には `<version>-fips` タグが付きます (`UCM_FIPS=1` で実行してください)。
+GitHub Container Registry からも入手できます: `ghcr.io/neyslim/ultimate-ca-manager`。FIPS 版には `<version>-fips` タグが付きます (`UCM_FIPS=1` で実行してください)。3.x のリリースだけを追うには `3` (または `3-fips`) を固定してください。
 
 ### Debian/Ubuntu
 
@@ -153,7 +153,7 @@ Docker Compose やソースからのインストールを含むすべての方�
 
 | コンポーネント | 技術 |
 |-----------|------------|
-| フロントエンド | React 18、Vite、Radix UI、Recharts |
+| フロントエンド | React 18、Vite、Radix UI |
 | バックエンド | Python 3.11+、Flask、SQLAlchemy |
 | データベース | SQLite または PostgreSQL |
 | サーバー | Gunicorn + gevent WebSocket |

@@ -63,7 +63,7 @@ volumes:
 ### PKI core
 - **CA hierarchy** -- Root and intermediate CAs, offline or HSM-backed keys, externally signed CAs, RFC 5280 name constraints, revocation of an intermediate from its parent
 - **Certificate lifecycle** -- Issue, sign, renew in place, revoke with a reason, rename, export (PEM, DER, PKCS#12 with a legacy compatibility mode, JKS), bulk operations
-- **Policies and approvals** -- Issuance policies with approval workflows, binding the issue form, CSR signing and renewal alike
+- **Policies and approvals** -- Issuance policies with approval workflows, binding the issue form, CSR signing, renewal and the ACME, EST, SCEP and Windows enrollment requests alike
 - **Conformance linting** -- Per-certificate checks against RFC 5280 and the CA/Browser Forum Baseline Requirements
 - **Templates** -- Server, client, code signing, email and Windows smartcard logon presets
 - **Post-quantum** -- ML-DSA-44/65/87 keys for CAs, certificates, CSRs and templates, across ACME, EST, SCEP, Windows enrollment and the TSA
@@ -82,6 +82,7 @@ volumes:
 - **SSH CA** -- User and host certificate signing, KRL revocation, setup scripts for Linux and Windows
 
 ### Operations
+- **High availability** -- Two or more nodes on one PostgreSQL database with `UCM_HA=1`
 - **Deploy hooks** -- Push an issued or renewed certificate to the host that serves it over SSH/SFTP, and run its reload command
 - **Key protection** -- Private keys encrypted at rest, key archival and dual-control recovery under four eyes
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS, OpenBao/Vault Transit
@@ -94,7 +95,7 @@ volumes:
 - **Reports and alerts** -- Scheduled PDF reports, SMTP notifications with OAuth2, expiry alerts at several thresholds
 - **Metrics** -- Opt-in, bearer-gated Prometheus endpoint
 - **Backup** -- Manual and scheduled encrypted backups with retention
-- **Interface** -- Six themes, 10 languages, command palette, WebSocket live updates, responsive down to phone width
+- **Interface** -- Two themes (Atelier and Aurore, dark or light), 10 languages, command palette, WebSocket live updates, responsive down to phone width
 
 ---
 
@@ -120,6 +121,7 @@ volumes:
 | `UCM_SECRET_KEY` | generated | Session secret |
 | `DATABASE_URL` | unset | PostgreSQL DSN; SQLite is used when unset |
 | `KEY_ENCRYPTION_KEY` | unset | Encrypts private keys at rest, in place of the `master.key` file |
+| `UCM_ACCEPT_MAJOR_UPGRADE` | unset | Set to `3` to let a 3.x image upgrade a volume last used by 2.254 |
 | `UCM_AUTO_MASTER_KEY` | `true` | Creates `master.key` at first start, only when `/etc/ucm` is a named volume or a host directory; `false` leaves private keys unencrypted until encryption is enabled |
 
 ---

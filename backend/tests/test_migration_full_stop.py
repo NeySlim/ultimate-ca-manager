@@ -373,7 +373,7 @@ def test_the_ha_guide_names_the_asset_and_the_delay_the_code_uses():
     upgrading = guide[guide.index('## Upgrading'):]
     assert f'`{migration_marks.FULL_STOP_ASSET}`' in upgrading
     assert STALE_PASSES * WAKE_INTERVAL_SECONDS == 180 and 'three minutes' in upgrading
-    assert 'The move from 2.x to 3.0 is a full stop' in upgrading
+    assert 'High availability starts with 3.0: a 2.x installation is a single instance' in upgrading
     import migration_runner
     assert (migration_runner.FULL_STOP_LOG_SECONDS, migration_runner.FULL_STOP_MARGIN_SECONDS) == (15, 15)
     assert 'every 15 seconds' in upgrading and 'three minutes and 15 seconds' in upgrading
