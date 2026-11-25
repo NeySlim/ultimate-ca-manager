@@ -14,10 +14,11 @@ def encrypt_key_pem(key_pem, password):
         serialization.BestAvailableEncryption(password.encode()))
 
 
-def audit_key_export(resource_type, resource_id, resource_name, export_format, password):
-    """Record who exported which private key, in what format; never the key or password."""
+def audit_key_export(resource_type, resource_id, resource_name, export_format, password, *, sealed=False):
+    """Record who exported which private key, in what format; never the key or password.
+    *sealed*: the key leaves already encrypted, as stored (an offline CA's)."""
     # Bundles always carry a password; key, PEM and hybrid zip only when one was given.
-    encrypted = export_format in ('pkcs12', 'p12', 'pfx', 'jks') or (
+    encrypted = sealed or export_format in ('pkcs12', 'p12', 'pfx', 'jks') or (
         export_format in ('key', 'pem', 'hybrid-bundle') and bool(password))
     protection = 'password-protected' if encrypted else 'unencrypted'
     AuditService.log_action(

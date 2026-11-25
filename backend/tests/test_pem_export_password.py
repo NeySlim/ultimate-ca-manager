@@ -142,8 +142,49 @@ def test_an_offline_ca_key_is_not_sealed_under_a_second_password(auth_client, cr
     assert blocks == [b'ENCRYPTED '], blocks
 
 
-@pytest.mark.parametrize('body', [{'format': 'pem', 'include_key': True}, {'format': 'key'}])
-def test_a_ca_key_export_password_follows_the_export_password_rule(auth_client, ca_id, body):
-    r = auth_client.post(_url('ca', ca_id), json={**body, 'password': 'short'})
+def _offline_ca(auth_client, create_ca, cn):
+    ca = create_ca(cn=cn)
+    offline = auth_client.post(f"/api/v2/cas/{ca['id']}/offline",
+                               json={'password': 'OfflineP@ss2026!', 'mode': 'password_protected'})
+    assert offline.status_code == 200, offline.data[:300]
+    return ca['id']
+
+
+@pytest.mark.parametrize('state', ['online', 'offline', 'hsm'])
+@pytest.mark.parametrize('body', [{'format': 'pem', 'include_key': True}, {'format': 'key'},
+                                  {'format': 'pkcs12'}, {'format': 'pfx'}, {'format': 'jks'}])
+def test_a_ca_key_export_password_follows_the_export_password_rule(auth_client, create_ca, ca_id,
+                                                                   body, state, monkeypatch):
+    """A password outside the rule answers 400 whatever the format, before the 409 of an offline
+    or HSM-backed CA."""
+    from models import CA
+    rid = ca_id
+    if state == 'offline':
+        rid = _offline_ca(auth_client, create_ca, f"Pem Pw rule {body['format']}")
+    elif state == 'hsm':
+        monkeypatch.setattr(CA, 'uses_hsm', property(lambda self: self.id == ca_id))
+        assert auth_client.post(_url('ca', ca_id), json={**body, 'password': PASSWORD}).status_code == 409
+    r = auth_client.post(_url('ca', rid), json={**body, 'password': 'short'})
     assert r.status_code == 400, r.data[:300]
     assert KEY_MARK not in r.data and 'between 8 and' in r.get_json()['message']
+
+
+@pytest.mark.parametrize('fmt', ['pkcs12', 'pfx', 'jks'])
+@pytest.mark.parametrize('password', [PASSWORD, None])
+def test_an_offline_ca_key_is_not_bundled(auth_client, create_ca, fmt, password):
+    """A bundle needs the key in clear, which an offline CA no longer holds: 409, never 500."""
+    rid = _offline_ca(auth_client, create_ca, f'Pem Pw offline bundle {fmt}')
+    r = auth_client.post(_url('ca', rid), json={'format': fmt, **({'password': password} if password else {})})
+    assert r.status_code == 409, r.data[:300]
+    assert 'offline password' in r.get_json()['message']
+
+
+@pytest.mark.parametrize('fmt', ['pem', 'key'])
+def test_an_offline_ca_key_export_is_audited_as_encrypted(app, auth_client, create_ca, fmt):
+    """Without a password the key leaves sealed under the offline password, as the audit says."""
+    rid = _offline_ca(auth_client, create_ca, f'Pem Pw offline audit {fmt}')
+    body = {'format': fmt, **({'include_key': True} if fmt == 'pem' else {})}
+    r = auth_client.post(_url('ca', rid), json=body)
+    assert r.status_code == 200, r.data[:300]
+    assert b'ENCRYPTED PRIVATE KEY' in r.data
+    assert _last_audit(app, 'ca', rid) == f'Private key exported as {fmt.upper()} (password-protected)'

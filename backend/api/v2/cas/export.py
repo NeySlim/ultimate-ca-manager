@@ -94,7 +94,9 @@ def _validate_export_password(password):
 
 
 def _audit_key_export(ca, export_format, password):
-    audit_key_export('ca', ca.id, ca.descr or ca.refid, export_format, password)
+    # An offline CA's key leaves as stored, encrypted under its offline password
+    audit_key_export('ca', ca.id, ca.descr or ca.refid, export_format, password,
+                     sealed=bool(ca.offline and ca.prv))
 
 
 @bp.route('/api/v2/cas/export', methods=['GET', 'POST'])
@@ -201,14 +203,6 @@ def export_ca(ca_id):
                 and has_permission('read:private_keys', g.permissions)):
             return error_response(
                 'Private key export requires the write:cas and read:private_keys permissions', 403)
-        # HSM-backed CAs cannot export their private key — it never leaves the HSM
-        if ca.uses_hsm:
-            return error_response('Cannot export HSM-backed key', 409)
-        # An offline CA's stored key is sealed under its offline password: no second one applies
-        if password and ca.offline and ca.prv and export_format in ('pem', 'key'):
-            return error_response(
-                'The key of an offline CA is sealed under its offline password; '
-                'export it without a password', 409)
 
     if include_key and export_format not in ('pem', 'pkcs12', 'p12', 'pfx', 'jks', 'key'):
         return error_response(
@@ -218,6 +212,18 @@ def export_ca(ca_id):
     pw_err = _validate_export_password(password)
     if pw_err:
         return error_response(pw_err, 400)
+
+    # The state of the key is judged after the request is: a bad password answers 400 whatever the CA
+    if include_key or export_format in ('pkcs12', 'pfx', 'key', 'jks'):
+        # HSM-backed CAs cannot export their private key — it never leaves the HSM
+        if ca.uses_hsm:
+            return error_response('Cannot export HSM-backed key', 409)
+        # An offline CA's stored key is sealed under its offline password: it leaves only
+        # as stored, in PEM without a password, never re-encrypted nor bundled
+        if ca.offline and ca.prv and (password or export_format not in ('pem', 'key')):
+            return error_response(
+                'The key of an offline CA is sealed under its offline password; '
+                'export it as PEM or KEY without a password', 409)
 
     try:
         explicit = opts.get('chain_variant') not in (None, '', 'auto')
