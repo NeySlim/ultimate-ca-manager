@@ -95,3 +95,57 @@ test.describe('phone', () => {
     }
   })
 })
+
+// Wide windows: a list's search field stops at 540 px, its filters follow it, its tools sit at the right edge
+const SEARCH_MAX = 540
+const LISTS = ['/certificates', '/csrs', '/cas', '/templates', '/users', '/rbac', '/truststore', '/policies', '/hsm', '/acme',
+  '/crl-ocsp', '/ssh/cas', '/ssh/certificates', '/user-certificates', '/audit', '/logs', '/acme?tab=history']
+for (const width of [1280, 1600, 1920, 2560]) {
+  test(`at ${width}px the search of a list stops at 540 px, filters after it, tools at the right`, async ({ page, api: _api }) => {
+    test.setTimeout(120_000)
+    await page.setViewportSize({ width, height: 1000 })
+    let tooled = 0
+    for (const path of LISTS) {
+      await page.goto(path)
+      const toolbar = page.locator('.atl .page-content .toolbar:has(> .search)').first()
+      await expect(toolbar.locator('> .search'), path).toBeVisible()
+      const m = await toolbar.evaluate((el) => {
+        const r = (e: Element) => { const b = e.getBoundingClientRect(); return { x: b.x, right: b.right, width: b.width } }
+        const kids = [...el.children].filter((k) => k.getBoundingClientRect().width > 0)
+        const search = el.querySelector(':scope > .search')!
+        const after = kids[kids.indexOf(search) + 1]
+        const tools = kids.filter((k) => k.matches('.tools-divider, .btn, .icon-btn'))
+        const c = getComputedStyle(el)
+        return {
+          left: r(el).x + parseFloat(c.paddingLeft), right: r(el).right - parseFloat(c.paddingRight),
+          search: r(search), after: after ? { ...r(after), tool: after.matches('.tools-divider, .btn, .icon-btn') } : null,
+          firstTool: tools.length ? r(tools[0]) : null, last: r(kids[kids.length - 1]), lastIsTool: tools.includes(kids[kids.length - 1]),
+        }
+      })
+      expect(Math.abs(m.search.x - m.left), `${path}: field at the left`).toBeLessThanOrEqual(1)
+      expect(Math.abs(m.search.width - SEARCH_MAX), `${path}: field of ${m.search.width} px`).toBeLessThanOrEqual(1)
+      // what follows the field that is not a tool (a filter, a switch of view) starts a gap after it, two past an empty status
+      if (m.after && !m.after.tool) {
+        expect(m.after.x - m.search.right, `${path}: filters after the field`).toBeGreaterThanOrEqual(8 - 1)
+        expect(m.after.x - m.search.right, `${path}: filters after the field`).toBeLessThanOrEqual(16 + 1)
+      }
+      if (m.lastIsTool) {
+        tooled += 1
+        expect(Math.abs(m.last.right - m.right), `${path}: tools at the right edge`).toBeLessThanOrEqual(1)
+        expect(m.firstTool!.x, `${path}: room between the filters and the tools`).toBeGreaterThan(m.search.right + 100)
+      }
+    }
+    expect(tooled).toBeGreaterThanOrEqual(5)
+  })
+}
+
+test('at 820px the search of a list keeps the room its toolbar leaves, under 540 px', async ({ page, api: _api }) => {
+  await page.setViewportSize({ width: 820, height: 1000 })
+  await page.goto('/certificates')
+  const toolbar = page.locator('.atl .page-content .toolbar:has(> .search)').first()
+  const field = (await toolbar.locator('> .search').boundingBox())!
+  expect(field.width).toBeGreaterThan(170)
+  expect(field.width).toBeLessThanOrEqual(SEARCH_MAX + 1)
+  const over = await toolbar.evaluate((el) => el.scrollWidth - el.clientWidth)
+  expect(over).toBeLessThanOrEqual(0)
+})

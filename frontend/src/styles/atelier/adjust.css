@@ -101,6 +101,14 @@
    field's line; the copied rule gives the field the whole line, written for the Certificates toolbar. */
 @media(max-width:800px){:root .atl .toolbar:not(:has(>:not(.search,.search-status,.icon-btn))):has(>.icon-btn:only-of-type) .search{flex-basis:0}}
 
+/* Above the phone a toolbar's search field stops at 540 px: the filters follow it, the tools (from their divider,
+   or the first button of a toolbar without one) go to the right edge. A folded toolbar keeps the field on its line. */
+@media(min-width:801px){
+  :root .atl .toolbar:not(.folded)>.search{max-width:540px}
+  :root .atl .toolbar:not(.folded)>.search~.tools-divider{margin-left:auto}
+  :root .atl .toolbar:not(.folded,:has(>.tools-divider))>.search~:is(.btn,.icon-btn):not(:is(.btn,.icon-btn)~*){margin-left:auto}
+}
+
 /* Beside the dock at the right (from 1200 px), a toolbar short of room folds as the mockup's phone toolbar
    (components/atelier/Toolbar.jsx): the search on its own line, the filters and tools on the next. */
 :root .atl .toolbar.folded{flex-wrap:wrap}
