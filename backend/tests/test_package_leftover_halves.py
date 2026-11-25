@@ -3,9 +3,13 @@ hold every test of ChaosSuite, and NothingRenamesSuite, once each, so a split lo
 import collections
 import importlib
 import inspect
+import os
 import pathlib
 
-from tests.package_leftover_chaos import LAYOUTS, ChaosSuite, NothingRenamesSuite, _ChaosBase
+import pytest
+
+from tests.package_leftover_chaos import (
+    CHAOS, LAYOUTS, ChaosSuite, NothingRenamesSuite, _chaos_box, _chaos_run, _ChaosBase)
 
 # Named in the fips_env files: they do not depend on ucm.env
 NOT_RUN = {('data and config are mount points', 'fips only'): {
@@ -47,3 +51,24 @@ def test_the_files_of_a_layout_hold_every_test_once():
 def test_every_layout_but_one_keeps_its_nothing_renames_suite():
     layouts = [c.layout for c in _classes() if issubclass(c, NothingRenamesSuite)]
     assert sorted(layouts) == sorted(set(LAYOUTS) - NO_NOTHING_RENAMES)
+
+
+@pytest.mark.skipif(not os.path.exists('/proc/self/stat'), reason='reads /proc')
+def test_a_chaos_kill_never_reaches_the_process_group_of_the_test(tmp_path):
+    """Every command a plan can kill (`kill -9 0`) runs in a session and process group of its
+    own: the kill ends the run, never the pytest worker that started it."""
+    box, _data, _config = _chaos_box(tmp_path / 'whole', 'one filesystem')
+    groups = box.state / 'groups'
+    for name in CHAOS:
+        head, rest = (box.bin / name).read_text().split('\n', 1)
+        # In a subshell: "set --" there leaves the wrapper's own arguments alone
+        (box.bin / name).write_text(
+            f'{head}\n( read -r st < /proc/$$/stat; set -- ${{st##*) }}; echo "$3 $4" >> {groups} )\n{rest}')
+    out, count = _chaos_run(box)
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    seen = [tuple(map(int, line.split())) for line in groups.read_text().splitlines()]
+    assert len(seen) == count > 20
+    assert all(pgrp != os.getpgrp() and sid != os.getsid(0) for pgrp, sid in seen), seen[:3]
+    box, _data, _config = _chaos_box(tmp_path / 'killed', 'one filesystem')
+    out, _count = _chaos_run(box, [(count // 2, 'kill')])
+    assert out.returncode == -9, (out.stdout, out.stderr)
