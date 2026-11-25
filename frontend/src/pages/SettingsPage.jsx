@@ -57,6 +57,7 @@ import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
 import { SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard } from '../hooks/useSaveParts'
+import { usePhoneWidth } from '../hooks/useMediaQuery'
 import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Pill, SkeletonPanel, jumpTo } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsSaveBar } from '../components/atelier/SettingsView'
@@ -171,6 +172,8 @@ export default function SettingsPage() {
   const { showSuccess, showError, showInfo, showConfirm, showPrompt, showWarning } = useNotification()
   const { canWrite, hasPermission } = usePermission()
   const { isMobile } = useMobile()
+  // A wide screen holds the save state in the page head; a phone keeps the bar under the form
+  const phone = usePhoneWidth()
   const [searchParams, setSearchParams] = useSearchParams()
   const { reconnecting, status: reconnectStatus, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
   
@@ -2239,14 +2242,14 @@ export default function SettingsPage() {
     .map(id => allowed.find(cat => cat.id === id))
     .filter(Boolean)
     .map(cat => ({ id: cat.id, label: t(cat.labelKey), description: t(cat.descKey), icon: SECTION_ICONS[cat.id] }))
-  const head = (
-    <PageHead title={t('common.settings')} total={t('sectioned.sectionCount', { count: sections.length })} intent={t('shell.moduleDesc.settings')} />
+  const head = (bar) => (
+    <PageHead title={t('common.settings')} total={t('sectioned.sectionCount', { count: sections.length })} intent={t('shell.moduleDesc.settings')} bar={bar} />
   )
 
   if (loading) {
     return (
       <Zone testId="settings-page">
-        {head}
+        {head()}
         <div className="scroll-view" id="view-scroll"><SkeletonPanel label={t('settings.loadingSettings')} /></div>
       </Zone>
     )
@@ -2266,6 +2269,23 @@ export default function SettingsPage() {
     ) : null,
     microsoftCA: <Pill tone="warn" icon="sparkles" label={t('common.experimental')} />,
   }
+  // One bar at a time, so its ids stay unique; without it the announcement stays in the form
+  const saveBar = (canWrite('settings') || pendingCount > 0) && (
+    <SettingsSaveBar
+      head={!phone}
+      stateRef={saveState}
+      dirty={pendingCount > 0}
+      count={pendingCount}
+      sections={pendingSections.map(sectionLabel)}
+      pending={changedLabels(pendingFields, t, sectionLabel)}
+      failed={pendingCount ? Object.keys(sectionErrors).map(sectionLabel) : []}
+      lastSaved={lastSave ? { at: formatDate(lastSave.timestamp, { time: true }), by: lastSave.username } : null}
+      saving={savingAll}
+      onReset={resetAll}
+      onSave={saveAll}
+      announce={announce}
+    />
+  )
 
   return (
     <>
@@ -2275,7 +2295,7 @@ export default function SettingsPage() {
       {/* A section's inspector (the scheduler's tasks) is drawn where the zone draws its dock */}
       <DockSlotProvider>
       <Zone testId="settings-page" dock={<DockSlot />}>
-        {head}
+        {head(phone ? null : saveBar)}
         <SavePartsContext.Provider value={parts.api}>
           <SettingsLayout
             toc={(
@@ -2292,23 +2312,9 @@ export default function SettingsPage() {
                 {renderCategoryContent(section.id)}
               </SettingsFrame>
             ))}
-            {(canWrite('settings') || pendingCount > 0) ? (
-              <SettingsSaveBar
-                stateRef={saveState}
-                dirty={pendingCount > 0}
-                count={pendingCount}
-                sections={pendingSections.map(sectionLabel)}
-                pending={changedLabels(pendingFields, t, sectionLabel)}
-                failed={pendingCount ? Object.keys(sectionErrors).map(sectionLabel) : []}
-                lastSaved={lastSave ? { at: formatDate(lastSave.timestamp, { time: true }), by: lastSave.username } : null}
-                saving={savingAll}
-                onReset={resetAll}
-                onSave={saveAll}
-                announce={announce}
-              />
-            ) : (
+            {!saveBar ? (
               <p className="sr-only" id="settings-announce" role="status" aria-live="polite">{announce}</p>
-            )}
+            ) : phone && saveBar}
           </SettingsLayout>
         </SavePartsContext.Provider>
       </Zone>

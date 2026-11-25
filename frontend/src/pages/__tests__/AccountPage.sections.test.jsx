@@ -76,6 +76,7 @@ vi.mock('../../components', async (orig) => ({
 import AccountPage from '../AccountPage'
 import { accountService } from '../../services'
 import { dropAllDrafts } from '../../lib/draftMemory'
+import { phoneScreen } from '../../test/phoneScreen'
 
 beforeAll(() => {
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
@@ -99,6 +100,28 @@ describe('AccountPage sections', () => {
     expect(bar).not.toHaveClass('dirty')
     expect(within(bar).getByRole('button', { name: 'common.save' })).toBeDisabled()
     expect(bar).toHaveTextContent('sectioned.nothingPending')
+  })
+
+  it('holds the state and its buttons in the page head on a wide screen, under the form on a phone', async () => {
+    const screenSize = phoneScreen(false)
+    try {
+      open()
+      await screen.findByRole('region', { name: 'account.profile' })
+      const bar = () => document.getElementById('settings-savebar')
+      const head = document.querySelector('.page-head')
+      expect(head).toContainElement(bar())
+      expect(document.getElementById('settings-form').querySelector('#settings-savebar, #settings-save, #settings-state')).toBeNull()
+      fireEvent.change(screen.getByLabelText('account.fullName'), { target: { value: 'Alice B.' } })
+      expect(bar()).toHaveClass('dirty')
+      screenSize.resize(true)
+      expect(document.getElementById('settings-form')).toContainElement(bar())
+      expect(head.querySelector('#settings-savebar')).toBeNull()
+      for (const id of ['settings-savebar', 'settings-state', 'settings-reset', 'settings-save', 'settings-announce']) {
+        expect(document.querySelectorAll(`#${id}`)).toHaveLength(1)
+      }
+    } finally {
+      screenSize.restore()
+    }
   })
 
   it('carries the language of the account in its profile, saved with the preferences', async () => {

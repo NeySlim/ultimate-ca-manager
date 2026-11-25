@@ -8,7 +8,7 @@ export default {
         title: 'Organización de la página',
         content: 'El perfil, la seguridad y las claves API están en una sola página, cada uno en su marco; el índice de la izquierda lleva a ellos (en un teléfono, la lista Ir a la sección).',
         items: [
-          { label: 'Acciones propias', text: 'El nombre y el correo se editan en su sitio: la barra de guardado inferior indica lo que se ha cambiado y no se ha guardado, Deshacer los cambios restablece los valores guardados y Guardar los envía (Intro en un campo también); Crear Clave abre el formulario de claves' },
+          { label: 'Acciones propias', text: 'El nombre y el correo se editan en su sitio: el estado de guardado, en la cabecera de la página (al pie de la página en un teléfono), indica lo que se ha cambiado y no se ha guardado, Deshacer los cambios restablece los valores guardados y Guardar los envía (Intro en un campo también); Crear Clave abre el formulario de claves' },
           { label: 'Enlaces', text: 'Un enlace a /account?tab=security o /account?tab=api-keys abre la página en ese marco' },
           { label: 'Edición conservada', text: 'Un cambio de perfil aún no guardado se marca como Modificado en el índice, se conserva en esta pestaña al salir de la página y reaparece al volver; Deshacer los cambios lo olvida' },
           { label: 'Preferencias', text: 'Cerrar el inspector al navegar: los objetos abiertos en el inspector se cierran al ir a otra página. Desactivado por defecto: permanecen abiertos, igual que sus pestañas. La elección se conserva en este navegador' },

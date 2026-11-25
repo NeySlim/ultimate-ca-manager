@@ -20,6 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME: an issuing CA taken offline while keeping its key, or revoked, made a finalize or an approved issuance answer `badCSR`; it now answers `serverInternal` with the order invalid, a CA chosen for a domain or as the default being refused before signing.
 - Trust store: an entry stored by 2.254.4 or earlier with a certificate block carrying RFC 1421 headers beside plain blocks lost that certificate at the upgrade and in every read; it is now kept, re-serialized.
 - Settings and Account: the floating save bar stopped 24 px above the bottom of the page on wide screens, letting fields show under it; it now sits flush on the bottom (#455).
+- **The Settings and Account save bar no longer covers the form (#455).** On wide screens the save state and its Undo changes and Save buttons sit in the page head, centered above the form; a phone keeps the bar at the bottom of the page.
 
 ## [3.0] - 2026-11-25
 

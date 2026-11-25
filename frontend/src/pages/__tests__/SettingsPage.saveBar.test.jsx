@@ -51,6 +51,7 @@ import SettingsPage from '../SettingsPage'
 import { settingsService } from '../../services/settings.service'
 import { auditService } from '../../services'
 import { dropAllDrafts } from '../../lib/draftMemory'
+import { phoneScreen } from '../../test/phoneScreen'
 
 const renderPage = (entry = '/settings') => render(
   <MemoryRouter initialEntries={[entry]}>
@@ -91,6 +92,31 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
     await waitFor(() => expect(document.activeElement).toBe(title))
     expect(title).toHaveAttribute('data-quiet-focus')
     delete Element.prototype.scrollIntoView
+  })
+
+  it('holds the state and its buttons in the page head on a wide screen, under the form on a phone', async () => {
+    const screenSize = phoneScreen(false)
+    try {
+      await loaded()
+      const head = document.querySelector('.page-head')
+      expect(head).toContainElement(bar())
+      expect(document.getElementById('settings-form').querySelector('#settings-savebar, #settings-save, #settings-state')).toBeNull()
+      fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+      expect(bar()).toHaveClass('dirty')
+      expect(document.getElementById('settings-state')).toHaveAttribute('title', expect.stringContaining('sectioned.pendingTitle'))
+      screenSize.resize(true)
+      expect(document.getElementById('settings-form')).toContainElement(bar())
+      expect(head.querySelector('#settings-savebar')).toBeNull()
+      expect(bar()).toHaveClass('dirty')
+      for (const id of ['settings-savebar', 'settings-state', 'settings-reset', 'settings-save', 'settings-announce']) {
+        expect(document.querySelectorAll(`#${id}`)).toHaveLength(1)
+      }
+      screenSize.resize(false)
+      expect(head).toContainElement(bar())
+      expect(document.querySelectorAll('#settings-announce')).toHaveLength(1)
+    } finally {
+      screenSize.restore()
+    }
   })
 
   it('shows every section in a frame of its own, listed by group', async () => {

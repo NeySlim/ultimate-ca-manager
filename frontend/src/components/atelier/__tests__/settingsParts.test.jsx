@@ -93,6 +93,20 @@ describe('settings save bar', () => {
   })
 })
 
+describe('settings save bar in the page head', () => {
+  it('gives its whole state as the title, the text shown being cut to two lines', () => {
+    const { rerender } = render(<SettingsSaveBar head dirty pending={['Port', 'Hôte']} onSave={() => {}} />)
+    const state = document.getElementById('settings-state')
+    expect(state).toHaveAttribute('title', 'sectioned.pendingTitlesectioned.pendingFields {"fields":"Port, Hôte"}')
+    expect(state.querySelector('.settings-state-text')).toHaveTextContent('sectioned.pendingFields {"fields":"Port, Hôte"}')
+    expect(document.getElementById('settings-savebar')).toHaveClass('settings-savebar', 'dirty')
+    rerender(<SettingsSaveBar head failed={['SMTP']} onSave={() => {}} />)
+    expect(state).toHaveAttribute('title', 'sectioned.saveFailedTitlesectioned.saveFailedIn {"sections":"SMTP"}')
+    rerender(<SettingsSaveBar head dirty={false} lastSaved={{ at: '6 nov.', by: 'admin' }} onSave={() => {}} />)
+    expect(state).toHaveAttribute('title', 'sectioned.nothingPending sectioned.lastSavedBy {"date":"6 nov.","user":"admin"}')
+  })
+})
+
 describe('settings table of contents', () => {
   const sections = [{ id: 'general', label: 'Général', icon: 'settings' }, { id: 'email', label: 'SMTP', icon: 'send' }]
   it('links each entry to the address the page gives, the mockup anchor otherwise', () => {
