@@ -24,6 +24,7 @@ import { usePhoneWidth } from '../hooks/useMediaQuery'
 import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Btn, IconBtn, Pill, Facts, RecordList, RecordRow, SkeletonPanel, AtelierDialog } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsSaveBar } from '../components/atelier/SettingsView'
+import { useSaveBarFocus } from '../hooks/useSaveBarFocus'
 import { Field, FormModal, Input, NumberInput, Notice, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import { useSectionParam } from '../components/atelier/useSectionParam'
 import { MtlsCertificateDialog } from '../components/mtls/MtlsCertificateDialog'
@@ -50,6 +51,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true)
   // A wide screen holds the save state in the page head; a phone keeps the bar under the form
   const phone = usePhoneWidth()
+  useSaveBarFocus(phone)
   // The section a link names (/account?tab=security) is the one the page lands on
   const [activeTab, setActiveTab] = useSectionParam(SECTION_IDS, 'profile', { stacked: true, ready: !loading })
   const [saving, setSaving] = useState(false)

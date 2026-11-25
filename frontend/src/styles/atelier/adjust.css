@@ -525,12 +525,14 @@
 
 /* Wide screens: the save state and its buttons are text of the page head, which does not scroll, centred over the form
    column (past the contents and their gutter, --form-max wide) or, short of room, just right of the title; no frame (#455).
-   The title keeps its width up to half the window; a long state is cut to two lines, whole in its title. */
+   The title keeps its width up to half the window; a long state is cut to two lines, whole in its title. Short of room
+   for the state (10em) beside its buttons, the two buttons pass together under it. */
 :root .atl{--toc-col:200px;--toc-gap:24px}
 @media(min-width:801px){:root .atl .settings-layout:not(.guide-layout){grid-template-columns:var(--toc-col) minmax(0,1fr);gap:var(--toc-gap)}}
 :root .atl .page-head:has(>.settings-savebar){display:grid;grid-template-columns:1fr auto 1fr max(0px,100% - var(--form-max));gap:0;padding-left:calc(var(--toc-col) + var(--toc-gap))}
 :root .atl .page-head:has(>.settings-savebar)>div:first-child{grid-column:1;justify-self:start;width:max-content;max-width:50vw;margin-left:calc(-1*(var(--toc-col) + var(--toc-gap)))}
-:root .atl .page-head>.settings-savebar{grid-column:2;position:static;flex-wrap:nowrap;margin:0 20px;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
-:root .atl .page-head>.settings-savebar .settings-state{flex:0 1 auto;margin-top:0}
+:root .atl .page-head>.settings-savebar{grid-column:2;position:static;flex-wrap:wrap;margin:0 20px;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
+:root .atl .page-head>.settings-savebar .settings-state{flex:1 1 0;min-width:min(100%,10em);margin-top:0}
+:root .atl .page-head>.settings-savebar .settings-save-buttons{display:flex;gap:inherit;flex-shrink:0}
 :root .atl .page-head>.settings-savebar .settings-state-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 :root .atl .page-head>.settings-savebar .btn{flex-shrink:0}

@@ -173,6 +173,67 @@ for (const width of [1912, 1280]) {
   })
 }
 
+// Just past the phone width, the longest titles leave the bar short of room: its buttons pass under the state,
+// nothing leaves the head nor the window. Account of a 21-character user name (createUser), in Russian and in English.
+const narrow = (page) => page.evaluate(() => {
+  const head = (document.querySelector('.page-head') as HTMLElement).getBoundingClientRect()
+  const bar = document.querySelector('.page-head #settings-savebar') as HTMLElement
+  const rect = (id: string) => (document.getElementById(id) as HTMLElement).getBoundingClientRect()
+  const title = (document.querySelector('.page-head > div:first-child') as HTMLElement).getBoundingClientRect()
+  return {
+    inHead: !!bar,
+    headRight: head.right,
+    titleRight: title.right,
+    state: { x: rect('settings-state').x, right: rect('settings-state').right, bottom: rect('settings-state').bottom },
+    reset: { x: rect('settings-reset').x, y: rect('settings-reset').y, right: rect('settings-reset').right },
+    save: { x: rect('settings-save').x, y: rect('settings-save').y, right: rect('settings-save').right },
+    barX: bar?.getBoundingClientRect().x ?? 0,
+    headOverflow: (document.querySelector('.page-head') as HTMLElement).scrollWidth - (document.querySelector('.page-head') as HTMLElement).clientWidth,
+    pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+    vw: window.innerWidth,
+  }
+})
+
+for (const [lang, width, h1] of [['ru', 801, 'Моя учётная запись'], ['ru', 820, 'Моя учётная запись'], ['en', 801, 'My Account']] as const) {
+  test.describe(`${lang} at ${width} px`, () => {
+    test.use({ viewport: { width, height: 867 } })
+    for (const { path, input } of [{ path: '/settings', input: '#set-system_name' }, { path: '/account', input: '#set-full_name' }]) {
+      test(`${path}: the state and its buttons stay inside the head and the window, clean and modified`, async ({ page: adminPage, api, signIn }) => {
+        let page = adminPage
+        if (path === '/account') {
+          const user = await createUser(api, 'viewer')
+          expect(user.username).toHaveLength(21)
+          page = (await signIn(user.username, user.password)).page
+          await page.setViewportSize({ width, height: 867 })
+        }
+        await page.addInitScript((l) => { try { localStorage.setItem('i18nextLng', l) } catch { /* noop */ } }, lang)
+        await page.goto(path)
+        await expect(page.locator('.page-head #settings-state')).toBeVisible()
+        if (path === '/account') await expect(page.locator('#main-title')).toHaveText(h1)
+        for (const dirty of [false, true]) {
+          if (dirty) {
+            await page.locator(input).fill(`e2e-${Date.now()}`)
+            await expect(page.locator('.page-head #settings-savebar')).toHaveClass(/dirty/)
+          }
+          const m = await narrow(page)
+          const where = `${path} ${lang} ${width} ${dirty ? 'modified' : 'clean'} ${JSON.stringify(m)}`
+          expect(m.inHead, where).toBe(true)
+          expect(m.save.right, where).toBeLessThanOrEqual(m.headRight + EPS)
+          expect(m.save.right, where).toBeLessThanOrEqual(m.vw + EPS)
+          expect(m.headOverflow, where).toBeLessThanOrEqual(0)
+          expect(m.pageOverflow, where).toBeLessThanOrEqual(0)
+          // clear of the title; the two buttons side by side, beside the state or together under it
+          expect(m.barX, where).toBeGreaterThanOrEqual(m.titleRight - EPS)
+          expect(Math.abs(m.reset.y - m.save.y), where).toBeLessThanOrEqual(EPS)
+          expect(m.save.x, where).toBeGreaterThan(m.reset.right)
+          if (m.reset.y > m.state.bottom - EPS) expect(Math.abs(m.reset.x - m.state.x), where).toBeLessThanOrEqual(EPS)
+          else expect(m.reset.x, where).toBeGreaterThanOrEqual(m.state.right - EPS)
+        }
+      })
+    }
+  })
+}
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
   for (const { path, field } of PAGES) {
