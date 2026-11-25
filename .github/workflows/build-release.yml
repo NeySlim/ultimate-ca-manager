@@ -1223,8 +1223,19 @@ jobs:
           sed -i "s|VERSION|$VERSION|g" "$INSTALL_FILE"
           
           # Build release notes
+          # A major release may carry a written text, docs/releases/<VERSION>.md, in place of the list
+          WRITTEN="docs/releases/${VERSION}.md"
           {
-            if [ -s "$CHANGES_FILE" ]; then
+            if [ -s "$WRITTEN" ]; then
+              cat "$WRITTEN"
+              echo ""
+              echo "**Full list of changes:** [CHANGELOG.md](https://github.com/${REPO}/blob/v${VERSION}/CHANGELOG.md)"
+              echo ""
+              echo "**Upgrading:** [UPGRADE.md](https://github.com/${REPO}/blob/v${VERSION}/UPGRADE.md)"
+              echo ""
+              echo "---"
+              echo ""
+            elif [ -s "$CHANGES_FILE" ]; then
               echo "## What's Changed"
               echo ""
               cat "$CHANGES_FILE"
@@ -1232,10 +1243,12 @@ jobs:
               echo "---"
               echo ""
             fi
-            echo "Earlier releases: [CHANGELOG.md](https://github.com/${REPO}/blob/v${VERSION}/CHANGELOG.md)"
-            echo ""
-            echo "---"
-            echo ""
+            if [ ! -s "$WRITTEN" ]; then
+              echo "Earlier releases: [CHANGELOG.md](https://github.com/${REPO}/blob/v${VERSION}/CHANGELOG.md)"
+              echo ""
+              echo "---"
+              echo ""
+            fi
             cat "$INSTALL_FILE"
           } > notes.md
           

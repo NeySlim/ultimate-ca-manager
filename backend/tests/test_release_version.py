@@ -325,6 +325,38 @@ def test_a_rehearsed_stable_without_its_section_takes_unreleased_with_a_warning(
         assert _notes_step(tmp_path / ('s' + strict['REHEARSAL']), v, changelog, env=strict)[0].returncode != 0
 
 
+def _notes_with_text(tmp_path, v, text):
+    work = tmp_path / 'w'
+    (work / 'docs' / 'releases').mkdir(parents=True)
+    (work / 'docs' / 'releases' / f'{v}.md').write_text(text)
+    return _notes_step(tmp_path, v, f'## [{v}] - 2026-11-30\n- Marker.\n')
+
+
+def test_a_written_release_text_replaces_the_changelog_list(tmp_path):
+    result, notes = _notes_with_text(tmp_path, '3.0', '# UCM 3.0 Phare\n\nHand written.\n')
+    assert result.returncode == 0, result.stderr
+    text = notes.read_text()
+    assert text.startswith('# UCM 3.0 Phare\n\nHand written.\n')
+    assert "What's Changed" not in text and 'Marker.' not in text
+    assert '**Full list of changes:** [CHANGELOG.md](https://github.com/o/r/blob/v3.0/CHANGELOG.md)' in text
+    assert '**Upgrading:** [UPGRADE.md](https://github.com/o/r/blob/v3.0/UPGRADE.md)' in text
+    assert '## Installation' in text and text.index('Hand written.') < text.index('---') < text.index('## Installation')
+
+
+def test_an_empty_release_text_keeps_the_changelog_list(tmp_path):
+    result, notes = _notes_with_text(tmp_path, '3.0', '')
+    assert result.returncode == 0, result.stderr
+    assert "What's Changed" in notes.read_text() and 'Marker.' in notes.read_text()
+
+
+def test_a_written_text_does_not_lift_the_changelog_section_check(tmp_path):
+    work = tmp_path / 'w'
+    (work / 'docs' / 'releases').mkdir(parents=True)
+    (work / 'docs' / 'releases' / '3.0.md').write_text('Text.\n')
+    result, _ = _notes_step(tmp_path, '3.0', '## [Unreleased]\n- x\n')
+    assert result.returncode != 0
+
+
 def test_the_notes_step_reads_the_rehearsal_flag_from_the_dispatch():
     step = _step('build-release.yml', 'release', 'Generate release notes')
     assert step['env']['REHEARSAL'] == '${{ inputs.dry_run }}'
