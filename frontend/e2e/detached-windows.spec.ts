@@ -293,15 +293,20 @@ test('the status bar sums up a pending approval and an entry of the queue, each 
   // The shared instance keeps its approvals empty for the other tests: the two reads answer here
   await page.route('**/api/v2/approvals/stats', (route) => route.fulfill({ json: { data: { pending: 1 } } }))
   await page.route('**/api/v2/dashboard/queue*', async (route) => {
-    const response = await route.fetch()
-    const body = await response.json()
+    let response, body
+    try {
+      response = await route.fetch()
+      body = await response.json()
+    } catch {
+      return // the page closed while the read was answered: nobody is left to show it
+    }
     body.data = {
       ...body.data,
       items: [{ kind: 'approval_pending', tier: 'warning', id: 1, label: 'web', due_at: null, href_hint: '/approvals' }],
       counts: { ...(body.data?.counts || {}), approval_pending: 1, crl_missing: 0, ca_expiring: 0, truststore_expiring: 0, client_renewal_overdue: 0 },
       total: 1,
     }
-    return route.fulfill({ response, json: body })
+    return route.fulfill({ response, json: body }).catch(() => {})
   })
   await page.goto('/certificates')
   const activity = page.locator('footer.statusbar').getByRole('group', { name: 'Activity' })
@@ -312,6 +317,8 @@ test('the status bar sums up a pending approval and an entry of the queue, each 
   await expect(page).toHaveURL((url) => url.pathname === '/approvals')
   await activity.getByRole('link', { name: '1 to act on' }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/')
+  // The overview reads the queue again: no handler may still run once the context closes
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
 })
 
 test('no Detach button and no window at phone width', async ({ page, api }) => {
