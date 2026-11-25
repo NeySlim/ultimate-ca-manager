@@ -13,6 +13,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Access log: a double quote in a parameter's name (`my"password=`) left its value in the log, and one in a secret value left the rest of it; both are now masked.
 
+### Fixed
+
+- CA export: a password given with the `pem` (with `include_key`) or `key` export of an offline CA kept under its offline password answered 500; it now answers 409, and the export without a password still returns the key encrypted under the offline password.
+
 ## [3.0] - 2026-11-25
 
 ### Added

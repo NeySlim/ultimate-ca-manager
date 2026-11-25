@@ -120,3 +120,23 @@ def test_user_certificate_pem_with_password_encrypts_the_key(app, auth_client, c
     assert '(password-protected)' in _last_audit(app, 'user_certificate', rid, 'user_certificate_exported')
     bad = auth_client.post(url, json={'format': 'pem', 'include_key': True, 'password': 'short'})
     assert bad.status_code == 400
+
+
+@pytest.mark.parametrize('fmt', ['pem', 'key'])
+def test_an_offline_ca_key_is_not_sealed_under_a_second_password(auth_client, create_ca, fmt):
+    """Its stored key is sealed under the offline password: a second one answers 409, not 500."""
+    ca = create_ca(cn=f'Pem Pw offline {fmt}')
+    offline = auth_client.post(f"/api/v2/cas/{ca['id']}/offline",
+                               json={'password': 'OfflineP@ss2026!', 'mode': 'password_protected'})
+    assert offline.status_code == 200, offline.data[:300]
+    url = f"/api/v2/cas/{ca['id']}/export"
+    body = {'format': fmt, **({'include_key': True} if fmt == 'pem' else {})}
+
+    r = auth_client.post(url, json={**body, 'password': PASSWORD})
+    assert r.status_code == 409, r.data[:300]
+    assert KEY_MARK not in r.data
+
+    kept = auth_client.post(url, json=body)
+    assert kept.status_code == 200, kept.data[:300]
+    blocks = re.findall(rb'-----BEGIN ([A-Z ]*)PRIVATE KEY-----', kept.data)
+    assert blocks == [b'ENCRYPTED '], blocks
