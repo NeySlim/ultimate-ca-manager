@@ -270,3 +270,45 @@ def test_the_check_reads_only_the_declared_settings(app, create_ca):
             SystemConfig.query.filter(SystemConfig.key.like('unrelated.setting.%')).delete(synchronize_session=False)
             db.session.commit()
         assert not [key for key in loaded if key.startswith('unrelated.setting.')]
+
+
+@pytest.mark.parametrize('key', ['scep_ca_id', 'acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid',
+                                 'mtls_trusted_ca_id'])
+def test_each_ca_setting_blocks_by_its_name(app, auth_client, create_ca, key):
+    """Listed by hand, not from the manifest: a declaration dropped there still fails here."""
+    ca = create_ca(cn=f'Named by {key}')
+    with app.app_context():
+        before = _set(key, db.session.get(CA, ca['id']).refid)
+    try:
+        r = auth_client.delete(f"/api/v2/cas/{ca['id']}")
+        assert r.status_code == 409, r.data
+        assert CA_SETTING_WORDING[key][0] in r.get_json()['message']
+    finally:
+        with app.app_context():
+            _put_back(key, before)
+    assert auth_client.delete(f"/api/v2/cas/{ca['id']}").status_code == 204
+
+
+def test_a_number_left_by_an_older_version_names_the_ca_now_holding_it(app, auth_client, create_ca):
+    """State left before the blocker: the setting names a free number, a CA created later takes it.
+    Nothing tells that CA from one the administrator chose: it is the issuing CA, and is not deleted."""
+    import uuid
+    from services.acme.mixins.issuance import IssuanceMixin
+    source = create_ca(cn='Source of the copied key')
+    with app.app_context():
+        free = (db.session.query(db.func.max(CA.id)).scalar() or 0) + 1000
+        before = _set('acme.issuing_ca_id', str(free))
+    try:
+        with app.app_context():
+            row = db.session.get(CA, source['id'])
+            copied = {c.name: getattr(row, c.name) for c in CA.__table__.columns
+                      if c.name not in ('id', 'refid', 'url_slug', 'hsm_key_id', 'descr')}
+            db.session.add(CA(id=free, refid=str(uuid.uuid4()), descr='Took the free number', **copied))
+            db.session.commit()
+            taker = db.session.get(CA, free)
+            assert IssuanceMixin()._resolve_ca_for_domains([]) == taker.refid
+        assert auth_client.delete(f'/api/v2/cas/{free}').status_code == 409
+    finally:
+        with app.app_context():
+            _put_back('acme.issuing_ca_id', before)
+    assert auth_client.delete(f'/api/v2/cas/{free}').status_code == 204
