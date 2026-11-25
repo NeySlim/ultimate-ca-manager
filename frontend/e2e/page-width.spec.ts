@@ -106,8 +106,9 @@ for (const width of [1440, 1920, 3440]) {
       // The scheduler's table of nine columns is the exception: it keeps the whole column
       near(c.width, c.id === 'set-sec-scheduler' ? column : Math.min(960, column), `${c.id} width`)
     }
-    const bar = await box(page.locator('#settings-savebar'))
-    near(bar.width, 960, 'save bar under the cards')
+    // The save state is in the page head, at the right edge of the page (#455)
+    const bar = await box(page.locator('.page-head #settings-savebar'))
+    near(bar.x + bar.width, width - m, 'save state at the right of the head')
     // Every help and description of a section, a block, at most 62ch of its own font
     const over = await page.locator('.atl .settings-layout').evaluate((layout) => {
       const out: string[] = []

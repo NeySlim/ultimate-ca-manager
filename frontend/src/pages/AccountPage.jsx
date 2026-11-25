@@ -20,6 +20,7 @@ import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
 import { describePermissions } from '../lib/rbacPermissions'
 import { useUnloadGuard } from '../hooks/useSaveParts'
+import { usePhoneWidth } from '../hooks/useMediaQuery'
 import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Btn, IconBtn, Pill, Facts, RecordList, RecordRow, SkeletonPanel, AtelierDialog } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsSaveBar } from '../components/atelier/SettingsView'
@@ -47,6 +48,8 @@ export default function AccountPage() {
   const { closeOnNav, toggleCloseOnNav } = useInspector()
 
   const [loading, setLoading] = useState(true)
+  // A wide screen holds the save state in the page head; a phone keeps the bar under the form
+  const phone = usePhoneWidth()
   // The section a link names (/account?tab=security) is the one the page lands on
   const [activeTab, setActiveTab] = useSectionParam(SECTION_IDS, 'profile', { stacked: true, ready: !loading })
   const [saving, setSaving] = useState(false)
@@ -568,12 +571,12 @@ export default function AccountPage() {
     { id: 'security', label: t('common.security'), description: t('account.manageAccountSecurity'), icon: 'lock' },
     { id: 'api-keys', label: t('account.apiKeys'), description: t('account.apiKeysIntent'), icon: 'key' },
   ]
-  const head = <PageHead title={t('common.account')} total={accountData.username || user?.username} intent={t('account.intent')} />
+  const head = (bar) => <PageHead title={t('common.account')} total={accountData.username || user?.username} intent={t('account.intent')} bar={bar} />
 
   if (loading) {
     return (
       <Zone testId="account-page">
-        {head}
+        {head()}
         <div className="scroll-view" id="view-scroll"><SkeletonPanel label={t('account.loadingAccount')} /></div>
       </Zone>
     )
@@ -860,9 +863,15 @@ export default function AccountPage() {
     </>
   )
 
+  // One bar at a time, so its ids stay unique
+  const saveBar = (
+    <SettingsSaveBar head={!phone} stateRef={saveState} dirty={profileChanged} pending={changedFields.map((k) => profileLabels[k])}
+      saving={saving} onReset={resetProfile} onSave={handleSaveProfile} announce={announce} />
+  )
+
   return (
     <Zone testId="account-page" after={dialogs}>
-      {head}
+      {head(phone ? null : saveBar)}
       <SettingsLayout
         toc={<SettingsToc label={t('account.tocLabel')} sections={sections} flags={profileChanged ? { profile: 'modified' } : {}} current={activeTab}
           hrefFor={(id) => (id === 'profile' ? '/account' : `/account?tab=${id}`)} onJump={setActiveTab} />}
@@ -872,8 +881,7 @@ export default function AccountPage() {
         {sections.map((s) => (
           <SettingsFrame key={s.id} id={s.id} label={s.label} desc={s.description} aside={asides[s.id]}>{bodies[s.id]}</SettingsFrame>
         ))}
-        <SettingsSaveBar stateRef={saveState} dirty={profileChanged} pending={changedFields.map((k) => profileLabels[k])}
-          saving={saving} onReset={resetProfile} onSave={handleSaveProfile} announce={announce} />
+        {phone && saveBar}
       </SettingsLayout>
     </Zone>
   )

@@ -40,14 +40,19 @@ for (const { path, toc, first } of PAGES) {
   })
 }
 
-test('the settings save bar stays above the status bar and counts a change', async ({ page, api }) => {
+test('the settings save state sits in the page head, right of the title, and counts a change', async ({ page, api }) => {
   await page.goto('/settings')
-  const bar = page.locator('#settings-savebar')
+  const bar = page.locator('.page-head #settings-savebar')
   await expect(bar).toBeVisible()
   const b = await box(bar)
-  const status = await box(page.getByRole('contentinfo'))
-  // flush on the status bar: no band under the bar where the fields would show (#455)
-  expect(Math.abs(status.y - (b.y + b.height))).toBeLessThanOrEqual(EPS)
+  const head = await box(page.locator('.page-head'))
+  const title = await box(page.locator('#main-title'))
+  // in the head, at its right edge, beside the title: nothing of the save over the form (#455)
+  expect(b.y).toBeGreaterThanOrEqual(head.y - EPS)
+  expect(b.y + b.height).toBeLessThanOrEqual(head.y + head.height + EPS)
+  expect(Math.abs(b.x + b.width - (head.x + head.width))).toBeLessThanOrEqual(EPS)
+  expect(b.x).toBeGreaterThan(title.x + title.width)
+  await expect(page.locator('#settings-form #settings-savebar')).toHaveCount(0)
   await expect(bar.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 
   await page.getByLabel('Syslog hostname').fill(`e2e-${Date.now()}`)

@@ -41,6 +41,13 @@ describe('the configuration form', () => {
     expect(screen.getByRole('button', { name: 'sectioned.undo' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled()
   })
+  it('keeps its save bar at the foot of its form, Enregistrer being that form\u2019s submit', () => {
+    render(<Page />)
+    const form = document.getElementById('settings-form')
+    expect(form).toContainElement(document.getElementById('settings-savebar'))
+    expect(document.getElementById('settings-state')).not.toHaveAttribute('title')
+    expect(screen.getByRole('button', { name: 'common.save' })).toHaveAttribute('type', 'submit')
+  })
   it('marks a changed field in the state, its section in the contents, and undoes it', () => {
     const { container } = render(<Page />)
     fireEvent.change(screen.getByLabelText('Port'), { target: { value: '465' } })

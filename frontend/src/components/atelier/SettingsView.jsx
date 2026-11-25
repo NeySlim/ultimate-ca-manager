@@ -245,24 +245,25 @@ export function SettingsJump({ sections, current, onJump }) {
  * The save bar (settingsState() and its buttons), then the polite announcement. Pending fields
  * are named by `pending` (labels), else counted (`count`, `sections`); `failed` names the sections
  * whose save the server refused. `submit` makes Enregistrer the submit of an enclosing form.
+ * `head`: drawn in the page head, its state cut to two lines and given whole as the title.
  */
 export function SettingsSaveBar({ dirty, pending = [], count = 0, sections = [], failed = [], lastSaved, saving = false, disabled = false,
-  onReset, onSave, submit = false, stateRef, announce = '' }) {
+  onReset, onSave, submit = false, stateRef, announce = '', head = false }) {
   const { t } = useTranslation()
-  const state = failed.length ? (
-    <><Icon name="warning" /><span><strong>{t('sectioned.saveFailedTitle')}</strong>{t('sectioned.saveFailedIn', { sections: failed.join(', ') })}</span></>
-  ) : dirty ? (
-    <><Icon name="warning" /><span><strong>{t('sectioned.pendingTitle')}</strong>{pending.length
+  const saved = lastSaved && (lastSaved.by
+    ? t('sectioned.lastSavedBy', { date: lastSaved.at, user: lastSaved.by }) : t('sectioned.lastSaved', { date: lastSaved.at }))
+  const [icon, lead, rest] = failed.length ? ['warning', t('sectioned.saveFailedTitle'), t('sectioned.saveFailedIn', { sections: failed.join(', ') })]
+    : dirty ? ['warning', t('sectioned.pendingTitle'), pending.length
       ? t('sectioned.pendingFields', { fields: pending.join(', ') })
-      : t('sectioned.pendingCount', { count, sections: sections.join(', ') })}</span></>
-  ) : (
-    <><Icon name="check" /><span>{t('sectioned.nothingPending')}{lastSaved && <>{' '}{lastSaved.by
-      ? t('sectioned.lastSavedBy', { date: lastSaved.at, user: lastSaved.by }) : t('sectioned.lastSaved', { date: lastSaved.at })}</>}</span></>
-  )
+      : t('sectioned.pendingCount', { count, sections: sections.join(', ') })]
+      : ['check', '', saved ? `${t('sectioned.nothingPending')} ${saved}` : t('sectioned.nothingPending')]
+  const bar = ['settings-savebar', dirty && 'dirty', head && 'in-head'].filter(Boolean).join(' ')
   return (
     <>
-      <div className={dirty ? 'settings-savebar dirty' : 'settings-savebar'} id="settings-savebar">
-        <p className="settings-state" id="settings-state" tabIndex={-1} ref={stateRef}>{state}</p>
+      <div className={bar} id="settings-savebar">
+        <p className="settings-state" id="settings-state" tabIndex={-1} ref={stateRef} title={head ? `${lead}${rest}` : undefined}>
+          <Icon name={icon} /><span className="settings-state-text">{lead && <strong>{lead}</strong>}{rest}</span>
+        </p>
         <button type="button" className="btn" id="settings-reset" data-action="settings-reset" disabled={!dirty || saving} onClick={onReset}>{t('sectioned.undo')}</button>
         <button type={submit ? 'submit' : 'button'} className="btn primary" id="settings-save" data-write="" disabled={!dirty || saving || disabled}
           onClick={submit ? undefined : onSave}>
