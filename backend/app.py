@@ -129,6 +129,11 @@ def create_app(config_name=None):
 
     root_logger = _logging.getLogger()
     root_logger.setLevel(_log_level)
+    # One set of these handlers per process: an application built again replaces them
+    for _h in [h for h in root_logger.handlers if getattr(h, '_ucm_root', False)]:
+        root_logger.removeHandler(_h)
+        _h.close()
+    _kept = list(root_logger.handlers)
 
     if _is_docker:
         # Docker: everything to stdout (captured by docker logs)
@@ -152,6 +157,10 @@ def create_app(config_name=None):
             _sh = _logging.StreamHandler(sys.stderr)
             _sh.setFormatter(_log_fmt)
             root_logger.addHandler(_sh)
+
+    for _h in root_logger.handlers:
+        if _h not in _kept:
+            _h._ucm_root = True
 
     # Quiet noisy third-party libraries
     for _lib in ('urllib3', 'gevent', 'geventwebsocket', 'engineio',
