@@ -111,6 +111,13 @@ describe('the work queue', () => {
     expect(document.getElementById('work-history')).not.toHaveAttribute('hidden')
     expect(screen.getByText('DEM-1')).toBeInTheDocument()
   })
+
+  it('marks a history that is a catalog, a dated history not', () => {
+    const { rerender, container } = render(<WorkView {...base} groups={groups([row('a', 'CSR a')])} history={{ label: 'Traitées', count: 1, children: [<li key="1">DEM-1</li>] }} />)
+    expect(container.querySelector('.work-history')).not.toHaveClass('catalog')
+    rerender(<WorkView {...base} groups={groups([row('a', 'CSR a')])} history={{ label: 'Non planifiés', count: 1, catalog: true, children: [<li key="1">Inventaire</li>] }} />)
+    expect(container.querySelector('.work-history')).toHaveClass('catalog')
+  })
   // A long history opens on its newest twenty lines; each ask shows twenty more
   it('bounds the history to twenty lines, then twenty more at each ask', () => {
     const items = Array.from({ length: 45 }, (_, i) => <li key={i} className="h">{`DEM-${i}`}</li>)

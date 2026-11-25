@@ -106,6 +106,8 @@ describe('ReportsPage queue', () => {
     renderPage()
     const toggle = await screen.findByRole('button', { name: /^Non planifiés/ })
     expect(toggle).toHaveTextContent('Non planifiés9')
+    // a catalog of kinds, laid two abreast on a wide screen (adjust.css)
+    expect(toggle.closest('.work-history')).toHaveClass('catalog')
     fireEvent.click(toggle)
     expect(screen.getByRole('button', { name: 'Planifier Résumé d’audit' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Télécharger Résumé d’audit' }))

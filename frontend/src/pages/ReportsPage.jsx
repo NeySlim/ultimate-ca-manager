@@ -141,6 +141,7 @@ export default function ReportsPage() {
         history={{
           label: t('reports.work.unscheduled'),
           count: unscheduled.length,
+          catalog: true,
           children: unscheduled.map((e) => (
             <RecordRow key={e.key}
               title={<button type="button" className="text-link" data-item={e.key} data-open={e.key} onClick={() => open(e)}>{reportName(e.key, t)}</button>}

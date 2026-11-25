@@ -113,7 +113,7 @@ const HISTORY_STEP = 20
  * @param {Array<{id,label,icon,tone,items}>} p.groups  rows: { id, title, kind, facts, due, dueLabel, dueDate, tone, onOpen, actions(disabled), selectable }
  * @param {(ids: string[], clear: () => void) => import('react').ReactNode} [p.bulk]  no selection without it
  * @param {{ title, text, action }} p.empty
- * @param {{ label, count, children, empty }} [p.history]
+ * @param {{ label, count, children, empty, catalog }} [p.history]  `catalog`: a list of kinds, not of dated events: two abreast in a wide panel
  */
 export function WorkView({ state = 'ready', error, hint, groups, bulk, openedId, empty, history, after, label }) {
   const { t } = useTranslation()
@@ -147,7 +147,7 @@ export function WorkView({ state = 'ready', error, hint, groups, bulk, openedId,
           </div>
         )}
         {history && (
-          <section className="panel work-history" aria-labelledby="work-history-title">
+          <section className={history.catalog ? 'panel work-history catalog' : 'panel work-history'} aria-labelledby="work-history-title">
             <h2 className="work-history-title" id="work-history-title">
               <button type="button" className="work-history-toggle" id="work-history-toggle" data-work-history="" aria-expanded={historyOpen}
                 aria-controls="work-history" onClick={() => setHistoryOpen((v) => !v)}>

@@ -71,3 +71,34 @@ test('the queue groups, rows, due dates and history keep the mockup geometry', a
     await api.put('/reports/schedule', { expiring_certificates: before.expiring_certificates })
   }
 })
+
+// The reports not scheduled are a catalog: two abreast, 48 px apart, from 1600 px of window, one per line under it
+for (const width of [1280, 1600, 1920, 2560]) {
+  test(`at ${width}px the reports not scheduled take ${width >= 1600 ? 'two columns' : 'one column'}`, async ({ page, api: _api }) => {
+    await page.setViewportSize({ width, height: H })
+    await page.goto('/reports')
+    const toggle = page.getByRole('main').locator('[data-work-history]')
+    await toggle.click()
+    const list = page.locator('#work-history .record-list')
+    await expect(list).toBeVisible()
+    const inner = await box(list)
+    const rows = await list.locator('> li').evaluateAll((els) => els.map((el) => {
+      const r = el.getBoundingClientRect(), last = el.lastElementChild!.getBoundingClientRect(), name = el.querySelector('.text-link')!.getBoundingClientRect()
+      return { x: r.x, y: r.y, width: r.width, right: r.right, actions: last.right, name: name.x, rule: parseFloat(getComputedStyle(el).borderBottomWidth) }
+    }))
+    expect(rows.length).toBeGreaterThan(6)
+    const two = width >= 1600
+    const col = two ? (inner.width - 48) / 2 : inner.width
+    for (const [i, r] of rows.entries()) {
+      expect(Math.abs(r.width - col), `row ${i} width`).toBeLessThanOrEqual(1)
+      expect(Math.abs(r.x - (two && i % 2 ? inner.x + col + 48 : inner.x)), `row ${i} left`).toBeLessThanOrEqual(1)
+      // the buttons of a row end at its right edge: 48 px short of the next name on the line, not a window away
+      expect(Math.abs(r.actions - r.right), `row ${i} actions`).toBeLessThanOrEqual(1)
+      if (two && i % 2) expect(Math.abs(r.y - rows[i - 1].y), `row ${i} level with its neighbour`).toBeLessThanOrEqual(1)
+    }
+    // no rule under the last line of the list
+    const lastY = rows[rows.length - 1].y
+    for (const r of rows) expect(r.rule, 'rule under a row').toBe(Math.abs(r.y - lastY) <= 1 ? 0 : 1)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
+}
