@@ -569,6 +569,26 @@ def test_the_placeholders_of_the_installation_part_leave_the_changes_alone(tmp_p
     assert 'releases/download/v3.0-rc1/ucm-el10-3.0.rc1-1.el10.noarch.rpm' in text
     assert 'https://github.com/o/r/blob/v3.0-rc1/CHANGELOG.md' in text
 
+def _docker_runs(text):
+    """Each `docker run` command of *text*, its continuation lines joined."""
+    joined = re.sub(r'\\\n\s*', ' ', text)
+    return [line.strip() for line in joined.splitlines() if line.strip().startswith('docker run')]
+
+
+def test_the_docker_runs_of_the_notes_keep_their_data_and_read_their_variables(tmp_path):
+    """The real notes step: every image is run with its data and configuration volumes (master.key
+    lives in /etc/ucm), and every variable it sets is one the image's entrypoint reads."""
+    result, notes = _notes_step(tmp_path, '3.0', '## [3.0] - 2026-11-30\n- Marker.\n')
+    assert result.returncode == 0, result.stderr
+    runs = _docker_runs(notes.read_text())
+    assert len(runs) >= 2, runs
+    entrypoint = (ROOT / 'docker' / 'entrypoint.sh').read_text()
+    for run in runs:
+        assert ':/opt/ucm/data' in run and ':/etc/ucm' in run, run
+        for name in re.findall(r'-e ([A-Z_][A-Z0-9_]*)=', run):
+            assert re.search(r'\$\{?' + name + r'\b', entrypoint), (name, run)
+
+
 # ---- 3b. the branch a tag must sit on -------------------------------------------------------------
 
 def _tagged_checkout(tmp_path, branches, tag_on):

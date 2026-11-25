@@ -1133,9 +1133,10 @@ jobs:
           # Or from GitHub Container Registry
           docker pull IMAGE:VERSION
           
-          # Run
-          docker run -d -p 8443:8443 \
-            -e SECRET_KEY=$(openssl rand -hex 32) \
+          # Run: /etc/ucm keeps master.key, without it the stored keys cannot be read again
+          docker run -d -p 8443:8443 -p 8080:8080 \
+            -v ucm-data:/opt/ucm/data -v ucm-config:/etc/ucm \
+            --restart unless-stopped \
             --name ucm neyslim/ultimate-ca-manager:VERSION
           ```
           
