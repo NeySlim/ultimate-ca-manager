@@ -72,11 +72,22 @@ NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md --c
 
 NOTES_FILE="$(mktemp -t ucm-relnotes.XXXXXX.md)"
 trap 'rm -f "$NOTES_FILE"' EXIT
-{
-    echo "## UCM ${VERSION}"
-    echo
-    echo "$NOTES"
-} > "$NOTES_FILE"
+if [[ -s "docs/releases/${VERSION}.md" ]]; then
+    # A written text replaces the CHANGELOG list, as in the workflow.
+    {
+        cat "docs/releases/${VERSION}.md"
+        echo
+        echo "**Full list of changes:** [CHANGELOG.md](${CHANGELOG_URL})"
+        echo
+        echo "**Upgrading:** [UPGRADE.md](https://github.com/${REPO}/blob/${TAG}/UPGRADE.md)"
+    } > "$NOTES_FILE"
+else
+    {
+        echo "## UCM ${VERSION}"
+        echo
+        echo "$NOTES"
+    } > "$NOTES_FILE"
+fi
 
 GH_FLAGS=()
 [[ $PRERELEASE -eq 1 ]] && GH_FLAGS+=(--prerelease)

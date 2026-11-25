@@ -174,6 +174,8 @@ The release smoke (`release-smoke.yml`, with `scripts/ci/package-smoke.sh` for t
 
 Each package job and, on a tag, each image job writes the CycloneDX SBOM of what it built (`scripts/ci/sbom.py`, see [SBOM.md](SBOM.md)) and fails if it cannot. Each manifest job requires the SBOM of both architectures on the digests it is about to tag, and the release job checks every SBOM against its package file or image digest, the schema and `sbom-index.json` before it deletes or publishes an asset (`test_sbom.py`, `test_workflow_sbom.py`).
 
+The release notes are the CHANGELOG section of the version, unless `docs/releases/<version>.md` exists: that text then replaces the list, followed by links to the CHANGELOG and UPGRADE at the tag and the installation part (`test_release_version.py`).
+
 The `latest` and `latest-fips` image tags, and the "Latest" mark of the GitHub release, go to a stable version that no published stable tag exceeds: never to a release candidate, never to a maintenance release of an older line, never to a branch run (`scripts/ci/release_version.py latest`).
 
 ## E2E Tests
