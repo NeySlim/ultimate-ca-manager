@@ -43,7 +43,7 @@ def test_the_fips_image_check_runs_on_each_line_branch(branch):
 
 
 @pytest.mark.parametrize('event, ref', [('pull_request', 'refs/heads/dev'), ('push', 'refs/heads/feature/x'),
-                                         ('push', 'refs/heads/sextant')])
+                                         ('push', 'refs/heads/retired')])
 def test_the_fips_image_check_stays_off_pull_requests_and_feature_branches(event, ref):
     job = load('tests.yml')['jobs']['build-test-fips']
     assert not evaluate(job['if'], {'github': github_context(event, ref)})

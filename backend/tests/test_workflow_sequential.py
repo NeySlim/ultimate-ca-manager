@@ -5,7 +5,7 @@ from tests.workflow_support import evaluate, github_context, load, render
 
 LINE_BRANCH = 'dev'
 # Frozen at the last 3.0 release candidate once merged into dev: it must start nothing any more
-RETIRED_BRANCH = 'sextant'
+RETIRED_BRANCH = 'retired'
 
 
 def _job():

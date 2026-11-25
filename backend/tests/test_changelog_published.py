@@ -27,6 +27,7 @@ def test_published_sections_match_the_releases():
 def test_sections_are_in_descending_order():
     text = (ROOT / 'CHANGELOG.md').read_text(encoding='utf-8')
     heads = re.findall(r'(?m)^## \[([^\]]+)\]', text)
-    assert heads[0] == 'Unreleased'
+    # Unreleased while developing, the version itself in the release commit
+    assert heads[0] in ('Unreleased', (ROOT / 'VERSION').read_text().strip())
     versions = [_numeric(h) for h in heads[1:]]
     assert versions == sorted(versions, reverse=True)

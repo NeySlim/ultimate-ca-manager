@@ -371,11 +371,20 @@ def test_the_validator_is_installed_by_hash_only(tmp_path):
 
 # ---- no release created around the workflow -------------------------------------------------------
 
+def _release_checkout(tmp_path):
+    """A checkout whose CHANGELOG holds an RC section: the script is read, not the repository's notes."""
+    repo = tmp_path / 'repo'
+    (repo / 'scripts' / 'ci').mkdir(parents=True)
+    shutil.copy(ROOT / 'scripts' / 'ci' / 'release_version.py', repo / 'scripts' / 'ci')
+    (repo / 'CHANGELOG.md').write_text('# Changelog\n\n## [3.0-rc1] - 2026-01-01\n\n### Fixed\n- An entry.\n')
+    return repo
+
+
 def test_the_publish_script_never_creates_a_release(tmp_path):
     """Only the workflow creates a release, with its SBOMs: the script edits the notes of one."""
     calls = tmp_path / 'gh.calls'
     bindir = _stub_bin(tmp_path, {
-        'git': f'case "$1" in rev-parse) echo {ROOT};; ls-remote) printf "x\\trefs/tags/v3.0-rc1\\n";; esac',
+        'git': f'case "$1" in rev-parse) echo {_release_checkout(tmp_path)};; ls-remote) printf "x\\trefs/tags/v3.0-rc1\\n";; esac',
         'gh': f'echo "$@" >> {calls}; case "$1 $2" in "release view") exit 1;; "repo view") echo o/r;; esac; exit 0',
         'python3': f'exec {sys.executable} "$@"',
     })
@@ -392,7 +401,7 @@ def test_the_publish_script_never_creates_a_release(tmp_path):
 def test_the_publish_script_still_edits_the_notes_of_a_release(tmp_path):
     calls = tmp_path / 'gh.calls'
     bindir = _stub_bin(tmp_path, {
-        'git': f'case "$1" in rev-parse) echo {ROOT};; ls-remote) printf "x\\trefs/tags/v3.0-rc1\\n";; esac',
+        'git': f'case "$1" in rev-parse) echo {_release_checkout(tmp_path)};; ls-remote) printf "x\\trefs/tags/v3.0-rc1\\n";; esac',
         'gh': f'echo "$@" >> {calls}; case "$1 $2" in "repo view") echo o/r;; esac; exit 0',
         'python3': f'exec {sys.executable} "$@"',
     })
