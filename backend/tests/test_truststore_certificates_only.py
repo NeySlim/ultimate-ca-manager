@@ -341,7 +341,9 @@ def test_a_headered_block_beside_a_plain_one_is_handed_out_with_it(app, auth_cli
     assert bundle.status_code == 200 and _pem(first).strip() in bundle.data and b'Comment: x' not in bundle.data
 
 
-def test_a_row_cryptography_cannot_read_still_hands_out_its_plain_blocks():
+def test_guard_a_row_cryptography_cannot_read_still_hands_out_its_plain_blocks():
+    """Non-regression guard, not a proof of the headered-block fix (it passes without it): when
+    cryptography refuses the text, its plain blocks are still handed out, not dropped."""
     from utils.trust_pem import certificate_blocks
     _, cert = _issue('plain-beside-broken')
     broken = b'-----BEGIN CERTIFICATE-----\nComment: x\n\nAAAA\n-----END CERTIFICATE-----\n'
