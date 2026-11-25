@@ -46,8 +46,8 @@ test('the settings save bar stays above the status bar and counts a change', asy
   await expect(bar).toBeVisible()
   const b = await box(bar)
   const status = await box(page.getByRole('contentinfo'))
-  // 24 px above the status bar, the content scrolls in that band (the mockup's scroll-view padding)
-  expect(Math.abs(status.y - (b.y + b.height) - 24)).toBeLessThanOrEqual(EPS)
+  // flush on the status bar: no band under the bar where the fields would show (#455)
+  expect(Math.abs(status.y - (b.y + b.height))).toBeLessThanOrEqual(EPS)
   await expect(bar.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 
   await page.getByLabel('Syslog hostname').fill(`e2e-${Date.now()}`)

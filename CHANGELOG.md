@@ -19,6 +19,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME: a finalize refused on the server side (issuing CA without key, offline or outside its window) whose message held the word `caa`, a domain such as `caa.example.com` for instance, was answered as a CAA denial carrying that message; it now answers `serverInternal`, the cause kept for the log and the audit.
 - ACME: an issuing CA chosen for a domain or as the default, taken offline while keeping its key, made a finalize answer `badCSR` and left the order `ready`; it now refuses the order before signing, as `serverInternal`, like an offline CA without its key.
 - Trust store: an entry stored by 2.254.4 or earlier with a certificate block carrying RFC 1421 headers beside plain blocks lost that certificate at the upgrade and in every read; it is now kept, re-serialized.
+### Fixed
+
+- **The Settings and Account save bar no longer shows fields in a band under it (#455).** On wide screens the floating bar now sits flush on the bottom of the page instead of 24 px above it.
 
 ## [3.0] - 2026-11-25
 

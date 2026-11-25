@@ -522,3 +522,6 @@
   :root .atl .dash-cards>.card-authorities:first-child:is(:has(+.card-compliance:last-child),:has(+.card-compliance+:not(.card-revocation))){flex-basis:calc(62% - 10px)}
   :root .atl .dash-cards>.card-horizon:has(.wk-row>.wk:nth-child(27)){flex-basis:100%}
 }
+
+/* The sticky edge of the settings bar sits inside the scroll area's 24px bottom padding: offset it so the bar is flush (#455). */
+@media(min-width:801px){:root .atl .settings-savebar{bottom:-24px}}
