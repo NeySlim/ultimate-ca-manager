@@ -2,7 +2,8 @@
 #
 # UCM release publisher — generic wrapper around `gh release`.
 #
-# Reads VERSION from the repo, extracts the matching CHANGELOG section and
+# Reads VERSION from the repo, takes docs/releases/<VERSION>.md when it exists
+# (a major release's written text), else the matching CHANGELOG section, and
 # edits the notes of the existing GitHub release. A release is only created by
 # the Build & Release workflow, which attaches every deliverable with its SBOM.
 #
