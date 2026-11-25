@@ -175,16 +175,6 @@ def require_jose_content_type():
     return None
 
 
-def _is_caa_failure(error: Any) -> bool:
-    """True only for a definitive CAA policy denial. A DNS lookup error is a
-    server failure (serverInternal), not a caa refusal."""
-    from utils import caa_checker
-    text = str(error or '')
-    if caa_checker.is_transient_caa_failure(text):
-        return False
-    return bool(re.search(r'\bcaa\b', text, re.IGNORECASE))
-
-
 # Identifier syntax is judged in `services/acme/identifiers.py`, which the
 # ACME proxy calls too: it takes the same unauthenticated `identifiers` array
 # and used to forward it unexamined. Re-exported here because this module is
@@ -1303,13 +1293,11 @@ def finalize_order(order_id: str):
         try:
             success, error = service.finalize_order(order_id, csr_pem)
         except Exception as finalize_error:
-            # RFC 8555 §7.1.6: an error once processing makes the order invalid
+            # RFC 8555 §7.1.6: an error once processing makes the order invalid; a CAA
+            # denial is a refusal finalize_order returns, so an exception is the server's
             db.session.rollback()
-            caa = _is_caa_failure(finalize_error)
-            if caa:
-                service.invalidate_processing_order(order_id, 'caa', str(finalize_error))
-            else:
-                service.invalidate_processing_order(order_id, 'serverInternal', SERVER_FAILURE_DETAIL)
+            logger.exception("ACME finalize of order %s failed", order_id)
+            service.invalidate_processing_order(order_id, 'serverInternal', SERVER_FAILURE_DETAIL)
             _audit_acme(
                 'acme.order.finalize',
                 resource_type='acme_order',
@@ -1317,17 +1305,14 @@ def finalize_order(order_id: str):
                 details=f'failed: {finalize_error}',
                 success=False,
             )
-            if caa:
-                return acme_error('caa', str(finalize_error), 400)
-            raise
+            return acme_error('serverInternal', SERVER_FAILURE_DETAIL, 500)
         finally:
             service._finalizing_order_id = None
 
         if not success:
-            # A server-side refusal names a CA or a domain: never read it as a CAA denial
-            named_type = getattr(service, '_last_finalize_error_type', None)
-            error_type = ('caa' if named_type != 'serverInternal' and _is_caa_failure(error)
-                          else named_type or 'badCSR')
+            # The refusal's type is the one finalize named (caa only from the CAA check),
+            # never read from its text, which may name a `caa` domain label
+            error_type = getattr(service, '_last_finalize_error_type', None) or 'badCSR'
             if error_type == 'badCSR':
                 # RFC 8555 §7.4: the client may finalize again with an amended CSR
                 service.reopen_order_after_bad_csr(order_id)

@@ -1040,7 +1040,8 @@ class TestRfc8555StateMachine:
         def reject_caa(_service, candidate_order_id, _csr_pem):
             current = AcmeOrder.query.filter_by(order_id=candidate_order_id).first()
             observed['status'] = current.status
-            return False, 'CAA check failed: issuer is not authorized'
+            # What the CAA check's own refusal returns: the type is named, not read from the text
+            return _service._caa_refusal('CAA check failed: issuer is not authorized')
 
         monkeypatch.setattr(AcmeService, 'finalize_order', reject_caa)
         path = f'/acme/order/{order_id}/finalize'

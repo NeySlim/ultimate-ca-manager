@@ -478,3 +478,71 @@ def test_an_ip_address_cn_is_not_a_dns_name(app, client, served):
     r = _signed(client, account, f'/acme/order/{order_id}/finalize',
                 {'csr': _b64u(csr.public_bytes(serialization.Encoding.DER))})
     _assert_issued(client, account, order_id, r)
+
+
+# --- A domain under a `caa` label: only the CAA check's own refusal is a caa error ----------------
+
+@pytest.fixture
+def caa_served(app, create_ca, monkeypatch):
+    """(account, ca_id, domain) as `served`, the domain under a `caa` label."""
+    import utils.caa_checker as caa
+    monkeypatch.setattr(caa, 'check_caa_for_domains', lambda *a, **k: (True, 'test'))
+    ca = create_ca(cn=f'ACME caa label CA {uuid.uuid4().hex[:6]}')
+    domain = f'caa.out-{uuid.uuid4().hex[:8]}.example'
+    with app.app_context():
+        db.session.add(AcmeLocalDomain(domain=domain, issuing_ca_id=ca['id']))
+        db.session.commit()
+    return _new_account(app), ca['id'], domain
+
+
+def test_a_taken_subject_naming_a_caa_label_is_a_bad_csr(app, client, caa_served):
+    """RFC 8555 §7.4: the CSR is refused, the order stays ready, whatever the domain is called."""
+    account, ca_id, domain = caa_served
+    with app.app_context():
+        db.session.get(CA, ca_id).enforce_unique_subject = True
+        db.session.commit()
+    first = _order(app, account, domain)
+    _assert_issued(client, account, first, _finalize(client, account, first, domain))
+    other = _new_account(app)
+    order_id = _order(app, other, domain)
+    r = _finalize(client, other, order_id, domain)
+    _assert_ready_after_bad_csr(client, other, order_id, r, f'CN={domain}')
+
+
+def test_a_caa_denial_on_a_caa_label_is_still_a_caa_error(app, client, caa_served, monkeypatch):
+    import utils.caa_checker as caa
+    account, _ca_id, domain = caa_served
+    monkeypatch.setattr(caa, 'check_caa_for_domains',
+                        lambda *a, **k: (False, f'CAA record forbids issuance for {domain}'))
+    order_id = _order(app, account, domain)
+    r = _finalize(client, account, order_id, domain)
+    assert r.status_code == 400, r.get_json()
+    assert r.get_json()['type'] == 'urn:ietf:params:acme:error:caa'
+    read = _read(client, account, order_id)
+    assert read['status'] == 'invalid'
+    assert read['error']['type'] == 'urn:ietf:params:acme:error:caa'
+
+
+def test_an_exception_naming_a_caa_label_is_a_server_error_kept_from_the_client(
+        app, client, caa_served, monkeypatch):
+    from models import AuditLog
+    from services.acme.mixins.issuance import IssuanceMixin
+    account, _ca_id, domain = caa_served
+    secret = 'pg-password-0xdeadbeef'
+
+    def explode(self, order, csr_pem, ca_refid):
+        raise RuntimeError(f'INSERT failed for {domain}: password={secret}')
+    monkeypatch.setattr(IssuanceMixin, '_sign_certificate_with_ca', explode)
+    order_id = _order(app, account, domain)
+    r = _finalize(client, account, order_id, domain)
+    assert r.status_code == 500, r.get_json()
+    assert r.get_json() == {**r.get_json(), 'type': SERVER, 'detail': GENERIC}
+    assert secret not in r.get_data(as_text=True)
+    read = _read(client, account, order_id)
+    assert read['status'] == 'invalid'
+    assert read['error'] == {'type': SERVER, 'detail': GENERIC}
+    with app.app_context():
+        assert secret not in AcmeOrder.query.filter_by(order_id=order_id).one().error
+        line = (AuditLog.query.filter_by(action='acme.order.finalize', resource_id=str(order_id))
+                .order_by(AuditLog.id.desc()).first())
+        assert line is not None and not line.success and secret in line.details

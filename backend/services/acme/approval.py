@@ -35,7 +35,6 @@ def _service(data):
 
 def _issue(approval, data):
     """Finalize the held order with its stored CSR, as the client's finalize would have."""
-    from api.acme.acme_api import _is_caa_failure
     order = _held_order(data)
     if order is None:
         raise ProtocolRequestGone(_GONE)
@@ -56,8 +55,8 @@ def _issue(approval, data):
     finally:
         service._finalizing_order_id = None
     if not success:
-        error_type = 'caa' if _is_caa_failure(error) else (
-            getattr(service, '_last_finalize_error_type', None) or 'badCSR')
+        # As on finalize: the type finalize named, never one read from the refusal's text
+        error_type = getattr(service, '_last_finalize_error_type', None) or 'badCSR'
         # Nothing is committed here: the approval route rolls the vote back
         # and closes the request, whose closed handler invalidates the order
         if error_type == 'serverInternal':

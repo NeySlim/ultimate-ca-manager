@@ -329,3 +329,27 @@ def test_an_approved_order_does_not_hold_its_policy(app, client, auth_client, ac
         assert _read(client, account, order_id).get_json()['status'] == 'valid'
         r = auth_client.delete(f'/api/v2/policies/{pid}')
         assert r.status_code == 200, r.get_json()
+
+
+SERVER = 'urn:ietf:params:acme:error:serverInternal'
+
+
+def test_a_taken_subject_naming_a_caa_label_at_approval_is_a_bad_csr(app, client, auth_client, acme_ca,
+                                                                    monkeypatch):
+    """Only the CAA check's own refusal is a caa error, never a message that names a `caa` label."""
+    from services.acme.mixins.issuance import IssuanceMixin
+    from services.cert.unique_subject import SubjectTaken
+
+    def taken(self, order, csr_pem, ca_refid):
+        self._last_signing_exception = SubjectTaken('CN=caa.taken.example', 7)
+        return False, None, f'Certificate signing failed: {self._last_signing_exception}'
+    with approval_policy(app, acme_ca[0], 'acme-held-caa-label') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        monkeypatch.setattr(IssuanceMixin, '_sign_certificate_with_ca', taken)
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.get_json()['message'] == 'Request closed', r.get_json()
+        read = _read(client, account, order_id).get_json()
+        assert read['status'] == 'invalid'
+        assert read['error']['type'] == 'urn:ietf:params:acme:error:badCSR'
+
