@@ -22,3 +22,11 @@ def test_every_value_has_a_row_in_the_readme_table():
     missing = [key for key in _leaves(values)
                if not any(key == d or key.startswith(d + '.') for d in documented)]
     assert missing == []
+
+
+def test_every_link_of_the_readme_is_absolute():
+    """Artifact Hub shows the README away from the repository: a relative link leads nowhere there."""
+    text = (CHART / 'README.md').read_text()
+    targets = re.findall(r'\]\(([^)\s]+)', text) + re.findall(r'^\[[^\]]+\]:\s*(\S+)', text, re.M)
+    relative = [t for t in targets if not re.match(r'(https?://|mailto:|#)', t)]
+    assert relative == []

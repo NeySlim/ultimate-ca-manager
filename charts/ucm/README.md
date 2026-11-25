@@ -97,7 +97,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `nodeSelector` / `tolerations` / `affinity` | `{}` / `[]` / `{}` | Scheduling; `affinity` replaces the HA anti-affinity |
 | `podAnnotations` / `podLabels` | `{}` / `{}` | Extra pod annotations and labels |
 
-See [`values.yaml`](values.yaml) for the full list.
+See [`values.yaml`](https://github.com/NeySlim/ultimate-ca-manager/blob/main/charts/ucm/values.yaml) for the full list.
 
 ### External PostgreSQL
 
