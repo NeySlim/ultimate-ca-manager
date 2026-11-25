@@ -313,3 +313,22 @@ def test_a_real_caa_denial_still_invalidates_the_order(app, client, monkeypatch)
     assert response.get_json()['type'] == 'urn:ietf:params:acme:error:caa'
     with app.app_context():
         assert AcmeOrder.query.filter_by(order_id=order_id).one().status == 'invalid'
+
+
+def test_a_chosen_ca_offline_with_its_key_refuses_and_no_other_ca_signs(app, monkeypatch, create_ca,
+                                                                        default_setting):
+    """An offline CA keeping its key is refused before signing, as a server error: never another CA."""
+    create_ca(cn='A CA able to sign, not chosen')
+    chosen = create_ca(cn='Default CA offline keeping its key')
+    with app.app_context():
+        ca = db.session.get(CA, chosen['id'])
+        _set_default(ca.refid)
+        ca.offline = True
+        db.session.commit()
+        try:
+            success, error, service, order = _finalize(monkeypatch, _domain())
+            _assert_refused(success, error, service, order, words='offline')
+        finally:
+            ca = db.session.get(CA, chosen['id'])
+            ca.offline = False
+            db.session.commit()

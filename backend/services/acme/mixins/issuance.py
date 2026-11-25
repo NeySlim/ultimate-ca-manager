@@ -628,11 +628,11 @@ class IssuanceMixin:
         if ca is None:
             raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} no longer exists: '
                                     f'choose another one in {where}')
+        # Offline, with or without its key: the remedy is the CA itself, and signing never starts
+        if ca.offline:
+            raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} is offline: bring it '
+                                    f'back online, or choose a CA able to sign in {where}')
         if not ca.has_private_key:
-            # Taken offline with its key exported: the remedy is the CA itself
-            if ca.offline:
-                raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} is offline: bring it '
-                                        f'back online, or choose a CA able to sign in {where}')
             raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} has no private key: '
                                     f'choose a CA able to sign in {where}')
         return ca.refid
