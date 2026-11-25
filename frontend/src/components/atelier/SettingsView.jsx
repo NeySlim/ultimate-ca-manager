@@ -258,17 +258,23 @@ export function SettingsSaveBar({ dirty, pending = [], count = 0, sections = [],
       : t('sectioned.pendingCount', { count, sections: sections.join(', ') })]
       : ['check', '', saved ? `${t('sectioned.nothingPending')} ${saved}` : t('sectioned.nothingPending')]
   const bar = ['settings-savebar', dirty && 'dirty', head && 'in-head'].filter(Boolean).join(' ')
+  // In the head the two buttons wrap as one, under the state when it lacks room beside them
+  const buttons = (
+    <>
+      <button type="button" className="btn" id="settings-reset" data-action="settings-reset" disabled={!dirty || saving} onClick={onReset}>{t('sectioned.undo')}</button>
+      <button type={submit ? 'submit' : 'button'} className="btn primary" id="settings-save" data-write="" disabled={!dirty || saving || disabled}
+        onClick={submit ? undefined : onSave}>
+        <Icon name="check" />{saving ? t('sectioned.saving') : t('common.save')}
+      </button>
+    </>
+  )
   return (
     <>
       <div className={bar} id="settings-savebar">
         <p className="settings-state" id="settings-state" tabIndex={-1} ref={stateRef} title={head ? `${lead}${rest}` : undefined}>
           <Icon name={icon} /><span className="settings-state-text">{lead && <strong>{lead}</strong>}{rest}</span>
         </p>
-        <button type="button" className="btn" id="settings-reset" data-action="settings-reset" disabled={!dirty || saving} onClick={onReset}>{t('sectioned.undo')}</button>
-        <button type={submit ? 'submit' : 'button'} className="btn primary" id="settings-save" data-write="" disabled={!dirty || saving || disabled}
-          onClick={submit ? undefined : onSave}>
-          <Icon name="check" />{saving ? t('sectioned.saving') : t('common.save')}
-        </button>
+        {head ? <span className="settings-save-buttons">{buttons}</span> : buttons}
       </div>
       <p className="sr-only" id="settings-announce" role="status" aria-live="polite">{announce}</p>
     </>
