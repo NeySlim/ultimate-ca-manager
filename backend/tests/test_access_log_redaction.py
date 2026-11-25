@@ -98,3 +98,23 @@ def test_an_encoded_password_name_leaves_no_decoded_value_in_the_line():
     line = cfg.access_log_format % atoms
     for shown in ('S3cret', 'S3cret!Pw', 'S3cret%21Pw'):
         assert shown not in line and shown not in str(atoms)
+
+
+@pytest.mark.parametrize('url, expected', [
+    ('/x?my"password=secret', '/x?my"password=[REDACTED]'),
+    ('/x?a=1&"Passphrase"=abc&b=2', '/x?a=1&"Passphrase"=[REDACTED]&b=2'),
+    ('/x?password=se"cret&b=2', '/x?password=[REDACTED]&b=2'),
+    ('/x?a="1"&b=2', '/x?a="1"&b=2'),
+])
+def test_a_quote_neither_hides_a_name_nor_cuts_a_value(url, expected):
+    assert redact_url(url) == expected
+
+
+@pytest.mark.parametrize('unit', ['&', '?a=', '"', '?"', '&"=', '?a"'])
+def test_a_one_megabyte_url_is_redacted_in_linear_time(unit):
+    import time
+    url = '/x?' + unit * (1_000_000 // len(unit)) + '&password=secret'
+    started = time.perf_counter()
+    redacted = redact_url(url)
+    assert time.perf_counter() - started < 2
+    assert redacted.endswith('&password=[REDACTED]') and 'secret' not in redacted

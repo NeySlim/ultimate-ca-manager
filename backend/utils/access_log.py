@@ -10,9 +10,10 @@ SECRET_PARAMS = ('token', 'code', 'state', 'access_token', 'id_token', 'refresh_
 # Any parameter whose name holds one of these: a password refused in a URL still reaches the log
 SECRET_NAME_PARTS = ('password', 'passphrase')
 
-# A name stops at "?": "?a=1?token=x" and "?a?token=x" still show the parameter behind the second "?"
-_NAME = re.compile(r'[?&;]([^=&;#\s"?]*)=')
-_VALUE = re.compile(r'[^&;#\s"]*')
+# A name stops at "?": "?a=1?token=x" and "?a?token=x" still show the parameter behind the second "?".
+# A quote ends neither a name nor a value: the server reads both through it.
+_NAME = re.compile(r'[?&;]([^=&;#\s?]*)=')
+_VALUE = re.compile(r'[^&;#\s]*')
 
 
 def _secret_name(raw):

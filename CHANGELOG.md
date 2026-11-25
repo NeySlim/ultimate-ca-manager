@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- Access log: a double quote in a parameter's name (`my"password=`) left its value in the log, and one in a secret value left the rest of it; both are now masked.
+
 ## [3.0] - 2026-11-25
 
 ### Added
