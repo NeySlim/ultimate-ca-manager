@@ -353,3 +353,30 @@ def test_a_taken_subject_naming_a_caa_label_at_approval_is_a_bad_csr(app, client
         assert read['status'] == 'invalid'
         assert read['error']['type'] == 'urn:ietf:params:acme:error:badCSR'
 
+
+@pytest.mark.parametrize('state', ['offline', 'revoked'])
+def test_a_held_order_whose_ca_can_no_longer_sign_is_a_server_error(app, client, auth_client, acme_ca, state):
+    """The CA retained when the order was held went offline (keeping its key) or was revoked:
+    the server's failure (RFC 8555 §7.1.6), the order invalid, never reopened as badCSR."""
+    ca_id = acme_ca[0]
+    with approval_policy(app, ca_id, f'acme-held-ca-{state}') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        with app.app_context():
+            ca = db.session.get(CA, ca_id)
+            setattr(ca, state, True)
+            db.session.commit()
+            assert ca.has_private_key
+        try:
+            r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+            assert r.get_json()['message'] == 'Request closed', r.get_json()
+            assert r.get_json()['data']['certificate_issued'] is False
+            assert requests_of(app, pid, 'acme_order')[0][1] == 'rejected'
+            read = _read(client, account, order_id).get_json()
+            assert read['status'] == 'invalid'
+            assert read['error'] == {'type': SERVER,
+                                     'detail': 'Certificate signing failed on the server; retry later'}
+        finally:
+            with app.app_context():
+                setattr(db.session.get(CA, ca_id), state, False)
+                db.session.commit()

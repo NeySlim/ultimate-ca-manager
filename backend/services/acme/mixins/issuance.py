@@ -161,7 +161,7 @@ class IssuanceMixin:
         # IP-only orders have no domains: skips the per-domain mappings and
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
-            # A chosen CA that is gone or keyless refuses the order: never another CA instead
+            # A chosen CA that is gone, offline, revoked or keyless refuses the order: never another CA instead
             try:
                 ca_refid = self._resolve_ca_for_domains(order_domains)
             except IssuingCAUnusable as e:
@@ -589,7 +589,8 @@ class IssuanceMixin:
         3. Global default from acme.issuing_ca_id config
         4. None: nothing chosen, _select_signing_ca takes the first CA able to sign
 
-        Raises IssuingCAUnusable when the chosen CA is gone or has no private key.
+        Raises IssuingCAUnusable when the chosen CA is gone, offline (with or
+        without its key), revoked (itself or an ancestor) or has no private key.
         """
         from api.v2.acme_local_domains import find_local_domain_ca
         from api.v2.acme_domains import find_provider_for_domain
@@ -632,6 +633,9 @@ class IssuanceMixin:
         if ca.offline:
             raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} is offline: bring it '
                                     f'back online, or choose a CA able to sign in {where}')
+        if ca.revoked_in_chain:
+            raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} is revoked and can no longer '
+                                    f'sign: choose a CA able to sign in {where}')
         if not ca.has_private_key:
             raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} has no private key: '
                                     f'choose a CA able to sign in {where}')
@@ -660,7 +664,8 @@ class IssuanceMixin:
         text = str(exc)
         if any(word in text for word in ('signing key', 'HSM', 'No CA available',
                                          'awaiting its certificate', 'has no private key',
-                                         'KEY_ENCRYPTION_KEY')):
+                                         'KEY_ENCRYPTION_KEY', 'CA is offline',
+                                         'can no longer sign')):
             return False
         return isinstance(exc, ValueError)
 

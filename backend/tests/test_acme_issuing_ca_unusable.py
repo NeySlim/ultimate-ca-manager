@@ -332,3 +332,43 @@ def test_a_chosen_ca_offline_with_its_key_refuses_and_no_other_ca_signs(app, mon
             ca = db.session.get(CA, chosen['id'])
             ca.offline = False
             db.session.commit()
+
+
+def test_a_chosen_ca_revoked_refuses_and_names_the_setting(app, monkeypatch, create_ca, default_setting):
+    """A revoked CA keeping its key is refused before signing, as a server error: never another CA."""
+    create_ca(cn='A CA able to sign, not chosen over a revoked one')
+    chosen = create_ca(cn='Default CA revoked keeping its key')
+    with app.app_context():
+        ca = db.session.get(CA, chosen['id'])
+        _set_default(ca.refid)
+        ca.revoked = True
+        db.session.commit()
+        assert ca.has_private_key and ca.revoked_in_chain
+        try:
+            success, error, service, order = _finalize(monkeypatch, _domain())
+            _assert_refused(success, error, service, order, words='revoked')
+            assert 'ACME settings' in error, error
+        finally:
+            db.session.get(CA, chosen['id']).revoked = False
+            db.session.commit()
+
+
+def test_a_chosen_ca_revoked_answers_a_server_error_by_the_route(app, client, monkeypatch, create_ca,
+                                                                 default_setting):
+    chosen = create_ca(cn='Default CA revoked, by the route')
+    with app.app_context():
+        ca = db.session.get(CA, chosen['id'])
+        _set_default(ca.refid)
+        ca.revoked = True
+        db.session.commit()
+    try:
+        response, order_id = _finalize_by_route(app, client, monkeypatch, _domain())
+        assert response.status_code == 500, response.get_data(as_text=True)
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:serverInternal'
+        with app.app_context():
+            order = AcmeOrder.query.filter_by(order_id=order_id).one()
+            assert order.status == 'invalid' and order.certificate_id is None
+    finally:
+        with app.app_context():
+            db.session.get(CA, chosen['id']).revoked = False
+            db.session.commit()
