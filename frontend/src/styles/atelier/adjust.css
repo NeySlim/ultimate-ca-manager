@@ -358,6 +358,14 @@
 /* A notice keeps its ground on the width it is given, its words on 78ch; a command in it wraps instead of scrolling. */
 :root .atl .notice>span{max-width:var(--notice-measure)}
 :root .atl .notice .command-line code{white-space:pre-wrap;overflow-wrap:anywhere}
+/* A wide inspector (1100 px or more): an extension's value sits beside its name instead of at the far edge of its
+   column, the names of a column sharing one width (280 px at most). */
+@container (min-width:1100px){
+  :root .atl .extensions{grid-template-columns:repeat(2,fit-content(280px) minmax(0,1fr))}
+  :root .atl #app.dock-right .extensions{grid-template-columns:fit-content(280px) minmax(0,1fr)}
+  :root .atl .extension{display:grid;grid-column:span 2;grid-template-columns:subgrid}
+  :root .atl .extension dd{max-width:none;text-align:left}
+}
 /* A dialog's helps (under a field, a group or its title) read on 78ch too, whatever the dialog's width. */
 :root .atl dialog :is(small,p:is(.small,.muted,.group-hint),.modal-head p){max-width:var(--notice-measure)}
 /* A help held to the measure in a centred empty block stays centred under its title. */

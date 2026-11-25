@@ -88,6 +88,52 @@ for (const width of [1920, 3440]) {
   })
 }
 
+// The Extensions tab of a wide inspector: a value beside its name, the names of a column on one width (280 px at most)
+for (const width of [1280, 1600, 1920, 2560]) {
+  test(`at ${width}px an extension's value sits beside its name in the inspector`, async ({ page, api }) => {
+    await page.setViewportSize({ width, height: 1200 })
+    const cert = await issueCert(api, (await createCA(api)).id)
+    await page.goto('/certificates')
+    await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
+    await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
+    await page.locator('#inspector').getByRole('tab', { name: 'Extensions' }).click()
+    const list = page.getByTestId('certificate-extensions')
+    await expect(list).toBeVisible()
+    const rows = await list.locator('.extension').evaluateAll((els) => els.map((el) => {
+      const r = el.getBoundingClientRect(), dt = el.querySelector('dt')!.getBoundingClientRect(), dd = el.querySelector('dd')!
+      return { x: r.x, right: r.right, name: dt.right - dt.x, value: dd.getBoundingClientRect().x, align: getComputedStyle(dd).textAlign }
+    }))
+    expect(rows.length).toBeGreaterThan(3)
+    const columns = [...new Set(rows.map((r) => Math.round(r.x)))]
+    expect(columns).toHaveLength(2)
+    for (const x of columns) {
+      const col = rows.filter((r) => Math.round(r.x) === x)
+      const start = col[0].value
+      for (const r of col) {
+        // one edge for the values of a column, 28 px past its longest name, never more than 280 px of name
+        near(r.value, start, 'values of a column on one edge')
+        expect(r.align).toMatch(/^(left|start)$/)
+        expect(r.value - r.x).toBeLessThanOrEqual(280 + 28 + EPS)
+      }
+      expect(start - x).toBeLessThanOrEqual(Math.max(...col.map((r) => r.name)) + 28 + EPS)
+    }
+  })
+}
+
+test('under 1100 px of inspector an extension keeps its value at the right of its row', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1024, height: 1200 })
+  const cert = await issueCert(api, (await createCA(api)).id)
+  await page.goto('/certificates')
+  await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
+  await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
+  await page.locator('#inspector').getByRole('tab', { name: 'Extensions' }).click()
+  const row = page.getByTestId('certificate-extensions').locator('.extension').first()
+  await expect(row).toBeVisible()
+  const m = await row.evaluate((el) => ({ right: el.getBoundingClientRect().right, value: el.querySelector('dd')!.getBoundingClientRect().right, align: getComputedStyle(el.querySelector('dd')!).textAlign }))
+  expect(m.align).toBe('right')
+  near(m.value, m.right, 'value at the right edge of its row')
+})
+
 // The form pages (Settings, Account, the tools, the operations, the protocols' configuration): a card holds 960 px beside the
 // contents while its column is narrower than 1280 px; from 1280 px it takes the column and lays its groups of
 // fields in two columns 48 px apart. No field nor text grows: helps 62ch, notices 78ch, fields 640 px (220 px short).
