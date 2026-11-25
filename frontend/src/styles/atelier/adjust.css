@@ -320,7 +320,7 @@
 @media(min-width:1921px){:root .atl :is(.masthead,.statusbar,.stage){padding-left:calc((100% - var(--page-max))/2);padding-right:calc((100% - var(--page-max))/2)}}
 /* The cap is a switch on the column's own width: --form-max under 1280 px, none from 1280 px. */
 @media(min-width:801px){:root .atl .settings-layout:not(.guide-layout) :is(.settings-main,.settings-form)>:not(.settings-form){max-width:max(var(--form-max),(100% - 1279.99px)*1000000)}}
-:root .atl .settings-body :is(small,p:not(.field-error)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
+:root .atl .settings-body :is(small,p:not(.field-error,.notice)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
 /* A card of 1280 px or more: its groups of fields in two independent columns, 48 px apart, balanced by the browser;
    a group alone stays in the first. What is not a group of fields (a table, a notice, a test line) and a group
    marked .wide (it holds a table or a list, or is the card's only one) keep the whole card. */

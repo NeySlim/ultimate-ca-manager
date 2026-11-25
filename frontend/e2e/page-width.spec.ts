@@ -88,7 +88,7 @@ for (const width of [1920, 3440]) {
   })
 }
 
-// The form pages (Settings, Account): a card holds 960 px beside the
+// The form pages (Settings, Account, the tools, the operations, the protocols' configuration): a card holds 960 px beside the
 // contents while its column is narrower than 1280 px; from 1280 px it takes the column and lays its groups of
 // fields in two columns 48 px apart. No field nor text grows: helps 62ch, notices 78ch, fields 640 px (220 px short).
 const FORM = 960
@@ -167,7 +167,7 @@ const expectCards = async (page, width: number, where: string) => {
       for (const f of c.fields) expect(f.width, `${where} ${c.id} #${f.id}`).toBeLessThanOrEqual((f.short ? SHORT : FIELD) + EPS)
     }
   }
-  expect(await overMeasure(page, '.settings-body small, .settings-body p, .settings-section .panel-heading p', 62), `${where}: helps`).toEqual([])
+  expect(await overMeasure(page, '.settings-body small, .settings-body p:not(.notice), .settings-section .panel-heading p', 62), `${where}: helps`).toEqual([])
   expect(await overMeasure(page, '.notice > span', 78), `${where}: notices`).toEqual([])
   return { toc, cards, wide, col }
 }
@@ -198,9 +198,9 @@ for (const width of [1280, 1440, 1600, 1920, 2560, 3440]) {
 }
 
 for (const width of [1280, 1600, 1920, 2560]) {
-  test(`at ${width}px the account follows the same rule`, async ({ page, api: _api }) => {
+  test(`at ${width}px the account and the one-group form pages follow the same rule, their contents at the left`, async ({ page, api: _api }) => {
     await page.setViewportSize({ width, height: 1000 })
-    for (const path of ['/account']) {
+    for (const path of ['/account', '/tools', '/operations', '/operations?tab=export', '/acme?tab=config', '/acme?tab=letsencrypt', '/scep-config?tab=config', '/est-config?tab=config', '/tsa-config?tab=config']) {
       await open(page, path)
       await expect(page.locator('.atl .settings-layout .settings-section').first()).toBeVisible()
       const { cards, wide } = await expectCards(page, width, path)
