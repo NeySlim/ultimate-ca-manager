@@ -181,7 +181,7 @@ function PolicyDialog({ editing, cas, groups, keyTypeOptions, saving, onSave, on
               </div>
             ))}
             {(formData.rules.allowed_key_types || []).some(isBrainpool) && (
-              <p className="notice warn" role="note" style={{ margin: 0 }}><Icon name="warning" />{t('common.keyGroups.brainpoolWarning')}</p>
+              <p className="notice warn" role="note" style={{ margin: 0 }}><Icon name="warning" /><span>{t('common.keyGroups.brainpoolWarning')}</span></p>
             )}
             <small>{t('policies.allowedKeyTypesHelp')}</small>
           </fieldset>

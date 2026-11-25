@@ -358,6 +358,8 @@
 /* A notice keeps its ground on the width it is given, its words on 78ch; a command in it wraps instead of scrolling. */
 :root .atl .notice>span{max-width:var(--notice-measure)}
 :root .atl .notice .command-line code{white-space:pre-wrap;overflow-wrap:anywhere}
+/* A dialog's helps (under a field, a group or its title) read on 78ch too, whatever the dialog's width. */
+:root .atl dialog :is(small,p:is(.small,.muted,.group-hint),.modal-head p){max-width:var(--notice-measure)}
 /* A help held to the measure in a centred empty block stays centred under its title. */
 :root .atl .settings-body .empty p{margin-left:auto;margin-right:auto}
 /* Graphic review: PKI and protocols. */

@@ -46,3 +46,43 @@ test.describe('desktop', () => {
     await expect(ask).toBeHidden()
   })
 })
+
+// A dialog's helps and notices read on 78 characters of their own font at most, in the wide dialogs too
+const DIALOGS: [string, string][] = [['/templates', '#template-new'], ['/policies', '#policy-new'], ['/cas', '[data-action=create-ca]'],
+  ['/ssh/cas', '#ssh-ca-new'], ['/hsm', '#hsm-new'], ['/certificates', '[data-action=issue]'], ['/ssh/certificates', '#ssh-cert-new'], ['/rbac', '#rbac-new']]
+for (const width of [1280, 1920]) {
+  test(`at ${width}px the helps and notices of the form dialogs stop at 78ch`, async ({ page, api: _api }) => {
+    test.setTimeout(120_000)
+    await page.setViewportSize({ width, height: 1200 })
+    let measured = 0
+    for (const [path, opener] of DIALOGS) {
+      await page.goto(path)
+      await page.locator(opener).first().click()
+      const dialog = page.locator('dialog[open]').last()
+      await expect(dialog, path).toBeVisible()
+      // the folded parts hold helps too
+      const folded = dialog.locator('.advanced-toggle[aria-expanded=false]')
+      while (await folded.count()) await folded.first().click()
+      const m = await dialog.evaluate((d) => {
+        const over: string[] = []
+        let count = 0, widest = 0
+        for (const el of d.querySelectorAll('small, p.small, p.muted, p.group-hint, .modal-head p, .notice > span')) {
+          if (getComputedStyle(el).display === 'inline' || !(el as HTMLElement).offsetParent) continue
+          const probe = document.createElement('span')
+          probe.style.cssText = 'position:absolute;visibility:hidden;width:78ch'
+          el.appendChild(probe)
+          const limit = probe.getBoundingClientRect().width
+          probe.remove()
+          const w = el.getBoundingClientRect().width
+          count += 1
+          widest = Math.max(widest, w / limit)
+          if (w > limit + 1) over.push(`${el.textContent?.slice(0, 40)}: ${Math.round(w)} > ${Math.round(limit)}`)
+        }
+        return { over, count, widest, width: d.getBoundingClientRect().width }
+      })
+      expect(m.over, path).toEqual([])
+      measured += m.count
+    }
+    expect(measured).toBeGreaterThan(30)
+  })
+}
