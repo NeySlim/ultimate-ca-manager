@@ -1095,3 +1095,37 @@ def test_an_ldap_entry_named_like_a_local_account_is_counted_on_it(
     assert client.post(LDAP_DOOR, json=_ldap_body(directory.mail, ldap_provider, PASSWORD)
                        ).status_code == 401
     assert len(directory.binds) == MAX_ATTEMPTS
+
+
+def test_an_ldap_attempt_is_counted_on_the_account_linked_by_its_address(
+        app, client, ldap_user, ldap_provider, any_spelling):
+    """Linked by an administrator, never bound: another name, found by the entry's mail."""
+    entry_uid = f'dir{uuid.uuid4().hex[:8]}'
+    directory = any_spelling(_AnySpellingDirectory(entry_uid, f'{ldap_user}@example.test'))
+    for _ in range(BURST):
+        assert client.post(LDAP_DOOR, json=_ldap_body(entry_uid, ldap_provider)
+                           ).status_code == 401
+    assert len(directory.binds) == MAX_ATTEMPTS
+    with app.app_context():
+        failures, locked_until = _stored(ldap_user)
+    assert failures == MAX_ATTEMPTS and locked_until is not None
+
+
+def test_an_ldap_attempt_is_stored_before_its_bind(app, client, ldap_user, ldap_provider, any_spelling):
+    """Committed, not only written: nothing the bind does to the session takes it back."""
+    directory = any_spelling(_AnySpellingDirectory(ldap_user, f'{ldap_user}@example.test'))
+    real = directory.bind
+
+    def bind_then_roll_back(conn, provider):
+        proved = real(conn, provider)
+        if not conn.user.startswith('cn=svc'):
+            db.session.rollback()
+        return proved
+
+    import api.v2.sso.connection_tests as connection_tests
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(connection_tests, 'ldap_bind', bind_then_roll_back)
+        assert client.post(LDAP_DOOR, json=_ldap_body(ldap_user, ldap_provider)
+                           ).status_code == 401
+    with app.app_context():
+        assert _stored(ldap_user)[0] == 1
