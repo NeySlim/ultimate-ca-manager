@@ -94,7 +94,7 @@ export default function WindowsSettingsPanel({ hasPermission, onLoaded }) {
 
   return (
     <>
-      <SettingsGroup legend={t('xcepWstep.sharedTitle')} hint={t('xcepWstep.sharedDescription')}>
+      <SettingsGroup legend={t('xcepWstep.sharedTitle')} hint={t('xcepWstep.sharedDescription')} wide={!settings.xcep_enabled}>
         {defaultWithoutRealm && (
           <Notice tone="warn"><strong>{t('xcepWstep.noRealmTitle')}</strong>{' '}{t('xcepWstep.noRealmKerberosRefused', { name: defaultProfile.name })}</Notice>
         )}

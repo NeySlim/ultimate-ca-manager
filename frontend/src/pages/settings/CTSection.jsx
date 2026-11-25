@@ -10,7 +10,7 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctNewL
   return (
     <>
       {/* The logs as the mockup's record list; a new one typed in a full-width field, its button under it */}
-      <SettingsGroup legend={t('settings.ct')} grid={false}>
+      <SettingsGroup legend={t('settings.ct')} grid={false} wide>
         {ctSettings.log_urls?.length > 0 && (
           <RecordList label={t('settings.ctLogUrls')}>
             {ctSettings.log_urls.map((url, i) => (

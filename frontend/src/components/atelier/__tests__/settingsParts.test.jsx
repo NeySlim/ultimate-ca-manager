@@ -56,6 +56,19 @@ describe('settings frame and group', () => {
     expect(blocks.querySelector('.settings-stack > dl')).not.toBeNull()
     expect(blocks.querySelector('.group-hint')).toBeNull()
   })
+
+  it('marks the group that keeps the whole card, and no frame as wide', () => {
+    const { container } = render(
+      <SettingsFrame id="s" label="Planificateur" wide>
+        <SettingsGroup legend="Champs"><div className="field" /></SettingsGroup>
+        <SettingsGroup legend="Tâches" grid={false} wide><table /></SettingsGroup>
+      </SettingsFrame>,
+    )
+    const [fields, table] = container.querySelectorAll('fieldset.settings-group')
+    expect(fields).not.toHaveClass('wide')
+    expect(table).toHaveClass('wide')
+    expect(container.querySelector('.settings-section')).not.toHaveClass('settings-wide')
+  })
 })
 
 describe('settings test', () => {

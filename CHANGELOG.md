@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+
+- Settings and Account on a wide screen: once the form column reaches 1280 px (a window of about 1550 px) a card takes the whole column and lays its groups of fields in two columns, with tables, notices and test lines across the card. Narrower windows keep the 960 px cards; no field or text grows (long fields stop at 640 px, help texts at 62 characters, notice texts at 78).
+
 ### Security
 
 - Access log: a double quote in a parameter's name (`my"password=`) left its value in the log, and one in a secret value left the rest of it; both are now masked.

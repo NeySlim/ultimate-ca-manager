@@ -19,7 +19,7 @@ export default function SsoSection({ ssoProviders, ssoLoading, ssoTesting, handl
   const canDelete = hasPermission('delete:sso')
   if (ssoLoading) return <SkeletonPanel label={t('common.loading')} />
   return (
-    <SettingsGroup legend={t('sso.configuredProviders')} grid={false}>
+    <SettingsGroup legend={t('sso.configuredProviders')} grid={false} wide>
       <RecordList columns>
         {TYPES.map(({ type, labelKey, descKey }) => {
           const label = t(labelKey)

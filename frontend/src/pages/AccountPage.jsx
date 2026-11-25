@@ -685,7 +685,7 @@ export default function AccountPage() {
   )
 
   const keys = (
-    <SettingsGroup legend={t('account.yourAPIKeys')} grid={false}>
+    <SettingsGroup legend={t('account.yourAPIKeys')} grid={false} wide>
       <p className="group-hint">{t('account.apiKeyHint')}</p>
       <ApiKeyList keys={apiKeys} loading={apiKeysLoading} onRevoke={handleRevokeApiKey} onDelete={handleDeleteApiKey}
         onCopy={(prefix) => { copy(prefix); showSuccess(t('common.copied')) }} />

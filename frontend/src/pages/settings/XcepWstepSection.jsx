@@ -29,7 +29,7 @@ export default function XcepWstepSection({ hasPermission }) {
     <>
       <WindowsSettingsPanel hasPermission={hasPermission} />
 
-      <SettingsGroup legend={t('xcepWstep.profilesTitle')} hint={t('xcepWstep.profilesDescription')} grid={false}>
+      <SettingsGroup legend={t('xcepWstep.profilesTitle')} hint={t('xcepWstep.profilesDescription')} grid={false} wide>
         <WindowsProfileList
           cas={cas}
           canWrite={canWrite}

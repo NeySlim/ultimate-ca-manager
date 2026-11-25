@@ -1,13 +1,14 @@
 import { test, expect } from './support/fixtures'
 
 // Real geometry of the sectioned pages at 1600 px, as the Atelier form with a table of
-// contents draws it: 200 px contents, 24 px gap, frames of 960 px at most (adjust.css --form-max)
+// contents draws it: 200 px contents, 24 px gap, frames on the whole column from 1280 px of it
+// (960 px under it, adjust.css --form-max: page-width.spec.ts)
 const EPS = 1
 const W = 1600
 const H = 1000
 const GUTTER = 24
 const TOC = 200
-const FORM = 960
+const FORM = W - GUTTER - TOC - GUTTER - GUTTER
 type Box = { x: number; y: number; width: number; height: number }
 const box = async (locator): Promise<Box> => {
   const b = await locator.boundingBox()
@@ -25,7 +26,7 @@ const PAGES = [
 ]
 
 for (const { path, toc, first } of PAGES) {
-  test(`${path} puts its contents left of frames held to the form measure`, async ({ page, api }) => {
+  test(`${path} puts its contents left of frames that take the column`, async ({ page, api }) => {
     await page.goto(path)
     const nav = page.getByRole('navigation', { name: toc, exact: true })
     const frame = page.getByRole('region', { name: first, exact: true })
@@ -85,15 +86,19 @@ test('every settings section is in view in the table of contents, no title cut',
   expect(await nav.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true)
 })
 
-test('a short field takes one column of four, a button the width of its text', async ({ page, api }) => {
+test('a short field keeps a short width, a long one its group, a button the width of its text', async ({ page, api }) => {
+  // 1440 px, a card of 960 px: 918 px of fields in 4 columns of 217.5 (short), the public URL on the whole line, 16 px gaps
+  await page.setViewportSize({ width: 1440, height: H })
   await page.goto('/settings')
   const general = page.getByRole('region', { name: 'General', exact: true })
   await expect(general).toBeVisible()
-  const port = await box(general.getByLabel('ACME public port'))
-  const base = await box(general.getByLabel('Public URL', { exact: true }))
-  // 918 px of fields in a 960 px card: 4 columns of 217.5 (short), the public URL on the whole line, 16 px gaps
-  expect(Math.abs(port.width - 217.5)).toBeLessThanOrEqual(2)
-  expect(Math.abs(base.width - 918)).toBeLessThanOrEqual(2)
+  expect(Math.abs((await box(general.getByLabel('ACME public port'))).width - 217.5)).toBeLessThanOrEqual(2)
+  expect(Math.abs((await box(general.getByLabel('Public URL', { exact: true }))).width - 918)).toBeLessThanOrEqual(2)
+  // 1600 px, the card on the column, the group on half of it (619 px): a short field stops at 220 px, the public URL fills the group
+  await page.setViewportSize({ width: W, height: H })
+  const half = (FORM - 2 - 40 - 48) / 2
+  await expect.poll(async () => Math.abs((await box(general.getByLabel('Public URL', { exact: true }))).width - half)).toBeLessThanOrEqual(2)
+  expect(Math.abs((await box(general.getByLabel('ACME public port'))).width - 220)).toBeLessThanOrEqual(2)
 
   await page.goto('/tools')
   const run = page.getByRole('button', { name: 'Check SSL', exact: true })
@@ -165,8 +170,14 @@ test('groups of a frame stand 20 px apart', async ({ page, api }) => {
   await page.goto('/settings')
   const groups = page.locator('#set-sec-general > .settings-body > .settings-group')
   await expect(groups.first()).toBeVisible()
-  const boxes = await groups.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })))
-  for (let i = 1; i < boxes.length; i++) expect(Math.abs(boxes[i].top - boxes[i - 1].bottom - 20)).toBeLessThanOrEqual(EPS)
+  // two columns at this width: 20 px between the groups of each
+  const boxes = await groups.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ x: r.x, top: r.top, bottom: r.bottom })))
+  const columns = [...new Set(boxes.map((r) => Math.round(r.x)))]
+  expect(columns).toHaveLength(2)
+  for (const x of columns) {
+    const col = boxes.filter((r) => Math.round(r.x) === x)
+    for (let i = 1; i < col.length; i++) expect(Math.abs(col[i].top - col[i - 1].bottom - 20)).toBeLessThanOrEqual(EPS)
+  }
 })
 
 test.describe('on a phone', () => {

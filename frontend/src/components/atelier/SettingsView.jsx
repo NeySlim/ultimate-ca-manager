@@ -83,13 +83,12 @@ class SectionBoundary extends Component {
 
 /**
  * The frame of a section (settingsSection()): its heading, the refusal of its last save, then its
- * body. `aside` sits at the right of the heading (a state of the section). `wide`: a table too dense
- * for the 960 px of the form measure keeps the whole column (adjust.css, .settings-wide).
+ * body. `aside` sits at the right of the heading (a state of the section).
  */
-export function SettingsFrame({ id, label, desc, error, aside, wide = false, children }) {
+export function SettingsFrame({ id, label, desc, error, aside, children }) {
   const { t } = useTranslation()
   return (
-    <section className={wide ? 'panel settings-section settings-wide' : 'panel settings-section'} id={`set-sec-${id}`} aria-labelledby={`set-title-${id}`}>
+    <section className="panel settings-section" id={`set-sec-${id}`} aria-labelledby={`set-title-${id}`}>
       <header className="panel-heading">
         <div>
           <h2 id={`set-title-${id}`} tabIndex={-1}>{label}</h2>
@@ -111,10 +110,14 @@ export function SettingsFrame({ id, label, desc, error, aside, wide = false, chi
  * A group of fields: `fieldset.settings-group`, its legend, the two (four) column grid; `grid={false}`
  * for blocks stacked one under the other. `hint` says what the group does, under its legend (absent from the mockup).
  */
-/** `legendHidden`: a legend that would repeat its card's title is kept for assistive technology only. */
-export function SettingsGroup({ legend, hint, grid = true, legendHidden = false, children, ...rest }) {
+/**
+ * `legendHidden`: a legend that would repeat its card's title is kept for assistive technology only.
+ * `wide`: the group keeps the whole card where the groups go two abreast (adjust.css): it holds a table
+ * or a list, or it is the only group of fields of its card.
+ */
+export function SettingsGroup({ legend, hint, grid = true, legendHidden = false, wide = false, children, ...rest }) {
   return (
-    <fieldset className="settings-group" {...rest}>
+    <fieldset className={wide ? 'settings-group wide' : 'settings-group'} {...rest}>
       <legend className={legendHidden ? 'sr-only' : undefined}>{legend}</legend>
       {hint && <p className="group-hint">{hint}</p>}
       <div className={grid ? 'settings-grid' : 'settings-stack'}>{children}</div>

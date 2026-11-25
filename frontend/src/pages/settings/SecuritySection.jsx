@@ -211,7 +211,7 @@ export default function SecuritySection({ settings, fieldErrors = {}, updateSett
         <ToggleSwitch id="set-password_require_special" checked={settings.password_require_special || false}
           onChange={(val) => updateSetting('password_require_special', val)} label={t('settings.requireSpecial')} disabled={adminLocked} />
       </SettingsGroup>
-      <SettingsGroup grid={false}
+      <SettingsGroup grid={false} wide
         legend={<>{t('settings.anomalyDetection')}{anomalies.length > 0 && <>{' '}<Pill tone="warn" label={String(anomalies.length)} /></>}</>}>
         <AnomalyList anomalies={anomalies} loading={anomaliesLoading} />
         <div className="settings-actions">

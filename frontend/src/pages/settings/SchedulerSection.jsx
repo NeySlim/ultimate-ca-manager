@@ -195,7 +195,7 @@ export default function SchedulerSection({ hasPermission }) {
   return (
     <>
       {meta.stale && <Notice tone="warn">{t('scheduler.stateStale')}</Notice>}
-      <SettingsGroup grid={false} legend={(
+      <SettingsGroup grid={false} wide legend={(
         <>{t('scheduler.tasksTitle')}{meta.warnings > 0 && <>{' '}<Pill tone="warn" label={t('scheduler.warningsCount', { count: meta.warnings })} /></>}</>
       )}>
         <div className="settings-actions">

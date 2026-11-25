@@ -314,12 +314,42 @@
 :root[data-theme|=aurore] .atl .btn-sm:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 18%,transparent)}
 
 /* The measures of the page: past a 1920 px window the bars' contents and the stage keep the 1920 px layout, centred,
-   the bars' grounds edge to edge; the settings' cards (not the guide's) 960 px beside their contents, a section of a wide
-   table (.settings-wide) keeping the whole column; their help 62ch. */
-:root .atl{--page-max:1852px;--form-max:960px;--measure:62ch}
+   the bars' grounds edge to edge. A form card (not the guide's) holds 960 px beside its contents while its column is
+   narrower than 1280 px, the whole column from there; a help reads on 62ch, a notice on 78ch. */
+:root .atl{--page-max:1852px;--form-max:960px;--measure:62ch;--notice-measure:78ch;--field-max:640px;--field-mid:452px;--field-short:220px}
 @media(min-width:1921px){:root .atl :is(.masthead,.statusbar,.stage){padding-left:calc((100% - var(--page-max))/2);padding-right:calc((100% - var(--page-max))/2)}}
-@media(min-width:801px){:root .atl .settings-layout:not(.guide-layout) :is(.settings-main,.settings-form)>:not(.settings-form,.settings-wide){max-width:var(--form-max)}}
+/* The cap is a switch on the column's own width: --form-max under 1280 px, none from 1280 px. */
+@media(min-width:801px){:root .atl .settings-layout:not(.guide-layout) :is(.settings-main,.settings-form)>:not(.settings-form){max-width:max(var(--form-max),(100% - 1279.99px)*1000000)}}
 :root .atl .settings-body :is(small,p:not(.field-error)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
+/* A card of 1280 px or more: its groups of fields in two independent columns, 48 px apart, balanced by the browser;
+   a group alone stays in the first. What is not a group of fields (a table, a notice, a test line) and a group
+   marked .wide (it holds a table or a list, or is the card's only one) keep the whole card. */
+@container (min-width:1280px){
+  :root .atl .settings-body{display:block;columns:2;column-gap:48px}
+  :root .atl .settings-body>:not(dialog){break-inside:avoid}
+  :root .atl .settings-body>:not(:first-child,dialog){margin-top:20px}
+  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide){column-span:all}
+  /* The first block of a column loses its top margin: what follows a block on the whole card takes it from that block. */
+  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide):not(:last-child){margin-bottom:20px}
+  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide)+:not(dialog){margin-top:0}
+  /* A group on half a card: two columns of fields under 700 px of group, four from there. On the whole card: four
+     columns 48 px apart, a long field on a half. No field grows: a long one stops at 640 px, a short one at 220 px. */
+  :root .atl .settings-body{--sg-cols:2;--sg-gap:16px;--sg-span:1;--sg-full:1/-1;--sg-short-help:1;--sg-short-max:var(--field-short)}
+  :root .atl .settings-body>:is(:not(.settings-group,dialog),.settings-group.wide){--sg-cols:4;--sg-gap:48px;--sg-span:2;--sg-full:span 2;--sg-short-help:2;--sg-short-max:var(--field-short)}
+  :root .atl .settings-body .settings-grid{grid-template-columns:repeat(var(--sg-cols),minmax(0,1fr));column-gap:var(--sg-gap)}
+  :root .atl .settings-body .settings-grid>.field{grid-column:span var(--sg-span)}
+  :root .atl .settings-body .settings-grid>.field.short{grid-column:span 1}
+  :root .atl .settings-body .settings-grid>.field.full{grid-column:var(--sg-full)}
+  :root .atl .settings-body .settings-grid>.field.short:has(>small){grid-column:span var(--sg-short-help)}
+  :root .atl .settings-body .settings-grid>.field.short:has(>small)>:is(input,select){max-width:var(--sg-short-max)}
+  :root .atl .settings-body .field>:is(input:not([type=checkbox],[type=radio]),select,textarea){max-width:var(--field-max)}
+  :root .atl .settings-body .field:not(.full,.short)>:is(input,select){max-width:var(--field-mid)}
+  :root .atl .settings-body .field.short>:is(input,select){max-width:var(--field-short)}
+}
+@container (min-width:1488px){:root .atl .settings-body{--sg-cols:4;--sg-span:2;--sg-short-help:2;--sg-short-max:calc(50% - 8px)}}
+/* A notice keeps its ground on the width it is given, its words on 78ch; a command in it wraps instead of scrolling. */
+:root .atl .notice>span{max-width:var(--notice-measure)}
+:root .atl .notice .command-line code{white-space:pre-wrap;overflow-wrap:anywhere}
 /* A help held to the measure in a centred empty block stays centred under its title. */
 :root .atl .settings-body .empty p{margin-left:auto;margin-right:auto}
 /* Graphic review: PKI and protocols. */
@@ -524,12 +554,12 @@
 }
 
 /* Wide screens: the save state and its buttons are text of the page head, which does not scroll, centred over the form
-   column (past the contents and their gutter, --form-max wide) or, short of room, just right of the title; no frame (#455).
+   column (past the contents and their gutter: --form-max wide, the whole column from 1280 px) or, short of room, just right of the title; no frame (#455).
    The title keeps its width up to half the window; a long state is cut to two lines, whole in its title. Short of room
    for the state (10em) beside its buttons, the two buttons pass together under it. */
 :root .atl{--toc-col:200px;--toc-gap:24px}
 @media(min-width:801px){:root .atl .settings-layout:not(.guide-layout){grid-template-columns:var(--toc-col) minmax(0,1fr);gap:var(--toc-gap)}}
-:root .atl .page-head:has(>.settings-savebar){display:grid;grid-template-columns:1fr auto 1fr max(0px,100% - var(--form-max));gap:0;padding-left:calc(var(--toc-col) + var(--toc-gap))}
+:root .atl .page-head:has(>.settings-savebar){display:grid;grid-template-columns:1fr auto 1fr clamp(0px,(1279.99px - 100%)*1000000,100% - var(--form-max));gap:0;padding-left:calc(var(--toc-col) + var(--toc-gap))}
 :root .atl .page-head:has(>.settings-savebar)>div:first-child{grid-column:1;justify-self:start;width:max-content;max-width:50vw;margin-left:calc(-1*(var(--toc-col) + var(--toc-gap)))}
 :root .atl .page-head>.settings-savebar{grid-column:2;position:static;flex-wrap:wrap;margin:0 20px;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
 :root .atl .page-head>.settings-savebar .settings-state{flex:1 1 0;min-width:min(100%,10em);margin-top:0}

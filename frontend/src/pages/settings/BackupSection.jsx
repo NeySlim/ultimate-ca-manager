@@ -107,7 +107,7 @@ export default function BackupSection({
 
   return (
     <>
-      <SettingsGroup legend={t('settings.backupScheduleGroup')}>
+      <SettingsGroup legend={t('settings.backupScheduleGroup')} wide>
         <Select id="set-backup_frequency" label={t('settings.backupFrequency')} disabled={locked}
           value={enabled ? (settings.backup_frequency || 'daily') : 'off'} onChange={pickFrequency} hint={t('settings.backupCadenceNote')}
           options={[
@@ -175,7 +175,7 @@ export default function BackupSection({
         )}
       </SettingsGroup>
 
-      <SettingsGroup legend={t('settings.availableBackups')} grid={false}>
+      <SettingsGroup legend={t('settings.availableBackups')} grid={false} wide>
         {/* Summary: count, total size and free disk, on one muted line */}
         <p className="group-hint backup-summary">
           <span>{t('settings.backupCount', { count: backupMeta.total ?? backups.length })}</span>
