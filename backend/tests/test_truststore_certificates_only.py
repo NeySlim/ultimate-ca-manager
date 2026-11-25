@@ -346,3 +346,48 @@ def test_a_row_cryptography_cannot_read_still_hands_out_its_plain_blocks():
     _, cert = _issue('plain-beside-broken')
     broken = b'-----BEGIN CERTIFICATE-----\nComment: x\n\nAAAA\n-----END CERTIFICATE-----\n'
     assert certificate_blocks(broken + _pem(cert)) == _pem(cert)
+
+
+@pytest.fixture
+def keyed_row(app, drop):
+    """A row as 2.254.4 stored an uploaded `key + certificate` file, written straight to the table."""
+    key, cert = _issue('stored-with-key')
+    drop(cert)
+    key_pem = _key_pem(key).decode()
+    with app.app_context():
+        row = TrustedCertificate(name='stored with key', certificate_pem=key_pem + _legacy(_pem(cert)).decode(),
+                                 fingerprint_sha256=cert.fingerprint(hashes.SHA256()).hex(),
+                                 subject=cert.subject.rfc4514_string(), purpose='custom')
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    return row_id, cert, key_pem.splitlines()[1]
+
+
+def test_the_detail_and_the_list_hand_out_the_certificate_only(auth_client, keyed_row):
+    row_id, cert, body = keyed_row
+    detail = auth_client.get(f'{TS}/{row_id}')
+    assert detail.status_code == 200
+    assert detail.get_json()['data']['certificate_pem'].encode() == _pem(cert)
+    listing = auth_client.get(f'{TS}?per_page=200')
+    assert body not in listing.get_data(as_text=True)
+    (entry,) = [e for e in listing.get_json()['data'] if e['id'] == row_id]
+    assert entry['certificate_pem'].encode() == _pem(cert)
+
+
+def test_the_pem_export_hands_out_the_certificate_only(auth_client, keyed_row):
+    _, cert, body = keyed_row
+    r = auth_client.get(f'{TS}/export?format=pem')
+    assert r.status_code == 200
+    text = r.get_data(as_text=True)
+    assert body not in text and 'PRIVATE KEY' not in text
+    assert _pem(cert).decode().strip() in text and 'X509 CERTIFICATE' not in text
+
+
+def test_the_p7b_export_carries_the_certificate(auth_client, keyed_row):
+    from cryptography.hazmat.primitives.serialization import pkcs7
+    _, cert, body = keyed_row
+    r = auth_client.get(f'{TS}/export?format=p7b')
+    assert r.status_code == 200
+    assert body.encode() not in r.data
+    assert cert in pkcs7.load_der_pkcs7_certificates(r.data)
