@@ -152,7 +152,8 @@ export default {
           '1. 本地域名映射：精确域名匹配，然后父域名',
           '2. DNS 域名映射：检查为 DNS 提供商配置的签发 CA',
           '3. 全局默认：ACME 服务器配置中设置的 CA',
-          '4. 第一个拥有私钥的可用 CA',
+          '4. 仅当以上步骤均未选定 CA 时：第一个能够签名的 CA（拥有私钥、在线、未吊销）',
+          '已选定的 CA（域名映射或默认值）若无法签名（已删除、无私钥、离线或已吊销），订单将被拒绝：不会改由其他 CA 签名',
         ]
       },
       {
@@ -186,7 +187,7 @@ export default {
       '对于 Kubernetes/cert-manager：参见 examples/kubernetes/cert-manager/ 中的参考清单',
       'ECDSA P-256 密钥提供与 RSA-2048 等效的安全性，但体积更小',
       '使用本地域名为不同的内部域名分配不同的 CA',
-      '任何拥有私钥的 CA 都可以被选为签发 CA',
+      '签发 CA 必须能够签名：拥有私钥、在线且未吊销',
       '通配符域名 (*.example.com) 需要 DNS-01 验证',
       '每个 CA 账户保留自己的上游注册：将代理切换到另一个账户时使用该账户的注册',
       '在 certbot 中使用代理 URL：certbot certonly --server https://your-server:port/acme/proxy/directory',
@@ -475,7 +476,9 @@ certbot、acme.sh 或 Caddy 等客户端使用此 URL 来发现 ACME 端点。
 1. **本地域名映射**: 精确匹配，然后父域名匹配
 2. **DNS 域名映射**: 为 DNS 提供商配置的 CA
 3. **全局默认**: ACME 服务器配置中设置的 CA
-4. **第一个可用**: 任何拥有私钥的 CA
+4. **第一个可用**: 仅当以上步骤均未选定 CA 时，第一个能够签名的 CA（拥有私钥、在线、未吊销）
+
+由域名映射或默认值选定的 CA 若无法签名（已删除、无私钥、离线或已吊销），订单将被拒绝：不会改由其他 CA 签名。
 
 ### EAB 凭据（服务器端）
 当 UCM 作为 ACME 服务器（或代理）时，可以要求 **External Account Binding**：客户端必须出示预先签发的 kid + HMAC 密钥才能注册账户。在 **ACME → EAB Credentials** 中签发和撤销凭据。

@@ -152,7 +152,8 @@ export default {
           '1. Mapeo de dominio local: coincidencia exacta de dominio, luego dominio padre',
           '2. Mapeo de dominio DNS: verifica la CA emisora configurada para el proveedor DNS',
           '3. Predeterminado global: la CA establecida en la configuración del servidor ACME',
-          '4. Primera CA disponible con clave privada',
+          '4. Solo si ningún paso anterior eligió una CA: la primera CA capaz de firmar (clave privada, en línea, no revocada)',
+          'Una CA elegida (mapeo de dominio o predeterminada) que no puede firmar (eliminada, sin clave privada, sin conexión o revocada) hace rechazar el pedido: ninguna otra CA firma en su lugar',
         ]
       },
       {
@@ -186,7 +187,7 @@ export default {
       'Para Kubernetes/cert-manager: vea los manifiestos de referencia en examples/kubernetes/cert-manager/',
       'Las claves ECDSA P-256 ofrecen seguridad equivalente a RSA-2048 con un tamaño mucho menor',
       'Use dominios locales para asignar diferentes CA a diferentes dominios internos',
-      'Cualquier CA con clave privada puede seleccionarse como CA emisora',
+      'La CA emisora debe poder firmar: con su clave privada, en línea y no revocada',
       'Los dominios comodín (*.example.com) requieren validación DNS-01',
       'Cada cuenta CA conserva su propio registro upstream: al cambiar el proxy a otra cuenta se usa el de esa cuenta',
       'Use la URL del proxy con certbot: certbot certonly --server https://tu-servidor:puerto/acme/proxy/directory',
@@ -474,7 +475,9 @@ Cuando un cliente ACME solicita un certificado, UCM determina la CA firmante en 
 1. **Mapeo de dominio local**: Coincidencia exacta, luego coincidencia de dominio padre
 2. **Mapeo de dominio DNS**: La CA configurada para el proveedor DNS
 3. **Predeterminado global**: La CA establecida en la configuración del servidor ACME
-4. **Primera disponible**: Cualquier CA con clave privada
+4. **Primera disponible**: solo si ningún paso anterior eligió una CA, la primera CA capaz de firmar (clave privada, en línea, no revocada)
+
+Una CA elegida por un mapeo de dominio o como predeterminada que no puede firmar (eliminada, sin clave privada, sin conexión o revocada) hace rechazar el pedido: ninguna otra CA firma en su lugar.
 
 ### Credenciales EAB (lado servidor)
 Cuando UCM es el servidor ACME (o el proxy), puede exigir **External Account Binding**: los clientes deben presentar un kid + clave HMAC pre-emitidos para registrar una cuenta. Emita y revoque credenciales desde **ACME → Credenciales EAB**.

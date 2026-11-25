@@ -923,7 +923,8 @@ export const helpContent = {
           '1. Local Domain mapping: exact domain match, then parent domain',
           '2. DNS Domain mapping: checks the issuing CA configured for the DNS provider',
           '3. Global default: the CA set in ACME server configuration',
-          '4. First available CA with a private key',
+          '4. Only when none of the above chose a CA: the first CA able to sign (private key, online, not revoked)',
+          'A chosen CA (domain mapping or default) that cannot sign (deleted, without its private key, offline or revoked) refuses the order: no other CA signs instead',
         ]
       },
       {
@@ -959,7 +960,7 @@ export const helpContent = {
       'For Kubernetes/cert-manager: see the reference manifests under examples/kubernetes/cert-manager/',
       'ECDSA P-256 keys offer equivalent security to RSA-2048 with much smaller size',
       'Use Local Domains to assign different CAs to different internal domains',
-      'Any CA with a private key can be selected as the issuing CA',
+      'The issuing CA must be able to sign: its private key held, online and not revoked',
       'Wildcard domains (*.example.com) require DNS-01 validation',
       'Each CA account keeps its own upstream registration: switching the proxy to another account uses that account\'s',
       'Use the proxy URL with certbot: certbot certonly --server https://your-server:port/acme/proxy/directory',

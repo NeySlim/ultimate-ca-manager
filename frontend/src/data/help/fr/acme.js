@@ -152,7 +152,8 @@ export default {
           '1. Mappage de domaine local : correspondance exacte du domaine, puis domaine parent',
           '2. Mappage de domaine DNS : vérifie l’AC émettrice configurée pour le fournisseur DNS',
           '3. Valeur par défaut globale : l’AC définie dans la configuration du serveur ACME',
-          '4. Première AC disponible avec une clé privée',
+          '4. Seulement si aucune étape ci-dessus n’a choisi d’AC : la première AC capable de signer (clé privée, en ligne, non révoquée)',
+          'Une AC choisie (mappage de domaine ou valeur par défaut) qui ne peut pas signer (supprimée, sans clé privée, hors ligne ou révoquée) fait refuser la commande : aucune autre AC ne signe à sa place',
         ]
       },
       {
@@ -186,7 +187,7 @@ export default {
       'Pour Kubernetes/cert-manager : voir les manifests de référence sous examples/kubernetes/cert-manager/',
       'Les clés ECDSA P-256 offrent une sécurité équivalente à RSA-2048 avec une taille bien plus petite',
       'Utilisez les domaines locaux pour attribuer différentes AC à différents domaines internes',
-      'Toute AC avec une clé privée peut être sélectionnée comme AC émettrice',
+      'L’AC émettrice doit pouvoir signer : clé privée détenue, en ligne et non révoquée',
       'Les domaines génériques (*.example.com) nécessitent la validation DNS-01',
       'Chaque compte AC conserve sa propre inscription en amont : basculer le proxy sur un autre compte utilise celle de ce compte',
       'Utilisez l’URL du proxy avec certbot : certbot certonly --server https://votre-serveur:port/acme/proxy/directory',
@@ -475,7 +476,9 @@ Lorsqu’un client ACME demande un certificat, UCM détermine l’AC de signatur
 1. **Mappage de domaine local** : Correspondance exacte, puis correspondance de domaine parent
 2. **Mappage de domaine DNS** : L’AC configurée pour le fournisseur DNS
 3. **Valeur par défaut globale** : L’AC définie dans la configuration du serveur ACME
-4. **Première disponible** : Toute AC avec une clé privée
+4. **Première disponible** : seulement si rien ci-dessus n’a choisi d’AC, la première AC capable de signer (clé privée, en ligne, non révoquée)
+
+Une AC choisie par un mappage de domaine ou comme valeur par défaut qui ne peut pas signer (supprimée, sans clé privée, hors ligne ou révoquée) fait refuser la commande : aucune autre AC ne signe à sa place.
 
 ### Identifiants EAB (côté serveur)
 Quand UCM est le serveur ACME (ou le proxy), vous pouvez exiger le **External Account Binding** : les clients doivent présenter un kid + une clé HMAC pré-émis pour enregistrer un compte. Émettez et révoquez les identifiants depuis **ACME → EAB Credentials**.

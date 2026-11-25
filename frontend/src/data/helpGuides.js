@@ -1262,7 +1262,9 @@ When an ACME client requests a certificate, UCM determines the signing CA in thi
 1. **Local Domain mapping**: Exact match, then parent domain match
 2. **DNS Domain mapping**: The CA configured for the DNS provider
 3. **Global default**: The CA set in ACME server configuration
-4. **First available**: Any CA with a private key
+4. **First available**: only when nothing above chose a CA, the first CA able to sign (private key, online, not revoked)
+
+A CA chosen by a domain mapping or as the default that cannot sign (deleted, without its private key, offline or revoked) refuses the order: no other CA signs instead.
 
 ### EAB Credentials (Server-side)
 When UCM is the ACME server (or proxy), you can require **External Account Binding**: clients must present a pre-issued kid + HMAC key to register an account. Issue and revoke credentials from **ACME → EAB Credentials**.
