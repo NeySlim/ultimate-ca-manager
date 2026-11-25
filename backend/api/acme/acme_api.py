@@ -1324,8 +1324,10 @@ def finalize_order(order_id: str):
             service._finalizing_order_id = None
 
         if not success:
-            error_type = ('caa' if _is_caa_failure(error)
-                          else getattr(service, '_last_finalize_error_type', None) or 'badCSR')
+            # A server-side refusal names a CA or a domain: never read it as a CAA denial
+            named_type = getattr(service, '_last_finalize_error_type', None)
+            error_type = ('caa' if named_type != 'serverInternal' and _is_caa_failure(error)
+                          else named_type or 'badCSR')
             if error_type == 'badCSR':
                 # RFC 8555 §7.4: the client may finalize again with an amended CSR
                 service.reopen_order_after_bad_csr(order_id)
