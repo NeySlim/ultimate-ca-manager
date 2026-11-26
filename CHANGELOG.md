@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- CAs: a CA imported without its private key can be attached to the key an HSM provider still holds (Use a key from the HSM in its details): only the provider's keys whose public key is the certificate's are offered, and the key must sign for the certificate before the CA takes it (#458).
+
 ### Changed
 
 - Settings and Account on a wide screen: once the form column reaches 1280 px (a window of 1552 px) a card takes the whole column and lays its groups of fields in two columns, with tables, notices and test lines across the card. Narrower windows keep the 960 px cards; no field or text grows (long fields stop at 640 px, help texts at 62 characters, notice texts at 78).

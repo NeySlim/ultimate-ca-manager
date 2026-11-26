@@ -891,12 +891,16 @@ A CA created from an external CSR holds no certificate until one is installed. U
 GET /api/v2/cas/{ca_id}/csr
 POST /api/v2/cas/{ca_id}/certificate
 POST /api/v2/cas/{ca_id}/key
+GET /api/v2/cas/{ca_id}/hsm-keys?provider_id={id}
+POST /api/v2/cas/{ca_id}/hsm-key
 POST /api/v2/cas/{ca_id}/crl
 POST /api/v2/cas/{ca_id}/renew-csr
 ```
 - `csr` (`read:cas`) downloads the outstanding CSR as PEM; `404` when there is none.
 - `certificate` (`write:cas`) installs the signed certificate: a multipart `file`, or `pem_content` in a form field or a JSON body, and optionally `cross_mode` (`auto` or `replace`, else `400`). `409` when the CA is offline or the certificate conflicts with the CA's current one (the response details say how).
 - `key` (`write:cas`) attaches the private key to a CA that holds only its certificate: JSON `key` (PEM or base64 PEM, required) and optional `passphrase`. `409` for a pending CA, `400` when the CA already has a key, lives in an HSM, is offline, or the key does not match the certificate or is refused as weak.
+- `hsm-keys` (`write:cas` and `read:hsm`) reads the keys of HSM provider `provider_id` on the token and lists, in `data.keys`, those whose public key (SubjectPublicKeyInfo) is the certificate's: `key_identifier`, `label`, `algorithm`, `hsm_key_id` (the key's record, or null), `held_by` (the authority already on it, or null) and `refusal` (why the provider cannot sign with it, or null). Same refusals as below, `404` for an unknown provider.
+- `hsm-key` (`write:cas` and `read:hsm`) attaches one of those keys to a CA that holds only its certificate: JSON `provider_id` (integer) and `key_identifier`. The key must sign a test CRL that the certificate's public key verifies before the CA takes it; audited as `ca_hsm_key_attached`. `400` when the CA already has a key or the key does not match the certificate or does not sign for it, `404` for an unknown provider or a key absent from the token, `409` for a pending or offline CA or a key another authority holds, `502` when the provider cannot be reached, `403` without `read:hsm`.
 - `crl` (`write:crl`) installs a CRL generated elsewhere on a key-less or offline CA: a multipart `file` or `pem_content`. Returns the installed CRL's `next_update` and `revoked_count`; `409` or `400` when it is refused.
 - `renew-csr` (`write:cas`) issues a new CSR from the CA's existing key. Optional `digest` (`sha256`, `sha384` or `sha512`). `409` when the CA is offline or revoked, `400` when it has no key.
 
