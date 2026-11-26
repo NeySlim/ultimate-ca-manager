@@ -90,6 +90,7 @@ def import_ca_private_key(ca_id):
     # The CA is read again under its row lock: an HSM key attached meanwhile keeps the CA
     ca = lock_ca_row(ca_id)
     if ca is None:
+        db.session.rollback()
         return error_response('CA not found', 404)
     if ca.hsm_key_id:
         db.session.rollback()
