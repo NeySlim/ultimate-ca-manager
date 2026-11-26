@@ -19,9 +19,10 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 
 # put_own <file> <mode> [copy | <user>:<group>]: stdin becomes <file>, created anew (O_EXCL), in a
 # directory the service account may write: whatever entry was there is removed, a link never followed.
-# copy: stdin to stdout too; <user>:<group>: the new file's owner, set before anything is written
+# copy: stdin to stdout too; <user>:<group>: the new file's owner, set before anything is written.
+# UCM_PYTHON: the interpreter the package requires (python3.12 on EL9, where python3 may be absent)
 put_own() {
-    python3 -I -c '
+    "${UCM_PYTHON:-python3}" -I -c '
 import grp, os, pwd, sys
 path, mode, extra = sys.argv[1], int(sys.argv[2], 8), sys.argv[3] if len(sys.argv) > 3 else ""
 copy = extra == "copy"

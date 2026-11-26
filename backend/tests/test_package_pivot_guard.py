@@ -1015,3 +1015,21 @@ def test_the_deb_postinst_adds_data_dir_through_native_setup(tmp_path):
     out, calls, home, data, config = _run_postinst(tmp_path, 'configure', '2.254')
     assert out.returncode == 0, out.stderr
     assert f'bash {home}/scripts/native-setup.sh env-ensure {config}/ucm.env DATA_DIR {data}' in calls
+
+
+def test_the_rpm_post_runs_native_setup_with_the_interpreter_the_package_requires(tmp_path):
+    """EL9 requires python3.12 alone: native-setup writes through it, not through python3."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    (tmp_path / 'bin' / 'bash').write_text(
+        f'#!{POSIX_SH}\necho "bash UCM_PYTHON=${{UCM_PYTHON:-}} $*" >> "$LOG"\n'
+        '[ "$2" != fips-requested ] || grep -qx "UCM_FIPS_BUILD=1" "$3"\n')
+    m = re.search(r'^%post\n(.*?)^%preun\n', SPEC.read_text(), re.M | re.S)
+    body = m.group(1).replace('%systemd_post %{name}.service\n', ': systemd_post\n')
+    body = _paths(_expand(body.replace('%{ucm_data}', '/opt/ucm/data')
+                          .replace('%{ucm_python}', 'python3.12')), home, data, config, quoted=False)
+    out = subprocess.run([POSIX_SH, '-c', body, 'post', '1'], capture_output=True, text=True,
+                         timeout=20, env=env)
+    assert out.returncode == 0, out.stderr
+    setup = [c for c in _calls(log) if c.startswith('bash ') and 'native-setup.sh' in c]
+    assert any(' venv ' in c for c in setup) and any(' https-cert ' in c for c in setup), setup
+    assert all(c.startswith('bash UCM_PYTHON=python3.12 ') for c in setup), setup

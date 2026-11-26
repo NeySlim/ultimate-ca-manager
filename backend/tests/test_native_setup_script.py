@@ -1614,3 +1614,20 @@ def test_a_ucm_env_swapped_for_a_directory_link_mid_write_receives_nothing(tmp_p
     assert result.returncode == 0, result.stderr
     assert list(elsewhere.iterdir()) == []
     assert not envfile.is_symlink() and envfile.read_text() == 'SECRET_KEY=a\nDATA_DIR=/d\n'
+
+
+def test_the_certificate_is_written_by_the_interpreter_ucm_python_names(tmp_path):
+    """The EL9 package requires python3.12, not python3: UCM_PYTHON names the one it has."""
+    data = tmp_path / 'data'
+    data.mkdir()
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    for util in ('mktemp', 'rm', 'openssl', 'uname', 'cat'):
+        (bin_dir / util).symlink_to(shutil.which(util))
+    (bin_dir / 'python3.12').symlink_to(sys.executable)
+    user, group = _owner()
+    result = _run(['https-cert', str(data), user, group],
+                  _env(tmp_path, extra={'PATH': str(bin_dir), 'UCM_PYTHON': 'python3.12'}))
+    assert result.returncode == 0, result.stderr
+    assert (data / 'https_key.pem').read_text().startswith('-----BEGIN PRIVATE KEY-----')
+    assert (data / 'https_cert.pem').read_text().startswith('-----BEGIN CERTIFICATE-----')

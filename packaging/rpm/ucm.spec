@@ -137,6 +137,9 @@ systemctl start ucm-watcher.path
 UCM_DATA=%{ucm_data}
 UCM_CONFIG=/etc/%{name}
 UCM_SETUP=$UCM_HOME/scripts/native-setup.sh
+# The interpreter this package requires, for what native-setup.sh writes itself
+UCM_PYTHON=%{ucm_python}
+export UCM_PYTHON
 NEW_CONFIG=""
 mkdir -p /var/log/%{name}
 # Resumed after a failed first attempt: the service never had a working venv
