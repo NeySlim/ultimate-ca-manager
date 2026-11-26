@@ -1807,6 +1807,37 @@ def test_chown_tree_never_enters_a_directory_swapped_for_a_link_while_it_walks(t
     assert not [g for g in chowned(trace) if g.startswith(str(outside))], chowned(trace)
 
 
+def _racing_tree(tmp_path, python, race):
+    """`python` with `race` (Python code) run before own: it changes the tree at one step of the walk."""
+    return str(_stub(tmp_path / 'racing-tree-python', f'code=$3; shift 3\nexec {python} -I -c "{race}$code" "$@"'))
+
+
+def _after_first(call, name, then):
+    """Python code: the first `os.<call>` of entry `name` runs, then `then` changes the tree."""
+    return (f"import shutil\n_real_{call} = os.{call}\n_raced = []\n"
+            f"def _racing(n, *a, **k):\n"
+            f"    r = _real_{call}(n, *a, **k)\n"
+            f"    if n == '{name}' and not _raced:\n"
+            f"        _raced.append(1); {then}\n"
+            f"    return r\n"
+            f"os.{call} = _racing\n")
+
+
+@pytest.mark.parametrize('owner', ['7:8', '0:0'])
+def test_chown_tree_survives_a_directory_swapped_for_a_file_before_its_descent(tmp_path, owner):
+    """The account can turn a directory it owns into a file once it is listed: that entry is
+    passed by and named, the walk goes on."""
+    top, _outside = _tree_layout(tmp_path)
+    python, trace = tracing_python(tmp_path)
+    swap = f"shutil.rmtree('{top}/sub'); open('{top}/sub', 'w').write('x')"
+    racing = _racing_tree(tmp_path, python, _after_first('stat', 'sub', swap))
+    result = _run(['own', 'chown-tree', f'{top}/', owner], _env(tmp_path, extra={'UCM_PYTHON': racing}))
+    assert result.returncode == 0, result.stderr
+    assert f'WARNING: {top}/sub: ' in result.stderr, result.stderr
+    assert (top / 'sub').is_file()
+    assert str(top / 'ca' / 'root.pem') in chowned(trace) and str(top / 'dns-hooks' / 'hook.sh') in chowned(trace)
+
+
 def test_ucm_env_swapped_for_a_link_before_it_is_restricted_keeps_the_target_mode(tmp_path):
     """The mode a new ucm.env gets before its first secret is set by descriptor, never by path."""
     envfile = tmp_path / 'ucm.env'

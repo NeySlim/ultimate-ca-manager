@@ -165,43 +165,72 @@ elif op == "chown-tree":
         if mode & strip:
             os.fchmod(fd, mode & ~strip)
 
+    def warn(rel, why):
+        sys.stderr.write("WARNING: %s: %s\n" % (os.path.normpath(os.path.join(path, rel)), why))
+
+    def give(dirfd, rel, n):
+        """Changes entry n of dirfd; returns the descriptor of a directory to walk next, or None."""
+        try:
+            st = os.stat(n, dir_fd=dirfd, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+        fd = None
+        if stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
+            isdir = stat.S_ISDIR(st.st_mode)
+            try:
+                # A link laid since is refused by O_NOFOLLOW: only the entry itself is changed then
+                fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY
+                             | (os.O_DIRECTORY if isdir else 0), dir_fd=dirfd)
+            except FileNotFoundError:
+                return None
+            except OSError as e:
+                if isdir:
+                    # Swapped since it was listed (the account owns it), or out of descriptors
+                    warn(rel, "changed while walked (%s), left as it is" % e.strerror)
+                    return None
+        walk = False
+        try:
+            if fd is not None:
+                st = os.fstat(fd)
+            if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+                warn(rel, "a hard link, left as it is")
+                return None
+            if fd is not None and stat.S_ISREG(st.st_mode):
+                os.fchown(fd, uid, gid)
+            else:
+                os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
+            if fd is not None:
+                restrict(fd)
+            walk = fd is not None and stat.S_ISDIR(st.st_mode)
+            return fd if walk else None
+        except FileNotFoundError:
+            return None
+        finally:
+            if fd is not None and not walk:
+                os.close(fd)
+
     os.fchown(top, uid, gid)
     restrict(top)
-    for where, dirs, files, dirfd in os.fwalk(".", dir_fd=top, follow_symlinks=False):
-        def kept(n):
-            return not n.startswith(ARCHIVE) and os.path.normpath(os.path.join(where, n)) not in skip
-        dirs[:] = [d for d in dirs if kept(d)]
-        for n in dirs + [f for f in files if kept(f)]:
+    # Depth first, each directory listed through the descriptor it was opened by, never by its name
+    stack = [(top, ".", None)]
+    while stack:
+        dirfd, where, names = stack.pop()
+        if names is None:
             try:
-                st = os.stat(n, dir_fd=dirfd, follow_symlinks=False)
-            except FileNotFoundError:
+                names = iter(os.listdir(dirfd))
+            except OSError as e:
+                warn(where, "not walked (%s)" % e.strerror)
+                names = iter(())
+        for n in names:
+            rel = os.path.normpath(os.path.join(where, n))
+            if n.startswith(ARCHIVE) or rel in skip:
                 continue
-            fd = None
-            if stat.S_ISREG(st.st_mode) or (strip and stat.S_ISDIR(st.st_mode)):
-                try:
-                    # A link laid since is refused by O_NOFOLLOW: only the entry itself is changed then
-                    fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY, dir_fd=dirfd)
-                except FileNotFoundError:
-                    continue
-                except OSError:
-                    pass
-            try:
-                if fd is not None:
-                    st = os.fstat(fd)
-                if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
-                    sys.stderr.write("WARNING: %s: a hard link, left as it is\n" % os.path.join(path, where, n))
-                    continue
-                if fd is not None and stat.S_ISREG(st.st_mode):
-                    os.fchown(fd, uid, gid)
-                else:
-                    os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
-                if fd is not None:
-                    restrict(fd)
-            except FileNotFoundError:
-                pass
-            finally:
-                if fd is not None:
-                    os.close(fd)
+            sub = give(dirfd, rel, n)
+            if sub is not None:
+                stack += [(dirfd, where, names), (sub, rel, None)]
+                break
+        else:
+            os.close(dirfd)
 else:
     fail("unknown operation " + op)
 '
