@@ -192,7 +192,9 @@ class ExternalCRLMixin:
         # pre-generated 'good' answer must not outlive a CRL that revokes the
         # serial (RFC 6960 freshness — same rule as revocation elsewhere).
         from models import OCSPResponse
-        purged = OCSPResponse.query.filter_by(ca_id=ca.id).delete(synchronize_session=False)
+        from services.ocsp_service import twin_ca_ids
+        purged = OCSPResponse.query.filter(OCSPResponse.ca_id.in_(twin_ca_ids(ca.id))).delete(
+            synchronize_session=False)
 
         try:
             db.session.commit()

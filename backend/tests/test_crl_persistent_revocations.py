@@ -18,7 +18,7 @@ from cryptography.x509 import ocsp
 from cryptography.x509.oid import CRLEntryExtensionOID, NameOID
 from sqlalchemy import create_engine, text
 
-from models import db, CA, Certificate, RevokedSerial, SystemConfig
+from models import db, CA, Certificate, OCSPResponse, RevokedSerial, SystemConfig
 from services.crl.query import CRLQueryMixin
 from services.crl_service import CRLService
 from services.ocsp_service import OCSPService
@@ -791,3 +791,86 @@ class TestMigratedRows:
         CertificateService.revoke_certificate(twin.id, reason='keyCompromise', username='admin')
         db.session.commit()
         assert [r.serial_number for r in RevokedSerial.query.filter_by(caref=ca.refid)] == [str(SERIAL_A)]
+
+
+# --------------------------------------------------------------------------
+# Twin CA records (same subject and key) share one OCSP cache
+# --------------------------------------------------------------------------
+
+def _twin_of(ca):
+    """A second record of *ca*'s certificate and key, as a duplicate import leaves it."""
+    tag = uuid.uuid4().hex[:10]
+    twin = CA(refid=f'b6-twin-{tag}', descr=f'{ca.descr} twin', serial=0, prv=ca.prv, crt=ca.crt,
+              subject=ca.subject, issuer=ca.issuer, ocsp_enabled=True, cdp_enabled=True)
+    db.session.add(twin)
+    db.session.commit()
+    _CREATED_CA_REFIDS.append(twin.refid)
+    return twin
+
+
+def _cached(ca_id, serial, status='good'):
+    now = _now()
+    db.session.add(OCSPResponse(ca_id=ca_id, cert_serial=f'{format(serial, "x")}:sha1',
+                                response_der=b'\x30\x00', status=status,
+                                this_update=now, next_update=now + timedelta(days=1)))
+    db.session.commit()
+
+
+def _cache_rows(ca_id):
+    db.session.expire_all()
+    return OCSPResponse.query.filter_by(ca_id=ca_id).count()
+
+
+class TestTwinRecordsShareTheCache:
+
+    def test_a_revocation_under_the_twin_clears_the_answer_cached_under_the_first(self, app, backend):
+        """/ocsp matches the first record; the leaf belongs to the twin. The
+        'good' cached under the first must not outlive the revocation."""
+        from services.cert_service import CertificateService
+        first, ca_key, ca_cert = _make_ca()
+        twin = _twin_of(first)
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        row = _store(twin, leaf)
+        assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.GOOD
+        assert _cache_rows(first.id) == 1
+
+        CertificateService.revoke_certificate(row.id, reason='keyCompromise', username='admin')
+        db.session.commit()
+
+        assert _cache_rows(first.id) == 0
+        assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
+
+    def test_clearing_a_cas_cache_clears_its_twins(self, backend):
+        first, _, _ = _make_ca()
+        twin = _twin_of(first)
+        _cached(first.id, SERIAL_A)
+        _cached(twin.id, SERIAL_B)
+        OCSPService.invalidate_ca_cache(twin.id)
+        assert (_cache_rows(first.id), _cache_rows(twin.id)) == (0, 0)
+
+    def test_an_unrelated_ca_keeps_its_cache(self, backend):
+        first, _, _ = _make_ca()
+        other, _, _ = _make_ca()
+        _cached(first.id, SERIAL_A)
+        _cached(other.id, SERIAL_A)
+        OCSPService.invalidate_cached_responses(str(SERIAL_A), ca_id=first.id)
+        OCSPService.invalidate_ca_cache(first.id)
+        assert (_cache_rows(first.id), _cache_rows(other.id)) == (0, 1)
+
+    def test_an_external_crl_on_the_twin_purges_the_firsts_cache(self, backend):
+        first, ca_key, ca_cert = _make_ca()
+        twin = _twin_of(first)
+        for record in (first, twin):
+            record.prv = None
+        db.session.commit()
+        _cached(first.id, SERIAL_A)
+        now = datetime.now(timezone.utc)
+        crl = (x509.CertificateRevocationListBuilder()
+               .issuer_name(ca_cert.subject)
+               .last_update(now - timedelta(minutes=1)).next_update(now + timedelta(days=1))
+               .add_extension(x509.CRLNumber(7), critical=False)
+               .add_revoked_certificate(x509.RevokedCertificateBuilder()
+                                        .serial_number(SERIAL_A).revocation_date(now).build())
+               .sign(ca_key, hashes.SHA256()))
+        CRLService.install_external_crl(twin.id, crl.public_bytes(serialization.Encoding.DER))
+        assert _cache_rows(first.id) == 0

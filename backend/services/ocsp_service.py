@@ -115,6 +115,20 @@ def _record_holds_serial(record, cert_serial: int):
         return None
 
 
+def twin_ca_ids(ca_id: int) -> list:
+    """Ids of every CA record with *ca_id*'s subject and key, *ca_id* included.
+
+    /ocsp caches an answer under the twin it matched, which need not be the
+    certificate's caref: an invalidation covers them all."""
+    from utils.cert_issuer import same_key_refids
+    ca = db.session.get(CA, ca_id)
+    if ca is None:
+        return [ca_id]
+    refids = same_key_refids(ca)
+    ids = [row.id for row in CA.query.filter(CA.refid.in_(refids)).all()]
+    return ids if ca_id in ids else ids + [ca_id]
+
+
 def _cache_key_forms(serial, serial_hex: str) -> set:
     """The cache keys a stored serial may have been cached under.
 
@@ -1049,7 +1063,7 @@ class OCSPService:
         """
         try:
             deleted = OCSPResponse.query.filter(
-                OCSPResponse.ca_id == ca_id
+                OCSPResponse.ca_id.in_(twin_ca_ids(ca_id))
             ).delete(synchronize_session=False)
             db.session.commit()
             logger.info(f"Invalidated {deleted} OCSP cache entries for CA {ca_id}")
@@ -1085,7 +1099,7 @@ class OCSPService:
         try:
             query = OCSPResponse.query
             if ca_id is not None:
-                query = query.filter(OCSPResponse.ca_id == ca_id)
+                query = query.filter(OCSPResponse.ca_id.in_(twin_ca_ids(ca_id)))
             conditions = []
             for form in forms:
                 conditions.append(OCSPResponse.cert_serial == form)
