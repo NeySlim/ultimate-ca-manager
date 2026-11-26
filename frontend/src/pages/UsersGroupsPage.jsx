@@ -33,6 +33,7 @@ import { ROLE_KEYS, isSso, userName, sourceText } from './users/userFacts'
 import { usersCsv } from './users/usersExport'
 import { dateOf, dateTimeOf } from './admin/adminDates'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
+import { useAccountProof } from '../hooks/useAccountProof'
 
 const NONE = []
 const USER_SECTIONS = ['profile', 'permissions', 'keys', 'security', 'mtls']
@@ -49,6 +50,7 @@ export default function UsersGroupsPage() {
   const { user: me } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
+  const askProof = useAccountProof()
   const { canWrite, canDelete, hasPermission } = usePermission()
   const { muteToasts } = useWebSocket()
   
@@ -157,6 +159,13 @@ export default function UsersGroupsPage() {
   }
 
   const handleUpdateUser = async (data) => {
+    // Your own reset link goes to your email: moving it asks the password of an account that
+    // has one (a new password already did), as the Account page does
+    if (editingUser.id === me?.id && 'email' in data && (data.email || '') !== (editingUser.email || '') && !data.current_password) {
+      const proof = await askProof({ passwordOnly: true })
+      if (!proof) return
+      if (proof.password) data = { ...data, current_password: proof.password }
+    }
     try {
       await usersService.update(editingUser.id, data)
       showSuccess(t('messages.success.update.user'))
@@ -514,11 +523,17 @@ export default function UsersGroupsPage() {
     setAvailableCerts([])
   }
 
+  // A certificate for yourself signs you in alone: the server asks you to prove it is you
+  const selfProof = async () => (selectedUser?.id === me?.id ? askProof() : {})
+
   const handleGenerateUserMtls = async () => {
     if (!selectedUser) return
+    const proof = await selfProof()
+    if (!proof) return
     setMtlsCreating(true)
     try {
       const response = await usersService.createMtlsCertificate(selectedUser.id, {
+        ...proof,
         mode: 'generate',
         name: mtlsForm.name || undefined,
         ca_id: mtlsForm.ca_id || undefined,
@@ -536,9 +551,12 @@ export default function UsersGroupsPage() {
 
   const handleImportUserMtls = async () => {
     if (!selectedUser || !mtlsImportForm.pem.trim()) return
+    const proof = await selfProof()
+    if (!proof) return
     setMtlsCreating(true)
     try {
       await usersService.createMtlsCertificate(selectedUser.id, {
+        ...proof,
         mode: 'import',
         pem: mtlsImportForm.pem,
         name: mtlsImportForm.name,
@@ -588,9 +606,12 @@ export default function UsersGroupsPage() {
 
   const handleAssignUserMtls = async () => {
     if (!selectedUser || !selectedAssignCert) return
+    const proof = await askProof()  // the route enrols a sign-in credential: the caller proves it is them
+    if (!proof) return
     setMtlsCreating(true)
     try {
       await usersService.assignMtlsCertificate({
+        ...proof,
         cert_id: selectedAssignCert.id,
         user_id: selectedUser.id,
         name: selectedAssignCert.name,

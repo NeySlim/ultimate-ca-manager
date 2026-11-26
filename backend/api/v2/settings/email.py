@@ -2,8 +2,8 @@
 Settings - Email/SMTP settings + OAuth2 + template routes
 """
 
-from flask import request
-from auth.unified import require_auth
+from flask import g, request
+from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.secret_target import changed_targets, keeps_saved_secret, retarget_error
@@ -78,6 +78,36 @@ def get_email_settings():
     })
 
 
+def _smtp_target(smtp):
+    """Where mail and its reset links go, as the sender reads it from the row."""
+    method = 'none' if smtp.smtp_auth is False else (smtp.smtp_auth_method or 'password')
+    target = {'smtp_host': smtp.smtp_host or '', 'smtp_port': smtp.smtp_port or 587,
+              'smtp_security': _smtp_security(smtp), 'smtp_auth_method': method,
+              'from_email': smtp.smtp_from or ''}
+    # The account that signs in sends the mail; its password alone stays write:settings
+    if method != 'none':
+        target['smtp_username'] = smtp.smtp_user or ''
+    if method == 'oauth2':
+        for key in ('smtp_oauth_provider', 'smtp_oauth_tenant_id', 'smtp_oauth_client_id',
+                    'smtp_oauth_authorize_url', 'smtp_oauth_token_url', 'smtp_oauth_redirect_uri'):
+            target[key] = (getattr(smtp, key) or '').lower() if key == 'smtp_oauth_provider' \
+                else (getattr(smtp, key) or '')
+    return target
+
+
+def _target_refusal(before, smtp):
+    """403 when the SMTP target moved without admin:settings, as base_url: it receives
+    every password-reset link. None when it stayed or the caller holds admin:settings."""
+    if has_permission('admin:settings', getattr(g, 'permissions', None) or []):
+        return None
+    after = _smtp_target(smtp)
+    moved = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+    if not moved:
+        return None
+    return error_response('These settings require the admin:settings permission: '
+                          + ', '.join(moved), 403)
+
+
 def _smtp_retarget_check(smtp, data):
     """(error, stale): saved SMTP secrets stay with their target.
 
@@ -148,6 +178,7 @@ def update_email_settings():
     if not smtp:
         smtp = SMTPConfig()
         db.session.add(smtp)
+    target_before = _smtp_target(smtp)
 
     # Update fields (map frontend names to model column names)
     if 'enabled' in data:
@@ -216,6 +247,10 @@ def update_email_settings():
         smtp.smtp_oauth_redirect_uri = data['smtp_oauth_redirect_uri'] or None
     for key in stale:
         setattr(smtp, key, None)
+    refused = _target_refusal(target_before, smtp)
+    if refused:
+        db.session.rollback()
+        return refused
 
     try:
         db.session.commit()
@@ -299,12 +334,13 @@ def smtp_oauth_providers():
 
 
 @bp.route('/api/v2/settings/email/oauth/authorize-url', methods=['POST'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def smtp_oauth_authorize_url():
     """Build the OAuth consent URL and stash ``state`` in the user session.
 
     Body (optional): {"redirect_uri": "https://..."} to override default.
     Returns: {"authorize_url": "...", "redirect_uri": "..."}
+    admin:settings, as the SMTP target: the consent picks the mailbox that sends.
     """
     from flask import session
     from models.email_notification import SMTPConfig
@@ -344,7 +380,7 @@ def smtp_oauth_authorize_url():
 
 
 @bp.route('/api/v2/settings/email/oauth/callback', methods=['GET'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def smtp_oauth_callback():
     """Receive the OAuth redirect, exchange ``code`` for tokens, persist refresh_token.
 
@@ -480,9 +516,10 @@ def get_email_template():
 
 
 @bp.route('/api/v2/settings/email/template', methods=['PATCH'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def update_email_template():
-    """Update email template (HTML and/or text)"""
+    """Update email template (HTML and/or text). admin:settings, as the SMTP target:
+    the template wraps every password-reset link."""
     from models.email_notification import SMTPConfig
 
     data = request.json
@@ -517,7 +554,7 @@ def update_email_template():
 
 
 @bp.route('/api/v2/settings/email/template/reset', methods=['POST'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def reset_email_template():
     """Reset email template to default (HTML and text)"""
     from models.email_notification import SMTPConfig

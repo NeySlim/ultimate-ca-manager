@@ -90,6 +90,25 @@ describe('AccountPage: Certificates Only API key', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     m.createApiKey.mockResolvedValue({ data: { id: 1, key: 'k' } })
+    notify.showPrompt.mockResolvedValue('pw')
+  })
+
+  it('sends the password asked again: a key outlives a password change', async () => {
+    auth.permissions = ['read:certificates']
+    await createCertificatesKey()
+    expect(notify.showPrompt).toHaveBeenCalledWith('account.confirmWithPassword', expect.objectContaining({ type: 'password' }))
+    expect(m.createApiKey.mock.calls[0][0].password).toBe('pw')
+  })
+
+  it('creates nothing when the prompt is cancelled', async () => {
+    notify.showPrompt.mockResolvedValue(null)
+    render(<MemoryRouter><AccountPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByText('account.apiKeys'))[0])
+    fireEvent.click((await screen.findAllByText('account.createKey'))[0])
+    fireEvent.change(await screen.findByLabelText('account.apiKeyName'), { target: { value: 'ci' } })
+    fireEvent.submit(screen.getByLabelText('account.apiKeyName').closest('form'))
+    await waitFor(() => expect(notify.showPrompt).toHaveBeenCalled())
+    expect(m.createApiKey).not.toHaveBeenCalled()
   })
 
   it('asks for no SSH scope the account lacks', async () => {

@@ -52,7 +52,8 @@ def same_serial(app):
 
 
 def _import(client, pem):
-    return client.post('/api/v2/users/1/mtls/certificates', json={'mode': 'import', 'pem': pem})
+    return client.post('/api/v2/users/1/mtls/certificates', json={'mode': 'import', 'pem': pem,
+                                                                      'password': 'changeme123'})
 
 
 def _info(pem):
@@ -75,7 +76,7 @@ def test_two_issuers_may_enrol_the_same_serial(app, auth_client, same_serial):
 def test_enroll_import_takes_the_other_issuers_certificate(app, auth_client, same_serial):
     _serial, pem_a, pem_b = same_serial
     for pem in (pem_a, pem_b):
-        r = auth_client.post('/api/v2/mtls/enroll-import', json={'pem': pem})
+        r = auth_client.post('/api/v2/mtls/enroll-import', json={'password': 'changeme123', 'pem': pem})
         assert r.status_code == 201, r.get_json()
     assert _enrolments(app) == 2
 
@@ -98,7 +99,7 @@ def test_the_other_issuers_certificate_stays_available_and_assignable(app, auth_
                                                Certificate.id != row_id).one().id
     listed = [c['id'] for c in auth_client.get('/api/v2/mtls/available-certificates').get_json()['data']]
     assert row_id in listed and enrolled_id not in listed
-    r = auth_client.post('/api/v2/mtls/assign', json={'cert_id': row_id})
+    r = auth_client.post('/api/v2/mtls/assign', json={'password': 'changeme123', 'cert_id': row_id})
     assert r.status_code in (200, 201), r.get_json()
     assert _enrolments(app) == 2
 
@@ -337,17 +338,17 @@ def test_proxy_login_needs_the_issuer_header_or_the_certificate(app, client, aut
 def test_enrolling_from_headers_needs_the_issuer(app, auth_client, same_serial):
     """An enrolment made from a serial alone could never be told apart from another CA's."""
     _serial, pem_a, _pem_b = same_serial
-    r = auth_client.post('/api/v2/mtls/enroll', json={}, headers=_proxy_headers(pem_a))
+    r = auth_client.post('/api/v2/mtls/enroll', json={'password': 'changeme123'}, headers=_proxy_headers(pem_a))
     assert r.status_code == 400, r.get_json()
     assert r.get_json()['message'].startswith('The client certificate issuer is missing')
     assert 'X-SSL-Client-I-DN' in r.get_json()['message']
-    r = auth_client.post('/api/v2/mtls/enroll', json={},
+    r = auth_client.post('/api/v2/mtls/enroll', json={'password': 'changeme123'},
                          headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': 'CN=Evil,notAnAttribute=x'}))
     assert r.status_code == 400, r.get_json()
     assert r.get_json()['message'].startswith('The client certificate issuer cannot be read')
     assert 'RFC 4514' in r.get_json()['message']
     assert _enrolments(app) == 0
-    r = auth_client.post('/api/v2/mtls/enroll', json={},
+    r = auth_client.post('/api/v2/mtls/enroll', json={'password': 'changeme123'},
                          headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': _info(pem_a)['issuer_dn']}))
     assert r.status_code == 200, r.get_json()
     with app.app_context():

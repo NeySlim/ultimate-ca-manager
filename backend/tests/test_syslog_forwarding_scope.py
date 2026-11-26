@@ -160,7 +160,8 @@ def test_syslog_forwards_audit_cleanup_and_api_key_events(app, auth_client, coll
         assert any('audit_cleanup' in p and 'audit_log' in p for p in packets), packets
 
         r = auth_client.post('/api/v2/account/apikeys', content_type='application/json',
-                             data=json.dumps({'name': 'syslog-probe', 'permissions': ['read:certificates']}))
+                             data=json.dumps({'name': 'syslog-probe', 'permissions': ['read:certificates'],
+                                              'password': 'changeme123'}))
         assert r.status_code in (200, 201), r.get_json()
         packets = _received(collector)
         assert any('api_key' in p for p in packets), packets

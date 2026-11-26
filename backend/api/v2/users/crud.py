@@ -428,12 +428,22 @@ def update_user(user_id):
             return refused
 
     # Update fields
+    old_email = user.email
+    moved_own = (g.current_user.id == user_id and 'email' in data
+                 and (data['email'] or None) != (old_email or None))
     if 'email' in data:
         # Email is unique only among local accounts. Only block when this change
         # would put two local accounts on the same email (an SSO account may
         # share an email with a local one).
         if user.is_local and local_email_holder(data['email'], other_than=user_id) is not None:
             return error_response('Email already in use', 409)
+        # Your own address receives your reset link: the proof of the Account page
+        # (`password` here is the new password, never the proof)
+        if moved_own:
+            from api.v2.account.profile import email_move_refused
+            refused = email_move_refused(user, data.get('current_password'))
+            if refused:
+                return refused
         user.email = data['email']
 
     if 'full_name' in data:
@@ -511,6 +521,10 @@ def update_user(user_id):
                 return taken
         logger.error(f"Failed to update user: {e}", exc_info=True)
         return error_response('Failed to update user', 500)
+
+    if moved_own:
+        from api.v2.account.profile import record_email_change
+        record_email_change(user, old_email, user.email)
 
     AuditService.log_action(
         action='user_update',

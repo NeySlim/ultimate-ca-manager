@@ -332,7 +332,8 @@ Content-Type: application/json
 
 {
   "full_name": "John Doe",
-  "email": "john@example.com"
+  "email": "john@example.com",
+  "current_password": "..."
 }
 
 # Change password
@@ -344,6 +345,8 @@ Content-Type: application/json
   "new_password": "new-password"
 }
 ```
+
+A new `email` on an account with a local password needs `current_password` (`403` with `details.reauth` `password` without it or when it is wrong); the same address, or another field alone, needs nothing. The change is audited as `profile_email_change` and, when email is configured, a notice goes to the old address (a notice that cannot be sent is logged and does not undo the change).
 
 ### Two-Factor Authentication (2FA/TOTP)
 
@@ -393,7 +396,8 @@ Content-Type: application/json
 {
   "name": "CI/CD Integration",
   "expires_days": 365,
-  "permissions": ["read:certificates", "write:certificates"]
+  "permissions": ["read:certificates", "write:certificates"],
+  "password": "the caller's password"
 }
 
 # Get API key details
@@ -414,6 +418,8 @@ POST /api/v2/account/apikeys/{key_id}/regenerate
 # Delete API key
 DELETE /api/v2/account/apikeys/{key_id}
 ```
+
+A key outlives a password change, so creating or regenerating one from a session needs the caller's `password` in the body, or `code`, the authenticator code, for an account without a local password (`403` with `details.reauth` otherwise). A call authenticated by an API key needs neither: the key it creates holds at most its scopes and expires with it.
 
 The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
 
@@ -455,9 +461,9 @@ Any authenticated user. The caller's enrolled certificates, newest first.
 POST /api/v2/mtls/certificates
 Content-Type: application/json
 
-{ "name": "My Laptop", "validity_days": 365, "organization": "UCM Users", "ca_id": 1 }
+{ "name": "My Laptop", "validity_days": 365, "organization": "UCM Users", "ca_id": 1, "password": "..." }
 ```
-Permission `write:user_certificates`, session only. Issues a client certificate (CN `<username>@mtls`) from the configured mTLS CA and enrolls it. `ca_id` (numeric id or refid) overrides the configured CA and then also requires `write:cas` (`403`). `400` when no mTLS CA is configured and none is given, when `validity_days` is outside the allowed range, or when `organization` is not 1 to 64 letters, digits, spaces, dots or hyphens. Responds `201` with `id` (the enrolment id), `certificate_id`, `name`, `serial`, `certificate`, `private_key`, `created_at`, `expires_at`, `status`.
+Permission `write:user_certificates`, session only. Issues a client certificate (CN `<username>@mtls`) from the configured mTLS CA and enrolls it. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `ca_id` (numeric id or refid) overrides the configured CA and then also requires `write:cas` (`403`). `400` when no mTLS CA is configured and none is given, when `validity_days` is outside the allowed range, or when `organization` is not 1 to 64 letters, digits, spaces, dots or hyphens. Responds `201` with `id` (the enrolment id), `certificate_id`, `name`, `serial`, `certificate`, `private_key`, `created_at`, `expires_at`, `status`.
 
 ```http
 DELETE /api/v2/mtls/certificates/{cert_id}
@@ -477,17 +483,17 @@ Session only. `format` is `pem` (default) or `pkcs12` (also spelled `p12` or `pf
 POST /api/v2/mtls/enroll
 Content-Type: application/json
 
-{ "name": "Work laptop" }
+{ "name": "Work laptop", "password": "..." }
 ```
-Session only. Enrolls the client certificate presented with the request: the TLS handshake's, or one forwarded by a trusted proxy. `400` when none is presented, it is expired, not yet valid, revoked, or its issuer is revoked or unknown; `409` when already enrolled.
+Session only. Enrolls the client certificate presented with the request: the TLS handshake's, or one forwarded by a trusted proxy. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `400` when none is presented, it is expired, not yet valid, revoked, or its issuer is revoked or unknown; `409` when already enrolled.
 
 ```http
 POST /api/v2/mtls/enroll-import
 Content-Type: application/json
 
-{ "pem": "-----BEGIN CERTIFICATE-----...", "name": "Work laptop", "user_id": 2 }
+{ "pem": "-----BEGIN CERTIFICATE-----...", "name": "Work laptop", "user_id": 2, "password": "..." }
 ```
-Session only. Imports a certificate issued by a CA of this server and enrolls it. `pem` is the PEM text, base64 of it, or `BASE64:` followed by the base64 of a DER file (a `.cer` or `.crt`). It is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
+Session only. Imports a certificate issued by a CA of this server and enrolls it. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `pem` is the PEM text, base64 of it, or `BASE64:` followed by the base64 of a DER file (a `.cer` or `.crt`). It is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
 
 ```http
 GET /api/v2/mtls/available-certificates
@@ -498,9 +504,12 @@ Any authenticated user. User certificates (`usr_cert`, not revoked) that no acco
 POST /api/v2/mtls/assign
 Content-Type: application/json
 
-{ "cert_id": 12, "name": "Work laptop", "user_id": 2 }
+{ "cert_id": 12, "name": "Work laptop", "user_id": 2, "password": "..." }
 ```
-Session only. Enrolls an existing user certificate (`cert_id` is the certificate id, required). `user_id` is honoured for admins only; a non-admin may assign only a certificate made for their account (`403`). `400` when the certificate is not a user certificate or is revoked, `404` when unknown, `409` when already enrolled. Responds `201`.
+Session only. Enrolls an existing user certificate (`cert_id` is the certificate id, required). The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `user_id` is honoured for admins only; a non-admin may assign only a certificate made for their account (`403`). `400` when the certificate is not a user certificate or is revoked, `404` when unknown, `409` when already enrolled. Responds `201`.
+
+### Confirming it is you
+A request that adds a credential able to sign in alone (a security key, an mTLS certificate) proves the account holder again: `password` for an account with a local password (`GET /api/v2/account/profile` reports `has_local_password`), else `code`, a current code of its authenticator app. A missing or wrong proof answers `403` with `details.reauth` set to `password` or `code`; an account with neither a local password nor an authenticator app gets `403` with `details.reauth` `none` and must set up the app first. Wrong passwords count towards the same lock as the other password checks of a session (`429` once locked), wrong codes towards the second factor's. A change of the account e-mail follows its own rule, `current_password` only for an account with a local password (see Profile and Update User).
 
 ### Preferences
 ```http
@@ -1957,7 +1966,7 @@ Permission `write:acme`. Body `acme_account_id` optional. Clears the upstream re
 ```http
 POST /api/v2/acme/client/proxy/test-connection
 ```
-Permission `read:acme`. Body `acme_account_id` or `url` optional (otherwise the proxy account's directory). The URL must be HTTPS and not target loopback or cloud metadata (`400`). Returns `connected`, `ca_name`, `directory_url`, `terms_of_service`, `website`, `eab_required` and `endpoints`; `502` when the directory cannot be fetched.
+Permission `write:acme`. Body `acme_account_id` or `url` optional (otherwise the proxy account's directory). The URL must be HTTPS and not target loopback or cloud metadata (`400`). Returns `connected`, `ca_name`, `directory_url`, `terms_of_service`, `website`, `eab_required` and `endpoints`; `502` when the directory cannot be fetched.
 
 ### ACME Server Accounts
 `{account_id}` is the numeric id or the RFC 8555 account id. Unknown accounts answer `404`.
@@ -2608,6 +2617,7 @@ Content-Type: application/json
   "full_name": "Updated Name"
 }
 ```
+On one's own account, a new `email` needs `current_password` when the account has a local password (`403` with `details.reauth` `password` without it or when it is wrong), and the change is audited as `profile_email_change` with a notice to the old address, as on `PATCH /api/v2/account/profile`. Another user's email needs no proof.
 
 ### Toggle User Status
 ```http
@@ -2674,7 +2684,7 @@ GET /api/v2/users/{user_id}/mtls/certificates
 POST /api/v2/users/{user_id}/mtls/certificates
 DELETE /api/v2/users/{user_id}/mtls/certificates/{cert_id}
 ```
-Permission `admin:users`. `POST` takes `mode`: `generate` (default) issues a certificate for the user from `ca_id` (or the configured mTLS CA; `validity_days` default 365, `name` optional) and returns the `certificate` and `private_key` once; `import` takes `pem` (required) and `name` and enrolls an existing certificate (`409` when it is already enrolled, `400` when revoked or invalid). `201` in both cases. `DELETE` removes the enrolment (`404` for an unknown user or certificate).
+Permission `admin:users`. `POST` takes `mode`: `generate` (default) issues a certificate for the user from `ca_id` (or the configured mTLS CA; `validity_days` default 365, `name` optional) and returns the `certificate` and `private_key` once; `import` takes `pem` (required) and `name` and enrolls an existing certificate (`409` when it is already enrolled, `400` when revoked or invalid). `201` in both cases. For one's own account, `POST` also needs `password` (or `code` for an account without one; `403` with `details.reauth` otherwise), as `/api/v2/mtls/certificates`. `DELETE` removes the enrolment (`404` for an unknown user or certificate).
 
 ---
 
@@ -3133,7 +3143,9 @@ Content-Type: application/json
 }
 ```
 
-`smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
+`smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). With `starttls` and `ssl` the relay's certificate must chain to the system trust store and name `smtp_host`; there is no setting to skip the check. The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
+
+`PATCH` needs `write:settings`. The SMTP target (`smtp_host`, `smtp_port`, `smtp_security` or the older booleans, `smtp_auth` and `smtp_auth_method`, `from_email`, `smtp_username` when authentication is on and, under OAuth2, `smtp_oauth_provider`, `smtp_oauth_tenant_id`, `smtp_oauth_client_id`, `smtp_oauth_authorize_url`, `smtp_oauth_token_url` and `smtp_oauth_redirect_uri`) changes only with `admin:settings`: without it a request that would change one of them is refused with 403 naming them, and nothing is saved. Sending them with their stored values is accepted, and so is a new password or client secret for the same account.
 
 ### Webhooks
 See [Webhooks](#webhooks): `/api/v2/settings/webhooks` does not exist.
@@ -3234,10 +3246,10 @@ POST /api/v2/settings/email/oauth/authorize-url
 GET /api/v2/settings/email/oauth/callback
 POST /api/v2/settings/email/oauth/revoke
 ```
-- `template` reads need `read:settings`, changes `write:settings`. `GET` returns the HTML `template` and `text_template` in force (the defaults when none is customized), `is_custom`, `is_text_custom` and the two defaults. `PATCH` takes `template` and/or `text_template` (`400` for an empty body). `preview` renders `template` of `type` `html` (default) or `text` with sample data and returns it under `html` or `text`. `reset` restores both defaults.
+- `template` reads and `preview` need `read:settings`; `PATCH` and `reset` need `admin:settings`, as the SMTP target, since the template wraps every password-reset link. `GET` returns the HTML `template` and `text_template` in force (the defaults when none is customized), `is_custom`, `is_text_custom` and the two defaults. `PATCH` takes `template` and/or `text_template` (`400` for an empty body). `preview` renders `template` of `type` `html` (default) or `text` with sample data and returns it under `html` or `text`. `reset` restores both defaults.
 - `oauth/providers` (`read:settings`) returns the provider presets (`smtp_host`, `smtp_port`, TLS flags, `needs_tenant`, `default_tenant`).
-- `oauth/authorize-url` (`write:settings`) builds the consent URL from the saved SMTP settings (`404` when none are saved) and returns `authorize_url` and `redirect_uri`; optional `redirect_uri` in the body. The state is kept in the caller's session.
-- `oauth/callback` (`write:settings`) is the redirect target: it exchanges `code` for tokens, stores the refresh token and answers an HTML page saying whether authorization succeeded (state mismatch, missing parameters and provider errors are reported there).
+- `oauth/authorize-url` (`admin:settings`, as the consent picks the mailbox that sends) builds the consent URL from the saved SMTP settings (`404` when none are saved) and returns `authorize_url` and `redirect_uri`; optional `redirect_uri` in the body. The state is kept in the caller's session.
+- `oauth/callback` (`admin:settings`) is the redirect target: it exchanges `code` for tokens, stores the refresh token and answers an HTML page saying whether authorization succeeded (state mismatch, missing parameters and provider errors are reported there).
 - `oauth/revoke` (`write:settings`) drops the stored refresh and access tokens (`404` when no SMTP settings exist).
 
 ### Public Endpoints
@@ -4135,6 +4147,7 @@ Content-Type: application/json
   "port": 443
 }
 ```
+Permission `admin:system`, as the discovery scans. The name is resolved once and the connection goes to the addresses checked: cloud metadata, loopback, unspecified, link-local and multicast addresses answer `403`, a port outside 1 to 65535 `400`. A host named in `SSRF_ALLOWED_DOMAINS` may be loopback or link-local, never cloud metadata.
 
 ### Decode CSR
 ```http
@@ -4202,7 +4215,7 @@ GET /api/v2/search?q=example.com&limit=20
 | `q` | string | Search query (required) |
 | `limit` | integer | Max results per category (default: 5) |
 
-Certificates match on their subject, issuer, display name and serial number, and on their comment for a user with `read:certificates`.
+Certificates match on their subject, issuer, display name, serial number and comment.
 
 **Response:**
 ```json
@@ -4218,7 +4231,7 @@ Certificates match on their subject, issuer, display name and serial number, and
 }
 ```
 
-`users` needs `read:users`, `acme_accounts` (matched on contact and account ID, named by the first contact) needs `read:acme`, and `scep_profiles` (matched on name, URL path and description) needs `read:scep`; without the permission the group is empty.
+`certificates` needs `read:certificates`, `cas` needs `read:cas`, `templates` needs `read:templates`, `users` needs `read:users`, `acme_accounts` (matched on contact and account ID, named by the first contact) needs `read:acme`, and `scep_profiles` (matched on name, URL path and description) needs `read:scep`; without the permission the group is empty.
 
 ---
 
@@ -5030,8 +5043,11 @@ Session only. `enabled` defaults to `true`. Disabling the last enabled factor of
 ### Register - Get Options
 ```http
 POST /api/v2/webauthn/register/options
+Content-Type: application/json
+
+{ "password": "..." }
 ```
-Session only. Returns the creation options for the host the request was made to.
+Session only. Returns the creation options for the host the request was made to. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. Under forced two-factor enrolment, right after the password login, no proof is asked.
 
 ### Register - Verify
 ```http

@@ -65,7 +65,7 @@ export default {
     warnings: [
       'Una política de contraseñas demasiado estricta puede frustrar a los usuarios',
       'Detrás de un proxy inverso, defina UCM_BEHIND_PROXY y UCM_TRUSTED_PROXIES antes de usar la lista de acceso de administración; de lo contrario, todas las solicitudes parecen provenir del proxy',
-      'Los ajustes sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, política de contraseñas) requieren admin:settings; los campos están bloqueados para los operadores',
+      'Los ajustes sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, servidor SMTP, política de contraseñas) requieren admin:settings; los campos están bloqueados para los operadores',
     ],
   },
   helpGuides: {
@@ -164,7 +164,7 @@ Permita a los usuarios iniciar sesión con un certificado de cliente en lugar de
 
 ## Permisos requeridos
 
-Los ajustes sensibles de seguridad: sesión, bloqueo, HSTS, URL pública y política de contraseñas, requieren el permiso **admin:settings**. Para los operadores (solo write:settings), esos campos se muestran bloqueados; el resto se guarda con la barra de guardado de la página.
+Los ajustes sensibles de seguridad: sesión, bloqueo, HSTS, URL pública, servidor SMTP y política de contraseñas, requieren el permiso **admin:settings**. Para los operadores (solo write:settings), esos campos se muestran bloqueados; el resto se guarda con la barra de guardado de la página.
 `
   }
 }

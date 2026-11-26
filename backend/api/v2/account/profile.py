@@ -1,5 +1,6 @@
 import re
 import logging
+import threading
 
 from flask import request, g
 from models import db, User
@@ -8,6 +9,8 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from auth.unified import require_auth
+from auth.session_reverify import check_session_password
+from api.v2.sso.account_state import SSO_NO_PASSWORD
 from auth.twofa_enforcement import enforcement_active_for, second_factor_methods
 
 from . import bp
@@ -133,6 +136,8 @@ def get_profile():
             'webauthn_2fa': bool(user.webauthn_2fa),
             'two_factor_enforced': enforcement_active_for(user),
             'two_factor_methods': second_factor_methods(user),
+            # Which proof a change of sign-in credentials asks: the password, else the TOTP code
+            'has_local_password': user.password_hash != SSO_NO_PASSWORD,
             'password_changed_at': utc_isoformat(user.password_changed_at) if hasattr(user, 'password_changed_at') and user.password_changed_at else None,
         }
     )
@@ -157,6 +162,8 @@ def update_profile():
         return error_response('No data provided', 400)
 
     user = g.current_user
+    old_email = user.email
+    moved = 'email' in data and (data['email'] or None) != (old_email or None)
 
     # Update allowed fields
     if 'email' in data:
@@ -166,6 +173,10 @@ def update_profile():
         # E-mail is unique among local accounts (#136); ix_users_email_local refuses a race
         if email and user.is_local and local_email_holder(email, other_than=user.id) is not None:
             return error_response('Email already in use', 409)
+        if moved:
+            refused = email_move_refused(user, data.get('current_password'))
+            if refused:
+                return refused
         user.email = email
 
     if 'full_name' in data:
@@ -179,6 +190,8 @@ def update_profile():
                            on_conflict=lambda: local_email_taken(email, other_than=uid))
     if not ok:
         return _err
+    if moved:
+        record_email_change(user, old_email, email)
 
     return success_response(
         data={
@@ -190,6 +203,64 @@ def update_profile():
         },
         message='Profile updated successfully'
     )
+
+
+def email_move_refused(user, current):
+    """The address receives the password-reset link: moving it proves the password, which
+    an account without one cannot give. Before any field changes: its counter commits."""
+    if user.password_hash == SSO_NO_PASSWORD:
+        return None
+    if not isinstance(current, str) or not current:
+        return error_response('Enter your current password to change the email', 403,
+                              details={'reauth': 'password'})
+    return check_session_password(
+        user, current, error_response('Current password is incorrect', 403,
+                                      details={'reauth': 'password'}))
+
+
+def record_email_change(user, old_email, new_email):
+    """Audit the change and tell the old address; a failed notice never undoes it."""
+    from html import escape
+    from flask import current_app
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        action='profile_email_change',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'Email changed from {old_email or "(none)"} to {new_email or "(none)"}',
+        success=True,
+    )
+    if not old_email:
+        return
+    username = user.username
+    message = (
+        f'The email of the UCM account <strong>{escape(username)}</strong> was changed '
+        f'from {escape(old_email)} to {escape(new_email or "(none)")}. If you did not make '
+        'this change, contact your administrator: password reset links now go to the new address.')
+
+    def send():
+        try:
+            from services.notification_service import NotificationService
+            sent = NotificationService.send_email(
+                to=old_email, subject='UCM - Account email changed', template='generic',
+                context={'message': message})
+            if not sent:
+                logger.warning('Email change notice to the old address of %s not sent', username)
+        except Exception as exc:  # noqa: BLE001 - the change stands without its notice
+            logger.warning('Email change notice to the old address of %s failed: %s',
+                           username, type(exc).__name__)
+
+    app = current_app._get_current_object()
+    if app.config.get('TESTING'):
+        send()  # inline on the caller's session (a single shared connection in tests)
+        return
+
+    def run():
+        with app.app_context():
+            send()
+    # The relay is reached off the request: a slow or dead one never holds the reply
+    threading.Thread(target=run, name='email-change-notice', daemon=True).start()
 
 
 @bp.route('/api/v2/account/preferences', methods=['GET'])

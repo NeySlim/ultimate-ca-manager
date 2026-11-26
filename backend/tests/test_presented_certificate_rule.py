@@ -77,7 +77,7 @@ class TestMtlsLoginRevocation:
         from services.mtls_auth_service import MTLSAuthService
         ca = create_ca(cn='mTLS login revocation CA')
         r = auth_client.post('/api/v2/mtls/certificates', data=json.dumps(
-            {'ca_id': ca['id'], 'name': 'revocable'}), content_type='application/json')
+            {'password': 'changeme123', 'ca_id': ca['id'], 'name': 'revocable'}), content_type='application/json')
         assert r.status_code == 201, r.get_json()
         data = r.get_json()['data']
         cert = x509.load_pem_x509_certificate(data['certificate'].encode(), default_backend())

@@ -2,9 +2,6 @@
 Certificate Tools API endpoints
 SSL checker, decoders, converters, key matcher
 """
-import os
-import socket
-import ipaddress
 from datetime import datetime, timezone
 from utils.days_remaining import days_remaining as compute_days_remaining
 
@@ -227,35 +224,6 @@ def get_public_key_bytes(obj):
         encoding=serialization.Encoding.DER,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
-
-
-def is_safe_host(hostname):
-    """
-    Check if hostname is safe to connect to (SSRF protection)
-    UCM is a self-hosted PKI tool — private/local network access is allowed
-    since users need to check certificates on their own infrastructure.
-    Only link-local and multicast addresses are blocked.
-    """
-    ALLOWED_DOMAINS = os.getenv('SSRF_ALLOWED_DOMAINS', '').split(',')
-    if hostname in ALLOWED_DOMAINS:
-        return True
-
-    try:
-        ip = ipaddress.ip_address(hostname)
-        if ip.is_link_local or ip.is_multicast:
-            return False
-        return True
-    except ValueError:
-        # It's a hostname - resolve it (supports both IPv4 and IPv6)
-        try:
-            results = socket.getaddrinfo(hostname, None)
-            for family, _, _, _, sockaddr in results:
-                ip = ipaddress.ip_address(sockaddr[0])
-                if ip.is_link_local or ip.is_multicast:
-                    return False
-            return True
-        except (socket.gaierror, ValueError):
-            return False
 
 
 from . import ssl_checker, decoder, key_matcher, converter  # noqa: F401, E402

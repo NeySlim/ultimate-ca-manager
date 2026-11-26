@@ -263,7 +263,7 @@ Two guards, because the two jobs have different answers.
 **Network scan endpoints** (Discovery and the SSL Checker) connect to hosts you name, and UCM is installed on premises, where scanning the internal network is the point. They therefore do not block private networks:
 
 - Discovery accepts RFC 1918 targets and IPv4 loopback. It rejects link-local, multicast and reserved addresses, for a literal IP address and for the address a hostname resolves to (the first one returned). It runs at most three scans at a time.
-- The SSL Checker accepts private and loopback targets. It rejects link-local and multicast addresses, and refuses a hostname when any address it resolves to is one of them or it does not resolve. The `SSRF_ALLOWED_DOMAINS` environment variable (comma-separated hostnames, exact match) lets a named host skip these checks.
+- The SSL Checker needs `admin:system` and accepts private targets. It rejects cloud metadata, loopback, unspecified, link-local and multicast addresses, refuses a hostname when any address it resolves to is one of them or it does not resolve, and connects to the addresses it checked. The `SSRF_ALLOWED_DOMAINS` environment variable (comma-separated hostnames, exact match) lets a named host be loopback or link-local; cloud metadata stays refused.
 
 **User-supplied outbound URLs** (webhooks, SSO, ACME, imports) use `validate_url_not_cloud_metadata`, which blocks cloud metadata and loopback while deliberately allowing the LAN. UCM is deployed on premises: an RFC1918 webhook or an internal SSO endpoint is the primary use case, not an attack.
 

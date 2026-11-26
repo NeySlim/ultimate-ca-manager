@@ -170,7 +170,7 @@ def test_requires_auth(client):
 
 def test_a_key_without_read_dashboard_is_refused(app, auth_client):
     r = auth_client.post('/api/v2/account/apikeys',
-                         json={'name': 'expirations-no-dashboard', 'permissions': ['read:certificates']})
+                         json={'password': 'changeme123', 'name': 'expirations-no-dashboard', 'permissions': ['read:certificates']})
     assert r.status_code == 201, r.data
     key = get_json(r)['data']
     try:

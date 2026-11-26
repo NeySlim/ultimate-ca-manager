@@ -103,8 +103,8 @@ def _rows_of(app, pem):
 @pytest.mark.parametrize('route', ['enroll-import', 'user-import'])
 def test_mtls_import_fires_imported_once_after_commit(app, auth_client, same_serial, events, committed, route):
     _serial, pem, _ = same_serial
-    url, body = (('/api/v2/mtls/enroll-import', {'pem': pem}) if route == 'enroll-import'
-                 else ('/api/v2/users/1/mtls/certificates', {'mode': 'import', 'pem': pem}))
+    url, body = (('/api/v2/mtls/enroll-import', {'password': 'changeme123', 'pem': pem}) if route == 'enroll-import'
+                 else ('/api/v2/users/1/mtls/certificates', {'mode': 'import', 'pem': pem, 'password': 'changeme123'}))
     r = auth_client.post(url, json=body)
     assert r.status_code == 201, r.get_json()
     [cert_id] = _rows_of(app, pem)
@@ -124,7 +124,7 @@ def test_mtls_enrolment_of_a_recorded_certificate_fires_nothing(app, auth_client
         db.session.add(row)
         db.session.commit()
     events.clear()
-    r = auth_client.post('/api/v2/mtls/enroll-import', json={'pem': pem})
+    r = auth_client.post('/api/v2/mtls/enroll-import', json={'password': 'changeme123', 'pem': pem})
     assert r.status_code == 201, r.get_json()
     assert [e for e, _ in events if e.startswith('certificate.')] == []
 

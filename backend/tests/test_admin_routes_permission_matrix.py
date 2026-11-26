@@ -85,6 +85,11 @@ ROUTES = {
     'PATCH /api/v2/settings/backup/schedule': ADMIN_SYSTEM,
     'POST /api/v2/settings/backup/create': ADMIN_SYSTEM,
     'POST /api/v2/settings/backup/restore': ADMIN_SYSTEM,
+    # api.v2.settings.email
+    'GET /api/v2/settings/email/oauth/callback': ADMIN_SETTINGS,
+    'POST /api/v2/settings/email/oauth/authorize-url': ADMIN_SETTINGS,
+    'PATCH /api/v2/settings/email/template': ADMIN_SETTINGS,
+    'POST /api/v2/settings/email/template/reset': ADMIN_SETTINGS,
     # api.v2.settings.general
     'PATCH /api/v2/settings/ct': ADMIN_SETTINGS,
     # api.v2.settings.notifications
@@ -168,6 +173,8 @@ ROUTES = {
     'PATCH /api/v2/system/updates/settings': ADMIN_SYSTEM,
     'POST /api/v2/system/updates/campaign/resume': ADMIN_SYSTEM,
     'POST /api/v2/system/updates/install': ADMIN_SYSTEM,
+    # api.v2.tools
+    'POST /api/v2/tools/check-ssl': ADMIN_SYSTEM,
     # api.v2.users.mtls
     'DELETE /api/v2/users/<int:user_id>/mtls/certificates/<int:cert_id>': ADMIN_USERS,
     'GET /api/v2/users/<int:user_id>/mtls/certificates': ADMIN_USERS,

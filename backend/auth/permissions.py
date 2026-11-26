@@ -126,7 +126,7 @@ ENFORCED_PERMISSIONS = set()
 INLINE_CHECKED_PERMISSIONS = frozenset({
     'admin:key_recovery', 'admin:settings', 'admin:system', 'read:acme', 'read:audit',
     'read:cas', 'read:certificates', 'read:deploy', 'read:hsm', 'read:private_keys', 'read:scep', 'read:settings',
-    'read:system', 'read:truststore', 'read:users', 'read:kerberos', 'read:wstep', 'write:approvals', 'write:cas',
+    'read:system', 'read:templates', 'read:truststore', 'read:users', 'read:kerberos', 'read:wstep', 'write:approvals', 'write:cas',
     'write:kerberos', 'write:wstep', 'write:xcep',
 })
 

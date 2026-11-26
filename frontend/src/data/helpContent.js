@@ -1429,7 +1429,7 @@ export const helpContent = {
         icon: Users,
         items: [
           { label: 'Full Name', text: 'Your display name shown across the application' },
-          { label: 'Email', text: 'Used for notifications and account recovery' },
+          { label: 'Email', text: 'Used for notifications and account recovery. Changing it asks for your password, and a notice goes to the old address' },
           { label: 'Account Information', text: 'Creation date, last login, total login count' },
         ]
       },
@@ -1439,8 +1439,8 @@ export const helpContent = {
         items: [
           { label: 'Password', text: 'Change your current password. Your other sessions are signed out; this one stays' },
           { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
-          { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
-          { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
+          { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.). Adding one asks for your password first, or your authenticator code for an account without one' },
+          { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication. Adding one asks for your password first, or your authenticator code for an account without one' },
           { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and its only other button is Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
         ]
       },
@@ -1535,7 +1535,7 @@ export const helpContent = {
         title: 'Available Tools',
         icon: Wrench,
         items: [
-          { label: 'SSL Checker', text: 'Connect to a remote host and inspect the certificate it presents (the leaf only, not the chain)' },
+          { label: 'SSL Checker', text: 'Connect to a remote host and inspect the certificate it presents (the leaf only, not the chain). Needs admin:system, as network discovery' },
           { label: 'CSR Decoder', text: 'Paste a CSR in PEM format to view its subject, SANs, and key info' },
           { label: 'Certificate Decoder', text: 'Paste a certificate in PEM format to inspect its subject, issuer, validity, key, SANs, key usages and fingerprints; CDP, AIA and policies are not shown' },
           { label: 'Key Matcher', text: 'Verify that a certificate, CSR, and private key belong together' },
@@ -1830,7 +1830,7 @@ export const helpContent = {
     warnings: [
       'Locking the password policy too tightly may frustrate users',
       'Behind a reverse proxy, set UCM_BEHIND_PROXY and UCM_TRUSTED_PROXIES before using the admin access allowlist, otherwise every request appears to come from the proxy',
-      'Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require admin:settings, the fields are locked for operators',
+      'Security-sensitive settings (session, lockout, HSTS, public URL, SMTP server and account, email template, password policy) require admin:settings, the fields are locked for operators',
     ],
     related: ['Account', 'Users & Groups', 'Settings']
   },

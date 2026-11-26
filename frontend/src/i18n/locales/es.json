@@ -4100,6 +4100,7 @@
     },
     "emailTemplate": "Plantilla de correo",
     "templateDescription": "Personalice la plantilla HTML utilizada para todas las notificaciones por correo.",
+    "templateAdminOnly": "Modificar la plantilla requiere el permiso de administración de ajustes: se muestra en solo lectura.",
     "editTemplate": "Editar plantilla",
     "templateSaved": "Plantilla de correo guardada",
     "templateCustom": "Plantilla personalizada",
@@ -4712,7 +4713,11 @@
     "profileReset": "Cambios del perfil deshechos.",
     "apiKeyHint": "Las claves de API permiten el acceso programático a UCM. Mantenga sus claves en secreto y rótelas con regularidad. Cada clave puede tener una fecha de expiración personalizada.",
     "apiKeySearchPlaceholder": "Buscar por nombre o prefijo...",
-    "apiKeyPrefix": "Prefijo"
+    "apiKeyPrefix": "Prefijo",
+    "confirmItIsYou": "Confirme que es usted",
+    "confirmWithPassword": "Introduzca su contraseña para confirmar este cambio",
+    "confirmWithCode": "Introduzca el código de su aplicación de autenticación para confirmar este cambio",
+    "confirmEmailChange": "Introduzca su contraseña para cambiar el correo electrónico: los enlaces de restablecimiento de contraseña se envían a él"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",

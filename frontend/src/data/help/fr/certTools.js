@@ -15,7 +15,7 @@ export default {
       {
         title: 'Outils disponibles',
         items: [
-          { label: 'Vérificateur SSL', text: 'Se connecter à un hôte distant et inspecter le certificat qu’il présente (le certificat final seulement, pas la chaîne)' },
+          { label: 'Vérificateur SSL', text: 'Se connecter à un hôte distant et inspecter le certificat qu’il présente (le certificat final seulement, pas la chaîne). Exige admin:system, comme la découverte réseau' },
           { label: 'Décodeur de CSR', text: 'Collez une CSR au format PEM pour voir son sujet, ses SAN et ses infos de clé' },
           { label: 'Décodeur de certificat', text: 'Collez un certificat au format PEM pour inspecter son sujet, son émetteur, sa validité, sa clé, ses SAN, ses usages de clé et ses empreintes ; CDP, AIA et politiques ne sont pas affichés' },
           { label: 'Vérificateur de correspondance de clé', text: 'Vérifier qu’un certificat, une CSR et une clé privée correspondent' },
@@ -49,7 +49,7 @@ Une boîte à outils pour inspecter, convertir et vérifier les certificats sans
 
 ## Vérificateur SSL
 
-Inspecter le certificat SSL/TLS d’un serveur distant :
+Inspecter le certificat SSL/TLS d’un serveur distant. Le vérificateur ouvre une connexion vers n’importe quel hôte et port : il n’est donc proposé qu’avec la permission **admin:system**, comme la découverte réseau ; les adresses de bouclage et de métadonnées cloud sont refusées.
 
 1. Entrez le **nom d’hôte** (par ex. \`google.com\`)
 2. Changez optionnellement le **port** (par défaut : 443)

@@ -19,6 +19,7 @@ from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.issuance_defaults import browser_key_type
 
+from auth.session_reverify import confirm_account_holder
 from auth.unified import require_auth, has_permission
 from models import User, Certificate, CA, SystemConfig, db
 from models.auth_certificate import AuthCertificate
@@ -246,6 +247,12 @@ def create_mtls_certificate():
     org = data.get('organization', 'UCM Users')
     if not re.match(r'^[a-zA-Z0-9\s\-\.]{1,64}$', org):
         return error_response('Invalid organization name', 400)
+
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before issuing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, data)
+    if refused:
+        return refused
 
     try:
         cert_obj = CertificateService.create_certificate(
@@ -556,6 +563,12 @@ def enroll_presented_certificate():
     if enrolments_of(presented_serial, presented_issuer):
         return error_response('This certificate is already enrolled', 409)
 
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before writing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, request.get_json(silent=True))
+    if refused:
+        return refused
+
     data = request.get_json() or {}
     auth_cert = AuthCertificate(
         user_id=user.id,
@@ -700,6 +713,12 @@ def enroll_import_certificate():
         if target:
             enroll_user_id = target.id
             enroll_username = target.username
+
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before writing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, request.get_json(silent=True))
+    if refused:
+        return refused
 
     # Create Certificate record if not exists
     created = existing_cert is None
@@ -866,6 +885,12 @@ def assign_certificate():
     except Exception as e:
         logger.error(f"Failed to parse certificate {cert_id}: {e}")
         return error_response('Failed to parse certificate', 500)
+
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before writing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, request.get_json(silent=True))
+    if refused:
+        return refused
 
     auth_cert = AuthCertificate(
         user_id=enroll_user_id,

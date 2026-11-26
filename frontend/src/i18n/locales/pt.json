@@ -4100,6 +4100,7 @@
     },
     "emailTemplate": "Modelo de email",
     "templateDescription": "Personalize o modelo HTML usado para todas as notificações por email.",
+    "templateAdminOnly": "Alterar o modelo requer a permissão de administração das configurações: ele é exibido somente para leitura.",
     "editTemplate": "Editar modelo",
     "templateSaved": "Modelo de email salvo",
     "templateCustom": "Modelo personalizado",
@@ -4712,7 +4713,11 @@
     "profileReset": "Alterações do perfil anuladas.",
     "apiKeyHint": "As chaves de API permitem o acesso programático ao UCM. Mantenha suas chaves secretas e rode-as regularmente. Cada chave pode ter uma data de expiração personalizada.",
     "apiKeySearchPlaceholder": "Pesquisar por nome ou prefixo...",
-    "apiKeyPrefix": "Prefixo"
+    "apiKeyPrefix": "Prefixo",
+    "confirmItIsYou": "Confirme que é você",
+    "confirmWithPassword": "Digite sua senha para confirmar esta alteração",
+    "confirmWithCode": "Digite o código do seu aplicativo autenticador para confirmar esta alteração",
+    "confirmEmailChange": "Digite sua senha para alterar o email: os links de redefinição de senha são enviados para ele"
   },
   "rbac": {
     "title": "Controle de acesso baseado em funções",

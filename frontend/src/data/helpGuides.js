@@ -2074,7 +2074,7 @@ Require all users to enable two-factor authentication.
 Encrypt all private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
 A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Security section of Settings shows the encryption status, and the Overview shows a banner while no key is loaded.
 
-> 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
+> 💡 Security-sensitive settings (session, lockout, HSTS, public URL, SMTP server and account, email template, password policy) require the **admin:settings** permission, the fields are locked for operators.
 
 > ⚠ A list that does not include your own address is refused. If you lose access anyway, set \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` and restart UCM.
 
@@ -2374,7 +2374,7 @@ Manage your personal profile, security settings, and API keys.
 ## Profile
 
 - **Full Name**: Your display name shown across UCM
-- **Email**: Used for notifications and password recovery
+- **Email**: Used for notifications and password recovery. Changing it asks for your password, and a notice goes to the old address
 - **Account Information**: Creation date, last login timestamp, total login count
 
 ## Security
@@ -2410,6 +2410,8 @@ Register hardware security keys or biometric authenticators:
 3. Follow the browser prompt to authenticate
 4. The key appears in your registered credentials list
 
+UCM first asks for your password, or the code of your authenticator app for an account without a local password: a key signs in on its own, so an unattended session cannot add one. Adding an mTLS certificate asks the same.
+
 With 2FA enabled or enforced, a registered key can also answer the second step of a password login: choose **Use security key instead**.
 
 Without an authenticator app, turn on **Security key as second factor** in the Two-Factor Authentication section: every password login then asks for one of your keys, and the last key cannot be removed while it is on.
@@ -2426,7 +2428,7 @@ Manage client certificates for mutual TLS authentication:
 1. Click **Create Key**
 2. Enter a **name** (descriptive, e.g., "CI/CD Pipeline")
 3. Optionally set an expiry in **days**
-4. Click **Create**
+4. Click **Create**, then confirm with your password (or your authenticator code for an account without one): a key keeps working after a password change
 5. Copy the key immediately: it is shown only once
 
 ### Using API Keys
@@ -2527,7 +2529,7 @@ A toolkit for inspecting, converting, and verifying certificates without leaving
 
 ## SSL Checker
 
-Inspect a remote server's SSL/TLS certificate:
+Inspect a remote server's SSL/TLS certificate. The checker opens a connection to any host and port, so it is offered with the **admin:system** permission only, as network discovery; loopback and cloud metadata addresses are refused.
 
 1. Enter the **hostname** (e.g., \`google.com\`)
 2. Optionally change the **port** (default: 443)
@@ -3021,7 +3023,7 @@ Let users log in with a client certificate instead of a password:
 
 ## Required Permissions
 
-Security-sensitive settings: session, lockout, HSTS, public URL, and password policy, require the **admin:settings** permission. For operators (write:settings only), those fields are shown locked; the rest saves through the page's save bar.
+Security-sensitive settings: session, lockout, HSTS, public URL, SMTP server and account, email template, and password policy, require the **admin:settings** permission. For operators (write:settings only), those fields are shown locked; the rest saves through the page's save bar.
 `
   },
 

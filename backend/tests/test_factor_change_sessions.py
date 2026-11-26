@@ -209,7 +209,7 @@ def _regenerate_codes(application, c, user):
 
 
 def _add_key(application, c, user):
-    r = _post(c, '/api/v2/webauthn/register/options', {})
+    r = _post(c, '/api/v2/webauthn/register/options', {'password': PASSWORD})
     assert r.status_code == 200, r.data
     return _post(c, '/api/v2/webauthn/register/verify',
                  {'credential': SoftKey().attest(r.get_json()['data']['challenge']), 'name': 'new'})
@@ -735,7 +735,7 @@ def test_a_key_change_for_an_account_deleted_meanwhile_answers_404(app, auth_cli
     try:
         this = _open_session(app, user)
         if operation == 'add-key':
-            options = _post(this, '/api/v2/webauthn/register/options', {})
+            options = _post(this, '/api/v2/webauthn/register/options', {'password': PASSWORD})
             challenge = options.get_json()['data']['challenge']
             monkeypatch.setattr(enforcement, 'lock_user', _delete_then_lock)
             r = _post(this, '/api/v2/webauthn/register/verify',
@@ -875,7 +875,7 @@ def test_a_key_enrolled_for_an_account_deleted_meanwhile_never_answers_500(app, 
     try:
         this = _open_session(app, user)
         _enrolling(this)
-        options = _post(this, '/api/v2/webauthn/register/options', {})
+        options = _post(this, '/api/v2/webauthn/register/options', {'password': PASSWORD})
         challenge = options.get_json()['data']['challenge']
         monkeypatch.setattr(enforcement, 'lock_user', _delete_then_lock)
         monkeypatch.setattr(webauthn, 'lock_user', _delete_then_lock, raising=False)

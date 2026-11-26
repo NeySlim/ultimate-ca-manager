@@ -39,7 +39,7 @@ class TestMtlsIssuanceScope:
     def test_viewer_cannot_make_a_ca_sign_an_mtls_cert(self, viewer_client):
         r = viewer_client.post(
             '/api/v2/mtls/certificates',
-            data=json.dumps({'name': 'viewer-probe'}),
+            data=json.dumps({'password': 'ViewerPass123!', 'name': 'viewer-probe'}),
             content_type='application/json',
         )
         assert r.status_code == 403, (
@@ -151,7 +151,7 @@ class TestMtlsExplicitCaRequiresCaScope:
         c = self._group_granted_client(app, auth_client)
         r = c.post(
             '/api/v2/mtls/certificates',
-            data=json.dumps({'name': 'ca-direct-probe',
+            data=json.dumps({'password': 'ProbePass123!', 'name': 'ca-direct-probe',
                              'ca_id': mtls_cas['other']['id']}),
             content_type='application/json',
         )
@@ -165,7 +165,7 @@ class TestMtlsExplicitCaRequiresCaScope:
         c = self._group_granted_client(app, auth_client)
         r = c.post(
             '/api/v2/mtls/certificates',
-            data=json.dumps({'name': 'trusted-ca-probe',
+            data=json.dumps({'password': 'ProbePass123!', 'name': 'trusted-ca-probe',
                              'ca_id': mtls_cas['mtls']['refid']}),
             content_type='application/json',
         )
@@ -175,7 +175,7 @@ class TestMtlsExplicitCaRequiresCaScope:
         """The admin flow (Users page issues for a chosen CA) is unchanged."""
         r = auth_client.post(
             '/api/v2/mtls/certificates',
-            data=json.dumps({'name': 'admin-ca-choice-probe',
+            data=json.dumps({'password': 'changeme123', 'name': 'admin-ca-choice-probe',
                              'ca_id': mtls_cas['other']['id']}),
             content_type='application/json',
         )
@@ -245,6 +245,7 @@ class TestApiKeyPermissionsFollowOwnerRole:
             data=json.dumps({
                 'name': 'demotion-probe',
                 'permissions': ['read:cas', 'write:cas'],
+                'password': 'ProbePass123!',
             }),
             content_type='application/json',
         )

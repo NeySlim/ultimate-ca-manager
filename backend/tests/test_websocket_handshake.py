@@ -14,7 +14,7 @@ from websocket import events, socketio
 def api_key(app, auth_client, monkeypatch):
     # Keys other files left on the shared admin must not hit the per-user cap
     monkeypatch.setitem(app.config, 'API_KEY_MAX_PER_USER', 1000)
-    r = auth_client.post('/api/v2/account/apikeys', json={
+    r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123',
         'name': 'ws-handshake',
         'permissions': ['read:certificates', 'read:cas'],
     })

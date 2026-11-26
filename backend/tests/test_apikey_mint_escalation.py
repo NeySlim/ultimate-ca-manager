@@ -14,7 +14,8 @@ from tests.conftest import assert_success
 def _create(client, permissions, name='mint-escalation', headers=None):
     return client.post(
         '/api/v2/account/apikeys',
-        data=json.dumps({'name': name, 'permissions': permissions}),
+        data=json.dumps({'name': name, 'permissions': permissions,
+                         **({} if headers else {'password': 'changeme123'})}),
         content_type='application/json',
         headers=headers or {},
     )

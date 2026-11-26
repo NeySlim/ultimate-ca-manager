@@ -55,7 +55,8 @@ def test_imported_enrolment_is_filed_under_the_self_signed_root(app, auth_client
     leaf = make_cert(f'user-{uuid.uuid4().hex[:6]}', new_key(), twin_records['cn_b'], twin_records['key_b'],
                      ca=False, days=30)
     pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
-    r = auth_client.post('/api/v2/users/1/mtls/certificates', json={'mode': 'import', 'pem': pem, 'name': 'twin'})
+    r = auth_client.post('/api/v2/users/1/mtls/certificates', json={'mode': 'import', 'pem': pem, 'name': 'twin',
+                                                                  'password': 'changeme123'})
     assert r.status_code in (200, 201), r.data
     row = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).one()
     assert row.caref == twin_records['root']

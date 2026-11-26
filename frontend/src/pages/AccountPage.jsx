@@ -33,6 +33,7 @@ import { ExportDialog } from './certificates/dialogs/ExportDialog'
 import { ROLE_KEYS } from './users/userFacts'
 import { languages } from '../i18n'
 import ApiKeyList from './account/ApiKeyList'
+import { useAccountProof } from '../hooks/useAccountProof'
 import { chooseLanguage } from '../lib/chooseLanguage'
 import { useInFlight } from '../hooks/useInFlight'
 
@@ -45,6 +46,7 @@ export default function AccountPage() {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
+  const askProof = useAccountProof()
   const { copy } = useClipboard()
   const { hasPermission } = usePermission()
   const { closeOnNav, toggleCloseOnNav } = useInspector()
@@ -191,9 +193,18 @@ export default function AccountPage() {
 
   // Profile handlers
   const handleSaveProfile = async () => {
+    // The address receives the reset link: moving it asks the password of an account that has one
+    let proof = {}
+    if ((formData.email || '') !== (accountData.email || '') && accountData.has_local_password !== false) {
+      const password = await showPrompt(t('account.confirmEmailChange'), {
+        title: t('account.confirmItIsYou'), type: 'password', confirmText: t('common.confirm'),
+      })
+      if (!password) return
+      proof = { current_password: password }
+    }
     setSaving(true)
     try {
-      await accountService.updateProfile(formData)
+      await accountService.updateProfile({ ...formData, ...proof })
       showSuccess(t('messages.success.update.user'))
       await loadAccount({ keepPending: false })
       setAnnounce(t('account.profileSaved'))
@@ -306,9 +317,11 @@ export default function AccountPage() {
       return
     }
     
+    const proof = await askProof()
+    if (!proof) return
     setWebauthnRegistering(true)
     try {
-      const registered = await accountService.registerWebAuthnKey(webauthnName)
+      const registered = await accountService.registerWebAuthnKey(webauthnName, proof)
       factorChanged('account.keyRegistered', registered)
       setShowWebAuthnModal(false)
       setWebauthnName('')
@@ -362,7 +375,10 @@ export default function AccountPage() {
         permissions: apiKeyScopePermissions(apiKeyForm.scope, hasPermission),
         expires_days: expiresDays,
       }
-      const response = await accountService.createApiKey(payload)
+      // A key outlives a password change: the server asks the holder again
+      const proof = await askProof()
+      if (!proof) return
+      const response = await accountService.createApiKey({ ...payload, ...proof })
       // apiClient returns the full envelope: { data: {...}, message }
       const created = response.data || response
       setShowApiKeyModal(false)
@@ -430,10 +446,13 @@ export default function AccountPage() {
   }
 
   const handleCreateMTLS = async () => {
+    const proof = await askProof()
+    if (!proof) return
     setMtlsCreating(true)
     setMtlsResult(null)
     try {
       const response = await accountService.createMTLSCertificate({
+        ...proof,
         name: mtlsForm.name || undefined,
         validity_days: validityDays(mtlsForm.validity_days),
         ca_id: mtlsForm.ca_id || undefined,
@@ -468,9 +487,11 @@ export default function AccountPage() {
       showError(t('account.mtlsPemRequired'))
       return
     }
+    const proof = await askProof()
+    if (!proof) return
     setMtlsCreating(true)
     try {
-      await accountService.importMTLSCertificate(mtlsImportForm.pem, mtlsImportForm.name)
+      await accountService.importMTLSCertificate(mtlsImportForm.pem, mtlsImportForm.name, proof)
       showSuccess(t('account.mtlsCertImported'))
       await loadMTLSCertificates()
       handleCloseMTLSModal()
@@ -495,9 +516,11 @@ export default function AccountPage() {
 
   const handleAssignMTLS = async () => {
     if (!selectedAssignCert) return
+    const proof = await askProof()
+    if (!proof) return
     setMtlsCreating(true)
     try {
-      await accountService.assignMTLSCertificate(selectedAssignCert.id, selectedAssignCert.name)
+      await accountService.assignMTLSCertificate(selectedAssignCert.id, selectedAssignCert.name, proof)
       showSuccess(t('account.mtlsCertAssigned'))
       await loadMTLSCertificates()
       handleCloseMTLSModal()

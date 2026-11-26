@@ -420,7 +420,7 @@ def test_kind_restricts_the_items_but_not_the_counts(auth_client, seeded):
 def test_a_key_without_read_dashboard_is_refused(app, auth_client):
     """Every built-in role holds read:dashboard, so the refusal is shown with a scoped API key."""
     r = auth_client.post('/api/v2/account/apikeys',
-                         json={'name': 'queue-no-dashboard', 'permissions': ['read:certificates']})
+                         json={'password': 'changeme123', 'name': 'queue-no-dashboard', 'permissions': ['read:certificates']})
     assert r.status_code == 201, r.data
     key = get_json(r)['data']
     try:

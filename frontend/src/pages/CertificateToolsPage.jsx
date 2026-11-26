@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { toolsService } from '../services'
 import { useNotification } from '../contexts'
 import { useClipboard } from '../hooks'
+import { usePermission } from '../hooks/usePermission'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
 import { Zone, PageHead, Btn, Pill, Facts, RecordList, RecordRow } from '../components/atelier'
@@ -23,9 +24,10 @@ function publicKeyText(pk, t, bitSuffix = '') {
   return [keyAlgorithmLabel(pk?.type, t, pk?.security_level), size].filter(Boolean).join(' ') || null
 }
 
-// The tools in the order of the table of contents, with the mockup's pictogram of each
+// The tools in the order of the table of contents, with the mockup's pictogram of each;
+// the SSL checker connects to any host, which the API grants with admin:system only
 const TOOLS = [
-  { id: 'ssl-checker', labelKey: 'tools.sslChecker', descKey: 'tools.sslCheckerDesc', icon: 'globe' },
+  { id: 'ssl-checker', labelKey: 'tools.sslChecker', descKey: 'tools.sslCheckerDesc', icon: 'globe', permission: 'admin:system' },
   { id: 'csr-decoder', labelKey: 'tools.csrDecoder', descKey: 'tools.csrDecoderDesc', icon: 'file' },
   { id: 'cert-decoder', labelKey: 'tools.decoder', descKey: 'tools.certDecoderDesc', icon: 'cert' },
   { id: 'key-matcher', labelKey: 'tools.keyMatcher', descKey: 'tools.keyMatcherDesc', icon: 'key' },
@@ -40,8 +42,11 @@ export default function CertificateToolsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const { copy: clipboardCopy } = useClipboard()
+  const { hasPermission } = usePermission()
+  const tools = TOOLS.filter((tool) => !tool.permission || hasPermission(tool.permission))
+  const firstTool = tools[0].id
   // The tool a link names (/tools?tab=converter) is the one shown
-  const [activeTool, setActiveTool] = useSectionParam(TOOLS.map((tool) => tool.id), 'ssl-checker')
+  const [activeTool, setActiveTool] = useSectionParam(tools.map((tool) => tool.id), firstTool)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
@@ -240,7 +245,7 @@ export default function CertificateToolsPage() {
   }
   const signature = (label, value) => fact(label, value && <span title={t('common.issuerSignatureAlgorithmHint')}>{value}</span>)
 
-  const sections = TOOLS.map((tool) => ({ id: tool.id, label: t(tool.labelKey), description: t(tool.descKey), icon: tool.icon }))
+  const sections = tools.map((tool) => ({ id: tool.id, label: t(tool.labelKey), description: t(tool.descKey), icon: tool.icon }))
   const active = sections.find((section) => section.id === activeTool)
 
   // The outcome of the last run, in the words of the test line; the details follow under it
@@ -475,7 +480,7 @@ export default function CertificateToolsPage() {
       <PageHead title={t('common.tools')} total={t('tools.toolCount', { count: sections.length })} intent={t('shell.moduleDesc.tools')} />
       <SettingsLayout
         toc={<SettingsToc label={t('tools.tocLabel')} sections={sections} current={activeTool}
-          hrefFor={(id) => (id === 'ssl-checker' ? '/tools' : `/tools?tab=${id}`)} onJump={handleToolChange} />}
+          hrefFor={(id) => (id === firstTool ? '/tools' : `/tools?tab=${id}`)} onJump={handleToolChange} />}
       >
         <SettingsJump sections={sections} current={activeTool} onJump={handleToolChange} />
         <SettingsFrame id={active.id} label={active.label} desc={active.description}>

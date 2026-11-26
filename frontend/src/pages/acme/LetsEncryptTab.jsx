@@ -150,7 +150,7 @@ export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWri
             </Notice>
           ) : proxyAccountId ? <Notice>{t('acme.upstreamAccountNotRegistered')} {t('acme.willAutoRegister')}</Notice> : null}
           <div className="settings-test">
-            <Btn icon="send" id="acme-proxy-test" disabled={testingConnection || !proxyAccountId || undefined} onClick={onTestConnection}>{t('acme.testConnection')}</Btn>
+            <Btn icon="send" id="acme-proxy-test" disabled={testingConnection || !proxyAccountId || !canWrite || undefined} onClick={onTestConnection}>{t('acme.testConnection')}</Btn>
             {connectionResult && (
               <p className={`test-result ${connectionResult.connected ? 'good' : 'bad'}`} role="status">
                 <span>{connectionResult.connected

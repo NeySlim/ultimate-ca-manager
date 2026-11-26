@@ -18,7 +18,7 @@ export default {
         title: 'Profil',
         items: [
           { label: 'Nom complet', text: 'Votre nom d’affichage affiché dans toute l’application' },
-          { label: 'E-mail', text: 'Utilisé pour les notifications et la récupération de compte' },
+          { label: 'E-mail', text: 'Utilisé pour les notifications et la récupération de compte. Le modifier demande votre mot de passe, et un avis part vers l’ancienne adresse' },
           { label: 'Informations du compte', text: 'Date de création, dernière connexion, nombre total de connexions' },
         ]
       },
@@ -27,8 +27,8 @@ export default {
         items: [
           { label: 'Mot de passe', text: 'Changer votre mot de passe actuel. Vos autres sessions sont fermées ; celle-ci reste ouverte' },
           { label: '2FA (TOTP)', text: 'Activer les mots de passe à usage unique basés sur le temps via une application d’authentification. La réactiver alors qu’elle est déjà active est refusé : désactivez-la d’abord. Chaque code ne fonctionne qu’une fois : après en avoir utilisé un, attendez le suivant pour confirmer une autre action' },
-          { label: 'Clés de sécurité', text: 'Enregistrer des clés WebAuthn/FIDO2 (YubiKey, empreinte digitale, etc.)' },
-          { label: 'mTLS', text: 'Gérer les certificats client pour l’authentification TLS mutuel' },
+          { label: 'Clés de sécurité', text: 'Enregistrer des clés WebAuthn/FIDO2 (YubiKey, empreinte digitale, etc.). L’ajout d’une clé demande d’abord votre mot de passe, ou votre code d’authentification pour un compte sans mot de passe' },
+          { label: 'mTLS', text: 'Gérer les certificats client pour l’authentification TLS mutuel. L’ajout d’un certificat demande d’abord votre mot de passe, ou votre code d’authentification pour un compte sans mot de passe' },
           { label: "Changement de mot de passe imposé (v2.245)", text: "Un compte à qui l’on a demandé un nouveau mot de passe, comme le premier administrateur dont UCM a généré le mot de passe au premier démarrage, ne peut rien faire d’autre tant qu’il ne l’a pas changé, API et WebSocket compris ; l’invite ne peut pas être ignorée et son seul autre bouton est Déconnexion. Ce changement supprime le fichier qui contenait le mot de passe généré. Un mot de passe fourni par INITIAL_ADMIN_PASSWORD ou INITIAL_ADMIN_PASSWORD_FILE n’a pas à être changé, sauf si INITIAL_ADMIN_PASSWORD_FORCE_CHANGE est défini (le chart Helm le définit pour le mot de passe qu’il génère)" },
         ]
       },
@@ -71,7 +71,7 @@ Gérez votre profil personnel, vos paramètres de sécurité et vos clés API.
 ## Profil
 
 - **Nom complet** : Votre nom d’affichage affiché dans UCM
-- **E-mail** : Utilisé pour les notifications et la récupération de mot de passe
+- **E-mail** : Utilisé pour les notifications et la récupération de mot de passe. Le modifier demande votre mot de passe, et un avis part vers l’ancienne adresse
 - **Informations du compte** : Date de création, horodatage de la dernière connexion, nombre total de connexions
 
 ## Sécurité
@@ -106,6 +106,8 @@ Enregistrez des clés de sécurité matérielles ou des authentificateurs biomé
 3. Suivez l’invite du navigateur pour vous authentifier
 4. La clé apparaît dans la liste de vos identifiants enregistrés
 
+UCM demande d’abord votre mot de passe, ou le code de votre application d’authentification pour un compte sans mot de passe local : une clé ouvre une session à elle seule, une session laissée ouverte ne peut donc pas en ajouter. L’ajout d’un certificat mTLS demande de même.
+
 Avec la 2FA activée ou imposée, une clé enregistrée peut aussi valider la seconde étape d’une connexion par mot de passe : choisissez **Utiliser la clé de sécurité**.
 
 Sans application d’authentification, activez **Clé de sécurité comme second facteur** dans la section Authentification à deux facteurs : chaque connexion par mot de passe demande alors l’une de vos clés, et la dernière clé ne peut pas être supprimée tant que l’option est active.
@@ -122,7 +124,7 @@ Gérez les certificats client pour l’authentification TLS mutuel :
 1. Cliquez sur **Créer une clé**
 2. Entrez un **nom** (descriptif, par ex. « Pipeline CI/CD »)
 3. Définissez optionnellement une expiration en **jours**
-4. Cliquez sur **Créer**
+4. Cliquez sur **Créer**, puis confirmez avec votre mot de passe (ou votre code d’authentification pour un compte sans mot de passe) : une clé continue de fonctionner après un changement de mot de passe
 5. Copiez la clé immédiatement : elle n’est affichée qu’une seule fois
 
 ### Utiliser les clés API

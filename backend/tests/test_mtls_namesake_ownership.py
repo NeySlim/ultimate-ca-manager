@@ -76,7 +76,7 @@ class TestANamesakeGetsNothing:
 
     def test_it_cannot_be_assigned(self, app, left_behind):
         answer = left_behind['client'].post(
-            '/api/v2/mtls/assign', data=json.dumps({'cert_id': left_behind['certificate_id']}),
+            '/api/v2/mtls/assign', data=json.dumps({'password': 'TestPass123!', 'cert_id': left_behind['certificate_id']}),
             content_type='application/json')
         assert answer.status_code == 403, answer.data[:300]
         with app.app_context():
@@ -92,7 +92,7 @@ class TestANamesakeGetsNothing:
             row.serial_number = str(x509.load_pem_x509_certificate(pem).serial_number)
             db.session.commit()
         answer = left_behind['client'].post(
-            '/api/v2/mtls/enroll-import', data=json.dumps({'pem': pem.decode()}),
+            '/api/v2/mtls/enroll-import', data=json.dumps({'password': 'TestPass123!', 'pem': pem.decode()}),
             content_type='application/json')
         assert answer.status_code == 403, answer.data[:300]
         assert b"another record" in answer.data, answer.data[:300]
@@ -100,7 +100,7 @@ class TestANamesakeGetsNothing:
     def test_its_key_cannot_be_downloaded(self, app, left_behind):
         # Whatever the assignment answered, the key never leaves through the namesake
         left_behind['client'].post(
-            '/api/v2/mtls/assign', data=json.dumps({'cert_id': left_behind['certificate_id']}),
+            '/api/v2/mtls/assign', data=json.dumps({'password': 'TestPass123!', 'cert_id': left_behind['certificate_id']}),
             content_type='application/json')
         with app.app_context():
             owner_id = User.query.filter_by(username=NAME).first().id
@@ -123,7 +123,7 @@ class TestTheAccountsOwnCertificatesStillWork:
         offered = [c['id'] for c in json.loads(
             client.get('/api/v2/mtls/available-certificates').data)['data']]
         assert mine['id'] in offered
-        answer = client.post('/api/v2/mtls/assign', data=json.dumps({'cert_id': mine['id']}),
+        answer = client.post('/api/v2/mtls/assign', data=json.dumps({'password': 'TestPass123!', 'cert_id': mine['id']}),
                              content_type='application/json')
         assert answer.status_code in (200, 201), answer.data[:300]
         with app.app_context():
@@ -163,7 +163,7 @@ class TestAnUndatedRecordProvesNothing:
         offered = [c['id'] for c in json.loads(
             client.get('/api/v2/mtls/available-certificates').data)['data']]
         assert undated['id'] not in offered
-        answer = client.post('/api/v2/mtls/assign', data=json.dumps({'cert_id': undated['id']}),
+        answer = client.post('/api/v2/mtls/assign', data=json.dumps({'password': 'TestPass123!', 'cert_id': undated['id']}),
                              content_type='application/json')
         assert answer.status_code == 403, answer.data[:300]
         with app.app_context():

@@ -278,7 +278,7 @@ def test_verify_tells_no_provider_internal_and_no_secret(app, ldap_provider, mon
 def test_an_api_key_verify_keeps_its_own_method(app, auth_client):
     from tests.conftest import assert_success
     key = assert_success(auth_client.post('/api/v2/account/apikeys', data=json.dumps(
-        {'name': 'verify-method', 'permissions': ['read:certificates']}),
+        {'password': 'changeme123', 'name': 'verify-method', 'permissions': ['read:certificates']}),
         content_type='application/json'), 201)
     try:
         data = app.test_client().get('/api/v2/auth/verify',
@@ -308,7 +308,7 @@ def test_locking_needs_a_session(app):
 def test_locking_refuses_an_api_key(app, auth_client):
     from tests.conftest import assert_success
     key = assert_success(auth_client.post('/api/v2/account/apikeys', data=json.dumps(
-        {'name': 'lock', 'permissions': ['*']}), content_type='application/json'), 201)
+        {'password': 'changeme123', 'name': 'lock', 'permissions': ['*']}), content_type='application/json'), 201)
     try:
         r = _post(app.test_client(), '/api/v2/auth/lock', headers={'X-API-Key': key['key']})
         assert r.status_code == 403

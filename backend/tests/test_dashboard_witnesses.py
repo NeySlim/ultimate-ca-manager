@@ -98,7 +98,7 @@ def test_the_route_serves_admin_and_withholds_from_a_scoped_key(app, auth_client
     settings(smtp=READY, webhooks=(True,), renewal='true')
     full = get_json(auth_client.get(URL))['data']['protocols']
     assert (full['smtp']['state'], full['webhooks']['state'], full['auto_renewal']['state']) == ('ready', 'active', 'enabled')
-    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'health-no-settings', 'permissions': ['read:dashboard']})
+    r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123', 'name': 'health-no-settings', 'permissions': ['read:dashboard']})
     assert r.status_code == 201, r.data
     key = get_json(r)['data']
     try:
@@ -114,7 +114,7 @@ def test_the_route_serves_admin_and_withholds_from_a_scoped_key(app, auth_client
 def test_legacy_system_status_withholds_the_witnesses_from_a_key_without_read_settings(app, auth_client, settings):
     settings(smtp=READY, webhooks=(True,), renewal='true')
     legacy = '/api/v2/dashboard/system-status'
-    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'legacy-no-settings', 'permissions': ['read:certificates']})
+    r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123', 'name': 'legacy-no-settings', 'permissions': ['read:certificates']})
     assert r.status_code == 201, r.data
     key = get_json(r)['data']
     try:

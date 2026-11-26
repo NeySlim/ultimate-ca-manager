@@ -269,7 +269,7 @@ class TestImportLinksOnlyTheSigningCa:
             admin_id = User.query.filter_by(username='admin').first().id
         try:
             r = auth_client.post(f'/api/v2/users/{admin_id}/mtls/certificates',
-                                 json={'mode': 'import', 'pem': _pem(forged)})
+                                 json={'mode': 'import', 'pem': _pem(forged), 'password': 'changeme123'})
             assert r.status_code in (200, 201), r.data
             assert [caref for _, caref in _rows(app, forged)] == [None]
         finally:

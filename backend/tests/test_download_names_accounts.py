@@ -65,7 +65,7 @@ def test_mtls_downloads_name_the_file_after_the_user(app, create_ca, create_user
     client = app.test_client()
     r = client.post('/api/v2/auth/login', json={'username': user['username'], 'password': 'TestPass123!'})
     assert r.status_code == 200, r.data
-    made = client.post('/api/v2/mtls/certificates', json={'ca_id': ca['id'], 'name': 'jp-mtls'})
+    made = client.post('/api/v2/mtls/certificates', json={'password': 'TestPass123!', 'ca_id': ca['id'], 'name': 'jp-mtls'})
     assert made.status_code == 201, made.data
     url = f'/api/v2/mtls/certificates/{made.get_json()["data"]["id"]}/download'
     plain = plain_stem(name, f'user-{user["id"]}')

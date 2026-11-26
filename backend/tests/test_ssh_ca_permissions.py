@@ -49,7 +49,7 @@ def api_key(auth_client):
     made = []
 
     def make(permissions):
-        r = _post(auth_client, '/api/v2/account/apikeys', {'name': 'ssh-ca-scope', 'permissions': permissions})
+        r = _post(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123', 'name': 'ssh-ca-scope', 'permissions': permissions})
         assert r.status_code == 201, r.data
         data = r.get_json()['data']
         made.append(data['id'])

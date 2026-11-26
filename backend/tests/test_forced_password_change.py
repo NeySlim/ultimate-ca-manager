@@ -61,7 +61,7 @@ def _refused(r):
     ('get', '/api/v2/cas', None),
     ('get', '/api/v2/users', None),
     ('get', '/api/v2/settings/general', None),
-    ('post', '/api/v2/account/apikeys', {'name': 'k', 'permissions': ['read:cas']}),
+    ('post', '/api/v2/account/apikeys', {'name': 'k', 'permissions': ['read:cas'], 'password': _FIRST}),
     ('post', '/api/v2/users', {'username': 'x', 'email': 'x@test.local', 'password': _NEW}),
 ])
 def test_the_session_reaches_nothing_else(app, flagged_admin, method, path, body):
@@ -109,7 +109,7 @@ def test_an_api_key_made_with_full_access_keeps_working(app, flagged_admin):
     _set_flag(app, user_id, False)
     client, _ = _login(app, username)
     key = assert_success(client.post('/api/v2/account/apikeys', json={
-        'name': 'fpc', 'permissions': ['read:cas']}), 201)['key']
+        'name': 'fpc', 'permissions': ['read:cas'], 'password': _FIRST}), 201)['key']
     _set_flag(app, user_id, True)
     assert app.test_client().get('/api/v2/cas', headers={'X-API-Key': key}).status_code == 200
 

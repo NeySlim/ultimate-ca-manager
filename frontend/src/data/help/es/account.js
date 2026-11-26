@@ -18,7 +18,7 @@ export default {
         title: 'Perfil',
         items: [
           { label: 'Nombre completo', text: 'El nombre que se muestra en toda la aplicación' },
-          { label: 'Correo electrónico', text: 'Se usa para las notificaciones y la recuperación de la cuenta' },
+          { label: 'Correo electrónico', text: 'Se usa para las notificaciones y la recuperación de la cuenta. Cambiarlo pide la contraseña, y se envía un aviso a la dirección anterior' },
           { label: 'Información de la cuenta', text: 'Fecha de creación, último inicio de sesión, número total de inicios de sesión' },
         ]
       },
@@ -27,8 +27,8 @@ export default {
         items: [
           { label: 'Contraseña', text: 'Cambiar la contraseña actual. Las demás sesiones se cierran; esta se mantiene' },
           { label: '2FA (TOTP)', text: 'Activar contraseñas de un solo uso basadas en el tiempo mediante una aplicación de autenticación. Volver a activarlo mientras está activado se rechaza: desactivarlo primero. Cada código funciona una sola vez: tras usar uno, esperar al siguiente para confirmar otra acción' },
-          { label: 'Claves de seguridad', text: 'Registrar llaves WebAuthn/FIDO2 (YubiKey, huella digital, etc.)' },
-          { label: 'mTLS', text: 'Gestionar los certificados de cliente para la autenticación TLS mutua' },
+          { label: 'Claves de seguridad', text: 'Registrar llaves WebAuthn/FIDO2 (YubiKey, huella digital, etc.). Añadir una pide primero la contraseña, o el código de autenticación para una cuenta sin contraseña' },
+          { label: 'mTLS', text: 'Gestionar los certificados de cliente para la autenticación TLS mutua. Añadir uno pide primero la contraseña, o el código de autenticación para una cuenta sin contraseña' },
           { label: 'Cambio de contraseña forzado (v2.245)', text: 'Una cuenta a la que se pidió una contraseña nueva, como el primer administrador cuya contraseña generó UCM en el primer arranque, no puede hacer nada más hasta cambiarla, API y WebSocket incluidos; el aviso no puede omitirse y su único otro botón es Cerrar sesión. Ese cambio elimina el archivo que contiene la contraseña generada. Una contraseña proporcionada mediante INITIAL_ADMIN_PASSWORD o INITIAL_ADMIN_PASSWORD_FILE no tiene que cambiarse, salvo que se defina INITIAL_ADMIN_PASSWORD_FORCE_CHANGE (el chart de Helm lo define para la contraseña que genera)' },
         ]
       },
@@ -70,7 +70,7 @@ Gestionar el perfil personal, la configuración de seguridad y las claves API.
 ## Perfil
 
 - **Nombre completo**: el nombre que se muestra en todo UCM
-- **Correo electrónico**: se usa para las notificaciones y la recuperación de la contraseña
+- **Correo electrónico**: se usa para las notificaciones y la recuperación de la contraseña. Cambiarlo pide la contraseña, y se envía un aviso a la dirección anterior
 - **Información de la cuenta**: fecha de creación, marca de tiempo del último inicio de sesión, número total de inicios de sesión
 
 ## Seguridad
@@ -106,6 +106,8 @@ Registrar llaves de seguridad de hardware o autenticadores biométricos:
 3. Seguir el aviso del navegador para autenticarse
 4. La llave aparece en la lista de credenciales registradas
 
+UCM pide primero la contraseña, o el código de la aplicación de autenticación para una cuenta sin contraseña local: una llave inicia sesión por sí sola, así que una sesión desatendida no puede añadir una. Añadir un certificado mTLS pide lo mismo.
+
 Con el 2FA activado o impuesto, una llave registrada también puede responder al segundo paso de un inicio de sesión con contraseña: elegir **Usar la llave de seguridad en su lugar**.
 
 Sin una aplicación de autenticación, activar **Llave de seguridad como segundo factor** en la sección Autenticación de dos factores: cada inicio de sesión con contraseña pide entonces una de las llaves, y la última llave no puede quitarse mientras esté activado.
@@ -122,7 +124,7 @@ Gestionar los certificados de cliente para la autenticación TLS mutua:
 1. Hacer clic en **Crear Clave**
 2. Introducir un **nombre** (descriptivo, por ejemplo "Pipeline CI/CD")
 3. Opcionalmente, fijar una caducidad en **días**
-4. Hacer clic en **Crear**
+4. Hacer clic en **Crear** y confirmar con la contraseña (o con el código de autenticación en una cuenta sin contraseña): una clave sigue funcionando tras un cambio de contraseña
 5. Copiar la clave de inmediato: se muestra una sola vez
 
 ### Usar las claves API

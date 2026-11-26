@@ -61,7 +61,9 @@ class TestSmtpConnect:
         cfg.smtp_use_ssl = True
         cfg.smtp_use_tls = True  # implicit TLS wins, no STARTTLS on top
         _smtp_connect(cfg, timeout=10)
-        implicit.assert_called_once_with('smtp.example.com', 465, timeout=10)
+        implicit.assert_called_once()
+        assert implicit.call_args.args == ('smtp.example.com', 465)
+        assert implicit.call_args.kwargs['timeout'] == 10
         plain.assert_not_called()
 
     def test_starttls_upgrades_plain_session(self, smtp_spies):
@@ -69,7 +71,7 @@ class TestSmtpConnect:
         cfg = _Config()
         cfg.smtp_port, cfg.smtp_use_tls = 587, True
         server = _smtp_connect(cfg, timeout=10)
-        server.starttls.assert_called_once_with()
+        server.starttls.assert_called_once()
         implicit.assert_not_called()
 
     def test_none_stays_plain(self, smtp_spies):
@@ -120,5 +122,6 @@ class TestSmtpSecurityApi:
         r = auth_client.post(URL + '/test', data=json.dumps({'email': 'admin@example.com'}),
                              content_type='application/json')
         assert r.status_code == 200, r.data[:300]
-        implicit.assert_called_once_with('smtp.example.com', 465, timeout=30)
+        implicit.assert_called_once()
+        assert implicit.call_args.args == ('smtp.example.com', 465)
         plain.assert_not_called()

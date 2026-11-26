@@ -62,7 +62,7 @@ class TestSearch:
 
     def test_search_includes_users_with_read_users_api_key(self, auth_client, app):
         """Explicit read:users scope must unlock user category results."""
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'search-read-users',
             'permissions': ['read:certificates', 'read:users'],
         })
@@ -184,7 +184,7 @@ class TestSmartImport:
             lambda _self, _content, password=None, options=None: True,
         )
 
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'cert-only-smart-import',
             'permissions': ['read:certificates', 'write:certificates'],
         })
@@ -211,7 +211,7 @@ class TestSmartImport:
             lambda _self, _content, password=None, options=None: False,
         )
 
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'cert-only-no-ca-smart-import',
             'permissions': ['read:certificates', 'write:certificates'],
         })
@@ -236,7 +236,7 @@ class TestSmartImport:
             lambda _self, _content, password=None, options=None: True,
         )
 
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'ca-smart-import',
             'permissions': ['read:certificates', 'write:certificates', 'write:cas'],
         })
@@ -303,7 +303,7 @@ class TestSmartImport:
         ).decode()
         bundle = cert_pem + key_pem
 
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'legacy-ca-bypass-test',
             'permissions': ['read:certificates', 'write:certificates'],
         })

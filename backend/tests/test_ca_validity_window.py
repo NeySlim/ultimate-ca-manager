@@ -158,7 +158,7 @@ class TestMtlsPath:
             ca.offline = True
             db.session.commit()
         r = auth_client.post('/api/v2/mtls/certificates',
-                             data=json.dumps({'ca_id': ca_data['id'], 'name': 'x'}),
+                             data=json.dumps({'password': 'changeme123', 'ca_id': ca_data['id'], 'name': 'x'}),
                              content_type='application/json')
         assert r.status_code == 400, (r.status_code, r.get_json())
 

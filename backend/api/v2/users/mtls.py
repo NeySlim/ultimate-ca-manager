@@ -14,6 +14,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_reverify import confirm_account_holder
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
@@ -57,6 +58,12 @@ def create_user_mtls_certificate(user_id):
         return error_response('User not found', 404)
 
     data = request.get_json() or {}
+
+    def holder_refused():
+        # A certificate for yourself signs you in alone: prove the holder, as /api/v2/mtls
+        # does, last before writing (an authenticator code is spent by the check)
+        return confirm_account_holder(g.current_user, data) if user_id == g.current_user.id else None
+
     mode = data.get('mode', 'generate')  # 'generate' or 'import'
 
     if mode == 'import':
@@ -112,6 +119,9 @@ def create_user_mtls_certificate(user_id):
         if (existing_cert is not None and existing_cert.revoked) or (
                 issuer_ca is not None and persisted_revocation(issuer_ca, cert_obj.serial_number) is not None):
             return error_response('This certificate has been revoked', 400)
+        refused = holder_refused()
+        if refused:
+            return refused
         created = existing_cert is None
         if created:
             existing_cert = Certificate(
@@ -187,6 +197,9 @@ def create_user_mtls_certificate(user_id):
                 ca = CA.query.filter_by(refid=config.value).first()
         if not ca:
             return error_response('No CA available for mTLS certificate generation', 400)
+        refused = holder_refused()
+        if refused:
+            return refused
 
         try:
             result = CertificateService.create_certificate(

@@ -1,4 +1,5 @@
 import { test, expect, createCA, issueCert, uid, seedOnce } from './support/fixtures'
+import { ADMIN_PASSWORD } from './support/api'
 
 // The PKI lists measured where jsdom cannot: certificates, authorities, CSRs (pending and
 // signed), templates, trust store, user certificates, SSH CAs and SSH certificates, at 1000, 1280 and 1600 px dock
@@ -32,7 +33,8 @@ async function make(api) {
   const signed = await api.post('/csrs', { cn: `${uid('csr-signed')}.internal.example.com`, key_type: 'RSA 2048' })
   await api.post(`/csrs/${signed.id}/sign`, { ca_id: ca.id, validity_days: 30 })
   await api.post(`/truststore/add-from-ca/${ca.refid}`, { purpose: 'root_ca', description: 'Imported from system CA bundle for the bank clients' }).catch(() => null)
-  await api.post('/mtls/certificates', { ca_id: ca.id, validity_days: 30, name: uid('user-cert') }).catch(() => null)
+  // An mTLS certificate signs in alone: its route asks the account's password again
+  await api.post('/mtls/certificates', { ca_id: ca.id, validity_days: 30, name: uid('user-cert'), password: ADMIN_PASSWORD })
   const ssh = await api.post('/ssh/cas', { descr: uid('ssh-users'), ca_type: 'user', key_type: 'ed25519', allowed_principals: ['alice', 'bob', 'carol', 'deploy'] })
   await api.post('/ssh/certificates/generate', { ca_id: ssh.id, cert_type: 'user', principals: ['alice', 'bob', 'carol', 'deploy'], key_type: 'ed25519', validity_seconds: 86400 })
   return { pending }

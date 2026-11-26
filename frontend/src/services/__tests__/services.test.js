@@ -646,9 +646,9 @@ describe('accountService', () => {
     expect(mockApiClient.get).toHaveBeenCalledWith('/webauthn/credentials')
   })
 
-  it('startWebAuthnRegistration → POST /webauthn/register/options', async () => {
-    await accountService.startWebAuthnRegistration()
-    expect(mockApiClient.post).toHaveBeenCalledWith('/webauthn/register/options')
+  it('startWebAuthnRegistration → POST /webauthn/register/options with the proof', async () => {
+    await accountService.startWebAuthnRegistration({ password: 'pw' })
+    expect(mockApiClient.post).toHaveBeenCalledWith('/webauthn/register/options', { password: 'pw' })
   })
 
   it('completeWebAuthnRegistration → POST /webauthn/register/verify', async () => {

@@ -140,7 +140,11 @@
     "profileReset": "Modifications du profil annulées.",
     "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée.",
     "apiKeySearchPlaceholder": "Rechercher par nom ou préfixe...",
-    "apiKeyPrefix": "Préfixe"
+    "apiKeyPrefix": "Préfixe",
+    "confirmItIsYou": "Confirmez qu’il s’agit bien de vous",
+    "confirmWithPassword": "Saisissez votre mot de passe pour confirmer cette modification",
+    "confirmWithCode": "Saisissez le code de votre application d’authentification pour confirmer cette modification",
+    "confirmEmailChange": "Saisissez votre mot de passe pour changer l’adresse e-mail : les liens de réinitialisation du mot de passe y sont envoyés"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -4128,6 +4132,7 @@
     },
     "emailTemplate": "Modèle d’e-mail",
     "templateDescription": "Personnalisez le modèle HTML utilisé pour toutes les notifications e-mail.",
+    "templateAdminOnly": "Modifier le modèle nécessite la permission d’administration des paramètres : il est affiché en lecture seule.",
     "editTemplate": "Modifier le modèle",
     "templateSaved": "Modèle d’e-mail enregistré",
     "templateCustom": "Modèle personnalisé",

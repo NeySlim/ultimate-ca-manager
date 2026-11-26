@@ -65,7 +65,7 @@ def test_rate_limit_enabled_false_lets_six_failed_logins_through(monkeypatch):
 
 def test_mtls_list_routes_accept_api_keys(auth_client, app):
     r = auth_client.post('/api/v2/account/apikeys',
-                         data=json.dumps({'name': 'mtls-doc',
+                         data=json.dumps({'password': 'changeme123', 'name': 'mtls-doc',
                                           'permissions': ['read:certificates']}),
                          content_type='application/json')
     key = r.get_json()['data']['key']

@@ -56,7 +56,7 @@ import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
-import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
+import { secretRequiredForTarget, smtpSecretTargets, smtpSentProvider } from '../lib/secretTarget'
 import { SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard } from '../hooks/useSaveParts'
 import { usePhoneWidth } from '../hooks/useMediaQuery'
 import { keepDraft, readDraft } from '../lib/draftMemory'
@@ -492,7 +492,8 @@ export default function SettingsPage() {
         // Authentication off is reported as 'none' by the API; derive the
         // highlighted method from it rather than from the stored default (#322)
         smtp_auth_method: emailSettings.smtp_auth === false ? 'none' : (emailSettings.smtp_auth_method || 'password'),
-        smtp_oauth_provider: emailSettings.smtp_oauth_provider || 'google',
+        // As stored: the card shows Google for an empty one, the save sends it back untouched
+        smtp_oauth_provider: emailSettings.smtp_oauth_provider ?? '',
         smtp_oauth_tenant_id: emailSettings.smtp_oauth_tenant_id || '',
         smtp_oauth_client_id: emailSettings.smtp_oauth_client_id || '',
         smtp_oauth_client_secret: emailSettings.has_oauth_client_secret ? '********' : '',
@@ -1351,7 +1352,8 @@ export default function SettingsPage() {
     let ignoredKeys = []
     try {
       if (section === 'email') {
-        const targets = smtpSecretTargets(savedEmail, settings)
+        const mayMoveTarget = hasPermission('admin:settings')
+        const targets = smtpSecretTargets(savedEmail, settings, mayMoveTarget)
         if (secretRequiredForTarget(targets.password) || secretRequiredForTarget(targets.oauth)) {
           if (!quiet) showError(t('common.secretRequiredForTarget'))
           return { ok: false, message: t('common.secretRequiredForTarget') }
@@ -1369,7 +1371,8 @@ export default function SettingsPage() {
           from_name: settings.smtp_from_name,
           enabled: true,
           smtp_auth_method: settings.smtp_auth_method,
-          smtp_oauth_provider: settings.smtp_oauth_provider,
+          // The provider the secret pre-check above compared against
+          smtp_oauth_provider: smtpSentProvider(savedEmail, settings, mayMoveTarget),
           smtp_oauth_tenant_id: settings.smtp_oauth_tenant_id,
           smtp_oauth_client_id: settings.smtp_oauth_client_id,
           ...(settings.smtp_oauth_client_secret && settings.smtp_oauth_client_secret !== '********' ? { smtp_oauth_client_secret: settings.smtp_oauth_client_secret } : {}),
@@ -1462,7 +1465,8 @@ export default function SettingsPage() {
       // Auto-save OAuth config if there are unsaved changes,
       // so the backend uses the latest client_id/secret/redirect_uri.
       if (oauthDirty) {
-        await handleSave('email')
+        const saved = await handleSave('email')
+        if (saved && saved.ok === false) return
       }
       const res = await settingsService.getSmtpOAuthAuthorizeUrl(settings.smtp_oauth_redirect_uri || '')
       const authorizeUrl = res?.data?.authorize_url || res?.authorize_url
@@ -2026,6 +2030,7 @@ export default function SettingsPage() {
       case 'email':
         return (
           <EmailSection
+            hasPermission={hasPermission}
             settings={settings}
             fieldErrors={fieldErrors}
             savedEmail={savedEmail}

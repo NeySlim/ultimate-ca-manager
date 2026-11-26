@@ -73,7 +73,8 @@ class TestAReusedIdIsAnotherAccount:
         cleanup.extend(['reused_key_first', 'reused_key_second'])
         first = create_user(username='reused_key_first', role='operator')
         owner = _login(app, 'reused_key_first')
-        made = owner.post(PROTECTED, data=json.dumps({'name': 'probe', 'permissions': ['read:certificates']}),
+        made = owner.post(PROTECTED, data=json.dumps({'name': 'probe', 'permissions': ['read:certificates'],
+                                                      'password': 'TestPass123!'}),
                           content_type='application/json')
         assert made.status_code == 201, made.data[:300]
         key = json.loads(made.data)['data']['key']

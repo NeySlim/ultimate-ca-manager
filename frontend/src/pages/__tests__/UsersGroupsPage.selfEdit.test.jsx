@@ -14,6 +14,7 @@ vi.mock('react-i18next', () => ({
 
 const mocks = vi.hoisted(() => ({
   showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn(), update: vi.fn(), reset: vi.fn(), prompt: vi.fn(),
+  profile: vi.fn(),
 }))
 const stable = vi.hoisted(() => ({
   i18n: {
@@ -70,7 +71,7 @@ vi.mock('../../services', () => ({
   groupsService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
   rolesService: { getAll: vi.fn().mockResolvedValue({ data: [] }), listRoles: vi.fn().mockResolvedValue({ data: [] }) },
   casService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
-  accountService: {},
+  accountService: { getProfile: (...a) => mocks.profile(...a) },
   ssoService: {},
 }))
 
@@ -100,6 +101,7 @@ describe('UsersGroupsPage editing your own account', () => {
     Object.values(mocks).forEach(m => m.mockReset())
     mocks.update.mockResolvedValue({})
     mocks.reset.mockResolvedValue({})
+    mocks.profile.mockResolvedValue({ data: { has_local_password: true } })
   })
 
   it('asks for the current password with a new one and sends it', async () => {
@@ -113,6 +115,41 @@ describe('UsersGroupsPage editing your own account', () => {
     await waitFor(() => expect(mocks.update).toHaveBeenCalled())
     expect(mocks.update.mock.calls[0][0]).toBe(7)
     expect(mocks.update.mock.calls[0][1]).toMatchObject({ password: 'Brand-New-Passw0rd!', current_password: 'old-pass' })
+  })
+
+  it('asks for the password before moving your own email, where your reset link goes', async () => {
+    mocks.prompt.mockResolvedValueOnce('old-pass')
+    await open(7)
+    fireEvent.click(await screen.findByRole('button', { name: /common\.edit/ }))
+    fireEvent.change(await screen.findByLabelText(/common\.email/), { target: { value: 'moved@example.com' } })
+    fireEvent.click(screen.getAllByRole('button', { name: /common\.save/ }).pop())
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.prompt).toHaveBeenCalledWith('account.confirmWithPassword', expect.objectContaining({ type: 'password' }))
+    expect(mocks.update.mock.calls[0][1]).toMatchObject({ email: 'moved@example.com', current_password: 'old-pass' })
+  })
+
+  it('moves the email of an account without a local password with no prompt and no proof', async () => {
+    mocks.profile.mockResolvedValue({ data: { has_local_password: false, two_factor_enabled: true } })
+    await open(7)
+    fireEvent.click(await screen.findByRole('button', { name: /common\.edit/ }))
+    fireEvent.change(await screen.findByLabelText(/common\.email/), { target: { value: 'moved@example.com' } })
+    fireEvent.click(screen.getAllByRole('button', { name: /common\.save/ }).pop())
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.prompt).not.toHaveBeenCalled()
+    const body = mocks.update.mock.calls[0][1]
+    expect(body).toMatchObject({ email: 'moved@example.com' })
+    expect(body.current_password).toBeUndefined()
+    expect(body.code).toBeUndefined()
+  })
+
+  it('moves nothing when that prompt is cancelled, and asks nothing for another user', async () => {
+    mocks.prompt.mockResolvedValueOnce(null)
+    await open(7)
+    fireEvent.click(await screen.findByRole('button', { name: /common\.edit/ }))
+    fireEvent.change(await screen.findByLabelText(/common\.email/), { target: { value: 'moved@example.com' } })
+    fireEvent.click(screen.getAllByRole('button', { name: /common\.save/ }).pop())
+    await waitFor(() => expect(mocks.prompt).toHaveBeenCalled())
+    expect(mocks.update).not.toHaveBeenCalled()
   })
 
   it('does not ask for it for another user', async () => {

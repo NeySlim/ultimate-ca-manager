@@ -92,7 +92,7 @@ class TestMTLSAuthRequired:
             pem = base64.b64decode(row.crt).decode()
 
         r = _post(auth_client, '/api/v2/mtls/enroll-import',
-                  {'pem': pem, 'name': 'enroll-import-regression'})
+                  {'password': 'changeme123', 'pem': pem, 'name': 'enroll-import-regression'})
         assert r.status_code in (200, 201), r.get_json()
         data = r.get_json()['data']
         assert 'enroll-import.example.com' in data['cert_subject']
@@ -164,7 +164,7 @@ class TestMTLSCertificates:
         from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_key_path
 
         ca_data = create_ca(cn='mTLS encrypted key source')
-        response = _post(auth_client, '/api/v2/mtls/certificates', {
+        response = _post(auth_client, '/api/v2/mtls/certificates', {'password': 'changeme123',
             'ca_id': ca_data['id'],
             'name': 'Encrypted mTLS enrollment',
         })
@@ -225,7 +225,7 @@ class TestMTLSEnroll:
 
     def test_enroll_no_client_cert(self, auth_client):
         """Enroll without a presented client cert → 400."""
-        r = _post(auth_client, '/api/v2/mtls/enroll', {})
+        r = _post(auth_client, '/api/v2/mtls/enroll', {'password': 'changeme123'})
         assert r.status_code == 400
 
     def test_enroll_rejects_spoofed_proxy_headers_from_untrusted_peer(
@@ -238,7 +238,7 @@ class TestMTLSEnroll:
         )
         r = auth_client.post(
             '/api/v2/mtls/enroll',
-            data='{}',
+            data='{"password": "changeme123"}',
             content_type='application/json',
             headers={
                 'X-SSL-Client-Verify': 'SUCCESS',
@@ -250,19 +250,19 @@ class TestMTLSEnroll:
 
     def test_enroll_import_empty_pem(self, auth_client):
         """Import with no PEM data → 400."""
-        r = _post(auth_client, '/api/v2/mtls/enroll-import', {})
+        r = _post(auth_client, '/api/v2/mtls/enroll-import', {'password': 'changeme123'})
         assert r.status_code == 400
 
     def test_enroll_import_invalid_pem(self, auth_client):
         """Import with invalid PEM → 400."""
-        r = _post(auth_client, '/api/v2/mtls/enroll-import', {
+        r = _post(auth_client, '/api/v2/mtls/enroll-import', {'password': 'changeme123',
             'pem': 'not-a-real-certificate',
         })
         assert r.status_code == 400
 
     def test_enroll_import_garbage_base64(self, auth_client):
         """Import with garbage base64 → 400."""
-        r = _post(auth_client, '/api/v2/mtls/enroll-import', {
+        r = _post(auth_client, '/api/v2/mtls/enroll-import', {'password': 'changeme123',
             'pem': 'dGhpcyBpcyBub3QgYSBjZXJ0',
         })
         assert r.status_code == 400
@@ -288,9 +288,9 @@ class TestMTLSAssign:
     """Test certificate assignment."""
 
     def test_assign_missing_cert_id(self, auth_client):
-        r = _post(auth_client, '/api/v2/mtls/assign', {})
+        r = _post(auth_client, '/api/v2/mtls/assign', {'password': 'changeme123'})
         assert r.status_code == 400
 
     def test_assign_cert_not_found(self, auth_client):
-        r = _post(auth_client, '/api/v2/mtls/assign', {'cert_id': 99999})
+        r = _post(auth_client, '/api/v2/mtls/assign', {'password': 'changeme123', 'cert_id': 99999})
         assert r.status_code == 404

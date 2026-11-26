@@ -504,7 +504,7 @@ def test_a_worker_that_loaded_a_former_ca_keeps_its_certificates_aside_after_a_r
 # --- A save that changes the listener's trust reloads or restarts it: admin:system --------------------
 
 def _scoped(auth_client, permissions):
-    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'c20-scope', 'permissions': permissions})
+    r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123', 'name': 'c20-scope', 'permissions': permissions})
     assert r.status_code == 201, r.data
     data = r.get_json()['data']
     return data['id'], {'X-API-Key': data['key']}

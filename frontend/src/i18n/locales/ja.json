@@ -4100,6 +4100,7 @@
     },
     "emailTemplate": "メールテンプレート",
     "templateDescription": "すべてのメール通知に使用されるHTMLテンプレートをカスタマイズします。",
+    "templateAdminOnly": "テンプレートの変更には設定の管理権限が必要です。読み取り専用で表示されています。",
     "editTemplate": "テンプレートを編集",
     "templateSaved": "メールテンプレートを保存しました",
     "templateCustom": "カスタムテンプレート",
@@ -4712,7 +4713,11 @@
     "profileReset": "プロフィールの変更を元に戻しました。",
     "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。",
     "apiKeySearchPlaceholder": "名前またはプレフィックスで検索...",
-    "apiKeyPrefix": "プレフィックス"
+    "apiKeyPrefix": "プレフィックス",
+    "confirmItIsYou": "本人確認",
+    "confirmWithPassword": "この変更を確認するにはパスワードを入力してください",
+    "confirmWithCode": "この変更を確認するには認証アプリのコードを入力してください",
+    "confirmEmailChange": "メールアドレスを変更するにはパスワードを入力してください。パスワードリセットのリンクはこのアドレスに送信されます"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
