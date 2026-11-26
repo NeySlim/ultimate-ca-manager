@@ -394,15 +394,18 @@ renew_host() {
     code=$(http_post "$base/challenge" "$work/empty" "$work/answer")
     case "$code" in
         200) ;;
-        403|404)
+        *)
+            # Stopped for good only by UCM's own refusal; a proxy's 403 or 404 is retried
             state=$(field state "$work/answer" 2>/dev/null || true)
-            if [ "$state" != disabled ]; then
-                reason=$(field error "$work/answer" 2>/dev/null || true)
-                conf_set RENEWAL_STOPPED "${reason:-HTTP $code}"
-                log "renewal stopped: ${reason:-HTTP $code}"
-            fi
-            rm -rf "$work"; return 0 ;;
-        *) rm -rf "$work"; log "renewal check failed (HTTP $code)"; return 1 ;;
+            case "$code:$state" in
+                403:revoked|403:expired|404:unknown)
+                    reason=$(field error "$work/answer" 2>/dev/null || true)
+                    conf_set RENEWAL_STOPPED "${reason:-HTTP $code}"
+                    log "renewal stopped: ${reason:-HTTP $code}"
+                    rm -rf "$work"; return 0 ;;
+                403:disabled) rm -rf "$work"; return 0 ;;
+            esac
+            rm -rf "$work"; log "renewal check failed (HTTP $code)"; return 1 ;;
     esac
     if [ "$(field due "$work/answer")" != 1 ]; then rm -rf "$work"; return 0; fi
     challenge=$(field challenge "$work/answer")

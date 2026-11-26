@@ -343,6 +343,34 @@ class TestTheAgentRenews:
         assert host.run('sync').returncode == 0
         assert self._refusals(app) == refusals + 1
 
+    @pytest.mark.parametrize('code', [403, 404])
+    def test_a_refusal_that_is_not_ucms_is_retried(self, app, host, enrolled_host, monkeypatch, code):
+        from werkzeug.exceptions import Forbidden, NotFound
+        from services import ssh_host_service
+        _, refid = enrolled_host
+        real = ssh_host_service.challenge
+
+        # A proxy in front of UCM: a 403 or 404 without UCM's state stops nothing
+        def proxy(host_refid):
+            raise (Forbidden if code == 403 else NotFound)()
+        monkeypatch.setattr(ssh_host_service, 'challenge', proxy)
+        out = host.run('sync')
+        assert out.returncode == 1 and f'renewal check failed (HTTP {code})' in out.stderr, out.stderr
+        assert 'RENEWAL_STOPPED' not in host.conf()
+        monkeypatch.setattr(ssh_host_service, 'challenge', real)
+        self._age(app, refid)
+        out = host.run('sync')
+        assert 'host certificate renewed' in out.stderr, out.stderr
+
+    def test_an_unknown_host_stops_asking(self, app, host, enrolled_host):
+        from models.ssh import SSHHost
+        _, refid = enrolled_host
+        with app.app_context():
+            db.session.delete(SSHHost.query.filter_by(refid=refid).one())
+            db.session.commit()
+        assert host.run('sync').returncode == 0
+        assert host.conf()['RENEWAL_STOPPED'] == 'unknown host'
+
     def test_a_disabled_renewal_waits_and_resumes(self, app, auth_client, host, enrolled_host):
         from models.ssh import SSHHost
         _, refid = enrolled_host
