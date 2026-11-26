@@ -270,8 +270,8 @@ if [ -f "$UPDATE_FILE" ]; then
 
     # Claim the manifest atomically: from here on, every metadata read and
     # the final result belong to THIS operation even if a new manifest is
-    # written concurrently.
-    mv -f "$MANIFEST_FILE" "$PROCESSING_FILE" 2>/dev/null || true
+    # written concurrently. -T renames over the entry itself: a link there is replaced, never entered
+    mv -fT "$MANIFEST_FILE" "$PROCESSING_FILE" 2>/dev/null || true
 
     if [ -z "$PACKAGE_PATH" ] || [ ! -f "$PACKAGE_PATH" ]; then
         log "ERROR: Invalid or missing package path: '$PACKAGE_PATH'"

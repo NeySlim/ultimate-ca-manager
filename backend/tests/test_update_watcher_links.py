@@ -77,3 +77,13 @@ def test_a_claimed_manifest_that_is_a_link_is_not_read(host):
     assert result['op_id'] is None, result
     assert result['status'] == 'failed' and 'no valid target version' in result['error'], result
     assert os.path.exists(secret)
+
+
+def test_a_claimed_manifest_link_to_a_directory_receives_nothing(host):
+    """The claim renames over .update_manifest.processing: a link there is replaced, never entered."""
+    elsewhere = host.tmp / 'root-dir'
+    elsewhere.mkdir()
+    (host.data / '.update_manifest.processing').symlink_to(elsewhere)
+    result, _ = host.run(host.package())
+    assert list(elsewhere.iterdir()) == []
+    assert result['op_id'] == 'op' and result['status'] == 'installed', result
