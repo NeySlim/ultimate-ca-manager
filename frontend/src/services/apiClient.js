@@ -111,6 +111,18 @@ export function resetLoginRedirect() {
 // The 401 of the server's authentication gate: refused before the route ran, so safe to send again
 export const AUTHENTICATION_REQUIRED_PROBLEM = 'urn:ucm:problem:authentication-required'
 
+// A write refused for its CSRF token (backend security/csrf.py); an older server only says it in text
+export const CSRF_PROBLEM = 'urn:ucm:problem:csrf-invalid'
+
+export const isCsrfRefusal = (status, data) => status === 403 && (data?.type === CSRF_PROBLEM
+  || /^CSRF validation failed/.test(String(data?.detail || data?.message || '')))
+
+function staleError(status, data) {
+  const error = new Error(localText('messages.errors.csrfStale',
+    'This page is out of date: reload it (F5) to continue. Nothing was saved.'))
+  return Object.assign(error, { status, data, stale: true })
+}
+
 // One check of the session for a burst of 401s: /auth/verify with the cookie held now, which a
 // renewed identifier (TOTP, password, other sessions closed) replaced. False when it cannot tell.
 let sessionCheck = null
@@ -187,8 +199,9 @@ class APIClient {
     sessionStorage.removeItem(CSRF_TOKEN_KEY)
   }
 
-  // `replayed`: this call already follows a 401 and a session check, its own 401 signs out
-  async request(endpoint, options = {}, replayed = false) {
+  // `replayed`: this call already follows a 401 and a session check, its own 401 signs out.
+  // `renewed`: it already follows a CSRF refusal and a new token, its own refusal is final.
+  async request(endpoint, options = {}, replayed = false, renewed = false) {
     if (import.meta.env.DEV && options.params) {
       console.warn(`⚠️ apiClient does not support 'params'. Use buildQueryString() to append query params to the URL. Called on: ${endpoint}`)
     }
@@ -249,6 +262,11 @@ class APIClient {
       }
 
       if (!response.ok) {
+        // A refused CSRF token: a new one from the session check, then the write once more
+        if (isCsrfRefusal(response.status, data)) {
+          if (!renewed && await sessionStillOpen(this)) return this.request(endpoint, options, replayed, true)
+          throw Object.assign(staleError(response.status, data), { request: `${config.method} ${url.split('?')[0]}` })
+        }
         const busy = isBusyRefusal(response.status, data)
         // Busy: nothing was written, the page's language says so and asks to send it again
         const msg = busy && i18next.isInitialized ? i18next.t('messages.errors.serverBusy') : buildErrorMessage(response.status, data)
@@ -336,14 +354,15 @@ class APIClient {
   }
 
   // upload() and download() have neither the session check nor the single replay of the
-  // gate's 401 that request() has: their 401 is thrown and never signs out.
+  // gate's 401 that request() has: their 401 is thrown and never signs out. upload() renews a
+  // refused CSRF token as request() does.
   /**
    * Upload FormData (multipart/form-data)
    * @param {string} endpoint - API endpoint
    * @param {FormData} formData - Form data to upload
    * @param {object} options - Additional options
    */
-  async upload(endpoint, formData, options = {}) {
+  async upload(endpoint, formData, options = {}, renewed = false) {
     const url = `${this.baseURL}${endpoint}`
     
     // Build headers with CSRF token
@@ -379,6 +398,10 @@ class APIClient {
       }
 
       if (!response.ok) {
+        if (isCsrfRefusal(response.status, data)) {
+          if (!renewed && await sessionStillOpen(this)) return this.upload(endpoint, formData, options, true)
+          throw staleError(response.status, data)
+        }
         const msg = buildErrorMessage(response.status, data, localText('messages.errors.uploadFailed', 'Upload failed'))
         const error = new Error(msg)
         error.status = response.status

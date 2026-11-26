@@ -3871,12 +3871,12 @@
     "sessionKeyFromEnvironment": "Aus der Umgebung (SECRET_KEY)",
     "sessionKeyPreviousUntil": "Vorheriger Schlüssel akzeptiert bis {{date}}",
     "sessionKeyRotateStoredDesc": "Der Sitzungsschlüssel signiert die CSRF-Tokens der Weboberfläche. Bei aktivierter Verschlüsselung speichert eine Rotation den neuen Schlüssel verschlüsselt in der Datenbank, und jeder Knoten lädt ihn ohne Neustart; der vorherige Schlüssel bleibt 24 Stunden akzeptiert, sodass niemand abgemeldet wird. SECRET_KEY in der Umgebung dient dann nur noch als Ersatz, wenn der gespeicherte Schlüssel beim Start nicht gelesen werden kann; ein laufender Knoten behält seinen Schlüssel und versucht es erneut.",
-    "sessionKeyRotateFileDesc": "Der Sitzungsschlüssel signiert die CSRF-Tokens der Weboberfläche. Ohne Verschlüsselung wird er nie in der Datenbank gespeichert: Eine Rotation schreibt den neuen SECRET_KEY in die Umgebungsdatei und startet den Dienst neu; vor dem Neustart geöffnete Seiten müssen neu geladen werden.",
+    "sessionKeyRotateFileDesc": "Der Sitzungsschlüssel signiert die CSRF-Tokens der Weboberfläche. Ohne Verschlüsselung wird er nie in der Datenbank gespeichert: Eine Rotation schreibt den neuen SECRET_KEY in die Umgebungsdatei und startet den Dienst neu; vor dem Neustart geöffnete Seiten arbeiten weiter.",
     "sessionKeyRotateHaRefused": "In HA wird der Sitzungsschlüssel nur bei aktivierter Verschlüsselung rotiert: Der neue Schlüssel wird dann in der Datenbank unter dem KEK gespeichert, den jeder Knoten besitzt. Ohne Verschlüsselung würde die Rotation nur die Umgebungsdatei eines einzelnen Knotens schreiben, daher wird sie abgelehnt.",
     "sessionKeyRotateBlocked": "Eine Deaktivierung der Verschlüsselung wurde nicht abgeschlossen, und der gespeicherte Sitzungsschlüssel signiert weiterhin. Führen Sie die Deaktivierung erneut aus und rotieren Sie dann den Schlüssel.",
     "rotateSessionKey": "Sitzungsschlüssel rotieren",
     "rotateSessionKeyConfirmStored": "Einen neuen Sitzungsschlüssel in der Datenbank speichern? Jeder Knoten lädt ihn ohne Neustart, und der vorherige Schlüssel bleibt 24 Stunden akzeptiert. Nach Ablauf dieses Zeitraums ist eine weitere Rotation möglich.",
-    "rotateSessionKeyConfirmFile": "Einen neuen SECRET_KEY in die Umgebungsdatei schreiben und den Dienst neu starten? Vor dem Neustart geöffnete Seiten müssen neu geladen werden.",
+    "rotateSessionKeyConfirmFile": "Einen neuen SECRET_KEY in die Umgebungsdatei schreiben und den Dienst neu starten?",
     "rotateSessionKeyDoneStored": "Sitzungsschlüssel rotiert. Kein Neustart, niemand wird abgemeldet.",
     "rotateSessionKeyDoneFile": "Sitzungsschlüssel geschrieben. Der Dienst wird neu gestartet.",
     "rotateDataKeyDone": "Datenschlüssel auf Version {{version}} rotiert",
@@ -6104,6 +6104,7 @@
         "requiredField": "Dieses Feld ist erforderlich"
       },
       "serverBusy": "Der Server ist mit einer anderen Änderung beschäftigt: Versuchen Sie es in einigen Sekunden erneut.",
+      "csrfStale": "Diese Seite ist veraltet: Laden Sie sie neu (F5), um fortzufahren. Es wurde nichts gespeichert.",
       "downloadFailed": {
         "publicKey": "Öffentlicher Schlüssel konnte nicht heruntergeladen werden",
         "krl": "KRL konnte nicht heruntergeladen werden",

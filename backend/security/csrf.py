@@ -16,13 +16,14 @@ No route ever carried it. Anything that needs a narrower rule belongs in
 """
 
 import os
+import hashlib
 import hmac
 import secrets
 import time
 import logging
 from typing import Optional, Tuple
 from functools import wraps
-from flask import request, g, session, current_app
+from flask import request, g, session, current_app, has_request_context
 
 import fips_mode
 
@@ -32,6 +33,12 @@ logger = logging.getLogger(__name__)
 
 # CSRF token validity (seconds)
 CSRF_TOKEN_LIFETIME = 3600 * 24  # 24 hours
+
+# The tokens issued to a session, recorded in its server-side record as "stamp:user_id:digest":
+# they stay valid while it lives, whatever SECRET_KEY a restart brings, and only for it
+ISSUED_KEY = '_csrf_issued'
+MAX_ISSUED = 32
+CSRF_PROBLEM = 'urn:ucm:problem:csrf-invalid'
 
 # Methods that require CSRF protection
 CSRF_PROTECTED_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH']
@@ -107,8 +114,12 @@ class CSRFProtection:
         message = f"{timestamp}:{nonce}:{user_id}"
         fips_mode.refuse_short_hmac_key(secret.encode('utf-8'), 'Session key (SECRET_KEY)')
         signature = hmac.digest(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hex()  # Full 256-bit signature (no truncation)
-        
-        return f"{timestamp}:{nonce}:{signature}"
+        token = f"{timestamp}:{nonce}:{signature}"
+        if has_request_context():
+            issued = _unexpired(session.get(ISSUED_KEY) or [])
+            issued.append(_entry(token, user_id))
+            session[ISSUED_KEY] = issued[-MAX_ISSUED:]
+        return token
     
     @classmethod
     def validate_token(cls, token: str, user_id: int) -> Tuple[bool, str]:
@@ -136,6 +147,14 @@ class CSRFProtection:
             if token_age < 0:
                 return False, "Invalid token timestamp"
             
+            # A session that records its tokens accepts those only, signed by any key
+            issued = session.get(ISSUED_KEY) if has_request_context() else None
+            if issued is not None:
+                entry = _entry(token, user_id)
+                if any(hmac.compare_digest(entry, held) for held in issued if isinstance(held, str)):
+                    return True, ""
+                return False, "Invalid CSRF token"
+
             # The active key, then the previous one while its grace runs (security.session_key)
             from security.session_key import verification_keys
             message = f"{timestamp}:{nonce}:{user_id}"
@@ -163,6 +182,35 @@ class CSRFProtection:
             if path.startswith(exempt):
                 return True
         return False
+
+
+def _entry(token, user_id):
+    return f"{token.split(':', 1)[0]}:{user_id}:{hashlib.sha256(token.encode('utf-8')).hexdigest()}"
+
+
+def _unexpired(entries):
+    now = int(time.time())
+    kept = []
+    for entry in entries:
+        try:
+            if isinstance(entry, str) and 0 <= now - int(entry.split(':', 1)[0]) <= CSRF_TOKEN_LIFETIME:
+                kept.append(entry)
+        except ValueError:
+            continue
+    return kept
+
+
+def keep_stored_tokens(data, stored):
+    """A save of the same account's session never drops a token another request recorded
+    in the stored copy meanwhile: the copies' tokens are joined."""
+    theirs = stored.get(ISSUED_KEY) if stored else None
+    if not theirs or not data.get('user_id') or data.get('user_id') != stored.get('user_id'):
+        return
+    mine = data.get(ISSUED_KEY) or []
+    joined = mine + [entry for entry in theirs if entry not in mine]
+    joined = sorted(_unexpired(joined), key=lambda entry: int(entry.split(':', 1)[0]))
+    if joined != mine:
+        data[ISSUED_KEY] = joined[-MAX_ISSUED:]
 
 
 def check_request():
@@ -207,7 +255,7 @@ def check_request():
     if not is_valid:
         logger.warning(f"CSRF validation failed for {request.path}: {error}")
         from utils.response import error_response
-        return error_response(f"CSRF validation failed: {error}", 403)
+        return error_response(f"CSRF validation failed: {error}", 403, problem_type=CSRF_PROBLEM)
     
     return None
 

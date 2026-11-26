@@ -239,6 +239,8 @@ Public: answers `{"authenticated": false}` without a valid session or key. Signe
 ```
 `auth_method` is how the session was opened, kept from its login: `password` (with or without a second factor), `mtls` (certificate login), `certificate` (certificate auto-login), `webauthn`, `sso` (OIDC or SAML) or `ldap`; a call with an API key says `api_key`. `auth_provider` is the display name of the SSO or LDAP provider, else `null`. `mfa.methods` lists the second factors a password sign-in asks for (`totp`, `webauthn`). `session.idle_timeout_s` is the inactivity timeout and `session.expires_at` the end of the session's maximum lifetime, both `null` for an API key.
 
+Each answer carries a new `csrf_token` for the session. Every write of a session sends one in `X-CSRF-Token`; a token stays valid for 24 hours and only for the session it was issued to, also after a restart of the service. A missing, expired or foreign token is answered `403` with the problem type `urn:ucm:problem:csrf-invalid`: get a new one from this route and send the request again.
+
 ### Logout
 ```http
 POST /api/v2/auth/logout

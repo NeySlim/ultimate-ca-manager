@@ -3871,12 +3871,12 @@
     "sessionKeyFromEnvironment": "Proveniente do ambiente (SECRET_KEY)",
     "sessionKeyPreviousUntil": "Chave anterior aceita até {{date}}",
     "sessionKeyRotateStoredDesc": "A chave de sessão assina os tokens CSRF da interface web. Com a criptografia ativada, uma rotação salva a nova chave criptografada no banco de dados e cada nó a carrega sem reinício; a chave anterior continua aceita durante 24 horas, portanto ninguém é desconectado. SECRET_KEY no ambiente serve então apenas de recurso quando a chave salva não pode ser lida na inicialização; um nó já em execução mantém a chave que tem e tenta novamente.",
-    "sessionKeyRotateFileDesc": "A chave de sessão assina os tokens CSRF da interface web. Sem criptografia, nunca é salva no banco de dados: uma rotação escreve a nova SECRET_KEY no arquivo de ambiente e reinicia o serviço; as páginas abertas antes do reinício precisam ser recarregadas.",
+    "sessionKeyRotateFileDesc": "A chave de sessão assina os tokens CSRF da interface web. Sem criptografia, nunca é salva no banco de dados: uma rotação escreve a nova SECRET_KEY no arquivo de ambiente e reinicia o serviço; as páginas abertas antes do reinício continuam funcionando.",
     "sessionKeyRotateHaRefused": "Em HA, a chave de sessão só é rodada com a criptografia ativada: a nova chave é então salva no banco de dados sob a KEK que cada nó possui. Sem criptografia, a rotação escreveria o arquivo de ambiente de um único nó, portanto é recusada.",
     "sessionKeyRotateBlocked": "Uma desativação da criptografia não foi concluída e a chave de sessão salva continua assinando. Execute novamente a desativação e depois rode a chave.",
     "rotateSessionKey": "Rodar chave de sessão",
     "rotateSessionKeyConfirmStored": "Salvar uma nova chave de sessão no banco de dados? Cada nó carrega-a sem reinício e a chave anterior continua aceita durante 24 horas. Outra rotação é possível quando esse período terminar.",
-    "rotateSessionKeyConfirmFile": "Escrever uma nova SECRET_KEY no arquivo de ambiente e reiniciar o serviço? As páginas abertas antes do reinício precisam ser recarregadas.",
+    "rotateSessionKeyConfirmFile": "Escrever uma nova SECRET_KEY no arquivo de ambiente e reiniciar o serviço?",
     "rotateSessionKeyDoneStored": "Chave de sessão rodada. Sem reinício, ninguém é desconectado.",
     "rotateSessionKeyDoneFile": "Chave de sessão escrita. O serviço está reiniciando.",
     "rotateDataKeyDone": "Chave de dados rodada para a versão {{version}}",
@@ -6104,6 +6104,7 @@
         "requiredField": "Este campo é obrigatório"
       },
       "serverBusy": "O servidor está ocupado com outra alteração: tente novamente em alguns segundos.",
+      "csrfStale": "Esta página está desatualizada: recarregue-a (F5) para continuar. Nada foi salvo.",
       "downloadFailed": {
         "publicKey": "Falha ao baixar a chave pública",
         "krl": "Falha ao baixar a KRL",

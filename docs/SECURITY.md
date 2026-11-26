@@ -47,14 +47,15 @@ Cross-Site Request Forgery protection for all state-changing requests.
 1. Login/verify response includes `csrf_token`
 2. Client stores token in `sessionStorage`
 3. Client sends `X-CSRF-Token` header on POST/PUT/DELETE/PATCH
-4. Server validates token signature and expiry
+4. Server checks the token against the session that received it, and its expiry
 
 #### Token Format
 ```
 timestamp:nonce:hmac_signature
 ```
 - Valid for 24 hours
-- Signed with SECRET_KEY
+- Signed with SECRET_KEY, and recorded in the server-side record of the session it was issued to: that session accepts only the tokens it holds, still after a restart that changed SECRET_KEY, and a token of another session is refused
+- A refused token is answered `403` with the problem type `urn:ucm:problem:csrf-invalid`; the web interface then fetches a new token and sends the request once more
 
 #### Exempt Paths
 - Pre-session authentication: `/api/v2/auth/login`, `/api/v2/auth/forgot`, `/api/v2/auth/reset`, `/api/v2/auth/methods`
