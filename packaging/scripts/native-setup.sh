@@ -27,7 +27,8 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 #   mode <path> <mode> [link-ok]  fchmod of a regular file or directory (a final / follows the path
 #       itself); link-ok: a link is left as it is
 #   chown-tree <dir>/ <user>:<group> [<entry>...]  the directory, then what it holds, links themselves;
-#       .ucm-archive-* and the listed top-level entries are skipped with what they hold
+#       .ucm-archive-* and the listed entries (paths under <dir>) are skipped with what they hold;
+#       given to root, group and other write and set-id bits are also removed
 # UCM_PYTHON: the interpreter the package requires (python3.12 on EL9, where python3 may be absent)
 OWN_PY='
 import grp, os, pwd, signal, stat, sys
@@ -144,18 +145,45 @@ elif op == "mode":
     os.fchmod(fd, mode)
 elif op == "chown-tree":
     uid, gid = ids(args[0])
-    skip = set(args[1:])
-    top = os.open(path, os.O_RDONLY | os.O_DIRECTORY | (0 if path.endswith("/") else os.O_NOFOLLOW))
+    skip = set(os.path.normpath(a) for a in args[1:])
+    # Given to root, a tree root runs from: no group or other account writes it, no set-id bit stays
+    strip = 0o6022 if uid == 0 else 0
+    try:
+        top = os.open(path, os.O_RDONLY | os.O_DIRECTORY | (0 if path.endswith("/") else os.O_NOFOLLOW))
+    except OSError:
+        fail("a symbolic link or not a directory")
+
+    def restrict(fd):
+        mode = stat.S_IMODE(os.fstat(fd).st_mode)
+        if mode & strip:
+            os.fchmod(fd, mode & ~strip)
+
     os.fchown(top, uid, gid)
+    restrict(top)
     for where, dirs, files, dirfd in os.fwalk(".", dir_fd=top, follow_symlinks=False):
         def kept(n):
-            return not n.startswith(ARCHIVE) and not (where == "." and n in skip)
+            return not n.startswith(ARCHIVE) and os.path.normpath(os.path.join(where, n)) not in skip
         dirs[:] = [d for d in dirs if kept(d)]
         for n in dirs + [f for f in files if kept(f)]:
             try:
                 os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
             except FileNotFoundError:
-                pass
+                continue
+            try:
+                st = os.stat(n, dir_fd=dirfd, follow_symlinks=False)
+                if not (strip and stat.S_IMODE(st.st_mode) & strip
+                        and (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode))):
+                    continue
+                # Swapped for a link since: O_NOFOLLOW refuses it, and its mode is never changed
+                fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY, dir_fd=dirfd)
+            except OSError:
+                continue
+            try:
+                st = os.fstat(fd)
+                if stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
+                    restrict(fd)
+            finally:
+                os.close(fd)
 else:
     fail("unknown operation " + op)
 '

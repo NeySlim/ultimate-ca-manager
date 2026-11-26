@@ -1842,3 +1842,52 @@ def test_own_mode_with_a_final_slash_reaches_a_linked_data_directory(tmp_path):
     result = _run(['own', 'mode', f'{tmp_path}/data/', '750'], _env(tmp_path))
     assert result.returncode == 0, result.stderr
     assert stat.S_IMODE(elsewhere.stat().st_mode) == 0o750
+
+
+# ------------------------------------------- the home is root's, the data the account's
+
+def _home_layout(tmp_path):
+    """/opt/ucm as a 3.0 or 2.254 package left it: everything the account's, some of it writable by all."""
+    home = tmp_path / 'opt-ucm'
+    for rel in ('scripts', 'venv/bin', 'venv/lib/data', 'backend/models', 'backend/data/ca', 'data/ca', 'frontend/dist'):
+        (home / rel).mkdir(parents=True)
+    for rel in ('scripts/ucm-watcher.sh', 'venv/bin/pip', 'venv/lib/data/x.py', 'backend/models/m.py',
+                'backend/data/ca/old.pem', 'data/ca/root.pem', 'frontend/dist/index.html', 'VERSION'):
+        (home / rel).write_text('x\n')
+    (home / 'scripts' / 'ucm-watcher.sh').chmod(0o6777)
+    (home / 'scripts').chmod(0o777)
+    return home
+
+
+def test_the_root_pass_gives_the_home_to_root_but_the_data_the_unit_writes(tmp_path):
+    home = _home_layout(tmp_path)
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{home}/', '0:0', 'data', 'backend/data'],
+                  _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    given = set(chowned(trace))
+    for rel in ('', 'scripts', 'scripts/ucm-watcher.sh', 'venv', 'venv/bin/pip', 'venv/lib/data', 'venv/lib/data/x.py',
+                'backend', 'backend/models/m.py', 'frontend/dist/index.html', 'VERSION'):
+        assert os.path.normpath(home / rel) in given, rel
+    assert not [g for g in given if g.startswith((str(home / 'data'), str(home / 'backend' / 'data')))], given
+    # No group or other account may write what root runs, and no set-id bit outlives the pass
+    assert stat.S_IMODE((home / 'scripts' / 'ucm-watcher.sh').stat().st_mode) == 0o755
+    assert stat.S_IMODE((home / 'scripts').stat().st_mode) == 0o755
+
+
+def test_the_account_pass_leaves_modes_alone(tmp_path):
+    home = _home_layout(tmp_path)
+    python, _trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{home}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert stat.S_IMODE((home / 'scripts').stat().st_mode) == 0o777
+
+
+def test_chown_tree_refuses_a_linked_top_named_without_a_final_slash(tmp_path):
+    real = tmp_path / 'real'
+    real.mkdir()
+    (tmp_path / 'top').symlink_to(real)
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', str(tmp_path / 'top'), '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 3 and 'symbolic link or not a directory' in result.stderr, result.stderr
+    assert chowned(trace) == []

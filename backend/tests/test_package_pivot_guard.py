@@ -640,6 +640,7 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
         (top / '.ucm-archive-20261114T120000Z' / 'old' / 'leaf.key').write_text('key')
     (data / 'ca' / 'kept.pem').write_text('pem')
     (config / 'kept.env').write_text('x')
+    (home / 'backend' / 'data').mkdir(parents=True)
     if package == 'deb':
         script = tmp_path / 'postinst.sandboxed'
         script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
@@ -652,7 +653,10 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
     # points end in /: a data or configuration directory behind a link is reached
     setup = f'bash {home}/scripts/native-setup.sh own chown-tree'
     trees = [c for c in _calls(log) if c.startswith(setup)]
-    assert trees == [f'{setup} {home}/ ucm:ucm', f'{setup} {data}/ ucm:ucm', f'{setup} {config}/ ucm:ucm dns-hooks',
+    # The home and all that root runs from it are root's: only what the service writes (the data,
+    # the older backend/data its unit still lists) is given to the account
+    assert trees == [f'{setup} {home}/ root:root data backend/data', f'{setup} {data}/ ucm:ucm',
+                     f'{setup} {home}/backend/data ucm:ucm', f'{setup} {config}/ ucm:ucm dns-hooks',
                      f'{setup} /var/log/ucm/ ucm:ucm'], trees
     assert not [c for c in _calls(log) if c.startswith('chown ')], _calls(log)
 

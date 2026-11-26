@@ -113,3 +113,9 @@ def test_post_leaves_a_linked_directory_as_the_operator_set_it(tmp_path):
     _post_directories(data)
     assert elsewhere.stat().st_mode & 0o7777 == 0o770
     assert (data / 'sessions').stat().st_mode & 0o7777 == 0o700
+
+
+def test_the_home_outside_the_data_is_root_s(payload):
+    """Scripts root runs (the update watcher) and the code are root's; %post gives the account the data only."""
+    home = {p: v[1:3] for p, v in payload.items() if p.startswith('/opt/ucm') and not (p == DATA or p.startswith(DATA + '/'))}
+    assert home and {owner for owner in home.values()} == {('root', 'root')}, home
