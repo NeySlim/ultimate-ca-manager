@@ -268,11 +268,39 @@ def _live_certificates_of_key(host):
     return sorted(ids, key=lambda i: (i != host.certificate_id, i))
 
 
+def _sweepable(host):
+    """Live certificates of the revoked *host*'s key that its revocation owes to the KRL: issued
+    before it, or by its renewal, and before the key was enrolled again as an unrevoked host."""
+    successor = SSHHost.query.filter(
+        SSHHost.ssh_ca_id == host.ssh_ca_id, SSHHost.fingerprint == host.fingerprint,
+        SSHHost.revoked_at.is_(None)).first()
+    ids = []
+    for cert_id in _live_certificates_of_key(host):
+        cert = db.session.get(SSHCertificate, cert_id)
+        if successor is not None and cert.created_at >= successor.enrolled_at:
+            continue
+        if cert.created_at <= host.revoked_at or cert.source == 'renewal':
+            ids.append(cert_id)
+    return ids
+
+
+def _sweep(host, reason, username):
+    """How many of the certificates owed by the revoked *host* this call revoked."""
+    from services.ssh_cert import SSHCertificateService
+    swept = 0
+    for cert_id in _sweepable(host):
+        try:
+            SSHCertificateService.revoke_certificate(cert_id, reason, username)
+            swept += 1
+        except ValueError:
+            pass  # revoked meanwhile, or with a sibling of the same serial
+    return swept
+
+
 def revoke_host(host_id, reason='host revoked', username=None):
     """Every live certificate of the host key under its CA revoked (published in the KRL), the
     ones a renewal or a new enrollment replaced included, and its renewals ended for good.
     ValueError when the host was revoked already and nothing was left to revoke."""
-    from services.ssh_cert import SSHCertificateService
     host = db.session.get(SSHHost, host_id)
     if not host:
         raise LookupError('SSH host not found')
@@ -288,16 +316,41 @@ def revoke_host(host_id, reason='host revoked', username=None):
     again = not first and SSHHost.query.filter(
         SSHHost.ssh_ca_id == host.ssh_ca_id, SSHHost.fingerprint == host.fingerprint,
         SSHHost.revoked_at.is_(None)).first() is not None
-    swept = 0
-    for cert_id in [] if again else _live_certificates_of_key(host):
-        try:
-            SSHCertificateService.revoke_certificate(cert_id, reason, username)
-            swept += 1
-        except ValueError:
-            pass  # revoked meanwhile, or with a sibling of the same serial
+    swept = 0 if again else _sweep(host, reason, username)
     if not first and not swept:
         raise ValueError('This host is already revoked')
     return db.session.get(SSHHost, host_id)
+
+
+REVOKED_HOST_SWEEP_SECONDS = 300
+
+
+def sweep_revoked_hosts():
+    """Scheduled: what an interrupted host revocation or renewal left live goes to the KRL."""
+    from services.audit_service import AuditService
+    live = {}  # per CA, the keys holding a live certificate: one read per CA, not per host
+    total = 0
+    for host in SSHHost.query.filter(SSHHost.revoked_at.isnot(None)).order_by(SSHHost.id).all():
+        if host.ssh_ca_id not in live:
+            live[host.ssh_ca_id] = {tuple((c.public_key or '').split()[:2]) for c in SSHCertificate.query.filter(
+                SSHCertificate.ssh_ca_id == host.ssh_ca_id, SSHCertificate.valid_to > utc_now(),
+                or_(SSHCertificate.revoked.is_(False), SSHCertificate.revoked.is_(None)))}
+        if tuple(host.public_key.split()[:2]) not in live[host.ssh_ca_id]:
+            continue
+        host_id, name = host.id, host.name
+        try:
+            swept = _sweep(host, 'host revoked', 'system')
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Revoked host {name}: its certificates left live could not be revoked: {e}')
+            continue
+        if swept:
+            total += swept
+            AuditService.log_action(
+                action='ssh_host_revocation_finished', resource_type='ssh_host', resource_id=str(host_id),
+                resource_name=name, username='system', success=True,
+                details=f'SSH host revocation finished: {swept} certificate(s) left live revoked')
+    return total
 
 
 def set_auto_renew(host_id, enabled):
@@ -423,7 +476,7 @@ def renew(host_refid, answered, signature):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Host {name} was revoked during its renewal, but its new certificate '
-                         f'{new_id} could not be revoked ({e}): revoke the host again')
+                         f'{new_id} could not be revoked ({e}): the revoked host sweep will revoke it')
         raise RenewalRefused(403, 'this host is revoked: enroll it again',
                              f'host {name} was revoked during its renewal', state='revoked')
     host.certificate_id = new.id

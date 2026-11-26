@@ -7724,6 +7724,7 @@
       "dek_sweep": "Neuverschlüsselung unter dem Datenschlüssel",
       "sso_sign_in_test_purge": "Bereinigung der SSO-Anmeldetests",
       "session_key_retire": "Ausmusterung früherer Sitzungsschlüssel",
+      "ssh_revoked_host_sweep": "Revoked SSH host sweep",
       "cluster_command_purge": "Bereinigung der HA-Cluster-Befehle",
       "update_campaign": "HA-Rolling-Update",
       "delivery_retention": "Aufbewahrung des Zustellverlaufs",

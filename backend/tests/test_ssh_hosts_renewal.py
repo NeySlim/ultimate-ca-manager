@@ -284,7 +284,7 @@ class TestTheRenewal:
         assert len(_audits(app, since, 'ssh_host_revoked')) == 1
         assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 409
 
-    def test_a_renewal_left_live_by_a_failure_goes_with_the_next_revocation(self, app, auth_client, client,
+    def test_a_renewal_left_live_by_a_failure_goes_with_the_sweep(self, app, auth_client, client,
                                                                             enrolled, tmp_path, monkeypatch,
                                                                             caplog):
         from sqlalchemy.exc import OperationalError
@@ -307,15 +307,15 @@ class TestTheRenewal:
         with caplog.at_level('ERROR', logger=hosts.logger.name):
             r = _renew(client, refid, challenge, _sign(tmp_path, key, challenge))
         assert r.status_code == 403 and r.get_json()['state'] == 'revoked'
-        assert any(rec.levelname == 'ERROR' and 'revoke' in rec.getMessage() for rec in caplog.records)
+        assert any(rec.levelname == 'ERROR' and 'sweep will revoke it' in rec.getMessage() for rec in caplog.records)
         monkeypatch.undo()
         with app.app_context():
             renewed = SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == enrolled[0]['id'],
                                                   SSHCertificate.source == 'renewal').one()
             assert not renewed.revoked
             renewed_id = renewed.id
-        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
-        with app.app_context():
+            # Signed after the revocation, by the host's own renewal: the sweep owes it to the KRL
+            assert hosts.sweep_revoked_hosts() >= 1
             assert db.session.get(SSHCertificate, renewed_id).revoked
 
     def test_an_expired_certificate_cannot_renew(self, app, client, enrolled):
@@ -340,3 +340,119 @@ class TestTheKrlPullIsSeen:
             assert SSHHost.query.filter_by(refid=refid).one().last_krl_sync_at == first
         # Unnamed or unknown: nothing to record, the KRL is served all the same
         assert client.get(f"/ssh/krl/{user_ca['refid']}?host=';drop").status_code == 200
+
+
+def _cut_short(app, client, refid, key, tmp_path, monkeypatch):
+    """The host renewed once, then its revocation interrupted after the first of its two certificates."""
+    from sqlalchemy.exc import OperationalError
+    from services.ssh_cert import SSHCertificateService
+    _age(app, refid)
+    challenge = _challenge(client, refid).get_json()['challenge']
+    assert _renew(client, refid, challenge, _sign(tmp_path, key, challenge)).status_code == 200
+    with app.app_context():
+        host = SSHHost.query.filter_by(refid=refid).one()
+        host_id = host.id
+        certs = [db.session.get(SSHCertificate, i).certificate for i in hosts._live_certificates_of_key(host)]
+    assert len(certs) == 2
+    real, calls = SSHCertificateService.revoke_certificate, []
+
+    def second_fails(cert_id, *args, **kwargs):
+        calls.append(cert_id)
+        if len(calls) == 2:
+            raise OperationalError('UPDATE', {}, Exception('database is locked'))
+        return real(cert_id, *args, **kwargs)
+    monkeypatch.setattr(SSHCertificateService, 'revoke_certificate', second_fails)
+    with app.app_context():
+        with pytest.raises(OperationalError):
+            hosts.revoke_host(host_id)
+        db.session.rollback()
+    monkeypatch.undo()
+    return host_id, certs
+
+
+def _enroll_again(app, auth_client, client, tmp_path, ca, key, principals):
+    token = post_json(auth_client, '/api/v2/ssh/enrollment-tokens', {
+        'ca_id': ca['id'], 'principals': principals, 'validity_seconds': 86400}).get_json()['data']['token']
+    r = client.post(f"/ssh/enroll/{ca['refid']}", data=json.dumps({
+        'token': token, 'public_key': (tmp_path / 'ssh_host_ed25519_key.pub').read_text(),
+        'signature': _sign(tmp_path, key, token, hosts.ENROLL_NAMESPACE)}), content_type='application/json')
+    assert r.status_code == 201, r.data
+    with app.app_context():
+        host = SSHHost.query.filter_by(refid=r.get_json()['host_refid']).one()
+        return host.id, host.certificate_id
+
+
+def _in_krl(client, tmp_path, ca, cert_line):
+    (tmp_path / 'krl').write_bytes(client.get(f"/ssh/krl/{ca['refid']}").data)
+    (tmp_path / 'q-cert.pub').write_text(cert_line)
+    out = subprocess.run(['ssh-keygen', '-Q', '-f', str(tmp_path / 'krl'), str(tmp_path / 'q-cert.pub')],
+                         capture_output=True, text=True, timeout=30)
+    assert out.returncode in (0, 1), out.stdout + out.stderr
+    return out.returncode == 1
+
+
+class TestTheSweepOfRevokedHosts:
+    def test_the_task_is_registered_at_its_interval(self, app):
+        task = app.scheduler.tasks['ssh_revoked_host_sweep']
+        assert task.func is hosts.sweep_revoked_hosts and task.interval == hosts.REVOKED_HOST_SWEEP_SECONDS
+
+    def test_a_revocation_cut_short_is_finished_by_the_sweep(self, app, client, enrolled, tmp_path, monkeypatch):
+        ca, refid, key = enrolled
+        host_id, certs = _cut_short(app, client, refid, key, tmp_path, monkeypatch)
+        assert not all(_in_krl(client, tmp_path, ca, c) for c in certs)
+        since = _since(app)
+
+        def finished():
+            return [(a.username, a.details) for a in AuditLog.query.filter(
+                AuditLog.id > since, AuditLog.action == 'ssh_host_revocation_finished',
+                AuditLog.resource_id == str(host_id))]
+        with app.app_context():
+            hosts.sweep_revoked_hosts()
+            assert hosts._live_certificates_of_key(db.session.get(SSHHost, host_id)) == []
+        assert all(_in_krl(client, tmp_path, ca, c) for c in certs)
+        with app.app_context():
+            assert [u for u, _ in finished()] == ['system'] and '1 certificate' in finished()[0][1]
+            # Nothing left: the next pass revokes nothing and writes nothing
+            hosts.sweep_revoked_hosts()
+            assert len(finished()) == 1
+
+    def test_the_certificates_of_the_key_enrolled_again_stay_valid(self, app, auth_client, client, enrolled,
+                                                                    tmp_path, monkeypatch):
+        ca, refid, key = enrolled
+        host_id, certs = _cut_short(app, client, refid, key, tmp_path, monkeypatch)
+        again, _ = _enroll_again(app, auth_client, client, tmp_path, ca, key, ['db01.example.com'])
+        with app.app_context():
+            again_refid = db.session.get(SSHHost, again).refid
+        # The new host renews too: its renewal certificate is its own, not the revoked host's. Its
+        # timeline moved back as a whole, the revoked host's before it, for its renewal to be due
+        with app.app_context():
+            revoked, host = db.session.get(SSHHost, host_id), db.session.get(SSHHost, again)
+            revoked.revoked_at -= timedelta(days=20)
+            for cert_id in set(hosts._live_certificates_of_key(revoked)) - {host.certificate_id}:
+                db.session.get(SSHCertificate, cert_id).created_at -= timedelta(days=20)
+            host.certificate.created_at -= timedelta(days=10)
+            host.enrolled_at -= timedelta(days=10)
+            db.session.commit()
+        challenge = _challenge(client, again_refid).get_json()['challenge']
+        assert _renew(client, again_refid, challenge, _sign(tmp_path, key, challenge)).status_code == 200
+        with app.app_context():
+            hosts.sweep_revoked_hosts()
+            kept = hosts._live_certificates_of_key(db.session.get(SSHHost, again))
+            assert len(kept) == 2
+            kept_lines = [db.session.get(SSHCertificate, i).certificate for i in kept]
+        assert all(_in_krl(client, tmp_path, ca, c) for c in certs)
+        assert not any(_in_krl(client, tmp_path, ca, c) for c in kept_lines)
+
+    def test_a_certificate_signed_for_the_key_after_its_revocation_is_left_alone(self, app, auth_client, enrolled):
+        from services.ssh_cert import SSHCertificateService
+        _, refid, _ = enrolled
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=refid).one()
+            host_id, ca_id, line = host.id, host.ssh_ca_id, host.public_key
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        with app.app_context():
+            manual = SSHCertificateService.sign_certificate(
+                ca_id=ca_id, public_key_data=line, cert_type='host', principals=['web01'],
+                validity_seconds=3600, descr='signed by hand', source='web', username='admin').id
+            hosts.sweep_revoked_hosts()
+            assert not db.session.get(SSHCertificate, manual).revoked

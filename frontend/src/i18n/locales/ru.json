@@ -8066,6 +8066,7 @@
       "dek_sweep": "Перешифрование ключом данных",
       "sso_sign_in_test_purge": "Очистка тестов входа SSO",
       "session_key_retire": "Вывод старого ключа сеанса",
+      "ssh_revoked_host_sweep": "Завершение отзыва SSH-хостов",
       "cluster_command_purge": "Очистка команд кластера HA",
       "update_campaign": "Поэтапное обновление HA",
       "delivery_retention": "Хранение истории доставки",

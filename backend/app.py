@@ -723,6 +723,14 @@ def create_app(config_name=None):
             description="Purge OIDC and SAML sign-in tests and their reports past their expiry"
         )
 
+        from services.ssh_host_service import REVOKED_HOST_SWEEP_SECONDS, sweep_revoked_hosts
+        scheduler.register_task(
+            name="ssh_revoked_host_sweep",
+            func=sweep_revoked_hosts,
+            interval=REVOKED_HOST_SWEEP_SECONDS,
+            description="Revoke the certificates an interrupted SSH host revocation left live"
+        )
+
         from security.session_key import scheduled_retire as retire_session_key
         scheduler.register_task(
             name="session_key_retire",

@@ -7724,6 +7724,7 @@
       "dek_sweep": "以数据密钥重新加密",
       "sso_sign_in_test_purge": "SSO 登录测试清理",
       "session_key_retire": "旧会话密钥退役",
+      "ssh_revoked_host_sweep": "Revoked SSH host sweep",
       "cluster_command_purge": "HA 集群命令清理",
       "update_campaign": "HA 滚动更新",
       "delivery_retention": "投递历史保留",

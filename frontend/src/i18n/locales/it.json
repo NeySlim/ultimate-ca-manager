@@ -7724,6 +7724,7 @@
       "dek_sweep": "Ricifratura con la chiave dati",
       "sso_sign_in_test_purge": "Pulizia dei test di accesso SSO",
       "session_key_retire": "Ritiro della vecchia chiave di sessione",
+      "ssh_revoked_host_sweep": "Revoked SSH host sweep",
       "cluster_command_purge": "Pulizia dei comandi del cluster HA",
       "update_campaign": "Aggiornamento progressivo HA",
       "delivery_retention": "Conservazione della cronologia delle consegne",
