@@ -7,6 +7,65 @@ set -e
 UCM_HOME=/opt/ucm
 UCM_CONFIG=/etc/ucm
 
+# What $1 holds but the .ucm-archive-* directories, walked by descriptor: a directory the
+# account swaps for a link is never entered, a name is only ever removed in the directory read
+PURGE_PY='
+import os, stat, sys
+ARCHIVE = ".ucm-archive-"
+
+def purge(dirfd):
+    """Empties dirfd but its archives; True when an archive keeps something in it."""
+    kept = False
+    for name in os.listdir(dirfd):
+        if name.startswith(ARCHIVE):
+            kept = True
+        elif remove(dirfd, name):
+            kept = True
+    return kept
+
+def unlink(dirfd, name):
+    """Removes a name that is no directory; True when it stays (it became one meanwhile)."""
+    try:
+        os.unlink(name, dir_fd=dirfd)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        return True
+    return False
+
+def remove(dirfd, name):
+    try:
+        st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    if not stat.S_ISDIR(st.st_mode):
+        return unlink(dirfd, name)
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dirfd)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        # Swapped for a link or a file since: only that entry goes
+        return unlink(dirfd, name)
+    try:
+        if purge(fd):
+            return True
+    finally:
+        os.close(fd)
+    try:
+        os.rmdir(name, dir_fd=dirfd)
+    except FileNotFoundError:
+        pass
+    except NotADirectoryError:
+        return unlink(dirfd, name)
+    except OSError:
+        return True
+    return False
+
+top = os.open(sys.argv[1], os.O_RDONLY | os.O_DIRECTORY)
+purge(top)
+'
+
 # Removes directory $1, except the archives of an earlier installation kept beside its
 # files (.ucm-archive-*): they hold its keys, and only their owner removes them. Every
 # directory a purge removes goes through it: the archiver may leave one in any of them.
@@ -16,11 +75,11 @@ purge_keeping_archives() {
         rm -rf "$1"
         return 0
     fi
-    find "$1" -name '.ucm-archive-*' -prune -o ! -type d -exec rm -f {} +
-    # Deepest first; a directory that holds an archive stays, with nothing else in it
-    find "$1" -name '.ucm-archive-*' -prune -o -type d -print | sort -r | while IFS= read -r d; do
-        rmdir -- "$d" 2>/dev/null || true
-    done
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "Kept $1 whole: removing it around the archives it holds needs python3"
+        return 0
+    fi
+    python3 -I -c "$PURGE_PY" "$1"
     chown root:root "$1" && chmod 700 "$1"
     echo "Kept: what an earlier UCM installation left, archived under $1:"
     find "$1" -name '.ucm-archive-*' -prune -print | sed 's/^/  /'

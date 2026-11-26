@@ -9,6 +9,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -664,18 +665,23 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
 POSTRM = ROOT / 'packaging' / 'debian' / 'postrm'
 
 
-def _postrm_with(tmp_path, action, lay, lib=None, logs=None, real=()):
+def _postrm_with(tmp_path, action, lay, lib=None, logs=None, real=(), tools=None):
     """_postrm, with `lay(home, config)` run on the sandbox before the script; /var/lib/ucm
     and /var/log/ucm become `lib` and `logs` (by default absent paths of the sandbox);
-    the tools named in `real` run for real instead of being recorded."""
+    the tools named in `real` run for real instead of being recorded, `tools` maps a name
+    to a script body that replaces it last."""
     env, log, home, _data, config = _post_sandbox(tmp_path, 0)
     lay(home, config)
-    for tool in real:
+    for tool in (*real, 'python3'):
         (pathlib.Path(env['PATH']) / tool).unlink(missing_ok=True)
         os.symlink(shutil.which(tool), pathlib.Path(env['PATH']) / tool)
     (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
         f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\nexec {shutil.which("rm")} "$@"\n')
     bin_rm.chmod(0o755)
+    for name, body in (tools or {}).items():
+        (pathlib.Path(env['PATH']) / name).unlink(missing_ok=True)
+        (pathlib.Path(env['PATH']) / name).write_text(f'#!{POSIX_SH}\n{body}\n')
+        (pathlib.Path(env['PATH']) / name).chmod(0o755)
     for tool in ('sort', 'sed', 'rmdir', 'dd'):
         os.symlink(shutil.which(tool), pathlib.Path(env['PATH']) / tool)
     text = POSTRM.read_text()
@@ -764,6 +770,42 @@ def test_a_purge_keeps_the_local_archives_of_an_earlier_installation(tmp_path):
     assert f'chown root:root {config}' in _calls(log) and f'chmod 700 {config}' in _calls(log)
     assert not any(c.startswith('rm -rf ') for c in _calls(log)), _calls(log)
     assert not any('.ucm-archive-' in c for c in _calls(log) if c.startswith('rm ')), _calls(log)
+
+
+def test_a_directory_swapped_for_a_link_during_the_purge_is_never_entered(tmp_path):
+    """/etc/ucm is the account's: a directory of it swapped for a link to a root directory while
+    the purge empties it must cost that directory nothing, whatever removes the files."""
+    victim = tmp_path / 'victim'
+    victim.mkdir()
+    for name in ('a.conf', 'b.conf'):
+        (victim / name).write_text('root\n')
+    sub = tmp_path.resolve() / 'etc' / 'ucm' / 'sub'
+
+    def lay(home, config):
+        (config / '.ucm-archive-20260101T000000Z').mkdir()
+        (config / '.ucm-archive-20260101T000000Z' / 'master.key').write_text('old key')
+        sub.mkdir()
+        for name in ('a.conf', 'b.conf'):
+            (sub / name).write_text('account\n')
+    swap = f'mv {sub} {sub}.moved; ln -s {victim} {sub}'
+    # The swap lands right before the first removal inside sub, by path (rm) or by descriptor (python)
+    prelude = (f"import os\n_unlink = os.unlink\n_swapped = []\n"
+               f"def _racing(name, *a, dir_fd=None, **k):\n"
+               f"    at = os.readlink('/proc/self/fd/%d' % dir_fd) if dir_fd is not None else os.path.dirname(name)\n"
+               f"    if not _swapped and at == '{sub}':\n"
+               f"        _swapped.append(1); os.rename('{sub}', '{sub}.moved'); os.symlink('{victim}', '{sub}')\n"
+               f"    return _unlink(name, *a, dir_fd=dir_fd, **k)\n"
+               f"os.unlink = _racing\nos.remove = _racing\n")
+    tools = {
+        'rm': f'case "$*" in *{sub}/*) [ -L {sub} ] || {{ {swap}; }};; esac\nexec {shutil.which("rm")} "$@"',
+        'python3': f'[ "$2" = -c ] || exec {sys.executable} "$@"\ncode=$3; shift 3\nexec {sys.executable} -I -c "{prelude}$code" "$@"',
+    }
+    out, _log, _home, config = _postrm_with(tmp_path, 'purge', lay, real=('mv', 'ln'), tools=tools)
+    assert sorted(p.name for p in victim.iterdir()) == ['a.conf', 'b.conf']
+    assert all((victim / n).read_text() == 'root\n' for n in ('a.conf', 'b.conf'))
+    assert (config / '.ucm-archive-20260101T000000Z' / 'master.key').read_text() == 'old key'
+    # The race was run: the directory emptied is the one moved away, the link went with the purge
+    assert (sub.parent / 'sub.moved').is_dir() and not list((sub.parent / 'sub.moved').iterdir())
 
 
 def test_a_removal_says_where_the_data_stays_and_what_a_purge_keeps(tmp_path):
