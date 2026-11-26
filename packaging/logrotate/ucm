@@ -16,6 +16,8 @@
     notifempty
     missingok
     create 0640 ucm ucm
+    # The directory is the service account's: rotate as that account, never following a link it laid
+    su ucm ucm
     dateext
     dateformat -%Y%m%d
     sharedscripts
