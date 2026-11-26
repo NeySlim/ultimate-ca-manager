@@ -15,10 +15,10 @@ from datetime import timedelta
 
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.hazmat.primitives.serialization import ssh as ssh_serialization
-from sqlalchemy import update
+from sqlalchemy import or_, update
 
 from models import db
-from models.ssh import SSHCertificateAuthority, SSHHost, SSHHostEnrollmentToken
+from models.ssh import SSHCertificate, SSHCertificateAuthority, SSHHost, SSHHostEnrollmentToken
 from services.ssh_cert.signing import MAX_VALIDITY_SECONDS
 from utils.datetime_utils import utc_now
 
@@ -226,17 +226,30 @@ def enroll(ca_refid, secret, public_key, principals=None, ip=None):
     return host, cert
 
 
+def _live_certificates_of_key(host):
+    """Ids of the unrevoked, unexpired certificates of *host*'s CA for its key, current first."""
+    key = host.public_key.split()[:2]
+    certs = SSHCertificate.query.filter(
+        SSHCertificate.ssh_ca_id == host.ssh_ca_id, SSHCertificate.valid_to > utc_now(),
+        or_(SSHCertificate.revoked.is_(False), SSHCertificate.revoked.is_(None))).all()
+    ids = [c.id for c in certs if (c.public_key or '').split()[:2] == key]
+    return sorted(ids, key=lambda i: (i != host.certificate_id, i))
+
+
 def revoke_host(host_id, reason='host revoked', username=None):
-    """The host's certificate revoked (published in the KRL) and its renewals ended for good."""
+    """Every live certificate of the host key under its CA revoked (published in the KRL), the
+    ones a renewal or a new enrollment replaced included, and its renewals ended for good."""
     from services.ssh_cert import SSHCertificateService
     host = db.session.get(SSHHost, host_id)
     if not host:
         raise LookupError('SSH host not found')
     if host.revoked_at:
         raise ValueError('This host is already revoked')
-    cert = host.certificate
-    if cert is not None and not cert.revoked:
-        SSHCertificateService.revoke_certificate(cert.id, reason, username)
+    for cert_id in _live_certificates_of_key(host):
+        try:
+            SSHCertificateService.revoke_certificate(cert_id, reason, username)
+        except ValueError:
+            pass  # revoked meanwhile, or with a sibling of the same serial
     host = db.session.get(SSHHost, host_id)
     host.revoked_at = utc_now()
     host.auto_renew = False

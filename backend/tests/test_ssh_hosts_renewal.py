@@ -186,6 +186,23 @@ class TestTheRenewal:
         r = _challenge(client, refid)
         assert r.status_code == 403 and r.get_json()['state'] == 'revoked'
 
+    def test_revoking_the_host_revokes_the_certificates_a_renewal_replaced(self, app, auth_client, client,
+                                                                           enrolled, tmp_path):
+        ca, refid, key = enrolled
+        _age(app, refid)
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=refid).one()
+            host_id, old = host.id, host.certificate.certificate
+        challenge = _challenge(client, refid).get_json()['challenge']
+        assert _renew(client, refid, challenge, _sign(tmp_path, key, challenge)).status_code == 200
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        (tmp_path / 'krl').write_bytes(client.get(f"/ssh/krl/{ca['refid']}").data)
+        (tmp_path / 'old-cert.pub').write_text(old)
+        # 1: revoked, 0: still accepted by a client checking the host CA's KRL
+        out = subprocess.run(['ssh-keygen', '-Q', '-f', str(tmp_path / 'krl'), str(tmp_path / 'old-cert.pub')],
+                             capture_output=True, text=True, timeout=30)
+        assert out.returncode == 1, out.stdout + out.stderr
+
     def test_an_expired_certificate_cannot_renew(self, app, client, enrolled):
         _, refid, _ = enrolled
         with app.app_context():
