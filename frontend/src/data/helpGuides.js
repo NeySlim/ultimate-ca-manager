@@ -3903,7 +3903,7 @@ curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROL
 
 The agent sends the server's public host key (Ed25519 first, then ECDSA, then RSA; \`--host-key\` picks another) with the token signed by that key, which proves the server holds it, checks that the certificate it gets certifies that key, writes it beside the key and points \`HostCertificate\` at it. Add \`-s -- --principal web01\` to ask for some of the token's names only.
 
-The token is shown once, works once and is never written to disk on the server. A token that is not used can be revoked in **Enrollment tokens**.
+The token is shown once and works once. The server never stores it: the agent hands it to curl on a pipe (to wget, which reads no pipe, in a file only root can read, deleted after the request). A token that is not used can be revoked in **Enrollment tokens**.
 
 Clients trust the host CA with a line in \`known_hosts\`:
 

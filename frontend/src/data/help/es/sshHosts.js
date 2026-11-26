@@ -74,7 +74,7 @@ curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROL
 
 El agente envía la clave pública de host del servidor (Ed25519 primero, luego ECDSA, luego RSA; \`--host-key\` elige otra) con el token firmado por esa clave, lo que prueba que el servidor la posee, comprueba que el certificado recibido certifica esa clave, lo escribe junto a la clave y apunta \`HostCertificate\` a él. Añada \`-s -- --principal web01\` para pedir solo una parte de los nombres del token.
 
-El token se muestra una vez, sirve una vez y nunca se escribe en el disco del servidor. Un token sin usar puede revocarse en **Tokens de inscripción**.
+El token se muestra una vez y sirve una vez. El servidor nunca lo conserva: el agente se lo pasa a curl por una tubería (a wget, que no lee tuberías, por un archivo que solo root puede leer, borrado tras la solicitud). Un token sin usar puede revocarse en **Tokens de inscripción**.
 
 Los clientes confían en la CA de host con una línea en \`known_hosts\`:
 

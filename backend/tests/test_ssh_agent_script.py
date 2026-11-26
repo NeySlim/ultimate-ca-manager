@@ -254,6 +254,15 @@ class TestTheAgentEnrolls:
         # The token never reaches the disk
         assert not [p for p in host.root.rglob('*') if p.is_file() and token.encode() in p.read_bytes()]
 
+    def test_the_token_is_on_no_file_while_it_is_sent(self, auth_client, host, server, tmp_path):
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent token in flight CA')
+        token, seen = _enroll_token(auth_client, ca), tmp_path / 'seen'
+        out = host.install(_installer(server, ca['refid']),
+                           env={'UCM_ENROLL_TOKEN': token, 'FAKE_CURL_SECRET': token, 'FAKE_CURL_SEEN': str(seen)})
+        assert out.returncode == 0, out.stderr
+        # curl reads the body on its standard input: no file holds the token meanwhile
+        assert seen.read_text().splitlines() == ['called']
+
     def test_a_refused_token_changes_nothing(self, auth_client, host, server):
         ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent refused token CA')
         original = (host.ssh / 'sshd_config').read_text()

@@ -10,10 +10,10 @@ import threading
 import time
 from contextlib import contextmanager
 
-# curl as the agent calls it: -sS --max-time N -o OUT -w '%{http_code}' [-H h] [-X POST --data-binary @f] URL
+# curl as the agent calls it: -sS --max-time N -o OUT -w '%{http_code}' [-H h] [-X POST --data-binary @f|@-] URL
 FAKE_CURL = textwrap.dedent('''\
     #!PYTHON
-    import sys, urllib.request, urllib.error
+    import os, sys, urllib.request, urllib.error
     args, out, fmt, headers, data, method, url = sys.argv[1:], None, None, {}, None, None, None
     i = 0
     while i < len(args):
@@ -25,11 +25,18 @@ FAKE_CURL = textwrap.dedent('''\
             elif a == '-H':
                 k, _, val = v.partition(':'); headers[k.strip()] = val.strip()
             elif a == '-X': method = v
-            elif a == '--data-binary': data = open(v[1:], 'rb').read() if v.startswith('@') else v.encode()
+            elif a == '--data-binary':
+                data = (sys.stdin.buffer.read() if v == '@-' else open(v[1:], 'rb').read()) if v.startswith('@') else v.encode()
             i += 2
             continue
         if not a.startswith('-'): url = a
         i += 1
+    secret, seen = os.environ.get('FAKE_CURL_SECRET'), os.environ.get('FAKE_CURL_SEEN')
+    if secret and seen:
+        # Every file under the agent's root that holds the secret while curl runs
+        hits = [os.path.join(d, f) for d, _, files in os.walk(os.environ['UCM_AGENT_ROOT']) for f in files
+                if secret.encode() in open(os.path.join(d, f), 'rb').read()]
+        open(seen, 'a').write(''.join(f'{h}\\n' for h in ['called', *hits]))
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         resp = urllib.request.urlopen(req, timeout=60); code, body = resp.status, resp.read()

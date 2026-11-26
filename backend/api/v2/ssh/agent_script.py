@@ -3,7 +3,8 @@
 It pulls the KRL of an SSH user CA (RevokedKeys) on a timer, and enrolls the server with a host CA
 for a host certificate of its own key (HostCertificate). The agent holds no secret: what it needs
 to reach UCM is the URL it was installed from and the CA refids, all public; the single-use
-enrollment token is spent at once and never written to disk.
+enrollment token is spent at once and never stored (with wget, which reads no body from a pipe, it
+sits in a 0600 file for the request).
 """
 import re
 
@@ -87,7 +88,8 @@ http_get() {
     printf '%s' "${code:-000}"
 }
 
-# http_post URL BODY_FILE OUT: a JSON body, a text/plain answer; prints the status (000: no answer)
+# http_post URL BODY_FILE OUT: a JSON body, a text/plain answer; prints the status (000: no answer).
+# BODY_FILE - is the standard input: curl reads it from there, wget, which cannot, from a 0600 file
 http_post() {
     url=$1 body=$2 out=$3
     cacert=$(conf_get CA_BUNDLE)
@@ -101,12 +103,13 @@ http_post() {
     fi
     have wget || die "neither curl nor wget is installed"
     hdr="$out.hdr"
+    if [ "$body" = - ]; then body="$out.body"; (umask 077; cat > "$body"); fi
     set -- -q -S -T 60 -O "$out" --header='Content-Type: application/json' --header='Accept: text/plain' \
         --post-file="$body"
     if [ -n "$cacert" ]; then set -- "$@" --ca-certificate="$cacert"; fi
     wget "$@" "$url" 2> "$hdr" || true
     code=$(sed -n 's/.*HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' "$hdr" | tail -n 1)
-    rm -f "$hdr"
+    rm -f "$hdr" "$out.body"
     printf '%s' "${code:-000}"
 }
 field() { sed -n "s/^$1=//p" "$2" | head -n 1; }
@@ -348,7 +351,6 @@ cmd_enroll() { # REFID [NAME...]
         names="$names${names:+,}\"$name\""
     done
     mkdir -p "$CONF_DIR"
-    body="$CONF_DIR/.enroll.$$"
     out="$CONF_DIR/.enroll-answer.$$"
     # The token signed with the host key proves this server holds it (ssh-keygen -Y sign)
     if ! proof=$(printf '%s' "$token" | ssh-keygen -q -Y sign -n ucm-ssh-host-enrollment -f "$key" 2>/dev/null) \
@@ -356,10 +358,9 @@ cmd_enroll() { # REFID [NAME...]
         die "could not sign the enrollment with $key"
     fi
     signature=$(printf '%s\n' "$proof" | awk '{ printf "%s\\n", $0 }')
-    (umask 077; printf '{"token":"%s","public_key":"%s","signature":"%s"%s}' "$token" "$pub" "$signature" \
-        "${names:+,\"principals\":[$names]}" > "$body")
-    code=$(http_post "$(conf_get UCM_URL)/ssh/enroll/$refid" "$body" "$out")
-    rm -f "$body"
+    # The body on a pipe: printf is built in, so the token is in no argument and, with curl, no file
+    code=$(printf '{"token":"%s","public_key":"%s","signature":"%s"%s}' "$token" "$pub" "$signature" \
+        "${names:+,\"principals\":[$names]}" | http_post "$(conf_get UCM_URL)/ssh/enroll/$refid" - "$out")
     if [ "$code" != 201 ]; then
         reason=$(field error "$out" 2>/dev/null || true)
         rm -f "$out"

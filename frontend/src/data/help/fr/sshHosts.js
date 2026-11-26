@@ -74,7 +74,7 @@ curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROL
 
 L’agent envoie la clé publique d’hôte du serveur (Ed25519 d’abord, puis ECDSA, puis RSA ; \`--host-key\` en choisit une autre) avec le jeton signé par cette clé, ce qui prouve que le serveur la détient, vérifie que le certificat reçu certifie cette clé, l’écrit à côté de la clé et y fait pointer \`HostCertificate\`. Ajoutez \`-s -- --principal web01\` pour ne demander qu’une partie des noms du jeton.
 
-Le jeton est affiché une fois, sert une fois et n’est jamais écrit sur le disque du serveur. Un jeton inutilisé peut être révoqué dans **Jetons d’enrôlement**.
+Le jeton est affiché une fois et sert une fois. Le serveur ne le conserve jamais : l’agent le passe à curl par un tube (à wget, qui ne lit pas de tube, par un fichier que seul root peut lire, effacé après la requête). Un jeton inutilisé peut être révoqué dans **Jetons d’enrôlement**.
 
 Les clients font confiance à l’AC hôte par une ligne de \`known_hosts\` :
 
