@@ -643,22 +643,20 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
     keys. Returns (ca_dict, warnings, superseded); raises ValueError with a
     user-safe message when the certificate is refused (#347 review).
     """
-    from models import db
     from services.ca_service import CAService
     from services.webhook_service import emit_ca_updated
-    if encrypted_prv and not ca.prv and not ca.hsm_key_id:
-        ca.prv = encrypted_prv
-    ca, warnings, superseded = CAService.complete_external_ca(
-        ca, cert_pem, username=username, replace_cross=replace_cross)
     from services.audit_service import AuditService
     from services.ca import labels as ca_labels
-    # Written once the certificate is accepted, in the commit the event below reports
+    if encrypted_prv and not ca.prv and not ca.hsm_key_id:
+        ca.prv = encrypted_prv
+    # The labels go in the certificate's own commit: a refused certificate rolls them back with it
     old_name, old_description = ca.descr, ca.description
     ca.descr = name or ca.descr
     ca.description = description or ca.description
     changed = ca_labels.changes(old_name, old_description, ca)
+    ca, warnings, superseded = CAService.complete_external_ca(
+        ca, cert_pem, username=username, replace_cross=replace_cross)
     if changed:
-        db.session.commit()
         AuditService.log_action(action='ca_updated', resource_type='ca', resource_id=ca.id,
                                 resource_name=ca.descr, success=True,
                                 details=ca_labels.audit_details(f'CA {ca.descr} labelled at import', changed))

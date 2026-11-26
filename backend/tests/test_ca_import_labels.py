@@ -155,3 +155,28 @@ def test_an_unusable_smart_label_imports_nothing(app, auth_client, labels):
     assert 'ca_labels' in json.dumps(body)
     assert 'Import failed' not in json.dumps(body)
     assert _stored(app, cn) == []
+
+
+@pytest.mark.parametrize('route', ROUTES)
+def test_the_install_path_writes_the_labels_with_the_certificate(app, auth_client, monkeypatch, route):
+    """A commit that would hold the labels apart from the certificate fails: they go in one."""
+    from sqlalchemy import inspect as sa_inspect
+    real_commit = db.session.commit
+
+    def commit():
+        for obj in list(db.session.dirty):
+            if isinstance(obj, CA):
+                state = sa_inspect(obj).attrs
+                labels = state.descr.history.has_changes() or state.description.history.has_changes()
+                if labels and not state.crt.history.has_changes():
+                    db.session.rollback()
+                    raise RuntimeError('labels committed apart from the certificate')
+        return real_commit()
+
+    monkeypatch.setattr(db.session, 'commit', commit)
+    r, _ = _pending_reimport(app, auth_client, monkeypatch, route, name='Together', description='One commit')
+    assert r.status_code == 200, r.get_json()
+    monkeypatch.undo()
+    with app.app_context():
+        ca = db.session.get(CA, r.get_json()['data']['id'])
+        assert (ca.descr, ca.description) == ('Together', 'One commit')
