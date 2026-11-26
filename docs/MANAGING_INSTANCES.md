@@ -39,7 +39,7 @@ Account > API Keys**, with the **Instance management** scope. It holds exactly:
 | Scope | Allows |
 |---|---|
 | `read:instance` | `GET /api/v2/system/instance` |
-| `read:settings` | reading the settings (`GET /api/v2/settings/...`) |
+| `read:settings` | reading the settings (`GET /api/v2/settings/...`), except the backup history and download and `audit-logs`, which take `admin:system` |
 | `write:backups` | starting a backup (`POST /api/v2/system/backup/create`) and following its job |
 | `write:updates` | installing an update (`POST /api/v2/system/updates/install`) and following an HA rolling update |
 
