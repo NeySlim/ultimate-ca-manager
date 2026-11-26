@@ -62,7 +62,8 @@ NOT_A_ROW = {
     'session', 'logger', 'os', 'sys', 'json', 'result', 'results',
     'args', 'kwargs', 'e', 'err', 'exc', 'service', 'client', 'provider_cls',
 }
-COMMITS = {'safe_commit', '_safe_commit', 'commit_or_rollback'}
+# complete_external_ca commits the certificate or raises before its caller audits
+COMMITS = {'safe_commit', '_safe_commit', 'commit_or_rollback', 'complete_external_ca'}
 # A rollback settles the session too. What follows it carries nothing, which
 # is why a refusal that audits has to roll back first: `api/v2/webhooks.py`
 # audited its refusal with the refused webhook's URL and signing secret still
@@ -123,7 +124,7 @@ def _kind(call):
         return 'commit+audit' if AUDIT_WRAPPERS[func.attr] else 'audit'
     if isinstance(func, ast.Name) and func.id in COMMITS:
         return 'commit'
-    if isinstance(func, ast.Attribute) and func.attr == 'commit':
+    if isinstance(func, ast.Attribute) and (func.attr == 'commit' or func.attr in COMMITS):
         return 'commit'
     if isinstance(func, ast.Attribute) and func.attr in SETTLES:
         owner = func.value
@@ -543,7 +544,7 @@ def _kind_without_wrappers(call):
         return 'audit'
     if isinstance(func, ast.Name) and func.id in COMMITS:
         return 'commit'
-    if isinstance(func, ast.Attribute) and func.attr == 'commit':
+    if isinstance(func, ast.Attribute) and (func.attr == 'commit' or func.attr in COMMITS):
         return 'commit'
     return None
 
