@@ -21,10 +21,12 @@ def dialect(request):
 
 def _as_rc6(db):
     """A 2.254 database upgraded, then put in the state 3.0-rc6 left: 300 recorded, no step
-    row, no certificates.comment nor revoked_serials.published (steps 175, 176 came after it)."""
+    row, no certificates.comment, revoked_serials.published nor api_keys.allowed_networks (steps
+    175 and later came after it)."""
     assert db.upgrade()
     db.run("ALTER TABLE certificates DROP COLUMN comment")
     db.run("ALTER TABLE revoked_serials DROP COLUMN published")
+    db.run("ALTER TABLE api_keys DROP COLUMN allowed_networks")
     db.run("DELETE FROM _migrations WHERE name LIKE :p", {'p': STEP_ROW})
     assert '300_upgrade_from_2_254' in db.registry()
     assert not [n for n in db.registry() if n.startswith('300_upgrade_from_2_254/')]
@@ -119,6 +121,7 @@ def test_a_rc6_database_gets_the_comment_column_and_lists_its_certificates(rc6, 
     assert out.count('LIST 200') == 3, out[-3000:] + err[-3000:]
     assert 'comment' in _columns(rc6, 'certificates')
     assert 'published' in _columns(rc6, 'revoked_serials')
+    assert 'allowed_networks' in _columns(rc6, 'api_keys')
 
 
 def test_a_rc6_database_runs_the_steps_after_rc1_and_records_every_step(rc6, monkeypatch):
@@ -127,6 +130,7 @@ def test_a_rc6_database_runs_the_steps_after_rc1_and_records_every_step(rc6, mon
     assert rc6.upgrade()
     assert ran == [s for s in STEPS if s not in UNRECORDED]
     assert '175_certificate_comment' in ran and '176_revoked_serial_publication' in ran
+    assert '178_api_key_allowed_networks' in ran
     assert '165_sso_ldap_group_base_dn' in ran  # changed after rc1: runs again
     assert 'comment' in _columns(rc6, 'certificates')
     assert _holds_every_step(rc6)

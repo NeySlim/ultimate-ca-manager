@@ -185,7 +185,8 @@ def _wait_for_job(job_id, seconds):
 
 def _readable(kind):
     jt = jobs.job_type(kind)
-    return jt is not None and has_permission(jt.permission, g.permissions or [])
+    held = g.permissions or []
+    return jt is not None and any(has_permission(p, held) for p in (jt.permission, *jt.also_readable_by))
 
 
 @bp.route('/api/v2/system/jobs', methods=['GET'])

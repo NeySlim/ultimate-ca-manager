@@ -12,6 +12,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Added
 
 - CAs: the display name and a free-text description can be changed from the CA's panel, set at import (CA import, certificate import of a CA and smart import) and come back from a backup, without touching the certificate (#459). A re-import keeps the name given since, and every change, from the panel or a re-import, is audited with the old and new values.
+- Instance state for a console that watches several instances: `GET /api/v2/system/instance` gives the version and channel, mode and nodes, database engine, health, CAs, update, last backup, FIPS and a stable instance identifier, without any secret, to a key holding the new `read:instance` scope (#403).
+- API keys: `write:backups` starts a backup and `write:updates` installs an update, so a console's key no longer needs `admin:system`; the account page offers an "Instance management" preset with them, `read:instance` and `read:settings` (#403).
+- API keys: a key can be limited to source addresses (IP addresses or CIDR networks), set at creation on the account page or with `allowed_networks`; from any other address it is refused with 403 (#403).
+- Documentation: [Managing several instances](docs/MANAGING_INSTANCES.md) describes what a console watching several instances can rely on: the state route, the scopes and source networks of its key, and the instance identity across restarts, HA nodes and restores (#403).
 
 ### Changed
 

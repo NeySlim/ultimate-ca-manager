@@ -1931,7 +1931,8 @@
       "deleted": "API 密钥已删除",
       "loadFailed": "无法加载 API 密钥",
       "updateFailed": "无法更新 API 密钥",
-      "meta": "{{scope}} · 创建于 {{created}} · 上次使用 {{used}} · 到期 {{expires}}"
+      "meta": "{{scope}} · 创建于 {{created}} · 上次使用 {{used}} · 到期 {{expires}}",
+      "allowedFrom": "允许来源 {{networks}}"
     },
     "createUser": "创建用户",
     "editUser": "编辑用户",
@@ -4731,7 +4732,13 @@
     "confirmItIsYou": "确认是您本人",
     "confirmWithPassword": "请输入密码以确认此更改",
     "confirmWithCode": "请输入身份验证器应用中的代码以确认此更改",
-    "confirmEmailChange": "请输入密码以更改邮箱：密码重置链接会发送到该邮箱"
+    "confirmEmailChange": "请输入密码以更改邮箱：密码重置链接会发送到该邮箱",
+    "scopeInstance": "实例管理（集中控制台）",
+    "allowedNetworks": "允许的来源地址",
+    "allowedNetworksHint": "使用该密钥的 IP 地址或 CIDR 网络，以逗号或换行分隔。留空：任意地址。",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "允许来源",
+    "apiKeyAnyAddress": "任意地址"
   },
   "rbac": {
     "title": "基于角色的访问控制",
@@ -4767,7 +4774,10 @@
       "trustStore": "信任存储",
       "hsmManagement": "HSM管理",
       "ssh": "SSH证书",
-      "sshCas": "SSH证书颁发机构"
+      "sshCas": "SSH证书颁发机构",
+      "instanceState": "实例状态",
+      "backups": "备份",
+      "updates": "更新"
     },
     "customRole": "自定义角色",
     "noCustomRole": "无（仅基础角色）",

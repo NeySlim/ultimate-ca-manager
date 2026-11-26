@@ -397,6 +397,7 @@ Content-Type: application/json
   "name": "CI/CD Integration",
   "expires_days": 365,
   "permissions": ["read:certificates", "write:certificates"],
+  "allowed_networks": ["192.0.2.0/24", "2001:db8::/32"],
   "password": "the caller's password"
 }
 
@@ -421,6 +422,14 @@ DELETE /api/v2/account/apikeys/{key_id}
 
 A key outlives a password change, so creating or regenerating one from a session needs the caller's `password` in the body, or `code`, the authenticator code, for an account without a local password (`403` with `details.reauth` otherwise). A call authenticated by an API key needs neither: the key it creates holds at most its scopes and expires with it.
 
+**Source networks.** `allowed_networks` (optional, a list or a comma or line separated string of
+IP addresses and CIDR networks, at most 100) limits the key to those sources; absent or empty, any
+address. The address checked is the one UCM resolves for the request, after its trusted proxy hops.
+From another address the key is refused with `403` (`This API key is not allowed from this address`)
+and its `last_used_at` is not updated. An invalid entry answers `400`. A key created by a limited API
+key gets its networks when none is given, and `403` when one lies outside them; regenerating keeps
+them, under the same rule when a limited API key regenerates another key. Every key in a listing carries `allowed_networks` (`[]` for any address).
+
 The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
 
 An administrator (`write:users`) lists another user's keys and revokes a leaked or unused one, with the same revoke-then-delete rule. The secret is never returned. Each change is audited with the administrator, the account and the key. An API key cannot revoke or delete through them a key of its own account.
@@ -428,6 +437,13 @@ An administrator (`write:users`) lists another user's keys and revokes a leaked 
 GET    /api/v2/users/{id}/apikeys                      // the user's keys
 DELETE /api/v2/users/{id}/apikeys/{key_id}             // revoke, then delete
 ```
+
+**Scopes for a fleet console.** Three admin-only scopes let a key do what a console does without
+`admin:system`: `read:instance` reads [the instance state](#instance-state), `write:backups` starts a
+backup (`POST /api/v2/system/backup/create`) and follows its job, `write:updates` installs an update
+(`POST /api/v2/system/updates/install`) and follows an HA rolling update
+(`GET /api/v2/system/updates/campaign`). Settings are read with `read:settings`. None of them reads,
+downloads or restores an archive, nor changes a setting.
 
 A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present. A bearer token that does not start with `ucm_ak_` (an IdP token relayed by an authenticating proxy, for instance) is not taken for a key: it is ignored, gets no CSRF exemption, and the session cookie applies.
 
@@ -3278,6 +3294,67 @@ Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `p
 
 ## System
 
+### Instance State
+
+What a console that watches several instances reads of this one (see
+[Managing several instances](MANAGING_INSTANCES.md)). It needs `read:instance`, a
+scope only an administrator holds and that a key can be limited to; nothing narrower reads it. The answer
+carries no secret: the database is named by its engine, never by its URL, and `Cache-Control:
+no-store` is set. No request leaves the instance to answer it.
+
+```http
+GET /api/v2/system/instance
+```
+
+```json
+{
+  "data": {
+    "schema_version": 1,
+    "instance_id": "5f0c2b9e8d7a4c1e9b3a6d2f1e0c9b8a",
+    "generated_at": "2026-11-26T10:00:00Z",
+    "version": "3.1",
+    "update_channel": "stable",
+    "install": {"family": "deb"},
+    "mode": {"ha": true, "node_id": "ucm-a", "nodes": [
+      {"node_id": "ucm-a", "leader": true, "stopped": false, "stale": false, "version": "3.1",
+       "heartbeat_at": "2026-11-26T09:59:42Z", "package_family": "deb"}]},
+    "database": {"engine": "postgresql", "server_version": "16.4"},
+    "health": {"status": "ok", "checks": {"database": {"status": "ok"},
+               "filesystem": {"status": "ok"}, "cluster": {"status": "ok"}}, "maintenance": null},
+    "cas": {"total": 4, "active": 3, "expired": 1, "expiring_90_days": 0, "expiring_365_days": 1,
+            "next_expiry": "2027-03-01T00:00:00Z"},
+    "update": {"available": true, "latest_version": "3.2", "checked_at": "2026-11-26T03:00:12Z"},
+    "backup": {"scheduled": true, "last_archive_at": "2026-11-26T02:00:05Z",
+               "last_outcome": "ok", "last_outcome_at": "2026-11-26T02:00:07Z"},
+    "fips": {"requested": false, "active": false}
+  }
+}
+```
+
+- `schema_version`: `1`. A later release only adds fields to it; removing a field or changing
+  what one means takes `2`.
+- `instance_id`: 32 hexadecimal characters, created once and kept in the database: the same
+  after a restart, a change of address or a restore, and the same on every node of an HA
+  cluster. A restore keeps the id of the database it restores into; a restore on another
+  machine therefore keeps that machine's id. A copy of the database itself (file copy,
+  `pg_dump`) carries the id with it.
+- `install.family`: `deb`, `rpm-elN`, `rpm-fedora`, `container` or `unknown`.
+- `mode`: `node_id` and `nodes` are `null` on a single node; in HA, `nodes` lists every node
+  registered and not gone, `null` when the registry cannot be read.
+- `health.status`: `ok`, `degraded` (a check of `/health/ready` failed), `maintenance` (an HA
+  cluster maintenance). In safe mode the route answers `503` like the rest of the API, and
+  `/health/ready` says why. When the database check fails, what the database holds is
+  `null` (`instance_id`, `update_channel`, `cas`, `update`, `backup`, and `mode.nodes` in HA)
+  instead of an error.
+- `cas`: active means holding its certificate, not revoked, not expired; `expiring_90_days` and
+  `expiring_365_days` count active CAs, `next_expiry` is the nearest end of an active CA.
+- `update`: the verdict of the last scheduled update check, all `null` before the first one;
+  `latest_version` is set only when `available` is `true`. A version found on the `rc` channel
+  gives `available: null` once the channel is back to `stable`, until the next check.
+- `backup`: whether the scheduled backup is on, when the newest archive was written (`null`
+  without one) and the outcome of the last scheduled run (`ok`, `failed`, `skipped`, `null`
+  before the first).
+
 ### Background Jobs
 
 Long operations (the manual backup, the audit chain verification) run outside the web
@@ -3304,8 +3381,8 @@ GET  /api/v2/system/jobs/<id>
 POST /api/v2/system/jobs/<id>/cancel
 ```
 
-Each job is read and cancelled with its own permission (`admin:system` for `backup`,
-`read:audit` for `audit_verify`); the
+Each job is read and cancelled with its own permission (`admin:system` or `write:backups` for
+`backup`, `read:audit` for `audit_verify`); the
 list shows only the kinds the caller may read, and the id of another kind answers `404`.
 
 ```json
@@ -3467,6 +3544,7 @@ GET /api/v2/system/backup/list
 GET /api/v2/system/backups
 
 # Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id"; POST /api/v2/system/backup is the same route)
+# admin:system or write:backups; every other route of this block takes admin:system
 # Removes nothing for the ceiling: "warning" is set when the
 # archives are then above it, null otherwise; the next retention applies it
 # A background job of kind "backup" (see Background Jobs): within 25 s the answer of before
@@ -3790,6 +3868,7 @@ POST /api/v2/system/updates/install
 # Docker/Kubernetes: 400, the orchestrator updates; 502 with the message of a failed check)
 POST /api/v2/system/updates/install
 
+# install and campaign take admin:system or write:updates; the other routes admin:system
 # HA rolling update state: {ha, campaign: {status (running|stopped|done), target, order,
 # done, skipped, current: {node, since, state}, failed: {node, reason, at},
 # packages: {family: {download_url, package_name, sha256}}, families: {node: family}} or null}

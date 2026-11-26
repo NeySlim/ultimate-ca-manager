@@ -1931,7 +1931,8 @@
       "deleted": "Clave API eliminada",
       "loadFailed": "No se pudieron cargar las claves API",
       "updateFailed": "No se pudo modificar la clave API",
-      "meta": "{{scope}} · creada el {{created}} · último uso {{used}} · expira {{expires}}"
+      "meta": "{{scope}} · creada el {{created}} · último uso {{used}} · expira {{expires}}",
+      "allowedFrom": "permitida desde {{networks}}"
     },
     "createUser": "Crear usuario",
     "editUser": "Editar usuario",
@@ -4731,7 +4732,13 @@
     "confirmItIsYou": "Confirme que es usted",
     "confirmWithPassword": "Introduzca su contraseña para confirmar este cambio",
     "confirmWithCode": "Introduzca el código de su aplicación de autenticación para confirmar este cambio",
-    "confirmEmailChange": "Introduzca su contraseña para cambiar el correo electrónico: los enlaces de restablecimiento de contraseña se envían a él"
+    "confirmEmailChange": "Introduzca su contraseña para cambiar el correo electrónico: los enlaces de restablecimiento de contraseña se envían a él",
+    "scopeInstance": "Gestión de instancia (consola de flota)",
+    "allowedNetworks": "Direcciones de origen permitidas",
+    "allowedNetworksHint": "Direcciones IP o redes CIDR desde las que se usa la clave, separadas por comas o líneas. Vacío: cualquier dirección.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Permitida desde",
+    "apiKeyAnyAddress": "Cualquier dirección"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",
@@ -4767,7 +4774,10 @@
       "trustStore": "Almacén de confianza",
       "hsmManagement": "Gestión de HSM",
       "ssh": "Certificados SSH",
-      "sshCas": "Autoridades de certificación SSH"
+      "sshCas": "Autoridades de certificación SSH",
+      "instanceState": "Estado de la instancia",
+      "backups": "Copias de seguridad",
+      "updates": "Actualizaciones"
     },
     "customRole": "Rol Personalizado",
     "noCustomRole": "Ninguno (solo rol base)",

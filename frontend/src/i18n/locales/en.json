@@ -1931,7 +1931,8 @@
       "deleted": "API key deleted",
       "loadFailed": "Could not load the API keys",
       "updateFailed": "Could not update the API key",
-      "meta": "{{scope}} · created on {{created}} · last used {{used}} · expires {{expires}}"
+      "meta": "{{scope}} · created on {{created}} · last used {{used}} · expires {{expires}}",
+      "allowedFrom": "allowed from {{networks}}"
     },
     "createUser": "Create User",
     "editUser": "Edit User",
@@ -4731,7 +4732,13 @@
     "confirmItIsYou": "Confirm it is you",
     "confirmWithPassword": "Enter your password to confirm this change",
     "confirmWithCode": "Enter the code of your authenticator app to confirm this change",
-    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it"
+    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it",
+    "scopeInstance": "Instance management (fleet console)",
+    "allowedNetworks": "Allowed source addresses",
+    "allowedNetworksHint": "IP addresses or CIDR networks the key is used from, separated by commas or lines. Empty: any address.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Allowed from",
+    "apiKeyAnyAddress": "Any address"
   },
   "rbac": {
     "title": "Role-Based Access Control",
@@ -4767,7 +4774,10 @@
       "trustStore": "Trust Store",
       "hsmManagement": "HSM Management",
       "ssh": "SSH Certificates",
-      "sshCas": "SSH Certificate Authorities"
+      "sshCas": "SSH Certificate Authorities",
+      "instanceState": "Instance state",
+      "backups": "Backups",
+      "updates": "Updates"
     },
     "customRole": "Custom Role",
     "noCustomRole": "None (base role only)",

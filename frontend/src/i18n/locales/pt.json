@@ -1931,7 +1931,8 @@
       "deleted": "Chave de API excluída",
       "loadFailed": "Não foi possível carregar as chaves de API",
       "updateFailed": "Não foi possível alterar a chave de API",
-      "meta": "{{scope}} · criada em {{created}} · último uso {{used}} · expira {{expires}}"
+      "meta": "{{scope}} · criada em {{created}} · último uso {{used}} · expira {{expires}}",
+      "allowedFrom": "permitida a partir de {{networks}}"
     },
     "createUser": "Criar usuário",
     "editUser": "Editar usuário",
@@ -4731,7 +4732,13 @@
     "confirmItIsYou": "Confirme que é você",
     "confirmWithPassword": "Digite sua senha para confirmar esta alteração",
     "confirmWithCode": "Digite o código do seu aplicativo autenticador para confirmar esta alteração",
-    "confirmEmailChange": "Digite sua senha para alterar o email: os links de redefinição de senha são enviados para ele"
+    "confirmEmailChange": "Digite sua senha para alterar o email: os links de redefinição de senha são enviados para ele",
+    "scopeInstance": "Gestão da instância (consola de frota)",
+    "allowedNetworks": "Endereços de origem permitidos",
+    "allowedNetworksHint": "Endereços IP ou redes CIDR a partir dos quais a chave é usada, separados por vírgulas ou linhas. Vazio: qualquer endereço.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Permitida a partir de",
+    "apiKeyAnyAddress": "Qualquer endereço"
   },
   "rbac": {
     "title": "Controle de acesso baseado em funções",
@@ -4767,7 +4774,10 @@
       "trustStore": "Armazém de confiança",
       "hsmManagement": "Gerenciamento de HSM",
       "ssh": "Certificados SSH",
-      "sshCas": "Autoridades de certificação SSH"
+      "sshCas": "Autoridades de certificação SSH",
+      "instanceState": "Estado da instância",
+      "backups": "Cópias de segurança",
+      "updates": "Atualizações"
     },
     "customRole": "Papel Personalizado",
     "noCustomRole": "Nenhum (apenas função base)",

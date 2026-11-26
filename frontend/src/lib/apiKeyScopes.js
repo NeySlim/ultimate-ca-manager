@@ -12,6 +12,8 @@ export const API_KEY_SCOPES = {
     'read:certificates', 'write:certificates', 'read:cas', 'read:crl',
     'read:ssh', 'write:ssh', 'read:ssh_cas',
   ],
+  // A fleet console: reads the instance state and settings, starts a backup or an update
+  instance: ['read:instance', 'read:settings', 'write:backups', 'write:updates'],
 }
 
 /**
@@ -22,7 +24,7 @@ export function apiKeyScopePermissions(scope, holds = () => true) {
   return (API_KEY_SCOPES[scope] || ['*']).filter(p => p.includes('*') || holds(p))
 }
 
-const SCOPE_LABELS = { full: 'account.scopeFull', read: 'account.scopeReadOnly', readwrite: 'account.scopeReadWrite', certificates: 'account.scopeCertificates' }
+const SCOPE_LABELS = { full: 'account.scopeFull', read: 'account.scopeReadOnly', readwrite: 'account.scopeReadWrite', certificates: 'account.scopeCertificates', instance: 'account.scopeInstance' }
 
 /** A key's scope in words: its preset's name, else the permissions it holds by resource and action. */
 export function apiKeyScopeLabel(t, permissions) {

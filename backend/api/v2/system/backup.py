@@ -123,7 +123,7 @@ def _disk_meta(directory) -> dict:
 
 @bp.route('/api/v2/system/backup', methods=['POST'])
 @bp.route('/api/v2/system/backup/create', methods=['POST'])
-@require_auth(['admin:system'])
+@require_auth(['admin:system', 'write:backups'], any_of=True)
 def create_backup():
     """Create an encrypted archive in the backup directory."""
     # The gate lets this start through: a maintenance refuses it before any check or audit write

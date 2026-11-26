@@ -1931,7 +1931,8 @@
       "deleted": "API-Schlüssel gelöscht",
       "loadFailed": "Die API-Schlüssel konnten nicht geladen werden",
       "updateFailed": "Der API-Schlüssel konnte nicht geändert werden",
-      "meta": "{{scope}} · erstellt am {{created}} · zuletzt verwendet {{used}} · läuft ab {{expires}}"
+      "meta": "{{scope}} · erstellt am {{created}} · zuletzt verwendet {{used}} · läuft ab {{expires}}",
+      "allowedFrom": "erlaubt von {{networks}}"
     },
     "createUser": "Benutzer erstellen",
     "editUser": "Benutzer bearbeiten",
@@ -4731,7 +4732,13 @@
     "confirmItIsYou": "Bestätigen Sie, dass Sie es sind",
     "confirmWithPassword": "Geben Sie Ihr Passwort ein, um diese Änderung zu bestätigen",
     "confirmWithCode": "Geben Sie den Code Ihrer Authenticator-App ein, um diese Änderung zu bestätigen",
-    "confirmEmailChange": "Geben Sie Ihr Passwort ein, um die E-Mail-Adresse zu ändern: An sie werden Links zum Zurücksetzen des Passworts gesendet"
+    "confirmEmailChange": "Geben Sie Ihr Passwort ein, um die E-Mail-Adresse zu ändern: An sie werden Links zum Zurücksetzen des Passworts gesendet",
+    "scopeInstance": "Instanzverwaltung (Flottenkonsole)",
+    "allowedNetworks": "Erlaubte Quelladressen",
+    "allowedNetworksHint": "IP-Adressen oder CIDR-Netze, von denen aus der Schlüssel verwendet wird, durch Kommas oder Zeilen getrennt. Leer: jede Adresse.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Erlaubt von",
+    "apiKeyAnyAddress": "Jede Adresse"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
@@ -4767,7 +4774,10 @@
       "trustStore": "Vertrauensspeicher",
       "hsmManagement": "HSM-Verwaltung",
       "ssh": "SSH-Zertifikate",
-      "sshCas": "SSH-Zertifizierungsstellen"
+      "sshCas": "SSH-Zertifizierungsstellen",
+      "instanceState": "Instanzstatus",
+      "backups": "Sicherungen",
+      "updates": "Aktualisierungen"
     },
     "customRole": "Benutzerdefinierte Rolle",
     "noCustomRole": "Keine (nur Basisrolle)",

@@ -28,6 +28,7 @@ Technical documentation for Ultimate Certificate Manager.
 
 - **[HSM_DOCKER.md](./HSM_DOCKER.md)**: HSM integration in Docker
 - **[LOG_ROTATION.md](./LOG_ROTATION.md)**: Log rotation configuration
+- **[MANAGING_INSTANCES.md](./MANAGING_INSTANCES.md)**: Managing several instances: the state route, the API key scopes and source networks a console uses, the instance identity
 - **[REDIS.md](./REDIS.md)**: Redis, optional: holds the sessions and events of a high-availability cluster instead of PostgreSQL
 - **[TESTING.md](./TESTING.md)**: Testing & linting guide (unit + E2E + ESLint + Ruff)
 

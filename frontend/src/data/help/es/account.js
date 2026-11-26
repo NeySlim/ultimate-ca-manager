@@ -38,6 +38,8 @@ export default {
           { label: 'Crear clave', text: 'Generar una clave API nueva, con caducidad opcional tras un número de días' },
           { label: 'Permisos', text: 'Una clave lleva el alcance elegido al crearla, nunca más que los permisos propios. Una clave solo puede crear o regenerar una clave cuyos permisos posea ella misma, y que caduque como muy tarde cuando ella. Regenerar, que solo ofrece la API, conserva la duración de la clave; una clave revocada o caducada no puede regenerarse' },
           { label: 'Revocar', text: 'Invalidar de inmediato una clave API' },
+          { label: 'Gestión de instancia', text: 'Ajuste para una consola que supervisa varias instancias: lee el estado de la instancia y los ajustes, inicia una copia de seguridad o una actualización, nada más. Solo para administradores' },
+          { label: 'Direcciones de origen permitidas', text: 'Direcciones IP o redes CIDR desde las que puede usarse la clave; desde cualquier otra dirección la clave se rechaza (403) y su último uso no se actualiza. Una clave creada por una clave limitada queda dentro de sus redes. Vacío: cualquier dirección' },
           { label: 'Usuarios desactivados', text: 'Las claves API de un usuario desactivado se rechazan aunque la propia clave siga siendo válida' },
           { label: 'Solo sesión interactiva', text: 'Las claves API, incluso las de Acceso completo, no pueden cambiar el perfil, la contraseña, el 2FA, las llaves de seguridad, los certificados mTLS ni las sesiones, ni alcanzar la propia cuenta mediante las acciones de administración de usuarios: iniciar sesión de forma interactiva' },
         ]
@@ -140,6 +142,9 @@ O enviarla como token bearer: \`Authorization: Bearer <your-api-key>\`.
 Cada clave lleva el alcance elegido al crearla (**Acceso completo**, **Solo lectura**, **Lectura y escritura**, **Solo certificados**) y nunca más acceso que la cuenta. **Solo certificados** emite certificados X.509 y SSH y lee las CA, las CA SSH y las CRL, pero no puede crear ni modificar una CA. Una clave solo puede crear o regenerar una clave cuyos permisos posea ella misma, y esa clave caduca como muy tarde cuando la que lo pide. Regenerar una clave, que solo ofrece la API (\`POST /api/v2/account/apikeys/<id>/regenerate\`), conserva sus permisos y su duración; una clave revocada o caducada no puede regenerarse.
 
 Las claves API, incluso las de Acceso completo, no pueden cambiar el perfil, la contraseña, el 2FA, las llaves de seguridad, los certificados mTLS ni las sesiones, ni alcanzar la propia cuenta mediante las acciones de administración de usuarios: estas requieren una sesión interactiva.
+
+### Gestión de instancia y direcciones de origen
+El ajuste **Gestión de instancia**, ofrecido a los administradores, da a una clave lo que necesita una consola que supervisa varias instancias: \`read:instance\` (\`GET /api/v2/system/instance\`), \`read:settings\`, \`write:backups\` y \`write:updates\`, sin \`admin:system\`. **Direcciones de origen permitidas** limita una clave a direcciones IP o redes CIDR: desde cualquier otra dirección se rechaza (403). Una clave creada por una clave limitada queda dentro de sus redes, y regenerarla las conserva.
 
 ### Revocar claves
 **Revocar** en una clave en uso la revoca de inmediato: las solicitudes con ella se rechazan desde ese momento. Una clave revocada o caducada ofrece **Eliminar**, que la borra. La tabla muestra primero las claves en uso y después las caducadas y revocadas; se busca por nombre o prefijo, se ordena por cualquier columna y se pagina a partir de diez claves.

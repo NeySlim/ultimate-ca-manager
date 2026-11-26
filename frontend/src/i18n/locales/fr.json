@@ -144,7 +144,13 @@
     "confirmItIsYou": "Confirmez qu’il s’agit bien de vous",
     "confirmWithPassword": "Saisissez votre mot de passe pour confirmer cette modification",
     "confirmWithCode": "Saisissez le code de votre application d’authentification pour confirmer cette modification",
-    "confirmEmailChange": "Saisissez votre mot de passe pour changer l’adresse e-mail : les liens de réinitialisation du mot de passe y sont envoyés"
+    "confirmEmailChange": "Saisissez votre mot de passe pour changer l’adresse e-mail : les liens de réinitialisation du mot de passe y sont envoyés",
+    "scopeInstance": "Gestion d’instance (console de parc)",
+    "allowedNetworks": "Adresses sources autorisées",
+    "allowedNetworksHint": "Adresses IP ou réseaux CIDR depuis lesquels la clé est utilisée, séparés par des virgules ou des lignes. Vide : toute adresse.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Autorisée depuis",
+    "apiKeyAnyAddress": "Toute adresse"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -3397,7 +3403,10 @@
       "trustStore": "Magasin de confiance",
       "hsmManagement": "Gestion HSM",
       "ssh": "Certificats SSH",
-      "sshCas": "Autorités de certification SSH"
+      "sshCas": "Autorités de certification SSH",
+      "instanceState": "État de l’instance",
+      "backups": "Sauvegardes",
+      "updates": "Mises à jour"
     },
     "customRole": "Rôle personnalisé",
     "noCustomRole": "Aucun (rôle de base uniquement)",
@@ -5331,7 +5340,8 @@
       "deleted": "Clé API supprimée",
       "loadFailed": "Impossible de charger les clés API",
       "updateFailed": "Impossible de modifier la clé API",
-      "meta": "{{scope}} · créée le {{created}} · dernier usage {{used}} · expire {{expires}}"
+      "meta": "{{scope}} · créée le {{created}} · dernier usage {{used}} · expire {{expires}}",
+      "allowedFrom": "autorisée depuis {{networks}}"
     },
     "createUser": "Créer un utilisateur",
     "editUser": "Modifier l’utilisateur",

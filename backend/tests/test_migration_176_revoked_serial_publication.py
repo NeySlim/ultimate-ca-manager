@@ -17,7 +17,7 @@ def _migration():
     return importlib.import_module('migrations._from_2_254.176_revoked_serial_publication')
 
 
-def test_the_step_follows_175():
+def test_the_step_follows_175_in_the_upgrade():
     from migrations._from_2_254 import STEPS
     assert STEPS.index('176_revoked_serial_publication') > STEPS.index('175_certificate_comment')
 

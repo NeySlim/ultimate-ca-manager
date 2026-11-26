@@ -17,9 +17,8 @@ def _migration():
     return importlib.import_module('migrations._from_2_254.177_ca_description')
 
 
-def test_the_step_is_the_last_of_the_upgrade():
+def test_the_step_follows_176_in_the_upgrade():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == '177_ca_description'
     assert STEPS.index('177_ca_description') > STEPS.index('176_revoked_serial_publication')
 
 

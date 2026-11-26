@@ -1931,7 +1931,8 @@
       "deleted": "APIキーを削除しました",
       "loadFailed": "APIキーを読み込めませんでした",
       "updateFailed": "APIキーを更新できませんでした",
-      "meta": "{{scope}} · 作成日 {{created}} · 最終使用 {{used}} · 有効期限 {{expires}}"
+      "meta": "{{scope}} · 作成日 {{created}} · 最終使用 {{used}} · 有効期限 {{expires}}",
+      "allowedFrom": "許可元 {{networks}}"
     },
     "createUser": "ユーザーを作成",
     "editUser": "ユーザーを編集",
@@ -4731,7 +4732,13 @@
     "confirmItIsYou": "本人確認",
     "confirmWithPassword": "この変更を確認するにはパスワードを入力してください",
     "confirmWithCode": "この変更を確認するには認証アプリのコードを入力してください",
-    "confirmEmailChange": "メールアドレスを変更するにはパスワードを入力してください。パスワードリセットのリンクはこのアドレスに送信されます"
+    "confirmEmailChange": "メールアドレスを変更するにはパスワードを入力してください。パスワードリセットのリンクはこのアドレスに送信されます",
+    "scopeInstance": "インスタンス管理（フリートコンソール）",
+    "allowedNetworks": "許可する送信元アドレス",
+    "allowedNetworksHint": "キーを使用する IP アドレスまたは CIDR ネットワーク（カンマまたは改行で区切る）。空欄の場合はすべてのアドレス。",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "許可元",
+    "apiKeyAnyAddress": "すべてのアドレス"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
@@ -4767,7 +4774,10 @@
       "trustStore": "トラストストア",
       "hsmManagement": "HSM管理",
       "ssh": "SSH証明書",
-      "sshCas": "SSH認証局"
+      "sshCas": "SSH認証局",
+      "instanceState": "インスタンスの状態",
+      "backups": "バックアップ",
+      "updates": "更新"
     },
     "customRole": "カスタムロール",
     "noCustomRole": "なし（基本ロールのみ）",

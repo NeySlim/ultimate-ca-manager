@@ -126,7 +126,10 @@ describe('AccountPage: Certificates Only API key', () => {
 })
 
 describe('AccountPage: API key creation', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    notify.showPrompt.mockResolvedValue('pw')
+  })
 
   it('creates one key for a double click, Create key disabled meanwhile', async () => {
     let release
@@ -140,11 +143,50 @@ describe('AccountPage: API key creation', () => {
     fireEvent.click(button)
     fireEvent.click(button)
     fireEvent.submit(form)
-    expect(m.createApiKey).toHaveBeenCalledTimes(1)
+    // The password prompt resolves first: one submit still reaches the service
+    await waitFor(() => expect(m.createApiKey).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(button).toBeDisabled())
     expect(button).toHaveAttribute('aria-busy', 'true')
     release({ data: { id: 1, key: 'k' } })
     await waitFor(() => expect(screen.getByText('account.apiKeyCreatedTitle')).toBeInTheDocument())
     expect(m.createApiKey).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('AccountPage: API key source networks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    m.createApiKey.mockResolvedValue({ data: { id: 1, key: 'k' } })
+    notify.showPrompt.mockResolvedValue('pw')
+  })
+
+  async function createWith(networks) {
+    render(<MemoryRouter><AccountPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByText('account.apiKeys'))[0])
+    fireEvent.click((await screen.findAllByText('account.createKey'))[0])
+    fireEvent.change(await screen.findByLabelText('account.apiKeyName'), { target: { value: 'console' } })
+    if (networks !== undefined) {
+      fireEvent.change(screen.getByLabelText('account.allowedNetworks'), { target: { value: networks } })
+    }
+    fireEvent.submit(screen.getByLabelText('account.apiKeyName').closest('form'))
+    await waitFor(() => expect(m.createApiKey).toHaveBeenCalledTimes(1))
+    return m.createApiKey.mock.calls[0][0].allowed_networks
+  }
+
+  it('sends the networks typed, one per line or comma', async () => {
+    expect(await createWith('192.0.2.0/24,\n 2001:db8::1 \n\n')).toEqual(['192.0.2.0/24', '2001:db8::1'])
+  })
+
+  it('sends an empty list when the field is left empty: any address', async () => {
+    expect(await createWith()).toEqual([])
+  })
+
+  it('offers the Instance management preset only to an account holding read:instance', async () => {
+    auth.permissions = ['read:certificates']
+    render(<MemoryRouter><AccountPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByText('account.apiKeys'))[0])
+    fireEvent.click((await screen.findAllByText('account.createKey'))[0])
+    await screen.findByLabelText('account.apiKeyName')
+    expect(screen.queryByText('account.scopeInstance')).toBeNull()
   })
 })

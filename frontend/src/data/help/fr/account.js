@@ -38,6 +38,8 @@ export default {
           { label: 'Créer une clé', text: 'Générer une nouvelle clé API, expirant éventuellement après un nombre de jours' },
           { label: 'Permissions', text: 'Une clé porte le périmètre choisi à sa création, jamais plus que vos propres permissions. Une clé ne peut créer ou régénérer qu’une clé dont elle détient elle-même les permissions, expirant au plus tard comme elle. Régénérer, ce que seule l’API propose, conserve la durée de vie de la clé ; une clé révoquée ou expirée ne peut pas être régénérée' },
           { label: 'Révoquer', text: 'Invalider immédiatement une clé API' },
+          { label: 'Gestion d’instance', text: 'Préréglage pour une console qui surveille plusieurs instances : lit l’état de l’instance et les réglages, lance une sauvegarde ou une mise à jour, rien d’autre. Proposé aux administrateurs seulement' },
+          { label: 'Adresses sources autorisées', text: 'Adresses IP ou réseaux CIDR depuis lesquels la clé peut être utilisée ; depuis toute autre adresse la clé est refusée (403) et sa dernière utilisation n’est pas mise à jour. Une clé créée par une clé limitée reste dans ses réseaux. Vide : toute adresse' },
           { label: 'Utilisateurs désactivés', text: 'Les clés API appartenant à un utilisateur désactivé sont rejetées même si la clé elle-même est encore valide' },
           { label: 'Session interactive uniquement', text: 'Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d’administration des utilisateurs : connectez-vous de façon interactive' },
         ]
@@ -140,6 +142,9 @@ Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <your-api-key>\`.
 Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d’accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les AC, les AC SSH et les CRL, mais ne peut ni créer ni modifier une AC. Une clé ne peut créer ou régénérer qu’une clé dont elle détient elle-même les permissions, et cette clé expire au plus tard avec celle qui la demande. Régénérer une clé, ce que seule l’API propose (\`POST /api/v2/account/apikeys/<id>/regenerate\`), conserve ses permissions et sa durée ; une clé révoquée ou expirée ne peut pas être régénérée.
 
 Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d’administration des utilisateurs : celles-ci exigent une session interactive.
+
+### Gestion d’instance et adresses sources
+Le préréglage **Gestion d’instance**, proposé aux administrateurs, donne à une clé ce dont a besoin une console qui surveille plusieurs instances : \`read:instance\` (\`GET /api/v2/system/instance\`), \`read:settings\`, \`write:backups\` et \`write:updates\`, sans \`admin:system\`. **Adresses sources autorisées** limite une clé à des adresses IP ou des réseaux CIDR : depuis toute autre adresse elle est refusée (403). Une clé créée par une clé limitée reste dans ses réseaux, et la régénérer les conserve.
 
 ### Révoquer des clés
 **Révoquer** sur une clé en usage la révoque immédiatement : les requêtes qui l’utilisent sont refusées dès lors. Une clé révoquée ou expirée propose **Supprimer**, qui la retire. Le tableau liste d’abord les clés en usage, puis les clés expirées et révoquées ; il se cherche par nom ou préfixe, se trie par chaque colonne et se pagine au-delà de dix clés.

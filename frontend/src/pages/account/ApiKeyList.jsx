@@ -49,6 +49,8 @@ export default function ApiKeyList({ keys, loading, onRevoke, onDelete, onCopy }
       columns={[
         { id: 'prefix', label: t('account.apiKeyPrefix'), cell: prefix, kind: 'fit', priority: 2, sort: 'prefix' },
         { id: 'scope', label: t('common.permissions'), cell: (key) => (key.permissions ? apiKeyScopeLabel(t, key.permissions) : '—'), kind: 'text', priority: 3, grow: true },
+        { id: 'networks', label: t('account.apiKeyAllowedFrom'), cell: (key) => (key.allowed_networks?.length
+          ? <span className="mono">{key.allowed_networks.join(', ')}</span> : t('account.apiKeyAnyAddress')), kind: 'text', priority: 4 },
         { id: 'created', label: t('common.created'), cell: (key) => formatDate(key.created_at), kind: 'fit', priority: 4, sort: 'created' },
         { id: 'used', label: t('account.apiKeyLastUsed'), cell: (key) => (key.last_used_at ? formatDate(key.last_used_at) : t('common.never')), kind: 'fit', priority: 3, sort: 'used' },
         { id: 'expires', label: t('common.expires'), cell: (key) => (key.expires_at ? formatDate(key.expires_at) : '—'), kind: 'fit', priority: 4, sort: 'expires' },

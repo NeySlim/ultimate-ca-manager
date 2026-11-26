@@ -11,6 +11,7 @@ from utils.response import success_response, error_response, created_response
 from utils.db_transaction import safe_commit
 from services.api_key_revocation import revoke_or_delete
 from auth.session_reverify import confirm_account_holder
+from auth import api_key_networks
 
 from . import bp
 
@@ -33,6 +34,17 @@ def _session_proof():
     if getattr(g, 'auth_method', None) == 'api_key':
         return None
     return confirm_account_holder(g.current_user, request.get_json(silent=True))
+
+
+_WIDER_NETWORKS = 'An API key can only create a key limited to its own networks'
+
+
+def _caller_key_networks():
+    """Networks of the API key making the request: a key it creates stays inside them."""
+    if getattr(g, 'auth_method', None) != 'api_key' or not getattr(g, 'api_key_id', None):
+        return []
+    key = db.session.get(APIKey, g.api_key_id)
+    return key.networks if key else []
 
 
 def _caller_key_expiry():
@@ -71,7 +83,8 @@ def create_api_key():
     Body: {
         "name": "Automation Script",
         "permissions": ["read:cas", "write:certificates"],
-        "expires_days": 365  // optional, default 365
+        "expires_days": 365,  // optional, default 365
+        "allowed_networks": ["192.0.2.0/24"]  // optional, any address when absent
     }
 
     Returns the key ONLY ONCE!
@@ -118,6 +131,16 @@ def create_api_key():
             )
         if not _caller_can_grant(perm, user_perms):
             return error_response(_NARROW_CALLER, 403)
+
+    try:
+        networks = api_key_networks.parse(data.get('allowed_networks'))
+    except ValueError as e:
+        return error_response(str(e), 400)
+    limits = _caller_key_networks()
+    if limits and not networks:
+        networks = limits
+    elif not api_key_networks.within(networks, limits):
+        return error_response(_WIDER_NETWORKS, 403)
 
     # Check limit (max 10 keys per user by default). Expired keys don't
     # count - is_active alone doesn't capture that, expiry is derived live
@@ -169,13 +192,15 @@ def create_api_key():
             permissions=data['permissions'],
             expires_days=expires_days,
             not_after=_caller_key_expiry(),
+            allowed_networks=networks,
         )
 
         AuditService.log_action(
             action='apikey_create',
             resource_type='api_key',
             resource_name=data['name'],
-            details=f'Created API key: {data["name"]}',
+            details=f'Created API key: {data["name"]}'
+                    + (f' (allowed from {", ".join(networks)})' if networks else ''),
             success=True
         )
 
@@ -296,6 +321,13 @@ def regenerate_api_key(key_id):
         return error_response('This key holds permissions you no longer have; delete it and create a new one', 403)
     if not all(_caller_can_grant(p, owner_perms) for p in old_perms):
         return error_response(_NARROW_CALLER, 403)
+    # As at creation: a limited caller's key cannot regenerate a secret valid outside its networks
+    networks, limits = old_key.networks, _caller_key_networks()
+    if limits and not networks:
+        networks = limits
+    elif not api_key_networks.within(networks, limits):
+        return error_response(_WIDER_NETWORKS, 403)
+    # Last check before the write: an authenticator code is spent by it
     refused = _session_proof()
     if refused:
         return refused
@@ -313,6 +345,7 @@ def regenerate_api_key(key_id):
             permissions=old_perms,
             expires_days=lifetime_days,
             not_after=_caller_key_expiry(),
+            allowed_networks=networks,
         )
 
         # Revoke old key

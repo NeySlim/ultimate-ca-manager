@@ -68,7 +68,7 @@ class AuthManager:
         # its header skipped CSRF, so it must not fall back to the session.
         api_key = presented_api_key(request_obj)
         if api_key:
-            return self.verify_api_key(api_key)
+            return self.verify_api_key(api_key, addr=request_obj.remote_addr)
         
         # 2. Check Session Cookie (Flask session)
         if 'user_id' in session:
@@ -78,12 +78,13 @@ class AuthManager:
         
         return None
     
-    def verify_api_key(self, key):
+    def verify_api_key(self, key, addr=None):
         """
         Verify API key and return user info
         
         Args:
             key: API key string (ucm_ak_...)
+            addr: the client address, checked against the key's allowed networks
         
         Returns:
             dict: User info with permissions, or None
@@ -112,6 +113,13 @@ class AuthManager:
         # itself is revoked.
         linked_user = api_key.user
         if not linked_user or not getattr(linked_user, 'active', False):
+            return None
+
+        # Outside its networks the key opens nothing and its use is not recorded; require_auth answers 403
+        from auth import api_key_networks
+        if not api_key_networks.admits(api_key.networks, addr):
+            api_key_networks.log_refusal(api_key.id, addr)
+            g.api_key_refused_address = True
             return None
         
         # last_used is telemetry: a lock its write swallows is not the request's
@@ -270,7 +278,8 @@ class AuthManager:
             logger.warning(f"Failed to read session_max_lifetime from SystemConfig, using 24h default: {e}")
         return 86400  # 24 hours default
     
-    def create_api_key(self, user_id, name, permissions, expires_days=365, not_after=None):
+    def create_api_key(self, user_id, name, permissions, expires_days=365, not_after=None,
+                       allowed_networks=None):
         """
         Create new API key
 
@@ -281,6 +290,7 @@ class AuthManager:
             expires_days: Days until expiration. Pass ``None`` or ``0`` for a
                 key that never expires.
             not_after: Latest expiry allowed, e.g. that of the key asking.
+            allowed_networks: Canonical source networks, None or empty for any address.
 
         Returns:
             dict: API key info (key is shown ONLY ONCE!)
@@ -310,7 +320,8 @@ class AuthManager:
             key_prefix=key_prefix,
             name=name,
             permissions=json.dumps(permissions),
-            expires_at=expires_at
+            expires_at=expires_at,
+            allowed_networks=json.dumps(allowed_networks) if allowed_networks else None,
         )
 
         db.session.add(api_key)
@@ -319,6 +330,7 @@ class AuthManager:
 
         # Return key - ONLY TIME WE SHOW IT!
         return {
+            'allowed_networks': api_key.networks,
             'key': key,  # ⚠️ Store this! We won't show it again
             'id': api_key.id,
             'name': name,
@@ -341,7 +353,7 @@ def refuse_api_key_on_own_account(user_id):
     return None
 
 
-def require_auth(permissions=None, session_only=False):
+def require_auth(permissions=None, session_only=False, any_of=False):
     """
     Decorator to protect routes with authentication
     Supports: Session, JWT, API Key (auto-detected)
@@ -351,6 +363,7 @@ def require_auth(permissions=None, session_only=False):
                     Examples: ['read:cas'], ['write:certificates', 'read:cas']
         session_only: refuse API keys; for routes that change how the
                     account signs in, whatever scopes the key holds
+        any_of: one of the permissions suffices instead of all of them
     
     Usage:
         @require_auth()  # Any authenticated user
@@ -373,6 +386,10 @@ def require_auth(permissions=None, session_only=False):
             if not auth_result:
                 from auth import restore_hold
                 restore_hold.forget()
+                if getattr(g, 'api_key_refused_address', False):
+                    from auth.api_key_networks import REFUSAL_MESSAGE
+                    from utils.response import error_response
+                    return error_response(REFUSAL_MESSAGE, 403)
                 from auth.session_lock import locked_refusal, locks_this_request
                 if locks_this_request():
                     return locked_refusal()
@@ -411,14 +428,12 @@ def require_auth(permissions=None, session_only=False):
                 user_perms = auth_result['permissions']
                 
                 # Wildcard check - '*' means all permissions
-                if '*' not in user_perms:
-                    # Check each required permission
-                    for perm in permissions:
-                        if not has_permission(perm, user_perms):
-                            return jsonify({
-                                'error': 'Forbidden',
-                                'message': 'Insufficient permissions'
-                            }), 403
+                held = [has_permission(perm, user_perms) for perm in permissions]
+                if '*' not in user_perms and not (any(held) if any_of else all(held)):
+                    return jsonify({
+                        'error': 'Forbidden',
+                        'message': 'Insufficient permissions'
+                    }), 403
             
             # Inject auth info into Flask's g object
             g.current_user = auth_result['user']

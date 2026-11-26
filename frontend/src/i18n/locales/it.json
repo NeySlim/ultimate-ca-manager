@@ -1931,7 +1931,8 @@
       "deleted": "Chiave API eliminata",
       "loadFailed": "Impossibile caricare le chiavi API",
       "updateFailed": "Impossibile modificare la chiave API",
-      "meta": "{{scope}} · creata il {{created}} · ultimo utilizzo {{used}} · scade {{expires}}"
+      "meta": "{{scope}} · creata il {{created}} · ultimo utilizzo {{used}} · scade {{expires}}",
+      "allowedFrom": "consentita da {{networks}}"
     },
     "createUser": "Crea utente",
     "editUser": "Modifica utente",
@@ -4731,7 +4732,13 @@
     "confirmItIsYou": "Conferma la tua identità",
     "confirmWithPassword": "Inserisci la password per confermare questa modifica",
     "confirmWithCode": "Inserisci il codice dell’app di autenticazione per confermare questa modifica",
-    "confirmEmailChange": "Inserisci la password per cambiare l’email: i link di reimpostazione della password vengono inviati a questo indirizzo"
+    "confirmEmailChange": "Inserisci la password per cambiare l’email: i link di reimpostazione della password vengono inviati a questo indirizzo",
+    "scopeInstance": "Gestione dell’istanza (console di flotta)",
+    "allowedNetworks": "Indirizzi di origine consentiti",
+    "allowedNetworksHint": "Indirizzi IP o reti CIDR da cui si usa la chiave, separati da virgole o righe. Vuoto: qualsiasi indirizzo.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Consentita da",
+    "apiKeyAnyAddress": "Qualsiasi indirizzo"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",
@@ -4767,7 +4774,10 @@
       "trustStore": "Archivio attendibilità",
       "hsmManagement": "Gestione HSM",
       "ssh": "Certificati SSH",
-      "sshCas": "Autorità di certificazione SSH"
+      "sshCas": "Autorità di certificazione SSH",
+      "instanceState": "Stato dell’istanza",
+      "backups": "Copie di backup",
+      "updates": "Aggiornamenti"
     },
     "customRole": "Ruolo Personalizzato",
     "noCustomRole": "Nessuno (solo ruolo base)",

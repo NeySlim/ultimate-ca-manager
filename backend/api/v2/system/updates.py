@@ -59,7 +59,7 @@ def check_updates():
 
 
 @bp.route('/api/v2/system/updates/install', methods=['POST'])
-@require_auth(['admin:system'])
+@require_auth(['admin:system', 'write:updates'], any_of=True)
 def install_update():
     """Download and install an update; in HA, start a rolling update of every node"""
     from services.updates import CONTAINER_HA_REFUSAL, is_container_install
@@ -201,7 +201,7 @@ def _start_rolling_update(update_info):
 
 
 @bp.route('/api/v2/system/updates/campaign', methods=['GET'])
-@require_auth(['admin:system'])
+@require_auth(['admin:system', 'write:updates'], any_of=True)
 def get_update_campaign():
     """HA rolling update state: target, nodes done, node in progress, failure and its reason"""
     from services.update_campaign import public_view, read_campaign

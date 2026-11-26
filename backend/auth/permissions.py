@@ -87,7 +87,7 @@ BUILTIN_ROLES = tuple(ROLE_PERMISSIONS)
 # management or SSO config), so they're unioned into VALID_RESOURCES below. Keep in sync
 # with @require_auth usage — tests/test_apikey_valid_resources.py fails if a new enforced
 # scope is added without registering its resource here (or granting it to a role above).
-ADMIN_ONLY_RESOURCES = {'users', 'system', 'sso', 'private_keys', 'deploy'}
+ADMIN_ONLY_RESOURCES = {'users', 'system', 'sso', 'private_keys', 'deploy', 'instance', 'backups', 'updates'}
 
 # Canonical set of resources an API key can be scoped to: every resource granted to a role
 # in ROLE_PERMISSIONS PLUS the admin-only resources above. Derived from these sources of
@@ -144,6 +144,9 @@ RESERVED_PERMISSIONS = {
     'delete:audit': 'erases the audit trail',
     'write:ad_connector': 'handles the bind secret of the AD service account',
     'write:hsm': 'loads native PKCS#11 modules into the UCM process',
+    'read:instance': 'shows version, cluster, backup and update state for fleet management',
+    'write:backups': 'starts a backup that holds every private key',
+    'write:updates': 'installs a new release of UCM',
 }
 
 
