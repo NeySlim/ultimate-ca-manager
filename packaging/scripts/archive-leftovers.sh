@@ -37,9 +37,11 @@ README_NEW=.README.txt.new
 # LOCALS: the local archives this run made, one per line between newlines
 DEST="" JOURNAL="" MADE_PARENT="" LOCALS=$NL EARLIER="" LAST_ERR="" LAST_DIR=""
 
+# The service account owned the log's directory, and no UCM service runs while this does: a link
+# or anything but a file it left at the log's path is never written through
 log_line() {
-    { mkdir -p "${LOG%/*}" && printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG"; } \
-        2>/dev/null || true
+    { mkdir -p "${LOG%/*}" && [ ! -L "$LOG" ] && { [ ! -e "$LOG" ] || [ -f "$LOG" ]; } \
+        && printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG"; } 2>/dev/null || true
 }
 say() { printf '%s\n' "$*"; log_line "$*"; }
 

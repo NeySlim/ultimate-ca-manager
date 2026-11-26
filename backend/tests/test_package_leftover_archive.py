@@ -432,6 +432,21 @@ def test_it_reports_what_it_found_where_it_went_and_that_ucm_starts_empty(tmp_pa
         assert SECRET not in text
 
 
+def test_the_log_is_never_appended_through_a_link(tmp_path):
+    """The service account owned /var/log/ucm: a link it left there leads nowhere root writes."""
+    box = Box(tmp_path)
+    victim = tmp_path / 'victim'
+    victim.write_text('precious')
+    victim.chmod(0o600)
+    box.log.parent.mkdir(parents=True)
+    box.log.symlink_to(victim)
+    out = box.run()
+    assert out.returncode == 0, out.stderr
+    assert 'starts empty' in out.stdout
+    assert victim.read_text() == 'precious' and stat.S_IMODE(victim.stat().st_mode) == 0o600
+    assert box.log.is_symlink()
+
+
 def _elsewhere(box, tmp_path):
     elsewhere = tmp_path / 'srv'
     elsewhere.mkdir()
