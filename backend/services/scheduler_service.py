@@ -741,7 +741,7 @@ class SchedulerService:
                             break
                         ran = False
                         try:
-                            ran = self._try_run(task, requested=task in requested)
+                            ran = self._run_leading(task, lock, requested=task in requested)
                         except Exception as e:
                             logger.error(
                                 f"Unexpected error running task '{task.name}': {e}",
@@ -760,6 +760,30 @@ class SchedulerService:
             # The next process waiting for the lock takes over from here
             self._release_lock()
             self._heartbeat(force=True)
+
+    def _run_leading(self, task: ScheduledTask, lock, requested: bool) -> bool:
+        """HA leader: while the task runs, a beat thread keeps this node's row and the state
+        it publishes fresh, however long the task lasts."""
+        if not _ha():
+            return self._try_run(task, requested=requested)
+        done = threading.Event()
+        beat = threading.Thread(target=self._beat_while_leading, args=(done, lock), daemon=True,
+                                name="SchedulerLeaderBeat")
+        beat.start()
+        try:
+            return self._try_run(task, requested=requested)
+        finally:
+            done.set()
+            beat.join()
+
+    def _beat_while_leading(self, done: threading.Event, lock) -> None:
+        """Beats only while the server says the lock is held: a leader whose session dropped
+        never writes the flag over the next leader's; the loop handles the loss after the task."""
+        while not done.wait(self.wake_interval / 2):
+            if not self._owns_lock or self.deposed or not lock.still_held():
+                return
+            self._heartbeat()
+            self._publish_state()
 
     def _start_node_tasks(self) -> None:
         """HA follower: due per-node tasks run in their own thread, so the loop keeps

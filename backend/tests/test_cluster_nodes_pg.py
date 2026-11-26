@@ -174,6 +174,62 @@ def test_a_pass_longer_than_the_stale_window_keeps_the_leader_fresh(app, ha, mon
     assert seen == [PREFIX + 'slow']
 
 
+def _long_task(s, name, release, started):
+    def run():
+        started.set()
+        release.wait(10)
+    s.register_task(name, run, interval=3600)
+    s.tasks[name]._created_at -= timedelta(seconds=3600)
+
+
+def test_the_leader_stays_fresh_during_one_task_longer_than_the_stale_window(app, ha):
+    """One task alone outlasting STALE_PASSES passes: the leader's row and the state it
+    publishes stay fresh while it runs, as the followers' do."""
+    import threading
+    release, started = threading.Event(), threading.Event()
+    a = ha('a')
+    _long_task(a, 'long', release, started)
+    a.start(app=app)
+    try:
+        assert started.wait(5)
+        time.sleep(scheduler_leader.STALE_PASSES * WAKE * 3)
+        with app.app_context():
+            summary = scheduler_leader.cluster_summary(WAKE)
+            assert a._owns_lock
+            assert summary['leader_node_id'] == PREFIX + 'a' and summary['stale'] == 0, summary
+            assert not a._stale(a._published_state())
+    finally:
+        release.set()
+
+
+def test_a_leader_that_lost_its_lock_during_a_long_task_never_reclaims_the_flag(app, ha):
+    """Its session gone, the other node leads: the beat of the running task stops, it never
+    writes the leader flag back over the new leader's."""
+    import threading
+    from models import db
+    from sqlalchemy import text
+    release, started = threading.Event(), threading.Event()
+    a, b = ha('a'), ha('b')
+    _long_task(a, 'long', release, started)
+    a.start(app=app)
+    try:
+        assert started.wait(5) and a._owns_lock
+        b.start(app=app)
+        assert wait_for(lambda: len(rows(app)) == 2)
+        with app.app_context():
+            db.session.execute(text('SELECT pg_terminate_backend(:p)'), {'p': a._leader_lock.backend_pid})
+            db.session.commit()
+        assert wait_for(lambda: rows(app) == {PREFIX + 'a': False, PREFIX + 'b': True})
+        seen = set()
+        deadline = time.monotonic() + scheduler_leader.STALE_PASSES * WAKE * 3
+        while time.monotonic() < deadline:
+            seen.add(tuple(sorted(rows(app).items())))
+            time.sleep(WAKE / 4)
+        assert seen == {((PREFIX + 'a', False), (PREFIX + 'b', True))}, seen
+    finally:
+        release.set()
+
+
 def _beat(app, name, token, age=0.0):
     """A heartbeat of node ``name`` written ``age`` seconds ago."""
     from models import ClusterNode, db
