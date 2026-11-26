@@ -1,4 +1,5 @@
 import { test, expect, uid } from './support/fixtures'
+import { PALETTES, usePalette, expectPalette } from './support/themes'
 
 // The product's dialogs drawn as the mockup's modal(): a native dialog, its widths, focus in and back
 type Box = { x: number; y: number; width: number; height: number }
@@ -111,5 +112,27 @@ for (const [width, height] of [[1600, 900], [390, 844]]) {
       expect(m!.inView, `${path} ${JSON.stringify(m)}`).toBe(true)
     }
     expect(long).toBeGreaterThan(2)
+  })
+}
+
+// The sticky actions of a long dialog lie on the dialog's own ground, opaque, in every palette
+for (const [family, mode] of PALETTES) {
+  test(`${family} ${mode}: the sticky actions of a long dialog share the dialog's opaque ground`, async ({ page, api: _api }) => {
+    test.setTimeout(120_000)
+    await usePalette(page, family, mode)
+    await page.setViewportSize({ width: 1600, height: 900 })
+    for (const [path, opener] of DIALOGS.slice(0, 3)) {
+      await page.goto(path)
+      await expectPalette(page, family, mode)
+      await page.locator(opener).first().click()
+      const dialog = page.locator('dialog[open]').last()
+      await expect(dialog, path).toBeVisible()
+      const m = await dialog.evaluate((d) => {
+        const actions = [...d.querySelectorAll('.modal-actions')].filter((a) => (a as HTMLElement).offsetParent).pop()
+        return { dialog: getComputedStyle(d).backgroundColor, actions: actions && getComputedStyle(actions).backgroundColor }
+      })
+      expect(m.actions, path).toBe(m.dialog)
+      expect(m.dialog, path).toMatch(/^rgb\(/)
+    }
   })
 }
