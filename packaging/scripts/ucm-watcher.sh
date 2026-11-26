@@ -287,6 +287,7 @@ if [ -f "$UPDATE_FILE" ]; then
     if [ -f "$SETUP" ] && ! PRECHECK=$(bash "$SETUP" update-precheck "$ROOT/opt/ucm" "$UCM_ENV" 2>&1); then
         log "ERROR: update refused: $PRECHECK"
         write_result failed precheck "$PRECHECK"
+        rm -rf "$(dirname "$PACKAGE_PATH")"
         finish_update
     fi
 

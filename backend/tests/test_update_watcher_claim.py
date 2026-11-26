@@ -253,3 +253,12 @@ def test_a_package_declaring_another_version_than_the_target_is_refused(host, na
 def test_an_unreadable_package_database_refuses_the_update(host):
     host.in_database = ''
     _refused(*host.run(host.package()), 'cannot be read from the package database')
+
+
+def test_a_refused_precheck_leaves_no_copy_in_roots_temporary_directory(host):
+    setup = host.root / 'opt/ucm/scripts/native-setup.sh'
+    setup.parent.mkdir(parents=True)
+    setup.write_text('echo "no compiler for the FIPS build"; exit 1\n')
+    result, calls = host.run(host.package())
+    _refused(result, calls, 'no compiler')
+    assert not list(host.tmp.glob('ucm-update.*'))
