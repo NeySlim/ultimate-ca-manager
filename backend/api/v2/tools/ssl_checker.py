@@ -3,6 +3,7 @@ import ipaddress
 import os
 import ssl
 import socket
+from time import monotonic
 
 from flask import request
 from cryptography import x509
@@ -39,13 +40,25 @@ def _vetted_addresses(hostname, port):
     return addresses
 
 
-def _connect(addresses, port):
-    last = None
+# One wait for the whole check, however many addresses the name has: connections and
+# handshake share it, so unreachable addresses never stack their timeouts
+CHECK_DEADLINE = 15
+CONNECT_TIMEOUT = 10
+
+
+def _connect(addresses, port, deadline):
+    last = socket.timeout('timed out')
     for address in addresses:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            break
         try:
-            return socket.create_connection((address, port), timeout=10)
+            sock = socket.create_connection((address, port), timeout=min(CONNECT_TIMEOUT, remaining))
         except OSError as exc:
             last = exc
+            continue
+        sock.settimeout(max(deadline - monotonic(), 0.1))  # the TLS handshake gets what is left
+        return sock
     raise last
 
 
@@ -83,7 +96,7 @@ def check_ssl():
 
         # Connect to the vetted addresses; the name still goes in SNI
         sni = None if _is_ip(hostname) else hostname
-        with _connect(addresses, port) as sock:
+        with _connect(addresses, port, monotonic() + CHECK_DEADLINE) as sock:
             with context.wrap_socket(sock, server_hostname=sni) as ssock:
                 # Get certificate chain
                 der_cert = ssock.getpeercert(binary_form=True)

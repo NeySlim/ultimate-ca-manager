@@ -76,3 +76,29 @@ def test_a_literal_forbidden_address_is_refused(auth_client, network, host):
 def test_a_port_out_of_range_is_refused(auth_client, network):
     assert _check(auth_client, port=70000).status_code == 400
     assert network['connected'] == []
+
+
+def test_unreachable_addresses_share_one_deadline(auth_client, monkeypatch):
+    """N addresses that never answer cost the request one bounded wait, not N waits."""
+    import api.v2.tools.ssl_checker as checker
+    import utils.ssrf_protection as ssrf
+    answers = [f'203.0.113.{n}' for n in range(1, 9)]
+    clock = {'now': 1000.0}
+    waits = []
+
+    def _getaddrinfo(host, *a, **kw):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (ip, 0)) for ip in answers]
+
+    def _connect(address, timeout=None, *a, **kw):
+        waits.append(timeout)
+        clock['now'] += timeout  # the address never answers: the whole wait is spent
+        raise socket.timeout('timed out')
+    monkeypatch.setattr(ssrf.socket, 'getaddrinfo', _getaddrinfo)
+    monkeypatch.setattr(checker, 'socket', types.SimpleNamespace(
+        create_connection=_connect, timeout=socket.timeout, gaierror=socket.gaierror))
+    monkeypatch.setattr(checker, 'monotonic', lambda: clock['now'])
+    r = _check(auth_client)
+    assert r.status_code == 400 and 'timeout' in r.get_json()['message'].lower(), r.data
+    assert waits and all(w > 0 for w in waits)
+    assert sum(waits) <= checker.CHECK_DEADLINE
+    assert len(waits) < len(answers)
