@@ -8,14 +8,19 @@ KRL files can be used in sshd_config:
     RevokedKeys /etc/ssh/revoked_keys
 """
 
+import hashlib
 import logging
 import os
 import subprocess
 import tempfile
 import time
 
-from models.ssh import SSHCertificateAuthority, SSHCertificate
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
+
+from models.ssh import SSHCertificateAuthority, SSHCertificate, SSHKRL
 from models import db
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +41,61 @@ class SSHKRLService:
     """Service for generating SSH Key Revocation Lists"""
 
     @staticmethod
-    def generate_krl(ca_id):
+    def revocation_digest(ca):
+        """SHA-256 of the CA key and its sorted revocation lines: what a KRL of *ca* holds."""
+        revoked = SSHCertificate.query.filter_by(ssh_ca_id=ca.id, revoked=True).all()
+        lines = sorted(_revocation_line(cert) for cert in revoked)
+        material = (ca.public_key or '').strip() + '\n' + ''.join(lines)
+        return hashlib.sha256(material.encode('utf-8')).hexdigest()
+
+    @staticmethod
+    def published(ca_id):
+        """The stored KRL of the CA, rebuilt with a higher version when its revocations changed.
+        Written with a compare-and-set on the version, which every write raises: two nodes that
+        rebuild at once keep one KRL, which both then serve."""
+        ca = db.session.get(SSHCertificateAuthority, ca_id)
+        if not ca:
+            raise ValueError(f"SSH CA not found: {ca_id}")
+        table = SSHKRL.__table__
+        for _ in range(3):
+            row = db.session.execute(table.select().where(table.c.ssh_ca_id == ca_id)).mappings().first()
+            digest = SSHKRLService.revocation_digest(ca)
+            if row is not None and row['digest'] == digest:
+                return {'data': bytes(row['data']), 'version': int(row['version']),
+                        'updated_at': row['updated_at']}
+            floor = int(row['version']) + 1 if row is not None else 0
+            version = max(floor, time.time_ns() // 1_000_000)
+            data = SSHKRLService.generate_krl(ca_id, version=version)
+            now = utc_now()
+            values = dict(version=version, digest=digest, data=data, updated_at=now)
+            try:
+                if row is None:
+                    db.session.execute(table.insert().values(ssh_ca_id=ca_id, **values))
+                else:
+                    written = db.session.execute(update(table).where(
+                        table.c.ssh_ca_id == ca_id, table.c.version == row['version']).values(**values))
+                    if written.rowcount != 1:
+                        db.session.rollback()
+                        continue
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                continue
+            logger.info(f"Published KRL version {version} of SSH CA '{ca.descr}'")
+            return {'data': data, 'version': version, 'updated_at': now}
+        raise RuntimeError("the KRL changed three times while it was being published")
+
+    @staticmethod
+    def publish(ca_id):
+        """After a revocation: the stored KRL follows at once; a failure waits for the next read."""
+        try:
+            SSHKRLService.published(ca_id)
+        except Exception as exc:
+            db.session.rollback()
+            logger.error(f"Failed to publish the KRL of SSH CA {ca_id}: {exc}")
+
+    @staticmethod
+    def generate_krl(ca_id, version=None):
         """Generate a KRL file containing all revoked certificates for a CA.
 
         Uses ssh-keygen -k to create a binary KRL.
@@ -75,10 +134,12 @@ class SSHKRLService:
                 for cert in revoked_certs:
                     f.write(_revocation_line(cert))
 
-            # PROTOCOL.krl: krl_version increases each time the KRL changes; every
-            # generation is a new KRL, so its time in milliseconds is used
+            # PROTOCOL.krl: krl_version increases each time the KRL changes; without one
+            # given, a generation is a new KRL and takes its time in milliseconds
+            if version is None:
+                version = time.time_ns() // 1_000_000
             result = subprocess.run(
-                ['ssh-keygen', '-k', '-z', str(time.time_ns() // 1_000_000),
+                ['ssh-keygen', '-k', '-z', str(int(version)),
                  '-f', krl_path, '-s', ca_pub_path, revoked_serials_path],
                 capture_output=True, text=True, timeout=30
             )

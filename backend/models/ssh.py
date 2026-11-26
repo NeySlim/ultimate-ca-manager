@@ -82,6 +82,7 @@ class SSHCertificateAuthority(db.Model if db else object):
     # Relationships
     certificates = db.relationship('SSHCertificate', backref='ca', lazy='dynamic',
                                    cascade='all, delete-orphan')
+    published_krl = db.relationship('SSHKRL', uselist=False, cascade='all, delete-orphan')
 
     VALID_CA_TYPES = ['user', 'host']
     VALID_KEY_TYPES = ['ed25519', 'rsa', 'ecdsa-p256', 'ecdsa-p384', 'ecdsa-p521']
@@ -349,3 +350,18 @@ class SSHCertificate(db.Model if db else object):
 
     def __repr__(self):
         return f'<SSHCertificate {self.key_id} ({self.cert_type})>'
+
+
+class SSHKRL(db.Model if db else object):
+    """The KRL an SSH CA publishes, in the database so every node serves the same bytes (HA).
+    ``digest`` covers the CA key and its revocation lines: a new set is a new KRL and version."""
+
+    __tablename__ = 'ssh_krls'
+
+    ssh_ca_id = db.Column(db.Integer, db.ForeignKey('ssh_cas.id', ondelete='CASCADE'),
+                          primary_key=True, autoincrement=False)
+    # PROTOCOL.krl krl_version: grows with every change, never with a download
+    version = db.Column(db.BigInteger, nullable=False)
+    digest = db.Column(db.String(64), nullable=False)
+    data = db.Column(db.LargeBinary, nullable=False)
+    updated_at = db.Column(db.DateTime, nullable=False)

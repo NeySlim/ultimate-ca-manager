@@ -22,6 +22,7 @@ SAMPLE_PATH = {
     '/.well-known/': '/.well-known/est/simpleenroll',
     '/tsa/': '/tsa/reply',
     '/ssh/setup/': '/ssh/setup/host',
+    '/ssh/krl/': '/ssh/krl/ca-refid',
     '/ADPolicyProvider_CEP_': '/ADPolicyProvider_CEP_UsernamePassword/service.svc',
     '/ADCertificateService_CES_': '/ADCertificateService_CES_UsernamePassword/service.svc',
 }
@@ -77,7 +78,7 @@ class TestABarePathIsNotAPrefix:
 
 
 class TestTheLimitsStayProtocolSized:
-    NEWLY_CLASSIFIED = ['/tsa', '/ca/x.crt', '/ssh/setup/x',
+    NEWLY_CLASSIFIED = ['/tsa', '/ca/x.crt', '/ssh/setup/x', '/ssh/krl/x',
                         '/ADPolicyProvider_CEP_UsernamePassword/service.svc',
                         '/ADCertificateService_CES_UsernamePassword/service.svc']
 

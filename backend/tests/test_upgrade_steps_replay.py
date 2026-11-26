@@ -21,10 +21,12 @@ def dialect(request):
 
 def _as_rc6(db):
     """A 2.254 database upgraded, then put in the state 3.0-rc6 left: 300 recorded, no step
-    row, no certificates.comment nor revoked_serials.published (steps 175, 176 came after it)."""
+    row, no certificates.comment, revoked_serials.published nor ssh_krls (steps 175 to 177 came
+    after it)."""
     assert db.upgrade()
     db.run("ALTER TABLE certificates DROP COLUMN comment")
     db.run("ALTER TABLE revoked_serials DROP COLUMN published")
+    db.run("DROP TABLE ssh_krls")
     db.run("DELETE FROM _migrations WHERE name LIKE :p", {'p': STEP_ROW})
     assert '300_upgrade_from_2_254' in db.registry()
     assert not [n for n in db.registry() if n.startswith('300_upgrade_from_2_254/')]
@@ -119,6 +121,7 @@ def test_a_rc6_database_gets_the_comment_column_and_lists_its_certificates(rc6, 
     assert out.count('LIST 200') == 3, out[-3000:] + err[-3000:]
     assert 'comment' in _columns(rc6, 'certificates')
     assert 'published' in _columns(rc6, 'revoked_serials')
+    assert 'ssh_krls' in inspect(rc6.engine).get_table_names()
 
 
 def test_a_rc6_database_runs_the_steps_after_rc1_and_records_every_step(rc6, monkeypatch):
@@ -127,6 +130,7 @@ def test_a_rc6_database_runs_the_steps_after_rc1_and_records_every_step(rc6, mon
     assert rc6.upgrade()
     assert ran == [s for s in STEPS if s not in UNRECORDED]
     assert '175_certificate_comment' in ran and '176_revoked_serial_publication' in ran
+    assert '177_ssh_krls' in ran
     assert '165_sso_ldap_group_base_dn' in ran  # changed after rc1: runs again
     assert 'comment' in _columns(rc6, 'certificates')
     assert _holds_every_step(rc6)
@@ -156,12 +160,13 @@ def test_a_failed_step_is_not_recorded_and_runs_at_the_next_start(rc6, monkeypat
     assert rc6.upgrade() is False
     assert 'disk full' in capsys.readouterr().out
     assert '300_upgrade_from_2_254/175_certificate_comment' not in rc6.registry()
-    # The steps before it are recorded: the next start runs 175 alone
+    # The steps before it are recorded: the next start runs 175 and the steps after it
     assert '300_upgrade_from_2_254/174_windows_profile_renewal_cas' in rc6.registry()
     monkeypatch.setattr(package, 'step', real)
     ran = _spy_steps(monkeypatch)
     assert rc6.upgrade()
-    assert ran == ['175_certificate_comment', '176_revoked_serial_publication']
+    from migrations._from_2_254 import STEPS
+    assert ran == list(STEPS[STEPS.index('175_certificate_comment'):])
     assert 'comment' in _columns(rc6, 'certificates')
 
 

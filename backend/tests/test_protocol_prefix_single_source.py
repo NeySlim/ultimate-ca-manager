@@ -40,6 +40,7 @@ _PROTOCOL_PATHS = (
     '/.well-known/est/cacerts',
     '/.well-known/acme-challenge/token',
     '/ssh/setup/abc',
+    '/ssh/krl/abc',
     '/ADPolicyProvider_CEP_UsernamePassword/service.svc',
     '/ADCertificateService_CES_Kerberos/service.svc',
 )

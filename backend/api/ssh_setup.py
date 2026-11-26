@@ -12,12 +12,16 @@ Security:
 """
 
 import logging
+from email.utils import format_datetime
+from datetime import timezone
+
 from flask import Blueprint, request, Response
 
 from api.v2.ssh.validation import validate_setup_hostname
 from models.ssh import SSHCertificateAuthority
 from utils.sanitize import content_disposition
 from services.ssh_ca_service import SSHCAService
+from services.ssh_krl_service import SSHKRLService
 
 logger = logging.getLogger(__name__)
 
@@ -116,3 +120,42 @@ def get_public_key(refid):
     except Exception as e:
         logger.error(f"Failed to serve public key for refid {refid}: {e}")
         return Response('Error retrieving public key', status=500, mimetype='text/plain')
+
+
+def _etag_matches(header, etag):
+    """RFC 9110 13.1.2: If-None-Match compares weakly, and ``*`` matches any current KRL."""
+    if not header:
+        return False
+    for candidate in header.split(','):
+        candidate = candidate.strip()
+        if candidate == '*' or candidate.removeprefix('W/') == etag:
+            return True
+    return False
+
+
+@bp.route('/ssh/krl/<refid>', methods=['GET'])
+def get_public_krl(refid):
+    """The published KRL of an SSH CA, public as a CRL is: ETag and X-KRL-Version carry the
+    KRL version, which changes only with the revocations; a matching If-None-Match gets 304."""
+    ca = SSHCertificateAuthority.query.filter_by(refid=refid).first()
+    if not ca:
+        return Response('SSH CA not found\n', status=404, mimetype='text/plain')
+    try:
+        krl = SSHKRLService.published(ca.id)
+    except Exception as e:
+        logger.error(f"Failed to publish the KRL of SSH CA {ca.id}: {e}")
+        return Response('KRL unavailable\n', status=503, mimetype='text/plain',
+                        headers={'Retry-After': '60'})
+    etag = f'"{krl["version"]}"'
+    headers = {
+        'ETag': etag,
+        'X-KRL-Version': str(krl['version']),
+        # Stored by caches, revalidated on every use: a revocation is seen at the next pull
+        'Cache-Control': 'public, no-cache',
+        'Last-Modified': format_datetime(krl['updated_at'].replace(tzinfo=timezone.utc), usegmt=True),
+    }
+    if _etag_matches(request.headers.get('If-None-Match'), etag):
+        return Response(status=304, headers=headers)
+    headers['Content-Disposition'] = content_disposition(
+        ca.descr.replace(' ', '_'), '.krl', fallback=ca.refid, prefix='ssh_ca_')
+    return Response(krl['data'], mimetype='application/octet-stream', headers=headers)

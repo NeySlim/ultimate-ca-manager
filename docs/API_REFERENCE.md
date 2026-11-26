@@ -2298,6 +2298,14 @@ GET /api/v2/ssh/stats
 - `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate, with `revoked_with`: the ids of the other certificates of the CA that this revocation revoked with it, since the KRL revokes by serial, or by key ID for a certificate of serial 0: those holding the same serial, or bearing the same key ID whatever their serial (a certificate already revoked is not listed; empty but for a pair kept by an upgrade from 2.x or by the restore of a 2.x archive, and for a serial 0 certificate, which only an import brings), and `revoked_by`: the KRL entries that took them, in order, each `{"serial": n}` or `{"key_id": "..."}` (a key ID takes numbered certificates, whose serial then takes its other holders, so a serial 0 revocation may list its key ID and serials). Every certificate carries `serial_shared_with`, the ids of the other holders of its serial (always empty for serial 0). `DELETE` answers `204` or `409` when it cannot be deleted.
 - `stats` returns the counts shown on the SSH dashboard.
 
+### Public KRL
+
+```
+GET /ssh/krl/{refid}
+```
+
+The KRL of an SSH CA, without authentication, as a CRL is (`404` for an unknown CA). It is the KRL `GET /api/v2/ssh/cas/{ca_id}/krl` downloads: one per CA, stored in the database so every node of a cluster serves the same bytes. Its version (PROTOCOL.krl) changes only when the CA's revocations change, and a revocation publishes the new KRL at once. The response carries `ETag` (the version, quoted), `X-KRL-Version`, `Last-Modified` and `Cache-Control: public, no-cache`; a request whose `If-None-Match` names the current version gets `304` without a body. `503` with `Retry-After` when the KRL cannot be built.
+
 ---
 
 ## Deployment
@@ -5586,6 +5594,7 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 | Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |
 | Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
 | SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key` | [SSH Certificates](#ssh-certificates) |
+| SSH KRL | `/ssh/krl/{refid}` | [Public KRL](#public-krl) |
 
 The routes are always served; a protocol turned off in Settings refuses its requests with `503` (ACME, SCEP, EST, TSA, XCEP and WSTEP).
 

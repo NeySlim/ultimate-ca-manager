@@ -553,6 +553,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'acme_proxy_challenge_links': ('which in-flight proxy order a challenge belongs to, kept 24 hours; '
                                    'rebuilt when the client fetches the authorization'),
     'crls': 'regenerated from the CAs and their revocation records',
+    'ssh_krls': 'the published KRL of each SSH CA, rebuilt from its revoked certificates',
     'crl_metadata': 'regenerated with the CRLs; their numbering travels in crl_number_counters',
     'ocsp_responses': 'a response cache, rebuilt on demand',
     'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',

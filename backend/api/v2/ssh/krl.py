@@ -19,7 +19,7 @@ from models import db
 def get_ssh_ca_krl(ca_id):
     """Download the KRL (Key Revocation List) for this CA."""
     try:
-        krl_data = SSHKRLService.generate_krl(ca_id)
+        krl_data = SSHKRLService.published(ca_id)['data']
         ca = db.session.get(SSHCertificateAuthority, ca_id)
         ca_name = ca.descr if ca else 'unknown'
 
