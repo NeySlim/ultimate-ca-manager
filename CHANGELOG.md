@@ -31,6 +31,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME client: a second click or Enter on Request certificate while the first request ran created a second order at the external CA; the button is now disabled until the request returns.
 - HA: a node whose clock differed from the leader's by more than two passes showed the scheduler state as stale for good, or never; the state the leader publishes is now judged on the PostgreSQL server clock.
 - HA: the scheduler leader wrote its heartbeat only between two tasks, so one task longer than three passes (an ACME renewal waiting on DNS) showed the cluster without a leader and let a restore or a rolling restart pass it over; the leader now beats while a task runs, as long as it holds the lock. During such a task a restore now waits for the maintenance acknowledgment and answers 409 `maintenance_not_acknowledged` after 30 seconds instead of passing the leader over.
 - HA: a node whose clock ran more than 10 minutes ahead purged the WebSocket events the other nodes had just relayed; the relay now stamps and purges its rows on the PostgreSQL server clock.

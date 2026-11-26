@@ -137,3 +137,28 @@ describe('RequestCertificateForm ML-DSA', () => {
       expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('key_type')
     })
 })
+
+describe('RequestCertificateForm double submit', () => {
+  beforeEach(() => {
+    getClientSettings.mockReset()
+    getClientSettings.mockResolvedValue({ data: {} })
+  })
+
+  it('sends one request while the first is pending, its button disabled, then allows another', async () => {
+    let release
+    const onSubmit = vi.fn(() => new Promise((r) => { release = r }))
+    renderForm({ onSubmit, defaultKeyType: 'EC-P256' })
+    fireEvent.change(screen.getByLabelText(/^acme\.domains/), { target: { value: 'example.com' } })
+    const button = screen.getByText('acme.requestCertificate').closest('button')
+    fireEvent.click(button)
+    fireEvent.click(button)
+    fireEvent.submit(button.closest('form'))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(button).toBeDisabled())
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    release()
+    await waitFor(() => expect(button).not.toBeDisabled())
+    fireEvent.click(button)
+    expect(onSubmit).toHaveBeenCalledTimes(2)
+  })
+})
