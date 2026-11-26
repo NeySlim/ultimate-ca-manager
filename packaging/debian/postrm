@@ -32,16 +32,22 @@ purge_keeping_archives() {
 keep_key_with_data() {
     data_kept || return 0
     kept="${UCM_HOME%/*}/ucm-archive/$(date -u +%Y%m%dT%H%M%SZ)-purge"
+    local moved="" keys=""
     for f in master.key ucm.env audit-chain.keys; do
         [ -e "$UCM_CONFIG/$f" ] || continue
         (umask 077 && mkdir -p "$kept")
         mv -- "$UCM_CONFIG/$f" "$kept/$f"
+        moved="${moved:+$moved, }$f"
+        [ "$f" = ucm.env ] || keys="${keys:+$keys and }$f"
     done
     [ -d "$kept" ] || return 0
     chown -R root:root "$kept" && chmod -R go= "$kept"
-    echo "Kept: master.key, ucm.env and audit-chain.keys, which the data left in place needs, root only, in:"
+    echo "Kept: $moved, which the data left in place needs, root only, in:"
     echo "  $kept"
-    echo "Put master.key and audit-chain.keys back into $UCM_CONFIG before UCM starts on that data again."
+    # postinst starts UCM: what it needs must be in place before the package is installed again
+    echo "To start UCM on that data again, before apt install ucm (which starts it):"
+    [ -z "$keys" ] || echo "  put $keys back into $UCM_CONFIG, mode 600 (the package gives them to the ucm account; put back later: chown ucm:ucm, chmod 600),"
+    [ ! -e "$kept/ucm.env" ] || echo "  carry DATABASE_URL and KEY_ENCRYPTION_KEY over from the archived ucm.env into $UCM_CONFIG/ucm.env."
 }
 
 data_kept() {

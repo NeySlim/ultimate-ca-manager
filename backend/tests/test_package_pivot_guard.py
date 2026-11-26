@@ -809,6 +809,27 @@ def test_a_purge_that_keeps_data_keeps_its_master_key_root_only(tmp_path, data_f
     assert 'master.key' in out.stdout
 
 
+def test_a_purge_names_only_the_files_it_kept(tmp_path):
+    """No audit-chain.keys in the configuration: the output never says it was kept."""
+    def lay(home, config):
+        _lay_key('ucm.db')(home, config)
+        (config / 'audit-chain.keys').unlink()
+    out, _log, home, _config = _postrm_with(tmp_path, 'purge', lay, real=KEY_TOOLS)
+    kept = next((home.parent / 'ucm-archive').glob('*-purge'))
+    assert sorted(p.name for p in kept.iterdir()) == ['master.key', 'ucm.env']
+    assert 'audit-chain.keys' not in out.stdout, out.stdout
+    assert 'Kept: master.key, ucm.env,' in out.stdout, out.stdout
+
+
+def test_a_purge_says_how_to_restore_the_kept_keys(tmp_path):
+    # postinst starts UCM: the keys go back before the install, with the archived settings
+    out, _log, _home, config = _postrm_with(tmp_path, 'purge', _lay_key('ucm.db'), real=KEY_TOOLS)
+    text = ' '.join(out.stdout.split())
+    assert 'before apt install ucm' in text and f'master.key and audit-chain.keys back into {config}' in text, text
+    assert 'chown ucm:ucm' in text and 'chmod 600' in text, text
+    assert 'DATABASE_URL and KEY_ENCRYPTION_KEY' in text, text
+
+
 def test_a_purge_without_data_removes_the_key_with_the_configuration(tmp_path):
     """Nothing kept needs the key: the configuration goes whole, no archive is made."""
     def lay(home, config):
