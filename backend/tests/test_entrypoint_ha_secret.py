@@ -48,7 +48,7 @@ def test_entrypoint_checks_ha_secret_before_generating_one_neg():
     # test d'ordre textuel, le comportement est prouvé par les tests de ha-secret.sh et par l'image en CI
     text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
     check = text.index('check_ha_secret || exit 1')
-    assert check < text.index('generate_secret)')
+    assert check < text.index('ucm_secret_key /etc/ucm')
 
 
 @pytest.mark.parametrize('ha', [' 1', '1 ', ' true\t'])

@@ -81,6 +81,16 @@
 /* A toast shown takes the pointer (its delay pauses under it, a swipe down closes it); a swipe moves it with the pointer. */
 .atl #toast.visible{pointer-events:auto;touch-action:none;user-select:none}
 .atl #toast[data-swipe="move"]{transform:translate(-50%,var(--toast-swipe-y,0))}
+/* In an open modal dialog the toast is a popover (top layer): the browser's popover box gives way to the toast's own. */
+.atl #toast[popover]{top:auto;right:auto;margin:0;overflow:visible}
+.atl #toast[popover]:not(.failure){border:0}
+/* On a phone the line takes the width of its message up to the screen's, not half of it (the left edge sits mid-screen). */
+@media (max-width:800px){.atl #toast{width:max-content}}
+/* The error of a form dialog sits in its action bar, on a line of its own above the buttons. */
+.atl .modal-actions:has(>.dialog-notice){flex-wrap:wrap}
+.atl .modal-actions>.dialog-notice{order:-1;flex:1 0 100%;margin:0;align-items:center}
+.atl .modal-actions>.dialog-notice>span{flex:1;white-space:pre-line;overflow-wrap:anywhere}
+.atl .modal-actions>.dialog-notice .icon-btn{width:28px;min-height:28px;margin:-4px -6px -4px 0;color:inherit}
 /* Tailwind's reset follows the scope in the bundle and gives a search field `textfield`: the browser's own, as in the mockup */
 .atl [type=search]{-webkit-appearance:revert;appearance:revert}
 .atl #toast.failure.tone-warn{border-left-color:var(--warn-fill)}

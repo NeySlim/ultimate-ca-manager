@@ -66,7 +66,7 @@ All data is stored in `/opt/ucm/data/`:
 
 Mount this directory as a Docker volume to persist data across container restarts.
 
-`/etc/ucm/` holds `master.key`, which decrypts every private key stored in the database. Mount it as a volume too: without one, recreating the container loses the key.
+`/etc/ucm/` holds `master.key`, which decrypts every private key stored in the database, and `secret.key`, the session key generated when `UCM_SECRET_KEY` is not set. Mount it as a volume too: without one, recreating the container loses the keys.
 
 ## Backup
 

@@ -150,7 +150,7 @@ volumes:
 | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `/opt/ucm/data/ucm.log` is rotated (10 MB) |
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
 | `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before the worker is restarted, 30 to 3600; out of bounds the container refuses to start |
-| `UCM_SECRET_KEY` | auto-generated | Session secret key |
+| `UCM_SECRET_KEY` | generated at the first start, kept in `/etc/ucm/secret.key` | Session secret key |
 | `UCM_BACKUP_ENABLED` | `true` | Copy the SQLite database into `/opt/ucm/data/backups` before each start; a start on a database unchanged since its newest copy makes none |
 | `UCM_BACKUP_RETENTION_DAYS` | `30` | Days a pre-start copy is kept |
 | `UCM_BACKUP_KEEP` | `5` | Most pre-start copies kept, the newest; the oldest are removed at each start, before any new copy |

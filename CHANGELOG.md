@@ -59,6 +59,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Docker: without `UCM_SECRET_KEY` the image generated a new session key at each start, so a restart signed every session out and broke what was signed with the key; the key generated at the first start is now kept in `/etc/ucm/secret.key` and used again (#457).
+- Dialogs: a message raised while a dialog was open was drawn under its blurred backdrop, unreadable and its buttons out of reach; the error or warning that answers a form dialog now shows in the dialog above its buttons, and any other message is drawn above the dialog; on a phone a message takes the screen's width instead of half of it (#456).
+- Web interface: after a restart of the service that changed `SECRET_KEY` (before 3.1, a container without `UCM_SECRET_KEY` generated one at each start), a page left open stayed signed in but every save failed with `403 CSRF validation failed`; a token now stays valid for the session that received it, and a refused token is renewed and the request sent once more, with a "reload the page" message if that fails too (#457).
 - Overview: a figure that leads to the queue, clicked while the queue card was hidden or still loading, neither scrolled to the card nor focused its title; the request now waits for the card to load.
 - Settings > Security: the encryption text gave /etc/ucm/master.key as the master key's place; it now names the master.key file of the configuration directory or KEY_ENCRYPTION_KEY, the Key source row shows that variable rather than the file when the key comes from it, and the help says the configuration directory follows UCM_CONFIG_DIR.
 - Phone cards: the OCSP state of a CRL, the approval of a policy and the last success of a deployment target showed a bare value ("Inactive" read as the CA's state); each now follows its column name.

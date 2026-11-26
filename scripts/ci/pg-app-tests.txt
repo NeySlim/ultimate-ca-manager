@@ -31,6 +31,8 @@ tests/test_sessions_store.py
 tests/test_session_epoch_pg.py
 tests/test_redis_sessions_pg.py
 tests/test_factor_change_sessions.py
+tests/test_csrf_api_key_session.py
+tests/test_csrf_session_bound.py
 tests/test_session_lock_and_info.py
 tests/test_session_lock_unlock.py
 tests/test_websocket_session_lock.py

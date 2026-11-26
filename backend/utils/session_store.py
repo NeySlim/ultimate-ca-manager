@@ -103,8 +103,11 @@ LOCK_MERGE_ATTEMPTS = 5
 
 def keep_stored_lock(session, stored):
     """A copy read before the lock was set takes the stored lock: only an unlock (a new
-    identifier) or a sign-out (removal) lifts it, never a request saving what it read."""
+    identifier) or a sign-out (removal) lifts it, never a request saving what it read.
+    The CSRF tokens the stored copy records are kept the same way."""
     from auth.session_lock import LOCK_KEY, UNLOCK_2FA_KEY, is_locked
+    from security.csrf import keep_stored_tokens
+    keep_stored_tokens(session, stored)
     if is_locked(session) or not stored or not is_locked(stored):
         return
     session[LOCK_KEY] = stored[LOCK_KEY]

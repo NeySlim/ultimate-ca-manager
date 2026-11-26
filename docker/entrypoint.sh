@@ -29,10 +29,6 @@ echo ""
 # UTILITY FUNCTIONS
 # =============================================================================
 
-generate_secret() {
-    python3 -c 'import secrets; print(secrets.token_hex(32))'
-}
-
 validate_port() {
     local port=$1
     if [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
@@ -54,6 +50,7 @@ validate_fqdn() {
 # DNS UPDATE (RFC 2136) listener port check
 . "$(dirname "${BASH_SOURCE[0]}")/dns-update-port.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/ha-secret.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/secret-key.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/ha-database.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/fips-module.sh"
 
@@ -168,7 +165,8 @@ fi
 
 # Security
 check_ha_secret || exit 1
-: "${UCM_SECRET_KEY:=$(generate_secret)}"
+# Unset: the key kept in the configuration volume since the first start (HA requires it set)
+ucm_secret_key /etc/ucm || exit 1
 
 # Database
 : "${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}"  # unused and not exported in HA mode

@@ -3900,12 +3900,12 @@
     "sessionKeyFromEnvironment": "来自环境变量（SECRET_KEY）",
     "sessionKeyPreviousUntil": "旧密钥在 {{date}} 之前仍被接受",
     "sessionKeyRotateStoredDesc": "会话密钥用于签名 Web 界面的 CSRF 令牌。启用加密后，轮换会将新密钥加密存储在数据库中，各节点无需重启即可加载；旧密钥在 24 小时内仍被接受，因此不会有人被登出。此时环境变量中的 SECRET_KEY 仅作为启动时无法读取已存储密钥的后备；已运行的节点会保留当前密钥并重试。",
-    "sessionKeyRotateFileDesc": "会话密钥用于签名 Web 界面的 CSRF 令牌。未启用加密时，它不会存储在数据库中：轮换会将新的 SECRET_KEY 写入环境文件并重启服务；重启前已打开的页面必须重新加载。",
+    "sessionKeyRotateFileDesc": "会话密钥用于签名 Web 界面的 CSRF 令牌。未启用加密时，它不会存储在数据库中：轮换会将新的 SECRET_KEY 写入环境文件并重启服务；重启前已打开的页面可继续使用。",
     "sessionKeyRotateHaRefused": "在 HA 中，仅在启用加密时才可轮换会话密钥：新密钥将存储在数据库中，由每个节点持有的 KEK 保护。未启用加密时，轮换只会写入单个节点的环境文件，因此被拒绝。",
     "sessionKeyRotateBlocked": "加密的禁用操作尚未完成，已存储的会话密钥仍在用于签名。请先再次运行禁用操作，然后再轮换密钥。",
     "rotateSessionKey": "轮换会话密钥",
     "rotateSessionKeyConfirmStored": "将新的会话密钥存储到数据库？各节点无需重启即可加载，旧密钥在 24 小时内仍被接受。该期限结束后方可再次轮换。",
-    "rotateSessionKeyConfirmFile": "将新的 SECRET_KEY 写入环境文件并重启服务？重启前已打开的页面必须重新加载。",
+    "rotateSessionKeyConfirmFile": "将新的 SECRET_KEY 写入环境文件并重启服务？",
     "rotateSessionKeyDoneStored": "会话密钥已轮换。无需重启，不会有人被登出。",
     "rotateSessionKeyDoneFile": "会话密钥已写入。服务正在重启。",
     "rotateDataKeyDone": "数据密钥已轮换至版本 {{version}}",
@@ -6147,6 +6147,7 @@
         "requiredField": "此字段为必填项"
       },
       "serverBusy": "服务器正在处理另一项更改：请几秒钟后重试。",
+      "csrfStale": "此页面已过期：请重新加载 (F5) 后继续。未保存任何内容。",
       "downloadFailed": {
         "publicKey": "下载公钥失败",
         "krl": "下载 KRL 失败",
