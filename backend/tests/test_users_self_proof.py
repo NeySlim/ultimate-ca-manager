@@ -94,11 +94,13 @@ def test_own_mtls_enrolment_refuses_its_input_before_the_proof(app, admin, body)
     assert r.status_code == 400, r.data
 
 
-def test_another_users_mtls_enrolment_needs_no_proof(app, admin, create_user):
+def test_another_users_mtls_enrolment_needs_no_proof(app, admin, create_user, create_ca):
     c, _uid, _old = admin
     other = create_user(username=f'selfproof_mtls_{uuid.uuid4().hex[:8]}', role='viewer')
-    r = _send(c, 'post', f"/api/v2/users/{other['id']}/mtls/certificates", {'mode': 'generate'})
-    assert _reauth(r) is None, r.data
+    ca = create_ca(cn=f'Other proof CA {uuid.uuid4().hex[:6]}')
+    r = _send(c, 'post', f"/api/v2/users/{other['id']}/mtls/certificates", {'mode': 'generate', 'ca_id': ca['id']})
+    assert r.status_code == 201, r.data
+    assert _reauth(r) is None
 
 
 def test_own_email_without_a_local_password_needs_no_proof(app, admin, notices):
