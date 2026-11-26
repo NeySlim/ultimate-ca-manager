@@ -35,7 +35,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 #       given to root, group and other write and set-id bits are also removed
 # UCM_PYTHON: the interpreter the package requires (python3.12 on EL9, where python3 may be absent)
 OWN_PY='
-import grp, os, pwd, signal, stat, sys
+import errno, grp, os, pwd, signal, stat, sys
 op, path, args = sys.argv[1], sys.argv[2], sys.argv[3:]
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 ARCHIVE = ".ucm-archive-"
@@ -199,7 +199,8 @@ elif op == "chown-tree":
             return None
         except OSError as e:
             # Swapped since it was listed (the account owns it), or out of descriptors
-            warn(rel, "changed while walked (%s), left as it is" % e.strerror)
+            why = "changed while walked" if e.errno in (errno.ELOOP, errno.ENOTDIR) else "not opened"
+            warn(rel, "%s (%s), left as it is" % (why, e.strerror))
             return None
         walk = False
         try:

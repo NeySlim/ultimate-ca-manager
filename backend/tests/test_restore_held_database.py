@@ -544,7 +544,7 @@ def test_a_cancellation_on_a_locked_database_before_the_mark_is_taken(restore_he
     assert seen.get_json()['data']['phase'] == restore_job.READING
     assert cancelled.status_code == 200, cancelled.data
     assert restore_job.cancel_flagged(job_id), 'the cancellation was not taken'
-    # Counted, not timed: a loaded host stretches the wall clock, never these
+    # Counted, not timed: a loaded host stretches the wall clock, never this one
     assert waits.statements and all(handled and timeout == sqlite_wait.IN_C_MS
                                     for handled, timeout in waits.statements), waits.statements
     # Each request held to the gate's budget (one second, not the five of the web server), with
