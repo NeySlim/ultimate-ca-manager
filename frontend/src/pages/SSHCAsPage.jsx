@@ -189,7 +189,7 @@ export default function SSHCAsPage() {
   const getCurlCommand = (ca) => `curl -sSL ${window.location.origin}/ssh/setup/${ca.refid} | sudo bash`
   // The agent: a user CA's KRL kept in sshd; a host CA enrolls with a token from SSH Hosts
   const getAgentCommand = (ca) => (ca.ca_type === 'host'
-    ? `curl -fsSL ${window.location.origin}/ssh/setup/${ca.refid}/agent | sudo UCM_ENROLL_TOKEN=<token> sh`
+    ? `curl -fsSL ${window.location.origin}/ssh/setup/${ca.refid}/agent | UCM_ENROLL_TOKEN=<token> sudo --preserve-env=UCM_ENROLL_TOKEN sh`
     : `curl -fsSL ${window.location.origin}/ssh/setup/${ca.refid}/agent | sudo sh`)
   // Self-elevating one-liner: a new admin PowerShell window that stays open, the script run through iex
   const getPowershellCommand = (ca) => {

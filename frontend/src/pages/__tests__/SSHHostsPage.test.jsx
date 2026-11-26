@@ -108,10 +108,10 @@ describe('SSHHostsPage', () => {
       ca_id: 3, principals: ['web02.example.com', 'web02'], lifetime_seconds: 3600, renew_percent: 30,
     }))
     expect(await within(dialog).findByTestId('ssh-token-secret')).toHaveTextContent('ucmh_secretvalue')
-    // The token travels in the environment, never in the URL
+    // The token travels in sudo's environment, never in the URL nor in an argument ps shows
     const command = within(dialog).getByTestId('ssh-token-command').textContent
     expect(command).toContain('/ssh/setup/ca-host-3/agent')
-    expect(command).toContain('UCM_ENROLL_TOKEN=ucmh_secretvalue sh')
+    expect(command).toContain('| UCM_ENROLL_TOKEN=ucmh_secretvalue sudo --preserve-env=UCM_ENROLL_TOKEN sh')
     expect(command.split('|')[0]).not.toContain('ucmh_secretvalue')
     fireEvent.click(within(dialog).getByText('common.close'))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

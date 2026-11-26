@@ -69,7 +69,7 @@ La KRL es pública, como una CRL: \`/ssh/krl/<refid>\`. Su versión solo cambia 
 4. Copie el comando mostrado con el token y ejecútelo como root en el servidor antes de que caduque el token
 
 \`\`\`bash
-curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROLL_TOKEN=ucmh_... sh
+curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | UCM_ENROLL_TOKEN=ucmh_... sudo --preserve-env=UCM_ENROLL_TOKEN sh
 \`\`\`
 
 El agente envía la clave pública de host del servidor (Ed25519 primero, luego ECDSA, luego RSA; \`--host-key\` elige otra) con el token firmado por esa clave, lo que prueba que el servidor la posee, comprueba que el certificado recibido certifica esa clave, lo escribe junto a la clave y apunta \`HostCertificate\` a él. Añada \`-s -- --principal web01\` para pedir solo una parte de los nombres del token.

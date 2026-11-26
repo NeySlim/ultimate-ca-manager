@@ -69,7 +69,7 @@ KRL публичен, как CRL: \`/ssh/krl/<refid>\`. Его версия ме
 4. Скопируйте команду, показанную вместе с токеном, и выполните её на сервере от root до истечения токена
 
 \`\`\`bash
-curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROLL_TOKEN=ucmh_... sh
+curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | UCM_ENROLL_TOKEN=ucmh_... sudo --preserve-env=UCM_ENROLL_TOKEN sh
 \`\`\`
 
 Агент отправляет открытый ключ хоста сервера (сначала Ed25519, затем ECDSA, затем RSA; \`--host-key\` выбирает другой) вместе с токеном, подписанным этим ключом, что доказывает, что сервер им владеет, проверяет, что полученный сертификат удостоверяет этот ключ, записывает его рядом с ключом и указывает на него \`HostCertificate\`. Добавьте \`-s -- --principal web01\`, чтобы запросить только часть имён токена.

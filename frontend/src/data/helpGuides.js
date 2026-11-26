@@ -3898,7 +3898,7 @@ The KRL is public, like a CRL: \`/ssh/krl/<refid>\`. Its version changes only wh
 4. Copy the command shown with the token and run it on the server as root, before the token expires
 
 \`\`\`bash
-curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROLL_TOKEN=ucmh_... sh
+curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | UCM_ENROLL_TOKEN=ucmh_... sudo --preserve-env=UCM_ENROLL_TOKEN sh
 \`\`\`
 
 The agent sends the server's public host key (Ed25519 first, then ECDSA, then RSA; \`--host-key\` picks another) with the token signed by that key, which proves the server holds it, checks that the certificate it gets certifies that key, writes it beside the key and points \`HostCertificate\` at it. Add \`-s -- --principal web01\` to ask for some of the token's names only.

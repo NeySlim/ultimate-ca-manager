@@ -509,7 +509,7 @@ INSTALLER = r'''#!/bin/sh
 #   ... | sudo sh -s -- --uninstall
 # A user CA: installs /usr/local/sbin/ucm-ssh-agent and a timer that pulls the KRL of this CA
 # into RevokedKeys. A host CA: enrolls this server with a single-use token from UCM,
-#   ... | sudo UCM_ENROLL_TOKEN=ucmh_... sh -s -- [--principal NAME]... [--host-key PATH]
+#   ... | UCM_ENROLL_TOKEN=ucmh_... sudo --preserve-env=UCM_ENROLL_TOKEN sh -s -- [--principal NAME]... [--host-key PATH]
 # and sshd presents the host certificate. Running it again updates the agent; nothing in it is secret.
 set -eu
 UCM_URL='@@UCM_URL@@'

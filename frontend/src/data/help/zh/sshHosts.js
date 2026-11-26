@@ -69,7 +69,7 @@ KRL与CRL一样是公开的：\`/ssh/krl/<refid>\`。只有当该CA的证书被�
 4. 复制随令牌显示的命令，在令牌过期前于服务器上以root身份运行
 
 \`\`\`bash
-curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROLL_TOKEN=ucmh_... sh
+curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | UCM_ENROLL_TOKEN=ucmh_... sudo --preserve-env=UCM_ENROLL_TOKEN sh
 \`\`\`
 
 代理发送服务器的主机公钥（依次优先Ed25519、ECDSA、RSA；\`--host-key\` 可选择其他密钥），并附上用该密钥签名的令牌，以证明服务器持有该密钥；检查收到的证书确实认证该密钥，将其写在密钥旁边，并让 \`HostCertificate\` 指向它。添加 \`-s -- --principal web01\` 可只请求令牌中的部分名称。

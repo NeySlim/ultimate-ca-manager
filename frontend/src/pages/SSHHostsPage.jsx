@@ -39,8 +39,8 @@ function tokenStatus(token, t) {
   return { label: t(`sshHosts.token.state.${token.state}`), tone: tones[token.state] ?? '' }
 }
 
-/** The command a server runs with its token: the token in the environment, never in the script. */
-const enrollCommand = (origin, caRefid, token) => `curl -fsSL ${origin}/ssh/setup/${caRefid}/agent | sudo UCM_ENROLL_TOKEN=${token} sh`
+/** The command a server runs with its token: in sudo's environment, never in the script nor in an argument ps shows. */
+const enrollCommand = (origin, caRefid, token) => `curl -fsSL ${origin}/ssh/setup/${caRefid}/agent | UCM_ENROLL_TOKEN=${token} sudo --preserve-env=UCM_ENROLL_TOKEN sh`
 
 export default function SSHHostsPage() {
   const { t } = useTranslation()

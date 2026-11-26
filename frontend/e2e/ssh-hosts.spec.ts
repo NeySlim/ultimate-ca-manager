@@ -33,7 +33,7 @@ test('a token created on screen enrolls a host once, which the page lists and re
 
   const token = (await dialog.getByTestId('ssh-token-secret').textContent())!.trim()
   expect(token).toMatch(/^ucmh_[A-Za-z0-9_-]{43}$/)
-  await expect(dialog.getByTestId('ssh-token-command')).toContainText(`/ssh/setup/${ca.refid}/agent | sudo UCM_ENROLL_TOKEN=${token} sh`)
+  await expect(dialog.getByTestId('ssh-token-command')).toContainText(`/ssh/setup/${ca.refid}/agent | UCM_ENROLL_TOKEN=${token} sudo --preserve-env=UCM_ENROLL_TOKEN sh`)
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(dialog).toBeHidden()
 
