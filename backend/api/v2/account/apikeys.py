@@ -134,11 +134,6 @@ def create_api_key():
             400,
             {'current': existing_count, 'max': max_keys}
         )
-    # After the cheap refusals: an authenticator code is spent by the check
-    refused = _session_proof()
-    if refused:
-        return refused
-
     # Create API key
     auth_manager = AuthManager()
 
@@ -162,6 +157,10 @@ def create_api_key():
                 return error_response('expires_days must be >= 0', 400)
         except (TypeError, ValueError):
             return error_response('expires_days must be an integer or null', 400)
+    # After the cheap refusals: an authenticator code is spent by the check
+    refused = _session_proof()
+    if refused:
+        return refused
 
     try:
         key_info = auth_manager.create_api_key(

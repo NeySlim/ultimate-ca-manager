@@ -73,3 +73,11 @@ def test_a_key_creates_a_key_with_its_own_credential(app, create_user):
     r = _post(app.test_client(), '/api/v2/account/apikeys', BODY,
               headers={'X-API-Key': parent.get_json()['data']['key']})
     assert r.status_code == 201, r.data
+
+
+def test_a_bad_expiry_is_refused_before_the_proof(app, create_user):
+    # The proof comes last: an authenticator code is spent by the check
+    c = _signed_in(app, create_user, 'apikey_proof_cheap')
+    r = _post(c, '/api/v2/account/apikeys', dict(BODY, expires_days='abc'))
+    assert r.status_code == 400, r.data
+    assert _own_keys(app, c) == 0
