@@ -39,7 +39,9 @@ import { useInFlight } from '../hooks/useInFlight'
 // Profile edit left pending, kept for the tab (lib/draftMemory)
 const PROFILE_DRAFT = 'account:profile'
 const SECTION_IDS = ['profile', 'security', 'api-keys']
-const NO_KEY_FORM = { name: '', expires_days: '', scope: 'full' }
+const NO_KEY_FORM = { name: '', expires_days: '', scope: 'full', allowed_networks: '' }
+// Addresses or CIDR networks typed one per line or comma-separated; the server validates them
+const networkList = (text) => String(text || '').split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean)
 
 export default function AccountPage() {
   const { t, i18n } = useTranslation()
@@ -361,12 +363,13 @@ export default function AccountPage() {
         name: apiKeyForm.name.trim(),
         permissions: apiKeyScopePermissions(apiKeyForm.scope, hasPermission),
         expires_days: expiresDays,
+        allowed_networks: networkList(apiKeyForm.allowed_networks),
       }
       const response = await accountService.createApiKey(payload)
       // apiClient returns the full envelope: { data: {...}, message }
       const created = response.data || response
       setShowApiKeyModal(false)
-      setApiKeyForm({ name: '', expires_days: '', scope: 'full' })
+      setApiKeyForm(NO_KEY_FORM)
       // Show the key in a dedicated modal — it's only available once.
       setNewApiKey(created)
       await loadApiKeys()
@@ -740,6 +743,9 @@ export default function AccountPage() {
               <NumberInput id="key-expires" label={t('account.expiresInDays')} value={apiKeyForm.expires_days} placeholder={t('account.expiresInDaysPlaceholder')}
                 hint={t('account.expiresInDaysHelp')} error={expiresBad ? t('account.expiresInDaysInvalid') : undefined}
                 onChange={(e) => setApiKeyForm((f) => ({ ...f, expires_days: e.target.value }))} />
+              <Textarea id="key-networks" mono rows={2} label={t('account.allowedNetworks')} value={apiKeyForm.allowed_networks}
+                placeholder={t('account.allowedNetworksPlaceholder')} hint={t('account.allowedNetworksHint')}
+                onChange={(e) => setApiKeyForm((f) => ({ ...f, allowed_networks: e.target.value }))} />
             </div>
             <div className="modal-actions">
               <button type="button" className="btn" data-action="close-modal" onClick={closeKeyModal}>{t('common.cancel')}</button>

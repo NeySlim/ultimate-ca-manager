@@ -1917,7 +1917,8 @@
       "deleted": "Chiave API eliminata",
       "loadFailed": "Impossibile caricare le chiavi API",
       "updateFailed": "Impossibile modificare la chiave API",
-      "meta": "{{scope}} · creata il {{created}} · ultimo utilizzo {{used}} · scade {{expires}}"
+      "meta": "{{scope}} · creata il {{created}} · ultimo utilizzo {{used}} · scade {{expires}}",
+      "allowedFrom": "consentita da {{networks}}"
     },
     "createUser": "Crea utente",
     "editUser": "Modifica utente",
@@ -4713,7 +4714,12 @@
     "apiKeyHint": "Le chiavi API consentono l'accesso programmatico a UCM. Mantieni segrete le tue chiavi e ruotale regolarmente. Ogni chiave può avere una data di scadenza personalizzata.",
     "apiKeySearchPlaceholder": "Cerca per nome o prefisso...",
     "apiKeyPrefix": "Prefisso",
-    "scopeInstance": "Gestione dell’istanza (console di flotta)"
+    "scopeInstance": "Gestione dell’istanza (console di flotta)",
+    "allowedNetworks": "Indirizzi di origine consentiti",
+    "allowedNetworksHint": "Indirizzi IP o reti CIDR da cui si usa la chiave, separati da virgole o righe. Vuoto: qualsiasi indirizzo.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Consentita da",
+    "apiKeyAnyAddress": "Qualsiasi indirizzo"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",

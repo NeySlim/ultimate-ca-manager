@@ -1917,7 +1917,8 @@
       "deleted": "Chave de API excluída",
       "loadFailed": "Não foi possível carregar as chaves de API",
       "updateFailed": "Não foi possível alterar a chave de API",
-      "meta": "{{scope}} · criada em {{created}} · último uso {{used}} · expira {{expires}}"
+      "meta": "{{scope}} · criada em {{created}} · último uso {{used}} · expira {{expires}}",
+      "allowedFrom": "permitida a partir de {{networks}}"
     },
     "createUser": "Criar usuário",
     "editUser": "Editar usuário",
@@ -4713,7 +4714,12 @@
     "apiKeyHint": "As chaves de API permitem o acesso programático ao UCM. Mantenha suas chaves secretas e rode-as regularmente. Cada chave pode ter uma data de expiração personalizada.",
     "apiKeySearchPlaceholder": "Pesquisar por nome ou prefixo...",
     "apiKeyPrefix": "Prefixo",
-    "scopeInstance": "Gestão da instância (consola de frota)"
+    "scopeInstance": "Gestão da instância (consola de frota)",
+    "allowedNetworks": "Endereços de origem permitidos",
+    "allowedNetworksHint": "Endereços IP ou redes CIDR a partir dos quais a chave é usada, separados por vírgulas ou linhas. Vazio: qualquer endereço.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Permitida a partir de",
+    "apiKeyAnyAddress": "Qualquer endereço"
   },
   "rbac": {
     "title": "Controle de acesso baseado em funções",

@@ -141,7 +141,12 @@
     "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée.",
     "apiKeySearchPlaceholder": "Rechercher par nom ou préfixe...",
     "apiKeyPrefix": "Préfixe",
-    "scopeInstance": "Gestion d’instance (console de parc)"
+    "scopeInstance": "Gestion d’instance (console de parc)",
+    "allowedNetworks": "Adresses sources autorisées",
+    "allowedNetworksHint": "Adresses IP ou réseaux CIDR depuis lesquels la clé est utilisée, séparés par des virgules ou des lignes. Vide : toute adresse.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Autorisée depuis",
+    "apiKeyAnyAddress": "Toute adresse"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -5316,7 +5321,8 @@
       "deleted": "Clé API supprimée",
       "loadFailed": "Impossible de charger les clés API",
       "updateFailed": "Impossible de modifier la clé API",
-      "meta": "{{scope}} · créée le {{created}} · dernier usage {{used}} · expire {{expires}}"
+      "meta": "{{scope}} · créée le {{created}} · dernier usage {{used}} · expire {{expires}}",
+      "allowedFrom": "autorisée depuis {{networks}}"
     },
     "createUser": "Créer un utilisateur",
     "editUser": "Modifier l’utilisateur",

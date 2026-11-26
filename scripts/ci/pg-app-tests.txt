@@ -141,3 +141,6 @@ tests/test_smart_import_trust_store.py
 tests/test_websocket_origin.py
 tests/test_cors_dynamic_origins.py
 tests/test_csv_formula_cells.py
+tests/test_api_key_allowed_networks.py
+tests/test_instance_state.py
+tests/test_instance_admin_scopes.py

@@ -1917,7 +1917,8 @@
       "deleted": "API 密钥已删除",
       "loadFailed": "无法加载 API 密钥",
       "updateFailed": "无法更新 API 密钥",
-      "meta": "{{scope}} · 创建于 {{created}} · 上次使用 {{used}} · 到期 {{expires}}"
+      "meta": "{{scope}} · 创建于 {{created}} · 上次使用 {{used}} · 到期 {{expires}}",
+      "allowedFrom": "允许来源 {{networks}}"
     },
     "createUser": "创建用户",
     "editUser": "编辑用户",
@@ -4713,7 +4714,12 @@
     "apiKeyHint": "API 密钥支持通过程序调用访问 UCM。妥善保管密钥，定期轮换。每个密钥可设置独立过期时间。",
     "apiKeySearchPlaceholder": "按名称或前缀搜索...",
     "apiKeyPrefix": "前缀",
-    "scopeInstance": "实例管理（集中控制台）"
+    "scopeInstance": "实例管理（集中控制台）",
+    "allowedNetworks": "允许的来源地址",
+    "allowedNetworksHint": "使用该密钥的 IP 地址或 CIDR 网络，以逗号或换行分隔。留空：任意地址。",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "允许来源",
+    "apiKeyAnyAddress": "任意地址"
   },
   "rbac": {
     "title": "基于角色的访问控制",

@@ -393,7 +393,8 @@ Content-Type: application/json
 {
   "name": "CI/CD Integration",
   "expires_days": 365,
-  "permissions": ["read:certificates", "write:certificates"]
+  "permissions": ["read:certificates", "write:certificates"],
+  "allowed_networks": ["192.0.2.0/24", "2001:db8::/32"]
 }
 
 # Get API key details
@@ -414,6 +415,14 @@ POST /api/v2/account/apikeys/{key_id}/regenerate
 # Delete API key
 DELETE /api/v2/account/apikeys/{key_id}
 ```
+
+**Source networks.** `allowed_networks` (optional, a list or a comma or line separated string of
+IP addresses and CIDR networks, at most 100) limits the key to those sources; absent or empty, any
+address. The address checked is the one UCM resolves for the request, after its trusted proxy hops.
+From another address the key is refused with `403` (`This API key is not allowed from this address`)
+and its `last_used_at` is not updated. An invalid entry answers `400`. A key created by a limited API
+key gets its networks when none is given, and `403` when one lies outside them; regenerating keeps
+them. Every key in a listing carries `allowed_networks` (`[]` for any address).
 
 The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
 

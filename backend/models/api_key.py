@@ -44,6 +44,9 @@ class APIKey(db.Model if db else object):
     
     # Active flag
     is_active = db.Column(db.Boolean, default=True)
+
+    # JSON list of canonical networks the key is used from (upgrade step 177); NULL admits any
+    allowed_networks = db.Column(db.Text, nullable=True)
     
     # Relationship to User
     user = db.relationship('User', backref='api_keys')
@@ -53,6 +56,17 @@ class APIKey(db.Model if db else object):
         """Expiry is derived live from expires_at, never persisted - same
         approach as certificate expiry (see Certificate.valid_to)."""
         return bool(self.expires_at and self.expires_at < utc_now())
+
+    @property
+    def networks(self) -> list:
+        """The source networks; an unreadable list admits nobody rather than everybody."""
+        if not self.allowed_networks:
+            return []
+        try:
+            value = json.loads(self.allowed_networks)
+        except (TypeError, ValueError):
+            return ['invalid']
+        return value if isinstance(value, list) else ['invalid']
 
     def to_dict(self):
         """
@@ -68,7 +82,8 @@ class APIKey(db.Model if db else object):
             'expires_at': utc_isoformat(self.expires_at),
             'last_used_at': utc_isoformat(self.last_used_at),
             'is_active': self.is_active,
-            'is_expired': self.is_expired
+            'is_expired': self.is_expired,
+            'allowed_networks': self.networks,
         }
     
     def __repr__(self):

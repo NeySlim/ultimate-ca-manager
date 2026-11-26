@@ -1917,7 +1917,8 @@
       "deleted": "API key deleted",
       "loadFailed": "Could not load the API keys",
       "updateFailed": "Could not update the API key",
-      "meta": "{{scope}} · created on {{created}} · last used {{used}} · expires {{expires}}"
+      "meta": "{{scope}} · created on {{created}} · last used {{used}} · expires {{expires}}",
+      "allowedFrom": "allowed from {{networks}}"
     },
     "createUser": "Create User",
     "editUser": "Edit User",
@@ -4713,7 +4714,12 @@
     "apiKeyHint": "API keys allow programmatic access to UCM. Keep your keys secret and rotate them regularly. Each key can have a custom expiration date.",
     "apiKeySearchPlaceholder": "Search by name or prefix...",
     "apiKeyPrefix": "Prefix",
-    "scopeInstance": "Instance management (fleet console)"
+    "scopeInstance": "Instance management (fleet console)",
+    "allowedNetworks": "Allowed source addresses",
+    "allowedNetworksHint": "IP addresses or CIDR networks the key is used from, separated by commas or lines. Empty: any address.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Allowed from",
+    "apiKeyAnyAddress": "Any address"
   },
   "rbac": {
     "title": "Role-Based Access Control",

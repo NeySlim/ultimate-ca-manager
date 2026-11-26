@@ -67,6 +67,7 @@ export default function UserApiKeys({ user, canRevoke = true }) {
                   used: key.last_used_at ? dateTimeOf(key.last_used_at, locale) : t('common.never'),
                   expires: key.expires_at ? dateOf(key.expires_at, locale) : t('common.never'),
                 })}
+                {key.allowed_networks?.length > 0 && <>{' · '}{t('users.apiKeys.allowedFrom', { networks: key.allowed_networks.join(', ') })}</>}
               </>}
               badge={<Pill label={t(label)} tone={tone} />}
               action={canRevoke && (

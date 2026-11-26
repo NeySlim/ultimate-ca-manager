@@ -1917,7 +1917,8 @@
       "deleted": "API-Schlüssel gelöscht",
       "loadFailed": "Die API-Schlüssel konnten nicht geladen werden",
       "updateFailed": "Der API-Schlüssel konnte nicht geändert werden",
-      "meta": "{{scope}} · erstellt am {{created}} · zuletzt verwendet {{used}} · läuft ab {{expires}}"
+      "meta": "{{scope}} · erstellt am {{created}} · zuletzt verwendet {{used}} · läuft ab {{expires}}",
+      "allowedFrom": "erlaubt von {{networks}}"
     },
     "createUser": "Benutzer erstellen",
     "editUser": "Benutzer bearbeiten",
@@ -4713,7 +4714,12 @@
     "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben.",
     "apiKeySearchPlaceholder": "Nach Name oder Präfix suchen...",
     "apiKeyPrefix": "Präfix",
-    "scopeInstance": "Instanzverwaltung (Flottenkonsole)"
+    "scopeInstance": "Instanzverwaltung (Flottenkonsole)",
+    "allowedNetworks": "Erlaubte Quelladressen",
+    "allowedNetworksHint": "IP-Adressen oder CIDR-Netze, von denen aus der Schlüssel verwendet wird, durch Kommas oder Zeilen getrennt. Leer: jede Adresse.",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "Erlaubt von",
+    "apiKeyAnyAddress": "Jede Adresse"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",

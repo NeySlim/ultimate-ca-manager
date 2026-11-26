@@ -1917,7 +1917,8 @@
       "deleted": "APIキーを削除しました",
       "loadFailed": "APIキーを読み込めませんでした",
       "updateFailed": "APIキーを更新できませんでした",
-      "meta": "{{scope}} · 作成日 {{created}} · 最終使用 {{used}} · 有効期限 {{expires}}"
+      "meta": "{{scope}} · 作成日 {{created}} · 最終使用 {{used}} · 有効期限 {{expires}}",
+      "allowedFrom": "許可元 {{networks}}"
     },
     "createUser": "ユーザーを作成",
     "editUser": "ユーザーを編集",
@@ -4713,7 +4714,12 @@
     "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。",
     "apiKeySearchPlaceholder": "名前またはプレフィックスで検索...",
     "apiKeyPrefix": "プレフィックス",
-    "scopeInstance": "インスタンス管理（フリートコンソール）"
+    "scopeInstance": "インスタンス管理（フリートコンソール）",
+    "allowedNetworks": "許可する送信元アドレス",
+    "allowedNetworksHint": "キーを使用する IP アドレスまたは CIDR ネットワーク（カンマまたは改行で区切る）。空欄の場合はすべてのアドレス。",
+    "allowedNetworksPlaceholder": "192.0.2.0/24, 2001:db8::/32",
+    "apiKeyAllowedFrom": "許可元",
+    "apiKeyAnyAddress": "すべてのアドレス"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

@@ -1451,6 +1451,8 @@ export const helpContent = {
           { label: 'Create Key', text: 'Generate a new API key, optionally expiring after a number of days' },
           { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating, offered by the API only, keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
           { label: 'Revoke', text: 'Immediately invalidate an API key' },
+          { label: 'Instance management', text: 'Preset for a console that watches several instances: reads the instance state and the settings, starts a backup or an update, nothing else. Offered to administrators only' },
+          { label: 'Allowed source addresses', text: 'IP addresses or CIDR networks the key may be used from; from any other address the key is refused (403) and its last use is not updated. A key created by a limited key stays inside its networks. Empty: any address' },
           { label: 'Deactivated users', text: 'API keys belonging to a deactivated user are rejected even if the key itself is still valid' },
           { label: 'Interactive session only', text: 'API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: sign in interactively' },
         ]
