@@ -7,7 +7,7 @@ from flask import request, g
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
-from auth.session_reverify import check_session_password, confirm_account_holder
+from auth.session_reverify import check_session_password
 from auth.session_start import keep_own_session
 from auth.twofa_enforcement import lock_user
 from utils.response import success_response, error_response, created_response
@@ -437,11 +437,11 @@ def update_user(user_id):
         # share an email with a local one).
         if user.is_local and local_email_holder(data['email'], other_than=user_id) is not None:
             return error_response('Email already in use', 409)
-        # Your own address receives your reset link: moving it proves the holder, as the
-        # Account page does (`password` here is the new password, never the proof)
+        # Your own address receives your reset link: the proof of the Account page
+        # (`password` here is the new password, never the proof)
         if moved_own:
-            refused = confirm_account_holder(
-                user, {'password': data.get('current_password'), 'code': data.get('code')})
+            from api.v2.account.profile import email_move_refused
+            refused = email_move_refused(user, data.get('current_password'))
             if refused:
                 return refused
         user.email = data['email']

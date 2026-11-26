@@ -100,3 +100,14 @@ def test_another_users_mtls_enrolment_needs_no_proof(app, admin, create_user):
     r = _send(c, 'post', f"/api/v2/users/{other['id']}/mtls/certificates", {'mode': 'generate'})
     assert _reauth(r) is None, r.data
 
+
+def test_own_email_without_a_local_password_needs_no_proof(app, admin, notices):
+    # As on PATCH /api/v2/account/profile: such an account has no password to give
+    from api.v2.sso.account_state import SSO_NO_PASSWORD
+    c, uid, _old = admin
+    with app.app_context():
+        db.session.get(User, uid).password_hash = SSO_NO_PASSWORD
+        db.session.commit()
+    r = _send(c, 'put', f'/api/v2/users/{uid}', {'email': 'sso@new.example'})
+    assert r.status_code == 200, r.data
+    assert _email(app, uid) == 'sso@new.example'

@@ -173,15 +173,8 @@ def update_profile():
         # E-mail is unique among local accounts (#136); ix_users_email_local refuses a race
         if email and user.is_local and local_email_holder(email, other_than=user.id) is not None:
             return error_response('Email already in use', 409)
-        # The address receives the password-reset link: moving it proves the password
-        if moved and user.password_hash != SSO_NO_PASSWORD:
-            current = data.get('current_password')
-            if not isinstance(current, str) or not current:
-                return error_response('Enter your current password to change the email', 403,
-                                      details={'reauth': 'password'})
-            refused = check_session_password(
-                user, current, error_response('Current password is incorrect', 403,
-                                              details={'reauth': 'password'}))
+        if moved:
+            refused = email_move_refused(user, data.get('current_password'))
             if refused:
                 return refused
         user.email = email
@@ -210,6 +203,19 @@ def update_profile():
         },
         message='Profile updated successfully'
     )
+
+
+def email_move_refused(user, current):
+    """The address receives the password-reset link: moving it proves the password, which
+    an account without one cannot give. Before any field changes: its counter commits."""
+    if user.password_hash == SSO_NO_PASSWORD:
+        return None
+    if not isinstance(current, str) or not current:
+        return error_response('Enter your current password to change the email', 403,
+                              details={'reauth': 'password'})
+    return check_session_password(
+        user, current, error_response('Current password is incorrect', 403,
+                                      details={'reauth': 'password'}))
 
 
 def record_email_change(user, old_email, new_email):

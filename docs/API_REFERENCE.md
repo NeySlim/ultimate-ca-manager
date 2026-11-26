@@ -2617,7 +2617,7 @@ Content-Type: application/json
   "full_name": "Updated Name"
 }
 ```
-On one's own account, a new `email` needs `current_password` (or `code`, the authenticator code, for an account without a local password; `403` with `details.reauth` otherwise), and the change is audited as `profile_email_change` with a notice to the old address, as on `PATCH /api/v2/account/profile`. Another user's email needs no proof.
+On one's own account, a new `email` needs `current_password` when the account has a local password (`403` with `details.reauth` `password` without it or when it is wrong), and the change is audited as `profile_email_change` with a notice to the old address, as on `PATCH /api/v2/account/profile`. Another user's email needs no proof.
 
 ### Toggle User Status
 ```http
