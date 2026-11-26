@@ -228,6 +228,13 @@ class TestTheAgentEnrolls:
         out = host.install(_installer(server, ca['refid']))
         assert out.returncode == 1 and 'UCM_ENROLL_TOKEN' in out.stderr
 
+    def test_the_token_is_never_an_argument(self, auth_client, host, server):
+        # An argument shows in the process list: the token comes in the environment only
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent token argument CA')
+        out = host.install(_installer(server, ca['refid']), '--token', _enroll_token(auth_client, ca))
+        assert out.returncode == 1 and 'unknown option: --token' in out.stderr
+        assert not host.agent.exists()
+
     def test_the_token_buys_the_host_certificate_sshd_presents(self, app, auth_client, host, server):
         ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent enroll CA')
         token = _enroll_token(auth_client, ca, principals=('web01.example.com', 'web01'))

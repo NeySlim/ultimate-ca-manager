@@ -536,7 +536,6 @@ install_agent() {
             --interval) [ $# -ge 2 ] || fail "--interval needs a value"; interval=$2; shift 2 ;;
             --cacert) [ $# -ge 2 ] || fail "--cacert needs a file"; cacert=$2; shift 2 ;;
             --uninstall) uninstall=1; shift ;;
-            --token) [ $# -ge 2 ] || fail "--token needs a value"; token=$2; shift 2 ;;
             --principal) [ $# -ge 2 ] || fail "--principal needs a host name"
                 case "$2" in *[!A-Za-z0-9._:-]*|'') fail "invalid host name: $2" ;; esac
                 names="$names $2"; shift 2 ;;
