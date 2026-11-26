@@ -7581,7 +7581,7 @@
     "noDataDescription": "Crea un token di registrazione, poi esegui con esso l'agente SSH sul server: ottiene un certificato host e lo rinnova.",
     "pageRange": "{{start}}–{{end}} di {{count}} host",
     "revokeHost": "Revoca host",
-    "revokeConfirm": "Revocare {{name}}? Il suo certificato host viene revocato e incluso nella KRL, e non si rinnoverà più: il server dovrà registrarsi con un nuovo token.",
+    "revokeConfirm": "Revocare {{name}}? Tutti i certificati non scaduti della sua chiave, quello attuale e quelli sostituiti dai rinnovi, vengono revocati e inclusi nella KRL, e non si rinnoverà più: il server dovrà registrarsi con un nuovo token.",
     "revoked": "{{name}} revocato",
     "pauseRenewal": "Sospendi il rinnovo",
     "resumeRenewal": "Riprendi il rinnovo",

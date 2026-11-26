@@ -7581,7 +7581,7 @@
     "noDataDescription": "Créez un jeton d’enrôlement, puis lancez l’agent SSH sur le serveur avec ce jeton : il obtient un certificat d’hôte et le renouvelle.",
     "pageRange": "{{start}}–{{end}} sur {{count}} hôtes",
     "revokeHost": "Révoquer l’hôte",
-    "revokeConfirm": "Révoquer {{name}} ? Son certificat d’hôte est révoqué et listé dans la KRL, et il ne se renouvellera plus : le serveur devra s’enrôler avec un nouveau jeton.",
+    "revokeConfirm": "Révoquer {{name}} ? Tous les certificats non expirés de sa clé, celui en cours et ceux que ses renouvellements ont remplacés, sont révoqués et listés dans la KRL, et il ne se renouvellera plus : le serveur devra s’enrôler avec un nouveau jeton.",
     "revoked": "{{name}} révoqué",
     "pauseRenewal": "Suspendre le renouvellement",
     "resumeRenewal": "Reprendre le renouvellement",

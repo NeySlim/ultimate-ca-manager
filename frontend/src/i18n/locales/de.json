@@ -7581,7 +7581,7 @@
     "noDataDescription": "Erstellen Sie ein Registrierungstoken und führen Sie damit den SSH-Agenten auf dem Server aus: Er erhält ein Host-Zertifikat und erneuert es.",
     "pageRange": "{{start}}–{{end}} von {{count}} Hosts",
     "revokeHost": "Host widerrufen",
-    "revokeConfirm": "{{name}} widerrufen? Sein Host-Zertifikat wird widerrufen und in der KRL aufgeführt, und er wird nicht mehr erneuert: Der Server muss sich mit einem neuen Token registrieren.",
+    "revokeConfirm": "{{name}} widerrufen? Alle nicht abgelaufenen Zertifikate seines Schlüssels, das aktuelle und die durch Erneuerungen ersetzten, werden widerrufen und in der KRL aufgeführt, und er wird nicht mehr erneuert: Der Server muss sich mit einem neuen Token registrieren.",
     "revoked": "{{name}} widerrufen",
     "pauseRenewal": "Erneuerung pausieren",
     "resumeRenewal": "Erneuerung fortsetzen",

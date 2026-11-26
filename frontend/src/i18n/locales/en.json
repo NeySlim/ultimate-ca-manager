@@ -7581,7 +7581,7 @@
     "noDataDescription": "Create an enrollment token, then run the SSH agent on the server with it: it gets a host certificate and renews it.",
     "pageRange": "{{start}}–{{end}} of {{count}} hosts",
     "revokeHost": "Revoke host",
-    "revokeConfirm": "Revoke {{name}}? Its host certificate is revoked and listed in the KRL, and it will not renew again: the server must enroll with a new token.",
+    "revokeConfirm": "Revoke {{name}}? Every unexpired certificate of its key, the current one and those its renewals replaced, is revoked and listed in the KRL, and it will not renew again: the server must enroll with a new token.",
     "revoked": "{{name}} revoked",
     "pauseRenewal": "Pause renewal",
     "resumeRenewal": "Resume renewal",

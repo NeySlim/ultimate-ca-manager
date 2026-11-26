@@ -7581,7 +7581,7 @@
     "noDataDescription": "创建注册令牌，然后在服务器上用它运行 SSH 代理：服务器将获得主机证书并自动续期。",
     "pageRange": "第 {{start}}–{{end}} 台，共 {{count}} 台主机",
     "revokeHost": "吊销主机",
-    "revokeConfirm": "吊销 {{name}}？其主机证书将被吊销并列入 KRL，且不再续期：服务器必须使用新令牌重新注册。",
+    "revokeConfirm": "吊销 {{name}}？其密钥所有未过期的证书（当前证书以及续期所替换的证书）都将被吊销并列入 KRL，且不再续期：服务器必须使用新令牌重新注册。",
     "revoked": "已吊销 {{name}}",
     "pauseRenewal": "暂停续期",
     "resumeRenewal": "恢复续期",
