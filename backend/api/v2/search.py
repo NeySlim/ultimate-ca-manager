@@ -52,17 +52,18 @@ def global_search():
     search_pattern = f'%{safe_query}%'
     results = {}
     
-    # Search certificates; the comment only for a user who may read the certificates
+    # Each category to the readers of its own list only, as /api/v2/certificates, /cas
+    # and /templates answer them
     cert_terms = [
         Certificate.subject.ilike(search_pattern, escape='\\'),
         Certificate.issuer.ilike(search_pattern, escape='\\'),
         Certificate.descr.ilike(search_pattern, escape='\\'),
         Certificate.serial_number.ilike(search_pattern, escape='\\'),
         Certificate.serial_number.in_(serial_search_forms(query)),
+        Certificate.comment.ilike(search_pattern, escape='\\'),
     ]
-    if has_permission('read:certificates', g.permissions):
-        cert_terms.append(Certificate.comment.ilike(search_pattern, escape='\\'))
-    certs = Certificate.query.filter(or_(*cert_terms)).limit(limit).all()
+    certs = (Certificate.query.filter(or_(*cert_terms)).limit(limit).all()
+             if has_permission('read:certificates', g.permissions) else [])
     
     from datetime import datetime
     
@@ -89,7 +90,7 @@ def global_search():
             CA.subject.ilike(search_pattern, escape='\\'),
             CA.issuer.ilike(search_pattern, escape='\\')
         )
-    ).limit(limit).all()
+    ).limit(limit).all() if has_permission('read:cas', g.permissions) else []
     
     results['cas'] = [{
         'id': ca.id,
@@ -127,7 +128,7 @@ def global_search():
             CertificateTemplate.name.ilike(search_pattern, escape='\\'),
             CertificateTemplate.description.ilike(search_pattern, escape='\\')
         )
-    ).limit(limit).all()
+    ).limit(limit).all() if has_permission('read:templates', g.permissions) else []
     
     results['templates'] = [{
         'id': t.id,

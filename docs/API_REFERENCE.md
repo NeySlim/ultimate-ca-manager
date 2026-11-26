@@ -4211,7 +4211,7 @@ GET /api/v2/search?q=example.com&limit=20
 | `q` | string | Search query (required) |
 | `limit` | integer | Max results per category (default: 5) |
 
-Certificates match on their subject, issuer, display name and serial number, and on their comment for a user with `read:certificates`.
+Certificates match on their subject, issuer, display name, serial number and comment.
 
 **Response:**
 ```json
@@ -4227,7 +4227,7 @@ Certificates match on their subject, issuer, display name and serial number, and
 }
 ```
 
-`users` needs `read:users`, `acme_accounts` (matched on contact and account ID, named by the first contact) needs `read:acme`, and `scep_profiles` (matched on name, URL path and description) needs `read:scep`; without the permission the group is empty.
+`certificates` needs `read:certificates`, `cas` needs `read:cas`, `templates` needs `read:templates`, `users` needs `read:users`, `acme_accounts` (matched on contact and account ID, named by the first contact) needs `read:acme`, and `scep_profiles` (matched on name, URL path and description) needs `read:scep`; without the permission the group is empty.
 
 ---
 
