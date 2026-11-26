@@ -361,7 +361,7 @@
 :root .atl .notice>span{max-width:var(--notice-measure)}
 :root .atl .notice .command-line code{white-space:pre-wrap;overflow-wrap:anywhere}
 /* A history that is a catalog (the reports not scheduled): two abreast, 48 px apart, in a panel of 1500 px or more
-   (a 1600 px window), so a row's buttons stay near its name; the last row draws no rule under it. */
+   (a 1550 px window), so a row's buttons stay near its name; the last row draws no rule under it. */
 :root .atl .work-history.catalog{container-type:inline-size}
 @container (min-width:1500px){
   :root .atl .work-history.catalog .record-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:48px}

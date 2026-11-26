@@ -72,9 +72,9 @@ test('the queue groups, rows, due dates and history keep the mockup geometry', a
   }
 })
 
-// The reports not scheduled are a catalog: two abreast, 48 px apart, from 1600 px of window, one per line under it
-for (const width of [1280, 1600, 1920, 2560]) {
-  test(`at ${width}px the reports not scheduled take ${width >= 1600 ? 'two columns' : 'one column'}`, async ({ page, api: _api }) => {
+// The reports not scheduled are a catalog: two abreast, 48 px apart, from 1550 px of window (1500 px of panel), one per line under it
+for (const width of [1280, 1549, 1550, 1600, 1920, 2560]) {
+  test(`at ${width}px the reports not scheduled take ${width >= 1550 ? 'two columns' : 'one column'}`, async ({ page, api: _api }) => {
     await page.setViewportSize({ width, height: H })
     await page.goto('/reports')
     const toggle = page.getByRole('main').locator('[data-work-history]')
@@ -87,7 +87,7 @@ for (const width of [1280, 1600, 1920, 2560]) {
       return { x: r.x, y: r.y, width: r.width, right: r.right, actions: last.right, name: name.x, rule: parseFloat(getComputedStyle(el).borderBottomWidth) }
     }))
     expect(rows.length).toBeGreaterThan(6)
-    const two = width >= 1600
+    const two = width >= 1550
     const col = two ? (inner.width - 48) / 2 : inner.width
     for (const [i, r] of rows.entries()) {
       expect(Math.abs(r.width - col), `row ${i} width`).toBeLessThanOrEqual(1)

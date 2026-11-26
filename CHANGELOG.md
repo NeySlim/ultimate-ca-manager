@@ -16,7 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Lists: above the phone width the search field of a toolbar stops at 540 px instead of taking the whole line; the filters follow it and the tools (columns, density, export, refresh) sit at the right edge.
 - Dialogs: the help texts of a form dialog (Create Template, the policies, the CAs and the others) wrap at 78 characters like the notices, instead of running the whole width of a wide dialog.
 - Certificate inspector, Extensions tab: in a wide inspector (1100 px or more) the value of an extension sits beside its name, the names of a column on one width, instead of at the far right of its column.
-- Reports: from a 1600 px window the reports that are not scheduled are listed two abreast, so the Download and Schedule buttons of a report stay near its name.
+- Reports: from a 1550 px window the reports that are not scheduled are listed two abreast, so the Download and Schedule buttons of a report stay near its name.
 
 ### Security
 
