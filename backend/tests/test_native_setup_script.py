@@ -1554,6 +1554,19 @@ def test_a_ucm_env_link_is_refused_and_its_target_untouched(tmp_path, command):
     assert envfile.is_symlink()
 
 
+@pytest.mark.parametrize('command', [['env', '/opt/ucm/data'], ['env-ensure', 'DATA_DIR', '/d'], ['env-check']])
+def test_a_hard_linked_ucm_env_is_refused_with_its_remedy(tmp_path, command):
+    """A second name of a root file: refused like a link, before any read, with the same remedy."""
+    victim = _env_victim(tmp_path, 'UCM_FIPS_BUILD=1\n')
+    envfile = tmp_path / 'ucm.env'
+    os.link(victim, envfile)
+    result = _run([command[0], str(envfile), *command[1:]], _env(tmp_path))
+    assert result.returncode == 1
+    assert f'{envfile} is a hard link to another file: replace it with a regular file, then install again' \
+        in result.stderr, result.stderr
+    assert victim.read_text() == 'UCM_FIPS_BUILD=1\n' and stat.S_IMODE(victim.stat().st_mode) == 0o640
+
+
 def test_a_dangling_ucm_env_link_creates_nothing(tmp_path):
     envfile = tmp_path / 'ucm.env'
     envfile.symlink_to(tmp_path / 'created-by-root')

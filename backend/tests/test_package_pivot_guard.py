@@ -96,7 +96,7 @@ def _fakebin(tmp_path, extra=None):
         path = bin_dir / name
         path.write_text(f'#!{POSIX_SH}\n{body}\n')
         path.chmod(0o755)
-    for tool in ('cut', 'date'):
+    for tool in ('cut', 'date', 'stat'):
         os.symlink(shutil.which(tool), bin_dir / tool)
     env = {'PATH': str(bin_dir), 'LOG': str(log)}
     return env, log
@@ -126,24 +126,27 @@ def _run_preinst(script, tmp_path, *args, python='3.12'):
     return out, _calls(log)
 
 
-@pytest.mark.parametrize('linked', [True, False])
+@pytest.mark.parametrize('linked', ['symbolic', 'hard', None])
 def test_the_deb_preinst_refuses_a_linked_ucm_env_before_copying_it(preinst, tmp_path, linked):
     """/etc/ucm is the account's: a ucm.env it replaced by a link is named, and nothing is read through it."""
     victim = tmp_path / 'shadow'
     victim.write_text('root:*:1::::::\n')
     envfile = tmp_path / 'etc-ucm' / 'ucm.env'
     envfile.parent.mkdir()
-    if linked:
+    if linked == 'symbolic':
         envfile.symlink_to(victim)
+    elif linked == 'hard':
+        os.link(victim, envfile)
     else:
         envfile.write_text('SECRET_KEY=a\n')
     text = preinst.read_text()
-    assert text.count('/etc/ucm/ucm.env') == 4, text
+    assert text.count('/etc/ucm/ucm.env') == 7, text
     preinst.write_text(text.replace('/etc/ucm/ucm.env', str(envfile)))
     out, calls = _run_preinst(preinst, tmp_path, 'upgrade', '2.254')
     backups = [c for c in calls if c.startswith('dd ')]
     if linked:
-        assert out.returncode == 1 and f'{envfile} is a symbolic link or not a regular file' in out.stderr, out.stderr
+        why = 'a symbolic link or not a regular file' if linked == 'symbolic' else 'a hard link to another file'
+        assert out.returncode == 1 and f'{envfile} is {why}: replace it with a regular file' in out.stderr, out.stderr
         assert backups == [], calls
     else:
         assert out.returncode == 0, out.stderr
@@ -1081,6 +1084,25 @@ def test_the_rpm_post_writes_no_ucm_env_through_a_link(tmp_path):
     calls = _calls(log)
     check = calls.index(f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env')
     assert calls.index(f'bash {home}/scripts/native-setup.sh own write {config}/ucm.env 600') > check
+
+
+@pytest.mark.parametrize('package', ['deb', 'rpm'])
+def test_ucm_env_is_checked_before_the_venv_is_built(tmp_path, package):
+    """A ucm.env that only own can refuse reading (a hard link) would read as no UCM_FIPS_BUILD:
+    the check stops the install before a standard venv replaces a FIPS one."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    if package == 'deb':
+        script = tmp_path / 'postinst.sandboxed'
+        script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+        cmd = ['/bin/bash', str(script), 'configure', '2.254']
+    else:
+        cmd = [POSIX_SH, '-c', _post_body(tmp_path, home, data, config), 'post', '2']
+    subprocess.run(cmd, capture_output=True, text=True, timeout=20, env=env)
+    setup = f'bash {home}/scripts/native-setup.sh'
+    calls = _calls(log)
+    check = calls.index(f'{setup} env-check {config}/ucm.env')
+    assert check < calls.index(f'{setup} fips-requested {config}/ucm.env'), calls
+    assert check < next(i for i, c in enumerate(calls) if c.startswith(f'{setup} venv ')), calls
 
 
 def test_the_deb_postinst_adds_data_dir_through_native_setup(tmp_path):

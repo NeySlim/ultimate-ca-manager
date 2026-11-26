@@ -148,6 +148,8 @@ bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
 # Built before anything is written to the data or the configuration: the archiving
 # below asks this release's runner about the database left there
 echo "Creating Python virtual environment..."
+# A ucm.env own refuses to read would pass for one without UCM_FIPS_BUILD=1
+bash "$UCM_SETUP" env-check "$UCM_CONFIG/ucm.env" || exit 1
 BUILT_FIPS=""
 ! bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" || BUILT_FIPS=1
 # A failed UCM_FIPS_BUILD=1 build fails the scriptlet; the standard install keeps going as before

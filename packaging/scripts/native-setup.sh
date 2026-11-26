@@ -260,11 +260,14 @@ is_true() {
     return 1
 }
 
-# /etc/ucm is the service account's: a ucm.env it replaced by a link or by anything but a file is
-# refused before root reads it for a write; root then reads and replaces it only through own
+# /etc/ucm is the service account's: a ucm.env it replaced by a link, a second name of another
+# file or anything but a file is refused before root reads it; root then goes only through own
 env_check() {
     if [ -L "$1" ] || { [ -e "$1" ] && [ ! -f "$1" ]; }; then
         die "$1 is a symbolic link or not a regular file: replace it with a regular file, then install again"
+    fi
+    if [ -f "$1" ] && ! "${UCM_PYTHON:-python3}" -I -c 'import os, sys; sys.exit(os.lstat(sys.argv[1]).st_nlink > 1)' "$1"; then
+        die "$1 is a hard link to another file: replace it with a regular file, then install again"
     fi
 }
 

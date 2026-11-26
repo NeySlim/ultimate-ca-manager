@@ -66,6 +66,8 @@ case "$1" in
         # Built before anything is written to the data or the configuration: the archiving
         # below asks this release's runner about the database left there
         echo "Creating/updating Python virtual environment..."
+        # A ucm.env own refuses to read would pass for one without UCM_FIPS_BUILD=1
+        bash "$UCM_SETUP" env-check "$UCM_CONFIG/ucm.env"
         BUILT_FIPS=""
         ! bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" || BUILT_FIPS=1
         bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
