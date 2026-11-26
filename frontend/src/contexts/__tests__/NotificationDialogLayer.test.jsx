@@ -18,16 +18,16 @@ function Probe() {
   return null
 }
 
-function FormDialog({ onSubmit = () => {} }) {
+function FormDialog() {
   const [open, setOpen] = useState(true)
   if (!open) return <button type="button">Reopen</button>
   return (
     <AtelierDialog title="Create Template" onClose={() => setOpen(false)}>
-      <form onSubmit={(e) => { e.preventDefault(); onSubmit() }}>
+      <form onSubmit={(e) => { e.preventDefault(); onSend() }}>
         <input aria-label="Template Name" />
         <div className="modal-actions">
           <button type="button" onClick={() => setOpen(false)}>Cancel</button>
-          <button type="submit">Create</button>
+          <button type="submit" className="btn primary">Create</button>
         </div>
       </form>
     </AtelierDialog>
@@ -48,11 +48,17 @@ const line = () => document.getElementById('toast')
 const wait = (ms) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
 const mount = (children) => render(<NotificationProvider><Probe />{children}</NotificationProvider>)
 
+// What the dialog's form does when sent: set by each test
+let onSend = () => {}
+beforeEach(() => { onSend = () => {} })
+const send = (dialog, name = 'Create') => act(async () => { fireEvent.click(within(dialog).getByRole('button', { name })) })
+
 describe('the error of a form dialog', () => {
   it('is shown in the dialog above its buttons, as an alert, and not as a toast', async () => {
     mount(<FormDialog />)
     const dialog = await screen.findByRole('dialog')
-    await act(async () => { api.showError('A template with this name exists.') })
+    onSend = () => api.showError('A template with this name exists.')
+    await send(dialog)
     const alert = within(dialog).getByRole('alert')
     expect(alert).toHaveTextContent('A template with this name exists.')
     expect(alert).toHaveClass('notice', 'bad')
@@ -60,26 +66,41 @@ describe('the error of a form dialog', () => {
     expect(line()).not.toHaveClass('visible')
   })
 
-  it('takes the warning tone for a warning, and gives way to a newer one', async () => {
+  it('takes the warning tone for a warning, and gives way to a newer one of the same sending', async () => {
     mount(<FormDialog />)
     const dialog = await screen.findByRole('dialog')
-    await act(async () => { api.showWarning('Name required.') })
+    onSend = () => { api.showWarning('Name required.') }
+    await send(dialog)
     expect(within(dialog).getByRole('alert')).toHaveClass('warn')
-    await act(async () => { api.showError('Saving failed.') })
+    onSend = () => { api.showWarning('Name required.'); api.showError('Saving failed.') }
+    await send(dialog)
     expect(within(dialog).getAllByRole('alert')).toHaveLength(1)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Saving failed.')
+  })
+
+  it('is the answer to a sending that waited for the server', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = async () => { await new Promise((done) => setTimeout(done, 300)); api.showError('Saving failed.') }
+    await send(dialog)
+    await wait(400)
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Saving failed.')
   })
 
   it('goes at the next submit, with its close button, and with the dialog', async () => {
     mount(<FormDialog />)
     const dialog = await screen.findByRole('dialog')
-    await act(async () => { api.showError('Saving failed.') })
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Create' })) })
+    onSend = () => api.showError('Saving failed.')
+    await send(dialog)
+    onSend = () => {}
+    await send(dialog)
     expect(within(dialog).queryByRole('alert')).toBeNull()
-    await act(async () => { api.showError('Saving failed again.') })
+    onSend = () => api.showError('Saving failed again.')
+    await send(dialog)
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'common.closeMessage' })) })
     expect(within(dialog).queryByRole('alert')).toBeNull()
-    await act(async () => { api.showError('Saving failed once more.') })
+    onSend = () => api.showError('Saving failed once more.')
+    await send(dialog)
     await wait(50)
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' })) })
     expect(screen.queryByRole('alert')).toBeNull()
@@ -92,10 +113,73 @@ describe('the error of a form dialog', () => {
     expect(line()).toHaveTextContent('Load failed.')
     cleanup()
     mount(<FormDialog />)
-    await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('dialog')
     const again = vi.fn()
-    await act(async () => { api.showError('Relaunch failed.', { action: { label: 'Again', onClick: again } }) })
+    onSend = () => api.showError('Relaunch failed.', { action: { label: 'Again', onClick: again } })
+    await send(dialog)
     expect(line()).toHaveTextContent('Relaunch failed.')
+  })
+})
+
+describe('a message that is not the answer to the form', () => {
+  it('raised while the form was never sent (polling, another page) is a toast above the dialog', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    await act(async () => { api.showError('Background job failed.') })
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    expect(line()).toHaveTextContent('Background job failed.')
+    expect(dialog.contains(line())).toBe(true)
+  })
+
+  it('raised after the answer to the sending is a toast', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = () => api.showError('Saving failed.')
+    await send(dialog)
+    await wait(50)
+    await act(async () => { api.showWarning('Connection lost.') })
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Saving failed.')
+    expect(line()).toHaveTextContent('Connection lost.')
+  })
+
+  it('raised after a Cancel click is a toast', async () => {
+    function Kept() {
+      return (
+        <AtelierDialog title="Keep" onClose={() => {}}>
+          <div className="modal-actions">
+            <button type="button" className="btn" onClick={() => api.showError('Nothing to cancel.')}>Cancel</button>
+          </div>
+        </AtelierDialog>
+      )
+    }
+    mount(<Kept />)
+    const dialog = await screen.findByRole('dialog')
+    await send(dialog, 'Cancel')
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    expect(line()).toHaveTextContent('Nothing to cancel.')
+  })
+})
+
+describe('a dialog whose primary button is a click, not a submit', () => {
+  function ClickDialog() {
+    return (
+      <AtelierDialog title="Restore" onClose={() => {}}>
+        <div className="modal-actions">
+          <button type="button" className="btn primary" onClick={() => onSend()}>Restore</button>
+        </div>
+      </AtelierDialog>
+    )
+  }
+
+  it('shows the answer to the click in the dialog, and clears it at the next click', async () => {
+    mount(<ClickDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = () => api.showError('Restore refused.')
+    await send(dialog, 'Restore')
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Restore refused.')
+    onSend = async () => { await new Promise((done) => setTimeout(done, 300)) }
+    await send(dialog, 'Restore')
+    expect(within(dialog).queryByRole('alert')).toBeNull()
   })
 })
 

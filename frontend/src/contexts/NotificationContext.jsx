@@ -106,9 +106,39 @@ export function NotificationProvider({ children }) {
     }
   }, [setPause])
 
-  // An error or a warning raised while a form dialog is open: shown in it, above its buttons
+  // The answer to a form dialog's sending (an error or a warning): shown in it, above its buttons
   const [dialogNotice, setDialogNotice] = useState(null)
   const clearNotice = useCallback(() => setDialogNotice(null), [])
+  // Dialogs sent (submit, or a click on the primary button) and not answered yet: a message raised
+  // meanwhile is theirs; the first one ends the sending once the task that raised it is over
+  const sending = useRef(new Set())
+  useEffect(() => {
+    const armed = sending.current
+    const arm = (dialog) => {
+      if (!dialog?.hasAttribute('open')) return
+      for (const held of armed) if (!held.isConnected) armed.delete(held)
+      armed.add(dialog)
+      setDialogNotice((current) => (current?.dialog === dialog ? null : current))
+    }
+    const onSubmit = (e) => arm(e.target?.closest?.('dialog'))
+    const onClick = (e) => {
+      const button = e.target?.closest?.(PRIMARY)
+      if (button && !button.disabled) arm(button.closest('dialog'))
+    }
+    document.addEventListener('submit', onSubmit, true)
+    document.addEventListener('click', onClick, true)
+    return () => {
+      document.removeEventListener('submit', onSubmit, true)
+      document.removeEventListener('click', onClick, true)
+      armed.clear()
+    }
+  }, [])
+  const answered = useCallback(() => {
+    const dialog = typeof document === 'undefined' ? null : topModal()
+    if (!dialog || !sending.current.has(dialog)) return null
+    setTimeout(() => sending.current.delete(dialog), 0)
+    return dialog
+  }, [])
 
   const pushToast = useCallback((type, message, duration, action) => {
     const id = Date.now() + Math.random() // unique even when called in a tight loop
@@ -125,13 +155,14 @@ export function NotificationProvider({ children }) {
   const addToast = useCallback((type, message, options) => {
     const opts = options !== null && typeof options === 'object' ? options : { duration: options }
     const action = opts.action && opts.action.label && typeof opts.action.onClick === 'function' ? opts.action : null
-    const form = (type === 'error' || type === 'warning') && !action ? formDialogBar() : null
+    const sent = answered()
+    const form = sent && (type === 'error' || type === 'warning') && !action ? formDialogBar(sent) : null
     if (form) {
       setDialogNotice({ id: Date.now() + Math.random(), type, message, duration: opts.duration, ...form })
       return
     }
     pushToast(type, message, opts.duration ?? (action ? 0 : 5000), action)
-  }, [pushToast])
+  }, [pushToast, answered])
 
   // A notice whose dialog closed before it was painted would be lost: it is shown as a toast
   const noticeLost = useCallback((notice) => {
@@ -244,16 +275,18 @@ function topModal() {
   return open[open.length - 1] || null
 }
 
-// The topmost modal dialog when it is a form (it has an action bar), with its last bar
-function formDialogBar() {
-  const dialog = typeof document === 'undefined' ? null : topModal()
-  const bars = dialog ? dialog.querySelectorAll('.modal-actions') : []
+// A dialog's primary button: a click on it sends the dialog as a submit would
+const PRIMARY = 'dialog .modal-actions :is(.primary, .is-primary, .danger, [type="submit"])'
+
+// A form dialog (it has an action bar), with its last bar
+function formDialogBar(dialog) {
+  const bars = dialog.querySelectorAll('.modal-actions')
   return bars.length ? { dialog, bar: bars[bars.length - 1] } : null
 }
 
 /**
- * The error of a form dialog, in the dialog's action bar above its buttons (an alert). It goes
- * when the dialog closes, at the next submit, or with its own close button.
+ * The answer to a form dialog's sending, in its action bar above its buttons (an alert). It goes
+ * when the dialog closes, at the next sending, or with its own close button.
  */
 function DialogNotice({ notice, onClose, onLost, closeLabel }) {
   const { dialog, bar } = notice
@@ -273,14 +306,11 @@ function DialogNotice({ notice, onClose, onLost, closeLabel }) {
     let frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => { painted = true }) })
     const watch = new MutationObserver(check)
     watch.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] })
-    const done = () => onClose()
     dialog.addEventListener('close', check)
-    dialog.addEventListener('submit', done, true)
     return () => {
       cancelAnimationFrame(frame)
       watch.disconnect()
       dialog.removeEventListener('close', check)
-      dialog.removeEventListener('submit', done, true)
     }
   }, [notice, dialog, bar, onClose, onLost])
   if (!bar.isConnected) return null
