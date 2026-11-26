@@ -1,5 +1,6 @@
 import re
 import logging
+import threading
 
 from flask import request, g
 from models import db, User
@@ -214,6 +215,7 @@ def update_profile():
 def record_email_change(user, old_email, new_email):
     """Audit the change and tell the old address; a failed notice never undoes it."""
     from html import escape
+    from flask import current_app
     from services.audit_service import AuditService
     AuditService.log_action(
         action='profile_email_change',
@@ -225,22 +227,34 @@ def record_email_change(user, old_email, new_email):
     )
     if not old_email:
         return
-    try:
-        from services.notification_service import NotificationService
-        sent = NotificationService.send_email(
-            to=old_email,
-            subject='UCM - Account email changed',
-            template='generic',
-            context={'message': (
-                f'The email of the UCM account <strong>{escape(user.username)}</strong> was changed '
-                f'from {escape(old_email)} to {escape(new_email or "(none)")}. If you did not make '
-                'this change, contact your administrator: password reset links now go to the new address.')},
-        )
-        if not sent:
-            logger.warning('Email change notice to the old address of %s not sent', user.username)
-    except Exception as exc:  # noqa: BLE001 - the change stands without its notice
-        logger.warning('Email change notice to the old address of %s failed: %s',
-                       user.username, type(exc).__name__)
+    username = user.username
+    message = (
+        f'The email of the UCM account <strong>{escape(username)}</strong> was changed '
+        f'from {escape(old_email)} to {escape(new_email or "(none)")}. If you did not make '
+        'this change, contact your administrator: password reset links now go to the new address.')
+
+    def send():
+        try:
+            from services.notification_service import NotificationService
+            sent = NotificationService.send_email(
+                to=old_email, subject='UCM - Account email changed', template='generic',
+                context={'message': message})
+            if not sent:
+                logger.warning('Email change notice to the old address of %s not sent', username)
+        except Exception as exc:  # noqa: BLE001 - the change stands without its notice
+            logger.warning('Email change notice to the old address of %s failed: %s',
+                           username, type(exc).__name__)
+
+    app = current_app._get_current_object()
+    if app.config.get('TESTING'):
+        send()  # inline on the caller's session (a single shared connection in tests)
+        return
+
+    def run():
+        with app.app_context():
+            send()
+    # The relay is reached off the request: a slow or dead one never holds the reply
+    threading.Thread(target=run, name='email-change-notice', daemon=True).start()
 
 
 @bp.route('/api/v2/account/preferences', methods=['GET'])

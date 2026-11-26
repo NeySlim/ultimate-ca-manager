@@ -107,3 +107,32 @@ def test_an_account_without_a_password_changes_it_without_one(app, signed_in, no
     r = _patch(c, {'email': old.replace('@old.example', '@sso.example')})
     assert r.status_code == 200, r.data
     assert [to for to, _s, _m in notices] == [old]
+
+
+def test_the_notice_leaves_the_request_and_a_failure_is_logged(app, signed_in, monkeypatch, caplog):
+    """Outside tests the relay is reached from a thread: a slow relay never holds the reply."""
+    import api.v2.account.profile as profile_module
+    started = []
+
+    class _Held:
+        def __init__(self, target, name=None, daemon=None):
+            self.target, self.daemon = target, daemon
+
+        def start(self):
+            started.append(self)
+    calls = []
+
+    def _broken(to, subject, template, context):
+        calls.append(to)
+        raise OSError('relay down')
+    monkeypatch.setattr(profile_module.threading, 'Thread', _Held)
+    monkeypatch.setattr(notification_module.NotificationService, 'send_email', staticmethod(_broken))
+    monkeypatch.setitem(app.config, 'TESTING', False)
+    c, uid, old = signed_in()
+    r = _patch(c, {'email': old.replace('@old.example', '@late.example'), 'current_password': PASSWORD})
+    assert r.status_code == 200, r.data
+    assert calls == [] and len(started) == 1 and started[0].daemon
+    with caplog.at_level('WARNING'):
+        started[0].target()
+    assert calls == [old]
+    assert 'Email change notice' in caplog.text
