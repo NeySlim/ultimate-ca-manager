@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- Settings and Account on a wide screen: once the form column reaches 1280 px (a window of about 1550 px) a card takes the whole column and lays its groups of fields in two columns, with tables, notices and test lines across the card. Narrower windows keep the 960 px cards; no field or text grows (long fields stop at 640 px, help texts at 62 characters, notice texts at 78).
+- Settings and Account on a wide screen: once the form column reaches 1280 px (a window of 1552 px) a card takes the whole column and lays its groups of fields in two columns, with tables, notices and test lines across the card. Narrower windows keep the 960 px cards; no field or text grows (long fields stop at 640 px, help texts at 62 characters, notice texts at 78).
 - Certificate Tools, Operations and the configuration of ACME (server and client), SCEP, EST and TSA follow the same rule: on a wide screen the card takes the column and a group of fields alone in it takes the whole card, its fields at the left with the same limits; an editor, a list or a result uses that width. A notice of these pages runs across its card, its text held to 78 characters.
 - Lists: above the phone width the search field of a toolbar stops at 540 px instead of taking the whole line; the filters follow it and the tools (columns, density, export, refresh) sit at the right edge.
 - Dialogs: the help texts of a form dialog (Create Template, the policies, the CAs and the others) wrap at 78 characters like the notices, instead of running the whole width of a wide dialog.

@@ -332,9 +332,9 @@
 :root .atl .settings-body :is(small,p:not(.field-error,.notice)),:root .atl .settings-section .panel-heading p{max-width:var(--measure)}
 /* A card of 1280 px or more: its groups of fields in two independent columns, 48 px apart, balanced by the browser.
    The rest keeps the whole card: what is not a group of fields (a table, a notice, a test line), a group marked .wide
-   or .stacked, and a group alone in its run (no other group of fields beside it, a closed dialog not counted).
-   The query reads the card's content box, its 1 px borders off: 1278 px is a card on a column of 1280 px. */
-@container (min-width:1278px){
+   or .stacked, and a group alone in its run (no other group of fields beside it, a dialog, out of the flow, not counted).
+   The query reads the card's content box, its 1 px borders off: 1278 px is a card on a column of 1280 px (1277.99 for a fractional zoom). */
+@container (min-width:1277.99px){
   :root .atl .settings-body{display:block;columns:2;column-gap:48px}
   :root .atl .settings-body>:not(dialog){break-inside:avoid}
   :root .atl .settings-body>:not(:first-child,dialog){margin-top:20px}
