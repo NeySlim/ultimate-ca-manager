@@ -138,7 +138,7 @@ volumes:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UCM_FQDN` | `ucm.example.com` | Server FQDN (important for SSL) |
+| `UCM_FQDN` | `ucm.local` | Server FQDN: the name of the self-signed UI certificate and of the AIA, CDP and OCSP URLs; set it to the name clients use |
 | `UCM_HTTPS_PORT` | `8443` | HTTPS port |
 
 ### Optional

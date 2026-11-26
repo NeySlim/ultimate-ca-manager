@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Docker guide: `UCM_FQDN` was documented with the default `ucm.example.com`; the image uses `ucm.local`, which the guide now gives.
 - Packages: the firewall script promised a prompt that could never appear, and `UCM_FIREWALL=ask` opened the port without asking; it now never prompts and changes the firewall only on `UCM_FIREWALL=yes`.
 - DEB: removing the package left `ucm-watcher.path` enabled and watching the data directory without its unit files; it is now stopped and disabled with the service.
 - Docker: each start copied the SQLite database into `backups`, so a container restarting in a loop filled its volume; the copies are now capped at `UCM_BACKUP_KEEP` (default 5), pruned before the copy, and a start on a database unchanged since its newest copy makes none.
