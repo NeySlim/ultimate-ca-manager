@@ -7724,7 +7724,7 @@
       "dek_sweep": "データ鍵での再暗号化",
       "sso_sign_in_test_purge": "SSOサインインテストの削除",
       "session_key_retire": "旧セッション鍵の廃止",
-      "ssh_revoked_host_sweep": "Revoked SSH host sweep",
+      "ssh_revoked_host_sweep": "SSH ホスト失効の完了",
       "cluster_command_purge": "HAクラスターコマンドの削除",
       "update_campaign": "HAローリングアップデート",
       "delivery_retention": "配信履歴の保持",

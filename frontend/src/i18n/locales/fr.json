@@ -7724,7 +7724,7 @@
       "dek_sweep": "Rechiffrement sous la clé de données",
       "sso_sign_in_test_purge": "Purge des tests de connexion SSO",
       "session_key_retire": "Retrait de l’ancienne clé de session",
-      "ssh_revoked_host_sweep": "Revoked SSH host sweep",
+      "ssh_revoked_host_sweep": "Fin des révocations d’hôtes SSH",
       "cluster_command_purge": "Purge des commandes de la grappe HA",
       "update_campaign": "Mise à jour HA nœud par nœud",
       "delivery_retention": "Conservation de l’historique des envois",
