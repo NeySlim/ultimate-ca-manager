@@ -26,8 +26,12 @@ def _ca_pem(tag):
     return cn, pem(make_cert(cn, new_key()))
 
 
-def _import(auth_client, **form):
-    return auth_client.post('/api/v2/cas/import', data=form, content_type='multipart/form-data')
+# Both routes that create or update a CA from its certificate take the same labels
+ROUTES = ['/api/v2/cas/import', '/api/v2/certificates/import']
+
+
+def _import(auth_client, route='/api/v2/cas/import', **form):
+    return auth_client.post(route, data=form, content_type='multipart/form-data')
 
 
 def _stored(app, cn):
@@ -35,38 +39,44 @@ def _stored(app, cn):
         return [(c.descr, c.description) for c in CA.query.all() if c.common_name == cn]
 
 
-def test_the_import_takes_a_name_and_a_description(app, auth_client):
+@pytest.mark.parametrize('route', ROUTES)
+def test_the_import_takes_a_name_and_a_description(app, auth_client, route):
     cn, cert = _ca_pem('named')
-    r = _import(auth_client, pem_content=cert, name='  Partner Root  ', description='Signed by the partner\nkept')
+    r = _import(auth_client, route, pem_content=cert, name='  Partner Root  ',
+                description='Signed by the partner\nkept')
     assert r.status_code == 201, r.get_json()
     assert r.get_json()['data']['description'] == 'Signed by the partner\nkept'
     assert _stored(app, cn) == [('Partner Root', 'Signed by the partner\nkept')]
 
 
-def test_without_them_the_name_is_the_cn(app, auth_client):
+@pytest.mark.parametrize('route', ROUTES)
+@pytest.mark.parametrize('form', [{}, {'name': '   ', 'description': '  '}], ids=['absent', 'blank'])
+def test_without_them_the_name_is_the_cn(app, auth_client, route, form):
     cn, cert = _ca_pem('plain')
-    assert _import(auth_client, pem_content=cert).status_code == 201
+    assert _import(auth_client, route, pem_content=cert, **form).status_code == 201
     assert _stored(app, cn) == [(cn, None)]
 
 
 @pytest.mark.parametrize('form', [{'name': 'n' * 256}, {'description': 'd' * 1001}, {'description': 'bell\x07'}],
                          ids=['long-name', 'long-description', 'control'])
-def test_an_unusable_label_refuses_the_import(app, auth_client, form):
+@pytest.mark.parametrize('route', ROUTES)
+def test_an_unusable_label_refuses_the_import(app, auth_client, form, route):
     cn, cert = _ca_pem('refused')
-    r = _import(auth_client, pem_content=cert, **form)
+    r = _import(auth_client, route, pem_content=cert, **form)
     assert r.status_code == 400, r.get_json()
     assert _stored(app, cn) == []
 
 
-def test_a_reimport_keeps_the_name_given_since(app, auth_client):
+@pytest.mark.parametrize('route', ROUTES)
+def test_a_reimport_keeps_the_name_given_since(app, auth_client, route):
     cn, cert = _ca_pem('kept')
     ca_id = _import(auth_client, pem_content=cert).get_json()['data']['id']
     r = auth_client.patch(f'/api/v2/cas/{ca_id}', json={'name': 'Renamed since', 'description': 'Mine'})
     assert r.status_code == 200, r.get_json()
-    r = _import(auth_client, pem_content=cert)
+    r = _import(auth_client, route, pem_content=cert, name='  ')
     assert r.status_code == 200, r.get_json()
     assert _stored(app, cn) == [('Renamed since', 'Mine')]
-    assert _import(auth_client, pem_content=cert, name='Given now', description='New').status_code == 200
+    assert _import(auth_client, route, pem_content=cert, name='Given now', description='New').status_code == 200
     assert _stored(app, cn) == [('Given now', 'New')]
 
 
@@ -88,8 +98,10 @@ def _pending_reimport(app, auth_client, monkeypatch, route='/api/v2/cas/import',
     return r, sent
 
 
-def test_the_install_path_event_carries_the_new_description(app, auth_client, monkeypatch):
-    r, sent = _pending_reimport(app, auth_client, monkeypatch, name='Installed Root', description='Renewed here')
+@pytest.mark.parametrize('route', ROUTES)
+def test_the_install_path_event_carries_the_new_description(app, auth_client, monkeypatch, route):
+    r, sent = _pending_reimport(app, auth_client, monkeypatch, route, name='Installed Root',
+                                description='Renewed here')
     assert r.status_code == 200, r.get_json()
     assert r.get_json()['data']['description'] == 'Renewed here'
     assert [(p['descr'], p['description']) for p in sent] == [('Installed Root', 'Renewed here')]
