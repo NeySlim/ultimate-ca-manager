@@ -4713,10 +4713,10 @@
     "apiKeyHint": "API 密钥支持通过程序调用访问 UCM。妥善保管密钥，定期轮换。每个密钥可设置独立过期时间。",
     "apiKeySearchPlaceholder": "按名称或前缀搜索...",
     "apiKeyPrefix": "前缀",
-    "confirmItIsYou": "Confirm it is you",
-    "confirmWithPassword": "Enter your password to confirm this change",
-    "confirmWithCode": "Enter the code of your authenticator app to confirm this change",
-    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it"
+    "confirmItIsYou": "确认是您本人",
+    "confirmWithPassword": "请输入密码以确认此更改",
+    "confirmWithCode": "请输入身份验证器应用中的代码以确认此更改",
+    "confirmEmailChange": "请输入密码以更改邮箱：密码重置链接会发送到该邮箱"
   },
   "rbac": {
     "title": "基于角色的访问控制",

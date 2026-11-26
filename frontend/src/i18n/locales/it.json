@@ -4713,10 +4713,10 @@
     "apiKeyHint": "Le chiavi API consentono l'accesso programmatico a UCM. Mantieni segrete le tue chiavi e ruotale regolarmente. Ogni chiave può avere una data di scadenza personalizzata.",
     "apiKeySearchPlaceholder": "Cerca per nome o prefisso...",
     "apiKeyPrefix": "Prefisso",
-    "confirmItIsYou": "Confirm it is you",
-    "confirmWithPassword": "Enter your password to confirm this change",
-    "confirmWithCode": "Enter the code of your authenticator app to confirm this change",
-    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it"
+    "confirmItIsYou": "Conferma la tua identità",
+    "confirmWithPassword": "Inserisci la password per confermare questa modifica",
+    "confirmWithCode": "Inserisci il codice dell’app di autenticazione per confermare questa modifica",
+    "confirmEmailChange": "Inserisci la password per cambiare l’email: i link di reimpostazione della password vengono inviati a questo indirizzo"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",

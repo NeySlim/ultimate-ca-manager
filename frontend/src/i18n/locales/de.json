@@ -4713,10 +4713,10 @@
     "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben.",
     "apiKeySearchPlaceholder": "Nach Name oder Präfix suchen...",
     "apiKeyPrefix": "Präfix",
-    "confirmItIsYou": "Confirm it is you",
-    "confirmWithPassword": "Enter your password to confirm this change",
-    "confirmWithCode": "Enter the code of your authenticator app to confirm this change",
-    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it"
+    "confirmItIsYou": "Bestätigen Sie, dass Sie es sind",
+    "confirmWithPassword": "Geben Sie Ihr Passwort ein, um diese Änderung zu bestätigen",
+    "confirmWithCode": "Geben Sie den Code Ihrer Authenticator-App ein, um diese Änderung zu bestätigen",
+    "confirmEmailChange": "Geben Sie Ihr Passwort ein, um die E-Mail-Adresse zu ändern: An sie werden Links zum Zurücksetzen des Passworts gesendet"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",

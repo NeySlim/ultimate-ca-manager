@@ -141,10 +141,10 @@
     "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée.",
     "apiKeySearchPlaceholder": "Rechercher par nom ou préfixe...",
     "apiKeyPrefix": "Préfixe",
-    "confirmItIsYou": "Confirm it is you",
-    "confirmWithPassword": "Enter your password to confirm this change",
-    "confirmWithCode": "Enter the code of your authenticator app to confirm this change",
-    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it"
+    "confirmItIsYou": "Confirmez qu’il s’agit bien de vous",
+    "confirmWithPassword": "Saisissez votre mot de passe pour confirmer cette modification",
+    "confirmWithCode": "Saisissez le code de votre application d’authentification pour confirmer cette modification",
+    "confirmEmailChange": "Saisissez votre mot de passe pour changer l’adresse e-mail : les liens de réinitialisation du mot de passe y sont envoyés"
   },
   "acme": {
     "title": "Protocole ACME",

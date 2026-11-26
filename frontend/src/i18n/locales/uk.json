@@ -4887,10 +4887,10 @@
     "apiKeyHint": "Ключі API надають програмний доступ до UCM. Зберігайте ключі в таємниці та регулярно змінюйте їх. Для кожного ключа можна задати власний термін дії.",
     "apiKeySearchPlaceholder": "Пошук за назвою або префіксом...",
     "apiKeyPrefix": "Префікс",
-    "confirmItIsYou": "Confirm it is you",
-    "confirmWithPassword": "Enter your password to confirm this change",
-    "confirmWithCode": "Enter the code of your authenticator app to confirm this change",
-    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it"
+    "confirmItIsYou": "Підтвердьте, що це ви",
+    "confirmWithPassword": "Введіть пароль, щоб підтвердити цю зміну",
+    "confirmWithCode": "Введіть код застосунку-автентифікатора, щоб підтвердити цю зміну",
+    "confirmEmailChange": "Введіть пароль, щоб змінити адресу email: на неї надсилаються посилання для скидання пароля"
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",
