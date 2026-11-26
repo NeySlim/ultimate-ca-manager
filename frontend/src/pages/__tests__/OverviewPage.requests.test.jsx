@@ -127,6 +127,50 @@ describe('requests of the overview', () => {
     await waitFor(() => expect(document.activeElement).toBe(document.getElementById('card-queue-title')))
   })
 
+  // The card asked for may still be loading (shown again, or slower than the strip): the request waits for it
+  const QUEUE = { data: {
+    items: [
+      { kind: 'manual_renewal_due', tier: 'warning', id: 1, label: 'cert-one', href_hint: '/certificates/1' },
+      { kind: 'acme_order_failed', tier: 'critical', id: 7, label: 'order-seven', href_hint: '/acme?order=7' },
+    ],
+    counts: { manual_renewal_due: 1, acme_order_failed: 1 }, total: 2 } }
+  /** The next queue request answers only on release(). */
+  const heldQueue = () => {
+    let done
+    api.getQueue.mockImplementationOnce(() => new Promise((resolve) => { done = resolve }))
+    return () => act(async () => { done(QUEUE) })
+  }
+  const frames = (n) => act(async () => { for (let i = 0; i < n; i += 1) await new Promise((r) => requestAnimationFrame(r)) })
+  const focusedOnAcme = async () => {
+    await waitFor(() => expect(document.getElementById('queue-chip-acme')?.getAttribute('aria-pressed')).toBe('true'))
+    expect(screen.queryByText('cert-one')).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(document.getElementById('card-queue-title')))
+  }
+
+  it('a hidden queue shown by the failures figure is filtered and focused once it has loaded', async () => {
+    api.getQueue.mockResolvedValueOnce(QUEUE)
+    const release = heldQueue()
+    store.prefs = { dashboard: { hidden: ['queue'] } }
+    render(<MemoryRouter><OverviewPage /></MemoryRouter>)
+    await loaded()
+    fireEvent.click(metric('failures'))
+    expect(document.querySelector('#card-queue.sk-card')).not.toBeNull()
+    await frames(3)
+    await release()
+    await focusedOnAcme()
+  })
+
+  it('the failures figure clicked while the queue is still loading filters and focuses it once loaded', async () => {
+    const release = heldQueue()
+    render(<MemoryRouter><OverviewPage /></MemoryRouter>)
+    await waitFor(() => expect(value('failures')).toBe('2'))
+    expect(document.querySelector('#card-queue.sk-card')).not.toBeNull()
+    fireEvent.click(metric('failures'))
+    await frames(3)
+    await release()
+    await focusedOnAcme()
+  })
+
   it('a failure shared by two readers reaches both', async () => {
     api.getQueue.mockRejectedValue(Object.assign(new Error('down'), { status: 500 }))
     render(<MemoryRouter><OverviewPage /></MemoryRouter>)

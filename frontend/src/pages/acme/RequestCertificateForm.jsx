@@ -7,6 +7,7 @@ import { acmeService } from '../../services'
 import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
 import { useKeyPlatform } from '../../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
+import { useInFlight } from '../../hooks/useInFlight'
 
 const KEY_TYPES = ACME_CLIENT_LABELS
 
@@ -116,10 +117,14 @@ export default function RequestCertificateForm({
     return payload
   }
 
+  // One order per request: the CA creates one per POST, so a second submit waits for the first
+  const [submitting, runSubmit] = useInFlight()
   const handleSubmit = (e) => {
     e.preventDefault()
-    const payload = buildPayload()
-    if (payload) onSubmit(payload)
+    runSubmit(async () => {
+      const payload = buildPayload()
+      if (payload) await onSubmit(payload)
+    })
   }
 
   const handlePreflight = (e) => {
@@ -231,7 +236,9 @@ export default function RequestCertificateForm({
         <button type="button" className="btn" onClick={handlePreflight} disabled={preflightLoading || undefined}>
           <Icon name="search" />{preflightLoading ? t('acme.preflightRunning') : t('acme.preflightRun')}
         </button>
-        <button type="submit" className="btn primary"><Icon name="upload" />{t('acme.requestCertificate')}</button>
+        <button type="submit" className="btn primary" disabled={submitting || undefined} aria-busy={submitting || undefined}>
+          <Icon name="upload" />{t('acme.requestCertificate')}
+        </button>
       </div>
     </form>
   )

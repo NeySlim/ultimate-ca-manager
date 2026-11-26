@@ -36,7 +36,10 @@ export default function SecuritySection({ settings, fieldErrors = {}, updateSett
             <Facts items={[
               { label: t('common.status'), state: enc.disabling ? ['warn', t('settings.encryptionDisabling')]
                 : [enc.enabled ? 'good' : 'warn', enc.enabled ? t('common.enabled') : t('common.disabled')] },
-              enc.enabled && enc.key_source && fact(t('settings.keySource'), enc.key_file_path, { kind: 'url' }),
+              // The API gives the key file's path whatever the source: a key from the environment names its variable
+              enc.enabled && enc.key_source && (enc.key_source === 'env'
+                ? { label: t('settings.keySource'), value: t('settings.keySourceEnv', { name: 'KEY_ENCRYPTION_KEY' }) }
+                : fact(t('settings.keySource'), enc.key_file_path, { kind: 'url' })),
               enc.enabled && enc.kek_fingerprint && { label: t('settings.kekFingerprint'), value: enc.kek_fingerprint, kind: 'hex' },
               enc.enabled && enc.kek_fingerprint && [t('settings.dekVersion'), (
                 <span className="row-actions">

@@ -469,8 +469,8 @@
 :root .atl .notice>span>strong:has(+.pre-line){display:block;margin-bottom:6px}
 /* Atelier: a neutral pill keeps the box of the tinted ones and takes a ground of its own, so a state column lines up. */
 :root:not([data-theme|=aurore]) .atl .badge:not(.good,.warn,.bad){background-color:color-mix(in srgb,var(--muted) 12%,transparent)}
-/* Aurore, light: a dialog on the dark veil is opaque white, as the page's panels; its fields keep their ground. */
-:root[data-theme="aurore"][data-mode="light"] .atl dialog{background:var(--panel)}
+/* Aurore: a dialog is opaque on its veil, the ground of its sticky actions (var(--panel)); the mode attribute outranks maquette.css. */
+:root[data-theme|=aurore][data-mode] .atl dialog[open]{background:var(--panel)}
 /* Dark modes: the browser draws its own controls (check boxes, scroll bars) dark. */
 :root[data-mode="dark"] .atl:not(.guide-app){color-scheme:dark}
 /* A block left empty: its title and its action apart. */
@@ -594,5 +594,5 @@
 :root .atl .page-head>.settings-savebar .settings-save-buttons{display:flex;gap:inherit;flex-shrink:0}
 :root .atl .page-head>.settings-savebar .settings-state-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 :root .atl .page-head>.settings-savebar .btn{flex-shrink:0}
-/* Phone: the document scrolls under the 62 px sticky masthead, a section reached by its link starts below it. */
-@media(max-width:800px){:root .atl .settings-section{scroll-margin-top:calc(62px + 8px)}}
+/* Phone: the document's scroll padding (index.css) already clears the sticky masthead, a section adds nothing to it. */
+@media(max-width:800px){:root .atl .settings-section{scroll-margin-top:0}}

@@ -177,6 +177,14 @@ describe('the CRL / OCSP list', () => {
     expect(screen.getByRole('combobox', { name: 'table.sortBy' })).toHaveValue('next')
   })
 
+  it('names the responder state of a record by its column, so it does not read as the CA state', async () => {
+    mobile.isMobile = true
+    page()
+    const record = (await screen.findAllByRole('button', { name: 'New CA' }))[0].closest('article.mobile-record')
+    const facts = [...record.querySelectorAll('.row-meta > span')].map((s) => s.textContent)
+    expect(facts).toContain('OCSP crlOcsp.ocspInactive')
+  })
+
   it('computes the state on the CRL dates, never on the publish cadence', () => {
     expect(crlState({ has_crl: false }, NOW)).toBe('none')
     expect(crlState({ has_crl: true, crl_next_update: '2026-11-08T11:00:00Z', crl_next_publish: '2026-12-01T00:00:00Z' }, NOW)).toBe('expired')

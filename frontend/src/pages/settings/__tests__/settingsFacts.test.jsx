@@ -125,9 +125,12 @@ describe('the key encryption', () => {
     expect(row('settings.kekFingerprint').querySelector('dd.v .code-value.hex')).not.toBeNull()
   })
 
-  it('says a key source without a file apart from the values', () => {
-    show({ enabled: true, key_source: 'env', key_file_path: null, total_keys: 0, key_files_on_disk: 0 })
-    expect(row('settings.keySource').querySelector('dd')).toHaveClass('absent')
+  // The API sends the key file's path whatever the source: a key read from the environment names the variable
+  it('names the KEY_ENCRYPTION_KEY variable when the key comes from the environment, not the key file', () => {
+    show({ enabled: true, key_source: 'env', key_file_path: '/etc/ucm/master.key', total_keys: 0, key_files_on_disk: 0 })
+    const source = row('settings.keySource')
+    expect(source).toHaveTextContent('settings.keySourceEnv {"name":"KEY_ENCRYPTION_KEY"}')
+    expect(source).not.toHaveTextContent('master.key')
   })
 })
 

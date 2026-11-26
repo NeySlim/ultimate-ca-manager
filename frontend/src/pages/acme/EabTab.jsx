@@ -11,6 +11,7 @@ import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
+import { useInFlight } from '../../hooks/useInFlight'
 
 // Every page is read (200 a page), so the list sorts and searches them all; the newest first
 const EAB_MAX = 5000
@@ -92,7 +93,9 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     return searchedEabCredentials.filter(c => c.status === eabFilterStatus)
   }, [searchedEabCredentials, eabFilterStatus])
 
-  const handleCreateEabCredential = async () => {
+  // The secret is shown once: a second submit while the first runs would create a credential never shown
+  const [creatingEab, runCreateEab] = useInFlight()
+  const handleCreateEabCredential = () => runCreateEab(async () => {
     try {
       const payload = { label: eabLabel || null }
       const days = parseInt(eabExpiresInDays, 10)
@@ -112,7 +115,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     } catch (error) {
       showError(error.message || t('acme.eab.createFailed'))
     }
-  }
+  })
 
   const handleRevokeEabCredential = async (cred) => {
     const confirmed = await showConfirm(
@@ -328,7 +331,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
           </div>
           <div className="modal-actions">
             <button type="button" className="btn" data-action="close-modal" onClick={() => { setShowLocalCreate(false); onCloseCreateModal() }}>{t('common.cancel')}</button>
-            <button type="submit" className="btn primary">{t('acme.eab.generate')}</button>
+            <button type="submit" className="btn primary" disabled={creatingEab || undefined} aria-busy={creatingEab || undefined}>{t('acme.eab.generate')}</button>
           </div>
         </form>
       </Modal>

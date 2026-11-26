@@ -11,7 +11,7 @@ vi.mock('../../i18n', () => ({ languages: [{ code: 'en', name: 'English', flag: 
 vi.mock('../../contexts/ThemeContext', () => ({
   useTheme: () => ({ themeFamily: 'atelier', setThemeFamily: vi.fn(), mode: 'dark', setMode: vi.fn(), resolvedMode: 'dark', themes: [] }),
 }))
-vi.mock('../../services', () => ({ authService: s }))
+vi.mock('../../services', () => ({ authService: s, usersService: { getPasswordPolicy: vi.fn(async () => ({ data: { min_length: 8 } })) } }))
 vi.mock('../../lib/passwordStrength', async (orig) => ({
   ...(await orig()),
   fetchPasswordStrength: vi.fn(async () => ({ score: 20, level: 'weak' })),

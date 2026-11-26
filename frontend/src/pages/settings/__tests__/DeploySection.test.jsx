@@ -9,6 +9,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
 }))
 
+const mobile = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => mobile }))
+vi.mock('../../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
+
 vi.mock('../../../contexts', () => ({
   useNotification: () => ({
     showSuccess: vi.fn(),
@@ -205,5 +209,23 @@ describe('DeploySection targets table', () => {
     expect(within(ssh).getByTitle('deploy.showPublicKey')).toBeInTheDocument()
     fireEvent.click(within(api).getByTitle('deploy.testConnection'))
     await vi.waitFor(() => expect(service.testTarget).toHaveBeenCalledWith(1))
+  })
+})
+
+describe('DeploySection on a phone', () => {
+  it('names the date of the last success by its column', async () => {
+    const { deployService } = await import('../../../services')
+    deployService.getTargets.mockResolvedValueOnce({ data: [
+      { id: 3, name: 'web-01', kind: 'ssh', username: 'deploy', host: 'web01.example.test', port: 22, last_success_at: '2026-11-20T10:00:00Z' },
+    ] })
+    mobile.isMobile = true
+    try {
+      render(<DeploySection />)
+      const record = (await screen.findAllByRole('button', { name: 'web-01' }))[0].closest('article.mobile-record')
+      const facts = [...record.querySelectorAll('.row-meta > span')].map((s) => s.textContent)
+      expect(facts.some((f) => f.startsWith('deploy.lastSuccessColumn '))).toBe(true)
+    } finally {
+      mobile.isMobile = false
+    }
   })
 })

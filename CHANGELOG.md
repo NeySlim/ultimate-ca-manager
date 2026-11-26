@@ -20,6 +20,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Settings, SMTP OAuth: the console accepted an authorization result posted by any window, the provider's page included; it now takes it only from its own popup on the console's origin.
+- Operations, OPNsense import: the API key and secret were kept in clear in the browser's session storage after a connection test and survived a sign-out; only the host, port and TLS check stay there now, the credentials are held in memory until sign-out.
 - ACME Custom Command DNS provider: holding `write:acme` was enough to run any program as the service account; the provider now runs only root-owned hooks of `/etc/ucm/dns-hooks`, named without a path (see UPGRADE.md to move an existing script).
 - WebAuthn: a passwordless login or a passkey unlock accepted an assertion without user verification, so a key without a PIN opened a session alone; both now require it (W3C WebAuthn, section 7.2 step 17), the second step after a password still accepting a key without it.
 - Package updates: the root watcher installed whatever package path the service account wrote; it now installs only a release package of the updates directory, copied out of that account's reach and checked against the release's `.sha256` fetched by root, declaring a version above the installed one, and no longer runs `rpm -U --force`.
@@ -30,6 +32,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Overview: a figure that leads to the queue, clicked while the queue card was hidden or still loading, neither scrolled to the card nor focused its title; the request now waits for the card to load.
+- Settings > Security: the encryption text gave /etc/ucm/master.key as the master key's place; it now names the master.key file of the configuration directory or KEY_ENCRYPTION_KEY, the Key source row shows that variable rather than the file when the key comes from it, and the help says the configuration directory follows UCM_CONFIG_DIR.
+- Phone cards: the OCSP state of a CRL, the approval of a policy and the last success of a deployment target showed a bare value ("Inactive" read as the CA's state); each now follows its column name.
+- Phone: tapping an authority in the tree, or the To handle figure of the overview, scrolled the panel or the queue with its title under the sticky header; whatever a scroll brings into view now lands below it.
+- Aurore palette: the sticky action bar of a long dialog (Create CA, Create Template, policies, issuance) stood out as a solid band over the translucent dialog; dialogs are now opaque, the bar on the same ground.
+- Password reset page: the minimum length was fixed at 8 characters; it now follows the password policy, as the other password forms do.
+- Operations, bulk actions: the result message named the action by its internal code ("revoke: 3 succeeded", in every language); it now uses the translated action name.
+- ACME EAB credentials and API keys: a double click on Generate or Create key created two, the first one live but its secret never shown; the button is now disabled until the creation returns.
+- ACME client: a second click or Enter on Request certificate while the first request ran created a second order at the external CA; the button is now disabled until the request returns.
 - HA: a node whose clock differed from the leader's by more than two passes showed the scheduler state as stale for good, or never; the state the leader publishes is now judged on the PostgreSQL server clock.
 - HA: the scheduler leader wrote its heartbeat only between two tasks, so one task longer than three passes (an ACME renewal waiting on DNS) showed the cluster without a leader and let a restore or a rolling restart pass it over; the leader now beats while a task runs, as long as it holds the lock. During such a task a restore now waits for the maintenance acknowledgment and answers 409 `maintenance_not_acknowledged` after 30 seconds instead of passing the leader over.
 - HA: a node whose clock ran more than 10 minutes ahead purged the WebSocket events the other nodes had just relayed; the relay now stamps and purges its rows on the PostgreSQL server clock.
