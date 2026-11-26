@@ -24,7 +24,7 @@ const KEYS = [
 ]
 
 const openOn = async () => {
-  mocks.getProviders.mockResolvedValue({ data: [{ id: 3, name: 'Token', provider_type: 'pkcs11' }] })
+  mocks.getProviders.mockResolvedValue({ data: [{ id: 3, name: 'Token', provider_type: 'pkcs11', enabled: true }] })
   mocks.listMatchingHsmKeys.mockResolvedValue({ data: { keys: KEYS } })
   const onSuccess = vi.fn()
   const onClose = vi.fn()
@@ -85,8 +85,24 @@ describe('AttachHsmKeyModal', () => {
     expect(screen.getByTestId('attach-hsm-key-dialog')).toBeInTheDocument()
   })
 
+  it('offers only the enabled providers', async () => {
+    mocks.getProviders.mockResolvedValue({ data: [
+      { id: 3, name: 'Token', provider_type: 'pkcs11', enabled: true },
+      { id: 4, name: 'Off', provider_type: 'openbao', enabled: false },
+    ] })
+    render(<AttachHsmKeyModal open ca={CA} onClose={vi.fn()} t={t} />)
+    const select = await screen.findByLabelText('cas.attachHsmKey.provider')
+    expect([...select.options].filter((o) => o.value).map((o) => o.value)).toEqual(['3'])
+  })
+
+  it('says when no provider is enabled', async () => {
+    mocks.getProviders.mockResolvedValue({ data: [{ id: 4, name: 'Off', provider_type: 'openbao', enabled: false }] })
+    render(<AttachHsmKeyModal open ca={CA} onClose={vi.fn()} t={t} />)
+    expect(await screen.findByText('cas.attachHsmKey.noProviders')).toBeInTheDocument()
+  })
+
   it('says when the provider cannot be read', async () => {
-    mocks.getProviders.mockResolvedValue({ data: [{ id: 3, name: 'Token', provider_type: 'pkcs11' }] })
+    mocks.getProviders.mockResolvedValue({ data: [{ id: 3, name: 'Token', provider_type: 'pkcs11', enabled: true }] })
     mocks.listMatchingHsmKeys.mockRejectedValue(new Error('The HSM provider could not be reached'))
     render(<AttachHsmKeyModal open ca={CA} onClose={vi.fn()} t={t} />)
     fireEvent.change(await screen.findByLabelText('cas.attachHsmKey.provider'), { target: { value: '3' } })

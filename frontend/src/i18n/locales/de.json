@@ -1244,7 +1244,7 @@
       "keys": "Passende Schlüssel",
       "keyId": "Schlüssel-ID",
       "reading": "Schlüssel des Anbieters werden gelesen…",
-      "noProviders": "Kein HSM-Anbieter ist konfiguriert.",
+      "noProviders": "Kein HSM-Anbieter ist aktiviert.",
       "noMatch": "Kein Schlüssel dieses Anbieters passt zum öffentlichen Schlüssel des CA-Zertifikats.",
       "heldBy": "Bereits verwendet von: {{holder}}",
       "confirmText": "Die CA signiert mit dem HSM-Schlüssel {{label}} (ID {{id}}, {{algorithm}}). Ihr privater Schlüssel bleibt im HSM.",

@@ -1244,7 +1244,7 @@
       "keys": "Claves coincidentes",
       "keyId": "ID de clave",
       "reading": "Leyendo las claves del proveedor…",
-      "noProviders": "No hay ningún proveedor HSM configurado.",
+      "noProviders": "No hay ningún proveedor HSM activado.",
       "noMatch": "Ninguna clave de este proveedor coincide con la clave pública del certificado de la CA.",
       "heldBy": "Ya la usa: {{holder}}",
       "confirmText": "La CA firmará con la clave HSM {{label}} (ID {{id}}, {{algorithm}}). Su clave privada permanece en el HSM.",

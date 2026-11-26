@@ -1244,7 +1244,7 @@
       "keys": "匹配的密钥",
       "keyId": "密钥 ID",
       "reading": "正在读取提供程序的密钥…",
-      "noProviders": "尚未配置 HSM 提供程序。",
+      "noProviders": "没有已启用的 HSM 提供程序。",
       "noMatch": "此提供程序中没有与 CA 证书公钥匹配的密钥。",
       "heldBy": "已被使用：{{holder}}",
       "confirmText": "CA 将使用 HSM 密钥 {{label}}（ID {{id}}，{{algorithm}}）签名。其私钥保留在 HSM 中。",

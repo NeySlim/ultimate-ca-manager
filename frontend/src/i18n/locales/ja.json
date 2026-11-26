@@ -1244,7 +1244,7 @@
       "keys": "一致する鍵",
       "keyId": "鍵 ID",
       "reading": "プロバイダーの鍵を読み取っています…",
-      "noProviders": "HSM プロバイダーが構成されていません。",
+      "noProviders": "有効な HSM プロバイダーがありません。",
       "noMatch": "このプロバイダーには CA 証明書の公開鍵と一致する鍵がありません。",
       "heldBy": "使用中: {{holder}}",
       "confirmText": "CA は HSM 鍵 {{label}}（ID {{id}}、{{algorithm}}）で署名します。秘密鍵は HSM 内に残ります。",

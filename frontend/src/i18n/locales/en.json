@@ -1244,7 +1244,7 @@
       "keys": "Matching keys",
       "keyId": "Key ID",
       "reading": "Reading the keys of the provider…",
-      "noProviders": "No HSM provider is configured.",
+      "noProviders": "No HSM provider is enabled.",
       "noMatch": "No key of this provider matches the public key of the CA certificate.",
       "heldBy": "Already used by the {{holder}}",
       "confirmText": "The CA will sign with HSM key {{label}} (ID {{id}}, {{algorithm}}). Its private key stays in the HSM.",

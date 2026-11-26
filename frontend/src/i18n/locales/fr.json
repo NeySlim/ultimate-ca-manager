@@ -1108,7 +1108,7 @@
       "keys": "Clés correspondantes",
       "keyId": "ID de clé",
       "reading": "Lecture des clés du fournisseur…",
-      "noProviders": "Aucun fournisseur HSM n’est configuré.",
+      "noProviders": "Aucun fournisseur HSM n’est activé.",
       "noMatch": "Aucune clé de ce fournisseur ne correspond à la clé publique du certificat de l’AC.",
       "heldBy": "Déjà utilisée par : {{holder}}",
       "confirmText": "L’AC signera avec la clé HSM {{label}} (ID {{id}}, {{algorithm}}). Sa clé privée reste dans le HSM.",

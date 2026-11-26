@@ -1244,7 +1244,7 @@
       "keys": "Chiavi corrispondenti",
       "keyId": "ID chiave",
       "reading": "Lettura delle chiavi del provider…",
-      "noProviders": "Nessun provider HSM è configurato.",
+      "noProviders": "Nessun provider HSM è abilitato.",
       "noMatch": "Nessuna chiave di questo provider corrisponde alla chiave pubblica del certificato della CA.",
       "heldBy": "Già usata da: {{holder}}",
       "confirmText": "La CA firmerà con la chiave HSM {{label}} (ID {{id}}, {{algorithm}}). La sua chiave privata resta nell'HSM.",

@@ -19,7 +19,7 @@ export function AttachHsmKeyModal({ open, onClose, ca, onSuccess, t }) {
     if (!open) return
     let cancelled = false
     hsmService.getProviders()
-      .then((res) => { if (!cancelled) setProviders(extractData(res) || []) })
+      .then((res) => { if (!cancelled) setProviders((extractData(res) || []).filter((p) => p.enabled)) })
       .catch((error) => { if (!cancelled) { setProviders([]); setListError(error?.message || t('common.operationFailed')) } })
     return () => { cancelled = true }
   }, [open, t])
