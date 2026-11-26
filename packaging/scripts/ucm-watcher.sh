@@ -132,7 +132,8 @@ claim_package() {
     PKG="$1" TO="$2" UPDATES="$DATA_DIR/updates" RELEASES="$RELEASES" python3 - <<'PYEOF' 2>/dev/null || echo "error package check failed"
 import hashlib, os, re, ssl, stat, sys, tempfile, urllib.request
 pkg, to, updates = os.environ["PKG"], os.environ["TO"], os.environ["UPDATES"]
-name = os.path.basename(pkg)
+# A rolling update names its download <12 hex>-<asset>: the asset name is checked and copied
+name = re.sub(r"^[0-9a-f]{12}-", "", os.path.basename(pkg))
 def refuse(reason):
     print("error " + reason)
     sys.exit(0)

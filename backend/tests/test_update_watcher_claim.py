@@ -48,8 +48,8 @@ class Host:
         _stub(self.bin / 'systemctl', 'exit 0')
 
     def package(self, name='ucm_99.0_all.deb', body=b'genuine package', publish=True,
-                published_digest=None):
-        path = self.data / 'updates' / name
+                published_digest=None, prefix=''):
+        path = self.data / 'updates' / (prefix + name)
         path.write_bytes(body)
         if publish:
             digest = published_digest or hashlib.sha256(body).hexdigest()
@@ -162,3 +162,13 @@ def test_a_release_candidate_asset_name_is_accepted(host):
     (host.root / 'opt/ucm/VERSION').write_text('98.0\n')
     result, calls = host.run(path, to_version='99.0-rc1')
     assert calls and calls[0].startswith('dpkg -i '), (result, calls)
+
+
+@pytest.mark.parametrize('name', ['ucm_99.0_all.deb', 'ucm-el9-99.0-1.el9.noarch.rpm'])
+def test_a_rolling_update_download_named_by_its_turn_is_installed(host, name):
+    # update_campaign names each turn's download <12 hex>-<asset>; the digest is the asset's
+    package = host.package(name, prefix='26792dcad0d0-')
+    result, calls = host.run(package)
+    assert result['status'] == 'installed', result
+    installed = calls[0].split()[-1]
+    assert pathlib.Path(installed).name == name
