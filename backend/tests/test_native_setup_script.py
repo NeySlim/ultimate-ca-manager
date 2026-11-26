@@ -1657,7 +1657,8 @@ def _env_writer(tmp_path, kind, stubs=None, extra=None):
     envfile.chmod(0o640)
     victim = tmp_path / 'authorized_keys'
     victim.write_text('ssh-ed25519 AAAA root\n')
-    victim.chmod(0o600)
+    # A mode no step gives ucm.env: one landing here shows
+    victim.chmod(0o604)
     bin_dir = tmp_path / 'bin'
     for name, body in (stubs or {}).items():
         _stub(bin_dir / name, body.format(victim=victim, real=shutil.which(name)))
@@ -1669,7 +1670,7 @@ def _env_writer(tmp_path, kind, stubs=None, extra=None):
 
 def _victim_intact(victim):
     assert victim.read_text() == 'ssh-ed25519 AAAA root\n'
-    assert stat.S_IMODE(victim.stat().st_mode) == 0o600
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o604
 
 
 @pytest.mark.parametrize('kind', sorted(_ENV_WRITERS))
