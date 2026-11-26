@@ -168,6 +168,8 @@ ROUTES = {
     'PATCH /api/v2/system/updates/settings': ADMIN_SYSTEM,
     'POST /api/v2/system/updates/campaign/resume': ADMIN_SYSTEM,
     'POST /api/v2/system/updates/install': ADMIN_SYSTEM,
+    # api.v2.tools
+    'POST /api/v2/tools/check-ssl': ADMIN_SYSTEM,
     # api.v2.users.mtls
     'DELETE /api/v2/users/<int:user_id>/mtls/certificates/<int:cert_id>': ADMIN_USERS,
     'GET /api/v2/users/<int:user_id>/mtls/certificates': ADMIN_USERS,
