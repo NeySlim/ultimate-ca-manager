@@ -12,6 +12,7 @@ import base64
 import logging
 
 from cryptography import x509
+from sqlalchemy import update
 
 from auth.unified import require_auth
 from utils.db_transaction import safe_commit
@@ -26,6 +27,15 @@ from models import CA, db
 from security.encryption import encrypt_private_key
 
 logger = logging.getLogger(__name__)
+
+
+def _lock_ca(ca_id):
+    """The CA row read afresh, locked until the commit: FOR UPDATE on PostgreSQL, the database
+    write lock (no-op UPDATE) on SQLite, which has no row lock."""
+    if db.session.get_bind().dialect.name == 'sqlite':
+        table = CA.__table__
+        db.session.execute(update(table).where(table.c.id == ca_id).values(id=table.c.id))
+    return CA.query.filter_by(id=ca_id).with_for_update().populate_existing().one_or_none()
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/key', methods=['POST'])
@@ -86,6 +96,16 @@ def import_ca_private_key(ca_id):
     if weak:
         return error_response(weak, 400)
 
+    # The CA is read again under its row lock: an HSM key attached meanwhile keeps the CA
+    ca = _lock_ca(ca_id)
+    if ca is None:
+        return error_response('CA not found', 404)
+    if ca.hsm_key_id:
+        db.session.rollback()
+        return error_response('CA key lives in an HSM', 400)
+    if ca.prv:
+        db.session.rollback()
+        return error_response('CA already has a private key', 400)
     key_pem = private_key_to_pem(private_key)
     ca.prv = encrypt_private_key(base64.b64encode(key_pem).decode('utf-8'))
     ok, err = safe_commit(logger, "Failed to import CA private key")

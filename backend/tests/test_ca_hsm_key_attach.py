@@ -349,6 +349,38 @@ class TestAttach:
         assert _message(r) == "HSM provider type 'pkcs11' does not sign RSA-PSS"
         assert _bound_key(app, ca_id) is None
 
+    def test_a_key_file_imported_while_the_hsm_key_is_attached_is_refused(self, app, auth_client, provider):
+        import threading
+        from api.v2.cas import key as key_api
+        from services.hsm.ca_key_attach import attach
+        key = ec.generate_private_key(ec.SECP256R1())
+        ca_id, _ = _keyless_ca(app, key, 'Import Race CA')
+        provider_id = provider()
+        real_matches = key_api.private_key_matches
+        attached = {}
+
+        def matches_then_attach(private_key, cert):
+            # The import has read the keyless CA; the attachment commits before it writes the key
+            def run():
+                with app.app_context():
+                    attached['key_id'] = attach(ca_id, provider_id, 'ours')[0].hsm_key_id
+                    db.session.remove()
+            worker = threading.Thread(target=run)
+            worker.start()
+            worker.join(60)
+            return real_matches(private_key, cert)
+
+        pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                serialization.NoEncryption()).decode()
+        with _token(_Token({'ours': key})), patch.object(key_api, 'private_key_matches', matches_then_attach):
+            r = auth_client.post(f'/api/v2/cas/{ca_id}/key', json={'key': pem})
+        assert attached.get('key_id') is not None
+        assert r.status_code == 400, r.data
+        assert _message(r) == 'CA key lives in an HSM'
+        with app.app_context():
+            ca = db.session.get(CA, ca_id)
+            assert (ca.prv, ca.hsm_key_id) == (None, attached['key_id'])
+
     def test_write_cas_and_read_hsm_are_both_needed(self, app, auth_client, provider, viewer_client):
         key = ec.generate_private_key(ec.SECP256R1())
         ca_id, _ = _keyless_ca(app, key, 'Permission CA')
