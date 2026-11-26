@@ -73,6 +73,8 @@ install -m 644 VERSION %{buildroot}%{ucm_home}/VERSION
 find %{buildroot}%{ucm_home} -name '.env*' -delete
 find %{buildroot}%{ucm_home} -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 find %{buildroot}%{ucm_home} -name '*.pyc' -delete
+# backend/ less its data directory, which %%files lists once, with its owner
+find %{buildroot}%{ucm_home}/backend -mindepth 1 -maxdepth 1 ! -name data -printf '%{ucm_home}/backend/%%f\n' > backend.files
 
 install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/requirements.txt
 
@@ -295,14 +297,14 @@ fi
 # Erased ($1 = 0): the mark of an archiving left pending goes with the package
 [ "$1" -ne 0 ] || rm -f %{ucm_home}/.leftover-archive-pending
 
-%files
+%files -f backend.files
 %license LICENSE NOTICE COMMERCIAL-LICENSE.md
 %dir %{ucm_home}
 %{ucm_home}/VERSION
 %{ucm_home}/requirements.txt
 %{ucm_home}/start-ucm.sh
-%{ucm_home}/backend/
-# Listed again for its owner: the older data directory the unit still writes, the account's as %%post gives it
+%dir %{ucm_home}/backend
+# The older data directory the unit still writes, the account's as %%post gives it
 %attr(-,%{name},%{name}) %{ucm_home}/backend/data
 %{ucm_home}/frontend/
 %{ucm_home}/scripts/

@@ -38,7 +38,8 @@ def _sources(top):
 
 
 @pytest.fixture(scope='module')
-def payload(tmp_path_factory):
+def build(tmp_path_factory):
+    """(rpmbuild's stderr, the payload as {path: (mode, user, group, flags)})."""
     top = tmp_path_factory.mktemp('rpmbuild')
     _sources(top)
     env = {k: v for k, v in os.environ.items() if k != 'SOURCE_DATE_EPOCH'}
@@ -51,8 +52,13 @@ def payload(tmp_path_factory):
                            '%{FILEGROUPNAME}\t%{FILEFLAGS}\n]', str(rpm)],
                           capture_output=True, text=True, timeout=60, env=env)
     assert dump.returncode == 0, dump.stderr
-    return {path: (int(mode, 8), user, group, int(flags)) for path, mode, user, group, flags
-            in (line.split('\t') for line in dump.stdout.splitlines())}
+    return built.stderr, {path: (int(mode, 8), user, group, int(flags)) for path, mode, user, group, flags
+                          in (line.split('\t') for line in dump.stdout.splitlines())}
+
+
+@pytest.fixture(scope='module')
+def payload(build):
+    return build[1]
 
 
 def test_each_data_directory_is_declared_as_the_installation_leaves_it(payload):
@@ -135,3 +141,8 @@ def test_the_older_data_directory_is_declared_the_account_s_as_post_leaves_it(pa
     old = {p: v[1:3] for p, v in payload.items() if _under(p, OLD_DATA)}
     assert set(old) == {OLD_DATA, f'{OLD_DATA}/ca', f'{OLD_DATA}/ca/.gitkeep'}, old
     assert set(old.values()) == {('ucm', 'ucm')}, old
+
+
+def test_no_file_is_listed_twice(build):
+    """backend/data comes once, with its owner: rpmbuild warns of nothing listed twice."""
+    assert 'listed twice' not in build[0], build[0][-3000:]
