@@ -593,3 +593,5 @@
 :root .atl .page-head>.settings-savebar .settings-save-buttons{display:flex;gap:inherit;flex-shrink:0}
 :root .atl .page-head>.settings-savebar .settings-state-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 :root .atl .page-head>.settings-savebar .btn{flex-shrink:0}
+/* Phone: the document scrolls under the 62 px sticky masthead, a section reached by its link starts below it. */
+@media(max-width:800px){:root .atl .settings-section{scroll-margin-top:calc(62px + 8px)}}

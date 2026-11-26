@@ -37,7 +37,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings: a double click on Create in the webhook or Microsoft CA form, or on Delete for an SSO provider, a webhook or a Microsoft CA connection, sent the request twice; the button is now disabled until the answer.
 - Interface: the network error, the messages for an HTTP status the server sent without text (a proxy's 502 or 504, a 413) and the result of a database migration were always in English; they now follow the interface language.
 - Dates: the short and long formats of lists, inspectors and notices followed the browser's language instead of the interface's (English months on a French page in an English browser); they now follow the interface language, as the date format preview already did.
-- Status bar: the shortcut « Esc Close inspector » showed on every page; it now shows only while an inspector is open.
+- Status bar: the shortcut "Esc Close inspector" showed on every page; it now shows only while an inspector is open.
+- Settings and Account on a phone: a section reached by its link or by the section menu started under the sticky header, its title hidden; it now starts below the header.
 
 ## [3.0] - 2026-11-25
 
