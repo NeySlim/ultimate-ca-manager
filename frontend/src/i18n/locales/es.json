@@ -1340,7 +1340,6 @@
     "revokeSuccess": "CA revocada",
     "revokeFailed": "Error al revocar la CA",
     "revokedBanner": "Revocada el {{date}} ({{reason}}). Publicada en la CRL y el OCSP de la CA superior; esta CA ya no puede firmar.",
-    "descriptionPlaceholder": "Descripción opcional para esta CA",
     "advancedConstraints": "Restricciones avanzadas (RFC 5280)",
     "pathLength": "Restricción de longitud de ruta",
     "pathLengthPlaceholder": "Vacío = ilimitado, 0 = solo CA hoja",
@@ -1589,7 +1588,22 @@
       "extensions": "Extensiones X.509",
       "show": "Mostrar {{name}}"
     },
-    "pageActions": "Acciones de la página"
+    "pageActions": "Acciones de la página",
+    "label": {
+      "displayName": "Nombre visible",
+      "displayNamePlaceholder": "Por defecto, el nombre común (CN)",
+      "displayNameHint": "Cómo UCM llama a esta CA en todas partes. El certificado conserva su nombre común ({{cn}}).",
+      "importNameHint": "Déjelo vacío para usar el nombre común.",
+      "description": "Descripción",
+      "noDescription": "Ninguna",
+      "descriptionHint": "Texto sin formato: se conservan los saltos de línea. Déjelo vacío para quitar la descripción.",
+      "descriptionCount": "{{length}} / {{max}} caracteres",
+      "edit": "Editar",
+      "dialogTitle": "Nombre y descripción",
+      "saved": "Nombre y descripción guardados",
+      "saveFailed": "No se pudieron guardar el nombre y la descripción",
+      "nameRequired": "El nombre visible no puede estar vacío"
+    }
   },
   "csrs": {
     "uploadCSR": "Subir CSR",

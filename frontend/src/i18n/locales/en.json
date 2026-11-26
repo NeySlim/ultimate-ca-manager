@@ -1340,7 +1340,6 @@
     "revokeSuccess": "CA revoked",
     "revokeFailed": "Failed to revoke CA",
     "revokedBanner": "Revoked on {{date}} ({{reason}}). Published on the parent CA's CRL and OCSP; this CA can no longer sign.",
-    "descriptionPlaceholder": "Optional description for this CA",
     "advancedConstraints": "Advanced Constraints (RFC 5280)",
     "pathLength": "Path Length Constraint",
     "pathLengthPlaceholder": "Empty = unlimited, 0 = leaf CA only",
@@ -1589,7 +1588,22 @@
       "extensions": "X.509 extensions",
       "show": "Show {{name}}"
     },
-    "pageActions": "Page actions"
+    "pageActions": "Page actions",
+    "label": {
+      "displayName": "Display name",
+      "displayNamePlaceholder": "Defaults to the Common Name",
+      "displayNameHint": "How UCM names this CA everywhere. The certificate keeps its Common Name ({{cn}}).",
+      "importNameHint": "Leave it empty to use the Common Name.",
+      "description": "Description",
+      "noDescription": "None",
+      "descriptionHint": "Plain text: line breaks are kept. Leave it empty to remove the description.",
+      "descriptionCount": "{{length}} / {{max}} characters",
+      "edit": "Edit",
+      "dialogTitle": "Name and description",
+      "saved": "Name and description saved",
+      "saveFailed": "The name and description could not be saved",
+      "nameRequired": "The display name cannot be empty"
+    }
   },
   "csrs": {
     "uploadCSR": "Upload CSR",

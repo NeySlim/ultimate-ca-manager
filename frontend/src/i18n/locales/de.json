@@ -1340,7 +1340,6 @@
     "revokeSuccess": "CA widerrufen",
     "revokeFailed": "CA konnte nicht widerrufen werden",
     "revokedBanner": "Widerrufen am {{date}} ({{reason}}). Auf CRL und OCSP der übergeordneten CA veröffentlicht; diese CA kann nicht mehr signieren.",
-    "descriptionPlaceholder": "Optionale Beschreibung für diese CA",
     "advancedConstraints": "Erweiterte Einschränkungen (RFC 5280)",
     "pathLength": "Pfadlängenbeschränkung",
     "pathLengthPlaceholder": "Leer = unbegrenzt, 0 = nur Blatt-CA",
@@ -1589,7 +1588,22 @@
       "extensions": "X.509-Erweiterungen",
       "show": "{{name}} anzeigen"
     },
-    "pageActions": "Seitenaktionen"
+    "pageActions": "Seitenaktionen",
+    "label": {
+      "displayName": "Anzeigename",
+      "displayNamePlaceholder": "Standardmäßig der Common Name",
+      "displayNameHint": "So nennt UCM diese CA überall. Das Zertifikat behält seinen Common Name ({{cn}}).",
+      "importNameHint": "Leer lassen, um den Common Name zu verwenden.",
+      "description": "Beschreibung",
+      "noDescription": "Keine",
+      "descriptionHint": "Nur Text: Zeilenumbrüche bleiben erhalten. Leer lassen, um die Beschreibung zu entfernen.",
+      "descriptionCount": "{{length}} / {{max}} Zeichen",
+      "edit": "Bearbeiten",
+      "dialogTitle": "Name und Beschreibung",
+      "saved": "Name und Beschreibung gespeichert",
+      "saveFailed": "Name und Beschreibung konnten nicht gespeichert werden",
+      "nameRequired": "Der Anzeigename darf nicht leer sein"
+    }
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",

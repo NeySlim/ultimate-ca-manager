@@ -90,6 +90,23 @@ describe('CASide: the mockup caSide()', () => {
     expect(api.certs).toHaveBeenCalledWith({ ca_id: 2, status: 'revoked', per_page: 1 })
   })
 
+  it('names the authority in Identité, its description below, and renames it in the head (#459)', async () => {
+    const renamed = { ...family()[1], name: 'Gateway Issuing', descr: 'Gateway Issuing', description: 'VPN only' }
+    // The announced change reloads the detail: the server then answers with the renamed authority
+    api.update.mockImplementation(async () => { api.getById.mockResolvedValue({ data: renamed }); return { data: renamed } })
+    renderSide(2)
+    const identity = screen.getByText('cas.side.identity').closest('section')
+    expect(within(identity).getByText('cas.label.displayName', { selector: 'dt' }).nextElementSibling).toHaveTextContent('Issuing')
+    expect(within(identity).getByText('cas.label.description', { selector: 'dt' })).toBeInTheDocument()
+    fireEvent.click(within(row('cas.label.displayName')).getByRole('button', { name: 'cas.label.edit' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'cas.label.displayName' }), { target: { value: 'Gateway Issuing' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'common.save' }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Gateway Issuing'))
+    expect(api.update).toHaveBeenCalledWith(2, { name: 'Gateway Issuing', description: '' })
+    expect(row('cas.label.description')).toHaveTextContent('VPN only')
+  })
+
   it('selects the issuer and the sub-authorities from their links', () => {
     const { onPick } = renderSide(2)
     fireEvent.click(within(row('cas.side.issuer')).getByRole('button', { name: 'Root' }))

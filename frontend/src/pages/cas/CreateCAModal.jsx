@@ -494,7 +494,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           {field('ca-locality', t('cas.locality') + ' (L)', <input id="ca-locality" name="locality" placeholder={t('cas.localityPlaceholder')} autoComplete="off" />)}
           {field('ca-organization', t('common.organization') + ' (O)', <input id="ca-organization" name="organization" placeholder={t('cas.orgPlaceholder')} autoComplete="off" />)}
           {field('ca-ou', t('common.orgUnit') + ' (OU)', <input id="ca-ou" name="organizationalUnit" placeholder={t('csrs.departmentPlaceholder')} autoComplete="off" />)}
-          {field('ca-description', t('common.description'), <input id="ca-description" name="description" placeholder={t('cas.descriptionPlaceholder')} autoComplete="off" />)}
+          {field('ca-description', t('cas.label.displayName'), <input id="ca-description" name="description" placeholder={t('cas.label.displayNamePlaceholder')} maxLength={255} autoComplete="off" />)}
 
           {field('ca-profile', t('cas.complianceProfile'), select('ca-profile', profileName, (v) => setCreateFormProfile(v), [
             { value: '', label: t('cas.complianceProfileNone') },
