@@ -680,7 +680,7 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
     trees = [c for c in _calls(log) if c.startswith(setup)]
     # The home and all that root runs from it are root's: only what the service writes (the data,
     # the older backend/data its unit still lists) is given to the account
-    assert trees == [f'{setup} {home}/ root:root data backend/data', f'{setup} {data}/ ucm:ucm',
+    assert trees == [f'{setup} {home}/ root:root --from=ucm data backend/data', f'{setup} {data}/ ucm:ucm',
                      f'{setup} {home}/backend/data ucm:ucm', f'{setup} {config}/ ucm:ucm dns-hooks',
                      f'{setup} /var/log/ucm/ ucm:ucm'], trees
     assert not [c for c in _calls(log) if c.startswith('chown ')], _calls(log)

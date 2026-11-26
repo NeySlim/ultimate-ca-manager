@@ -249,7 +249,7 @@ ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 # Set permissions, through a linked directory too (the final /), never through a link inside;
 # a local archive of a removed UCM's files (.ucm-archive-*) and the DNS hooks stay root's.
 # The home, its scripts and venv are root's: the account gets only what its unit writes
-bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" root:root data backend/data
+bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" root:root --from=%{name} data backend/data
 bash "$UCM_SETUP" own chown-tree "$UCM_DATA/" %{name}:%{name}
 if [ -d "$UCM_HOME/backend/data" ] && [ ! -L "$UCM_HOME/backend/data" ]; then
     bash "$UCM_SETUP" own chown-tree "$UCM_HOME/backend/data" %{name}:%{name}

@@ -24,13 +24,14 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 #       given); copy: created at its own name, stdin also copied to stdout (a build log read live)
 #   replace <path> [<mode>]   stdin replaces a regular file, keeping its owner and (unless given) mode
 #   read <path>               a regular file to stdout; nothing for an absent one, an error for a link
-#   (read, replace, mode and chown-tree never touch a regular file with a second name, a hard link;
-#   chown-tree changes a file or directory only through its descriptor, a link only itself)
+#   (read, replace, mode and chown-tree never touch a regular file with a second name, a hard link,
+#   but one --from names; chown-tree changes a file or directory only by descriptor, a link itself)
 #   mode <path> <mode> [link-ok]  fchmod of a regular file or directory (a final / follows the path
 #       itself); link-ok: a link is left as it is
-#   chown-tree <dir>/ <user>:<group> [<entry>...]  the directory, then what it holds, links themselves
-#       (nothing else: no device, pipe or socket); .ucm-archive-* and the listed entries (paths under
-#       <dir>) are skipped with what they hold, an entry changed while walked is named and left;
+#   chown-tree <dir>/ <user>:<group> [--from=<user>] [<entry>...]  the directory, then what it holds,
+#       links themselves, nothing else (no device, pipe or socket); --from: a hard-linked file of
+#       that user is changed too; .ucm-archive-* and the listed entries (paths under <dir>) are
+#       skipped with what they hold, an entry changed while walked is named and left;
 #       given to root, group and other write and set-id bits are also removed
 # UCM_PYTHON: the interpreter the package requires (python3.12 on EL9, where python3 may be absent)
 OWN_PY='
@@ -154,7 +155,13 @@ elif op == "mode":
     os.fchmod(fd, mode)
 elif op == "chown-tree":
     uid, gid = ids(args[0])
-    skip = set(os.path.normpath(a) for a in args[1:])
+    rest = args[1:]
+    # --from=<user>: a file of that user with a second name is given too (root takes back what the
+    # account laid where root runs from); any other hard link is left as it is
+    reclaim = None
+    if rest and rest[0].startswith("--from="):
+        reclaim, rest = ids(rest[0][len("--from="):] + ":0")[0], rest[1:]
+    skip = set(os.path.normpath(a) for a in rest)
     # Given to root, a tree root runs from: no group or other account writes it, no set-id bit stays
     strip = 0o6022 if uid == 0 else 0
     try:
@@ -197,7 +204,7 @@ elif op == "chown-tree":
         walk = False
         try:
             st = os.fstat(fd)
-            if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+            if stat.S_ISREG(st.st_mode) and st.st_nlink > 1 and st.st_uid != reclaim:
                 warn(rel, "a hard link, left as it is")
             elif stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
                 os.fchown(fd, uid, gid)

@@ -2005,3 +2005,19 @@ def test_chown_tree_leaves_a_hard_link_as_it_is(tmp_path, owner):
     assert 'hard link' in result.stderr, result.stderr
     assert str(linked) not in chowned(trace) and str(linked.parent / 'kept.pem') in chowned(trace)
     assert stat.S_IMODE(victim.stat().st_mode) == 0o604
+
+
+@pytest.mark.parametrize('ours', [True, False])
+def test_the_root_pass_takes_back_a_hard_linked_file_of_the_account(tmp_path, ours):
+    """A file the account laid under /opt/ucm and linked from its data is given to root all the
+    same; a hard link to anyone else's file stays as it is."""
+    victim, linked = _hard_linked(tmp_path, 'evil.pth')
+    victim.chmod(0o666)
+    account = os.getuid() if ours else os.getuid() + 1
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{linked.parent}/', '0:0', f'--from={account}'],
+                  _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert (str(linked) in chowned(trace)) is ours, (chowned(trace), result.stderr)
+    assert ('hard link' in result.stderr) is not ours, result.stderr
+    assert stat.S_IMODE(victim.stat().st_mode) == (0o644 if ours else 0o666)

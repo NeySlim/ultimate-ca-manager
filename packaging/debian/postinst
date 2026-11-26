@@ -188,7 +188,7 @@ ENVEOF
         # Set permissions, through a linked directory too (the final /), never through a link inside;
         # a local archive of a removed UCM's files (.ucm-archive-*) and the DNS hooks stay root's.
         # The home, its scripts and venv are root's: the account gets only what its unit writes
-        bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" root:root data backend/data
+        bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" root:root --from="$UCM_USER" data backend/data
         bash "$UCM_SETUP" own chown-tree "$UCM_DATA/" "$UCM_USER:$UCM_GROUP"
         if [ -d "$UCM_HOME/backend/data" ] && [ ! -L "$UCM_HOME/backend/data" ]; then
             bash "$UCM_SETUP" own chown-tree "$UCM_HOME/backend/data" "$UCM_USER:$UCM_GROUP"
