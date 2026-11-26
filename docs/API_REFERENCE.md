@@ -3276,7 +3276,8 @@ Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `p
 
 ### Instance State
 
-What a console that watches several instances reads of this one. It needs `read:instance`, a
+What a console that watches several instances reads of this one (see
+[Managing several instances](MANAGING_INSTANCES.md)). It needs `read:instance`, a
 scope only an administrator holds and that a key can be limited to; nothing narrower reads it. The answer
 carries no secret: the database is named by its engine, never by its URL, and `Cache-Control:
 no-store` is set. No request leaves the instance to answer it.

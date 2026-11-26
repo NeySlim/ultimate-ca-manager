@@ -112,3 +112,10 @@ def test_write_updates_opens_nothing_else_of_admin_system(app, update_key):
         r = client.open(path, method=method, data='{}', content_type='application/json',
                         headers={'X-API-Key': update_key})
         assert r.status_code == 403, (path, r.status_code)
+
+
+def test_an_administrator_s_category_wildcards_cover_the_new_scopes(app, auth_client):
+    """As UPGRADE.md says: an admin's write:* key starts a backup, its read:* key reads the state."""
+    key = _key(auth_client, ['read:*', 'write:*'], 'console-wildcards')
+    assert _post(app, key, '/api/v2/system/backup/create', {}).status_code == 400
+    assert _get(app, key, '/api/v2/system/instance').status_code == 200
