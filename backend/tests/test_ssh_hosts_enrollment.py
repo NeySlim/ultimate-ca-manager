@@ -234,6 +234,22 @@ class TestEnrollment:
         assert r.status_code == 201 and r.get_json()['host_refid'] != first['host_refid']
 
 
+    def test_a_certificate_the_ca_refuses_leaves_the_token_unspent(self, app, auth_client, client):
+        from models.ssh import SSHCertificateAuthority
+        ca = _host_ca(auth_client, 'Enroll narrowed CA')
+        token = _token(auth_client, ca)
+        # The CA narrowed after the token was made: its signature refuses the names
+        with app.app_context():
+            row = db.session.get(SSHCertificateAuthority, ca['id'])
+            row.allow_any_principal = False
+            row.set_allowed_principals(['*.prod.example.com'])
+            db.session.commit()
+        r = _enroll(client, ca, token['token'])
+        assert r.status_code == 400 and 'allowed principals' in r.get_json()['error']
+        with app.app_context():
+            assert db.session.get(SSHHostEnrollmentToken, token['id']).state == 'active'
+
+
 class TestProofOfPossession:
     """The token signed with the host key: a public key alone, which any server shows, enrolls nothing."""
 
