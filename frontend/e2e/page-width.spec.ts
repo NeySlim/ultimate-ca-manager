@@ -225,7 +225,8 @@ const expectCards = async (page, width: number, where: string) => {
   return { toc, cards, wide, col }
 }
 
-for (const width of [1280, 1440, 1600, 1920, 2560, 3440]) {
+// 1551, 1552, 1553: a column of 1279, 1280, 1281 px, each side of the switch of the cards
+for (const width of [1280, 1440, 1551, 1552, 1553, 1600, 1920, 2560, 3440]) {
   test(`at ${width}px the settings' cards hold 960 px or, from 1280 px of column, the column with two groups abreast`, async ({ page, api: _api }) => {
     await page.setViewportSize({ width, height: 1000 })
     await open(page, '/settings')
