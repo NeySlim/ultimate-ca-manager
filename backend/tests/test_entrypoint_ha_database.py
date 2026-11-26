@@ -778,3 +778,30 @@ def test_a_start_on_an_unchanged_database_still_prunes_to_the_keep_count(tmp_pat
     names = sorted(p.name for p in backups.iterdir())
     assert names == [f'ucm-backup-2026010{i}-000000.db' for i in (6, 7, 8)], names
 
+
+def _unchanged_database(tmp_path, keep='3', copies=2):
+    env = _env(tmp_path, 'true')
+    backups = tmp_path / 'backups'
+    backups.mkdir()
+    env.update(UCM_BACKUP_KEEP=keep)
+    _database(tmp_path, NAMES)
+    _seed(backups, copies, 60)
+    _age(tmp_path / 'ucm.db', 3600)
+    return env, backups
+
+
+def test_an_unchanged_database_starts_without_room_for_a_copy(tmp_path):
+    # no copy will be written: none of its size is claimed
+    env, backups = _unchanged_database(tmp_path)
+    r = _run(_df(2999) + f'UCM_SQLITE_BACKUP_DIR={backups}; ' + _COUNTING_CP, env, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'Not enough' not in r.stdout and 'unchanged since its last copy' in r.stdout, r.stdout
+
+
+def test_a_start_refused_for_room_has_already_pruned_the_old_copies(tmp_path):
+    # pruning comes before the room is measured: the copies it removes free the room it measures
+    env, backups = _unchanged_database(tmp_path, copies=6)
+    _age(tmp_path / 'ucm.db', 0)
+    r = _run(_df(2999) + f'UCM_SQLITE_BACKUP_DIR={backups}; ' + _COUNTING_CP, env, tmp_path)
+    assert r.returncode != 0 and 'Not enough' in r.stdout and 'at copy' not in r.stdout, r.stdout
+    assert len([p for p in backups.iterdir() if p.name.endswith('.db')]) == 2
