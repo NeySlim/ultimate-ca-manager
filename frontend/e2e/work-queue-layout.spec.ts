@@ -73,6 +73,7 @@ test('the queue groups, rows, due dates and history keep the mockup geometry', a
 })
 
 // The reports not scheduled are a catalog: two abreast, 48 px apart, from 1550 px of window (1500 px of panel), one per line under it
+// 1280 and 1549 are guards against regression (one column on the base as after); 1550 and up prove the switch
 for (const width of [1280, 1549, 1550, 1600, 1920, 2560]) {
   test(`at ${width}px the reports not scheduled take ${width >= 1550 ? 'two columns' : 'one column'}`, async ({ page, api: _api }) => {
     await page.setViewportSize({ width, height: H })

@@ -139,6 +139,7 @@ for (const width of [1280, 1600, 1920, 2560]) {
   })
 }
 
+// Guard against regression only: at 820 px the search held 398 px on the base too, so this proves nothing of the cap
 test('at 820px the search of a list keeps the room its toolbar leaves, under 540 px', async ({ page, api: _api }) => {
   await page.setViewportSize({ width: 820, height: 1000 })
   await page.goto('/certificates')

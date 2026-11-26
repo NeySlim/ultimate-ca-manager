@@ -87,6 +87,7 @@ test('every settings section is in view in the table of contents, no title cut',
 })
 
 test('a short field keeps a short width, a long one its group, a button the width of its text', async ({ page, api }) => {
+  // Its 1440 px half is a guard against regression (green on the base as after)
   // 1440 px, a card of 960 px: 918 px of fields in 4 columns of 217.5 (short), the public URL on the whole line, 16 px gaps
   await page.setViewportSize({ width: 1440, height: H })
   await page.goto('/settings')

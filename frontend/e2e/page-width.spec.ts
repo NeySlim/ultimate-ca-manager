@@ -120,6 +120,7 @@ for (const width of [1280, 1600, 1920, 2560]) {
   })
 }
 
+// Guard against regression, green on the base as after
 test('under 1100 px of inspector an extension keeps its value at the right of its row', async ({ page, api }) => {
   await page.setViewportSize({ width: 1024, height: 1200 })
   const cert = await issueCert(api, (await createCA(api)).id)
@@ -286,6 +287,7 @@ for (const width of [1280, 1600, 1920, 2560]) {
   })
 }
 
+// Guard against regression, green on the base as after: under the switch nothing changed
 for (const width of [820, 1024]) {
   test(`at ${width}px the settings keep one group per line in cards of 960 px at most`, async ({ page, api: _api }) => {
     await page.setViewportSize({ width, height: 1000 })
