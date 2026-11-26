@@ -40,6 +40,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Status bar: the shortcut "Esc Close inspector" showed on every page; it now shows only while an inspector is open.
 - Settings and Account on a phone: a section reached by its link or by the section menu started under the sticky header, its title hidden; it now starts below the header.
 - Lists on a phone: a long labelled value (a long issuer name) ran past the edge of its card, cut mid-word; it now folds onto the next line.
+- Dialogs: only Create Template kept its buttons in view at the foot of a long form; every form dialog (Issue a certificate, Create a CA, the policies and the others) now does, so its main button is never cut by the dialog's edge.
 
 ## [3.0] - 2026-11-25
 
