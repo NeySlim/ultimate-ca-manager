@@ -81,11 +81,15 @@ def _ca_labels(objects: List[ParsedObject], options: Dict):
         return None, "ca_labels must map analysis positions to {name, description}"
     labels = {}
     for key, value in raw.items():
-        position = int(key) if isinstance(key, str) and key.isdigit() else None
+        # str.isdigit() also accepts digits such as '\u00b2' that int() refuses
+        position = int(key) if isinstance(key, str) and key.isascii() and key.isdigit() else None
         if position is None or position >= len(objects) or not isinstance(value, dict):
             return None, "ca_labels must map analysis positions to {name, description}"
-        name = value.get("name") or ""
-        description = value.get("description") or None
+        name = value.get("name")
+        if name is not None and not isinstance(name, str):
+            return None, f"ca_labels[{key}]: name must be a string or null"
+        name = name or ""
+        description = value.get("description")
         error = (name.strip() and ca_label_rules.name_error(name)) or ca_label_rules.description_error(description)
         if error:
             return None, f"ca_labels[{key}]: {error}"

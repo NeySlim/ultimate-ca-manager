@@ -87,10 +87,13 @@ def test_the_smart_import_names_each_ca_it_is_given_a_label_for(app, auth_client
 @pytest.mark.parametrize('labels', [
     ['x'], {'9': {'name': 'Out of range'}}, {'a': {'name': 'Not a position'}}, {'0': 'Root'},
     {'0': {'name': 'n' * 256}}, {'0': {'description': 'bell\x07'}},
-], ids=['list', 'out-of-range', 'not-a-position', 'not-an-object', 'long-name', 'control'])
+    {'0': {'name': 5}}, {'0': {'description': 0}}, {'\u00b2': {'name': 'Superscript'}},
+], ids=['list', 'out-of-range', 'not-a-position', 'not-an-object', 'long-name', 'control',
+        'name-not-text', 'description-not-text', 'non-ascii-digit'])
 def test_an_unusable_smart_label_imports_nothing(app, auth_client, labels):
     cn, cert = _ca_pem('smart refused')
     status, body = _smart(auth_client, cert, ca_labels=labels)
     assert not (body.get('data') or {}).get('cas_imported'), body
     assert 'ca_labels' in json.dumps(body)
+    assert 'Import failed' not in json.dumps(body)
     assert _stored(app, cn) == []
