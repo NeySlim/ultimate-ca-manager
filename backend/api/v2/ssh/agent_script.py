@@ -355,7 +355,7 @@ cmd_enroll() { # REFID [NAME...]
     # The token signed with the host key proves this server holds it (ssh-keygen -Y sign)
     if ! proof=$(printf '%s' "$token" | ssh-keygen -q -Y sign -n ucm-ssh-host-enrollment -f "$key" 2>/dev/null) \
         || [ -z "$proof" ]; then
-        die "could not sign the enrollment with $key"
+        die "could not sign the enrollment with $key (ssh-keygen -Y sign needs OpenSSH 8.1 or later)"
     fi
     signature=$(printf '%s\n' "$proof" | awk '{ printf "%s\\n", $0 }')
     # The body on a pipe: printf is built in, so the token is in no argument and, with curl, no file

@@ -47,7 +47,7 @@ SSH代理是UCM提供给服务器的POSIX shell脚本。它不包含任何秘密
 - 使sshd跟随用户CA的**KRL**，让被吊销的用户证书在几分钟内被拒绝；
 - 使用一次性令牌将服务器**注册**到主机CA，并自行**续期**主机证书。
 
-它需要 \`ssh-keygen\` 以及 \`curl\` 或 \`wget\`，通过systemd定时器或cron任务每15分钟运行一次。
+它需要 \`ssh-keygen\` 以及 \`curl\` 或 \`wget\`，通过systemd定时器或cron任务每15分钟运行一次。注册和续期主机还需要 OpenSSH 8.1 或更高版本，以使用 \`ssh-keygen -Y sign\`。
 
 ## 跟随KRL
 

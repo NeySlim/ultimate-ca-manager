@@ -47,7 +47,7 @@ L’agent SSH est un script shell POSIX qu’UCM sert à vos serveurs. Il ne con
 - il tient sshd sur la **KRL** d’une AC utilisateur, pour qu’un certificat utilisateur révoqué soit refusé en quelques minutes ;
 - il **enrôle** le serveur auprès d’une AC hôte, avec un jeton à usage unique, et **renouvelle** seul le certificat d’hôte.
 
-Il demande \`ssh-keygen\` et \`curl\` ou \`wget\`, et tourne par un minuteur systemd, ou une tâche cron, toutes les 15 minutes.
+Il demande \`ssh-keygen\` et \`curl\` ou \`wget\`, et tourne par un minuteur systemd, ou une tâche cron, toutes les 15 minutes. L’enrôlement et le renouvellement d’un hôte demandent aussi OpenSSH 8.1 ou plus, pour \`ssh-keygen -Y sign\`.
 
 ## Suivre une KRL
 

@@ -47,7 +47,7 @@ El agente SSH es un script de shell POSIX que UCM sirve a sus servidores. No con
 - mantiene sshd en la **KRL** de una CA de usuario, para que un certificado de usuario revocado se rechace en pocos minutos;
 - **inscribe** el servidor en una CA de host, con un token de un solo uso, y **renueva** por sí mismo el certificado de host.
 
-Necesita \`ssh-keygen\` y \`curl\` o \`wget\`, y se ejecuta con un temporizador de systemd, o una tarea cron, cada 15 minutos.
+Necesita \`ssh-keygen\` y \`curl\` o \`wget\`, y se ejecuta con un temporizador de systemd, o una tarea cron, cada 15 minutos. Inscribir y renovar un host también requiere OpenSSH 8.1 o posterior, por \`ssh-keygen -Y sign\`.
 
 ## Seguir una KRL
 

@@ -3876,7 +3876,7 @@ The SSH agent is a POSIX shell script that UCM serves to your servers. It holds 
 - it keeps sshd on the **KRL** of a user CA, so a revoked user certificate is refused within minutes;
 - it **enrolls** the server with a host CA, with a single-use token, and **renews** the host certificate by itself.
 
-It needs \`ssh-keygen\` and \`curl\` or \`wget\`, and runs from a systemd timer, or a cron job, every 15 minutes.
+It needs \`ssh-keygen\` and \`curl\` or \`wget\`, and runs from a systemd timer, or a cron job, every 15 minutes. Enrolling and renewing a host also need OpenSSH 8.1 or later, for \`ssh-keygen -Y sign\`.
 
 ## Following a KRL
 
