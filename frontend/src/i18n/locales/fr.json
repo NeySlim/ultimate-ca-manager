@@ -2455,7 +2455,11 @@
     "chooseFile": "Choisir un fichier…",
     "more": "Plus",
     "moreActions": "Autres actions",
-    "otherViews": "Autres vues"
+    "otherViews": "Autres vues",
+    "creating": "Création...",
+    "notFound": "Introuvable",
+    "popular": "Populaires",
+    "other": "Autres"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -3199,7 +3203,8 @@
     "crossSkipped_other": "{{count}} certificats croisés écartés ; les AC auto-signées sont conservées",
     "unverifiableParentsTitle": "Parentes à confirmer sur la page de l’AC",
     "unverifiableParent": "{{ca}} reste sans parente : parente probable {{parent}}, signature non vérifiable ici ({{algorithm}})",
-    "filePasswordFor": "Mot de passe de {{name}}"
+    "filePasswordFor": "Mot de passe de {{name}}",
+    "readFailed": "Impossible de lire {{name}}"
   },
   "importExport": {
     "exportCerts": "Exporter les certificats",
@@ -4207,7 +4212,8 @@
       "migrateFailed": "Échec de la migration",
       "droppedColumns": "Colonnes abandonnées par cette migration : {{columns}}. Leurs valeurs ne sont pas sur le nouveau backend.",
       "sourceDrift": "{{tables}} table(s) ont changé sur la source après la prise du snapshot. Ces lignes ne sont pas sur le nouveau backend : arrêtez les écritures sur cette instance et relancez la migration depuis une source au repos.",
-      "testHint": "Test de connexion à l’URL saisie, sans rien changer."
+      "testHint": "Test de connexion à l’URL saisie, sans rien changer.",
+      "migrationVerified": "{{tables}} tables, {{rows}} lignes vérifiées"
     },
     "smtpOauthProvider_microsoft365": "Microsoft 365 (pro/école)",
     "smtpOauthRedirectUriUseDefault": "Utiliser par défaut",
@@ -6371,7 +6377,35 @@
       "validation": {
         "requiredField": "Ce champ est obligatoire"
       },
-      "serverBusy": "Le serveur est occupé par une autre modification : réessayez dans quelques secondes."
+      "serverBusy": "Le serveur est occupé par une autre modification : réessayez dans quelques secondes.",
+      "downloadFailed": {
+        "publicKey": "Échec du téléchargement de la clé publique",
+        "krl": "Échec du téléchargement de la KRL",
+        "generic": "Échec du téléchargement"
+      },
+      "copyFailed": {
+        "publicKey": "Échec de la copie de la clé publique"
+      },
+      "network": "Erreur réseau. Vérifiez votre connexion.",
+      "requestFailed": "Échec de la requête",
+      "uploadFailed": "Échec de l’envoi",
+      "http": {
+        "400": "Requête invalide. Vérifiez votre saisie et réessayez.",
+        "401": "Votre session a expiré. Reconnectez-vous.",
+        "403": "Vous n’avez pas l’autorisation d’effectuer cette action.",
+        "404": "La ressource demandée est introuvable.",
+        "405": "Cette opération n’est pas prise en charge.",
+        "408": "La requête a expiré. Réessayez.",
+        "409": "Conflit : cette ressource existe déjà ou est utilisée.",
+        "413": "Le serveur ou un proxy placé devant lui a refusé une requête de cette taille.",
+        "415": "Type de fichier non pris en charge.",
+        "422": "Les données fournies sont invalides. Vérifiez-les et réessayez.",
+        "429": "Trop de requêtes. Patientez un instant et réessayez.",
+        "500": "Une erreur interne du serveur s’est produite. Réessayez plus tard.",
+        "502": "Le serveur est momentanément indisponible. Réessayez plus tard.",
+        "503": "Le service est actuellement indisponible. Réessayez plus tard.",
+        "504": "Le serveur a mis trop de temps à répondre. Réessayez."
+      }
     },
     "success": {
       "create": {
@@ -6389,7 +6423,8 @@
         "sshCa": "AC SSH créée avec succès",
         "sshCertificate": "Certificat SSH émis avec succès",
         "caOffline": "AC mise hors ligne",
-        "caRestored": "AC restaurée à l’état en ligne"
+        "caRestored": "AC restaurée à l’état en ligne",
+        "mscaConnection": "Connexion à l’AC Microsoft créée"
       },
       "update": {
         "certificate": "Certificat mis à jour avec succès",
@@ -6419,7 +6454,8 @@
         "apiKeyPermanent": "Clé API supprimée",
         "generic": "Supprimé avec succès",
         "sshCa": "AC SSH supprimée avec succès",
-        "sshCertificate": "Certificat SSH supprimé avec succès"
+        "sshCertificate": "Certificat SSH supprimé avec succès",
+        "mscaConnection": "Connexion à l’AC Microsoft supprimée"
       },
       "export": {
         "certificate": "Certificat exporté avec succès",

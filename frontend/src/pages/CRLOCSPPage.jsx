@@ -260,7 +260,7 @@ export default function CRLOCSPPage() {
       patchCa(open.id, updated)
       loadData()
     } catch (error) {
-      showError(error.message || t('messages.errors.saveFailed'))
+      showError(error.message || t('messages.errors.saveFailed.generic'))
     } finally {
       setSavingUrls(false)
     }
@@ -274,7 +274,7 @@ export default function CRLOCSPPage() {
       setAdding({ type: null, value: '' })
       await loadData()
     } catch (error) {
-      showError(error.message || t('messages.errors.saveFailed'))
+      showError(error.message || t('messages.errors.saveFailed.generic'))
     } finally {
       setSavingUrls(false)
     }
@@ -294,7 +294,7 @@ export default function CRLOCSPPage() {
       showSuccess(t('common.saved'))
       await loadData()
     } catch (error) {
-      showError(error.message || t('messages.errors.saveFailed'))
+      showError(error.message || t('messages.errors.saveFailed.generic'))
     } finally {
       setSavingUrls(false)
     }

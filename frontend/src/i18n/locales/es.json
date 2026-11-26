@@ -478,7 +478,11 @@
     "chooseFile": "Elegir un archivo…",
     "more": "Más",
     "moreActions": "Otras acciones",
-    "otherViews": "Otras vistas"
+    "otherViews": "Otras vistas",
+    "creating": "Creando...",
+    "notFound": "No encontrado",
+    "popular": "Populares",
+    "other": "Otros"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificado, página o acción…",
@@ -4180,7 +4184,8 @@
       "migrateFailed": "Error al migrar datos",
       "droppedColumns": "Columnas que esta migración deja atrás: {{columns}}. Sus valores no están en el nuevo backend.",
       "sourceDrift": "{{tables}} tabla(s) cambiaron en el origen después de tomar la instantánea. Esas filas no están en el nuevo backend: detenga las escrituras en esta instancia y vuelva a migrar desde un origen en reposo.",
-      "testHint": "Prueba la conexión con la URL introducida, sin cambiar nada."
+      "testHint": "Prueba la conexión con la URL introducida, sin cambiar nada.",
+      "migrationVerified": "{{tables}} tablas, {{rows}} filas verificadas"
     },
     "smtpOauthProvider_microsoft365": "Microsoft 365 (trabajo/escuela)",
     "smtpOauthRedirectUriUseDefault": "Usar predeterminado",
@@ -5440,7 +5445,8 @@
     "crossSkipped_other": "{{count}} certificados cruzados omitidos; se conservan las CAs autofirmadas",
     "unverifiableParentsTitle": "CA padre por confirmar en la página de la CA",
     "unverifiableParent": "{{ca}} quedó sin CA padre: CA padre probable {{parent}}, firma no verificable aquí ({{algorithm}})",
-    "filePasswordFor": "Contraseña de {{name}}"
+    "filePasswordFor": "Contraseña de {{name}}",
+    "readFailed": "No se pudo leer {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6096,7 +6102,35 @@
       "validation": {
         "requiredField": "Este campo es obligatorio"
       },
-      "serverBusy": "El servidor está ocupado con otro cambio: vuelva a intentarlo en unos segundos."
+      "serverBusy": "El servidor está ocupado con otro cambio: vuelva a intentarlo en unos segundos.",
+      "downloadFailed": {
+        "publicKey": "Error al descargar la clave pública",
+        "krl": "Error al descargar la KRL",
+        "generic": "Error en la descarga"
+      },
+      "copyFailed": {
+        "publicKey": "Error al copiar la clave pública"
+      },
+      "network": "Error de red. Compruebe su conexión.",
+      "requestFailed": "La solicitud falló",
+      "uploadFailed": "Error al subir el archivo",
+      "http": {
+        "400": "Solicitud no válida. Revise los datos introducidos e inténtelo de nuevo.",
+        "401": "Su sesión ha caducado. Inicie sesión de nuevo.",
+        "403": "No tiene permiso para realizar esta acción.",
+        "404": "No se encontró el recurso solicitado.",
+        "405": "Esta operación no es compatible.",
+        "408": "La solicitud superó el tiempo de espera. Inténtelo de nuevo.",
+        "409": "Conflicto: este recurso ya existe o está en uso.",
+        "413": "El servidor o un proxy delante de él rechazó una solicitud de este tamaño.",
+        "415": "Tipo de archivo no compatible.",
+        "422": "Los datos proporcionados no son válidos. Revíselos e inténtelo de nuevo.",
+        "429": "Demasiadas solicitudes. Espere un momento e inténtelo de nuevo.",
+        "500": "Se produjo un error interno del servidor. Inténtelo de nuevo más tarde.",
+        "502": "El servidor no está disponible temporalmente. Inténtelo de nuevo más tarde.",
+        "503": "El servicio no está disponible en este momento. Inténtelo de nuevo más tarde.",
+        "504": "El servidor tardó demasiado en responder. Inténtelo de nuevo."
+      }
     },
     "success": {
       "backup": {
@@ -6121,7 +6155,8 @@
         "sshCa": "CA SSH creada correctamente",
         "sshCertificate": "Certificado SSH emitido correctamente",
         "caOffline": "CA fuera de línea",
-        "caRestored": "CA restaurada a estado en línea"
+        "caRestored": "CA restaurada a estado en línea",
+        "mscaConnection": "Conexión con la CA de Microsoft creada"
       },
       "crl": {
         "generated": "CRL regenerada exitosamente"
@@ -6149,7 +6184,8 @@
         "truststore": "Certificado eliminado del almacén de confianza",
         "user": "Usuario eliminado exitosamente",
         "sshCa": "CA SSH eliminada correctamente",
-        "sshCertificate": "Certificado SSH eliminado correctamente"
+        "sshCertificate": "Certificado SSH eliminado correctamente",
+        "mscaConnection": "Conexión con la CA de Microsoft eliminada"
       },
       "duplicate": {
         "template": "Plantilla duplicada exitosamente"

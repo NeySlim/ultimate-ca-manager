@@ -478,7 +478,11 @@
     "chooseFile": "选择文件…",
     "more": "更多",
     "moreActions": "其他操作",
-    "otherViews": "其他视图"
+    "otherViews": "其他视图",
+    "creating": "正在创建...",
+    "notFound": "未找到",
+    "popular": "热门",
+    "other": "其他"
   },
   "commandPalette": {
     "searchPlaceholder": "证书、页面或操作…",
@@ -4180,7 +4184,8 @@
       "migrateFailed": "数据迁移失败",
       "droppedColumns": "本次迁移舍弃的列：{{columns}}。它们的值不在新后端中。",
       "sourceDrift": "快照之后源端有 {{tables}} 张表发生了变化。这些行不在新后端中：请停止对本实例的写入，并从静止的源重新迁移。",
-      "testHint": "使用输入的 URL 测试连接，不做任何更改。"
+      "testHint": "使用输入的 URL 测试连接，不做任何更改。",
+      "migrationVerified": "已验证 {{tables}} 个表、{{rows}} 行"
     },
     "smtpOauthProvider_microsoft365": "Microsoft 365（工作/学校）",
     "smtpOauthRedirectUriUseDefault": "使用默认值",
@@ -5440,7 +5445,8 @@
     "crossSkipped_other": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留",
     "unverifiableParentsTitle": "需在 CA 页面确认的父 CA",
     "unverifiableParent": "{{ca}} 未关联父 CA：可能的父 CA 为 {{parent}}，此处无法验证其签名（{{algorithm}}）",
-    "filePasswordFor": "{{name}} 的密码"
+    "filePasswordFor": "{{name}} 的密码",
+    "readFailed": "无法读取 {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6096,7 +6102,35 @@
       "validation": {
         "requiredField": "此字段为必填项"
       },
-      "serverBusy": "服务器正在处理另一项更改：请几秒钟后重试。"
+      "serverBusy": "服务器正在处理另一项更改：请几秒钟后重试。",
+      "downloadFailed": {
+        "publicKey": "下载公钥失败",
+        "krl": "下载 KRL 失败",
+        "generic": "下载失败"
+      },
+      "copyFailed": {
+        "publicKey": "复制公钥失败"
+      },
+      "network": "网络错误，请检查网络连接。",
+      "requestFailed": "请求失败",
+      "uploadFailed": "上传失败",
+      "http": {
+        "400": "请求无效，请检查输入后重试。",
+        "401": "会话已过期，请重新登录。",
+        "403": "您无权执行此操作。",
+        "404": "未找到请求的资源。",
+        "405": "不支持此操作。",
+        "408": "请求超时，请重试。",
+        "409": "冲突：此资源已存在或正在使用。",
+        "413": "服务器或其前端代理拒绝了此大小的请求。",
+        "415": "不支持的文件类型。",
+        "422": "提供的数据无效，请检查后重试。",
+        "429": "请求过多，请稍候再试。",
+        "500": "服务器内部错误，请稍后重试。",
+        "502": "服务器暂时不可用，请稍后重试。",
+        "503": "服务当前不可用，请稍后重试。",
+        "504": "服务器响应超时，请重试。"
+      }
     },
     "success": {
       "backup": {
@@ -6121,7 +6155,8 @@
         "sshCa": "SSH CA 创建成功",
         "sshCertificate": "SSH 证书签发成功",
         "caOffline": "CA已离线",
-        "caRestored": "CA已恢复为在线状态"
+        "caRestored": "CA已恢复为在线状态",
+        "mscaConnection": "已创建 Microsoft CA 连接"
       },
       "crl": {
         "generated": "CRL 重新生成成功"
@@ -6149,7 +6184,8 @@
         "truststore": "证书已从信任库中移除",
         "user": "用户删除成功",
         "sshCa": "SSH CA 删除成功",
-        "sshCertificate": "SSH 证书删除成功"
+        "sshCertificate": "SSH 证书删除成功",
+        "mscaConnection": "已删除 Microsoft CA 连接"
       },
       "duplicate": {
         "template": "模板复制成功"

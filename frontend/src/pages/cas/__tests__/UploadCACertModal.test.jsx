@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { UploadCACertModal } from '../UploadCACertModal'
+import { formatDate } from '../../../lib/utils'
 
 const { showSuccess, showError, showWarning, uploadCertificate } = vi.hoisted(() => ({
   showSuccess: vi.fn(),
@@ -52,7 +53,8 @@ describe('UploadCACertModal superseded notice', () => {
     })
     await submitPem()
     await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('cas.certInstalled'))
-    const expectedDate = new Date('2027-01-01T00:00:00+00:00').toLocaleDateString()
+    // The interface's date format and language, as every other date
+    const expectedDate = formatDate('2027-01-01T00:00:00+00:00', { time: false })
     expect(showWarning).toHaveBeenCalledWith(
       `cas.certSupersededNotice:1a2b3c:${expectedDate}`
     )

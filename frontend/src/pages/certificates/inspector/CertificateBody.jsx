@@ -77,7 +77,7 @@ export function CertificateBody({ entry, onOpenCa, section, onSection: setSectio
     return (
       <div className="dock-body">
         <div className="detail-panel" id={`${idPrefix || ''}detail-panel`} aria-busy={loading || undefined}>
-          {loading ? <SkeletonPanel label={t('common.loading')} /> : <p className="muted small">{failed ? t('inspector.loadFailed') : t('common.notFound', 'Not found')}</p>}
+          {loading ? <SkeletonPanel label={t('common.loading')} /> : <p className="muted small">{failed ? t('inspector.loadFailed') : t('common.notFound')}</p>}
         </div>
       </div>
     )

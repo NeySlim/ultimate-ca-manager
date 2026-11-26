@@ -478,7 +478,11 @@
     "chooseFile": "Escolher um arquivo…",
     "more": "Mais",
     "moreActions": "Outras ações",
-    "otherViews": "Outras vistas"
+    "otherViews": "Outras vistas",
+    "creating": "Criando...",
+    "notFound": "Não encontrado",
+    "popular": "Populares",
+    "other": "Outros"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificado, página ou ação…",
@@ -4180,7 +4184,8 @@
       "migrateFailed": "Falha ao migrar dados",
       "droppedColumns": "Colunas deixadas para trás por esta migração: {{columns}}. Seus valores não estão no novo backend.",
       "sourceDrift": "{{tables}} tabela(s) mudaram na origem depois de o snapshot ser tirado. Essas linhas não estão no novo backend: pare as escritas nesta instância e migre novamente a partir de uma origem em repouso.",
-      "testHint": "Testa uma conexão ao URL inserido, sem alterar nada."
+      "testHint": "Testa uma conexão ao URL inserido, sem alterar nada.",
+      "migrationVerified": "{{tables}} tabelas, {{rows}} linhas verificadas"
     },
     "smtpOauthProvider_microsoft365": "Microsoft 365 (trabalho/escola)",
     "smtpOauthRedirectUriUseDefault": "Usar padrão",
@@ -5440,7 +5445,8 @@
     "crossSkipped_other": "{{count}} certificados cruzados foram omitidos; as CAs autoassinadas são mantidas",
     "unverifiableParentsTitle": "Pais a confirmar na página da CA",
     "unverifiableParent": "{{ca}} ficou sem pai: provável pai {{parent}}, assinatura não verificável aqui ({{algorithm}})",
-    "filePasswordFor": "Senha de {{name}}"
+    "filePasswordFor": "Senha de {{name}}",
+    "readFailed": "Não foi possível ler {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6096,7 +6102,35 @@
       "validation": {
         "requiredField": "Este campo é obrigatório"
       },
-      "serverBusy": "O servidor está ocupado com outra alteração: tente novamente em alguns segundos."
+      "serverBusy": "O servidor está ocupado com outra alteração: tente novamente em alguns segundos.",
+      "downloadFailed": {
+        "publicKey": "Falha ao baixar a chave pública",
+        "krl": "Falha ao baixar a KRL",
+        "generic": "Falha no download"
+      },
+      "copyFailed": {
+        "publicKey": "Falha ao copiar a chave pública"
+      },
+      "network": "Erro de rede. Verifique sua conexão.",
+      "requestFailed": "Falha na solicitação",
+      "uploadFailed": "Falha no envio",
+      "http": {
+        "400": "Solicitação inválida. Verifique os dados informados e tente novamente.",
+        "401": "Sua sessão expirou. Faça login novamente.",
+        "403": "Você não tem permissão para realizar esta ação.",
+        "404": "O recurso solicitado não foi encontrado.",
+        "405": "Esta operação não é suportada.",
+        "408": "A solicitação expirou. Tente novamente.",
+        "409": "Conflito: este recurso já existe ou está em uso.",
+        "413": "O servidor ou um proxy à frente dele recusou uma solicitação deste tamanho.",
+        "415": "Tipo de arquivo não suportado.",
+        "422": "Os dados fornecidos são inválidos. Verifique e tente novamente.",
+        "429": "Muitas solicitações. Aguarde um momento e tente novamente.",
+        "500": "Ocorreu um erro interno no servidor. Tente novamente mais tarde.",
+        "502": "O servidor está temporariamente indisponível. Tente novamente mais tarde.",
+        "503": "O serviço está indisponível no momento. Tente novamente mais tarde.",
+        "504": "O servidor demorou demais para responder. Tente novamente."
+      }
     },
     "success": {
       "backup": {
@@ -6121,7 +6155,8 @@
         "sshCa": "CA SSH criada com sucesso",
         "sshCertificate": "Certificado SSH emitido com sucesso",
         "caOffline": "CA offline",
-        "caRestored": "CA restaurada para o estado online"
+        "caRestored": "CA restaurada para o estado online",
+        "mscaConnection": "Conexão com a CA Microsoft criada"
       },
       "crl": {
         "generated": "CRL regenerada com sucesso"
@@ -6149,7 +6184,8 @@
         "truststore": "Certificado removido do trust store",
         "user": "Usuário excluído com sucesso",
         "sshCa": "CA SSH excluída com sucesso",
-        "sshCertificate": "Certificado SSH excluído com sucesso"
+        "sshCertificate": "Certificado SSH excluído com sucesso",
+        "mscaConnection": "Conexão com a CA Microsoft excluída"
       },
       "duplicate": {
         "template": "Modelo duplicado com sucesso"

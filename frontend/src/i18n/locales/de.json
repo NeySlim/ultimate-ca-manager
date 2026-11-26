@@ -478,7 +478,11 @@
     "chooseFile": "Datei auswählen…",
     "more": "Mehr",
     "moreActions": "Weitere Aktionen",
-    "otherViews": "Weitere Ansichten"
+    "otherViews": "Weitere Ansichten",
+    "creating": "Wird erstellt...",
+    "notFound": "Nicht gefunden",
+    "popular": "Beliebt",
+    "other": "Andere"
   },
   "commandPalette": {
     "searchPlaceholder": "Zertifikat, Seite oder Aktion…",
@@ -4180,7 +4184,8 @@
       "migrateFailed": "Datenmigration fehlgeschlagen",
       "droppedColumns": "Von dieser Migration zurückgelassene Spalten: {{columns}}. Ihre Werte sind nicht im neuen Backend vorhanden.",
       "sourceDrift": "{{tables}} Tabelle(n) haben sich in der Quelle nach der Momentaufnahme geändert. Diese Zeilen sind nicht im neuen Backend: Stoppen Sie die Schreibzugriffe auf diese Instanz und migrieren Sie erneut von einer ruhenden Quelle.",
-      "testHint": "Testet eine Verbindung zur eingegebenen URL, ohne etwas zu ändern."
+      "testHint": "Testet eine Verbindung zur eingegebenen URL, ohne etwas zu ändern.",
+      "migrationVerified": "{{tables}} Tabellen, {{rows}} Zeilen geprüft"
     },
     "smtpOauthProvider_microsoft365": "Microsoft 365 (Arbeit/Schule)",
     "smtpOauthRedirectUriUseDefault": "Standard verwenden",
@@ -5440,7 +5445,8 @@
     "crossSkipped_other": "{{count}} Cross-Zertifikate wurden ausgelassen; die selbstsignierten CAs bleiben erhalten",
     "unverifiableParentsTitle": "Übergeordnete CAs zur Bestätigung auf der CA-Seite",
     "unverifiableParent": "{{ca}} ohne übergeordnete CA: wahrscheinlich {{parent}}, Signatur hier nicht prüfbar ({{algorithm}})",
-    "filePasswordFor": "Passwort von {{name}}"
+    "filePasswordFor": "Passwort von {{name}}",
+    "readFailed": "{{name}} konnte nicht gelesen werden"
   },
   "webhooks": {
     "eventLabels": {
@@ -6096,7 +6102,35 @@
       "validation": {
         "requiredField": "Dieses Feld ist erforderlich"
       },
-      "serverBusy": "Der Server ist mit einer anderen Änderung beschäftigt: Versuchen Sie es in einigen Sekunden erneut."
+      "serverBusy": "Der Server ist mit einer anderen Änderung beschäftigt: Versuchen Sie es in einigen Sekunden erneut.",
+      "downloadFailed": {
+        "publicKey": "Öffentlicher Schlüssel konnte nicht heruntergeladen werden",
+        "krl": "KRL konnte nicht heruntergeladen werden",
+        "generic": "Download fehlgeschlagen"
+      },
+      "copyFailed": {
+        "publicKey": "Öffentlicher Schlüssel konnte nicht kopiert werden"
+      },
+      "network": "Netzwerkfehler. Bitte prüfen Sie Ihre Verbindung.",
+      "requestFailed": "Anfrage fehlgeschlagen",
+      "uploadFailed": "Hochladen fehlgeschlagen",
+      "http": {
+        "400": "Ungültige Anfrage. Bitte prüfen Sie Ihre Eingaben und versuchen Sie es erneut.",
+        "401": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+        "403": "Sie haben keine Berechtigung für diese Aktion.",
+        "404": "Die angeforderte Ressource wurde nicht gefunden.",
+        "405": "Dieser Vorgang wird nicht unterstützt.",
+        "408": "Zeitüberschreitung der Anfrage. Bitte versuchen Sie es erneut.",
+        "409": "Konflikt: Diese Ressource existiert bereits oder wird verwendet.",
+        "413": "Der Server oder ein vorgeschalteter Proxy hat eine Anfrage dieser Größe abgelehnt.",
+        "415": "Nicht unterstützter Dateityp.",
+        "422": "Die angegebenen Daten sind ungültig. Bitte prüfen Sie sie und versuchen Sie es erneut.",
+        "429": "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+        "500": "Ein interner Serverfehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+        "502": "Der Server ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut.",
+        "503": "Der Dienst ist derzeit nicht verfügbar. Bitte versuchen Sie es später erneut.",
+        "504": "Der Server hat zu lange für die Antwort gebraucht. Bitte versuchen Sie es erneut."
+      }
     },
     "success": {
       "backup": {
@@ -6121,7 +6155,8 @@
         "sshCa": "SSH-CA erfolgreich erstellt",
         "sshCertificate": "SSH-Zertifikat erfolgreich ausgestellt",
         "caOffline": "CA offline",
-        "caRestored": "CA wieder online"
+        "caRestored": "CA wieder online",
+        "mscaConnection": "Verbindung zur Microsoft-CA erstellt"
       },
       "crl": {
         "generated": "CRL erfolgreich neu generiert"
@@ -6149,7 +6184,8 @@
         "truststore": "Zertifikat aus dem Trust Store entfernt",
         "user": "Benutzer erfolgreich gelöscht",
         "sshCa": "SSH-CA erfolgreich gelöscht",
-        "sshCertificate": "SSH-Zertifikat erfolgreich gelöscht"
+        "sshCertificate": "SSH-Zertifikat erfolgreich gelöscht",
+        "mscaConnection": "Verbindung zur Microsoft-CA gelöscht"
       },
       "duplicate": {
         "template": "Vorlage erfolgreich dupliziert"

@@ -91,9 +91,9 @@
    opens it, and its chevron stays on screen at the right, a 44 px target. */
 :root .atl .mobile-record.opens{cursor:pointer}
 :root .atl .mobile-record .row-top>.icon-btn{width:44px;min-height:44px;flex-shrink:0}
-/* A fact named by its column: the name muted, the value in the text colour, the two on one line. */
-:root .atl .mobile-record .row-meta>span:has(>.fact-label){color:var(--text);white-space:nowrap}
-:root .atl .mobile-record .fact-label{color:var(--muted)}
+/* A fact named by its column: the name muted on one line, the value in the text colour, folding when long. */
+:root .atl .mobile-record .row-meta>span:has(>.fact-label){color:var(--text)}
+:root .atl .mobile-record .fact-label{color:var(--muted);white-space:nowrap}
 /* Without a checkbox the record starts at its left edge, as the mockup's module records do. */
 :root .atl .mobile-record:not(:has(.check-hit)) :is(.row-meta,.row-status){margin-left:0}
 
@@ -390,11 +390,12 @@
 :root .atl .hier-head>strong{min-width:0;max-width:calc(100% - 23px)}
 /* A folded subject grid stays folded: its display rule must not undo [hidden]. */
 :root .atl .subject-grid[hidden]{display:none}
-/* Template form: each section opens on a rule and a heading heavier than a field label; the actions stay in view. */
+/* Template form: each section opens on a rule and a heading heavier than a field label. */
 :root .atl .template-form>.form-fields>fieldset.field.full{padding-top:14px;margin-top:6px;border-top:1px solid var(--line)}
 :root .atl .template-form>.form-fields>fieldset.field.full>legend{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
 :root .atl .template-form .choice-grid{gap:2px 10px}
-:root .atl .template-form>.modal-actions{position:sticky;bottom:0;z-index:1;background:var(--panel);margin-top:0;padding-bottom:4px}
+/* Every dialog: the actions closing its body (or its form) stay in view at its foot while the dialog scrolls. */
+:root .atl dialog .modal-body>.modal-actions:last-child,:root .atl dialog .modal-body>form>.modal-actions:last-child{position:sticky;bottom:0;z-index:1;background:var(--panel);padding-bottom:4px}
 /* Lone roots: boxes of one width in as many columns as the panel holds, the count and date aligned at the right. */
 :root .atl .ca-tree>:is(.ca-compact,.ca-bundle){align-self:stretch}
 :root .atl .ca-lines{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));align-items:stretch}
@@ -549,7 +550,7 @@
 /* Phone: a row of tabs wider than the screen fades at its right edge; scrolled to, the last tab stands clear of the fade. */
 @media(max-width:800px){:root .atl .views{padding-right:28px;-webkit-mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent);mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent)}}
 /* Phone records: a labelled fact on a line of its own; the detail chevron on the card's right edge. */
-:root .atl .mobile-record .row-meta>span:has(>.fact-label){flex-basis:100%}
+:root .atl .mobile-record .row-meta>span:has(>.fact-label){flex-basis:100%;min-width:0;overflow-wrap:anywhere}
 :root .atl .mobile-record .row-top>.icon-btn.quiet:last-child{margin-right:-14px}
 /* An empty block in a table: its action at a button's full height, as the page head's. */
 :root .atl .module-table td .empty .btn{min-height:32px}
@@ -593,3 +594,5 @@
 :root .atl .page-head>.settings-savebar .settings-save-buttons{display:flex;gap:inherit;flex-shrink:0}
 :root .atl .page-head>.settings-savebar .settings-state-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 :root .atl .page-head>.settings-savebar .btn{flex-shrink:0}
+/* Phone: the document scrolls under the 62 px sticky masthead, a section reached by its link starts below it. */
+@media(max-width:800px){:root .atl .settings-section{scroll-margin-top:calc(62px + 8px)}}

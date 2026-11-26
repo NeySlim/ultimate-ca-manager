@@ -52,13 +52,13 @@ export default function ProviderTypeGrid({ label, providers, value, onChange, di
         {search === '' && (manualProvider || rfc2136Provider) && grid([manualProvider, rfc2136Provider].filter(Boolean))}
         {search === '' && popularProviders.length > 0 && (
           <>
-            <p className="small muted">{t('common.popular', 'Popular')}</p>
+            <p className="small muted">{t('common.popular')}</p>
             {grid(popularProviders)}
           </>
         )}
         {search === '' && otherProviders.length > 0 && (
           <>
-            <p className="small muted">{t('common.other', 'Other')}</p>
+            <p className="small muted">{t('common.other')}</p>
             {grid(otherProviders)}
           </>
         )}

@@ -13,6 +13,7 @@ import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
 import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, auditService } from '../services'
 import { holdSignOut } from '../services/apiClient'
+import { useInFlight } from '../hooks/useInFlight'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission, useJob, isTransientError, jobPercent } from '../hooks'
@@ -184,6 +185,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({})
   // Values as last loaded or stored: the save bar counts the draft against them
   const [savedSettings, setSavedSettings] = useState({})
+  const savedSettingsRef = useRef(savedSettings)
+  savedSettingsRef.current = savedSettings
   // Section whose field last changed a key: a bulk save in error points at it
   const keyOrigin = useRef({})
   const [sectionErrors, setSectionErrors] = useState({})
@@ -372,6 +375,8 @@ export default function SettingsPage() {
   const [editingMsca, setEditingMsca] = useState(null)
   const [mscaTesting, setMscaTesting] = useState(false)
   const [mscaConfirmDelete, setMscaConfirmDelete] = useState(null)
+  // One deletion at a time: the SSO, webhook and Microsoft CA confirmations share it
+  const [deleting, runDelete] = useInFlight()
   const [mscaCaControl, setMscaCaControl] = useState(null)
 
   // Active Directory Connector state
@@ -457,9 +462,11 @@ export default function SettingsPage() {
     systemService.getServiceStatus().then(r => setIsDocker(r.data?.is_docker || false)).catch(() => {})
   }, [])
 
-  // `keep`: keys whose draft survives the reload (a part whose save failed)
-  const loadSettings = async ({ initial = false, keep = [] } = {}) => {
+  // `keep`: keys whose draft survives the reload (a part whose save failed).
+  // `keepPending`: every key still differing from what was loaded survives too, except `stored`.
+  const loadSettings = async ({ initial = false, keep = [], keepPending = false, stored = [] } = {}) => {
     if (initial) setLoading(true)
+    const savedBefore = savedSettingsRef.current
     try {
       const [generalRes, emailRes] = await Promise.all([
         settingsService.getAll(),
@@ -501,7 +508,12 @@ export default function SettingsPage() {
         Object.assign(keyOrigin.current, takeKept('keyOrigin') || {})
         if (takeKept('oauthDirty')) setOauthDirty(true)
       }
-      setSettings(prev => ({ _testRecipient: prev._testRecipient, ...generalSettings, ...email, ...pick(prev, keep), ...keptSettings }))
+      setSettings(prev => {
+        const pending = keepPending
+          ? changedKeys(prev, savedBefore, [...bulkKeys(prev, savedBefore), ...EMAIL_KEYS]).filter((k) => !stored.includes(k))
+          : []
+        return { _testRecipient: prev._testRecipient, ...generalSettings, ...email, ...pick(prev, [...keep, ...pending]), ...keptSettings }
+      })
       setSavedSettings({ ...generalSettings, ...email })
       setSavedEmail(email)
       // Load OAuth provider presets in parallel (best-effort, non-blocking)
@@ -668,7 +680,7 @@ export default function SettingsPage() {
     try {
       await settingsService.updateBulk({ clear_backup_password: true })
       showSuccess(t('settings.backupPasswordCleared'))
-      await loadSettings()
+      await loadSettings({ keepPending: true })
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
     } finally {
@@ -735,7 +747,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSsoDelete = async () => {
+  const handleSsoDelete = () => runDelete(async () => {
     if (!ssoConfirmDelete) return
     try {
       await ssoService.deleteProvider(ssoConfirmDelete.id)
@@ -746,7 +758,7 @@ export default function SettingsPage() {
     } finally {
       setSsoConfirmDelete(null)
     }
-  }
+  })
 
   const handleSsoToggle = async (provider) => {
     try {
@@ -802,7 +814,7 @@ export default function SettingsPage() {
         showSuccess(t('messages.success.update.settings'))
       } else {
         await mscaService.create(formData)
-        showSuccess(t('messages.success.create.settings'))
+        showSuccess(t('messages.success.create.mscaConnection'))
       }
       setShowMscaModal(false)
       setEditingMsca(null)
@@ -812,17 +824,17 @@ export default function SettingsPage() {
     }
   }
 
-  const handleMscaDelete = async () => {
+  const handleMscaDelete = () => runDelete(async () => {
     if (!mscaConfirmDelete) return
     try {
       await mscaService.delete(mscaConfirmDelete.id)
-      showSuccess(t('messages.success.delete.settings'))
+      showSuccess(t('messages.success.delete.mscaConnection'))
       setMscaConfirmDelete(null)
       loadMscaConnections()
     } catch (error) {
       showError(error.message)
     }
-  }
+  })
 
   const handleMscaToggle = async (conn) => {
     try {
@@ -937,7 +949,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleWebhookDelete = async () => {
+  const handleWebhookDelete = () => runDelete(async () => {
     if (!webhookConfirmDelete) return
     try {
       await settingsService.deleteWebhook(webhookConfirmDelete.id)
@@ -948,7 +960,7 @@ export default function SettingsPage() {
     } finally {
       setWebhookConfirmDelete(null)
     }
-  }
+  })
 
   const handleWebhookToggle = async (webhook) => {
     try {
@@ -1382,7 +1394,8 @@ export default function SettingsPage() {
       if (settings.date_format) setDateFormat(settings.date_format)
       if (settings.show_time !== undefined) setShowTime(settings.show_time !== 'false' && settings.show_time !== false)
       if (reload) {
-        await loadSettings()
+        // The other route's drafts were not stored: they survive the reload
+        await loadSettings({ keepPending: true, stored: section === 'email' ? EMAIL_KEYS : bulkKeys(settings, savedSettings) })
         if (section === 'backup') await loadBackupSchedule()
         setSavedVersion((v) => v + 1)
       }
@@ -1464,7 +1477,7 @@ export default function SettingsPage() {
         if (ok) {
           showSuccess(t('settings.smtpOauthSuccess'))
           setOauthDirty(false)
-          await loadSettings()
+          await loadSettings({ keepPending: true })
         } else {
           showError(t('settings.smtpOauthFailure'))
         }
@@ -1489,7 +1502,7 @@ export default function SettingsPage() {
         if (popup && popup.closed) {
           clearInterval(pollClose)
           if (settled) return
-          await loadSettings()
+          await loadSettings({ keepPending: true })
           // Re-read latest settings to detect if authorization succeeded.
           try {
             const fresh = await settingsService.getAll()
@@ -1515,7 +1528,7 @@ export default function SettingsPage() {
     try {
       await settingsService.revokeSmtpOAuth()
       showSuccess(t('messages.success.update.settings'))
-      loadSettings()
+      loadSettings({ keepPending: true })
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
     }
@@ -2374,6 +2387,7 @@ export default function SettingsPage() {
         message={t('sso.deleteConfirm', { name: ssoConfirmDelete?.name })}
         confirmLabel={t('common.delete')}
         variant="danger"
+        loading={deleting}
       />
 
       {/* Webhook Modal */}
@@ -2399,6 +2413,7 @@ export default function SettingsPage() {
         message={t('webhooks.deleteConfirm', { name: webhookConfirmDelete?.name })}
         confirmLabel={t('common.delete')}
         variant="danger"
+        loading={deleting}
       />
 
       {/* Microsoft CA Connection Modal */}
@@ -2424,6 +2439,7 @@ export default function SettingsPage() {
         message={t('msca.deleteConfirm')}
         confirmLabel={t('common.delete')}
         variant="danger"
+        loading={deleting}
       />
 
       {/* Microsoft CA Control Panel (pending requests + health) */}

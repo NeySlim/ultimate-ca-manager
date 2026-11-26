@@ -151,7 +151,7 @@ export default function DiscoveryPage() {
   const saveProfile = async (payload) => {
     const editing = dialog?.profile
     const ok = await act(() => (editing ? discoveryService.updateProfile(editing.id, payload) : discoveryService.createProfile(payload)),
-      editing ? t('discovery.profileUpdated') : t('discovery.profileCreated'), t('messages.errors.saveFailed'))
+      editing ? t('discovery.profileUpdated') : t('discovery.profileCreated'), t('messages.errors.saveFailed.generic'))
     if (ok) { setDialog(null); loadProfiles().catch(() => {}) }
   }
   const quickScan = (payload) => { setDialog(null); startScan(() => discoveryService.scan(payload)) }
@@ -164,8 +164,8 @@ export default function DiscoveryPage() {
     const d = dialog
     const ok = await act(() => (d.kind === 'removeProfile' ? discoveryService.deleteProfile(d.item.id)
       : d.kind === 'removeFound' ? discoveryService.delete(d.item.id) : discoveryService.deleteAll()),
-    d.kind === 'removeProfile' ? t('discovery.profileDeleted') : d.kind === 'removeFound' ? t('messages.success.delete') : t('discovery.found.purged'),
-    t('messages.errors.deleteFailed'))
+    d.kind === 'removeProfile' ? t('discovery.profileDeleted') : d.kind === 'removeFound' ? t('messages.success.delete.generic') : t('discovery.found.purged'),
+    t('messages.errors.deleteFailed.generic'))
     if (!ok) return
     setDialog(null)
     if (d.kind !== 'removeAll') setOpened(null)

@@ -29,6 +29,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME: an issuing CA taken offline while keeping its key, or revoked, made a finalize or an approved issuance answer `badCSR`; it now answers `serverInternal` with the order invalid, a CA chosen for a domain or as the default being refused before signing.
 - Trust store: an entry stored by 2.254.4 or earlier with a certificate block carrying RFC 1421 headers beside plain blocks lost that certificate at the upgrade and in every read; it is now kept, re-serialized.
 - Settings and Account: the floating save bar no longer covers the form (#455). On wide screens the save state and its Undo changes and Save buttons sit in the page head, centered above the form; a phone keeps the bar at the bottom of the page.
+- Webhooks: with Basic authentication the form crashed as soon as a password was typed; the preview now shows a masked value and the revealed one is encoded in UTF-8.
+- Settings: revoking or authorizing SMTP OAuth, or clearing the backup password, reloaded the page's settings and silently dropped the changes not yet saved in the other sections; they are now kept.
+- Account: turning a second factor or the security key on or off reset a name or e-mail change not yet saved; the change is now kept.
+- Interface: a few texts showed their raw key instead of a sentence (the Create button while a CA is created, the Microsoft CA connection toasts, some SSH CA, Discovery and CRL errors); they now read in every language.
+- Import: a binary file larger than about 125 KB (a DER root store, a large PKCS#12) was silently left out of the list; it is now read, and a file that cannot be read is named in an error.
+- Settings: a double click on Create in the webhook or Microsoft CA form, or on Delete for an SSO provider, a webhook or a Microsoft CA connection, sent the request twice; the button is now disabled until the answer.
+- Interface: the network error, the messages for an HTTP status the server sent without text (a proxy's 502 or 504, a 413), the result of a database migration and a few labels ("Not found", "Popular", "Other") were always in English; they now follow the interface language.
+- Dates: the short and long formats of lists, inspectors and notices followed the browser's language instead of the interface's (English months on a French page in an English browser); they now follow the interface language, as the date format preview already did.
+- Status bar: the shortcut "Esc Close inspector" showed on every page; it now shows only while an inspector is open.
+- Settings and Account on a phone: a section reached by its link or by the section menu started under the sticky header, its title hidden; it now starts below the header.
+- Lists on a phone: a long labelled value (a long issuer name) ran past the edge of its card, cut mid-word; it now folds onto the next line.
+- Dialogs: only Create Template kept its buttons in view at the foot of a long form; every form dialog (Issue a certificate, Create a CA, the policies and the others) now does, so its main button is never cut by the dialog's edge.
 
 ## [3.0] - 2026-11-25
 

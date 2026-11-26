@@ -177,13 +177,18 @@ test.describe('phone', () => {
       const m = await page.evaluate(() => {
         // A lone number, or a date as the interface writes it (« Jan 1, 2040 », « 1 janv. 2040 », « 2040-01-01 »)
         const plain = (s: string) => /^[\d\s.,]+$/.test(s) || /^(\p{L}{3,}\.? \d{1,2}, \d{4}|\d{1,2} \p{L}{3,}\.? \d{4}|\d{4}-\d{2}-\d{2})/u.test(s)
-        const out = { records: 0, lost: 0, empty: [] as string[], unnamed: [] as string[], sort: !!document.querySelector('.atl .mobile-sort select') }
+        const out = { records: 0, lost: 0, empty: [] as string[], unnamed: [] as string[], spill: [] as string[], sort: !!document.querySelector('.atl .mobile-sort select') }
         for (const r of document.querySelectorAll('.atl article.mobile-record')) {
           out.records += 1
           const chevron = r.querySelector('.row-top > .icon-btn')
           if (chevron) {
             const b = chevron.getBoundingClientRect()
             if (!b.width || b.right > window.innerWidth || b.left < 0) out.lost += 1
+          }
+          // A long labelled fact (an issuer) folds inside its record, its whole value on the card
+          const edge = r.getBoundingClientRect().right
+          for (const fact of r.querySelectorAll('.row-meta > span')) {
+            if (fact.getBoundingClientRect().right > edge + 1) out.spill.push((fact.textContent || '').trim().slice(0, 60))
           }
           for (const fact of r.querySelectorAll('.row-meta > span, .row-status > .remaining')) {
             const text = (fact.textContent || '').trim()
@@ -194,7 +199,7 @@ test.describe('phone', () => {
         return out
       })
       console.log(`COLP1 ${JSON.stringify({ width: 390, list: list.name, ...m })}`)
-      soft(m, list.name).toMatchObject({ lost: 0, empty: [], unnamed: [], sort: true })
+      soft(m, list.name).toMatchObject({ lost: 0, empty: [], unnamed: [], spill: [], sort: true })
       soft(m.records, list.name).toBeGreaterThan(0)
     })
   }

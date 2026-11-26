@@ -230,10 +230,16 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
         const text = new TextDecoder().decode(bytes)
         return { name: file.name, type: 'text', data: text, size: file.size, ext }
       } else {
-        const base64 = btoa(String.fromCharCode(...bytes))
+        // Spread by blocks: one call over the whole file passes the engine's argument limit
+        let binary = ''
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+        }
+        const base64 = btoa(binary)
         return { name: file.name, type: 'binary', data: base64, size: file.size, ext }
       }
-    } catch (err) {
+    } catch {
+      showError(t('import.readFailed', { name: file.name }))
       return null
     }
   }

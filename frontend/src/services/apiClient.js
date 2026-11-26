@@ -34,7 +34,7 @@ function announceAnswered() {
 // CSRF token storage key
 const CSRF_TOKEN_KEY = 'ucm_csrf_token'
 
-// Human-readable error messages for HTTP status codes
+// English texts for HTTP status codes, used while i18next is not ready (messages.errors.http.*)
 const HTTP_ERROR_MESSAGES = {
   400: 'Invalid request. Please check your input and try again.',
   401: 'Your session has expired. Please log in again.',
@@ -73,14 +73,22 @@ export function parseRetryAfter(value) {
  * Build a user-friendly error message from an HTTP response.
  * Priority: backend message > status-code message > generic fallback.
  */
-function buildErrorMessage(status, data, fallback = 'Request failed') {
+// The interface's language when its key is there, the English text otherwise
+function localText(key, english) {
+  return i18next.isInitialized && i18next.exists(key) ? i18next.t(key) : english
+}
+const httpMessage = (status) => HTTP_ERROR_MESSAGES[status]
+  && localText(`messages.errors.http.${status}`, HTTP_ERROR_MESSAGES[status])
+const networkMessage = () => localText('messages.errors.network', 'Network error. Please check your connection.')
+
+function buildErrorMessage(status, data, fallback) {
   // Backend errors are an RFC 7807 problem document that also carries the
   // legacy keys: `message` (legacy) and `detail` (7807) hold the same text.
   // `data.error` is a boolean in that shape, so it must never be used as text.
   const backendMsg = (typeof data === 'object' && data !== null)
     ? (data.message || data.detail || (typeof data.error === 'string' ? data.error : null))
     : null
-  return backendMsg || HTTP_ERROR_MESSAGES[status] || fallback
+  return backendMsg || httpMessage(status) || fallback || localText('messages.errors.requestFailed', 'Request failed')
 }
 
 // One redirect for a burst of 401s: each navigation to /login can log in again with
@@ -185,7 +193,7 @@ class APIClient {
       console.warn(`⚠️ apiClient does not support 'params'. Use buildQueryString() to append query params to the URL. Called on: ${endpoint}`)
     }
     if (loginRedirectPending) {
-      const error = new Error(HTTP_ERROR_MESSAGES[401])
+      const error = new Error(httpMessage(401))
       error.status = 401
       throw error
     }
@@ -299,7 +307,7 @@ class APIClient {
     } catch (error) {
       // Network errors or fetch failures
       if (!error.status) {
-        error.message = 'Network error. Please check your connection.'
+        error.message = networkMessage()
         error.status = 0
         error.request = error.request || `${config.method} ${url.split('?')[0]}`
       }
@@ -371,7 +379,7 @@ class APIClient {
       }
 
       if (!response.ok) {
-        const msg = buildErrorMessage(response.status, data, 'Upload failed')
+        const msg = buildErrorMessage(response.status, data, localText('messages.errors.uploadFailed', 'Upload failed'))
         const error = new Error(msg)
         error.status = response.status
         error.data = data
@@ -382,7 +390,7 @@ class APIClient {
       return data
     } catch (error) {
       if (!error.status) {
-        error.message = 'Network error. Please check your connection.'
+        error.message = networkMessage()
         error.status = 0
       }
       throw error
@@ -406,7 +414,7 @@ class APIClient {
     const response = await fetch(url, config)
     
     if (!response.ok) {
-      const msg = HTTP_ERROR_MESSAGES[response.status] || 'Download failed'
+      const msg = httpMessage(response.status) || localText('messages.errors.downloadFailed.generic', 'Download failed')
       throw new Error(msg)
     }
     

@@ -6,6 +6,7 @@ import CertificateInput from '../../components/CertificateInput'
 import { mscaService } from '../../services'
 import { useNotification } from '../../contexts'
 import { secretInputProps, secretRequiredForTarget, typedSecret } from '../../lib/secretTarget'
+import { useInFlight } from '../../hooks/useInFlight'
 
 const WINRM_TARGET = ['winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
   'winrm_transport', 'winrm_username']
@@ -25,6 +26,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning } = useNotification()
   const [testing, setTesting] = useState(false)
+  const [saving, runSave] = useInFlight()
   const [formData, setFormData] = useState({
     name: connection?.name || '',
     server: connection?.server || '',
@@ -105,7 +107,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     if (connection && !data.password) delete data.password
     if (connection && !data.client_key_pem) delete data.client_key_pem
     if (connection && !data.winrm_password) delete data.winrm_password
-    onSave(data)
+    runSave(() => onSave(data))
   }
 
   const handleTestAdminChannel = async () => {
@@ -286,7 +288,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
 
       <div className="modal-actions">
         <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
-        <Btn type="submit" tone="primary" icon="check">{connection ? t('common.save') : t('common.create')}</Btn>
+        <Btn type="submit" tone="primary" icon="check" disabled={saving || undefined}>{connection ? t('common.save') : t('common.create')}</Btn>
       </div>
     </form>
   )

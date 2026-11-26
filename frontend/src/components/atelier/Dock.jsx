@@ -15,6 +15,7 @@ import { useToolbarMenu } from '../list/useToolbarMenu'
 import { Icon } from './Icon'
 import { heightMax, heightMin } from './helpers'
 import { DOCK_RIGHT_MIN, DockSideContext, useDockPreference } from './dockSide'
+import { useDockMounted } from './openDocks'
 
 const STEP = 20
 const WIDTH = [360, 720]
@@ -174,6 +175,7 @@ function OpenTabs({ tabs, activeKey, onSelect, onClose, label, moreTitle, hidden
 export function Dock({ label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTab, onClose, onDetach, children }) {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
+  useDockMounted()
   const setZoneRight = useContext(DockSideContext)
   const ref = useRef(null)
   const pref = useDockPreference()

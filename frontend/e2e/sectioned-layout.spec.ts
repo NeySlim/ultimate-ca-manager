@@ -203,6 +203,22 @@ test.describe('on a phone', () => {
     })
   }
 
+  // The document scrolls under the sticky masthead: a section reached by its link starts below it
+  for (const [path, id] of [['/settings?tab=sso', 'sso'], ['/settings?tab=security', 'security']]) {
+    test(`${path} lands its section title below the masthead`, async ({ page, api }) => {
+      await page.goto(path)
+      const title = page.locator(`#set-title-${id}`)
+      await expect(title).toBeFocused()
+      // Below the masthead's bottom edge, and what is drawn at the title is the title
+      await expect.poll(async () => title.evaluate((el) => {
+        const t = el.getBoundingClientRect()
+        const m = document.querySelector('.atl .masthead')!.getBoundingClientRect()
+        const at = document.elementFromPoint(t.left + 4, t.top + t.height / 2)
+        return { below: t.top >= m.bottom - 1, drawn: el.contains(at), at: at?.className || at?.tagName, top: Math.round(t.top), masthead: Math.round(m.bottom) }
+      })).toMatchObject({ below: true, drawn: true })
+    })
+  }
+
   test('the bulk list of Operations keeps to its frame, its rows scrolling inside it', async ({ page, api }) => {
     await page.goto('/operations?tab=bulk')
     const frame = page.getByRole('region', { name: 'Bulk Actions', exact: true })

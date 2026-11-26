@@ -428,4 +428,23 @@ describe('WebhookForm — auth section', () => {
     previewCode = previewPane.querySelector('code').textContent || ''
     expect(previewCode).toContain('mytoken12345')
   })
+
+  it('WK-6.13: basic auth previews a typed password, UTF-8 encoded when revealed', () => {
+    const existing = {
+      name: 'Hook', url: 'https://example.com', events: [], ca_filter: '', enabled: true,
+      auth_type: 'basic', auth_username: 'alice', auth_token_set: false,
+    }
+    const { container } = render(<WebhookForm webhook={existing} onSave={noop} onCancel={noop} />)
+    const tokenInput = screen.getByPlaceholderText('webhooks.auth.token.placeholder')
+    fireEvent.change(tokenInput, { target: { value: 'пароль€' } })
+
+    const code = () => container.querySelector('[data-testid="auth-preview"] code').textContent
+    expect(code()).toContain('Basic')
+    expect(code()).not.toContain('пароль')
+
+    fireEvent.click(screen.getByText('webhooks.auth.preview.reveal', { selector: 'button', exact: false }))
+    // RFC 7617: user-pass is UTF-8 before base64
+    const expected = Buffer.from('alice:пароль€', 'utf8').toString('base64')
+    expect(code()).toContain(`Basic ${expected}`)
+  })
 })

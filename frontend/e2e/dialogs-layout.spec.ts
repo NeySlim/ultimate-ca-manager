@@ -86,3 +86,30 @@ for (const width of [1280, 1920]) {
     expect(measured).toBeGreaterThan(30)
   })
 }
+
+// A form dialog taller than the window keeps its actions in view at its foot, whichever dialog it is
+for (const [width, height] of [[1600, 900], [390, 844]]) {
+  test(`at ${width}x${height} the actions of a long form dialog stay in view`, async ({ page, api: _api }) => {
+    test.setTimeout(120_000)
+    await page.setViewportSize({ width, height })
+    let long = 0
+    for (const [path, opener] of DIALOGS) {
+      await page.goto(path)
+      await page.locator(opener).first().click()
+      const dialog = page.locator('dialog[open]').last()
+      await expect(dialog, path).toBeVisible()
+      const m = await dialog.evaluate((d) => {
+        const actions = [...d.querySelectorAll('.modal-actions')].filter((a) => (a as HTMLElement).offsetParent).pop()
+        if (!actions) return null
+        const a = actions.getBoundingClientRect()
+        const b = d.getBoundingClientRect()
+        return { scrolls: d.scrollHeight > d.clientHeight + 1, inView: a.top >= b.top - 1 && a.bottom <= b.bottom + 1, a: [a.top, a.bottom], b: [b.top, b.bottom] }
+      })
+      expect(m, path).not.toBeNull()
+      if (!m!.scrolls) continue
+      long += 1
+      expect(m!.inView, `${path} ${JSON.stringify(m)}`).toBe(true)
+    }
+    expect(long).toBeGreaterThan(2)
+  })
+}
