@@ -110,6 +110,16 @@ export function NotificationProvider({ children }) {
   const [dialogNotice, setDialogNotice] = useState(null)
   const clearNotice = useCallback(() => setDialogNotice(null), [])
 
+  const pushToast = useCallback((type, message, duration, action) => {
+    const id = Date.now() + Math.random() // unique even when called in a tight loop
+    setToasts(prev => [...prev, { id, type, message, duration, action }])
+    if (duration > 0) {
+      const entry = { handle: null, remaining: duration, started: 0 }
+      timers.current.set(id, entry)
+      if (!pauses.current.size) runTimer(id, entry)
+    }
+  }, [runTimer])
+
   // options: a duration in ms (0 keeps the toast until it is closed) or { duration, action: { label, onClick } };
   // a toast that carries an action stays until it is used or closed, as the mockup's failure toast
   const addToast = useCallback((type, message, options) => {
@@ -117,19 +127,17 @@ export function NotificationProvider({ children }) {
     const action = opts.action && opts.action.label && typeof opts.action.onClick === 'function' ? opts.action : null
     const form = (type === 'error' || type === 'warning') && !action ? formDialogBar() : null
     if (form) {
-      setDialogNotice({ id: Date.now() + Math.random(), type, message, ...form })
+      setDialogNotice({ id: Date.now() + Math.random(), type, message, duration: opts.duration, ...form })
       return
     }
-    const duration = opts.duration ?? (action ? 0 : 5000)
-    const id = Date.now() + Math.random() // unique even when called in a tight loop
-    setToasts(prev => [...prev, { id, type, message, duration, action }])
+    pushToast(type, message, opts.duration ?? (action ? 0 : 5000), action)
+  }, [pushToast])
 
-    if (duration > 0) {
-      const entry = { handle: null, remaining: duration, started: 0 }
-      timers.current.set(id, entry)
-      if (!pauses.current.size) runTimer(id, entry)
-    }
-  }, [runTimer])
+  // A notice whose dialog closed before it was painted would be lost: it is shown as a toast
+  const noticeLost = useCallback((notice) => {
+    setDialogNotice((current) => (current === notice ? null : current))
+    pushToast(notice.type, notice.message, notice.duration ?? 5000, null)
+  }, [pushToast])
 
   const showSuccess = useCallback((message, options) => addToast('success', message, options), [addToast])
   const showError = useCallback((message, options) => addToast('error', message, options), [addToast])
@@ -195,7 +203,7 @@ export function NotificationProvider({ children }) {
   return (
     <NotificationContext.Provider value={value}>
       {children}
-      {dialogNotice && <DialogNotice notice={dialogNotice} onClose={clearNotice} closeLabel={t('common.closeMessage')} />}
+      {dialogNotice && <DialogNotice notice={dialogNotice} onClose={clearNotice} onLost={noticeLost} closeLabel={t('common.closeMessage')} />}
       <ToastLine toast={toasts[toasts.length - 1]} onClose={removeToast} onPause={setPause} closeLabel={t('common.closeMessage')} />
 
       {/* Confirmation and prompt: the mockup's narrow modal(); inside a dialog still drawn by Radix, its own layer */}
@@ -247,17 +255,34 @@ function formDialogBar() {
  * The error of a form dialog, in the dialog's action bar above its buttons (an alert). It goes
  * when the dialog closes, at the next submit, or with its own close button.
  */
-function DialogNotice({ notice, onClose, closeLabel }) {
+function DialogNotice({ notice, onClose, onLost, closeLabel }) {
   const { dialog, bar } = notice
-  useEffect(() => {
+  // Checked after the commit: a dialog closed before the notice was painted hands it back as a toast
+  useLayoutEffect(() => {
+    const alive = () => bar.isConnected && dialog.isConnected && dialog.hasAttribute('open')
+    let painted = false
+    let lost = false
+    const check = () => {
+      if (lost || alive()) return
+      lost = true
+      if (painted) onClose()
+      else onLost(notice)
+    }
+    check()
+    if (lost) return undefined
+    let frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => { painted = true }) })
+    const watch = new MutationObserver(check)
+    watch.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] })
     const done = () => onClose()
-    dialog.addEventListener('close', done)
+    dialog.addEventListener('close', check)
     dialog.addEventListener('submit', done, true)
     return () => {
-      dialog.removeEventListener('close', done)
+      cancelAnimationFrame(frame)
+      watch.disconnect()
+      dialog.removeEventListener('close', check)
       dialog.removeEventListener('submit', done, true)
     }
-  }, [dialog, onClose])
+  }, [notice, dialog, bar, onClose, onLost])
   if (!bar.isConnected) return null
   return createPortal(
     <div key={notice.id} className={`notice ${notice.type === 'warning' ? 'warn' : 'bad'} dialog-notice`} role="alert">

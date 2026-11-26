@@ -80,6 +80,7 @@ describe('the error of a form dialog', () => {
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'common.closeMessage' })) })
     expect(within(dialog).queryByRole('alert')).toBeNull()
     await act(async () => { api.showError('Saving failed once more.') })
+    await wait(50)
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' })) })
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByText('Saving failed once more.')).toBeNull()
@@ -95,6 +96,61 @@ describe('the error of a form dialog', () => {
     const again = vi.fn()
     await act(async () => { api.showError('Relaunch failed.', { action: { label: 'Again', onClick: again } }) })
     expect(line()).toHaveTextContent('Relaunch failed.')
+  })
+})
+
+describe('a message raised by the handler that closes its dialog', () => {
+  // The dialog is gone before the message could be painted in it: it is an ordinary toast
+  function ClosingDialog({ order, type }) {
+    const notify = useNotification()
+    const [open, setOpen] = useState(true)
+    if (!open) return null
+    const raise = () => (type === 'error' ? notify.showError : notify.showWarning)('Export cut short.')
+    return (
+      <AtelierDialog title="Export" onClose={() => setOpen(false)}>
+        <div className="modal-actions">
+          <button type="button" className="btn primary" onClick={() => {
+            if (order === 'close-first') { setOpen(false); raise() } else { raise(); setOpen(false) }
+          }}>Export</button>
+        </div>
+      </AtelierDialog>
+    )
+  }
+
+  for (const [order, type] of [['close-first', 'error'], ['close-first', 'warning'], ['message-first', 'warning']]) {
+    it(`shows as a toast (${order}, ${type})`, async () => {
+      mount(<ClosingDialog order={order} type={type} />)
+      const dialog = await screen.findByRole('dialog')
+      await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Export' })) })
+      await wait(50)
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(line()).toHaveTextContent('Export cut short.')
+      expect(line()).toHaveClass('visible')
+    })
+  }
+
+  it('shows as a toast when the dialog closes later, before the notice was painted', async () => {
+    function LateClose() {
+      const notify = useNotification()
+      const [open, setOpen] = useState(true)
+      if (!open) return null
+      return (
+        <AtelierDialog title="Backup" onClose={() => setOpen(false)}>
+          <div className="modal-actions">
+            <button type="button" className="btn primary" onClick={() => {
+              notify.showWarning('Backup cancelled.')
+              queueMicrotask(() => setOpen(false))
+            }}>Create</button>
+          </div>
+        </AtelierDialog>
+      )
+    }
+    mount(<LateClose />)
+    const dialog = await screen.findByRole('dialog')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Create' })) })
+    await wait(50)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(line()).toHaveTextContent('Backup cancelled.')
   })
 })
 
