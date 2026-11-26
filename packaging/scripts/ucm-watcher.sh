@@ -203,6 +203,33 @@ package_name() {
     fi
 }
 
+# check_target <package> <to_version>: prints a reason unless the package declares to_version and
+# to_version is above what root's package database holds (a genuine older release is refused too)
+check_target() {
+    local want installed declared newer
+    want=$(printf '%s' "$2" | tr '-' '~')
+    if [[ "$1" == *.deb ]]; then
+        installed=$(dpkg-query -W -f='${Version}' ucm 2>/dev/null || true)
+        declared=$(dpkg-deb -f "$1" Version 2>/dev/null || true)
+    else
+        installed=$(rpm -q --qf '%{VERSION}' ucm 2>/dev/null || true)
+        declared=$(rpm -qp --qf '%{VERSION}' "$1" 2>/dev/null || true)
+    fi
+    if ! [[ "$installed" =~ ^[0-9][0-9A-Za-z.+~:-]*$ ]]; then
+        echo "the installed ucm version cannot be read from the package database"; return
+    fi
+    if [ "$declared" != "$want" ]; then
+        echo "the package declares version '$declared', not the update target '$want'"; return
+    fi
+    # Both versions match [0-9A-Za-z.+~:-]: nothing in them can leave the Lua string
+    if [[ "$1" == *.deb ]]; then
+        dpkg --compare-versions "$want" gt "$installed" && newer=1
+    else
+        [ "$(rpm --eval "%{lua:print(rpm.vercmp('$want', '$installed'))}" 2>/dev/null)" = 1 ] && newer=1
+    fi
+    [ -n "${newer:-}" ] || echo "the update target $2 is not above the installed version $installed"
+}
+
 finish_update() {
     # Always restart UCM so the backend consumes the result and emits the
     # truthful installed/failed event
@@ -241,6 +268,14 @@ if [ -f "$UPDATE_FILE" ]; then
     if [ "$(package_name "$PACKAGE_PATH")" != "ucm" ]; then
         log "ERROR: update refused: the package is not named ucm"
         write_result failed precheck "the package is not named ucm"
+        rm -rf "$(dirname "$PACKAGE_PATH")"
+        finish_update
+    fi
+
+    REASON=$(check_target "$PACKAGE_PATH" "$(manifest_get to_version)")
+    if [ -n "$REASON" ]; then
+        log "ERROR: update refused: $REASON"
+        write_result failed precheck "$REASON"
         rm -rf "$(dirname "$PACKAGE_PATH")"
         finish_update
     fi

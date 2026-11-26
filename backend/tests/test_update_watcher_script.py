@@ -9,6 +9,7 @@ import subprocess
 import pytest
 
 from tests.test_native_setup_script import BASH, UBUNTU, _env, _stub, _toolbox
+from tests.test_update_watcher_claim import DPKG_COMPARE, stub_version_tools
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WATCHER = ROOT / 'packaging' / 'scripts' / 'ucm-watcher.sh'
@@ -46,10 +47,12 @@ def _update(tmp_path, dpkg, apt_get, stale_marker=False):
     (root / 'opt/ucm/venv/bin').mkdir(parents=True)
     (root / 'opt/ucm/venv/bin/python').symlink_to(_stub(tmp_path / 'python3.12'))
     calls = tmp_path / 'calls'
-    _stub(bin_dir / 'dpkg', f'echo dpkg >> {calls}\nR={root}\n{dpkg}')
+    (tmp_path / 'in_database').write_text('98.0')
+    stub_version_tools(bin_dir, tmp_path)
+    _stub(bin_dir / 'dpkg', f'{DPKG_COMPARE}\necho dpkg >> {calls}\nR={root}\n{dpkg}')
     _stub(bin_dir / 'apt-get', f'echo apt-get >> {calls}\nR={root}\n{apt_get}')
     _stub(bin_dir / 'systemctl', f'echo "$*" >> {tmp_path}/systemctl.calls')
-    _stub(bin_dir / 'dpkg-deb', 'echo ucm')
+    _stub(bin_dir / 'dpkg-deb', 'case "$3" in Package) echo ucm;; *) echo 99.0;; esac')
 
     env = _env(tmp_path, UBUNTU, {'PATH': str(bin_dir), 'UCM_WATCHER_ROOT': str(root),
                                   'UCM_WATCHER_RELEASES': releases.as_uri(), 'TMPDIR': str(tmp_path),

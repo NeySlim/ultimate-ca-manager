@@ -2,8 +2,9 @@
 release asset, declaring the package ucm, and matching the release's .sha256 fetched by root.
 
 packaging/scripts/ucm-watcher.sh runs for real under a temporary root (UCM_WATCHER_ROOT), with
-stubs for dpkg, dpkg-deb, apt-get, rpm and systemctl; the release digests come from a directory
-standing for GitHub (UCM_WATCHER_RELEASES, honoured under UCM_WATCHER_ROOT only).
+stubs for dpkg, dpkg-query, dpkg-deb, apt-get, rpm and systemctl; the release digests come from a
+directory standing for GitHub (UCM_WATCHER_RELEASES, honoured under UCM_WATCHER_ROOT only).
+The stubs compare versions as dpkg and rpm do for the forms UCM releases take (X.Y, X.Y~rcN).
 """
 import hashlib
 import json
@@ -17,7 +18,7 @@ from tests.test_native_setup_script import BASH, _stub
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WATCHER = ROOT / 'packaging' / 'scripts' / 'ucm-watcher.sh'
-UTILS = ('date', 'tee', 'python3', 'bash', 'rm', 'dirname', 'cat', 'mv', 'cp')
+UTILS = ('date', 'tee', 'python3', 'bash', 'rm', 'dirname', 'cat', 'mv', 'cp', 'tr')
 
 pytestmark = pytest.mark.skipif(BASH is None or shutil.which('python3') is None,
                                 reason='bash and python3 are required')
@@ -39,12 +40,19 @@ class Host:
             (self.bin / util).symlink_to(shutil.which(util))
         self.calls = tmp_path / 'calls'
         self.declared = 'ucm'
+        # The ucm version in root's package database, and the one the package declares
+        self.in_database = '98.0'
+        self.declares = None
+        stub_version_tools(self.bin, tmp_path)
         installed = f'echo 99.0 > {self.root}/opt/ucm/VERSION'
-        _stub(self.bin / 'dpkg', f'echo "dpkg $*" >> {self.calls}\n{installed}')
+        _stub(self.bin / 'dpkg', f'{DPKG_COMPARE}\necho "dpkg $*" >> {self.calls}\n{installed}')
         _stub(self.bin / 'apt-get', f'echo "apt-get $*" >> {self.calls}')
-        _stub(self.bin / 'rpm', f'case "$1" in -qp) cat {tmp_path}/declared;; '
+        _stub(self.bin / 'rpm', f'case "$1" in -qp) case "$3" in *NAME*) cat {tmp_path}/declared;; '
+                                f'*) cat {tmp_path}/declares;; esac;; -q) cat {tmp_path}/in_database;; '
+                                f'--eval) "$(dirname "$0")/vercmp" lua "$2";; '
                                 f'*) echo "rpm $*" >> {self.calls}; {installed};; esac')
-        _stub(self.bin / 'dpkg-deb', f'cat {tmp_path}/declared')
+        _stub(self.bin / 'dpkg-deb', f'case "$3" in Package) cat {tmp_path}/declared;; '
+                                     f'*) cat {tmp_path}/declares;; esac')
         _stub(self.bin / 'systemctl', 'exit 0')
 
     def package(self, name='ucm_99.0_all.deb', body=b'genuine package', publish=True,
@@ -59,6 +67,8 @@ class Host:
 
     def run(self, pending, to_version='99.0'):
         (self.tmp / 'declared').write_text(self.declared)
+        (self.tmp / 'in_database').write_text(self.in_database)
+        (self.tmp / 'declares').write_text(self.declares or to_version.replace('-', '~'))
         (self.data / '.update_pending').write_text(str(pending))
         (self.data / '.update_manifest.json').write_text(
             json.dumps({'op_id': 'op', 'to_version': to_version}))
@@ -68,6 +78,25 @@ class Host:
         assert done.returncode == 0, done.stderr
         calls = self.calls.read_text().splitlines() if self.calls.exists() else []
         return json.loads((self.data / '.update_result.json').read_text()), calls
+
+
+VERCMP = """import re, sys
+def key(v):
+    main, _, pre = v.partition("~")
+    return tuple(int(n) for n in main.split(".")), 0 if pre else 1, pre
+a, b = re.findall(r"'([^']*)'", sys.argv[2]) if sys.argv[1] == "lua" else sys.argv[1:3]
+print((key(a) > key(b)) - (key(a) < key(b)))
+"""
+# dpkg --compare-versions A gt B, answered by the vercmp stub
+DPKG_COMPARE = ('if [ "$1" = --compare-versions ]; then [ "$3" = gt ] || exit 2; '
+                '[ "$("$(dirname "$0")/vercmp" "$2" "$4")" = 1 ]; exit; fi')
+
+
+def stub_version_tools(bin_dir, tmp_path):
+    """vercmp, and dpkg-query reading tmp_path/in_database."""
+    (bin_dir / 'vercmp').write_text(f'#!{shutil.which("python3")}\n{VERCMP}')
+    (bin_dir / 'vercmp').chmod(0o755)
+    _stub(bin_dir / 'dpkg-query', f'cat {tmp_path}/in_database')
 
 
 @pytest.fixture
@@ -194,3 +223,33 @@ def test_a_rolling_update_download_named_by_its_turn_is_installed(host, name):
     assert result['status'] == 'installed', result
     installed = calls[0].split()[-1]
     assert pathlib.Path(installed).name == name
+
+
+FAMILIES = ['ucm_99.0_all.deb', 'ucm-99.0-1.fc43.noarch.rpm']
+
+
+@pytest.mark.parametrize('name', FAMILIES)
+@pytest.mark.parametrize('in_database', ['99.5', '99.0'])
+def test_a_target_not_above_the_installed_package_is_refused(host, name, in_database):
+    # A genuine older (or the same) release would reopen what the installed one fixed
+    host.in_database = in_database
+    package = host.package(name)
+    _refused(*host.run(package), 'is not above the installed version')
+
+
+@pytest.mark.parametrize('name', FAMILIES)
+def test_a_release_candidate_is_upgraded_to_its_stable(host, name):
+    host.in_database = '99.0~rc1'
+    result, calls = host.run(host.package(name))
+    assert result['status'] == 'installed', result
+
+
+@pytest.mark.parametrize('name', FAMILIES)
+def test_a_package_declaring_another_version_than_the_target_is_refused(host, name):
+    host.declares = '97.0'
+    _refused(*host.run(host.package(name)), 'not the update target')
+
+
+def test_an_unreadable_package_database_refuses_the_update(host):
+    host.in_database = ''
+    _refused(*host.run(host.package()), 'cannot be read from the package database')
