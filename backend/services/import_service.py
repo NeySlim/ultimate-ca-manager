@@ -398,14 +398,15 @@ def lock_ca_row(ca_id):
 def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=None, encrypted_prv=None, name=None):
     """Apply an imported CA certificate to its existing record; returns whether the stored key was unbound.
 
-    The stored key is checked before anything is changed; raises ImportConflict
-    when it cannot be (HSM unreachable, key unreadable). The caller commits.
+    The stored key is checked before anything is changed, then the CA row is locked until the
+    caller's commit. Raises ImportConflict when the key cannot be checked (HSM unreachable, key
+    unreadable), when it changed meanwhile, or when the CA was deleted. The caller commits.
     """
     from services.ca_service import CAService
     from utils.cert_issuer import stored_private_key_matches, hsm_key_binding_matches
     # The key state the decision below is made on, compared again under the CA row lock
     decided_on = (existing_ca.prv, existing_ca.hsm_key_id)
-    # An HSM lookup may commit its public key cache, so the key is decided before the record is touched
+    # An HSM lookup flushes its public key cache, so the key is decided before the record is touched
     key_dropped = False
     if key_pem:
         # The new certificate's key arrived with it: it replaces whatever the record held
