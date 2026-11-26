@@ -469,7 +469,7 @@ export default function OperationsPage() {
       const data = result?.data
       const successCount = data?.success?.length || 0
       const failedCount = data?.failed?.length || 0
-      showSuccess(t('operations.bulkSuccess', { action: bulkAction, count: successCount }))
+      showSuccess(t('operations.bulkSuccess', { action: t(`common.${bulkAction}`), count: successCount }))
       if (failedCount > 0) {
         showError(t('operations.bulkPartialFail', {
           count: failedCount,
@@ -558,7 +558,7 @@ export default function OperationsPage() {
       const service = bulkResourceType === 'certificates' ? certificatesService : casService
       const blob = await service.bulkExport(ids, 'pem')
       if (blob) downloadBlob(blob, `${bulkResourceType}_export.pem`)
-      showSuccess(t('operations.bulkSuccess', { action: 'export', count: blob?.exportedCount ?? ids.length }))
+      showSuccess(t('operations.bulkSuccess', { action: t('common.export'), count: blob?.exportedCount ?? ids.length }))
       warnSkippedExport(blob, t, showWarning)
     } catch (e) { showError(e.message || t('importExport.export.exportFailed')) }
   }
