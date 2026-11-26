@@ -1474,8 +1474,9 @@ def respond_to_challenge(challenge_id: str):
         # Verify JWS
         # Challenge URLs use the challenge-specific URL, not a fixed pattern
         # Try to find the challenge first to get its URL for verification
+        # % and _ of the path are characters, not LIKE wildcards (RFC 8555 7.5.1: the URL's resource)
         challenge = AcmeChallenge.query.filter(
-            AcmeChallenge.url.endswith(f'/{challenge_id}')
+            AcmeChallenge.url.endswith(f'/{challenge_id}', autoescape=True)
         ).first()
         if not challenge:
             challenge = AcmeChallenge.query.filter_by(challenge_id=challenge_id).first()
