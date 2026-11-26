@@ -1,11 +1,22 @@
-import { generateKeyPairSync } from 'node:crypto'
+import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { test, expect, uid } from './support/fixtures'
 
-// An OpenSSH ed25519 public key line from a fresh key: string "ssh-ed25519", string the 32-byte key
-function ed25519PublicKey() {
-  const raw = generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).subarray(-32)
-  const str = (b: Buffer) => { const n = Buffer.alloc(4); n.writeUInt32BE(b.length); return Buffer.concat([n, b]) }
-  return `ssh-ed25519 ${Buffer.concat([str(Buffer.from('ssh-ed25519')), str(raw)]).toString('base64')}`
+const str = (b: Buffer) => { const n = Buffer.alloc(4); n.writeUInt32BE(b.length); return Buffer.concat([n, b]) }
+
+// A fresh ed25519 host key: its OpenSSH public line, and the token signed with it as
+// `ssh-keygen -Y sign -n ucm-ssh-host-enrollment` signs it (PROTOCOL.sshsig)
+function hostKeyAndProof(token: string) {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+  const raw = publicKey.export({ format: 'der', type: 'spki' }).subarray(-32)
+  const blob = Buffer.concat([str(Buffer.from('ssh-ed25519')), str(raw)])
+  const ns = Buffer.from('ucm-ssh-host-enrollment'), alg = Buffer.from('sha512'), magic = Buffer.from('SSHSIG')
+  const digest = createHash('sha512').update(token).digest()
+  const signed = Buffer.concat([magic, str(ns), str(Buffer.alloc(0)), str(alg), str(digest)])
+  const sig = Buffer.concat([str(Buffer.from('ssh-ed25519')), str(sign(null, signed, privateKey))])
+  const version = Buffer.alloc(4); version.writeUInt32BE(1)
+  const body = Buffer.concat([magic, version, str(blob), str(ns), str(Buffer.alloc(0)), str(alg), str(sig)])
+  const armored = `-----BEGIN SSH SIGNATURE-----\n${body.toString('base64').match(/.{1,70}/g)!.join('\n')}\n-----END SSH SIGNATURE-----\n`
+  return { public_key: `ssh-ed25519 ${blob.toString('base64')}`, signature: armored }
 }
 
 test('a token created on screen enrolls a host once, which the page lists and revokes', async ({ page, api }) => {
@@ -27,7 +38,7 @@ test('a token created on screen enrolls a host once, which the page lists and re
   await expect(dialog).toBeHidden()
 
   // The server's side: the public enrollment route, then the same token a second time
-  const enroll = () => page.request.post(`/ssh/enroll/${ca.refid}`, { data: { token, public_key: ed25519PublicKey() } })
+  const enroll = () => page.request.post(`/ssh/enroll/${ca.refid}`, { data: { token, ...hostKeyAndProof(token) } })
   expect((await enroll()).status()).toBe(201)
   expect((await enroll()).status()).toBe(403)
 

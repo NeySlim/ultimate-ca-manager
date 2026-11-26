@@ -72,7 +72,7 @@ La KRL est publique, comme une CRL : \`/ssh/krl/<refid>\`. Sa version ne change 
 curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo UCM_ENROLL_TOKEN=ucmh_... sh
 \`\`\`
 
-L’agent envoie la clé publique d’hôte du serveur (Ed25519 d’abord, puis ECDSA, puis RSA ; \`--host-key\` en choisit une autre), vérifie que le certificat reçu certifie cette clé, l’écrit à côté de la clé et y fait pointer \`HostCertificate\`. Ajoutez \`-s -- --principal web01\` pour ne demander qu’une partie des noms du jeton.
+L’agent envoie la clé publique d’hôte du serveur (Ed25519 d’abord, puis ECDSA, puis RSA ; \`--host-key\` en choisit une autre) avec le jeton signé par cette clé, ce qui prouve que le serveur la détient, vérifie que le certificat reçu certifie cette clé, l’écrit à côté de la clé et y fait pointer \`HostCertificate\`. Ajoutez \`-s -- --principal web01\` pour ne demander qu’une partie des noms du jeton.
 
 Le jeton est affiché une fois, sert une fois et n’est jamais écrit sur le disque du serveur. Un jeton inutilisé peut être révoqué dans **Jetons d’enrôlement**.
 

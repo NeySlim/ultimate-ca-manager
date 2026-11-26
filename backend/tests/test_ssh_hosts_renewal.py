@@ -29,7 +29,8 @@ def enrolled(app, auth_client, client, tmp_path):
         'ca_id': ca['id'], 'principals': ['web01.example.com', 'web01'], 'validity_seconds': 86400,
     }).get_json()['data']['token']
     r = client.post(f"/ssh/enroll/{ca['refid']}", data=json.dumps({
-        'token': token, 'public_key': (tmp_path / 'ssh_host_ed25519_key.pub').read_text()}),
+        'token': token, 'public_key': (tmp_path / 'ssh_host_ed25519_key.pub').read_text(),
+        'signature': _sign(tmp_path, key, token, hosts.ENROLL_NAMESPACE)}),
         content_type='application/json')
     assert r.status_code == 201, r.data
     return ca, r.get_json()['host_refid'], key

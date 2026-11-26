@@ -2,7 +2,8 @@
 
 A token is created by an administrator for one host CA, the principals the host may claim and
 the validity of its certificates; only its SHA-256 is stored and it is spent at the first
-exchange. The host sends its own public key: UCM never sees a host's private key.
+exchange. The host sends its own public key and the token signed with it: UCM never sees a
+host's private key.
 """
 import fnmatch
 import hashlib
@@ -25,6 +26,7 @@ from utils.datetime_utils import utc_now
 logger = logging.getLogger(__name__)
 
 TOKEN_PREFIX = 'ucmh_'
+ENROLL_NAMESPACE = 'ucm-ssh-host-enrollment'
 _TOKEN = re.compile(r'^ucmh_[A-Za-z0-9_-]{43}$')
 _HOSTNAME = re.compile(r'^(?=.{1,253}$)[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,62})(?:\.[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,62}))*\.?$')
 MAX_PRINCIPALS = 32
@@ -156,9 +158,12 @@ def revoke_token(token_id):
     return token
 
 
-def enroll(ca_refid, secret, public_key, principals=None, ip=None):
-    """(host, certificate) for the host key *public_key*; EnrollmentRefused otherwise."""
+def enroll(ca_refid, secret, public_key, principals=None, ip=None, signature=None):
+    """(host, certificate) for the host key *public_key*, whose possession *signature* proves
+    (the token signed with it, namespace ENROLL_NAMESPACE); EnrollmentRefused otherwise."""
     from services.ssh_cert import SSHCertificateService
+    from services.ssh_cert.utils import SSHCertificateUtilsMixin
+    from utils import sshsig
     refused = EnrollmentRefused(403, 'invalid, used or expired enrollment token')
     if not isinstance(secret, str) or not _TOKEN.match(secret):
         raise EnrollmentRefused(403, refused.public, 'malformed token')
@@ -181,6 +186,20 @@ def enroll(ca_refid, secret, public_key, principals=None, ip=None):
     outside = [n for n in names if n not in allowed]
     if outside:
         raise EnrollmentRefused(403, f"host name not allowed by this token: {outside[0]}")
+    # A public key is public: only the holder of its private key enrolls it
+    if not isinstance(signature, str) or not signature.strip():
+        raise EnrollmentRefused(403, 'the signature does not prove the host key',
+                                'no signature of the token by the host key')
+    try:
+        sshsig.verify(signature, secret.encode(), ENROLL_NAMESPACE, key_line)
+    except sshsig.SignatureError as e:
+        raise EnrollmentRefused(403, 'the signature does not prove the host key', str(e)) from None
+    fingerprint = SSHCertificateUtilsMixin._compute_fingerprint(key)
+    enrolled = SSHHost.query.filter(SSHHost.ssh_ca_id == ca.id, SSHHost.fingerprint == fingerprint,
+                                    SSHHost.revoked_at.is_(None)).first()
+    if enrolled is not None and enrolled.get_principals() != names:
+        raise EnrollmentRefused(409, 'this host key is enrolled with other host names: revoke that host first',
+                                f'key {fingerprint} is enrolled as host {enrolled.name} with other host names')
 
     # Spent before the signature: two exchanges of one token, one wins
     now = utc_now()
@@ -193,8 +212,6 @@ def enroll(ca_refid, secret, public_key, principals=None, ip=None):
         raise EnrollmentRefused(403, refused.public, f'token {token.token_prefix} spent meanwhile')
     db.session.commit()
 
-    from services.ssh_cert.utils import SSHCertificateUtilsMixin
-    fingerprint = SSHCertificateUtilsMixin._compute_fingerprint(key)
     try:
         cert = SSHCertificateService.sign_certificate(
             ca_id=ca.id, public_key_data=key_line, cert_type='host', principals=names,

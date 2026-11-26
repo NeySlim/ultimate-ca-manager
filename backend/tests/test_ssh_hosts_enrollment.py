@@ -8,7 +8,7 @@ import subprocess
 from datetime import timedelta
 
 import pytest
-from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import ssh as ssh_ser
 
 from models import AuditLog, db
@@ -16,11 +16,18 @@ from models.ssh import SSHCertificate, SSHHost, SSHHostEnrollmentToken
 from services import ssh_host_service as hosts
 from utils.datetime_utils import utc_now
 from tests.test_ssh import _create_ssh_ca, post_json
+from tests import sshsig_support
 from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 
+# The private key of each public line _host_key made: _enroll signs the token with it
+_PRIVATE = {}
+
+
 def _host_key():
-    return ssh_ser.serialize_ssh_public_key(ed25519.Ed25519PrivateKey.generate().public_key()).decode()
+    private, public = sshsig_support.new_key()
+    _PRIVATE[public] = private
+    return public
 
 
 def _host_ca(auth_client, descr, **extra):
@@ -34,8 +41,14 @@ def _token(auth_client, ca, principals=('web01.example.com', 'web01'), **extra):
     return r.get_json()['data']
 
 
-def _enroll(client, ca, token, key=None, principals=None, text=False):
-    body = {'token': token, 'public_key': key or _host_key()}
+def _enroll(client, ca, token, key=None, principals=None, text=False, signature=True):
+    """*signature* True: the token signed with the host key, as the agent does; None: no proof."""
+    key = key or _host_key()
+    body = {'token': token, 'public_key': key}
+    if signature is True and key in _PRIVATE and isinstance(token, str):
+        signature = sshsig_support.sign(_PRIVATE[key], token, hosts.ENROLL_NAMESPACE)
+    if isinstance(signature, str):
+        body['signature'] = signature
     if principals is not None:
         body['principals'] = principals
     headers = {'Accept': 'text/plain'} if text else {}
@@ -197,12 +210,63 @@ class TestEnrollment:
         with app.app_context():
             assert SSHCertificate.query.filter_by(ssh_ca_id=ca['id']).count() == before
 
-    def test_the_same_key_enrolled_again_keeps_its_host(self, app, auth_client, client):
+    def test_the_same_key_enrolled_again_for_the_same_names_keeps_its_host(self, app, auth_client, client):
         ca = _host_ca(auth_client, 'Enroll again CA')
         key = _host_key()
         first = _enroll(client, ca, _token(auth_client, ca)['token'], key).get_json()
-        second = _enroll(client, ca, _token(auth_client, ca, principals=['web02'])['token'], key).get_json()
-        assert second['host_refid'] == first['host_refid'] and second['principals'] == 'web02'
+        second = _enroll(client, ca, _token(auth_client, ca)['token'], key)
+        assert second.status_code == 201 and second.get_json()['host_refid'] == first['host_refid']
+
+    def test_the_same_key_for_other_names_is_409_until_its_host_is_revoked(self, app, auth_client, client):
+        ca = _host_ca(auth_client, 'Enroll other names CA')
+        key = _host_key()
+        first = _enroll(client, ca, _token(auth_client, ca)['token'], key).get_json()
+        token = _token(auth_client, ca, principals=['web02'])
+        r = _enroll(client, ca, token['token'], key)
+        assert r.status_code == 409 and 'revoke' in r.get_json()['error']
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=first['host_refid']).one()
+            assert host.get_principals() == ['web01.example.com', 'web01']
+            assert db.session.get(SSHHostEnrollmentToken, token['id']).state == 'active'
+            host_id = host.id
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        r = _enroll(client, ca, token['token'], key)
+        assert r.status_code == 201 and r.get_json()['host_refid'] != first['host_refid']
+
+
+class TestProofOfPossession:
+    """The token signed with the host key: a public key alone, which any server shows, enrolls nothing."""
+
+    def test_another_servers_public_key_cannot_take_its_host(self, app, auth_client, client):
+        ca = _host_ca(auth_client, 'Enroll victim CA')
+        victim = _host_key()
+        first = _enroll(client, ca, _token(auth_client, ca)['token'], victim).get_json()
+        evil = _token(auth_client, ca, principals=['evil.example.com'])
+        attacker, _ = sshsig_support.new_key()
+        since = _last_audit(app)
+        assert _enroll(client, ca, evil['token'], victim, signature=None).status_code == 403
+        forged = sshsig_support.sign(attacker, evil['token'], hosts.ENROLL_NAMESPACE)
+        assert _enroll(client, ca, evil['token'], victim, signature=forged).status_code == 403
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=first['host_refid']).one()
+            assert host.name == 'web01.example.com' and host.get_principals() == ['web01.example.com', 'web01']
+            assert db.session.get(SSHHostEnrollmentToken, evil['id']).state == 'active'
+        assert [d for _, d in _audits(app, 'ssh_host_enrollment_refused', since)] == [
+            'SSH host enrollment refused: no signature of the token by the host key',
+            'SSH host enrollment refused: signed with another key']
+
+    def test_a_signature_of_another_token_or_purpose_is_refused(self, app, auth_client, client):
+        ca = _host_ca(auth_client, 'Enroll proof CA')
+        key = _host_key()
+        token, other = _token(auth_client, ca), _token(auth_client, ca)
+        for signature in (sshsig_support.sign(_PRIVATE[key], other['token'], hosts.ENROLL_NAMESPACE),
+                          sshsig_support.sign(_PRIVATE[key], token['token'], hosts.NAMESPACE),
+                          'not a signature'):
+            r = _enroll(client, ca, token['token'], key, signature=signature)
+            assert r.status_code == 403 and r.get_json()['error'] == 'the signature does not prove the host key'
+        with app.app_context():
+            assert db.session.get(SSHHostEnrollmentToken, token['id']).state == 'active'
+        assert _enroll(client, ca, token['token'], key).status_code == 201
 
     def test_an_unknown_ca_is_404_and_a_bad_body_400(self, auth_client, client):
         assert client.post('/ssh/enroll/nope', data='{}', content_type='application/json').status_code == 403

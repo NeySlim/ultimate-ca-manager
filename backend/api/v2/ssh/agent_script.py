@@ -350,7 +350,13 @@ cmd_enroll() { # REFID [NAME...]
     mkdir -p "$CONF_DIR"
     body="$CONF_DIR/.enroll.$$"
     out="$CONF_DIR/.enroll-answer.$$"
-    (umask 077; printf '{"token":"%s","public_key":"%s"%s}' "$token" "$pub" \
+    # The token signed with the host key proves this server holds it (ssh-keygen -Y sign)
+    if ! proof=$(printf '%s' "$token" | ssh-keygen -q -Y sign -n ucm-ssh-host-enrollment -f "$key" 2>/dev/null) \
+        || [ -z "$proof" ]; then
+        die "could not sign the enrollment with $key"
+    fi
+    signature=$(printf '%s\n' "$proof" | awk '{ printf "%s\\n", $0 }')
+    (umask 077; printf '{"token":"%s","public_key":"%s","signature":"%s"%s}' "$token" "$pub" "$signature" \
         "${names:+,\"principals\":[$names]}" > "$body")
     code=$(http_post "$(conf_get UCM_URL)/ssh/enroll/$refid" "$body" "$out")
     rm -f "$body"

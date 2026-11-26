@@ -263,6 +263,9 @@ class TestTheAgentEnrolls:
         other = ssh_ser.serialize_ssh_public_key(ed25519.Ed25519PrivateKey.generate().public_key()).decode()
         real = ssh_host_service.checked_host_key
         monkeypatch.setattr(ssh_host_service, 'checked_host_key', lambda key: real(other))
+        # A server that certifies another key than the one the agent proved
+        from utils import sshsig
+        monkeypatch.setattr(sshsig, 'verify', lambda *args: None)
         out = host.install(_installer(server, ca['refid']), env={'UCM_ENROLL_TOKEN': _enroll_token(auth_client, ca)})
         assert out.returncode == 1 and 'does not certify' in out.stderr
         assert not (host.ssh / 'ssh_host_ed25519_key-cert.pub').exists()

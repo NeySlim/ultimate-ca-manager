@@ -47,13 +47,14 @@ def _body():
 
 @bp.route('/ssh/enroll/<refid>', methods=['POST'])
 def enroll_host(refid):
-    """Body: ``token``, ``public_key`` (the host key, ``type base64``), optional ``principals``
+    """Body: ``token``, ``public_key`` (the host key, ``type base64``), ``signature`` (the token
+    signed with that key, ``ssh-keygen -Y sign -n ucm-ssh-host-enrollment``), optional ``principals``
     (a subset of the token's; all of them by default). 201 with the host refid and certificate."""
     ip = client_ip()
     try:
         data = _body()
         host, cert = hosts.enroll(refid, data.get('token'), data.get('public_key'),
-                                  data.get('principals'), ip=ip)
+                                  data.get('principals'), ip=ip, signature=data.get('signature'))
     except hosts.EnrollmentRefused as e:
         AuditService.log_action(action='ssh_host_enrollment_refused', resource_type='ssh_host',
                                 resource_name=refid[:64], details=f'SSH host enrollment refused: {e.reason}',
