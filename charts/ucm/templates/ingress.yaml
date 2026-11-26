@@ -33,14 +33,15 @@ spec:
 ---
 # Cleartext-HTTP protocol endpoints (CDP / OCSP / AIA / ACME HTTP-01) served on
 # the container's 8080 port. Kept on a separate host so the main UI ingress can
-# speak HTTPS to the backend.
+# speak HTTPS to the backend; its own annotations only, never the UI's (a backend-protocol
+# HTTPS there would make the controller speak TLS to this cleartext port).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $fullName }}-protocol
   labels:
     {{- include "ucm.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with .Values.ingress.protocolHttp.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}

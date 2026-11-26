@@ -187,6 +187,9 @@ ingress:
   protocolHttp:
     enabled: false
     host: pki.local
+    ## Annotations of this Ingress alone: ingress.annotations are not copied here, since
+    ## this backend port speaks plain HTTP.
+    annotations: {}
 
 ## Backups and restores run in the scheduler process of this container, and their memory grows with the number of
 ## certificates. Size limits.memory for the larger of the backup and the restore, plus the web worker (0.25 GB) and

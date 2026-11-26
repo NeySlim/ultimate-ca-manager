@@ -179,6 +179,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v3.1
+
+- **Helm chart, cleartext protocol Ingress:** the `<release>-protocol` Ingress (`ingress.protocolHttp.enabled`) no longer copies `ingress.annotations`. Put the annotations it needs (a TLS issuer, an ingress class option) under `ingress.protocolHttp.annotations`; a `backend-protocol: "HTTPS"` must not go there, as its port 8080 speaks plain HTTP.
+
 ### Upgrading to v3.0
 
 Some changes below were already delivered by a 2.254.N security update; each says which one. Coming from that update or a later one, they are not new.
