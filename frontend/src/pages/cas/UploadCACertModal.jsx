@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { AtelierDialog, Icon } from '../../components/atelier'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
-import { extractData } from '../../lib/utils'
+import { extractData, formatDate } from '../../lib/utils'
 import { crossAttachOffered, crossReplaceOffered } from '../../lib/crossCertificates'
 
 const MAX_FILE_SIZE = 256 * 1024
@@ -59,7 +59,7 @@ function UploadBody({ onClose, ca, onSuccess }) {
         const notice = t('cas.certSupersededNotice', {
           serial: data.superseded_serial,
           date: data.superseded_valid_to
-            ? new Date(data.superseded_valid_to).toLocaleDateString()
+            ? formatDate(data.superseded_valid_to, { time: false })
             : '?',
         })
         showWarning ? showWarning(notice) : showError(notice)

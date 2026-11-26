@@ -1,4 +1,5 @@
 import { clsx } from 'clsx'
+import i18next from 'i18next'
 import { twMerge } from 'tailwind-merge'
 import { getAppTimezone } from '../stores/timezoneStore'
 import { getDateFormat, getShowTime } from '../stores/dateFormatStore'
@@ -103,7 +104,15 @@ export function formatDate(date, { time, ...options } = {}) {
       return parts.map(p => p.value).join('')
     }
 
-    return new Intl.DateTimeFormat(fmt === 'us' ? 'en-US' : undefined, formatMap[fmt] || formatMap.short).format(d)
+    // Month names in the interface's language (i18next), the browser's only before it is ready
+    const locale = fmt === 'us' ? 'en-US' : (i18next.language || undefined)
+    const opts = formatMap[fmt] || formatMap.short
+    try {
+      return new Intl.DateTimeFormat(locale, opts).format(d)
+    } catch (err) {
+      if (!(err instanceof RangeError) || !locale) throw err
+      return new Intl.DateTimeFormat(undefined, opts).format(d)
+    }
   } catch {
     return '-'
   }
