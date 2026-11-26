@@ -9,6 +9,7 @@ import EmailTemplateDialog from './EmailTemplateDialog'
 import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
 import { useRefocusAfter } from '../../hooks/useRefocus'
 import { shownNumber, typedNumber } from './numberFields'
+import AdminLockLabel from './AdminLockLabel'
 
 const OAUTH_CONSOLES = {
   google: { consoleUrl: 'https://console.cloud.google.com/apis/credentials', consoleLabel: 'Google Cloud Console → APIs & Services → Credentials' },
@@ -18,7 +19,7 @@ const OAUTH_CONSOLES = {
 const ALERT_DAYS = [90, 60, 30, 14, 7, 3, 1]
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
-export default function EmailSection({ settings, fieldErrors = {}, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
+export default function EmailSection({ hasPermission, settings, fieldErrors = {}, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
   const { t } = useTranslation()
   const testButton = useRef(null)
   useRefocusAfter(emailTesting, testButton)
@@ -28,22 +29,25 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
   const method = settings.smtp_auth_method || 'password'
   const provider = settings.smtp_oauth_provider || 'google'
   const oauth = (key) => (e) => { updateSetting(key, e.target.value); setOauthDirty(true) }
+  // Where mail and its reset links go: the API moves it for admin:settings only
+  const locked = hasPermission ? !hasPermission('admin:settings') : false
+  const lockedLabel = (key) => <AdminLockLabel text={t(key)} locked={locked} mockup />
   const defaultRedirect = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v2/settings/email/oauth/callback`
   return (
     <>
       <SettingsGroup legend={t('settings.smtpConfig')}>
-        <Input id="set-smtp_host" label={t('settings.smtpHost')} value={settings.smtp_host || ''}
+        <Input id="set-smtp_host" label={lockedLabel('settings.smtpHost')} disabled={locked} value={settings.smtp_host || ''}
           onChange={(e) => updateSetting('smtp_host', e.target.value)} placeholder={t('settings.smtpHostPlaceholder')} />
-        <NumberInput id="set-smtp_port" label={t('settings.smtpPort')} value={shownNumber(settings.smtp_port ?? 587)}
+        <NumberInput id="set-smtp_port" label={lockedLabel('settings.smtpPort')} disabled={locked} value={shownNumber(settings.smtp_port ?? 587)}
           onChange={(e) => updateSetting('smtp_port', typedNumber(e))} error={fieldErrors.smtp_port} hint={t('settings.smtpSecurityHint')} />
-        <Select id="set-smtp_security" short label={t('settings.smtpSecurity')} value={settings.smtp_security || 'starttls'}
+        <Select id="set-smtp_security" short label={lockedLabel('settings.smtpSecurity')} disabled={locked} value={settings.smtp_security || 'starttls'}
           onChange={(mode) => updateSetting('smtp_security', mode)}
           options={[['starttls', 'smtpSecurityStarttls'], ['ssl', 'smtpSecuritySsl'], ['none', 'smtpSecurityNone']]
             .map(([value, labelKey]) => ({ value, label: t(`settings.${labelKey}`) }))} />
-        <Input id="set-smtp_from_email" label={t('settings.fromEmail')} type="email" value={settings.smtp_from_email || ''}
+        <Input id="set-smtp_from_email" label={lockedLabel('settings.fromEmail')} disabled={locked} type="email" value={settings.smtp_from_email || ''}
           onChange={(e) => updateSetting('smtp_from_email', e.target.value)} error={fieldErrors.smtp_from_email}
           placeholder={t('settings.fromEmailPlaceholder')} />
-        <Select id="set-smtp_auth_method" label={t('settings.smtpAuthMethod')} value={method}
+        <Select id="set-smtp_auth_method" label={lockedLabel('settings.smtpAuthMethod')} disabled={locked} value={method}
           onChange={(next) => { updateSetting('smtp_auth_method', next); setOauthDirty((prev) => prev || next === 'oauth2') }}
           options={['password', 'oauth2', 'none'].map((value) => ({ value, label: t(`settings.smtpAuthMethod_${value}`) }))} />
         <Select id="set-smtp_content_type" label={t('settings.emailFormat')} value={settings.smtp_content_type || 'html'}
@@ -77,7 +81,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
             <Input id="set-smtp_username" label={t('settings.smtpUsername')} value={settings.smtp_username || ''}
               onChange={(e) => updateSetting('smtp_username', e.target.value)} />
             {/* Provider: a preset that fills the endpoints */}
-            <SegmentedField id="set-smtp_oauth_provider" label={t('settings.smtpOauthProvider')}
+            <SegmentedField id="set-smtp_oauth_provider" label={lockedLabel('settings.smtpOauthProvider')} disabled={locked}
               options={['google', 'microsoft', 'microsoft365', 'custom'].map((p) => ({ value: p, label: t(`settings.smtpOauthProvider_${p}`) }))}
               pressed={(p) => provider === p} onPick={applyOAuthProviderPreset} />
             {OAUTH_CONSOLES[provider] && (
@@ -90,7 +94,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
               </Notice>
             )}
             {provider === 'microsoft365' && (
-              <Input id="set-smtp_oauth_tenant_id" label={t('settings.smtpOauthTenant')} value={settings.smtp_oauth_tenant_id || ''}
+              <Input id="set-smtp_oauth_tenant_id" label={lockedLabel('settings.smtpOauthTenant')} disabled={locked} value={settings.smtp_oauth_tenant_id || ''}
                 onChange={oauth('smtp_oauth_tenant_id')} placeholder="common" hint={t('settings.smtpOauthTenantHintM365')} />
             )}
             <Input id="set-smtp_oauth_client_id" label={t('settings.smtpOauthClientId')} value={settings.smtp_oauth_client_id || ''}
@@ -101,18 +105,18 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
               {...secretInputProps(t, secretTargets.oauth)} />
             {provider === 'custom' && (
               <>
-                <Input id="set-smtp_oauth_authorize_url" label={t('settings.smtpOauthAuthorizeUrl')} value={settings.smtp_oauth_authorize_url || ''}
+                <Input id="set-smtp_oauth_authorize_url" label={lockedLabel('settings.smtpOauthAuthorizeUrl')} disabled={locked} value={settings.smtp_oauth_authorize_url || ''}
                   onChange={oauth('smtp_oauth_authorize_url')} />
-                <Input id="set-smtp_oauth_token_url" label={t('settings.smtpOauthTokenUrl')} value={settings.smtp_oauth_token_url || ''}
+                <Input id="set-smtp_oauth_token_url" label={lockedLabel('settings.smtpOauthTokenUrl')} disabled={locked} value={settings.smtp_oauth_token_url || ''}
                   onChange={oauth('smtp_oauth_token_url')} />
                 <Input id="set-smtp_oauth_scope" label={t('settings.smtpOauthScope')} value={settings.smtp_oauth_scope || ''}
                   onChange={oauth('smtp_oauth_scope')} />
               </>
             )}
-            <Input id="set-smtp_oauth_redirect_uri" full label={t('settings.smtpOauthRedirectUri')} value={settings.smtp_oauth_redirect_uri || ''}
+            <Input id="set-smtp_oauth_redirect_uri" full label={lockedLabel('settings.smtpOauthRedirectUri')} disabled={locked} value={settings.smtp_oauth_redirect_uri || ''}
               onChange={oauth('smtp_oauth_redirect_uri')} placeholder={defaultRedirect} hint={t('settings.smtpOauthRedirectUriHint')} />
             <div className="settings-actions">
-              <Btn onClick={() => { updateSetting('smtp_oauth_redirect_uri', defaultRedirect); setOauthDirty(true) }}>
+              <Btn disabled={locked || undefined} onClick={() => { updateSetting('smtp_oauth_redirect_uri', defaultRedirect); setOauthDirty(true) }}>
                 {t('settings.smtpOauthRedirectUriUseDefault')}
               </Btn>
               <Btn tone="quiet" icon="copy" disabled={!settings.smtp_oauth_redirect_uri}

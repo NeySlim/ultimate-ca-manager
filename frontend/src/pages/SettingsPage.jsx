@@ -2024,6 +2024,7 @@ export default function SettingsPage() {
       case 'email':
         return (
           <EmailSection
+            hasPermission={hasPermission}
             settings={settings}
             fieldErrors={fieldErrors}
             savedEmail={savedEmail}

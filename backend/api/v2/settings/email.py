@@ -2,8 +2,8 @@
 Settings - Email/SMTP settings + OAuth2 + template routes
 """
 
-from flask import request
-from auth.unified import require_auth
+from flask import g, request
+from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.secret_target import changed_targets, keeps_saved_secret, retarget_error
@@ -78,6 +78,33 @@ def get_email_settings():
     })
 
 
+def _smtp_target(smtp):
+    """Where mail and its reset links go, as the sender reads it from the row."""
+    method = 'none' if smtp.smtp_auth is False else (smtp.smtp_auth_method or 'password')
+    target = {'smtp_host': smtp.smtp_host or '', 'smtp_port': smtp.smtp_port or 587,
+              'smtp_security': _smtp_security(smtp), 'smtp_auth_method': method,
+              'from_email': smtp.smtp_from or ''}
+    if method == 'oauth2':
+        for key in ('smtp_oauth_provider', 'smtp_oauth_tenant_id', 'smtp_oauth_authorize_url',
+                    'smtp_oauth_token_url', 'smtp_oauth_redirect_uri'):
+            target[key] = (getattr(smtp, key) or '').lower() if key == 'smtp_oauth_provider' \
+                else (getattr(smtp, key) or '')
+    return target
+
+
+def _target_refusal(before, smtp):
+    """403 when the SMTP target moved without admin:settings, as base_url: it receives
+    every password-reset link. None when it stayed or the caller holds admin:settings."""
+    if has_permission('admin:settings', getattr(g, 'permissions', None) or []):
+        return None
+    after = _smtp_target(smtp)
+    moved = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+    if not moved:
+        return None
+    return error_response('These settings require the admin:settings permission: '
+                          + ', '.join(moved), 403)
+
+
 def _smtp_retarget_check(smtp, data):
     """(error, stale): saved SMTP secrets stay with their target.
 
@@ -148,6 +175,7 @@ def update_email_settings():
     if not smtp:
         smtp = SMTPConfig()
         db.session.add(smtp)
+    target_before = _smtp_target(smtp)
 
     # Update fields (map frontend names to model column names)
     if 'enabled' in data:
@@ -216,6 +244,10 @@ def update_email_settings():
         smtp.smtp_oauth_redirect_uri = data['smtp_oauth_redirect_uri'] or None
     for key in stale:
         setattr(smtp, key, None)
+    refused = _target_refusal(target_before, smtp)
+    if refused:
+        db.session.rollback()
+        return refused
 
     try:
         db.session.commit()
@@ -315,11 +347,13 @@ def smtp_oauth_authorize_url():
         return error_response('SMTP configuration not found: save settings first', 404)
 
     data = request.json or {}
-    redirect_uri = (
-        data.get('redirect_uri')
-        or smtp.smtp_oauth_redirect_uri
-        or _default_oauth_redirect_uri()
-    )
+    stored_uri = smtp.smtp_oauth_redirect_uri or _default_oauth_redirect_uri()
+    redirect_uri = data.get('redirect_uri') or stored_uri
+    # The consent's redirect is part of the SMTP target: moved only with admin:settings
+    if redirect_uri != stored_uri and not has_permission(
+            'admin:settings', getattr(g, 'permissions', None) or []):
+        return error_response(
+            'These settings require the admin:settings permission: redirect_uri', 403)
 
     try:
         url, state = oauth_helper.build_authorize_url(smtp, redirect_uri)

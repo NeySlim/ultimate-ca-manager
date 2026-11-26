@@ -65,7 +65,7 @@ export default {
     warnings: [
       'Une politique de mot de passe trop stricte peut frustrer les utilisateurs',
       'Derrière un reverse proxy, définissez UCM_BEHIND_PROXY et UCM_TRUSTED_PROXIES avant d’utiliser la liste d’accès administrateur, sinon toutes les requêtes semblent provenir du proxy',
-      'Les paramètres sensibles (session, verrouillage, HSTS, URL publique, politique de mot de passe) exigent admin:settings, les champs sont verrouillés pour les opérateurs',
+      'Les paramètres sensibles (session, verrouillage, HSTS, URL publique, serveur SMTP, politique de mot de passe) exigent admin:settings, les champs sont verrouillés pour les opérateurs',
     ],
   },
   helpGuides: {
@@ -164,7 +164,7 @@ Permettre aux utilisateurs de se connecter avec un certificat client au lieu d�
 
 ## Permissions requises
 
-Les paramètres sensibles : session, verrouillage, HSTS, URL publique et politique de mot de passe, exigent la permission **admin:settings**. Pour les opérateurs (write:settings uniquement), ces champs apparaissent verrouillés ; le reste s’enregistre par la barre d’enregistrement de la page.
+Les paramètres sensibles : session, verrouillage, HSTS, URL publique, serveur SMTP et politique de mot de passe, exigent la permission **admin:settings**. Pour les opérateurs (write:settings uniquement), ces champs apparaissent verrouillés ; le reste s’enregistre par la barre d’enregistrement de la page.
 `
   }
 }

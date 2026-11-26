@@ -65,7 +65,7 @@ export default {
     warnings: [
       '密码策略设置过于严格可能会影响用户体验',
       '在反向代理之后，使用管理访问允许列表前请先设置 UCM_BEHIND_PROXY 和 UCM_TRUSTED_PROXIES，否则每个请求都会显示为来自代理',
-      '安全敏感设置（会话、锁定、HSTS、公共 URL、密码策略）需要 admin:settings 权限，这些字段对操作员锁定',
+      '安全敏感设置（会话、锁定、HSTS、公共 URL、SMTP 服务器、密码策略）需要 admin:settings 权限，这些字段对操作员锁定',
     ],
   },
   helpGuides: {
@@ -164,7 +164,7 @@ UCM 没有密码过期和密码历史记录设置。
 
 ## 所需权限
 
-安全敏感设置：会话、锁定、HSTS、公共 URL 和密码策略，需要 **admin:settings** 权限。对于操作员（仅 write:settings），这些字段显示为锁定；其余部分通过页面的保存栏保存。
+安全敏感设置：会话、锁定、HSTS、公共 URL、SMTP 服务器和密码策略，需要 **admin:settings** 权限。对于操作员（仅 write:settings），这些字段显示为锁定；其余部分通过页面的保存栏保存。
 `
   }
 }
