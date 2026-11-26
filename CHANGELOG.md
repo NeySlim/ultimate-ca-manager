@@ -24,7 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - WebAuthn: a passwordless login or a passkey unlock accepted an assertion without user verification, so a key without a PIN opened a session alone; both now require it (W3C WebAuthn, section 7.2 step 17), the second step after a password still accepting a key without it.
 - Package updates: the root watcher installed whatever package path the service account wrote; it now installs only a release package of the updates directory, copied out of that account's reach and checked against the release's `.sha256` fetched by root, declaring a version above the installed one, and no longer runs `rpm -U --force`.
 - `init_db.py` printed the database URL with its PostgreSQL password; it now prints the engine and database name only.
-- ACME server: a `%` or `_` in a challenge URL acted as a wildcard and found another account's challenge, whose URL the error then named; the challenge is now looked up by its exact id.
+- ACME server: a `%` or `_` in a challenge URL acted as a wildcard and found another account's challenge, whose URL the error then named; the challenge URL is now matched literally.
 - ACME server: an ES256, ES384 or ES512 JWS signed in DER instead of R||S was accepted; only R||S of the curve's exact length, on the curve the algorithm names, is now accepted (RFC 7518 section 3.4).
 - Access log: a double quote in a parameter's name (`my"password=`) left its value in the log, and one in a secret value left the rest of it; both are now masked.
 
