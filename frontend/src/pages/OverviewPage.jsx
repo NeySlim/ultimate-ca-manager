@@ -38,6 +38,8 @@ export default function OverviewPage() {
   // The Cards dialog, and where the focus returns when its opener is gone
   const [dialog, setDialog] = useState(null)
   const inflight = useRef(new Map())
+  // The queue asked for by a figure or a card, until the queue card has its rows to filter and focus
+  const queueAsk = useRef(null)
   const current = useRef(layout)
   current.current = layout
 
@@ -64,8 +66,10 @@ export default function OverviewPage() {
         save(setCardHidden(current.current, 'queue', false))
         notify.showInfo(t('overview.layout.queueShown'))
       }
-      requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('ucm:overview-queue', { detail: { group } })))
+      queueAsk.current = { group }
+      window.dispatchEvent(new CustomEvent('ucm:overview-queue', { detail: { group } }))
     },
+    takeQueueAsk: () => { const ask = queueAsk.current; queueAsk.current = null; return ask },
   }), [save, t, title, notify])
   const context = useMemo(() => ({ ...page, notify }), [page, notify])
 

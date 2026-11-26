@@ -160,18 +160,26 @@ export function QueueCard({ defaultOpen = false, onToggle }) {
   const [group, setGroup] = useState('')
   // The saved preference may arrive after mounting: it wins over the initial state
   useEffect(() => { setOpen(defaultOpen) }, [defaultOpen])
-  // A figure or another card asks for one type of the queue (the page has shown the card first)
+  // A figure or another card asks for one type: kept by the page until this card is mounted and loaded
+  const page = useContext(OverviewContext)
+  const [ask, setAsk] = useState(null)
   useEffect(() => {
-    const onFilter = (e) => {
-      setGroup(e.detail?.group || '')
-      requestAnimationFrame(() => {
-        document.getElementById('card-queue')?.scrollIntoView?.({ block: 'start' })
-        document.getElementById('card-queue-title')?.focus({ preventScroll: true })
-      })
-    }
-    window.addEventListener('ucm:overview-queue', onFilter)
-    return () => window.removeEventListener('ucm:overview-queue', onFilter)
-  }, [])
+    const take = (e) => setAsk(page?.takeQueueAsk?.() || (e ? { group: e.detail?.group || '' } : null))
+    take()
+    window.addEventListener('ucm:overview-queue', take)
+    return () => window.removeEventListener('ucm:overview-queue', take)
+  }, [page])
+  const loading = state.status === 'loading'
+  useEffect(() => {
+    if (!ask) return
+    setGroup(ask.group)
+    if (loading) return
+    setAsk(null)
+    requestAnimationFrame(() => {
+      document.getElementById('card-queue')?.scrollIntoView?.({ block: 'start' })
+      document.getElementById('card-queue-title')?.focus({ preventScroll: true })
+    })
+  }, [ask, loading])
 
   const data = state.data || {}
   const items = Array.isArray(data.items) ? data.items : []
