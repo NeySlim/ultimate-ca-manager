@@ -189,10 +189,11 @@ class TestAdminUserMtlsInputs:
         ca_data = create_ca(cn='mTLS identity validity CA')
         for bad in ('abc', 0, -5, 99999):
             r = _post(auth_client, '/api/v2/users/1/mtls/certificates',
-                      {'mode': 'generate', 'ca_id': ca_data['id'], 'validity_days': bad})
+                      {'mode': 'generate', 'ca_id': ca_data['id'], 'validity_days': bad,
+                       'password': 'changeme123'})
             assert r.status_code == 400, (bad, r.status_code, r.get_json())
 
     def test_non_numeric_ca_id_is_not_found(self, auth_client):
         r = _post(auth_client, '/api/v2/users/1/mtls/certificates',
-                  {'mode': 'generate', 'ca_id': 'not-a-ca'})
+                  {'mode': 'generate', 'ca_id': 'not-a-ca', 'password': 'changeme123'})
         assert r.status_code in (400, 404)

@@ -2617,6 +2617,7 @@ Content-Type: application/json
   "full_name": "Updated Name"
 }
 ```
+On one's own account, a new `email` needs `current_password` (or `code`, the authenticator code, for an account without a local password; `403` with `details.reauth` otherwise), and the change is audited as `profile_email_change` with a notice to the old address, as on `PATCH /api/v2/account/profile`. Another user's email needs no proof.
 
 ### Toggle User Status
 ```http
@@ -2683,7 +2684,7 @@ GET /api/v2/users/{user_id}/mtls/certificates
 POST /api/v2/users/{user_id}/mtls/certificates
 DELETE /api/v2/users/{user_id}/mtls/certificates/{cert_id}
 ```
-Permission `admin:users`. `POST` takes `mode`: `generate` (default) issues a certificate for the user from `ca_id` (or the configured mTLS CA; `validity_days` default 365, `name` optional) and returns the `certificate` and `private_key` once; `import` takes `pem` (required) and `name` and enrolls an existing certificate (`409` when it is already enrolled, `400` when revoked or invalid). `201` in both cases. `DELETE` removes the enrolment (`404` for an unknown user or certificate).
+Permission `admin:users`. `POST` takes `mode`: `generate` (default) issues a certificate for the user from `ca_id` (or the configured mTLS CA; `validity_days` default 365, `name` optional) and returns the `certificate` and `private_key` once; `import` takes `pem` (required) and `name` and enrolls an existing certificate (`409` when it is already enrolled, `400` when revoked or invalid). `201` in both cases. For one's own account, `POST` also needs `password` (or `code` for an account without one; `403` with `details.reauth` otherwise), as `/api/v2/mtls/certificates`. `DELETE` removes the enrolment (`404` for an unknown user or certificate).
 
 ---
 

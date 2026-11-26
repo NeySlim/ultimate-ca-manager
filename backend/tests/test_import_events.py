@@ -104,7 +104,7 @@ def _rows_of(app, pem):
 def test_mtls_import_fires_imported_once_after_commit(app, auth_client, same_serial, events, committed, route):
     _serial, pem, _ = same_serial
     url, body = (('/api/v2/mtls/enroll-import', {'password': 'changeme123', 'pem': pem}) if route == 'enroll-import'
-                 else ('/api/v2/users/1/mtls/certificates', {'mode': 'import', 'pem': pem}))
+                 else ('/api/v2/users/1/mtls/certificates', {'mode': 'import', 'pem': pem, 'password': 'changeme123'}))
     r = auth_client.post(url, json=body)
     assert r.status_code == 201, r.get_json()
     [cert_id] = _rows_of(app, pem)

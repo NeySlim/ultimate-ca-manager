@@ -26,7 +26,8 @@ def test_an_unknown_key_is_refused_by_name(key):
 def test_an_admin_generated_mtls_certificate_carries_the_name_as_cn(app, auth_client, create_ca):
     ca = create_ca(cn='Admin mTLS CN CA')
     r = auth_client.post('/api/v2/users/1/mtls/certificates',
-                         data=json.dumps({'mode': 'generate', 'ca_id': ca['id'], 'name': 'alice-laptop'}),
+                         data=json.dumps({'mode': 'generate', 'ca_id': ca['id'], 'name': 'alice-laptop',
+                                          'password': 'changeme123'}),
                          content_type='application/json')
     assert r.status_code == 201, r.get_json()
     data = r.get_json()['data']

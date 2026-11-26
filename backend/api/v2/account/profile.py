@@ -197,7 +197,7 @@ def update_profile():
     if not ok:
         return _err
     if moved:
-        _email_changed(user, old_email, email)
+        record_email_change(user, old_email, email)
 
     return success_response(
         data={
@@ -211,7 +211,7 @@ def update_profile():
     )
 
 
-def _email_changed(user, old_email, new_email):
+def record_email_change(user, old_email, new_email):
     """Audit the change and tell the old address; a failed notice never undoes it."""
     from html import escape
     from services.audit_service import AuditService

@@ -52,7 +52,8 @@ def same_serial(app):
 
 
 def _import(client, pem):
-    return client.post('/api/v2/users/1/mtls/certificates', json={'mode': 'import', 'pem': pem})
+    return client.post('/api/v2/users/1/mtls/certificates', json={'mode': 'import', 'pem': pem,
+                                                                      'password': 'changeme123'})
 
 
 def _info(pem):

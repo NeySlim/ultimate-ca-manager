@@ -14,6 +14,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_reverify import confirm_account_holder
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
@@ -57,6 +58,11 @@ def create_user_mtls_certificate(user_id):
         return error_response('User not found', 404)
 
     data = request.get_json() or {}
+    # A certificate for yourself signs you in alone: prove the holder, as /api/v2/mtls does
+    if user_id == g.current_user.id:
+        refused = confirm_account_holder(g.current_user, data)
+        if refused:
+            return refused
     mode = data.get('mode', 'generate')  # 'generate' or 'import'
 
     if mode == 'import':

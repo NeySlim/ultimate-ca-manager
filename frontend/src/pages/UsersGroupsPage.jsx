@@ -159,6 +159,12 @@ export default function UsersGroupsPage() {
   }
 
   const handleUpdateUser = async (data) => {
+    // Your own reset link goes to your email: moving it proves it is you (a new password already does)
+    if (editingUser.id === me?.id && 'email' in data && (data.email || '') !== (editingUser.email || '') && !data.current_password) {
+      const proof = await askProof()
+      if (!proof) return
+      data = { ...data, current_password: proof.password, code: proof.code }
+    }
     try {
       await usersService.update(editingUser.id, data)
       showSuccess(t('messages.success.update.user'))
@@ -516,11 +522,17 @@ export default function UsersGroupsPage() {
     setAvailableCerts([])
   }
 
+  // A certificate for yourself signs you in alone: the server asks you to prove it is you
+  const selfProof = async () => (selectedUser?.id === me?.id ? askProof() : {})
+
   const handleGenerateUserMtls = async () => {
     if (!selectedUser) return
+    const proof = await selfProof()
+    if (!proof) return
     setMtlsCreating(true)
     try {
       const response = await usersService.createMtlsCertificate(selectedUser.id, {
+        ...proof,
         mode: 'generate',
         name: mtlsForm.name || undefined,
         ca_id: mtlsForm.ca_id || undefined,
@@ -538,9 +550,12 @@ export default function UsersGroupsPage() {
 
   const handleImportUserMtls = async () => {
     if (!selectedUser || !mtlsImportForm.pem.trim()) return
+    const proof = await selfProof()
+    if (!proof) return
     setMtlsCreating(true)
     try {
       await usersService.createMtlsCertificate(selectedUser.id, {
+        ...proof,
         mode: 'import',
         pem: mtlsImportForm.pem,
         name: mtlsImportForm.name,

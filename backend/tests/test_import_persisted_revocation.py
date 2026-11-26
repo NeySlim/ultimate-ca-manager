@@ -167,7 +167,7 @@ class TestAnImportAppliesThePersistedRevocation:
             admin_id = User.query.filter_by(username='admin').first().id
         try:
             r = auth_client.post(f'/api/v2/users/{admin_id}/mtls/certificates',
-                                 json={'mode': 'import', 'pem': _pem(real)})
+                                 json={'mode': 'import', 'pem': _pem(real), 'password': 'changeme123'})
             assert r.status_code == 400, r.data
             assert _states(app, real) == []
         finally:

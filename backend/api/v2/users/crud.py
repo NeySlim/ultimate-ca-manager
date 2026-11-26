@@ -7,7 +7,7 @@ from flask import request, g
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
-from auth.session_reverify import check_session_password
+from auth.session_reverify import check_session_password, confirm_account_holder
 from auth.session_start import keep_own_session
 from auth.twofa_enforcement import lock_user
 from utils.response import success_response, error_response, created_response
@@ -428,12 +428,22 @@ def update_user(user_id):
             return refused
 
     # Update fields
+    old_email = user.email
+    moved_own = (g.current_user.id == user_id and 'email' in data
+                 and (data['email'] or None) != (old_email or None))
     if 'email' in data:
         # Email is unique only among local accounts. Only block when this change
         # would put two local accounts on the same email (an SSO account may
         # share an email with a local one).
         if user.is_local and local_email_holder(data['email'], other_than=user_id) is not None:
             return error_response('Email already in use', 409)
+        # Your own address receives your reset link: moving it proves the holder, as the
+        # Account page does (`password` here is the new password, never the proof)
+        if moved_own:
+            refused = confirm_account_holder(
+                user, {'password': data.get('current_password'), 'code': data.get('code')})
+            if refused:
+                return refused
         user.email = data['email']
 
     if 'full_name' in data:
@@ -511,6 +521,10 @@ def update_user(user_id):
                 return taken
         logger.error(f"Failed to update user: {e}", exc_info=True)
         return error_response('Failed to update user', 500)
+
+    if moved_own:
+        from api.v2.account.profile import record_email_change
+        record_email_change(user, old_email, user.email)
 
     AuditService.log_action(
         action='user_update',

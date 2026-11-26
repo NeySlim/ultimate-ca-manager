@@ -201,7 +201,7 @@ def test_admin_generated_user_mtls_under_a_p384_ca_is_p384(app, auth_client, cre
                    keySize='secp384r1', hashAlgorithm='sha384')
     r = auth_client.post('/api/v2/users/1/mtls/certificates', content_type='application/json',
                          data=json.dumps({'mode': 'generate', 'ca_id': ca['id'], 'validity_days': 30,
-                                          'name': 'keys-user-mtls'}))
+                                          'name': 'keys-user-mtls', 'password': 'changeme123'}))
     assert r.status_code == 201, r.data
     data = json.loads(r.data)['data']
     try:

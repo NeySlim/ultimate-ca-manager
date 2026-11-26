@@ -235,7 +235,8 @@ class TestListingsAndInputs:
                 row.value = ca.refid
             db.session.commit()
         try:
-            r = _post(auth_client, '/api/v2/users/1/mtls/certificates', {'mode': 'generate'})
+            r = _post(auth_client, '/api/v2/users/1/mtls/certificates',
+                      {'mode': 'generate', 'password': 'changeme123'})
             assert r.status_code == 201, r.get_json()
             data = r.get_json()['data']
         finally:
