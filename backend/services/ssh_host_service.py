@@ -262,7 +262,8 @@ def _live_certificates_of_key(host):
 
 def revoke_host(host_id, reason='host revoked', username=None):
     """Every live certificate of the host key under its CA revoked (published in the KRL), the
-    ones a renewal or a new enrollment replaced included, and its renewals ended for good."""
+    ones a renewal or a new enrollment replaced included, and its renewals ended for good.
+    ValueError when the host was revoked already and nothing was left to revoke."""
     from services.ssh_cert import SSHCertificateService
     host = db.session.get(SSHHost, host_id)
     if not host:
@@ -271,16 +272,23 @@ def revoke_host(host_id, reason='host revoked', username=None):
     table = SSHHost.__table__
     done = db.session.execute(update(table).where(table.c.id == host_id, table.c.revoked_at.is_(None)).values(
         revoked_at=utc_now(), auto_renew=False, challenge=None, challenge_expires_at=None))
-    if done.rowcount != 1:
-        db.session.rollback()
-        raise ValueError('This host is already revoked')
+    first = done.rowcount == 1
     db.session.commit()
     host = db.session.get(SSHHost, host_id)
-    for cert_id in _live_certificates_of_key(host):
+    # Swept on every request: one cut short leaves the host revoked, the next revokes what it left,
+    # unless the key was enrolled again since and its certificates are that host's
+    again = not first and SSHHost.query.filter(
+        SSHHost.ssh_ca_id == host.ssh_ca_id, SSHHost.fingerprint == host.fingerprint,
+        SSHHost.revoked_at.is_(None)).first() is not None
+    swept = 0
+    for cert_id in [] if again else _live_certificates_of_key(host):
         try:
             SSHCertificateService.revoke_certificate(cert_id, reason, username)
+            swept += 1
         except ValueError:
             pass  # revoked meanwhile, or with a sibling of the same serial
+    if not first and not swept:
+        raise ValueError('This host is already revoked')
     return db.session.get(SSHHost, host_id)
 
 

@@ -241,6 +241,10 @@ class TestEnrollment:
         assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
         r = _enroll(client, ca, token['token'], key)
         assert r.status_code == 201 and r.get_json()['host_refid'] != first['host_refid']
+        # The old host revoked again leaves the certificate of the key's new host alone
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 409
+        with app.app_context():
+            assert not SSHHost.query.filter_by(refid=r.get_json()['host_refid']).one().certificate.revoked
 
 
     def test_a_certificate_the_ca_refuses_leaves_the_token_unspent(self, app, auth_client, client):

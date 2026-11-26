@@ -251,6 +251,39 @@ class TestTheRenewal:
             assert len(renewed) == 1 and renewed[0].revoked
             assert SSHHost.query.filter_by(refid=refid).one().certificate_id == before
 
+    def test_a_revocation_cut_short_is_finished_by_the_next_one(self, app, auth_client, client, enrolled,
+                                                                tmp_path, monkeypatch):
+        from sqlalchemy.exc import OperationalError
+        from services.ssh_cert import SSHCertificateService
+        _, refid, key = enrolled
+        _age(app, refid)
+        challenge = _challenge(client, refid).get_json()['challenge']
+        assert _renew(client, refid, challenge, _sign(tmp_path, key, challenge)).status_code == 200
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=refid).one()
+            host_id = host.id
+            assert len(hosts._live_certificates_of_key(host)) == 2
+        real, calls = SSHCertificateService.revoke_certificate, []
+
+        def second_fails(cert_id, *args, **kwargs):
+            calls.append(cert_id)
+            if len(calls) == 2:
+                raise OperationalError('UPDATE', {}, Exception('database is locked'))
+            return real(cert_id, *args, **kwargs)
+        monkeypatch.setattr(SSHCertificateService, 'revoke_certificate', second_fails)
+        with app.app_context():
+            with pytest.raises(OperationalError):
+                hosts.revoke_host(host_id)
+            db.session.rollback()
+        monkeypatch.undo()
+        since = _since(app)
+        # The host already shows revoked: the next request still sweeps what the first one left
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        with app.app_context():
+            assert hosts._live_certificates_of_key(db.session.get(SSHHost, host_id)) == []
+        assert len(_audits(app, since, 'ssh_host_revoked')) == 1
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 409
+
     def test_an_expired_certificate_cannot_renew(self, app, client, enrolled):
         _, refid, _ = enrolled
         with app.app_context():
