@@ -8,6 +8,9 @@ import { AtelierDialog } from '../components/atelier/AtelierDialog'
 import { useTranslation } from 'react-i18next'
 
 const NotificationContext = createContext()
+// How long a sending waits for its answer: the client cannot tie a request to the sending that
+// launched it, so a delay bounds it, long enough for a slow write, short for a background message
+export const SENDING_MS = 10000
 // A message that stays takes the mockup's failure toast; its icon and rule follow its type (extensions.css)
 const TOAST_TONES = { success: ['check', 'good'], error: ['warning', 'bad'], warning: ['warning', 'warn'], info: ['bell', 'accent'] }
 
@@ -109,15 +112,21 @@ export function NotificationProvider({ children }) {
   // The answer to a form dialog's sending (an error or a warning): shown in it, above its buttons
   const [dialogNotice, setDialogNotice] = useState(null)
   const clearNotice = useCallback(() => setDialogNotice(null), [])
-  // Dialogs sent (submit, or a click on the primary button) and not answered yet: a message raised
-  // meanwhile is theirs; the first one ends the sending once the task that raised it is over
-  const sending = useRef(new Set())
+  // Dialogs sent (submit, or a click on the primary button) and not answered yet, with the delay that
+  // ends their sending: a message raised meanwhile is theirs; the sending also ends at its first
+  // answer (once the task that raised it is over) and at any other use of the dialog
+  const sending = useRef(new Map())
+  const disarm = useCallback((dialog) => {
+    clearTimeout(sending.current.get(dialog))
+    sending.current.delete(dialog)
+  }, [])
   useEffect(() => {
     const armed = sending.current
     const arm = (dialog) => {
       if (!dialog?.hasAttribute('open')) return
-      for (const held of armed) if (!held.isConnected) armed.delete(held)
-      armed.add(dialog)
+      for (const held of armed.keys()) if (!held.isConnected) disarm(held)
+      clearTimeout(armed.get(dialog))
+      armed.set(dialog, setTimeout(() => armed.delete(dialog), SENDING_MS))
       setDialogNotice((current) => (current?.dialog === dialog ? null : current))
     }
     const onSubmit = (e) => arm(e.target?.closest?.('dialog'))
@@ -125,20 +134,30 @@ export function NotificationProvider({ children }) {
       const button = e.target?.closest?.(PRIMARY)
       if (button && !button.disabled) arm(button.closest('dialog'))
     }
+    // Typing or pointing elsewhere in the dialog: a later message no longer answers the sending
+    const onUse = (e) => {
+      if (e.target?.closest?.(PRIMARY)) return
+      const dialog = e.target?.closest?.('dialog')
+      if (dialog && armed.has(dialog)) disarm(dialog)
+    }
+    const used = ['input', 'pointerdown', 'keydown']
     document.addEventListener('submit', onSubmit, true)
     document.addEventListener('click', onClick, true)
+    for (const type of used) document.addEventListener(type, onUse, true)
     return () => {
       document.removeEventListener('submit', onSubmit, true)
       document.removeEventListener('click', onClick, true)
+      for (const type of used) document.removeEventListener(type, onUse, true)
+      for (const handle of armed.values()) clearTimeout(handle)
       armed.clear()
     }
-  }, [])
+  }, [disarm])
   const answered = useCallback(() => {
     const dialog = typeof document === 'undefined' ? null : topModal()
     if (!dialog || !sending.current.has(dialog)) return null
-    setTimeout(() => sending.current.delete(dialog), 0)
+    setTimeout(() => disarm(dialog), 0)
     return dialog
-  }, [])
+  }, [disarm])
 
   const pushToast = useCallback((type, message, duration, action) => {
     const id = Date.now() + Math.random() // unique even when called in a tight loop

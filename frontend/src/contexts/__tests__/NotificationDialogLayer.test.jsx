@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }), initReactI18next: { type: '3rdParty', init: () => {} } }))
 
-import { NotificationProvider, useNotification } from '../NotificationContext'
+import { NotificationProvider, SENDING_MS, useNotification } from '../NotificationContext'
 import { AtelierDialog } from '../../components/atelier/AtelierDialog'
 
 let api
@@ -157,6 +157,28 @@ describe('a message that is not the answer to the form', () => {
     await send(dialog, 'Cancel')
     expect(within(dialog).queryByRole('alert')).toBeNull()
     expect(line()).toHaveTextContent('Nothing to cancel.')
+  })
+})
+
+describe('a sending that raises nothing', () => {
+  it('lets a later message be a toast once its delay has run out', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    await send(dialog)
+    await wait(SENDING_MS + 100)
+    await act(async () => { api.showError('Background job failed.') })
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    expect(line()).toHaveTextContent('Background job failed.')
+  })
+
+  it('lets a later message be a toast once the dialog is used again', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    await send(dialog)
+    await act(async () => { fireEvent.input(within(dialog).getByLabelText('Template Name'), { target: { value: 'x' } }) })
+    await act(async () => { api.showError('Background job failed.') })
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    expect(line()).toHaveTextContent('Background job failed.')
   })
 })
 
