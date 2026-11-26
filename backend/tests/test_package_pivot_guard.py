@@ -827,6 +827,16 @@ def test_a_removal_says_where_the_master_key_of_the_data_is(tmp_path):
     assert f'{config}/master.key' in out.stdout, out.stdout
 
 
+def test_a_removal_stops_and_disables_the_watcher_too(tmp_path):
+    """postinst enables ucm-watcher.path: once its unit files are gone it must not keep
+    watching the data left in place."""
+    _out, log, _home, _config = _postrm_with(tmp_path, 'remove', lambda home, config: None)
+    calls = _calls(log)
+    for call in ('systemctl stop ucm-watcher.path ucm-watcher.service', 'systemctl disable ucm-watcher.path'):
+        assert call in calls, calls
+    assert calls.index('systemctl disable ucm-watcher.path') < calls.index('systemctl daemon-reload')
+
+
 # -- bytecode an earlier version wrote never outlives it ----------------------------
 
 def _caches(home, data):

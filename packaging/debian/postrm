@@ -52,9 +52,12 @@ data_kept() {
 
 case "$1" in
     remove)
-        # Stop service
+        # Stop service, and the watcher postinst enabled: its unit files go with the package
         systemctl stop ucm.service >/dev/null 2>&1 || true
         systemctl disable ucm.service >/dev/null 2>&1 || true
+        systemctl stop ucm-watcher.path ucm-watcher.service >/dev/null 2>&1 || true
+        systemctl disable ucm-watcher.path >/dev/null 2>&1 || true
+        systemctl daemon-reload >/dev/null 2>&1 || true
         
         echo "UCM service stopped and disabled"
         echo "Data preserved in $UCM_HOME/data, configuration in $UCM_CONFIG"

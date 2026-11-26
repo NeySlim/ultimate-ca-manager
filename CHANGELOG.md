@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- DEB: removing the package left `ucm-watcher.path` enabled and watching the data directory without its unit files; it is now stopped and disabled with the service.
 - Docker: each start copied the SQLite database into `backups`, so a container restarting in a loop filled its volume; the copies are now capped at `UCM_BACKUP_KEEP` (default 5), pruned before the copy, and a start on a database unchanged since its newest copy makes none.
 - Helm chart: the cleartext protocol Ingress (`ingress.protocolHttp`) copied `ingress.annotations`, so the documented `backend-protocol: "HTTPS"` made CDP, OCSP and HTTP-01 fail on port 8080; it now takes only the new `ingress.protocolHttp.annotations` (default empty).
 - DEB: `apt purge ucm` deleted `/etc/ucm/master.key` while keeping the database it encrypts, leaving its private keys unreadable; while data is kept, the key and `ucm.env` now move to a root-only `/opt/ucm-archive/<date>-purge/` named in the output.
