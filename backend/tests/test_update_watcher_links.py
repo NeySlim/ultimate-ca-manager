@@ -10,6 +10,7 @@ import shutil
 import stat
 import subprocess
 
+from tests.test_native_setup_script import _stub
 from tests.test_update_watcher_claim import BASH, WATCHER, host  # noqa: F401 (fixture)
 
 INJECTED = "'\ntouch /tmp/pwned\n#"
@@ -110,3 +111,14 @@ def test_an_error_too_large_for_an_argument_still_gets_its_result(host):
     assert result['status'] == 'failed' and result['step'] == 'precheck', result
     assert result['error'] == 'x' * 500, len(result['error'] or '')
 
+
+def test_a_claimed_manifest_path_that_is_a_directory_is_refused_and_the_service_restarted(host):
+    """rename(2) cannot replace a directory: the update is refused, its result written, ucm started."""
+    (host.data / '.update_manifest.processing' / 'inside').mkdir(parents=True)
+    _stub(host.bin / 'systemctl', f'echo "systemctl $*" >> {host.calls}')
+    result, calls = host.run(host.package())
+    assert result['status'] == 'failed' and result['step'] == 'precheck', result
+    assert 'is a directory' in result['error'], result
+    assert not [c for c in calls if c.startswith(('dpkg', 'rpm', 'apt-get'))], calls
+    assert 'systemctl restart ucm' in calls, calls
+    assert not (host.data / '.update_pending').exists()

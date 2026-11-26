@@ -121,10 +121,13 @@ fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, d
 with os.fdopen(fd, "w") as f:
     os.fchmod(f.fileno(), 0o644)
     json.dump(result, f)
+    f.flush()
+    os.fsync(f.fileno())
 os.replace(tmp, name, src_dir_fd=dirfd, dst_dir_fd=dirfd)
 PYEOF
     then
-        rm -f "$PROCESSING_FILE"
+        # The account may have made it a directory: the result is written, the run goes on
+        rm -f -- "$PROCESSING_FILE" 2>/dev/null || log "ERROR: could not remove the claimed manifest"
     else
         log "ERROR: could not write the update result file — keeping the claimed manifest for diagnosis"
     fi
@@ -258,7 +261,7 @@ check_target() {
 finish_update() {
     # Always restart UCM so the backend consumes the result and emits the
     # truthful installed/failed event
-    rm -f "$RESTART_FILE"
+    rm -f -- "$RESTART_FILE" 2>/dev/null || true
     log "Update handling done (status recorded), restarting UCM..."
     restart_ucm
     exit 0
@@ -267,12 +270,18 @@ finish_update() {
 # ── Handle update (install package + verify + record result + restart) ──
 if [ -f "$UPDATE_FILE" ]; then
     PACKAGE_PATH=$(read_own "$UPDATE_FILE")
-    rm -f "$UPDATE_FILE"
+    rm -f -- "$UPDATE_FILE" 2>/dev/null || true
 
     # Claim the manifest atomically: from here on, every metadata read and
     # the final result belong to THIS operation even if a new manifest is
     # written concurrently. -T renames over the entry itself: a link there is replaced, never entered
     mv -fT "$MANIFEST_FILE" "$PROCESSING_FILE" 2>/dev/null || true
+    # A directory there takes no claim (rename(2) cannot replace it): refused and recorded
+    if [ -d "$PROCESSING_FILE" ] && [ ! -L "$PROCESSING_FILE" ]; then
+        log "ERROR: update refused: the claimed manifest path is a directory"
+        write_result failed precheck "the claimed manifest path $PROCESSING_FILE is a directory"
+        finish_update
+    fi
 
     if [ -z "$PACKAGE_PATH" ] || [ ! -f "$PACKAGE_PATH" ]; then
         log "ERROR: Invalid or missing package path: '$PACKAGE_PATH'"
@@ -379,7 +388,7 @@ fi
 
 # ── Handle simple restart ──
 if [ -f "$RESTART_FILE" ]; then
-    rm -f "$RESTART_FILE"
+    rm -f -- "$RESTART_FILE" 2>/dev/null || true
     log "Restart requested, restarting UCM..."
     restart_ucm
     log "Restart complete"
