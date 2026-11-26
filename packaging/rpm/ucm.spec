@@ -148,6 +148,8 @@ bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
 # Built before anything is written to the data or the configuration: the archiving
 # below asks this release's runner about the database left there
 echo "Creating Python virtual environment..."
+# A ucm.env own refuses to read would pass for one without UCM_FIPS_BUILD=1
+bash "$UCM_SETUP" env-check "$UCM_CONFIG/ucm.env" || exit 1
 BUILT_FIPS=""
 ! bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" || BUILT_FIPS=1
 # A failed UCM_FIPS_BUILD=1 build fails the scriptlet; the standard install keeps going as before
@@ -247,9 +249,13 @@ ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
 
 # Set permissions, through a linked directory too (the final /), never through a link inside;
-# a local archive of a removed UCM's files (.ucm-archive-*) and the DNS hooks stay root's
-bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" %{name}:%{name}
+# a local archive of a removed UCM's files (.ucm-archive-*) and the DNS hooks stay root's.
+# The home, its scripts and venv are root's: the account gets only what its unit writes
+bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" root:root --from=%{name} data backend/data
 bash "$UCM_SETUP" own chown-tree "$UCM_DATA/" %{name}:%{name}
+if [ -d "$UCM_HOME/backend/data" ] && [ ! -L "$UCM_HOME/backend/data" ]; then
+    bash "$UCM_SETUP" own chown-tree "$UCM_HOME/backend/data" %{name}:%{name}
+fi
 bash "$UCM_SETUP" own chown-tree "$UCM_CONFIG/" %{name}:%{name} dns-hooks
 bash "$UCM_SETUP" own chown-tree /var/log/%{name}/ %{name}:%{name}
 bash "$UCM_SETUP" own mode "$UCM_DATA/" 750
@@ -296,6 +302,8 @@ fi
 %{ucm_home}/requirements.txt
 %{ucm_home}/start-ucm.sh
 %{ucm_home}/backend/
+# Listed again for its owner: the older data directory the unit still writes, the account's as %%post gives it
+%attr(-,%{name},%{name}) %{ucm_home}/backend/data
 %{ucm_home}/frontend/
 %{ucm_home}/scripts/
 # The owner and mode %%post and the service give them, so that laying the package down

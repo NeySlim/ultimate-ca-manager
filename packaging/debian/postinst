@@ -66,6 +66,8 @@ case "$1" in
         # Built before anything is written to the data or the configuration: the archiving
         # below asks this release's runner about the database left there
         echo "Creating/updating Python virtual environment..."
+        # A ucm.env own refuses to read would pass for one without UCM_FIPS_BUILD=1
+        bash "$UCM_SETUP" env-check "$UCM_CONFIG/ucm.env"
         BUILT_FIPS=""
         ! bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" || BUILT_FIPS=1
         bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
@@ -186,9 +188,13 @@ ENVEOF
         bash "$UCM_SETUP" env-ensure "$UCM_CONFIG/ucm.env" DATA_DIR "$UCM_DATA"
         
         # Set permissions, through a linked directory too (the final /), never through a link inside;
-        # a local archive of a removed UCM's files (.ucm-archive-*) and the DNS hooks stay root's
-        bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" "$UCM_USER:$UCM_GROUP"
+        # a local archive of a removed UCM's files (.ucm-archive-*) and the DNS hooks stay root's.
+        # The home, its scripts and venv are root's: the account gets only what its unit writes
+        bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" root:root --from="$UCM_USER" data backend/data
         bash "$UCM_SETUP" own chown-tree "$UCM_DATA/" "$UCM_USER:$UCM_GROUP"
+        if [ -d "$UCM_HOME/backend/data" ] && [ ! -L "$UCM_HOME/backend/data" ]; then
+            bash "$UCM_SETUP" own chown-tree "$UCM_HOME/backend/data" "$UCM_USER:$UCM_GROUP"
+        fi
         bash "$UCM_SETUP" own chown-tree "$UCM_CONFIG/" "$UCM_USER:$UCM_GROUP" dns-hooks
         bash "$UCM_SETUP" own chown-tree /var/log/ucm/ "$UCM_USER:$UCM_GROUP"
         bash "$UCM_SETUP" own mode "$UCM_DATA/" 750

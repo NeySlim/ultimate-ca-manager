@@ -28,6 +28,8 @@ def _sources(top):
     (src / 'backend').mkdir()
     (src / 'backend' / 'requirements.txt').write_text('flask\n')
     (src / 'backend' / 'app.py').write_text('x = 1\n')
+    (src / 'backend' / 'data' / 'ca').mkdir(parents=True)
+    (src / 'backend' / 'data' / 'ca' / '.gitkeep').write_text('')
     (src / 'frontend' / 'dist').mkdir(parents=True)
     (src / 'frontend' / 'dist' / 'index.html').write_text('<html></html>\n')
     (top / 'SOURCES').mkdir()
@@ -113,3 +115,23 @@ def test_post_leaves_a_linked_directory_as_the_operator_set_it(tmp_path):
     _post_directories(data)
     assert elsewhere.stat().st_mode & 0o7777 == 0o770
     assert (data / 'sessions').stat().st_mode & 0o7777 == 0o700
+
+
+OLD_DATA = '/opt/ucm/backend/data'
+
+
+def _under(p, top):
+    return p == top or p.startswith(top + '/')
+
+
+def test_the_home_outside_the_data_is_root_s(payload):
+    """Scripts root runs (the update watcher) and the code are root's; %post gives the account the data only."""
+    home = {p: v[1:3] for p, v in payload.items() if p.startswith('/opt/ucm') and not _under(p, DATA) and not _under(p, OLD_DATA)}
+    assert home and {owner for owner in home.values()} == {('root', 'root')}, home
+
+
+def test_the_older_data_directory_is_declared_the_account_s_as_post_leaves_it(payload):
+    """%post gives backend/data, which the unit still writes, to the account: rpm -V finds it as declared."""
+    old = {p: v[1:3] for p, v in payload.items() if _under(p, OLD_DATA)}
+    assert set(old) == {OLD_DATA, f'{OLD_DATA}/ca', f'{OLD_DATA}/ca/.gitkeep'}, old
+    assert set(old.values()) == {('ucm', 'ucm')}, old

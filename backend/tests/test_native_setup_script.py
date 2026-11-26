@@ -1554,6 +1554,19 @@ def test_a_ucm_env_link_is_refused_and_its_target_untouched(tmp_path, command):
     assert envfile.is_symlink()
 
 
+@pytest.mark.parametrize('command', [['env', '/opt/ucm/data'], ['env-ensure', 'DATA_DIR', '/d'], ['env-check']])
+def test_a_hard_linked_ucm_env_is_refused_with_its_remedy(tmp_path, command):
+    """A second name of a root file: refused like a link, before any read, with the same remedy."""
+    victim = _env_victim(tmp_path, 'UCM_FIPS_BUILD=1\n')
+    envfile = tmp_path / 'ucm.env'
+    os.link(victim, envfile)
+    result = _run([command[0], str(envfile), *command[1:]], _env(tmp_path))
+    assert result.returncode == 1
+    assert f'{envfile} is a hard link to another file: replace it with a regular file, then install again' \
+        in result.stderr, result.stderr
+    assert victim.read_text() == 'UCM_FIPS_BUILD=1\n' and stat.S_IMODE(victim.stat().st_mode) == 0o640
+
+
 def test_a_dangling_ucm_env_link_creates_nothing(tmp_path):
     envfile = tmp_path / 'ucm.env'
     envfile.symlink_to(tmp_path / 'created-by-root')
@@ -1792,19 +1805,86 @@ def test_chown_tree_never_enters_a_directory_swapped_for_a_link_while_it_walks(t
     """A name walked by path would be resolved through the link laid in its place: fwalk never is."""
     top, outside = _tree_layout(tmp_path)
     python, trace = tracing_python(tmp_path)
-    # Each chown of sub swaps it for a link to the outside before the walk descends
-    swap = (f"import shutil\n_chown = os.chown\n"
-            f"def _swap(name, uid, gid, dir_fd=None, follow_symlinks=True):\n"
-            f"    _chown(name, uid, gid, dir_fd=dir_fd, follow_symlinks=follow_symlinks)\n"
-            f"    if name == 'sub' and not os.path.islink('{top}/sub'):\n"
-            f"        shutil.rmtree('{top}/sub'); os.symlink('{outside}', '{top}/sub')\n"
-            f"os.chown = _swap\n")
-    racing = _stub(tmp_path / 'racing-tree-python',
-                   f'code=$3; shift 3\nexec {python} -I -c "{swap}$code" "$@"')
-    result = _run(['own', 'chown-tree', f'{top}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': str(racing)}))
+    # Once opened, sub is swapped for a link to the outside before the walk descends
+    swap = f"shutil.rmtree('{top}/sub'); os.symlink('{outside}', '{top}/sub')"
+    racing = _racing_tree(tmp_path, python, _after_first('open', 'sub', swap))
+    result = _run(['own', 'chown-tree', f'{top}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': racing}))
     assert result.returncode == 0, result.stderr
     assert (top / 'sub').is_symlink()
     assert not [g for g in chowned(trace) if g.startswith(str(outside))], chowned(trace)
+
+
+def _racing_tree(tmp_path, python, race):
+    """`python` with `race` (Python code) run before own: it changes the tree at one step of the walk."""
+    return str(_stub(tmp_path / 'racing-tree-python', f'code=$3; shift 3\nexec {python} -I -c "{race}$code" "$@"'))
+
+
+def _after_first(call, name, then):
+    """Python code: the first `os.<call>` of entry `name` runs, then `then` changes the tree."""
+    return (f"import shutil\n_real_{call} = os.{call}\n_raced = []\n"
+            f"def _racing(n, *a, **k):\n"
+            f"    r = _real_{call}(n, *a, **k)\n"
+            f"    if n == '{name}' and not _raced:\n"
+            f"        _raced.append(1); {then}\n"
+            f"    return r\n"
+            f"os.{call} = _racing\n")
+
+
+@pytest.mark.parametrize('owner', ['7:8', '0:0'])
+def test_chown_tree_survives_a_directory_swapped_for_a_file_before_its_descent(tmp_path, owner):
+    """The account can turn a directory it owns into a file once it is listed: that entry is
+    passed by and named, the walk goes on."""
+    top, _outside = _tree_layout(tmp_path)
+    python, trace = tracing_python(tmp_path)
+    swap = f"shutil.rmtree('{top}/sub'); open('{top}/sub', 'w').write('x')"
+    racing = _racing_tree(tmp_path, python, _after_first('stat', 'sub', swap))
+    result = _run(['own', 'chown-tree', f'{top}/', owner], _env(tmp_path, extra={'UCM_PYTHON': racing}))
+    assert result.returncode == 0, result.stderr
+    assert f'WARNING: {top}/sub: ' in result.stderr, result.stderr
+    assert (top / 'sub').is_file()
+    assert str(top / 'ca' / 'root.pem') in chowned(trace) and str(top / 'dns-hooks' / 'hook.sh') in chowned(trace)
+
+
+def inode_tracing_python(tmp_path):
+    """tracing_python, recording the inode each chown reaches instead of its name."""
+    trace = tmp_path / 'inode-trace'
+    prelude = (
+        "import os\n_lstat = os.stat\n"
+        f"def _log(st):\n    open('{trace}', 'a').write('%d\\n' % st.st_ino)\n"
+        "os.fchown = lambda fd, uid, gid: _log(os.fstat(fd))\n"
+        "os.chown = lambda name, uid, gid, dir_fd=None, follow_symlinks=True: "
+        "_log(_lstat(name, dir_fd=dir_fd, follow_symlinks=follow_symlinks))\n")
+    wrapper = _stub(tmp_path / 'inode-tracing-python', f'code=$3; shift 3\nexec {sys.executable} -I -c "{prelude}$code" "$@"')
+    return str(wrapper), trace
+
+
+@pytest.mark.parametrize('owner', ['7:8', '0:0'])
+@pytest.mark.parametrize('step', ['stat', 'open'])
+def test_chown_tree_never_reaches_a_file_linked_in_place_of_a_directory(tmp_path, owner, step):
+    """A directory swapped for a hard link to a root file, once read or once opened, is changed
+    through the descriptor of the directory, or not at all: never through its name."""
+    top, _outside = _tree_layout(tmp_path)
+    victim = tmp_path / 'shadow'
+    victim.write_text('root:*:1::::::\n')
+    victim.chmod(0o646)
+    python, trace = inode_tracing_python(tmp_path)
+    swap = f"shutil.rmtree('{top}/sub'); os.link('{victim}', '{top}/sub')"
+    racing = _racing_tree(tmp_path, python, _after_first(step, 'sub', swap))
+    result = _run(['own', 'chown-tree', f'{top}/', owner], _env(tmp_path, extra={'UCM_PYTHON': racing}))
+    assert result.returncode == 0, result.stderr
+    assert os.path.samefile(victim, top / 'sub')
+    reached = trace.read_text().split()
+    assert str(victim.stat().st_ino) not in reached and str((top / 'ca').stat().st_ino) in reached, reached
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o646
+
+
+def test_chown_tree_leaves_what_is_neither_a_file_a_directory_nor_a_link(tmp_path):
+    top, _outside = _tree_layout(tmp_path)
+    os.mkfifo(top / 'ca' / 'pipe')
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{top}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert str(top / 'ca' / 'pipe') not in chowned(trace) and str(top / 'ca' / 'root.pem') in chowned(trace)
 
 
 def test_ucm_env_swapped_for_a_link_before_it_is_restricted_keeps_the_target_mode(tmp_path):
@@ -1842,3 +1922,115 @@ def test_own_mode_with_a_final_slash_reaches_a_linked_data_directory(tmp_path):
     result = _run(['own', 'mode', f'{tmp_path}/data/', '750'], _env(tmp_path))
     assert result.returncode == 0, result.stderr
     assert stat.S_IMODE(elsewhere.stat().st_mode) == 0o750
+
+
+# ------------------------------------------- the home is root's, the data the account's
+
+def _home_layout(tmp_path):
+    """/opt/ucm as a 3.0 or 2.254 package left it: everything the account's, some of it writable by all."""
+    home = tmp_path / 'opt-ucm'
+    for rel in ('scripts', 'venv/bin', 'venv/lib/data', 'backend/models', 'backend/data/ca', 'data/ca', 'frontend/dist'):
+        (home / rel).mkdir(parents=True)
+    for rel in ('scripts/ucm-watcher.sh', 'venv/bin/pip', 'venv/lib/data/x.py', 'backend/models/m.py',
+                'backend/data/ca/old.pem', 'data/ca/root.pem', 'frontend/dist/index.html', 'VERSION'):
+        (home / rel).write_text('x\n')
+    (home / 'scripts' / 'ucm-watcher.sh').chmod(0o6777)
+    (home / 'scripts').chmod(0o777)
+    return home
+
+
+def test_the_root_pass_gives_the_home_to_root_but_the_data_the_unit_writes(tmp_path):
+    home = _home_layout(tmp_path)
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{home}/', '0:0', 'data', 'backend/data'],
+                  _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    given = set(chowned(trace))
+    for rel in ('', 'scripts', 'scripts/ucm-watcher.sh', 'venv', 'venv/bin/pip', 'venv/lib/data', 'venv/lib/data/x.py',
+                'backend', 'backend/models/m.py', 'frontend/dist/index.html', 'VERSION'):
+        assert os.path.normpath(home / rel) in given, rel
+    assert not [g for g in given if g.startswith((str(home / 'data'), str(home / 'backend' / 'data')))], given
+    # No group or other account may write what root runs, and no set-id bit outlives the pass
+    assert stat.S_IMODE((home / 'scripts' / 'ucm-watcher.sh').stat().st_mode) == 0o755
+    assert stat.S_IMODE((home / 'scripts').stat().st_mode) == 0o755
+
+
+def test_the_account_pass_leaves_modes_alone(tmp_path):
+    home = _home_layout(tmp_path)
+    python, _trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{home}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert stat.S_IMODE((home / 'scripts').stat().st_mode) == 0o777
+
+
+def test_chown_tree_refuses_a_linked_top_named_without_a_final_slash(tmp_path):
+    real = tmp_path / 'real'
+    real.mkdir()
+    (tmp_path / 'top').symlink_to(real)
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', str(tmp_path / 'top'), '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 3 and 'symbolic link or not a directory' in result.stderr, result.stderr
+    assert chowned(trace) == []
+
+
+# ------------------------------------------- a hard link to a root file is never touched
+
+def _hard_linked(tmp_path, name='ucm.env'):
+    """A file of root's (mode 0604, no step gives it) and, in the account's directory, a second name for it."""
+    victim = tmp_path / 'shadow'
+    victim.write_text('root:*:1::::::\n')
+    victim.chmod(0o604)
+    own_dir = tmp_path / 'etc-ucm'
+    own_dir.mkdir()
+    os.link(victim, own_dir / name)
+    return victim, own_dir / name
+
+
+def test_own_read_refuses_a_hard_link(tmp_path):
+    victim, linked = _hard_linked(tmp_path)
+    result = _run(['own', 'read', str(linked)], _env(tmp_path))
+    assert result.returncode == 3 and 'hard link' in result.stderr, result.stderr
+    assert result.stdout == ''
+
+
+def test_own_replace_refuses_a_hard_link(tmp_path):
+    victim, linked = _hard_linked(tmp_path)
+    result = subprocess.run([BASH, str(SCRIPT), 'own', 'replace', str(linked)], env=_env(tmp_path),
+                            input='X=1\n', capture_output=True, text=True)
+    assert result.returncode == 3 and 'hard link' in result.stderr, result.stderr
+    assert os.path.samefile(victim, linked) and victim.read_text() == 'root:*:1::::::\n'
+
+
+def test_own_mode_refuses_a_hard_link(tmp_path):
+    victim, linked = _hard_linked(tmp_path, 'private')
+    result = _run(['own', 'mode', str(linked), '700'], _env(tmp_path))
+    assert result.returncode == 3 and 'hard link' in result.stderr, result.stderr
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o604
+
+
+@pytest.mark.parametrize('owner', ['7:8', '0:0'])
+def test_chown_tree_leaves_a_hard_link_as_it_is(tmp_path, owner):
+    victim, linked = _hard_linked(tmp_path, 'x.pem')
+    (linked.parent / 'kept.pem').write_text('pem')
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{linked.parent}/', owner], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert 'hard link' in result.stderr, result.stderr
+    assert str(linked) not in chowned(trace) and str(linked.parent / 'kept.pem') in chowned(trace)
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o604
+
+
+@pytest.mark.parametrize('ours', [True, False])
+def test_the_root_pass_takes_back_a_hard_linked_file_of_the_account(tmp_path, ours):
+    """A file the account laid under /opt/ucm and linked from its data is given to root all the
+    same; a hard link to anyone else's file stays as it is."""
+    victim, linked = _hard_linked(tmp_path, 'evil.pth')
+    victim.chmod(0o666)
+    account = os.getuid() if ours else os.getuid() + 1
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{linked.parent}/', '0:0', f'--from={account}'],
+                  _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert (str(linked) in chowned(trace)) is ours, (chowned(trace), result.stderr)
+    assert ('hard link' in result.stderr) is not ours, result.stderr
+    assert stat.S_IMODE(victim.stat().st_mode) == (0o644 if ours else 0o666)

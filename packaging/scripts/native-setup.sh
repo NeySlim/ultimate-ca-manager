@@ -24,13 +24,18 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 #       given); copy: created at its own name, stdin also copied to stdout (a build log read live)
 #   replace <path> [<mode>]   stdin replaces a regular file, keeping its owner and (unless given) mode
 #   read <path>               a regular file to stdout; nothing for an absent one, an error for a link
+#   (read, replace, mode and chown-tree never touch a regular file with a second name, a hard link,
+#   but one --from names; chown-tree changes a file or directory only by descriptor, a link itself)
 #   mode <path> <mode> [link-ok]  fchmod of a regular file or directory (a final / follows the path
 #       itself); link-ok: a link is left as it is
-#   chown-tree <dir>/ <user>:<group> [<entry>...]  the directory, then what it holds, links themselves;
-#       .ucm-archive-* and the listed top-level entries are skipped with what they hold
+#   chown-tree <dir>/ <user>:<group> [--from=<user>] [<entry>...]  the directory, then what it holds,
+#       links themselves, nothing else (no device, pipe or socket); --from: a hard-linked file of
+#       that user is changed too; .ucm-archive-* and the listed entries (paths under <dir>) are
+#       skipped with what they hold, an entry changed while walked is named and left;
+#       given to root, group and other write and set-id bits are also removed
 # UCM_PYTHON: the interpreter the package requires (python3.12 on EL9, where python3 may be absent)
 OWN_PY='
-import grp, os, pwd, signal, stat, sys
+import errno, grp, os, pwd, signal, stat, sys
 op, path, args = sys.argv[1], sys.argv[2], sys.argv[3:]
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 ARCHIVE = ".ucm-archive-"
@@ -51,6 +56,12 @@ def parent():
     # The directory itself may be a link an operator laid (data on another disk): only its entries are not
     return os.open(head or ".", os.O_RDONLY | os.O_DIRECTORY), name
 
+def single(st):
+    # A second name of a root file (a hard link the account laid) is never read, replaced or changed
+    if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+        fail("a hard link to another file")
+    return st
+
 def entry(dirfd, name):
     try:
         st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
@@ -58,7 +69,7 @@ def entry(dirfd, name):
         return None
     if not stat.S_ISREG(st.st_mode):
         fail("a symbolic link or not a regular file")
-    return st
+    return single(st)
 
 def copy(src, dst, echo=False):
     for chunk in iter(lambda: src.read1(1 << 16), b""):
@@ -123,7 +134,7 @@ elif op == "read":
     except OSError:
         fail("a symbolic link or not a regular file")
     with os.fdopen(fd, "rb") as f:
-        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+        if not stat.S_ISREG(single(os.fstat(f.fileno())).st_mode):
             fail("not a regular file")
         copy(f, sys.stdout.buffer)
 elif op == "mode":
@@ -138,24 +149,95 @@ elif op == "mode":
             if link_ok and os.path.islink(path):
                 sys.exit(0)
             fail("a symbolic link or not a regular file or directory")
-    st = os.fstat(fd)
+    st = single(os.fstat(fd))
     if not (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode)):
         fail("not a regular file or directory")
     os.fchmod(fd, mode)
 elif op == "chown-tree":
     uid, gid = ids(args[0])
-    skip = set(args[1:])
-    top = os.open(path, os.O_RDONLY | os.O_DIRECTORY | (0 if path.endswith("/") else os.O_NOFOLLOW))
-    os.fchown(top, uid, gid)
-    for where, dirs, files, dirfd in os.fwalk(".", dir_fd=top, follow_symlinks=False):
-        def kept(n):
-            return not n.startswith(ARCHIVE) and not (where == "." and n in skip)
-        dirs[:] = [d for d in dirs if kept(d)]
-        for n in dirs + [f for f in files if kept(f)]:
+    rest = args[1:]
+    # --from=<user>: a file of that user with a second name is given too (root takes back what the
+    # account laid where root runs from); any other hard link is left as it is
+    reclaim = None
+    if rest and rest[0].startswith("--from="):
+        reclaim, rest = ids(rest[0][len("--from="):] + ":0")[0], rest[1:]
+    skip = set(os.path.normpath(a) for a in rest)
+    # Given to root, a tree root runs from: no group or other account writes it, no set-id bit stays
+    strip = 0o6022 if uid == 0 else 0
+    try:
+        top = os.open(path, os.O_RDONLY | os.O_DIRECTORY | (0 if path.endswith("/") else os.O_NOFOLLOW))
+    except OSError:
+        fail("a symbolic link or not a directory")
+
+    def restrict(fd):
+        mode = stat.S_IMODE(os.fstat(fd).st_mode)
+        if mode & strip:
+            os.fchmod(fd, mode & ~strip)
+
+    def warn(rel, why):
+        sys.stderr.write("WARNING: %s: %s\n" % (os.path.normpath(os.path.join(path, rel)), why))
+
+    def give(dirfd, rel, n):
+        """Changes entry n of dirfd; returns the descriptor of a directory to walk next, or None."""
+        try:
+            st = os.stat(n, dir_fd=dirfd, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+        if stat.S_ISLNK(st.st_mode):
             try:
                 os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
             except FileNotFoundError:
                 pass
+            return None
+        if not (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode)):
+            return None
+        try:
+            # A file or directory is only ever changed through its descriptor, never by its name
+            fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY
+                         | (os.O_DIRECTORY if stat.S_ISDIR(st.st_mode) else 0), dir_fd=dirfd)
+        except FileNotFoundError:
+            return None
+        except OSError as e:
+            # Swapped since it was listed (the account owns it), or out of descriptors
+            why = "changed while walked" if e.errno in (errno.ELOOP, errno.ENOTDIR) else "not opened"
+            warn(rel, "%s (%s), left as it is" % (why, e.strerror))
+            return None
+        walk = False
+        try:
+            st = os.fstat(fd)
+            if stat.S_ISREG(st.st_mode) and st.st_nlink > 1 and st.st_uid != reclaim:
+                warn(rel, "a hard link, left as it is")
+            elif stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
+                os.fchown(fd, uid, gid)
+                restrict(fd)
+                walk = stat.S_ISDIR(st.st_mode)
+            return fd if walk else None
+        finally:
+            if not walk:
+                os.close(fd)
+
+    os.fchown(top, uid, gid)
+    restrict(top)
+    # Depth first, each directory listed through the descriptor it was opened by, never by its name
+    stack = [(top, ".", None)]
+    while stack:
+        dirfd, where, names = stack.pop()
+        if names is None:
+            try:
+                names = iter(os.listdir(dirfd))
+            except OSError as e:
+                warn(where, "not walked (%s)" % e.strerror)
+                names = iter(())
+        for n in names:
+            rel = os.path.normpath(os.path.join(where, n))
+            if n.startswith(ARCHIVE) or rel in skip:
+                continue
+            sub = give(dirfd, rel, n)
+            if sub is not None:
+                stack += [(dirfd, where, names), (sub, rel, None)]
+                break
+        else:
+            os.close(dirfd)
 else:
     fail("unknown operation " + op)
 '
@@ -179,11 +261,14 @@ is_true() {
     return 1
 }
 
-# /etc/ucm is the service account's: a ucm.env it replaced by a link or by anything but a file is
-# refused before root reads it for a write; root then reads and replaces it only through own
+# /etc/ucm is the service account's: a ucm.env it replaced by a link, a second name of another
+# file or anything but a file is refused before root reads it; root then goes only through own
 env_check() {
     if [ -L "$1" ] || { [ -e "$1" ] && [ ! -f "$1" ]; }; then
         die "$1 is a symbolic link or not a regular file: replace it with a regular file, then install again"
+    fi
+    if [ -f "$1" ] && ! "${UCM_PYTHON:-python3}" -I -c 'import os, sys; sys.exit(os.lstat(sys.argv[1]).st_nlink > 1)' "$1"; then
+        die "$1 is a hard link to another file: replace it with a regular file, then install again"
     fi
 }
 

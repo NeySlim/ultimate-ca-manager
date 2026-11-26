@@ -125,8 +125,12 @@ test.describe('sign-in and session', () => {
     await page.bringToFront()
     await page.locator('body').press('Alt+Shift+L')
     await expect(page.getByRole('heading', { name: 'Session locked' })).toBeVisible()
-    // An in-app move to another page sends the second tab's next requests
+    // An in-app move to another page sends the second tab's next requests. A refresh of its own
+    // may have sent one first: its move to the lock screen then destroys the context of this one
+    const locked = other.waitForURL(url => url.pathname === '/login')
     await other.evaluate(() => { history.pushState({}, '', '/certificates'); dispatchEvent(new PopStateEvent('popstate')) })
+      .catch((error: Error) => { if (!/Execution context was destroyed/.test(error.message)) throw error })
+    await locked
     await expect(other.getByRole('heading', { name: 'Session locked' })).toBeVisible()
     await expect(other.getByText('You locked the session.', { exact: false })).toBeVisible()
     await expect(other).toHaveURL(url => url.pathname === '/login')

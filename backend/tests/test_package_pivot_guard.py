@@ -9,6 +9,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -95,7 +96,7 @@ def _fakebin(tmp_path, extra=None):
         path = bin_dir / name
         path.write_text(f'#!{POSIX_SH}\n{body}\n')
         path.chmod(0o755)
-    for tool in ('cut', 'date'):
+    for tool in ('cut', 'date', 'stat'):
         os.symlink(shutil.which(tool), bin_dir / tool)
     env = {'PATH': str(bin_dir), 'LOG': str(log)}
     return env, log
@@ -123,6 +124,33 @@ def _run_preinst(script, tmp_path, *args, python='3.12'):
     out = subprocess.run(['/bin/bash', str(sandboxed), *args], capture_output=True, text=True,
                          timeout=20, env=env)
     return out, _calls(log)
+
+
+@pytest.mark.parametrize('linked', ['symbolic', 'hard', None])
+def test_the_deb_preinst_refuses_a_linked_ucm_env_before_copying_it(preinst, tmp_path, linked):
+    """/etc/ucm is the account's: a ucm.env it replaced by a link is named, and nothing is read through it."""
+    victim = tmp_path / 'shadow'
+    victim.write_text('root:*:1::::::\n')
+    envfile = tmp_path / 'etc-ucm' / 'ucm.env'
+    envfile.parent.mkdir()
+    if linked == 'symbolic':
+        envfile.symlink_to(victim)
+    elif linked == 'hard':
+        os.link(victim, envfile)
+    else:
+        envfile.write_text('SECRET_KEY=a\n')
+    text = preinst.read_text()
+    assert text.count('/etc/ucm/ucm.env') == 7, text
+    preinst.write_text(text.replace('/etc/ucm/ucm.env', str(envfile)))
+    out, calls = _run_preinst(preinst, tmp_path, 'upgrade', '2.254')
+    backups = [c for c in calls if c.startswith('dd ')]
+    if linked:
+        why = 'a symbolic link or not a regular file' if linked == 'symbolic' else 'a hard link to another file'
+        assert out.returncode == 1 and f'{envfile} is {why}: replace it with a regular file' in out.stderr, out.stderr
+        assert backups == [], calls
+    else:
+        assert out.returncode == 0, out.stderr
+        assert backups and f'if={envfile}' in backups[0], calls
 
 
 @pytest.mark.parametrize('args', [('upgrade', '2.253'), ('upgrade', '1.8.3')])
@@ -640,6 +668,7 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
         (top / '.ucm-archive-20261114T120000Z' / 'old' / 'leaf.key').write_text('key')
     (data / 'ca' / 'kept.pem').write_text('pem')
     (config / 'kept.env').write_text('x')
+    (home / 'backend' / 'data').mkdir(parents=True)
     if package == 'deb':
         script = tmp_path / 'postinst.sandboxed'
         script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
@@ -652,7 +681,10 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
     # points end in /: a data or configuration directory behind a link is reached
     setup = f'bash {home}/scripts/native-setup.sh own chown-tree'
     trees = [c for c in _calls(log) if c.startswith(setup)]
-    assert trees == [f'{setup} {home}/ ucm:ucm', f'{setup} {data}/ ucm:ucm', f'{setup} {config}/ ucm:ucm dns-hooks',
+    # The home and all that root runs from it are root's: only what the service writes (the data,
+    # the older backend/data its unit still lists) is given to the account
+    assert trees == [f'{setup} {home}/ root:root --from=ucm data backend/data', f'{setup} {data}/ ucm:ucm',
+                     f'{setup} {home}/backend/data ucm:ucm', f'{setup} {config}/ ucm:ucm dns-hooks',
                      f'{setup} /var/log/ucm/ ucm:ucm'], trees
     assert not [c for c in _calls(log) if c.startswith('chown ')], _calls(log)
 
@@ -660,18 +692,23 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
 POSTRM = ROOT / 'packaging' / 'debian' / 'postrm'
 
 
-def _postrm_with(tmp_path, action, lay, lib=None, logs=None, real=()):
+def _postrm_with(tmp_path, action, lay, lib=None, logs=None, real=(), tools=None):
     """_postrm, with `lay(home, config)` run on the sandbox before the script; /var/lib/ucm
     and /var/log/ucm become `lib` and `logs` (by default absent paths of the sandbox);
-    the tools named in `real` run for real instead of being recorded."""
+    the tools named in `real` run for real instead of being recorded, `tools` maps a name
+    to a script body that replaces it last."""
     env, log, home, _data, config = _post_sandbox(tmp_path, 0)
     lay(home, config)
-    for tool in real:
+    for tool in (*real, 'python3'):
         (pathlib.Path(env['PATH']) / tool).unlink(missing_ok=True)
         os.symlink(shutil.which(tool), pathlib.Path(env['PATH']) / tool)
     (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
         f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\nexec {shutil.which("rm")} "$@"\n')
     bin_rm.chmod(0o755)
+    for name, body in (tools or {}).items():
+        (pathlib.Path(env['PATH']) / name).unlink(missing_ok=True)
+        (pathlib.Path(env['PATH']) / name).write_text(f'#!{POSIX_SH}\n{body}\n')
+        (pathlib.Path(env['PATH']) / name).chmod(0o755)
     for tool in ('sort', 'sed', 'rmdir', 'dd'):
         os.symlink(shutil.which(tool), pathlib.Path(env['PATH']) / tool)
     text = POSTRM.read_text()
@@ -760,6 +797,60 @@ def test_a_purge_keeps_the_local_archives_of_an_earlier_installation(tmp_path):
     assert f'chown root:root {config}' in _calls(log) and f'chmod 700 {config}' in _calls(log)
     assert not any(c.startswith('rm -rf ') for c in _calls(log)), _calls(log)
     assert not any('.ucm-archive-' in c for c in _calls(log) if c.startswith('rm ')), _calls(log)
+
+
+def test_a_purge_goes_through_a_chain_of_directories_as_deep_as_the_account_makes_it(tmp_path):
+    """The account may nest a thousand directories beside a kept archive: the purge removes them
+    all, the archive stays."""
+    def lay(home, config):
+        (config / '.ucm-archive-20260101T000000Z').mkdir()
+        (config / '.ucm-archive-20260101T000000Z' / 'master.key').write_text('old key')
+        fd = os.open(config, os.O_RDONLY | os.O_DIRECTORY)
+        for _ in range(1000):
+            os.mkdir('d', dir_fd=fd)
+            fd, parent = os.open('d', os.O_RDONLY | os.O_DIRECTORY, dir_fd=fd), fd
+            os.close(parent)
+        os.close(os.open('leaf', os.O_WRONLY | os.O_CREAT, 0o600, dir_fd=fd))
+        os.close(fd)
+    out, _log, _home, config = _postrm_with(tmp_path, 'purge', lay)
+    assert sorted(p.name for p in config.iterdir()) == ['.ucm-archive-20260101T000000Z'], out.stderr
+    assert (config / '.ucm-archive-20260101T000000Z' / 'master.key').read_text() == 'old key'
+
+
+def test_a_directory_swapped_for_a_link_during_the_purge_is_never_entered(tmp_path):
+    """/etc/ucm is the account's: a directory of it swapped for a link to a root directory while
+    the purge empties it must cost that directory nothing, whatever removes the files."""
+    victim = tmp_path / 'victim'
+    victim.mkdir()
+    for name in ('a.conf', 'b.conf'):
+        (victim / name).write_text('root\n')
+    sub = tmp_path.resolve() / 'etc' / 'ucm' / 'sub'
+
+    def lay(home, config):
+        (config / '.ucm-archive-20260101T000000Z').mkdir()
+        (config / '.ucm-archive-20260101T000000Z' / 'master.key').write_text('old key')
+        sub.mkdir()
+        for name in ('a.conf', 'b.conf'):
+            (sub / name).write_text('account\n')
+    swap = f'mv {sub} {sub}.moved; ln -s {victim} {sub}'
+    # The swap lands right before the first removal inside sub, by path (rm) or by descriptor (python)
+    prelude = (f"import os\n_unlink = os.unlink\n_swapped = []\n"
+               f"def _racing(name, *a, dir_fd=None, **k):\n"
+               f"    at = os.readlink('/proc/self/fd/%d' % dir_fd) if dir_fd is not None else os.path.dirname(name)\n"
+               f"    if not _swapped and at == '{sub}':\n"
+               f"        _swapped.append(1); os.rename('{sub}', '{sub}.moved'); os.symlink('{victim}', '{sub}')\n"
+               f"    return _unlink(name, *a, dir_fd=dir_fd, **k)\n"
+               f"os.unlink = _racing\nos.remove = _racing\n")
+    tools = {
+        'rm': f'case "$*" in *{sub}/*) [ -L {sub} ] || {{ {swap}; }};; esac\nexec {shutil.which("rm")} "$@"',
+        'python3': f'[ "$2" = -c ] || exec {sys.executable} "$@"\ncode=$3; shift 3\nexec {sys.executable} -I -c "{prelude}$code" "$@"',
+    }
+    out, _log, _home, config = _postrm_with(tmp_path, 'purge', lay, real=('mv', 'ln'), tools=tools)
+    assert sorted(p.name for p in victim.iterdir()) == ['a.conf', 'b.conf']
+    assert all((victim / n).read_text() == 'root\n' for n in ('a.conf', 'b.conf'))
+    assert (config / '.ucm-archive-20260101T000000Z' / 'master.key').read_text() == 'old key'
+    # The race was run: the directory emptied is the one moved away, the link went with the purge
+    assert (sub.parent / 'sub.moved').is_dir() and not list((sub.parent / 'sub.moved').iterdir())
 
 
 def test_a_removal_says_where_the_data_stays_and_what_a_purge_keeps(tmp_path):
@@ -1011,6 +1102,25 @@ def test_the_rpm_post_writes_no_ucm_env_through_a_link(tmp_path):
     calls = _calls(log)
     check = calls.index(f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env')
     assert calls.index(f'bash {home}/scripts/native-setup.sh own write {config}/ucm.env 600') > check
+
+
+@pytest.mark.parametrize('package', ['deb', 'rpm'])
+def test_ucm_env_is_checked_before_the_venv_is_built(tmp_path, package):
+    """A ucm.env that only own can refuse reading (a hard link) would read as no UCM_FIPS_BUILD:
+    the check stops the install before a standard venv replaces a FIPS one."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    if package == 'deb':
+        script = tmp_path / 'postinst.sandboxed'
+        script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+        cmd = ['/bin/bash', str(script), 'configure', '2.254']
+    else:
+        cmd = [POSIX_SH, '-c', _post_body(tmp_path, home, data, config), 'post', '2']
+    subprocess.run(cmd, capture_output=True, text=True, timeout=20, env=env)
+    setup = f'bash {home}/scripts/native-setup.sh'
+    calls = _calls(log)
+    check = calls.index(f'{setup} env-check {config}/ucm.env')
+    assert check < calls.index(f'{setup} fips-requested {config}/ucm.env'), calls
+    assert check < next(i for i, c in enumerate(calls) if c.startswith(f'{setup} venv ')), calls
 
 
 def test_the_deb_postinst_adds_data_dir_through_native_setup(tmp_path):

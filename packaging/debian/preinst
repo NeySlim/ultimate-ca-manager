@@ -57,6 +57,10 @@ case "$1" in
                 echo "/etc/ucm/ucm.env is a symbolic link or not a regular file: replace it with a regular file, then install again" >&2
                 exit 1
             fi
+            if [ -f "/etc/ucm/ucm.env" ] && [ "$(stat -c %h -- /etc/ucm/ucm.env)" != 1 ]; then
+                echo "/etc/ucm/ucm.env is a hard link to another file: replace it with a regular file, then install again" >&2
+                exit 1
+            fi
             if [ -f "/etc/ucm/ucm.env" ]; then
                 echo "Creating backup of configuration..."
                 BACKUP_FILE="$BACKUP_DIR/ucm.env-pre-upgrade-$(date +%Y%m%d-%H%M%S)"
