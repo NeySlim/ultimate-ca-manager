@@ -70,11 +70,12 @@ env_check() {
     fi
 }
 
-# Replaces $1 with the temporary file $2, which takes $1's owner and mode
+# Replaces $1 with the temporary file $2, which takes $1's owner and mode; -T renames over the
+# entry itself, so a link laid there after the check is replaced, never entered
 env_replace() {
     chown -h --reference="$1" "$2"
     chmod --reference="$1" "$2"
-    mv -f "$2" "$1"
+    mv -fT "$2" "$1"
     trap - EXIT
 }
 

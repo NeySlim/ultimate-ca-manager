@@ -1596,3 +1596,21 @@ def test_env_ensure_adds_a_missing_key_and_keeps_the_mode(tmp_path, before, afte
     assert result.returncode == 0, result.stderr
     assert envfile.read_text() == after
     assert stat.S_IMODE(envfile.stat().st_mode) == 0o640 and not envfile.is_symlink()
+
+
+def test_a_ucm_env_swapped_for_a_directory_link_mid_write_receives_nothing(tmp_path):
+    """The account owns /etc/ucm: a link laid after the check is replaced by the rename, not entered."""
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('SECRET_KEY=a\n')
+    elsewhere = tmp_path / 'root-dir'
+    elsewhere.mkdir()
+    bin_dir = tmp_path / 'bin'
+    # chmod --reference is the last step before the rename: the link lands in that window
+    _stub(bin_dir / 'chmod', f'{shutil.which("chmod")} "$@" || exit\n'
+                             f'case "$1" in --reference=*) rm -f "${{1#--reference=}}"; '
+                             f'ln -s {elsewhere} "${{1#--reference=}}";; esac')
+    path = f'{bin_dir}:{os.environ.get("PATH", "/usr/bin:/bin")}'
+    result = _run(['env-ensure', str(envfile), 'DATA_DIR', '/d'], _env(tmp_path, extra={'PATH': path}))
+    assert result.returncode == 0, result.stderr
+    assert list(elsewhere.iterdir()) == []
+    assert not envfile.is_symlink() and envfile.read_text() == 'SECRET_KEY=a\nDATA_DIR=/d\n'
