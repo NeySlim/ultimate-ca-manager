@@ -384,6 +384,17 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     return None
 
 
+def lock_ca_row(ca_id):
+    """The CA row read afresh, locked until the commit: FOR UPDATE on PostgreSQL, the database
+    write lock (no-op UPDATE) on SQLite, which has no row lock."""
+    from sqlalchemy import update
+    from models import CA, db
+    if db.session.get_bind().dialect.name == 'sqlite':
+        table = CA.__table__
+        db.session.execute(update(table).where(table.c.id == ca_id).values(id=table.c.id))
+    return CA.query.filter_by(id=ca_id).with_for_update().populate_existing().one_or_none()
+
+
 def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=None, encrypted_prv=None, name=None):
     """Apply an imported CA certificate to its existing record; returns whether the stored key was unbound.
 
@@ -411,6 +422,12 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
             raise ImportConflict('Cannot verify the stored private key against the new '
                                  'certificate; the stored key could not be read')
         key_dropped = matches is False
+
+    # The key state is read again under the CA row lock: an HSM key attached since the decision is seen
+    decided_on = (existing_ca.prv, existing_ca.hsm_key_id)
+    lock_ca_row(existing_ca.id)
+    if not key_pem and (existing_ca.prv, existing_ca.hsm_key_id) != decided_on:
+        raise ImportConflict('The key of this CA changed during the import; import the certificate again')
 
     old_serial = stored_certificate_serial(existing_ca)
     existing_ca.descr = name or cert_info['cn'] or existing_ca.descr

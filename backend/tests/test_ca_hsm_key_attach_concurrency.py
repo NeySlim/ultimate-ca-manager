@@ -91,3 +91,93 @@ def test_an_attachment_during_a_sync_of_its_provider_on_sqlite(app, tmp_path):
 
     with _bound_to(app, f"sqlite:///{tmp_path / 'attach-race.db'}"):
         _assert_serialized(*_race(app))
+
+
+def _self_signed(key, like):
+    from datetime import timedelta
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    builder = (x509.CertificateBuilder().subject_name(like.subject).issuer_name(like.subject)
+               .public_key(key.public_key()).serial_number(x509.random_serial_number())
+               .not_valid_before(like.not_valid_before_utc).not_valid_after(like.not_valid_after_utc + timedelta(days=1)))
+    for ext in like.extensions:
+        builder = builder.add_extension(ext.value, ext.critical)
+    return builder.sign(key, hashes.SHA256())
+
+
+def _import_over_an_attachment(app, with_key):
+    """A CA re-imported after an HSM key was attached by another session to the copy the import had read.
+
+    With its key, the import replaces the HSM key; without it, a re-keyed certificate must not keep it."""
+    from services.hsm.ca_key_attach import attach
+    from services.import_service import ImportConflict, extract_cert_info, update_ca_from_import
+    from cryptography.hazmat.primitives import serialization
+    key = ec.generate_private_key(ec.SECP256R1())
+    cn = f'Import Race CA {uuid.uuid4().hex[:6]}'
+    ca_id, old_cert = _keyless_ca(app, key, cn)
+    new_key = key if with_key else ec.generate_private_key(ec.SECP256R1())
+    new_cert = _self_signed(new_key, old_cert)
+    with app.app_context():
+        provider = HsmProvider(type='pkcs11', name=f'import-race-{uuid.uuid4().hex[:8]}', config='{}')
+        db.session.add(provider)
+        db.session.commit()
+        provider_id = provider.id
+        db.session.remove()
+    outcome = {}
+    with patch('services.hsm.HsmService._get_provider_instance', return_value=_Token({'ours': key})), \
+            app.app_context():
+        existing = db.session.get(CA, ca_id)
+        assert existing.hsm_key_id is None
+
+        def other_session():
+            with app.app_context():
+                outcome['attached'] = attach(ca_id, provider_id, 'ours')[0].hsm_key_id
+                db.session.remove()
+        worker = threading.Thread(target=other_session)
+        worker.start()
+        worker.join(60)
+        pem = new_cert.public_bytes(serialization.Encoding.PEM)
+        key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                    serialization.NoEncryption()) if with_key else None
+        try:
+            update_ca_from_import(existing, new_cert, pem, extract_cert_info(new_cert),
+                                  key_pem=key_pem, encrypted_prv='stored-key' if with_key else None)
+            db.session.commit()
+            outcome['import'] = 'ok'
+        except ImportConflict:
+            db.session.rollback()
+            outcome['import'] = 'conflict'
+        db.session.remove()
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        outcome['stored'] = (ca.prv, ca.hsm_key_id)
+        db.session.remove()
+    return outcome
+
+
+def _assert_coherent(outcome, with_key):
+    assert outcome['attached'] is not None, outcome
+    if with_key:
+        assert outcome['import'] == 'ok' and outcome['stored'] == ('stored-key', None), outcome
+    else:
+        assert outcome['import'] == 'conflict' and outcome['stored'] == (None, outcome['attached']), outcome
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+@pytest.mark.parametrize('with_key', [True, False])
+def test_an_import_over_an_attachment_on_postgresql(app, with_key):
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'hsm_import_race_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        _assert_coherent(_import_over_an_attachment(app, with_key), with_key)
+
+
+@pytest.mark.parametrize('with_key', [True, False])
+def test_an_import_over_an_attachment_on_sqlite(app, tmp_path, with_key):
+    from tests.test_backup_cross_installation import _bound_to
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'import-race.db'}"):
+        _assert_coherent(_import_over_an_attachment(app, with_key), with_key)

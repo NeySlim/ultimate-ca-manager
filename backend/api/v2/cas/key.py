@@ -12,14 +12,13 @@ import base64
 import logging
 
 from cryptography import x509
-from sqlalchemy import update
 
 from auth.unified import require_auth
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.cert_issuer import private_key_matches
 from utils.key_type import weak_ca_key_refusal
-from services.import_service import KeyPasswordError, load_import_private_key
+from services.import_service import KeyPasswordError, load_import_private_key, lock_ca_row
 from utils.key_codec import MalformedKey, private_key_to_pem, refuse_eddsa_key
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from services.audit_service import AuditService
@@ -27,15 +26,6 @@ from models import CA, db
 from security.encryption import encrypt_private_key
 
 logger = logging.getLogger(__name__)
-
-
-def _lock_ca(ca_id):
-    """The CA row read afresh, locked until the commit: FOR UPDATE on PostgreSQL, the database
-    write lock (no-op UPDATE) on SQLite, which has no row lock."""
-    if db.session.get_bind().dialect.name == 'sqlite':
-        table = CA.__table__
-        db.session.execute(update(table).where(table.c.id == ca_id).values(id=table.c.id))
-    return CA.query.filter_by(id=ca_id).with_for_update().populate_existing().one_or_none()
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/key', methods=['POST'])
@@ -97,7 +87,7 @@ def import_ca_private_key(ca_id):
         return error_response(weak, 400)
 
     # The CA is read again under its row lock: an HSM key attached meanwhile keeps the CA
-    ca = _lock_ca(ca_id)
+    ca = lock_ca_row(ca_id)
     if ca is None:
         return error_response('CA not found', 404)
     if ca.hsm_key_id:
