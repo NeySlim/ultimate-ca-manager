@@ -128,8 +128,11 @@ def list_ca_hsm_keys(ca_id):
     refusal = _hsm_attach_refusal()
     if refusal:
         return refusal
+    provider_id = request.args.get('provider_id', type=int)
+    if provider_id is None:
+        return error_response('provider_id must be an integer', 400)
     try:
-        keys = compatible_keys(db.session.get(CA, ca_id), request.args.get('provider_id', type=int))
+        keys = compatible_keys(db.session.get(CA, ca_id), provider_id)
     except AttachRefused as e:
         return error_response(str(e), e.status)
     return success_response(data={'keys': keys})

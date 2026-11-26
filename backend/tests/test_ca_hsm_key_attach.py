@@ -208,6 +208,13 @@ class TestListing:
         ca_id, _ = _keyless_ca(app, ec.generate_private_key(ec.SECP256R1()), 'No Provider CA')
         assert _list(auth_client, ca_id, 999999).status_code == 404
 
+    @pytest.mark.parametrize('query', ['', '?provider_id=', '?provider_id=abc'], ids=['absent', 'empty', 'text'])
+    def test_a_missing_or_malformed_provider_id_is_a_bad_request(self, app, auth_client, query):
+        ca_id, _ = _keyless_ca(app, ec.generate_private_key(ec.SECP256R1()), f'Bad Query CA {uuid.uuid4().hex[:6]}')
+        r = auth_client.get(f'/api/v2/cas/{ca_id}/hsm-keys{query}')
+        assert r.status_code == 400, r.data
+        assert _message(r) == 'provider_id must be an integer'
+
 
 class TestAttach:
     @pytest.mark.parametrize('make_key', [
