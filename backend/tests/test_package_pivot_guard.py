@@ -826,7 +826,7 @@ def test_a_purge_says_how_to_restore_the_kept_keys(tmp_path):
     out, _log, _home, config = _postrm_with(tmp_path, 'purge', _lay_key('ucm.db'), real=KEY_TOOLS)
     text = ' '.join(out.stdout.split())
     assert 'before apt install ucm' in text and f'master.key and audit-chain.keys back into {config}' in text, text
-    assert 'chown ucm:ucm' in text and 'chmod 600' in text, text
+    assert 'chown ucm:ucm' in text and 'chmod 600' in text and 'systemctl restart ucm' in text, text
     assert 'DATABASE_URL and KEY_ENCRYPTION_KEY' in text, text
 
 

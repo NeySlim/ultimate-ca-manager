@@ -299,7 +299,7 @@ With a generated password, UCM asks for a new one right after login. Until it is
 - **Logs:** `/var/log/ucm/`
 - **Service:** `/etc/systemd/system/ucm.service`
 - **Archive of a removed older installation:** `/opt/ucm-archive/` (only after one was archived; see above)
-- **After `apt purge ucm`:** `/opt/ucm/data` stays; while it holds data, or `ucm.env` names a PostgreSQL `DATABASE_URL`, `master.key`, `ucm.env` and `audit-chain.keys` move to a root-only `/opt/ucm-archive/<UTC date and time>-purge/`, which the output names. To start UCM on that data again, before `apt install ucm` (it starts UCM): put `master.key` and `audit-chain.keys` back into `/etc/ucm` with mode 600 (the package gives them to the `ucm` account; put back after the install, they need `chown ucm:ucm` and `chmod 600`), and carry `DATABASE_URL` and `KEY_ENCRYPTION_KEY` over from the archived `ucm.env` into `/etc/ucm/ucm.env`.
+- **After `apt purge ucm`:** `/opt/ucm/data` stays; while it holds data, or `ucm.env` names a PostgreSQL `DATABASE_URL`, `master.key`, `ucm.env` and `audit-chain.keys` move to a root-only `/opt/ucm-archive/<UTC date and time>-purge/`, which the output names. To start UCM on that data again, before `apt install ucm` (it starts UCM): put `master.key` and `audit-chain.keys` back into `/etc/ucm` with mode 600 (the package gives them to the `ucm` account; put back after the install, they need `chown ucm:ucm`, `chmod 600` and `systemctl restart ucm`), and carry `DATABASE_URL` and `KEY_ENCRYPTION_KEY` over from the archived `ucm.env` into `/etc/ucm/ucm.env`.
 
 ### Source Installation
 - **Data:** `./backend/data` (relative to repository root)

@@ -46,7 +46,7 @@ keep_key_with_data() {
     echo "  $kept"
     # postinst starts UCM: what it needs must be in place before the package is installed again
     echo "To start UCM on that data again, before apt install ucm (which starts it):"
-    [ -z "$keys" ] || echo "  put $keys back into $UCM_CONFIG, mode 600 (the package gives them to the ucm account; put back later: chown ucm:ucm, chmod 600),"
+    [ -z "$keys" ] || echo "  put $keys back into $UCM_CONFIG, mode 600 (the package gives them to the ucm account; put back later: chown ucm:ucm, chmod 600, then systemctl restart ucm),"
     [ ! -e "$kept/ucm.env" ] || echo "  carry DATABASE_URL and KEY_ENCRYPTION_KEY over from the archived ucm.env into $UCM_CONFIG/ucm.env."
 }
 
