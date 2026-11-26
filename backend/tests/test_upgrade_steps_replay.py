@@ -22,7 +22,7 @@ def dialect(request):
 def _as_rc6(db):
     """A 2.254 database upgraded, then put in the state 3.0-rc6 left: 300 recorded, no step
     row, no certificates.comment, revoked_serials.published nor api_keys.allowed_networks (steps
-    175 to 177 came after it)."""
+    175 and later came after it)."""
     assert db.upgrade()
     db.run("ALTER TABLE certificates DROP COLUMN comment")
     db.run("ALTER TABLE revoked_serials DROP COLUMN published")
@@ -130,7 +130,7 @@ def test_a_rc6_database_runs_the_steps_after_rc1_and_records_every_step(rc6, mon
     assert rc6.upgrade()
     assert ran == [s for s in STEPS if s not in UNRECORDED]
     assert '175_certificate_comment' in ran and '176_revoked_serial_publication' in ran
-    assert '177_api_key_allowed_networks' in ran
+    assert '178_api_key_allowed_networks' in ran
     assert '165_sso_ldap_group_base_dn' in ran  # changed after rc1: runs again
     assert 'comment' in _columns(rc6, 'certificates')
     assert _holds_every_step(rc6)
@@ -165,7 +165,7 @@ def test_a_failed_step_is_not_recorded_and_runs_at_the_next_start(rc6, monkeypat
     monkeypatch.setattr(package, 'step', real)
     ran = _spy_steps(monkeypatch)
     assert rc6.upgrade()
-    assert ran == ['175_certificate_comment', '176_revoked_serial_publication', '177_api_key_allowed_networks']
+    assert ran == list(package.STEPS[package.STEPS.index('175_certificate_comment'):])
     assert 'comment' in _columns(rc6, 'certificates')
 
 

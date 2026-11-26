@@ -1,4 +1,4 @@
-"""Migration 177: the source networks an API key is limited to (#403), a nullable TEXT added on
+"""Migration 178: the source networks an API key is limited to (#403), a nullable TEXT added on
 both backends, NULL (any address) for the keys already there; a second run keeps the values."""
 import importlib
 import os
@@ -14,13 +14,15 @@ KEYS = APIKey.__tablename__
 
 
 def _migration():
-    return importlib.import_module('migrations._from_2_254.177_api_key_allowed_networks')
+    return importlib.import_module('migrations._from_2_254.178_api_key_allowed_networks')
 
 
-def test_the_step_is_the_last_of_the_upgrade():
+def test_the_step_follows_every_lower_numbered_step():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == '177_api_key_allowed_networks'
-    assert STEPS.index('177_api_key_allowed_networks') > STEPS.index('176_revoked_serial_publication')
+    mine = STEPS.index('178_api_key_allowed_networks')
+    assert mine > STEPS.index('176_revoked_serial_publication')
+    assert all(int(s.split('_')[0]) < 178 for s in STEPS[:mine])
+    assert all(int(s.split('_')[0]) > 178 for s in STEPS[mine + 1:])
 
 
 def test_sqlite_adds_the_column_open_and_keeps_values_on_a_second_run():
@@ -57,7 +59,7 @@ def test_the_sqlalchemy_path_is_idempotent():
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_postgres_adds_the_column_open_and_keeps_values_on_a_second_run():
-    schema = f"migtest_177_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    schema = f"migtest_178_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
     engine = create_engine(PG_URL)
     conn = engine.connect()
     try:

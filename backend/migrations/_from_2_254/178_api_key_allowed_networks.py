@@ -1,4 +1,4 @@
-"""Upgrade step 177: the source networks an API key is limited to (issue #403).
+"""Upgrade step 178: the source networks an API key is limited to (issue #403).
 
 A nullable TEXT column on api_keys holding a JSON list of canonical networks; NULL, as for every
 key written before it, admits any address. Idempotent, dual-backend.
@@ -20,7 +20,7 @@ def upgrade(conn):
         if columns and COLUMN not in columns:
             conn.execute(DDL)
             conn.commit()
-            logger.info("[177] api_keys.allowed_networks added (SQLite)")
+            logger.info("[178] api_keys.allowed_networks added (SQLite)")
         return
     from sqlalchemy import inspect, text
     inspector = inspect(conn)
@@ -28,7 +28,7 @@ def upgrade(conn):
         return
     if COLUMN not in {c['name'] for c in inspector.get_columns(KEYS)}:
         conn.execute(text(DDL))
-        logger.info("[177] api_keys.allowed_networks added (PostgreSQL)")
+        logger.info("[178] api_keys.allowed_networks added (PostgreSQL)")
 
 
 def downgrade(conn):

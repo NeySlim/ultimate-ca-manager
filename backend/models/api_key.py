@@ -45,7 +45,7 @@ class APIKey(db.Model if db else object):
     # Active flag
     is_active = db.Column(db.Boolean, default=True)
 
-    # JSON list of canonical networks the key is used from (upgrade step 177); NULL admits any
+    # JSON list of canonical networks the key is used from (upgrade step 178); NULL admits any
     allowed_networks = db.Column(db.Text, nullable=True)
     
     # Relationship to User
