@@ -75,8 +75,9 @@ def import_ca_private_key(ca_id):
     except Exception as e:
         logger.warning(f"CA {ca_id} key import: invalid key: {e}")
         return error_response('Invalid private key format', 400)
+    matched_crt = ca.crt
     try:
-        cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+        cert = x509.load_pem_x509_certificate(base64.b64decode(matched_crt))
     except Exception:
         return error_response('CA certificate could not be parsed', 400)
     if not private_key_matches(private_key, cert):
@@ -96,6 +97,10 @@ def import_ca_private_key(ca_id):
     if ca.prv:
         db.session.rollback()
         return error_response('CA already has a private key', 400)
+    if ca.crt != matched_crt:
+        # The key was matched against a certificate the CA no longer holds
+        db.session.rollback()
+        return error_response('The CA certificate changed during the key import; import the key again', 409)
     key_pem = private_key_to_pem(private_key)
     ca.prv = encrypt_private_key(base64.b64encode(key_pem).decode('utf-8'))
     ok, err = safe_commit(logger, "Failed to import CA private key")
