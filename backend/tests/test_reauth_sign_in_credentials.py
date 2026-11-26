@@ -1,12 +1,16 @@
 """Adding a credential that signs in alone (a passkey, an mTLS certificate) proves the
 account holder again (OWASP ASVS 4.0.3 V3.7.1): the password, or for an account
 without one its authenticator code; forced enrolment, just past the password, is exempt."""
+import base64
 import json
+import uuid
 
 import pyotp
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 
-from models import User, db
+from models import Certificate, User, db
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
 
@@ -15,8 +19,8 @@ ROUTES = ['/api/v2/webauthn/register/options', '/api/v2/mtls/certificates',
           '/api/v2/mtls/enroll', '/api/v2/mtls/enroll-import', '/api/v2/mtls/assign']
 
 
-def _post(client, url, body):
-    return client.post(url, data=json.dumps(body), content_type='application/json')
+def _post(client, url, body, **kw):
+    return client.post(url, data=json.dumps(body), content_type='application/json', **kw)
 
 
 def _signed_in(app, create_user, username, role):
@@ -60,10 +64,37 @@ def _reauth(r):
     return ((r.get_json() or {}).get('details') or {}).get('reauth')
 
 
+@pytest.fixture
+def valid(app, create_cert, mtls_ca):
+    """The body and request options with which a route reaches the proof: the proof
+    comes after every cheap refusal, so a bare body would stop before it."""
+    def _make(username, route, extra):
+        body, kw = dict(extra), {}
+        if route in ROUTES[2:]:
+            info = create_cert(cn=f'reauth-{uuid.uuid4().hex[:8]}', ca_id=mtls_ca['id'])
+            with app.app_context():
+                owner = User.query.filter_by(username=username).first()
+                row = db.session.get(Certificate, info['id'])
+                # A user certificate made for this account, as the non-admin routes require
+                row.cert_type, row.created_by, row.created_at = 'usr_cert', username, owner.created_at
+                db.session.commit()
+                pem = base64.b64decode(row.crt)
+            if route.endswith('/enroll'):
+                der = x509.load_pem_x509_certificate(pem).public_bytes(serialization.Encoding.DER)
+                kw['environ_overrides'] = {'peercert': der}
+            elif route.endswith('/enroll-import'):
+                body['pem'] = pem.decode()
+            else:
+                body['cert_id'] = info['id']
+        return body, kw
+    return _make
+
+
 @pytest.mark.parametrize('route', ROUTES)
 @pytest.mark.parametrize('role', ['auditor', 'operator', 'admin'])
-def test_no_password_is_refused(clients, role, route):
-    r = _post(clients[role], route, {'name': 'probe'})
+def test_no_password_is_refused(clients, valid, role, route):
+    body, kw = valid(f'reauth_{role}', route, {'name': 'probe'})
+    r = _post(clients[role], route, body, **kw)
     assert r.status_code == 403, r.data
     if role == 'auditor' and route == '/api/v2/mtls/certificates':
         assert _reauth(r) is None  # its scope is refused before any password
@@ -73,23 +104,25 @@ def test_no_password_is_refused(clients, role, route):
 
 @pytest.mark.parametrize('route', ROUTES)
 @pytest.mark.parametrize('role', ['operator', 'admin'])
-def test_a_wrong_password_is_refused(app, create_user, role, route):
+def test_a_wrong_password_is_refused(app, create_user, valid, role, route):
     # An account per case: failures count towards a lock
-    c = _signed_in(app, create_user, f'reauth_wrong_{role}_{ROUTES.index(route)}', role)
-    r = _post(c, route, {'password': 'not-the-password'})
+    username = f'reauth_wrong_{role}_{ROUTES.index(route)}'
+    c = _signed_in(app, create_user, username, role)
+    body, kw = valid(username, route, {'password': 'not-the-password'})
+    r = _post(c, route, body, **kw)
     assert r.status_code == 403, r.data
     assert r.get_json()['message'] == 'Invalid password'
 
 
 @pytest.mark.parametrize('route', ROUTES)
 @pytest.mark.parametrize('role', ['auditor', 'operator', 'admin'])
-def test_the_password_lets_the_route_go_on(clients, role, route):
-    r = _post(clients[role], route, {'password': PASSWORD})
+def test_the_password_lets_the_route_go_on(clients, valid, role, route):
+    body, kw = valid(f'reauth_{role}', route, {'password': PASSWORD})
+    r = _post(clients[role], route, body, **kw)
     if role == 'auditor' and route == '/api/v2/mtls/certificates':
         assert r.status_code == 403  # no write:user_certificates
     else:
-        # Past the proof: what follows refuses for its own reasons (no CA, no PEM...)
-        assert _reauth(r) is None and r.status_code != 401, r.data
+        assert r.status_code in (200, 201), r.data
     if route == ROUTES[0]:
         assert r.status_code == 200, r.data
         assert r.get_json()['data']['challenge']
@@ -135,10 +168,11 @@ def test_an_account_without_a_password_answers_with_its_code(provider_only):
     assert r.status_code == 403, r.data
 
 
-def test_an_account_without_password_nor_code_is_refused(provider_only):
+def test_an_account_without_password_nor_code_is_refused(provider_only, valid):
     c, _ = provider_only('reauth_sso_bare')
     for route in ROUTES:
-        r = _post(c, route, {'password': PASSWORD, 'code': '123456'})
+        body, kw = valid('reauth_sso_bare', route, {'password': PASSWORD, 'code': '123456'})
+        r = _post(c, route, body, **kw)
         assert r.status_code == 403, (route, r.data)
         assert _reauth(r) == 'none', (route, r.data)
 
@@ -159,3 +193,17 @@ def test_a_cheap_refusal_spends_no_authenticator_code(provider_only):
     assert r.status_code == 400, r.data
     r = _post(c, '/api/v2/mtls/certificates', {'code': code, 'name': 'cheap-refusal'})
     assert r.status_code == 201, r.data
+
+
+@pytest.mark.parametrize('route, body', [
+    ('/api/v2/mtls/enroll', {}),
+    ('/api/v2/mtls/enroll-import', {}),
+    ('/api/v2/mtls/assign', {}),
+])
+def test_a_cheap_refusal_leaves_the_code_unspent(provider_only, route, body):
+    c, secret = provider_only(f'reauth_sso_cheap_{route.rsplit("/", 1)[1]}', totp=True)
+    code = pyotp.TOTP(secret).now()
+    r = _post(c, route, dict(body, code=code))
+    assert r.status_code == 400, r.data
+    r = _post(c, ROUTES[0], {'code': code})
+    assert r.status_code == 200, r.data

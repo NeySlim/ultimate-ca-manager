@@ -488,11 +488,6 @@ def enroll_presented_certificate():
     """Enroll a client certificate already presented via mTLS.
     Used when user has a valid cert signed by the trusted CA but not yet enrolled."""
 
-    # A certificate enrolled here signs in alone: the session proves the account holder first
-    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
-    if refused:
-        return refused
-
     user = g.current_user
     cert_info = None
 
@@ -568,6 +563,12 @@ def enroll_presented_certificate():
     if enrolments_of(presented_serial, presented_issuer):
         return error_response('This certificate is already enrolled', 409)
 
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before writing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, request.get_json(silent=True))
+    if refused:
+        return refused
+
     data = request.get_json() or {}
     auth_cert = AuthCertificate(
         user_id=user.id,
@@ -601,11 +602,6 @@ def enroll_presented_certificate():
 @require_auth(session_only=True)
 def enroll_import_certificate():
     """Import a PEM certificate: create Certificate record + AuthCertificate enrollment."""
-
-    # A certificate enrolled here signs in alone: the session proves the account holder first
-    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
-    if refused:
-        return refused
 
     user = g.current_user
     data = request.get_json() or {}
@@ -718,6 +714,12 @@ def enroll_import_certificate():
             enroll_user_id = target.id
             enroll_username = target.username
 
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before writing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, request.get_json(silent=True))
+    if refused:
+        return refused
+
     # Create Certificate record if not exists
     created = existing_cert is None
     if created:
@@ -826,11 +828,6 @@ def assign_certificate():
     """Assign an existing certificate to the current user's mTLS account.
     Admin can assign to another user via user_id param."""
 
-    # A certificate enrolled here signs in alone: the session proves the account holder first
-    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
-    if refused:
-        return refused
-
     user = g.current_user
     data = request.get_json() or {}
     cert_id = data.get('cert_id')
@@ -888,6 +885,12 @@ def assign_certificate():
     except Exception as e:
         logger.error(f"Failed to parse certificate {cert_id}: {e}")
         return error_response('Failed to parse certificate', 500)
+
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before writing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, request.get_json(silent=True))
+    if refused:
+        return refused
 
     auth_cert = AuthCertificate(
         user_id=enroll_user_id,
