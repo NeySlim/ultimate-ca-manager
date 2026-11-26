@@ -245,6 +245,7 @@ class TestApiKeyPermissionsFollowOwnerRole:
             data=json.dumps({
                 'name': 'demotion-probe',
                 'permissions': ['read:cas', 'write:cas'],
+                'password': 'ProbePass123!',
             }),
             content_type='application/json',
         )

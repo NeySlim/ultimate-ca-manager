@@ -124,7 +124,7 @@ Gérez les certificats client pour l’authentification TLS mutuel :
 1. Cliquez sur **Créer une clé**
 2. Entrez un **nom** (descriptif, par ex. « Pipeline CI/CD »)
 3. Définissez optionnellement une expiration en **jours**
-4. Cliquez sur **Créer**
+4. Cliquez sur **Créer**, puis confirmez avec votre mot de passe (ou votre code d’authentification pour un compte sans mot de passe) : une clé continue de fonctionner après un changement de mot de passe
 5. Copiez la clé immédiatement : elle n’est affichée qu’une seule fois
 
 ### Utiliser les clés API

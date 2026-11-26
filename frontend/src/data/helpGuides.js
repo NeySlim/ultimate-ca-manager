@@ -2428,7 +2428,7 @@ Manage client certificates for mutual TLS authentication:
 1. Click **Create Key**
 2. Enter a **name** (descriptive, e.g., "CI/CD Pipeline")
 3. Optionally set an expiry in **days**
-4. Click **Create**
+4. Click **Create**, then confirm with your password (or your authenticator code for an account without one): a key keeps working after a password change
 5. Copy the key immediately: it is shown only once
 
 ### Using API Keys

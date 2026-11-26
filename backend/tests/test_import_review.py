@@ -188,7 +188,7 @@ class TestSmartImportSelection:
         ca_key = _gen()
         ca = _cert(f'unselected-ca-{tag}', ca_key, ca=True)
         leaf = _cert(f'leaf-under-unselected-{tag}', _gen(), issuer_cert=ca, signer=ca_key)
-        r = auth_client.post('/api/v2/account/apikeys', data=json.dumps({
+        r = auth_client.post('/api/v2/account/apikeys', data=json.dumps({'password': 'changeme123',
             'name': f'no-write-cas-{tag}', 'permissions': ['read:certificates', 'write:certificates']}),
             content_type='application/json')
         assert r.status_code == 201, r.data

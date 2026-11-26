@@ -307,7 +307,7 @@ def test_an_encrypted_key_pem_is_refused_not_admitted():
 
 def test_certificates_import_asks_write_cas_before_judging_the_key(app, auth_client):
     from tests.conftest import assert_success
-    created = assert_success(auth_client.post('/api/v2/account/apikeys', json={
+    created = assert_success(auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123',
         'name': f'cert-only-{uuid.uuid4().hex[:6]}',
         'permissions': ['read:certificates', 'write:certificates']}), 201)
     key = _weak_key()

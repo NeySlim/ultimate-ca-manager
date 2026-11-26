@@ -232,7 +232,7 @@ class TestApiKeyIsNeverAccepted:
     @pytest.fixture
     def api_key(self, app, auth_client, monkeypatch):
         monkeypatch.setitem(app.config, 'API_KEY_MAX_PER_USER', 1000)
-        r = auth_client.post('/api/v2/account/apikeys', json={
+        r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123',
             'name': 'ws-realtime', 'permissions': ['read:certificates', 'read:cas']})
         data = assert_success(r, 201)
         yield data['key']

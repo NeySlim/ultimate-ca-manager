@@ -34,7 +34,8 @@ def owner(app, create_user, request):
         row.force_password_change = False
         db.session.commit()
     c = _login(app, username, 'TestPass123!')
-    r = c.post('/api/v2/account/apikeys', json={'name': 'ci-runner', 'permissions': ['read:certificates']})
+    r = c.post('/api/v2/account/apikeys', json={'name': 'ci-runner', 'permissions': ['read:certificates'],
+                                                'password': 'TestPass123!'})
     assert r.status_code == 201, r.data
     key = get_json(r)['data']
     yield {'id': user['id'], 'username': username, 'key_id': key['id'], 'secret': key['key']}
@@ -97,7 +98,7 @@ def test_without_write_users_both_routes_are_refused(app, viewer_client, owner):
 
 
 def test_an_api_key_cannot_revoke_through_its_own_account(app, auth_client):
-    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'own-account', 'permissions': ['*']})
+    r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123', 'name': 'own-account', 'permissions': ['*']})
     key = get_json(r)['data']
     with app.app_context():
         admin_id = User.query.filter_by(username='admin').first().id

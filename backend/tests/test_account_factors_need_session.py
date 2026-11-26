@@ -39,7 +39,7 @@ FACTOR_ROUTES = [
 @pytest.fixture(scope='module')
 def wildcard_key(auth_client):
     r = auth_client.post('/api/v2/account/apikeys',
-                         data=json.dumps({'name': 'factors', 'permissions': ['*']}),
+                         data=json.dumps({'password': 'changeme123', 'name': 'factors', 'permissions': ['*']}),
                          content_type='application/json')
     key = assert_success(r, 201)
     yield key['key']

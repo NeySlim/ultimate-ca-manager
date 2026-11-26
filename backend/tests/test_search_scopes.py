@@ -32,7 +32,7 @@ def key_client(app, auth_client):
 
     def _mint(permissions):
         r = auth_client.post('/api/v2/account/apikeys', data=json.dumps(
-            {'name': f'search-scope-{len(made)}', 'permissions': permissions}),
+            {'password': 'changeme123', 'name': f'search-scope-{len(made)}', 'permissions': permissions}),
             content_type='application/json')
         assert r.status_code == 201, r.data
         data = r.get_json()['data']

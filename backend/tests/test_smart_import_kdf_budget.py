@@ -348,7 +348,7 @@ def test_execute_without_write_cas_parses_once(app, auth_client, monkeypatch):
         return real(self, content, password)
     monkeypatch.setattr(SmartParser, 'parse', counted)
     r = auth_client.post('/api/v2/account/apikeys', data=json.dumps(
-        {'name': 'kdf-cap-no-cas', 'permissions': ['read:certificates', 'write:certificates']}),
+        {'password': 'changeme123', 'name': 'kdf-cap-no-cas', 'permissions': ['read:certificates', 'write:certificates']}),
         content_type='application/json')
     assert r.status_code == 201, r.data
     api_key = json.loads(r.data)['data']['key']

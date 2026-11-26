@@ -369,7 +369,10 @@ export default function AccountPage() {
         permissions: apiKeyScopePermissions(apiKeyForm.scope, hasPermission),
         expires_days: expiresDays,
       }
-      const response = await accountService.createApiKey(payload)
+      // A key outlives a password change: the server asks the holder again
+      const proof = await askProof()
+      if (!proof) return
+      const response = await accountService.createApiKey({ ...payload, ...proof })
       // apiClient returns the full envelope: { data: {...}, message }
       const created = response.data || response
       setShowApiKeyModal(false)

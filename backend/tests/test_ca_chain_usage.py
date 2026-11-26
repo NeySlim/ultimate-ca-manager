@@ -285,7 +285,7 @@ def test_bindings_without_full_chain_or_disabled_are_ignored(app, auth_client, w
 
 def _key_with(auth_client, permissions):
     r = auth_client.post('/api/v2/account/apikeys',
-                         json={'name': 'cu' + uuid.uuid4().hex[:8], 'permissions': permissions})
+                         json={'password': 'changeme123', 'name': 'cu' + uuid.uuid4().hex[:8], 'permissions': permissions})
     assert r.status_code == 201, r.data
     return r.get_json()['data']['key']
 

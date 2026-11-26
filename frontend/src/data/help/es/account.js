@@ -124,7 +124,7 @@ Gestionar los certificados de cliente para la autenticación TLS mutua:
 1. Hacer clic en **Crear Clave**
 2. Introducir un **nombre** (descriptivo, por ejemplo "Pipeline CI/CD")
 3. Opcionalmente, fijar una caducidad en **días**
-4. Hacer clic en **Crear**
+4. Hacer clic en **Crear** y confirmar con la contraseña (o con el código de autenticación en una cuenta sin contraseña): una clave sigue funcionando tras un cambio de contraseña
 5. Copiar la clave de inmediato: se muestra una sola vez
 
 ### Usar las claves API

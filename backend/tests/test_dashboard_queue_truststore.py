@@ -95,7 +95,7 @@ def test_route_withholds_from_a_key_without_read_truststore(app, auth_client, an
     mine = [anchors[k] for k in ('soon', 'expired')]
     got = get_json(auth_client.get(URL + f'?kind={KIND}&limit=500'))['data']
     assert set(mine) <= {i['id'] for i in got['items']}
-    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'queue-no-truststore', 'permissions': ['read:dashboard']})
+    r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123', 'name': 'queue-no-truststore', 'permissions': ['read:dashboard']})
     assert r.status_code == 201, r.data
     key = get_json(r)['data']
     try:

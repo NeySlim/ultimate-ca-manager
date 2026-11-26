@@ -164,7 +164,7 @@ def test_no_route_serves_a_locked_session_more_than_an_anonymous_caller(app, mak
 def test_an_api_key_beside_a_locked_cookie_is_its_own_credential(app, make_user, auth_client):
     from tests.conftest import assert_success
     key = assert_success(auth_client.post('/api/v2/account/apikeys', data=json.dumps(
-        {'name': 'beside-lock', 'permissions': ['read:certificates']}),
+        {'password': 'changeme123', 'name': 'beside-lock', 'permissions': ['read:certificates']}),
         content_type='application/json'), 201)
     try:
         user = make_user()

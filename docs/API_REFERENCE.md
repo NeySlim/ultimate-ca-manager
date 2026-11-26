@@ -396,7 +396,8 @@ Content-Type: application/json
 {
   "name": "CI/CD Integration",
   "expires_days": 365,
-  "permissions": ["read:certificates", "write:certificates"]
+  "permissions": ["read:certificates", "write:certificates"],
+  "password": "the caller's password"
 }
 
 # Get API key details
@@ -417,6 +418,8 @@ POST /api/v2/account/apikeys/{key_id}/regenerate
 # Delete API key
 DELETE /api/v2/account/apikeys/{key_id}
 ```
+
+A key outlives a password change, so creating or regenerating one from a session needs the caller's `password` in the body, or `code`, the authenticator code, for an account without a local password (`403` with `details.reauth` otherwise). A call authenticated by an API key needs neither: the key it creates holds at most its scopes and expires with it.
 
 The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
 

@@ -106,7 +106,7 @@ def api_key(auth_client):
 
     def _mint(permissions):
         r = auth_client.post('/api/v2/account/apikeys',
-                             data=json.dumps({'name': f'reserved-settings-{len(created)}',
+                             data=json.dumps({'password': 'changeme123', 'name': f'reserved-settings-{len(created)}',
                                               'permissions': permissions}),
                              content_type='application/json')
         assert r.status_code == 201, r.data

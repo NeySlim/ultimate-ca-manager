@@ -11,6 +11,8 @@ from utils.datetime_utils import utc_now
 
 
 def _create(client, body, headers=None):
+    if not headers:
+        body = dict(body, password='changeme123')  # a session proves the holder again
     return client.post('/api/v2/account/apikeys', data=json.dumps(body),
                        content_type='application/json', headers=headers or {})
 
@@ -58,7 +60,7 @@ def test_a_revoked_key_is_not_regenerated(app, auth_client, keys):
     with app.app_context():
         db.session.get(APIKey, key['id']).is_active = False
         db.session.commit()
-    r = auth_client.post(f"/api/v2/account/apikeys/{key['id']}/regenerate")
+    r = auth_client.post(f"/api/v2/account/apikeys/{key['id']}/regenerate", json={'password': 'changeme123'})
     assert r.status_code == 409, r.data
 
 
@@ -68,14 +70,14 @@ def test_an_expired_key_is_not_regenerated(app, auth_client, keys):
     with app.app_context():
         db.session.get(APIKey, key['id']).expires_at = utc_now() - timedelta(minutes=1)
         db.session.commit()
-    r = auth_client.post(f"/api/v2/account/apikeys/{key['id']}/regenerate")
+    r = auth_client.post(f"/api/v2/account/apikeys/{key['id']}/regenerate", json={'password': 'changeme123'})
     assert r.status_code == 409, r.data
 
 
 def test_regenerate_keeps_the_original_lifetime(auth_client, keys):
     make, created = keys
     key = make(expires_days=7)
-    data = assert_success(auth_client.post(f"/api/v2/account/apikeys/{key['id']}/regenerate"), 201)
+    data = assert_success(auth_client.post(f"/api/v2/account/apikeys/{key['id']}/regenerate", json={'password': 'changeme123'}), 201)
     created.append(data['id'])
     lifetime = _expiry(data) - utc_now().replace(tzinfo=None)
     assert timedelta(days=6) < lifetime <= timedelta(days=7)

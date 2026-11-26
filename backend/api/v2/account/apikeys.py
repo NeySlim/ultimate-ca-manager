@@ -10,6 +10,7 @@ from services.audit_service import AuditService
 from utils.response import success_response, error_response, created_response
 from utils.db_transaction import safe_commit
 from services.api_key_revocation import revoke_or_delete
+from auth.session_reverify import confirm_account_holder
 
 from . import bp
 
@@ -24,6 +25,14 @@ def _caller_can_grant(perm, owner_perms):
     if perm == '*':
         return '*' in owner_perms and '*' in caller_perms
     return has_permission(perm, owner_perms) and has_permission(perm, caller_perms)
+
+
+def _session_proof():
+    """A key outlives a password change: a session proves the holder again first. A key
+    calling with its own credential is exempt, its child bounded by its scopes and expiry."""
+    if getattr(g, 'auth_method', None) == 'api_key':
+        return None
+    return confirm_account_holder(g.current_user, request.get_json(silent=True))
 
 
 def _caller_key_expiry():
@@ -125,6 +134,10 @@ def create_api_key():
             400,
             {'current': existing_count, 'max': max_keys}
         )
+    # After the cheap refusals: an authenticator code is spent by the check
+    refused = _session_proof()
+    if refused:
+        return refused
 
     # Create API key
     auth_manager = AuthManager()
@@ -284,6 +297,9 @@ def regenerate_api_key(key_id):
         return error_response('This key holds permissions you no longer have; delete it and create a new one', 403)
     if not all(_caller_can_grant(p, owner_perms) for p in old_perms):
         return error_response(_NARROW_CALLER, 403)
+    refused = _session_proof()
+    if refused:
+        return refused
 
     # Same permissions and lifetime as the old key (None: never expires)
     lifetime_days = None

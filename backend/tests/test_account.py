@@ -242,33 +242,33 @@ class TestCreateAPIKey:
         assert r.status_code == 401, r.data
 
     def test_missing_name(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'permissions': ['read:certificates'],
         })
         assert_error(r, 400)
 
     def test_missing_permissions(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'No Perms Key',
         })
         assert_error(r, 400)
 
     def test_invalid_permissions_format(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Bad Perms', 'permissions': ['invalid'],
         })
         assert_error(r, 400)
 
     def test_cannot_grant_permissions_beyond_role(self, viewer_client):
         """Viewer must not create API keys with admin/write permissions."""
-        r = post_json(viewer_client, '/api/v2/account/apikeys', {
+        r = post_json(viewer_client, '/api/v2/account/apikeys', {'password': 'ViewerPass123!',
             'name': 'Escalation Attempt',
             'permissions': ['admin:system', 'write:users'],
         })
         assert r.status_code == 403
 
     def test_viewer_can_grant_own_read_permissions(self, viewer_client):
-        r = post_json(viewer_client, '/api/v2/account/apikeys', {
+        r = post_json(viewer_client, '/api/v2/account/apikeys', {'password': 'ViewerPass123!',
             'name': 'Viewer Read Key',
             'permissions': ['read:certificates', 'read:cas'],
         })
@@ -281,13 +281,13 @@ class TestCreateAPIKey:
                 viewer_client.delete(f'/api/v2/account/apikeys/{kid}')
 
     def test_permissions_not_list(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'String Perms', 'permissions': 'read:certificates',
         })
         assert_error(r, 400)
 
     def test_create_success(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Test Automation Key',
             'permissions': ['read:certificates', 'read:cas'],
         })
@@ -295,7 +295,7 @@ class TestCreateAPIKey:
         assert 'key' in data or 'id' in data
 
     def _create_and_cleanup(self, auth_client, payload):
-        r = post_json(auth_client, '/api/v2/account/apikeys', payload)
+        r = post_json(auth_client, '/api/v2/account/apikeys', dict(payload, password='changeme123'))
         data = assert_success(r, 201)
         kid = data.get('id')
         return data, kid
@@ -364,7 +364,7 @@ class TestCreateAPIKey:
             self._delete(auth_client, kid)
 
     def test_create_invalid_expiry_string(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Bad Expiry',
             'permissions': ['read:certificates'],
             'expires_days': 'forever',
@@ -387,13 +387,13 @@ class TestCreateAPIKey:
             self._delete(auth_client, kid)
 
     def test_invalid_permission_category(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Bad Cat', 'permissions': ['bogus:certificates'],
         })
         assert_error(r, 400)
 
     def test_invalid_permission_resource(self, auth_client):
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Bad Res', 'permissions': ['read:nonexistent'],
         })
         assert_error(r, 400)
@@ -412,7 +412,7 @@ class TestGetAPIKey:
 
     def test_get_existing_key(self, auth_client):
         """Create a key then retrieve it."""
-        cr = post_json(auth_client, '/api/v2/account/apikeys', {
+        cr = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Retrieve Me',
             'permissions': ['read:certificates'],
         })
@@ -437,7 +437,7 @@ class TestUpdateAPIKey:
         assert_error(r, 404)
 
     def test_update_name(self, auth_client):
-        cr = post_json(auth_client, '/api/v2/account/apikeys', {
+        cr = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Original Name',
             'permissions': ['read:cas'],
         })
@@ -462,7 +462,7 @@ class TestDeleteAPIKey:
         assert_error(r, 404)
 
     def test_delete_key(self, auth_client):
-        cr = post_json(auth_client, '/api/v2/account/apikeys', {
+        cr = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Delete Me',
             'permissions': ['read:certificates'],
         })
@@ -486,18 +486,18 @@ class TestRegenerateAPIKey:
         assert r.status_code == 401, r.data
 
     def test_not_found(self, auth_client):
-        r = auth_client.post('/api/v2/account/apikeys/99999/regenerate')
+        r = auth_client.post('/api/v2/account/apikeys/99999/regenerate', json={'password': 'changeme123'})
         assert_error(r, 404)
 
     def test_regenerate_key(self, auth_client):
-        cr = post_json(auth_client, '/api/v2/account/apikeys', {
+        cr = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Regen Me',
             'permissions': ['read:cas'],
         })
         created = assert_success(cr, 201)
         key_id = created['id']
 
-        r = auth_client.post(f'/api/v2/account/apikeys/{key_id}/regenerate')
+        r = auth_client.post(f'/api/v2/account/apikeys/{key_id}/regenerate', json={'password': 'changeme123'})
         data = assert_success(r, 201)
         # A new secret, shown once, never the old one
         assert data['key'] and data['key'] != created['key']
@@ -747,7 +747,7 @@ class TestAPIKeyLifecycle:
 
     def test_full_crud(self, auth_client):
         # Create
-        r = post_json(auth_client, '/api/v2/account/apikeys', {
+        r = post_json(auth_client, '/api/v2/account/apikeys', {'password': 'changeme123',
             'name': 'Lifecycle Key',
             'permissions': ['read:certificates', 'write:certificates'],
         })
@@ -771,7 +771,7 @@ class TestAPIKeyLifecycle:
         assert data.get('name') == 'Renamed Key'
 
         # Regenerate
-        r = auth_client.post(f'/api/v2/account/apikeys/{key_id}/regenerate')
+        r = auth_client.post(f'/api/v2/account/apikeys/{key_id}/regenerate', json={'password': 'changeme123'})
         regen = assert_success(r, 201)
         assert regen.get('id') != key_id or 'key' in regen
 

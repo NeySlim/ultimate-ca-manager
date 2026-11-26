@@ -19,7 +19,7 @@ from tests.conftest import assert_success, get_json
 def read_certs_key(auth_client):
     r = auth_client.post(
         '/api/v2/account/apikeys',
-        data=json.dumps({'name': 'bearer-alias', 'permissions': ['read:certificates']}),
+        data=json.dumps({'password': 'changeme123', 'name': 'bearer-alias', 'permissions': ['read:certificates']}),
         content_type='application/json',
     )
     return assert_success(r, 201)['key']

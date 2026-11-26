@@ -230,7 +230,7 @@ def test_the_single_row_configuration_routes_are_gone(auth_client, method, path)
 
 
 def _key(auth_client, permissions):
-    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'wp-scope', 'permissions': permissions})
+    r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123', 'name': 'wp-scope', 'permissions': permissions})
     assert r.status_code == 201, r.data
     data = r.get_json()['data']
     return data['id'], {'X-API-Key': data['key']}

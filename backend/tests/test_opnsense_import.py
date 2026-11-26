@@ -138,7 +138,7 @@ def test_opnsense_ca_import_requires_write_cas(app, auth_client, monkeypatch):
 
     r_key = auth_client.post(
         '/api/v2/account/apikeys',
-        data=json.dumps({
+        data=json.dumps({'password': 'changeme123',
             'name': 'opn-cert-only',
             'permissions': ['read:certificates', 'write:certificates'],
         }),

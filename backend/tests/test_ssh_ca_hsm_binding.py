@@ -378,7 +378,7 @@ class TestPermission:
         made = []
 
         def make(permissions):
-            r = auth_client.post('/api/v2/account/apikeys', json={'name': 'ssh-hsm', 'permissions': permissions})
+            r = auth_client.post('/api/v2/account/apikeys', json={'password': 'changeme123', 'name': 'ssh-hsm', 'permissions': permissions})
             assert r.status_code == 201, r.data
             made.append(r.get_json()['data']['id'])
             return {'X-API-Key': r.get_json()['data']['key']}
