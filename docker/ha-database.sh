@@ -308,12 +308,12 @@ _ucm_unchanged_since_copy() {
     [ ! -s "$UCM_DATABASE_PATH-wal" ] || [ "$newest" -nt "$UCM_DATABASE_PATH-wal" ]
 }
 
-# Removes all but the newest UCM_BACKUP_KEEP - 1 copies (default 5 kept), before the new one
-# is written: the copies never outnumber UCM_BACKUP_KEEP, whatever the restarts.
+# Removes all but the newest UCM_BACKUP_KEEP - $2 copies (default 5 kept; $2 is 1 before a new
+# copy, 0 when none follows): the copies never outnumber UCM_BACKUP_KEEP, whatever the restarts.
 _ucm_prune_copies() {
     local keep=${UCM_BACKUP_KEEP:-5} old
     case $keep in ''|*[!0-9]*|0) keep=5 ;; esac
-    _ucm_copies "$1" | tail -n +"$keep" | while IFS= read -r old; do
+    _ucm_copies "$1" | tail -n +"$(( keep - ${2:-1} + 1 ))" | while IFS= read -r old; do
         rm -f -- "$old" "$old-wal"
     done
 }
@@ -343,10 +343,11 @@ ucm_sqlite_check_and_backup() {
             find "$BACKUP_DIR" \( -name "ucm-backup-*.db" -o -name "ucm-backup-*.db-wal" \) \
                 -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
             if _ucm_unchanged_since_copy "$BACKUP_DIR"; then
+                _ucm_prune_copies "$BACKUP_DIR" 0
                 echo -e "${GREEN:-}✅ Database unchanged since its last copy: no new copy${NC:-}"
                 return 0
             fi
-            _ucm_prune_copies "$BACKUP_DIR"
+            _ucm_prune_copies "$BACKUP_DIR" 1
 
             # Create backup: writes still in the WAL are copied with the file, then folded into it
             cp "$UCM_DATABASE_PATH" "$BACKUP_FILE"

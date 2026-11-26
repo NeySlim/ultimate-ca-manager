@@ -765,3 +765,16 @@ def test_a_database_written_since_its_newest_copy_is_copied(tmp_path, changed):
         (tmp_path / 'ucm.db-wal').write_bytes(b'w' * 10)
     r = _start_copies(tmp_path, env, 'cp() { echo "cp $*"; }; ucm_sqlite_check_and_backup')
     assert r.returncode == 0 and f"cp {env['UCM_DATABASE_PATH']} {backups}/ucm-backup-" in r.stdout, r.stdout
+
+
+def test_a_start_on_an_unchanged_database_still_prunes_to_the_keep_count(tmp_path):
+    """A restart loop on an unchanged database must not leave the volume holding every old copy."""
+    env, backups = _copies_env(tmp_path, '3')
+    _seed(backups, 8, 60)
+    _age(tmp_path / 'ucm.db', 3600)
+    r = _start_copies(tmp_path, env, _COUNTING_CP)
+    assert r.returncode == 0 and 'unchanged since its last copy' in r.stdout, r.stdout + r.stderr
+    assert 'at copy' not in r.stdout, r.stdout
+    names = sorted(p.name for p in backups.iterdir())
+    assert names == [f'ucm-backup-2026010{i}-000000.db' for i in (6, 7, 8)], names
+
