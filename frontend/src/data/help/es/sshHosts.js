@@ -98,7 +98,7 @@ Una renovación se rechaza cuando el host o su certificado está revocado, cuand
 | Última descarga de la KRL | Cuándo el agente descargó una KRL por última vez, según lo declara |
 | Estado | Válido, Caducado o Revocado |
 
-**Pausar la renovación** detiene las renovaciones hasta **Reanudar la renovación**. **Revocar el host** revoca el certificado actual, que la KRL de la CA de host lista entonces, y pone fin a las renovaciones. Cada inscripción, renovación y rechazo figura en el registro de auditoría.
+**Pausar la renovación** detiene las renovaciones hasta **Reanudar la renovación**. **Revocar el host** revoca todos los certificados no caducados de su clave, el actual y los que sus renovaciones reemplazaron, que la KRL de la CA de host lista entonces, y pone fin a las renovaciones. Cada inscripción, renovación y rechazo figura en el registro de auditoría.
 
 ## Quitar el agente
 

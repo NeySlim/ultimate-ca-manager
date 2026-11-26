@@ -3927,7 +3927,7 @@ A renewal is refused when the host or its certificate is revoked, when the certi
 | Last KRL pull | When the agent last downloaded a KRL, as it reports it |
 | State | Valid, Expired or Revoked |
 
-**Pause renewal** stops the renewals until **Resume renewal**. **Revoke host** revokes the current certificate, which the host CA's KRL then lists, and ends the renewals for good. Every enrollment, renewal and refusal is in the audit log.
+**Pause renewal** stops the renewals until **Resume renewal**. **Revoke host** revokes every unexpired certificate of its key, the current one and those its renewals replaced, which the host CA's KRL then lists, and ends the renewals for good. Every enrollment, renewal and refusal is in the audit log.
 
 ## Removing the Agent
 

@@ -98,7 +98,7 @@ Un renouvellement est refusé quand l’hôte ou son certificat est révoqué, q
 | Dernière récupération de la KRL | Quand l’agent a téléchargé une KRL pour la dernière fois, tel qu’il le déclare |
 | État | Valide, Expiré ou Révoqué |
 
-**Suspendre le renouvellement** arrête les renouvellements jusqu’à **Reprendre le renouvellement**. **Révoquer l’hôte** révoque le certificat en cours, que la KRL de l’AC hôte liste alors, et met fin aux renouvellements. Chaque enrôlement, renouvellement et refus figure dans le journal d’audit.
+**Suspendre le renouvellement** arrête les renouvellements jusqu’à **Reprendre le renouvellement**. **Révoquer l’hôte** révoque tous les certificats non expirés de sa clé, celui en cours et ceux que ses renouvellements ont remplacés, que la KRL de l’AC hôte liste alors, et met fin aux renouvellements. Chaque enrôlement, renouvellement et refus figure dans le journal d’audit.
 
 ## Retirer l’agent
 
