@@ -77,8 +77,8 @@ POST_DIRECTORIES = [
     'for d in ca certs private crl scep backups sessions; do',
     '    mkdir -p $UCM_DATA/$d',
     'done',
-    '[ -L "$UCM_DATA/private" ] || chmod 700 "$UCM_DATA/private"',
-    '[ -L "$UCM_DATA/sessions" ] || chmod 700 "$UCM_DATA/sessions"',
+    'bash "$UCM_SETUP" own mode "$UCM_DATA/private" 700 link-ok',
+    'bash "$UCM_SETUP" own mode "$UCM_DATA/sessions" 700 link-ok',
 ]
 
 
@@ -91,7 +91,8 @@ def _post_directories(data):
     assert re.fullmatch(r'[\w/.-]+', str(data)), data
     run = subprocess.run(['sh', '-c', 'umask 022\n' + '\n'.join(POST_DIRECTORIES)],
                          capture_output=True, text=True, cwd=data, timeout=30,
-                         env={'PATH': '/usr/bin:/bin', 'UCM_DATA': str(data)})
+                         env={'PATH': '/usr/bin:/bin', 'UCM_DATA': str(data),
+                              'UCM_SETUP': str(ROOT / 'packaging' / 'scripts' / 'native-setup.sh')})
     assert run.returncode == 0, run.stderr
 
 

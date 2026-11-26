@@ -648,14 +648,13 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
         cmd = [POSIX_SH, '-c', _post_body(tmp_path, home, data, config), 'post', '2']
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=20, env=env)
     assert out.returncode == 0, out.stderr
-    chowned = [c for c in _calls(log) if c.startswith('chown ')]
-    named = ' '.join(chowned)
-    assert '.ucm-archive-' not in named, chowned
-    # The starting points end in /: a data or configuration directory behind a link is reached
-    for path in (data / 'ca' / 'kept.pem', config / 'kept.env', f'{data}/', f'{config}/'):
-        assert f' {path} ' in f'{named} ', (path, chowned)
-    assert not any(c.startswith('chown -R ') and (str(data) in c or str(config) in c or c.endswith(str(home)))
-                   for c in chowned), chowned
+    # own chown-tree passes .ucm-archive-* by (tests/test_native_setup_script.py); the starting
+    # points end in /: a data or configuration directory behind a link is reached
+    setup = f'bash {home}/scripts/native-setup.sh own chown-tree'
+    trees = [c for c in _calls(log) if c.startswith(setup)]
+    assert trees == [f'{setup} {home}/ ucm:ucm', f'{setup} {data}/ ucm:ucm', f'{setup} {config}/ ucm:ucm dns-hooks',
+                     f'{setup} /var/log/ucm/ ucm:ucm'], trees
+    assert not [c for c in _calls(log) if c.startswith('chown ')], _calls(log)
 
 
 POSTRM = ROOT / 'packaging' / 'debian' / 'postrm'
@@ -982,7 +981,7 @@ def test_the_rpm_pre_gives_the_account_a_shell_that_exists(rpm_pre, tmp_path, no
 
 
 # /etc/ucm is the service account's: a ucm.env it replaced by a link is checked before any write,
-# and the new file is created exclusively, so that a dangling link is never followed
+# and the new file is written by own (a new file renamed over the entry), never through a link
 def _linked_env(tmp_path, config):
     absent = tmp_path / 'victim-created-by-root'
     (config / 'ucm.env').symlink_to(absent)
@@ -994,11 +993,12 @@ def test_the_deb_postinst_writes_no_ucm_env_through_a_link(tmp_path):
     absent = _linked_env(tmp_path, config)
     script = tmp_path / 'postinst.sandboxed'
     script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
-    out = subprocess.run(['/bin/bash', str(script), 'configure', '2.254'], capture_output=True,
-                         text=True, timeout=20, env=env)
-    assert out.returncode != 0
+    subprocess.run(['/bin/bash', str(script), 'configure', '2.254'], capture_output=True,
+                   text=True, timeout=20, env=env)
     assert not absent.exists()
-    assert f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env' in _calls(log)
+    calls = _calls(log)
+    check = calls.index(f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env')
+    assert calls.index(f'bash {home}/scripts/native-setup.sh own write {config}/ucm.env 600') > check
 
 
 def test_the_rpm_post_writes_no_ucm_env_through_a_link(tmp_path):
@@ -1008,7 +1008,9 @@ def test_the_rpm_post_writes_no_ucm_env_through_a_link(tmp_path):
     subprocess.run([POSIX_SH, '-c', body, 'post', '2'], capture_output=True, text=True,
                    timeout=20, env=env)
     assert not absent.exists()
-    assert f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env' in _calls(log)
+    calls = _calls(log)
+    check = calls.index(f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env')
+    assert calls.index(f'bash {home}/scripts/native-setup.sh own write {config}/ucm.env 600') > check
 
 
 def test_the_deb_postinst_adds_data_dir_through_native_setup(tmp_path):

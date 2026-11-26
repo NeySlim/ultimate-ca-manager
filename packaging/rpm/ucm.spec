@@ -197,8 +197,8 @@ for d in ca certs private crl scep backups sessions; do
 done
 # The modes %%files declares for them, so rpm -V agrees before the first start;
 # a link an operator put there is left as it is
-[ -L "$UCM_DATA/private" ] || chmod 700 "$UCM_DATA/private"
-[ -L "$UCM_DATA/sessions" ] || chmod 700 "$UCM_DATA/sessions"
+bash "$UCM_SETUP" own mode "$UCM_DATA/private" 700 link-ok
+bash "$UCM_SETUP" own mode "$UCM_DATA/sessions" 700 link-ok
 mkdir -p $UCM_CONFIG
 
 # SoftHSM setup: add ucm user to softhsm/ods group and prepare token directory
@@ -219,11 +219,11 @@ fi
 SECRET_KEY=$(openssl rand -hex 32)
 
 # Create config if not exists. /etc/ucm is the service account's: a link or anything but a
-# file there stops the install, and the new file is created exclusively
+# file there stops the install, and the new file is written by own
 bash "$UCM_SETUP" env-check "$UCM_CONFIG/ucm.env" || exit 1
 if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
     NEW_CONFIG=1
-    (umask 077 && set -C && cat > "$UCM_CONFIG/ucm.env") << ENVEOF
+    bash "$UCM_SETUP" own write "$UCM_CONFIG/ucm.env" 600 << ENVEOF
 # UCM Configuration - Generated on install
 DATABASE_PATH=$UCM_DATA/ucm.db
 DATA_DIR=$UCM_DATA
@@ -241,19 +241,18 @@ SECRET_KEY=$SECRET_KEY
 # INITIAL_ADMIN_PASSWORD_FILE=/etc/ucm/admin-password   (readable by the ucm user)
 # INITIAL_ADMIN_PASSWORD=
 ENVEOF
-    chmod 600 "$UCM_CONFIG/ucm.env"
 fi
 # A file written before the install (UCM_FIPS_BUILD=1 alone) gets its secrets and defaults
 ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
 
-# Set permissions, through a linked directory too (the final /); a local archive of a
-# removed UCM's files (.ucm-archive-*) and the DNS hooks (dns-hooks) stay root's
-find $UCM_HOME/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
-find $UCM_DATA/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
-find $UCM_CONFIG/ \( -name '.ucm-archive-*' -o -path "$UCM_CONFIG/dns-hooks" \) -prune -o -exec chown -h %{name}:%{name} {} +
-chown -R %{name}:%{name} /var/log/%{name}
-chmod 750 $UCM_DATA
+# Set permissions, through a linked directory too (the final /), never through a link inside;
+# a local archive of a removed UCM's files (.ucm-archive-*) and the DNS hooks stay root's
+bash "$UCM_SETUP" own chown-tree "$UCM_HOME/" %{name}:%{name}
+bash "$UCM_SETUP" own chown-tree "$UCM_DATA/" %{name}:%{name}
+bash "$UCM_SETUP" own chown-tree "$UCM_CONFIG/" %{name}:%{name} dns-hooks
+bash "$UCM_SETUP" own chown-tree /var/log/%{name}/ %{name}:%{name}
+bash "$UCM_SETUP" own mode "$UCM_DATA/" 750
 
 # Host FIPS state, UCM_FIPS and readiness report (UCM_FIPS_BUILD=1 only)
 bash "$UCM_SETUP" fips-finish "$UCM_HOME" "$UCM_CONFIG/ucm.env" "$UCM_DATA" %{name}

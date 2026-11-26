@@ -18,11 +18,14 @@ def written_env(path, tmp_path):
     """The env file a packaging script writes, produced by running its here-document
     in a throwaway shell; returns ``{name: value}``, commented examples included."""
     text = (ROOT / path).read_text()
-    block = re.search(r'^[ \t]*(?:\(umask 077 && set -C && )?cat > "\$UCM_CONFIG/ucm\.env"\)? << ?\'?ENVEOF\'?\n.*?\nENVEOF$',
+    block = re.search(r'^[ \t]*bash "\$UCM_SETUP" own write "\$UCM_CONFIG/ucm\.env" 600 << ?\'?ENVEOF\'?\n.*?\nENVEOF$',
                       text, re.S | re.M).group(0)
     env = {'PATH': '/usr/bin:/bin', 'UCM_CONFIG': str(tmp_path), 'UCM_DATA': '/data',
+           'UCM_SETUP': str(ROOT / 'packaging' / 'scripts' / 'native-setup.sh'),
            'SECRET_KEY': 'generated-secret', 'ADMIN_PASS': 'generated-pass'}
     subprocess.run(['bash', '-c', 'set -e\n' + block], env=env, check=True)
+    # Written by own: a regular file, root's only from the start
+    assert (tmp_path / 'ucm.env').lstat().st_mode & 0o170777 == 0o100600
     written = (tmp_path / 'ucm.env').read_text()
     return dict(re.findall(r'^#?\s*([A-Z][A-Z0-9_]+)=(\S*)', written, re.M))
 

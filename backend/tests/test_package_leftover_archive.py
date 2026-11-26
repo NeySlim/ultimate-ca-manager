@@ -1511,10 +1511,12 @@ def _ownership_commands(box):
     readme = next(l.strip() for l in (box.archive / 'README.txt').read_text().splitlines() if 'chown' in l)
     assert readme.startswith('sudo ') and readme.count('ucm:ucm') == 1, readme
     commands = {'readme': readme[5:].replace('ucm:ucm', '1:1')}
-    env = f'UCM_HOME={box.home} UCM_DATA={box.data} UCM_CONFIG={box.config} UCM_USER=1 UCM_GROUP=1; '
+    env = (f'UCM_HOME={box.home} UCM_DATA={box.data} UCM_CONFIG={box.config} UCM_USER=1 UCM_GROUP=1 '
+           f'UCM_SETUP={ROOT}/packaging/scripts/native-setup.sh; ')
+    # The log directory's line is left out: it names the host's own /var/log/ucm
     for name, path in (('postinst', 'debian/postinst'), ('spec', 'rpm/ucm.spec')):
         lines = [l.strip() for l in (ROOT / 'packaging' / path).read_text().splitlines()
-                 if l.strip().startswith('find ') and 'chown' in l]
+                 if l.strip().startswith('bash "$UCM_SETUP" own chown-tree "$UCM_')]
         assert lines, path
         commands[name] = env + '; '.join(lines).replace('%{name}', '1')
     return commands
@@ -2103,4 +2105,5 @@ def test_every_suite_lab_goes_with_its_class(tmp_path, suite, name):
 
 def test_the_suite_labs_are_found():
     assert len(_suite_labs()) == 3, _suite_labs()
+
 
