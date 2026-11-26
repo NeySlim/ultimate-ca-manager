@@ -6,6 +6,7 @@ root, as in tests/test_update_watcher_claim.py.
 """
 import json
 import os
+import shutil
 import stat
 import subprocess
 
@@ -96,3 +97,16 @@ def test_a_manifest_too_large_for_an_argument_still_gets_its_result(host):
     (host.data / '.update_manifest.json').write_bytes(body)
     result, _ = host.run(host.package(), manifest=False)
     assert result['op_id'] == 'op' and result['status'] == 'installed', result
+
+
+def test_an_error_too_large_for_an_argument_still_gets_its_result(host):
+    """A precheck message the account can make grow (a FIPS build log line, say) is cut before the exec."""
+    scripts = host.root / 'opt/ucm/scripts'
+    scripts.mkdir(parents=True)
+    (scripts / 'native-setup.sh').write_text('[ "$1" != update-precheck ] && exit 0\n'
+                                             'head -c 300000 /dev/zero | tr "\\0" x; exit 1\n')
+    (host.bin / 'head').symlink_to(shutil.which('head'))
+    result, _ = host.run(host.package())
+    assert result['status'] == 'failed' and result['step'] == 'precheck', result
+    assert result['error'] == 'x' * 500, len(result['error'] or '')
+

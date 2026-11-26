@@ -86,9 +86,9 @@ write_result() {
     # consumed once by the UCM backend after the restart. The claimed
     # manifest is removed only after the result is durably written; on a
     # write failure it is kept for diagnosis and NO result is left behind
-    # (the backend then simply never claims success). The manifest comes on descriptor 3:
-    # decoded, it can outgrow what one environment string may hold
-    if STATUS="$1" STEP="$2" ERROR="$3" INSTALLED="$(installed_version)" DATA_DIR="$DATA_DIR" \
+    # (the backend then simply never claims success). The manifest comes on descriptor 3 and the
+    # error is cut to what the result keeps: neither may outgrow what one environment string holds
+    if STATUS="$1" STEP="$2" ERROR="${3:0:500}" INSTALLED="$(installed_version)" DATA_DIR="$DATA_DIR" \
         RESULT_NAME="${RESULT_FILE##*/}" python3 - 3< <(read_own "$PROCESSING_FILE") <<'PYEOF'
 import json, os, time
 manifest = {}
