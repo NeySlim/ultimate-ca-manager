@@ -122,7 +122,7 @@ class TestRelationsTravelByIdentity:
         revoked = create_cert(cn='manifest-revoked.example.com', ca_id=ca['id'])
         r = auth_client.post(f"/api/v2/certificates/{revoked['id']}/revoke", json={'reason': 'superseded'})
         assert r.status_code == 200, r.get_json()
-        exempt = {'ssh_cas', 'ssh_certificates'}
+        exempt = {'ssh_cas', 'ssh_certificates', 'ssh_hosts'}
         with app.app_context():
             # A row in every section the factory can build, so none is skipped as empty.
             _seeded, _failures, order, _secrets = _seed_all()

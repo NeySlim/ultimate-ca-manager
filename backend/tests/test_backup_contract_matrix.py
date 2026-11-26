@@ -53,6 +53,7 @@ NEEDS_REAL_MATERIAL: dict = {
         'it hangs off an SSH authority, whose exporter reads a real key, and '
         'the suite has no SSH authority factory'
     ),
+    'ssh_hosts': 'it hangs off an SSH authority and one of its certificates, as ssh_certificates do',
 }
 
 # How many passes the seeder makes over the sections it has not built yet.
@@ -309,8 +310,9 @@ class TestEverySectionCanBeExercised:
 
     def test_almost_everything_is_actually_exercised(self, seeded):
         """The file is worth its cost only while it covers nearly all of the
-        manifest; a slow drift towards exemptions would empty it quietly."""
-        assert len(seeded['seeded']) >= len(manifest.SECTIONS) - 6
+        manifest; a slow drift towards exemptions would empty it quietly. The SSH sections,
+        which hang off a real key, are three of the seven left out."""
+        assert len(seeded['seeded']) >= len(manifest.SECTIONS) - 7
 
 
 class TestTheArchiveCarriesEverySection:
