@@ -99,6 +99,26 @@ def test_a_package_outside_updates_is_refused(host):
     package = elsewhere / 'ucm_99.0_all.deb'
     package.write_bytes(b'x')
     _refused(*host.run(package), 'not directly under')
+    # The service account wrote that path: root deletes nothing outside updates/
+    assert package.read_bytes() == b'x'
+
+
+def test_any_file_named_by_the_trigger_is_left_alone(host):
+    victim = host.tmp / 'shadow'
+    victim.write_bytes(b'precious')
+    _refused(*host.run(victim), 'not directly under')
+    assert victim.read_bytes() == b'precious'
+
+
+def test_updates_as_a_link_deletes_nothing_where_it_leads(host):
+    elsewhere = host.tmp / 'elsewhere'
+    elsewhere.mkdir()
+    victim = elsewhere / 'ucm_99.0_all.deb'
+    victim.write_bytes(b'precious')
+    shutil.rmtree(host.data / 'updates')
+    (host.data / 'updates').symlink_to(elsewhere)
+    _refused(*host.run(host.data / 'updates' / 'ucm_99.0_all.deb'), 'not directly under')
+    assert victim.read_bytes() == b'precious'
 
 
 def test_a_package_in_a_subdirectory_of_updates_is_refused(host):
@@ -117,6 +137,7 @@ def test_a_symbolic_link_is_refused(host):
     (host.releases / 'v99.0' / 'ucm_99.0_all.deb.sha256').write_text(
         hashlib.sha256(b'genuine package').hexdigest() + '  ucm_99.0_all.deb\n')
     _refused(*host.run(link), 'symbolic link')
+    assert target.read_bytes() == b'genuine package'
 
 
 @pytest.mark.parametrize('name', ['x.deb', 'ucm_99.0_amd64.deb', 'evil-99.0-1.fc43.noarch.rpm',
@@ -128,6 +149,7 @@ def test_a_name_that_is_not_a_release_asset_is_refused(host, name):
 def test_a_package_unlike_the_release_digest_is_refused(host):
     package = host.package(published_digest=hashlib.sha256(b'the real one').hexdigest())
     _refused(*host.run(package), 'does not match the release digest')
+    assert not package.exists()
 
 
 def test_a_release_without_a_digest_is_refused(host):

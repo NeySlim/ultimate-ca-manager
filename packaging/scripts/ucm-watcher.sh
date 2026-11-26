@@ -127,24 +127,38 @@ restart_ucm() {
 
 # claim_package <path> <to_version>: prints "ok <copy>" or "error <reason>". The service account
 # writes the trigger, so root accepts only a release asset under updates/, copies it where that
-# account cannot reach, and checks the copy against the release's .sha256 fetched from GitHub
+# account cannot reach, and checks the copy against the release's .sha256 fetched from GitHub.
+# Root removes the download only through a no-follow handle on updates/, never by the path given
 claim_package() {
     PKG="$1" TO="$2" UPDATES="$DATA_DIR/updates" RELEASES="$RELEASES" python3 - <<'PYEOF' 2>/dev/null || echo "error package check failed"
 import hashlib, os, re, ssl, stat, sys, tempfile, urllib.request
 pkg, to, updates = os.environ["PKG"], os.environ["TO"], os.environ["UPDATES"]
+entry = os.path.basename(pkg)
 # A rolling update names its download <12 hex>-<asset>: the asset name is checked and copied
-name = re.sub(r"^[0-9a-f]{12}-", "", os.path.basename(pkg))
+name = re.sub(r"^[0-9a-f]{12}-", "", entry)
+dirfd = None
+def drop():
+    try:
+        os.unlink(entry, dir_fd=dirfd)
+    except OSError:
+        pass
 def refuse(reason):
+    if dirfd is not None:
+        drop()
     print("error " + reason)
     sys.exit(0)
-if os.path.dirname(pkg) != updates or os.path.islink(updates):
+if os.path.dirname(pkg) != updates or entry in ("", ".", ".."):
+    refuse("package not directly under " + updates)
+try:
+    dirfd = os.open(updates, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+except OSError:
     refuse("package not directly under " + updates)
 if not re.fullmatch(r"ucm_[0-9][0-9A-Za-z.+]*_all\.deb|ucm(-el[0-9]+)?-[0-9][0-9A-Za-z.+]*-[0-9]+\.[0-9A-Za-z_]+\.noarch\.rpm", name):
     refuse("package name is not one of a UCM release: " + name)
 if not re.fullmatch(r"[0-9][0-9A-Za-z.+-]*", to or ""):
     refuse("no valid target version in the update manifest")
 try:
-    fd = os.open(pkg, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    fd = os.open(entry, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dirfd)
 except OSError:
     refuse("package is missing or is a symbolic link")
 with os.fdopen(fd, "rb") as src:
@@ -160,6 +174,7 @@ with os.fdopen(fd, "rb") as src:
         for chunk in iter(lambda: src.read(1 << 20), b""):
             digest.update(chunk)
             dst.write(chunk)
+drop()
 url = "%s/v%s/%s.sha256" % (os.environ["RELEASES"], to, name)
 def discard(reason):
     os.remove(copy)
@@ -220,7 +235,6 @@ if [ -f "$UPDATE_FILE" ]; then
         REASON="${CLAIM#error }"
         log "ERROR: update refused: $REASON"
         write_result failed precheck "$REASON"
-        rm -f "$ORIGINAL_PATH"
         finish_update
     fi
     PACKAGE_PATH="${CLAIM#ok }"
@@ -228,7 +242,6 @@ if [ -f "$UPDATE_FILE" ]; then
         log "ERROR: update refused: the package is not named ucm"
         write_result failed precheck "the package is not named ucm"
         rm -rf "$(dirname "$PACKAGE_PATH")"
-        rm -f "$ORIGINAL_PATH"
         finish_update
     fi
 
@@ -296,9 +309,8 @@ if [ -f "$UPDATE_FILE" ]; then
         fi
     fi
 
-    # Clean up the downloaded package and its checked copy
+    # The download went with the claim: only the checked copy is left
     rm -rf "$(dirname "$PACKAGE_PATH")"
-    rm -f "$ORIGINAL_PATH"
     log "Cleaned up package: $ORIGINAL_PATH"
 
     finish_update
