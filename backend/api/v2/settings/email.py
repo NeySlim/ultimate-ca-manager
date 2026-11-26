@@ -84,9 +84,12 @@ def _smtp_target(smtp):
     target = {'smtp_host': smtp.smtp_host or '', 'smtp_port': smtp.smtp_port or 587,
               'smtp_security': _smtp_security(smtp), 'smtp_auth_method': method,
               'from_email': smtp.smtp_from or ''}
+    # The account that signs in sends the mail; its password alone stays write:settings
+    if method != 'none':
+        target['smtp_username'] = smtp.smtp_user or ''
     if method == 'oauth2':
-        for key in ('smtp_oauth_provider', 'smtp_oauth_tenant_id', 'smtp_oauth_authorize_url',
-                    'smtp_oauth_token_url', 'smtp_oauth_redirect_uri'):
+        for key in ('smtp_oauth_provider', 'smtp_oauth_tenant_id', 'smtp_oauth_client_id',
+                    'smtp_oauth_authorize_url', 'smtp_oauth_token_url', 'smtp_oauth_redirect_uri'):
             target[key] = (getattr(smtp, key) or '').lower() if key == 'smtp_oauth_provider' \
                 else (getattr(smtp, key) or '')
     return target
@@ -331,12 +334,13 @@ def smtp_oauth_providers():
 
 
 @bp.route('/api/v2/settings/email/oauth/authorize-url', methods=['POST'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def smtp_oauth_authorize_url():
     """Build the OAuth consent URL and stash ``state`` in the user session.
 
     Body (optional): {"redirect_uri": "https://..."} to override default.
     Returns: {"authorize_url": "...", "redirect_uri": "..."}
+    admin:settings, as the SMTP target: the consent picks the mailbox that sends.
     """
     from flask import session
     from models.email_notification import SMTPConfig
@@ -347,13 +351,11 @@ def smtp_oauth_authorize_url():
         return error_response('SMTP configuration not found: save settings first', 404)
 
     data = request.json or {}
-    stored_uri = smtp.smtp_oauth_redirect_uri or _default_oauth_redirect_uri()
-    redirect_uri = data.get('redirect_uri') or stored_uri
-    # The consent's redirect is part of the SMTP target: moved only with admin:settings
-    if redirect_uri != stored_uri and not has_permission(
-            'admin:settings', getattr(g, 'permissions', None) or []):
-        return error_response(
-            'These settings require the admin:settings permission: redirect_uri', 403)
+    redirect_uri = (
+        data.get('redirect_uri')
+        or smtp.smtp_oauth_redirect_uri
+        or _default_oauth_redirect_uri()
+    )
 
     try:
         url, state = oauth_helper.build_authorize_url(smtp, redirect_uri)
@@ -378,7 +380,7 @@ def smtp_oauth_authorize_url():
 
 
 @bp.route('/api/v2/settings/email/oauth/callback', methods=['GET'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def smtp_oauth_callback():
     """Receive the OAuth redirect, exchange ``code`` for tokens, persist refresh_token.
 

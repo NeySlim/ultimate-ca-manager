@@ -67,7 +67,7 @@ export default function EmailSection({ hasPermission, settings, fieldErrors = {}
         )}
         {method === 'password' && (
           <>
-            <Input id="set-smtp_username" label={t('settings.smtpUsername')} value={settings.smtp_username || ''}
+            <Input id="set-smtp_username" label={lockedLabel('settings.smtpUsername')} disabled={locked} value={settings.smtp_username || ''}
               onChange={(e) => updateSetting('smtp_username', e.target.value)} />
             <SecretInput id="set-smtp_password" label={t('settings.smtpPassword')}
               value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
@@ -78,7 +78,7 @@ export default function EmailSection({ hasPermission, settings, fieldErrors = {}
         {method === 'oauth2' && (
           <>
             {/* Mailbox / username (XOAUTH2 uses email address as user) */}
-            <Input id="set-smtp_username" label={t('settings.smtpUsername')} value={settings.smtp_username || ''}
+            <Input id="set-smtp_username" label={lockedLabel('settings.smtpUsername')} disabled={locked} value={settings.smtp_username || ''}
               onChange={(e) => updateSetting('smtp_username', e.target.value)} />
             {/* Provider: a preset that fills the endpoints */}
             <SegmentedField id="set-smtp_oauth_provider" label={lockedLabel('settings.smtpOauthProvider')} disabled={locked}
@@ -97,7 +97,7 @@ export default function EmailSection({ hasPermission, settings, fieldErrors = {}
               <Input id="set-smtp_oauth_tenant_id" label={lockedLabel('settings.smtpOauthTenant')} disabled={locked} value={settings.smtp_oauth_tenant_id || ''}
                 onChange={oauth('smtp_oauth_tenant_id')} placeholder="common" hint={t('settings.smtpOauthTenantHintM365')} />
             )}
-            <Input id="set-smtp_oauth_client_id" label={t('settings.smtpOauthClientId')} value={settings.smtp_oauth_client_id || ''}
+            <Input id="set-smtp_oauth_client_id" label={lockedLabel('settings.smtpOauthClientId')} disabled={locked} value={settings.smtp_oauth_client_id || ''}
               onChange={oauth('smtp_oauth_client_id')} />
             <SecretInput id="set-smtp_oauth_client_secret" label={t('settings.smtpOauthClientSecret')}
               value={settings.smtp_oauth_client_secret === '********' ? '' : (settings.smtp_oauth_client_secret || '')}
@@ -136,7 +136,7 @@ export default function EmailSection({ hasPermission, settings, fieldErrors = {}
             <div className="settings-actions">
               <Pill tone={settings.has_oauth_refresh_token ? 'good' : 'muted'}
                 label={settings.has_oauth_refresh_token ? t('settings.smtpOauthStatusAuthorized') : t('settings.smtpOauthStatusNotAuthorized')} />
-              <Btn tone="primary" icon="key" onClick={handleSmtpOAuthAuthorize} disabled={!settings.smtp_oauth_client_id || saving}
+              <Btn tone="primary" icon="key" onClick={handleSmtpOAuthAuthorize} disabled={locked || !settings.smtp_oauth_client_id || saving}
                 title={oauthDirty ? t('settings.smtpOauthAutoSaveHint') : undefined}>
                 {oauthDirty ? t('settings.smtpOauthSaveAndAuthorize') : t('settings.smtpOauthAuthorize')}
               </Btn>

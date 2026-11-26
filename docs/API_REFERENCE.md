@@ -3141,7 +3141,7 @@ Content-Type: application/json
 
 `smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). With `starttls` and `ssl` the relay's certificate must chain to the system trust store and name `smtp_host`; there is no setting to skip the check. The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
 
-`PATCH` needs `write:settings`. The SMTP target (`smtp_host`, `smtp_port`, `smtp_security` or the older booleans, `smtp_auth` and `smtp_auth_method`, `from_email` and, under OAuth2, `smtp_oauth_provider`, `smtp_oauth_tenant_id`, `smtp_oauth_authorize_url`, `smtp_oauth_token_url` and `smtp_oauth_redirect_uri`) changes only with `admin:settings`: without it a request that would change one of them is refused with 403 naming them, and nothing is saved. Sending them with their stored values is accepted.
+`PATCH` needs `write:settings`. The SMTP target (`smtp_host`, `smtp_port`, `smtp_security` or the older booleans, `smtp_auth` and `smtp_auth_method`, `from_email`, `smtp_username` when authentication is on and, under OAuth2, `smtp_oauth_provider`, `smtp_oauth_tenant_id`, `smtp_oauth_client_id`, `smtp_oauth_authorize_url`, `smtp_oauth_token_url` and `smtp_oauth_redirect_uri`) changes only with `admin:settings`: without it a request that would change one of them is refused with 403 naming them, and nothing is saved. Sending them with their stored values is accepted, and so is a new password or client secret for the same account.
 
 ### Webhooks
 See [Webhooks](#webhooks): `/api/v2/settings/webhooks` does not exist.
@@ -3244,8 +3244,8 @@ POST /api/v2/settings/email/oauth/revoke
 ```
 - `template` reads and `preview` need `read:settings`; `PATCH` and `reset` need `admin:settings`, as the SMTP target, since the template wraps every password-reset link. `GET` returns the HTML `template` and `text_template` in force (the defaults when none is customized), `is_custom`, `is_text_custom` and the two defaults. `PATCH` takes `template` and/or `text_template` (`400` for an empty body). `preview` renders `template` of `type` `html` (default) or `text` with sample data and returns it under `html` or `text`. `reset` restores both defaults.
 - `oauth/providers` (`read:settings`) returns the provider presets (`smtp_host`, `smtp_port`, TLS flags, `needs_tenant`, `default_tenant`).
-- `oauth/authorize-url` (`write:settings`) builds the consent URL from the saved SMTP settings (`404` when none are saved) and returns `authorize_url` and `redirect_uri`; optional `redirect_uri` in the body, which needs `admin:settings` when it differs from the saved one (`403` otherwise). The state is kept in the caller's session.
-- `oauth/callback` (`write:settings`) is the redirect target: it exchanges `code` for tokens, stores the refresh token and answers an HTML page saying whether authorization succeeded (state mismatch, missing parameters and provider errors are reported there).
+- `oauth/authorize-url` (`admin:settings`, as the consent picks the mailbox that sends) builds the consent URL from the saved SMTP settings (`404` when none are saved) and returns `authorize_url` and `redirect_uri`; optional `redirect_uri` in the body. The state is kept in the caller's session.
+- `oauth/callback` (`admin:settings`) is the redirect target: it exchanges `code` for tokens, stores the refresh token and answers an HTML page saying whether authorization succeeded (state mismatch, missing parameters and provider errors are reported there).
 - `oauth/revoke` (`write:settings`) drops the stored refresh and access tokens (`404` when no SMTP settings exist).
 
 ### Public Endpoints

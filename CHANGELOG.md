@@ -20,7 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- Email settings: `write:settings` (the operator role) could point the SMTP server, and with it every password-reset link, at a host of its choosing; the SMTP target (host, port, security, authentication, sender and OAuth2 endpoints) now changes only with `admin:settings`, like `base_url`, and so do the email templates, which wrap those links.
+- Email settings: `write:settings` (the operator role) could point the SMTP server, and with it every password-reset link, at a host of its choosing; the SMTP target (host, port, security, authentication, account, sender, OAuth2 client, endpoints and consent) now changes only with `admin:settings`, like `base_url`, and so do the email templates, which wrap those links.
 - Email: STARTTLS and implicit TLS accepted any certificate, so an attacker on the path to the relay received the SMTP password and every message; the relay's certificate and name are now checked against the system trust store.
 - Account: an open session alone could register a passkey or enrol an mTLS certificate, either of which then signed in without the password or second factor; both now ask the password again, or the authenticator code of an account without one.
 - Account: an open session could change the profile email, where password-reset links go, without the password and without a trace; the change now asks the current password, is audited and is announced to the old address.

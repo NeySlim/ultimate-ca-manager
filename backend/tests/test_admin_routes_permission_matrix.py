@@ -86,6 +86,8 @@ ROUTES = {
     'POST /api/v2/settings/backup/create': ADMIN_SYSTEM,
     'POST /api/v2/settings/backup/restore': ADMIN_SYSTEM,
     # api.v2.settings.email
+    'GET /api/v2/settings/email/oauth/callback': ADMIN_SETTINGS,
+    'POST /api/v2/settings/email/oauth/authorize-url': ADMIN_SETTINGS,
     'PATCH /api/v2/settings/email/template': ADMIN_SETTINGS,
     'POST /api/v2/settings/email/template/reset': ADMIN_SETTINGS,
     # api.v2.settings.general

@@ -15,7 +15,7 @@ _COLUMNS = ('enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_from', 'smtp
             'smtp_oauth_provider', 'smtp_oauth_tenant_id', 'smtp_oauth_authorize_url',
             'smtp_oauth_token_url', 'smtp_oauth_redirect_uri', '_smtp_password',
             '_smtp_oauth_client_secret', '_smtp_oauth_refresh_token', 'smtp_content_type',
-            'email_template', 'email_text_template')
+            'email_template', 'email_text_template', 'smtp_oauth_client_id')
 
 STORED = dict(enabled=True, smtp_host='relay.example.com', smtp_port=587, smtp_user=None,
               smtp_from='ucm@example.com', smtp_from_name='UCM', smtp_use_tls=True,
@@ -133,12 +133,56 @@ def test_an_operator_cannot_move_the_oauth_endpoints(app, operator_client, store
         assert SMTPConfig.query.first().smtp_oauth_token_url == 'https://idp.example.com/token'
 
 
-def test_an_operator_cannot_redirect_the_oauth_consent(app, operator_client, stored_smtp):
-    r = operator_client.post(f'{URL}/oauth/authorize-url',
-                             data=json.dumps({'redirect_uri': 'https://attacker.example/cb'}),
+@pytest.mark.parametrize('body', [{'redirect_uri': 'https://attacker.example/cb'}, {}])
+def test_an_operator_cannot_start_an_oauth_consent(app, operator_client, stored_smtp, body):
+    """A consent picks the mailbox that sends: the operator would sign in with its own."""
+    r = operator_client.post(f'{URL}/oauth/authorize-url', data=json.dumps(body),
                              content_type='application/json')
     assert r.status_code == 403, r.data
-    assert 'redirect_uri' in r.get_json()['message']
+
+
+def _sign_in_with_password(app):
+    with app.app_context():
+        row = SMTPConfig.query.first()
+        row.smtp_auth, row.smtp_auth_method, row.smtp_user = True, 'password', 'mailer@example.com'
+        row.smtp_password = 'old-secret'
+        db.session.commit()
+
+
+def test_an_operator_cannot_change_the_smtp_account(app, operator_client, stored_smtp):
+    """The account signs the mail as much as the host does."""
+    _sign_in_with_password(app)
+    r = _patch(operator_client, {'smtp_username': 'mine@attacker.example',
+                                 'smtp_password': 'attacker-secret'})
+    assert r.status_code == 403, r.data
+    assert 'smtp_username' in r.get_json()['message']
+    with app.app_context():
+        db.session.expire_all()
+        assert SMTPConfig.query.first().smtp_user == 'mailer@example.com'
+
+
+def test_an_operator_types_the_password_of_the_same_account(app, operator_client, stored_smtp):
+    _sign_in_with_password(app)
+    r = _patch(operator_client, {'smtp_username': 'mailer@example.com',
+                                 'smtp_password': 'rotated-secret'})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        db.session.expire_all()
+        assert SMTPConfig.query.first().smtp_password == 'rotated-secret'
+
+
+def test_an_operator_cannot_change_the_oauth_client(app, operator_client, stored_smtp):
+    with app.app_context():
+        row = SMTPConfig.query.first()
+        row.smtp_auth, row.smtp_auth_method, row.smtp_oauth_provider = True, 'oauth2', 'google'
+        row.smtp_oauth_client_id = 'ucm-client'
+        db.session.commit()
+    r = _patch(operator_client, {'smtp_oauth_client_id': 'attacker-client'})
+    assert r.status_code == 403, r.data
+    assert 'smtp_oauth_client_id' in r.get_json()['message']
+    with app.app_context():
+        db.session.expire_all()
+        assert SMTPConfig.query.first().smtp_oauth_client_id == 'ucm-client'
 
 
 def test_the_admin_moves_the_target(app, auth_client, stored_smtp):
