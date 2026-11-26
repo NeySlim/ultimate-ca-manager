@@ -546,7 +546,7 @@ def test_the_rpm_post_marks_a_new_install_before_anything_else(tmp_path):
 
 @pytest.mark.parametrize('count, kept', [('0', False), ('1', True)])
 def test_the_rpm_postun_drops_the_mark_on_erase_only(tmp_path, count, kept):
-    m = re.search(r'^%postun\n(.*?)^%files\n', SPEC.read_text(), re.M | re.S)
+    m = re.search(r'^%postun\n(.*?)^%files\b', SPEC.read_text(), re.M | re.S)
     assert m, 'no %postun section'
     body = m.group(1)
     macro = '%systemd_postun_with_restart %{name}.service\n'

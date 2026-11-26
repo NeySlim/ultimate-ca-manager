@@ -3349,14 +3349,15 @@ GET /api/v2/system/instance
   registered and not gone, `null` when the registry cannot be read.
 - `health.status`: `ok`, `degraded` (a check of `/health/ready` failed), `maintenance` (an HA
   cluster maintenance). In safe mode the route answers `503` like the rest of the API, and
-  `/health/ready` says why. When the database check fails, what the database holds is
-  `null` (`instance_id`, `update_channel`, `cas`, `update`, `backup`, and `mode.nodes` in HA)
-  instead of an error.
+  `/health/ready` says why. When the database check of
+  `/health/ready` fails or times out, what the database holds is `null` (`instance_id`,
+  `update_channel`, `cas`, `update`, `backup`, and `mode.nodes` in HA) instead of an error.
 - `cas`: active means holding its certificate, not revoked, not expired; `expiring_90_days` and
   `expiring_365_days` count active CAs, `next_expiry` is the nearest end of an active CA.
 - `update`: the verdict of the last scheduled update check, all `null` before the first one;
   `latest_version` is set only when `available` is `true`. A version found on the `rc` channel
-  gives `available: null` once the channel is back to `stable`, until the next check.
+  and newer than the running one gives `available: null` once the channel is back to
+  `stable`, until a check finds an update on that channel.
 - `backup`: whether the scheduled backup is on, when the newest archive was written (`null`
   without one) and the outcome of the last scheduled run (`ok`, `failed`, `skipped`, `null`
   before the first).

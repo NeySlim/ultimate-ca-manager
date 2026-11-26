@@ -36,7 +36,7 @@ def _session_proof():
     return confirm_account_holder(g.current_user, request.get_json(silent=True))
 
 
-_WIDER_NETWORKS = 'An API key can only create a key limited to its own networks'
+_WIDER_NETWORKS = 'An API key can only create or regenerate a key limited to its own networks'
 
 
 def _caller_key_networks():

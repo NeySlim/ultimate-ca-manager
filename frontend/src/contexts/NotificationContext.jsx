@@ -113,8 +113,8 @@ export function NotificationProvider({ children }) {
   const [dialogNotice, setDialogNotice] = useState(null)
   const clearNotice = useCallback(() => setDialogNotice(null), [])
   // Dialogs sent (submit, or a click on the primary button) and not answered yet, with the delay that
-  // ends their sending: a message raised meanwhile is theirs; the sending also ends at its first
-  // answer (once the task that raised it is over) and at any other use of the dialog
+  // ends their sending: an error or a warning raised meanwhile is theirs; the sending also ends at its
+  // first answer or success (once the task that raised it is over) and at any other use of the dialog
   const sending = useRef(new Map())
   const disarm = useCallback((dialog) => {
     clearTimeout(sending.current.get(dialog))
@@ -134,9 +134,11 @@ export function NotificationProvider({ children }) {
       const button = e.target?.closest?.(PRIMARY)
       if (button && !button.disabled) arm(button.closest('dialog'))
     }
-    // Typing or pointing elsewhere in the dialog: a later message no longer answers the sending
+    // Typing, or pointing at another control of the dialog: a later message no longer answers the
+    // sending; a pointer on its text or padding (a scroll on a phone) is no use of it
     const onUse = (e) => {
       if (e.target?.closest?.(PRIMARY)) return
+      if (e.type === 'pointerdown' && !e.target?.closest?.(CONTROLS)) return
       const dialog = e.target?.closest?.('dialog')
       if (dialog && armed.has(dialog)) disarm(dialog)
     }
@@ -174,8 +176,10 @@ export function NotificationProvider({ children }) {
   const addToast = useCallback((type, message, options) => {
     const opts = options !== null && typeof options === 'object' ? options : { duration: options }
     const action = opts.action && opts.action.label && typeof opts.action.onClick === 'function' ? opts.action : null
-    // Only an error or a warning without action answers the sending: a passing message leaves it armed
+    // Only an error or a warning without action answers the sending; a success ends it with its task,
+    // an information leaves it armed
     const sent = (type === 'error' || type === 'warning') && !action ? answered() : null
+    if (type === 'success') answered()
     const form = sent ? formDialogBar(sent) : null
     if (form) {
       setDialogNotice({ id: Date.now() + Math.random(), type, message, duration: opts.duration, ...form })
@@ -297,6 +301,8 @@ function topModal() {
 
 // A dialog's primary button: a click on it sends the dialog as a submit would
 const PRIMARY = 'dialog .modal-actions :is(.primary, .is-primary, .danger, [type="submit"])'
+// What a pointer uses in a dialog, as opposed to its text and padding
+const CONTROLS = 'input, select, textarea, button, a[href], label, summary, [contenteditable]:not([contenteditable="false"]), [role="button"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="option"], [role="combobox"], [role="menuitem"], [role="slider"]'
 
 // A form dialog (it has an action bar), with its last bar
 function formDialogBar(dialog) {

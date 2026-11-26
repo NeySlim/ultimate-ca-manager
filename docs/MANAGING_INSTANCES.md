@@ -39,7 +39,7 @@ Account > API Keys**, with the **Instance management** scope. It holds exactly:
 | Scope | Allows |
 |---|---|
 | `read:instance` | `GET /api/v2/system/instance` |
-| `read:settings` | reading the settings (`GET /api/v2/settings/...`), except the backup history and download and `audit-logs`, which take `admin:system` |
+| `read:settings` | reading the settings (`GET /api/v2/settings/...`), except the backup history and download and `audit-logs`, which take `admin:system`, and the e-mail OAuth callback (`email/oauth/callback`), which takes `admin:settings` |
 | `write:backups` | starting a backup (`POST /api/v2/system/backup/create`) and following its job |
 | `write:updates` | installing an update (`POST /api/v2/system/updates/install`) and following an HA rolling update |
 
@@ -56,7 +56,7 @@ rotate it like any other credential: a key cannot be read back after its creatio
 A console connects from afar, so its key should work from the console's address only. When
 creating the key, fill **Allowed source addresses** (or `allowed_networks` in the API) with the
 console's IP addresses or CIDR networks. From any other address the key is refused with `403` and
-its last use is not updated. A key created through a limited key stays inside the same networks.
+its last use is not updated. A key created or regenerated through a limited key stays inside the same networks.
 
 The address checked is the one UCM resolves for the request. Behind a reverse proxy, declare it
 in `UCM_TRUSTED_PROXIES` and `UCM_TRUSTED_PROXY_HOPS`, otherwise every request seems to come from

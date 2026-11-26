@@ -144,6 +144,6 @@ def test_a_limited_key_cannot_regenerate_a_key_wider_than_itself(app, auth_clien
                                                  'allowed_networks': ['198.51.100.0/24']}), 201)
     r = _regenerate(app, wider['id'], limited['key'])
     assert r.status_code == 403
-    assert b'limited to its own networks' in r.data
+    assert b'can only create or regenerate a key limited to its own networks' in r.data
     with app.app_context():
         assert db.session.get(APIKey, wider['id']).is_active

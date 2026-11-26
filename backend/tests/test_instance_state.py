@@ -234,7 +234,9 @@ def test_safe_mode_answers_503_like_the_rest_of_the_api(app, state_key, monkeypa
 
 
 @pytest.mark.parametrize('channel, notified, available', [
-    ('stable', '999.0-rc1', None), ('rc', '999.0-rc1', True), ('rc', '999.0', True), ('stable', '999.0', True)])
+    ('stable', '999.0-rc1', None), ('rc', '999.0-rc1', True), ('rc', '999.0', True), ('stable', '999.0', True),
+    # An rc the running version has reached is no update on any channel
+    ('stable', '0.1-rc1', False)])
 def test_update_availability_follows_the_current_channel(app, state_key, channel, notified, available):
     import services.updates as updates
     keys = (updates._NOTIFIED_VERSION_KEY, updates._LAST_CHECK_TS_KEY, updates.UPDATE_CHANNEL_KEY)
