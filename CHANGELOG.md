@@ -30,6 +30,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME server: a response to the challenge of a pending authorization past its expiry, or of an expired order, ran the validation and could turn the authorization valid; the authorization and its order now become invalid first and the challenge is returned invalid (RFC 8555 section 7.1.6).
 - OCSP: with two records of one CA (same subject and key), a revocation, a lifted hold or an external CRL cleared the cached answers of only one of them, so the responder could answer `good` for a revoked certificate until nextUpdate; the cache of every twin record is now cleared.
 - HA: a node whose clock differed from the leader's by more than two passes showed the scheduler state as stale for good, or never; the state the leader publishes is now judged on the PostgreSQL server clock.
 - HA: the scheduler leader wrote its heartbeat only between two tasks, so one task longer than three passes (an ACME renewal waiting on DNS) showed the cluster without a leader and let a restore or a rolling restart pass it over; the leader now beats while a task runs, as long as it holds the lock. During such a task a restore now waits for the maintenance acknowledgment and answers 409 `maintenance_not_acknowledged` after 30 seconds instead of passing the leader over.
