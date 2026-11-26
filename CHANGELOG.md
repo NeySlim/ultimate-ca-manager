@@ -32,6 +32,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Settings > Security: the encryption text gave /etc/ucm/master.key as the master key's place; it now names the master.key file of the configuration directory or KEY_ENCRYPTION_KEY, and the help says the configuration directory follows UCM_CONFIG_DIR.
 - Phone cards: the OCSP state of a CRL, the approval of a policy and the last success of a deployment target showed a bare value ("Inactive" read as the CA's state); each now follows its column name.
 - Phone: tapping an authority in the tree, or the To handle figure of the overview, scrolled the panel or the queue with its title under the sticky header; whatever a scroll brings into view now lands below it.
 - Aurore palette: the sticky action bar of a long dialog (Create CA, Create Template, policies, issuance) stood out as a solid band over the translucent dialog; dialogs are now opaque, the bar on the same ground.

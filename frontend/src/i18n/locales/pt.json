@@ -3843,7 +3843,7 @@
     "saveSettings": "Salvar configurações",
     "securitySubtitle": "Sessões, autenticação e criptografia.",
     "keyEncryption": "Criptografia de chaves privadas",
-    "encryptionDesc": "Criptografa todas as chaves privadas no banco de dados com AES-128 (Fernet, com HMAC-SHA256). Protegidas por uma chave mestra em /etc/ucm/master.key. Quando ativada, a UCM deixa de manter arquivos de chave em texto claro no diretório privado e remove os existentes. Use hooks de implantação para colocar as chaves onde um serviço precisa delas.",
+    "encryptionDesc": "Criptografa todas as chaves privadas no banco de dados com AES-128 (Fernet, com HMAC-SHA256). Protegidas por uma chave mestra: o arquivo master.key do diretório de configuração da UCM ou a variável KEY_ENCRYPTION_KEY; com a criptografia ativada, Fonte da chave indica a que está em uso. Quando ativada, a UCM deixa de manter arquivos de chave em texto claro no diretório privado e remove os existentes. Use hooks de implantação para colocar as chaves onde um serviço precisa delas.",
     "enableEncryption": "Ativar criptografia",
     "disableEncryption": "Desativar criptografia",
     "encryptRemainingKeys": "Criptografar chaves restantes ({{count}})",
