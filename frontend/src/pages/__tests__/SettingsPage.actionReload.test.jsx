@@ -52,6 +52,13 @@ beforeEach(() => {
 })
 afterEach(() => { vi.clearAllMocks(); dropAllDrafts() })
 
+// A message as the browser delivers it: its origin, and the window that sent it
+function postFrom(source, data, origin = window.location.origin) {
+  const event = new MessageEvent('message', { data, origin })
+  Object.defineProperty(event, 'source', { value: source })
+  window.dispatchEvent(event)
+}
+
 async function withPendingDrafts() {
   render(<MemoryRouter><SettingsPage /></MemoryRouter>)
   await waitFor(() => expect(screen.getByLabelText('system-name')).toHaveValue('PKI'))
@@ -93,12 +100,37 @@ describe('SettingsPage: a one-off action keeps the pending drafts', { timeout: 2
       expect(settingsService.updateBulk).not.toHaveBeenCalled()
       expectDraftsKept()
       const loads = settingsService.getAll.mock.calls.length
-      await act(async () => { window.dispatchEvent(new MessageEvent('message', { data: { type: 'smtp-oauth', ok: true } })) })
+      await act(async () => { postFrom(popup, { type: 'smtp-oauth', ok: true }) })
       await waitFor(() => expect(settingsService.getAll.mock.calls.length).toBeGreaterThan(loads))
       await act(async () => {})
       expectDraftsKept()
       // the saved section reads what the server now holds
       expect(screen.getByLabelText('smtp-host')).toHaveValue('smtp.example.com')
+    } finally {
+      popup.closed = true
+      open.mockRestore()
+    }
+  })
+})
+
+describe('SettingsPage: the SMTP OAuth result comes from its own popup only', { timeout: 20000 }, () => {
+  it.each([
+    ['another origin', (popup) => [popup, 'https://idp.example.com']],
+    ['another window of the console origin', () => [window, window.location.origin]],
+    ['no window at all', () => [null, window.location.origin]],
+  ])('ignores a success posted from %s', async (_name, from) => {
+    const popup = { closed: false }
+    const open = vi.spyOn(window, 'open').mockReturnValue(popup)
+    try {
+      render(<MemoryRouter><SettingsPage /></MemoryRouter>)
+      await waitFor(() => expect(screen.getByLabelText('system-name')).toHaveValue('PKI'))
+      await act(async () => { fireEvent.click(screen.getByText('authorize')) })
+      const [source, origin] = from(popup)
+      await act(async () => { postFrom(source, { type: 'smtp-oauth', ok: true }, origin) })
+      expect(notificationSpies.showSuccess).not.toHaveBeenCalledWith('settings.smtpOauthSuccess')
+      // The popup's own answer still settles it
+      await act(async () => { postFrom(popup, { type: 'smtp-oauth', ok: true }) })
+      await waitFor(() => expect(notificationSpies.showSuccess).toHaveBeenCalledWith('settings.smtpOauthSuccess'))
     } finally {
       popup.closed = true
       open.mockRestore()

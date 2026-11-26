@@ -1482,7 +1482,9 @@ export default function SettingsPage() {
           showError(t('settings.smtpOauthFailure'))
         }
       }
+      // Only the callback page, same-origin and in the popup opened here, settles the result
       const handler = (event) => {
+        if (event.origin !== window.location.origin || !popup || event.source !== popup) return
         if (!event.data || event.data.type !== 'smtp-oauth') return
         finish(!!event.data.ok)
       }
