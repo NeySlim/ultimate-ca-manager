@@ -301,9 +301,12 @@ def restore_primary(ca_id: int, certificate, username: str = 'system'):
     """Put a self-signed certificate back on a record that holds a cross-certificate of its key.
 
     The replaced certificate is kept as a cross-certificate; returns ``(record, row, warnings)``."""
-    from services.import_service import extract_cert_info, update_ca_from_import, ImportConflict
+    from services.import_service import extract_cert_info, lock_ca_row, update_ca_from_import, ImportConflict
     from utils.cert_issuer import is_self_signed
-    record = _record(ca_id)
+    # The certificate replaced and the subject and key checks are read under the CA row lock
+    record = lock_ca_row(ca_id)
+    if record is None:
+        raise CrossCertError('CA not found', 404, 'not_found')
     ident = _identity(record)
     if ident is None:
         _refuse_unconvertible(record, 'Only a record holding a certificate that is not self-signed can be restored',

@@ -18,7 +18,7 @@ from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.cert_issuer import private_key_matches
 from utils.key_type import weak_ca_key_refusal
-from services.import_service import KeyPasswordError, load_import_private_key
+from services.import_service import KeyPasswordError, load_import_private_key, lock_ca_row
 from utils.key_codec import MalformedKey, private_key_to_pem, refuse_eddsa_key
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from services.audit_service import AuditService
@@ -75,8 +75,9 @@ def import_ca_private_key(ca_id):
     except Exception as e:
         logger.warning(f"CA {ca_id} key import: invalid key: {e}")
         return error_response('Invalid private key format', 400)
+    matched_crt = ca.crt
     try:
-        cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+        cert = x509.load_pem_x509_certificate(base64.b64decode(matched_crt))
     except Exception:
         return error_response('CA certificate could not be parsed', 400)
     if not private_key_matches(private_key, cert):
@@ -86,6 +87,21 @@ def import_ca_private_key(ca_id):
     if weak:
         return error_response(weak, 400)
 
+    # The CA is read again under its row lock: an HSM key attached meanwhile keeps the CA
+    ca = lock_ca_row(ca_id)
+    if ca is None:
+        db.session.rollback()
+        return error_response('CA not found', 404)
+    if ca.hsm_key_id:
+        db.session.rollback()
+        return error_response('CA key lives in an HSM', 400)
+    if ca.prv:
+        db.session.rollback()
+        return error_response('CA already has a private key', 400)
+    if ca.crt != matched_crt:
+        # The key was matched against a certificate the CA no longer holds
+        db.session.rollback()
+        return error_response('The CA certificate changed during the key import; import the key again', 409)
     key_pem = private_key_to_pem(private_key)
     ca.prv = encrypt_private_key(base64.b64encode(key_pem).decode('utf-8'))
     ok, err = safe_commit(logger, "Failed to import CA private key")
@@ -109,4 +125,75 @@ def import_ca_private_key(ca_id):
     problem = signing_ca_problem(ca)
     message = (f'Private key imported; the CA still cannot sign: {problem}' if problem
                else f'Private key imported; CA "{ca_dict["descr"]}" can now sign')
+    return success_response(data=ca_dict, message=message)
+
+
+def _hsm_attach_refusal():
+    """403 unless the caller may also read the HSM inventory, as binding a new CA to a key requires."""
+    from auth.unified import has_permission
+    if has_permission('read:hsm', getattr(g, 'permissions', None) or []):
+        return None
+    return error_response('Attaching an HSM key to a CA requires the read:hsm permission', 403)
+
+
+@bp.route('/api/v2/cas/<int:ca_id>/hsm-keys', methods=['GET'])
+@require_auth(['write:cas'])
+def list_ca_hsm_keys(ca_id):
+    """Keys of an HSM provider whose public key is this keyless CA's (#458). Query: ``provider_id``."""
+    from services.hsm.ca_key_attach import AttachRefused, compatible_keys
+    refusal = _hsm_attach_refusal()
+    if refusal:
+        return refusal
+    provider_id = request.args.get('provider_id', type=int)
+    if provider_id is None:
+        return error_response('provider_id must be an integer', 400)
+    try:
+        keys = compatible_keys(db.session.get(CA, ca_id), provider_id)
+    except AttachRefused as e:
+        return error_response(str(e), e.status)
+    return success_response(data={'keys': keys})
+
+
+@bp.route('/api/v2/cas/<int:ca_id>/hsm-key', methods=['POST'])
+@require_auth(['write:cas'])
+def attach_ca_hsm_key(ca_id):
+    """Attach a key an HSM holds to a CA that holds only its certificate (#458).
+
+    Body (JSON): ``{provider_id, key_identifier}``. The key must be the certificate's own and sign for it.
+    """
+    from services.hsm.ca_key_attach import AttachRefused, attach
+    from services.hsm.key_binding import HsmKeyBound
+    refusal = _hsm_attach_refusal()
+    if refusal:
+        return refusal
+    data = request.get_json(silent=True) or {}
+    provider_id = data.get('provider_id')
+    if not isinstance(provider_id, int) or isinstance(provider_id, bool):
+        return error_response('provider_id must be an integer', 400)
+    key_identifier = data.get('key_identifier')
+    if not isinstance(key_identifier, str) or not key_identifier.strip():
+        return error_response('key_identifier is required', 400)
+    try:
+        ca, key_row = attach(ca_id, provider_id, key_identifier)
+    except AttachRefused as e:
+        db.session.rollback()
+        return error_response(str(e), e.status)
+    except HsmKeyBound as e:
+        db.session.rollback()
+        return error_response(str(e), 409)
+
+    username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
+    provider_name = key_row.provider.name if key_row.provider else ''
+    AuditService.log_action(
+        action='ca_hsm_key_attached', resource_type='ca', resource_id=ca.id, resource_name=ca.descr,
+        details=(f"HSM key '{key_row.label}' ({key_row.key_identifier}, {key_row.algorithm}) on provider "
+                 f"'{provider_name}' attached to CA: {ca.descr}"), success=True,
+    )
+    ca_dict = ca.to_dict()
+    from services.webhook_service import emit_ca_updated
+    emit_ca_updated(ca_dict, actor=username, changes={'private_key': 'hsm_attached'})
+    from utils.signing_ca import signing_ca_problem
+    problem = signing_ca_problem(ca)
+    message = (f'HSM key attached; the CA still cannot sign: {problem}' if problem
+               else f'HSM key attached; CA "{ca_dict["descr"]}" can now sign')
     return success_response(data=ca_dict, message=message)

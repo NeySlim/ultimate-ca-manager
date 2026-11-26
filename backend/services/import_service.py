@@ -384,15 +384,29 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     return None
 
 
+def lock_ca_row(ca_id):
+    """The CA row read afresh, locked until the commit: FOR UPDATE on PostgreSQL, the database
+    write lock (no-op UPDATE) on SQLite, which has no row lock."""
+    from sqlalchemy import update
+    from models import CA, db
+    if db.session.get_bind().dialect.name == 'sqlite':
+        table = CA.__table__
+        db.session.execute(update(table).where(table.c.id == ca_id).values(id=table.c.id))
+    return CA.query.filter_by(id=ca_id).with_for_update().populate_existing().one_or_none()
+
+
 def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=None, encrypted_prv=None, name=None):
     """Apply an imported CA certificate to its existing record; returns whether the stored key was unbound.
 
-    The stored key is checked before anything is changed; raises ImportConflict
-    when it cannot be (HSM unreachable, key unreadable). The caller commits.
+    The stored key is checked before anything is changed, then the CA row is locked until the
+    caller's commit. Raises ImportConflict when the key cannot be checked (HSM unreachable, key
+    unreadable), when it changed meanwhile, or when the CA was deleted. The caller commits.
     """
     from services.ca_service import CAService
     from utils.cert_issuer import stored_private_key_matches, hsm_key_binding_matches
-    # An HSM lookup may commit its public key cache, so the key is decided before the record is touched
+    # The key state the decision below is made on, compared again under the CA row lock
+    decided_on = (existing_ca.prv, existing_ca.hsm_key_id)
+    # An HSM lookup flushes its public key cache, so the key is decided before the record is touched
     key_dropped = False
     if key_pem:
         # The new certificate's key arrived with it: it replaces whatever the record held
@@ -411,6 +425,12 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
             raise ImportConflict('Cannot verify the stored private key against the new '
                                  'certificate; the stored key could not be read')
         key_dropped = matches is False
+
+    # The key state is read again under the CA row lock: an HSM key attached since the decision is seen
+    if lock_ca_row(existing_ca.id) is None:
+        raise ImportConflict('CA was deleted during the import')
+    if not key_pem and (existing_ca.prv, existing_ca.hsm_key_id) != decided_on:
+        raise ImportConflict('The key of this CA changed during the import; import the certificate again')
 
     old_serial = stored_certificate_serial(existing_ca)
     # A name given since the first import is the operator's: only one given now replaces it

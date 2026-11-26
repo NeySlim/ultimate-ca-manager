@@ -25,6 +25,7 @@ tests/test_discovery_timestamps.py
 tests/test_health_ha.py
 tests/test_ha_softhsm.py
 tests/test_hsm_key_binding_concurrency_pg.py
+tests/test_ca_hsm_key_attach.py
 tests/test_hsm_sync_concurrency_pg.py
 tests/test_sessions_store.py
 tests/test_session_epoch_pg.py
@@ -146,3 +147,4 @@ tests/test_csv_formula_cells.py
 tests/test_api_key_allowed_networks.py
 tests/test_instance_state.py
 tests/test_instance_admin_scopes.py
+tests/test_cross_repair.py

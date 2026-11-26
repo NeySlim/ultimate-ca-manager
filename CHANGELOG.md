@@ -16,6 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - API keys: `write:backups` starts a backup and `write:updates` installs an update, so a console's key no longer needs `admin:system`; the account page offers an "Instance management" preset with them, `read:instance` and `read:settings` (#403).
 - API keys: a key can be limited to source addresses (IP addresses or CIDR networks), set at creation on the account page or with `allowed_networks`; from any other address it is refused with 403 (#403).
 - Documentation: [Managing several instances](docs/MANAGING_INSTANCES.md) describes what a console watching several instances can rely on: the state route, the scopes and source networks of its key, and the instance identity across restarts, HA nodes and restores (#403).
+- CAs: a CA imported without its private key can be attached to the key an HSM provider still holds (Use a key from the HSM in its details): only the provider's keys whose public key is the certificate's are offered, and the key must sign for the certificate before the CA takes it (#458).
 
 ### Changed
 

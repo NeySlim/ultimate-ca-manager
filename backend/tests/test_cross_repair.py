@@ -196,6 +196,26 @@ def test_restore_primary_refuses_when_a_self_signed_record_is_held(app, auth_cli
     assert 'convert' in r.get_json()['message']
 
 
+def test_restore_primary_reads_the_record_again_under_its_lock(app):
+    """A record restored by another session after this one read it: refused, not restored a second time."""
+    from sqlalchemy import update
+    from services.ca import cross_repair
+    from services.ca.cross_certs import CrossCertError
+    pki, ids = _world(app, with_root_b=False)
+    with app.app_context():
+        read_before = db.session.get(CA, ids['x'])  # held: the session keeps this stale copy
+        assert read_before.caref
+        table = CA.__table__
+        db.session.execute(update(table).where(table.c.id == ids['x']).values(
+            crt=base64.b64encode(pem(pki.root_b).encode()).decode(), caref=None,
+            issuer=pki.root_b.issuer.rfc4514_string(), serial_number=str(pki.root_b.serial_number)))
+        with pytest.raises(CrossCertError) as refused:
+            cross_repair.restore_primary(ids['x'], pem(pki.root_b))
+        db.session.rollback()
+        assert refused.value.code == 'not_restorable'
+        assert CACrossCertificate.query.filter_by(ca_id=ids['x']).count() == 0
+
+
 def test_repairs_need_authentication(app, client):
     assert client.get(FINDINGS).status_code in (401, 403)
     assert client.post('/api/v2/cas/1/convert-to-cross', json={}).status_code in (401, 403)

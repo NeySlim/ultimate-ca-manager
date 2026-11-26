@@ -150,3 +150,59 @@ class TestCaKeyImportReview:
         r = _post(auth_client, ca_id, {'key': _pem(key)})
         assert r.status_code == 200, r.data
         assert 'still cannot sign' in json.loads(r.data)['message']
+
+
+def _while_the_key_is_matched(app, ca_id, change):
+    """Patch the key check so *change* commits in another session after the import has read the CA."""
+    import threading
+    from unittest.mock import patch
+    from api.v2.cas import key as key_api
+    real_matches = key_api.private_key_matches
+
+    def matches_then_change(private_key, cert):
+        def run():
+            with app.app_context():
+                change(db.session.get(CA, ca_id))
+                db.session.commit()
+                db.session.remove()
+        worker = threading.Thread(target=run)
+        worker.start()
+        worker.join(60)
+        return real_matches(private_key, cert)
+    return patch.object(key_api, 'private_key_matches', matches_then_change)
+
+
+class TestCaKeyImportRaces:
+    def test_a_certificate_replaced_while_the_key_is_matched_is_a_conflict(self, app, auth_client):
+        key = ec.generate_private_key(ec.SECP256R1())
+        ca_id = _keyless_ca(app, key, 'Replaced Certificate CA')
+        other = _keyless_ca(app, ec.generate_private_key(ec.SECP256R1()), 'Replacement Certificate CA')
+        with app.app_context():
+            replacement = db.session.get(CA, other).crt
+
+        def replace(ca):
+            ca.crt = replacement
+        with _while_the_key_is_matched(app, ca_id, replace):
+            r = _post(auth_client, ca_id, {'key': _pem(key)})
+        assert r.status_code == 409, r.data
+        with app.app_context():
+            ca = db.session.get(CA, ca_id)
+            assert (ca.prv, ca.crt) == (None, replacement)
+
+    def test_a_ca_deleted_while_the_key_is_matched_releases_its_lock(self, app, auth_client):
+        from unittest.mock import patch
+        from api.v2.cas import key as key_api
+        key = ec.generate_private_key(ec.SECP256R1())
+        ca_id = _keyless_ca(app, key, 'Deleted During Import CA')
+        real_error = key_api.error_response
+        open_at_404 = []
+
+        def error_response(message, status=400, *args, **kwargs):
+            if status == 404:
+                open_at_404.append(db.session().in_transaction())
+            return real_error(message, status, *args, **kwargs)
+        with _while_the_key_is_matched(app, ca_id, db.session.delete), \
+                patch.object(key_api, 'error_response', error_response):
+            r = _post(auth_client, ca_id, {'key': _pem(key)})
+        assert r.status_code == 404, r.data
+        assert open_at_404 == [False]

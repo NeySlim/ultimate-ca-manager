@@ -22,6 +22,7 @@ import { RevokeDialog as AtelierRevoke } from '../pages/certificates/dialogs/Rev
 import { TakeOfflineModal } from '../components/cas/TakeOfflineModal'
 import { RestoreModal } from '../components/cas/RestoreModal'
 import { ImportCaKeyModal } from '../components/cas/ImportCaKeyModal'
+import { AttachHsmKeyModal } from '../components/cas/AttachHsmKeyModal'
 import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
 import { UploadKeyModal } from '../pages/certificates/UploadKeyModal'
 import { IssueCertificateDialog } from '../pages/certificates/IssueCertificateDialog'
@@ -75,6 +76,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   const [offlineOpen, setOfflineOpen] = useState(false)
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [importKeyOpen, setImportKeyOpen] = useState(false)
+  const [attachHsmKeyOpen, setAttachHsmKeyOpen] = useState(false)
   const [uploadCertOpen, setUploadCertOpen] = useState(false)
   const [uploadKeyOpen, setUploadKeyOpen] = useState(false)
   const [renewOpen, setRenewOpen] = useState(false)
@@ -401,6 +403,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
     // Rendered by the CA panel's "no key" banner, not by the action bar
     row({ id: 'importKey', label: t('cas.importPrivateKey', 'Import private key'), icon: Key, inBar: false,
       onClick: () => setImportKeyOpen(true), visible: isCA && canWrite('cas') && holdsNoKey(data) }),
+    // The key an HSM still holds (#458): the server asks read:hsm too, as for a new CA on an HSM key
+    row({ id: 'attachHsmKey', label: t('cas.useHsmKey', 'Use a key from the HSM'), icon: Key, inBar: false,
+      onClick: () => setAttachHsmKeyOpen(true), visible: isCA && canWrite('cas') && hasPermission('read:hsm') && holdsNoKey(data) }),
     row({ id: 'delete', label: t('common.delete'), icon: Trash, danger: true, iconOnly: true, end: true,
       onClick: handleDelete, visible: canDelete(resource) }),
   ] : []
@@ -459,6 +464,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       {isCA && (
         <>
           <ImportCaKeyModal open={importKeyOpen} onClose={() => setImportKeyOpen(false)} ca={data} onSuccess={handleKeyImported} t={t} />
+          <AttachHsmKeyModal open={attachHsmKeyOpen} onClose={() => setAttachHsmKeyOpen(false)} ca={data} onSuccess={handleKeyImported} t={t} />
           <TakeOfflineModal open={offlineOpen} onClose={() => setOfflineOpen(false)} ca={data} onSuccess={settle} />
           <RestoreModal open={restoreOpen} onClose={() => setRestoreOpen(false)} ca={data} onSuccess={settle} />
           <UploadCACertModal open={uploadCertOpen} onClose={() => setUploadCertOpen(false)} ca={data} onSuccess={settle} />

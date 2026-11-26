@@ -131,6 +131,7 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
   }
 
   const importKey = handler('importKey')
+  const attachHsmKey = handler('attachHsmKey')
 
   return (
     <aside className="panel ca-side" aria-labelledby={`${idPrefix}ca-side-title`} data-testid="ca-side" ref={asideRef}>
@@ -165,6 +166,7 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
           <span>
             {t(needsKeyImport(ca) ? 'cas.certificateOnlyBanner' : 'cas.noPrivateKeyBanner')}
             {importKey && <SideAction onClick={importKey}>{t('cas.importPrivateKey')}</SideAction>}
+            {attachHsmKey && <SideAction onClick={attachHsmKey} data-action="ca-attach-hsm-key">{t('cas.useHsmKey')}</SideAction>}
           </span>
         </p>
       )}
