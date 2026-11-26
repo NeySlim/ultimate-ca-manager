@@ -294,6 +294,30 @@ _ucm_database_url_elsewhere() {
     esac
 }
 
+# The pre-start copies of directory $1, newest first (their names sort by date).
+_ucm_copies() {
+    find "$1" -maxdepth 1 -name 'ucm-backup-*.db' 2>/dev/null | sort -r
+}
+
+# True when the newest copy is younger than the database and than a log that holds writes:
+# a start that fails under a restart policy then adds no copy of the same data.
+_ucm_unchanged_since_copy() {
+    local newest
+    newest=$(_ucm_copies "$1" | head -n 1)
+    [ -n "$newest" ] && [ "$newest" -nt "$UCM_DATABASE_PATH" ] || return 1
+    [ ! -s "$UCM_DATABASE_PATH-wal" ] || [ "$newest" -nt "$UCM_DATABASE_PATH-wal" ]
+}
+
+# Removes all but the newest UCM_BACKUP_KEEP - 1 copies (default 5 kept), before the new one
+# is written: the copies never outnumber UCM_BACKUP_KEEP, whatever the restarts.
+_ucm_prune_copies() {
+    local keep=${UCM_BACKUP_KEEP:-5} old
+    case $keep in ''|*[!0-9]*|0) keep=5 ;; esac
+    _ucm_copies "$1" | tail -n +"$keep" | while IFS= read -r old; do
+        rm -f -- "$old" "$old-wal"
+    done
+}
+
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode. With a PostgreSQL
 # DATABASE_URL the SQLite file is neither checked nor copied.
 ucm_sqlite_check_and_backup() {
@@ -315,6 +339,15 @@ ucm_sqlite_check_and_backup() {
             BACKUP_DIR="$UCM_SQLITE_BACKUP_DIR"
             BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
 
+            # Clean old backups
+            find "$BACKUP_DIR" \( -name "ucm-backup-*.db" -o -name "ucm-backup-*.db-wal" \) \
+                -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
+            if _ucm_unchanged_since_copy "$BACKUP_DIR"; then
+                echo -e "${GREEN:-}✅ Database unchanged since its last copy: no new copy${NC:-}"
+                return 0
+            fi
+            _ucm_prune_copies "$BACKUP_DIR"
+
             # Create backup: writes still in the WAL are copied with the file, then folded into it
             cp "$UCM_DATABASE_PATH" "$BACKUP_FILE"
             if [ -s "$UCM_DATABASE_PATH-wal" ]; then
@@ -326,10 +359,6 @@ c.close()' "$BACKUP_FILE" 2>/dev/null \
                     || echo -e "${YELLOW:-}   The backup keeps its -wal file beside it: copy both together${NC:-}"
             fi
             echo -e "${GREEN:-}✅ Database backup created${NC:-}"
-
-            # Clean old backups
-            find "$BACKUP_DIR" \( -name "ucm-backup-*.db" -o -name "ucm-backup-*.db-wal" \) \
-                -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
         fi
     fi
 }

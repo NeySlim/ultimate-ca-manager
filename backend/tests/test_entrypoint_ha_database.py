@@ -1,6 +1,8 @@
 """With UCM_HA the image entrypoint leaves SQLite alone: no DATABASE_PATH, no file copy."""
+import os
 import pathlib
 import subprocess
+import time
 
 import pytest
 
@@ -682,3 +684,84 @@ def test_the_script_drops_no_blank_the_application_keeps_under_a_utf8_locale(tmp
     assert r.stdout.strip() == 'unset', ascii(raw)
     monkeypatch.setenv('UCM_HA', raw)
     assert env_bool('UCM_HA', False) is False
+
+
+# -- the pre-start copies are bounded in number, and a start on an unchanged database adds none --
+
+def _copies_env(tmp_path, keep='3'):
+    env = _sqlite_env(tmp_path, None)
+    backups = tmp_path / 'backups'
+    backups.mkdir()
+    env.update(UCM_BACKUP_KEEP=keep)
+    return env, backups
+
+
+def _seed(backups, count, age_s):
+    """`count` earlier copies (and the -wal of the oldest), all `age_s` seconds old."""
+    now = time.time()
+    for i in range(1, count + 1):
+        p = backups / f'ucm-backup-2026010{i}-000000.db'
+        p.write_text(str(i))
+        os.utime(p, (now - age_s, now - age_s))
+    (backups / 'ucm-backup-20260101-000000.db-wal').write_text('w')
+
+
+def _age(path, age_s):
+    now = time.time()
+    os.utime(path, (now - age_s, now - age_s))
+
+
+_COUNTING_CP = ('cp() { echo "at copy: $(ls "$UCM_SQLITE_BACKUP_DIR" | grep -c "\\.db$")"; command cp "$@"; }; '
+                'ucm_sqlite_check_and_backup')
+
+
+def _start_copies(tmp_path, env, body):
+    # The directory is set by the helper when sourced: set it after, never the image's path
+    return _run(_df(10 ** 7) + f'UCM_SQLITE_BACKUP_DIR={tmp_path / "backups"}; ' + body, env, tmp_path)
+
+
+@pytest.mark.parametrize('keep', ['3', '1'])
+def test_the_copies_are_pruned_to_the_newest_before_the_copy(tmp_path, keep):
+    """A start that fails under a restart policy would otherwise add one whole database per restart."""
+    env, backups = _copies_env(tmp_path, keep)
+    _seed(backups, 6, 3600)
+    r = _start_copies(tmp_path, env, _COUNTING_CP)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert f'at copy: {int(keep) - 1}' in r.stdout, r.stdout
+    names = sorted(p.name for p in backups.iterdir())
+    kept = [f'ucm-backup-2026010{i}-000000.db' for i in range(7 - int(keep) + 1, 7)]
+    assert [n for n in names if n.startswith('ucm-backup-2026010')] == kept, names
+    assert len(names) == int(keep), names
+
+
+@pytest.mark.parametrize('keep', ['', '0', 'x'])
+def test_an_unusable_keep_count_falls_back_to_the_default(tmp_path, keep):
+    env, backups = _copies_env(tmp_path, keep)
+    _seed(backups, 9, 3600)
+    r = _start_copies(tmp_path, env, _COUNTING_CP)
+    assert r.returncode == 0 and 'at copy: 4' in r.stdout, r.stdout + r.stderr
+    assert len([p for p in backups.iterdir() if p.name.endswith('.db')]) == 5
+
+
+def test_a_database_unchanged_since_its_newest_copy_is_not_copied_again(tmp_path):
+    env, backups = _copies_env(tmp_path)
+    _seed(backups, 2, 60)
+    _age(tmp_path / 'ucm.db', 3600)
+    # An empty log holds nothing the copy lacks, however recent
+    (tmp_path / 'ucm.db-wal').write_bytes(b'')
+    before = sorted(backups.iterdir())
+    r = _start_copies(tmp_path, env, _COUNTING_CP)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'at copy' not in r.stdout and 'unchanged since its last copy' in r.stdout, r.stdout
+    assert sorted(backups.iterdir()) == before
+
+
+@pytest.mark.parametrize('changed', ['db', 'wal'])
+def test_a_database_written_since_its_newest_copy_is_copied(tmp_path, changed):
+    env, backups = _copies_env(tmp_path)
+    _seed(backups, 2, 60)
+    _age(tmp_path / 'ucm.db', 3600 if changed == 'wal' else 0)
+    if changed == 'wal':
+        (tmp_path / 'ucm.db-wal').write_bytes(b'w' * 10)
+    r = _start_copies(tmp_path, env, 'cp() { echo "cp $*"; }; ucm_sqlite_check_and_backup')
+    assert r.returncode == 0 and f"cp {env['UCM_DATABASE_PATH']} {backups}/ucm-backup-" in r.stdout, r.stdout

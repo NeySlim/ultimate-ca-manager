@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Docker: each start copied the SQLite database into `backups`, so a container restarting in a loop filled its volume; the copies are now capped at `UCM_BACKUP_KEEP` (default 5), pruned before the copy, and a start on a database unchanged since its newest copy makes none.
 - Helm chart: the cleartext protocol Ingress (`ingress.protocolHttp`) copied `ingress.annotations`, so the documented `backend-protocol: "HTTPS"` made CDP, OCSP and HTTP-01 fail on port 8080; it now takes only the new `ingress.protocolHttp.annotations` (default empty).
 - DEB: `apt purge ucm` deleted `/etc/ucm/master.key` while keeping the database it encrypts, leaving its private keys unreadable; while data is kept, the key and `ucm.env` now move to a root-only `/opt/ucm-archive/<date>-purge/` named in the output.
 - CA export: the `pkcs12`, `pfx` and `jks` exports of an offline CA kept under its offline password, and its `pem` (with `include_key`) or `key` export with a password, answered 500 (400 for a bundle sent without a password); they now answer 409 once the password has passed the rule, and the export without a password still returns the key encrypted under the offline password, audited as `password-protected`.
