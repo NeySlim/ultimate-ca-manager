@@ -124,7 +124,7 @@ def compatible_keys(ca, provider_id):
     return sorted(keys, key=lambda k: (k['label'], k['key_identifier']))
 
 
-def _record(provider, info):
+def _key_row_for(provider, info):
     """The key row naming *info* on *provider*, created or refreshed from the token's reading."""
     # Under the provider lock, as sync_keys: a sync adding this key commits first, then it is found
     HsmService._lock_provider(provider.id)
@@ -197,7 +197,7 @@ def attach(ca_id, provider_id, key_identifier):
         raise AttachRefused('HSM key does not match the CA certificate')
     _refuse_signing(ca, cert, provider, info.algorithm)
 
-    key_row = _record(provider, info)
+    key_row = _key_row_for(provider, info)
     db.session.flush()
     HsmService.refuse_signing_in_fips_mode(key_row)
     key_binding.refuse_bound_key(key_row)
