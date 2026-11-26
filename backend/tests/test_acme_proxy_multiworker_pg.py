@@ -9,6 +9,7 @@ import json
 import os
 import threading
 import uuid
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -170,3 +171,107 @@ def test_a_link_another_worker_recorded_first_keeps_the_callers_work(app, monkey
         assert links.get(key) == (order.id, 'race.multiworker.example', AUTHZ['a'])
         SystemConfig.query.filter_by(key=marker).delete()
         db.session.commit()
+
+
+# --- An 'initiated' flag whose automation died (restart, rolling update, lost node) ---
+
+def _recording_threads(monkeypatch):
+    started = []
+
+    class _Recorder:
+        def __init__(self, target=None, args=(), **_kw):
+            started.append(args)
+            self.name, self.daemon = '', False
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(threading, 'Thread', _Recorder)
+    monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                        lambda *_a, **_k: {'provider': object()})
+    return started
+
+
+def _flagged_order(started_at, *, account=ACCOUNT):
+    order = _order(account_id=account, order_url=f'{UPSTREAM}/order/{uuid.uuid4().hex[:8]}',
+                   domains=json.dumps([DOMAIN['a']]), upstream_authz_urls=json.dumps([AUTHZ['a']]))
+    order.set_challenges_dict({CHALL['a']: {'status': 'initiated', 'started_at': started_at.isoformat()}})
+    db.session.commit()
+    return order.id
+
+
+def _lease():
+    return timedelta(seconds=proxy_mod._initiated_lease_seconds())
+
+
+def _stuck_scenario(app, monkeypatch, now):
+    started = _recording_threads(monkeypatch)
+    with app.app_context():
+        stale = _flagged_order(now - _lease() - timedelta(minutes=1))
+        _forget_process_memory()
+        _worker().get_authz(_b64(AUTHZ['a']), requester_account_id=ACCOUNT)
+        assert [(args[1], args[4]) for args in started] == [(CHALL['a'], stale)]
+        state = db.session.get(AcmeClientOrder, stale).challenges_dict[CHALL['a']]
+        assert state['status'] == 'initiated'
+        assert abs(datetime.fromisoformat(state['started_at']) - now) < timedelta(minutes=1)
+        db.session.remove()
+
+
+def _live_scenario(app, monkeypatch, now):
+    started = _recording_threads(monkeypatch)
+    with app.app_context():
+        _flagged_order(now - _lease() + timedelta(minutes=1))
+        _forget_process_memory()
+        node = _worker()
+        node.get_authz(_b64(AUTHZ['a']), requester_account_id=ACCOUNT)
+        data, _link = node.respond_challenge(_b64(CHALL['a']), requester_account_id=ACCOUNT)
+        assert data['status'] == 'processing'
+        assert started == []
+        db.session.remove()
+
+
+def _sibling_scenario(app, monkeypatch, now):
+    """The dead flag sits on another account's order sharing the upstream authorization."""
+    started = _recording_threads(monkeypatch)
+    with app.app_context():
+        _flagged_order(now - _lease() - timedelta(minutes=1), account='c1-other')
+        mine = _order(account_id=ACCOUNT, order_url=f'{UPSTREAM}/order/{uuid.uuid4().hex[:8]}',
+                      domains=json.dumps([DOMAIN['a']]), upstream_authz_urls=json.dumps([AUTHZ['a']])).id
+        _forget_process_memory()
+        node = _worker()
+        data, _link = node.respond_challenge(_b64(CHALL['a']), requester_account_id=ACCOUNT)
+        assert data['status'] == 'processing'
+        assert [(args[1], args[4]) for args in started] == [(CHALL['a'], mine)]
+        db.session.remove()
+
+
+@pytest.mark.parametrize('scenario', [_stuck_scenario, _live_scenario, _sibling_scenario])
+def test_an_initiated_flag_is_a_lease_on_sqlite(app, monkeypatch, tmp_path, scenario):
+    from tests.test_backup_cross_installation import _bound_to
+    from utils.datetime_utils import utc_now
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'proxy.db'}"):
+        scenario(app, monkeypatch, utc_now())
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+@pytest.mark.parametrize('scenario', [_stuck_scenario, _live_scenario, _sibling_scenario])
+def test_an_initiated_flag_is_a_lease_on_the_postgresql_clock_in_ha(app, monkeypatch, scenario):
+    """In HA the lease is read and written on the server clock: this node's runs a day late."""
+    from sqlalchemy import text
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    import utils.datetime_utils as clock
+    from utils import ha
+
+    monkeypatch.setattr(ha, 'ha_enabled', lambda: True)
+    with _a_schema_of_our_own(f'proxy_lease_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            server_now = db.session.execute(text("SELECT clock_timestamp() AT TIME ZONE 'UTC'")).scalar()
+            db.session.remove()
+        late = clock.utc_now
+        monkeypatch.setattr(clock, 'utc_now', lambda: late() - timedelta(days=1))
+        monkeypatch.setattr(proxy_mod, 'utc_now', clock.utc_now)
+        scenario(app, monkeypatch, server_now)
