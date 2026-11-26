@@ -59,7 +59,6 @@ const slowQueue = (page: Page) => page.route('**/api/v2/dashboard/queue**', asyn
 
 test('the To handle figure brings the queue title below the masthead', async ({ page, api }) => {
   await createCA(api, { validityDays: 100 })
-  await slowQueue(page)
   await page.goto('/')
   const figure = page.locator('a.metric.stat[data-metric="queue"][href="#card-queue"]')
   await expect(figure).toBeVisible()

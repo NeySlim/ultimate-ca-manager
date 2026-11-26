@@ -164,7 +164,7 @@ export function QueueCard({ defaultOpen = false, onToggle }) {
   const page = useContext(OverviewContext)
   const [ask, setAsk] = useState(null)
   useEffect(() => {
-    const take = (e) => setAsk(page?.takeQueueAsk?.() || (e ? { group: e.detail?.group || '' } : null))
+    const take = (e) => setAsk((prev) => page?.takeQueueAsk?.() || (e ? { group: e.detail?.group || '' } : prev))
     take()
     window.addEventListener('ucm:overview-queue', take)
     return () => window.removeEventListener('ucm:overview-queue', take)
