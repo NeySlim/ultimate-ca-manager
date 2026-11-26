@@ -30,6 +30,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- HA: the lock around the read, merge and write of a DNS-01 TXT record was a file on each node, so two nodes publishing values on one name (`example.com` and `*.example.com`) could each erase the other's and fail an order; in HA on PostgreSQL it is now an advisory lock shared by the nodes.
 - ACME server: a response to the challenge of a pending authorization past its expiry, or of an expired order, ran the validation and could turn the authorization valid; the authorization and its order now become invalid first and the challenge is returned invalid (RFC 8555 section 7.1.6).
 - OCSP: with two records of one CA (same subject and key), a revocation, a lifted hold or an external CRL cleared the cached answers of only one of them, so the responder could answer `good` for a revoked certificate until nextUpdate; the cache of every twin record is now cleared.
 - HA: a node whose clock differed from the leader's by more than two passes showed the scheduler state as stale for good, or never; the state the leader publishes is now judged on the PostgreSQL server clock.
