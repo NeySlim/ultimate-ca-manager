@@ -75,14 +75,20 @@ def revoke_ssh_host(host_id):
     if not isinstance(reason, str) or len(reason) > 255:
         return error_response('reason is text of 255 characters at most', 400)
     try:
-        host = hosts.revoke_host(host_id, reason, _username())
+        host, first = hosts.revoke_host(host_id, reason, _username())
     except LookupError as e:
         return error_response(str(e), 404)
     except ValueError as e:
         return error_response(str(e), 409)
-    AuditService.log_action(action='ssh_host_revoked', resource_type='ssh_host', resource_id=str(host.id),
-                            resource_name=host.name, details=f'SSH host revoked, renewals ended: {reason}',
-                            success=True)
+    # One revocation audit per host, by the request that set revoked_at; a later one only finished it
+    if first:
+        AuditService.log_action(action='ssh_host_revoked', resource_type='ssh_host', resource_id=str(host.id),
+                                resource_name=host.name, details=f'SSH host revoked, renewals ended: {reason}',
+                                success=True)
+    else:
+        AuditService.log_action(action='ssh_host_revocation_finished', resource_type='ssh_host',
+                                resource_id=str(host.id), resource_name=host.name, success=True,
+                                details=f'SSH host revocation finished, certificates left live revoked: {reason}')
     return success_response(data=host.to_dict(), message='SSH host revoked')
 
 

@@ -281,7 +281,11 @@ class TestTheRenewal:
         assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
         with app.app_context():
             assert hosts._live_certificates_of_key(db.session.get(SSHHost, host_id)) == []
-        assert len(_audits(app, since, 'ssh_host_revoked')) == 1
+        # The revocation itself is the request that set revoked_at: this one only finished it
+        assert _audits(app, since, 'ssh_host_revoked') == []
+        with app.app_context():
+            done = AuditLog.query.filter(AuditLog.id > since, AuditLog.action == 'ssh_host_revocation_finished').all()
+            assert [(a.username, a.resource_id) for a in done] == [('admin', str(host_id))]
         assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 409
 
     def test_a_renewal_left_live_by_a_failure_goes_with_the_sweep(self, app, auth_client, client,

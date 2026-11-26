@@ -316,7 +316,7 @@ def revoke_host(host_id, reason='host revoked', username=None):
     swept = _sweep(host, reason, username)
     if not first and not swept:
         raise ValueError('This host is already revoked')
-    return db.session.get(SSHHost, host_id)
+    return db.session.get(SSHHost, host_id), first
 
 
 REVOKED_HOST_SWEEP_SECONDS = 300
