@@ -514,9 +514,10 @@ def get_email_template():
 
 
 @bp.route('/api/v2/settings/email/template', methods=['PATCH'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def update_email_template():
-    """Update email template (HTML and/or text)"""
+    """Update email template (HTML and/or text). admin:settings, as the SMTP target:
+    the template wraps every password-reset link."""
     from models.email_notification import SMTPConfig
 
     data = request.json
@@ -551,7 +552,7 @@ def update_email_template():
 
 
 @bp.route('/api/v2/settings/email/template/reset', methods=['POST'])
-@require_auth(['write:settings'])
+@require_auth(['admin:settings'])
 def reset_email_template():
     """Reset email template to default (HTML and text)"""
     from models.email_notification import SMTPConfig

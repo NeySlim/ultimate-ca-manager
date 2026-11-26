@@ -4131,6 +4131,7 @@
     },
     "emailTemplate": "Modèle d’e-mail",
     "templateDescription": "Personnalisez le modèle HTML utilisé pour toutes les notifications e-mail.",
+    "templateAdminOnly": "Modifier le modèle nécessite la permission d’administration des paramètres : il est affiché en lecture seule.",
     "editTemplate": "Modifier le modèle",
     "templateSaved": "Modèle d’e-mail enregistré",
     "templateCustom": "Modèle personnalisé",

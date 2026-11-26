@@ -22,17 +22,25 @@ const loaded = (custom = false) => ({
   },
 })
 
-async function open(custom = false) {
+async function open(custom = false, props = {}) {
   api.get.mockResolvedValue(loaded(custom))
   api.post.mockImplementation((url, body) => Promise.resolve({ data: body?.type === 'text' ? { text: `PREVIEW ${body.template}` } : { html: `<b>${body?.template}</b>` } }))
   const onClose = vi.fn()
-  render(<EmailTemplateDialog onClose={onClose} />)
+  render(<EmailTemplateDialog onClose={onClose} {...props} />)
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
   return { onClose, dialog: screen.getByTestId('email-template-dialog') }
 }
 
 describe('EmailTemplateDialog', () => {
   beforeEach(() => { vi.clearAllMocks(); vi.useRealTimers() })
+
+  it('shows the template read-only without admin:settings, as the API refuses the change', async () => {
+    const { dialog } = await open(true, { locked: true })
+    expect(within(dialog).getByLabelText('settings.templateHtmlSource')).toHaveAttribute('readonly')
+    expect(within(dialog).queryByRole('button', { name: 'common.save' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'settings.templateResetDefault' })).toBeNull()
+    expect(dialog).toHaveTextContent('settings.templateAdminOnly')
+  })
 
   it('is the mockup\'s wide dialog with the template\'s state, not a floating window', async () => {
     const { dialog } = await open()

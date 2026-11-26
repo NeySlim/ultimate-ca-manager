@@ -4099,6 +4099,7 @@
     },
     "emailTemplate": "Plantilla de correo",
     "templateDescription": "Personalice la plantilla HTML utilizada para todas las notificaciones por correo.",
+    "templateAdminOnly": "Modificar la plantilla requiere el permiso de administración de ajustes: se muestra en solo lectura.",
     "editTemplate": "Editar plantilla",
     "templateSaved": "Plantilla de correo guardada",
     "templateCustom": "Plantilla personalizada",

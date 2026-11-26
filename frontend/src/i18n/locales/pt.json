@@ -4099,6 +4099,7 @@
     },
     "emailTemplate": "Modelo de email",
     "templateDescription": "Personalize o modelo HTML usado para todas as notificações por email.",
+    "templateAdminOnly": "Alterar o modelo requer a permissão de administração das configurações: ele é exibido somente para leitura.",
     "editTemplate": "Editar modelo",
     "templateSaved": "Modelo de email salvo",
     "templateCustom": "Modelo personalizado",

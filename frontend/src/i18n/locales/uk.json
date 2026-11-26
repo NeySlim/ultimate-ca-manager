@@ -4263,6 +4263,7 @@
     },
     "emailTemplate": "Шаблон email",
     "templateDescription": "Налаштуйте HTML-шаблон для всіх email-сповіщень.",
+    "templateAdminOnly": "Для зміни шаблону потрібен дозвіл на адміністрування налаштувань: його показано лише для читання.",
     "editTemplate": "Редагувати шаблон",
     "templateSaved": "Шаблон email збережено",
     "templateCustom": "Користувацький шаблон",

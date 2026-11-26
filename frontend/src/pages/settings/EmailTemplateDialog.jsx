@@ -29,7 +29,8 @@ const TEXT_VARS = [
   { var: '{{instance_url}}', desc: 'templateVarInstanceUrl' },
 ]
 
-export default function EmailTemplateDialog({ onClose }) {
+// `locked`: no admin:settings, which the API asks to change the template (it wraps reset links)
+export default function EmailTemplateDialog({ onClose, locked = false }) {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm } = useNotification()
   const [tab, setTab] = useState('html')
@@ -151,6 +152,7 @@ export default function EmailTemplateDialog({ onClose }) {
           <button type="button" aria-pressed={!html} onClick={() => setTab('text')}>{t('settings.templatePlainText')}</button>
         </div>
       </Toolbar>
+      {locked && <Notice tone="warn">{t('settings.templateAdminOnly')}</Notice>}
       <Notice>
         {t('settings.templateVariablesLead')}
         {vars.map((v, i) => <span key={v.var}>{i > 0 && ', '}<span className="mono">{v.var}</span> {t(`settings.${v.desc}`)}</span>)}
@@ -159,7 +161,7 @@ export default function EmailTemplateDialog({ onClose }) {
         <div className="form-fields">
           <Field id="template-source" label={html ? t('settings.templateHtmlSource') : t('settings.templatePlainText')}>
             <textarea id="template-source" className="mono template-source" spellCheck={false}
-              value={html ? htmlTemplate : textTemplate} onChange={onSource} />
+              value={html ? htmlTemplate : textTemplate} onChange={onSource} readOnly={locked} />
           </Field>
           <div className="field">
             <span>{t('settings.templatePreview')}</span>
@@ -170,9 +172,9 @@ export default function EmailTemplateDialog({ onClose }) {
         </div>
       )}
       <ModalActions>
-        {(isHtmlCustom || isTextCustom) && <Btn icon="refresh" write onClick={handleReset}>{t('settings.templateResetDefault')}</Btn>}
+        {!locked && (isHtmlCustom || isTextCustom) && <Btn icon="refresh" write onClick={handleReset}>{t('settings.templateResetDefault')}</Btn>}
         <Btn onClick={onClose}>{t('common.close')}</Btn>
-        <Btn tone="primary" icon="check" onClick={handleSave} disabled={saving || !dirty}>{t('common.save')}</Btn>
+        {!locked && <Btn tone="primary" icon="check" onClick={handleSave} disabled={saving || !dirty}>{t('common.save')}</Btn>}
       </ModalActions>
     </AtelierDialog>
   )

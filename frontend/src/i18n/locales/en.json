@@ -4099,6 +4099,7 @@
     },
     "emailTemplate": "Email Template",
     "templateDescription": "Customize the HTML template used for all email notifications.",
+    "templateAdminOnly": "Changing the template needs the settings administration permission: it is shown read-only.",
     "editTemplate": "Edit Template",
     "templateSaved": "Email template saved",
     "templateCustom": "Custom template",

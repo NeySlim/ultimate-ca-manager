@@ -85,6 +85,9 @@ ROUTES = {
     'PATCH /api/v2/settings/backup/schedule': ADMIN_SYSTEM,
     'POST /api/v2/settings/backup/create': ADMIN_SYSTEM,
     'POST /api/v2/settings/backup/restore': ADMIN_SYSTEM,
+    # api.v2.settings.email
+    'PATCH /api/v2/settings/email/template': ADMIN_SETTINGS,
+    'POST /api/v2/settings/email/template/reset': ADMIN_SETTINGS,
     # api.v2.settings.general
     'PATCH /api/v2/settings/ct': ADMIN_SETTINGS,
     # api.v2.settings.notifications

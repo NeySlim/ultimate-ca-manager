@@ -4099,6 +4099,7 @@
     },
     "emailTemplate": "メールテンプレート",
     "templateDescription": "すべてのメール通知に使用されるHTMLテンプレートをカスタマイズします。",
+    "templateAdminOnly": "テンプレートの変更には設定の管理権限が必要です。読み取り専用で表示されています。",
     "editTemplate": "テンプレートを編集",
     "templateSaved": "メールテンプレートを保存しました",
     "templateCustom": "カスタムテンプレート",

@@ -4099,6 +4099,7 @@
     },
     "emailTemplate": "邮件模板",
     "templateDescription": "自定义所有邮件通知使用的HTML模板。",
+    "templateAdminOnly": "修改模板需要设置管理权限：当前仅供查看。",
     "editTemplate": "编辑模板",
     "templateSaved": "邮件模板已保存",
     "templateCustom": "自定义模板",

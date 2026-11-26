@@ -155,7 +155,7 @@ export default function EmailSection({ hasPermission, settings, fieldErrors = {}
         </div>
       </SettingsGroup>
       {showTemplateEditor && (
-        <EmailTemplateDialog onClose={() => setShowTemplateEditor(false)} />
+        <EmailTemplateDialog locked={locked} onClose={() => setShowTemplateEditor(false)} />
       )}
 
       <SettingsGroup legend={t('settings.expiryAlerts')}>
