@@ -122,6 +122,27 @@ def get_public_key(refid):
         return Response('Error retrieving public key', status=500, mimetype='text/plain')
 
 
+@bp.route('/ssh/setup/<refid>/agent', methods=['GET'])
+def get_agent_installer(refid):
+    """The installer of the SSH agent for this CA (issue #451): POSIX sh, no secret in it."""
+    from api.v2.ssh.agent_script import installer_script, shell_safe_base_url
+
+    def refusal(message, status):
+        return Response(f'#!/bin/sh\necho "Error: {message}" >&2\nexit 1\n', status=status,
+                        mimetype='text/x-shellscript')
+    ca = SSHCertificateAuthority.query.filter_by(refid=refid).first()
+    if not ca:
+        return refusal('SSH CA not found', 404)
+    base_url = shell_safe_base_url(request.url_root)
+    if not base_url:
+        return refusal('this server is reached under a name the agent cannot use', 400)
+    return Response(installer_script(base_url, ca), mimetype='text/x-shellscript', headers={
+        'Content-Disposition': content_disposition(ca.descr.replace(' ', '_'), '.sh', fallback=ca.refid,
+                                                   prefix='ucm_ssh_agent_'),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+    })
+
+
 def _etag_matches(header, etag):
     """RFC 9110 13.1.2: If-None-Match compares weakly, and ``*`` matches any current KRL."""
     if not header:

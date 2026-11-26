@@ -2306,6 +2306,14 @@ GET /ssh/krl/{refid}
 
 The KRL of an SSH CA, without authentication, as a CRL is (`404` for an unknown CA). It is the KRL `GET /api/v2/ssh/cas/{ca_id}/krl` downloads: one per CA, stored in the database so every node of a cluster serves the same bytes. Its version (PROTOCOL.krl) changes only when the CA's revocations change, and a revocation publishes the new KRL at once. The response carries `ETag` (the version, quoted), `X-KRL-Version`, `Last-Modified` and `Cache-Control: public, no-cache`; a request whose `If-None-Match` names the current version gets `304` without a body. `503` with `Retry-After` when the KRL cannot be built.
 
+### SSH Agent
+
+```
+GET /ssh/setup/{refid}/agent
+```
+
+A POSIX `sh` installer, without authentication, run on a server as `curl -fsSL https://<ucm>/ssh/setup/{refid}/agent | sudo sh` (`sh -s -- --interval 15 --cacert ca.pem` to pass options, `--uninstall` to remove it). It holds no secret: only the URL it was fetched from (`400` when that URL is not one a shell can hold) and the CA refid (`404` for an unknown CA). For a user CA it installs `/usr/local/sbin/ucm-ssh-agent`, downloads the KRL to `/etc/ssh/ucm/revoked_keys` before pointing `RevokedKeys` at it (in `/etc/ssh/sshd_config.d` when sshd_config includes it, else at the top of sshd_config), and a systemd timer, else a cron job, that runs `ucm-ssh-agent sync` every 15 minutes. A sync sends the installed version as `If-None-Match`, checks a new KRL with `ssh-keygen -Q` and refuses one older than the installed one, replaces the file atomically and reloads sshd only when the KRL changed and `sshd -t` passes. It needs `ssh-keygen` and `curl` or `wget`.
+
 ---
 
 ## Deployment
@@ -5593,7 +5601,7 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 | CA issuers (AIA) | `/ca/{ca_ref}.cer`, `/ca/{ca_ref}.pem`, `/ca/{ca_ref}.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
 | Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |
 | Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
-| SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key` | [SSH Certificates](#ssh-certificates) |
+| SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key`, `/ssh/setup/{refid}/agent` | [SSH Certificates](#ssh-certificates) |
 | SSH KRL | `/ssh/krl/{refid}` | [Public KRL](#public-krl) |
 
 The routes are always served; a protocol turned off in Settings refuses its requests with `503` (ACME, SCEP, EST, TSA, XCEP and WSTEP).
