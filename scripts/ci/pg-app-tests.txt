@@ -97,6 +97,7 @@ tests/test_sso_provider_per_type.py
 tests/test_sso_oauth2_tenants_*.py
 tests/test_cas_list_query_count.py
 tests/test_ca_display_name.py
+tests/test_ca_import_labels.py
 tests/test_fresh_app.py
 tests/test_policy_algorithms_397.py
 tests/test_startup_backend_guards.py

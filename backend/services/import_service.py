@@ -413,7 +413,8 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
         key_dropped = matches is False
 
     old_serial = stored_certificate_serial(existing_ca)
-    existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
+    # A name given since the first import is the operator's: only one given now replaces it
+    existing_ca.descr = name or existing_ca.descr or cert_info['cn']
     existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
     if key_pem:
         existing_ca.prv = encrypted_prv

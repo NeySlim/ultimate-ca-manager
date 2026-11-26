@@ -24,6 +24,7 @@ from fips_mode import FipsRestricted
 from utils.key_codec import refuse_eddsa_key
 from utils.certificate_readability import UnreadableCertificate
 from utils.trusted_proxy import client_ip
+from services.ca import labels as ca_label_rules
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
 from .chain_builder import ChainBuilder, ChainInfo
@@ -68,6 +69,28 @@ def _selected(objects: List[ParsedObject], options: Dict) -> Optional[List[Parse
         return None
     keep = set(selected)
     return [o for i, o in enumerate(objects) if i in keep]
+
+
+def _ca_labels(objects: List[ParsedObject], options: Dict):
+    """``ca_labels`` as {object: (name or None, description or None)}, or the reason it is refused.
+    Its keys are positions in the analysis object list, as for ``selected_indices`` (issue #459)."""
+    raw = options.get("ca_labels")
+    if raw is None:
+        return {}, None
+    if not isinstance(raw, dict):
+        return None, "ca_labels must map analysis positions to {name, description}"
+    labels = {}
+    for key, value in raw.items():
+        position = int(key) if isinstance(key, str) and key.isdigit() else None
+        if position is None or position >= len(objects) or not isinstance(value, dict):
+            return None, "ca_labels must map analysis positions to {name, description}"
+        name = value.get("name") or ""
+        description = value.get("description") or None
+        error = (name.strip() and ca_label_rules.name_error(name)) or ca_label_rules.description_error(description)
+        if error:
+            return None, f"ca_labels[{key}]: {error}"
+        labels[id(objects[position])] = (name.strip() or None, ca_label_rules.stored_description(description))
+    return labels, None
 
 
 def _is_ca_import_target(obj: ParsedObject) -> bool:
@@ -282,6 +305,11 @@ class SmartImporter:
         try:
             # Parse
             objects = self._parse(content, password)
+            labels, labels_error = _ca_labels(objects, options)
+            if labels_error:
+                result.success = False
+                result.errors.append(labels_error)
+                return result
             objects = _selected(objects, options)
             if objects is None:
                 result.success = False
@@ -311,7 +339,8 @@ class SmartImporter:
             
             # Import CAs first (respecting hierarchy)
             if import_cas:
-                self._import_cas(objects, chains, matching, result, desc_prefix, username, skip_duplicates)
+                self._import_cas(objects, chains, matching, result, desc_prefix, username, skip_duplicates,
+                                 labels)
             
             # Import certificates
             if import_certs:
@@ -370,9 +399,10 @@ class SmartImporter:
         result: ImportResult,
         desc_prefix: str,
         username: str,
-        skip_duplicates: bool
+        skip_duplicates: bool,
+        labels: Optional[Dict] = None
     ):
-        """Import CA certificates"""
+        """Import CA certificates; *labels* gives some of them a display name and a description"""
         
         # Get all CAs from objects
         ca_objects = [o for o in objects if o.type == ObjectType.CERTIFICATE and _is_ca_import_target(o)]
@@ -453,9 +483,11 @@ class SmartImporter:
 
             # Create CA
             refid = secrets.token_hex(8)
+            name, description = (labels or {}).get(id(ca_obj), (None, None))
             ca = CA(
                 refid=refid,
-                descr=self._get_cn(ca_obj),
+                descr=name or self._get_cn(ca_obj),
+                description=description,
                 caref=caref,
                 crt=base64.b64encode(ca_obj.raw_pem.encode()).decode(),
                 prv=prv,
