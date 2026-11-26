@@ -2455,7 +2455,11 @@
     "chooseFile": "Choisir un fichier…",
     "more": "Plus",
     "moreActions": "Autres actions",
-    "otherViews": "Autres vues"
+    "otherViews": "Autres vues",
+    "creating": "Création...",
+    "notFound": "Introuvable",
+    "popular": "Populaires",
+    "other": "Autres"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -6371,7 +6375,14 @@
       "validation": {
         "requiredField": "Ce champ est obligatoire"
       },
-      "serverBusy": "Le serveur est occupé par une autre modification : réessayez dans quelques secondes."
+      "serverBusy": "Le serveur est occupé par une autre modification : réessayez dans quelques secondes.",
+      "downloadFailed": {
+        "publicKey": "Échec du téléchargement de la clé publique",
+        "krl": "Échec du téléchargement de la KRL"
+      },
+      "copyFailed": {
+        "publicKey": "Échec de la copie de la clé publique"
+      }
     },
     "success": {
       "create": {
@@ -6389,7 +6400,8 @@
         "sshCa": "AC SSH créée avec succès",
         "sshCertificate": "Certificat SSH émis avec succès",
         "caOffline": "AC mise hors ligne",
-        "caRestored": "AC restaurée à l’état en ligne"
+        "caRestored": "AC restaurée à l’état en ligne",
+        "mscaConnection": "Connexion à l’AC Microsoft créée"
       },
       "update": {
         "certificate": "Certificat mis à jour avec succès",
@@ -6419,7 +6431,8 @@
         "apiKeyPermanent": "Clé API supprimée",
         "generic": "Supprimé avec succès",
         "sshCa": "AC SSH supprimée avec succès",
-        "sshCertificate": "Certificat SSH supprimé avec succès"
+        "sshCertificate": "Certificat SSH supprimé avec succès",
+        "mscaConnection": "Connexion à l’AC Microsoft supprimée"
       },
       "export": {
         "certificate": "Certificat exporté avec succès",

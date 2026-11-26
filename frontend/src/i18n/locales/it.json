@@ -478,7 +478,11 @@
     "chooseFile": "Scegli un file…",
     "more": "Altro",
     "moreActions": "Altre azioni",
-    "otherViews": "Altre viste"
+    "otherViews": "Altre viste",
+    "creating": "Creazione...",
+    "notFound": "Non trovato",
+    "popular": "Popolari",
+    "other": "Altri"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificato, pagina o azione…",
@@ -6096,7 +6100,14 @@
       "validation": {
         "requiredField": "Questo campo è obbligatorio"
       },
-      "serverBusy": "Il server è occupato con un'altra modifica: riprova tra qualche secondo."
+      "serverBusy": "Il server è occupato con un'altra modifica: riprova tra qualche secondo.",
+      "downloadFailed": {
+        "publicKey": "Impossibile scaricare la chiave pubblica",
+        "krl": "Impossibile scaricare la KRL"
+      },
+      "copyFailed": {
+        "publicKey": "Impossibile copiare la chiave pubblica"
+      }
     },
     "success": {
       "backup": {
@@ -6121,7 +6132,8 @@
         "sshCa": "CA SSH creata con successo",
         "sshCertificate": "Certificato SSH emesso con successo",
         "caOffline": "CA offline",
-        "caRestored": "CA ripristinata online"
+        "caRestored": "CA ripristinata online",
+        "mscaConnection": "Connessione alla CA Microsoft creata"
       },
       "crl": {
         "generated": "CRL rigenerata con successo"
@@ -6149,7 +6161,8 @@
         "truststore": "Certificato rimosso dall'archivio attendibilità",
         "user": "Utente eliminato con successo",
         "sshCa": "CA SSH eliminata con successo",
-        "sshCertificate": "Certificato SSH eliminato con successo"
+        "sshCertificate": "Certificato SSH eliminato con successo",
+        "mscaConnection": "Connessione alla CA Microsoft eliminata"
       },
       "duplicate": {
         "template": "Modello duplicato con successo"

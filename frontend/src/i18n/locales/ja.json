@@ -478,7 +478,11 @@
     "chooseFile": "ファイルを選択…",
     "more": "その他",
     "moreActions": "その他の操作",
-    "otherViews": "その他のビュー"
+    "otherViews": "その他のビュー",
+    "creating": "作成中...",
+    "notFound": "見つかりません",
+    "popular": "人気",
+    "other": "その他"
   },
   "commandPalette": {
     "searchPlaceholder": "証明書、ページ、操作…",
@@ -6096,7 +6100,14 @@
       "validation": {
         "requiredField": "この項目は必須です"
       },
-      "serverBusy": "サーバーは別の変更を処理中です。数秒後にもう一度お試しください。"
+      "serverBusy": "サーバーは別の変更を処理中です。数秒後にもう一度お試しください。",
+      "downloadFailed": {
+        "publicKey": "公開鍵をダウンロードできませんでした",
+        "krl": "KRL をダウンロードできませんでした"
+      },
+      "copyFailed": {
+        "publicKey": "公開鍵をコピーできませんでした"
+      }
     },
     "success": {
       "backup": {
@@ -6121,7 +6132,8 @@
         "sshCa": "SSH CAが作成されました",
         "sshCertificate": "SSH証明書が発行されました",
         "caOffline": "CAがオフラインになりました",
-        "caRestored": "CAがオンラインに復旧しました"
+        "caRestored": "CAがオンラインに復旧しました",
+        "mscaConnection": "Microsoft CA への接続を作成しました"
       },
       "crl": {
         "generated": "CRLが再生成されました"
@@ -6149,7 +6161,8 @@
         "truststore": "証明書がトラストストアから削除されました",
         "user": "ユーザーが削除されました",
         "sshCa": "SSH CAが削除されました",
-        "sshCertificate": "SSH証明書が削除されました"
+        "sshCertificate": "SSH証明書が削除されました",
+        "mscaConnection": "Microsoft CA への接続を削除しました"
       },
       "duplicate": {
         "template": "テンプレートが複製されました"

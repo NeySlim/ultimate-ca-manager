@@ -480,7 +480,11 @@
     "chooseFile": "Выбрать файл…",
     "more": "Ещё",
     "moreActions": "Другие действия",
-    "otherViews": "Другие разделы"
+    "otherViews": "Другие разделы",
+    "creating": "Создание...",
+    "notFound": "Не найдено",
+    "popular": "Популярные",
+    "other": "Другие"
   },
   "commandPalette": {
     "searchPlaceholder": "Сертификат, страница или действие…",
@@ -6661,7 +6665,14 @@
       "validation": {
         "requiredField": "Это поле обязательно"
       },
-      "serverBusy": "Сервер занят другим изменением: повторите попытку через несколько секунд."
+      "serverBusy": "Сервер занят другим изменением: повторите попытку через несколько секунд.",
+      "downloadFailed": {
+        "publicKey": "Не удалось скачать открытый ключ",
+        "krl": "Не удалось скачать KRL"
+      },
+      "copyFailed": {
+        "publicKey": "Не удалось скопировать открытый ключ"
+      }
     },
     "success": {
       "create": {
@@ -6679,7 +6690,8 @@
         "sshCa": "ЦС SSH создан",
         "sshCertificate": "Сертификат SSH выпущен",
         "caOffline": "ЦС переведён в автономный режим",
-        "caRestored": "ЦС возвращён в рабочий режим"
+        "caRestored": "ЦС возвращён в рабочий режим",
+        "mscaConnection": "Подключение к ЦС Microsoft создано"
       },
       "update": {
         "certificate": "Сертификат обновлён",
@@ -6709,7 +6721,8 @@
         "apiKeyPermanent": "Ключ API удалён",
         "generic": "Удалено",
         "sshCa": "ЦС SSH удалён",
-        "sshCertificate": "Сертификат SSH удалён"
+        "sshCertificate": "Сертификат SSH удалён",
+        "mscaConnection": "Подключение к ЦС Microsoft удалено"
       },
       "export": {
         "certificate": "Сертификат экспортирован",

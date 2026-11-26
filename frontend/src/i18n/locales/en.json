@@ -478,7 +478,11 @@
     "chooseFile": "Choose a file…",
     "more": "More",
     "moreActions": "Other actions",
-    "otherViews": "Other views"
+    "otherViews": "Other views",
+    "creating": "Creating...",
+    "notFound": "Not found",
+    "popular": "Popular",
+    "other": "Other"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificate, page or action…",
@@ -6371,7 +6375,14 @@
       "validation": {
         "requiredField": "This field is required"
       },
-      "serverBusy": "The server is busy with another change: try again in a few seconds."
+      "serverBusy": "The server is busy with another change: try again in a few seconds.",
+      "downloadFailed": {
+        "publicKey": "Failed to download the public key",
+        "krl": "Failed to download the KRL"
+      },
+      "copyFailed": {
+        "publicKey": "Failed to copy the public key"
+      }
     },
     "success": {
       "create": {
@@ -6389,7 +6400,8 @@
         "sshCa": "SSH CA created successfully",
         "sshCertificate": "SSH certificate issued successfully",
         "caOffline": "CA taken offline",
-        "caRestored": "CA restored to online state"
+        "caRestored": "CA restored to online state",
+        "mscaConnection": "Microsoft CA connection created"
       },
       "update": {
         "certificate": "Certificate updated successfully",
@@ -6419,7 +6431,8 @@
         "apiKeyPermanent": "API key deleted",
         "generic": "Deleted successfully",
         "sshCa": "SSH CA deleted successfully",
-        "sshCertificate": "SSH certificate deleted successfully"
+        "sshCertificate": "SSH certificate deleted successfully",
+        "mscaConnection": "Microsoft CA connection deleted"
       },
       "export": {
         "certificate": "Certificate exported successfully",

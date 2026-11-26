@@ -478,7 +478,11 @@
     "chooseFile": "Datei auswählen…",
     "more": "Mehr",
     "moreActions": "Weitere Aktionen",
-    "otherViews": "Weitere Ansichten"
+    "otherViews": "Weitere Ansichten",
+    "creating": "Wird erstellt...",
+    "notFound": "Nicht gefunden",
+    "popular": "Beliebt",
+    "other": "Andere"
   },
   "commandPalette": {
     "searchPlaceholder": "Zertifikat, Seite oder Aktion…",
@@ -6096,7 +6100,14 @@
       "validation": {
         "requiredField": "Dieses Feld ist erforderlich"
       },
-      "serverBusy": "Der Server ist mit einer anderen Änderung beschäftigt: Versuchen Sie es in einigen Sekunden erneut."
+      "serverBusy": "Der Server ist mit einer anderen Änderung beschäftigt: Versuchen Sie es in einigen Sekunden erneut.",
+      "downloadFailed": {
+        "publicKey": "Öffentlicher Schlüssel konnte nicht heruntergeladen werden",
+        "krl": "KRL konnte nicht heruntergeladen werden"
+      },
+      "copyFailed": {
+        "publicKey": "Öffentlicher Schlüssel konnte nicht kopiert werden"
+      }
     },
     "success": {
       "backup": {
@@ -6121,7 +6132,8 @@
         "sshCa": "SSH-CA erfolgreich erstellt",
         "sshCertificate": "SSH-Zertifikat erfolgreich ausgestellt",
         "caOffline": "CA offline",
-        "caRestored": "CA wieder online"
+        "caRestored": "CA wieder online",
+        "mscaConnection": "Verbindung zur Microsoft-CA erstellt"
       },
       "crl": {
         "generated": "CRL erfolgreich neu generiert"
@@ -6149,7 +6161,8 @@
         "truststore": "Zertifikat aus dem Trust Store entfernt",
         "user": "Benutzer erfolgreich gelöscht",
         "sshCa": "SSH-CA erfolgreich gelöscht",
-        "sshCertificate": "SSH-Zertifikat erfolgreich gelöscht"
+        "sshCertificate": "SSH-Zertifikat erfolgreich gelöscht",
+        "mscaConnection": "Verbindung zur Microsoft-CA gelöscht"
       },
       "duplicate": {
         "template": "Vorlage erfolgreich dupliziert"

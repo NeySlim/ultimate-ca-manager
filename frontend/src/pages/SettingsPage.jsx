@@ -811,7 +811,7 @@ export default function SettingsPage() {
         showSuccess(t('messages.success.update.settings'))
       } else {
         await mscaService.create(formData)
-        showSuccess(t('messages.success.create.settings'))
+        showSuccess(t('messages.success.create.mscaConnection'))
       }
       setShowMscaModal(false)
       setEditingMsca(null)
@@ -825,7 +825,7 @@ export default function SettingsPage() {
     if (!mscaConfirmDelete) return
     try {
       await mscaService.delete(mscaConfirmDelete.id)
-      showSuccess(t('messages.success.delete.settings'))
+      showSuccess(t('messages.success.delete.mscaConnection'))
       setMscaConfirmDelete(null)
       loadMscaConnections()
     } catch (error) {
