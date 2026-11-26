@@ -425,7 +425,8 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
 
     # The key state is read again under the CA row lock: an HSM key attached since the decision is seen
     decided_on = (existing_ca.prv, existing_ca.hsm_key_id)
-    lock_ca_row(existing_ca.id)
+    if lock_ca_row(existing_ca.id) is None:
+        raise ImportConflict('CA was deleted during the import')
     if not key_pem and (existing_ca.prv, existing_ca.hsm_key_id) != decided_on:
         raise ImportConflict('The key of this CA changed during the import; import the certificate again')
 

@@ -181,3 +181,39 @@ def test_an_import_over_an_attachment_on_sqlite(app, tmp_path, with_key):
 
     with _bound_to(app, f"sqlite:///{tmp_path / 'import-race.db'}"):
         _assert_coherent(_import_over_an_attachment(app, with_key), with_key)
+
+
+def _import_over_a_deletion(app):
+    """A CA re-imported after its row was deleted under the copy the import had read: refused, nothing written."""
+    from sqlalchemy import delete
+    from services.import_service import ImportConflict, extract_cert_info, update_ca_from_import
+    from cryptography.hazmat.primitives import serialization
+    key = ec.generate_private_key(ec.SECP256R1())
+    ca_id, old_cert = _keyless_ca(app, key, f'Import Gone CA {uuid.uuid4().hex[:6]}')
+    new_cert = _self_signed(key, old_cert)
+    with app.app_context():
+        existing = db.session.get(CA, ca_id)
+        db.session.execute(delete(CA.__table__).where(CA.__table__.c.id == ca_id))
+        with pytest.raises(ImportConflict, match='deleted'):
+            update_ca_from_import(existing, new_cert, new_cert.public_bytes(serialization.Encoding.PEM),
+                                  extract_cert_info(new_cert))
+        db.session.rollback()
+        db.session.remove()
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_an_import_over_a_deleted_ca_on_postgresql(app):
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'hsm_import_gone_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        _import_over_a_deletion(app)
+
+
+def test_an_import_over_a_deleted_ca_on_sqlite(app, tmp_path):
+    from tests.test_backup_cross_installation import _bound_to
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'import-gone.db'}"):
+        _import_over_a_deletion(app)
