@@ -107,6 +107,11 @@ def _update():
     latest = setting(updates._NOTIFIED_VERSION_KEY)
     if checked_at is None:
         return {'available': None, 'latest_version': None, 'checked_at': None}
+    # A version found on another channel says nothing of this one until the next check
+    suffix = latest.lstrip('v').split('-', 1)[1] if latest and '-' in latest else ''
+    channel = updates.get_update_settings()['channel']
+    if suffix and not (channel == 'rc' and suffix.startswith('rc')):
+        return {'available': None, 'latest_version': None, 'checked_at': checked_at}
     available = bool(latest) and updates.compare_versions(latest, updates.get_current_version()) > 0
     return {'available': available, 'latest_version': latest if available else None, 'checked_at': checked_at}
 

@@ -231,3 +231,27 @@ def test_a_silent_database_degrades_the_answer_instead_of_failing(app, state_key
 def test_safe_mode_answers_503_like_the_rest_of_the_api(app, state_key, monkeypatch):
     monkeypatch.setitem(app.config, 'SAFE_MODE', True)
     assert _read(app, state_key).status_code == 503
+
+
+@pytest.mark.parametrize('channel, notified, available', [
+    ('stable', '999.0-rc1', None), ('rc', '999.0-rc1', True), ('rc', '999.0', True), ('stable', '999.0', True)])
+def test_update_availability_follows_the_current_channel(app, state_key, channel, notified, available):
+    import services.updates as updates
+    keys = (updates._NOTIFIED_VERSION_KEY, updates._LAST_CHECK_TS_KEY, updates.UPDATE_CHANNEL_KEY)
+    with app.app_context():
+        for key in keys:
+            SystemConfig.query.filter_by(key=key).delete()
+        db.session.add_all([SystemConfig(key=updates._NOTIFIED_VERSION_KEY, value=notified),
+                            SystemConfig(key=updates._LAST_CHECK_TS_KEY, value='1700000000'),
+                            SystemConfig(key=updates.UPDATE_CHANNEL_KEY, value=channel)])
+        db.session.commit()
+    try:
+        update = assert_success(_read(app, state_key))['update']
+        assert update['available'] is available
+        assert update['latest_version'] == (notified if available else None)
+        assert update['checked_at'].startswith('2023-11-14')
+    finally:
+        with app.app_context():
+            for key in keys:
+                SystemConfig.query.filter_by(key=key).delete()
+            db.session.commit()

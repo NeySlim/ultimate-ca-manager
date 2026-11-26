@@ -3329,7 +3329,8 @@ GET /api/v2/system/instance
 - `cas`: active means holding its certificate, not revoked, not expired; `expiring_90_days` and
   `expiring_365_days` count active CAs, `next_expiry` is the nearest end of an active CA.
 - `update`: the verdict of the last scheduled update check, all `null` before the first one;
-  `latest_version` is set only when `available` is `true`.
+  `latest_version` is set only when `available` is `true`. A version found on the `rc` channel
+  gives `available: null` once the channel is back to `stable`, until the next check.
 - `backup`: whether the scheduled backup is on, when the newest archive was written (`null`
   without one) and the outcome of the last scheduled run (`ok`, `failed`, `skipped`, `null`
   before the first).
