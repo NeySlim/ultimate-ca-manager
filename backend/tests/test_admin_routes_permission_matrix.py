@@ -36,6 +36,10 @@ READ_SETTINGS = ('read:settings',)
 WRITE_SETTINGS = ('write:settings',)
 READ_CAS = ('read:cas',)
 WRITE_CAS = ('write:cas',)
+# A fleet console's scopes (#403): one of the two suffices (require_auth any_of), admin-only
+ADMIN_OR_BACKUPS = ('admin:system', 'write:backups')
+ADMIN_OR_UPDATES = ('admin:system', 'write:updates')
+READ_INSTANCE = ('read:instance',)
 SIGNED_IN = ()          # require_auth() with no scope
 PUBLIC = None           # no require_auth at all
 
@@ -105,8 +109,8 @@ ROUTES = {
     'GET /api/v2/system/backup/<filename>/download': ADMIN_SYSTEM,
     'GET /api/v2/system/backup/list': ADMIN_SYSTEM,
     'GET /api/v2/system/backups': ADMIN_SYSTEM,
-    'POST /api/v2/system/backup': ADMIN_SYSTEM,
-    'POST /api/v2/system/backup/create': ADMIN_SYSTEM,
+    'POST /api/v2/system/backup': ADMIN_OR_BACKUPS,
+    'POST /api/v2/system/backup/create': ADMIN_OR_BACKUPS,
     'POST /api/v2/system/backup/restore': ADMIN_SYSTEM,
     'POST /api/v2/system/backups/bulk-delete': ADMIN_SYSTEM,
     'POST /api/v2/system/backups/run-retention': ADMIN_SYSTEM,
@@ -122,6 +126,8 @@ ROUTES = {
     'POST /api/v2/system/https/apply': ADMIN_SYSTEM,
     'POST /api/v2/system/https/regenerate': ADMIN_SYSTEM,
     'POST /api/v2/system/https/unbind': ADMIN_SYSTEM,
+    # api.v2.system.instance
+    'GET /api/v2/system/instance': READ_INSTANCE,
     # api.v2.system.jobs: each job's own permission, checked inline
     'GET /api/v2/system/jobs': SIGNED_IN,
     'GET /api/v2/system/jobs/<job_id>': SIGNED_IN,
@@ -160,14 +166,14 @@ ROUTES = {
     'POST /api/v2/system/scheduler/<task_name>/run': ADMIN_SYSTEM,
     'POST /api/v2/system/service/restart': WRITE_SETTINGS,
     # api.v2.system.updates
-    'GET /api/v2/system/updates/campaign': ADMIN_SYSTEM,
+    'GET /api/v2/system/updates/campaign': ADMIN_OR_UPDATES,
     'GET /api/v2/system/updates/check': ADMIN_SYSTEM,
     'GET /api/v2/system/updates/settings': ADMIN_SYSTEM,
     'GET /api/v2/system/updates/version': PUBLIC,
     'GET /api/v2/system/updates/whatsnew': SIGNED_IN,
     'PATCH /api/v2/system/updates/settings': ADMIN_SYSTEM,
     'POST /api/v2/system/updates/campaign/resume': ADMIN_SYSTEM,
-    'POST /api/v2/system/updates/install': ADMIN_SYSTEM,
+    'POST /api/v2/system/updates/install': ADMIN_OR_UPDATES,
     # api.v2.users.mtls
     'DELETE /api/v2/users/<int:user_id>/mtls/certificates/<int:cert_id>': ADMIN_USERS,
     'GET /api/v2/users/<int:user_id>/mtls/certificates': ADMIN_USERS,
@@ -189,6 +195,9 @@ EXPECTED = {
     ADMIN_SETTINGS: _REFUSED_TO_ALL,
     ADMIN_USERS: _REFUSED_TO_ALL,
     ADMIN_KEY_RECOVERY: _REFUSED_TO_ALL,
+    ADMIN_OR_BACKUPS: _REFUSED_TO_ALL,
+    ADMIN_OR_UPDATES: _REFUSED_TO_ALL,
+    READ_INSTANCE: _REFUSED_TO_ALL,
     READ_SETTINGS: {'admin': GRANTED, 'operator': GRANTED, 'auditor': 403,
                     'viewer': 403, 'custom': GRANTED},
     WRITE_SETTINGS: {'admin': GRANTED, 'operator': GRANTED, 'auditor': 403,
