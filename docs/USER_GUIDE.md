@@ -306,6 +306,12 @@ A key revocation list names the certificates of a CA by serial number, so UCM gi
 
 An SSH CA on an HSM key keeps its private key on the token and needs the `read:hsm` permission besides `write:ssh_cas`. An HSM key backs one authority, X.509 or SSH, user or host: the key list offers only unused keys, and a key already held is refused with the name of the CA that holds it, and neither the key nor its provider can be deleted while the CA exists.
 
+#### SSH Hosts
+
+The **SSH agent** command of a CA's **Quick Install** tab installs on a server a script that pulls from UCM every 15 minutes; UCM never connects to the server. For a user CA it keeps sshd on the CA's KRL, published at `/ssh/krl/<refid>`, so a revoked certificate is refused within minutes. For a host CA it enrolls the server: open **Modules** > **Administration** > **SSH Hosts**, create an enrollment token for the host CA and the server's host names, and run the command shown with it, as root, before the token expires. The token is shown once and works once; the agent exchanges it for a host certificate of the server's own key, then renews it by signing a challenge with that key once 30 % of its lifetime is left.
+
+The page lists the enrolled hosts with the state of their certificate, whether they renew, and their last KRL pull as the agent reports it. **Pause renewal** stops the renewals until resumed; **Revoke host** revokes its certificate, which the KRL then lists, and ends its renewals. These actions need `write:ssh`; the page needs `read:ssh`, and choosing the CA of a token `read:ssh_cas`.
+
 ### Settings
 
 Open **Modules** > **Administration** > **Settings** (administrators), or **Settings** from the search (`Ctrl K`). Its sections, one under the other on a single page and listed in the table of contents, are: General, Appearance & Language, SMTP, Security, SSO, Backup, Audit, Database, HTTPS, Updates, Scheduler, Webhooks, CT, Auto-Renewal, Deployment, Microsoft CA, Active Directory, Windows Autoenrollment and About; a section you have no right to is not shown.

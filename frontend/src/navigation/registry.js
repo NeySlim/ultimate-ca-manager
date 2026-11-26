@@ -45,6 +45,8 @@ const RAW_MODULES = [
     palette: { icon: Terminal } },
   { id: 'ssh-certificates', path: '/ssh/certificates', labelKey: 'common.sshCertificates', descKey: 'shell.moduleDesc.sshCertificates', icon: Certificate, group: 'admin', guard: { permission: 'read:ssh' }, pinnable: true,
     palette: { icon: Terminal } },
+  { id: 'ssh-hosts', path: '/ssh/hosts', labelKey: 'common.sshHosts', descKey: 'shell.moduleDesc.sshHosts', icon: Terminal, group: 'admin', guard: { permission: 'read:ssh' }, pinnable: true,
+    palette: { icon: Terminal } },
   { id: 'acme', path: '/acme', labelKey: 'common.acme', descKey: 'shell.moduleDesc.acme', shortKey: 'common.acmeShort', icon: ArrowClockwise, group: 'protocols', guard: { permission: 'read:acme' }, pinnable: true,
     palette: { views: [
       ['localorders', 'acme.views.localorders'], ['localdomains', 'acme.views.localdomains'], ['eab', 'acme.views.eab'], ['config', 'acme.views.config'],
@@ -151,7 +153,7 @@ const GLYPHS = {
   csrs: 'file', templates: 'template', truststore: 'anchor', 'user-certificates': 'cert', tools: 'command',
   acme: 'refresh', scep: 'globe', est: 'plug', tsa: 'stamp', 'crl-ocsp': 'crl',
   policies: 'policy', approvals: 'approve', keyRecovery: 'key', reports: 'chart', discovery: 'radar',
-  'ssh-cas': 'terminal', 'ssh-certificates': 'terminal', operations: 'upload', users: 'users', rbac: 'lock',
+  'ssh-cas': 'terminal', 'ssh-certificates': 'terminal', 'ssh-hosts': 'terminal', operations: 'upload', users: 'users', rbac: 'lock',
   hsm: 'chip', logs: 'rows', settings: 'settings', account: 'users',
 }
 export const glyphOf = (mod) => GLYPHS[mod?.id] || 'cert'

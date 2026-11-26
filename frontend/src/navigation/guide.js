@@ -11,7 +11,7 @@ import { GROUPS, MODULES, isVisible, moduleById } from './registry'
 // Chapters whose key differs from their module's id, and the chapters of a settings tab
 const MODULE_OF = {
   dashboard: 'dashboard', auditLogs: 'audit', crlocsp: 'crl-ocsp', usersGroups: 'users', certTools: 'tools',
-  sshCas: 'ssh-cas', sshCertificates: 'ssh-certificates', systemLogs: 'logs',
+  sshCas: 'ssh-cas', sshCertificates: 'ssh-certificates', sshHosts: 'ssh-hosts', systemLogs: 'logs',
   sso: 'settings', security: 'settings', msca: 'settings',
 }
 const TAB_OF = { sso: 'sso', security: 'security', msca: 'microsoftCA' }

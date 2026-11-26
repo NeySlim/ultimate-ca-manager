@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SSH agent: `curl -fsSL https://<ucm>/ssh/setup/<refid>/agent | sudo sh` makes sshd read the KRL of a user CA and installs a timer that pulls it every 15 minutes, checks it and reloads sshd only when it changed; `--uninstall` removes it (#451).
 - SSH host enrollment: an administrator creates a single-use enrollment token for a host CA and the host names it allows, and the agent installed with it exchanges the token for a host certificate of the server's own key, which sshd then presents (#451).
 - SSH host renewal: once a host certificate has 30 % of its lifetime left, the agent signs a UCM challenge with the host key the certificate certifies and installs the new certificate; revoking the host, or its certificate, ends its renewals (#451).
+- SSH Hosts page (Modules > Administration): the enrolled servers with the state of their host certificate, automatic renewal and last KRL pull, the Revoke host and Pause renewal actions, and the enrollment tokens, created there, shown once and revocable (#451).
 
 ### Changed
 

@@ -57,4 +57,5 @@ export const pages = {
   discovery: lazyWithRetry(() => import('../pages/DiscoveryPage')),
   'ssh-cas': lazyWithRetry(() => import('../pages/SSHCAsPage')),
   'ssh-certificates': lazyWithRetry(() => import('../pages/SSHCertificatesPage')),
+  'ssh-hosts': lazyWithRetry(() => import('../pages/SSHHostsPage')),
 }

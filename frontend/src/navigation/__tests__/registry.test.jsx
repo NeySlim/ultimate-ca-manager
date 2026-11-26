@@ -109,7 +109,7 @@ const BASE_GUARDS = {
   '/truststore': 'read:truststore', '/truststore/:id': 'read:truststore', '/rbac': 'admin',
   '/hsm': 'read:hsm', '/policies': 'read:policies', '/approvals': 'read:approvals',
   '/key-recovery': 'read:key_recovery', '/reports': 'read:audit', '/discovery': 'read:certificates',
-  '/ssh/cas': 'read:ssh_cas', '/ssh/certificates': 'read:ssh',
+  '/ssh/cas': 'read:ssh_cas', '/ssh/certificates': 'read:ssh', '/ssh/hosts': 'read:ssh',
 }
 const BASE_REDIRECTS = {
   '/import': '/operations', '/groups': '/users?tab=groups', '/sso': '/settings?tab=sso',
@@ -287,10 +287,10 @@ describe('visibility (e)', () => {
   // What the old sidebar listed per role, plus the entries it reached from elsewhere
   // (settings from its bottom link, user certificates from no entry at all)
   it.each([
-    ['admin', ['*'], ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'operations', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'users', 'rbac', 'hsm', 'audit', 'logs', 'user-certificates', 'settings']],
-    ['operator', operator, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'hsm', 'audit', 'user-certificates']],
-    ['auditor', auditor, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'crl-ocsp', 'truststore', 'tools', 'policies', 'approvals', 'reports', 'discovery', 'hsm', 'audit']],
-    ['viewer', viewer, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'truststore', 'tools', 'discovery']],
+    ['admin', ['*'], ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'ssh-hosts', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'operations', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'users', 'rbac', 'hsm', 'audit', 'logs', 'user-certificates', 'settings']],
+    ['operator', operator, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'ssh-hosts', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'hsm', 'audit', 'user-certificates']],
+    ['auditor', auditor, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'ssh-hosts', 'acme', 'scep', 'est', 'crl-ocsp', 'truststore', 'tools', 'policies', 'approvals', 'reports', 'discovery', 'hsm', 'audit']],
+    ['viewer', viewer, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'ssh-hosts', 'truststore', 'tools', 'discovery']],
   ])('the Modules menu lists what the old navigation gave %s', (_role, perms, expected) => {
     expect(menuIds(perms)).toEqual([...expected].sort())
   })
@@ -323,7 +323,7 @@ describe('palette', () => {
       'csrs /csrs', 'templates /templates', 'truststore /truststore', 'tools /tools', 'user-certificates /user-certificates',
       'acme /acme', 'scep /scep-config', 'est /est-config', 'tsa /tsa-config', 'crl-ocsp /crl-ocsp',
       'policies /policies', 'approvals /approvals', 'keyRecovery /key-recovery', 'reports /reports', 'discovery /discovery',
-      'ssh-cas /ssh/cas', 'ssh-certificates /ssh/certificates', 'import /operations', 'users /users', 'rbac /rbac', 'hsm /hsm',
+      'ssh-cas /ssh/cas', 'ssh-certificates /ssh/certificates', 'ssh-hosts /ssh/hosts', 'import /operations', 'users /users', 'rbac /rbac', 'hsm /hsm',
       'logs /logs', 'settings /settings',
       'account /account', 'groups /users?tab=groups', 'sso /sso',
       'new-cert /certificates?action=create', 'new-ca /cas?action=create', 'upload-csr /csrs?action=upload',

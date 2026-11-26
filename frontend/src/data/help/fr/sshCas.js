@@ -210,16 +210,16 @@ sudo systemctl restart sshd
 
 Les AC SSH prennent en charge les listes de révocation de clés pour invalider les certificats compromis :
 
-1. Révoquez les certificats depuis la page Certificats SSH
-2. Téléchargez la KRL mise à jour depuis le panneau de détail de l’AC
-3. Déployez le fichier KRL sur les serveurs :
+1. Révoquez les certificats depuis la page Certificats SSH : l’AC publie aussitôt sa nouvelle KRL, à \`/ssh/krl/<refid>\`, sans authentification
+2. Sur chaque serveur, la commande **Agent SSH** de l’onglet **Installation rapide** installe la KRL et la récupère toutes les 15 minutes (voir Hôtes SSH)
+3. Ou téléchargez la KRL depuis le panneau de détail de l’AC et déployez-la vous-même :
 
 \`\`\`bash
 # Ajoutez à sshd_config
 RevokedKeys /etc/ssh/revoked_keys
 \`\`\`
 
-> ⚠ Les serveurs doivent être configurés pour vérifier la KRL. La révocation ne prend effet qu’après le déploiement de la KRL.
+> ⚠ Les serveurs doivent être configurés pour vérifier la KRL. Une révocation prend effet sur un serveur dès qu’il a la nouvelle KRL : en 15 minutes au plus avec l’agent.
 
 ## Bonnes pratiques
 

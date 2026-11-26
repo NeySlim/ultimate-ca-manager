@@ -21,7 +21,7 @@ const RELATED = {
   settings: 'settings', 'CRL/OCSP': 'crlocsp', 'CRL & OCSP': 'crlocsp', Account: 'account', 'Microsoft CA': 'msca', SCEP: 'scep',
   ACME: 'acme', RBAC: 'rbac', 'Audit Logs': 'auditLogs', auditLogs: 'auditLogs', 'Users & Groups': 'usersGroups',
   Operations: 'operations', 'Import/Export': 'operations', Approvals: 'approvals', Policies: 'policies', Reports: 'reports',
-  'SSH Certificates': 'sshCertificates', 'SSH CAs': 'sshCas',
+  'SSH Certificates': 'sshCertificates', 'SSH CAs': 'sshCas', 'SSH Hosts': 'sshHosts',
 }
 
 function Related({ name, newTab }) {

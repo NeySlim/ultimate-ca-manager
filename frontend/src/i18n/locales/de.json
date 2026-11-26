@@ -482,7 +482,8 @@
     "creating": "Wird erstellt...",
     "notFound": "Nicht gefunden",
     "popular": "Beliebt",
-    "other": "Andere"
+    "other": "Andere",
+    "sshHosts": "SSH Hosts"
   },
   "commandPalette": {
     "searchPlaceholder": "Zertifikat, Seite oder Aktion…",
@@ -7467,7 +7468,10 @@
     "range": "{{shown}} von {{count}} SSH-CAs",
     "pageRange": "{{start}}–{{end}} von {{count}} SSH-CAs",
     "moreActions": "Weitere Aktionen für {{name}}",
-    "actionsTitle": "Aktionen der SSH-CA"
+    "actionsTitle": "Aktionen der SSH-CA",
+    "agent": "SSH agent",
+    "agentUserDescription": "Installs the agent: sshd reads this CA's KRL, pulled every 15 minutes, so a revoked certificate is refused.",
+    "agentHostDescription": "Enrolls the server with an enrollment token: it gets a host certificate of this CA and renews it. Create the token in SSH Hosts."
   },
   "sshCertificates": {
     "title": "SSH-Zertifikate",
@@ -7560,6 +7564,86 @@
     "grants": "Principals und Optionen",
     "moreActions": "Weitere Aktionen für {{name}}",
     "actionsTitle": "Aktionen des SSH-Zertifikats"
+  },
+  "sshHosts": {
+    "title": "SSH Hosts",
+    "subtitle_one": "{{count}} host",
+    "subtitle_other": "{{count}} hosts",
+    "intent": "Servers the SSH agent enrolled with a host CA, the certificate each presents and its renewal.",
+    "caption": "Enrolled SSH hosts",
+    "loadFailed": "Failed to load SSH hosts",
+    "stateValid": "Valid",
+    "stateExpired": "Expired",
+    "stateRevoked": "Revoked",
+    "filterByState": "Filter hosts by state",
+    "searchLabel": "Search hosts",
+    "noData": "No enrolled host",
+    "noDataDescription": "Create an enrollment token, then run the SSH agent on the server with it: it gets a host certificate and renews it.",
+    "pageRange": "{{start}}–{{end}} of {{count}} hosts",
+    "revokeHost": "Revoke host",
+    "revokeConfirm": "Revoke {{name}}? Its host certificate is revoked and listed in the KRL, and it will not renew again: the server must enroll with a new token.",
+    "revoked": "{{name}} revoked",
+    "pauseRenewal": "Pause renewal",
+    "resumeRenewal": "Resume renewal",
+    "renewalPaused": "Renewal of {{name}} paused",
+    "renewalResumed": "Renewal of {{name}} resumed",
+    "renewalOn": "On",
+    "renewalOff": "Paused",
+    "autoRenew": "Automatic renewal",
+    "certificate": "Host certificate",
+    "hostKey": "Host key",
+    "agent": "Agent",
+    "renewAt": "Renews",
+    "renewAtValue": "with {{percent}} % of its lifetime left",
+    "enrolledAt": "Enrolled",
+    "enrolledFrom": "Enrolled from",
+    "lastRenewed": "Last renewal",
+    "lastSeen": "Last contact",
+    "lastKrlSync": "Last KRL pull",
+    "notReported": "Not reported",
+    "revokedNotice": "This host is revoked: it no longer renews. To use it again, enroll the server with a new token.",
+    "token": {
+      "title": "Enrollment tokens",
+      "subtitle_one": "{{count}} token",
+      "subtitle_other": "{{count}} tokens",
+      "intent": "A token enrolls one server, once, before it expires, for the host names it lists.",
+      "caption": "Enrollment tokens",
+      "create": "New enrollment token",
+      "createHint": "The server exchanges it once for a host certificate of its own key.",
+      "created": "Enrollment token created",
+      "revoked": "Token {{prefix}} revoked",
+      "revoke": "Revoke token",
+      "prefix": "Token",
+      "expires": "Expires",
+      "noData": "No enrollment token",
+      "noDataDescription": "Create a token for a host CA and the names of the server, then run the command it shows on the server.",
+      "state": {
+        "active": "Active",
+        "used": "Used",
+        "expired": "Expired",
+        "revoked": "Revoked"
+      },
+      "hostCa": "Host CA",
+      "needsCaRead": "Choosing the CA requires the read:ssh_cas permission.",
+      "noHostCa": "No host CA: create one in SSH CAs first.",
+      "principals": "Host names",
+      "principalsHint": "The names the server may hold in its certificate, separated by commas or spaces.",
+      "validity": "Certificate validity",
+      "caDefault": "The CA's default",
+      "lifetime": "Token valid for",
+      "lifetimes": {
+        "15m": "15 minutes",
+        "1h": "1 hour",
+        "24h": "24 hours",
+        "7d": "7 days"
+      },
+      "renewPercent": "Renew with % of lifetime left",
+      "renewPercentHint": "From 5 to 90. The agent renews the certificate once it has this share of its lifetime left.",
+      "shownOnce": "This token is shown once: UCM keeps only its fingerprint. Copy it now.",
+      "value": "Token",
+      "command": "Command to run on the server",
+      "commandHint": "Run it as root before {{expires}}. The token is passed in the environment and is not written to disk."
+    }
   },
   "filters": {
     "managePresets": "Voreinstellungen verwalten"
@@ -8080,7 +8164,8 @@
       "hsm": "Hardwaremodule und Schlüsseltresore.",
       "audit": "Protokoll der Vorgänge und Anmeldungen.",
       "logs": "Technische Protokolle des Dienstes.",
-      "settings": "Allgemeine Konfiguration der Instanz."
+      "settings": "Allgemeine Konfiguration der Instanz.",
+      "sshHosts": "Servers enrolled by the SSH agent and their host certificates"
     },
     "moduleLabel": {
       "crlOcsp": "CRL / OCSP",
