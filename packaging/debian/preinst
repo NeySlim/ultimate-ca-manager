@@ -53,10 +53,15 @@ case "$1" in
             mkdir -p "$BACKUP_DIR"
             
             # Backup configuration
+            if [ -L "/etc/ucm/ucm.env" ]; then
+                echo "/etc/ucm/ucm.env is a symbolic link or not a regular file: replace it with a regular file, then install again" >&2
+                exit 1
+            fi
             if [ -f "/etc/ucm/ucm.env" ]; then
                 echo "Creating backup of configuration..."
                 BACKUP_FILE="$BACKUP_DIR/ucm.env-pre-upgrade-$(date +%Y%m%d-%H%M%S)"
-                cp "/etc/ucm/ucm.env" "$BACKUP_FILE"
+                # /etc/ucm is the service account's: read with O_NOFOLLOW, never through a link
+                (umask 077 && dd if=/etc/ucm/ucm.env iflag=nofollow,nonblock of="$BACKUP_FILE" status=none)
                 echo "✓ Config backup: $BACKUP_FILE"
             fi
         fi

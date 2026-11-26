@@ -432,6 +432,21 @@ def test_it_reports_what_it_found_where_it_went_and_that_ucm_starts_empty(tmp_pa
         assert SECRET not in text
 
 
+def test_the_log_is_never_appended_through_a_link(tmp_path):
+    """The service account owned /var/log/ucm: a link it left there leads nowhere root writes."""
+    box = Box(tmp_path)
+    victim = tmp_path / 'victim'
+    victim.write_text('precious')
+    victim.chmod(0o600)
+    box.log.parent.mkdir(parents=True)
+    box.log.symlink_to(victim)
+    out = box.run()
+    assert out.returncode == 0, out.stderr
+    assert 'starts empty' in out.stdout
+    assert victim.read_text() == 'precious' and stat.S_IMODE(victim.stat().st_mode) == 0o600
+    assert box.log.is_symlink()
+
+
 def _elsewhere(box, tmp_path):
     elsewhere = tmp_path / 'srv'
     elsewhere.mkdir()
@@ -516,7 +531,7 @@ def test_the_readme_puts_each_file_where_the_packages_write_it(tmp_path):
     config_line = next(line for line in lines if line.lstrip().startswith('config/'))
     assert 'HTTPS' in data_line and 'HTTPS' not in config_line
     postinst = (ROOT / 'packaging' / 'debian' / 'postinst').read_text()
-    assert '-keyout "$UCM_DATA/https_key.pem"' in postinst
+    assert 'https-cert "$UCM_DATA"' in postinst
 
 
 @pytest.mark.parametrize('line, kept', [('UCM_FIPS_BUILD=1', True), ('export UCM_FIPS_BUILD="yes"', True),
@@ -1496,10 +1511,12 @@ def _ownership_commands(box):
     readme = next(l.strip() for l in (box.archive / 'README.txt').read_text().splitlines() if 'chown' in l)
     assert readme.startswith('sudo ') and readme.count('ucm:ucm') == 1, readme
     commands = {'readme': readme[5:].replace('ucm:ucm', '1:1')}
-    env = f'UCM_HOME={box.home} UCM_DATA={box.data} UCM_CONFIG={box.config} UCM_USER=1 UCM_GROUP=1; '
+    env = (f'UCM_HOME={box.home} UCM_DATA={box.data} UCM_CONFIG={box.config} UCM_USER=1 UCM_GROUP=1 '
+           f'UCM_SETUP={ROOT}/packaging/scripts/native-setup.sh; ')
+    # The log directory's line is left out: it names the host's own /var/log/ucm
     for name, path in (('postinst', 'debian/postinst'), ('spec', 'rpm/ucm.spec')):
         lines = [l.strip() for l in (ROOT / 'packaging' / path).read_text().splitlines()
-                 if l.strip().startswith('find ') and 'chown' in l]
+                 if l.strip().startswith('bash "$UCM_SETUP" own chown-tree "$UCM_')]
         assert lines, path
         commands[name] = env + '; '.join(lines).replace('%{name}', '1')
     return commands
@@ -2089,3 +2106,39 @@ def test_every_suite_lab_goes_with_its_class(tmp_path, suite, name):
 def test_the_suite_labs_are_found():
     assert len(_suite_labs()) == 3, _suite_labs()
 
+
+
+# The service account owns /var/log/ucm and /etc/ucm: what it lays there after a check is never written through
+def _precious(tmp_path):
+    victim = tmp_path / 'victim'
+    victim.write_text('precious\n')
+    victim.chmod(0o600)
+    return victim
+
+
+def test_the_log_swapped_for_a_link_after_its_check_is_not_written_through(tmp_path):
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    victim = _precious(tmp_path)
+    # date runs between the check of the log and the write of its line
+    (box.bin / 'date').write_text(
+        f'#!/bin/sh\ncase "$*" in *%Y%m%dT*) echo {STAMP}; exit ;; esac\n'
+        f'[ -L {box.log} ] || {{ rm -f {box.log}; ln -s {victim} {box.log}; }}\nexec {shutil.which("date")} "$@"\n')
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert victim.read_text() == 'precious\n' and stat.S_IMODE(victim.stat().st_mode) == 0o600
+
+
+def test_a_link_laid_where_the_fips_line_goes_is_not_written_through(tmp_path):
+    box = Box(tmp_path, python='stub')
+    env = box.config / 'ucm.env'
+    env.write_text(env.read_text() + FIPS)
+    box.wrap()
+    victim = _precious(tmp_path)
+    # The fips line of the journal is written just before the new ucm.env: the link lands in between
+    (box.bin / 'tee').write_text(
+        f'#!/bin/sh\nline=$({REAL_CAT})\ncase $line in fips*) ln -s {victim} {env} ;; esac\n'
+        f'printf "%s\\n" "$line" | exec {REAL["tee"]} "$@"\n')
+    out = box.run()
+    assert out.returncode != 0, out.stdout
+    assert victim.read_text() == 'precious\n' and stat.S_IMODE(victim.stat().st_mode) == 0o600

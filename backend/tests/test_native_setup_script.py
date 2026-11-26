@@ -19,7 +19,7 @@ SCRIPT = ROOT / 'packaging' / 'scripts' / 'native-setup.sh'
 BASH = shutil.which('bash')
 UTILS = ('sed', 'awk', 'sort', 'grep', 'dirname', 'tail', 'head', 'tr', 'cat', 'wc',
          'mktemp', 'rm', 'mv', 'mkdir', 'touch', 'chmod', 'chown', 'openssl', 'env', 'cp',
-         'readlink')
+         'readlink', 'python3')
 
 UBUNTU = 'ID=ubuntu\nVERSION_ID="24.04"\nPRETTY_NAME="Ubuntu 24.04.3 LTS"\n'
 ALMA = 'ID="almalinux"\nID_LIKE="rhel centos fedora"\nVERSION_ID="9.8"\nPRETTY_NAME="AlmaLinux 9.8"\n'
@@ -383,6 +383,59 @@ def test_a_failed_fips_build_fails_and_keeps_the_previous_venv(tmp_path):
     assert 'linker cc failed' in result.stderr
     assert (home / 'venv' / 'previous').read_text() == 'old venv'
     assert '--quiet -r' not in record.read_text()  # never falls back to the wheels
+
+
+# The service account owns /var/log/ucm: the build log and its marker are never written through a link
+def _linked_build_files(tmp_path):
+    (tmp_path / 'log').mkdir()
+    victims = {}
+    for name in ('fips-build.log', 'fips-build.failed'):
+        victim = tmp_path / f'victim-{name}'
+        victim.write_text('precious')
+        victim.chmod(0o600)
+        (tmp_path / 'log' / name).symlink_to(victim)
+        victims[name] = victim
+    return victims
+
+
+def _untouched(victims):
+    for victim in victims.values():
+        assert victim.read_text() == 'precious' and stat.S_IMODE(victim.stat().st_mode) == 0o600, victim
+
+
+def test_missing_tools_write_no_marker_through_a_link(tmp_path):
+    victims = _linked_build_files(tmp_path)
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, _ = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, extra={'PATH': str(bin_dir)}))
+    assert result.returncode == 1 and 'cargo/rustc>=1.83' in result.stderr, result.stderr
+    _untouched(victims)
+    marker = tmp_path / 'log' / 'fips-build.failed'
+    assert not marker.is_symlink() and marker.read_text() == 'build tools missing\n'
+
+
+@pytest.mark.parametrize('build, failed', [
+    ('exit 0', False),
+    ('case "$*" in *no-binary*) echo "error: linker cc failed"; exit 1;; esac; exit 0', True)])
+@pytest.mark.parametrize('linked', [False, True])
+def test_a_fips_build_keeps_its_log_and_marker(tmp_path, build, failed, linked):
+    """A link laid at either path is replaced, never written through."""
+    victims = _linked_build_files(tmp_path) if linked else {}
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, _ = _fake_python(tmp_path, build)
+    home, envfile = _home(tmp_path)
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
+    assert (result.returncode == 1) is failed, result.stderr
+    log = tmp_path / 'log' / 'fips-build.log'
+    assert stat.S_ISREG(log.lstat().st_mode)
+    if failed:
+        assert 'linker cc failed' in log.read_text() and 'linker cc failed' in result.stderr
+        assert (tmp_path / 'log' / 'fips-build.failed').read_text() == 'build failed\n'
+    else:
+        assert 'cryptography, hashlib and psycopg use the system OpenSSL' in log.read_text()
+        assert not (tmp_path / 'log' / 'fips-build.failed').exists()
+    _untouched(victims)
 
 
 def _venv_dir(path, works=True, gunicorn=True, tag='good'):
@@ -1319,16 +1372,22 @@ def test_a_failed_write_leaves_no_copy_of_the_secret(tmp_path):
     bin_dir = tmp_path / 'bin'
     for util in UTILS:
         real = shutil.which(util)
-        if real and util not in ('openssl', 'mv'):
+        if real and util != 'openssl':
             (bin_dir / util).parent.mkdir(parents=True, exist_ok=True)
             (bin_dir / util).symlink_to(real)
     _stub(bin_dir / 'openssl', f'echo {"ef" * 32}')
-    _stub(bin_dir / 'mv', 'exit 1')
+    # The final rename fails (a full disk, say)
+    failing = _stub(tmp_path / 'failing-python',
+                    'code=$3; shift 3\n'
+                    f'exec {sys.executable} -I -c "import os'
+                    '\ndef rename(*a, **k): raise OSError(28, \'No space left on device\')'
+                    '\nos.rename = rename\n$code" "$@"')
     conf = tmp_path / 'etc'
     conf.mkdir()
     envfile = conf / 'ucm.env'
     envfile.write_text('SECRET_KEY=\n')
-    result = _run(['env', str(envfile), '/d'], _env(tmp_path, extra={'PATH': str(bin_dir)}))
+    result = _run(['env', str(envfile), '/d'],
+                  _env(tmp_path, extra={'PATH': str(bin_dir), 'UCM_PYTHON': str(failing)}))
     assert result.returncode != 0
     assert [p.name for p in conf.iterdir()] == ['ucm.env'] and envfile.read_text() == 'SECRET_KEY=\n'
 
@@ -1340,7 +1399,8 @@ def _sourced_banner(tmp_path, env_text):
     def function(name):
         one_line = _re.search(rf'^{name}\(\) \{{ .*\}}$', body, _re.M)
         return (one_line or _re.search(rf'^{name}\(\) \{{\n.*?^\}}$', body, _re.M | _re.S)).group(0)
-    funcs = '\n'.join(function(name) for name in ('env_value', 'env_has', 'cmd_banner'))
+    helper = _re.search(r"^OWN_PY='\n.*?^'$", body, _re.M | _re.S).group(0)
+    funcs = '\n'.join([helper] + [function(name) for name in ('own', 'env_value', 'env_has', 'cmd_banner')])
     bin_dir = tmp_path / 'bin'
     bin_dir.mkdir()
     for tool, script in (('hostname', 'echo ucm.example.test'), ('dpkg-query', 'exit 1'), ('rpm', 'exit 1')):
@@ -1399,3 +1459,386 @@ def test_with_hostname_its_fully_qualified_name_comes_first(tmp_path):
     _stub(bin_dir / 'hostname', '[ "$1" = -f ] && echo ucm.example.test || echo ucm')
     result = _run(['host-name'], _env(tmp_path, extra={'PATH': f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"}))
     assert result.stdout == 'ucm.example.test\n'
+
+
+# ------------------------------------------------------------ HTTPS certificate
+
+def _owner():
+    import grp
+    import pwd
+    return pwd.getpwuid(os.getuid()).pw_name, grp.getgrgid(os.getgid()).gr_name
+
+
+def _https_cert(tmp_path, data):
+    user, group = _owner()
+    return _run(['https-cert', str(data), user, group], _env(tmp_path))
+
+
+def test_a_missing_certificate_is_generated_with_its_modes(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    result = _https_cert(tmp_path, data)
+    assert result.returncode == 0, result.stderr
+    key, cert = data / 'https_key.pem', data / 'https_cert.pem'
+    assert key.read_text().startswith('-----BEGIN PRIVATE KEY-----')
+    assert cert.read_text().startswith('-----BEGIN CERTIFICATE-----')
+    assert stat.S_IMODE(key.stat().st_mode) == 0o600 and stat.S_IMODE(cert.stat().st_mode) == 0o644
+    assert key.stat().st_uid == os.getuid() and cert.stat().st_gid == os.getgid()
+
+
+@pytest.mark.parametrize('name', ['https_key.pem', 'https_cert.pem'])
+def test_a_link_the_service_account_laid_is_replaced_not_written_through(tmp_path, name):
+    """Root generates while the service account owns the data directory: its link leads nowhere."""
+    data = tmp_path / 'data'
+    data.mkdir()
+    victim = tmp_path / 'passwd'
+    victim.write_text('root:x:0:0::/root:/bin/bash\n')
+    victim.chmod(0o644)
+    if name == 'https_cert.pem':
+        # Dangling for [ -f ]: a link to a file that is not there yet
+        (data / name).symlink_to(tmp_path / 'absent')
+    else:
+        (data / name).symlink_to(victim)
+    result = _https_cert(tmp_path, data)
+    assert result.returncode == 0, result.stderr
+    assert victim.read_text() == 'root:x:0:0::/root:/bin/bash\n'
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o644
+    assert not (tmp_path / 'absent').exists()
+    for f in ('https_key.pem', 'https_cert.pem'):
+        assert not (data / f).is_symlink() and stat.S_ISREG((data / f).lstat().st_mode), f
+    assert stat.S_IMODE((data / 'https_key.pem').stat().st_mode) == 0o600
+
+
+def test_an_existing_certificate_is_kept(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    (data / 'https_cert.pem').write_text('operator cert')
+    (data / 'https_key.pem').write_text('operator key')
+    result = _https_cert(tmp_path, data)
+    assert result.returncode == 0, result.stderr
+    assert (data / 'https_key.pem').read_text() == 'operator key'
+    assert (data / 'https_cert.pem').read_text() == 'operator cert'
+
+
+def test_without_hostname_the_certificate_is_named_from_uname(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    user, group = _owner()
+    result = _run(['https-cert', str(data), user, group],
+                  _env(tmp_path, extra={'PATH': _path_without_hostname(tmp_path)}))
+    assert result.returncode == 0, result.stderr
+    subject = subprocess.run(['openssl', 'x509', '-noout', '-subject', '-in', str(data / 'https_cert.pem')],
+                             capture_output=True, text=True).stdout
+    assert subject.replace(' ', '').startswith(f'subject=CN={os.uname().nodename},O=UCM'), subject
+
+
+# ---------------------------------------------------- ucm.env as a link
+
+def _env_victim(tmp_path, body='root ALL=(ALL:ALL) ALL\n'):
+    victim = tmp_path / 'sudoers'
+    victim.write_text(body)
+    # Writable by its owner: the tests may run as any user
+    victim.chmod(0o640)
+    return victim
+
+
+@pytest.mark.parametrize('command', [['env', '/opt/ucm/data'], ['env-ensure', 'DATA_DIR', '/d'], ['env-check']])
+def test_a_ucm_env_link_is_refused_and_its_target_untouched(tmp_path, command):
+    victim = _env_victim(tmp_path, 'UCM_FIPS_BUILD=1\n')
+    envfile = tmp_path / 'ucm.env'
+    envfile.symlink_to(victim)
+    result = _run([command[0], str(envfile), *command[1:]], _env(tmp_path, extra={'UCM_FIPS_BUILD': '1'}))
+    assert result.returncode == 1
+    assert 'symbolic link or not a regular file' in result.stderr
+    assert victim.read_text() == 'UCM_FIPS_BUILD=1\n' and stat.S_IMODE(victim.stat().st_mode) == 0o640
+    assert envfile.is_symlink()
+
+
+def test_a_dangling_ucm_env_link_creates_nothing(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.symlink_to(tmp_path / 'created-by-root')
+    result = _run(['env', str(envfile), '/d'], _env(tmp_path))
+    assert result.returncode == 1
+    assert not (tmp_path / 'created-by-root').exists()
+
+
+def test_a_ucm_env_that_is_not_a_file_is_refused(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.mkdir()
+    result = _run(['env', str(envfile), '/d'], _env(tmp_path))
+    assert result.returncode == 1 and 'not a regular file' in result.stderr
+
+
+def test_the_fips_step_writes_no_ucm_env_through_a_link(tmp_path):
+    victim = _env_victim(tmp_path, 'UCM_FIPS_BUILD=1\n')
+    envfile = tmp_path / 'ucm.env'
+    envfile.symlink_to(victim)
+    (tmp_path / 'fips_enabled').write_text('1\n')
+    result = _run(['fips-finish', str(tmp_path / 'home'), str(envfile), str(tmp_path / 'data'), 'ucm'],
+                  _env(tmp_path))
+    assert result.returncode == 1, result.stdout
+    assert victim.read_text() == 'UCM_FIPS_BUILD=1\n' and stat.S_IMODE(victim.stat().st_mode) == 0o640
+
+
+@pytest.mark.parametrize('absent', [True, False])
+def test_a_new_ucm_env_is_created_restricted(tmp_path, absent):
+    envfile = tmp_path / 'ucm.env'
+    if not absent:
+        envfile.write_text('UCM_FIPS_BUILD=1\n')
+        envfile.chmod(0o644)
+    assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
+    assert stat.S_ISREG(envfile.lstat().st_mode) and stat.S_IMODE(envfile.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize('before, after', [
+    ('SECRET_KEY=a\n', 'SECRET_KEY=a\nDATA_DIR=/d\n'),
+    ('SECRET_KEY=a', 'SECRET_KEY=a\nDATA_DIR=/d\n'),
+    ('SECRET_KEY=a\nDATA_DIR=/srv\n', 'SECRET_KEY=a\nDATA_DIR=/srv\n'),
+])
+def test_env_ensure_adds_a_missing_key_and_keeps_the_mode(tmp_path, before, after):
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text(before)
+    envfile.chmod(0o640)
+    result = _run(['env-ensure', str(envfile), 'DATA_DIR', '/d'], _env(tmp_path))
+    assert result.returncode == 0, result.stderr
+    assert envfile.read_text() == after
+    assert stat.S_IMODE(envfile.stat().st_mode) == 0o640 and not envfile.is_symlink()
+
+
+def test_a_ucm_env_swapped_for_a_directory_link_mid_write_receives_nothing(tmp_path):
+    """The account owns /etc/ucm: a link laid after the check is replaced by the rename, not entered."""
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('SECRET_KEY=a\n')
+    elsewhere = tmp_path / 'root-dir'
+    elsewhere.mkdir()
+    bin_dir = tmp_path / 'bin'
+    # chmod --reference is the last step before the rename: the link lands in that window
+    _stub(bin_dir / 'chmod', f'{shutil.which("chmod")} "$@" || exit\n'
+                             f'case "$1" in --reference=*) rm -f "${{1#--reference=}}"; '
+                             f'ln -s {elsewhere} "${{1#--reference=}}";; esac')
+    path = f'{bin_dir}:{os.environ.get("PATH", "/usr/bin:/bin")}'
+    result = _run(['env-ensure', str(envfile), 'DATA_DIR', '/d'], _env(tmp_path, extra={'PATH': path}))
+    assert result.returncode == 0, result.stderr
+    assert list(elsewhere.iterdir()) == []
+    assert not envfile.is_symlink() and envfile.read_text() == 'SECRET_KEY=a\nDATA_DIR=/d\n'
+
+
+def test_the_certificate_is_written_by_the_interpreter_ucm_python_names(tmp_path):
+    """The EL9 package requires python3.12, not python3: UCM_PYTHON names the one it has."""
+    data = tmp_path / 'data'
+    data.mkdir()
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    for util in ('mktemp', 'rm', 'openssl', 'uname', 'cat'):
+        (bin_dir / util).symlink_to(shutil.which(util))
+    (bin_dir / 'python3.12').symlink_to(sys.executable)
+    user, group = _owner()
+    result = _run(['https-cert', str(data), user, group],
+                  _env(tmp_path, extra={'PATH': str(bin_dir), 'UCM_PYTHON': 'python3.12'}))
+    assert result.returncode == 0, result.stderr
+    assert (data / 'https_key.pem').read_text().startswith('-----BEGIN PRIVATE KEY-----')
+    assert (data / 'https_cert.pem').read_text().startswith('-----BEGIN CERTIFICATE-----')
+
+
+# ------------------------------------------- ucm.env written only through descriptors
+# Each writer of ucm.env, as (command, file before, environment): append, fill, drop, set in place
+_ENV_WRITERS = {
+    'append': (['env-ensure', 'DATA_DIR', '/d'], 'SECRET_KEY=a\n', {}),
+    'fill': (['env', '/d'], 'SECRET_KEY=\n', {}),
+    'drop': (['env', '/d'], f'SECRET_KEY={"a" * 64}\nINITIAL_ADMIN_PASSWORD=changeme123\n', {}),
+    'set': (['env', '/d'], f'SECRET_KEY={"a" * 64}\nUCM_FIPS_BUILD=0\n', {'UCM_FIPS_BUILD': '1'}),
+}
+
+
+def _env_writer(tmp_path, kind, stubs=None, extra=None):
+    command, before, env = _ENV_WRITERS[kind]
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text(before)
+    envfile.chmod(0o640)
+    victim = tmp_path / 'authorized_keys'
+    victim.write_text('ssh-ed25519 AAAA root\n')
+    # A mode no step gives ucm.env: one landing here shows
+    victim.chmod(0o604)
+    bin_dir = tmp_path / 'bin'
+    for name, body in (stubs or {}).items():
+        _stub(bin_dir / name, body.format(victim=victim, real=shutil.which(name)))
+    path = f'{bin_dir}:{os.environ.get("PATH", "/usr/bin:/bin")}'
+    result = _run([command[0], str(envfile), *command[1:]],
+                  _env(tmp_path, extra={'PATH': path, **env, **(extra or {})}))
+    return result, envfile, victim
+
+
+def _victim_intact(victim):
+    assert victim.read_text() == 'ssh-ed25519 AAAA root\n'
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o604
+
+
+@pytest.mark.parametrize('kind', sorted(_ENV_WRITERS))
+def test_a_temporary_file_swapped_for_a_link_never_reaches_its_target(tmp_path, kind):
+    """The account owns /etc/ucm: a temporary file it could swap for a link right after mktemp."""
+    result, envfile, victim = _env_writer(tmp_path, kind, {
+        'mktemp': 't=$({real} "$@") || exit; rm -f "$t"; ln -s {victim} "$t"; echo "$t"'})
+    assert result.returncode == 0, result.stderr
+    _victim_intact(victim)
+    assert not envfile.is_symlink() and stat.S_IMODE(envfile.stat().st_mode) in (0o640, 0o600)
+
+
+@pytest.mark.parametrize('kind', sorted(_ENV_WRITERS))
+def test_the_mode_of_ucm_env_never_lands_on_another_file(tmp_path, kind):
+    """A link laid in place of the new file before its mode is set: only a descriptor is changed."""
+    result, envfile, victim = _env_writer(tmp_path, kind, {
+        'chmod': 'for a; do t=$a; done; case "$1" in --reference=*) rm -f "$t"; ln -s {victim} "$t";; esac\n'
+                 'exec {real} "$@"',
+        'chown': 'for a; do t=$a; done; case "$*" in *--reference=*) rm -f "$t"; ln -s {victim} "$t";; esac\n'
+                 'exec {real} "$@"'})
+    assert result.returncode == 0, result.stderr
+    _victim_intact(victim)
+
+
+def _racing_python(tmp_path, op, swap_back=False):
+    """An interpreter that swaps ucm.env for a link to a victim when first asked for `op` on it;
+    swap_back: a regular file is put back before the replacement, so that only the read raced."""
+    wrapper = tmp_path / 'racing-python'
+    envfile, raced = tmp_path / 'ucm.env', tmp_path / 'raced'
+    back = (f'[ "$4" != replace ] || [ ! -L {envfile} ] || {{ rm -f {envfile}; echo X=1 > {envfile}; }}\n'
+            if swap_back else '')
+    _stub(wrapper, f'case $4 in {op}) [ -e {raced} ] || {{ touch {raced}; rm -f {envfile}; '
+                   f'ln -s {tmp_path}/authorized_keys {envfile}; }};; esac\n{back}'
+                   f'exec {sys.executable} "$@"')
+    return str(wrapper)
+
+
+@pytest.mark.parametrize('kind', sorted(_ENV_WRITERS))
+def test_ucm_env_swapped_for_a_link_before_its_replacement_is_refused(tmp_path, kind):
+    result, envfile, victim = _env_writer(tmp_path, kind, extra={'UCM_PYTHON': _racing_python(tmp_path, 'replace')})
+    assert result.returncode != 0
+    assert 'symbolic link or not a regular file' in result.stderr, result.stderr
+    _victim_intact(victim)
+    assert envfile.is_symlink()
+
+
+@pytest.mark.parametrize('kind', sorted(_ENV_WRITERS))
+def test_ucm_env_swapped_for_a_link_before_it_is_read_copies_nothing_from_it(tmp_path, kind):
+    """Read through a link, another file (a key, /etc/shadow) would land in a file the account reads."""
+    result, envfile, victim = _env_writer(tmp_path, kind, extra={'UCM_PYTHON': _racing_python(tmp_path, 'read', swap_back=True)})
+    assert result.returncode != 0
+    _victim_intact(victim)
+    leaked = [p for p in tmp_path.iterdir() if p.is_file() and not p.is_symlink() and p != victim
+              and 'AAAA root' in p.read_text(errors='replace')]
+    assert leaked == [], leaked
+
+
+def tracing_python(tmp_path):
+    """An interpreter for own that records each chown (the absolute path it reaches) instead of
+    making it, so that the ownership steps are checked without root; returns (it, the trace)."""
+    trace = tmp_path / 'chown-trace'
+    prelude = (
+        "import os\n"
+        "def _at(name, dir_fd=None):\n"
+        "    return os.path.join(os.readlink('/proc/self/fd/%d' % dir_fd), name) if dir_fd is not None else name\n"
+        "def _log(where, uid, gid):\n"
+        f"    open('{trace}', 'a').write('%s %d:%d\\n' % (os.path.normpath(where), uid, gid))\n"
+        "os.fchown = lambda fd, uid, gid: _log(os.readlink('/proc/self/fd/%d' % fd), uid, gid)\n"
+        "os.chown = lambda name, uid, gid, dir_fd=None, follow_symlinks=True: _log(_at(name, dir_fd), uid, gid)\n")
+    wrapper = _stub(tmp_path / 'tracing-python', f'code=$3; shift 3\nexec {sys.executable} -I -c "{prelude}$code" "$@"')
+    return str(wrapper), trace
+
+
+def chowned(trace):
+    return [line.rsplit(' ', 1)[0] for line in trace.read_text().splitlines()] if trace.exists() else []
+
+
+# --------------------------------------------------------------- own chown-tree
+
+def _tree_layout(tmp_path):
+    top = tmp_path / 'data'
+    (top / 'ca' / '.ucm-archive-20261114T120000Z' / 'old').mkdir(parents=True)
+    (top / 'ca' / '.ucm-archive-20261114T120000Z' / 'old' / 'leaf.key').write_text('key')
+    (top / 'ca' / 'root.pem').write_text('pem')
+    (top / 'dns-hooks').mkdir()
+    (top / 'dns-hooks' / 'hook.sh').write_text('#!/bin/sh\n')
+    (top / 'sub').mkdir()
+    (top / 'sub' / 'dns-hooks').write_text('not the hook directory\n')
+    outside = tmp_path / 'outside'
+    (outside / 'deep').mkdir(parents=True)
+    os.symlink(outside, top / 'link')
+    return top, outside
+
+
+def test_chown_tree_gives_everything_but_the_archives_and_the_skipped_entries(tmp_path):
+    top, outside = _tree_layout(tmp_path)
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{top}/', '7:8', 'dns-hooks'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    given = chowned(trace)
+    assert set(given) == {str(top), str(top / 'ca'), str(top / 'ca' / 'root.pem'), str(top / 'sub'),
+                          str(top / 'sub' / 'dns-hooks'), str(top / 'link')}, given
+    assert all(line.endswith(' 7:8') for line in trace.read_text().splitlines())
+
+
+def test_chown_tree_follows_a_linked_top_but_no_link_inside(tmp_path):
+    top, outside = _tree_layout(tmp_path)
+    linked = tmp_path / 'linked-data'
+    os.symlink(top, linked)
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{linked}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    given = chowned(trace)
+    assert str(top) in given and str(top / 'ca' / 'root.pem') in given, given
+    assert not [g for g in given if g.startswith(str(outside))], given
+
+
+def test_chown_tree_never_enters_a_directory_swapped_for_a_link_while_it_walks(tmp_path):
+    """A name walked by path would be resolved through the link laid in its place: fwalk never is."""
+    top, outside = _tree_layout(tmp_path)
+    python, trace = tracing_python(tmp_path)
+    # Each chown of sub swaps it for a link to the outside before the walk descends
+    swap = (f"import shutil\n_chown = os.chown\n"
+            f"def _swap(name, uid, gid, dir_fd=None, follow_symlinks=True):\n"
+            f"    _chown(name, uid, gid, dir_fd=dir_fd, follow_symlinks=follow_symlinks)\n"
+            f"    if name == 'sub' and not os.path.islink('{top}/sub'):\n"
+            f"        shutil.rmtree('{top}/sub'); os.symlink('{outside}', '{top}/sub')\n"
+            f"os.chown = _swap\n")
+    racing = _stub(tmp_path / 'racing-tree-python',
+                   f'code=$3; shift 3\nexec {python} -I -c "{swap}$code" "$@"')
+    result = _run(['own', 'chown-tree', f'{top}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': str(racing)}))
+    assert result.returncode == 0, result.stderr
+    assert (top / 'sub').is_symlink()
+    assert not [g for g in chowned(trace) if g.startswith(str(outside))], chowned(trace)
+
+
+def test_ucm_env_swapped_for_a_link_before_it_is_restricted_keeps_the_target_mode(tmp_path):
+    """The mode a new ucm.env gets before its first secret is set by descriptor, never by path."""
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('UCM_FIPS_BUILD=1\n')
+    victim = tmp_path / 'shadow'
+    victim.write_text('root:*:1::::::\n')
+    victim.chmod(0o640)
+    bin_dir = tmp_path / 'bin'
+    # tail ends the lookup of SECRET_KEY, the last step before the file is restricted
+    _stub(bin_dir / 'tail', f'[ -e {tmp_path}/raced ] || {{ touch {tmp_path}/raced; rm -f {envfile}; '
+                            f'ln -s {victim} {envfile}; }}\nexec {shutil.which("tail")} "$@"')
+    result = _run(['env', str(envfile), '/d'],
+                  _env(tmp_path, extra={'PATH': f'{bin_dir}:{os.environ.get("PATH", "/usr/bin:/bin")}'}))
+    assert result.returncode != 0
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o640 and victim.read_text() == 'root:*:1::::::\n'
+
+
+@pytest.mark.parametrize('link_ok', [True, False])
+def test_own_mode_leaves_a_link_and_what_it_points_to(tmp_path, link_ok):
+    elsewhere = tmp_path / 'elsewhere'
+    elsewhere.mkdir()
+    elsewhere.chmod(0o770)
+    (tmp_path / 'private').symlink_to(elsewhere)
+    result = _run(['own', 'mode', str(tmp_path / 'private'), '700', *(['link-ok'] if link_ok else [])], _env(tmp_path))
+    assert (result.returncode == 0) is link_ok, result.stderr
+    assert stat.S_IMODE(elsewhere.stat().st_mode) == 0o770
+
+
+def test_own_mode_with_a_final_slash_reaches_a_linked_data_directory(tmp_path):
+    elsewhere = tmp_path / 'elsewhere'
+    elsewhere.mkdir()
+    (tmp_path / 'data').symlink_to(elsewhere)
+    result = _run(['own', 'mode', f'{tmp_path}/data/', '750'], _env(tmp_path))
+    assert result.returncode == 0, result.stderr
+    assert stat.S_IMODE(elsewhere.stat().st_mode) == 0o750

@@ -65,16 +65,19 @@ class Host:
             (self.releases / 'v99.0' / f'{name}.sha256').write_text(f'{digest}  {name}\n')
         return path
 
-    def run(self, pending, to_version='99.0'):
+    def run(self, pending, to_version='99.0', manifest=True):
+        """pending: the trigger's text, or None when the test laid .update_pending itself."""
         (self.tmp / 'declared').write_text(self.declared)
         (self.tmp / 'in_database').write_text(self.in_database)
         (self.tmp / 'declares').write_text(self.declares or to_version.replace('-', '~'))
-        (self.data / '.update_pending').write_text(str(pending))
-        (self.data / '.update_manifest.json').write_text(
-            json.dumps({'op_id': 'op', 'to_version': to_version}))
+        if pending is not None:
+            (self.data / '.update_pending').write_text(str(pending))
+        if manifest:
+            (self.data / '.update_manifest.json').write_text(
+                json.dumps({'op_id': 'op', 'to_version': to_version}))
         env = {'PATH': str(self.bin), 'UCM_WATCHER_ROOT': str(self.root),
                'UCM_WATCHER_RELEASES': self.releases.as_uri(), 'TMPDIR': str(self.tmp)}
-        done = subprocess.run([BASH, str(WATCHER)], env=env, capture_output=True, text=True)
+        done = self.done = subprocess.run([BASH, str(WATCHER)], env=env, capture_output=True, text=True)
         assert done.returncode == 0, done.stderr
         calls = self.calls.read_text().splitlines() if self.calls.exists() else []
         return json.loads((self.data / '.update_result.json').read_text()), calls

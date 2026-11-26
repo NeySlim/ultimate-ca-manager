@@ -60,3 +60,11 @@ def test_documented_manual_signal_targets_the_master_through_systemd():
     docs = (ROOT / 'docs/LOG_ROTATION.md').read_text(encoding='utf-8')
     command = 'systemctl kill --kill-whom=main --signal=USR1 ucm.service'
     assert command in docs
+
+
+def test_rotation_runs_as_the_account_that_owns_the_directory():
+    """/var/log/ucm belongs to the service account: rotated as root, a link it lays there would
+    lead root's rename, create and compress elsewhere. `su` makes logrotate act as that account."""
+    body = CONFIG.read_text(encoding='utf-8')
+    directives = [line.split('#')[0].split() for line in body.splitlines()]
+    assert ['su', 'ucm', 'ucm'] in directives

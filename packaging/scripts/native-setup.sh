@@ -17,10 +17,156 @@ GUARDED_VENV="" GUARDED_TMP="" SERVICE_STOPPED="" VENV_BUILDING="" HAD_VENV=""
 say() { echo "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+# own <op> <path> ...: the only way root touches a file in /etc/ucm, /opt/ucm/data or /var/log/ucm,
+# directories the service account owns. Everything goes through descriptors: a link there is never
+# followed, a file is only ever replaced by a new one renamed over it within its directory.
+#   write <path> <mode> [<user>:<group> | copy]  stdin becomes a new file (root's unless an owner is
+#       given); copy: created at its own name, stdin also copied to stdout (a build log read live)
+#   replace <path> [<mode>]   stdin replaces a regular file, keeping its owner and (unless given) mode
+#   read <path>               a regular file to stdout; nothing for an absent one, an error for a link
+#   mode <path> <mode> [link-ok]  fchmod of a regular file or directory (a final / follows the path
+#       itself); link-ok: a link is left as it is
+#   chown-tree <dir>/ <user>:<group> [<entry>...]  the directory, then what it holds, links themselves;
+#       .ucm-archive-* and the listed top-level entries are skipped with what they hold
+# UCM_PYTHON: the interpreter the package requires (python3.12 on EL9, where python3 may be absent)
+OWN_PY='
+import grp, os, pwd, signal, stat, sys
+op, path, args = sys.argv[1], sys.argv[2], sys.argv[3:]
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+ARCHIVE = ".ucm-archive-"
+
+def fail(why):
+    sys.stderr.write("ERROR: %s: %s\n" % (path, why))
+    sys.exit(3)
+
+def ids(spec):
+    u, g = spec.split(":", 1)
+    return (int(u) if u.isdigit() else pwd.getpwnam(u).pw_uid,
+            int(g) if g.isdigit() else grp.getgrnam(g).gr_gid)
+
+def parent():
+    head, name = os.path.split(path)
+    if not name:
+        fail("no file name")
+    # The directory itself may be a link an operator laid (data on another disk): only its entries are not
+    return os.open(head or ".", os.O_RDONLY | os.O_DIRECTORY), name
+
+def entry(dirfd, name):
+    try:
+        st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(st.st_mode):
+        fail("a symbolic link or not a regular file")
+    return st
+
+def copy(src, dst, echo=False):
+    for chunk in iter(lambda: src.read1(1 << 16), b""):
+        dst.write(chunk)
+        dst.flush()
+        if echo:
+            sys.stdout.buffer.write(chunk)
+            sys.stdout.buffer.flush()
+
+def new_file(dirfd, name, mode, owner):
+    for _ in range(100):
+        tmp = ".%s.%s" % (name, os.urandom(6).hex())
+        try:
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=dirfd)
+            break
+        except FileExistsError:
+            continue
+    else:
+        fail("no temporary name left")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            copy(sys.stdin.buffer, f)
+            if owner:
+                os.fchown(f.fileno(), *owner)
+            os.fchmod(f.fileno(), mode)
+            os.fsync(f.fileno())
+        os.rename(tmp, name, src_dir_fd=dirfd, dst_dir_fd=dirfd)
+    except BaseException:
+        try:
+            os.unlink(tmp, dir_fd=dirfd)
+        except OSError:
+            pass
+        raise
+
+if op == "write":
+    dirfd, name = parent()
+    mode, extra = int(args[0], 8), args[1] if len(args) > 1 else ""
+    if extra != "copy":
+        new_file(dirfd, name, mode, ids(extra) if extra else None)
+        sys.exit(0)
+    try:
+        os.unlink(name, dir_fd=dirfd)
+    except FileNotFoundError:
+        pass
+    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=dirfd)
+    os.fchmod(fd, mode)
+    with os.fdopen(fd, "wb") as f:
+        copy(sys.stdin.buffer, f, echo=True)
+elif op == "replace":
+    dirfd, name = parent()
+    st = entry(dirfd, name)
+    if st is None:
+        fail("not found")
+    mode = int(args[0], 8) if args else stat.S_IMODE(st.st_mode) & 0o777
+    new_file(dirfd, name, mode, (st.st_uid, st.st_gid))
+elif op == "read":
+    dirfd, name = parent()
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dirfd)
+    except FileNotFoundError:
+        sys.exit(0)
+    except OSError:
+        fail("a symbolic link or not a regular file")
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            fail("not a regular file")
+        copy(f, sys.stdout.buffer)
+elif op == "mode":
+    mode, link_ok = int(args[0], 8), args[1:] == ["link-ok"]
+    if path.endswith("/"):
+        fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    else:
+        dirfd, name = parent()
+        try:
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dirfd)
+        except OSError:
+            if link_ok and os.path.islink(path):
+                sys.exit(0)
+            fail("a symbolic link or not a regular file or directory")
+    st = os.fstat(fd)
+    if not (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode)):
+        fail("not a regular file or directory")
+    os.fchmod(fd, mode)
+elif op == "chown-tree":
+    uid, gid = ids(args[0])
+    skip = set(args[1:])
+    top = os.open(path, os.O_RDONLY | os.O_DIRECTORY | (0 if path.endswith("/") else os.O_NOFOLLOW))
+    os.fchown(top, uid, gid)
+    for where, dirs, files, dirfd in os.fwalk(".", dir_fd=top, follow_symlinks=False):
+        def kept(n):
+            return not n.startswith(ARCHIVE) and not (where == "." and n in skip)
+        dirs[:] = [d for d in dirs if kept(d)]
+        for n in dirs + [f for f in files if kept(f)]:
+            try:
+                os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+else:
+    fail("unknown operation " + op)
+'
+own() { "${UCM_PYTHON:-python3}" -I -c "$OWN_PY" "$@"; }
+
+mark_build() { printf '%s\n' "$1" | own write "$BUILD_FAILED" 644; }
+
 # Last value assigned to $2 in env file $1, unquoted; empty when unset.
 env_value() {
     [ -f "$1" ] || return 0
-    sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=[[:space:]]*//p" "$1" \
+    own read "$1" | sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=[[:space:]]*//p" \
         | tail -n 1 | sed -E 's/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'
 }
 
@@ -33,30 +179,52 @@ is_true() {
     return 1
 }
 
+# /etc/ucm is the service account's: a ucm.env it replaced by a link or by anything but a file is
+# refused before root reads it for a write; root then reads and replaces it only through own
+env_check() {
+    if [ -L "$1" ] || { [ -e "$1" ] && [ ! -f "$1" ]; }; then
+        die "$1 is a symbolic link or not a regular file: replace it with a regular file, then install again"
+    fi
+}
+
+# ENV_TEXT: the whole of env file $1, read once; a file that cannot be read stops here, before a write
+env_read() {
+    local text
+    text=$(own read "$1" && printf x) || die "could not read $1"
+    ENV_TEXT=${text%x}
+}
+
+# Whether a line of ENV_TEXT matches the extended regular expression $1
+env_grep() { printf '%s' "$ENV_TEXT" | grep -Eq "$1"; }
+
 # Appends KEY=VALUE, starting a new line if the file does not end with one.
 env_append() {
-    if [ -s "$1" ] && [ -n "$(tail -c 1 "$1")" ]; then
-        echo >> "$1"
-    fi
-    echo "$2=$3" >> "$1"
+    env_read "$1"
+    {
+        printf '%s' "$ENV_TEXT"
+        [[ -z $ENV_TEXT || $ENV_TEXT == *$'\n' ]] || echo
+        printf '%s=%s\n' "$2" "$3"
+    } | own replace "$1"
+}
+
+# Appends KEY=VALUE unless a line already assigns KEY.
+env_ensure() {
+    env_check "$1"
+    env_read "$1"
+    env_grep "^$2=" || env_append "$1" "$2" "$3"
 }
 
 # Sets a key that has no value: an empty assignment (KEY=, KEY="") is filled in place.
 env_fill() {
     local re="^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=[[:space:]]*(\"\"|'')?[[:space:]]*\$"
-    if grep -Eq "$re" "$1"; then
+    env_read "$1"
+    if env_grep "$re"; then
         # Builtins only: the value is a secret and must not appear in a process's argv
-        local tmp line
-        tmp=$(mktemp "$1.XXXXXX")
-        trap "rm -f -- $(printf %q "$tmp")" EXIT
+        local line
         while IFS= read -r line || [ -n "$line" ]; do
             [[ $line =~ $re ]] && line="$2=$3"
             printf '%s\n' "$line"
-        done < "$1" > "$tmp"
-        chown --reference="$1" "$tmp"
-        chmod --reference="$1" "$tmp"
-        mv -f "$tmp" "$1"
-        trap - EXIT
+        done < <(printf '%s' "$ENV_TEXT") | own replace "$1"
     else
         env_append "$1" "$2" "$3"
     fi
@@ -66,17 +234,12 @@ env_fill() {
 # then generates a password instead of reusing it. A value the operator chose stays.
 env_drop_legacy_admin_password() {
     local re='^[[:space:]]*(export[[:space:]]+)?INITIAL_ADMIN_PASSWORD[[:space:]]*=[[:space:]]*("changeme123"|'"'changeme123'"'|changeme123)[[:space:]]*$'
-    grep -Eq "$re" "$1" || return 0
-    local tmp line
-    tmp=$(mktemp "$1.XXXXXX")
-    trap "rm -f -- $(printf %q "$tmp")" EXIT
+    env_read "$1"
+    env_grep "$re" || return 0
+    local line
     while IFS= read -r line || [ -n "$line" ]; do
         [[ $line =~ $re ]] || printf '%s\n' "$line"
-    done < "$1" > "$tmp"
-    chown --reference="$1" "$tmp"
-    chmod --reference="$1" "$tmp"
-    mv -f "$tmp" "$1"
-    trap - EXIT
+    done < <(printf '%s' "$ENV_TEXT") | own replace "$1"
 }
 
 fips_requested() {
@@ -187,10 +350,12 @@ cmd_check_build_tools() {
 
 cmd_env() {
     local file=$1 data=$2 had_secret="" key
-    touch "$file"
+    env_check "$file"
+    # Restricted from the start
+    [ -e "$file" ] || own write "$file" 600 < /dev/null
     env_has "$file" SECRET_KEY && had_secret=1
     # Restricted before the first secret is written
-    env_has "$file" SECRET_KEY || chmod 600 "$file"
+    env_has "$file" SECRET_KEY || own mode "$file" 600
     env_has "$file" SECRET_KEY || env_fill "$file" SECRET_KEY "$(openssl rand -hex 32)"
     # A file the package never completed (written by hand before the install) gets the defaults too.
     if [ -z "$had_secret" ]; then
@@ -203,8 +368,10 @@ cmd_env() {
     fi
     env_drop_legacy_admin_password "$file"
     if is_true "${UCM_FIPS_BUILD:-}" && ! is_true "$(env_value "$file" UCM_FIPS_BUILD)"; then
-        if grep -Eq '^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*=' "$file"; then
-            sed -i -E 's/^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*=.*/UCM_FIPS_BUILD=1/' "$file"
+        env_read "$file"
+        if env_grep '^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*='; then
+            printf '%s' "$ENV_TEXT" | sed -E 's/^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*=.*/UCM_FIPS_BUILD=1/' \
+                | own replace "$file"
         else
             env_append "$file" UCM_FIPS_BUILD 1
         fi
@@ -319,7 +486,7 @@ recover_venv() {
     trap '' HUP INT TERM PIPE
     set +e
     local venv=$GUARDED_VENV
-    [ -z "$GUARDED_TMP" ] || rm -f "$GUARDED_TMP"
+    [ -z "$GUARDED_TMP" ] || rm -rf "$GUARDED_TMP"
     case $VENV_BUILDING in
         next) rm -rf "$venv.next"
               [ ! -e "$venv" ] || say "Kept the previous Python environment." >&2 ;;
@@ -372,7 +539,7 @@ switch_venv() {
 }
 
 cmd_venv() {
-    local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs=""
+    local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs="" work built
     local had_kerberos=""
 
     # pyspnego[kerberos] is optional and admin-installed: the venv is recreated on every
@@ -386,28 +553,35 @@ cmd_venv() {
 
     if fips_requested "$envfile"; then
         mkdir -p "$(dirname "$BUILD_LOG")"
-        echo "build tools missing" > "$BUILD_FAILED"
+        mark_build "build tools missing"
         rust=$(cmd_check_build_tools "$python" "$format")
         export PATH="$rust:$PATH" RUSTC="$rust/rustc" CARGO="$rust/cargo"
         say "UCM_FIPS_BUILD=1: building cryptography, psycopg, lxml and xmlsec against the system OpenSSL"
         say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
-        reqs=$(mktemp)
-        guard_venv "$venv" "$reqs"
+        # Root's own copy of the log, read back here: the one in BUILD_LOG is the service account's to swap
+        work=$(mktemp -d)
+        reqs=$work/requirements.txt
+        guard_venv "$venv" "$work"
         fips_requirements "$home/requirements.txt" "$reqs"
         clear_leftovers "$venv"
-        echo "build failed" > "$BUILD_FAILED"
-        if ! build_fips_venv "$python" "$venv.next" "$reqs" "${venv##*/}" > "$BUILD_LOG" 2>&1 \
-                || ! verify_fips_venv "$venv.next" >> "$BUILD_LOG" 2>&1; then
-            tail -n 25 "$BUILD_LOG" >&2 || true
+        mark_build "build failed"
+        set +e
+        { build_fips_venv "$python" "$venv.next" "$reqs" "${venv##*/}" && verify_fips_venv "$venv.next"; } 2>&1 \
+            | own write "$BUILD_LOG" 644 copy > "$work/build.log"
+        built=("${PIPESTATUS[@]}")
+        set -e
+        [ "${built[1]}" = 0 ] || die "could not write $BUILD_LOG"
+        if [ "${built[0]}" != 0 ]; then
+            tail -n 25 "$work/build.log" >&2 || true
             echo "ERROR: the UCM_FIPS_BUILD=1 build failed (full log: $BUILD_LOG)." >&2
             echo "Fix the cause, or remove UCM_FIPS_BUILD from $envfile for the standard build, and" >&2
             retry_hint "$format" >&2
             exit 1
         fi
-        rm -f "$reqs"
         # Built: from here the marker only says the switch did not happen
-        echo "switch not completed" > "$BUILD_FAILED"
-        tail -n 1 "$BUILD_LOG" || true
+        mark_build "switch not completed"
+        tail -n 1 "$work/build.log" || true
+        rm -rf "$work"
     else
         guard_venv "$venv"
         clear_leftovers "$venv"
@@ -450,12 +624,14 @@ run_preflight() {
 cmd_fips_finish() {
     local home=$1 envfile=$2 data=$3 user=$4 flag active
     flag=$(cat "$FIPS_FLAG" 2>/dev/null || true)
+    env_check "$envfile"
     if ! fips_requested "$envfile"; then
         [ "$flag" != 1 ] || say "Note: host is in FIPS mode: set UCM_FIPS_BUILD=1 in $envfile and reinstall, to link UCM to the system OpenSSL."
         return 0
     fi
     if [ "$flag" = 1 ]; then
-        grep -Eq '^[[:space:]]*(export[[:space:]]+)?UCM_FIPS[[:space:]]*=' "$envfile" || env_append "$envfile" UCM_FIPS 1
+        env_read "$envfile"
+        env_grep '^[[:space:]]*(export[[:space:]]+)?UCM_FIPS[[:space:]]*=' || env_append "$envfile" UCM_FIPS 1
         # The check the service runs at startup with UCM_FIPS=1
         active=$(cd "$home/backend" && "$home/venv/bin/python" -c 'import fips_mode; print(int(fips_mode.provider_active()))' 2>/dev/null || echo 0)
         if [ "$active" = 1 ]; then
@@ -486,7 +662,7 @@ cmd_update_precheck() {
 
 cmd_fips_build_ok() {
     fips_requested "$1" && [ -e "$BUILD_FAILED" ] || return 0
-    if [ "$(cat "$BUILD_FAILED" 2>/dev/null)" = "switch not completed" ]; then
+    if [ "$(own read "$BUILD_FAILED" 2>/dev/null)" = "switch not completed" ]; then
         echo "the UCM_FIPS_BUILD=1 update did not complete after the build (log: $BUILD_LOG); the previous environment was kept" >&2
     else
         echo "the UCM_FIPS_BUILD=1 build failed (log: $BUILD_LOG); the previous environment was kept" >&2
@@ -504,6 +680,25 @@ host_name() {
     printf '%s\n' "${name:-localhost}"
 }
 
+# https-cert <data dir> <user> <group>: a self-signed HTTPS certificate when the data has none. The data
+# is the service account's: generated in root's own directory, then put in place without following a link
+cmd_https_cert() {
+    local data=$1 user=$2 group=$3 host san ip work
+    [ ! -f "$data/https_cert.pem" ] || return 0
+    say "Generating HTTPS certificate..."
+    host=$(host_name)
+    san="DNS:${host},DNS:localhost,IP:127.0.0.1"
+    for ip in $(hostname -I 2>/dev/null); do san="$san,IP:$ip"; done
+    work=$(mktemp -d)
+    trap "rm -rf -- $(printf %q "$work")" EXIT
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "$work/key.pem" -out "$work/cert.pem" \
+        -subj "/CN=${host}/O=UCM/OU=PKI" -addext "subjectAltName=${san}" 2>/dev/null
+    own write "$data/https_key.pem" 600 "$user:$group" < "$work/key.pem"
+    own write "$data/https_cert.pem" 644 "$user:$group" < "$work/cert.pem"
+    rm -rf -- "$work"
+    trap - EXIT
+}
+
 # Post-install banner; IPv6 addresses are bracketed in the URLs.
 cmd_banner() {
     local envfile=$1 pkg=$2 host port ips ip pwfile data user
@@ -513,7 +708,7 @@ cmd_banner() {
     data=$(env_value "$envfile" DATA_DIR)
     echo ""
     host=$(host_name)
-    port=$(grep "^HTTPS_PORT=" "$envfile" 2>/dev/null | cut -d= -f2)
+    port=$(env_value "$envfile" HTTPS_PORT 2>/dev/null)
     port=${port:-8443}
     ips=$(hostname -I 2>/dev/null | xargs)
     echo ""
@@ -564,6 +759,8 @@ cmd_banner() {
 
 case "${1:-}" in
     env) cmd_env "$2" "$3" ;;
+    env-check) env_check "$2" ;;
+    env-ensure) env_ensure "$2" "$3" "$4" ;;
     venv-ok) venv_ok "$2/venv" ;;
     venv) cmd_venv "$2" "$3" "$4" "$5" ;;
     fips-finish) cmd_fips_finish "$2" "$3" "$4" "$5" ;;
@@ -573,9 +770,12 @@ case "${1:-}" in
     fips-build-ok) cmd_fips_build_ok "$2" ;;
     banner) cmd_banner "$2" "$3" ;;
     host-name) host_name ;;
-    *) die "usage: $0 env <ucm.env> <data dir>
+    https-cert) cmd_https_cert "$2" "$3" "$4" ;;
+    own) shift; own "$@" ;;
+    *) die "usage: $0 env <ucm.env> <data dir> | env-check <ucm.env> | env-ensure <ucm.env> <key> <value>
   | venv <ucm home> <python> <deb|rpm> <ucm.env> | venv-ok <ucm home>
   | fips-finish <ucm home> <ucm.env> <data dir> <user> | fips-requested <ucm.env>
   | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env>
-  | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm> | host-name" ;;
+  | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm> | host-name
+  | https-cert <data dir> <user> <group> | own <op> <path> ..." ;;
 esac

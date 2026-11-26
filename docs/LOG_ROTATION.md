@@ -99,6 +99,7 @@ missingok # Don't error if log missing
 dateext # Use date extension (not .1, .2)
 sharedscripts # Run postrotate once for all logs
 create 0640 ucm ucm # Owner and mode of the fresh file
+su ucm ucm # Rotate as the account that owns /var/log/ucm
 postrotate # Send USR1 so gunicorn reopens, never a reload
 ```
 
