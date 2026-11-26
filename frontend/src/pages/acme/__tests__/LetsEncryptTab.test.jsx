@@ -179,4 +179,12 @@ describe('LetsEncryptTab proxy', () => {
     expect(screen.queryByRole('button', { name: 'acme.resetAccount' })).toBeNull()
     expect(screen.getByRole('combobox', { name: 'acme.defaultEnvironment' })).toBeDisabled()
   })
+
+  it('tests the connection with write:acme only, as the API asks', () => {
+    const { unmount } = renderTab({ clientSettings: { proxy_acme_account_id: 3 }, caAccounts: ACCOUNTS })
+    expect(document.getElementById('acme-proxy-test')).not.toBeDisabled()
+    unmount()
+    renderTab({ clientSettings: { proxy_acme_account_id: 3 }, caAccounts: ACCOUNTS, canWrite: false })
+    expect(document.getElementById('acme-proxy-test')).toBeDisabled()
+  })
 })

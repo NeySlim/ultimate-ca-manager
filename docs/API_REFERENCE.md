@@ -1963,7 +1963,7 @@ Permission `write:acme`. Body `acme_account_id` optional. Clears the upstream re
 ```http
 POST /api/v2/acme/client/proxy/test-connection
 ```
-Permission `read:acme`. Body `acme_account_id` or `url` optional (otherwise the proxy account's directory). The URL must be HTTPS and not target loopback or cloud metadata (`400`). Returns `connected`, `ca_name`, `directory_url`, `terms_of_service`, `website`, `eab_required` and `endpoints`; `502` when the directory cannot be fetched.
+Permission `write:acme`. Body `acme_account_id` or `url` optional (otherwise the proxy account's directory). The URL must be HTTPS and not target loopback or cloud metadata (`400`). Returns `connected`, `ca_name`, `directory_url`, `terms_of_service`, `website`, `eab_required` and `endpoints`; `502` when the directory cannot be fetched.
 
 ### ACME Server Accounts
 `{account_id}` is the numeric id or the RFC 8555 account id. Unknown accounts answer `404`.

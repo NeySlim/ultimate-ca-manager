@@ -57,7 +57,7 @@ def _resolve_test_url(data: dict) -> str:
 
 
 @bp.route('/api/v2/acme/client/proxy/test-connection', methods=['POST'])
-@require_auth(['read:acme'])
+@require_auth(['write:acme'])
 def test_proxy_connection():
     """Test connection to upstream ACME directory"""
     import requests
