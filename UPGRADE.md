@@ -181,6 +181,7 @@ Database migrations run automatically at startup.
 
 ### Upgrading to v3.1
 
+- **Docker: the generated session key is kept.** Without `UCM_SECRET_KEY` the image now writes the key it generates to `/etc/ucm/secret.key` (mode 0600, the `ucm` account's) at the first 3.1 start and uses it at every later start, instead of a new one each time. The first 3.1 start still signs the open sessions out. A `UCM_SECRET_KEY` that is set wins and the file is neither read nor written. Without a volume on `/etc/ucm` the key is lost with the container, as `master.key` is. In HA every node still needs the same `UCM_SECRET_KEY` (the Helm chart stores it in its Secret): a file per node would differ.
 - **Docker: at most `UCM_BACKUP_KEEP` pre-start copies.** The image now keeps the newest `UCM_BACKUP_KEEP` copies of the SQLite database (default 5) whatever `UCM_BACKUP_RETENTION_DAYS` allows, so the first 3.1 start removes the older ones (`docker-compose.prod.yml` keeps 90 days): raise `UCM_BACKUP_KEEP` to keep them.
 - **Packages: `UCM_FIREWALL=ask` no longer opens the port.** Only `yes` (or `y`, `Y`, `true`, `1`) changes the firewall; any other value, `ask` included, now leaves it as it is.
 - **Helm chart, cleartext protocol Ingress:** the `<release>-protocol` Ingress (`ingress.protocolHttp.enabled`) no longer copies `ingress.annotations`. Put the annotations it needs (a TLS issuer, an ingress class option) under `ingress.protocolHttp.annotations`; a `backend-protocol: "HTTPS"` must not go there, as its port 8080 speaks plain HTTP.

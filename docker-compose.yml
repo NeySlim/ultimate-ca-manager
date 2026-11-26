@@ -52,7 +52,7 @@ services:
       # SECURITY (REQUIRED)
       # ========================================
       
-      # Auto-generated if not provided
+      # Unset: generated at the first start and kept in /etc/ucm/secret.key (the ucm-config volume)
       - UCM_SECRET_KEY=${UCM_SECRET_KEY:-}
 
       # Initial admin password (first start only). Unset: generated, read it with
