@@ -17,7 +17,8 @@ identity that lets it recognize an instance, and how to expose all of it safely.
 - the mode: single node, or HA with the list of its nodes, the leader and those that stopped
   answering;
 - the database engine and server version (never its URL, its host or its credentials);
-- the health: `ok`, `degraded`, `maintenance` or `safe_mode`, with the readiness checks behind it;
+- the health: `ok`, `degraded` or `maintenance`, with the readiness checks behind it (in safe mode
+  the route answers `503`, as the rest of the API does);
 - the CAs: how many, how many are active, expired, and expiring within 90 and 365 days, and the
   nearest expiry;
 - whether an update is available, as the last scheduled check found it (the route itself never

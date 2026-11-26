@@ -51,7 +51,6 @@ def _mode(database_ok):
 def _health():
     """The checks of /health/ready (database, filesystem, Redis when configured, cluster in HA),
     and what the instance refuses to do now."""
-    from flask import current_app
     from api import health_routes
     checks = {'database': health_routes._check_database(), 'filesystem': health_routes._check_filesystem()}
     database_ok = checks['database']['status'] == 'ok'
@@ -62,9 +61,8 @@ def _health():
         checks['cluster'] = health_routes._check_cluster() if database_ok else {
             'status': 'error', 'message': 'Cluster registry not read: the database does not answer'}
     maintenance = health_routes._maintenance(refresh=database_ok) if Config.HA_MODE else None
-    if current_app.config.get('SAFE_MODE'):
-        status = 'safe_mode'
-    elif maintenance is not None:
+    # Safe mode never reaches here: the whole API answers 503 then
+    if maintenance is not None:
         status = 'maintenance'
     elif all(c.get('status') in ('ok', 'skipped') for c in checks.values()):
         status = 'ok'

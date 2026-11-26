@@ -40,7 +40,7 @@ def test_a_key_scoped_to_read_instance_reads_the_state(app, state_key):
     assert data['schema_version'] == 1
     assert data['version'] == Config.APP_VERSION
     assert data['update_channel'] in ('stable', 'rc')
-    assert data['health']['status'] in ('ok', 'degraded', 'safe_mode', 'maintenance')
+    assert data['health']['status'] in ('ok', 'degraded', 'maintenance')
     assert isinstance(data['fips']['active'], bool)
 
 
@@ -226,3 +226,8 @@ def test_a_silent_database_degrades_the_answer_instead_of_failing(app, state_key
     for field in ('instance_id', 'update_channel', 'cas', 'update', 'backup'):
         assert data[field] is None, field
 
+
+
+def test_safe_mode_answers_503_like_the_rest_of_the_api(app, state_key, monkeypatch):
+    monkeypatch.setitem(app.config, 'SAFE_MODE', True)
+    assert _read(app, state_key).status_code == 503
