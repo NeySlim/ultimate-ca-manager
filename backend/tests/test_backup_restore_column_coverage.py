@@ -147,7 +147,7 @@ def test_nearly_every_section_is_exercised(both_archives):
     empty = sorted(name for name in manifest.SECTIONS
                    if isinstance(archived.get(name), list) and not archived[name])
     # An SSH authority needs a real key pair, and its certificates hang off it
-    assert empty == ['ssh_cas', 'ssh_certificates'], f'sections seeded with no row: {empty}'
+    assert empty == ['ssh_cas', 'ssh_certificates', 'ssh_hosts'], f'sections seeded with no row: {empty}'
 
 
 def test_every_exemption_is_still_needed_and_explained(both_archives):

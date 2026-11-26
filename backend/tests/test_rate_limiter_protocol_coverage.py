@@ -22,6 +22,9 @@ SAMPLE_PATH = {
     '/.well-known/': '/.well-known/est/simpleenroll',
     '/tsa/': '/tsa/reply',
     '/ssh/setup/': '/ssh/setup/host',
+    '/ssh/krl/': '/ssh/krl/ca-refid',
+    '/ssh/enroll/': '/ssh/enroll/ca-refid',
+    '/ssh/renew/': '/ssh/renew/host-refid',
     '/ADPolicyProvider_CEP_': '/ADPolicyProvider_CEP_UsernamePassword/service.svc',
     '/ADCertificateService_CES_': '/ADCertificateService_CES_UsernamePassword/service.svc',
 }
@@ -77,7 +80,7 @@ class TestABarePathIsNotAPrefix:
 
 
 class TestTheLimitsStayProtocolSized:
-    NEWLY_CLASSIFIED = ['/tsa', '/ca/x.crt', '/ssh/setup/x',
+    NEWLY_CLASSIFIED = ['/tsa', '/ca/x.crt', '/ssh/setup/x', '/ssh/krl/x',
                         '/ADPolicyProvider_CEP_UsernamePassword/service.svc',
                         '/ADCertificateService_CES_UsernamePassword/service.svc']
 
@@ -93,6 +96,15 @@ class TestTheLimitsStayProtocolSized:
         """
         assert RateLimitConfig.get_limit(path)['rpm'] >= \
             RateLimitConfig.get_default_limits()['_default']['rpm'], path
+
+
+    def test_a_fleet_of_ssh_hosts_behind_one_address_is_not_throttled(self, stock_limits):
+        """Every agent asks for a renewal challenge at each sync: the standard rate, while an
+        enrollment, which a token guess would spend, stays narrow."""
+        limits = RateLimitConfig.get_default_limits()['_default']
+        assert RateLimitConfig.get_limit('/ssh/renew/host-refid/challenge')['rpm'] >= limits['rpm']
+        assert RateLimitConfig.get_limit('/ssh/renew/host-refid/challenge')['burst'] >= limits['burst']
+        assert RateLimitConfig.get_limit('/ssh/enroll/ca-refid')['rpm'] == 10
 
 
 class TestTheLimitAndTheBucketAgree:

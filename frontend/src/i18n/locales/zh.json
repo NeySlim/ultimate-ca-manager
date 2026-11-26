@@ -482,7 +482,8 @@
     "creating": "正在创建...",
     "notFound": "未找到",
     "popular": "热门",
-    "other": "其他"
+    "other": "其他",
+    "sshHosts": "SSH 主机"
   },
   "commandPalette": {
     "searchPlaceholder": "证书、页面或操作…",
@@ -7511,7 +7512,10 @@
     "range": "{{shown}} / {{count}} 个 SSH CA",
     "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH CA",
     "moreActions": "{{name}} 的其他操作",
-    "actionsTitle": "SSH CA 操作"
+    "actionsTitle": "SSH CA 操作",
+    "agent": "SSH 代理",
+    "agentUserDescription": "安装代理：sshd 读取此 CA 的 KRL（每 15 分钟拉取一次），因此已吊销的证书会被拒绝。",
+    "agentHostDescription": "使用注册令牌注册服务器：服务器获得此 CA 的主机证书并自动续期。请在 SSH 主机中创建令牌。"
   },
   "sshCertificates": {
     "title": "SSH 证书",
@@ -7605,6 +7609,86 @@
     "moreActions": "{{name}} 的其他操作",
     "actionsTitle": "SSH 证书操作"
   },
+  "sshHosts": {
+    "title": "SSH 主机",
+    "subtitle_one": "{{count}} 台主机",
+    "subtitle_other": "{{count}} 台主机",
+    "intent": "SSH 代理在主机 CA 下注册的服务器、每台服务器出示的证书及其续期。",
+    "caption": "已注册的 SSH 主机",
+    "loadFailed": "无法加载 SSH 主机",
+    "stateValid": "有效",
+    "stateExpired": "已过期",
+    "stateRevoked": "已吊销",
+    "filterByState": "按状态筛选主机",
+    "searchLabel": "搜索主机",
+    "noData": "没有已注册的主机",
+    "noDataDescription": "创建注册令牌，然后在服务器上用它运行 SSH 代理：服务器将获得主机证书并自动续期。",
+    "pageRange": "第 {{start}}–{{end}} 台，共 {{count}} 台主机",
+    "revokeHost": "吊销主机",
+    "revokeConfirm": "吊销 {{name}}？其密钥所有未过期的证书（当前证书以及续期所替换的证书）都将被吊销并列入 KRL，且不再续期：服务器必须使用新令牌重新注册。",
+    "revoked": "已吊销 {{name}}",
+    "pauseRenewal": "暂停续期",
+    "resumeRenewal": "恢复续期",
+    "renewalPaused": "已暂停 {{name}} 的续期",
+    "renewalResumed": "已恢复 {{name}} 的续期",
+    "renewalOn": "开启",
+    "renewalOff": "已暂停",
+    "autoRenew": "自动续期",
+    "certificate": "主机证书",
+    "hostKey": "主机密钥",
+    "agent": "代理",
+    "renewAt": "续期时机",
+    "renewAtValue": "有效期剩余 {{percent}} % 时",
+    "enrolledAt": "注册时间",
+    "enrolledFrom": "注册来源",
+    "lastRenewed": "上次续期",
+    "lastSeen": "上次联系",
+    "lastKrlSync": "上次拉取 KRL",
+    "notReported": "未报告",
+    "revokedNotice": "此主机已吊销：不再续期。如需再次使用，请使用新令牌注册服务器。",
+    "token": {
+      "title": "注册令牌",
+      "subtitle_one": "{{count}} 个令牌",
+      "subtitle_other": "{{count}} 个令牌",
+      "intent": "一个令牌在过期前只能为其列出的主机名注册一台服务器，且仅限一次。",
+      "caption": "注册令牌",
+      "create": "新建注册令牌",
+      "createHint": "服务器用它一次性换取其自身密钥的主机证书。",
+      "created": "已创建注册令牌",
+      "revoked": "已吊销令牌 {{prefix}}",
+      "revoke": "吊销令牌",
+      "prefix": "令牌",
+      "expires": "过期时间",
+      "noData": "没有注册令牌",
+      "noDataDescription": "为主机 CA 和服务器名称创建令牌，然后在服务器上运行显示的命令。",
+      "state": {
+        "active": "有效",
+        "used": "已使用",
+        "expired": "已过期",
+        "revoked": "已吊销"
+      },
+      "hostCa": "主机 CA",
+      "needsCaRead": "选择 CA 需要 read:ssh_cas 权限。",
+      "noHostCa": "没有主机 CA：请先在 SSH CA 中创建。",
+      "principals": "主机名",
+      "principalsHint": "服务器证书中可包含的名称，以逗号或空格分隔。",
+      "validity": "证书有效期",
+      "caDefault": "CA 默认值",
+      "lifetime": "令牌有效期",
+      "lifetimes": {
+        "15m": "15 分钟",
+        "1h": "1 小时",
+        "24h": "24 小时",
+        "7d": "7 天"
+      },
+      "renewPercent": "有效期剩余 % 时续期",
+      "renewPercentHint": "5 到 90。证书有效期剩余此比例时，代理即续期。",
+      "shownOnce": "此令牌仅显示一次：UCM 只保存其指纹。请立即复制。",
+      "value": "令牌",
+      "command": "在服务器上运行的命令",
+      "commandHint": "请在 {{expires}} 之前以 root 身份运行。令牌通过环境变量传递，不会写入磁盘。"
+    }
+  },
   "filters": {
     "managePresets": "管理预设"
   },
@@ -7684,6 +7768,7 @@
       "dek_sweep": "以数据密钥重新加密",
       "sso_sign_in_test_purge": "SSO 登录测试清理",
       "session_key_retire": "旧会话密钥退役",
+      "ssh_revoked_host_sweep": "完成 SSH 主机吊销",
       "cluster_command_purge": "HA 集群命令清理",
       "update_campaign": "HA 滚动更新",
       "delivery_retention": "投递历史保留",
@@ -8124,7 +8209,8 @@
       "hsm": "硬件模块和密钥库。",
       "audit": "操作和登录日志。",
       "logs": "服务的技术日志。",
-      "settings": "实例的常规配置。"
+      "settings": "实例的常规配置。",
+      "sshHosts": "SSH 代理注册的服务器及其主机证书"
     },
     "moduleLabel": {
       "crlOcsp": "CRL / OCSP",

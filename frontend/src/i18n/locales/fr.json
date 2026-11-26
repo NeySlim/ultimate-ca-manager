@@ -2497,7 +2497,8 @@
     "creating": "Création...",
     "notFound": "Introuvable",
     "popular": "Populaires",
-    "other": "Autres"
+    "other": "Autres",
+    "sshHosts": "Hôtes SSH"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -7511,7 +7512,10 @@
     "range": "{{shown}} sur {{count}} AC SSH",
     "pageRange": "{{start}}–{{end}} sur {{count}} AC SSH",
     "moreActions": "Autres actions de {{name}}",
-    "actionsTitle": "Actions de l’AC SSH"
+    "actionsTitle": "Actions de l’AC SSH",
+    "agent": "Agent SSH",
+    "agentUserDescription": "Installe l’agent : sshd lit la KRL de cette AC, récupérée toutes les 15 minutes, et refuse ainsi un certificat révoqué.",
+    "agentHostDescription": "Enrôle le serveur avec un jeton d’enrôlement : il obtient un certificat d’hôte de cette AC et le renouvelle. Créez le jeton dans Hôtes SSH."
   },
   "sshCertificates": {
     "title": "Certificats SSH",
@@ -7605,6 +7609,86 @@
     "moreActions": "Autres actions de {{name}}",
     "actionsTitle": "Actions du certificat SSH"
   },
+  "sshHosts": {
+    "title": "Hôtes SSH",
+    "subtitle_one": "{{count}} hôte",
+    "subtitle_other": "{{count}} hôtes",
+    "intent": "Les serveurs que l’agent SSH a enrôlés auprès d’une AC hôte, le certificat que chacun présente et son renouvellement.",
+    "caption": "Hôtes SSH enrôlés",
+    "loadFailed": "Échec du chargement des hôtes SSH",
+    "stateValid": "Valide",
+    "stateExpired": "Expiré",
+    "stateRevoked": "Révoqué",
+    "filterByState": "Filtrer les hôtes par état",
+    "searchLabel": "Rechercher des hôtes",
+    "noData": "Aucun hôte enrôlé",
+    "noDataDescription": "Créez un jeton d’enrôlement, puis lancez l’agent SSH sur le serveur avec ce jeton : il obtient un certificat d’hôte et le renouvelle.",
+    "pageRange": "{{start}}–{{end}} sur {{count}} hôtes",
+    "revokeHost": "Révoquer l’hôte",
+    "revokeConfirm": "Révoquer {{name}} ? Tous les certificats non expirés de sa clé, celui en cours et ceux que ses renouvellements ont remplacés, sont révoqués et listés dans la KRL, et il ne se renouvellera plus : le serveur devra s’enrôler avec un nouveau jeton.",
+    "revoked": "{{name}} révoqué",
+    "pauseRenewal": "Suspendre le renouvellement",
+    "resumeRenewal": "Reprendre le renouvellement",
+    "renewalPaused": "Renouvellement de {{name}} suspendu",
+    "renewalResumed": "Renouvellement de {{name}} repris",
+    "renewalOn": "Actif",
+    "renewalOff": "Suspendu",
+    "autoRenew": "Renouvellement automatique",
+    "certificate": "Certificat d’hôte",
+    "hostKey": "Clé d’hôte",
+    "agent": "Agent",
+    "renewAt": "Renouvellement",
+    "renewAtValue": "à {{percent}} % de durée de vie restante",
+    "enrolledAt": "Enrôlé le",
+    "enrolledFrom": "Enrôlé depuis",
+    "lastRenewed": "Dernier renouvellement",
+    "lastSeen": "Dernier contact",
+    "lastKrlSync": "Dernière récupération de la KRL",
+    "notReported": "Non déclaré",
+    "revokedNotice": "Cet hôte est révoqué : il ne se renouvelle plus. Pour le réutiliser, enrôlez le serveur avec un nouveau jeton.",
+    "token": {
+      "title": "Jetons d’enrôlement",
+      "subtitle_one": "{{count}} jeton",
+      "subtitle_other": "{{count}} jetons",
+      "intent": "Un jeton enrôle un serveur, une seule fois, avant son expiration, pour les noms d’hôte qu’il liste.",
+      "caption": "Jetons d’enrôlement",
+      "create": "Nouveau jeton d’enrôlement",
+      "createHint": "Le serveur l’échange une fois contre un certificat d’hôte de sa propre clé.",
+      "created": "Jeton d’enrôlement créé",
+      "revoked": "Jeton {{prefix}} révoqué",
+      "revoke": "Révoquer le jeton",
+      "prefix": "Jeton",
+      "expires": "Expiration",
+      "noData": "Aucun jeton d’enrôlement",
+      "noDataDescription": "Créez un jeton pour une AC hôte et les noms du serveur, puis lancez sur le serveur la commande qu’il affiche.",
+      "state": {
+        "active": "Actif",
+        "used": "Utilisé",
+        "expired": "Expiré",
+        "revoked": "Révoqué"
+      },
+      "hostCa": "AC hôte",
+      "needsCaRead": "Choisir l’AC demande la permission read:ssh_cas.",
+      "noHostCa": "Aucune AC hôte : créez-en une dans AC SSH d’abord.",
+      "principals": "Noms d’hôte",
+      "principalsHint": "Les noms que le serveur peut porter dans son certificat, séparés par des virgules ou des espaces.",
+      "validity": "Validité du certificat",
+      "caDefault": "Celle de l’AC",
+      "lifetime": "Jeton valable",
+      "lifetimes": {
+        "15m": "15 minutes",
+        "1h": "1 heure",
+        "24h": "24 heures",
+        "7d": "7 jours"
+      },
+      "renewPercent": "Renouveler à % de durée restante",
+      "renewPercentHint": "De 5 à 90. L’agent renouvelle le certificat dès qu’il lui reste cette part de sa durée de vie.",
+      "shownOnce": "Ce jeton n’est affiché qu’une fois : UCM n’en garde que l’empreinte. Copiez-le maintenant.",
+      "value": "Jeton",
+      "command": "Commande à lancer sur le serveur",
+      "commandHint": "Lancez-la en root avant le {{expires}}. Le jeton passe par l’environnement et n’est pas écrit sur le disque."
+    }
+  },
   "filters": {
     "managePresets": "Gérer les préréglages"
   },
@@ -7684,6 +7768,7 @@
       "dek_sweep": "Rechiffrement sous la clé de données",
       "sso_sign_in_test_purge": "Purge des tests de connexion SSO",
       "session_key_retire": "Retrait de l’ancienne clé de session",
+      "ssh_revoked_host_sweep": "Fin des révocations d’hôtes SSH",
       "cluster_command_purge": "Purge des commandes de la grappe HA",
       "update_campaign": "Mise à jour HA nœud par nœud",
       "delivery_retention": "Conservation de l’historique des envois",
@@ -8124,7 +8209,8 @@
       "hsm": "Modules matériels et coffres de clés.",
       "audit": "Journal des opérations et des connexions.",
       "logs": "Journaux techniques du service.",
-      "settings": "Configuration générale de l’instance."
+      "settings": "Configuration générale de l’instance.",
+      "sshHosts": "Serveurs enrôlés par l’agent SSH et leurs certificats d’hôte"
     },
     "moduleLabel": {
       "crlOcsp": "CRL / OCSP",

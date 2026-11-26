@@ -22,6 +22,7 @@ STEPS = (
     '171_acme_purge_indexes', '172_sso_ldap_nested_groups', '173_sso_oauth2_tenants',
     '174_windows_profile_renewal_cas', '175_certificate_comment',
     '176_revoked_serial_publication', '177_ca_description', '178_api_key_allowed_networks',
+    '179_ssh_krls', '180_ssh_hosts',
 )
 
 

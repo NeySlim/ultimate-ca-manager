@@ -2337,6 +2337,45 @@ GET /api/v2/ssh/stats
 - `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate, with `revoked_with`: the ids of the other certificates of the CA that this revocation revoked with it, since the KRL revokes by serial, or by key ID for a certificate of serial 0: those holding the same serial, or bearing the same key ID whatever their serial (a certificate already revoked is not listed; empty but for a pair kept by an upgrade from 2.x or by the restore of a 2.x archive, and for a serial 0 certificate, which only an import brings), and `revoked_by`: the KRL entries that took them, in order, each `{"serial": n}` or `{"key_id": "..."}` (a key ID takes numbered certificates, whose serial then takes its other holders, so a serial 0 revocation may list its key ID and serials). Every certificate carries `serial_shared_with`, the ids of the other holders of its serial (always empty for serial 0). `DELETE` answers `204` or `409` when it cannot be deleted.
 - `stats` returns the counts shown on the SSH dashboard.
 
+### Public KRL
+
+```
+GET /ssh/krl/{refid}
+```
+
+The KRL of an SSH CA, without authentication, as a CRL is (`404` for an unknown CA). It is the KRL `GET /api/v2/ssh/cas/{ca_id}/krl` downloads: one per CA, stored in the database so every node of a cluster serves the same bytes. Its version (PROTOCOL.krl) changes only when the CA's revocations change, and a revocation publishes the new KRL at once. The response carries `ETag` (the version, quoted), `X-KRL-Version`, `Last-Modified` and `Cache-Control: public, no-cache`; a request whose `If-None-Match` names the current version gets `304` without a body. `503` with `Retry-After` when the KRL cannot be built.
+
+### SSH Agent
+
+```
+GET /ssh/setup/{refid}/agent
+```
+
+A POSIX `sh` installer, without authentication, run on a server as `curl -fsSL https://<ucm>/ssh/setup/{refid}/agent | sudo sh` (`sh -s -- --interval 15 --cacert ca.pem` to pass options, `--uninstall` to remove it). It holds no secret: only the URL it was fetched from (`400` when that URL is not one a shell can hold) and the CA refid (`404` for an unknown CA). For a user CA it installs `/usr/local/sbin/ucm-ssh-agent`, downloads the KRL to `/etc/ssh/ucm/revoked_keys` before pointing `RevokedKeys` at it (in `/etc/ssh/sshd_config.d` when sshd_config includes it, else at the top of sshd_config), and a systemd timer, else a cron job, that runs `ucm-ssh-agent sync` every 15 minutes. A sync sends the installed version as `If-None-Match`, checks a new KRL with `ssh-keygen -Q` and refuses one older than the installed one, replaces the file atomically and reloads sshd only when the KRL changed and `sshd -t` passes. It needs `ssh-keygen` and `curl` or `wget`; enrolling and renewing a host also need OpenSSH 8.1 or later, whose `ssh-keygen -Y sign` signs the token and the challenges.
+
+For a host CA the installer enrolls the server instead: `curl -fsSL https://<ucm>/ssh/setup/{refid}/agent | UCM_ENROLL_TOKEN=ucmh_... sudo --preserve-env=UCM_ENROLL_TOKEN sh` (the token is read from the environment only: set before `sudo` and kept by `--preserve-env`, it is in no argument the process list shows, as `sudo UCM_ENROLL_TOKEN=... sh` would put it), with `--principal NAME` (repeated) to ask for some of the token's names only, and `--host-key /etc/ssh/ssh_host_ecdsa_key` to pick a key (the first of Ed25519, ECDSA and RSA by default). The agent sends the public host key, checks that the certificate it gets certifies that key, writes it beside the key (`ssh_host_ed25519_key-cert.pub`; a file found there comes back at `--uninstall`), points `HostCertificate` at it and reloads sshd. The token is passed in the environment and never stored: the agent hands the request body to curl on a pipe, and to wget, which reads no body from a pipe, in a file only root can read, deleted after the request. One server may follow the KRL of one user CA and hold the host certificate of one host CA.
+
+### SSH Hosts and Enrollment Tokens
+
+```
+GET /api/v2/ssh/enrollment-tokens?ca_id=1
+POST /api/v2/ssh/enrollment-tokens
+POST /api/v2/ssh/enrollment-tokens/{token_id}/revoke
+GET /api/v2/ssh/hosts?ca_id=1&state=valid&search=web
+GET /api/v2/ssh/hosts/{host_id}
+POST /api/v2/ssh/hosts/{host_id}/revoke
+POST /api/v2/ssh/hosts/{host_id}/auto-renew
+POST /ssh/enroll/{refid}
+POST /ssh/renew/{host_refid}/challenge
+POST /ssh/renew/{host_refid}
+```
+
+- `POST /api/v2/ssh/enrollment-tokens` (`write:ssh`, `201`) creates a single-use enrollment token for a host CA: `ca_id` (`404` when unknown, `400` for a user CA) and `principals` (host names or IP addresses, 32 at most, each allowed by the CA), optional `validity_seconds` of the certificates (60 seconds to ten years, within the CA's `max_ttl`; the CA's default when absent), `lifetime_seconds` of the token (300 to 604800, 3600 by default), `renew_percent` (5 to 90, 30 by default: the share of its lifetime a certificate has left when the agent renews it) and `descr`. The answer carries the token in `token`, the only time it is shown: UCM keeps its SHA-256. A listed token shows its `token_prefix` and `state` (`active`, `used`, `expired` or `revoked`); `revoke` answers `409` for a token already used or revoked. Reading needs `read:ssh`.
+- `POST /ssh/enroll/{refid}` (public, no session) exchanges a token for a host certificate: a JSON body with `token`, `public_key` (the host's OpenSSH public key; Ed25519, ECDSA, or RSA of 2048 bits at least; never a certificate), `signature` (the token signed with that key, `ssh-keygen -Y sign -n ucm-ssh-host-enrollment`, which proves the host holds it; `403` when missing or wrong, the token left unspent) and optional `principals`, which must all be names of the token (all of them by default). `201` answers `host_refid`, `certificate`, `principals`, `valid_to` and `renew_percent`, as JSON or, with `Accept: text/plain`, as `key=value` lines. A malformed, unknown, used, expired or revoked token, or one of another CA, answers `403` with the same message; the audit log records the reason. A token is spent by the first exchange whose body is valid, before the certificate is signed; when the CA then refuses the certificate (`400`), the token is given back. The same key enrolled again under the same CA for the same names keeps its host and refid; for other names it answers `409` until that host is revoked. Rate limited (10 requests per minute per address).
+- `GET /api/v2/ssh/hosts` (`read:ssh`) lists the enrolled hosts, 25 per page, with `meta.counts` by `state` (`valid`, `expired`, `revoked`). A host carries its `principals`, key `fingerprint`, current certificate (`certificate_id`, `valid_from`, `valid_to`), `auto_renew`, `enrolled_at`, `last_renewed_at`, `last_seen_at` and `last_krl_sync_at`. The last two are set by unauthenticated requests naming the host refid (a renewal check, a KRL download), so they tell what was claimed for the host, never that the host itself made the request.
+- Renewal is authenticated by the host key alone, never by a stored secret. `POST /ssh/renew/{host_refid}/challenge` (public) answers `due: 0` with `renew_after` while the current certificate has more than `renew_percent` of the lifetime it was issued with left, then `due: 1` with a `challenge` and the `namespace` `ucm-ssh-host-renewal`; a challenge stays the same for five minutes, however often it is asked for. `POST /ssh/renew/{host_refid}` takes `challenge` and `signature`, the `ssh-keygen -Y sign -n ucm-ssh-host-renewal` signature of the challenge made with the key the current certificate certifies (Ed25519, ECDSA, or RSA with SHA-2), and answers `200` with a new `certificate` for the same names and validity. The challenge is spent by the renewal that uses it. A revoked host or certificate, an expired certificate, another key, another namespace or an unknown challenge answers `403`, an unknown host `404`, each with a `state` (`revoked`, `expired`, `unknown`, `refused`) and an audit entry; a host whose renewals are switched off answers `403` with `state: disabled`, not audited, and the agent asks again at its next sync. Rate limited at the standard rate (`RATE_LIMIT_STANDARD_RPM`, 600 requests per minute per address by default), so a fleet of hosts behind one address can sync every few minutes. The agent asks at every sync and stops asking once UCM answers `revoked`, `expired` or `unknown`; any other refusal, a proxy's `403` or `404` without that `state` included, is asked again at the next sync. `ucm-ssh-agent status` shows why it stopped. A KRL download with `?host={host_refid}` records the host's `last_krl_sync_at`, as the agent does when the server is enrolled: it is what the agent says, at most once a minute.
+- `revoke` (`write:ssh`) revokes every unexpired certificate of the host's key under its CA, the current one and those a renewal or a new enrollment replaced, which the host CA's KRL then lists, and ends its renewals for good; a revoked server enrolls again with a new token. Revoking a host already revoked answers `200` while a certificate its revocation owes to the KRL is still live (one issued before the revocation, or by its renewal, and before the key was enrolled again as another host), revokes it and writes the audit entry `ssh_host_revocation_finished`; otherwise it answers `409`. Every five minutes, a scheduled task revokes such certificates by itself, after a revocation or a renewal cut short. `auto-renew` takes `{"enabled": false}` to stop the renewals of a host and `true` to resume them (`400` for a revoked host).
+
 ---
 
 ## Deployment
@@ -5710,7 +5749,9 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 | CA issuers (AIA) | `/ca/{ca_ref}.cer`, `/ca/{ca_ref}.pem`, `/ca/{ca_ref}.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
 | Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |
 | Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
-| SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key` | [SSH Certificates](#ssh-certificates) |
+| SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key`, `/ssh/setup/{refid}/agent` | [SSH Certificates](#ssh-certificates) |
+| SSH KRL | `/ssh/krl/{refid}` | [Public KRL](#public-krl) |
+| SSH host enrollment and renewal | `/ssh/enroll/{refid}`, `/ssh/renew/{host_refid}/challenge`, `/ssh/renew/{host_refid}` | [SSH Hosts and Enrollment Tokens](#ssh-hosts-and-enrollment-tokens) |
 
 The routes are always served; a protocol turned off in Settings refuses its requests with `503` (ACME, SCEP, EST, TSA, XCEP and WSTEP).
 

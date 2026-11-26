@@ -210,16 +210,16 @@ sudo systemctl restart sshd
 
 SSH CA支持Key Revocation List来使被泄露的证书失效：
 
-1. 在SSH证书页面吊销证书
-2. 从CA详情面板下载更新的KRL
-3. 将KRL文件部署到服务器：
+1. 在SSH证书页面吊销证书：CA会立即在 \`/ssh/krl/<refid>\` 发布新的KRL，无需认证
+2. 在每台服务器上，**快速安装**选项卡中的 **SSH代理** 命令会安装KRL并每15分钟拉取一次（参见SSH主机）
+3. 或者从CA详情面板下载KRL并自行部署：
 
 \`\`\`bash
 # 添加到sshd_config
 RevokedKeys /etc/ssh/revoked_keys
 \`\`\`
 
-> ⚠ 服务器必须配置为检查KRL。在KRL部署之前，吊销不会生效。
+> ⚠ 服务器必须配置为检查KRL。服务器获得新的KRL后吊销即生效：使用代理时最多15分钟。
 
 ## 最佳实践
 

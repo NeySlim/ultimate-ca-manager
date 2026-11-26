@@ -75,7 +75,8 @@ export function AppShell() {
     'tools': 'certTools',
     'logs': 'systemLogs',
     'ssh/cas': 'sshCas',
-    'ssh/certificates': 'sshCertificates'
+    'ssh/certificates': 'sshCertificates',
+    'ssh/hosts': 'sshHosts'
   }
   const helpPageKey = helpPageKeyMap[fullPath] || helpPageKeyMap[activePage] || activePage
   
@@ -88,7 +89,7 @@ export function AppShell() {
     // Pro pages
     'rbac', 'hsm', 'logs',
     // SSH pages
-    'ssh-cas', 'ssh-certificates',
+    'ssh-cas', 'ssh-certificates', 'ssh-hosts',
     // Governance pages
     'keyRecovery', 'policies', 'approvals', 'reports', 'discovery'
   ]

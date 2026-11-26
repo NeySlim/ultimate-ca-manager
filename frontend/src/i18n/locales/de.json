@@ -482,7 +482,8 @@
     "creating": "Wird erstellt...",
     "notFound": "Nicht gefunden",
     "popular": "Beliebt",
-    "other": "Andere"
+    "other": "Andere",
+    "sshHosts": "SSH-Hosts"
   },
   "commandPalette": {
     "searchPlaceholder": "Zertifikat, Seite oder Aktion…",
@@ -7511,7 +7512,10 @@
     "range": "{{shown}} von {{count}} SSH-CAs",
     "pageRange": "{{start}}–{{end}} von {{count}} SSH-CAs",
     "moreActions": "Weitere Aktionen für {{name}}",
-    "actionsTitle": "Aktionen der SSH-CA"
+    "actionsTitle": "Aktionen der SSH-CA",
+    "agent": "SSH-Agent",
+    "agentUserDescription": "Installiert den Agenten: sshd liest die KRL dieser CA, die alle 15 Minuten abgerufen wird, sodass ein widerrufenes Zertifikat abgelehnt wird.",
+    "agentHostDescription": "Registriert den Server mit einem Registrierungstoken: Er erhält ein Host-Zertifikat dieser CA und erneuert es. Erstellen Sie das Token unter SSH-Hosts."
   },
   "sshCertificates": {
     "title": "SSH-Zertifikate",
@@ -7605,6 +7609,86 @@
     "moreActions": "Weitere Aktionen für {{name}}",
     "actionsTitle": "Aktionen des SSH-Zertifikats"
   },
+  "sshHosts": {
+    "title": "SSH-Hosts",
+    "subtitle_one": "{{count}} Host",
+    "subtitle_other": "{{count}} Hosts",
+    "intent": "Server, die der SSH-Agent bei einer Host-CA registriert hat, das Zertifikat, das jeder vorweist, und seine Erneuerung.",
+    "caption": "Registrierte SSH-Hosts",
+    "loadFailed": "SSH-Hosts konnten nicht geladen werden",
+    "stateValid": "Gültig",
+    "stateExpired": "Abgelaufen",
+    "stateRevoked": "Widerrufen",
+    "filterByState": "Hosts nach Status filtern",
+    "searchLabel": "Hosts durchsuchen",
+    "noData": "Kein registrierter Host",
+    "noDataDescription": "Erstellen Sie ein Registrierungstoken und führen Sie damit den SSH-Agenten auf dem Server aus: Er erhält ein Host-Zertifikat und erneuert es.",
+    "pageRange": "{{start}}–{{end}} von {{count}} Hosts",
+    "revokeHost": "Host widerrufen",
+    "revokeConfirm": "{{name}} widerrufen? Alle nicht abgelaufenen Zertifikate seines Schlüssels, das aktuelle und die durch Erneuerungen ersetzten, werden widerrufen und in der KRL aufgeführt, und er wird nicht mehr erneuert: Der Server muss sich mit einem neuen Token registrieren.",
+    "revoked": "{{name}} widerrufen",
+    "pauseRenewal": "Erneuerung pausieren",
+    "resumeRenewal": "Erneuerung fortsetzen",
+    "renewalPaused": "Erneuerung von {{name}} pausiert",
+    "renewalResumed": "Erneuerung von {{name}} fortgesetzt",
+    "renewalOn": "Ein",
+    "renewalOff": "Pausiert",
+    "autoRenew": "Automatische Erneuerung",
+    "certificate": "Host-Zertifikat",
+    "hostKey": "Host-Schlüssel",
+    "agent": "Agent",
+    "renewAt": "Erneuert",
+    "renewAtValue": "bei {{percent}} % verbleibender Laufzeit",
+    "enrolledAt": "Registriert",
+    "enrolledFrom": "Registriert von",
+    "lastRenewed": "Letzte Erneuerung",
+    "lastSeen": "Letzter Kontakt",
+    "lastKrlSync": "Letzter KRL-Abruf",
+    "notReported": "Nicht gemeldet",
+    "revokedNotice": "Dieser Host ist widerrufen: Er wird nicht mehr erneuert. Um ihn wieder zu verwenden, registrieren Sie den Server mit einem neuen Token.",
+    "token": {
+      "title": "Registrierungstoken",
+      "subtitle_one": "{{count}} Token",
+      "subtitle_other": "{{count}} Token",
+      "intent": "Ein Token registriert einen Server, einmal, vor seinem Ablauf, für die Hostnamen, die es auflistet.",
+      "caption": "Registrierungstoken",
+      "create": "Neues Registrierungstoken",
+      "createHint": "Der Server tauscht es einmal gegen ein Host-Zertifikat seines eigenen Schlüssels.",
+      "created": "Registrierungstoken erstellt",
+      "revoked": "Token {{prefix}} widerrufen",
+      "revoke": "Token widerrufen",
+      "prefix": "Token",
+      "expires": "Läuft ab",
+      "noData": "Kein Registrierungstoken",
+      "noDataDescription": "Erstellen Sie ein Token für eine Host-CA und die Namen des Servers und führen Sie dann den angezeigten Befehl auf dem Server aus.",
+      "state": {
+        "active": "Aktiv",
+        "used": "Verwendet",
+        "expired": "Abgelaufen",
+        "revoked": "Widerrufen"
+      },
+      "hostCa": "Host-CA",
+      "needsCaRead": "Die Auswahl der CA erfordert die Berechtigung read:ssh_cas.",
+      "noHostCa": "Keine Host-CA: Erstellen Sie zuerst eine unter SSH-CAs.",
+      "principals": "Hostnamen",
+      "principalsHint": "Die Namen, die der Server in seinem Zertifikat tragen darf, durch Kommas oder Leerzeichen getrennt.",
+      "validity": "Gültigkeit des Zertifikats",
+      "caDefault": "Standard der CA",
+      "lifetime": "Token gültig für",
+      "lifetimes": {
+        "15m": "15 Minuten",
+        "1h": "1 Stunde",
+        "24h": "24 Stunden",
+        "7d": "7 Tage"
+      },
+      "renewPercent": "Erneuern bei % verbleibender Laufzeit",
+      "renewPercentHint": "Von 5 bis 90. Der Agent erneuert das Zertifikat, sobald dieser Anteil seiner Laufzeit verbleibt.",
+      "shownOnce": "Dieses Token wird nur einmal angezeigt: UCM speichert nur seinen Fingerabdruck. Kopieren Sie es jetzt.",
+      "value": "Token",
+      "command": "Auf dem Server auszuführender Befehl",
+      "commandHint": "Führen Sie ihn als root vor {{expires}} aus. Das Token wird in der Umgebung übergeben und nicht auf die Festplatte geschrieben."
+    }
+  },
   "filters": {
     "managePresets": "Voreinstellungen verwalten"
   },
@@ -7684,6 +7768,7 @@
       "dek_sweep": "Neuverschlüsselung unter dem Datenschlüssel",
       "sso_sign_in_test_purge": "Bereinigung der SSO-Anmeldetests",
       "session_key_retire": "Ausmusterung früherer Sitzungsschlüssel",
+      "ssh_revoked_host_sweep": "Abschluss der SSH-Host-Sperrungen",
       "cluster_command_purge": "Bereinigung der HA-Cluster-Befehle",
       "update_campaign": "HA-Rolling-Update",
       "delivery_retention": "Aufbewahrung des Zustellverlaufs",
@@ -8124,7 +8209,8 @@
       "hsm": "Hardwaremodule und Schlüsseltresore.",
       "audit": "Protokoll der Vorgänge und Anmeldungen.",
       "logs": "Technische Protokolle des Dienstes.",
-      "settings": "Allgemeine Konfiguration der Instanz."
+      "settings": "Allgemeine Konfiguration der Instanz.",
+      "sshHosts": "Vom SSH-Agenten registrierte Server und ihre Host-Zertifikate"
     },
     "moduleLabel": {
       "crlOcsp": "CRL / OCSP",

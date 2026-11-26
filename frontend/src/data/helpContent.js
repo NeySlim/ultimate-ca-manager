@@ -2298,6 +2298,50 @@ export const helpContent = {
     ],
     related: ['SSH CAs', 'Audit Logs']
   },
+
+  // ===== SSH HOSTS =====
+  sshHosts: {
+    title: 'SSH Hosts',
+    subtitle: 'Enroll servers and renew their host certificates',
+    overview: 'The SSH agent installed on a server keeps sshd in step with UCM: it pulls the KRL of a user CA and, with a single-use enrollment token, gets a host certificate of the server\'s own key, which it then renews by itself. This page lists the enrolled servers and the enrollment tokens.',
+    sections: [
+      {
+        title: 'Enrollment',
+        icon: Key,
+        items: [
+          { label: 'Token', text: 'Create a token for a host CA and the host names of the server. It is shown once, works once and expires after the lifetime chosen, one hour by default.' },
+          { label: 'Command', text: 'Run the command shown with the token, as root, on the server: the agent sends the server\'s public host key and installs the host certificate it gets back as HostCertificate.' },
+          { label: 'Names', text: 'The server may ask for some of the names of the token; a name the token does not list is refused.' },
+        ]
+      },
+      {
+        title: 'Renewal',
+        icon: ArrowClockwise,
+        items: [
+          { label: 'When', text: 'Once a certificate has 30 % of its lifetime left (set per token), the agent asks UCM for a challenge at its next sync, every 15 minutes.' },
+          { label: 'Proof', text: 'The agent signs the challenge with the host key the certificate certifies. UCM keeps no secret of the host: the key is the proof.' },
+          { label: 'Pause and revoke', text: 'Pause renewal stops the renewals until they are resumed. Revoke host revokes its certificate, which the KRL then lists, and ends its renewals for good.' },
+        ]
+      },
+      {
+        title: 'States',
+        icon: ListChecks,
+        items: [
+          { label: 'Valid, expired, revoked', text: 'The state of the certificate the host presents now.' },
+          { label: 'Last KRL pull', text: 'When the agent of the server last downloaded a KRL, as the agent reports it. Not reported when the server follows no KRL.' },
+        ]
+      },
+    ],
+    tips: [
+      'Give host certificates a validity of weeks or months: the agent renews them, and revoking a host stops it at once.',
+      'Create one token per server, with the lifetime it needs to be run there.',
+    ],
+    warnings: [
+      'A token is shown once: UCM keeps only its fingerprint.',
+      'Removing the agent from a server does not revoke the host: revoke it here.',
+    ],
+    related: ['SSH CAs', 'SSH Certificates', 'Audit Logs']
+  },
 }
 
 export default helpContent

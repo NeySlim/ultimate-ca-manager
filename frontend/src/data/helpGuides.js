@@ -3695,16 +3695,16 @@ sudo systemctl restart sshd
 
 SSH CAs support Key Revocation Lists to invalidate compromised certificates:
 
-1. Revoke certificates from the SSH Certificates page
-2. Download the updated KRL from the CA detail panel
-3. Deploy the KRL file to servers:
+1. Revoke certificates from the SSH Certificates page: the CA publishes its new KRL at once, at \`/ssh/krl/<refid>\`, without authentication
+2. On each server, the **SSH agent** command of the **Quick Install** tab installs the KRL and pulls it every 15 minutes (see SSH Hosts)
+3. Or download the KRL from the CA detail panel and deploy it yourself:
 
 \`\`\`bash
 # Add to sshd_config
 RevokedKeys /etc/ssh/revoked_keys
 \`\`\`
 
-> ⚠ Servers must be configured to check the KRL. Revocation does not take effect until the KRL is deployed.
+> ⚠ Servers must be configured to check the KRL. A revocation takes effect on a server once it has the new KRL: within 15 minutes with the agent.
 
 ## Best Practices
 
@@ -3868,6 +3868,79 @@ The KRL names a certificate by its serial number, which UCM gives out once per C
 | Principal mismatch | The username you SSH as must be listed in the certificate's principals |
 | Certificate expired | Issue a new certificate with appropriate validity |
 | Host verification failed | Add the Host CA to known_hosts with @cert-authority |
+`
+  },
+  // ===== SSH HOSTS =====
+  sshHosts: {
+    title: 'SSH Hosts',
+    content: `
+## Overview
+
+The SSH agent is a POSIX shell script that UCM serves to your servers. It holds no secret and only pulls from UCM: UCM never connects to a server. It does two things:
+
+- it keeps sshd on the **KRL** of a user CA, so a revoked user certificate is refused within minutes;
+- it **enrolls** the server with a host CA, with a single-use token, and **renews** the host certificate by itself.
+
+It needs \`ssh-keygen\` and \`curl\` or \`wget\`, and runs from a systemd timer, or a cron job, every 15 minutes. Enrolling and renewing a host also need OpenSSH 8.1 or later, for \`ssh-keygen -Y sign\`.
+
+## Following a KRL
+
+Open the user CA in **SSH CAs**, tab **Quick Install**, and run the **SSH agent** command on the server as root:
+
+\`\`\`bash
+curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo sh
+\`\`\`
+
+The agent downloads the KRL to \`/etc/ssh/ucm/revoked_keys\` first, then adds \`RevokedKeys\` to sshd (in \`/etc/ssh/sshd_config.d\` when sshd_config includes it, otherwise at the top of sshd_config) and checks the result with \`sshd -t\`. At each sync it downloads the KRL only when its version changed, checks it with \`ssh-keygen\`, refuses one older than the installed one, replaces the file in one step and reloads sshd.
+
+The KRL is public, like a CRL: \`/ssh/krl/<refid>\`. Its version changes only when a certificate of the CA is revoked.
+
+## Enrolling a Server
+
+1. Open **SSH Hosts**, then **New enrollment token**
+2. Choose the host CA and enter the host names of the server (for example \`web01.example.com, web01\`)
+3. Optionally choose the validity of the certificates, the lifetime of the token and when to renew
+4. Copy the command shown with the token and run it on the server as root, before the token expires
+
+\`\`\`bash
+curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | UCM_ENROLL_TOKEN=ucmh_... sudo --preserve-env=UCM_ENROLL_TOKEN sh
+\`\`\`
+
+The agent sends the server's public host key (Ed25519 first, then ECDSA, then RSA; \`--host-key\` picks another) with the token signed by that key, which proves the server holds it, checks that the certificate it gets certifies that key, writes it beside the key and points \`HostCertificate\` at it. Add \`-s -- --principal web01\` to ask for some of the token's names only.
+
+The token is shown once and works once. The server never stores it: the agent hands it to curl on a pipe (to wget, which reads no pipe, in a file only root can read, deleted after the request). A token that is not used can be revoked in **Enrollment tokens**.
+
+Clients trust the host CA with a line in \`known_hosts\`:
+
+\`\`\`
+@cert-authority *.example.com ssh-ed25519 AAAA...
+\`\`\`
+
+## Renewal
+
+Once the host certificate has 30 % of its lifetime left (the share is set per token), the agent asks UCM for a challenge, signs it with the host key (\`ssh-keygen -Y sign\`) and gets a new certificate for the same names. UCM checks the signature against the key the current certificate certifies: no password or token is kept for the host.
+
+A renewal is refused when the host or its certificate is revoked, when the certificate has expired, or when renewal is paused. After such a refusal the agent stops asking, except for a pause; \`ucm-ssh-agent status\` says why. A server refused for good is enrolled again with a new token.
+
+## The SSH Hosts Page
+
+| Column | Meaning |
+|--------|---------|
+| Principals | The names of the host certificate |
+| Expiration | The end of the current certificate |
+| Automatic renewal | On, or Paused |
+| Last KRL pull | When the agent last downloaded a KRL, as it reports it |
+| State | Valid, Expired or Revoked |
+
+**Pause renewal** stops the renewals until **Resume renewal**. **Revoke host** revokes every unexpired certificate of its key, the current one and those its renewals replaced, which the host CA's KRL then lists, and ends the renewals for good. Every enrollment, renewal and refusal is in the audit log.
+
+## Removing the Agent
+
+\`\`\`bash
+curl -fsSL https://ucm.example.com:8443/ssh/setup/<refid>/agent | sudo sh -s -- --uninstall
+\`\`\`
+
+The agent removes its timer, its sshd settings, the KRL and the certificate it installed, and puts back a certificate it found in place. The host stays listed in UCM: revoke it there.
 `
   },
 }

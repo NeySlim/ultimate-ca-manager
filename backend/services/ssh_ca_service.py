@@ -524,6 +524,10 @@ class SSHCAService:
 
         ca_name = ca.descr
         try:
+            # Without SQLite foreign keys nothing cascades: the hosts and tokens of the CA go with it
+            from models.ssh import SSHHost, SSHHostEnrollmentToken
+            SSHHost.query.filter_by(ssh_ca_id=ca_id).delete()
+            SSHHostEnrollmentToken.query.filter_by(ssh_ca_id=ca_id).delete()
             db.session.delete(ca)
             db.session.commit()
         except Exception as e:

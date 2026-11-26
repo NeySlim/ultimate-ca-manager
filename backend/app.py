@@ -723,6 +723,14 @@ def create_app(config_name=None):
             description="Purge OIDC and SAML sign-in tests and their reports past their expiry"
         )
 
+        from services.ssh_host_service import REVOKED_HOST_SWEEP_SECONDS, sweep_revoked_hosts
+        scheduler.register_task(
+            name="ssh_revoked_host_sweep",
+            func=sweep_revoked_hosts,
+            interval=REVOKED_HOST_SWEEP_SECONDS,
+            description="Revoke the certificates an interrupted SSH host revocation left live"
+        )
+
         from security.session_key import scheduled_retire as retire_session_key
         scheduler.register_task(
             name="session_key_retire",
@@ -1900,6 +1908,8 @@ def register_blueprints(app):
         app.logger.info("✓ SSH public setup endpoint enabled (/ssh/setup)")
     except ImportError as e:
         app.logger.warning(f"⚠️ SSH setup endpoint not available: {e}")
+    from api.ssh_host_agent import bp as ssh_host_agent_bp
+    app.register_blueprint(ssh_host_agent_bp)  # SSH host enrollment and renewal (/ssh/enroll, /ssh/renew)
     
     # ACME Protocol (RFC 8555) - /acme/*
     try:

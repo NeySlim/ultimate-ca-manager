@@ -187,6 +187,10 @@ export default function SSHCAsPage() {
   }
 
   const getCurlCommand = (ca) => `curl -sSL ${window.location.origin}/ssh/setup/${ca.refid} | sudo bash`
+  // The agent: a user CA's KRL kept in sshd; a host CA enrolls with a token from SSH Hosts
+  const getAgentCommand = (ca) => (ca.ca_type === 'host'
+    ? `curl -fsSL ${window.location.origin}/ssh/setup/${ca.refid}/agent | UCM_ENROLL_TOKEN=<token> sudo --preserve-env=UCM_ENROLL_TOKEN sh`
+    : `curl -fsSL ${window.location.origin}/ssh/setup/${ca.refid}/agent | sudo sh`)
   // Self-elevating one-liner: a new admin PowerShell window that stays open, the script run through iex
   const getPowershellCommand = (ca) => {
     const url = `${window.location.origin}/ssh/setup/${ca.refid}?platform=windows`
@@ -291,6 +295,14 @@ export default function SSHCAsPage() {
                 <code className="mono">{getPowershellCommand(open)}</code>
                 <IconBtn icon={isCopied('powershell') ? 'check' : 'copy'} label={t('common.copy')} onClick={() => copyCommand(getPowershellCommand(open), 'powershell', 'sshCas.powershellCopied')} />
               </div>
+            </Section>
+            <Section title={t('sshCas.agent')}>
+              <p className="muted small">{open.ca_type === 'host' ? t('sshCas.agentHostDescription') : t('sshCas.agentUserDescription')}</p>
+              <div className="command-line">
+                <code className="mono">{getAgentCommand(open)}</code>
+                <IconBtn icon={isCopied('agent') ? 'check' : 'copy'} label={t('common.copy')} onClick={() => copyCommand(getAgentCommand(open), 'agent', 'sshCas.curlCopied')} />
+              </div>
+              {open.ca_type === 'host' && <p className="copy-url"><Btn icon="terminal" id="ssh-ca-hosts" to="/ssh/hosts?view=tokens">{t('sshHosts.token.title')}</Btn></p>}
             </Section>
             <Section title={t('sshCas.downloadSetupScript')}>
               <p className="muted small">{t('sshCas.setupScriptDescription')}</p>

@@ -17,6 +17,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - API keys: a key can be limited to source addresses (IP addresses or CIDR networks), set at creation on the account page or with `allowed_networks`; from any other address it is refused with 403 (#403).
 - Documentation: [Managing several instances](docs/MANAGING_INSTANCES.md) describes what a console watching several instances can rely on: the state route, the scopes and source networks of its key, and the instance identity across restarts, HA nodes and restores (#403).
 - CAs: a CA imported without its private key can be attached to the key an HSM provider still holds (Use a key from the HSM in its details): only the provider's keys whose public key is the certificate's are offered, and the key must sign for the certificate before the CA takes it (#458).
+- SSH CAs publish their KRL at `/ssh/krl/<refid>`, without authentication: the version changes only when a certificate is revoked, which publishes it at once, and a client that sends the ETag back gets `304` while nothing changed (#451).
+- SSH agent: `curl -fsSL https://<ucm>/ssh/setup/<refid>/agent | sudo sh` makes sshd read the KRL of a user CA and installs a timer that pulls it every 15 minutes, checks it and reloads sshd only when it changed; `--uninstall` removes it (#451).
+- SSH host enrollment: an administrator creates a single-use enrollment token for a host CA and the host names it allows, and the agent installed with it exchanges the token, signed with the server's host key to prove it holds that key, for a host certificate of that key, which sshd then presents (#451).
+- SSH host renewal: once a host certificate has 30 % of its lifetime left, the agent signs a UCM challenge with the host key the certificate certifies and installs the new certificate; revoking the host, or its certificate, ends its renewals (#451).
+- SSH Hosts page (Modules > Administration): the enrolled servers with the state of their host certificate, automatic renewal and last KRL pull, the Revoke host and Pause renewal actions, and the enrollment tokens, created there, shown once and revocable (#451).
 
 ### Changed
 

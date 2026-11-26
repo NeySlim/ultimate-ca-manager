@@ -4,7 +4,7 @@ import re
 # Module paths and redirect sources of frontend/src/navigation/registry.js (a test keeps them equal).
 KNOWN_PATHS = (
     '/', '/dashboard', '/certificates', '/certificates/:id', '/cas', '/cas/:id', '/csrs',
-    '/templates', '/ssh/cas', '/ssh/certificates', '/acme', '/scep-config', '/est-config',
+    '/templates', '/ssh/cas', '/ssh/certificates', '/ssh/hosts', '/acme', '/scep-config', '/est-config',
     '/tsa-config', '/crl-ocsp', '/truststore', '/truststore/:id', '/operations', '/tools',
     '/policies', '/approvals', '/key-recovery', '/reports', '/discovery', '/users', '/rbac',
     '/hsm', '/audit', '/logs', '/user-certificates', '/settings', '/account',

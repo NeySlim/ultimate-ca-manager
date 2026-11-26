@@ -211,16 +211,16 @@ sudo systemctl restart sshd
 
 Las CA SSH admiten listas de revocación de claves para invalidar certificados comprometidos:
 
-1. Revoque los certificados desde la página Certificados SSH
-2. Descargue la KRL actualizada desde el panel de detalle de la CA
-3. Despliegue el archivo KRL en los servidores:
+1. Revoque los certificados desde la página Certificados SSH: la CA publica su nueva KRL al instante, en \`/ssh/krl/<refid>\`, sin autenticación
+2. En cada servidor, el comando **Agente SSH** de la pestaña **Instalación rápida** instala la KRL y la descarga cada 15 minutos (vea Hosts SSH)
+3. O descargue la KRL desde el panel de detalle de la CA y despliéguela usted mismo:
 
 \`\`\`bash
 # Añadir a sshd_config
 RevokedKeys /etc/ssh/revoked_keys
 \`\`\`
 
-> ⚠ Los servidores deben estar configurados para comprobar la KRL. La revocación no surte efecto hasta que se despliega la KRL.
+> ⚠ Los servidores deben estar configurados para comprobar la KRL. Una revocación surte efecto en un servidor en cuanto tiene la nueva KRL: en 15 minutos como máximo con el agente.
 
 ## Buenas prácticas
 

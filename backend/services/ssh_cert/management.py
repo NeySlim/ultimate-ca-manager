@@ -72,6 +72,9 @@ class SSHCertificateManagementMixin:
             raise
 
         logger.info(f"Revoked SSH certificate #{cert.serial} ({cert.key_id}): {reason}")
+        # The public KRL takes the revocation now, not at its next download
+        from services.ssh_krl_service import SSHKRLService
+        SSHKRLService.publish(cert.ssh_ca_id)
         return cert
 
     @staticmethod
@@ -92,6 +95,8 @@ class SSHCertificateManagementMixin:
 
         cert_name = cert.key_id
         try:
+            from models.ssh import SSHHost
+            SSHHost.query.filter_by(certificate_id=cert.id).update({'certificate_id': None})
             db.session.delete(cert)
             db.session.commit()
         except Exception as e:

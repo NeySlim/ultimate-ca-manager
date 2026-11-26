@@ -482,7 +482,8 @@
     "creating": "Creando...",
     "notFound": "No encontrado",
     "popular": "Populares",
-    "other": "Otros"
+    "other": "Otros",
+    "sshHosts": "Hosts SSH"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificado, página o acción…",
@@ -7511,7 +7512,10 @@
     "range": "{{shown}} de {{count}} CA SSH",
     "pageRange": "{{start}}–{{end}} de {{count}} CA SSH",
     "moreActions": "Otras acciones para {{name}}",
-    "actionsTitle": "Acciones de la CA SSH"
+    "actionsTitle": "Acciones de la CA SSH",
+    "agent": "Agente SSH",
+    "agentUserDescription": "Instala el agente: sshd lee la KRL de esta CA, descargada cada 15 minutos, de modo que un certificado revocado se rechaza.",
+    "agentHostDescription": "Inscribe el servidor con un token de inscripción: obtiene un certificado de host de esta CA y lo renueva. Cree el token en Hosts SSH."
   },
   "sshCertificates": {
     "title": "Certificados SSH",
@@ -7605,6 +7609,86 @@
     "moreActions": "Otras acciones para {{name}}",
     "actionsTitle": "Acciones del certificado SSH"
   },
+  "sshHosts": {
+    "title": "Hosts SSH",
+    "subtitle_one": "{{count}} host",
+    "subtitle_other": "{{count}} hosts",
+    "intent": "Servidores que el agente SSH inscribió en una CA de host, el certificado que presenta cada uno y su renovación.",
+    "caption": "Hosts SSH inscritos",
+    "loadFailed": "No se pudieron cargar los hosts SSH",
+    "stateValid": "Válido",
+    "stateExpired": "Caducado",
+    "stateRevoked": "Revocado",
+    "filterByState": "Filtrar hosts por estado",
+    "searchLabel": "Buscar hosts",
+    "noData": "Ningún host inscrito",
+    "noDataDescription": "Cree un token de inscripción y ejecute con él el agente SSH en el servidor: obtiene un certificado de host y lo renueva.",
+    "pageRange": "{{start}}–{{end}} de {{count}} hosts",
+    "revokeHost": "Revocar host",
+    "revokeConfirm": "¿Revocar {{name}}? Todos los certificados no caducados de su clave, el actual y los que sus renovaciones reemplazaron, se revocan y se incluyen en la KRL, y no se renovará más: el servidor deberá inscribirse con un nuevo token.",
+    "revoked": "{{name}} revocado",
+    "pauseRenewal": "Pausar la renovación",
+    "resumeRenewal": "Reanudar la renovación",
+    "renewalPaused": "Renovación de {{name}} pausada",
+    "renewalResumed": "Renovación de {{name}} reanudada",
+    "renewalOn": "Activa",
+    "renewalOff": "En pausa",
+    "autoRenew": "Renovación automática",
+    "certificate": "Certificado de host",
+    "hostKey": "Clave de host",
+    "agent": "Agente",
+    "renewAt": "Se renueva",
+    "renewAtValue": "con el {{percent}} % de su vida útil restante",
+    "enrolledAt": "Inscrito",
+    "enrolledFrom": "Inscrito desde",
+    "lastRenewed": "Última renovación",
+    "lastSeen": "Último contacto",
+    "lastKrlSync": "Última descarga de la KRL",
+    "notReported": "No informado",
+    "revokedNotice": "Este host está revocado: ya no se renueva. Para volver a usarlo, inscriba el servidor con un nuevo token.",
+    "token": {
+      "title": "Tokens de inscripción",
+      "subtitle_one": "{{count}} token",
+      "subtitle_other": "{{count}} tokens",
+      "intent": "Un token inscribe un servidor, una sola vez, antes de caducar, para los nombres de host que enumera.",
+      "caption": "Tokens de inscripción",
+      "create": "Nuevo token de inscripción",
+      "createHint": "El servidor lo canjea una vez por un certificado de host de su propia clave.",
+      "created": "Token de inscripción creado",
+      "revoked": "Token {{prefix}} revocado",
+      "revoke": "Revocar token",
+      "prefix": "Token",
+      "expires": "Caduca",
+      "noData": "Ningún token de inscripción",
+      "noDataDescription": "Cree un token para una CA de host y los nombres del servidor, y luego ejecute en el servidor el comando que muestra.",
+      "state": {
+        "active": "Activo",
+        "used": "Usado",
+        "expired": "Caducado",
+        "revoked": "Revocado"
+      },
+      "hostCa": "CA de host",
+      "needsCaRead": "Elegir la CA requiere el permiso read:ssh_cas.",
+      "noHostCa": "Ninguna CA de host: cree una primero en CAs SSH.",
+      "principals": "Nombres de host",
+      "principalsHint": "Los nombres que el servidor puede llevar en su certificado, separados por comas o espacios.",
+      "validity": "Validez del certificado",
+      "caDefault": "El valor predeterminado de la CA",
+      "lifetime": "Token válido durante",
+      "lifetimes": {
+        "15m": "15 minutos",
+        "1h": "1 hora",
+        "24h": "24 horas",
+        "7d": "7 días"
+      },
+      "renewPercent": "Renovar con % de vida útil restante",
+      "renewPercentHint": "De 5 a 90. El agente renueva el certificado cuando le queda esta parte de su vida útil.",
+      "shownOnce": "Este token se muestra una sola vez: UCM solo guarda su huella. Cópielo ahora.",
+      "value": "Token",
+      "command": "Comando para ejecutar en el servidor",
+      "commandHint": "Ejecútelo como root antes de {{expires}}. El token se pasa en el entorno y no se escribe en el disco."
+    }
+  },
   "filters": {
     "managePresets": "Gestionar preajustes"
   },
@@ -7684,6 +7768,7 @@
       "dek_sweep": "Recifrado con la clave de datos",
       "sso_sign_in_test_purge": "Purga de pruebas de inicio de sesión SSO",
       "session_key_retire": "Retirada de la clave de sesión anterior",
+      "ssh_revoked_host_sweep": "Finalización de revocaciones de hosts SSH",
       "cluster_command_purge": "Purga de comandos del clúster HA",
       "update_campaign": "Actualización progresiva HA",
       "delivery_retention": "Retención del historial de entregas",
@@ -8124,7 +8209,8 @@
       "hsm": "Módulos de hardware y almacenes de claves.",
       "audit": "Registro de operaciones e inicios de sesión.",
       "logs": "Registros técnicos del servicio.",
-      "settings": "Configuración general de la instancia."
+      "settings": "Configuración general de la instancia.",
+      "sshHosts": "Servidores inscritos por el agente SSH y sus certificados de host"
     },
     "moduleLabel": {
       "crlOcsp": "CRL / OCSP",

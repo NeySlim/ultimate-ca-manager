@@ -232,6 +232,8 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'pro_sso_sign_in_tests': 'sign-in tests: reports minutes long, emptied rows kept a day',
     # 3.0 only: a 2.254 archive carries the provider on the account row instead
     'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
+    'ssh_krls': 'the published KRL of an SSH CA, rebuilt from its revoked certificates',
+    'ssh_host_enrollment_tokens': 'single-use tokens valid for hours, removed with their CA as deleting it does',
 }
 
 # Links the schema holds without a foreign key, handled as if it had one: SQLite
@@ -255,6 +257,8 @@ SOFT_LINKS = (
     ('webhook_deliveries', 'endpoint_id', 'webhook_endpoints', 'id'),
     ('deploy_deliveries', 'binding_id', 'deploy_bindings', 'id'),
     ('deploy_deliveries', 'binding_id', 'crl_deploy_bindings', 'id'),
+    ('ssh_host_enrollment_tokens', 'used_by_host_id', 'ssh_hosts', 'id'),
+    ('ssh_hosts', 'token_id', 'ssh_host_enrollment_tokens', 'id'),
 )
 
 # An optional link the schema never enforced is emptied wherever it lives.

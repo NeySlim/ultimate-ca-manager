@@ -616,6 +616,11 @@ def _seed_source():
         serial=17, valid_from=now, valid_to=now + timedelta(days=30),
         key_type='ed25519', fingerprint='SHA256:xinstcert',
         owner_group_id=groups[1].id)
+    db.session.flush()
+    ssh_certificate = _model('ssh_certificates').query.filter_by(refid='xinst-sshcert').one()
+    add('ssh_hosts', refid='xinst-sshhost', ssh_ca_id=ssh_authorities[1].id, name='xinst.example.test',
+        principals='["xinst.example.test"]', public_key='ssh-ed25519 AAAA xinst', key_type='ed25519',
+        fingerprint='SHA256:xinsthost', certificate_id=ssh_certificate.id, enrolled_at=now)
 
     microsoft = [add('microsoft_cas', name=f'xinst-msca-{suffix}',
                      server=f'ca-{suffix}.example.test') for suffix in 'ab']
@@ -766,7 +771,7 @@ RESTORABLE_SECTIONS = tuple(
         'dns_providers', 'acme_accounts', 'acme_eab_credentials',
         'acme_domains', 'acme_local_domains', 'acme_client_accounts',
         'acme_client_orders', 'acme_dns_update_keys',
-        'ssh_cas', 'ssh_certificates', 'microsoft_cas', 'msca_requests',
+        'ssh_cas', 'ssh_certificates', 'ssh_hosts', 'microsoft_cas', 'msca_requests',
         'scep_profiles', 'scep_requests', 'deploy_targets', 'scan_profiles', 'scan_runs',
         'intune_apps',
         'discovered_certificates', 'smtp_config', 'ad_connector',

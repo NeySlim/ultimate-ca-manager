@@ -344,6 +344,14 @@ SECTIONS: Dict[str, Section] = {
         references={'ssh_ca_id': 'ssh_cas',
                     'owner_group_id': 'groups'},
     ),
+    'ssh_hosts': Section(
+        model='models.ssh:SSHHost',
+        identity=('refid',),
+        exclude={**_SURROGATE, 'token_id': 'the enrollment token, never in an archive',
+                 'challenge': 'a pending renewal challenge, valid for minutes',
+                 'challenge_expires_at': 'a pending renewal challenge, valid for minutes'},
+        references={'ssh_ca_id': 'ssh_cas', 'certificate_id': 'ssh_certificates'},
+    ),
     'microsoft_cas': Section(
         model='models.msca:MicrosoftCA',
         identity=('name',),
@@ -553,6 +561,8 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'acme_proxy_challenge_links': ('which in-flight proxy order a challenge belongs to, kept 24 hours; '
                                    'rebuilt when the client fetches the authorization'),
     'crls': 'regenerated from the CAs and their revocation records',
+    'ssh_krls': 'the published KRL of each SSH CA, rebuilt from its revoked certificates',
+    'ssh_host_enrollment_tokens': 'single-use tokens valid for hours at most; a new one is created for a host',
     'crl_metadata': 'regenerated with the CRLs; their numbering travels in crl_number_counters',
     'ocsp_responses': 'a response cache, rebuilt on demand',
     'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',

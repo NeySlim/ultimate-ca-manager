@@ -150,3 +150,5 @@ tests/test_api_key_allowed_networks.py
 tests/test_instance_state.py
 tests/test_instance_admin_scopes.py
 tests/test_cross_repair.py
+tests/test_ssh_krl_public.py
+tests/test_ssh_hosts*.py

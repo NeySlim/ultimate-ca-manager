@@ -482,7 +482,8 @@
     "creating": "Criando...",
     "notFound": "Não encontrado",
     "popular": "Populares",
-    "other": "Outros"
+    "other": "Outros",
+    "sshHosts": "Hosts SSH"
   },
   "commandPalette": {
     "searchPlaceholder": "Certificado, página ou ação…",
@@ -7511,7 +7512,10 @@
     "range": "{{shown}} de {{count}} CA SSH",
     "pageRange": "{{start}}–{{end}} de {{count}} CA SSH",
     "moreActions": "Outras ações para {{name}}",
-    "actionsTitle": "Ações da CA SSH"
+    "actionsTitle": "Ações da CA SSH",
+    "agent": "Agente SSH",
+    "agentUserDescription": "Instala o agente: o sshd lê a KRL desta CA, obtida a cada 15 minutos, para que um certificado revogado seja recusado.",
+    "agentHostDescription": "Inscreve o servidor com um token de inscrição: ele obtém um certificado de host desta CA e o renova. Crie o token em Hosts SSH."
   },
   "sshCertificates": {
     "title": "Certificados SSH",
@@ -7605,6 +7609,86 @@
     "moreActions": "Outras ações para {{name}}",
     "actionsTitle": "Ações do certificado SSH"
   },
+  "sshHosts": {
+    "title": "Hosts SSH",
+    "subtitle_one": "{{count}} host",
+    "subtitle_other": "{{count}} hosts",
+    "intent": "Servidores que o agente SSH inscreveu numa CA de host, o certificado que cada um apresenta e a sua renovação.",
+    "caption": "Hosts SSH inscritos",
+    "loadFailed": "Falha ao carregar os hosts SSH",
+    "stateValid": "Válido",
+    "stateExpired": "Expirado",
+    "stateRevoked": "Revogado",
+    "filterByState": "Filtrar hosts por estado",
+    "searchLabel": "Pesquisar hosts",
+    "noData": "Nenhum host inscrito",
+    "noDataDescription": "Crie um token de inscrição e execute com ele o agente SSH no servidor: ele obtém um certificado de host e o renova.",
+    "pageRange": "{{start}}–{{end}} de {{count}} hosts",
+    "revokeHost": "Revogar host",
+    "revokeConfirm": "Revogar {{name}}? Todos os certificados não expirados da sua chave, o atual e os que as renovações substituíram, são revogados e listados na KRL, e não será mais renovado: o servidor terá de se inscrever com um novo token.",
+    "revoked": "{{name}} revogado",
+    "pauseRenewal": "Pausar a renovação",
+    "resumeRenewal": "Retomar a renovação",
+    "renewalPaused": "Renovação de {{name}} pausada",
+    "renewalResumed": "Renovação de {{name}} retomada",
+    "renewalOn": "Ativa",
+    "renewalOff": "Pausada",
+    "autoRenew": "Renovação automática",
+    "certificate": "Certificado de host",
+    "hostKey": "Chave de host",
+    "agent": "Agente",
+    "renewAt": "Renova",
+    "renewAtValue": "com {{percent}} % da sua validade restante",
+    "enrolledAt": "Inscrito",
+    "enrolledFrom": "Inscrito a partir de",
+    "lastRenewed": "Última renovação",
+    "lastSeen": "Último contacto",
+    "lastKrlSync": "Última obtenção da KRL",
+    "notReported": "Não reportado",
+    "revokedNotice": "Este host está revogado: já não é renovado. Para o usar novamente, inscreva o servidor com um novo token.",
+    "token": {
+      "title": "Tokens de inscrição",
+      "subtitle_one": "{{count}} token",
+      "subtitle_other": "{{count}} tokens",
+      "intent": "Um token inscreve um servidor, uma única vez, antes de expirar, para os nomes de host que lista.",
+      "caption": "Tokens de inscrição",
+      "create": "Novo token de inscrição",
+      "createHint": "O servidor troca-o uma vez por um certificado de host da sua própria chave.",
+      "created": "Token de inscrição criado",
+      "revoked": "Token {{prefix}} revogado",
+      "revoke": "Revogar token",
+      "prefix": "Token",
+      "expires": "Expira",
+      "noData": "Nenhum token de inscrição",
+      "noDataDescription": "Crie um token para uma CA de host e os nomes do servidor e, em seguida, execute no servidor o comando apresentado.",
+      "state": {
+        "active": "Ativo",
+        "used": "Usado",
+        "expired": "Expirado",
+        "revoked": "Revogado"
+      },
+      "hostCa": "CA de host",
+      "needsCaRead": "Escolher a CA requer a permissão read:ssh_cas.",
+      "noHostCa": "Nenhuma CA de host: crie primeiro uma em CAs SSH.",
+      "principals": "Nomes de host",
+      "principalsHint": "Os nomes que o servidor pode ter no seu certificado, separados por vírgulas ou espaços.",
+      "validity": "Validade do certificado",
+      "caDefault": "O padrão da CA",
+      "lifetime": "Token válido durante",
+      "lifetimes": {
+        "15m": "15 minutos",
+        "1h": "1 hora",
+        "24h": "24 horas",
+        "7d": "7 dias"
+      },
+      "renewPercent": "Renovar com % de validade restante",
+      "renewPercentHint": "De 5 a 90. O agente renova o certificado quando lhe resta esta parte da sua validade.",
+      "shownOnce": "Este token é mostrado uma única vez: o UCM guarda apenas a sua impressão digital. Copie-o agora.",
+      "value": "Token",
+      "command": "Comando a executar no servidor",
+      "commandHint": "Execute-o como root antes de {{expires}}. O token é passado no ambiente e não é escrito no disco."
+    }
+  },
   "filters": {
     "managePresets": "Gerenciar predefinições"
   },
@@ -7684,6 +7768,7 @@
       "dek_sweep": "Recriptografia com a chave de dados",
       "sso_sign_in_test_purge": "Limpeza dos testes de login SSO",
       "session_key_retire": "Retirada da antiga chave de sessão",
+      "ssh_revoked_host_sweep": "Conclusão das revogações de hosts SSH",
       "cluster_command_purge": "Limpeza de comandos do cluster HA",
       "update_campaign": "Atualização gradual HA",
       "delivery_retention": "Retenção do histórico de entregas",
@@ -8124,7 +8209,8 @@
       "hsm": "Módulos de hardware e cofres de chaves.",
       "audit": "Registro de operações e logins.",
       "logs": "Registros técnicos do serviço.",
-      "settings": "Configuração geral da instância."
+      "settings": "Configuração geral da instância.",
+      "sshHosts": "Servidores inscritos pelo agente SSH e os seus certificados de host"
     },
     "moduleLabel": {
       "crlOcsp": "CRL / OCSP",
