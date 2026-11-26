@@ -202,26 +202,8 @@ ENVEOF
             bash "$UCM_SETUP" banner "$UCM_CONFIG/ucm.env" deb
         fi
         
-        # Generate HTTPS cert if not exists
-        if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
-            echo "Generating HTTPS certificate..."
-            # Detect hostname and IPs for SAN
-            CERT_HOST=$(bash "$UCM_SETUP" host-name)
-            CERT_IPS=""
-            for ip in $(hostname -I 2>/dev/null); do
-                CERT_IPS="${CERT_IPS},IP:${ip}"
-            done
-            CERT_SAN="DNS:${CERT_HOST},DNS:localhost,IP:127.0.0.1${CERT_IPS}"
-            
-            openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-                -keyout "$UCM_DATA/https_key.pem" \
-                -out "$UCM_DATA/https_cert.pem" \
-                -subj "/CN=${CERT_HOST}/O=UCM/OU=PKI" \
-                -addext "subjectAltName=${CERT_SAN}" 2>/dev/null
-            chown "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"/https_*.pem
-            chmod 600 "$UCM_DATA/https_key.pem"
-            chmod 644 "$UCM_DATA/https_cert.pem"
-        fi
+        # Generate HTTPS cert if not exists, never through a link the service account laid
+        bash "$UCM_SETUP" https-cert "$UCM_DATA" "$UCM_USER" "$UCM_GROUP"
         
         # Enable and start/restart service
         systemctl daemon-reload 2>/dev/null || true

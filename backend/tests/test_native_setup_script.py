@@ -1452,3 +1452,74 @@ def test_with_hostname_its_fully_qualified_name_comes_first(tmp_path):
     _stub(bin_dir / 'hostname', '[ "$1" = -f ] && echo ucm.example.test || echo ucm')
     result = _run(['host-name'], _env(tmp_path, extra={'PATH': f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"}))
     assert result.stdout == 'ucm.example.test\n'
+
+
+# ------------------------------------------------------------ HTTPS certificate
+
+def _owner():
+    import grp
+    import pwd
+    return pwd.getpwuid(os.getuid()).pw_name, grp.getgrgid(os.getgid()).gr_name
+
+
+def _https_cert(tmp_path, data):
+    user, group = _owner()
+    return _run(['https-cert', str(data), user, group], _env(tmp_path))
+
+
+def test_a_missing_certificate_is_generated_with_its_modes(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    result = _https_cert(tmp_path, data)
+    assert result.returncode == 0, result.stderr
+    key, cert = data / 'https_key.pem', data / 'https_cert.pem'
+    assert key.read_text().startswith('-----BEGIN PRIVATE KEY-----')
+    assert cert.read_text().startswith('-----BEGIN CERTIFICATE-----')
+    assert stat.S_IMODE(key.stat().st_mode) == 0o600 and stat.S_IMODE(cert.stat().st_mode) == 0o644
+    assert key.stat().st_uid == os.getuid() and cert.stat().st_gid == os.getgid()
+
+
+@pytest.mark.parametrize('name', ['https_key.pem', 'https_cert.pem'])
+def test_a_link_the_service_account_laid_is_replaced_not_written_through(tmp_path, name):
+    """Root generates while the service account owns the data directory: its link leads nowhere."""
+    data = tmp_path / 'data'
+    data.mkdir()
+    victim = tmp_path / 'passwd'
+    victim.write_text('root:x:0:0::/root:/bin/bash\n')
+    victim.chmod(0o644)
+    if name == 'https_cert.pem':
+        # Dangling for [ -f ]: a link to a file that is not there yet
+        (data / name).symlink_to(tmp_path / 'absent')
+    else:
+        (data / name).symlink_to(victim)
+    result = _https_cert(tmp_path, data)
+    assert result.returncode == 0, result.stderr
+    assert victim.read_text() == 'root:x:0:0::/root:/bin/bash\n'
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o644
+    assert not (tmp_path / 'absent').exists()
+    for f in ('https_key.pem', 'https_cert.pem'):
+        assert not (data / f).is_symlink() and stat.S_ISREG((data / f).lstat().st_mode), f
+    assert stat.S_IMODE((data / 'https_key.pem').stat().st_mode) == 0o600
+
+
+def test_an_existing_certificate_is_kept(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    (data / 'https_cert.pem').write_text('operator cert')
+    (data / 'https_key.pem').write_text('operator key')
+    result = _https_cert(tmp_path, data)
+    assert result.returncode == 0, result.stderr
+    assert (data / 'https_key.pem').read_text() == 'operator key'
+    assert (data / 'https_cert.pem').read_text() == 'operator cert'
+
+
+def test_without_hostname_the_certificate_is_named_from_uname(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    user, group = _owner()
+    result = _run(['https-cert', str(data), user, group],
+                  _env(tmp_path, extra={'PATH': _path_without_hostname(tmp_path)}))
+    assert result.returncode == 0, result.stderr
+    subject = subprocess.run(['openssl', 'x509', '-noout', '-subject', '-in', str(data / 'https_cert.pem')],
+                             capture_output=True, text=True).stdout
+    assert subject.replace(' ', '').startswith(f'subject=CN={os.uname().nodename},O=UCM'), subject

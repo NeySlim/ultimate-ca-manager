@@ -17,17 +17,22 @@ GUARDED_VENV="" GUARDED_TMP="" SERVICE_STOPPED="" VENV_BUILDING="" HAD_VENV=""
 say() { echo "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-# put_own <file> <mode> [copy]: stdin becomes <file>, created anew (O_EXCL), in a directory the service
-# account may write: whatever entry was there is removed, a link never followed. copy: stdin to stdout too
+# put_own <file> <mode> [copy | <user>:<group>]: stdin becomes <file>, created anew (O_EXCL), in a
+# directory the service account may write: whatever entry was there is removed, a link never followed.
+# copy: stdin to stdout too; <user>:<group>: the new file's owner, set before anything is written
 put_own() {
     python3 -I -c '
-import os, sys
-path, mode, copy = sys.argv[1], int(sys.argv[2], 8), sys.argv[3:] == ["copy"]
+import grp, os, pwd, sys
+path, mode, extra = sys.argv[1], int(sys.argv[2], 8), sys.argv[3] if len(sys.argv) > 3 else ""
+copy = extra == "copy"
 try:
     os.unlink(path)
 except FileNotFoundError:
     pass
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+if ":" in extra:
+    user, group = extra.split(":", 1)
+    os.fchown(fd, pwd.getpwnam(user).pw_uid, grp.getgrnam(group).gr_gid)
 os.fchmod(fd, mode)
 with os.fdopen(fd, "wb") as f:
     for chunk in iter(lambda: sys.stdin.buffer.read1(1 << 16), b""):
@@ -535,6 +540,25 @@ host_name() {
     printf '%s\n' "${name:-localhost}"
 }
 
+# https-cert <data dir> <user> <group>: a self-signed HTTPS certificate when the data has none. The data
+# is the service account's: generated in root's own directory, then put in place without following a link
+cmd_https_cert() {
+    local data=$1 user=$2 group=$3 host san ip work
+    [ ! -f "$data/https_cert.pem" ] || return 0
+    say "Generating HTTPS certificate..."
+    host=$(host_name)
+    san="DNS:${host},DNS:localhost,IP:127.0.0.1"
+    for ip in $(hostname -I 2>/dev/null); do san="$san,IP:$ip"; done
+    work=$(mktemp -d)
+    trap "rm -rf -- $(printf %q "$work")" EXIT
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "$work/key.pem" -out "$work/cert.pem" \
+        -subj "/CN=${host}/O=UCM/OU=PKI" -addext "subjectAltName=${san}" 2>/dev/null
+    put_own "$data/https_key.pem" 600 "$user:$group" < "$work/key.pem"
+    put_own "$data/https_cert.pem" 644 "$user:$group" < "$work/cert.pem"
+    rm -rf -- "$work"
+    trap - EXIT
+}
+
 # Post-install banner; IPv6 addresses are bracketed in the URLs.
 cmd_banner() {
     local envfile=$1 pkg=$2 host port ips ip pwfile data user
@@ -604,9 +628,11 @@ case "${1:-}" in
     fips-build-ok) cmd_fips_build_ok "$2" ;;
     banner) cmd_banner "$2" "$3" ;;
     host-name) host_name ;;
+    https-cert) cmd_https_cert "$2" "$3" "$4" ;;
     *) die "usage: $0 env <ucm.env> <data dir>
   | venv <ucm home> <python> <deb|rpm> <ucm.env> | venv-ok <ucm home>
   | fips-finish <ucm home> <ucm.env> <data dir> <user> | fips-requested <ucm.env>
   | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env>
-  | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm> | host-name" ;;
+  | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm> | host-name
+  | https-cert <data dir> <user> <group>" ;;
 esac
