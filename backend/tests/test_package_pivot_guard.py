@@ -799,6 +799,24 @@ def test_a_purge_keeps_the_local_archives_of_an_earlier_installation(tmp_path):
     assert not any('.ucm-archive-' in c for c in _calls(log) if c.startswith('rm ')), _calls(log)
 
 
+def test_a_purge_goes_through_a_chain_of_directories_as_deep_as_the_account_makes_it(tmp_path):
+    """The account may nest a thousand directories beside a kept archive: the purge removes them
+    all, the archive stays."""
+    def lay(home, config):
+        (config / '.ucm-archive-20260101T000000Z').mkdir()
+        (config / '.ucm-archive-20260101T000000Z' / 'master.key').write_text('old key')
+        fd = os.open(config, os.O_RDONLY | os.O_DIRECTORY)
+        for _ in range(1000):
+            os.mkdir('d', dir_fd=fd)
+            fd, parent = os.open('d', os.O_RDONLY | os.O_DIRECTORY, dir_fd=fd), fd
+            os.close(parent)
+        os.close(os.open('leaf', os.O_WRONLY | os.O_CREAT, 0o600, dir_fd=fd))
+        os.close(fd)
+    out, _log, _home, config = _postrm_with(tmp_path, 'purge', lay)
+    assert sorted(p.name for p in config.iterdir()) == ['.ucm-archive-20260101T000000Z'], out.stderr
+    assert (config / '.ucm-archive-20260101T000000Z' / 'master.key').read_text() == 'old key'
+
+
 def test_a_directory_swapped_for_a_link_during_the_purge_is_never_entered(tmp_path):
     """/etc/ucm is the account's: a directory of it swapped for a link to a root directory while
     the purge empties it must cost that directory nothing, whatever removes the files."""

@@ -10,18 +10,8 @@ UCM_CONFIG=/etc/ucm
 # What $1 holds but the .ucm-archive-* directories, walked by descriptor: a directory the
 # account swaps for a link is never entered, a name is only ever removed in the directory read
 PURGE_PY='
-import os, stat, sys
+import errno, os, resource, stat, sys
 ARCHIVE = ".ucm-archive-"
-
-def purge(dirfd):
-    """Empties dirfd but its archives; True when an archive keeps something in it."""
-    kept = False
-    for name in os.listdir(dirfd):
-        if name.startswith(ARCHIVE):
-            kept = True
-        elif remove(dirfd, name):
-            kept = True
-    return kept
 
 def unlink(dirfd, name):
     """Removes a name that is no directory; True when it stays (it became one meanwhile)."""
@@ -33,25 +23,8 @@ def unlink(dirfd, name):
         return True
     return False
 
-def remove(dirfd, name):
-    try:
-        st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
-    except FileNotFoundError:
-        return False
-    if not stat.S_ISDIR(st.st_mode):
-        return unlink(dirfd, name)
-    try:
-        fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dirfd)
-    except FileNotFoundError:
-        return False
-    except OSError:
-        # Swapped for a link or a file since: only that entry goes
-        return unlink(dirfd, name)
-    try:
-        if purge(fd):
-            return True
-    finally:
-        os.close(fd)
+def rmdir(dirfd, name):
+    """Removes an emptied directory; True when it stays."""
     try:
         os.rmdir(name, dir_fd=dirfd)
     except FileNotFoundError:
@@ -62,8 +35,61 @@ def remove(dirfd, name):
         return True
     return False
 
+def enter(dirfd, rel, name):
+    """The descriptor of directory name to empty, or whether that entry stays (a bool)."""
+    try:
+        st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    if not stat.S_ISDIR(st.st_mode):
+        return unlink(dirfd, name)
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dirfd)
+    except FileNotFoundError:
+        return False
+    except OSError as e:
+        if e.errno in (errno.ELOOP, errno.ENOTDIR):
+            # Swapped for a link or a file since: only that entry goes
+            return unlink(dirfd, name)
+        sys.stderr.write("Kept %s: %s\n" % (rel, e.strerror))
+        return True
+    try:
+        return fd, iter(os.listdir(fd))
+    except OSError as e:
+        os.close(fd)
+        sys.stderr.write("Kept %s: %s\n" % (rel, e.strerror))
+        return True
+
+# Depth first with a stack of its own: a chain as deep as the account nests it costs no
+# recursion, one descriptor per level (the soft limit raised to the hard one)
+soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+try:
+    resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+except (ValueError, OSError):
+    pass
 top = os.open(sys.argv[1], os.O_RDONLY | os.O_DIRECTORY)
-purge(top)
+# Each level: its descriptor, the names left to read, its path, its name in the level above,
+# and whether an archive (or an entry that could not go) keeps something in it
+stack = [[top, iter(os.listdir(top)), sys.argv[1], None, False]]
+while stack:
+    level = stack[-1]
+    name = next(level[1], None)
+    if name is None:
+        stack.pop()
+        if stack:
+            os.close(level[0])
+            if level[4] or rmdir(stack[-1][0], level[3]):
+                stack[-1][4] = True
+        continue
+    rel = os.path.join(level[2], name)
+    if name.startswith(ARCHIVE):
+        level[4] = True
+        continue
+    entered = enter(level[0], rel, name)
+    if isinstance(entered, tuple):
+        stack.append([entered[0], entered[1], rel, name, False])
+    elif entered:
+        level[4] = True
 '
 
 # Removes directory $1, except the archives of an earlier installation kept beside its
