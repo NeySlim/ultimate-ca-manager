@@ -1465,7 +1465,8 @@ export default function SettingsPage() {
       // Auto-save OAuth config if there are unsaved changes,
       // so the backend uses the latest client_id/secret/redirect_uri.
       if (oauthDirty) {
-        await handleSave('email')
+        const saved = await handleSave('email')
+        if (saved && saved.ok === false) return
       }
       const res = await settingsService.getSmtpOAuthAuthorizeUrl(settings.smtp_oauth_redirect_uri || '')
       const authorizeUrl = res?.data?.authorize_url || res?.authorize_url

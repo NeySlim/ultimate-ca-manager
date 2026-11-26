@@ -9,12 +9,14 @@ import { render, screen, act, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('../settings/EmailSection', () => ({
-  default: ({ settings, updateSetting, handleSave }) => (
+  default: ({ settings, updateSetting, handleSave, setOauthDirty, handleSmtpOAuthAuthorize }) => (
     <div>
       <div data-testid="smtp-method">{settings.smtp_auth_method}</div>
       <button onClick={() => updateSetting('smtp_auth_method', 'oauth2')}>pick-oauth2</button>
       <button onClick={() => updateSetting('smtp_oauth_client_secret', 'typed-secret')}>type-secret</button>
       <button onClick={() => handleSave('email')}>save-email</button>
+      <button onClick={() => setOauthDirty(true)}>touch-oauth</button>
+      <button onClick={() => handleSmtpOAuthAuthorize()}>authorize</button>
     </div>
   ),
 }))
@@ -38,6 +40,7 @@ function mockEmailApi(emailData) {
   settingsService.getEmailSettings = vi.fn().mockResolvedValue({ data: emailData })
   settingsService.updateEmailSettings = vi.fn().mockResolvedValue({ data: {} })
   settingsService.getSmtpOAuthProviders = vi.fn().mockResolvedValue({ data: { providers: {} } })
+  settingsService.getSmtpOAuthAuthorizeUrl = vi.fn().mockResolvedValue({ data: { authorize_url: 'https://idp.example/auth' } })
 }
 
 async function clickSave(emailData, before) {
@@ -93,5 +96,16 @@ describe('SettingsPage: SMTP OAuth2 provider', () => {
     const body = settingsService.updateEmailSettings.mock.calls[0][0]
     expect(body.smtp_oauth_provider).toBe('google')
     expect(body.smtp_oauth_client_secret).toBe('typed-secret')
+  })
+
+  it('opens no consent window when the save before it was refused', async () => {
+    granted.perms = ['admin:settings']
+    mockEmailApi({ smtp_auth: true, smtp_auth_method: 'oauth2', smtp_oauth_provider: '', has_oauth_client_secret: true })
+    render(<MemoryRouter initialEntries={['/settings?tab=email']}><SettingsPage /></MemoryRouter>)
+    await waitFor(() => expect(screen.getByTestId('smtp-method').textContent).toBe('oauth2'))
+    await act(async () => { screen.getByText('touch-oauth').click() })
+    await act(async () => { screen.getByText('authorize').click() })
+    await waitFor(() => expect(notificationSpies.showError).toHaveBeenCalledWith('common.secretRequiredForTarget'))
+    expect(settingsService.getSmtpOAuthAuthorizeUrl).not.toHaveBeenCalled()
   })
 })
