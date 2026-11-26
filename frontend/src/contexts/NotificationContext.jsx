@@ -174,8 +174,9 @@ export function NotificationProvider({ children }) {
   const addToast = useCallback((type, message, options) => {
     const opts = options !== null && typeof options === 'object' ? options : { duration: options }
     const action = opts.action && opts.action.label && typeof opts.action.onClick === 'function' ? opts.action : null
-    const sent = answered()
-    const form = sent && (type === 'error' || type === 'warning') && !action ? formDialogBar(sent) : null
+    // Only an error or a warning without action answers the sending: a passing message leaves it armed
+    const sent = (type === 'error' || type === 'warning') && !action ? answered() : null
+    const form = sent ? formDialogBar(sent) : null
     if (form) {
       setDialogNotice({ id: Date.now() + Math.random(), type, message, duration: opts.duration, ...form })
       return

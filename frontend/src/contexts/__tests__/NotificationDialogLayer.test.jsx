@@ -182,6 +182,21 @@ describe('a sending that raises nothing', () => {
   })
 })
 
+describe('a passing message raised by the sending', () => {
+  it('does not take the answer: the error that follows is still shown in the dialog', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = async () => {
+      api.showInfo('Saving...')
+      await new Promise((done) => setTimeout(done, 300))
+      api.showError('Saving failed.')
+    }
+    await send(dialog)
+    await wait(400)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Saving failed.')
+  })
+})
+
 describe('a dialog whose primary button is a click, not a submit', () => {
   function ClickDialog() {
     return (
