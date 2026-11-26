@@ -82,7 +82,8 @@ def test_a_reimport_keeps_the_name_given_since(app, auth_client, route):
 
 def _audits(app, ca_id):
     with app.app_context():
-        return [a.details for a in AuditLog.query.filter_by(action='ca_updated', resource_id=str(ca_id))]
+        return [a.details for a in AuditLog.query.filter_by(
+            action='ca_updated', resource_id=str(ca_id)).order_by(AuditLog.id)]
 
 
 @pytest.mark.parametrize('route', ROUTES)
