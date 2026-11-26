@@ -1239,7 +1239,7 @@
     "importPrivateKey": "Import private key",
     "useHsmKey": "Use a key from the HSM",
     "attachHsmKey": {
-      "intro": "Choose the HSM provider that holds this CA's private key. Only the keys whose public key is the one in the CA certificate are listed; UCM checks that the chosen key signs for the certificate before the CA uses it.",
+      "intro": "Choose the HSM provider that holds this CA's private key. Only the keys whose public key is the one in the CA certificate are listed. Before the CA uses a key, UCM checks that the certificate verifies a signature made by the chosen key.",
       "provider": "HSM provider",
       "keys": "Matching keys",
       "keyId": "Key ID",
