@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  changedTargets, secretInputProps, secretRequiredForTarget, smtpSecretTargets, typedSecret,
+  changedTargets, secretInputProps, secretRequiredForTarget, smtpSecretTargets, smtpSentProvider, typedSecret,
 } from '../secretTarget'
 
 const t = (key) => key
@@ -61,5 +61,17 @@ describe('secretTarget', () => {
     // A cleared username sends the password nowhere new; the server ignores it too
     targets = smtpSecretTargets(saved, { ...saved, smtp_auth_method: 'password', smtp_username: '' })
     expect(secretRequiredForTarget(targets.password)).toBe(false)
+  })
+
+  it('SMTP: the provider checked is the one the save sends', () => {
+    const stored = { smtp_auth_method: 'oauth2', smtp_oauth_provider: '', has_oauth_client_secret: true }
+    expect(smtpSentProvider(stored, stored, true)).toBe('google')
+    expect(smtpSentProvider(stored, stored, false)).toBe('')
+    expect(smtpSentProvider({ smtp_auth_method: 'password' }, { smtp_auth_method: 'oauth2' }, false)).toBe('google')
+    expect(smtpSentProvider(stored, { ...stored, smtp_oauth_provider: 'microsoft' }, true)).toBe('microsoft')
+
+    // An empty stored provider sent as 'google' moves the target: the saved secret is asked first
+    expect(secretRequiredForTarget(smtpSecretTargets(stored, stored, true).oauth)).toBe(true)
+    expect(secretRequiredForTarget(smtpSecretTargets(stored, stored, false).oauth)).toBe(false)
   })
 })

@@ -39,14 +39,23 @@ const SMTP_SERVER_TARGET = ['smtp_host', 'smtp_port', 'smtp_username', 'smtp_sec
 const SMTP_OAUTH_TARGET = ['smtp_oauth_tenant_id', 'smtp_oauth_client_id', 'smtp_oauth_authorize_url',
   'smtp_oauth_token_url', 'smtp_oauth_provider']
 
+// The OAuth2 provider a save sends: an empty one becomes the preset the card shows,
+// unless the caller may not move the target and OAuth2 was already stored.
+export function smtpSentProvider(saved, current, mayMoveTarget) {
+  if (current?.smtp_oauth_provider) return current.smtp_oauth_provider
+  return current?.smtp_auth_method === 'oauth2' && (mayMoveTarget || saved?.smtp_auth_method !== 'oauth2')
+    ? 'google' : current?.smtp_oauth_provider
+}
+
 // The SMTP password and OAuth client secret, each with its own targets. Only the
 // one the chosen method uses is asked for: the server drops the other on a move.
-export function smtpSecretTargets(saved, current) {
+export function smtpSecretTargets(saved, current, mayMoveTarget = false) {
   const method = current?.smtp_auth_method
   // Turning authentication off clears the username, which sends nothing anywhere
   const username = current?.smtp_auth_method === 'none' || !current?.smtp_username
     ? saved?.smtp_username : current.smtp_username
-  const view = { ...current, smtp_username: username }
+  const view = { ...current, smtp_username: username,
+    smtp_oauth_provider: smtpSentProvider(saved, current, mayMoveTarget) }
   return {
     password: { saved, current: view, fields: SMTP_SERVER_TARGET, secret: current?.smtp_password,
       secretSaved: method === 'password' && saved?.smtp_password === '********' },

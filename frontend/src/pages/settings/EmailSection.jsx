@@ -23,7 +23,7 @@ export default function EmailSection({ hasPermission, settings, fieldErrors = {}
   const { t } = useTranslation()
   const testButton = useRef(null)
   useRefocusAfter(emailTesting, testButton)
-  const secretTargets = smtpSecretTargets(savedEmail, settings)
+  const secretTargets = smtpSecretTargets(savedEmail, settings, hasPermission ? hasPermission('admin:settings') : true)
   const { showSuccess } = useNotification()
   const { copy } = useClipboard()
   const method = settings.smtp_auth_method || 'password'

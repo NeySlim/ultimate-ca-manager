@@ -56,7 +56,7 @@ import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
-import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
+import { secretRequiredForTarget, smtpSecretTargets, smtpSentProvider } from '../lib/secretTarget'
 import { SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard } from '../hooks/useSaveParts'
 import { usePhoneWidth } from '../hooks/useMediaQuery'
 import { keepDraft, readDraft } from '../lib/draftMemory'
@@ -1352,7 +1352,8 @@ export default function SettingsPage() {
     let ignoredKeys = []
     try {
       if (section === 'email') {
-        const targets = smtpSecretTargets(savedEmail, settings)
+        const mayMoveTarget = hasPermission('admin:settings')
+        const targets = smtpSecretTargets(savedEmail, settings, mayMoveTarget)
         if (secretRequiredForTarget(targets.password) || secretRequiredForTarget(targets.oauth)) {
           if (!quiet) showError(t('common.secretRequiredForTarget'))
           return { ok: false, message: t('common.secretRequiredForTarget') }
@@ -1370,12 +1371,8 @@ export default function SettingsPage() {
           from_name: settings.smtp_from_name,
           enabled: true,
           smtp_auth_method: settings.smtp_auth_method,
-          // An empty provider sends the one the card shows, unless the caller's fields are locked
-          // (no admin:settings) and OAuth2 was already stored: then it goes back as it is
-          smtp_oauth_provider: settings.smtp_oauth_provider
-            || (settings.smtp_auth_method === 'oauth2'
-              && (hasPermission('admin:settings') || savedEmail?.smtp_auth_method !== 'oauth2')
-              ? 'google' : settings.smtp_oauth_provider),
+          // The provider the secret pre-check above compared against
+          smtp_oauth_provider: smtpSentProvider(savedEmail, settings, mayMoveTarget),
           smtp_oauth_tenant_id: settings.smtp_oauth_tenant_id,
           smtp_oauth_client_id: settings.smtp_oauth_client_id,
           ...(settings.smtp_oauth_client_secret && settings.smtp_oauth_client_secret !== '********' ? { smtp_oauth_client_secret: settings.smtp_oauth_client_secret } : {}),
