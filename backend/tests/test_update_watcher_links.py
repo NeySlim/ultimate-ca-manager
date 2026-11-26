@@ -87,3 +87,12 @@ def test_a_claimed_manifest_link_to_a_directory_receives_nothing(host):
     result, _ = host.run(host.package())
     assert list(elsewhere.iterdir()) == []
     assert result['op_id'] == 'op' and result['status'] == 'installed', result
+
+
+def test_a_manifest_too_large_for_an_argument_still_gets_its_result(host):
+    """64 KiB of invalid UTF-8 grows threefold once decoded: over what one exec argument may hold."""
+    head = json.dumps({'op_id': 'op', 'to_version': '99.0', 'pad': ''})[:-2].encode()
+    body = head + b'\xff' * ((1 << 16) - len(head) - 2) + b'"}'
+    (host.data / '.update_manifest.json').write_bytes(body)
+    result, _ = host.run(host.package(), manifest=False)
+    assert result['op_id'] == 'op' and result['status'] == 'installed', result
