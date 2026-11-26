@@ -4063,6 +4063,7 @@
     "encryptionEnableFailed": "Не вдалося увімкнути шифрування",
     "encryptionDisableFailed": "Не вдалося вимкнути шифрування",
     "keySource": "Джерело ключа",
+    "keySourceEnv": "Змінна середовища {{name}}",
     "encryptedKeys": "Зашифровані",
     "unencryptedKeys": "Незашифровані",
     "keyFilesOnDisk": "Файли приватних ключів на диску",

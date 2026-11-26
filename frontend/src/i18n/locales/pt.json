@@ -3899,6 +3899,7 @@
     "encryptionEnableFailed": "Falha ao ativar criptografia",
     "encryptionDisableFailed": "Falha ao desativar criptografia",
     "keySource": "Fonte da chave",
+    "keySourceEnv": "Variável de ambiente {{name}}",
     "encryptedKeys": "Criptografadas",
     "unencryptedKeys": "Não criptografadas",
     "keyFilesOnDisk": "Arquivos de chave privada no disco",

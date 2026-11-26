@@ -4063,6 +4063,7 @@
     "encryptionEnableFailed": "Не удалось включить шифрование",
     "encryptionDisableFailed": "Не удалось отключить шифрование",
     "keySource": "Источник ключа",
+    "keySourceEnv": "Переменная окружения {{name}}",
     "encryptedKeys": "Зашифровано",
     "unencryptedKeys": "Не зашифровано",
     "keyFilesOnDisk": "Файлы закрытых ключей на диске",

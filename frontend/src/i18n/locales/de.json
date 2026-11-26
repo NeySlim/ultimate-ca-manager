@@ -3899,6 +3899,7 @@
     "encryptionEnableFailed": "Aktivierung der Verschlüsselung fehlgeschlagen",
     "encryptionDisableFailed": "Deaktivierung der Verschlüsselung fehlgeschlagen",
     "keySource": "Schlüsselquelle",
+    "keySourceEnv": "Umgebungsvariable {{name}}",
     "encryptedKeys": "Verschlüsselt",
     "unencryptedKeys": "Unverschlüsselt",
     "keyFilesOnDisk": "Private Schlüsseldateien auf dem Datenträger",

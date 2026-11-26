@@ -3899,6 +3899,7 @@
     "encryptionEnableFailed": "暗号化の有効化に失敗しました",
     "encryptionDisableFailed": "暗号化の無効化に失敗しました",
     "keySource": "鍵のソース",
+    "keySourceEnv": "環境変数 {{name}}",
     "encryptedKeys": "暗号化済み",
     "unencryptedKeys": "未暗号化",
     "keyFilesOnDisk": "ディスク上の秘密鍵ファイル",

@@ -3899,6 +3899,7 @@
     "encryptionEnableFailed": "Failed to enable encryption",
     "encryptionDisableFailed": "Failed to disable encryption",
     "keySource": "Key source",
+    "keySourceEnv": "Environment variable {{name}}",
     "encryptedKeys": "Encrypted",
     "unencryptedKeys": "Unencrypted",
     "keyFilesOnDisk": "Private key files on disk",

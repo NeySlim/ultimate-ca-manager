@@ -3873,6 +3873,7 @@
     "encryptionEnableFailed": "Échec de l’activation du chiffrement",
     "encryptionDisableFailed": "Échec de la désactivation du chiffrement",
     "keySource": "Source de la clé",
+    "keySourceEnv": "Variable d’environnement {{name}}",
     "encryptedKeys": "Chiffrées",
     "unencryptedKeys": "Non chiffrées",
     "keyFilesOnDisk": "Fichiers de clé privée sur disque",

@@ -3899,6 +3899,7 @@
     "encryptionEnableFailed": "启用加密失败",
     "encryptionDisableFailed": "禁用加密失败",
     "keySource": "密钥来源",
+    "keySourceEnv": "环境变量 {{name}}",
     "encryptedKeys": "已加密",
     "unencryptedKeys": "未加密",
     "keyFilesOnDisk": "磁盘上的私钥文件",
