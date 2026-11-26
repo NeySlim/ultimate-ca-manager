@@ -211,3 +211,18 @@ def test_a_redis_down_degrades_the_health_as_readiness_does(app, state_key, monk
     assert health['checks']['redis'] == {'status': 'error', 'message': 'down'}
     assert health['status'] == 'degraded'
 
+
+def test_a_silent_database_degrades_the_answer_instead_of_failing(app, state_key, monkeypatch):
+    from api import health_routes
+    import services.instance_state as instance_state
+    monkeypatch.setattr(health_routes, '_check_database', lambda: {'status': 'error', 'message': 'timeout'})
+    for name in ('_cas', '_update', '_backup'):
+        monkeypatch.setattr(instance_state, name, lambda *a, n=name: pytest.fail(f'{n} read a silent database'))
+    monkeypatch.setattr(installation, 'installation_id', lambda **k: pytest.fail('id read a silent database'))
+    data = assert_success(_read(app, state_key))
+    assert set(data) == TOP_LEVEL
+    assert data['health']['status'] == 'degraded'
+    assert data['health']['checks']['database']['status'] == 'error'
+    for field in ('instance_id', 'update_channel', 'cas', 'update', 'backup'):
+        assert data[field] is None, field
+

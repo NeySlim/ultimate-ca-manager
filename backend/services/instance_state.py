@@ -30,10 +30,12 @@ def _database():
     return {'engine': engine, 'server_version': version}
 
 
-def _mode():
+def _mode(database_ok):
     if not Config.HA_MODE:
         return {'ha': False, 'node_id': None, 'nodes': None}
     nodes = None
+    if not database_ok:
+        return {'ha': True, 'node_id': Config.NODE_ID, 'nodes': None}
     try:
         from services.scheduler_leader import cluster_nodes_detail
         from services.scheduler_service import get_scheduler
@@ -121,21 +123,25 @@ def _backup():
 
 
 def instance_state() -> dict:
+    """Health first: when the database does not answer, what it holds is null instead of a 500."""
     from services.updates import get_update_settings, package_family
     now = utc_now()
     fips = fips_mode.status()
+    health = _health()
+    database_ok = health['checks']['database']['status'] == 'ok'
+    stored = lambda read: read() if database_ok else None  # noqa: E731
     return {
         'schema_version': SCHEMA_VERSION,
-        'instance_id': installation.installation_id(create=True),
+        'instance_id': stored(lambda: installation.installation_id(create=True)),
         'generated_at': utc_isoformat(now),
         'version': Config.APP_VERSION,
-        'update_channel': get_update_settings()['channel'],
+        'update_channel': stored(lambda: get_update_settings()['channel']),
         'install': {'family': package_family()},
-        'mode': _mode(),
+        'mode': _mode(database_ok),
         'database': _database(),
-        'health': _health(),
-        'cas': _cas(now),
-        'update': _update(),
-        'backup': _backup(),
+        'health': health,
+        'cas': stored(lambda: _cas(now)),
+        'update': stored(_update),
+        'backup': stored(_backup),
         'fips': {'requested': bool(fips['fips_requested']), 'active': bool(fips['fips_active'])},
     }

@@ -3322,7 +3322,9 @@ GET /api/v2/system/instance
 - `mode`: `node_id` and `nodes` are `null` on a single node; in HA, `nodes` lists every node
   registered and not gone, `null` when the registry cannot be read.
 - `health.status`: `ok`, `degraded` (a check of `/health/ready` failed), `maintenance` (an HA
-  cluster maintenance) or `safe_mode`.
+  cluster maintenance) or `safe_mode`. When the database check fails, what the database holds is
+  `null` (`instance_id`, `update_channel`, `cas`, `update`, `backup`, and `mode.nodes` in HA)
+  instead of an error.
 - `cas`: active means holding its certificate, not revoked, not expired; `expiring_90_days` and
   `expiring_365_days` count active CAs, `next_expiry` is the nearest end of an active CA.
 - `update`: the verdict of the last scheduled update check, all `null` before the first one;
