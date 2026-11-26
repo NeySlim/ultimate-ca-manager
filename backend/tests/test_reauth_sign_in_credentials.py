@@ -27,6 +27,29 @@ def _signed_in(app, create_user, username, role):
     return client
 
 
+@pytest.fixture(scope='module', autouse=True)
+def mtls_ca(app, create_ca):
+    """A configured mTLS CA, so /api/v2/mtls/certificates gets past its cheap refusals."""
+    from models import SystemConfig
+    ca = create_ca(cn='Reauth mTLS CA')
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
+        previous = row.value if row else None
+        if not row:
+            row = SystemConfig(key='mtls_trusted_ca_id')
+            db.session.add(row)
+        row.value = ca['refid']
+        db.session.commit()
+    yield ca
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
+        if previous is None:
+            db.session.delete(row)
+        else:
+            row.value = previous
+        db.session.commit()
+
+
 @pytest.fixture(scope='module')
 def clients(app, create_user):
     return {role: _signed_in(app, create_user, f'reauth_{role}', role)
@@ -124,3 +147,15 @@ def test_the_profile_says_which_proof_the_account_gives(app, clients, provider_o
     assert clients['operator'].get('/api/v2/account/profile').get_json()['data']['has_local_password'] is True
     c, _ = provider_only('reauth_sso_profile')
     assert c.get('/api/v2/account/profile').get_json()['data']['has_local_password'] is False
+
+
+def test_a_cheap_refusal_spends_no_authenticator_code(provider_only):
+    """The code is checked last: a request refused for its input leaves it unspent."""
+    c, secret = provider_only('reauth_sso_cheap', totp=True)
+    code = pyotp.TOTP(secret).now()
+    r = _post(c, '/api/v2/mtls/certificates', {'code': code, 'validity_days': 'abc'})
+    assert r.status_code == 400, r.data
+    r = _post(c, '/api/v2/mtls/certificates', {'code': code, 'organization': 'bad<org>'})
+    assert r.status_code == 400, r.data
+    r = _post(c, '/api/v2/mtls/certificates', {'code': code, 'name': 'cheap-refusal'})
+    assert r.status_code == 201, r.data

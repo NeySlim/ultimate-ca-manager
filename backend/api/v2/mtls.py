@@ -201,11 +201,6 @@ def create_mtls_certificate():
     roles — could obtain a CA-signed client certificate.
     """
 
-    # A certificate enrolled here signs in alone: the session proves the account holder first
-    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
-    if refused:
-        return refused
-
     user = g.current_user
     data = request.get_json() or {}
 
@@ -252,6 +247,12 @@ def create_mtls_certificate():
     org = data.get('organization', 'UCM Users')
     if not re.match(r'^[a-zA-Z0-9\s\-\.]{1,64}$', org):
         return error_response('Invalid organization name', 400)
+
+    # A certificate enrolled here signs in alone: the session proves the account holder.
+    # Last before issuing: an authenticator code is spent by the check.
+    refused = confirm_account_holder(user, data)
+    if refused:
+        return refused
 
     try:
         cert_obj = CertificateService.create_certificate(
