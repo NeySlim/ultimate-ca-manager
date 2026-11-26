@@ -159,11 +159,12 @@ export default function UsersGroupsPage() {
   }
 
   const handleUpdateUser = async (data) => {
-    // Your own reset link goes to your email: moving it proves it is you (a new password already does)
+    // Your own reset link goes to your email: moving it asks the password of an account that
+    // has one (a new password already did), as the Account page does
     if (editingUser.id === me?.id && 'email' in data && (data.email || '') !== (editingUser.email || '') && !data.current_password) {
-      const proof = await askProof()
+      const proof = await askProof({ passwordOnly: true })
       if (!proof) return
-      data = { ...data, current_password: proof.password, code: proof.code }
+      if (proof.password) data = { ...data, current_password: proof.password }
     }
     try {
       await usersService.update(editingUser.id, data)
