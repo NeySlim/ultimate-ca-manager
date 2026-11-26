@@ -284,6 +284,40 @@ class TestTheRenewal:
         assert len(_audits(app, since, 'ssh_host_revoked')) == 1
         assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 409
 
+    def test_a_renewal_left_live_by_a_failure_goes_with_the_next_revocation(self, app, auth_client, client,
+                                                                            enrolled, tmp_path, monkeypatch,
+                                                                            caplog):
+        from sqlalchemy.exc import OperationalError
+        from services.ssh_cert import SSHCertificateService
+        _, refid, key = enrolled
+        _age(app, refid)
+        challenge = _challenge(client, refid).get_json()['challenge']
+        with app.app_context():
+            host_id = SSHHost.query.filter_by(refid=refid).one().id
+        real = SSHCertificateService.sign_certificate
+
+        def locked(*args, **kwargs):
+            raise OperationalError('UPDATE', {}, Exception('database is locked'))
+
+        def revoked_first(*args, **kwargs):
+            hosts.revoke_host(host_id)
+            monkeypatch.setattr(SSHCertificateService, 'revoke_certificate', locked)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(SSHCertificateService, 'sign_certificate', revoked_first)
+        with caplog.at_level('ERROR', logger=hosts.logger.name):
+            r = _renew(client, refid, challenge, _sign(tmp_path, key, challenge))
+        assert r.status_code == 403 and r.get_json()['state'] == 'revoked'
+        assert any(rec.levelname == 'ERROR' and 'revoke' in rec.getMessage() for rec in caplog.records)
+        monkeypatch.undo()
+        with app.app_context():
+            renewed = SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == enrolled[0]['id'],
+                                                  SSHCertificate.source == 'renewal').one()
+            assert not renewed.revoked
+            renewed_id = renewed.id
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        with app.app_context():
+            assert db.session.get(SSHCertificate, renewed_id).revoked
+
     def test_an_expired_certificate_cannot_renew(self, app, client, enrolled):
         _, refid, _ = enrolled
         with app.app_context():

@@ -405,13 +405,19 @@ def renew(host_refid, answered, signature):
     host = db.session.get(SSHHost, host.id)
     db.session.refresh(host)
     if host.revoked_at:
-        # Revoked while this certificate was signed: it goes to the KRL, never to the host
+        # Revoked while this certificate was signed: it goes to the KRL, never to the host. The
+        # host keeps no reason of its own; a failure here leaves it to the next host revocation
+        name, new_id = host.name, new.id
         try:
-            SSHCertificateService.revoke_certificate(new.id, 'host revoked', 'ssh-host-renewal')
+            SSHCertificateService.revoke_certificate(new_id, 'host revoked', 'ssh-host-renewal')
         except ValueError:
             pass  # revoked by the host's revocation itself
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Host {name} was revoked during its renewal, but its new certificate '
+                         f'{new_id} could not be revoked ({e}): revoke the host again')
         raise RenewalRefused(403, 'this host is revoked: enroll it again',
-                             f'host {host.name} was revoked during its renewal', state='revoked')
+                             f'host {name} was revoked during its renewal', state='revoked')
     host.certificate_id = new.id
     host.last_renewed_at = host.last_seen_at = utc_now()
     db.session.commit()
