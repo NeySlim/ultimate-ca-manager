@@ -24,6 +24,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 #       given); copy: created at its own name, stdin also copied to stdout (a build log read live)
 #   replace <path> [<mode>]   stdin replaces a regular file, keeping its owner and (unless given) mode
 #   read <path>               a regular file to stdout; nothing for an absent one, an error for a link
+#   (read, replace, mode and chown-tree never touch a regular file with a second name, a hard link)
 #   mode <path> <mode> [link-ok]  fchmod of a regular file or directory (a final / follows the path
 #       itself); link-ok: a link is left as it is
 #   chown-tree <dir>/ <user>:<group> [<entry>...]  the directory, then what it holds, links themselves;
@@ -52,6 +53,12 @@ def parent():
     # The directory itself may be a link an operator laid (data on another disk): only its entries are not
     return os.open(head or ".", os.O_RDONLY | os.O_DIRECTORY), name
 
+def single(st):
+    # A second name of a root file (a hard link the account laid) is never read, replaced or changed
+    if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+        fail("a hard link to another file")
+    return st
+
 def entry(dirfd, name):
     try:
         st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
@@ -59,7 +66,7 @@ def entry(dirfd, name):
         return None
     if not stat.S_ISREG(st.st_mode):
         fail("a symbolic link or not a regular file")
-    return st
+    return single(st)
 
 def copy(src, dst, echo=False):
     for chunk in iter(lambda: src.read1(1 << 16), b""):
@@ -124,7 +131,7 @@ elif op == "read":
     except OSError:
         fail("a symbolic link or not a regular file")
     with os.fdopen(fd, "rb") as f:
-        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+        if not stat.S_ISREG(single(os.fstat(f.fileno())).st_mode):
             fail("not a regular file")
         copy(f, sys.stdout.buffer)
 elif op == "mode":
@@ -139,7 +146,7 @@ elif op == "mode":
             if link_ok and os.path.islink(path):
                 sys.exit(0)
             fail("a symbolic link or not a regular file or directory")
-    st = os.fstat(fd)
+    st = single(os.fstat(fd))
     if not (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode)):
         fail("not a regular file or directory")
     os.fchmod(fd, mode)
@@ -166,24 +173,35 @@ elif op == "chown-tree":
         dirs[:] = [d for d in dirs if kept(d)]
         for n in dirs + [f for f in files if kept(f)]:
             try:
-                os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
+                st = os.stat(n, dir_fd=dirfd, follow_symlinks=False)
             except FileNotFoundError:
                 continue
-            try:
-                st = os.stat(n, dir_fd=dirfd, follow_symlinks=False)
-                if not (strip and stat.S_IMODE(st.st_mode) & strip
-                        and (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode))):
+            fd = None
+            if stat.S_ISREG(st.st_mode) or (strip and stat.S_ISDIR(st.st_mode)):
+                try:
+                    # A link laid since is refused by O_NOFOLLOW: only the entry itself is changed then
+                    fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY, dir_fd=dirfd)
+                except FileNotFoundError:
                     continue
-                # Swapped for a link since: O_NOFOLLOW refuses it, and its mode is never changed
-                fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY, dir_fd=dirfd)
-            except OSError:
-                continue
+                except OSError:
+                    pass
             try:
-                st = os.fstat(fd)
-                if stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
+                if fd is not None:
+                    st = os.fstat(fd)
+                if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+                    sys.stderr.write("WARNING: %s: a hard link, left as it is\n" % os.path.join(path, where, n))
+                    continue
+                if fd is not None and stat.S_ISREG(st.st_mode):
+                    os.fchown(fd, uid, gid)
+                else:
+                    os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
+                if fd is not None:
                     restrict(fd)
+            except FileNotFoundError:
+                pass
             finally:
-                os.close(fd)
+                if fd is not None:
+                    os.close(fd)
 else:
     fail("unknown operation " + op)
 '

@@ -1891,3 +1891,50 @@ def test_chown_tree_refuses_a_linked_top_named_without_a_final_slash(tmp_path):
     result = _run(['own', 'chown-tree', str(tmp_path / 'top'), '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
     assert result.returncode == 3 and 'symbolic link or not a directory' in result.stderr, result.stderr
     assert chowned(trace) == []
+
+
+# ------------------------------------------- a hard link to a root file is never touched
+
+def _hard_linked(tmp_path, name='ucm.env'):
+    """A file of root's (mode 0604, no step gives it) and, in the account's directory, a second name for it."""
+    victim = tmp_path / 'shadow'
+    victim.write_text('root:*:1::::::\n')
+    victim.chmod(0o604)
+    own_dir = tmp_path / 'etc-ucm'
+    own_dir.mkdir()
+    os.link(victim, own_dir / name)
+    return victim, own_dir / name
+
+
+def test_own_read_refuses_a_hard_link(tmp_path):
+    victim, linked = _hard_linked(tmp_path)
+    result = _run(['own', 'read', str(linked)], _env(tmp_path))
+    assert result.returncode == 3 and 'hard link' in result.stderr, result.stderr
+    assert result.stdout == ''
+
+
+def test_own_replace_refuses_a_hard_link(tmp_path):
+    victim, linked = _hard_linked(tmp_path)
+    result = subprocess.run([BASH, str(SCRIPT), 'own', 'replace', str(linked)], env=_env(tmp_path),
+                            input='X=1\n', capture_output=True, text=True)
+    assert result.returncode == 3 and 'hard link' in result.stderr, result.stderr
+    assert os.path.samefile(victim, linked) and victim.read_text() == 'root:*:1::::::\n'
+
+
+def test_own_mode_refuses_a_hard_link(tmp_path):
+    victim, linked = _hard_linked(tmp_path, 'private')
+    result = _run(['own', 'mode', str(linked), '700'], _env(tmp_path))
+    assert result.returncode == 3 and 'hard link' in result.stderr, result.stderr
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o604
+
+
+@pytest.mark.parametrize('owner', ['7:8', '0:0'])
+def test_chown_tree_leaves_a_hard_link_as_it_is(tmp_path, owner):
+    victim, linked = _hard_linked(tmp_path, 'x.pem')
+    (linked.parent / 'kept.pem').write_text('pem')
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{linked.parent}/', owner], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert 'hard link' in result.stderr, result.stderr
+    assert str(linked) not in chowned(trace) and str(linked.parent / 'kept.pem') in chowned(trace)
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o604
