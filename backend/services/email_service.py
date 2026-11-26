@@ -3,6 +3,7 @@ Email Service for sending notifications via SMTP
 """
 import re
 import smtplib
+import ssl
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -34,13 +35,16 @@ def _log_instant(log_clock):
 
 
 def _smtp_connect(config: SMTPConfig, timeout: int) -> smtplib.SMTP:
-    """Open the SMTP session: implicit TLS (port 465 style) wins over STARTTLS."""
+    """Open the SMTP session: implicit TLS (port 465 style) wins over STARTTLS.
+    Both check the relay's certificate and name against the system store: the
+    password, the OAuth2 token and the reset links go through this channel."""
     if config.smtp_use_ssl:
-        return smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=timeout)
+        return smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=timeout,
+                                context=ssl.create_default_context())
     server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=timeout)
     if config.smtp_use_tls:
         try:
-            server.starttls()
+            server.starttls(context=ssl.create_default_context())
         except Exception:
             server.close()
             raise

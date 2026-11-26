@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Security
 
 - Email settings: `write:settings` (the operator role) could point the SMTP server, and with it every password-reset link, at a host of its choosing; the SMTP target (host, port, security, authentication, sender and OAuth2 endpoints) now changes only with `admin:settings`, like `base_url`.
+- Email: STARTTLS and implicit TLS accepted any certificate, so an attacker on the path to the relay received the SMTP password and every message; the relay's certificate and name are now checked against the system trust store.
 - ACME Custom Command DNS provider: holding `write:acme` was enough to run any program as the service account; the provider now runs only root-owned hooks of `/etc/ucm/dns-hooks`, named without a path (see UPGRADE.md to move an existing script).
 - WebAuthn: a passwordless login or a passkey unlock accepted an assertion without user verification, so a key without a PIN opened a session alone; both now require it (W3C WebAuthn, section 7.2 step 17), the second step after a password still accepting a key without it.
 - Package updates: the root watcher installed whatever package path the service account wrote; it now installs only a release package of the updates directory, copied out of that account's reach and checked against the release's `.sha256` fetched by root, declaring a version above the installed one, and no longer runs `rpm -U --force`.

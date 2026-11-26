@@ -3133,7 +3133,7 @@ Content-Type: application/json
 }
 ```
 
-`smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
+`smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). With `starttls` and `ssl` the relay's certificate must chain to the system trust store and name `smtp_host`; there is no setting to skip the check. The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
 
 `PATCH` needs `write:settings`. The SMTP target (`smtp_host`, `smtp_port`, `smtp_security` or the older booleans, `smtp_auth` and `smtp_auth_method`, `from_email` and, under OAuth2, `smtp_oauth_provider`, `smtp_oauth_tenant_id`, `smtp_oauth_authorize_url`, `smtp_oauth_token_url` and `smtp_oauth_redirect_uri`) changes only with `admin:settings`: without it a request that would change one of them is refused with 403 naming them, and nothing is saved. Sending them with their stored values is accepted.
 
