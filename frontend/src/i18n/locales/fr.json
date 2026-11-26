@@ -1113,7 +1113,7 @@
       "heldBy": "Déjà utilisée par : {{holder}}",
       "confirmText": "L’AC signera avec la clé HSM {{label}} (ID {{id}}, {{algorithm}}). Sa clé privée reste dans le HSM.",
       "confirm": "Utiliser cette clé",
-      "attached": "Clé HSM rattachée : l’AC peut maintenant signer"
+      "attached": "Clé HSM rattachée"
     },
     "parentCA": "AC parente",
     "hierarchy": "Hiérarchie",

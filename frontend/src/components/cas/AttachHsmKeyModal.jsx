@@ -58,7 +58,7 @@ export function AttachHsmKeyModal({ open, onClose, ca, onSuccess, t }) {
     setBusy(true)
     try {
       const response = await casService.attachHsmKey(ca.id, Number(providerId), selected.key_identifier)
-      showSuccess(t('cas.attachHsmKey.attached'))
+      showSuccess(response?.message || t('cas.attachHsmKey.attached'))
       onSuccess?.(response?.data || response)
       reset()
       onClose()

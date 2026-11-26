@@ -1249,7 +1249,7 @@
       "heldBy": "Ya la usa: {{holder}}",
       "confirmText": "La CA firmará con la clave HSM {{label}} (ID {{id}}, {{algorithm}}). Su clave privada permanece en el HSM.",
       "confirm": "Usar esta clave",
-      "attached": "Clave HSM asociada: la CA ya puede firmar"
+      "attached": "Clave HSM asociada"
     },
     "parentCA": "CA padre",
     "hierarchy": "Jerarquía",

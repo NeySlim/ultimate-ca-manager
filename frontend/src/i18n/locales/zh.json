@@ -1249,7 +1249,7 @@
       "heldBy": "已被使用：{{holder}}",
       "confirmText": "CA 将使用 HSM 密钥 {{label}}（ID {{id}}，{{algorithm}}）签名。其私钥保留在 HSM 中。",
       "confirm": "使用此密钥",
-      "attached": "已关联 HSM 密钥：CA 现在可以签名"
+      "attached": "已关联 HSM 密钥"
     },
     "parentCA": "父CA",
     "hierarchy": "层级",

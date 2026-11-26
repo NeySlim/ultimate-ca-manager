@@ -56,6 +56,25 @@ describe('AttachHsmKeyModal', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('says what the server answered, even when the CA still cannot sign', async () => {
+    await openOn()
+    fireEvent.click(screen.getAllByRole('radio')[0])
+    fireEvent.click(screen.getByText('common.continue'))
+    const message = 'HSM key attached; the CA still cannot sign: CA is revoked'
+    mocks.attachHsmKey.mockResolvedValue({ data: { id: 12 }, message })
+    fireEvent.click(screen.getByText('cas.attachHsmKey.confirm'))
+    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith(message))
+  })
+
+  it('falls back to a neutral text when the server gives no message', async () => {
+    await openOn()
+    fireEvent.click(screen.getAllByRole('radio')[0])
+    fireEvent.click(screen.getByText('common.continue'))
+    mocks.attachHsmKey.mockResolvedValue({ data: { id: 12 } })
+    fireEvent.click(screen.getByText('cas.attachHsmKey.confirm'))
+    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith('cas.attachHsmKey.attached'))
+  })
+
   it('shows the refusal of the server and stays open', async () => {
     await openOn()
     fireEvent.click(screen.getAllByRole('radio')[0])

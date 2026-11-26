@@ -1249,7 +1249,7 @@
       "heldBy": "Bereits verwendet von: {{holder}}",
       "confirmText": "Die CA signiert mit dem HSM-Schlüssel {{label}} (ID {{id}}, {{algorithm}}). Ihr privater Schlüssel bleibt im HSM.",
       "confirm": "Diesen Schlüssel verwenden",
-      "attached": "HSM-Schlüssel zugeordnet: Die CA kann jetzt signieren"
+      "attached": "HSM-Schlüssel zugeordnet"
     },
     "parentCA": "Übergeordnete CA",
     "hierarchy": "Hierarchie",

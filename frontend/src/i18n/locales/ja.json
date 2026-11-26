@@ -1249,7 +1249,7 @@
       "heldBy": "使用中: {{holder}}",
       "confirmText": "CA は HSM 鍵 {{label}}（ID {{id}}、{{algorithm}}）で署名します。秘密鍵は HSM 内に残ります。",
       "confirm": "この鍵を使用",
-      "attached": "HSM 鍵を関連付けました。CA は署名できるようになりました"
+      "attached": "HSM 鍵を関連付けました"
     },
     "parentCA": "親CA",
     "hierarchy": "階層",

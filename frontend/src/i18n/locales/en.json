@@ -1249,7 +1249,7 @@
       "heldBy": "Already used by the {{holder}}",
       "confirmText": "The CA will sign with HSM key {{label}} (ID {{id}}, {{algorithm}}). Its private key stays in the HSM.",
       "confirm": "Use this key",
-      "attached": "HSM key attached: the CA can now sign"
+      "attached": "HSM key attached"
     },
     "parentCA": "Parent CA",
     "hierarchy": "Hierarchy",
