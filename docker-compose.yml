@@ -69,6 +69,7 @@ services:
       - UCM_DATABASE_PATH=${UCM_DATABASE_PATH:-/opt/ucm/data/ucm.db}
       - UCM_BACKUP_ENABLED=${UCM_BACKUP_ENABLED:-true}
       - UCM_BACKUP_RETENTION_DAYS=${UCM_BACKUP_RETENTION_DAYS:-30}
+      - UCM_BACKUP_KEEP=${UCM_BACKUP_KEEP:-5}
 
       # SMTP, ACME, mTLS, session timeout and certificate defaults are set
       # in the web interface and stored in the database, not here.

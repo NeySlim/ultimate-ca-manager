@@ -247,7 +247,7 @@ _ucm_room_short() {
     echo -e "${RED:-}❌ Not enough disk space in $1: the start needs $(( ($2 + 1023) / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
 }
 
-# Room for the start: the copy on the backups' filesystem when enabled, the database's size
+# Room for the start: the copy on the backups' filesystem when $1 is true, the database's size
 # again on its own filesystem when an upgrade may run (journal and growth), summed when both
 # are one filesystem. Fails with what is needed and available; a df that cannot answer passes.
 ucm_sqlite_disk_room() {
@@ -259,7 +259,7 @@ ucm_sqlite_disk_room() {
     size_kb=$(( (bytes + 1023) / 1024 ))
     size_mb=$(( (size_kb + 1023) / 1024 ))
     ucm_sqlite_upgrade_possible && db_need=$size_kb
-    [ "$UCM_BACKUP_ENABLED" = "true" ] && copy_need=$size_kb
+    [ "${1:-false}" = "true" ] && copy_need=$size_kb
     [ "$db_need" -gt 0 ] && db_df=$(_ucm_df "$db_dir")
     [ "$copy_need" -gt 0 ] && copy_df=$(_ucm_df "$UCM_SQLITE_BACKUP_DIR")
     if [ -n "$db_df" ] && [ -n "$copy_df" ] && _ucm_same_fs "$db_dir" "$UCM_SQLITE_BACKUP_DIR" "$db_df" "$copy_df"; then
@@ -294,6 +294,30 @@ _ucm_database_url_elsewhere() {
     esac
 }
 
+# The pre-start copies of directory $1, newest first (their names sort by date).
+_ucm_copies() {
+    find "$1" -maxdepth 1 -name 'ucm-backup-*.db' 2>/dev/null | sort -r
+}
+
+# True when the newest copy is younger than the database and than a log that holds writes:
+# a start that fails under a restart policy then adds no copy of the same data.
+_ucm_unchanged_since_copy() {
+    local newest
+    newest=$(_ucm_copies "$1" | head -n 1)
+    [ -n "$newest" ] && [ "$newest" -nt "$UCM_DATABASE_PATH" ] || return 1
+    [ ! -s "$UCM_DATABASE_PATH-wal" ] || [ "$newest" -nt "$UCM_DATABASE_PATH-wal" ]
+}
+
+# Removes all but the newest UCM_BACKUP_KEEP - $2 copies (default 5 kept; $2 is 1 before a new
+# copy, 0 when none follows): the copies never outnumber UCM_BACKUP_KEEP, whatever the restarts.
+_ucm_prune_copies() {
+    local keep=${UCM_BACKUP_KEEP:-5} old
+    case $keep in ''|*[!0-9]*|0) keep=5 ;; esac
+    _ucm_copies "$1" | tail -n +"$(( keep - ${2:-1} + 1 ))" | while IFS= read -r old; do
+        rm -f -- "$old" "$old-wal"
+    done
+}
+
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode. With a PostgreSQL
 # DATABASE_URL the SQLite file is neither checked nor copied.
 ucm_sqlite_check_and_backup() {
@@ -308,11 +332,22 @@ ucm_sqlite_check_and_backup() {
         echo -e "${GREEN:-}✅ Database from DATABASE_URL: the SQLite file is not used, no SQLite backup${NC:-}"
     else
         echo -e "${GREEN:-}✅ Database exists${NC:-}"
-        ucm_sqlite_disk_room || return 1
-
-        # Database backup if enabled
+        local copy=false
+        BACKUP_DIR="$UCM_SQLITE_BACKUP_DIR"
+        # Pruned before the room is measured, and room claimed only for a copy that will be written
         if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
-            BACKUP_DIR="$UCM_SQLITE_BACKUP_DIR"
+            find "$BACKUP_DIR" \( -name "ucm-backup-*.db" -o -name "ucm-backup-*.db-wal" \) \
+                -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
+            if _ucm_unchanged_since_copy "$BACKUP_DIR"; then
+                _ucm_prune_copies "$BACKUP_DIR" 0
+            else
+                _ucm_prune_copies "$BACKUP_DIR" 1
+                copy=true
+            fi
+        fi
+        ucm_sqlite_disk_room "$copy" || return 1
+
+        if [ "$copy" = "true" ]; then
             BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
 
             # Create backup: writes still in the WAL are copied with the file, then folded into it
@@ -326,10 +361,8 @@ c.close()' "$BACKUP_FILE" 2>/dev/null \
                     || echo -e "${YELLOW:-}   The backup keeps its -wal file beside it: copy both together${NC:-}"
             fi
             echo -e "${GREEN:-}✅ Database backup created${NC:-}"
-
-            # Clean old backups
-            find "$BACKUP_DIR" \( -name "ucm-backup-*.db" -o -name "ucm-backup-*.db-wal" \) \
-                -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
+        elif [ "$UCM_BACKUP_ENABLED" = "true" ]; then
+            echo -e "${GREEN:-}✅ Database unchanged since its last copy: no new copy${NC:-}"
         fi
     fi
 }

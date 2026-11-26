@@ -83,6 +83,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `ingress.host` / `ingress.tls` | `ucm.local` / `[]` | Host and TLS section of the HTTPS Ingress |
 | `ingress.protocolHttp.enabled` | `false` | Second Ingress for cleartext CDP/OCSP/ACME-HTTP-01 (port 8080) |
 | `ingress.protocolHttp.host` | `pki.local` | Host of the cleartext protocol Ingress |
+| `ingress.protocolHttp.annotations` | `{}` | Annotations of the cleartext protocol Ingress; `ingress.annotations` are not copied to it |
 | `proxy.behindProxy` | `false` | Set `UCM_BEHIND_PROXY=1` (honor `X-Forwarded-*` for one hop) |
 | `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES`: proxy IPs / CIDRs allowed to set forwarded / client-cert headers (CIDR entries need UCM 2.224 or later) |
 | `extraEnv` | `[]` | Extra `UCM_*` env vars, for example `UCM_WORKER_TIMEOUT`: the seconds a web request may run before gunicorn restarts the worker, 30 to 3600 (default 120); a value outside these bounds stops the pod at startup |
@@ -125,7 +126,7 @@ ingress:
       hosts: [ucm.example.com]
 ```
 
-Protocol endpoints that need cleartext HTTP (ACME HTTP-01, CRL, OCSP) can be exposed via `ingress.protocolHttp.enabled=true` on a separate host.
+Protocol endpoints that need cleartext HTTP (ACME HTTP-01, CRL, OCSP) can be exposed via `ingress.protocolHttp.enabled=true` on a separate host. That Ingress takes its annotations from `ingress.protocolHttp.annotations` only, so the `backend-protocol: "HTTPS"` above does not reach its plain-HTTP port.
 
 ### Behind a reverse proxy
 

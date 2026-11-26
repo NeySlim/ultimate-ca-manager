@@ -661,11 +661,15 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
 POSTRM = ROOT / 'packaging' / 'debian' / 'postrm'
 
 
-def _postrm_with(tmp_path, action, lay, lib=None, logs=None):
+def _postrm_with(tmp_path, action, lay, lib=None, logs=None, real=()):
     """_postrm, with `lay(home, config)` run on the sandbox before the script; /var/lib/ucm
-    and /var/log/ucm become `lib` and `logs` (by default absent paths of the sandbox)."""
+    and /var/log/ucm become `lib` and `logs` (by default absent paths of the sandbox);
+    the tools named in `real` run for real instead of being recorded."""
     env, log, home, _data, config = _post_sandbox(tmp_path, 0)
     lay(home, config)
+    for tool in real:
+        (pathlib.Path(env['PATH']) / tool).unlink(missing_ok=True)
+        os.symlink(shutil.which(tool), pathlib.Path(env['PATH']) / tool)
     (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
         f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\nexec {shutil.which("rm")} "$@"\n')
     bin_rm.chmod(0o755)
@@ -766,6 +770,92 @@ def test_a_removal_says_where_the_data_stays_and_what_a_purge_keeps(tmp_path):
     assert f'Data preserved in {home}/data, configuration in {config}' in out.stdout, out.stdout
     assert 'apt purge ucm' in out.stdout and '.ucm-archive-* directories' in out.stdout, out.stdout
     assert 'rm -rf' not in out.stdout, out.stdout
+
+
+KEY_TOOLS = ('mkdir', 'mv', 'date')
+
+
+def _lay_key(data_file=None, env_text='UCM_FQDN=x\n'):
+    def lay(home, config):
+        (config / 'master.key').write_bytes(b'k' * 32)
+        (config / 'ucm.env').write_text(env_text)
+        (config / 'audit-chain.keys').write_text('{}')
+        if data_file:
+            (home / 'data' / data_file).write_bytes(b'SQLite format 3\x00')
+    return lay
+
+
+@pytest.mark.parametrize('data_file, env_text', [
+    ('ucm.db', 'UCM_FQDN=x\n'),
+    # PostgreSQL: the data outlives the purge outside the machine
+    (None, 'export DATABASE_URL="postgresql://u:p@db/ucm"\n'),
+])
+def test_a_purge_that_keeps_data_keeps_its_master_key_root_only(tmp_path, data_file, env_text):
+    """The key encrypts the private keys of the data the purge leaves: it and ucm.env move
+    to a root-only archive beside the home, named in the output, before /etc/ucm goes."""
+    out, log, home, config = _postrm_with(tmp_path, 'purge', _lay_key(data_file, env_text),
+                                          real=KEY_TOOLS)
+    kept = list((home.parent / 'ucm-archive').glob('*-purge'))
+    assert len(kept) == 1, (kept, out.stderr)
+    assert re.fullmatch(r'\d{8}T\d{6}Z-purge', kept[0].name), kept[0].name
+    assert (kept[0] / 'master.key').read_bytes() == b'k' * 32
+    assert (kept[0] / 'ucm.env').read_text() == env_text
+    assert (kept[0] / 'audit-chain.keys').read_text() == '{}'
+    assert not config.exists()
+    calls = _calls(log)
+    assert f'chown -R root:root {kept[0]}' in calls and f'chmod -R go= {kept[0]}' in calls, calls
+    assert calls.index(f'chmod -R go= {kept[0]}') < calls.index(f'rm -rf {config}')
+    assert f'  {kept[0]}' in out.stdout.splitlines(), out.stdout
+    assert 'master.key' in out.stdout
+
+
+def test_a_purge_names_only_the_files_it_kept(tmp_path):
+    """No audit-chain.keys in the configuration: the output never says it was kept."""
+    def lay(home, config):
+        _lay_key('ucm.db')(home, config)
+        (config / 'audit-chain.keys').unlink()
+    out, _log, home, _config = _postrm_with(tmp_path, 'purge', lay, real=KEY_TOOLS)
+    kept = next((home.parent / 'ucm-archive').glob('*-purge'))
+    assert sorted(p.name for p in kept.iterdir()) == ['master.key', 'ucm.env']
+    assert 'audit-chain.keys' not in out.stdout, out.stdout
+    assert 'Kept: master.key, ucm.env,' in out.stdout, out.stdout
+
+
+def test_a_purge_says_how_to_restore_the_kept_keys(tmp_path):
+    # postinst starts UCM: the keys go back before the install, with the archived settings
+    out, _log, _home, config = _postrm_with(tmp_path, 'purge', _lay_key('ucm.db'), real=KEY_TOOLS)
+    text = ' '.join(out.stdout.split())
+    assert 'before apt install ucm' in text and f'master.key and audit-chain.keys back into {config}' in text, text
+    assert 'chown ucm:ucm' in text and 'chmod 600' in text and 'systemctl restart ucm' in text, text
+    assert 'DATABASE_URL and KEY_ENCRYPTION_KEY' in text, text
+
+
+def test_a_purge_without_data_removes_the_key_with_the_configuration(tmp_path):
+    """Nothing kept needs the key: the configuration goes whole, no archive is made."""
+    def lay(home, config):
+        _lay_key()(home, config)
+        # An earlier installation's archive in the data is no data of this one
+        (home / 'data' / '.ucm-archive-20260101T000000Z').mkdir()
+        (home / 'data' / '.ucm-archive-20260101T000000Z' / 'ucm.db').write_text('old')
+    out, log, home, config = _postrm_with(tmp_path, 'purge', lay, real=KEY_TOOLS)
+    assert not (home.parent / 'ucm-archive').exists()
+    assert not config.exists()
+    assert 'master.key' not in out.stdout
+
+
+def test_a_removal_says_where_the_master_key_of_the_data_is(tmp_path):
+    out, _log, _home, config = _postrm_with(tmp_path, 'remove', lambda home, config: None)
+    assert f'{config}/master.key' in out.stdout, out.stdout
+
+
+def test_a_removal_stops_and_disables_the_watcher_too(tmp_path):
+    """postinst enables ucm-watcher.path: once its unit files are gone it must not keep
+    watching the data left in place."""
+    _out, log, _home, _config = _postrm_with(tmp_path, 'remove', lambda home, config: None)
+    calls = _calls(log)
+    for call in ('systemctl stop ucm-watcher.path ucm-watcher.service', 'systemctl disable ucm-watcher.path'):
+        assert call in calls, calls
+    assert calls.index('systemctl disable ucm-watcher.path') < calls.index('systemctl daemon-reload')
 
 
 # -- bytecode an earlier version wrote never outlives it ----------------------------

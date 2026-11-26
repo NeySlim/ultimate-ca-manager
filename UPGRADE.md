@@ -179,6 +179,12 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v3.1
+
+- **Docker: at most `UCM_BACKUP_KEEP` pre-start copies.** The image now keeps the newest `UCM_BACKUP_KEEP` copies of the SQLite database (default 5) whatever `UCM_BACKUP_RETENTION_DAYS` allows, so the first 3.1 start removes the older ones (`docker-compose.prod.yml` keeps 90 days): raise `UCM_BACKUP_KEEP` to keep them.
+- **Packages: `UCM_FIREWALL=ask` no longer opens the port.** Only `yes` (or `y`, `Y`, `true`, `1`) changes the firewall; any other value, `ask` included, now leaves it as it is.
+- **Helm chart, cleartext protocol Ingress:** the `<release>-protocol` Ingress (`ingress.protocolHttp.enabled`) no longer copies `ingress.annotations`. Put the annotations it needs (a TLS issuer, an ingress class option) under `ingress.protocolHttp.annotations`; a `backend-protocol: "HTTPS"` must not go there, as its port 8080 speaks plain HTTP.
+
 ### Upgrading to v3.0
 
 Some changes below were already delivered by a 2.254.N security update; each says which one. Coming from that update or a later one, they are not new.

@@ -138,7 +138,7 @@ volumes:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UCM_FQDN` | `ucm.example.com` | Server FQDN (important for SSL) |
+| `UCM_FQDN` | `ucm.local` | Server FQDN: the name of the self-signed UI certificate and of the AIA, CDP and OCSP URLs; set it to the name clients use |
 | `UCM_HTTPS_PORT` | `8443` | HTTPS port |
 
 ### Optional
@@ -151,6 +151,9 @@ volumes:
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
 | `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before the worker is restarted, 30 to 3600; out of bounds the container refuses to start |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
+| `UCM_BACKUP_ENABLED` | `true` | Copy the SQLite database into `/opt/ucm/data/backups` before each start; a start on a database unchanged since its newest copy makes none |
+| `UCM_BACKUP_RETENTION_DAYS` | `30` | Days a pre-start copy is kept |
+| `UCM_BACKUP_KEEP` | `5` | Most pre-start copies kept, the newest; the oldest are removed at each start, before any new copy |
 | `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`. Changing it does not change the Docker mounts: mount a persistent directory at the configured path as well as the data directory |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
 | `UCM_HA` | (unset) | `1` enables HA mode: settings and restarts propagate to every node (a restart exits each container in turn with code 0: use the restart policy `always` or `unless-stopped`, as `on-failure` and `no` leave the container stopped), operations that only change the local host are refused (see [HA.md](../HA.md)). Requires `DATABASE_URL` (PostgreSQL), `UCM_SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node |

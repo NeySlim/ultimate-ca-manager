@@ -26,21 +26,57 @@ purge_keeping_archives() {
     find "$1" -name '.ucm-archive-*' -prune -print | sed 's/^/  /'
 }
 
+# The master key encrypts the private keys of the data a purge leaves (the data directory,
+# or a PostgreSQL database): it, ucm.env and audit-chain.keys move to a root-only archive
+# beside the home, never removed; without data to read, they go with the configuration.
+keep_key_with_data() {
+    data_kept || return 0
+    kept="${UCM_HOME%/*}/ucm-archive/$(date -u +%Y%m%dT%H%M%SZ)-purge"
+    local moved="" keys=""
+    for f in master.key ucm.env audit-chain.keys; do
+        [ -e "$UCM_CONFIG/$f" ] || continue
+        (umask 077 && mkdir -p "$kept")
+        mv -- "$UCM_CONFIG/$f" "$kept/$f"
+        moved="${moved:+$moved, }$f"
+        [ "$f" = ucm.env ] || keys="${keys:+$keys and }$f"
+    done
+    [ -d "$kept" ] || return 0
+    chown -R root:root "$kept" && chmod -R go= "$kept"
+    echo "Kept: $moved, which the data left in place needs, root only, in:"
+    echo "  $kept"
+    # postinst starts UCM: what it needs must be in place before the package is installed again
+    echo "To start UCM on that data again, before apt install ucm (which starts it):"
+    [ -z "$keys" ] || echo "  put $keys back into $UCM_CONFIG, mode 600 (the package gives them to the ucm account; put back later: chown ucm:ucm, chmod 600, then systemctl restart ucm),"
+    [ ! -e "$kept/ucm.env" ] || echo "  carry DATABASE_URL and KEY_ENCRYPTION_KEY over from the archived ucm.env into $UCM_CONFIG/ucm.env."
+}
+
+data_kept() {
+    [ -n "$(find "$UCM_HOME/data" -name '.ucm-archive-*' -prune -o ! -type d -print -quit 2>/dev/null)" ] \
+        || grep -qE '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL[[:space:]]*=[[:space:]]*[^[:space:]]' \
+            "$UCM_CONFIG/ucm.env" 2>/dev/null
+}
+
 case "$1" in
     remove)
-        # Stop service
+        # Stop service, and the watcher postinst enabled: its unit files go with the package
         systemctl stop ucm.service >/dev/null 2>&1 || true
         systemctl disable ucm.service >/dev/null 2>&1 || true
+        systemctl stop ucm-watcher.path ucm-watcher.service >/dev/null 2>&1 || true
+        systemctl disable ucm-watcher.path >/dev/null 2>&1 || true
+        systemctl daemon-reload >/dev/null 2>&1 || true
         
         echo "UCM service stopped and disabled"
         echo "Data preserved in $UCM_HOME/data, configuration in $UCM_CONFIG"
+        echo "The private keys in that data are encrypted with $UCM_CONFIG/master.key: keep it with the data."
         echo "apt purge ucm also removes the configuration, /var/lib/ucm and /var/log/ucm, and"
-        echo "keeps the .ucm-archive-* directories an earlier installation left; $UCM_HOME/data stays."
+        echo "keeps the .ucm-archive-* directories an earlier installation left; $UCM_HOME/data stays,"
+        echo "and master.key and ucm.env move to ${UCM_HOME%/*}/ucm-archive/ while data is kept."
         ;;
         
     purge)
         # Remove data directories
         purge_keeping_archives /var/lib/ucm
+        keep_key_with_data
         purge_keeping_archives "$UCM_CONFIG"
         purge_keeping_archives /var/log/ucm
         # Not a package file: the mark of an unfinished archiving would outlive the purge

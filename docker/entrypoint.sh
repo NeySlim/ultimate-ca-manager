@@ -175,6 +175,7 @@ check_ha_secret || exit 1
 # Copy of the SQLite database taken by this script before each start
 : "${UCM_BACKUP_ENABLED:=true}"
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
+: "${UCM_BACKUP_KEEP:=5}"
 # Before the first write to the volumes: a refused database is never copied
 ucm_refuse_unstartable_database || exit $?
 # Then, on every backend: a 2.254 database moves to this major only with UCM_ACCEPT_MAJOR_UPGRADE

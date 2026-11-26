@@ -368,10 +368,21 @@ class SchedulerService:
         return self._stale(state)
 
     def _stale(self, state: dict) -> bool:
+        """The state the HA leader stored is judged on the cluster clock, never against
+        another host's; this host's own file on its clock."""
+        window = 2 * self.wake_interval
+        cluster_at = state.get('published_cluster_at')
+        if isinstance(cluster_at, (int, float)) and not isinstance(cluster_at, bool):
+            try:
+                return _cluster_epoch() - cluster_at > window
+            except Exception as e:
+                _rollback()
+                logger.warning(f"Cluster clock not read for the scheduler state: {type(e).__name__}")
+                return True
         published_at = state.get('published_at')
         if not isinstance(published_at, (int, float)):
             return True
-        return time.time() - published_at > 2 * self.wake_interval
+        return time.time() - published_at > window
 
     def rearm_grace(self) -> None:
         """First runs wait the grace period from now, not from registration."""
@@ -416,7 +427,7 @@ class SchedulerService:
                     self._publish_error_logged = True
         if ha:
             try:
-                self._in_app(_store_state, state)
+                self._in_app(_store_cluster_state, state)
             except Exception as e:
                 self._in_app(_rollback)
                 logger.warning(f"Scheduler state not published to the database: {type(e).__name__}")
@@ -741,7 +752,7 @@ class SchedulerService:
                             break
                         ran = False
                         try:
-                            ran = self._try_run(task, requested=task in requested)
+                            ran = self._run_leading(task, lock, requested=task in requested)
                         except Exception as e:
                             logger.error(
                                 f"Unexpected error running task '{task.name}': {e}",
@@ -760,6 +771,30 @@ class SchedulerService:
             # The next process waiting for the lock takes over from here
             self._release_lock()
             self._heartbeat(force=True)
+
+    def _run_leading(self, task: ScheduledTask, lock, requested: bool) -> bool:
+        """HA leader: while the task runs, a beat thread keeps this node's row and the state
+        it publishes fresh, however long the task lasts."""
+        if not _ha():
+            return self._try_run(task, requested=requested)
+        done = threading.Event()
+        beat = threading.Thread(target=self._beat_while_leading, args=(done, lock), daemon=True,
+                                name="SchedulerLeaderBeat")
+        beat.start()
+        try:
+            return self._try_run(task, requested=requested)
+        finally:
+            done.set()
+            beat.join()
+
+    def _beat_while_leading(self, done: threading.Event, lock) -> None:
+        """Beats only while the server says the lock is held: a leader whose session dropped
+        never writes the flag over the next leader's; the loop handles the loss after the task."""
+        while not done.wait(self.wake_interval / 2):
+            if not self._owns_lock or self.deposed or not lock.still_held():
+                return
+            self._heartbeat()
+            self._publish_state()
 
     def _start_node_tasks(self) -> None:
         """HA follower: due per-node tasks run in their own thread, so the loop keeps
@@ -1080,6 +1115,16 @@ class SchedulerService:
         self._release_lock()
         logger.info("Scheduler stopped")
         return True
+
+
+def _cluster_epoch() -> float:
+    """Seconds since the epoch on the cluster clock (the PostgreSQL server's in HA)."""
+    from services.scheduler_leader import cluster_utc_now
+    return (cluster_utc_now() - datetime(1970, 1, 1)).total_seconds()
+
+
+def _store_cluster_state(state: dict) -> None:
+    _store_state(dict(state, published_cluster_at=_cluster_epoch()))
 
 
 def _store_state(state: dict) -> None:
