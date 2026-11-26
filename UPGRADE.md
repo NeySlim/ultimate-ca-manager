@@ -194,6 +194,7 @@ Database migrations run automatically at startup.
   then edit the provider (ACME > DNS Providers) and replace the command with `dns.sh --zone x`. A script that ran an interpreter by its path (`/usr/bin/python3 /srv/hook.py`) needs a first line naming it (`#!/usr/bin/python3`) once moved.
 
 - **Package updates are checked again by root.** The `ucm-watcher` unit that installs an update now accepts only a release package of `/opt/ucm/data/updates/` matching the `.sha256` of its release, fetched by root directly from GitHub over HTTPS (no proxy), whose version is the update's and above the one the package database holds (an older or the same release is refused), and no longer forces an RPM install (`rpm -U --force`). A host whose root cannot reach github.com sees the install fail at step `precheck`: install the package by hand there.
+- **The update watcher logs to the journal.** `ucm-watcher` no longer writes to `/var/log/ucm/ucm.log`: its lines and the output of `dpkg`, `apt-get` and `dnf` during an update are read with `journalctl -u ucm-watcher`.
 
 ### Upgrading to v3.0
 

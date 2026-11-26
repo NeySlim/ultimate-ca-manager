@@ -20,25 +20,39 @@ RESULT_FILE="$DATA_DIR/.update_result.json"
 VERSION_FILE="$ROOT/opt/ucm/VERSION"
 SETUP="$ROOT/opt/ucm/scripts/native-setup.sh"
 UCM_ENV="$ROOT/etc/ucm/ucm.env"
-LOG_FILE="$ROOT/var/log/ucm/ucm.log"
 # Release digests are fetched by root from GitHub; UCM_WATCHER_RELEASES is honoured in tests only
 RELEASES="https://github.com/NeySlim/ultimate-ca-manager/releases/download"
 if [ -n "$ROOT" ] && [ -n "${UCM_WATCHER_RELEASES:-}" ]; then RELEASES="$UCM_WATCHER_RELEASES"; fi
 
+# The service account owns /var/log/ucm and the data directory: root writes its log to the
+# journal only, control characters of the text the account wrote made visible
 log() {
-    echo "$(date -Iseconds) [ucm-watcher] $*" | tee -a "$LOG_FILE"
+    local msg="$*"
+    printf '%s [ucm-watcher] %s\n' "$(date -Iseconds)" "${msg//[[:cntrl:]]/?}"
+}
+
+# read_own <file>: a regular file the service account wrote, never through a link (64 KiB at most)
+read_own() {
+    python3 - "$1" <<'PYEOF' 2>/dev/null || true
+import os, stat, sys
+try:
+    fd = os.open(sys.argv[1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+except OSError:
+    sys.exit(0)
+with os.fdopen(fd, "rb") as f:
+    if stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+        sys.stdout.write(f.read(1 << 16).decode("utf-8", "replace"))
+PYEOF
 }
 
 manifest_get() {
     # Read one string field from the CLAIMED operation manifest ('' when absent)
-    MANIFEST_PATH="$PROCESSING_FILE" python3 - "$1" <<'PYEOF' 2>/dev/null || true
-import json, os, sys
+    read_own "$PROCESSING_FILE" | python3 -c '
+import json, sys
 try:
-    with open(os.environ["MANIFEST_PATH"]) as f:
-        print(json.load(f).get(sys.argv[1]) or '')
+    print(json.load(sys.stdin).get(sys.argv[1]) or "")
 except Exception:
-    pass
-PYEOF
+    pass' "$1" 2>/dev/null || true
 }
 
 installed_version() {
@@ -74,13 +88,13 @@ write_result() {
     # write failure it is kept for diagnosis and NO result is left behind
     # (the backend then simply never claims success).
     if STATUS="$1" STEP="$2" ERROR="$3" INSTALLED="$(installed_version)" \
-        MANIFEST_PATH="$PROCESSING_FILE" RESULT_PATH="$RESULT_FILE" \
-        python3 - <<'PYEOF' >> "$LOG_FILE" 2>&1
+        MANIFEST="$(read_own "$PROCESSING_FILE")" DATA_DIR="$DATA_DIR" \
+        RESULT_NAME="${RESULT_FILE##*/}" python3 - <<'PYEOF'
 import json, os, time
 manifest = {}
 try:
-    with open(os.environ["MANIFEST_PATH"]) as f:
-        manifest = json.load(f)
+    manifest = json.loads(os.environ["MANIFEST"])
+    manifest = manifest if isinstance(manifest, dict) else {}
 except Exception:
     pass
 result = {
@@ -94,12 +108,19 @@ result = {
     "installed_version": os.environ["INSTALLED"] or None,
     "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
 }
-result_path = os.environ["RESULT_PATH"]
-tmp = result_path + ".tmp"
-with open(tmp, "w") as f:
+# Created new beside the result through a handle on the directory: a link laid there is replaced
+dirfd = os.open(os.environ["DATA_DIR"], os.O_RDONLY | os.O_DIRECTORY)
+name = os.environ["RESULT_NAME"]
+tmp = name + ".tmp"
+try:
+    os.unlink(tmp, dir_fd=dirfd)
+except FileNotFoundError:
+    pass
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=dirfd)
+with os.fdopen(fd, "w") as f:
+    os.fchmod(f.fileno(), 0o644)
     json.dump(result, f)
-os.chmod(tmp, 0o644)
-os.replace(tmp, result_path)
+os.replace(tmp, name, src_dir_fd=dirfd, dst_dir_fd=dirfd)
 PYEOF
     then
         rm -f "$PROCESSING_FILE"
@@ -121,8 +142,8 @@ fips_build_ok() {
 # A restart asked for is not counted by the unit's start limit, meant for crashes alone:
 # reset-failed flushes that counter first
 restart_ucm() {
-    systemctl reset-failed ucm >> "$LOG_FILE" 2>&1 || true
-    systemctl restart ucm >> "$LOG_FILE" 2>&1
+    systemctl reset-failed ucm || true
+    systemctl restart ucm
 }
 
 # claim_package <path> <to_version>: prints "ok <copy>" or "error <reason>". The service account
@@ -244,7 +265,7 @@ finish_update() {
 
 # ── Handle update (install package + verify + record result + restart) ──
 if [ -f "$UPDATE_FILE" ]; then
-    PACKAGE_PATH=$(cat "$UPDATE_FILE")
+    PACKAGE_PATH=$(read_own "$UPDATE_FILE")
     rm -f "$UPDATE_FILE"
 
     # Claim the manifest atomically: from here on, every metadata read and
@@ -298,32 +319,32 @@ if [ -f "$UPDATE_FILE" ]; then
         log "Installing DEB package..."
         # dpkg first, then apt to resolve any missing dependencies; the
         # authoritative success check is the version verification below
-        dpkg -i "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1 || true
+        dpkg -i "$PACKAGE_PATH" || true
         # apt-get -f install would configure the package again, and rerun a failed FIPS build
         if ! fips_build_ok; then
             INSTALL_OK=0
         else
             log "Resolving dependencies..."
-            if ! apt-get -f install -y >> "$LOG_FILE" 2>&1; then
+            if ! apt-get -f install -y; then
                 INSTALL_OK=0
                 if fips_build_ok; then
                     log "ERROR: apt-get -f install failed"
-                    write_result failed apt-get "apt-get -f install failed (see ucm.log)"
+                    write_result failed apt-get "apt-get -f install failed (see journalctl -u ucm-watcher)"
                 fi
             fi
         fi
     elif [[ "$PACKAGE_PATH" == *.rpm ]]; then
         log "Installing RPM package..."
         if command -v dnf &>/dev/null; then
-            RPM_TOOL=dnf; dnf install -y "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1 || INSTALL_OK=0
+            RPM_TOOL=dnf; dnf install -y "$PACKAGE_PATH" || INSTALL_OK=0
         elif command -v yum &>/dev/null; then
-            RPM_TOOL=yum; yum localinstall -y "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1 || INSTALL_OK=0
+            RPM_TOOL=yum; yum localinstall -y "$PACKAGE_PATH" || INSTALL_OK=0
         else
-            RPM_TOOL=rpm; rpm -U "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1 || INSTALL_OK=0
+            RPM_TOOL=rpm; rpm -U "$PACKAGE_PATH" || INSTALL_OK=0
         fi
         if [ "$INSTALL_OK" != "1" ]; then
             log "ERROR: RPM install failed ($RPM_TOOL)"
-            write_result failed "$RPM_TOOL" "RPM install failed (see ucm.log)"
+            write_result failed "$RPM_TOOL" "RPM install failed (see journalctl -u ucm-watcher)"
         fi
     else
         log "ERROR: Unknown package format: $PACKAGE_PATH"
