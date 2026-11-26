@@ -116,8 +116,10 @@ def compatible_keys(ca, provider_id):
         if not matches_certificate(info.public_key_pem, cert):
             continue
         row = rows.get(info.key_identifier)
+        # A bound row without a cached public key is matched by its id, not its SPKI
+        held = (key_binding.holders(key_id=row.id) if row else None) or [None]
         keys.append({'key_identifier': info.key_identifier, 'label': info.label, 'algorithm': info.algorithm,
-                     'hsm_key_id': row.id if row else None, 'held_by': _holder_of(spki),
+                     'hsm_key_id': row.id if row else None, 'held_by': held[0] or _holder_of(spki),
                      'refusal': HsmService.algorithm_refusal(provider.type, info.algorithm)})
     return sorted(keys, key=lambda k: (k['label'], k['key_identifier']))
 

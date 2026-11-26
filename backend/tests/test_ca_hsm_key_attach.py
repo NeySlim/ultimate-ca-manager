@@ -314,6 +314,21 @@ class TestAttach:
         assert r.status_code == 409, r.data
         assert _bound_key(app, second) is None
 
+    def test_a_holder_is_named_when_its_key_row_has_no_cached_public_key(self, app, auth_client, provider):
+        from models.hsm import HsmKey
+        key = ec.generate_private_key(ec.SECP256R1())
+        first, _ = _keyless_ca(app, key, 'Uncached Holder CA')
+        second, _ = _keyless_ca(app, key, 'Uncached Second CA')
+        provider_id = provider()
+        with _token(_Token({'ours': key})):
+            assert _attach(auth_client, first, provider_id, 'ours').status_code == 200
+            with app.app_context():
+                HsmKey.query.filter_by(id=_bound_key(app, first)).update({'public_key_pem': None})
+                db.session.commit()
+            r = _list(auth_client, second, provider_id)
+        assert r.status_code == 200, r.data
+        assert [k['held_by'] for k in json.loads(r.data)['data']['keys']] == ["X.509 CA 'Uncached Holder CA'"]
+
     def test_write_cas_and_read_hsm_are_both_needed(self, app, auth_client, provider, viewer_client):
         key = ec.generate_private_key(ec.SECP256R1())
         ca_id, _ = _keyless_ca(app, key, 'Permission CA')
