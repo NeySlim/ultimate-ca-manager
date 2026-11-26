@@ -311,6 +311,12 @@ def revoke_host(host_id, reason='host revoked', username=None):
     first = done.rowcount == 1
     db.session.commit()
     host = db.session.get(SSHHost, host_id)
+    if first:
+        # Audited with revoked_at, before the sweep: a sweep cut short still leaves who and why
+        from services.audit_service import AuditService
+        AuditService.log_action(action='ssh_host_revoked', resource_type='ssh_host', resource_id=str(host.id),
+                                resource_name=host.name, details=f'SSH host revoked, renewals ended: {reason}',
+                                success=True, username=username)
     # Swept on every request: one cut short leaves the host revoked, the next revokes what it left,
     # never the certificates of a host the key was enrolled as since
     swept = _sweep(host, reason, username)
@@ -464,7 +470,7 @@ def renew(host_refid, answered, signature):
     db.session.refresh(host)
     if host.revoked_at:
         # Revoked while this certificate was signed: it goes to the KRL, never to the host. The
-        # host keeps no reason of its own; a failure here leaves it to the next host revocation
+        # host keeps no reason of its own; a failure here leaves it to the revoked host sweep
         name, new_id = host.name, new.id
         try:
             SSHCertificateService.revoke_certificate(new_id, 'host revoked', 'ssh-host-renewal')

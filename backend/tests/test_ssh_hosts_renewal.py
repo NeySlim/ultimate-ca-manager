@@ -271,11 +271,14 @@ class TestTheRenewal:
                 raise OperationalError('UPDATE', {}, Exception('database is locked'))
             return real(cert_id, *args, **kwargs)
         monkeypatch.setattr(SSHCertificateService, 'revoke_certificate', second_fails)
+        cut = _since(app)
         with app.app_context():
             with pytest.raises(OperationalError):
-                hosts.revoke_host(host_id)
+                hosts.revoke_host(host_id, 'key compromised', 'admin')
             db.session.rollback()
         monkeypatch.undo()
+        # Who revoked it and why survive the cut: audited with revoked_at, before the sweep
+        assert _audits(app, cut, 'ssh_host_revoked') == [(True, 'SSH host revoked, renewals ended: key compromised')]
         since = _since(app)
         # The host already shows revoked: the next request still sweeps what the first one left
         assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200

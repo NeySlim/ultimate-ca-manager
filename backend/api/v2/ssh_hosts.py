@@ -80,12 +80,8 @@ def revoke_ssh_host(host_id):
         return error_response(str(e), 404)
     except ValueError as e:
         return error_response(str(e), 409)
-    # One revocation audit per host, by the request that set revoked_at; a later one only finished it
-    if first:
-        AuditService.log_action(action='ssh_host_revoked', resource_type='ssh_host', resource_id=str(host.id),
-                                resource_name=host.name, details=f'SSH host revoked, renewals ended: {reason}',
-                                success=True)
-    else:
+    # The request that set revoked_at was audited by revoke_host; a later one only finished it
+    if not first:
         AuditService.log_action(action='ssh_host_revocation_finished', resource_type='ssh_host',
                                 resource_id=str(host.id), resource_name=host.name, success=True,
                                 details=f'SSH host revocation finished, certificates left live revoked: {reason}')
