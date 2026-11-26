@@ -79,3 +79,17 @@ def test_the_entrypoint_takes_the_kept_key_after_the_ha_check():
     assert 'generate_secret)}' not in text
     assert text.index('check_ha_secret || exit 1') < text.index('ucm_secret_key /etc/ucm || exit 1')
     assert 'COPY --chown=ucm:ucm docker/secret-key.sh /secret-key.sh' in (ROOT / 'Dockerfile').read_text()
+
+
+def test_no_random_source_stops_the_start_with_a_message_that_says_what_to_do(tmp_path):
+    fake = tmp_path / 'bin'
+    fake.mkdir()
+    (fake / 'od').write_text('#!/bin/sh\nexit 1\n')
+    (fake / 'od').chmod(0o755)
+    conf = tmp_path / 'conf'
+    conf.mkdir()
+    r, key = _start(conf, PATH=f'{fake}:/usr/bin:/bin')
+    assert r.returncode == 3 and key is None
+    out = r.stdout + r.stderr
+    assert '/dev/urandom' in out and 'UCM_SECRET_KEY' in out
+    assert list(conf.iterdir()) == []

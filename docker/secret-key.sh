@@ -19,8 +19,12 @@ ucm_secret_key() {
             return 0
         fi
     fi
-    key=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n') || return 1
-    [ ${#key} -eq 64 ] || return 1
+    key=$(od -An -tx1 -N32 /dev/urandom 2>/dev/null | tr -d ' \n')
+    if [ ${#key} -ne 64 ]; then
+        echo -e "${RED:-}❌ No session key could be read from /dev/urandom: set UCM_SECRET_KEY (64 hex characters," \
+            "openssl rand -hex 32) or start the container with /dev/urandom available${NC:-}"
+        return 1
+    fi
     UCM_SECRET_KEY=$key
     # A new file (mktemp: O_EXCL, mode 600) renamed over the name: a link there is replaced, never followed
     if tmp=$(mktemp "$dir/.secret.key.XXXXXX" 2>/dev/null); then
