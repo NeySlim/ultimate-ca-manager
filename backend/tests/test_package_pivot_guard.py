@@ -126,6 +126,30 @@ def _run_preinst(script, tmp_path, *args, python='3.12'):
     return out, _calls(log)
 
 
+@pytest.mark.parametrize('linked', [True, False])
+def test_the_deb_preinst_refuses_a_linked_ucm_env_before_copying_it(preinst, tmp_path, linked):
+    """/etc/ucm is the account's: a ucm.env it replaced by a link is named, and nothing is read through it."""
+    victim = tmp_path / 'shadow'
+    victim.write_text('root:*:1::::::\n')
+    envfile = tmp_path / 'etc-ucm' / 'ucm.env'
+    envfile.parent.mkdir()
+    if linked:
+        envfile.symlink_to(victim)
+    else:
+        envfile.write_text('SECRET_KEY=a\n')
+    text = preinst.read_text()
+    assert text.count('/etc/ucm/ucm.env') == 4, text
+    preinst.write_text(text.replace('/etc/ucm/ucm.env', str(envfile)))
+    out, calls = _run_preinst(preinst, tmp_path, 'upgrade', '2.254')
+    backups = [c for c in calls if c.startswith('dd ')]
+    if linked:
+        assert out.returncode == 1 and f'{envfile} is a symbolic link or not a regular file' in out.stderr, out.stderr
+        assert backups == [], calls
+    else:
+        assert out.returncode == 0, out.stderr
+        assert backups and f'if={envfile}' in backups[0], calls
+
+
 @pytest.mark.parametrize('args', [('upgrade', '2.253'), ('upgrade', '1.8.3')])
 def test_the_deb_preinst_refuses_before_any_write(preinst, tmp_path, args):
     """dpkg passes the installed version as $2."""
