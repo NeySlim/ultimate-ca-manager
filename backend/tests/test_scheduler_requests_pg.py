@@ -93,7 +93,13 @@ def test_the_follower_reads_the_state_the_leader_published(app, ha, monkeypatch)
         from models import SystemConfig, db
         row = SystemConfig.query.filter_by(key=scheduler_service.STATE_KEY).first()
         state = json.loads(row.value)
+        # The leader's host clock three hours behind this node's: judged on the cluster clock
         state['published_at'] -= 3 * 3600
+        row.value = json.dumps(state)
+        db.session.commit()
+        assert not follower.state_is_stale()
+        # Published three hours ago on the cluster clock: stale on every node
+        state['published_cluster_at'] -= 3 * 3600
         row.value = json.dumps(state)
         db.session.commit()
         assert follower.state_is_stale()

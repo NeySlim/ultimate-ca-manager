@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- HA: a node whose clock differed from the leader's by more than two passes showed the scheduler state as stale for good, or never; the state the leader publishes is now judged on the PostgreSQL server clock.
 - HA: the scheduler leader wrote its heartbeat only between two tasks, so one task longer than three passes (an ACME renewal waiting on DNS) showed the cluster without a leader and let a restore or a rolling restart pass it over; the leader now beats while a task runs, as long as it holds the lock.
 - HA: a node whose clock ran more than 10 minutes ahead purged the WebSocket events the other nodes had just relayed; the relay now stamps and purges its rows on the PostgreSQL server clock.
 - Docker guide: `UCM_FQDN` was documented with the default `ucm.example.com`; the image uses `ucm.local`, which the guide now gives.

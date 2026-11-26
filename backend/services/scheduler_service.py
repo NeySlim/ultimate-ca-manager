@@ -368,10 +368,21 @@ class SchedulerService:
         return self._stale(state)
 
     def _stale(self, state: dict) -> bool:
+        """The state the HA leader stored is judged on the cluster clock, never against
+        another host's; this host's own file on its clock."""
+        window = 2 * self.wake_interval
+        cluster_at = state.get('published_cluster_at')
+        if isinstance(cluster_at, (int, float)) and not isinstance(cluster_at, bool):
+            try:
+                return _cluster_epoch() - cluster_at > window
+            except Exception as e:
+                _rollback()
+                logger.warning(f"Cluster clock not read for the scheduler state: {type(e).__name__}")
+                return True
         published_at = state.get('published_at')
         if not isinstance(published_at, (int, float)):
             return True
-        return time.time() - published_at > 2 * self.wake_interval
+        return time.time() - published_at > window
 
     def rearm_grace(self) -> None:
         """First runs wait the grace period from now, not from registration."""
@@ -416,7 +427,7 @@ class SchedulerService:
                     self._publish_error_logged = True
         if ha:
             try:
-                self._in_app(_store_state, state)
+                self._in_app(_store_cluster_state, state)
             except Exception as e:
                 self._in_app(_rollback)
                 logger.warning(f"Scheduler state not published to the database: {type(e).__name__}")
@@ -1104,6 +1115,16 @@ class SchedulerService:
         self._release_lock()
         logger.info("Scheduler stopped")
         return True
+
+
+def _cluster_epoch() -> float:
+    """Seconds since the epoch on the cluster clock (the PostgreSQL server's in HA)."""
+    from services.scheduler_leader import cluster_utc_now
+    return (cluster_utc_now() - datetime(1970, 1, 1)).total_seconds()
+
+
+def _store_cluster_state(state: dict) -> None:
+    _store_state(dict(state, published_cluster_at=_cluster_epoch()))
 
 
 def _store_state(state: dict) -> None:
