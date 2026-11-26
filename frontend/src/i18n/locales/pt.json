@@ -1239,7 +1239,7 @@
     "importPrivateKey": "Importar chave privada",
     "useHsmKey": "Usar uma chave do HSM",
     "attachHsmKey": {
-      "intro": "Escolha o provedor HSM que guarda a chave privada desta CA. Só são listadas as chaves cuja chave pública é a do certificado da CA; o UCM verifica que a chave escolhida assina para o certificado antes de a CA a usar.",
+      "intro": "Escolha o provedor HSM que guarda a chave privada desta CA. Só são listadas as chaves cuja chave pública é a do certificado da CA; antes de a CA usá-la, o UCM verifica que uma assinatura da chave escolhida é validada pelo certificado.",
       "provider": "Provedor HSM",
       "keys": "Chaves correspondentes",
       "keyId": "ID da chave",
@@ -1247,7 +1247,7 @@
       "noProviders": "Nenhum provedor HSM está ativado.",
       "noMatch": "Nenhuma chave deste provedor corresponde à chave pública do certificado da CA.",
       "heldBy": "Já usada por: {{holder}}",
-      "confirmText": "A CA assinará com a chave HSM {{label}} (ID {{id}}, {{algorithm}}). A sua chave privada permanece no HSM.",
+      "confirmText": "A CA assinará com a chave HSM {{label}} (ID {{id}}, {{algorithm}}). Sua chave privada permanece no HSM.",
       "confirm": "Usar esta chave",
       "attached": "Chave HSM associada"
     },

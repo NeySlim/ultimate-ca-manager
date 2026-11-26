@@ -1239,7 +1239,7 @@
     "importPrivateKey": "Importar clave privada",
     "useHsmKey": "Usar una clave del HSM",
     "attachHsmKey": {
-      "intro": "Elija el proveedor HSM que guarda la clave privada de esta CA. Solo se listan las claves cuya clave pública es la del certificado de la CA; UCM comprueba que la clave elegida firma para el certificado antes de que la CA la use.",
+      "intro": "Elija el proveedor HSM que guarda la clave privada de esta CA. Solo se listan las claves cuya clave pública es la del certificado de la CA; antes de que la CA la use, UCM comprueba que una firma de la clave elegida se verifica con el certificado.",
       "provider": "Proveedor HSM",
       "keys": "Claves coincidentes",
       "keyId": "ID de clave",

@@ -1103,7 +1103,7 @@
     "importPrivateKey": "Importer la clé privée",
     "useHsmKey": "Utiliser une clé du HSM",
     "attachHsmKey": {
-      "intro": "Choisissez le fournisseur HSM qui détient la clé privée de cette AC. Seules les clés dont la clé publique est celle du certificat de l’AC sont listées ; UCM vérifie que la clé choisie signe pour le certificat avant que l’AC ne l’utilise.",
+      "intro": "Choisissez le fournisseur HSM qui détient la clé privée de cette AC. Seules les clés dont la clé publique est celle du certificat de l’AC sont listées ; avant que l’AC ne l’utilise, UCM vérifie que le certificat valide une signature produite par la clé choisie.",
       "provider": "Fournisseur HSM",
       "keys": "Clés correspondantes",
       "keyId": "ID de clé",

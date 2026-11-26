@@ -1239,7 +1239,7 @@
     "importPrivateKey": "Privaten Schlüssel importieren",
     "useHsmKey": "Schlüssel aus dem HSM verwenden",
     "attachHsmKey": {
-      "intro": "Wählen Sie den HSM-Anbieter, der den privaten Schlüssel dieser CA hält. Aufgeführt werden nur die Schlüssel, deren öffentlicher Schlüssel der des CA-Zertifikats ist; UCM prüft, dass der gewählte Schlüssel für das Zertifikat signiert, bevor die CA ihn verwendet.",
+      "intro": "Wählen Sie den HSM-Anbieter, der den privaten Schlüssel dieser CA hält. Aufgeführt werden nur die Schlüssel, deren öffentlicher Schlüssel der des CA-Zertifikats ist; bevor die CA ihn verwendet, prüft UCM, dass sich eine Signatur des gewählten Schlüssels mit dem Zertifikat verifizieren lässt.",
       "provider": "HSM-Anbieter",
       "keys": "Passende Schlüssel",
       "keyId": "Schlüssel-ID",
