@@ -315,21 +315,22 @@ def _verify_jws_signature(protected: Dict[str, Any], signing_input: bytes,
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import ec, utils
 
-        hash_alg, key_size = {
-            'ES256': (hashes.SHA256, 32),
-            'ES384': (hashes.SHA384, 48),
-            'ES512': (hashes.SHA512, 66),
+        hash_alg, key_size, curve = {
+            'ES256': (hashes.SHA256, 32, 'secp256r1'),
+            'ES384': (hashes.SHA384, 48, 'secp384r1'),
+            'ES512': (hashes.SHA512, 66, 'secp521r1'),
         }[alg]
         hash_alg = hash_alg()
-        # JWS EC signatures use raw R||S format (RFC 7518 §3.4); the
-        # cryptography library expects a DER-encoded signature.
+        # Each ES alg names its curve, and its signature is R||S of exactly twice the
+        # curve's size (RFC 7518 §3.4): a DER signature is not a JWS one
+        if getattr(public_key.key, 'curve', None) is None or public_key.key.curve.name != curve:
+            return f"Key curve does not match algorithm '{alg}' (RFC 7518 §3.4)"
+        if len(signature_bytes) != 2 * key_size:
+            return "Signature verification failed"
         try:
-            if len(signature_bytes) == 2 * key_size:
-                r = int.from_bytes(signature_bytes[:key_size], 'big')
-                s = int.from_bytes(signature_bytes[key_size:], 'big')
-                der_signature = utils.encode_dss_signature(r, s)
-            else:
-                der_signature = signature_bytes
+            r = int.from_bytes(signature_bytes[:key_size], 'big')
+            s = int.from_bytes(signature_bytes[key_size:], 'big')
+            der_signature = utils.encode_dss_signature(r, s)
 
             public_key.key.verify(der_signature, signing_input, ec.ECDSA(hash_alg))
         except Exception as e:
