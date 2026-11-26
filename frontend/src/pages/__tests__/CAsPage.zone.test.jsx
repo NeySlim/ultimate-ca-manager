@@ -474,3 +474,20 @@ describe('CAsPage: functions in reach', () => {
     expect(await screen.findByText('crossCerts.findings:1')).toBeInTheDocument()
   })
 })
+
+describe('CAsPage: a renamed authority (#459)', () => {
+  it('reloads on the change and shows the new name in the tree, the side panel and the list', async () => {
+    renderAt('/cas?authority=2')
+    await loaded()
+    const renamed = smallHierarchy().map((c) => (c.id === 2 ? { ...c, name: 'Gateway Issuing', descr: 'Gateway Issuing' } : c))
+    getAll.mockResolvedValue({ data: renamed })
+    window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
+    await waitFor(() => expect(treeNames()).toContain('Gateway Issuing'))
+    expect(treeNames()).not.toContain('Services')
+    expect(within(side()).getByRole('heading')).toHaveTextContent('Gateway Issuing')
+    fireEvent.click(screen.getByRole('button', { name: 'cas.listMode' }))
+    const names = within(screen.getByRole('table')).getAllByRole('button').filter((b) => b.classList.contains('entity-name')).map((b) => b.textContent)
+    expect(names).toContain('Gateway Issuing')
+    expect(names).not.toContain('Services')
+  })
+})

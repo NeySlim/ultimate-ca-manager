@@ -1340,7 +1340,6 @@
     "revokeSuccess": "CAを失効しました",
     "revokeFailed": "CAの失効に失敗しました",
     "revokedBanner": "{{date}} に失効（{{reason}}）。親CAのCRLとOCSPに公開済み。このCAは署名できません。",
-    "descriptionPlaceholder": "このCAの任意の説明",
     "advancedConstraints": "高度な制約 (RFC 5280)",
     "pathLength": "パス長制約",
     "pathLengthPlaceholder": "空 = 無制限、0 = リーフCAのみ",
@@ -1589,7 +1588,22 @@
       "extensions": "X.509拡張",
       "show": "{{name}} を表示"
     },
-    "pageActions": "ページの操作"
+    "pageActions": "ページの操作",
+    "label": {
+      "displayName": "表示名",
+      "displayNamePlaceholder": "既定ではコモンネーム (CN)",
+      "displayNameHint": "UCM 全体でこの CA を示す名前です。証明書のコモンネーム ({{cn}}) は変わりません。",
+      "importNameHint": "空欄にするとコモンネームを使用します。",
+      "description": "説明",
+      "noDescription": "なし",
+      "descriptionHint": "プレーンテキストです。改行は保持されます。空欄にすると説明を削除します。",
+      "descriptionCount": "{{length}} / {{max}} 文字",
+      "edit": "編集",
+      "dialogTitle": "名前と説明",
+      "saved": "名前と説明を保存しました",
+      "saveFailed": "名前と説明を保存できませんでした",
+      "nameRequired": "表示名は空にできません"
+    }
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",

@@ -1340,7 +1340,6 @@
     "revokeSuccess": "CA 已吊销",
     "revokeFailed": "吊销 CA 失败",
     "revokedBanner": "于 {{date}} 吊销（{{reason}}）。已发布到上级 CA 的 CRL 和 OCSP；此 CA 无法再签署。",
-    "descriptionPlaceholder": "此CA的可选描述",
     "advancedConstraints": "高级约束 (RFC 5280)",
     "pathLength": "路径长度约束",
     "pathLengthPlaceholder": "空 = 无限制，0 = 仅叶CA",
@@ -1589,7 +1588,22 @@
       "extensions": "X.509 扩展",
       "show": "显示 {{name}}"
     },
-    "pageActions": "页面操作"
+    "pageActions": "页面操作",
+    "label": {
+      "displayName": "显示名称",
+      "displayNamePlaceholder": "默认为通用名称 (CN)",
+      "displayNameHint": "UCM 在各处对该 CA 使用的名称。证书保留其通用名称 ({{cn}})。",
+      "importNameHint": "留空即使用通用名称。",
+      "description": "描述",
+      "noDescription": "无",
+      "descriptionHint": "纯文本，保留换行。留空即可删除描述。",
+      "descriptionCount": "{{length}} / {{max}} 个字符",
+      "edit": "编辑",
+      "dialogTitle": "名称和描述",
+      "saved": "名称和描述已保存",
+      "saveFailed": "无法保存名称和描述",
+      "nameRequired": "显示名称不能为空"
+    }
   },
   "csrs": {
     "uploadCSR": "上传CSR",

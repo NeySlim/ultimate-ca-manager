@@ -20,6 +20,7 @@ import { SignatureSchemeField } from '../../components/cas/SignatureSchemeField'
 import { ComplianceProfileField } from '../../components/cas/ComplianceProfileField'
 import { IssuanceVisibilityField } from '../../components/cas/IssuanceVisibilityField'
 import { UniqueSubjectField } from '../../components/cas/UniqueSubjectField'
+import { CALabelField } from '../../components/cas/CALabelField'
 import { ParentConfirmationSection } from '../../components/cas/ParentConfirmationSection'
 import { CrossCertificatesSection } from '../../components/cas/CrossCertificatesSection'
 import { ChainUsageSection } from '../../components/cas/ChainUsageSection'
@@ -186,7 +187,9 @@ export function CASide({ ca: listed, cas, forest, crossLinks = [], ocsp, onPick,
             { label: t('cas.side.subject'), value: ca.subject || '—', long: true, product: true },
             serial ? { label: t('cas.side.serial'), value: serial, kind: 'hex', long: serial.length > 23, product: true } : { label: t('cas.side.serial'), value: '—', product: true },
             { label: t('cas.side.validFrom'), value: ca.valid_from ? formatDate(ca.valid_from, { time: false }) : '—', product: true },
-          ]} />
+          ]}>
+            <CALabelField ca={ca} canWrite={canWrite('cas')} onChanged={setDetail} idPrefix={idPrefix} />
+          </Facts>
         </section>
 
         <section className="ca-side-section">

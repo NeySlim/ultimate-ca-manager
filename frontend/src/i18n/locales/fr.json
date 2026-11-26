@@ -1208,7 +1208,6 @@
     "revokeSuccess": "AC révoquée",
     "revokeFailed": "Échec de la révocation de l’AC",
     "revokedBanner": "Révoquée le {{date}} ({{reason}}). Publiée sur la CRL et l’OCSP de l’AC parente ; cette AC ne peut plus signer.",
-    "descriptionPlaceholder": "Description optionnelle pour cette AC",
     "advancedConstraints": "Contraintes avancées (RFC 5280)",
     "pathLength": "Contrainte de longueur de chemin",
     "pathLengthPlaceholder": "Vide = illimité, 0 = AC feuille uniquement",
@@ -1457,7 +1456,22 @@
       "extensions": "Extensions X.509",
       "show": "Afficher {{name}}"
     },
-    "pageActions": "Actions de la page"
+    "pageActions": "Actions de la page",
+    "label": {
+      "displayName": "Nom affiché",
+      "displayNamePlaceholder": "Par défaut, le nom commun (CN)",
+      "displayNameHint": "Le nom de cette AC partout dans UCM. Le certificat garde son nom commun ({{cn}}).",
+      "importNameHint": "Laissez le champ vide pour reprendre le nom commun.",
+      "description": "Description",
+      "noDescription": "Aucune",
+      "descriptionHint": "Texte brut : les retours à la ligne sont conservés. Laissez le champ vide pour supprimer la description.",
+      "descriptionCount": "{{length}} / {{max}} caractères",
+      "edit": "Modifier",
+      "dialogTitle": "Nom et description",
+      "saved": "Nom et description enregistrés",
+      "saveFailed": "Le nom et la description n’ont pas pu être enregistrés",
+      "nameRequired": "Le nom affiché ne peut pas être vide"
+    }
   },
   "certificates": {
     "createCertificate": "Créer un certificat",

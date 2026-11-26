@@ -51,6 +51,8 @@ class CA(db.Model):
     # in CDP/OCSP/AIA paths. NULL = refid-based URLs (default).
     url_slug = db.Column(db.String(64), unique=True)
     descr = db.Column(db.String(255), nullable=False)
+    # Free text beside the display name (issue #459, upgrade step 177); NULL when there is none
+    description = db.Column(db.Text, nullable=True)
     # Base64 encoded. '' (empty) = pending external-CSR CA awaiting its
     # certificate (#298) — sentinel keeps the NOT NULL constraint so SQLite
     # never needs a table rebuild.
@@ -634,6 +636,7 @@ class CA(db.Model):
             "url_slug": self.url_slug,
             "descr": self.descr,
             "name": self.descr,  # Alias for frontend
+            "description": self.description or "",
             "serial": self.serial,
             "caref": self.caref,
             "parent_id": parent_id,  # Numeric parent ID for frontend tree

@@ -1380,7 +1380,6 @@
     "revokeSuccess": "ЦС відкликано",
     "revokeFailed": "Не вдалося відкликати ЦС",
     "revokedBanner": "Відкликано {{date}} ({{reason}}). Опубліковано у CRL та OCSP батьківського ЦС; цей ЦС більше не може підписувати.",
-    "descriptionPlaceholder": "Необов'язковий опис для цього ЦС",
     "advancedConstraints": "Розширені обмеження (RFC 5280)",
     "pathLength": "Обмеження довжини шляху",
     "pathLengthPlaceholder": "Порожнє = необмежено, 0 = лише листовий ЦС",
@@ -1647,7 +1646,22 @@
       "extensions": "Розширення X.509",
       "show": "Показати {{name}}"
     },
-    "pageActions": "Дії сторінки"
+    "pageActions": "Дії сторінки",
+    "label": {
+      "displayName": "Відображуване ім’я",
+      "displayNamePlaceholder": "Типово: загальне ім’я (CN)",
+      "displayNameHint": "Під цим ім’ям UCM усюди показує цей ЦС. Сертифікат зберігає своє загальне ім’я ({{cn}}).",
+      "importNameHint": "Залиште поле порожнім, щоб використати загальне ім’я.",
+      "description": "Опис",
+      "noDescription": "Немає",
+      "descriptionHint": "Простий текст: розриви рядків зберігаються. Залиште поле порожнім, щоб видалити опис.",
+      "descriptionCount": "{{length}} / {{max}} символів",
+      "edit": "Змінити",
+      "dialogTitle": "Ім’я та опис",
+      "saved": "Ім’я та опис збережено",
+      "saveFailed": "Не вдалося зберегти ім’я та опис",
+      "nameRequired": "Відображуване ім’я не може бути порожнім"
+    }
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",

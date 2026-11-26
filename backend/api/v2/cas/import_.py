@@ -26,6 +26,7 @@ from services.import_service import (
 from security.encryption import encrypt_private_key
 from services.audit_service import AuditService
 from services.ca_service import CAService
+from services.ca import labels as ca_labels
 from services.notification_service import NotificationService
 from models import CA, db
 
@@ -44,7 +45,8 @@ def import_ca():
         file: Certificate file (optional if pem_content provided)
         pem_content: Pasted PEM content (optional if file provided)
         password: Password for PKCS12
-        name: Optional display name
+        name: Optional display name (default: the certificate's CN; a re-import keeps the stored one)
+        description: Optional free text (at most 1000 characters)
         import_key: Whether to import private key (default: true)
         update_existing: Whether to update if duplicate found (default: true)
     """
@@ -68,6 +70,12 @@ def import_ca():
 
     password = request.form.get('password')
     name = request.form.get('name', '')
+    description = request.form.get('description') or None
+    label_error = (name.strip() and ca_labels.name_error(name)) or ca_labels.description_error(description)
+    if label_error:
+        return error_response(label_error, 400)
+    name = name.strip()
+    description = ca_labels.stored_description(description)
     import_key = request.form.get('import_key', 'true').lower() == 'true'
     update_existing = request.form.get('update_existing', 'true').lower() == 'true'
     cross_mode = cross_mode_from(request.form.get('cross_mode'))
@@ -130,7 +138,7 @@ def import_ca():
                 try:
                     ca_dict, warnings, superseded = install_on_pending_ca(
                         existing_ca, cert_pem, username, encrypted_prv=encrypted_prv, name=name or None,
-                        replace_cross=cross_mode == 'replace')
+                        description=description, replace_cross=cross_mode == 'replace')
                 except CrossCertificateImport as e:
                     db.session.rollback()
                     return error_response(str(e), 409, e.details)
@@ -146,10 +154,13 @@ def import_ca():
                     data['superseded_valid_to'] = superseded['valid_to']
                 return success_response(data=data, message=message)
 
+            old_labels = (existing_ca.descr, existing_ca.description)
             try:
                 key_dropped = update_ca_from_import(
                     existing_ca, cert, cert_pem, cert_info,
                     key_pem=key_pem, encrypted_prv=encrypted_prv, name=name)
+                if description:
+                    existing_ca.description = description
             except ImportConflict as e:
                 db.session.rollback()
                 return error_response(str(e), 409)
@@ -162,7 +173,8 @@ def import_ca():
                 resource_type='ca',
                 resource_id=existing_ca.id,
                 resource_name=existing_ca.descr,
-                details=f'Updated CA via import: {existing_ca.descr}',
+                details=ca_labels.audit_details(f'Updated CA via import: {existing_ca.descr}',
+                                                ca_labels.changes(*old_labels, existing_ca)),
                 success=True
             )
             from services.ca import parent_confirmation
@@ -188,6 +200,7 @@ def import_ca():
         ca = CA(
             refid=refid,
             descr=name or cert_info['cn'] or filename,
+            description=description,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
             prv=encrypted_prv,
             serial=0,

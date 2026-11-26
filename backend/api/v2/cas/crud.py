@@ -26,6 +26,7 @@ import fips_mode
 from fips_mode import FipsRestricted
 from utils.ha import HaRestricted
 from services.ca_service import CAService
+from services.ca import labels as ca_labels
 from services.audit_service import AuditService
 from services.smart_import.parser import PasswordNotTried, inspected_key
 import compliance_profiles
@@ -65,7 +66,6 @@ def _needs_protocol_url(current_url):
 # every issued certificate, so we cap length, charset and list size). ----
 _MAX_URL_LEN = 2048
 _MAX_URLS_PER_FIELD = 8
-_MAX_DESCR_LEN = 255
 _MAX_DESCRIPTION_LEN = 1024
 # Same ceiling as validityYears (50 years)
 _MAX_CA_VALIDITY_DAYS = 50 * 365
@@ -825,7 +825,8 @@ def update_ca(ca_id):
     Update CA settings (OCSP, CDP, etc.)
 
     Body (all optional):
-        name: Display name
+        name: Display name (trimmed, 1 to 255 characters); the certificate is unchanged
+        description: Free text (at most 1000 characters, line feed and tab kept); '' or null clears it
         ocsp_enabled: bool - Enable OCSP responder
         ocsp_url: string - OCSP responder URL
         cdp_enabled: bool - Enable CRL Distribution Point
@@ -882,19 +883,25 @@ def update_ca(ca_id):
         if not isinstance(new_unique, bool):
             return error_response('enforceUniqueSubject must be true or false', 400)
 
+    label_error = ('name' in data and ca_labels.name_error(data['name'])) or \
+        ('description' in data and ca_labels.description_error(data['description']))
+    if label_error:
+        return error_response(label_error, 400)
+
     # Track which fields actually changed for the audit log
     changed = []
 
-    # Update allowed fields
+    # The display name and the description are the operator's: both values go to the audit log
     if 'name' in data:
-        new_name = data['name']
-        if new_name is not None and not isinstance(new_name, str):
-            return error_response('name must be a string', 400)
-        if new_name and len(new_name) > _MAX_DESCR_LEN:
-            return error_response(f'name too long (max {_MAX_DESCR_LEN} chars)', 400)
+        new_name = data['name'].strip()
         if new_name != ca.descr:
+            changed.append(f'name "{ca.descr}" -> "{new_name}"')
             ca.descr = new_name
-            changed.append('name')
+    if 'description' in data:
+        new_description = ca_labels.stored_description(data['description'])
+        if new_description != ca.description:
+            changed.append(f'description "{ca.description or ""}" -> "{new_description or ""}"')
+            ca.description = new_description
     if 'namedUrls' in data:
         want = bool(data['namedUrls'])
         if not want and ca.url_slug:
