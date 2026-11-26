@@ -219,10 +219,17 @@ def enroll(ca_refid, secret, public_key, principals=None, ip=None, signature=Non
             source='enrollment', username='ssh-host-enrollment')
     except Exception as e:
         # Nothing was issued: the token is given back, unless another write touched it since
+        prefix = token.token_prefix
         db.session.rollback()
-        db.session.execute(update(table).where(table.c.id == token.id, table.c.used_at == now,
-                                               table.c.used_by_host_id.is_(None)).values(used_at=None))
-        db.session.commit()
+        try:
+            db.session.execute(update(table).where(table.c.id == token.id, table.c.used_at == now,
+                                                   table.c.used_by_host_id.is_(None)).values(used_at=None))
+            db.session.commit()
+        except Exception as lost:
+            # The signing error is the one to report: this one only leaves the token spent
+            db.session.rollback()
+            logger.error(f'Enrollment token {prefix} could not be given back ({lost}) '
+                         f'after a failed signature: {e}')
         if isinstance(e, ValueError):
             raise EnrollmentRefused(400, str(e)) from None
         raise

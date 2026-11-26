@@ -282,6 +282,30 @@ class TestEnrollment:
         monkeypatch.undo()
         assert _enroll(client, ca, token['token'], key).status_code == 201
 
+    def test_a_failed_give_back_keeps_the_signing_error(self, app, auth_client, client, monkeypatch, caplog):
+        from sqlalchemy.exc import OperationalError
+        from services.ssh_cert import SSHCertificateService
+        ca = _host_ca(auth_client, 'Enroll give-back failure CA')
+        token = _token(auth_client, ca)
+
+        def lost(*args, **kwargs):
+            raise OperationalError('UPDATE', {}, Exception('server closed the connection'))
+
+        def failing(*args, **kwargs):
+            monkeypatch.setattr(db.session, 'execute', lost)
+            raise RuntimeError('disk full')
+        monkeypatch.setattr(SSHCertificateService, 'sign_certificate', failing)
+        key = _host_key()
+        signature = sshsig_support.sign(_PRIVATE[key], token['token'], hosts.ENROLL_NAMESPACE)
+        with app.app_context():
+            with caplog.at_level('ERROR', logger=hosts.logger.name):
+                with pytest.raises(RuntimeError, match='disk full'):
+                    hosts.enroll(ca['refid'], token['token'], key, signature=signature)
+            monkeypatch.undo()
+            db.session.rollback()
+        assert any(rec.levelname == 'ERROR' and token['token_prefix'] in rec.getMessage()
+                   for rec in caplog.records)
+
 
 class TestProofOfPossession:
     """The token signed with the host key: a public key alone, which any server shows, enrolls nothing."""
