@@ -13,6 +13,7 @@ import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
 import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, auditService } from '../services'
 import { holdSignOut } from '../services/apiClient'
+import { useInFlight } from '../hooks/useInFlight'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission, useJob, isTransientError, jobPercent } from '../hooks'
@@ -374,6 +375,8 @@ export default function SettingsPage() {
   const [editingMsca, setEditingMsca] = useState(null)
   const [mscaTesting, setMscaTesting] = useState(false)
   const [mscaConfirmDelete, setMscaConfirmDelete] = useState(null)
+  // One deletion at a time: the SSO, webhook and Microsoft CA confirmations share it
+  const [deleting, runDelete] = useInFlight()
   const [mscaCaControl, setMscaCaControl] = useState(null)
 
   // Active Directory Connector state
@@ -744,7 +747,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSsoDelete = async () => {
+  const handleSsoDelete = () => runDelete(async () => {
     if (!ssoConfirmDelete) return
     try {
       await ssoService.deleteProvider(ssoConfirmDelete.id)
@@ -755,7 +758,7 @@ export default function SettingsPage() {
     } finally {
       setSsoConfirmDelete(null)
     }
-  }
+  })
 
   const handleSsoToggle = async (provider) => {
     try {
@@ -821,7 +824,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleMscaDelete = async () => {
+  const handleMscaDelete = () => runDelete(async () => {
     if (!mscaConfirmDelete) return
     try {
       await mscaService.delete(mscaConfirmDelete.id)
@@ -831,7 +834,7 @@ export default function SettingsPage() {
     } catch (error) {
       showError(error.message)
     }
-  }
+  })
 
   const handleMscaToggle = async (conn) => {
     try {
@@ -946,7 +949,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleWebhookDelete = async () => {
+  const handleWebhookDelete = () => runDelete(async () => {
     if (!webhookConfirmDelete) return
     try {
       await settingsService.deleteWebhook(webhookConfirmDelete.id)
@@ -957,7 +960,7 @@ export default function SettingsPage() {
     } finally {
       setWebhookConfirmDelete(null)
     }
-  }
+  })
 
   const handleWebhookToggle = async (webhook) => {
     try {
@@ -2384,6 +2387,7 @@ export default function SettingsPage() {
         message={t('sso.deleteConfirm', { name: ssoConfirmDelete?.name })}
         confirmLabel={t('common.delete')}
         variant="danger"
+        loading={deleting}
       />
 
       {/* Webhook Modal */}
@@ -2409,6 +2413,7 @@ export default function SettingsPage() {
         message={t('webhooks.deleteConfirm', { name: webhookConfirmDelete?.name })}
         confirmLabel={t('common.delete')}
         variant="danger"
+        loading={deleting}
       />
 
       {/* Microsoft CA Connection Modal */}
@@ -2434,6 +2439,7 @@ export default function SettingsPage() {
         message={t('msca.deleteConfirm')}
         confirmLabel={t('common.delete')}
         variant="danger"
+        loading={deleting}
       />
 
       {/* Microsoft CA Control Panel (pending requests + health) */}

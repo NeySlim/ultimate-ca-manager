@@ -4,6 +4,7 @@ import { Btn, Icon, Pill } from '../../components/atelier'
 import { Input, SecretInput, Select, ToggleSwitch, Notice } from '../../components/atelier/Form'
 import { FieldError } from '../../components/atelier/SettingsView'
 import { changedTargets, secretRequiredForTarget } from '../../lib/secretTarget'
+import { useInFlight } from '../../hooks/useInFlight'
 
 const WEBHOOK_EVENTS = [
   'certificate.issued',
@@ -94,6 +95,7 @@ function maskToken(token) {
 export default function WebhookForm({ webhook, onSave, onCancel }) {
   const { t } = useTranslation()
   const isEditing = Boolean(webhook)
+  const [saving, runSave] = useInFlight()
 
   const [formData, setFormData] = useState({
     name: webhook?.name || '',
@@ -238,7 +240,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
       payload.auth_header_name = null
     }
 
-    onSave(payload)
+    runSave(() => onSave(payload))
   }
 
   // Preview logic: compute outgoing header from current form state
@@ -401,7 +403,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
 
       <div className="modal-actions">
         <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
-        <Btn type="submit" tone="primary" icon="check">{isEditing ? t('common.save') : t('common.create')}</Btn>
+        <Btn type="submit" tone="primary" icon="check" disabled={saving || undefined}>{isEditing ? t('common.save') : t('common.create')}</Btn>
       </div>
     </form>
   )
