@@ -218,6 +218,9 @@ check_target() {
     if ! [[ "$installed" =~ ^[0-9][0-9A-Za-z.+~:-]*$ ]]; then
         echo "the installed ucm version cannot be read from the package database"; return
     fi
+    if ! [[ "$want" =~ ^[0-9][0-9A-Za-z.+~:-]*$ ]]; then
+        echo "the update target '$2' is not a version"; return
+    fi
     if [ "$declared" != "$want" ]; then
         echo "the package declares version '$declared', not the update target '$want'"; return
     fi
