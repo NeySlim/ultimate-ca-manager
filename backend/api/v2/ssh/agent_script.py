@@ -21,7 +21,8 @@ def shell_safe_base_url(url):
 
 AGENT = r'''#!/bin/sh
 # ucm-ssh-agent: keeps this server's sshd in step with UCM (Ultimate Certificate Manager).
-#   ucm-ssh-agent sync        pull the KRL now (the timer runs this every INTERVAL minutes)
+#   ucm-ssh-agent sync        pull the KRL and renew the host certificate when due (the timer
+#                             runs this every INTERVAL minutes)
 #   ucm-ssh-agent enroll REFID [NAME...]   exchange UCM_ENROLL_TOKEN for a host certificate
 #   ucm-ssh-agent status      show what is installed
 #   ucm-ssh-agent uninstall   remove the agent, its timer and its sshd settings
@@ -230,6 +231,8 @@ sync_krl() {
     ca=$(conf_get KRL_CA)
     [ -n "$ca" ] || return 0
     url="$(conf_get UCM_URL)/ssh/krl/$ca"
+    # Names this server, so UCM shows when it last pulled the KRL
+    if [ -n "$(conf_get HOST_REFID)" ]; then url="$url?host=$(conf_get HOST_REFID)"; fi
     current=""
     if [ -s "$KRL_FILE" ]; then current=$(krl_version "$KRL_FILE"); fi
     etag=""
@@ -361,6 +364,7 @@ cmd_enroll() { # REFID [NAME...]
     rm -f "$out"
     case "$host" in *[!A-Za-z0-9-]*|'') die "UCM answered no host reference" ;; esac
     install_cert "$cert" "$key" || exit 1
+    conf_set RENEWAL_STOPPED ""
     conf_set HOST_CA "$refid"
     conf_set HOST_REFID "$host"
     conf_set HOST_KEY "$key"
@@ -370,9 +374,56 @@ cmd_enroll() { # REFID [NAME...]
     log "enrolled: sshd presents $key-cert.pub"
 }
 
+# The host certificate renewed in its last share of life: UCM hands out a challenge, the host
+# signs it with the certified host key (ssh-keygen -Y sign), UCM checks it and signs anew
+renew_host() {
+    host=$(conf_get HOST_REFID)
+    [ -n "$host" ] || return 0
+    if [ -n "$(conf_get RENEWAL_STOPPED)" ]; then return 0; fi
+    base="$(conf_get UCM_URL)/ssh/renew/$host"
+    key=$(conf_get HOST_KEY)
+    work="$CONF_DIR/.renew.$$"
+    mkdir -p "$work"
+    printf '{}' > "$work/empty"
+    code=$(http_post "$base/challenge" "$work/empty" "$work/answer")
+    case "$code" in
+        200) ;;
+        403|404)
+            state=$(field state "$work/answer" 2>/dev/null || true)
+            if [ "$state" != disabled ]; then
+                reason=$(field error "$work/answer" 2>/dev/null || true)
+                conf_set RENEWAL_STOPPED "${reason:-HTTP $code}"
+                log "renewal stopped: ${reason:-HTTP $code}"
+            fi
+            rm -rf "$work"; return 0 ;;
+        *) rm -rf "$work"; log "renewal check failed (HTTP $code)"; return 1 ;;
+    esac
+    if [ "$(field due "$work/answer")" != 1 ]; then rm -rf "$work"; return 0; fi
+    challenge=$(field challenge "$work/answer")
+    namespace=$(field namespace "$work/answer")
+    case "$challenge$namespace" in *[!A-Za-z0-9_.@-]*|'') rm -rf "$work"; log "UCM sent an unreadable challenge"; return 1 ;; esac
+    printf '%s' "$challenge" > "$work/challenge"
+    if ! ssh-keygen -q -Y sign -n "$namespace" -f "$key" "$work/challenge" >/dev/null 2>&1; then
+        rm -rf "$work"; log "could not sign the renewal challenge with $key"; return 1
+    fi
+    signature=$(awk '{ printf "%s\\n", $0 }' "$work/challenge.sig")
+    printf '{"challenge":"%s","signature":"%s"}' "$challenge" "$signature" > "$work/body"
+    code=$(http_post "$base" "$work/body" "$work/answer")
+    if [ "$code" != 200 ]; then
+        reason=$(field error "$work/answer" 2>/dev/null || true)
+        rm -rf "$work"; log "renewal refused (HTTP $code)${reason:+: $reason}"; return 1
+    fi
+    cert=$(field certificate "$work/answer")
+    rm -rf "$work"
+    install_cert "$cert" "$key" || return 1
+    log "host certificate renewed"
+    CHANGED=1
+}
+
 cmd_sync() {
     status=0 CHANGED=""
     sync_krl || status=1
+    renew_host || status=1
     if [ -n "$CHANGED" ]; then reload_sshd || true; fi
     return $status
 }
@@ -388,6 +439,7 @@ cmd_status() {
     host=$(conf_get HOST_REFID)
     if [ -n "$host" ]; then
         printf 'Host: %s (CA %s), certificate %s\n' "$host" "$(conf_get HOST_CA)" "$(conf_get HOST_CERT)"
+        if [ -n "$(conf_get RENEWAL_STOPPED)" ]; then printf 'Renewal stopped: %s\n' "$(conf_get RENEWAL_STOPPED)"; fi
         ssh-keygen -L -f "$(conf_get HOST_CERT)" 2>/dev/null | sed -n 's/^[[:space:]]*Valid: /Valid: /p'
     else
         printf 'Host: not enrolled\n'

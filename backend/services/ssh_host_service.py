@@ -258,3 +258,123 @@ def set_auto_renew(host_id, enabled):
         host.challenge = host.challenge_expires_at = None
     db.session.commit()
     return host
+
+
+# --- renewal: proof of possession of the certified host key (PROTOCOL.sshsig)
+
+NAMESPACE = 'ucm-ssh-host-renewal'
+CHALLENGE_SECONDS = 300
+SEEN_EVERY_SECONDS = 60
+
+
+class RenewalRefused(EnrollmentRefused):
+    """*state* names a refusal the agent waits out (``disabled``) or stops on (anything else);
+    *audited* is False for an expected answer repeated at every sync."""
+
+    def __init__(self, status, public, reason=None, state='refused', audited=True):
+        super().__init__(status, public, reason)
+        self.state, self.audited = state, audited
+
+
+def _renewal_window(cert, percent):
+    """When a certificate enters its last *percent* of the lifetime it was issued with."""
+    lifetime = cert.valid_to - (cert.created_at or cert.valid_from)
+    return cert.valid_to - lifetime * (percent / 100)
+
+
+def _renewable_host(host_refid):
+    host = SSHHost.query.filter_by(refid=host_refid).first() if isinstance(host_refid, str) else None
+    if host is None:
+        raise RenewalRefused(404, 'unknown host', f'no host {str(host_refid)[:40]}', state='unknown')
+    if host.revoked_at:
+        raise RenewalRefused(403, 'this host is revoked: enroll it again', f'host {host.name} is revoked',
+                             state='revoked')
+    if not host.auto_renew:
+        raise RenewalRefused(403, 'renewal is disabled for this host', f'host {host.name}: renewal disabled',
+                             state='disabled', audited=False)
+    cert = host.certificate
+    if cert is None or cert.revoked:
+        raise RenewalRefused(403, 'the host certificate is revoked: enroll again',
+                             f'host {host.name}: its certificate is revoked', state='revoked')
+    if cert.is_expired:
+        raise RenewalRefused(403, 'the host certificate has expired: enroll again',
+                             f'host {host.name}: its certificate has expired', state='expired')
+    # The key signing the proof is the key this certificate certifies, nothing stored beside it
+    if cert.public_key.split()[:2] != host.public_key.split()[:2]:
+        raise RenewalRefused(403, 'the host certificate does not certify the enrolled key',
+                             f'host {host.name}: certificate and key differ', state='revoked')
+    return host, cert
+
+
+def challenge(host_refid):
+    """{'due': 0, 'renew_after'} while the certificate is young, else {'due': 1, 'challenge'}."""
+    host, cert = _renewable_host(host_refid)
+    now = utc_now()
+    if host.last_seen_at is None or (now - host.last_seen_at).total_seconds() >= SEEN_EVERY_SECONDS:
+        host.last_seen_at = now
+    window = _renewal_window(cert, host.renew_percent or RENEW_PERCENT_DEFAULT)
+    if now < window:
+        db.session.commit()
+        return {'due': 0, 'renew_after': window}
+    # A pending challenge is handed out again: a stranger asking for one cannot void the host's
+    if not host.challenge or not host.challenge_expires_at or host.challenge_expires_at <= now:
+        host.challenge = secrets.token_urlsafe(32)
+        host.challenge_expires_at = now + timedelta(seconds=CHALLENGE_SECONDS)
+    db.session.commit()
+    return {'due': 1, 'challenge': host.challenge, 'namespace': NAMESPACE}
+
+
+def renew(host_refid, answered, signature):
+    """(host, new certificate): *signature* is an SSH signature of the pending challenge
+    *answered*, made with the key the current, unrevoked certificate certifies."""
+    from services.ssh_cert import SSHCertificateService
+    from utils import sshsig
+    host, cert = _renewable_host(host_refid)
+    now = utc_now()
+    pending = host.challenge
+    if (not isinstance(answered, str) or not pending or not host.challenge_expires_at
+            or host.challenge_expires_at <= now or not secrets.compare_digest(answered, pending)):
+        raise RenewalRefused(403, 'unknown or expired challenge', f'host {host.name}: no such pending challenge')
+    try:
+        sshsig.verify(signature, answered.encode(), NAMESPACE, cert.public_key)
+    except sshsig.SignatureError as e:
+        raise RenewalRefused(403, 'the signature does not prove the host key', f'host {host.name}: {e}') from None
+    # Spent before the signature: one challenge, one certificate
+    table = SSHHost.__table__
+    spent = db.session.execute(update(table).where(table.c.id == host.id, table.c.challenge == pending)
+                               .values(challenge=None, challenge_expires_at=None))
+    if spent.rowcount != 1:
+        db.session.rollback()
+        raise RenewalRefused(403, 'unknown or expired challenge', f'host {host.name}: challenge spent meanwhile')
+    db.session.commit()
+    names = host.get_principals()
+    try:
+        new = SSHCertificateService.sign_certificate(
+            ca_id=host.ssh_ca_id, public_key_data=host.public_key, cert_type='host', principals=names,
+            validity_seconds=host.validity_seconds, descr=f"Host cert for {', '.join(names)}",
+            source='renewal', username='ssh-host-renewal')
+    except ValueError as e:
+        raise RenewalRefused(400, str(e), f'host {host.name}: {e}') from None
+    host = db.session.get(SSHHost, host.id)
+    host.certificate_id = new.id
+    host.last_renewed_at = host.last_seen_at = utc_now()
+    db.session.commit()
+    return host, new
+
+
+def krl_pulled(host_refid):
+    """The agent of this host downloaded a KRL: recorded at most once a minute, as it claims."""
+    if not isinstance(host_refid, str) or not re.fullmatch(r'[A-Za-z0-9-]{1,36}', host_refid):
+        return
+    now = utc_now()
+    table = SSHHost.__table__
+    try:
+        db.session.execute(update(table).where(
+            table.c.refid == host_refid, table.c.revoked_at.is_(None),
+            (table.c.last_krl_sync_at.is_(None))
+            | (table.c.last_krl_sync_at < now - timedelta(seconds=SEEN_EVERY_SECONDS))
+        ).values(last_krl_sync_at=now))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f'Could not record the KRL download of host {host_refid}: {e}')

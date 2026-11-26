@@ -63,8 +63,8 @@ class RealSshd:
             subprocess.run(['kill', self.pidfile.read_text().strip()])
 
 
-def _login(port, key, cert, known_hosts=None, host_alias='127.0.0.1'):
-    args = ['ssh', '-F', '/dev/null', '-p', str(port), '-i', str(key), '-o', f'CertificateFile={cert}',
+def _login(port, key, cert, known_hosts=None, host_alias='127.0.0.1', verbose=False):
+    args = ['ssh', '-F', '/dev/null'] + (['-v'] if verbose else []) + ['-p', str(port), '-i', str(key), '-o', f'CertificateFile={cert}',
             '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes', '-o', 'ConnectTimeout=10']
     if known_hosts:
         args += ['-o', f'UserKnownHostsFile={known_hosts}', '-o', 'StrictHostKeyChecking=yes',
@@ -152,6 +152,49 @@ def test_a_client_trusting_the_host_ca_accepts_the_enrolled_server(app, auth_cli
         sshd.wait_restart(listened)
         after = _login(sshd.port, key, cert_file, known_hosts, alias)
         assert after.returncode == 0, after.stderr + sshd.log.read_text()
+    finally:
+        sshd.stop()
+        host.close()
+
+
+def test_the_renewed_host_certificate_is_the_one_sshd_presents(app, auth_client, tmp_path):
+    from datetime import timedelta
+    from models import db
+    from models.ssh import SSHHost
+    from utils.datetime_utils import utc_now
+    user_ca, key, cert_file = _user_login_material(auth_client, tmp_path, 'Real sshd renewal login CA')
+    host_ca = _create_ssh_ca(auth_client, ca_type='host', descr='Real sshd renewal host CA')
+    known_hosts = tmp_path / 'known_hosts'
+    known_hosts.write_text(f"@cert-authority web01.example.com {host_ca['public_key']}\n")
+    token = post_json(auth_client, '/api/v2/ssh/enrollment-tokens', {
+        'ca_id': host_ca['id'], 'principals': ['web01.example.com']}).get_json()['data']['token']
+    host = AgentHost(tmp_path, real_tools=True, sshd_pidfile=tmp_path / 'real-sshd.pid')
+    (host.ssh / 'user_ca.pub').write_text(user_ca['public_key'] + '\n')
+    sshd = RealSshd(host, tmp_path, extra=f"TrustedUserCAKeys {host.ssh / 'user_ca.pub'}\n")
+    sshd.start()
+    try:
+        with live_server(app) as url:
+            import urllib.request
+            script = urllib.request.urlopen(f"{url}/ssh/setup/{host_ca['refid']}/agent", timeout=30).read().decode()
+            listened = sshd.listening()
+            assert host.install(script, env={'UCM_ENROLL_TOKEN': token}).returncode == 0
+            sshd.wait_restart(listened)
+            refid = host.conf()['HOST_REFID']
+            with app.app_context():
+                cert = SSHHost.query.filter_by(refid=refid).one().certificate
+                first = cert.serial
+                cert.created_at = utc_now() - timedelta(days=3650)
+                db.session.commit()
+            listened = sshd.listening()
+            out = host.run('sync')
+            assert out.returncode == 0 and 'host certificate renewed' in out.stderr, out.stderr
+            sshd.wait_restart(listened)
+            with app.app_context():
+                renewed = SSHHost.query.filter_by(refid=refid).one().certificate.serial
+        assert renewed != first
+        login = _login(sshd.port, key, cert_file, known_hosts, 'web01.example.com', verbose=True)
+        assert login.returncode == 0, login.stderr
+        assert f'serial {renewed} ' in login.stderr
     finally:
         sshd.stop()
         host.close()

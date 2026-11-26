@@ -167,6 +167,9 @@ def get_public_krl(refid):
         logger.error(f"Failed to publish the KRL of SSH CA {ca.id}: {e}")
         return Response('KRL unavailable\n', status=503, mimetype='text/plain',
                         headers={'Retry-After': '60'})
+    if request.args.get('host'):
+        from services.ssh_host_service import krl_pulled
+        krl_pulled(request.args['host'])
     etag = f'"{krl["version"]}"'
     headers = {
         'ETag': etag,

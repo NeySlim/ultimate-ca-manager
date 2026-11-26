@@ -138,7 +138,7 @@ class TestTheAgent:
         out = host.run('sync')
         assert out.returncode == 0, out.stderr
         assert _krl_version(host.krl) > first
-        assert host.hup_count() == hups + 1
+        assert host.hup_count(hups + 1) == hups + 1
         assert f'KRL version {_krl_version(host.krl)} installed' in out.stderr
 
     def test_a_broken_krl_is_refused_and_the_installed_one_stays(self, auth_client, host, server, app):
@@ -287,3 +287,76 @@ class TestTheAgentEnrolls:
                             env={'UCM_ENROLL_TOKEN': _enroll_token(auth_client, host_ca)}).returncode == 0
         config = (host.ssh / 'sshd_config').read_text()
         assert config.count(BEGIN) == 1 and 'RevokedKeys' in config and 'HostCertificate' in config
+
+
+class TestTheAgentRenews:
+    @pytest.fixture
+    def enrolled_host(self, app, auth_client, host, server):
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr=f'Agent renew CA {host.root.parent.name}')
+        out = host.install(_installer(server, ca['refid']), env={'UCM_ENROLL_TOKEN': _enroll_token(auth_client, ca)})
+        assert out.returncode == 0, out.stderr
+        return ca, host.conf()['HOST_REFID']
+
+    def _age(self, app, refid):
+        from datetime import timedelta
+        from models.ssh import SSHHost
+        from utils.datetime_utils import utc_now
+        with app.app_context():
+            cert = SSHHost.query.filter_by(refid=refid).one().certificate
+            cert.created_at = utc_now() - timedelta(days=3650)
+            db.session.commit()
+
+    def _refusals(self, app):
+        from models import AuditLog
+        with app.app_context():
+            return AuditLog.query.filter_by(action='ssh_host_renewal_refused').count()
+
+    def test_a_certificate_in_its_last_share_is_renewed_and_sshd_reloaded(self, app, host, enrolled_host):
+        _, refid = enrolled_host
+        cert = host.ssh / 'ssh_host_ed25519_key-cert.pub'
+        before, hups = cert.read_text(), host.hup_count()
+        out = host.run('sync')
+        assert out.returncode == 0, out.stderr
+        assert cert.read_text() == before and host.hup_count() == hups
+        self._age(app, refid)
+        out = host.run('sync')
+        assert out.returncode == 0, out.stderr
+        assert 'host certificate renewed' in out.stderr
+        assert cert.read_text() != before and host.hup_count(hups + 1) == hups + 1
+        from models.ssh import SSHHost
+        with app.app_context():
+            assert SSHHost.query.filter_by(refid=refid).one().certificate.certificate == cert.read_text().strip()
+
+    def test_a_revoked_host_stops_asking(self, app, auth_client, host, enrolled_host):
+        from models.ssh import SSHHost
+        _, refid = enrolled_host
+        with app.app_context():
+            host_id = SSHHost.query.filter_by(refid=refid).one().id
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        refusals = self._refusals(app)
+        assert host.run('sync').returncode == 0
+        assert 'renewal stopped: this host is revoked' in host.run('status').stdout.replace('Renewal stopped', 'renewal stopped')
+        assert self._refusals(app) == refusals + 1
+        assert host.run('sync').returncode == 0
+        assert self._refusals(app) == refusals + 1
+
+    def test_a_disabled_renewal_waits_and_resumes(self, app, auth_client, host, enrolled_host):
+        from models.ssh import SSHHost
+        _, refid = enrolled_host
+        with app.app_context():
+            host_id = SSHHost.query.filter_by(refid=refid).one().id
+        post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/auto-renew', {'enabled': False})
+        self._age(app, refid)
+        assert host.run('sync').returncode == 0
+        assert 'RENEWAL_STOPPED' not in host.conf()
+        post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/auto-renew', {'enabled': True})
+        out = host.run('sync')
+        assert 'host certificate renewed' in out.stderr, out.stderr
+
+    def test_the_krl_pull_names_the_host(self, app, auth_client, host, server, enrolled_host):
+        from models.ssh import SSHHost
+        _, refid = enrolled_host
+        user_ca = _create_ssh_ca(auth_client, descr=f'Agent named pull CA {host.root.parent.name}')
+        assert host.install(_installer(server, user_ca['refid'])).returncode == 0
+        with app.app_context():
+            assert SSHHost.query.filter_by(refid=refid).one().last_krl_sync_at is not None

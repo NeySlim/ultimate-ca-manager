@@ -1,6 +1,8 @@
-"""Public routes of the SSH host agent (issue #451): enrollment with a single-use token.
+"""Public routes of the SSH host agent (issue #451): enrollment with a single-use token, and
+renewal by a signature of a server challenge with the certified host key.
 
-No session and no API key: a host authenticates with its enrollment token. Answers are JSON,
+No session and no API key: a host authenticates with its enrollment token, then with its key;
+UCM keeps no secret of the host. Answers are JSON,
 or ``key=value`` lines when the client asks for text/plain (the sh agent reads no JSON).
 """
 import logging
@@ -65,3 +67,38 @@ def enroll_host(refid):
     return _answer({'host_refid': host.refid, 'certificate': cert.certificate,
                     'principals': ','.join(host.get_principals()),
                     'valid_to': utc_isoformat(cert.valid_to), 'renew_percent': host.renew_percent}, 201)
+
+
+@bp.route('/ssh/renew/<host_refid>/challenge', methods=['POST'])
+def renewal_challenge(host_refid):
+    """``due=0`` with ``renew_after`` while the certificate is young; ``due=1`` with a
+    ``challenge`` to sign (``ssh-keygen -Y sign -n <namespace>``) once it is in its last share."""
+    try:
+        answer = hosts.challenge(host_refid)
+    except hosts.RenewalRefused as e:
+        if e.audited:
+            AuditService.log_action(action='ssh_host_renewal_refused', resource_type='ssh_host',
+                                    resource_name=host_refid[:64], details=f'SSH host renewal refused: {e.reason}',
+                                    success=False, username='ssh-host-agent')
+        return _answer({'error': e.public, 'state': e.state}, e.status)
+    if 'renew_after' in answer:
+        answer['renew_after'] = utc_isoformat(answer['renew_after'])
+    return _answer(answer)
+
+
+@bp.route('/ssh/renew/<host_refid>', methods=['POST'])
+def renew_host(host_refid):
+    """Body: ``challenge`` and ``signature`` (the armored SSH signature). 200 with the new certificate."""
+    try:
+        data = _body()
+        host, cert = hosts.renew(host_refid, data.get('challenge'), data.get('signature'))
+    except hosts.EnrollmentRefused as e:
+        AuditService.log_action(action='ssh_host_renewal_refused', resource_type='ssh_host',
+                                resource_name=host_refid[:64], details=f'SSH host renewal refused: {e.reason}',
+                                success=False, username='ssh-host-agent')
+        return _answer({'error': e.public, 'state': getattr(e, 'state', 'refused')}, e.status)
+    AuditService.log_action(
+        action='ssh_host_renewed', resource_type='ssh_host', resource_id=str(host.id), resource_name=host.name,
+        details=f"SSH host certificate renewed for {', '.join(host.get_principals())}: certificate #{cert.serial}",
+        success=True, username='ssh-host-agent')
+    return _answer({'certificate': cert.certificate, 'valid_to': utc_isoformat(cert.valid_to)})

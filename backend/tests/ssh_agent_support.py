@@ -135,8 +135,16 @@ class AgentHost:
     def agent(self):
         return self.root / 'usr' / 'local' / 'sbin' / 'ucm-ssh-agent'
 
-    def hup_count(self):
-        return int(self.hups.read_text() or 0)
+    def hup_count(self, expect=None):
+        """The SIGHUPs counted; with *expect*, waited for a moment, the signal being asynchronous."""
+        count = int(self.hups.read_text() or 0)
+        for _ in range(30):
+            time.sleep(0.1)
+            later = int(self.hups.read_text() or 0)
+            if (expect is None and later == count) or (expect is not None and later >= expect):
+                return later
+            count = later
+        return count
 
     def conf(self):
         text = (self.conf_dir / 'agent.conf').read_text() if (self.conf_dir / 'agent.conf').exists() else ''
