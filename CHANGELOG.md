@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- HA: a node whose clock ran more than 10 minutes ahead purged the WebSocket events the other nodes had just relayed; the relay now stamps and purges its rows on the PostgreSQL server clock.
 - Docker guide: `UCM_FQDN` was documented with the default `ucm.example.com`; the image uses `ucm.local`, which the guide now gives.
 - Packages: the firewall script promised a prompt that could never appear, and `UCM_FIREWALL=ask` opened the port without asking; it now never prompts and changes the firewall only on `UCM_FIREWALL=yes`.
 - DEB: removing the package left `ucm-watcher.path` enabled and watching the data directory without its unit files; it is now stopped and disabled with the service.

@@ -279,3 +279,23 @@ def test_two_nodes_writing_at_once_lose_and_double_nothing(engines, wakeups, fir
         other = 'b' if name == 'a' else 'a'
         assert [d['n'] for d in got if d['node'] == other] == list(range(PER_EMITTER))
         assert not [d for d in got if d['node'] == name]
+
+
+def test_a_node_whose_clock_is_ahead_purges_no_row_of_another_node(engines, first_id):
+    """created_at and the purge cutoff are both on the server's clock: a node 30 minutes
+    ahead keeps the rows another node wrote a moment ago, and stamps its own on the server."""
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    with engines[0].begin() as conn:
+        server_now = conn.execute(text("SELECT clock_timestamp() AT TIME ZONE 'UTC'")).scalar()
+        other_id = conn.execute(text("INSERT INTO websocket_relay (created_at, room, payload) "
+                                     "VALUES (:t, 'r', :p) RETURNING id"),
+                                {'t': server_now, 'p': json.dumps({'type': 'x'})}).scalar()
+    ahead = ws_relay.RelayPublisher(engines[1], clock=lambda: utc_now() + timedelta(minutes=30))
+    ahead.publish('r', _payload('ahead', 1))
+    ahead.stop(timeout=20)
+    with engines[0].connect() as conn:
+        rows = conn.execute(text("SELECT id, created_at FROM websocket_relay WHERE id > :i ORDER BY id"),
+                            {'i': first_id}).all()
+    assert [r.id for r in rows][0] == other_id and len(rows) == 2, rows
+    assert abs((rows[1].created_at - server_now).total_seconds()) < 60, rows

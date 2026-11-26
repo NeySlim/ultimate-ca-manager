@@ -49,6 +49,8 @@ _INSERT_SQL = text("INSERT INTO websocket_relay (created_at, room, payload) VALU
                    ).bindparams(bindparam('t', type_=DateTime()))
 _PURGE_SQL = text("DELETE FROM websocket_relay WHERE created_at < :t"
                   ).bindparams(bindparam('t', type_=DateTime()))
+# PostgreSQL: rows are stamped and purged on the server's clock, the one every node shares
+_SERVER_NOW_SQL = text("SELECT clock_timestamp() AT TIME ZONE 'UTC'")
 _LAST_SQL = text("SELECT COALESCE(MAX(id), 0) FROM websocket_relay")
 _SQLITE_SEQ_SQL = text("SELECT seq FROM sqlite_sequence WHERE name = 'websocket_relay'")
 _PG_SEQ_NAME_SQL = text("SELECT pg_get_serial_sequence('websocket_relay', 'id')")
@@ -167,20 +169,28 @@ class RelayPublisher:
                 return
             # One transaction per batch: its ids follow the queue order
             with self.engine.begin() as conn:
-                conn.execute(_INSERT_SQL, [{'t': t, 'r': room, 'p': payload}
+                server_now = self._server_now(conn)
+                conn.execute(_INSERT_SQL, [{'t': server_now or t, 'r': room, 'p': payload}
                                            for _, room, payload, t in batch])
-                if conn.dialect.name == 'postgresql':
+                if server_now is not None:
                     conn.execute(_NOTIFY_SQL)  # sent at commit, with the rows
             with self._lock:
                 while self._queue and self._queue[0][0] <= batch[-1][0]:
                     self._queue.popleft()
-            self._last_written = batch[-1][3]
+            self._last_written = server_now or batch[-1][3]
+
+    @staticmethod
+    def _server_now(conn):
+        """The server's clock on PostgreSQL (shared by every node), None elsewhere."""
+        if conn.dialect.name != 'postgresql':
+            return None
+        return conn.execute(_SERVER_NOW_SQL).scalar()
 
     def _purge_if_due(self):
         if self._last_written is None or self._monotonic() < self._next_purge:
             return
-        cutoff = self.clock() - self.retention
         with self.engine.begin() as conn:
+            cutoff = (self._server_now(conn) or self.clock()) - self.retention
             removed = conn.execute(_PURGE_SQL, {'t': cutoff}).rowcount
         self._next_purge = self._monotonic() + self.purge_every
         if removed:
