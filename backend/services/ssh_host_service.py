@@ -217,13 +217,15 @@ def enroll(ca_refid, secret, public_key, principals=None, ip=None, signature=Non
             ca_id=ca.id, public_key_data=key_line, cert_type='host', principals=names,
             validity_seconds=token.validity_seconds, descr=f"Host cert for {', '.join(names)}",
             source='enrollment', username='ssh-host-enrollment')
-    except ValueError as e:
+    except Exception as e:
         # Nothing was issued: the token is given back, unless another write touched it since
         db.session.rollback()
         db.session.execute(update(table).where(table.c.id == token.id, table.c.used_at == now,
                                                table.c.used_by_host_id.is_(None)).values(used_at=None))
         db.session.commit()
-        raise EnrollmentRefused(400, str(e)) from None
+        if isinstance(e, ValueError):
+            raise EnrollmentRefused(400, str(e)) from None
+        raise
 
     host = SSHHost.query.filter(SSHHost.ssh_ca_id == ca.id, SSHHost.fingerprint == fingerprint,
                                 SSHHost.revoked_at.is_(None)).first()

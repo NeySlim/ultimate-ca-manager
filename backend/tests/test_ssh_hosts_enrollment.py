@@ -258,6 +258,26 @@ class TestEnrollment:
         with app.app_context():
             assert db.session.get(SSHHostEnrollmentToken, token['id']).state == 'active'
 
+    @pytest.mark.parametrize('failure', ['serial', 'storage'])
+    def test_any_signing_failure_gives_the_token_back(self, app, auth_client, client, monkeypatch, failure):
+        from services.ssh_cert import SSHCertificateService
+        from services.ssh_cert.signing import SSHSerialConflict
+        ca = _host_ca(auth_client, f'Enroll {failure} failure CA')
+        token = _token(auth_client, ca)
+        error = SSHSerialConflict('try again') if failure == 'serial' else RuntimeError('disk full')
+
+        def failing(*args, **kwargs):
+            raise error
+        monkeypatch.setattr(SSHCertificateService, 'sign_certificate', failing)
+        key = _host_key()
+        signature = sshsig_support.sign(_PRIVATE[key], token['token'], hosts.ENROLL_NAMESPACE)
+        with app.app_context():
+            with pytest.raises(type(error)):
+                hosts.enroll(ca['refid'], token['token'], key, signature=signature)
+            assert db.session.get(SSHHostEnrollmentToken, token['id']).state == 'active'
+        monkeypatch.undo()
+        assert _enroll(client, ca, token['token'], key).status_code == 201
+
 
 class TestProofOfPossession:
     """The token signed with the host key: a public key alone, which any server shows, enrolls nothing."""
