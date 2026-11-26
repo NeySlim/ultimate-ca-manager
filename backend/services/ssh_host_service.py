@@ -298,9 +298,9 @@ def _sweep(host, reason, username):
 
 
 def revoke_host(host_id, reason='host revoked', username=None):
-    """Every live certificate of the host key under its CA revoked (published in the KRL), the
-    ones a renewal or a new enrollment replaced included, and its renewals ended for good.
-    ValueError when the host was revoked already and nothing was left to revoke."""
+    """(host, first): the live certificates its revocation owes to the KRL revoked (_sweepable), its
+    renewals ended for good; *first* when this call set revoked_at. ValueError when the host was
+    revoked already and nothing it owes was left live, those of a host its key re-enrolled as kept."""
     host = db.session.get(SSHHost, host_id)
     if not host:
         raise LookupError('SSH host not found')
