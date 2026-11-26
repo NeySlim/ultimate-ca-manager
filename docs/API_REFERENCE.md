@@ -3258,6 +3258,62 @@ Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `p
 
 ## System
 
+### Instance State
+
+What a console that watches several instances reads of this one. It needs `read:instance`, a
+scope only an administrator holds and that a key can be limited to; nothing narrower reads it. The answer
+carries no secret: the database is named by its engine, never by its URL, and `Cache-Control:
+no-store` is set. No request leaves the instance to answer it.
+
+```http
+GET /api/v2/system/instance
+```
+
+```json
+{
+  "data": {
+    "schema_version": 1,
+    "instance_id": "5f0c2b9e8d7a4c1e9b3a6d2f1e0c9b8a",
+    "generated_at": "2026-11-26T10:00:00Z",
+    "version": "3.1",
+    "update_channel": "stable",
+    "install": {"family": "deb"},
+    "mode": {"ha": true, "node_id": "ucm-a", "nodes": [
+      {"node_id": "ucm-a", "leader": true, "stopped": false, "stale": false, "version": "3.1",
+       "heartbeat_at": "2026-11-26T09:59:42Z", "package_family": "deb"}]},
+    "database": {"engine": "postgresql", "server_version": "16.4"},
+    "health": {"status": "ok", "checks": {"database": {"status": "ok"},
+               "filesystem": {"status": "ok"}, "cluster": {"status": "ok"}}, "maintenance": null},
+    "cas": {"total": 4, "active": 3, "expired": 1, "expiring_90_days": 0, "expiring_365_days": 1,
+            "next_expiry": "2027-03-01T00:00:00Z"},
+    "update": {"available": true, "latest_version": "3.2", "checked_at": "2026-11-26T03:00:12Z"},
+    "backup": {"scheduled": true, "last_archive_at": "2026-11-26T02:00:05Z",
+               "last_outcome": "ok", "last_outcome_at": "2026-11-26T02:00:07Z"},
+    "fips": {"requested": false, "active": false}
+  }
+}
+```
+
+- `schema_version`: `1`. A later release only adds fields to it; removing a field or changing
+  what one means takes `2`.
+- `instance_id`: 32 hexadecimal characters, created once and kept in the database: the same
+  after a restart, a change of address or a restore, and the same on every node of an HA
+  cluster. A restore keeps the id of the database it restores into; a restore on another
+  machine therefore keeps that machine's id. A copy of the database itself (file copy,
+  `pg_dump`) carries the id with it.
+- `install.family`: `deb`, `rpm-elN`, `rpm-fedora`, `container` or `unknown`.
+- `mode`: `node_id` and `nodes` are `null` on a single node; in HA, `nodes` lists every node
+  registered and not gone, `null` when the registry cannot be read.
+- `health.status`: `ok`, `degraded` (a check of `/health/ready` failed), `maintenance` (an HA
+  cluster maintenance) or `safe_mode`.
+- `cas`: active means holding its certificate, not revoked, not expired; `expiring_90_days` and
+  `expiring_365_days` count active CAs, `next_expiry` is the nearest end of an active CA.
+- `update`: the verdict of the last scheduled update check, all `null` before the first one;
+  `latest_version` is set only when `available` is `true`.
+- `backup`: whether the scheduled backup is on, when the newest archive was written (`null`
+  without one) and the outcome of the last scheduled run (`ok`, `failed`, `skipped`, `null`
+  before the first).
+
 ### Background Jobs
 
 Long operations (the manual backup, the audit chain verification) run outside the web
