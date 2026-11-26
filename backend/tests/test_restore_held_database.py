@@ -547,7 +547,9 @@ def test_a_cancellation_on_a_locked_database_before_the_mark_is_taken(restore_he
     # Counted, not timed: a loaded host stretches the wall clock, never these
     assert waits.statements and all(handled and timeout == sqlite_wait.IN_C_MS
                                     for handled, timeout in waits.statements), waits.statements
-    assert len(waits.requests) == 2 and all(w < sqlite_wait.WEB_LOCK_WAIT_SECONDS for w in waits.requests), waits.requests
+    # Each request held to the gate's budget (one second, not the five of the web server), with
+    # room for one retry beyond it; the bound is a number, so a budget raised in the product fails it
+    assert len(waits.requests) == 2 and all(w < 2.0 for w in waits.requests), waits.requests
 
 
 def test_a_cancellation_at_the_commit_is_too_late(restore_held):
