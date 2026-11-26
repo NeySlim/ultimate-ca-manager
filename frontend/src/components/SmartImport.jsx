@@ -28,8 +28,25 @@ const ALL_FORMATS = [...SUPPORTED_FORMATS.text, ...SUPPORTED_FORMATS.binary].joi
 
 const TYPE_LABELS = { certificate: 'import.typeCertificate', private_key: 'import.typePrivateKey', csr: 'import.typeCsr', ca_certificate: 'import.typeCaCertificate' }
 
+// A CA the import keeps: its display name (the CN by default) and its description (#459)
+const importsAsCA = (obj) => obj.type === 'certificate' && (obj.is_ca || obj.key_cert_sign)
+const subjectCN = (subject) => /(?:^|,)\s*CN=([^,]+)/.exec(subject || '')?.[1] || ''
+
+function CALabelInputs({ obj, label = {}, onLabel }) {
+  const { t } = useTranslation()
+  const set = (key) => (e) => onLabel({ ...label, [key]: e.target.value })
+  return (
+    <div className="form-fields" data-testid={`import-ca-label-${obj.index}`}>
+      <Input id={`import-ca-name-${obj.index}`} label={t('cas.label.displayName')} value={label.name || ''} maxLength={255}
+        placeholder={subjectCN(obj.subject)} hint={t('cas.label.importNameHint')} onChange={set('name')} />
+      <Textarea id={`import-ca-description-${obj.index}`} label={t('cas.label.description')} value={label.description || ''} rows={2}
+        maxLength={1000} onChange={set('description')} />
+    </div>
+  )
+}
+
 // One object found: its box to import it, its name, its kind in pills, its details on demand
-export function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
+export function ObjectCard({ obj, expanded, onToggle, selected, onSelect, label, onLabel }) {
   const { t } = useTranslation()
   const labelKey = obj.is_ca ? TYPE_LABELS.ca_certificate : TYPE_LABELS[obj.type] || TYPE_LABELS.certificate
   const displayName = obj.subject || obj.san_dns?.[0] || `${obj.type} #${obj.index + 1}`
@@ -50,6 +67,7 @@ export function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
       extra={(
         <>
           {obj.error && <Notice tone="bad">{obj.error}</Notice>}
+          {selected && onLabel && importsAsCA(obj) && <CALabelInputs obj={obj} label={label} onLabel={onLabel} />}
           {expanded && (
             <Facts items={[
               obj.subject && { label: t('common.subject'), value: <span className="mono">{obj.subject}</span>, long: true },
@@ -180,6 +198,7 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
   const [importResult, setImportResult] = useState(null)
   const [selectedObjects, setSelectedObjects] = useState(new Set())
   const [expandedObjects, setExpandedObjects] = useState(new Set())
+  const [caLabels, setCaLabels] = useState({})
   const [importOptions, setImportOptions] = useState({
     import_cas: true, import_certs: true, import_keys: true, import_csrs: true, skip_duplicates: true
   })
@@ -205,6 +224,7 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
     setImportResult(null)
     setSelectedObjects(new Set())
     setExpandedObjects(new Set())
+    setCaLabels({})
   }, [])
   
   // Read a single file
@@ -335,6 +355,7 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
       const result = response.data || response
       setAnalysisResult(result)
       setSelectedObjects(new Set(result.objects.map((_, i) => i)))
+      setCaLabels({})
       setStep('preview')
     } catch (err) {
       console.error('[SmartImport] Analysis error:', err)
@@ -344,6 +365,12 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
     }
   }
   
+  // Only the CAs kept that were given a name or a description; the server defaults the others to their CN
+  const labelsOption = () => {
+    const given = Object.entries(caLabels).filter(([i, l]) => selectedObjects.has(Number(i)) && (l.name?.trim() || l.description?.trim()))
+    return given.length ? { ca_labels: Object.fromEntries(given.map(([i, l]) => [i, { name: l.name || '', description: l.description || '' }])) } : {}
+  }
+
   // Execute import
   const handleImport = async () => {
     if (!analysisResult || selectedObjects.size === 0) return
@@ -355,7 +382,7 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
         content: buildContent(),
         password: getEffectivePassword(),
         file_passwords: getFilePasswords(),
-        options: { ...importOptions, selected_indices: Array.from(selectedObjects) }
+        options: { ...importOptions, selected_indices: Array.from(selectedObjects), ...labelsOption() }
       })
       const result = response.data || response
       setImportResult(result)
@@ -490,7 +517,8 @@ export function SmartImportWidget({ onImportComplete, onCancel }) {
         <Section title={<>{t('import.detectedObjects')} ({objects?.length || 0}) <TextLink onClick={selectAll}>{selectedObjects.size === objects?.length ? t('common.deselectAll') : t('common.selectAll')}</TextLink></>}>
           <RecordList>
             {objects?.map((obj, i) => (
-              <ObjectCard key={i} obj={obj} expanded={expandedObjects.has(i)} onToggle={() => toggleExpand(i)} selected={selectedObjects.has(i)} onSelect={() => toggleObject(i)} />
+              <ObjectCard key={i} obj={obj} expanded={expandedObjects.has(i)} onToggle={() => toggleExpand(i)} selected={selectedObjects.has(i)} onSelect={() => toggleObject(i)}
+                label={caLabels[i]} onLabel={importOptions.import_cas ? (l) => setCaLabels((prev) => ({ ...prev, [i]: l })) : undefined} />
             ))}
           </RecordList>
         </Section>
