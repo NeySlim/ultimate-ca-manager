@@ -115,7 +115,8 @@ class CSRFProtection:
         fips_mode.refuse_short_hmac_key(secret.encode('utf-8'), 'Session key (SECRET_KEY)')
         signature = hmac.digest(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hex()  # Full 256-bit signature (no truncation)
         token = f"{timestamp}:{nonce}:{signature}"
-        if has_request_context():
+        # Recorded only in the session of that account: an API-key request holds none, and opens none
+        if has_request_context() and session.get('user_id') == user_id:
             issued = _unexpired(session.get(ISSUED_KEY) or [])
             issued.append(_entry(token, user_id))
             session[ISSUED_KEY] = issued[-MAX_ISSUED:]
