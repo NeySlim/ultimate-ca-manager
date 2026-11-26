@@ -531,7 +531,7 @@ def test_the_readme_puts_each_file_where_the_packages_write_it(tmp_path):
     config_line = next(line for line in lines if line.lstrip().startswith('config/'))
     assert 'HTTPS' in data_line and 'HTTPS' not in config_line
     postinst = (ROOT / 'packaging' / 'debian' / 'postinst').read_text()
-    assert '-keyout "$UCM_DATA/https_key.pem"' in postinst
+    assert 'https-cert "$UCM_DATA"' in postinst
 
 
 @pytest.mark.parametrize('line, kept', [('UCM_FIPS_BUILD=1', True), ('export UCM_FIPS_BUILD="yes"', True),
