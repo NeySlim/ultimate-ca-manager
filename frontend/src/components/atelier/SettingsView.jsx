@@ -113,8 +113,9 @@ export function SettingsFrame({ id, label, desc, error, aside, wide = false, chi
  */
 /**
  * `legendHidden`: a legend that would repeat its card's title is kept for assistive technology only.
- * `wide`: the group keeps the whole card where the groups go two abreast (adjust.css): it holds a table
- * or a list, or it is the only group of fields of its card.
+ * `wide`: the group keeps the whole card even beside another group, where the groups go two abreast
+ * (adjust.css): a table, a result, long URLs. A group alone in its run takes the card without it; a short
+ * list (the Account's security records) stays on half a card.
  */
 export function SettingsGroup({ legend, hint, grid = true, legendHidden = false, wide = false, children, ...rest }) {
   return (

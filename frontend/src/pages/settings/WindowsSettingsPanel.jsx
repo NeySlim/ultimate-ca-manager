@@ -128,7 +128,7 @@ export default function WindowsSettingsPanel({ hasPermission, onLoaded }) {
       </SettingsGroup>
 
       {settings.xcep_enabled && (
-        <SettingsGroup legend={t('xcepWstep.urlsTitle')} hint={t('xcepWstep.urlsRoutedByRealm')} grid={false}>
+        <SettingsGroup legend={t('xcepWstep.urlsTitle')} hint={t('xcepWstep.urlsRoutedByRealm')} grid={false} wide>
           <RecordList>
             <CopyableUrl
               label={t('xcepWstep.urlUsernamePassword')}
