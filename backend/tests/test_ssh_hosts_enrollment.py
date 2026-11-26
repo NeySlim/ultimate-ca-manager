@@ -225,6 +225,10 @@ class TestEnrollment:
         r = _enroll(client, ca, again['token'], key)
         assert r.status_code == 201, r.data
         assert r.get_json()['host_refid'] == first['host_refid']
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=first['host_refid']).one()
+            assert host.name == 'web01.example.com'
+            assert host.get_principals() == ['web01.example.com', 'web01']
 
     def test_the_same_key_for_other_names_is_409_until_its_host_is_revoked(self, app, auth_client, client):
         ca = _host_ca(auth_client, 'Enroll other names CA')

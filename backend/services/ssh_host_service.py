@@ -239,8 +239,9 @@ def enroll(ca_refid, secret, public_key, principals=None, ip=None, signature=Non
     if host is None:
         host = SSHHost(ssh_ca_id=ca.id, fingerprint=fingerprint, enrolled_at=now)
         db.session.add(host)
-    host.name = names[0]
-    host.principals = json.dumps(names)
+        # Named once: enrolled again, with the same names in any order, the host keeps its own
+        host.name = names[0]
+        host.principals = json.dumps(names)
     host.public_key = key_line
     host.key_type = SSHCertificateUtilsMixin._detect_key_type(key)
     host.validity_seconds = token.validity_seconds
