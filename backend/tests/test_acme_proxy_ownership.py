@@ -20,6 +20,7 @@ import pytest
 
 from models import db, SystemConfig, AcmeAccount, AcmeClientAccount, AcmeClientOrder
 from tests.seeded_rows import delete_client_accounts, ensure_acme_account
+from utils.datetime_utils import utc_now
 from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
@@ -285,7 +286,7 @@ class TestSharedUpstreamAuthz:
             order_a = _seed_order(
                 account_id='acct-a', client_jwk_thumbprint='thumb-a',
             )
-            order_a.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+            order_a.set_challenges_dict({CHALL_URL: {'status': 'initiated', 'started_at': utc_now().isoformat()}})
             db.session.commit()
             self._seed_second()
 

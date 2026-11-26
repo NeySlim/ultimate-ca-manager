@@ -43,6 +43,7 @@ from services.acme.acme_proxy_account import (
 )
 from services.acme.dns_selfcheck import (
     acme_allow_loopback_upstream,
+    dns_propagation_delay,
     dns_propagation_timeout,
     wait_for_txt,
 )
@@ -126,6 +127,32 @@ _DNS_REFUSED_PROBLEM = {
 def _problem_text(problem):
     """Detail of a problem document, else its type: RFC 7807 makes detail optional."""
     return (problem or {}).get('detail') or (problem or {}).get('type') or 'upstream error'
+
+
+# Past the longest run of an automation (TXT lock wait, propagation wait, upstream POST),
+# an 'initiated' flag is a thread that died with its process: another may take it over
+_INITIATED_LEASE_MARGIN = 600
+
+
+def _initiated_lease_seconds() -> int:
+    return (dns_propagation_timeout('acme.client.dns_propagation_timeout')
+            + dns_propagation_delay() + _INITIATED_LEASE_MARGIN)
+
+
+def _automation_clock():
+    """utc_now() of the node, the PostgreSQL server clock in HA: every node stamps one clock."""
+    from services.scheduler_leader import cluster_utc_now
+    return cluster_utc_now()
+
+
+def _initiated_is_live(state, now, lease) -> bool:
+    try:
+        started = datetime.fromisoformat(state.get('started_at'))
+    except (TypeError, ValueError):
+        return False
+    if started.tzinfo is not None:
+        started = started.astimezone(timezone.utc).replace(tzinfo=None)
+    return started > now - timedelta(seconds=lease)
 
 
 def _txt_written(provider, zone, record_name, value):
@@ -1377,11 +1404,20 @@ class AcmeProxyService:
         The challenge is one upstream resource even when several local orders
         point at it (#307); its DNS automation must fire once, so the initiated
         flag is read across every sibling order, not only the one being served.
+        An 'initiated' flag older than its lease is a dead automation, not a running one.
         """
+        now = lease = None
         for order in sibling_orders or ():
             state = (order.challenges_dict or {}).get(chall_url)
-            if state and state.get('status') in ('initiated', 'submitted'):
+            if not state:
+                continue
+            if state.get('status') == 'submitted':
                 return True
+            if state.get('status') == 'initiated':
+                if now is None:
+                    now, lease = _automation_clock(), _initiated_lease_seconds()
+                if _initiated_is_live(state, now, lease):
+                    return True
         return False
 
     def get_authz(self, authz_id_b64, requester_account_id=None, requester_thumbprint=None):
@@ -1926,10 +1962,17 @@ class AcmeProxyService:
         with _txt_record_lock(txt_lock_name(provider, full_record_name)):
             # A value a sibling order already published is live: some providers refuse a duplicate
             by_sibling = self._sibling_records(order, authz_url)
+            # A takeover of a dead automation finds the values it had already published
+            db.session.refresh(order)
+            by_order = {(r.get('record_name'), r.get('value'))
+                        for r in json.loads(order.dns_records_created or '[]')
+                        if isinstance(r, dict) and not r.get('release_at')}
 
             def _write(value):
                 if (full_record_name, value) in by_sibling:
                     return True, 'already published for a sibling order'
+                if (full_record_name, value) in by_order:
+                    return True, 'already published for this order'
                 return _txt_written(provider, zone_name, full_record_name, value)
 
             ok, message = _write(txt_value)
@@ -1957,7 +2000,8 @@ class AcmeProxyService:
 
             # Store record info for cleanup, merged: another authorization of the order may have added its own
             added = [{'domain': zone_name, 'record_name': full_record_name,
-                      'value': value, 'provider_id': provider_model.id} for value in published]
+                      'value': value, 'provider_id': provider_model.id} for value in published
+                     if (full_record_name, value) not in by_order]
 
             def _add_records(row):
                 records = json.loads(row.dns_records_created) if row.dns_records_created else []
@@ -2055,7 +2099,7 @@ class AcmeProxyService:
                     return False
                 challenges_data = order.challenges_dict
                 challenges_data[chall_url] = {'status': 'initiated',
-                                              'started_at': datetime.now().isoformat()}
+                                              'started_at': _automation_clock().isoformat()}
                 order.set_challenges_dict(challenges_data)
                 db.session.commit()
         except Exception:

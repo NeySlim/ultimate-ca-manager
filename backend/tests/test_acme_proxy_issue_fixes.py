@@ -19,6 +19,7 @@ from models import Certificate, db
 from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
 from services.acme.upstream_problem import UpstreamProblem
+from utils.datetime_utils import utc_now
 
 UPSTREAM = 'https://acme-stub.example'
 
@@ -105,7 +106,7 @@ class TestChallengeUpLinkFallback:
             account_id='acct-up', client_jwk_thumbprint='thumb-up',
         )
         if status == 'pending':
-            order.set_challenges_dict({self.CHALL: {'status': 'initiated'}})
+            order.set_challenges_dict({self.CHALL: {'status': 'initiated', 'started_at': utc_now().isoformat()}})
             db.session.commit()
         # What get_authz records for the challenges of an authorization.
         _challenge_order_cache.put(

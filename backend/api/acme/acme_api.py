@@ -1524,6 +1524,11 @@ def respond_to_challenge(challenge_id: str):
         post_as_get = jws_data.get('payload') == ''
 
         authz = challenge.authorization
+        # A lapsed pending authorization or order turns invalid before any validation (§7.1.6)
+        if authz is not None:
+            service.expire_authorization_if_needed(authz)
+            if authz.order is not None:
+                service.expire_order_if_needed(authz.order)
         if post_as_get or challenge.status in ('valid', 'invalid'):
             pass
         elif authz and authz.status != 'pending':

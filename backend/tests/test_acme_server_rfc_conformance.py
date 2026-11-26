@@ -542,6 +542,38 @@ class TestChallengePostAsGet:
         assert r.get_json()['type'] == 'urn:ietf:params:acme:error:malformed'
 
 
+class TestChallengeOfALapsedAuthorization:
+    """RFC 8555 §7.1.6: a pending authorization past its expiry is invalid, never validated."""
+
+    def _challenge(self, app, acct, *, lapse):
+        with app.app_context():
+            service = AcmeService(base_url=BASE)
+            order = service.create_order(account_id=acct['account_id'],
+                                         identifiers=[{'type': 'dns', 'value': 'lapsechal.example'}])
+            past = utc_now() - timedelta(minutes=5)
+            if lapse == 'authz':
+                order.authorizations[0].expires = past
+            else:
+                order.expires = past
+            db.session.commit()
+            ch = next(c for c in order.authorizations[0].challenges if c.type == 'http-01')
+            return ch.url[len(BASE):], order.order_id
+
+    @pytest.mark.parametrize('lapse', ['authz', 'order'])
+    def test_a_response_is_refused_and_nothing_is_validated(self, app, client, account, monkeypatch, lapse):
+        path, order_id = self._challenge(app, account, lapse=lapse)
+        monkeypatch.setattr(AcmeService, 'validate_http01_challenge',
+                            lambda *a, **k: pytest.fail('validation triggered'))
+        r = _signed(client, account, path, {})
+        # The challenge comes back in its settled state, as a re-POST to an invalid one does
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['status'] == 'invalid'
+        with app.app_context():
+            order = AcmeOrder.query.filter_by(order_id=order_id).first()
+            assert order.status == 'invalid'
+            assert order.authorizations[0].status == 'invalid'
+
+
 # --- replaces reflected (RFC 9773 §5) ---
 
 class TestReplacesReflected:

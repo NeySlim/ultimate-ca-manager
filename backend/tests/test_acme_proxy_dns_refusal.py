@@ -1580,3 +1580,23 @@ class TestIssuedOrderRecordedUnderTheRowLock:
             assert found.id == row.id
             fresh = _fresh(row.id)
             assert (fresh.status, fresh.certificate_url) == ('valid', self.CERT_URL)
+
+
+class TestTakeoverOfADeadAutomation:
+    def test_a_value_the_dead_run_published_is_not_written_twice(self, app, monkeypatch):
+        """Some providers refuse a duplicate: the takeover counts what the order already lists."""
+        provider = _provider(monkeypatch, (False, 'record already exists'))
+        value = base64.urlsafe_b64encode(hashlib.sha256(b'tok.up').digest()).rstrip(b'=').decode()
+        published = {'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                     'value': value, 'provider_id': 5}
+        with app.app_context():
+            row = _order(dns_records_created=json.dumps([published]))
+            svc, calls = _svc(monkeypatch, {CHALL_URL: _Resp({'status': 'processing'})})
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+
+            provider.create_txt_record.assert_not_called()
+            assert calls == [(CHALL_URL, {})]
+            db.session.refresh(row)
+            assert row.status == 'pending'
+            assert json.loads(row.dns_records_created) == [published]
+            assert row.challenges_dict[CHALL_URL]['status'] == 'submitted'

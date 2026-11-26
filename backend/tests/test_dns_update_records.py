@@ -260,7 +260,7 @@ def test_R3_no_acme_domain_writes_nothing_neg(app, env, monkeypatch):
 def test_R3_row_written_when_sibling_started_automation_pos(app, env, monkeypatch):
     with app.app_context():
         a, b = _two_orders(env)
-        a.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+        a.set_challenges_dict({CHALL_URL: {'status': 'initiated', 'started_at': utc_now().isoformat()}})
         db.session.commit()
         svc = _svc(monkeypatch, _authz())
         _get_authz(svc, 'acct-b', 'thumb-b')
@@ -274,7 +274,7 @@ def test_R9_sibling_gets_row_while_challenge_is_not_final_pos(app, env, monkeypa
     # RFC 8555 section 7.1.6: pending and processing are not final.
     with app.app_context():
         a, b = _two_orders(env)
-        a.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+        a.set_challenges_dict({CHALL_URL: {'status': 'initiated', 'started_at': utc_now().isoformat()}})
         db.session.commit()
         svc = _svc(monkeypatch, _authz('pending', chall_status=chall_status))
         _get_authz(svc, 'acct-b', 'thumb-b')
