@@ -30,8 +30,12 @@ import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup
 import { ConfirmModal, Input, NumberInput, Notice, SecretInput, Select, ToggleSwitch } from '../components/atelier/Form'
 import { useSectionParam } from '../components/atelier/useSectionParam'
 import { ROLE_KEYS } from './users/userFacts'
+import { keepDraft, readDraft } from '../lib/draftMemory'
 
-const STORAGE_KEY = 'opnsense_config'
+// The tab keeps the connection only; the API key and secret stay in memory (draftMemory), dropped at sign-out
+const STORAGE_KEY = 'opnsense_connection'
+const LEGACY_STORAGE_KEY = 'opnsense_config'
+const CREDENTIALS_DRAFT = 'opnsense-credentials'
 const TYPE_KEY = 'ucm-ops-resource-type'
 const TYPES = ['certificates', 'cas', 'csrs', 'templates', 'users']
 // What each resource offers in bulk, and the fields its local search reads
@@ -189,19 +193,26 @@ export default function OperationsPage() {
   // Load on mount
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem(STORAGE_KEY)
+      // The former entry held the credentials in clear: its connection is kept, the entry removed
+      const legacy = sessionStorage.getItem(LEGACY_STORAGE_KEY)
+      sessionStorage.removeItem(LEGACY_STORAGE_KEY)
+      const saved = sessionStorage.getItem(STORAGE_KEY) || legacy
       if (saved) {
         const config = JSON.parse(saved)
         setOpnsenseHost(config.host || '')
         setOpnsensePort(config.port || '443')
-        setOpnsenseApiKey(config.api_key || '')
-        setOpnsenseApiSecret(config.api_secret || '')
         // Only an explicitly saved `false` opts out of verification; a saved
         // config from before the key existed must not re-disable it
         // (`config.verify_ssl || false` did exactly that).
         setOpnsenseVerifySsl(config.verify_ssl !== false)
+        if (saved === legacy) sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ host: config.host, port: config.port, verify_ssl: config.verify_ssl }))
       }
     } catch { /* non-critical */ }
+    const credentials = readDraft(CREDENTIALS_DRAFT)
+    if (credentials) {
+      setOpnsenseApiKey(credentials.api_key || '')
+      setOpnsenseApiSecret(credentials.api_secret || '')
+    }
     loadCAs()
   }, [])
 
@@ -295,10 +306,9 @@ export default function OperationsPage() {
   // ===== IMPORT HANDLERS (from ImportExportPage) =====
   const saveOpnsenseConfig = () => {
     try {
+      keepDraft(CREDENTIALS_DRAFT, { api_key: opnsenseApiKey, api_secret: opnsenseApiSecret })
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-        host: opnsenseHost, port: opnsensePort,
-        api_key: opnsenseApiKey, api_secret: opnsenseApiSecret,
-        verify_ssl: opnsenseVerifySsl
+        host: opnsenseHost, port: opnsensePort, verify_ssl: opnsenseVerifySsl
       }))
       showSuccess(t('importExport.opnsense.configSaved'))
     } catch { /* non-critical */ }
