@@ -500,21 +500,54 @@ def test_a_check_made_on_one_host_is_not_used_on_another(restore_held):
     assert elsewhere.status_code == 503, elsewhere.data
 
 
-def test_a_cancellation_on_a_locked_database_before_the_mark_is_taken(restore_held):
+@contextlib.contextmanager
+def lock_waits(app, monkeypatch):
+    """What each statement and request of the block did with a lock, as the product counts it:
+    statements as (waited in Python, sqlite3 busy timeout in ms), requests as seconds on locks."""
+    from flask import g, request_tearing_down
+    from utils import sqlite_wait
+    seen = types.SimpleNamespace(statements=[], requests=[])
+    real = sqlite_wait._execute
+
+    def recording(cursor, statement, parameters, context, many=False):
+        info = context.root_connection.connection.info if context is not None else {}
+        handled = True
+        try:
+            handled = real(cursor, statement, parameters, context, many) is not None
+            return handled
+        finally:
+            seen.statements.append((handled, info.get(sqlite_wait._BUSY_INFO)))
+
+    def ended(sender, **extra):
+        seen.requests.append(g.get(sqlite_wait._WAITED, 0.0))
+    monkeypatch.setattr(sqlite_wait, '_execute', recording)
+    request_tearing_down.connect(ended, app)
+    try:
+        yield seen
+    finally:
+        request_tearing_down.disconnect(ended, app)
+
+
+def test_a_cancellation_on_a_locked_database_before_the_mark_is_taken(restore_held, monkeypatch):
     """The gate is up, the transaction not yet marked as holding, and the database locked
-    (the restore reading its archive writes): the flag file takes the cancellation."""
+    (the restore reading its archive writes): the flag file takes the cancellation, and no
+    request waits in sqlite3's own busy handler, only the gate's short wait in Python."""
+    from utils import sqlite_wait
     job_id, admin = restore_held.job_id, restore_held.admin
     url = f'/api/v2/system/jobs/{job_id}'
     assert admin.get(url).status_code == 200
     restore_held.gate.set_view(phase=restore_job.READING)
-    with holding(restore_held.path):
-        seen, read_took = _timed(admin.get, url)
-        cancelled, took = _timed(admin.post, f'{url}/cancel')
-    assert seen.status_code == 200 and read_took < 2.0, seen.data
+    with holding(restore_held.path), lock_waits(restore_held.app, monkeypatch) as waits:
+        seen = admin.get(url)
+        cancelled = admin.post(f'{url}/cancel')
+    assert seen.status_code == 200, seen.data
     assert seen.get_json()['data']['phase'] == restore_job.READING
     assert cancelled.status_code == 200, cancelled.data
-    assert took < 2.0
     assert restore_job.cancel_flagged(job_id), 'the cancellation was not taken'
+    # Counted, not timed: a loaded host stretches the wall clock, never these
+    assert waits.statements and all(handled and timeout == sqlite_wait.IN_C_MS
+                                    for handled, timeout in waits.statements), waits.statements
+    assert len(waits.requests) == 2 and all(w < sqlite_wait.WEB_LOCK_WAIT_SECONDS for w in waits.requests), waits.requests
 
 
 def test_a_cancellation_at_the_commit_is_too_late(restore_held):
