@@ -1370,9 +1370,12 @@ export default function SettingsPage() {
           from_name: settings.smtp_from_name,
           enabled: true,
           smtp_auth_method: settings.smtp_auth_method,
-          // OAuth2 chosen anew takes the provider the card shows; a stored one goes back as it is
+          // An empty provider sends the one the card shows, unless the caller's fields are locked
+          // (no admin:settings) and OAuth2 was already stored: then it goes back as it is
           smtp_oauth_provider: settings.smtp_oauth_provider
-            || (settings.smtp_auth_method === 'oauth2' && savedEmail?.smtp_auth_method !== 'oauth2' ? 'google' : settings.smtp_oauth_provider),
+            || (settings.smtp_auth_method === 'oauth2'
+              && (hasPermission('admin:settings') || savedEmail?.smtp_auth_method !== 'oauth2')
+              ? 'google' : settings.smtp_oauth_provider),
           smtp_oauth_tenant_id: settings.smtp_oauth_tenant_id,
           smtp_oauth_client_id: settings.smtp_oauth_client_id,
           ...(settings.smtp_oauth_client_secret && settings.smtp_oauth_client_secret !== '********' ? { smtp_oauth_client_secret: settings.smtp_oauth_client_secret } : {}),
