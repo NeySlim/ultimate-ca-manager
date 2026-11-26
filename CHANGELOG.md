@@ -31,6 +31,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings and Account: the floating save bar no longer covers the form (#455). On wide screens the save state and its Undo changes and Save buttons sit in the page head, centered above the form; a phone keeps the bar at the bottom of the page.
 - Webhooks: with Basic authentication the form crashed as soon as a password was typed; the preview now shows a masked value and the revealed one is encoded in UTF-8.
 - Settings: revoking or authorizing SMTP OAuth, or clearing the backup password, reloaded the page's settings and silently dropped the changes not yet saved in the other sections; they are now kept.
+- Account: turning a second factor or the security key on or off reset a name or e-mail change not yet saved; the change is now kept.
 
 ## [3.0] - 2026-11-25
 

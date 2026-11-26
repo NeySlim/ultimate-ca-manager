@@ -127,4 +127,15 @@ describe('AccountPage: security key as second factor', () => {
     expect(screen.getByText(/account\.activeSecondFactorswork\.sepaccount\.authenticatorApp, account\.securityKey/)).toBeInTheDocument()
     expect(screen.getByText(/account\.twoFactorEnforced/)).toBeInTheDocument()
   })
+
+  it('keeps a profile edit not yet saved across the reload that follows', async () => {
+    await openSecurity({ full_name: 'Alice', email: 'alice@example.com', webauthn_2fa: false, two_factor_methods: [] }, [KEY])
+    fireEvent.change(document.getElementById('set-full_name'), { target: { value: 'Alice B' } })
+    m.getProfile.mockResolvedValue({ data: { username: 'alice', full_name: 'Alice', email: 'new@example.com', webauthn_2fa: true, two_factor_methods: ['webauthn'] } })
+    fireEvent.click(screen.getByText('account.turnOnKey2fa'))
+    await screen.findByText('account.turnOffKey2fa')
+    expect(document.getElementById('set-full_name')).toHaveValue('Alice B')
+    // a field left alone follows the server
+    expect(document.getElementById('set-email')).toHaveValue('new@example.com')
+  })
 })

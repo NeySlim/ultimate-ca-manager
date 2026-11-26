@@ -56,6 +56,8 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useSectionParam(SECTION_IDS, 'profile', { stacked: true, ready: !loading })
   const [saving, setSaving] = useState(false)
   const [accountData, setAccountData] = useState({})
+  const accountDataRef = useRef(accountData)
+  accountDataRef.current = accountData
   const [formData, setFormData] = useState({ full_name: '', email: '' })
   const keptProfile = useRef(readDraft(PROFILE_DRAFT))
   const saveState = useRef(null)
@@ -142,7 +144,9 @@ export default function AccountPage() {
     } catch (error) { reportSilentFailure('loadCAs', error) }
   }
 
-  const loadAccount = async () => {
+  // A field edited but not saved keeps its draft across a reload; the others follow the server
+  const loadAccount = async ({ keepPending = true } = {}) => {
+    const before = accountDataRef.current
     try {
       const response = await accountService.getProfile()
       const data = response.data || response
@@ -150,7 +154,10 @@ export default function AccountPage() {
       // An edit left pending on this tab comes back, still in edit mode, once
       const kept = keptProfile.current
       keptProfile.current = null
-      setFormData(kept || { full_name: data.full_name || '', email: data.email || '' })
+      const server = { full_name: data.full_name || '', email: data.email || '' }
+      setFormData((prev) => kept || (keepPending
+        ? Object.fromEntries(Object.keys(server).map((k) => [k, prev[k] !== (before[k] || '') ? prev[k] : server[k]]))
+        : server))
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.generic'))
     }
@@ -185,7 +192,7 @@ export default function AccountPage() {
     try {
       await accountService.updateProfile(formData)
       showSuccess(t('messages.success.update.user'))
-      await loadAccount()
+      await loadAccount({ keepPending: false })
       setAnnounce(t('account.profileSaved'))
       requestAnimationFrame(() => saveState.current?.focus())
     } catch (error) {
