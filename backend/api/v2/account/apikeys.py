@@ -27,6 +27,9 @@ def _caller_can_grant(perm, owner_perms):
     return has_permission(perm, owner_perms) and has_permission(perm, caller_perms)
 
 
+_WIDER_NETWORKS = 'An API key can only create a key limited to its own networks'
+
+
 def _caller_key_networks():
     """Networks of the API key making the request: a key it creates stays inside them."""
     if getattr(g, 'auth_method', None) != 'api_key' or not getattr(g, 'api_key_id', None):
@@ -128,7 +131,7 @@ def create_api_key():
     if limits and not networks:
         networks = limits
     elif not api_key_networks.within(networks, limits):
-        return error_response('An API key can only create a key limited to its own networks', 403)
+        return error_response(_WIDER_NETWORKS, 403)
 
     # Check limit (max 10 keys per user by default). Expired keys don't
     # count - is_active alone doesn't capture that, expiry is derived live
@@ -306,6 +309,12 @@ def regenerate_api_key(key_id):
         return error_response('This key holds permissions you no longer have; delete it and create a new one', 403)
     if not all(_caller_can_grant(p, owner_perms) for p in old_perms):
         return error_response(_NARROW_CALLER, 403)
+    # As at creation: a limited caller's key cannot regenerate a secret valid outside its networks
+    networks, limits = old_key.networks, _caller_key_networks()
+    if limits and not networks:
+        networks = limits
+    elif not api_key_networks.within(networks, limits):
+        return error_response(_WIDER_NETWORKS, 403)
 
     # Same permissions and lifetime as the old key (None: never expires)
     lifetime_days = None
@@ -320,7 +329,7 @@ def regenerate_api_key(key_id):
             permissions=old_perms,
             expires_days=lifetime_days,
             not_after=_caller_key_expiry(),
-            allowed_networks=old_key.networks,
+            allowed_networks=networks,
         )
 
         # Revoke old key

@@ -422,7 +422,7 @@ address. The address checked is the one UCM resolves for the request, after its 
 From another address the key is refused with `403` (`This API key is not allowed from this address`)
 and its `last_used_at` is not updated. An invalid entry answers `400`. A key created by a limited API
 key gets its networks when none is given, and `403` when one lies outside them; regenerating keeps
-them. Every key in a listing carries `allowed_networks` (`[]` for any address).
+them, under the same rule when a limited API key regenerates another key. Every key in a listing carries `allowed_networks` (`[]` for any address).
 
 The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
 

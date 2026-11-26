@@ -122,3 +122,25 @@ def test_the_archive_carries_the_list_and_a_restore_writes_it_back(app, limited)
         db.session.expire_all()
         assert json.loads(db.session.get(APIKey, limited['id']).allowed_networks) == [
             '192.0.2.0/24', '2001:db8::1']
+
+
+def _regenerate(app, key_id, caller):
+    return app.test_client().post(f'/api/v2/account/apikeys/{key_id}/regenerate',
+                                  headers={'X-API-Key': caller}, environ_base={'REMOTE_ADDR': CONSOLE})
+
+
+def test_a_limited_key_regenerating_an_open_key_gives_it_its_own_list(app, auth_client, limited):
+    sibling = assert_success(_create(auth_client, {'name': 'open-sibling', 'permissions': ['read:certificates']}), 201)
+    new = assert_success(_regenerate(app, sibling['id'], limited['key']), 201)
+    assert new['allowed_networks'] == limited['allowed_networks']
+    assert _get(app, new['key'], ELSEWHERE).status_code == 403
+
+
+def test_a_limited_key_cannot_regenerate_a_key_wider_than_itself(app, auth_client, limited):
+    wider = assert_success(_create(auth_client, {'name': 'wider-sibling', 'permissions': ['read:certificates'],
+                                                 'allowed_networks': ['198.51.100.0/24']}), 201)
+    r = _regenerate(app, wider['id'], limited['key'])
+    assert r.status_code == 403
+    assert b'limited to its own networks' in r.data
+    with app.app_context():
+        assert db.session.get(APIKey, wider['id']).is_active
