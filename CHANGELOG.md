@@ -22,6 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ACME Custom Command DNS provider: holding `write:acme` was enough to run any program as the service account; the provider now runs only root-owned hooks of `/etc/ucm/dns-hooks`, named without a path (see UPGRADE.md to move an existing script).
 - WebAuthn: a passwordless login or a passkey unlock accepted an assertion without user verification, so a key without a PIN opened a session alone; both now require it (W3C WebAuthn, section 7.2 step 17), the second step after a password still accepting a key without it.
+- Package updates: the root watcher installed whatever package path the service account wrote; it now installs only a release package of the updates directory, copied out of that account's reach and checked against the release's `.sha256` fetched by root, and no longer runs `rpm -U --force`.
 - Access log: a double quote in a parameter's name (`my"password=`) left its value in the log, and one in a secret value left the rest of it; both are now masked.
 
 ### Fixed
