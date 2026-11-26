@@ -2496,3 +2496,11 @@ html:has(.guide-app), html:has(.guide-app) body, html:has(.guide-app) #root {
   height: auto;
   overflow: visible;
 }
+
+/* Phone: the console's document scrolls under its 62 px sticky masthead; whatever a scroll brings
+   into view (scrollIntoView, an anchor) lands 8 px below it. The guide clears its own head. */
+@media (max-width: 800px) {
+  html:has(.atl .masthead):not(:has(.guide-app)) {
+    scroll-padding-top: calc(62px + 8px);
+  }
+}

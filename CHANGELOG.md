@@ -32,6 +32,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Phone: tapping an authority in the tree, or the To handle figure of the overview, scrolled the panel or the queue with its title under the sticky header; whatever a scroll brings into view now lands below it.
 - Aurore palette: the sticky action bar of a long dialog (Create CA, Create Template, policies, issuance) stood out as a solid band over the translucent dialog; dialogs are now opaque, the bar on the same ground.
 - Password reset page: the minimum length was fixed at 8 characters; it now follows the password policy, as the other password forms do.
 - Operations, bulk actions: the result message named the action by its internal code ("revoke: 3 succeeded", in every language); it now uses the translated action name.
