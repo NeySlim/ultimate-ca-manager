@@ -110,16 +110,18 @@ describe.each([
     const { container } = renderTab()
     const names = () => [...container.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)
     const footer = container.querySelector('footer.table-footer')
+    // Header queries stay in the header: a role query over 25 rows is what made this test slow
+    const head = () => within(container.querySelector('thead'))
     expect(names()).toHaveLength(25)
     expect(names()[0]).toBe('d01.example.test')
     expect(footer).toHaveTextContent('table.range')
-    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     expect(names()).toEqual(['d26.example.test', 'd27.example.test', 'd28.example.test', 'd29.example.test', 'd30.example.test'])
-    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    fireEvent.click(head().getByRole('button', { name: 'atelier.state' }))
     expect(names()[0]).toBe('d26.example.test')
     for (const name of sortable) {
-      fireEvent.click(screen.getByRole('button', { name }))
-      expect(screen.getByRole('button', { name }).closest('th')).toHaveAttribute('aria-sort', 'ascending')
+      fireEvent.click(head().getByRole('button', { name }))
+      expect(head().getByRole('button', { name }).closest('th')).toHaveAttribute('aria-sort', 'ascending')
     }
   })
 

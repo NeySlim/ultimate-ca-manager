@@ -82,19 +82,21 @@ describe('the SSH CA list', () => {
     const { container } = page()
     await screen.findByRole('button', { name: 'Host 01' })
     const footer = container.querySelector('footer.table-footer')
+    // Header queries stay in the header: a role query over 25 rows is what made this test slow
+    const head = () => within(container.querySelector('thead'))
     const names = () => [...container.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)
     expect(names()).toHaveLength(25)
-    expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(head().getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
     fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     expect(names()).toEqual(['Host 26', 'Host 27', 'Host 28', 'Host 29', 'Host 30', 'Users CA'])
     fireEvent.click(container.querySelector('[data-status="host"]'))
     expect(footer).toHaveTextContent('1 / 2')
-    fireEvent.click(screen.getByRole('button', { name: 'sshCas.stats.certificates' }))
-    fireEvent.click(screen.getByRole('button', { name: 'sshCas.stats.certificates' }))
+    fireEvent.click(head().getByRole('button', { name: 'sshCas.stats.certificates' }))
+    fireEvent.click(head().getByRole('button', { name: 'sshCas.stats.certificates' }))
     expect(names()[0]).toBe('Host 30')
     for (const name of ['sshCas.caType', 'sshCas.keyType', 'certificates.creationColumn']) {
-      fireEvent.click(screen.getByRole('button', { name }))
-      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+      fireEvent.click(head().getByRole('button', { name }))
+      expect(head().getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
     }
   })
 
