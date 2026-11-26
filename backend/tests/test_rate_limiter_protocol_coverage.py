@@ -98,6 +98,15 @@ class TestTheLimitsStayProtocolSized:
             RateLimitConfig.get_default_limits()['_default']['rpm'], path
 
 
+    def test_a_fleet_of_ssh_hosts_behind_one_address_is_not_throttled(self, stock_limits):
+        """Every agent asks for a renewal challenge at each sync: the standard rate, while an
+        enrollment, which a token guess would spend, stays narrow."""
+        limits = RateLimitConfig.get_default_limits()['_default']
+        assert RateLimitConfig.get_limit('/ssh/renew/host-refid/challenge')['rpm'] >= limits['rpm']
+        assert RateLimitConfig.get_limit('/ssh/renew/host-refid/challenge')['burst'] >= limits['burst']
+        assert RateLimitConfig.get_limit('/ssh/enroll/ca-refid')['rpm'] == 10
+
+
 class TestTheLimitAndTheBucketAgree:
     """Resolving twice let a request be measured against one limit and
     counted in another."""
