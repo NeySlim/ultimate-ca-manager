@@ -403,6 +403,8 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
     """
     from services.ca_service import CAService
     from utils.cert_issuer import stored_private_key_matches, hsm_key_binding_matches
+    # The key state the decision below is made on, compared again under the CA row lock
+    decided_on = (existing_ca.prv, existing_ca.hsm_key_id)
     # An HSM lookup may commit its public key cache, so the key is decided before the record is touched
     key_dropped = False
     if key_pem:
@@ -424,7 +426,6 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
         key_dropped = matches is False
 
     # The key state is read again under the CA row lock: an HSM key attached since the decision is seen
-    decided_on = (existing_ca.prv, existing_ca.hsm_key_id)
     if lock_ca_row(existing_ca.id) is None:
         raise ImportConflict('CA was deleted during the import')
     if not key_pem and (existing_ca.prv, existing_ca.hsm_key_id) != decided_on:
