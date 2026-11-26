@@ -1535,7 +1535,7 @@ export const helpContent = {
         title: 'Available Tools',
         icon: Wrench,
         items: [
-          { label: 'SSL Checker', text: 'Connect to a remote host and inspect the certificate it presents (the leaf only, not the chain)' },
+          { label: 'SSL Checker', text: 'Connect to a remote host and inspect the certificate it presents (the leaf only, not the chain). Needs admin:system, as network discovery' },
           { label: 'CSR Decoder', text: 'Paste a CSR in PEM format to view its subject, SANs, and key info' },
           { label: 'Certificate Decoder', text: 'Paste a certificate in PEM format to inspect its subject, issuer, validity, key, SANs, key usages and fingerprints; CDP, AIA and policies are not shown' },
           { label: 'Key Matcher', text: 'Verify that a certificate, CSR, and private key belong together' },

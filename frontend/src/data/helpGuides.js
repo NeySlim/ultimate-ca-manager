@@ -2529,7 +2529,7 @@ A toolkit for inspecting, converting, and verifying certificates without leaving
 
 ## SSL Checker
 
-Inspect a remote server's SSL/TLS certificate:
+Inspect a remote server's SSL/TLS certificate. The checker opens a connection to any host and port, so it is offered with the **admin:system** permission only, as network discovery; loopback and cloud metadata addresses are refused.
 
 1. Enter the **hostname** (e.g., \`google.com\`)
 2. Optionally change the **port** (default: 443)

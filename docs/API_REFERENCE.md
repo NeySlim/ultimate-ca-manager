@@ -4143,6 +4143,7 @@ Content-Type: application/json
   "port": 443
 }
 ```
+Permission `admin:system`, as the discovery scans. The name is resolved once and the connection goes to the addresses checked: cloud metadata, loopback, unspecified, link-local and multicast addresses answer `403`, a port outside 1 to 65535 `400`. A host named in `SSRF_ALLOWED_DOMAINS` may be loopback or link-local, never cloud metadata.
 
 ### Decode CSR
 ```http

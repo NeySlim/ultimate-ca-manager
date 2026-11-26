@@ -25,11 +25,13 @@ vi.mock('react-i18next', () => {
 })
 i18n.en = en
 
+const perms = vi.hoisted(() => ({ granted: ['admin:system'] }))
 vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: notify.showError }),
   useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true }),
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
+vi.mock('../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: (p) => perms.granted.includes(p) }) }))
 
 // Radix Select renders its items in a portal; a native <select> exposes the same options
 vi.mock('../../components/Select', () => ({

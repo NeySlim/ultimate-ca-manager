@@ -1,4 +1,6 @@
 """SSL certificate checker routes"""
+import ipaddress
+import os
 import ssl
 import socket
 
@@ -9,29 +11,69 @@ from cryptography.x509.oid import ExtensionOID
 
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.ssrf_protection import validated_addresses
 
-from . import tools_bp, cert_to_dict, get_extension_value, is_safe_host, logger
+from . import tools_bp, cert_to_dict, get_extension_value, logger
+
+
+def _is_ip(value):
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _vetted_addresses(hostname, port):
+    """The addresses ``hostname`` resolves to, vetted once as the other outbound routes
+    vet theirs (no cloud metadata, loopback, link-local or multicast); the connection
+    goes to these, never to a second resolution of the name."""
+    literal = f'[{hostname}]' if ':' in hostname else hostname
+    # A host named in SSRF_ALLOWED_DOMAINS may be loopback or link-local, never cloud metadata
+    allowed = hostname in os.getenv('SSRF_ALLOWED_DOMAINS', '').split(',')
+    addresses = validated_addresses(f'https://{literal}:{port}/', allow_loopback=allowed)[1]
+    for address in addresses if not allowed else ():
+        ip = ipaddress.ip_address(address)
+        if ip.is_link_local or ip.is_multicast:
+            raise ValueError(f'{address} is a link-local or multicast address')
+    return addresses
+
+
+def _connect(addresses, port):
+    last = None
+    for address in addresses:
+        try:
+            return socket.create_connection((address, port), timeout=10)
+        except OSError as exc:
+            last = exc
+    raise last
 
 
 @tools_bp.route('/check-ssl', methods=['POST'])
-@require_auth()
+@require_auth(['admin:system'])
 def check_ssl():
-    """Check SSL certificate of a remote server"""
+    """Check SSL certificate of a remote server: an outbound probe of any host and
+    port, so admin:system as the discovery scans."""
     data = request.get_json() or {}
-    hostname = data.get('hostname', '').strip()
+    hostname = str(data.get('hostname') or '').strip().rstrip('.')
     port = data.get('port', 443)
 
     if not hostname:
         return error_response('Hostname is required', 400)
 
-    # SSRF Protection
-    if not is_safe_host(hostname):
-        return error_response('Access to private/local network resources is blocked', 403)
-
     try:
         port = int(port)
     except (TypeError, ValueError):
         port = 443
+    if not 1 <= port <= 65535:
+        return error_response('Port must be between 1 and 65535', 400)
+
+    try:
+        addresses = _vetted_addresses(hostname, port)
+    except ValueError as exc:
+        if 'Cannot resolve' in str(exc):
+            return error_response(f'Could not resolve hostname: {hostname}', 400)
+        return error_response('Access to this address is blocked', 403)
 
     try:
         # Create SSL context
@@ -39,9 +81,10 @@ def check_ssl():
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE  # We want to see invalid certs too
 
-        # Connect
-        with socket.create_connection((hostname, port), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+        # Connect to the vetted addresses; the name still goes in SNI
+        sni = None if _is_ip(hostname) else hostname
+        with _connect(addresses, port) as sock:
+            with context.wrap_socket(sock, server_hostname=sni) as ssock:
                 # Get certificate chain
                 der_cert = ssock.getpeercert(binary_form=True)
                 cert = x509.load_der_x509_certificate(der_cert, default_backend())

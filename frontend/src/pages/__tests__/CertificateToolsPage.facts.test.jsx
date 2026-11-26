@@ -20,11 +20,13 @@ vi.mock('react-i18next', () => {
 })
 i18n.en = en
 
+const perms = vi.hoisted(() => ({ granted: ['admin:system'] }))
 vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
   useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true }),
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
+vi.mock('../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: (p) => perms.granted.includes(p) }) }))
 
 const decoded = vi.hoisted(() => ({ data: null }))
 vi.mock('../../services', () => ({

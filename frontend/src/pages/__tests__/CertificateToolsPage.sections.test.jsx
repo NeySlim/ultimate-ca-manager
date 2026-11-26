@@ -25,11 +25,13 @@ vi.mock('react-i18next', () => {
 })
 i18n.en = en
 
+const perms = vi.hoisted(() => ({ granted: ['admin:system'] }))
 vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
   useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true }),
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
+vi.mock('../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: (p) => perms.granted.includes(p) }) }))
 
 const decoded = vi.hoisted(() => ({ data: null }))
 vi.mock('../../services', () => ({
@@ -54,6 +56,20 @@ describe('certificate tools sections', () => {
     expect(screen.getByRole('heading', { level: 2, name: en.tools.sslChecker })).toBeInTheDocument()
     expect(screen.getByText(en.tools.sslCheckerDesc)).toBeInTheDocument()
     expect(document.getElementById('settings-savebar')).toBeNull()
+  })
+
+  it('leaves the SSL checker out without admin:system, the API refusing it, and opens on the next tool', () => {
+    perms.granted = []
+    try {
+      open('/tools?tab=ssl-checker')
+      const toc = screen.getByRole('navigation', { name: en.tools.tocLabel })
+      expect(within(toc).getAllByRole('link').map((a) => a.getAttribute('href')))
+        .toEqual(['/tools', '/tools?tab=cert-decoder', '/tools?tab=key-matcher', '/tools?tab=converter'])
+      expect(screen.queryByRole('heading', { level: 2, name: en.tools.sslChecker })).toBeNull()
+      expect(screen.getByRole('heading', { level: 2, name: en.tools.csrDecoder })).toBeInTheDocument()
+    } finally {
+      perms.granted = ['admin:system']
+    }
   })
 
   it('opens on the tool a link names', () => {

@@ -15,7 +15,7 @@ export default {
       {
         title: 'Herramientas disponibles',
         items: [
-          { label: 'Verificador SSL', text: 'Conectar a un host remoto e inspeccionar el certificado que presenta (solo el certificado final, no la cadena)' },
+          { label: 'Verificador SSL', text: 'Conectar a un host remoto e inspeccionar el certificado que presenta (solo el certificado final, no la cadena). Requiere admin:system, como el descubrimiento de red' },
           { label: 'Decodificador CSR', text: 'Pegar una CSR en formato PEM para ver su sujeto, SAN e información de clave' },
           { label: 'Decodificador', text: 'Pegar un certificado en formato PEM para inspeccionar su sujeto, emisor, validez, clave, SAN, usos de clave y huellas; CDP, AIA y políticas no se muestran' },
           { label: 'Comparador de claves', text: 'Verificar que un certificado, una CSR y una clave privada se corresponden' },
@@ -49,7 +49,7 @@ Un conjunto de herramientas para inspeccionar, convertir y verificar certificado
 
 ## Verificador SSL
 
-Inspeccionar el certificado SSL/TLS de un servidor remoto:
+Inspeccionar el certificado SSL/TLS de un servidor remoto. El verificador abre una conexión hacia cualquier host y puerto, por lo que solo se ofrece con el permiso **admin:system**, como el descubrimiento de red; se rechazan las direcciones de bucle local y de metadatos de la nube.
 
 1. Introduzca el **nombre de host** (por ejemplo, \`google.com\`)
 2. Opcionalmente cambie el **puerto** (por defecto: 443)
