@@ -195,6 +195,7 @@ Database migrations run automatically at startup.
 
 - **Package updates are checked again by root.** The `ucm-watcher` unit that installs an update now accepts only a release package of `/opt/ucm/data/updates/` matching the `.sha256` of its release, fetched by root directly from GitHub over HTTPS (no proxy), whose version is the update's and above the one the package database holds (an older or the same release is refused), and no longer forces an RPM install (`rpm -U --force`). A host whose root cannot reach github.com sees the install fail at step `precheck`: install the package by hand there.
 - **The update watcher logs to the journal.** `ucm-watcher` no longer writes to `/var/log/ucm/ucm.log`: its lines and the output of `dpkg`, `apt-get` and `dnf` during an update are read with `journalctl -u ucm-watcher`.
+- **`/etc/ucm/ucm.env` must be a regular file.** A DEB or RPM install or upgrade now stops when `ucm.env` is a symbolic link or not a regular file; replace it with a regular file (`sudo cp --remove-destination "$(readlink -f /etc/ucm/ucm.env)" /etc/ucm/ucm.env`), then run `sudo dpkg --configure -a` or reinstall the RPM.
 
 ### Upgrading to v3.0
 

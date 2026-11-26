@@ -215,10 +215,12 @@ fi
 # Generate secrets
 SECRET_KEY=$(openssl rand -hex 32)
 
-# Create config if not exists
+# Create config if not exists. /etc/ucm is the service account's: a link or anything but a
+# file there stops the install, and the new file is created exclusively
+bash "$UCM_SETUP" env-check "$UCM_CONFIG/ucm.env" || exit 1
 if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
     NEW_CONFIG=1
-    cat > "$UCM_CONFIG/ucm.env" << ENVEOF
+    (umask 077 && set -C && cat > "$UCM_CONFIG/ucm.env") << ENVEOF
 # UCM Configuration - Generated on install
 DATABASE_PATH=$UCM_DATA/ucm.db
 DATA_DIR=$UCM_DATA

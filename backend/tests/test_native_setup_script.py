@@ -1523,3 +1523,76 @@ def test_without_hostname_the_certificate_is_named_from_uname(tmp_path):
     subject = subprocess.run(['openssl', 'x509', '-noout', '-subject', '-in', str(data / 'https_cert.pem')],
                              capture_output=True, text=True).stdout
     assert subject.replace(' ', '').startswith(f'subject=CN={os.uname().nodename},O=UCM'), subject
+
+
+# ---------------------------------------------------- ucm.env as a link
+
+def _env_victim(tmp_path, body='root ALL=(ALL:ALL) ALL\n'):
+    victim = tmp_path / 'sudoers'
+    victim.write_text(body)
+    # Writable by its owner: the tests may run as any user
+    victim.chmod(0o640)
+    return victim
+
+
+@pytest.mark.parametrize('command', [['env', '/opt/ucm/data'], ['env-ensure', 'DATA_DIR', '/d'], ['env-check']])
+def test_a_ucm_env_link_is_refused_and_its_target_untouched(tmp_path, command):
+    victim = _env_victim(tmp_path, 'UCM_FIPS_BUILD=1\n')
+    envfile = tmp_path / 'ucm.env'
+    envfile.symlink_to(victim)
+    result = _run([command[0], str(envfile), *command[1:]], _env(tmp_path, extra={'UCM_FIPS_BUILD': '1'}))
+    assert result.returncode == 1
+    assert 'symbolic link or not a regular file' in result.stderr
+    assert victim.read_text() == 'UCM_FIPS_BUILD=1\n' and stat.S_IMODE(victim.stat().st_mode) == 0o640
+    assert envfile.is_symlink()
+
+
+def test_a_dangling_ucm_env_link_creates_nothing(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.symlink_to(tmp_path / 'created-by-root')
+    result = _run(['env', str(envfile), '/d'], _env(tmp_path))
+    assert result.returncode == 1
+    assert not (tmp_path / 'created-by-root').exists()
+
+
+def test_a_ucm_env_that_is_not_a_file_is_refused(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.mkdir()
+    result = _run(['env', str(envfile), '/d'], _env(tmp_path))
+    assert result.returncode == 1 and 'not a regular file' in result.stderr
+
+
+def test_the_fips_step_writes_no_ucm_env_through_a_link(tmp_path):
+    victim = _env_victim(tmp_path, 'UCM_FIPS_BUILD=1\n')
+    envfile = tmp_path / 'ucm.env'
+    envfile.symlink_to(victim)
+    (tmp_path / 'fips_enabled').write_text('1\n')
+    result = _run(['fips-finish', str(tmp_path / 'home'), str(envfile), str(tmp_path / 'data'), 'ucm'],
+                  _env(tmp_path))
+    assert result.returncode == 1, result.stdout
+    assert victim.read_text() == 'UCM_FIPS_BUILD=1\n' and stat.S_IMODE(victim.stat().st_mode) == 0o640
+
+
+@pytest.mark.parametrize('absent', [True, False])
+def test_a_new_ucm_env_is_created_restricted(tmp_path, absent):
+    envfile = tmp_path / 'ucm.env'
+    if not absent:
+        envfile.write_text('UCM_FIPS_BUILD=1\n')
+        envfile.chmod(0o644)
+    assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
+    assert stat.S_ISREG(envfile.lstat().st_mode) and stat.S_IMODE(envfile.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize('before, after', [
+    ('SECRET_KEY=a\n', 'SECRET_KEY=a\nDATA_DIR=/d\n'),
+    ('SECRET_KEY=a', 'SECRET_KEY=a\nDATA_DIR=/d\n'),
+    ('SECRET_KEY=a\nDATA_DIR=/srv\n', 'SECRET_KEY=a\nDATA_DIR=/srv\n'),
+])
+def test_env_ensure_adds_a_missing_key_and_keeps_the_mode(tmp_path, before, after):
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text(before)
+    envfile.chmod(0o640)
+    result = _run(['env-ensure', str(envfile), 'DATA_DIR', '/d'], _env(tmp_path))
+    assert result.returncode == 0, result.stderr
+    assert envfile.read_text() == after
+    assert stat.S_IMODE(envfile.stat().st_mode) == 0o640 and not envfile.is_symlink()

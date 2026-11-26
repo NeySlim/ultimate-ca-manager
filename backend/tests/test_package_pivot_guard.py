@@ -979,3 +979,39 @@ def test_the_rpm_pre_gives_the_account_a_shell_that_exists(rpm_pre, tmp_path, no
     assert out.returncode == 0, out.stderr
     useradd = next(c for c in calls if c.startswith('useradd'))
     assert f'-s {shell if nologin else "/bin/false"} ' in useradd, useradd
+
+
+# /etc/ucm is the service account's: a ucm.env it replaced by a link is checked before any write,
+# and the new file is created exclusively, so that a dangling link is never followed
+def _linked_env(tmp_path, config):
+    absent = tmp_path / 'victim-created-by-root'
+    (config / 'ucm.env').symlink_to(absent)
+    return absent
+
+
+def test_the_deb_postinst_writes_no_ucm_env_through_a_link(tmp_path):
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    absent = _linked_env(tmp_path, config)
+    script = tmp_path / 'postinst.sandboxed'
+    script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+    out = subprocess.run(['/bin/bash', str(script), 'configure', '2.254'], capture_output=True,
+                         text=True, timeout=20, env=env)
+    assert out.returncode != 0
+    assert not absent.exists()
+    assert f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env' in _calls(log)
+
+
+def test_the_rpm_post_writes_no_ucm_env_through_a_link(tmp_path):
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    absent = _linked_env(tmp_path, config)
+    body = _post_body(tmp_path, home, data, config)
+    subprocess.run([POSIX_SH, '-c', body, 'post', '2'], capture_output=True, text=True,
+                   timeout=20, env=env)
+    assert not absent.exists()
+    assert f'bash {home}/scripts/native-setup.sh env-check {config}/ucm.env' in _calls(log)
+
+
+def test_the_deb_postinst_adds_data_dir_through_native_setup(tmp_path):
+    out, calls, home, data, config = _run_postinst(tmp_path, 'configure', '2.254')
+    assert out.returncode == 0, out.stderr
+    assert f'bash {home}/scripts/native-setup.sh env-ensure {config}/ucm.env DATA_DIR {data}' in calls

@@ -62,12 +62,39 @@ is_true() {
     return 1
 }
 
+# /etc/ucm is the service account's: a ucm.env it replaced by a link or by anything but a file is
+# refused before root reads it for a write, and root writes it only by renaming a new file over it
+env_check() {
+    if [ -L "$1" ] || { [ -e "$1" ] && [ ! -f "$1" ]; }; then
+        die "$1 is a symbolic link or not a regular file: replace it with a regular file, then install again"
+    fi
+}
+
+# Replaces $1 with the temporary file $2, which takes $1's owner and mode
+env_replace() {
+    chown -h --reference="$1" "$2"
+    chmod --reference="$1" "$2"
+    mv -f "$2" "$1"
+    trap - EXIT
+}
+
 # Appends KEY=VALUE, starting a new line if the file does not end with one.
 env_append() {
-    if [ -s "$1" ] && [ -n "$(tail -c 1 "$1")" ]; then
-        echo >> "$1"
+    local tmp
+    tmp=$(mktemp "$1.XXXXXX")
+    trap "rm -f -- $(printf %q "$tmp")" EXIT
+    cat -- "$1" > "$tmp"
+    if [ -s "$tmp" ] && [ -n "$(tail -c 1 "$tmp")" ]; then
+        echo >> "$tmp"
     fi
-    echo "$2=$3" >> "$1"
+    printf '%s=%s\n' "$2" "$3" >> "$tmp"
+    env_replace "$1" "$tmp"
+}
+
+# Appends KEY=VALUE unless a line already assigns KEY.
+env_ensure() {
+    env_check "$1"
+    grep -q "^$2=" "$1" || env_append "$1" "$2" "$3"
 }
 
 # Sets a key that has no value: an empty assignment (KEY=, KEY="") is filled in place.
@@ -82,10 +109,7 @@ env_fill() {
             [[ $line =~ $re ]] && line="$2=$3"
             printf '%s\n' "$line"
         done < "$1" > "$tmp"
-        chown --reference="$1" "$tmp"
-        chmod --reference="$1" "$tmp"
-        mv -f "$tmp" "$1"
-        trap - EXIT
+        env_replace "$1" "$tmp"
     else
         env_append "$1" "$2" "$3"
     fi
@@ -102,10 +126,7 @@ env_drop_legacy_admin_password() {
     while IFS= read -r line || [ -n "$line" ]; do
         [[ $line =~ $re ]] || printf '%s\n' "$line"
     done < "$1" > "$tmp"
-    chown --reference="$1" "$tmp"
-    chmod --reference="$1" "$tmp"
-    mv -f "$tmp" "$1"
-    trap - EXIT
+    env_replace "$1" "$tmp"
 }
 
 fips_requested() {
@@ -216,7 +237,9 @@ cmd_check_build_tools() {
 
 cmd_env() {
     local file=$1 data=$2 had_secret="" key
-    touch "$file"
+    env_check "$file"
+    # Created exclusively (noclobber), restricted from the start
+    [ -e "$file" ] || (umask 077 && set -C && : > "$file")
     env_has "$file" SECRET_KEY && had_secret=1
     # Restricted before the first secret is written
     env_has "$file" SECRET_KEY || chmod 600 "$file"
@@ -486,6 +509,7 @@ run_preflight() {
 cmd_fips_finish() {
     local home=$1 envfile=$2 data=$3 user=$4 flag active
     flag=$(cat "$FIPS_FLAG" 2>/dev/null || true)
+    env_check "$envfile"
     if ! fips_requested "$envfile"; then
         [ "$flag" != 1 ] || say "Note: host is in FIPS mode: set UCM_FIPS_BUILD=1 in $envfile and reinstall, to link UCM to the system OpenSSL."
         return 0
@@ -619,6 +643,8 @@ cmd_banner() {
 
 case "${1:-}" in
     env) cmd_env "$2" "$3" ;;
+    env-check) env_check "$2" ;;
+    env-ensure) env_ensure "$2" "$3" "$4" ;;
     venv-ok) venv_ok "$2/venv" ;;
     venv) cmd_venv "$2" "$3" "$4" "$5" ;;
     fips-finish) cmd_fips_finish "$2" "$3" "$4" "$5" ;;
@@ -629,7 +655,7 @@ case "${1:-}" in
     banner) cmd_banner "$2" "$3" ;;
     host-name) host_name ;;
     https-cert) cmd_https_cert "$2" "$3" "$4" ;;
-    *) die "usage: $0 env <ucm.env> <data dir>
+    *) die "usage: $0 env <ucm.env> <data dir> | env-check <ucm.env> | env-ensure <ucm.env> <key> <value>
   | venv <ucm home> <python> <deb|rpm> <ucm.env> | venv-ok <ucm home>
   | fips-finish <ucm home> <ucm.env> <data dir> <user> | fips-requested <ucm.env>
   | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env>

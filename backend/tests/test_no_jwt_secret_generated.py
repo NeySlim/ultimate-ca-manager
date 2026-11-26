@@ -18,7 +18,7 @@ def written_env(path, tmp_path):
     """The env file a packaging script writes, produced by running its here-document
     in a throwaway shell; returns ``{name: value}``, commented examples included."""
     text = (ROOT / path).read_text()
-    block = re.search(r'^[ \t]*cat > "\$UCM_CONFIG/ucm\.env" << ?\'?ENVEOF\'?\n.*?\nENVEOF$',
+    block = re.search(r'^[ \t]*(?:\(umask 077 && set -C && )?cat > "\$UCM_CONFIG/ucm\.env"\)? << ?\'?ENVEOF\'?\n.*?\nENVEOF$',
                       text, re.S | re.M).group(0)
     env = {'PATH': '/usr/bin:/bin', 'UCM_CONFIG': str(tmp_path), 'UCM_DATA': '/data',
            'SECRET_KEY': 'generated-secret', 'ADMIN_PASS': 'generated-pass'}

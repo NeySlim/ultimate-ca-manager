@@ -111,12 +111,14 @@ case "$1" in
         mkdir -p "$UCM_DATA"/{ca,certs,private,crl,scep,backups,sessions}
         mkdir -p "$UCM_CONFIG"
 
-        # Create config if not exists (fresh install)
+        # Create config if not exists (fresh install). /etc/ucm is the service account's: a link
+        # or anything but a file there stops the install, and the new file is created exclusively
+        bash "$UCM_SETUP" env-check "$UCM_CONFIG/ucm.env"
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
             NEW_CONFIG=1
             SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
 
-            cat > "$UCM_CONFIG/ucm.env" << ENVEOF
+            (umask 077 && set -C && cat > "$UCM_CONFIG/ucm.env") << ENVEOF
 # ============================================================
 # UCM Configuration File
 # ============================================================
@@ -182,10 +184,7 @@ ENVEOF
         [ "$ENV_STATE" != new ] || NEW_CONFIG=1
         
         # Always ensure config has correct paths (for upgrades from older versions)
-        if [ -f "$UCM_CONFIG/ucm.env" ]; then
-            # Ensure DATA_DIR is set
-            grep -q "^DATA_DIR=" "$UCM_CONFIG/ucm.env" || echo "DATA_DIR=$UCM_DATA" >> "$UCM_CONFIG/ucm.env"
-        fi
+        bash "$UCM_SETUP" env-ensure "$UCM_CONFIG/ucm.env" DATA_DIR "$UCM_DATA"
         
         # Set permissions, through a linked directory too (the final /); a local archive of a
         # removed UCM's files (.ucm-archive-*) and the DNS hooks (dns-hooks) stay root's
