@@ -1900,6 +1900,8 @@ def register_blueprints(app):
         app.logger.info("✓ SSH public setup endpoint enabled (/ssh/setup)")
     except ImportError as e:
         app.logger.warning(f"⚠️ SSH setup endpoint not available: {e}")
+    from api.ssh_host_agent import bp as ssh_host_agent_bp
+    app.register_blueprint(ssh_host_agent_bp)  # SSH host enrollment and renewal (/ssh/enroll, /ssh/renew)
     
     # ACME Protocol (RFC 8555) - /acme/*
     try:

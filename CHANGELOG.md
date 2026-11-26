@@ -13,6 +13,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - SSH CAs publish their KRL at `/ssh/krl/<refid>`, without authentication: the version changes only when a certificate is revoked, which publishes it at once, and a client that sends the ETag back gets `304` while nothing changed (#451).
 - SSH agent: `curl -fsSL https://<ucm>/ssh/setup/<refid>/agent | sudo sh` makes sshd read the KRL of a user CA and installs a timer that pulls it every 15 minutes, checks it and reloads sshd only when it changed; `--uninstall` removes it (#451).
+- SSH host enrollment: an administrator creates a single-use enrollment token for a host CA and the host names it allows, and the agent installed with it exchanges the token for a host certificate of the server's own key, which sshd then presents (#451).
 
 ### Changed
 

@@ -21,7 +21,7 @@ STEPS = (
     '168_ssh_certificate_serial_unique', '169_background_jobs', '170_sso_sign_in_tests',
     '171_acme_purge_indexes', '172_sso_ldap_nested_groups', '173_sso_oauth2_tenants',
     '174_windows_profile_renewal_cas', '175_certificate_comment',
-    '176_revoked_serial_publication', '177_ssh_krls',
+    '176_revoked_serial_publication', '177_ssh_krls', '178_ssh_hosts',
 )
 
 

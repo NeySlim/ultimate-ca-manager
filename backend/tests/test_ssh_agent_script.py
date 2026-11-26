@@ -213,3 +213,77 @@ class TestTheAgent:
         out = host.install(_installer(server, ca['refid']), '--interval', '0;id')
         assert out.returncode == 1 and not host.agent.exists()
 
+
+
+def _enroll_token(auth_client, ca, principals=('web01.example.com',), **extra):
+    r = post_json(auth_client, '/api/v2/ssh/enrollment-tokens',
+                  {'ca_id': ca['id'], 'principals': list(principals), **extra})
+    assert r.status_code == 201, r.data
+    return r.get_json()['data']['token']
+
+
+class TestTheAgentEnrolls:
+    def test_a_host_ca_needs_a_token(self, auth_client, host, server):
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent no token CA')
+        out = host.install(_installer(server, ca['refid']))
+        assert out.returncode == 1 and 'UCM_ENROLL_TOKEN' in out.stderr
+
+    def test_the_token_buys_the_host_certificate_sshd_presents(self, app, auth_client, host, server):
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent enroll CA')
+        token = _enroll_token(auth_client, ca, principals=('web01.example.com', 'web01'))
+        out = host.install(_installer(server, ca['refid']), '--principal', 'web01',
+                           env={'UCM_ENROLL_TOKEN': token})
+        assert out.returncode == 0, out.stderr
+        cert = host.ssh / 'ssh_host_ed25519_key-cert.pub'
+        listed = subprocess.run(['ssh-keygen', '-L', '-f', str(cert)], capture_output=True, text=True).stdout
+        assert 'host certificate' in listed and 'web01' in listed and 'web01.example.com' not in listed
+        config = (host.ssh / 'sshd_config').read_text()
+        assert config.startswith(BEGIN) and f'HostCertificate {cert}\n' in config
+        conf = host.conf()
+        assert conf['HOST_CA'] == ca['refid'] and conf['HOST_CERT'] == str(cert)
+        with app.app_context():
+            from models.ssh import SSHHost
+            assert SSHHost.query.filter_by(refid=conf['HOST_REFID']).one().get_principals() == ['web01']
+        # The token never reaches the disk
+        assert not [p for p in host.root.rglob('*') if p.is_file() and token.encode() in p.read_bytes()]
+
+    def test_a_refused_token_changes_nothing(self, auth_client, host, server):
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent refused token CA')
+        original = (host.ssh / 'sshd_config').read_text()
+        out = host.install(_installer(server, ca['refid']), env={'UCM_ENROLL_TOKEN': 'ucmh_' + 'A' * 43})
+        assert out.returncode == 1 and 'HTTP 403' in out.stderr and 'invalid, used or expired' in out.stderr
+        assert (host.ssh / 'sshd_config').read_text() == original
+        assert not (host.ssh / 'ssh_host_ed25519_key-cert.pub').exists()
+
+    def test_a_certificate_of_another_key_is_not_installed(self, auth_client, host, server, monkeypatch):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from cryptography.hazmat.primitives.serialization import ssh as ssh_ser
+        from services import ssh_host_service
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent other key CA')
+        other = ssh_ser.serialize_ssh_public_key(ed25519.Ed25519PrivateKey.generate().public_key()).decode()
+        real = ssh_host_service.checked_host_key
+        monkeypatch.setattr(ssh_host_service, 'checked_host_key', lambda key: real(other))
+        out = host.install(_installer(server, ca['refid']), env={'UCM_ENROLL_TOKEN': _enroll_token(auth_client, ca)})
+        assert out.returncode == 1 and 'does not certify' in out.stderr
+        assert not (host.ssh / 'ssh_host_ed25519_key-cert.pub').exists()
+
+    def test_uninstall_puts_back_the_certificate_found_before(self, auth_client, host, server):
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent restore cert CA')
+        cert = host.ssh / 'ssh_host_ed25519_key-cert.pub'
+        cert.write_text('the certificate found there\n')
+        original = (host.ssh / 'sshd_config').read_text()
+        script = _installer(server, ca['refid'])
+        assert host.install(script, env={'UCM_ENROLL_TOKEN': _enroll_token(auth_client, ca)}).returncode == 0
+        assert cert.read_text() != 'the certificate found there\n'
+        assert host.install(script, '--uninstall').returncode == 0
+        assert cert.read_text() == 'the certificate found there\n'
+        assert (host.ssh / 'sshd_config').read_text() == original
+
+    def test_a_server_follows_a_krl_and_presents_a_host_certificate(self, auth_client, host, server):
+        user_ca = _create_ssh_ca(auth_client, descr='Agent both user CA')
+        host_ca = _create_ssh_ca(auth_client, ca_type='host', descr='Agent both host CA')
+        assert host.install(_installer(server, user_ca['refid'])).returncode == 0
+        assert host.install(_installer(server, host_ca['refid']),
+                            env={'UCM_ENROLL_TOKEN': _enroll_token(auth_client, host_ca)}).returncode == 0
+        config = (host.ssh / 'sshd_config').read_text()
+        assert config.count(BEGIN) == 1 and 'RevokedKeys' in config and 'HostCertificate' in config

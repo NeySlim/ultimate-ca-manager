@@ -18,15 +18,18 @@ def ssh_rows_stay_in_their_module():
         return
     with app.app_context():
         cas, certs = ids('ssh_cas'), ids('ssh_certificates')
+        hosts, tokens = ids('ssh_hosts'), ids('ssh_host_enrollment_tokens')
         db.session.rollback()
     yield
     with app.app_context():
         try:
-            for table, kept in (('ssh_certificates', certs), ('ssh_cas', cas)):
+            for table, kept in (('ssh_hosts', hosts), ('ssh_host_enrollment_tokens', tokens),
+                                ('ssh_certificates', certs), ('ssh_cas', cas)):
                 for row_id in ids(table) - kept:
                     db.session.execute(text(f'DELETE FROM {table} WHERE id = :i'), {'i': row_id})
             # Rows hanging from a deleted CA (SQLite does not cascade without its foreign keys)
-            db.session.execute(text('DELETE FROM ssh_krls WHERE ssh_ca_id NOT IN (SELECT id FROM ssh_cas)'))
+            for table in ('ssh_krls', 'ssh_hosts', 'ssh_host_enrollment_tokens'):
+                db.session.execute(text(f'DELETE FROM {table} WHERE ssh_ca_id NOT IN (SELECT id FROM ssh_cas)'))
             db.session.commit()
         finally:
             db.session.remove()

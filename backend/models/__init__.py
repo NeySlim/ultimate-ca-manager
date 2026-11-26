@@ -29,7 +29,7 @@ from models.hsm import HsmProvider, HsmKey
 from models.rbac import CustomRole, RolePermission
 from models.sso import SSOProvider, SSOSession, SAMLMessageId, SSOSignInTest
 from models.policy import CertificatePolicy, ApprovalRequest
-from models.ssh import SSHCertificateAuthority, SSHCertificate, SSHKRL
+from models.ssh import SSHCertificateAuthority, SSHCertificate, SSHKRL, SSHHost, SSHHostEnrollmentToken
 from models.msca import MicrosoftCA, MSCARequest
 from models.ad_connector import ADConnectorConfig
 from models.windows_profile import WindowsEnrollmentProfile, WindowsProfileTemplate
@@ -68,7 +68,7 @@ __all__ = [
     "AcmeClientAccount", "AcmeDnsUpdateKey", "AcmeProxyDnsChallenge",
     "HsmProvider", "HsmKey",
     "ScanProfile", "ScanRun", "DiscoveredCertificate",
-    "SSHCertificateAuthority", "SSHCertificate", "SSHKRL",
+    "SSHCertificateAuthority", "SSHCertificate", "SSHKRL", "SSHHost", "SSHHostEnrollmentToken",
     "CATemplatePin",
     "WebhookDelivery",
     "KeyRecoveryRequest",

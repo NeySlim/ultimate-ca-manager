@@ -108,6 +108,7 @@ from api.v2.deploy import bp as deploy_bp
 from api.v2.database import bp as database_bp
 from api.v2.ssh_cas import bp as ssh_cas_bp
 from api.v2.ssh_certificates import bp as ssh_certificates_bp
+from api.v2.ssh_hosts import bp as ssh_hosts_bp
 
 # All API v2 blueprints
 API_V2_BLUEPRINTS = [
@@ -156,6 +157,7 @@ API_V2_BLUEPRINTS = [
     database_bp,
     ssh_cas_bp,
     ssh_certificates_bp,
+    ssh_hosts_bp,
     key_recovery_bp,
     deploy_bp,
 ]

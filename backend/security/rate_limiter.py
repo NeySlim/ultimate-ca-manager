@@ -144,6 +144,9 @@ class RateLimitConfig:
             '/tsa': {'rpm': standard_rpm, 'burst': standard_burst},
             '/ssh/setup/': {'rpm': standard_rpm, 'burst': standard_burst},
             '/ssh/krl/': {'rpm': standard_rpm, 'burst': standard_burst},
+            # A host authenticates there with a token or a signature: a guess costs a request
+            '/ssh/enroll/': {'rpm': 10, 'burst': 5},
+            '/ssh/renew/': {'rpm': 30, 'burst': 10},
             '/.well-known/acme-challenge/': {'rpm': standard_rpm, 'burst': standard_burst},
             # Windows enrolment: a GPO refresh fans a fleet out at once, and
             # these had `_default` before. Separate bucket, same rate.

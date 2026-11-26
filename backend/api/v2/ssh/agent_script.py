@@ -1,7 +1,9 @@
 """The SSH host agent of issue #451: a POSIX sh script, installed by /ssh/setup/<refid>/agent.
 
-It pulls the KRL of an SSH user CA (RevokedKeys) on a timer. The agent holds no secret: what it
-needs to reach UCM is the URL it was installed from and the CA refid, both public.
+It pulls the KRL of an SSH user CA (RevokedKeys) on a timer, and enrolls the server with a host CA
+for a host certificate of its own key (HostCertificate). The agent holds no secret: what it needs
+to reach UCM is the URL it was installed from and the CA refids, all public; the single-use
+enrollment token is spent at once and never written to disk.
 """
 import re
 
@@ -20,6 +22,7 @@ def shell_safe_base_url(url):
 AGENT = r'''#!/bin/sh
 # ucm-ssh-agent: keeps this server's sshd in step with UCM (Ultimate Certificate Manager).
 #   ucm-ssh-agent sync        pull the KRL now (the timer runs this every INTERVAL minutes)
+#   ucm-ssh-agent enroll REFID [NAME...]   exchange UCM_ENROLL_TOKEN for a host certificate
 #   ucm-ssh-agent status      show what is installed
 #   ucm-ssh-agent uninstall   remove the agent, its timer and its sshd settings
 # It holds no secret. Configuration: /etc/ssh/ucm/agent.conf (KEY=value lines).
@@ -83,6 +86,30 @@ http_get() {
     printf '%s' "${code:-000}"
 }
 
+# http_post URL BODY_FILE OUT: a JSON body, a text/plain answer; prints the status (000: no answer)
+http_post() {
+    url=$1 body=$2 out=$3
+    cacert=$(conf_get CA_BUNDLE)
+    if have curl; then
+        set -- -sS --max-time 60 -o "$out" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+            -H 'Accept: text/plain' --data-binary "@$body"
+        if [ -n "$cacert" ]; then set -- "$@" --cacert "$cacert"; fi
+        code=$(curl "$@" "$url" 2>/dev/null) || code=000
+        printf '%s' "$code"
+        return 0
+    fi
+    have wget || die "neither curl nor wget is installed"
+    hdr="$out.hdr"
+    set -- -q -S -T 60 -O "$out" --header='Content-Type: application/json' --header='Accept: text/plain' \
+        --post-file="$body"
+    if [ -n "$cacert" ]; then set -- "$@" --ca-certificate="$cacert"; fi
+    wget "$@" "$url" 2> "$hdr" || true
+    code=$(sed -n 's/.*HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' "$hdr" | tail -n 1)
+    rm -f "$hdr"
+    printf '%s' "${code:-000}"
+}
+field() { sed -n "s/^$1=//p" "$2" | head -n 1; }
+
 # --- sshd
 sshd_bin() {
     if have sshd; then command -v sshd
@@ -117,6 +144,14 @@ dropin_included() {
     [ -d "$DROPIN_DIR" ] && grep -Eiq '^[[:space:]]*Include[[:space:]].*sshd_config\.d/\*\.conf' "$SSHD_CONFIG"
 }
 
+# DEST takes the content of SRC in one rename, mode and owner kept: sshd never reads half a file
+replace_file() {
+    if [ -L "$2" ]; then cat "$1" > "$2"; return 0; fi
+    cp -p "$2" "$2.ucm-new"
+    cat "$1" > "$2.ucm-new"
+    mv -f "$2.ucm-new" "$2"
+}
+
 strip_block() { # FILE: its content without the managed block
     awk -v b="$BEGIN_MARK" -v e="$END_MARK" '$0 == b { skip = 1; next } skip && $0 == e { skip = 0; next } !skip' "$1"
 }
@@ -127,6 +162,12 @@ apply_sshd_config() {
     [ -f "$SSHD_CONFIG" ] || die "$SSHD_CONFIG not found"
     lines=""
     if [ -n "$(conf_get KRL_CA)" ]; then lines="RevokedKeys $KRL_FILE"; fi
+    # Shell variables are global: this one is named after its function
+    sshd_host_cert=$(conf_get HOST_CERT)
+    if [ -n "$sshd_host_cert" ]; then
+        if [ -n "$lines" ]; then lines="$lines
+HostCertificate $sshd_host_cert"; else lines="HostCertificate $sshd_host_cert"; fi
+    fi
     backup="$CONF_DIR/sshd_config.before-agent"
     cp -p "$SSHD_CONFIG" "$backup.$$"
     if [ -f "$DROPIN" ]; then cp -p "$DROPIN" "$backup.dropin.$$"; fi
@@ -140,17 +181,17 @@ apply_sshd_config() {
         else
             rm -f "$DROPIN"
         fi
-        cat "$stripped" > "$SSHD_CONFIG"
+        replace_file "$stripped" "$SSHD_CONFIG"
     elif [ -n "$lines" ]; then
         { printf '%s\n%s\n%s\n' "$BEGIN_MARK" "$lines" "$END_MARK"; cat "$stripped"; } > "$stripped.new"
-        cat "$stripped.new" > "$SSHD_CONFIG"
+        replace_file "$stripped.new" "$SSHD_CONFIG"
         rm -f "$stripped.new"
     else
-        cat "$stripped" > "$SSHD_CONFIG"
+        replace_file "$stripped" "$SSHD_CONFIG"
     fi
     rm -f "$stripped"
     if ! sshd_test; then
-        cat "$backup.$$" > "$SSHD_CONFIG"
+        replace_file "$backup.$$" "$SSHD_CONFIG"
         if [ -f "$backup.dropin.$$" ]; then mv -f "$backup.dropin.$$" "$DROPIN"; else rm -f "$DROPIN"; fi
         rm -f "$backup.$$"
         die "sshd -t refused the new settings: sshd_config restored"
@@ -210,7 +251,7 @@ sync_krl() {
     chmod 644 "$tmp"
     mv -f "$tmp" "$KRL_FILE"
     log "KRL version $new installed"
-    reload_sshd || true
+    CHANGED=1
 }
 
 # --- scheduler: a systemd timer, else cron
@@ -259,9 +300,80 @@ cmd_install_krl() { # REFID: the KRL is in place before sshd is told to read it
     reload_sshd || true
 }
 
+# The host key to certify: UCM_HOST_KEY, else the first of Ed25519, ECDSA, RSA
+host_key() {
+    if [ -n "${UCM_HOST_KEY:-}" ]; then printf '%s' "$UCM_HOST_KEY"; return 0; fi
+    for type in ed25519 ecdsa rsa; do
+        if [ -f "$SSH_DIR/ssh_host_${type}_key.pub" ]; then printf '%s' "$SSH_DIR/ssh_host_${type}_key"; return 0; fi
+    done
+    die "no host key in $SSH_DIR"
+}
+
+# install_cert TEXT KEY: the certificate checked to certify KEY, then swapped in atomically
+install_cert() {
+    dest="$2-cert.pub"
+    tmp="$CONF_DIR/.host-cert.$$"
+    printf '%s\n' "$1" > "$tmp"
+    certified=$(ssh-keygen -L -f "$tmp" 2>/dev/null | sed -n 's/^[[:space:]]*Public key: [^ ]* //p' | head -n 1)
+    expected=$(ssh-keygen -l -f "$2.pub" 2>/dev/null | awk '{ print $2 }')
+    if [ -z "$certified" ] || [ "$certified" != "$expected" ]; then
+        rm -f "$tmp"
+        log "the certificate UCM sent does not certify $2.pub: not installed"
+        return 1
+    fi
+    # The file found there before the agent's first certificate comes back at uninstall
+    if [ -f "$dest" ] && [ -z "$(conf_get HOST_CERT)" ] && [ ! -f "$CONF_DIR/host-cert.before-agent" ]; then
+        cp -p "$dest" "$CONF_DIR/host-cert.before-agent"
+    fi
+    chmod 644 "$tmp"
+    mv -f "$tmp" "$dest"
+}
+
+cmd_enroll() { # REFID [NAME...]
+    refid=${1:-}
+    case "$refid" in *[!A-Za-z0-9-]*|'') die "invalid CA reference" ;; esac
+    shift
+    token=${UCM_ENROLL_TOKEN:-}
+    case "$token" in ucmh_*) ;; *) die "set UCM_ENROLL_TOKEN to the token shown in UCM" ;; esac
+    case "$token" in *[!A-Za-z0-9_-]*) die "invalid enrollment token" ;; esac
+    key=$(host_key)
+    pub=$(awk 'NR == 1 { print $1 " " $2 }' "$key.pub")
+    case "$pub" in *[!A-Za-z0-9+/=@.\ -]*|' ') die "unreadable host key $key.pub" ;; esac
+    names=""
+    for name in "$@"; do
+        case "$name" in *[!A-Za-z0-9._:-]*|'') die "invalid host name: $name" ;; esac
+        names="$names${names:+,}\"$name\""
+    done
+    mkdir -p "$CONF_DIR"
+    body="$CONF_DIR/.enroll.$$"
+    out="$CONF_DIR/.enroll-answer.$$"
+    (umask 077; printf '{"token":"%s","public_key":"%s"%s}' "$token" "$pub" \
+        "${names:+,\"principals\":[$names]}" > "$body")
+    code=$(http_post "$(conf_get UCM_URL)/ssh/enroll/$refid" "$body" "$out")
+    rm -f "$body"
+    if [ "$code" != 201 ]; then
+        reason=$(field error "$out" 2>/dev/null || true)
+        rm -f "$out"
+        die "enrollment refused (HTTP $code)${reason:+: $reason}"
+    fi
+    cert=$(field certificate "$out")
+    host=$(field host_refid "$out")
+    rm -f "$out"
+    case "$host" in *[!A-Za-z0-9-]*|'') die "UCM answered no host reference" ;; esac
+    install_cert "$cert" "$key" || exit 1
+    conf_set HOST_CA "$refid"
+    conf_set HOST_REFID "$host"
+    conf_set HOST_KEY "$key"
+    conf_set HOST_CERT "$key-cert.pub"
+    apply_sshd_config
+    reload_sshd || true
+    log "enrolled: sshd presents $key-cert.pub"
+}
+
 cmd_sync() {
-    status=0
+    status=0 CHANGED=""
     sync_krl || status=1
+    if [ -n "$CHANGED" ]; then reload_sshd || true; fi
     return $status
 }
 
@@ -273,13 +385,27 @@ cmd_status() {
     else
         printf 'KRL: none\n'
     fi
+    host=$(conf_get HOST_REFID)
+    if [ -n "$host" ]; then
+        printf 'Host: %s (CA %s), certificate %s\n' "$host" "$(conf_get HOST_CA)" "$(conf_get HOST_CERT)"
+        ssh-keygen -L -f "$(conf_get HOST_CERT)" 2>/dev/null | sed -n 's/^[[:space:]]*Valid: /Valid: /p'
+    else
+        printf 'Host: not enrolled\n'
+    fi
     printf 'Interval: %s minutes\n' "$(conf_get INTERVAL)"
 }
 
 cmd_uninstall() {
     remove_scheduler
+    installed_cert=$(conf_get HOST_CERT)
     conf_set KRL_CA ""
+    conf_set HOST_CERT ""
     if [ -f "$SSHD_CONFIG" ]; then apply_sshd_config; reload_sshd || true; fi
+    if [ -n "$installed_cert" ]; then
+        if [ -f "$CONF_DIR/host-cert.before-agent" ]; then mv -f "$CONF_DIR/host-cert.before-agent" "$installed_cert"
+        else rm -f "$installed_cert"
+        fi
+    fi
     rm -f "$KRL_FILE" "$CONF" "$CONF_DIR"/sshd_config.before-agent.*
     rmdir "$CONF_DIR" 2>/dev/null || true
     rm -f "$AGENT"
@@ -292,11 +418,12 @@ main() {
     [ $# -gt 0 ] && shift
     case "$command" in
         install-krl) cmd_install_krl "$@" ;;
+        enroll) cmd_enroll "$@" ;;
         install-scheduler) install_scheduler ;;
         sync) cmd_sync ;;
         status) cmd_status ;;
         uninstall) cmd_uninstall ;;
-        *) die "usage: ucm-ssh-agent sync|status|uninstall" ;;
+        *) die "usage: ucm-ssh-agent sync|status|enroll REFID [NAME...]|uninstall" ;;
     esac
 }
 
@@ -318,8 +445,10 @@ INSTALLER = r'''#!/bin/sh
 #   curl -fsSL @@UCM_URL@@/ssh/setup/@@CA_REFID@@/agent | sudo sh
 #   ... | sudo sh -s -- --interval 15 --cacert /path/to/ucm-ca.pem
 #   ... | sudo sh -s -- --uninstall
-# Installs /usr/local/sbin/ucm-ssh-agent and a timer that pulls the KRL of this SSH CA into
-# RevokedKeys. Running it again updates the agent; nothing in it is secret.
+# A user CA: installs /usr/local/sbin/ucm-ssh-agent and a timer that pulls the KRL of this CA
+# into RevokedKeys. A host CA: enrolls this server with a single-use token from UCM,
+#   ... | sudo UCM_ENROLL_TOKEN=ucmh_... sh -s -- [--principal NAME]... [--host-key PATH]
+# and sshd presents the host certificate. Running it again updates the agent; nothing in it is secret.
 set -eu
 UCM_URL='@@UCM_URL@@'
 CA_REFID='@@CA_REFID@@'
@@ -340,12 +469,17 @@ setconf() {
 
 # One function, read whole before it runs: a command reading stdin cannot eat the piped script
 install_agent() {
-    interval=15 cacert="" uninstall=""
+    interval=15 cacert="" uninstall="" names="" token=${UCM_ENROLL_TOKEN:-} hostkey=${UCM_HOST_KEY:-}
     while [ $# -gt 0 ]; do
         case "$1" in
             --interval) [ $# -ge 2 ] || fail "--interval needs a value"; interval=$2; shift 2 ;;
             --cacert) [ $# -ge 2 ] || fail "--cacert needs a file"; cacert=$2; shift 2 ;;
             --uninstall) uninstall=1; shift ;;
+            --token) [ $# -ge 2 ] || fail "--token needs a value"; token=$2; shift 2 ;;
+            --principal) [ $# -ge 2 ] || fail "--principal needs a host name"
+                case "$2" in *[!A-Za-z0-9._:-]*|'') fail "invalid host name: $2" ;; esac
+                names="$names $2"; shift 2 ;;
+            --host-key) [ $# -ge 2 ] || fail "--host-key needs a path"; hostkey=$2; shift 2 ;;
             *) fail "unknown option: $1" ;;
         esac
     done
@@ -358,7 +492,9 @@ install_agent() {
         printf 'the agent is not installed\n' >&2
         return 0
     fi
-    [ "$CA_TYPE" = user ] || fail "this CA signs host certificates: its KRL is for clients, not for sshd"
+    if [ "$CA_TYPE" = host ] && [ -z "$token" ]; then
+        fail "this CA signs host certificates: create an enrollment token in UCM (SSH Hosts) and pass it as UCM_ENROLL_TOKEN"
+    fi
     command -v ssh-keygen >/dev/null 2>&1 || fail "ssh-keygen is required"
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || fail "curl or wget is required"
 
@@ -377,6 +513,14 @@ install_agent() {
     fi
     if [ -n "${UCM_SSHD_PIDFILE:-}" ]; then setconf SSHD_PIDFILE "$UCM_SSHD_PIDFILE"; fi
 
+    if [ "$CA_TYPE" = host ]; then
+        # The token reaches the agent in its environment, never on a command line
+        # shellcheck disable=SC2086
+        UCM_ENROLL_TOKEN=$token UCM_HOST_KEY=$hostkey "$AGENT" enroll "$CA_REFID" $names < /dev/null
+        "$AGENT" install-scheduler < /dev/null
+        printf 'UCM SSH agent installed: sshd presents a host certificate of this CA.\n'
+        return 0
+    fi
     "$AGENT" install-krl "$CA_REFID" < /dev/null
     "$AGENT" install-scheduler < /dev/null
     printf 'UCM SSH agent installed: sshd reads the KRL of this CA, pulled every %s minutes.\n' "$interval"

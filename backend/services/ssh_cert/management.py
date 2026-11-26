@@ -95,6 +95,8 @@ class SSHCertificateManagementMixin:
 
         cert_name = cert.key_id
         try:
+            from models.ssh import SSHHost
+            SSHHost.query.filter_by(certificate_id=cert.id).update({'certificate_id': None})
             db.session.delete(cert)
             db.session.commit()
         except Exception as e:

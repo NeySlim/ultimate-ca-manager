@@ -23,6 +23,8 @@ SAMPLE_PATH = {
     '/tsa/': '/tsa/reply',
     '/ssh/setup/': '/ssh/setup/host',
     '/ssh/krl/': '/ssh/krl/ca-refid',
+    '/ssh/enroll/': '/ssh/enroll/ca-refid',
+    '/ssh/renew/': '/ssh/renew/host-refid',
     '/ADPolicyProvider_CEP_': '/ADPolicyProvider_CEP_UsernamePassword/service.svc',
     '/ADCertificateService_CES_': '/ADCertificateService_CES_UsernamePassword/service.svc',
 }

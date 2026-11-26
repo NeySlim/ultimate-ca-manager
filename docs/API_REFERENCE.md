@@ -2314,6 +2314,26 @@ GET /ssh/setup/{refid}/agent
 
 A POSIX `sh` installer, without authentication, run on a server as `curl -fsSL https://<ucm>/ssh/setup/{refid}/agent | sudo sh` (`sh -s -- --interval 15 --cacert ca.pem` to pass options, `--uninstall` to remove it). It holds no secret: only the URL it was fetched from (`400` when that URL is not one a shell can hold) and the CA refid (`404` for an unknown CA). For a user CA it installs `/usr/local/sbin/ucm-ssh-agent`, downloads the KRL to `/etc/ssh/ucm/revoked_keys` before pointing `RevokedKeys` at it (in `/etc/ssh/sshd_config.d` when sshd_config includes it, else at the top of sshd_config), and a systemd timer, else a cron job, that runs `ucm-ssh-agent sync` every 15 minutes. A sync sends the installed version as `If-None-Match`, checks a new KRL with `ssh-keygen -Q` and refuses one older than the installed one, replaces the file atomically and reloads sshd only when the KRL changed and `sshd -t` passes. It needs `ssh-keygen` and `curl` or `wget`.
 
+For a host CA the installer enrolls the server instead: `curl -fsSL https://<ucm>/ssh/setup/{refid}/agent | sudo UCM_ENROLL_TOKEN=ucmh_... sh` (or `sh -s -- --token ucmh_...`), with `--principal NAME` (repeated) to ask for some of the token's names only, and `--host-key /etc/ssh/ssh_host_ecdsa_key` to pick a key (the first of Ed25519, ECDSA and RSA by default). The agent sends the public host key, checks that the certificate it gets certifies that key, writes it beside the key (`ssh_host_ed25519_key-cert.pub`; a file found there comes back at `--uninstall`), points `HostCertificate` at it and reloads sshd. The token is passed in the environment, never written to disk. One server may follow the KRL of one user CA and hold the host certificate of one host CA.
+
+### SSH Hosts and Enrollment Tokens
+
+```
+GET /api/v2/ssh/enrollment-tokens?ca_id=1
+POST /api/v2/ssh/enrollment-tokens
+POST /api/v2/ssh/enrollment-tokens/{token_id}/revoke
+GET /api/v2/ssh/hosts?ca_id=1&state=valid&search=web
+GET /api/v2/ssh/hosts/{host_id}
+POST /api/v2/ssh/hosts/{host_id}/revoke
+POST /api/v2/ssh/hosts/{host_id}/auto-renew
+POST /ssh/enroll/{refid}
+```
+
+- `POST /api/v2/ssh/enrollment-tokens` (`write:ssh`, `201`) creates a single-use enrollment token for a host CA: `ca_id` (`404` when unknown, `400` for a user CA) and `principals` (host names or IP addresses, 32 at most, each allowed by the CA), optional `validity_seconds` of the certificates (60 seconds to ten years, within the CA's `max_ttl`; the CA's default when absent), `lifetime_seconds` of the token (300 to 604800, 3600 by default), `renew_percent` (5 to 90, 30 by default: the share of its lifetime a certificate has left when the agent renews it) and `descr`. The answer carries the token in `token`, the only time it is shown: UCM keeps its SHA-256. A listed token shows its `token_prefix` and `state` (`active`, `used`, `expired` or `revoked`); `revoke` answers `409` for a token already used or revoked. Reading needs `read:ssh`.
+- `POST /ssh/enroll/{refid}` (public, no session) exchanges a token for a host certificate: a JSON body with `token`, `public_key` (the host's OpenSSH public key; Ed25519, ECDSA, or RSA of 2048 bits at least; never a certificate) and optional `principals`, which must all be names of the token (all of them by default). `201` answers `host_refid`, `certificate`, `principals`, `valid_to` and `renew_percent`, as JSON or, with `Accept: text/plain`, as `key=value` lines. A malformed, unknown, used, expired or revoked token, or one of another CA, answers `403` with the same message; the audit log records the reason. A token is spent by the first exchange whose body is valid, before the certificate is signed. The same key enrolled again under the same CA keeps its host and refid. Rate limited (10 requests per minute per address).
+- `GET /api/v2/ssh/hosts` (`read:ssh`) lists the enrolled hosts, 25 per page, with `meta.counts` by `state` (`valid`, `expired`, `revoked`). A host carries its `principals`, key `fingerprint`, current certificate (`certificate_id`, `valid_from`, `valid_to`), `auto_renew`, `enrolled_at`, `last_renewed_at`, `last_seen_at` and `last_krl_sync_at`.
+- `revoke` (`write:ssh`) revokes the host's current certificate, which the host CA's KRL then lists, and ends its renewals for good (`409` when already revoked); a revoked server enrolls again with a new token. `auto-renew` takes `{"enabled": false}` to stop the renewals of a host and `true` to resume them (`400` for a revoked host).
+
 ---
 
 ## Deployment
@@ -5603,6 +5623,7 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 | Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
 | SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key`, `/ssh/setup/{refid}/agent` | [SSH Certificates](#ssh-certificates) |
 | SSH KRL | `/ssh/krl/{refid}` | [Public KRL](#public-krl) |
+| SSH host enrollment | `/ssh/enroll/{refid}` | [SSH Hosts and Enrollment Tokens](#ssh-hosts-and-enrollment-tokens) |
 
 The routes are always served; a protocol turned off in Settings refuses its requests with `503` (ACME, SCEP, EST, TSA, XCEP and WSTEP).
 

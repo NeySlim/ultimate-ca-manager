@@ -142,3 +142,4 @@ tests/test_websocket_origin.py
 tests/test_cors_dynamic_origins.py
 tests/test_csv_formula_cells.py
 tests/test_ssh_krl_public.py
+tests/test_ssh_hosts*.py

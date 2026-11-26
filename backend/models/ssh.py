@@ -365,3 +365,142 @@ class SSHKRL(db.Model if db else object):
     digest = db.Column(db.String(64), nullable=False)
     data = db.Column(db.LargeBinary, nullable=False)
     updated_at = db.Column(db.DateTime, nullable=False)
+
+
+class SSHHostEnrollmentToken(db.Model if db else object):
+    """A single-use, short-lived token an administrator hands to one server: exchanged once for
+    a host certificate of its CA, for the principals it lists. Only the SHA-256 of it is kept."""
+
+    __tablename__ = 'ssh_host_enrollment_tokens'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ssh_ca_id = db.Column(db.Integer, db.ForeignKey('ssh_cas.id', ondelete='CASCADE'), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), nullable=False, unique=True)
+    token_prefix = db.Column(db.String(16), nullable=False)
+    descr = db.Column(db.String(255))
+    principals = db.Column(db.Text, nullable=False)
+    # None: the CA's default validity
+    validity_seconds = db.Column(db.Integer)
+    renew_percent = db.Column(db.Integer, nullable=False, default=30, server_default='30')
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime)
+    used_by_host_id = db.Column(db.Integer)
+    revoked_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+    created_by = db.Column(db.String(80))
+
+    ca = db.relationship('SSHCertificateAuthority')
+
+    def get_principals(self):
+        try:
+            return json.loads(self.principals or '[]')
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @property
+    def state(self):
+        if self.revoked_at:
+            return 'revoked'
+        if self.used_at:
+            return 'used'
+        if self.expires_at <= utc_now():
+            return 'expired'
+        return 'active'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ssh_ca_id': self.ssh_ca_id,
+            'ca_name': self.ca.descr if self.ca else None,
+            'token_prefix': self.token_prefix,
+            'descr': self.descr,
+            'principals': self.get_principals(),
+            'validity_seconds': self.validity_seconds,
+            'renew_percent': self.renew_percent,
+            'expires_at': utc_isoformat(self.expires_at),
+            'used_at': utc_isoformat(self.used_at),
+            'used_by_host_id': self.used_by_host_id,
+            'revoked_at': utc_isoformat(self.revoked_at),
+            'state': self.state,
+            'created_at': utc_isoformat(self.created_at),
+            'created_by': self.created_by,
+        }
+
+
+class SSHHost(db.Model if db else object):
+    """A server enrolled with a host CA: its host key, the principals it was enrolled for and
+    the certificate it presents now, renewed by proof of possession of that key."""
+
+    __tablename__ = 'ssh_hosts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    refid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    ssh_ca_id = db.Column(db.Integer, db.ForeignKey('ssh_cas.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = db.Column(db.String(255), nullable=False)
+    principals = db.Column(db.Text, nullable=False)
+    public_key = db.Column(db.Text, nullable=False)
+    key_type = db.Column(db.String(20), nullable=False)
+    fingerprint = db.Column(db.String(100), nullable=False, index=True)
+    validity_seconds = db.Column(db.Integer)
+    renew_percent = db.Column(db.Integer, nullable=False, default=30, server_default='30')
+    certificate_id = db.Column(db.Integer, db.ForeignKey('ssh_certificates.id', ondelete='SET NULL'))
+    auto_renew = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    revoked_at = db.Column(db.DateTime)
+    enrolled_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+    enrolled_ip = db.Column(db.String(45))
+    token_id = db.Column(db.Integer)
+    last_renewed_at = db.Column(db.DateTime)
+    last_seen_at = db.Column(db.DateTime)
+    # Reported by the agent's KRL download (?host=<refid>), never inferred
+    last_krl_sync_at = db.Column(db.DateTime)
+    # The pending renewal challenge: single use, minutes long
+    challenge = db.Column(db.String(64))
+    challenge_expires_at = db.Column(db.DateTime)
+
+    ca = db.relationship('SSHCertificateAuthority')
+    certificate = db.relationship('SSHCertificate')
+
+    def get_principals(self):
+        try:
+            return json.loads(self.principals or '[]')
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @property
+    def state(self):
+        if self.revoked_at:
+            return 'revoked'
+        cert = self.certificate
+        # A host certificate is deleted only once expired
+        if cert is None or cert.is_expired:
+            return 'expired' if not (cert and cert.revoked) else 'revoked'
+        if cert.revoked:
+            return 'revoked'
+        return 'valid'
+
+    def to_dict(self):
+        cert = self.certificate
+        return {
+            'id': self.id,
+            'refid': self.refid,
+            'ssh_ca_id': self.ssh_ca_id,
+            'ca_name': self.ca.descr if self.ca else None,
+            'name': self.name,
+            'principals': self.get_principals(),
+            'key_type': self.key_type,
+            'fingerprint': self.fingerprint,
+            'validity_seconds': self.validity_seconds,
+            'renew_percent': self.renew_percent,
+            'auto_renew': bool(self.auto_renew) and not self.revoked_at,
+            'state': self.state,
+            'certificate_id': self.certificate_id,
+            'certificate_serial': cert.serial if cert else None,
+            'valid_from': utc_isoformat(cert.valid_from) if cert else None,
+            'valid_to': utc_isoformat(cert.valid_to) if cert else None,
+            'revoked_at': utc_isoformat(self.revoked_at),
+            'enrolled_at': utc_isoformat(self.enrolled_at),
+            'enrolled_ip': self.enrolled_ip,
+            'last_renewed_at': utc_isoformat(self.last_renewed_at),
+            'last_seen_at': utc_isoformat(self.last_seen_at),
+            'last_krl_sync_at': utc_isoformat(self.last_krl_sync_at),
+        }
