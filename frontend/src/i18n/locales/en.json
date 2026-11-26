@@ -4711,7 +4711,10 @@
     "profileReset": "Profile changes undone.",
     "apiKeyHint": "API keys allow programmatic access to UCM. Keep your keys secret and rotate them regularly. Each key can have a custom expiration date.",
     "apiKeySearchPlaceholder": "Search by name or prefix...",
-    "apiKeyPrefix": "Prefix"
+    "apiKeyPrefix": "Prefix",
+    "confirmItIsYou": "Confirm it is you",
+    "confirmWithPassword": "Enter your password to confirm this change",
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
   },
   "rbac": {
     "title": "Role-Based Access Control",

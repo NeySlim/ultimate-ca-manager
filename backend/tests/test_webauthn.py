@@ -196,7 +196,7 @@ class TestWebAuthnRegistration:
 
     def test_register_options_returns_data(self, auth_client):
         """Registration options should return 200 with challenge data."""
-        r = _post(auth_client, '/api/v2/webauthn/register/options')
+        r = _post(auth_client, '/api/v2/webauthn/register/options', {'password': 'changeme123'})
         assert r.status_code == 200, r.data
         data = get_json(r)['data']
         assert data['challenge'] and data['user']['name'] == 'admin'

@@ -100,7 +100,7 @@ class TestPkcs12ExportIdentity:
             type='intermediate',
             parentCAId=root['id'],
         )
-        created = _post(auth_client, '/api/v2/mtls/certificates', {
+        created = _post(auth_client, '/api/v2/mtls/certificates', {'password': 'changeme123',
             'ca_id': intermediate['id'], 'name': 'account-chain-choice',
         })
         assert created.status_code == 201, created.get_json()
@@ -139,7 +139,7 @@ class TestPkcs12ExportIdentity:
 
     def test_forged_serial_does_not_unlock_another_records_key(self, app, viewer_client, victim):
         forged = _forged_cert_with_serial(_serial_int(victim['serial']))
-        r = _post(viewer_client, '/api/v2/mtls/enroll-import', {'pem': forged, 'name': 'forged'})
+        r = _post(viewer_client, '/api/v2/mtls/enroll-import', {'password': 'ViewerPass123!', 'pem': forged, 'name': 'forged'})
         # A forged certificate no CA of this server issued cannot even be
         # enrolled; and were a row bound to it, the export would resolve the
         # enrolled certificate itself, never the victim's (see
@@ -150,7 +150,7 @@ class TestPkcs12ExportIdentity:
 
     def test_importing_someone_elses_public_certificate_is_refused(self, app, viewer_client, victim):
         r = _post(viewer_client, '/api/v2/mtls/enroll-import',
-                  {'pem': victim['pem'], 'name': 'stolen'})
+                  {'password': 'ViewerPass123!', 'pem': victim['pem'], 'name': 'stolen'})
         try:
             assert r.status_code == 403, (r.status_code, r.get_json())
         finally:
@@ -160,7 +160,7 @@ class TestPkcs12ExportIdentity:
 
     def test_own_generated_certificate_still_exports_with_its_key(self, app, auth_client, create_ca):
         ca_data = create_ca(cn='mTLS identity own CA')
-        r = _post(auth_client, '/api/v2/mtls/certificates', {'ca_id': ca_data['id'], 'name': 'own'})
+        r = _post(auth_client, '/api/v2/mtls/certificates', {'password': 'changeme123', 'ca_id': ca_data['id'], 'name': 'own'})
         assert r.status_code == 201, r.get_json()
         data = r.get_json()['data']
         try:

@@ -22,7 +22,7 @@ def _count(response):
 def enrolled(app, auth_client, create_ca):
     root = create_ca(cn='PEM chain root')
     inter = create_ca(cn='PEM chain intermediate', type='intermediate', parentCAId=root['id'])
-    created = _post(auth_client, '/api/v2/mtls/certificates', {'ca_id': inter['id'], 'name': 'pem-chain'})
+    created = _post(auth_client, '/api/v2/mtls/certificates', {'password': 'changeme123', 'ca_id': inter['id'], 'name': 'pem-chain'})
     assert created.status_code == 201, created.get_json()
     data = created.get_json()['data']
     yield f'/api/v2/mtls/certificates/{data["id"]}/download'
@@ -61,7 +61,7 @@ def enrolled_with_its_chain(app, auth_client, create_ca):
     from models import CA
     root = create_ca(cn='PEM inline root')
     inter = create_ca(cn='PEM inline intermediate', type='intermediate', parentCAId=root['id'])
-    created = _post(auth_client, '/api/v2/mtls/certificates', {'ca_id': inter['id'], 'name': 'pem-inline'})
+    created = _post(auth_client, '/api/v2/mtls/certificates', {'password': 'changeme123', 'ca_id': inter['id'], 'name': 'pem-inline'})
     assert created.status_code == 201, created.get_json()
     data = created.get_json()['data']
     with app.app_context():

@@ -4711,7 +4711,10 @@
     "profileReset": "Modifiche al profilo annullate.",
     "apiKeyHint": "Le chiavi API consentono l'accesso programmatico a UCM. Mantieni segrete le tue chiavi e ruotale regolarmente. Ogni chiave può avere una data di scadenza personalizzata.",
     "apiKeySearchPlaceholder": "Cerca per nome o prefisso...",
-    "apiKeyPrefix": "Prefisso"
+    "apiKeyPrefix": "Prefisso",
+    "confirmItIsYou": "Confirm it is you",
+    "confirmWithPassword": "Enter your password to confirm this change",
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",

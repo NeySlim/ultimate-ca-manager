@@ -775,7 +775,7 @@ class TestRelatedAndMtlsReadTheRecord:
             db.session.get(Certificate, row_id).cert_type = 'usr_cert'
             db.session.commit()
         _record(app, refid, real)
-        r = auth_client.post('/api/v2/mtls/assign', json={'cert_id': row_id})
+        r = auth_client.post('/api/v2/mtls/assign', json={'password': 'changeme123', 'cert_id': row_id})
         assert r.status_code == 400, r.data
         assert b'revoked' in r.data
 

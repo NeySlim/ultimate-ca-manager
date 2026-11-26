@@ -19,6 +19,7 @@ from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.issuance_defaults import browser_key_type
 
+from auth.session_reverify import confirm_account_holder
 from auth.unified import require_auth, has_permission
 from models import User, Certificate, CA, SystemConfig, db
 from models.auth_certificate import AuthCertificate
@@ -199,6 +200,11 @@ def create_mtls_certificate():
     any authenticated principal — including the read-only viewer and auditor
     roles — could obtain a CA-signed client certificate.
     """
+
+    # A certificate enrolled here signs in alone: the session proves the account holder first
+    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
+    if refused:
+        return refused
 
     user = g.current_user
     data = request.get_json() or {}
@@ -481,6 +487,11 @@ def enroll_presented_certificate():
     """Enroll a client certificate already presented via mTLS.
     Used when user has a valid cert signed by the trusted CA but not yet enrolled."""
 
+    # A certificate enrolled here signs in alone: the session proves the account holder first
+    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
+    if refused:
+        return refused
+
     user = g.current_user
     cert_info = None
 
@@ -589,6 +600,11 @@ def enroll_presented_certificate():
 @require_auth(session_only=True)
 def enroll_import_certificate():
     """Import a PEM certificate: create Certificate record + AuthCertificate enrollment."""
+
+    # A certificate enrolled here signs in alone: the session proves the account holder first
+    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
+    if refused:
+        return refused
 
     user = g.current_user
     data = request.get_json() or {}
@@ -808,6 +824,11 @@ def list_available_certificates():
 def assign_certificate():
     """Assign an existing certificate to the current user's mTLS account.
     Admin can assign to another user via user_id param."""
+
+    # A certificate enrolled here signs in alone: the session proves the account holder first
+    refused = confirm_account_holder(g.current_user, request.get_json(silent=True))
+    if refused:
+        return refused
 
     user = g.current_user
     data = request.get_json() or {}

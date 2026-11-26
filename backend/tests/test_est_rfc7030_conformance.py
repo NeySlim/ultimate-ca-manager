@@ -141,7 +141,7 @@ def test_mtls_enroll_refuses_a_revoked_presented_certificate(app, auth_client, o
     from models.auth_certificate import AuthCertificate
     with app.app_context():
         before = AuthCertificate.query.count()
-    r = auth_client.post('/api/v2/mtls/enroll', json={},
+    r = auth_client.post('/api/v2/mtls/enroll', json={'password': 'changeme123'},
                          environ_overrides={'peercert': leaf.public_bytes(serialization.Encoding.DER)})
     assert r.status_code == 400, r.get_json()
     assert 'revoked' in r.get_json()['message']
@@ -607,7 +607,7 @@ class TestPresentedCertificateUnderARevokedCa:
     @pytest.mark.parametrize('which', [0, 1], ids=['stored', 'minted'])
     def test_cannot_be_enrolled_for_mtls(self, app, auth_client, revoked_sub_ca_leaves, which):
         leaf = revoked_sub_ca_leaves(f'mtls{which}')[which]
-        r = auth_client.post('/api/v2/mtls/enroll', json={}, environ_overrides={
+        r = auth_client.post('/api/v2/mtls/enroll', json={'password': 'changeme123'}, environ_overrides={
             'peercert': leaf.public_bytes(serialization.Encoding.DER)})
         assert r.status_code == 400, r.get_json()
         assert 'issuer has been revoked' in r.get_json()['message']
@@ -644,7 +644,7 @@ class TestMtlsUnderARevokedCaAboveTheIssuer:
     def test_login_is_refused(self, app, auth_client, chain):
         leaf, revoke_l1 = chain
         pem = leaf('mtls-chain-login@example.test')
-        r = auth_client.post('/api/v2/mtls/enroll-import', json={'pem': pem, 'name': 'chain'})
+        r = auth_client.post('/api/v2/mtls/enroll-import', json={'password': 'changeme123', 'pem': pem, 'name': 'chain'})
         assert r.status_code == 201, r.get_json()
         der = x509.load_pem_x509_certificate(pem.encode()).public_bytes(serialization.Encoding.DER)
         login = app.test_client()
@@ -657,7 +657,7 @@ class TestMtlsUnderARevokedCaAboveTheIssuer:
         leaf, revoke_l1 = chain
         pem = leaf('mtls-chain-import@example.test')
         revoke_l1()
-        r = auth_client.post('/api/v2/mtls/enroll-import', json={'pem': pem, 'name': 'chain'})
+        r = auth_client.post('/api/v2/mtls/enroll-import', json={'password': 'changeme123', 'pem': pem, 'name': 'chain'})
         assert r.status_code == 400, r.get_json()
         assert 'issuer has been revoked' in r.get_json()['message']
 

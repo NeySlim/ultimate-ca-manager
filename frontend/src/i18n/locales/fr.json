@@ -140,7 +140,10 @@
     "profileReset": "Modifications du profil annulées.",
     "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée.",
     "apiKeySearchPlaceholder": "Rechercher par nom ou préfixe...",
-    "apiKeyPrefix": "Préfixe"
+    "apiKeyPrefix": "Préfixe",
+    "confirmItIsYou": "Confirm it is you",
+    "confirmWithPassword": "Enter your password to confirm this change",
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
   },
   "acme": {
     "title": "Protocole ACME",

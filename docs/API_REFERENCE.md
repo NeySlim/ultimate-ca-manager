@@ -455,9 +455,9 @@ Any authenticated user. The caller's enrolled certificates, newest first.
 POST /api/v2/mtls/certificates
 Content-Type: application/json
 
-{ "name": "My Laptop", "validity_days": 365, "organization": "UCM Users", "ca_id": 1 }
+{ "name": "My Laptop", "validity_days": 365, "organization": "UCM Users", "ca_id": 1, "password": "..." }
 ```
-Permission `write:user_certificates`, session only. Issues a client certificate (CN `<username>@mtls`) from the configured mTLS CA and enrolls it. `ca_id` (numeric id or refid) overrides the configured CA and then also requires `write:cas` (`403`). `400` when no mTLS CA is configured and none is given, when `validity_days` is outside the allowed range, or when `organization` is not 1 to 64 letters, digits, spaces, dots or hyphens. Responds `201` with `id` (the enrolment id), `certificate_id`, `name`, `serial`, `certificate`, `private_key`, `created_at`, `expires_at`, `status`.
+Permission `write:user_certificates`, session only. Issues a client certificate (CN `<username>@mtls`) from the configured mTLS CA and enrolls it. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `ca_id` (numeric id or refid) overrides the configured CA and then also requires `write:cas` (`403`). `400` when no mTLS CA is configured and none is given, when `validity_days` is outside the allowed range, or when `organization` is not 1 to 64 letters, digits, spaces, dots or hyphens. Responds `201` with `id` (the enrolment id), `certificate_id`, `name`, `serial`, `certificate`, `private_key`, `created_at`, `expires_at`, `status`.
 
 ```http
 DELETE /api/v2/mtls/certificates/{cert_id}
@@ -477,17 +477,17 @@ Session only. `format` is `pem` (default) or `pkcs12` (also spelled `p12` or `pf
 POST /api/v2/mtls/enroll
 Content-Type: application/json
 
-{ "name": "Work laptop" }
+{ "name": "Work laptop", "password": "..." }
 ```
-Session only. Enrolls the client certificate presented with the request: the TLS handshake's, or one forwarded by a trusted proxy. `400` when none is presented, it is expired, not yet valid, revoked, or its issuer is revoked or unknown; `409` when already enrolled.
+Session only. Enrolls the client certificate presented with the request: the TLS handshake's, or one forwarded by a trusted proxy. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `400` when none is presented, it is expired, not yet valid, revoked, or its issuer is revoked or unknown; `409` when already enrolled.
 
 ```http
 POST /api/v2/mtls/enroll-import
 Content-Type: application/json
 
-{ "pem": "-----BEGIN CERTIFICATE-----...", "name": "Work laptop", "user_id": 2 }
+{ "pem": "-----BEGIN CERTIFICATE-----...", "name": "Work laptop", "user_id": 2, "password": "..." }
 ```
-Session only. Imports a certificate issued by a CA of this server and enrolls it. `pem` is the PEM text, base64 of it, or `BASE64:` followed by the base64 of a DER file (a `.cer` or `.crt`). It is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
+Session only. Imports a certificate issued by a CA of this server and enrolls it. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `pem` is the PEM text, base64 of it, or `BASE64:` followed by the base64 of a DER file (a `.cer` or `.crt`). It is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
 
 ```http
 GET /api/v2/mtls/available-certificates
@@ -498,9 +498,12 @@ Any authenticated user. User certificates (`usr_cert`, not revoked) that no acco
 POST /api/v2/mtls/assign
 Content-Type: application/json
 
-{ "cert_id": 12, "name": "Work laptop", "user_id": 2 }
+{ "cert_id": 12, "name": "Work laptop", "user_id": 2, "password": "..." }
 ```
-Session only. Enrolls an existing user certificate (`cert_id` is the certificate id, required). `user_id` is honoured for admins only; a non-admin may assign only a certificate made for their account (`403`). `400` when the certificate is not a user certificate or is revoked, `404` when unknown, `409` when already enrolled. Responds `201`.
+Session only. Enrolls an existing user certificate (`cert_id` is the certificate id, required). The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. `user_id` is honoured for admins only; a non-admin may assign only a certificate made for their account (`403`). `400` when the certificate is not a user certificate or is revoked, `404` when unknown, `409` when already enrolled. Responds `201`.
+
+### Confirming it is you
+A request that adds a credential able to sign in alone (a security key, an mTLS certificate) or changes the account e-mail proves the account holder again: `password` for an account with a local password (`GET /api/v2/account/profile` reports `has_local_password`), else `code`, a current code of its authenticator app. A missing or wrong proof answers `403` with `details.reauth` set to `password` or `code`; an account with neither a local password nor an authenticator app gets `403` with `details.reauth` `none` and must set up the app first. Wrong passwords count towards the same lock as the other password checks of a session (`429` once locked), wrong codes towards the second factor's.
 
 ### Preferences
 ```http
@@ -5032,8 +5035,11 @@ Session only. `enabled` defaults to `true`. Disabling the last enabled factor of
 ### Register - Get Options
 ```http
 POST /api/v2/webauthn/register/options
+Content-Type: application/json
+
+{ "password": "..." }
 ```
-Session only. Returns the creation options for the host the request was made to.
+Session only. Returns the creation options for the host the request was made to. The body also carries the caller's `password` or, for an account without a local password, the `code` of its authenticator app (see Confirming it is you); without it `403`. Under forced two-factor enrolment, right after the password login, no proof is asked.
 
 ### Register - Verify
 ```http

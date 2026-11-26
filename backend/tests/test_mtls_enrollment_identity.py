@@ -37,7 +37,7 @@ class TestUserCertificateRoutesShareTheRule:
     @pytest.mark.parametrize('fmt', ['pem', 'pkcs12', 'jks'])
     def test_forged_serial_exports_no_key(self, app, viewer_client, victim, fmt):
         forged = _forged_cert_with_serial(_serial_int(victim['serial']))
-        r = _post(viewer_client, '/api/v2/mtls/enroll-import', {'pem': forged, 'name': 'forged'})
+        r = _post(viewer_client, '/api/v2/mtls/enroll-import', {'password': 'ViewerPass123!', 'pem': forged, 'name': 'forged'})
         # A forged self-signed certificate is no longer enrollable at all
         assert r.status_code == 400, (r.status_code, r.get_json())
 
@@ -164,13 +164,13 @@ class TestEnrolmentCannotSquatASerial:
 
     def test_self_signed_certificate_is_refused(self, auth_client):
         forged = _forged_cert_with_serial(12345)
-        r = _post(auth_client, '/api/v2/mtls/enroll-import', {'pem': forged, 'name': 'x'})
+        r = _post(auth_client, '/api/v2/mtls/enroll-import', {'password': 'changeme123', 'pem': forged, 'name': 'x'})
         assert r.status_code == 400
         assert b'not issued by a CA of this server' in r.data
 
     def test_login_refuses_a_certificate_that_is_not_the_enrolled_one(self, app, auth_client, create_ca):
         ca_data = create_ca(cn='mTLS login identity CA')
-        r = _post(auth_client, '/api/v2/mtls/certificates', {'ca_id': ca_data['id'], 'name': 'login'})
+        r = _post(auth_client, '/api/v2/mtls/certificates', {'password': 'changeme123', 'ca_id': ca_data['id'], 'name': 'login'})
         assert r.status_code == 201, r.get_json()
         data = r.get_json()['data']
         module = importlib.import_module('services.mtls_auth_service')

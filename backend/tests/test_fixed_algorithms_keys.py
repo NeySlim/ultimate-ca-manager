@@ -149,7 +149,7 @@ def _cert_for(key):
 # mTLS: browser keys, never EdDSA nor ML-DSA
 def _mtls(app, auth_client, ca_id):
     r = auth_client.post('/api/v2/mtls/certificates', content_type='application/json',
-                         data=json.dumps({'ca_id': ca_id, 'name': 'keys mtls', 'validity_days': 30}))
+                         data=json.dumps({'password': 'changeme123', 'ca_id': ca_id, 'name': 'keys mtls', 'validity_days': 30}))
     assert r.status_code == 201, r.data
     data = json.loads(r.data)['data']
     with app.app_context():

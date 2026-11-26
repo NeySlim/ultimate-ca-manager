@@ -244,7 +244,7 @@ def test_the_mtls_imports_refuse_an_unreadable_certificate(app, auth_client, rou
         ca_id = _row(_cert(ca_key, ca_cn), ca_key)
     try:
         pem = _signed_leaf_with_repeated_extension(cn, ca_cn, ca_key)
-        url, body = (('/api/v2/mtls/enroll-import', {'pem': pem}) if route == 'enroll-import'
+        url, body = (('/api/v2/mtls/enroll-import', {'password': 'changeme123', 'pem': pem}) if route == 'enroll-import'
                      else ('/api/v2/users/1/mtls/certificates', {'mode': 'import', 'pem': pem}))
         r = auth_client.post(url, json=body)
         assert r.status_code == 400, r.data

@@ -8,6 +8,7 @@ import logging
 
 from flask import Blueprint, request, g, session
 from auth.unified import require_auth
+from auth.session_reverify import confirm_account_holder
 from auth.twofa_enforcement import (
     ENROLL_SESSION_KEY, last_factor_refusal, lock_for_factor_change,
 )
@@ -126,6 +127,12 @@ def toggle_credential(credential_id):
 def registration_options():
     """Get WebAuthn registration options - uses WebAuthnService for proper crypto"""
     user = g.current_user
+    # A new key signs in alone: the session proves the account holder first, except
+    # under forced enrolment, whose login has just checked the password.
+    if session.get(ENROLL_SESSION_KEY) is None:
+        refused = confirm_account_holder(user, request.get_json(silent=True))
+        if refused:
+            return refused
     hostname = request.host
     
     options = WebAuthnService.generate_registration_options(user, hostname)

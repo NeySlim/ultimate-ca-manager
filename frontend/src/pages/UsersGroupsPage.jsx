@@ -33,6 +33,7 @@ import { ROLE_KEYS, isSso, userName, sourceText } from './users/userFacts'
 import { usersCsv } from './users/usersExport'
 import { dateOf, dateTimeOf } from './admin/adminDates'
 import { useDockSelection, asId } from '../components/atelier/useDockParam'
+import { useAccountProof } from '../hooks/useAccountProof'
 
 const NONE = []
 const USER_SECTIONS = ['profile', 'permissions', 'keys', 'security', 'mtls']
@@ -49,6 +50,7 @@ export default function UsersGroupsPage() {
   const { user: me } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
+  const askProof = useAccountProof()
   const { canWrite, canDelete, hasPermission } = usePermission()
   const { muteToasts } = useWebSocket()
   
@@ -588,9 +590,12 @@ export default function UsersGroupsPage() {
 
   const handleAssignUserMtls = async () => {
     if (!selectedUser || !selectedAssignCert) return
+    const proof = await askProof()  // the route enrols a sign-in credential: the caller proves it is them
+    if (!proof) return
     setMtlsCreating(true)
     try {
       await usersService.assignMtlsCertificate({
+        ...proof,
         cert_id: selectedAssignCert.id,
         user_id: selectedUser.id,
         name: selectedAssignCert.name,

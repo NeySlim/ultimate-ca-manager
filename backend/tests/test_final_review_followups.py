@@ -47,7 +47,7 @@ def test_revoked_then_deleted_certificate_opens_no_session(app, auth_client, cre
     from services.mtls_auth_service import MTLSAuthService
     ca = create_ca(cn='mTLS deleted revoked CA')
     r = auth_client.post('/api/v2/mtls/certificates', data=json.dumps(
-        {'ca_id': ca['id'], 'name': 'to-delete'}), content_type='application/json')
+        {'password': 'changeme123', 'ca_id': ca['id'], 'name': 'to-delete'}), content_type='application/json')
     assert r.status_code == 201, r.get_json()
     data = r.get_json()['data']
     cert = x509.load_pem_x509_certificate(data['certificate'].encode(), default_backend())
@@ -131,7 +131,7 @@ def test_assigning_a_revoked_certificate_is_refused(app, auth_client, create_ca)
         db.session.commit()
         row_id = row.id
     try:
-        r = auth_client.post('/api/v2/mtls/assign', data=json.dumps({'cert_id': row_id}),
+        r = auth_client.post('/api/v2/mtls/assign', data=json.dumps({'password': 'changeme123', 'cert_id': row_id}),
                              content_type='application/json')
         assert r.status_code == 400, (r.status_code, r.get_json())
     finally:

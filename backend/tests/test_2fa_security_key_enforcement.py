@@ -9,7 +9,7 @@ from models import User
 from models.webauthn import WebAuthnCredential
 from tests.conftest import get_json
 from tests.test_webauthn_second_factor import (  # noqa: F401 (fixtures)
-    SoftKey, enforce_2fa, make_user, _challenge, _logged_in, _password, _post, _verify,
+    PASSWORD, SoftKey, enforce_2fa, make_user, _challenge, _logged_in, _password, _post, _verify,
 )
 
 
@@ -21,7 +21,7 @@ def _key_session(app, username, key):
 
 
 def _register(c, key):
-    r = _post(c, '/api/v2/webauthn/register/options', {})
+    r = _post(c, '/api/v2/webauthn/register/options', {'password': PASSWORD})
     assert r.status_code == 200, r.data
     challenge = get_json(r)['data']['challenge']
     return _post(c, '/api/v2/webauthn/register/verify',

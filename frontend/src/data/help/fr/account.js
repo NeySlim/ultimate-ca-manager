@@ -27,8 +27,8 @@ export default {
         items: [
           { label: 'Mot de passe', text: 'Changer votre mot de passe actuel. Vos autres sessions sont fermées ; celle-ci reste ouverte' },
           { label: '2FA (TOTP)', text: 'Activer les mots de passe à usage unique basés sur le temps via une application d’authentification. La réactiver alors qu’elle est déjà active est refusé : désactivez-la d’abord. Chaque code ne fonctionne qu’une fois : après en avoir utilisé un, attendez le suivant pour confirmer une autre action' },
-          { label: 'Clés de sécurité', text: 'Enregistrer des clés WebAuthn/FIDO2 (YubiKey, empreinte digitale, etc.)' },
-          { label: 'mTLS', text: 'Gérer les certificats client pour l’authentification TLS mutuel' },
+          { label: 'Clés de sécurité', text: 'Enregistrer des clés WebAuthn/FIDO2 (YubiKey, empreinte digitale, etc.). L’ajout d’une clé demande d’abord votre mot de passe, ou votre code d’authentification pour un compte sans mot de passe' },
+          { label: 'mTLS', text: 'Gérer les certificats client pour l’authentification TLS mutuel. L’ajout d’un certificat demande d’abord votre mot de passe, ou votre code d’authentification pour un compte sans mot de passe' },
           { label: "Changement de mot de passe imposé (v2.245)", text: "Un compte à qui l’on a demandé un nouveau mot de passe, comme le premier administrateur dont UCM a généré le mot de passe au premier démarrage, ne peut rien faire d’autre tant qu’il ne l’a pas changé, API et WebSocket compris ; l’invite ne peut pas être ignorée et son seul autre bouton est Déconnexion. Ce changement supprime le fichier qui contenait le mot de passe généré. Un mot de passe fourni par INITIAL_ADMIN_PASSWORD ou INITIAL_ADMIN_PASSWORD_FILE n’a pas à être changé, sauf si INITIAL_ADMIN_PASSWORD_FORCE_CHANGE est défini (le chart Helm le définit pour le mot de passe qu’il génère)" },
         ]
       },
@@ -105,6 +105,8 @@ Enregistrez des clés de sécurité matérielles ou des authentificateurs biomé
 2. Entrez un nom pour la clé
 3. Suivez l’invite du navigateur pour vous authentifier
 4. La clé apparaît dans la liste de vos identifiants enregistrés
+
+UCM demande d’abord votre mot de passe, ou le code de votre application d’authentification pour un compte sans mot de passe local : une clé ouvre une session à elle seule, une session laissée ouverte ne peut donc pas en ajouter. L’ajout d’un certificat mTLS demande de même.
 
 Avec la 2FA activée ou imposée, une clé enregistrée peut aussi valider la seconde étape d’une connexion par mot de passe : choisissez **Utiliser la clé de sécurité**.
 

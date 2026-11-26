@@ -4711,7 +4711,10 @@
     "profileReset": "プロフィールの変更を元に戻しました。",
     "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。",
     "apiKeySearchPlaceholder": "名前またはプレフィックスで検索...",
-    "apiKeyPrefix": "プレフィックス"
+    "apiKeyPrefix": "プレフィックス",
+    "confirmItIsYou": "Confirm it is you",
+    "confirmWithPassword": "Enter your password to confirm this change",
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

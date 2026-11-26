@@ -8,6 +8,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from auth.unified import require_auth
+from api.v2.sso.account_state import SSO_NO_PASSWORD
 from auth.twofa_enforcement import enforcement_active_for, second_factor_methods
 
 from . import bp
@@ -133,6 +134,8 @@ def get_profile():
             'webauthn_2fa': bool(user.webauthn_2fa),
             'two_factor_enforced': enforcement_active_for(user),
             'two_factor_methods': second_factor_methods(user),
+            # Which proof a change of sign-in credentials asks: the password, else the TOTP code
+            'has_local_password': user.password_hash != SSO_NO_PASSWORD,
             'password_changed_at': utc_isoformat(user.password_changed_at) if hasattr(user, 'password_changed_at') and user.password_changed_at else None,
         }
     )

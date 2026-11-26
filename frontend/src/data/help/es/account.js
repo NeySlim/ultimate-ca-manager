@@ -27,8 +27,8 @@ export default {
         items: [
           { label: 'Contraseña', text: 'Cambiar la contraseña actual. Las demás sesiones se cierran; esta se mantiene' },
           { label: '2FA (TOTP)', text: 'Activar contraseñas de un solo uso basadas en el tiempo mediante una aplicación de autenticación. Volver a activarlo mientras está activado se rechaza: desactivarlo primero. Cada código funciona una sola vez: tras usar uno, esperar al siguiente para confirmar otra acción' },
-          { label: 'Claves de seguridad', text: 'Registrar llaves WebAuthn/FIDO2 (YubiKey, huella digital, etc.)' },
-          { label: 'mTLS', text: 'Gestionar los certificados de cliente para la autenticación TLS mutua' },
+          { label: 'Claves de seguridad', text: 'Registrar llaves WebAuthn/FIDO2 (YubiKey, huella digital, etc.). Añadir una pide primero la contraseña, o el código de autenticación para una cuenta sin contraseña' },
+          { label: 'mTLS', text: 'Gestionar los certificados de cliente para la autenticación TLS mutua. Añadir uno pide primero la contraseña, o el código de autenticación para una cuenta sin contraseña' },
           { label: 'Cambio de contraseña forzado (v2.245)', text: 'Una cuenta a la que se pidió una contraseña nueva, como el primer administrador cuya contraseña generó UCM en el primer arranque, no puede hacer nada más hasta cambiarla, API y WebSocket incluidos; el aviso no puede omitirse y su único otro botón es Cerrar sesión. Ese cambio elimina el archivo que contiene la contraseña generada. Una contraseña proporcionada mediante INITIAL_ADMIN_PASSWORD o INITIAL_ADMIN_PASSWORD_FILE no tiene que cambiarse, salvo que se defina INITIAL_ADMIN_PASSWORD_FORCE_CHANGE (el chart de Helm lo define para la contraseña que genera)' },
         ]
       },
@@ -105,6 +105,8 @@ Registrar llaves de seguridad de hardware o autenticadores biométricos:
 2. Introducir un nombre para la llave
 3. Seguir el aviso del navegador para autenticarse
 4. La llave aparece en la lista de credenciales registradas
+
+UCM pide primero la contraseña, o el código de la aplicación de autenticación para una cuenta sin contraseña local: una llave inicia sesión por sí sola, así que una sesión desatendida no puede añadir una. Añadir un certificado mTLS pide lo mismo.
 
 Con el 2FA activado o impuesto, una llave registrada también puede responder al segundo paso de un inicio de sesión con contraseña: elegir **Usar la llave de seguridad en su lugar**.
 

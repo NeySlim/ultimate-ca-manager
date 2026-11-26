@@ -4711,7 +4711,10 @@
     "profileReset": "已撤销个人资料的修改。",
     "apiKeyHint": "API 密钥支持通过程序调用访问 UCM。妥善保管密钥，定期轮换。每个密钥可设置独立过期时间。",
     "apiKeySearchPlaceholder": "按名称或前缀搜索...",
-    "apiKeyPrefix": "前缀"
+    "apiKeyPrefix": "前缀",
+    "confirmItIsYou": "Confirm it is you",
+    "confirmWithPassword": "Enter your password to confirm this change",
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
   },
   "rbac": {
     "title": "基于角色的访问控制",

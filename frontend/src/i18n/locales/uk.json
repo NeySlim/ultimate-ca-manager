@@ -4885,7 +4885,10 @@
     "profileReset": "Зміни профілю скасовано.",
     "apiKeyHint": "Ключі API надають програмний доступ до UCM. Зберігайте ключі в таємниці та регулярно змінюйте їх. Для кожного ключа можна задати власний термін дії.",
     "apiKeySearchPlaceholder": "Пошук за назвою або префіксом...",
-    "apiKeyPrefix": "Префікс"
+    "apiKeyPrefix": "Префікс",
+    "confirmItIsYou": "Confirm it is you",
+    "confirmWithPassword": "Enter your password to confirm this change",
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",

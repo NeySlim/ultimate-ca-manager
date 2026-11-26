@@ -70,8 +70,8 @@ export const accountService = {
     return apiClient.get('/webauthn/credentials')
   },
 
-  async startWebAuthnRegistration() {
-    return apiClient.post('/webauthn/register/options')
+  async startWebAuthnRegistration(proof = {}) {
+    return apiClient.post('/webauthn/register/options', proof)
   },
 
   async completeWebAuthnRegistration(data) {
@@ -82,9 +82,10 @@ export const accountService = {
   /**
    * Run the browser registration ceremony and store the new key
    * @param {string} name - Label shown in the key list
+   * @param {object} proof - { password } or { code }, asked before the ceremony
    */
-  async registerWebAuthnKey(name) {
-    const response = await this.startWebAuthnRegistration()
+  async registerWebAuthnKey(name, proof = {}) {
+    const response = await this.startWebAuthnRegistration(proof)
     const options = response.data
     
     const base64urlToUint8Array = (base64url) => {
@@ -187,15 +188,15 @@ export const accountService = {
     })
   },
 
-  async importMTLSCertificate(pem, name) {
-    return apiClient.post('/mtls/enroll-import', { pem, name })
+  async importMTLSCertificate(pem, name, proof = {}) {
+    return apiClient.post('/mtls/enroll-import', { pem, name, ...proof })
   },
 
   async getAvailableMTLSCertificates() {
     return apiClient.get('/mtls/available-certificates')
   },
 
-  async assignMTLSCertificate(certId, name) {
-    return apiClient.post('/mtls/assign', { cert_id: certId, name })
+  async assignMTLSCertificate(certId, name, proof = {}) {
+    return apiClient.post('/mtls/assign', { cert_id: certId, name, ...proof })
   }
 }

@@ -2410,6 +2410,8 @@ Register hardware security keys or biometric authenticators:
 3. Follow the browser prompt to authenticate
 4. The key appears in your registered credentials list
 
+UCM first asks for your password, or the code of your authenticator app for an account without a local password: a key signs in on its own, so an unattended session cannot add one. Adding an mTLS certificate asks the same.
+
 With 2FA enabled or enforced, a registered key can also answer the second step of a password login: choose **Use security key instead**.
 
 Without an authenticator app, turn on **Security key as second factor** in the Two-Factor Authentication section: every password login then asks for one of your keys, and the last key cannot be removed while it is on.

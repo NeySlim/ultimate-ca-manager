@@ -4711,7 +4711,10 @@
     "profileReset": "Profiländerungen verworfen.",
     "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben.",
     "apiKeySearchPlaceholder": "Nach Name oder Präfix suchen...",
-    "apiKeyPrefix": "Präfix"
+    "apiKeyPrefix": "Präfix",
+    "confirmItIsYou": "Confirm it is you",
+    "confirmWithPassword": "Enter your password to confirm this change",
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
