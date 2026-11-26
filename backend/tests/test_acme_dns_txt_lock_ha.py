@@ -128,7 +128,8 @@ def test_in_ha_on_sqlite_the_lock_is_the_host_lock(app, ha, monkeypatch):
     real = dns_txt_lock.process_lock
     monkeypatch.setattr(dns_txt_lock, 'process_lock', lambda *a, **k: calls.append(a[0]) or real(*a, **k))
     with app.app_context():
-        assert db.engine.dialect.name == 'sqlite'
+        if db.engine.dialect.name != 'sqlite':
+            pytest.skip('the application runs on PostgreSQL in this job')
         with txt_record_lock(NAME):
             pass
     assert len(calls) == 1
