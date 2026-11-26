@@ -5444,7 +5444,8 @@
     "crossSkipped_other": "{{count}} certificados cruzados omitidos; se conservan las CAs autofirmadas",
     "unverifiableParentsTitle": "CA padre por confirmar en la página de la CA",
     "unverifiableParent": "{{ca}} quedó sin CA padre: CA padre probable {{parent}}, firma no verificable aquí ({{algorithm}})",
-    "filePasswordFor": "Contraseña de {{name}}"
+    "filePasswordFor": "Contraseña de {{name}}",
+    "readFailed": "No se pudo leer {{name}}"
   },
   "webhooks": {
     "eventLabels": {

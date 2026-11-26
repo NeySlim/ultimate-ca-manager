@@ -5444,7 +5444,8 @@
     "crossSkipped_other": "{{count}} Cross-Zertifikate wurden ausgelassen; die selbstsignierten CAs bleiben erhalten",
     "unverifiableParentsTitle": "Übergeordnete CAs zur Bestätigung auf der CA-Seite",
     "unverifiableParent": "{{ca}} ohne übergeordnete CA: wahrscheinlich {{parent}}, Signatur hier nicht prüfbar ({{algorithm}})",
-    "filePasswordFor": "Passwort von {{name}}"
+    "filePasswordFor": "Passwort von {{name}}",
+    "readFailed": "{{name}} konnte nicht gelesen werden"
   },
   "webhooks": {
     "eventLabels": {

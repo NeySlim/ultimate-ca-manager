@@ -5444,7 +5444,8 @@
     "crossSkipped_other": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留",
     "unverifiableParentsTitle": "需在 CA 页面确认的父 CA",
     "unverifiableParent": "{{ca}} 未关联父 CA：可能的父 CA 为 {{parent}}，此处无法验证其签名（{{algorithm}}）",
-    "filePasswordFor": "{{name}} 的密码"
+    "filePasswordFor": "{{name}} 的密码",
+    "readFailed": "无法读取 {{name}}"
   },
   "webhooks": {
     "eventLabels": {

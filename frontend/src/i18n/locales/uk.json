@@ -5684,7 +5684,8 @@
     "crossSkipped_other": "{{count}} перехресного сертифіката пропущено; самопідписані ЦС збережено",
     "unverifiableParentsTitle": "Батьківські ЦС для підтвердження на сторінці ЦС",
     "unverifiableParent": "{{ca}} залишився без батьківського ЦС: імовірний батьківський {{parent}}, підпис тут неможливо перевірити ({{algorithm}})",
-    "filePasswordFor": "Пароль для {{name}}"
+    "filePasswordFor": "Пароль для {{name}}",
+    "readFailed": "Не вдалося прочитати {{name}}"
   },
   "webhooks": {
     "eventLabels": {

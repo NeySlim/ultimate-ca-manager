@@ -3203,7 +3203,8 @@
     "crossSkipped_other": "{{count}} certificats croisés écartés ; les AC auto-signées sont conservées",
     "unverifiableParentsTitle": "Parentes à confirmer sur la page de l’AC",
     "unverifiableParent": "{{ca}} reste sans parente : parente probable {{parent}}, signature non vérifiable ici ({{algorithm}})",
-    "filePasswordFor": "Mot de passe de {{name}}"
+    "filePasswordFor": "Mot de passe de {{name}}",
+    "readFailed": "Impossible de lire {{name}}"
   },
   "importExport": {
     "exportCerts": "Exporter les certificats",
