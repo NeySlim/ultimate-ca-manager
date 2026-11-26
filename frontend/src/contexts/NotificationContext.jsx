@@ -106,11 +106,20 @@ export function NotificationProvider({ children }) {
     }
   }, [setPause])
 
+  // An error or a warning raised while a form dialog is open: shown in it, above its buttons
+  const [dialogNotice, setDialogNotice] = useState(null)
+  const clearNotice = useCallback(() => setDialogNotice(null), [])
+
   // options: a duration in ms (0 keeps the toast until it is closed) or { duration, action: { label, onClick } };
   // a toast that carries an action stays until it is used or closed, as the mockup's failure toast
   const addToast = useCallback((type, message, options) => {
     const opts = options !== null && typeof options === 'object' ? options : { duration: options }
     const action = opts.action && opts.action.label && typeof opts.action.onClick === 'function' ? opts.action : null
+    const form = (type === 'error' || type === 'warning') && !action ? formDialogBar() : null
+    if (form) {
+      setDialogNotice({ id: Date.now() + Math.random(), type, message, ...form })
+      return
+    }
     const duration = opts.duration ?? (action ? 0 : 5000)
     const id = Date.now() + Math.random() // unique even when called in a tight loop
     setToasts(prev => [...prev, { id, type, message, duration, action }])
@@ -186,6 +195,7 @@ export function NotificationProvider({ children }) {
   return (
     <NotificationContext.Provider value={value}>
       {children}
+      {dialogNotice && <DialogNotice notice={dialogNotice} onClose={clearNotice} closeLabel={t('common.closeMessage')} />}
       <ToastLine toast={toasts[toasts.length - 1]} onClose={removeToast} onPause={setPause} closeLabel={t('common.closeMessage')} />
 
       {/* Confirmation and prompt: the mockup's narrow modal(); inside a dialog still drawn by Radix, its own layer */}
@@ -216,6 +226,46 @@ const HIDDEN = '[aria-hidden="true"], [inert], [hidden]'
 const isModal = (node) => {
   if (node.getAttribute('aria-modal') === 'true') return true
   try { return node.matches(':modal') } catch { return false }
+}
+
+const canPopover = () => typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function'
+
+// The topmost open modal dialog: the toast is drawn in it, so it is neither under its backdrop nor inert
+function topModal() {
+  const open = [...document.querySelectorAll('dialog[open]')].filter(isModal)
+  return open[open.length - 1] || null
+}
+
+// The topmost modal dialog when it is a form (it has an action bar), with its last bar
+function formDialogBar() {
+  const dialog = typeof document === 'undefined' ? null : topModal()
+  const bars = dialog ? dialog.querySelectorAll('.modal-actions') : []
+  return bars.length ? { dialog, bar: bars[bars.length - 1] } : null
+}
+
+/**
+ * The error of a form dialog, in the dialog's action bar above its buttons (an alert). It goes
+ * when the dialog closes, at the next submit, or with its own close button.
+ */
+function DialogNotice({ notice, onClose, closeLabel }) {
+  const { dialog, bar } = notice
+  useEffect(() => {
+    const done = () => onClose()
+    dialog.addEventListener('close', done)
+    dialog.addEventListener('submit', done, true)
+    return () => {
+      dialog.removeEventListener('close', done)
+      dialog.removeEventListener('submit', done, true)
+    }
+  }, [dialog, onClose])
+  if (!bar.isConnected) return null
+  return createPortal(
+    <div key={notice.id} className={`notice ${notice.type === 'warning' ? 'warn' : 'bad'} dialog-notice`} role="alert">
+      <Icon name="warning" /><span>{notice.message}</span>
+      <button type="button" className="icon-btn quiet" aria-label={closeLabel} onClick={onClose}><Icon name="close" /></button>
+    </div>,
+    bar,
+  )
 }
 
 // The dialog that hides the line from screen readers (a modal one, or the layer that set aria-hidden on it)
@@ -253,6 +303,24 @@ function ToastLine({ toast, onClose, onPause, closeLabel }) {
   const id = toast?.id
   const current = useRef(toast)
   current.current = toast
+  // Shown while a modal dialog is open, the line is drawn in it as a popover (the top layer, above
+  // the dialog): outside it, it would sit under the backdrop and be inert
+  const [host, setHost] = useState(null)
+  useLayoutEffect(() => {
+    if (!id) { setHost(null); return undefined }
+    const follow = () => setHost(topModal())
+    follow()
+    const watch = new MutationObserver(follow)
+    watch.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] })
+    return () => watch.disconnect()
+  }, [id])
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!host || !id || typeof el?.showPopover !== 'function') return
+    let shown = false
+    try { shown = el.matches(':popover-open') } catch { /* an engine without the selector */ }
+    if (!shown) try { el.showPopover() } catch { /* not in the document */ }
+  }, [host, id])
 
   // Escape outside a dialog or a menu closes the message shown; one typed in a dialog stays the dialog's.
   // F8 takes the focus to the message shown.
@@ -292,10 +360,10 @@ function ToastLine({ toast, onClose, onPause, closeLabel }) {
       el.style.removeProperty('--toast-swipe-y')
       return
     }
-    const host = silencingDialog(el)
+    const into = el.closest('dialog') || silencingDialog(el)
     const shown = current.current
-    if (host) setAnnounce({ id, host, text: [shown.message, shown.action?.label].filter(Boolean).join(' '), assertive: shown.type === 'error' })
-  }, [id, onPause])
+    if (into) setAnnounce({ id, host: into, text: [shown.message, shown.action?.label].filter(Boolean).join(' '), assertive: shown.type === 'error' })
+  }, [id, onPause, host])
 
   const stopSwipe = () => {
     swipe.current = null
@@ -336,9 +404,10 @@ function ToastLine({ toast, onClose, onPause, closeLabel }) {
   const held = !!toast && (toast.duration === 0 || !!toast.action)
   const [icon, tone] = TOAST_TONES[toast?.type] || TOAST_TONES.info
   const cls = toast ? `visible${held ? ` failure tone-${tone}` : ''}` : undefined
-  return (
-    <div className="atl atl-island">
-      <div id="toast" ref={ref} role="status" aria-live={toast?.type === 'error' ? 'assertive' : 'polite'} className={cls}
+  // In a dialog the line is moved, so its own live region would be new: the announcement says it
+  const line = (
+      <div id="toast" ref={ref} role={host ? undefined : 'status'} aria-live={host ? 'off' : toast?.type === 'error' ? 'assertive' : 'polite'} className={cls}
+        popover={host && canPopover() ? 'manual' : undefined}
         tabIndex={-1} aria-keyshortcuts="F8"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={stopSwipe}
         onPointerLeave={() => onPause('hover', false)}
@@ -370,6 +439,10 @@ function ToastLine({ toast, onClose, onPause, closeLabel }) {
           </>
         )}
       </div>
+  )
+  return (
+    <div className="atl atl-island">
+      {host ? createPortal(line, host) : line}
       {announce && <Announce key={announce.id} host={announce.host} text={announce.text} assertive={announce.assertive} onDone={endAnnounce} />}
     </div>
   )
