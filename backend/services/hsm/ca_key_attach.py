@@ -126,6 +126,8 @@ def compatible_keys(ca, provider_id):
 
 def _record(provider, info):
     """The key row naming *info* on *provider*, created or refreshed from the token's reading."""
+    # Under the provider lock, as sync_keys: a sync adding this key commits first, then it is found
+    HsmService._lock_provider(provider.id)
     row = HsmKey.query.filter_by(provider_id=provider.id, key_identifier=info.key_identifier).first()
     if row is None:
         row = HsmKey(provider_id=provider.id, key_identifier=info.key_identifier, label=info.label,
