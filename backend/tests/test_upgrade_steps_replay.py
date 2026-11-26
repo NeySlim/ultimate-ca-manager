@@ -161,7 +161,7 @@ def test_a_failed_step_is_not_recorded_and_runs_at_the_next_start(rc6, monkeypat
     monkeypatch.setattr(package, 'step', real)
     ran = _spy_steps(monkeypatch)
     assert rc6.upgrade()
-    assert ran == ['175_certificate_comment', '176_revoked_serial_publication']
+    assert ran == list(package.STEPS[package.STEPS.index('175_certificate_comment'):])
     assert 'comment' in _columns(rc6, 'certificates')
 
 
