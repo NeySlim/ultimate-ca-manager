@@ -47,11 +47,15 @@ def _mode():
 
 
 def _health():
-    """The readiness checks of /health/ready, and what the instance refuses to do now."""
+    """The checks of /health/ready (database, filesystem, Redis when configured, cluster in HA),
+    and what the instance refuses to do now."""
     from flask import current_app
     from api import health_routes
     checks = {'database': health_routes._check_database(), 'filesystem': health_routes._check_filesystem()}
     database_ok = checks['database']['status'] == 'ok'
+    redis_url = health_routes.config_redis_url()
+    if redis_url:
+        checks['redis'] = health_routes._check_redis(redis_url)
     if Config.HA_MODE:
         checks['cluster'] = health_routes._check_cluster() if database_ok else {
             'status': 'error', 'message': 'Cluster registry not read: the database does not answer'}

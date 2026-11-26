@@ -201,3 +201,13 @@ def test_the_answer_is_not_cached_by_intermediaries(app, state_key):
     r = _read(app, state_key)
     assert 'no-store' in (r.headers.get('Cache-Control') or '')
     assert get_json(r)['data']['generated_at']
+
+
+def test_a_redis_down_degrades_the_health_as_readiness_does(app, state_key, monkeypatch):
+    from api import health_routes
+    monkeypatch.setattr(health_routes, 'config_redis_url', lambda: 'redis://cache.example:6379/0')
+    monkeypatch.setattr(health_routes, '_check_redis', lambda url: {'status': 'error', 'message': 'down'})
+    health = assert_success(_read(app, state_key))['health']
+    assert health['checks']['redis'] == {'status': 'error', 'message': 'down'}
+    assert health['status'] == 'degraded'
+
