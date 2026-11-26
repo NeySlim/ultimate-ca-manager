@@ -297,7 +297,7 @@ The lab runs on one host, without internet access for the clients.
 
    `pebble-config.json` is the Pebble test configuration with `listenAddress` `127.0.0.1:14000`.
 
-2. The DNS provider script for UCM (`challtest-dns.sh`):
+2. The DNS provider script for UCM, installed as `/etc/ucm/dns-hooks/challtest-dns.sh` (owned by root, mode 0755):
 
    ```sh
    #!/bin/sh
@@ -322,7 +322,7 @@ The lab runs on one host, without internet access for the clients.
 
 4. Configure UCM (web interface or API):
    - Settings: `acme.client.allow_loopback_upstream=true`, `acme.dns01_resolver_mode=custom`, `acme.dns01_nameservers=127.0.0.1:8053`.
-   - DNS provider `custom_command` with the script of step 2 as create and delete command.
+   - DNS provider `custom_command` with `challtest-dns.sh` (the hook of step 2) as create and delete command.
    - ACME Domains: `example.com` with that provider, wildcards allowed.
    - Two External CA accounts on `https://127.0.0.1:14000/dir`, both exposed via the proxy: slugs `pebble` and `pebble2`.
    - One DNS UPDATE key per account (`hmac-sha256`): `e2e-a.` for `pebble`, `e2e-b.` for `pebble2`. Save each secret in a BIND key file.

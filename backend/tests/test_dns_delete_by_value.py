@@ -1,5 +1,6 @@
 """delete_txt_record removes the one value it is given: other challenges share the name."""
 import json
+import os
 import sys
 
 import dns.message
@@ -119,11 +120,17 @@ def test_cloudflare_deletes_one_value(monkeypatch):
 
 # --- custom command and manual -------------------------------------------------
 
-def test_custom_command_delete_receives_the_value(tmp_path):
+def test_custom_command_delete_receives_the_value(tmp_path, monkeypatch):
+    from services.acme.dns_providers import custom_command as cc
+    hooks = tmp_path / 'dns-hooks'
+    hooks.mkdir(mode=0o755)
+    monkeypatch.setattr(cc, 'HOOKS_DIR', str(hooks))
+    monkeypatch.setattr(cc, '_HOOK_OWNER_UID', os.getuid())
     trace = tmp_path / 'trace'
-    helper = tmp_path / 'helper.py'
-    helper.write_text("import os, sys\nopen(sys.argv[1], 'a').write(os.environ['ACTION'] + '|' + os.environ['RECORD_VALUE'] + '\\n')\n")
-    cmd = f'{sys.executable} {helper} {trace}'
+    helper = hooks / 'helper.py'
+    helper.write_text(f"#!{sys.executable}\nimport os, sys\nopen(sys.argv[1], 'a').write(os.environ['ACTION'] + '|' + os.environ['RECORD_VALUE'] + '\\n')\n")
+    helper.chmod(0o755)
+    cmd = f'helper.py {trace}'
     p = create_provider('custom_command', {'create_command': cmd, 'delete_command': cmd})
     assert p.delete_txt_record('example.com', NAME, 'apex')[0]
     assert trace.read_text() == 'delete|apex\n'

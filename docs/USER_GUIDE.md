@@ -355,6 +355,8 @@ When an administrator enforces 2FA, registering a key fulfils it as well as a TO
 
 Without enforcement, turn on **Security key as second factor** under **My Account** > **Security** to have every password login ask for one of your keys. Keys used only for passwordless login change nothing until you do. Under enforcement, it cannot be turned off while the account has no TOTP.
 
+A passwordless login and a passkey unlock require user verification: the key must check that you are you (PIN, fingerprint, face) and say so, or the login is refused. A key without a PIN or biometric still answers the second step after a password.
+
 ### Changes that sign out your other sessions
 
 Enabling or disabling 2FA, regenerating recovery codes, adding, removing, enabling or disabling a security key, and turning **Security key as second factor** on or off sign out every other session of your account, as a password change does. The session you make the change from stays open.

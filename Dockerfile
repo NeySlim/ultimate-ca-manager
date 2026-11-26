@@ -211,7 +211,8 @@ RUN for d in ca certs private crl scep backups sessions logs temp; do \
     done && \
     mkdir -p /var/log/ucm && \
     mkdir -p /etc/ucm && \
-    chown -R ucm:ucm /opt/ucm /var/log/ucm /etc/ucm
+    chown -R ucm:ucm /opt/ucm /var/log/ucm /etc/ucm && \
+    install -d -o root -g root -m 0755 /etc/ucm/dns-hooks
 
 # Set environment variables
 ENV PATH="/opt/ucm/venv/bin:$PATH" \

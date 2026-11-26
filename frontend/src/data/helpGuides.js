@@ -1086,7 +1086,7 @@ Each provider requires API credentials specific to the DNS service.
 Cleanup removes only the TXT value of its order, so another order, or the wildcard and apex sharing the name, keep theirs; DuckDNS, Hurricane Electric and FreeDNS hold one value per name, so they clear it only when no other order in progress uses it and refuse an order for a domain and its wildcard (v2.252). Vercel takes an optional **Team ID** for domains owned by a team, and RcodeZero needs a token with zone read and write access. A provider name already in use is refused (v2.251). The RFC 2136 provider accepts a host name as DNS server and uses a filled-in **Zone** for the names inside it; otherwise the zone comes from the SOA the configured server returns (v2.252).
 
 #### Custom Command provider
-For DNS services without a native driver, the **Custom Command** provider runs admin-configured local commands for TXT record create/delete. Record details are passed as environment variables:
+For DNS services without a native driver, the **Custom Command** provider runs a hook installed by the host administrator to create or delete the TXT record. Record details are passed as environment variables:
 
 - \`DOMAIN\`: base domain being validated
 - \`RECORD_NAME\`: full TXT record name (\`_acme-challenge.example.com\`)
@@ -1094,7 +1094,7 @@ For DNS services without a native driver, the **Custom Command** provider runs a
 - \`TTL\`: record TTL in seconds
 - \`ACTION\`: \`create\` or \`delete\`
 
-The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5-300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
+The command starts with the **name of a hook** in \`/etc/ucm/dns-hooks\` (a file name, no path), followed by its arguments. The directory and the hook must belong to root and be writable by no one else; a link that leads out of the directory is refused, so holding the ACME permission never chooses what runs. The hook runs without a shell (no pipes or expansion) and is killed after a configurable timeout (5-300 s, default 60). Use a small wrapper script to bridge any external DNS tooling. The **Working directory**, free to whoever edits the provider, becomes the hook's current directory: a hook that runs a relative path or \`python3 -m\` loads code from it, so give the hook absolute paths. In HA an order may run on any node: install the hook on every node.
 
 ### Custom DNS Resolvers
 **DNS-01 resolvers** chooses where UCM looks up \`_acme-challenge\` TXT records: **Automatic** (listed resolvers, then the zone's authoritative servers, then public resolvers, then the system resolver), **System resolver only**, or **Listed resolvers only**. The restricted modes never query public resolvers, for networks that block them. Entries are comma-separated IPs with an optional port, e.g. \`127.0.0.1:5353\` or \`[2001:db8::53]:5300\`.

@@ -185,6 +185,16 @@ Database migrations run automatically at startup.
 - **Packages: `UCM_FIREWALL=ask` no longer opens the port.** Only `yes` (or `y`, `Y`, `true`, `1`) changes the firewall; any other value, `ask` included, now leaves it as it is.
 - **Helm chart, cleartext protocol Ingress:** the `<release>-protocol` Ingress (`ingress.protocolHttp.enabled`) no longer copies `ingress.annotations`. Put the annotations it needs (a TLS issuer, an ingress class option) under `ingress.protocolHttp.annotations`; a `backend-protocol: "HTTPS"` must not go there, as its port 8080 speaks plain HTTP.
 
+- **Custom Command DNS provider: hooks only.** The provider now runs only an executable of `/etc/ucm/dns-hooks/`, named by its file name, with the arguments that follow it; the directory and the file must belong to root and be writable by no group or other account, and a symbolic link that leads out of the directory is refused. A command that starts with a path (`/usr/local/bin/dns.sh --zone x`) is refused when the provider is saved and when it runs, so an order or a renewal through such a provider fails until it is changed. The DEB and RPM packages and the Docker image create the directory, root's and mode 0755. A Docker volume for `/etc/ucm` created before 3.1 does not receive it: create it as root (`docker compose exec -u 0 ucm install -d -o root -g root -m 0755 /etc/ucm/dns-hooks`), or mount a root-owned host directory read-only at `/etc/ucm/dns-hooks`. On Kubernetes a ConfigMap or Secret volume does not work (its files are links into a dated subdirectory, refused as leading out of the directory, and `fsGroup` makes the volume writable by its group): only a root-owned `hostPath` or an image derived from UCM's that adds root-owned hooks to `/etc/ucm/dns-hooks` qualifies. The Helm chart mounts no extra volume, and outside HA its `/etc/ucm` volume hides the image's directory, so under the chart as shipped the provider is available only in HA mode with such a derived image. To move a script on a package installation:
+
+  ```bash
+  sudo install -o root -g root -m 0755 /usr/local/bin/dns.sh /etc/ucm/dns-hooks/dns.sh
+  ```
+
+  then edit the provider (ACME > Client > DNS Providers) and replace the command with `dns.sh --zone x`. A script that ran an interpreter by its path (`/usr/bin/python3 /srv/hook.py`) needs a first line naming it (`#!/usr/bin/python3`) once moved.
+
+- **Package updates are checked again by root.** The `ucm-watcher` unit that installs an update now accepts only a release package of `/opt/ucm/data/updates/` matching the `.sha256` of its release, fetched by root directly from GitHub over HTTPS (no proxy), whose version is the update's and above the one the package database holds (an older or the same release is refused), and no longer forces an RPM install (`rpm -U --force`). A host whose root cannot reach github.com sees the install fail at step `precheck`: install the package by hand there.
+
 ### Upgrading to v3.0
 
 Some changes below were already delivered by a 2.254.N security update; each says which one. Coming from that update or a later one, they are not new.

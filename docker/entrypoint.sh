@@ -264,7 +264,8 @@ echo -e "${BLUE}🔧 Checking file permissions...${NC}"
 # Only try chown if running as root (UID 0)
 if [ "$(id -u)" = "0" ] && [ -d "$DATA_PATH" ]; then
     chown -R 1000:1000 "$DATA_PATH" 2>/dev/null || true
-    chown -R 1000:1000 /etc/ucm 2>/dev/null || true
+    # The DNS hooks (dns-hooks) stay root's: the service account must not choose what they run
+    find /etc/ucm -path /etc/ucm/dns-hooks -prune -o -exec chown -h 1000:1000 {} + 2>/dev/null || true
 fi
 
 # Check data directory permissions

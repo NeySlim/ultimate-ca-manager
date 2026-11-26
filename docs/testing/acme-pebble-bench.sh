@@ -62,8 +62,10 @@ write_pebble_config() {
   }
 }
 EOF
-    cp "$HERE/acme_pebble_hook.py" "$WORKDIR/acme_pebble_hook.py"
-    chmod 0755 "$WORKDIR" "$WORKDIR/acme_pebble_hook.py"
+    # UCM runs only root-owned hooks of /etc/ucm/dns-hooks: run the bench as root
+    mkdir -p "$WORKDIR/dns-hooks"
+    cp "$HERE/acme_pebble_hook.py" "$WORKDIR/dns-hooks/acme_pebble_hook.py"
+    chmod 0755 "$WORKDIR" "$WORKDIR/dns-hooks" "$WORKDIR/dns-hooks/acme_pebble_hook.py"
     chmod 0644 "$WORKDIR/pebble.minica.pem" "$WORKDIR/pebble-config.json"
 }
 
@@ -88,6 +90,7 @@ cmd_up() {
         -e CHALLTEST_URL="http://${CHALLTEST_IP}:8055" \
         -e UCM_FQDN="$UCM_IP" \
         -v "$WORKDIR:/bench:ro" \
+        -v "$WORKDIR/dns-hooks:/etc/ucm/dns-hooks:ro" \
         "$UCM_IMAGE" >/dev/null
     echo "waiting for UCM..."
     for _ in $(seq 1 90); do

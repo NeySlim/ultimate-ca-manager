@@ -49,7 +49,9 @@ def init_database():
             print("✓ Admin user already exists")
         
         print("\n✅ Database initialization complete")
-        print(f"   Database location: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
+        # Engine and name only: DATABASE_URL carries the PostgreSQL password
+        from utils.db_url import database_label
+        print(f"   Database: {database_label(os.getenv('DATABASE_URL'), app.config.get('DATABASE_PATH'))}")
 
 if __name__ == '__main__':
     try:
