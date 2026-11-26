@@ -78,6 +78,13 @@ function byteLength(str) {
   return new TextEncoder().encode(str).length
 }
 
+// RFC 7617 charset=UTF-8: user-pass is encoded as UTF-8 before base64
+function utf8Base64(str) {
+  let binary = ''
+  for (const byte of new TextEncoder().encode(str)) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
 function maskToken(token) {
   if (!token) return '•••••••••'
   if (token.length <= 8) return '•'.repeat(token.length)
@@ -253,13 +260,11 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
     }
     if (auth_type === 'basic') {
       const user = auth_username || 'user'
-      const maskedB64 = displayToken
-        ? btoa(`${user}:${maskToken(displayToken)}`)
-        : '•••••••••'
-      const revealedB64 = displayToken ? btoa(`${user}:${displayToken}`) : null
+      // The mask is never base64-encoded (U+2022 is outside Latin-1, btoa throws)
+      const revealedB64 = displayToken ? utf8Base64(`${user}:${displayToken}`) : null
       return {
         headerName: 'Authorization',
-        maskedValue: `Basic ${maskedB64}`,
+        maskedValue: 'Basic •••••••••',
         revealedValue: revealedB64 ? `Basic ${revealedB64}` : null,
       }
     }
