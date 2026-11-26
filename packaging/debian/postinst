@@ -237,10 +237,8 @@ ENVEOF
         # ============================================================
         # FIREWALL CONFIGURATION
         # ============================================================
-        # Configure firewall if script exists
-        # Can be controlled via environment variables:
+        # Configure firewall if script exists: only with UCM_FIREWALL=yes, never a prompt
         #   UCM_PORT=8443 UCM_FIREWALL=yes dpkg -i ucm.deb
-        # Or interactively if no env vars set
         if [ -x "$UCM_HOME/scripts/configure-firewall.sh" ]; then
             "$UCM_HOME/scripts/configure-firewall.sh" || true
         fi

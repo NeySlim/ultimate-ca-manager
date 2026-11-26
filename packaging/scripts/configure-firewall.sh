@@ -5,13 +5,14 @@
 # This script configures firewall rules for UCM.
 # It supports both firewalld (RHEL/Fedora) and ufw (Debian/Ubuntu).
 #
+# It never prompts: it runs from the package scripts, where nothing can answer.
+#
 # Usage:
-#   Interactive:     ./configure-firewall.sh
-#   Non-interactive: UCM_PORT=8443 UCM_FIREWALL=yes ./configure-firewall.sh
+#   UCM_PORT=8443 UCM_FIREWALL=yes ./configure-firewall.sh
 #
 # Environment Variables:
-#   UCM_PORT      - HTTPS port (default: 8443)
-#   UCM_FIREWALL  - Open firewall: yes/no/ask (default: ask)
+#   UCM_PORT      - HTTPS port (default: HTTPS_PORT of /etc/ucm/ucm.env, else 8443)
+#   UCM_FIREWALL  - Open firewall: yes/no (default: no, the firewall is left as it is)
 # =============================================================================
 
 set -e
@@ -39,11 +40,6 @@ log_warn() {
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
-}
-
-is_interactive() {
-    # Check if running interactively (not piped, has tty)
-    [ -t 0 ] && [ -t 1 ]
 }
 
 # =============================================================================
@@ -80,34 +76,15 @@ get_port() {
         fi
     fi
     
-    if is_interactive && [ "$UCM_FIREWALL" != "no" ]; then
-        read -p "HTTPS port [$DEFAULT_PORT]: " input_port
-        echo "${input_port:-$DEFAULT_PORT}"
-    else
-        echo "$DEFAULT_PORT"
-    fi
+    echo "$DEFAULT_PORT"
 }
 
+# Only an explicit yes changes the firewall; unset or any other value leaves it as it is
 get_firewall_choice() {
-    if [ -n "$UCM_FIREWALL" ]; then
-        case "$UCM_FIREWALL" in
-            yes|y|Y|true|1) echo "yes" ;;
-            no|n|N|false|0) echo "no" ;;
-            *) echo "ask" ;;
-        esac
-        return
-    fi
-    
-    if is_interactive; then
-        read -p "Open firewall for UCM? [Y/n]: " choice
-        case "$choice" in
-            n|N|no|NO) echo "no" ;;
-            *) echo "yes" ;;
-        esac
-    else
-        # Non-interactive without env var: don't change firewall
-        echo "no"
-    fi
+    case "${UCM_FIREWALL:-}" in
+        yes|y|Y|true|1) echo "yes" ;;
+        *) echo "no" ;;
+    esac
 }
 
 # =============================================================================
