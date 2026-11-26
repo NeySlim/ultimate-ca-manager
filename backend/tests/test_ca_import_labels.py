@@ -1,12 +1,13 @@
 """Issue #459: an imported CA takes an optional display name and description (default: the CN, no
 description), from the CA import and from the smart import; a re-import keeps a name given since."""
+import base64
 import json
 import uuid
 
 import pytest
 
 from models import CA, db
-from tests.fixtures.cross_pki import make_cert, new_key, pem
+from tests.fixtures.cross_pki import key_pem, make_cert, new_key, pem
 
 
 @pytest.fixture(autouse=True)
@@ -67,6 +68,31 @@ def test_a_reimport_keeps_the_name_given_since(app, auth_client):
     assert _stored(app, cn) == [('Renamed since', 'Mine')]
     assert _import(auth_client, pem_content=cert, name='Given now', description='New').status_code == 200
     assert _stored(app, cn) == [('Given now', 'New')]
+
+
+def _pending_reimport(app, auth_client, monkeypatch, route='/api/v2/cas/import', **form):
+    """Re-import a CA holding a renewal request, which goes through the install path; returns
+    (response, a copy of each ca.updated payload as it was sent)."""
+    key = new_key()
+    cn = f'Labelled pending {uuid.uuid4().hex[:6]}'
+    r = _import(auth_client, pem_content=pem(make_cert(cn, key)) + key_pem(key))
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        db.session.get(CA, r.get_json()['data']['id']).csr = base64.b64encode(b'outstanding').decode()
+        db.session.commit()
+    import services.webhook_service as webhooks
+    sent = []
+    monkeypatch.setattr(webhooks, 'emit_ca_updated', lambda ca_dict, **kw: sent.append(dict(ca_dict)))
+    r = auth_client.post(route, data={'pem_content': pem(make_cert(cn, key)), **form},
+                         content_type='multipart/form-data')
+    return r, sent
+
+
+def test_the_install_path_event_carries_the_new_description(app, auth_client, monkeypatch):
+    r, sent = _pending_reimport(app, auth_client, monkeypatch, name='Installed Root', description='Renewed here')
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['data']['description'] == 'Renewed here'
+    assert [(p['descr'], p['description']) for p in sent] == [('Installed Root', 'Renewed here')]
 
 
 def _smart(auth_client, content, **options):

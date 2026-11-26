@@ -611,7 +611,8 @@ def _select_existing(candidates, cert, kind, replace_cross=False, any_validity=F
         f"certificate's key; the record to update cannot be determined")
 
 
-def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=None, replace_cross=False):
+def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=None, description=None,
+                          replace_cross=False):
     """Install *cert_pem* on a CA waiting for its certificate, or holding an
     outstanding renewal request, through the same path as the dedicated
     upload (key match, validity, chain to the issuer, activation, the
@@ -629,8 +630,11 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
         ca.prv = encrypted_prv
     ca, warnings, superseded = CAService.complete_external_ca(
         ca, cert_pem, username=username, replace_cross=replace_cross)
-    if name and name != ca.descr:
-        ca.descr = name
+    # Written once the certificate is accepted, in the commit the event below reports
+    labelled = (name and name != ca.descr) or (description and description != ca.description)
+    if labelled:
+        ca.descr = name or ca.descr
+        ca.description = description or ca.description
         db.session.commit()
     # Snapshot before emit: subscribers may commit and expire the instance
     ca_dict = ca.to_dict()

@@ -138,19 +138,13 @@ def import_ca():
                 try:
                     ca_dict, warnings, superseded = install_on_pending_ca(
                         existing_ca, cert_pem, username, encrypted_prv=encrypted_prv, name=name or None,
-                        replace_cross=cross_mode == 'replace')
+                        description=description, replace_cross=cross_mode == 'replace')
                 except CrossCertificateImport as e:
                     db.session.rollback()
                     return error_response(str(e), 409, e.details)
                 except ValueError as e:
                     db.session.rollback()
                     return error_response(str(e), 400)
-                if description:
-                    existing_ca.description = description
-                    ok, err = safe_commit(logger, "Failed to update CA")
-                    if not ok:
-                        return err
-                    ca_dict['description'] = description
                 message = f'CA "{ca_dict["descr"]}" certificate installed'
                 if warnings:
                     message += '; ' + '; '.join(warnings)
