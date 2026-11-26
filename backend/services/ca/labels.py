@@ -35,3 +35,18 @@ def description_error(value):
 def stored_description(value):
     """The column value of an accepted description: NULL for none or blank text."""
     return value if value and value.strip() else None
+
+
+def changes(old_name, old_description, ca):
+    """The audit fragments, worded as the PATCH words them, for the labels of *ca* that differ from the old ones."""
+    out = []
+    if (ca.descr or '') != (old_name or ''):
+        out.append(f'name "{old_name or ""}" -> "{ca.descr or ""}"')
+    if (ca.description or '') != (old_description or ''):
+        out.append(f'description "{old_description or ""}" -> "{ca.description or ""}"')
+    return out
+
+
+def audit_details(prefix, changed):
+    """*prefix*, followed by the label changes when there are any."""
+    return f'{prefix}; {", ".join(changed)}' if changed else prefix

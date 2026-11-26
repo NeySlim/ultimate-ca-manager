@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from models import CA, db
+from models import CA, AuditLog, db
 from tests.fixtures.cross_pki import key_pem, make_cert, new_key, pem
 
 
@@ -80,6 +80,23 @@ def test_a_reimport_keeps_the_name_given_since(app, auth_client, route):
     assert _stored(app, cn) == [('Given now', 'New')]
 
 
+def _audits(app, ca_id):
+    with app.app_context():
+        return [a.details for a in AuditLog.query.filter_by(action='ca_updated', resource_id=str(ca_id))]
+
+
+@pytest.mark.parametrize('route', ROUTES)
+def test_a_reimport_audits_the_old_and_the_new_labels(app, auth_client, route):
+    cn, cert = _ca_pem('audited')
+    ca_id = _import(auth_client, pem_content=cert, name='First name', description='First').get_json()['data']['id']
+    assert _import(auth_client, route, pem_content=cert, name='Second name', description='Second').status_code == 200
+    assert any('name "First name" -> "Second name"' in d and 'description "First" -> "Second"' in d
+               for d in _audits(app, ca_id)), _audits(app, ca_id)
+    before = len(_audits(app, ca_id))
+    assert _import(auth_client, route, pem_content=cert).status_code == 200
+    assert not any('->' in d for d in _audits(app, ca_id)[before:]), _audits(app, ca_id)
+
+
 def _pending_reimport(app, auth_client, monkeypatch, route='/api/v2/cas/import', **form):
     """Re-import a CA holding a renewal request, which goes through the install path; returns
     (response, a copy of each ca.updated payload as it was sent)."""
@@ -105,6 +122,9 @@ def test_the_install_path_event_carries_the_new_description(app, auth_client, mo
     assert r.status_code == 200, r.get_json()
     assert r.get_json()['data']['description'] == 'Renewed here'
     assert [(p['descr'], p['description']) for p in sent] == [('Installed Root', 'Renewed here')]
+    ca_id = r.get_json()['data']['id']
+    assert any('description "" -> "Renewed here"' in d and '-> "Installed Root"' in d
+               for d in _audits(app, ca_id)), _audits(app, ca_id)
 
 
 def _smart(auth_client, content, **options):

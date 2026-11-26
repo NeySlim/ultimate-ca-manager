@@ -4033,6 +4033,7 @@ Content-Type: multipart/form-data
 
 file: <certificate file>          # Required: .pem, .crt, .cer, .der, .p12, .pfx
 name: "My Certificate"            # Optional: display name
+description: "Partner root"       # Optional: a CA certificate's free text, at most 1000 characters
 password: "pkcs12password"        # Optional: for PKCS12 files
 ca_id: 1                          # Optional: link to this CA, which must have signed it (400 otherwise)
 import_key: true                  # Optional: import private key (default: true)
@@ -4057,6 +4058,10 @@ cross_mode: auto                  # Optional: auto | attach | replace | refuse (
   "message": "CA certificate \"My CA\" imported successfully (detected as CA)"
 }
 ```
+
+A CA certificate takes `name` and `description` under the rules of `POST /api/v2/cas/import`: a blank
+`name` means the CN, an invalid one answers `400`, a re-import keeps the stored name unless `name` is
+sent, and the `ca_updated` audit entry names the old and the new value of each label that changes.
 
 Without `ca_id`, the certificate is linked to the stored CA whose key verifies its signature (AKI, then issuer name, are only used to find candidates); with none it is stored as a third-party certificate.
 
@@ -4093,8 +4098,9 @@ import_key: true                  # Optional: import private key (default: true)
 ```
 
 A certificate imported again over a CA already held keeps the CA's display name unless `name` is
-sent; `description` replaces the CA's only when sent. An invalid `name` or `description` answers
-`400` and imports nothing.
+sent; `description` replaces the CA's only when sent, and the `ca_updated` audit entry names the old
+and the new value of each label that changes. An invalid `name` or `description` answers `400` and
+imports nothing.
 
 A certificate that carries the subject and key of a CA already held, under another issuer, is a
 cross-certificate (#400). `cross_mode` decides what happens: `auto` attaches it to a self-signed root

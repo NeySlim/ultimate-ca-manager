@@ -154,6 +154,7 @@ def import_ca():
                     data['superseded_valid_to'] = superseded['valid_to']
                 return success_response(data=data, message=message)
 
+            old_labels = (existing_ca.descr, existing_ca.description)
             try:
                 key_dropped = update_ca_from_import(
                     existing_ca, cert, cert_pem, cert_info,
@@ -172,7 +173,8 @@ def import_ca():
                 resource_type='ca',
                 resource_id=existing_ca.id,
                 resource_name=existing_ca.descr,
-                details=f'Updated CA via import: {existing_ca.descr}',
+                details=ca_labels.audit_details(f'Updated CA via import: {existing_ca.descr}',
+                                                ca_labels.changes(*old_labels, existing_ca)),
                 success=True
             )
             from services.ca import parent_confirmation

@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- CAs: the display name and a free-text description can be changed from the CA's panel, set at import (CA import and smart import) and come back from a backup, without touching the certificate (#459). A re-import keeps the name given since, and both changes are audited with the old and new values.
+- CAs: the display name and a free-text description can be changed from the CA's panel, set at import (CA import, certificate import of a CA and smart import) and come back from a backup, without touching the certificate (#459). A re-import keeps the name given since, and every change, from the panel or a re-import, is audited with the old and new values.
 
 ### Changed
 

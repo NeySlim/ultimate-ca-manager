@@ -630,12 +630,18 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
         ca.prv = encrypted_prv
     ca, warnings, superseded = CAService.complete_external_ca(
         ca, cert_pem, username=username, replace_cross=replace_cross)
+    from services.audit_service import AuditService
+    from services.ca import labels as ca_labels
     # Written once the certificate is accepted, in the commit the event below reports
-    labelled = (name and name != ca.descr) or (description and description != ca.description)
-    if labelled:
-        ca.descr = name or ca.descr
-        ca.description = description or ca.description
+    old_name, old_description = ca.descr, ca.description
+    ca.descr = name or ca.descr
+    ca.description = description or ca.description
+    changed = ca_labels.changes(old_name, old_description, ca)
+    if changed:
         db.session.commit()
+        AuditService.log_action(action='ca_updated', resource_type='ca', resource_id=ca.id,
+                                resource_name=ca.descr, success=True,
+                                details=ca_labels.audit_details(f'CA {ca.descr} labelled at import', changed))
     # Snapshot before emit: subscribers may commit and expire the instance
     ca_dict = ca.to_dict()
     emit_ca_updated(ca_dict, actor=username, changes={'certificate': 'installed'})
