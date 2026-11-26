@@ -234,7 +234,7 @@ export default function DeploySection() {
             kind: 'text', priority: 2, grow: true, sort: 'connection' },
           { id: 'delivery', label: t('deploy.deliveryColumn'), cell: delivery, title: delivery, kind: 'text', priority: 4 },
           { id: 'success', label: t('deploy.lastSuccessColumn'), cell: (target) => (target.last_success_at ? formatDate(target.last_success_at) : '—'),
-            kind: 'fit', priority: 3, sort: 'success' },
+            kind: 'fit', priority: 3, labelled: true, sort: 'success' },
           { status: true, sort: 'state' },
         ]}
         rowActions={rowActions}

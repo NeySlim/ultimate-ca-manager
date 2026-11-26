@@ -18,7 +18,9 @@ vi.mock('react-i18next', () => ({
 }))
 const notify = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }))
 const perms = vi.hoisted(() => ({ write: true, del: true }))
-vi.mock('../../contexts', () => ({ useNotification: () => notify }))
+const mobile = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('../../contexts', () => ({ useNotification: () => notify, useMobile: () => mobile }))
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => mobile }))
 vi.mock('../../hooks', async () => {
   const persisted = await vi.importActual('../../hooks/usePersistedState')
   return {
@@ -50,6 +52,7 @@ const sortableHeads = () => screen.getAllByRole('columnheader').filter((h) => h.
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mobile.isMobile = false
   localStorage.clear()
   perms.write = true
   perms.del = true
@@ -183,5 +186,15 @@ describe('the policy dock in the URL', () => {
     await screen.findByRole('button', { name: 'Clients' })
     expect(sortedHeads()).toEqual([['atelier.name', 'descending']])
     expect(names()).toEqual(['Serveurs TLS', 'Révocations', 'Clients'])
+  })
+})
+
+describe('PoliciesPage on a phone', () => {
+  it('names the approval of a record by its column, a bare yes or no reading alone', async () => {
+    mobile.isMobile = true
+    render(<PoliciesPage />)
+    const record = (await screen.findAllByRole('button', { name: 'Clients' }))[0].closest('article.mobile-record')
+    const facts = [...record.querySelectorAll('.row-meta > span')].map((s) => s.textContent)
+    expect(facts).toContain('policies.approval common.no')
   })
 })

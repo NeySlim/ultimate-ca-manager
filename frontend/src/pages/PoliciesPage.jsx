@@ -478,7 +478,7 @@ export default function PoliciesPage() {
           { id: 'scope', label: t('policies.scope'), cell: scopeOf, kind: 'text', priority: 3, sort: 'scope' },
           { id: 'operations', label: t('policies.operations'), cell: operationsOf, kind: 'text', priority: 4, sort: 'operations' },
           { id: 'priority', label: t('policies.priority'), cell: (p) => p.priority, kind: 'number', priority: 2, sort: 'priority' },
-          { id: 'approval', label: t('policies.approval'), cell: approvalOf, kind: 'text', priority: 3, sort: 'approval' },
+          { id: 'approval', label: t('policies.approval'), cell: approvalOf, kind: 'text', priority: 3, labelled: true, sort: 'approval' },
           { status: true, sort: 'state' },
         ]}
         error={loadError && (
