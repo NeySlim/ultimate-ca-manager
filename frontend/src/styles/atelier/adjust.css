@@ -395,7 +395,7 @@
 :root .atl .template-form>.form-fields>fieldset.field.full>legend{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
 :root .atl .template-form .choice-grid{gap:2px 10px}
 /* Every dialog: the actions closing its body (or its form) stay in view at its foot while the dialog scrolls. */
-:root .atl dialog .modal-body>.modal-actions:last-child,:root .atl dialog .modal-body>form>.modal-actions:last-child{position:sticky;bottom:0;z-index:1;background:var(--panel);margin-top:0;padding-bottom:4px}
+:root .atl dialog .modal-body>.modal-actions:last-child,:root .atl dialog .modal-body>form>.modal-actions:last-child{position:sticky;bottom:0;z-index:1;background:var(--panel);padding-bottom:4px}
 /* Lone roots: boxes of one width in as many columns as the panel holds, the count and date aligned at the right. */
 :root .atl .ca-tree>:is(.ca-compact,.ca-bundle){align-self:stretch}
 :root .atl .ca-lines{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));align-items:stretch}
