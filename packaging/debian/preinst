@@ -56,7 +56,8 @@ case "$1" in
             if [ -f "/etc/ucm/ucm.env" ]; then
                 echo "Creating backup of configuration..."
                 BACKUP_FILE="$BACKUP_DIR/ucm.env-pre-upgrade-$(date +%Y%m%d-%H%M%S)"
-                cp "/etc/ucm/ucm.env" "$BACKUP_FILE"
+                # /etc/ucm is the service account's: read with O_NOFOLLOW, never through a link
+                (umask 077 && dd if=/etc/ucm/ucm.env iflag=nofollow,nonblock of="$BACKUP_FILE" status=none)
                 echo "✓ Config backup: $BACKUP_FILE"
             fi
         fi

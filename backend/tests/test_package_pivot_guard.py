@@ -85,7 +85,7 @@ def _fakebin(tmp_path, extra=None):
     scripts = {
         # Writers: record the call, change nothing
         'mkdir': 'echo "mkdir $*" >> "$LOG"', 'cp': 'echo "cp $*" >> "$LOG"',
-        'mv': 'echo "mv $*" >> "$LOG"', 'groupadd': 'echo "groupadd $*" >> "$LOG"',
+        'mv': 'echo "mv $*" >> "$LOG"', 'dd': 'echo "dd $*" >> "$LOG"', 'groupadd': 'echo "groupadd $*" >> "$LOG"',
         'useradd': 'echo "useradd $*" >> "$LOG"',
         'dpkg-query': 'exit 0', 'getent': 'exit 2', 'openssl': 'exit 0',
         'python3': 'echo 3.12',
@@ -672,7 +672,7 @@ def _postrm_with(tmp_path, action, lay, lib=None, logs=None, real=()):
     (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
         f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\nexec {shutil.which("rm")} "$@"\n')
     bin_rm.chmod(0o755)
-    for tool in ('sort', 'sed', 'rmdir'):
+    for tool in ('sort', 'sed', 'rmdir', 'dd'):
         os.symlink(shutil.which(tool), pathlib.Path(env['PATH']) / tool)
     text = POSTRM.read_text()
     for line, path in (('UCM_HOME=/opt/ucm\n', home), ('UCM_CONFIG=/etc/ucm\n', config)):

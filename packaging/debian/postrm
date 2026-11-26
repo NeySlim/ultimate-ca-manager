@@ -52,8 +52,8 @@ keep_key_with_data() {
 
 data_kept() {
     [ -n "$(find "$UCM_HOME/data" -name '.ucm-archive-*' -prune -o ! -type d -print -quit 2>/dev/null)" ] \
-        || grep -qE '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL[[:space:]]*=[[:space:]]*[^[:space:]]' \
-            "$UCM_CONFIG/ucm.env" 2>/dev/null
+        || dd if="$UCM_CONFIG/ucm.env" iflag=nofollow,nonblock status=none 2>/dev/null \
+            | grep -qE '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL[[:space:]]*=[[:space:]]*[^[:space:]]'
 }
 
 case "$1" in

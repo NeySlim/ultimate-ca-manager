@@ -37,19 +37,22 @@ README_NEW=.README.txt.new
 # LOCALS: the local archives this run made, one per line between newlines
 DEST="" JOURNAL="" MADE_PARENT="" LOCALS=$NL EARLIER="" LAST_ERR="" LAST_DIR=""
 
-# The service account owned the log's directory, and no UCM service runs while this does: a link
-# or anything but a file it left at the log's path is never written through
+# The service account owns the log's directory: the log, like ucm.env below, is opened by dd with
+# O_NOFOLLOW, never through a link (this script must log without an interpreter, so not through own)
 log_line() {
     { mkdir -p "${LOG%/*}" && [ ! -L "$LOG" ] && { [ ! -e "$LOG" ] || [ -f "$LOG" ]; } \
-        && printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG"; } 2>/dev/null || true
+        && printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" \
+            | dd of="$LOG" oflag=append,nofollow,nonblock conv=notrunc status=none; } 2>/dev/null || true
 }
+# read_own <file>: a file of the account's directories, never through a link
+read_own() { dd if="$1" iflag=nofollow,nonblock status=none 2>/dev/null; }
 say() { printf '%s\n' "$*"; log_line "$*"; }
 
 # dnf5 cuts a scriptlet's lines at 80 columns: once a run said a longer one, a last line
 # names the log, which holds them whole (after its 21-column date)
-LOG_START=$( { wc -c < "$LOG"; } 2>/dev/null) || LOG_START=0
+LOG_START=$(read_own "$LOG" | wc -c) || LOG_START=0
 full_text() {
-    tail -c +$((LOG_START + 1)) -- "$LOG" 2>/dev/null | awk 'length($0) > 100 { f = 1 } END { exit !f }' \
+    read_own "$LOG" | tail -c +$((LOG_START + 1)) | awk 'length($0) > 100 { f = 1 } END { exit !f }' \
         && say "UCM: the full text is in $LOG"
 }
 # The package stops on 1 and 2: its retry is said here, so that the line naming the log is the last
@@ -66,7 +69,7 @@ trap finish EXIT
 # Last value of $2 in env file $1, unquoted; the file is read, never sourced
 env_value() {
     [ -f "$1" ] || return 0
-    sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=[[:space:]]*//p" "$1" \
+    read_own "$1" | sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=[[:space:]]*//p" \
         | tail -n 1 | sed -E 's/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'
 }
 
@@ -682,7 +685,9 @@ esac
 if [ -n "$FIPS_BUILD" ]; then
     OLD_ENV=$DEST/config/ucm.env
     present "$OLD_ENV" || OLD_ENV=$CONFIG/$LOCAL_NAME/ucm.env
-    { jot "fips$TAB$ENV_FILE$TAB$OLD_ENV" && printf 'UCM_FIPS_BUILD=1\n' > "$ENV_FILE"; } \
+    # Created exclusively (O_EXCL): whatever the account laid there since the move stops the run
+    { jot "fips$TAB$ENV_FILE$TAB$OLD_ENV" \
+        && printf 'UCM_FIPS_BUILD=1\n' | dd of="$ENV_FILE" oflag=nofollow conv=excl status=none; } \
         || fail "writing UCM_FIPS_BUILD=1 into $ENV_FILE"
 fi
 OWNERS=""

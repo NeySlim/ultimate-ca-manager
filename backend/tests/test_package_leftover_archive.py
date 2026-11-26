@@ -2107,3 +2107,38 @@ def test_the_suite_labs_are_found():
     assert len(_suite_labs()) == 3, _suite_labs()
 
 
+
+# The service account owns /var/log/ucm and /etc/ucm: what it lays there after a check is never written through
+def _precious(tmp_path):
+    victim = tmp_path / 'victim'
+    victim.write_text('precious\n')
+    victim.chmod(0o600)
+    return victim
+
+
+def test_the_log_swapped_for_a_link_after_its_check_is_not_written_through(tmp_path):
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    victim = _precious(tmp_path)
+    # date runs between the check of the log and the write of its line
+    (box.bin / 'date').write_text(
+        f'#!/bin/sh\ncase "$*" in *%Y%m%dT*) echo {STAMP}; exit ;; esac\n'
+        f'[ -L {box.log} ] || {{ rm -f {box.log}; ln -s {victim} {box.log}; }}\nexec {shutil.which("date")} "$@"\n')
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert victim.read_text() == 'precious\n' and stat.S_IMODE(victim.stat().st_mode) == 0o600
+
+
+def test_a_link_laid_where_the_fips_line_goes_is_not_written_through(tmp_path):
+    box = Box(tmp_path, python='stub')
+    env = box.config / 'ucm.env'
+    env.write_text(env.read_text() + FIPS)
+    box.wrap()
+    victim = _precious(tmp_path)
+    # The fips line of the journal is written just before the new ucm.env: the link lands in between
+    (box.bin / 'tee').write_text(
+        f'#!/bin/sh\nline=$({REAL_CAT})\ncase $line in fips*) ln -s {victim} {env} ;; esac\n'
+        f'printf "%s\\n" "$line" | exec {REAL["tee"]} "$@"\n')
+    out = box.run()
+    assert out.returncode != 0, out.stdout
+    assert victim.read_text() == 'precious\n' and stat.S_IMODE(victim.stat().st_mode) == 0o600
