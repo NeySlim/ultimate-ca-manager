@@ -293,7 +293,7 @@ Exiger que tous les utilisateurs activent l’authentification à deux facteurs.
 Chiffrez toutes les clés privées stockées en base de données avec AES-128 (Fernet, avec HMAC-SHA256), protégées par un fichier de clé maître. La section affiche l’état du chiffrement et les compteurs de clés **chiffrées / non chiffrées**. Deux variables d’environnement opt-in rendent l’absence de clé fatale au démarrage : \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (chiffrement des secrets d’intégration) et \`UCM_REQUIRE_KEY_ENCRYPTION\` (chiffrement des clés privées).
 Une nouvelle installation crée la clé maître à son premier démarrage (dans un conteneur, seulement si \`/etc/ucm\` est un volume à part) ; la section Sécurité des Paramètres affiche l’état du chiffrement, et la Vue d’ensemble affiche une bannière tant qu’aucune clé n’est chargée.
 
-> 💡 Les paramètres sensibles (session, verrouillage, HSTS, URL publique, serveur SMTP, politique de mot de passe) exigent la permission **admin:settings** : les champs sont verrouillés pour les opérateurs.
+> 💡 Les paramètres sensibles (session, verrouillage, HSTS, URL publique, serveur et compte SMTP, modèle d’e-mail, politique de mot de passe) exigent la permission **admin:settings** : les champs sont verrouillés pour les opérateurs.
 
 > ⚠ Une liste qui n’inclut pas votre propre adresse est refusée. Si vous perdez tout de même l’accès, définissez \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` et redémarrez UCM.
 

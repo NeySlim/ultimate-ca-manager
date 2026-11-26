@@ -292,7 +292,7 @@ Requerir que todos los usuarios activen la autenticación de dos factores.
 Cifre todas las claves privadas almacenadas en la base de datos con AES-128 (Fernet, con HMAC-SHA256), protegidas por un archivo de clave maestra. La sección muestra el estado del cifrado y los contadores de claves **cifradas / sin cifrar**. Dos variables de entorno opcionales hacen que la ausencia de claves sea fatal en el arranque: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (cifrado de secretos de integración) y \`UCM_REQUIRE_KEY_ENCRYPTION\` (cifrado de claves privadas).
 Una instalación nueva crea la clave maestra en su primer arranque (en un contenedor, solo cuando \`/etc/ucm\` es un volumen propio); la sección Seguridad de Configuración muestra el estado del cifrado, y el Resumen muestra un banner mientras no se haya cargado ninguna clave.
 
-> 💡 Las configuraciones sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, servidor SMTP, política de contraseñas) requieren el permiso **admin:settings**: los campos están bloqueados para los operadores.
+> 💡 Las configuraciones sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, servidor y cuenta SMTP, plantilla de correo, política de contraseñas) requieren el permiso **admin:settings**: los campos están bloqueados para los operadores.
 
 > ⚠ Se rechaza una lista que no incluya su propia dirección. Si pierde el acceso de todos modos, defina \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` y reinicie UCM.
 

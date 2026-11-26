@@ -1830,7 +1830,7 @@ export const helpContent = {
     warnings: [
       'Locking the password policy too tightly may frustrate users',
       'Behind a reverse proxy, set UCM_BEHIND_PROXY and UCM_TRUSTED_PROXIES before using the admin access allowlist, otherwise every request appears to come from the proxy',
-      'Security-sensitive settings (session, lockout, HSTS, public URL, SMTP server, password policy) require admin:settings, the fields are locked for operators',
+      'Security-sensitive settings (session, lockout, HSTS, public URL, SMTP server and account, email template, password policy) require admin:settings, the fields are locked for operators',
     ],
     related: ['Account', 'Users & Groups', 'Settings']
   },
