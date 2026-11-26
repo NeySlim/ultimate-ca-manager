@@ -31,6 +31,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Password reset page: the minimum length was fixed at 8 characters; it now follows the password policy, as the other password forms do.
 - Operations, bulk actions: the result message named the action by its internal code ("revoke: 3 succeeded", in every language); it now uses the translated action name.
 - ACME EAB credentials and API keys: a double click on Generate or Create key created two, the first one live but its secret never shown; the button is now disabled until the creation returns.
 - ACME client: a second click or Enter on Request certificate while the first request ran created a second order at the external CA; the button is now disabled until the request returns.

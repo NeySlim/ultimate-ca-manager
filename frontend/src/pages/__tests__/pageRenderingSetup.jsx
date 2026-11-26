@@ -145,6 +145,7 @@ vi.mock('../../services/users.service', () => ({
     getById: vi.fn().mockResolvedValue({ data: {} }),
     getGroups: vi.fn().mockResolvedValue({ data: [] }),
     getRoles: vi.fn().mockResolvedValue({ data: [] }),
+    getPasswordPolicy: vi.fn().mockResolvedValue({ data: { min_length: 8 } }),
   }
 }))
 vi.mock('../../services/audit.service', () => ({

@@ -1,14 +1,14 @@
 /**
  * New password from an emailed reset link (?token=), in the sign-in frame.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
 import { describedBy } from '../components/auth/describedBy'
 import { Icon } from '../components/atelier/Icon'
 import { PasswordMeter } from '../components/auth/PasswordMeter'
-import { authService } from '../services'
+import { authService, usersService } from '../services'
 
 export default function ResetPasswordPage() {
   const { t } = useTranslation()
@@ -23,6 +23,15 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('')
   // A field's error sits under it, as in the design; the server's refusal stays in the card
   const [fieldErrors, setFieldErrors] = useState({})
+  // The minimum is the server's policy (min_password_length), eight when it cannot be read
+  const [minLength, setMinLength] = useState(8)
+  useEffect(() => {
+    let live = true
+    usersService.getPasswordPolicy()
+      .then((res) => { const n = Number(res?.data?.min_length); if (live && n > 0) setMinLength(n) })
+      .catch(() => { /* the default stays */ })
+    return () => { live = false }
+  }, [])
   const titleRef = useRef(null)
   const newRef = useRef(null)
   const confirmRef = useRef(null)
@@ -37,8 +46,8 @@ export default function ResetPasswordPage() {
     setError('')
     setFieldErrors({})
 
-    if (password.length < 8) {
-      fieldError('password', t('auth.passwordMinLength'), newRef)
+    if (password.length < minLength) {
+      fieldError('password', t('auth.passwordMinLength', { min_length: minLength }), newRef)
       return
     }
 
@@ -98,7 +107,7 @@ export default function ResetPasswordPage() {
             aria-describedby={describedBy('reset-new', fieldErrors.password, 'reset-new-hint')}
           />
           <PasswordMeter password={password} />
-          <small id="reset-new-hint">{t('auth.minCharacters')}</small>
+          <small id="reset-new-hint">{t('auth.minCharacters', { min_length: minLength })}</small>
         </AuthField>
         <AuthField id="reset-confirm" label={t('common.confirmPassword')} error={fieldErrors.confirm}>
           <input
