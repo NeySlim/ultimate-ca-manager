@@ -267,19 +267,21 @@ def revoke_host(host_id, reason='host revoked', username=None):
     host = db.session.get(SSHHost, host_id)
     if not host:
         raise LookupError('SSH host not found')
-    if host.revoked_at:
+    # Revoked before its certificates are looked up: a renewal signed after this point sees it
+    table = SSHHost.__table__
+    done = db.session.execute(update(table).where(table.c.id == host_id, table.c.revoked_at.is_(None)).values(
+        revoked_at=utc_now(), auto_renew=False, challenge=None, challenge_expires_at=None))
+    if done.rowcount != 1:
+        db.session.rollback()
         raise ValueError('This host is already revoked')
+    db.session.commit()
+    host = db.session.get(SSHHost, host_id)
     for cert_id in _live_certificates_of_key(host):
         try:
             SSHCertificateService.revoke_certificate(cert_id, reason, username)
         except ValueError:
             pass  # revoked meanwhile, or with a sibling of the same serial
-    host = db.session.get(SSHHost, host_id)
-    host.revoked_at = utc_now()
-    host.auto_renew = False
-    host.challenge = host.challenge_expires_at = None
-    db.session.commit()
-    return host
+    return db.session.get(SSHHost, host_id)
 
 
 def set_auto_renew(host_id, enabled):
@@ -393,6 +395,15 @@ def renew(host_refid, answered, signature):
     except ValueError as e:
         raise RenewalRefused(400, str(e), f'host {host.name}: {e}') from None
     host = db.session.get(SSHHost, host.id)
+    db.session.refresh(host)
+    if host.revoked_at:
+        # Revoked while this certificate was signed: it goes to the KRL, never to the host
+        try:
+            SSHCertificateService.revoke_certificate(new.id, 'host revoked', 'ssh-host-renewal')
+        except ValueError:
+            pass  # revoked by the host's revocation itself
+        raise RenewalRefused(403, 'this host is revoked: enroll it again',
+                             f'host {host.name} was revoked during its renewal', state='revoked')
     host.certificate_id = new.id
     host.last_renewed_at = host.last_seen_at = utc_now()
     db.session.commit()

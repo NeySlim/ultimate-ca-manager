@@ -204,6 +204,53 @@ class TestTheRenewal:
                              capture_output=True, text=True, timeout=30)
         assert out.returncode == 1, out.stdout + out.stderr
 
+    def test_a_renewal_during_the_revocation_of_its_host_is_refused(self, app, auth_client, client, enrolled,
+                                                                    tmp_path, monkeypatch):
+        _, refid, key = enrolled
+        _age(app, refid)
+        challenge = _challenge(client, refid).get_json()['challenge']
+        signature = _sign(tmp_path, key, challenge)
+        with app.app_context():
+            host_id = SSHHost.query.filter_by(refid=refid).one().id
+        real, outcome = hosts._live_certificates_of_key, []
+
+        def renewal_meanwhile(host):
+            # The host's renewal lands while the revocation looks for its certificates
+            if not outcome:
+                try:
+                    hosts.renew(refid, challenge, signature)
+                    outcome.append('renewed')
+                except hosts.RenewalRefused as e:
+                    outcome.append(e.state)
+            return real(host)
+        monkeypatch.setattr(hosts, '_live_certificates_of_key', renewal_meanwhile)
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        assert outcome == ['revoked']
+
+    def test_a_certificate_signed_while_its_host_was_revoked_is_revoked(self, app, auth_client, client,
+                                                                        enrolled, tmp_path, monkeypatch):
+        from services.ssh_cert import SSHCertificateService
+        _, refid, key = enrolled
+        _age(app, refid)
+        challenge = _challenge(client, refid).get_json()['challenge']
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=refid).one()
+            host_id, before = host.id, host.certificate_id
+        real = SSHCertificateService.sign_certificate
+
+        def revoked_first(*args, **kwargs):
+            # The revocation took its snapshot of the key's certificates before this one existed
+            hosts.revoke_host(host_id)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(SSHCertificateService, 'sign_certificate', revoked_first)
+        r = _renew(client, refid, challenge, _sign(tmp_path, key, challenge))
+        assert r.status_code == 403 and r.get_json()['state'] == 'revoked'
+        with app.app_context():
+            renewed = SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == enrolled[0]['id'],
+                                                  SSHCertificate.source == 'renewal').all()
+            assert len(renewed) == 1 and renewed[0].revoked
+            assert SSHHost.query.filter_by(refid=refid).one().certificate_id == before
+
     def test_an_expired_certificate_cannot_renew(self, app, client, enrolled):
         _, refid, _ = enrolled
         with app.app_context():
