@@ -164,7 +164,18 @@ WORKER = textwrap.dedent('''
         return {'status': status, 'retry_after': headers.get('Retry-After'),
                 'took': time.monotonic() - started}
 
+    def idle_gap(count=20):
+        """The longest gap between two reads with no write waiting: what the host costs alone."""
+        ticks = []
+        for i in range(count):
+            ticks.append(time.monotonic())
+            call('GET', '/health/ready' if i % 2 else '/health/live')
+            time.sleep(0.05)
+        ticks.append(time.monotonic())
+        return max(b - a for a, b in zip(ticks, ticks[1:]))
+
     def scenario(hold):
+        idle = idle_gap()
         ready = db_path + '.held'
         holder = subprocess.Popen([sys.executable, '-I', '-c', sys.argv[1], db_path, str(hold), ready])
         while not os.path.exists(ready):
@@ -179,7 +190,7 @@ WORKER = textwrap.dedent('''
             time.sleep(0.05)
         ticks.append(time.monotonic())
         gap = max(b - a for a, b in zip(ticks, ticks[1:]))
-        result = {'write': write.get(), 'reads': reads, 'gap': gap}
+        result = {'write': write.get(), 'reads': reads, 'gap': gap, 'idle': idle, 'hold': hold}
         holder.wait()
         os.remove(ready)
         return result
@@ -204,10 +215,13 @@ def served(tmp_path_factory):
 @pytest.mark.slow
 @pytest.mark.parametrize('case', ['short', 'long'])
 def test_the_worker_serves_reads_while_a_request_waits_for_another_writer(served, case):
-    reads, gap = served[case]['reads'], served[case]['gap']
+    reads, gap, idle, hold = (served[case][k] for k in ('reads', 'gap', 'idle', 'hold'))
     assert len(reads) >= 10 and all(r['status'] == 200 for r in reads), reads
-    assert gap < 0.5 and max(r['took'] for r in reads) < 0.5, \
-        f'the worker stopped for {gap:.1f}s while a write waited: {reads}'
+    # A worker stopped by the wait shows a gap as long as the hold (or the 5 s busy timeout);
+    # a loaded host only stretches what it costs idle, measured in the same worker just before
+    bound = min(hold / 2, max(0.5, 4 * idle))
+    assert gap < bound and max(r['took'] for r in reads) < bound, \
+        f'the worker stopped for {gap:.2f}s (bound {bound:.2f}s, idle {idle:.2f}s) while a write waited: {reads}'
 
 
 @pytest.mark.slow
