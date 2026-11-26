@@ -24,6 +24,7 @@ export default {
           { label: '吊销', text: '从父 CA 吊销中间 CA：发布到父 CA 的 CRL 和 OCSP，该 CA 将无法再签名（永久）' },
           { label: '链修复', text: '自动修复损坏的父子关系。当某个 CA 没有父 CA、某条记录等待修复或修复正在进行时，其状态条会自行显示；否则由页面标题处的“链修复”按钮打开' },
           { label: '导入私钥', text: '为仅持有证书的 CA 附加私钥，使其能够签名' },
+          { label: '使用 HSM 中的密钥', text: '适用于导入时未带密钥、而密钥仍保存在 HSM 中的 CA：选择提供程序，再选择其公钥与证书公钥一致的密钥。UCM 会先确认该密钥能为此证书签名，然后 CA 才会使用它；已被其他 CA 使用的密钥会显示，但不能选择' },
           { label: '密钥与有效期', text: '默认 RSA-3072，本地或 HSM。有效期为 1、2、3、5、10、15 或 20 年，或自定义（天），最长 50 年。将在 2030 年之后到期的 RSA-2048 CA 会被标记：ANSSI 接受 RSA-2048 至 2030 年底，ETSI TS 119 312 接受至 2026 年底' },
           { label: '后量子（ML-DSA）', text: 'ML-DSA-44、ML-DSA-65 或 ML-DSA-87（FIPS 204，NIST 级别 2、3 和 5），在软件中生成，或在持有 ML-DSA 的 HSM 提供商上生成；FIPS 模式下仅提供软件密钥，且仅当 FIPS 模块批准 ML-DSA 时才提供（-fips Docker 镜像会）。ML-DSA 密钥无需单独的摘要即可签名，因此 CA、其 CRL 和 OCSP 响应没有可选的摘要。ML-DSA CA 可签发 RSA 或 EC 证书，RSA 或 EC CA 也可签发 ML-DSA 中间 CA' },
           { label: 'EdDSA（Ed25519、Ed448）', text: 'Ed25519 或 Ed448 密钥，用于根 CA、中间 CA 或外部 CA，仅限软件密钥（没有 HSM 提供商支持 EdDSA 签名），在 FIPS 模式下隐藏，除非 FIPS 模块批准 EdDSA（-fips Docker 镜像会）。与 ML-DSA 一样，EdDSA 密钥无需摘要即可签名，且层次结构可与 RSA、EC 或 ML-DSA 混用。无论叶证书使用何种密钥，浏览器、Windows（CryptoAPI/CNG）和 SCEP 客户端都不接受 EdDSA CA 签发的内容：请仅用于 OpenSSL、Go 或 Java 15+ 的使用方。SCEP 和 XCEP 拒绝此类 CA' },

@@ -315,4 +315,19 @@ describe('CASide: switches of the product, as rows of the mockup', () => {
     const notice = [...container.querySelectorAll('.ca-side > p.notice')].find((p) => p.textContent.includes('cas.certificateOnlyBanner'))
     expect(within(notice).getByRole('button', { name: 'cas.importPrivateKey' })).toHaveAttribute('data-write')
   })
+
+  it('offers the key an HSM holds beside the import, to whom may read the HSM', () => {
+    const cas = family().map((c) => (c.id === 2 ? { ...c, has_private_key: false, certificate_only: true } : c))
+    api.getById.mockImplementation((id) => Promise.resolve({ data: cas.find((c) => c.id === id) }))
+    const notice = (container) => [...container.querySelectorAll('.ca-side > p.notice')]
+      .find((p) => p.textContent.includes('cas.certificateOnlyBanner'))
+    granted = new Set(['read:cas', 'write:cas', 'read:hsm'])
+    let { container } = renderSide(2, { cas })
+    expect(within(notice(container)).getByRole('button', { name: 'cas.useHsmKey' })).toHaveAttribute('data-write')
+    document.body.innerHTML = ''
+    granted = new Set(['read:cas', 'write:cas'])
+    ;({ container } = renderSide(2, { cas }))
+    expect(within(notice(container)).getByRole('button', { name: 'cas.importPrivateKey' })).toBeInTheDocument()
+    expect(within(notice(container)).queryByRole('button', { name: 'cas.useHsmKey' })).toBeNull()
+  })
 })

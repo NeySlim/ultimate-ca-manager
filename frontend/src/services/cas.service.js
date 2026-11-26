@@ -125,6 +125,15 @@ export const casService = {
     return apiClient.post(`/cas/${id}/key`, { key: keyPem, passphrase })
   },
 
+  // Keys of an HSM provider whose public key is this keyless CA's certificate's (#458)
+  async listMatchingHsmKeys(id, providerId) {
+    return apiClient.get(`/cas/${id}/hsm-keys?provider_id=${encodeURIComponent(providerId)}`)
+  },
+
+  async attachHsmKey(id, providerId, keyIdentifier) {
+    return apiClient.post(`/cas/${id}/hsm-key`, { provider_id: providerId, key_identifier: keyIdentifier })
+  },
+
   async takeOffline(id, { password, mode = 'password_protected' } = {}) {
     if (mode === 'file_exported') {
       return apiClient.post(

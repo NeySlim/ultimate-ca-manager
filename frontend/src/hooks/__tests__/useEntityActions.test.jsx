@@ -276,6 +276,16 @@ describe('CA actions', () => {
     expect(noKey.handler('offline')).toBeNull()
   })
 
+  it('offers an HSM key to a keyless CA only with write:cas and read:hsm, outside the action bar', () => {
+    const keyless = { ...CA, has_private_key: false, certificate_only: true }
+    expect(run('ca', keyless, rights(['write:cas'])).handler('attachHsmKey')).toBeNull()
+    expect(run('ca', keyless, rights([], ['read:hsm'])).handler('attachHsmKey')).toBeNull()
+    expect(run('ca', CA, rights(['write:cas'], ['read:hsm'])).handler('attachHsmKey')).toBeNull()
+    const allowed = run('ca', keyless, rights(['write:cas'], ['read:hsm']))
+    expect(allowed.handler('attachHsmKey')).toBeTypeOf('function')
+    expect(visible(allowed)).not.toContain('attachHsmKey')
+  })
+
   it('keeps key import out of the action bar', () => {
     expect(visible(run('ca', { ...CA, has_private_key: false, certificate_only: true }, rights(['write:cas'])))).not.toContain('importKey')
   })
