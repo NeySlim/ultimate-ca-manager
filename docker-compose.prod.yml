@@ -21,6 +21,8 @@ services:
       # Backups
       - UCM_BACKUP_ENABLED=true
       - UCM_BACKUP_RETENTION_DAYS=90
+      # At most this many copies, the newest: it wins over the days above
+      - UCM_BACKUP_KEEP=5
       # Initial admin password: see the secret example in docker-compose.yml
     
     # Stricter resource limits for production
