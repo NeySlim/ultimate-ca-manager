@@ -17,6 +17,30 @@ GUARDED_VENV="" GUARDED_TMP="" SERVICE_STOPPED="" VENV_BUILDING="" HAD_VENV=""
 say() { echo "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+# put_own <file> <mode> [copy]: stdin becomes <file>, created anew (O_EXCL), in a directory the service
+# account may write: whatever entry was there is removed, a link never followed. copy: stdin to stdout too
+put_own() {
+    python3 -I -c '
+import os, sys
+path, mode, copy = sys.argv[1], int(sys.argv[2], 8), sys.argv[3:] == ["copy"]
+try:
+    os.unlink(path)
+except FileNotFoundError:
+    pass
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+os.fchmod(fd, mode)
+with os.fdopen(fd, "wb") as f:
+    for chunk in iter(lambda: sys.stdin.buffer.read1(1 << 16), b""):
+        f.write(chunk)
+        f.flush()
+        if copy:
+            sys.stdout.buffer.write(chunk)
+            sys.stdout.buffer.flush()
+' "$@"
+}
+
+mark_build() { printf '%s\n' "$1" | put_own "$BUILD_FAILED" 644; }
+
 # Last value assigned to $2 in env file $1, unquoted; empty when unset.
 env_value() {
     [ -f "$1" ] || return 0
@@ -319,7 +343,7 @@ recover_venv() {
     trap '' HUP INT TERM PIPE
     set +e
     local venv=$GUARDED_VENV
-    [ -z "$GUARDED_TMP" ] || rm -f "$GUARDED_TMP"
+    [ -z "$GUARDED_TMP" ] || rm -rf "$GUARDED_TMP"
     case $VENV_BUILDING in
         next) rm -rf "$venv.next"
               [ ! -e "$venv" ] || say "Kept the previous Python environment." >&2 ;;
@@ -372,7 +396,7 @@ switch_venv() {
 }
 
 cmd_venv() {
-    local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs=""
+    local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs="" work built
     local had_kerberos=""
 
     # pyspnego[kerberos] is optional and admin-installed: the venv is recreated on every
@@ -386,28 +410,35 @@ cmd_venv() {
 
     if fips_requested "$envfile"; then
         mkdir -p "$(dirname "$BUILD_LOG")"
-        echo "build tools missing" > "$BUILD_FAILED"
+        mark_build "build tools missing"
         rust=$(cmd_check_build_tools "$python" "$format")
         export PATH="$rust:$PATH" RUSTC="$rust/rustc" CARGO="$rust/cargo"
         say "UCM_FIPS_BUILD=1: building cryptography, psycopg, lxml and xmlsec against the system OpenSSL"
         say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
-        reqs=$(mktemp)
-        guard_venv "$venv" "$reqs"
+        # Root's own copy of the log, read back here: the one in BUILD_LOG is the service account's to swap
+        work=$(mktemp -d)
+        reqs=$work/requirements.txt
+        guard_venv "$venv" "$work"
         fips_requirements "$home/requirements.txt" "$reqs"
         clear_leftovers "$venv"
-        echo "build failed" > "$BUILD_FAILED"
-        if ! build_fips_venv "$python" "$venv.next" "$reqs" "${venv##*/}" > "$BUILD_LOG" 2>&1 \
-                || ! verify_fips_venv "$venv.next" >> "$BUILD_LOG" 2>&1; then
-            tail -n 25 "$BUILD_LOG" >&2 || true
+        mark_build "build failed"
+        set +e
+        { build_fips_venv "$python" "$venv.next" "$reqs" "${venv##*/}" && verify_fips_venv "$venv.next"; } 2>&1 \
+            | put_own "$BUILD_LOG" 644 copy > "$work/build.log"
+        built=("${PIPESTATUS[@]}")
+        set -e
+        [ "${built[1]}" = 0 ] || die "could not write $BUILD_LOG"
+        if [ "${built[0]}" != 0 ]; then
+            tail -n 25 "$work/build.log" >&2 || true
             echo "ERROR: the UCM_FIPS_BUILD=1 build failed (full log: $BUILD_LOG)." >&2
             echo "Fix the cause, or remove UCM_FIPS_BUILD from $envfile for the standard build, and" >&2
             retry_hint "$format" >&2
             exit 1
         fi
-        rm -f "$reqs"
         # Built: from here the marker only says the switch did not happen
-        echo "switch not completed" > "$BUILD_FAILED"
-        tail -n 1 "$BUILD_LOG" || true
+        mark_build "switch not completed"
+        tail -n 1 "$work/build.log" || true
+        rm -rf "$work"
     else
         guard_venv "$venv"
         clear_leftovers "$venv"

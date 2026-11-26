@@ -19,7 +19,7 @@ SCRIPT = ROOT / 'packaging' / 'scripts' / 'native-setup.sh'
 BASH = shutil.which('bash')
 UTILS = ('sed', 'awk', 'sort', 'grep', 'dirname', 'tail', 'head', 'tr', 'cat', 'wc',
          'mktemp', 'rm', 'mv', 'mkdir', 'touch', 'chmod', 'chown', 'openssl', 'env', 'cp',
-         'readlink')
+         'readlink', 'python3')
 
 UBUNTU = 'ID=ubuntu\nVERSION_ID="24.04"\nPRETTY_NAME="Ubuntu 24.04.3 LTS"\n'
 ALMA = 'ID="almalinux"\nID_LIKE="rhel centos fedora"\nVERSION_ID="9.8"\nPRETTY_NAME="AlmaLinux 9.8"\n'
@@ -383,6 +383,59 @@ def test_a_failed_fips_build_fails_and_keeps_the_previous_venv(tmp_path):
     assert 'linker cc failed' in result.stderr
     assert (home / 'venv' / 'previous').read_text() == 'old venv'
     assert '--quiet -r' not in record.read_text()  # never falls back to the wheels
+
+
+# The service account owns /var/log/ucm: the build log and its marker are never written through a link
+def _linked_build_files(tmp_path):
+    (tmp_path / 'log').mkdir()
+    victims = {}
+    for name in ('fips-build.log', 'fips-build.failed'):
+        victim = tmp_path / f'victim-{name}'
+        victim.write_text('precious')
+        victim.chmod(0o600)
+        (tmp_path / 'log' / name).symlink_to(victim)
+        victims[name] = victim
+    return victims
+
+
+def _untouched(victims):
+    for victim in victims.values():
+        assert victim.read_text() == 'precious' and stat.S_IMODE(victim.stat().st_mode) == 0o600, victim
+
+
+def test_missing_tools_write_no_marker_through_a_link(tmp_path):
+    victims = _linked_build_files(tmp_path)
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, _ = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, extra={'PATH': str(bin_dir)}))
+    assert result.returncode == 1 and 'cargo/rustc>=1.83' in result.stderr, result.stderr
+    _untouched(victims)
+    marker = tmp_path / 'log' / 'fips-build.failed'
+    assert not marker.is_symlink() and marker.read_text() == 'build tools missing\n'
+
+
+@pytest.mark.parametrize('build, failed', [
+    ('exit 0', False),
+    ('case "$*" in *no-binary*) echo "error: linker cc failed"; exit 1;; esac; exit 0', True)])
+@pytest.mark.parametrize('linked', [False, True])
+def test_a_fips_build_keeps_its_log_and_marker(tmp_path, build, failed, linked):
+    """A link laid at either path is replaced, never written through."""
+    victims = _linked_build_files(tmp_path) if linked else {}
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, _ = _fake_python(tmp_path, build)
+    home, envfile = _home(tmp_path)
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
+    assert (result.returncode == 1) is failed, result.stderr
+    log = tmp_path / 'log' / 'fips-build.log'
+    assert stat.S_ISREG(log.lstat().st_mode)
+    if failed:
+        assert 'linker cc failed' in log.read_text() and 'linker cc failed' in result.stderr
+        assert (tmp_path / 'log' / 'fips-build.failed').read_text() == 'build failed\n'
+    else:
+        assert 'cryptography, hashlib and psycopg use the system OpenSSL' in log.read_text()
+        assert not (tmp_path / 'log' / 'fips-build.failed').exists()
+    _untouched(victims)
 
 
 def _venv_dir(path, works=True, gunicorn=True, tag='good'):
