@@ -492,7 +492,8 @@ export default function SettingsPage() {
         // Authentication off is reported as 'none' by the API; derive the
         // highlighted method from it rather than from the stored default (#322)
         smtp_auth_method: emailSettings.smtp_auth === false ? 'none' : (emailSettings.smtp_auth_method || 'password'),
-        smtp_oauth_provider: emailSettings.smtp_oauth_provider || 'google',
+        // As stored: the card shows Google for an empty one, the save sends it back untouched
+        smtp_oauth_provider: emailSettings.smtp_oauth_provider ?? '',
         smtp_oauth_tenant_id: emailSettings.smtp_oauth_tenant_id || '',
         smtp_oauth_client_id: emailSettings.smtp_oauth_client_id || '',
         smtp_oauth_client_secret: emailSettings.has_oauth_client_secret ? '********' : '',
@@ -1369,7 +1370,9 @@ export default function SettingsPage() {
           from_name: settings.smtp_from_name,
           enabled: true,
           smtp_auth_method: settings.smtp_auth_method,
-          smtp_oauth_provider: settings.smtp_oauth_provider,
+          // OAuth2 chosen anew takes the provider the card shows; a stored one goes back as it is
+          smtp_oauth_provider: settings.smtp_oauth_provider
+            || (settings.smtp_auth_method === 'oauth2' && savedEmail?.smtp_auth_method !== 'oauth2' ? 'google' : settings.smtp_oauth_provider),
           smtp_oauth_tenant_id: settings.smtp_oauth_tenant_id,
           smtp_oauth_client_id: settings.smtp_oauth_client_id,
           ...(settings.smtp_oauth_client_secret && settings.smtp_oauth_client_secret !== '********' ? { smtp_oauth_client_secret: settings.smtp_oauth_client_secret } : {}),
