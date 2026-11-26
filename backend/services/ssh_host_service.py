@@ -197,7 +197,7 @@ def enroll(ca_refid, secret, public_key, principals=None, ip=None, signature=Non
     fingerprint = SSHCertificateUtilsMixin._compute_fingerprint(key)
     enrolled = SSHHost.query.filter(SSHHost.ssh_ca_id == ca.id, SSHHost.fingerprint == fingerprint,
                                     SSHHost.revoked_at.is_(None)).first()
-    if enrolled is not None and enrolled.get_principals() != names:
+    if enrolled is not None and set(enrolled.get_principals()) != set(names):
         raise EnrollmentRefused(409, 'this host key is enrolled with other host names: revoke that host first',
                                 f'key {fingerprint} is enrolled as host {enrolled.name} with other host names')
 

@@ -217,6 +217,15 @@ class TestEnrollment:
         second = _enroll(client, ca, _token(auth_client, ca)['token'], key)
         assert second.status_code == 201 and second.get_json()['host_refid'] == first['host_refid']
 
+    def test_the_same_names_in_another_order_keep_its_host(self, app, auth_client, client):
+        ca = _host_ca(auth_client, 'Enroll reordered CA')
+        key = _host_key()
+        first = _enroll(client, ca, _token(auth_client, ca)['token'], key).get_json()
+        again = _token(auth_client, ca, principals=['web01', 'web01.example.com'])
+        r = _enroll(client, ca, again['token'], key)
+        assert r.status_code == 201, r.data
+        assert r.get_json()['host_refid'] == first['host_refid']
+
     def test_the_same_key_for_other_names_is_409_until_its_host_is_revoked(self, app, auth_client, client):
         ca = _host_ca(auth_client, 'Enroll other names CA')
         key = _host_key()
