@@ -1,4 +1,4 @@
-"""Migration 178: enrolled SSH hosts and their enrollment tokens (issue #451), two tables on both
+"""Migration 180: enrolled SSH hosts and their enrollment tokens (issue #451), two tables on both
 backends, created once with the columns of the models; a second run keeps their rows."""
 import importlib
 import os
@@ -14,7 +14,7 @@ TABLES = (SSHHost.__table__, SSHHostEnrollmentToken.__table__)
 
 
 def _migration():
-    return importlib.import_module('migrations._from_2_254.178_ssh_hosts')
+    return importlib.import_module('migrations._from_2_254.180_ssh_hosts')
 
 
 def _base(conn):
@@ -22,9 +22,11 @@ def _base(conn):
     conn.execute("CREATE TABLE ssh_certificates (id INTEGER PRIMARY KEY)")
 
 
-def test_the_step_follows_177_in_the_upgrade():
+def test_the_step_runs_in_number_order():
     from migrations._from_2_254 import STEPS
-    assert STEPS.index('178_ssh_hosts') > STEPS.index('177_ssh_krls')
+    own = STEPS.index('180_ssh_hosts')
+    # Lower numbers run before it, higher ones after: no step is assumed to be the last
+    assert all((int(s[:3]) < 180) == (i < own) for i, s in enumerate(STEPS) if i != own)
 
 
 def test_sqlite_creates_both_tables_and_keeps_rows_on_a_second_run():
@@ -55,7 +57,7 @@ def test_the_columns_are_those_of_the_models():
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_postgres_creates_both_tables_once():
-    schema = f"migtest_178_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    schema = f"migtest_180_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
     engine = create_engine(PG_URL)
     conn = engine.connect()
     try:

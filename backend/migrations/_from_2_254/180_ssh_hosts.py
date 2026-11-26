@@ -1,4 +1,4 @@
-"""Upgrade step 178: enrolled SSH hosts and their enrollment tokens (issue #451).
+"""Upgrade step 180: enrolled SSH hosts and their enrollment tokens (issue #451).
 
 ``ssh_host_enrollment_tokens`` keeps the SHA-256 of single-use tokens, ``ssh_hosts`` the servers
 enrolled with a host CA and the certificate each presents. Both backends; idempotent.
@@ -42,14 +42,14 @@ def upgrade(conn):
         for statement in INDEXES:
             conn.execute(statement)
         conn.commit()
-        logger.info("[178] ssh_hosts, ssh_host_enrollment_tokens (SQLite)")
+        logger.info("[180] ssh_hosts, ssh_host_enrollment_tokens (SQLite)")
         return
     from sqlalchemy import text
     for ddl in TABLES:
         conn.execute(text(ddl.format(serial='SERIAL', timestamp='TIMESTAMP WITHOUT TIME ZONE', true='true')))
     for statement in INDEXES:
         conn.execute(text(statement))
-    logger.info("[178] ssh_hosts, ssh_host_enrollment_tokens (PostgreSQL)")
+    logger.info("[180] ssh_hosts, ssh_host_enrollment_tokens (PostgreSQL)")
 
 
 def downgrade(conn):

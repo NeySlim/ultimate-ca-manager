@@ -21,8 +21,8 @@ def dialect(request):
 
 def _as_rc6(db):
     """A 2.254 database upgraded, then put in the state 3.0-rc6 left: 300 recorded, no step
-    row, no certificates.comment, revoked_serials.published, ssh_krls nor ssh_hosts (steps 175 to
-    178 came after it)."""
+    row, no certificates.comment, revoked_serials.published, ssh_krls nor ssh_hosts (steps 175,
+    176, 179 and 180 came after it)."""
     assert db.upgrade()
     db.run("ALTER TABLE certificates DROP COLUMN comment")
     db.run("ALTER TABLE revoked_serials DROP COLUMN published")
@@ -132,7 +132,7 @@ def test_a_rc6_database_runs_the_steps_after_rc1_and_records_every_step(rc6, mon
     assert rc6.upgrade()
     assert ran == [s for s in STEPS if s not in UNRECORDED]
     assert '175_certificate_comment' in ran and '176_revoked_serial_publication' in ran
-    assert '177_ssh_krls' in ran and '178_ssh_hosts' in ran
+    assert '179_ssh_krls' in ran and '180_ssh_hosts' in ran
     assert '165_sso_ldap_group_base_dn' in ran  # changed after rc1: runs again
     assert 'comment' in _columns(rc6, 'certificates')
     assert _holds_every_step(rc6)

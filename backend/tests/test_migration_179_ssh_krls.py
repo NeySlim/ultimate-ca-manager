@@ -1,4 +1,4 @@
-"""Migration 177: the published KRL of each SSH CA (issue #451), one table on both backends,
+"""Migration 179: the published KRL of each SSH CA (issue #451), one table on both backends,
 created once; a second run keeps its rows."""
 import importlib
 import os
@@ -14,12 +14,14 @@ TABLE = SSHKRL.__tablename__
 
 
 def _migration():
-    return importlib.import_module('migrations._from_2_254.177_ssh_krls')
+    return importlib.import_module('migrations._from_2_254.179_ssh_krls')
 
 
-def test_the_step_follows_176_in_the_upgrade():
+def test_the_step_runs_in_number_order():
     from migrations._from_2_254 import STEPS
-    assert STEPS.index('177_ssh_krls') > STEPS.index('176_revoked_serial_publication')
+    own = STEPS.index('179_ssh_krls')
+    # Lower numbers run before it, higher ones after: no step is assumed to be the last
+    assert all((int(s[:3]) < 179) == (i < own) for i, s in enumerate(STEPS) if i != own)
 
 
 def test_sqlite_creates_the_table_and_keeps_rows_on_a_second_run():
@@ -47,7 +49,7 @@ def test_the_sqlalchemy_path_is_idempotent():
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_postgres_creates_the_table_once():
-    schema = f"migtest_177_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    schema = f"migtest_179_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
     engine = create_engine(PG_URL)
     conn = engine.connect()
     try:

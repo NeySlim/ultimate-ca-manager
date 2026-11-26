@@ -1,4 +1,4 @@
-"""Upgrade step 177: the KRL each SSH CA publishes (issue #451).
+"""Upgrade step 179: the KRL each SSH CA publishes (issue #451).
 
 ``ssh_krls`` holds one row per SSH CA, read by every node: the public KRL keeps its version
 until the revocations change. Created on both backends; idempotent.
@@ -19,11 +19,11 @@ def upgrade(conn):
     if isinstance(conn, sqlite3.Connection):
         conn.execute(DDL.format(blob='BLOB', timestamp='DATETIME'))
         conn.commit()
-        logger.info("[177] ssh_krls (SQLite)")
+        logger.info("[179] ssh_krls (SQLite)")
         return
     from sqlalchemy import text
     conn.execute(text(DDL.format(blob='BYTEA', timestamp='TIMESTAMP WITHOUT TIME ZONE')))
-    logger.info("[177] ssh_krls (PostgreSQL)")
+    logger.info("[179] ssh_krls (PostgreSQL)")
 
 
 def downgrade(conn):
