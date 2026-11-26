@@ -302,6 +302,8 @@ fi
 %{ucm_home}/requirements.txt
 %{ucm_home}/start-ucm.sh
 %{ucm_home}/backend/
+# Listed again for its owner: the older data directory the unit still writes, the account's as %%post gives it
+%attr(-,%{name},%{name}) %{ucm_home}/backend/data
 %{ucm_home}/frontend/
 %{ucm_home}/scripts/
 # The owner and mode %%post and the service give them, so that laying the package down
