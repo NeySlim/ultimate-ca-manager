@@ -58,11 +58,12 @@ def create_user_mtls_certificate(user_id):
         return error_response('User not found', 404)
 
     data = request.get_json() or {}
-    # A certificate for yourself signs you in alone: prove the holder, as /api/v2/mtls does
-    if user_id == g.current_user.id:
-        refused = confirm_account_holder(g.current_user, data)
-        if refused:
-            return refused
+
+    def holder_refused():
+        # A certificate for yourself signs you in alone: prove the holder, as /api/v2/mtls
+        # does, last before writing (an authenticator code is spent by the check)
+        return confirm_account_holder(g.current_user, data) if user_id == g.current_user.id else None
+
     mode = data.get('mode', 'generate')  # 'generate' or 'import'
 
     if mode == 'import':
@@ -118,6 +119,9 @@ def create_user_mtls_certificate(user_id):
         if (existing_cert is not None and existing_cert.revoked) or (
                 issuer_ca is not None and persisted_revocation(issuer_ca, cert_obj.serial_number) is not None):
             return error_response('This certificate has been revoked', 400)
+        refused = holder_refused()
+        if refused:
+            return refused
         created = existing_cert is None
         if created:
             existing_cert = Certificate(
@@ -193,6 +197,9 @@ def create_user_mtls_certificate(user_id):
                 ca = CA.query.filter_by(refid=config.value).first()
         if not ca:
             return error_response('No CA available for mTLS certificate generation', 400)
+        refused = holder_refused()
+        if refused:
+            return refused
 
         try:
             result = CertificateService.create_certificate(

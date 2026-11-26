@@ -78,11 +78,20 @@ def test_another_users_email_needs_no_proof(app, admin, create_user):
     assert r.status_code == 200, r.data
 
 
-def test_own_mtls_enrolment_needs_the_password(app, admin):
+def test_own_mtls_enrolment_needs_the_password(app, admin, create_ca):
     c, uid, _old = admin
-    r = _send(c, 'post', f'/api/v2/users/{uid}/mtls/certificates', {'mode': 'generate'})
+    ca = create_ca(cn=f'Self proof CA {uuid.uuid4().hex[:6]}')
+    r = _send(c, 'post', f'/api/v2/users/{uid}/mtls/certificates', {'mode': 'generate', 'ca_id': ca['id']})
     assert r.status_code == 403, r.data
     assert _reauth(r) == 'password'
+
+
+@pytest.mark.parametrize('body', [{'mode': 'import'}, {'mode': 'generate', 'validity_days': 'abc'}])
+def test_own_mtls_enrolment_refuses_its_input_before_the_proof(app, admin, body):
+    # The proof comes last: an authenticator code is spent by the check
+    c, uid, _old = admin
+    r = _send(c, 'post', f'/api/v2/users/{uid}/mtls/certificates', body)
+    assert r.status_code == 400, r.data
 
 
 def test_another_users_mtls_enrolment_needs_no_proof(app, admin, create_user):
@@ -90,3 +99,4 @@ def test_another_users_mtls_enrolment_needs_no_proof(app, admin, create_user):
     other = create_user(username=f'selfproof_mtls_{uuid.uuid4().hex[:8]}', role='viewer')
     r = _send(c, 'post', f"/api/v2/users/{other['id']}/mtls/certificates", {'mode': 'generate'})
     assert _reauth(r) is None, r.data
+
