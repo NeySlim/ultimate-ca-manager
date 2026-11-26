@@ -36,6 +36,16 @@ from utils.db_transaction import commit_or_rollback
 
 logger = logging.getLogger(__name__)
 
+# A key that opens a session alone must verify its user (W3C WebAuthn L2 7.2 step 17);
+# after the password ('2fa') it is the second factor and stays 'preferred'
+_KEY_ALONE = frozenset({'authentication', 'unlock'})
+
+
+def _user_verification(challenge_type: str) -> UserVerificationRequirement:
+    if challenge_type in _KEY_ALONE:
+        return UserVerificationRequirement.REQUIRED
+    return UserVerificationRequirement.PREFERRED
+
 
 def base64url_decode(data: str) -> bytes:
     """Decode base64url string with proper padding"""
@@ -277,7 +287,7 @@ class WebAuthnService:
             rp_id=rp_id,
             challenge=challenge_bytes,
             allow_credentials=allow_credentials,
-            user_verification=UserVerificationRequirement.PREFERRED,
+            user_verification=_user_verification(challenge_type),
         )
         return json.loads(options_to_json(options)), challenge_b64
 
@@ -307,7 +317,7 @@ class WebAuthnService:
             rp_id=rp_id,
             challenge=challenge_bytes,
             allow_credentials=[PublicKeyCredentialDescriptor(id=decoy_id)],
-            user_verification=UserVerificationRequirement.PREFERRED,
+            user_verification=_user_verification('authentication'),
         )
         return json.loads(options_to_json(options))
 
@@ -370,6 +380,7 @@ class WebAuthnService:
                 expected_origin=f"https://{hostname}",
                 credential_public_key=credential.public_key,
                 credential_current_sign_count=0,  # enforced below instead
+                require_user_verification=challenge_type in _KEY_ALONE,
             )
 
             stored_count = credential.sign_count or 0
