@@ -6,6 +6,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k, o) => (o ? `${k}|${Object.values(o).join(',')}` : k) }),
 }))
 
+vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: false }) }))
 vi.mock('../../WebSocketIndicator', () => ({ WebSocketIndicator: () => <span data-testid="ws" /> }))
 const getStats = vi.hoisted(() => vi.fn())
 vi.mock('../../../services/approvals.service', () => ({ approvalsService: { getStats } }))
@@ -13,6 +14,7 @@ vi.mock('../../../services/approvals.service', () => ({ approvalsService: { getS
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { StatusBar } from '../StatusBar'
+import { Dock } from '../../atelier/Dock'
 import { canFor } from './shellTestUtils'
 
 const answer = (body, ok = true) => vi.fn().mockResolvedValue({ ok, json: async () => body })
@@ -51,13 +53,17 @@ describe('StatusBar', () => {
     expect(getStats).not.toHaveBeenCalled()
   })
 
-  it('reminds the shortcuts: Ctrl K searches, Escape closes the inspector', async () => {
+  it('reminds the shortcuts: Ctrl K searches, Escape closes the inspector while one is open', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
-    const { container } = render(<StatusBar />)
+    const { container, rerender } = render(<StatusBar />)
     await screen.findByText(/shell\.statusRunning/)
-    const keys = [...container.querySelectorAll('.shortcut kbd')].map((k) => k.textContent)
-    expect(keys).toEqual(['Ctrl K', 'shell.escapeKey'])
+    const keys = () => [...container.querySelectorAll('.shortcut kbd')].map((k) => k.textContent)
+    expect(keys()).toEqual(['Ctrl K'])
+    rerender(<><StatusBar /><Dock label="Inspector" tabsLabel="Open" tabs={[{ key: 1, title: 'vpn', icon: 'cert' }]} activeKey={1} onClose={() => {}}><p>panel</p></Dock></>)
+    expect(keys()).toEqual(['Ctrl K', 'shell.escapeKey'])
     expect(container.querySelector('.shortcut > span')).toHaveTextContent('shell.escapeKey inspector.close')
+    rerender(<StatusBar />)
+    expect(keys()).toEqual(['Ctrl K'])
   })
 
   it('shows no HA part outside HA mode', async () => {

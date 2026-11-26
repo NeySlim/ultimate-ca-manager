@@ -2,7 +2,7 @@
  * Bottom bar, the mockup's footer.statusbar: what /health reports (version, service state, HA node and cluster) in one line,
  * the live connection, then the activity in short: pending approvals, background jobs running, the overview's interventions
  * to make and the detached windows, each a way to its page; « Nothing pending » when all that may be read is calm. Then the
- * shortcuts (search, close the inspector). Nothing is shown for a field the API omits.
+ * shortcuts (search, and close the inspector while one is open). Nothing is shown for a field the API omits.
  */
 import { useEffect } from 'react'
 import { usePanel } from './openPanel'
@@ -15,6 +15,7 @@ import { useDetached } from '../detached/useDetached'
 import { KIND_ICONS } from '../detached/kindIcons'
 import { haState, useHealth } from './health'
 import { useActivity } from './useActivity'
+import { useAnyDockOpen } from '../atelier/openDocks'
 
 // Where a running job is followed: backup and restore in Settings, the chain check in the journal
 const JOB_PAGES = { backup: '/settings?tab=backup', restore: '/settings?tab=backup', audit_verify: '/audit' }
@@ -96,6 +97,7 @@ function Activity({ can, t }) {
 export function StatusBar({ onShowNodes, can }) {
   const { t } = useTranslation()
   const health = useHealth()
+  const inspectorOpen = useAnyDockOpen()
 
   let tone = 'muted'
   let text = ''
@@ -135,7 +137,8 @@ export function StatusBar({ onShowNodes, can }) {
       <Activity can={can} t={t} />
       {indicator}
       <span className="shortcut">
-        <kbd>Ctrl K</kbd> {t('common.search')} <span style={{ marginLeft: 10 }}><kbd>{t('shell.escapeKey')}</kbd> {t('inspector.close')}</span>
+        <kbd>Ctrl K</kbd> {t('common.search')}
+        {inspectorOpen && <span style={{ marginLeft: 10 }}><kbd>{t('shell.escapeKey')}</kbd> {t('inspector.close')}</span>}
       </span>
     </footer>
   )
