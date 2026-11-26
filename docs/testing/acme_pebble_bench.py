@@ -32,7 +32,7 @@ PASSWORD = os.environ.get('UCM_PASSWORD', '')
 BENCH_PASSWORD = os.environ.get('UCM_BENCH_PASSWORD', 'Pebble-Bench-2026!')
 DOMAIN = os.environ.get('BENCH_DOMAIN', 'bench.example.com')
 RETRY_AFTER = int(os.environ.get('PEBBLE_RETRY_AFTER_ORDER', '40'))
-HOOK = '/usr/local/bin/python3 /bench/acme_pebble_hook.py'
+HOOK = 'acme_pebble_hook.py'  # a hook of /etc/ucm/dns-hooks, mounted by acme-pebble-bench.sh up
 DB_PATH = '/opt/ucm/data/ucm.db'
 # What a stopped process leaves on an order it was finalizing or renewing
 LEASE_SECONDS = 600

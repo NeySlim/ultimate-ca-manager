@@ -31,7 +31,8 @@ Files:
 - Pebble serves its directory with a certificate from its own test CA (`pebble.minica.pem`, SAN
   `pebble`). UCM's ACME client uses `requests` with verification on, so the UCM container gets
   `REQUESTS_CA_BUNDLE` pointing at that CA. No UCM setting is changed for TLS.
-- DNS-01 is real: UCM's Custom Command provider runs `acme_pebble_hook.py`, which publishes the TXT
+- DNS-01 is real: UCM's Custom Command provider runs `acme_pebble_hook.py`, mounted as a root-owned
+  hook in `/etc/ucm/dns-hooks` (run the bench as root), which publishes the TXT
   in challtestsrv; Pebble queries challtestsrv (`-dnsserver`); UCM's own TXT self-check uses the
   *custom* resolver mode pointed at challtestsrv.
 - Pebble sends `Retry-After: PEBBLE_RETRY_AFTER_ORDER` (default 40 s) on a processing order. The

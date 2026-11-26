@@ -188,10 +188,10 @@ ENVEOF
         fi
         
         # Set permissions, through a linked directory too (the final /); a local archive of a
-        # removed UCM's files (.ucm-archive-*) stays root's
+        # removed UCM's files (.ucm-archive-*) and the DNS hooks (dns-hooks) stay root's
         find "$UCM_HOME/" -name '.ucm-archive-*' -prune -o -exec chown -h "$UCM_USER":"$UCM_GROUP" {} +
         find "$UCM_DATA/" -name '.ucm-archive-*' -prune -o -exec chown -h "$UCM_USER":"$UCM_GROUP" {} +
-        find "$UCM_CONFIG/" -name '.ucm-archive-*' -prune -o -exec chown -h "$UCM_USER":"$UCM_GROUP" {} +
+        find "$UCM_CONFIG/" \( -name '.ucm-archive-*' -o -path "$UCM_CONFIG/dns-hooks" \) -prune -o -exec chown -h "$UCM_USER":"$UCM_GROUP" {} +
         chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
         chmod 750 "$UCM_DATA"
 

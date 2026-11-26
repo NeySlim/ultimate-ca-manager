@@ -179,6 +179,16 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v3.1
+
+- **Custom Command DNS provider: hooks only.** The provider now runs only an executable of `/etc/ucm/dns-hooks/`, named by its file name, with the arguments that follow it; the directory and the file must belong to root and be writable by no group or other account, and a symbolic link that leads out of the directory is refused. A command that starts with a path (`/usr/local/bin/dns.sh --zone x`) is refused when the provider is saved and when it runs, so an order or a renewal through such a provider fails until it is changed. The DEB and RPM packages and the Docker image create the directory, root's and mode 0755. A Docker volume for `/etc/ucm` created before 3.1 does not receive it: create it as root (`docker compose exec -u 0 ucm install -d -o root -g root -m 0755 /etc/ucm/dns-hooks`), or mount a root-owned host directory read-only at `/etc/ucm/dns-hooks`; on Kubernetes, mount one there. To move a script on a package installation:
+
+  ```bash
+  sudo install -o root -g root -m 0755 /usr/local/bin/dns.sh /etc/ucm/dns-hooks/dns.sh
+  ```
+
+  then edit the provider (ACME > Client > DNS Providers) and replace the command with `dns.sh --zone x`. A script that ran an interpreter by its path (`/usr/bin/python3 /srv/hook.py`) needs a first line naming it (`#!/usr/bin/python3`) once moved.
+
 ### Upgrading to v3.0
 
 Some changes below were already delivered by a 2.254.N security update; each says which one. Coming from that update or a later one, they are not new.

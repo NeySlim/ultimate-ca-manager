@@ -20,6 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- ACME Custom Command DNS provider: holding `write:acme` was enough to run any program as the service account; the provider now runs only root-owned hooks of `/etc/ucm/dns-hooks`, named without a path (see UPGRADE.md to move an existing script).
 - Access log: a double quote in a parameter's name (`my"password=`) left its value in the log, and one in a secret value left the rest of it; both are now masked.
 
 ### Fixed

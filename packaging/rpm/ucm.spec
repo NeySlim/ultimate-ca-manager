@@ -61,6 +61,8 @@ for d in ca certs private crl scep backups sessions; do
     install -d %{buildroot}%{ucm_data}/$d
 done
 install -d %{buildroot}%{_sysconfdir}/%{name}
+# DNS hooks of the Custom Command provider: root's, never writable by the service account
+install -d -m 0755 %{buildroot}%{_sysconfdir}/%{name}/dns-hooks
 install -d %{buildroot}%{_localstatedir}/log/%{name}
 install -d %{buildroot}%{_unitdir}
 install -d %{buildroot}/usr/lib/firewalld/services
@@ -241,10 +243,10 @@ ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
 
 # Set permissions, through a linked directory too (the final /); a local archive of a
-# removed UCM's files (.ucm-archive-*) stays root's
+# removed UCM's files (.ucm-archive-*) and the DNS hooks (dns-hooks) stay root's
 find $UCM_HOME/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
 find $UCM_DATA/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
-find $UCM_CONFIG/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
+find $UCM_CONFIG/ \( -name '.ucm-archive-*' -o -path "$UCM_CONFIG/dns-hooks" \) -prune -o -exec chown -h %{name}:%{name} {} +
 chown -R %{name}:%{name} /var/log/%{name}
 chmod 750 $UCM_DATA
 
@@ -322,6 +324,7 @@ fi
 %ghost %dir %attr(0755,%{name},%{name}) %{ucm_data}/backups
 %ghost %dir %attr(0700,%{name},%{name}) %{ucm_data}/sessions
 %dir %attr(0750,%{name},%{name}) %{_sysconfdir}/%{name}/
+%dir %attr(0755,root,root) %{_sysconfdir}/%{name}/dns-hooks
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service

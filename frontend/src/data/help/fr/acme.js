@@ -35,7 +35,7 @@ export default {
           { label: 'Clé réutilisée en mode FIPS', text: 'Réutiliser la clé d’un certificat source est refusé quand le mode FIPS n’approuve pas cette clé, ML-DSA compris (v2.248)' },
           { label: 'Clés de compte', text: 'Algorithmes ES256 (P-256), ES384 (P-384) ou RS256 pour les clés de compte ACME' },
           { label: 'Fournisseurs DNS', text: 'Configurer les fournisseurs de défi DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk passe par son API XML ; Verify TLS Certificate peut être désactivé pour un panneau auto-signé et un délai de propagation DNS ajouté' },
-          { label: 'Custom Command', text: 'Type de fournisseur DNS exécutant des commandes locales configurées par l’admin pour créer/supprimer les TXT, détails de l’enregistrement passés via les variables d’environnement DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Chemin binaire absolu requis, sans shell, timeout configurable' },
+          { label: 'Custom Command', text: 'Type de fournisseur DNS exécutant un hook installé par l’administrateur de l’hôte dans /etc/ucm/dns-hooks pour créer/supprimer les TXT, détails de l’enregistrement passés via les variables d’environnement DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. La commande nomme le fichier du hook (sans chemin), puis ses arguments ; sans shell, timeout configurable' },
           { label: 'Domaines', text: 'Associer des domaines aux fournisseurs DNS pour la validation automatique' },
           { label: 'HTTP-01', text: 'UCM sert le fichier de challenge de ses orders en attente sur /.well-known/acme-challenge/ via le port du protocole HTTP (8080 par défaut) : redirigez ce chemin depuis le port 80 du domaine vers UCM. Verify vérifie d’abord le fichier, et les orders HTTP-01 se renouvellent automatiquement' },
           { label: "Renouvellement en place (v2.251)", text: "Un renouvellement conserve l’id et le refid du certificat : la liaison HTTPS, les liaisons de déploiement et les webhooks le suivent. Les certificats que d’anciens renouvellements ont importés comme nouvelles lignes restent dans l’inventaire : archivez-les ou supprimez-les à la main" },
@@ -299,7 +299,7 @@ Chaque fournisseur nécessite des identifiants API spécifiques au service DNS.
 Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l’apex qui partagent le nom, gardent la leur ; DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu’une valeur par nom : ils l’effacent seulement si aucun autre order en cours ne l’utilise, et refusent un order pour un domaine et son wildcard (v2.252). Vercel accepte un **Team ID** facultatif pour les domaines appartenant à une équipe, et RcodeZero exige un jeton avec accès en lecture et écriture à la zone. Un nom de fournisseur déjà utilisé est refusé (v2.251). Le fournisseur RFC 2136 accepte un nom d’hôte comme serveur DNS et utilise une **Zone** renseignée pour les noms qu’elle contient ; sinon la zone provient du SOA que renvoie le serveur configuré (v2.252).
 
 #### Fournisseur Custom Command
-Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exécute des commandes locales configurées par l’admin pour créer/supprimer les enregistrements TXT. Les détails de l’enregistrement sont passés en variables d’environnement :
+Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exécute un hook installé par l’administrateur de l’hôte pour créer ou supprimer l’enregistrement TXT. Les détails de l’enregistrement sont passés en variables d’environnement :
 
 - \`DOMAIN\` : domaine de base en cours de validation
 - \`RECORD_NAME\` : nom complet de l’enregistrement TXT (\`_acme-challenge.example.com\`)
@@ -307,7 +307,7 @@ Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exéc
 - \`TTL\` : TTL de l’enregistrement en secondes
 - \`ACTION\` : \`create\` ou \`delete\`
 
-La commande exige un **chemin binaire absolu**, s’exécute sans shell (ni pipes ni expansion) et est tuée après un timeout configurable (5-300 s, 60 par défaut). Utilisez un petit script wrapper pour relier n’importe quel outillage DNS externe.
+La commande commence par le **nom d’un hook** de \`/etc/ucm/dns-hooks\` (un nom de fichier, sans chemin), suivi de ses arguments. Le répertoire et le hook doivent appartenir à root et n’être modifiables par personne d’autre ; un lien qui sort du répertoire est refusé, si bien que la permission ACME ne choisit jamais ce qui s’exécute. Le hook s’exécute sans shell (ni pipes ni expansion) et est tué après un timeout configurable (5-300 s, 60 par défaut). Utilisez un petit script wrapper pour relier n’importe quel outillage DNS externe.
 
 ### Résolveurs DNS personnalisés
 **Résolveurs DNS-01** choisit où UCM recherche les enregistrements TXT \`_acme-challenge\` : **Automatique** (résolveurs listés, puis serveurs autoritaires de la zone, puis résolveurs publics, puis résolveur système), **Résolveur système uniquement** ou **Résolveurs listés uniquement**. Les modes restreints n’interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent. Les entrées sont des IP séparées par des virgules avec un port optionnel, par ex. \`127.0.0.1:5353\` ou \`[2001:db8::53]:5300\`.
