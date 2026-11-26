@@ -1429,7 +1429,7 @@ export const helpContent = {
         icon: Users,
         items: [
           { label: 'Full Name', text: 'Your display name shown across the application' },
-          { label: 'Email', text: 'Used for notifications and account recovery' },
+          { label: 'Email', text: 'Used for notifications and account recovery. Changing it asks for your password, and a notice goes to the old address' },
           { label: 'Account Information', text: 'Creation date, last login, total login count' },
         ]
       },

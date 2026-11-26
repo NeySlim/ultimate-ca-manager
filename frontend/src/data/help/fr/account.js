@@ -18,7 +18,7 @@ export default {
         title: 'Profil',
         items: [
           { label: 'Nom complet', text: 'Votre nom d’affichage affiché dans toute l’application' },
-          { label: 'E-mail', text: 'Utilisé pour les notifications et la récupération de compte' },
+          { label: 'E-mail', text: 'Utilisé pour les notifications et la récupération de compte. Le modifier demande votre mot de passe, et un avis part vers l’ancienne adresse' },
           { label: 'Informations du compte', text: 'Date de création, dernière connexion, nombre total de connexions' },
         ]
       },
@@ -71,7 +71,7 @@ Gérez votre profil personnel, vos paramètres de sécurité et vos clés API.
 ## Profil
 
 - **Nom complet** : Votre nom d’affichage affiché dans UCM
-- **E-mail** : Utilisé pour les notifications et la récupération de mot de passe
+- **E-mail** : Utilisé pour les notifications et la récupération de mot de passe. Le modifier demande votre mot de passe, et un avis part vers l’ancienne adresse
 - **Informations du compte** : Date de création, horodatage de la dernière connexion, nombre total de connexions
 
 ## Sécurité

@@ -143,7 +143,8 @@
     "apiKeyPrefix": "Préfixe",
     "confirmItIsYou": "Confirm it is you",
     "confirmWithPassword": "Enter your password to confirm this change",
-    "confirmWithCode": "Enter the code of your authenticator app to confirm this change"
+    "confirmWithCode": "Enter the code of your authenticator app to confirm this change",
+    "confirmEmailChange": "Enter your password to change the email: password reset links are sent to it"
   },
   "acme": {
     "title": "Protocole ACME",

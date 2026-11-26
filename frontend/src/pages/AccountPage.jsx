@@ -190,9 +190,18 @@ export default function AccountPage() {
 
   // Profile handlers
   const handleSaveProfile = async () => {
+    // The address receives the reset link: moving it asks the password of an account that has one
+    let proof = {}
+    if ((formData.email || '') !== (accountData.email || '') && accountData.has_local_password !== false) {
+      const password = await showPrompt(t('account.confirmEmailChange'), {
+        title: t('account.confirmItIsYou'), type: 'password', confirmText: t('common.confirm'),
+      })
+      if (!password) return
+      proof = { current_password: password }
+    }
     setSaving(true)
     try {
-      await accountService.updateProfile(formData)
+      await accountService.updateProfile({ ...formData, ...proof })
       showSuccess(t('messages.success.update.user'))
       await loadAccount({ keepPending: false })
       setAnnounce(t('account.profileSaved'))

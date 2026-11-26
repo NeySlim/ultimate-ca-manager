@@ -2374,7 +2374,7 @@ Manage your personal profile, security settings, and API keys.
 ## Profile
 
 - **Full Name**: Your display name shown across UCM
-- **Email**: Used for notifications and password recovery
+- **Email**: Used for notifications and password recovery. Changing it asks for your password, and a notice goes to the old address
 - **Account Information**: Creation date, last login timestamp, total login count
 
 ## Security

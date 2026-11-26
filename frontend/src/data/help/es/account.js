@@ -18,7 +18,7 @@ export default {
         title: 'Perfil',
         items: [
           { label: 'Nombre completo', text: 'El nombre que se muestra en toda la aplicación' },
-          { label: 'Correo electrónico', text: 'Se usa para las notificaciones y la recuperación de la cuenta' },
+          { label: 'Correo electrónico', text: 'Se usa para las notificaciones y la recuperación de la cuenta. Cambiarlo pide la contraseña, y se envía un aviso a la dirección anterior' },
           { label: 'Información de la cuenta', text: 'Fecha de creación, último inicio de sesión, número total de inicios de sesión' },
         ]
       },
@@ -70,7 +70,7 @@ Gestionar el perfil personal, la configuración de seguridad y las claves API.
 ## Perfil
 
 - **Nombre completo**: el nombre que se muestra en todo UCM
-- **Correo electrónico**: se usa para las notificaciones y la recuperación de la contraseña
+- **Correo electrónico**: se usa para las notificaciones y la recuperación de la contraseña. Cambiarlo pide la contraseña, y se envía un aviso a la dirección anterior
 - **Información de la cuenta**: fecha de creación, marca de tiempo del último inicio de sesión, número total de inicios de sesión
 
 ## Seguridad

@@ -332,7 +332,8 @@ Content-Type: application/json
 
 {
   "full_name": "John Doe",
-  "email": "john@example.com"
+  "email": "john@example.com",
+  "current_password": "..."
 }
 
 # Change password
@@ -344,6 +345,8 @@ Content-Type: application/json
   "new_password": "new-password"
 }
 ```
+
+A new `email` on an account with a local password needs `current_password` (`403` with `details.reauth` `password` without it or when it is wrong); the same address, or another field alone, needs nothing. The change is audited as `profile_email_change` and, when email is configured, a notice goes to the old address (a notice that cannot be sent is logged and does not undo the change).
 
 ### Two-Factor Authentication (2FA/TOTP)
 

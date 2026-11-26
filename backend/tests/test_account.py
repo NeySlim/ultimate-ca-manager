@@ -83,7 +83,7 @@ class TestUpdateProfile:
 
     def test_update_email(self, auth_client):
         r = patch_json(auth_client, '/api/v2/account/profile',
-                       {'email': 'admin@test.local'})
+                       {'email': 'admin@test.local', 'current_password': 'changeme123'})
         data = assert_success(r)
         assert data.get('email') == 'admin@test.local'
 
@@ -97,7 +97,8 @@ class TestUpdateProfile:
             assert_error(r, 409)
             assert assert_success(auth_client.get('/api/v2/account/profile')).get('email') == before
         finally:
-            patch_json(auth_client, '/api/v2/account/profile', {'email': before})
+            patch_json(auth_client, '/api/v2/account/profile',
+                       {'email': before, 'current_password': 'changeme123'})
             auth_client.delete(f"/api/v2/users/{holder['id']}")
 
     def test_update_full_name(self, auth_client):
@@ -120,6 +121,7 @@ class TestUpdateProfile:
     def test_update_multiple_fields(self, auth_client):
         r = patch_json(auth_client, '/api/v2/account/profile', {
             'email': 'multi@test.local',
+            'current_password': 'changeme123',
             'full_name': 'Multi Update',
             'timezone': 'UTC',
         })

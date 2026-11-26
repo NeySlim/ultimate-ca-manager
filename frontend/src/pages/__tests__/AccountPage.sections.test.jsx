@@ -208,14 +208,33 @@ describe('AccountPage sections', () => {
   })
 
   it('saves the changed profile from the save bar, and with Enter in one of its fields', async () => {
+    notify.showPrompt.mockResolvedValue('pw')
     open()
     await screen.findByRole('region', { name: 'account.profile' })
     fireEvent.change(screen.getByLabelText('common.email'), { target: { value: 'a@example.com' } })
     fireEvent.click(within(document.getElementById('settings-savebar')).getByRole('button', { name: 'common.save' }))
-    await waitFor(() => expect(m.updateProfile).toHaveBeenCalledWith({ full_name: '', email: 'a@example.com' }))
+    // A new address asks the password first: it receives the reset link
+    await waitFor(() => expect(m.updateProfile).toHaveBeenCalledWith({ full_name: '', email: 'a@example.com', current_password: 'pw' }))
+    expect(notify.showPrompt).toHaveBeenCalledWith('account.confirmEmailChange', expect.objectContaining({ type: 'password' }))
     fireEvent.change(screen.getByLabelText('account.fullName'), { target: { value: 'Alice' } })
     fireEvent.keyDown(screen.getByLabelText('account.fullName'), { key: 'Enter' })
     await waitFor(() => expect(m.updateProfile).toHaveBeenCalledTimes(2))
+  })
+
+  it('saves a new name without asking the password, and nothing when the prompt is cancelled', async () => {
+    open()
+    await screen.findByRole('region', { name: 'account.profile' })
+    fireEvent.change(screen.getByLabelText('account.fullName'), { target: { value: 'Alice' } })
+    fireEvent.keyDown(screen.getByLabelText('account.fullName'), { key: 'Enter' })
+    await waitFor(() => expect(m.updateProfile).toHaveBeenCalledWith({ full_name: 'Alice', email: '' }))
+    expect(notify.showPrompt).not.toHaveBeenCalled()
+    m.updateProfile.mockClear()
+    notify.showPrompt.mockResolvedValue(null)
+    fireEvent.change(screen.getByLabelText('common.email'), { target: { value: 'b@example.com' } })
+    fireEvent.keyDown(screen.getByLabelText('common.email'), { key: 'Enter' })
+    await waitFor(() => expect(notify.showPrompt).toHaveBeenCalled())
+    await new Promise((r) => setTimeout(r, 20))
+    expect(m.updateProfile).not.toHaveBeenCalled()
   })
 
   it('offers the inspector preference "close on navigate" as a check box with its hint', async () => {
