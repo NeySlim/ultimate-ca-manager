@@ -295,9 +295,11 @@ With a generated password, UCM asks for a new one right after login. Until it is
 ### DEB/RPM Packages
 - **Data:** `/opt/ucm/data`
 - **Config:** `/etc/ucm/ucm.env`
+- **Master key:** `/etc/ucm/master.key`, created at the first start; it encrypts the private keys in the database, which cannot be read without it: back it up with the data
 - **Logs:** `/var/log/ucm/`
 - **Service:** `/etc/systemd/system/ucm.service`
 - **Archive of a removed older installation:** `/opt/ucm-archive/` (only after one was archived; see above)
+- **After `apt purge ucm`:** `/opt/ucm/data` stays; while it holds data, or `ucm.env` names a PostgreSQL `DATABASE_URL`, `master.key`, `ucm.env` and `audit-chain.keys` move to a root-only `/opt/ucm-archive/<UTC date and time>-purge/`, which the output names. Put `master.key` and `audit-chain.keys` back into `/etc/ucm` before UCM starts on that data again.
 
 ### Source Installation
 - **Data:** `./backend/data` (relative to repository root)

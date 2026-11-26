@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- DEB: `apt purge ucm` deleted `/etc/ucm/master.key` while keeping the database it encrypts, leaving its private keys unreadable; while data is kept, the key and `ucm.env` now move to a root-only `/opt/ucm-archive/<date>-purge/` named in the output.
 - CA export: the `pkcs12`, `pfx` and `jks` exports of an offline CA kept under its offline password, and its `pem` (with `include_key`) or `key` export with a password, answered 500 (400 for a bundle sent without a password); they now answer 409 once the password has passed the rule, and the export without a password still returns the key encrypted under the offline password, audited as `password-protected`.
 - ACME: a finalize or an approved issuance whose refusal or failure named a domain such as `caa.example.com` was answered as a CAA denial carrying that message; only the CAA check now answers `caa`, a refused CSR answers `badCSR` (on finalize, the order left `ready`) and a failure on the server `serverInternal`, its cause kept for the log and the audit.
 - ACME: an issuing CA taken offline while keeping its key, or revoked, made a finalize or an approved issuance answer `badCSR`; it now answers `serverInternal` with the order invalid, a CA chosen for a domain or as the default being refused before signing.
