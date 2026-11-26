@@ -197,6 +197,55 @@ describe('a passing message raised by the sending', () => {
   })
 })
 
+describe('a success raised by the sending', () => {
+  it('ends the sending: a later error of a dialog left open is a toast', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = () => api.showSuccess('Saved.')
+    await send(dialog)
+    await wait(300)
+    await act(async () => { api.showError('Background job failed.') })
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    expect(line()).toHaveTextContent('Background job failed.')
+  })
+
+  it('leaves an error raised in the same task to the dialog', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = () => { api.showSuccess('Template created.'); api.showError('Its first version failed.') }
+    await send(dialog)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Its first version failed.')
+  })
+})
+
+describe('pointing in the dialog while its sending waits', () => {
+  const waitingSend = () => async () => {
+    await new Promise((done) => setTimeout(done, 300))
+    api.showError('Saving failed.')
+  }
+
+  it('outside a control (a scroll on a phone) keeps the answer for the dialog', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = waitingSend()
+    await send(dialog)
+    await act(async () => { fireEvent.pointerDown(dialog.querySelector('form')) })
+    await wait(400)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Saving failed.')
+  })
+
+  it('on a control ends the sending', async () => {
+    mount(<FormDialog />)
+    const dialog = await screen.findByRole('dialog')
+    onSend = waitingSend()
+    await send(dialog)
+    await act(async () => { fireEvent.pointerDown(within(dialog).getByLabelText('Template Name')) })
+    await wait(400)
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    expect(line()).toHaveTextContent('Saving failed.')
+  })
+})
+
 describe('a dialog whose primary button is a click, not a submit', () => {
   function ClickDialog() {
     return (
