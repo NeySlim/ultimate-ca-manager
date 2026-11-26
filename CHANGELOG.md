@@ -35,6 +35,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Interface: a few texts showed their raw key instead of a sentence (the Create button while a CA is created, the Microsoft CA connection toasts, some SSH CA, Discovery and CRL errors); they now read in every language.
 - Import: a binary file larger than about 125 KB (a DER root store, a large PKCS#12) was silently left out of the list; it is now read, and a file that cannot be read is named in an error.
 - Settings: a double click on Create in the webhook or Microsoft CA form, or on Delete for an SSO provider, a webhook or a Microsoft CA connection, sent the request twice; the button is now disabled until the answer.
+- Interface: the network error, the messages for an HTTP status the server sent without text (a proxy's 502 or 504, a 413) and the result of a database migration were always in English; they now follow the interface language.
 
 ## [3.0] - 2026-11-25
 

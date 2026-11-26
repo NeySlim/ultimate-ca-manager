@@ -81,7 +81,7 @@ export default function DatabaseBackendSection() {
       // The proof is what makes the manual Docker restart a decision rather
       // than a leap: the operator sees the same verified figures the native
       // path acted on before it restarted itself.
-      const verified = `${stats.tables_migrated} tables, ${stats.rows_migrated} rows verified`
+      const verified = t('settings.backend.migrationVerified', { tables: stats.tables_migrated, rows: stats.rows_migrated })
       const msg = res.data?.docker
         ? `${res.data?.next_step || res.message} (${verified})`
         : `${res.message} (${verified})`

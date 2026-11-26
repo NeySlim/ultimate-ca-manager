@@ -4184,7 +4184,8 @@
       "migrateFailed": "Falha ao migrar dados",
       "droppedColumns": "Colunas deixadas para trás por esta migração: {{columns}}. Seus valores não estão no novo backend.",
       "sourceDrift": "{{tables}} tabela(s) mudaram na origem depois de o snapshot ser tirado. Essas linhas não estão no novo backend: pare as escritas nesta instância e migre novamente a partir de uma origem em repouso.",
-      "testHint": "Testa uma conexão ao URL inserido, sem alterar nada."
+      "testHint": "Testa uma conexão ao URL inserido, sem alterar nada.",
+      "migrationVerified": "{{tables}} tabelas, {{rows}} linhas verificadas"
     },
     "smtpOauthProvider_microsoft365": "Microsoft 365 (trabalho/escola)",
     "smtpOauthRedirectUriUseDefault": "Usar padrão",
@@ -6104,10 +6105,31 @@
       "serverBusy": "O servidor está ocupado com outra alteração: tente novamente em alguns segundos.",
       "downloadFailed": {
         "publicKey": "Falha ao baixar a chave pública",
-        "krl": "Falha ao baixar a KRL"
+        "krl": "Falha ao baixar a KRL",
+        "generic": "Falha no download"
       },
       "copyFailed": {
         "publicKey": "Falha ao copiar a chave pública"
+      },
+      "network": "Erro de rede. Verifique sua conexão.",
+      "requestFailed": "Falha na solicitação",
+      "uploadFailed": "Falha no envio",
+      "http": {
+        "400": "Solicitação inválida. Verifique os dados informados e tente novamente.",
+        "401": "Sua sessão expirou. Faça login novamente.",
+        "403": "Você não tem permissão para realizar esta ação.",
+        "404": "O recurso solicitado não foi encontrado.",
+        "405": "Esta operação não é suportada.",
+        "408": "A solicitação expirou. Tente novamente.",
+        "409": "Conflito: este recurso já existe ou está em uso.",
+        "413": "O servidor ou um proxy à frente dele recusou uma solicitação deste tamanho.",
+        "415": "Tipo de arquivo não suportado.",
+        "422": "Os dados fornecidos são inválidos. Verifique e tente novamente.",
+        "429": "Muitas solicitações. Aguarde um momento e tente novamente.",
+        "500": "Ocorreu um erro interno no servidor. Tente novamente mais tarde.",
+        "502": "O servidor está temporariamente indisponível. Tente novamente mais tarde.",
+        "503": "O serviço está indisponível no momento. Tente novamente mais tarde.",
+        "504": "O servidor demorou demais para responder. Tente novamente."
       }
     },
     "success": {

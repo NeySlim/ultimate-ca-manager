@@ -4184,7 +4184,8 @@
       "migrateFailed": "Failed to migrate data",
       "droppedColumns": "Columns left behind by this migration: {{columns}}. Their values are not on the new backend.",
       "sourceDrift": "{{tables}} table(s) changed on the source after the snapshot was taken. Those rows are not on the new backend: stop writing to this instance and migrate again from a quiet source.",
-      "testHint": "Tests a connection to the URL typed, without changing anything."
+      "testHint": "Tests a connection to the URL typed, without changing anything.",
+      "migrationVerified": "{{tables}} tables, {{rows}} rows verified"
     },
     "smtpOauthProvider_microsoft365": "Microsoft 365 (work/school)",
     "smtpOauthRedirectUriUseDefault": "Use default",
@@ -6379,10 +6380,31 @@
       "serverBusy": "The server is busy with another change: try again in a few seconds.",
       "downloadFailed": {
         "publicKey": "Failed to download the public key",
-        "krl": "Failed to download the KRL"
+        "krl": "Failed to download the KRL",
+        "generic": "Download failed"
       },
       "copyFailed": {
         "publicKey": "Failed to copy the public key"
+      },
+      "network": "Network error. Please check your connection.",
+      "requestFailed": "Request failed",
+      "uploadFailed": "Upload failed",
+      "http": {
+        "400": "Invalid request. Please check your input and try again.",
+        "401": "Your session has expired. Please log in again.",
+        "403": "You do not have permission to perform this action.",
+        "404": "The requested resource was not found.",
+        "405": "This operation is not supported.",
+        "408": "The request timed out. Please try again.",
+        "409": "Conflict: this resource already exists or is in use.",
+        "413": "The server or a proxy in front of it refused a request of this size.",
+        "415": "Unsupported file type.",
+        "422": "The data provided is invalid. Please check and try again.",
+        "429": "Too many requests. Please wait a moment and try again.",
+        "500": "An internal server error occurred. Please try again later.",
+        "502": "The server is temporarily unavailable. Please try again later.",
+        "503": "The service is currently unavailable. Please try again later.",
+        "504": "The server took too long to respond. Please try again."
       }
     },
     "success": {

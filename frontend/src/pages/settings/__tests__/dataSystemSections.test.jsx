@@ -180,6 +180,18 @@ describe('Database: change of backend', () => {
     expect(dialog.querySelector('.modal-actions')).not.toBeNull()
   })
 
+  it('says what the migration verified in the interface language', async () => {
+    mocks.testConnection.mockResolvedValue({ data: { success: true, message: 'ok' } })
+    mocks.migrateData.mockResolvedValue({ message: 'Migrated', data: { stats: { tables_migrated: 12, rows_migrated: 3400 } } })
+    render(<DatabaseBackendSection />)
+    fireEvent.change(await screen.findByLabelText('settings.backend.targetUrl'), { target: { value: 'postgresql://u:p@db:5432/ucm' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /settings.backend.test/ })) })
+    fireEvent.click(screen.getByRole('button', { name: /settings.backend.migrateData/ }))
+    const dialog = await screen.findByRole('dialog')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'settings.backend.confirmMigrateButton' })) })
+    expect(mocks.notify.showSuccess).toHaveBeenCalledWith('Migrated (settings.backend.migrationVerified)')
+  })
+
   it('names its health in words and offers the redacted URI to copy', async () => {
     render(<DatabaseBackendSection />)
     expect((await screen.findByText('settings.backend.healthy')).closest('.badge')).toHaveClass('good')
