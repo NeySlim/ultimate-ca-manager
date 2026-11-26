@@ -1792,16 +1792,10 @@ def test_chown_tree_never_enters_a_directory_swapped_for_a_link_while_it_walks(t
     """A name walked by path would be resolved through the link laid in its place: fwalk never is."""
     top, outside = _tree_layout(tmp_path)
     python, trace = tracing_python(tmp_path)
-    # Each chown of sub swaps it for a link to the outside before the walk descends
-    swap = (f"import shutil\n_chown = os.chown\n"
-            f"def _swap(name, uid, gid, dir_fd=None, follow_symlinks=True):\n"
-            f"    _chown(name, uid, gid, dir_fd=dir_fd, follow_symlinks=follow_symlinks)\n"
-            f"    if name == 'sub' and not os.path.islink('{top}/sub'):\n"
-            f"        shutil.rmtree('{top}/sub'); os.symlink('{outside}', '{top}/sub')\n"
-            f"os.chown = _swap\n")
-    racing = _stub(tmp_path / 'racing-tree-python',
-                   f'code=$3; shift 3\nexec {python} -I -c "{swap}$code" "$@"')
-    result = _run(['own', 'chown-tree', f'{top}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': str(racing)}))
+    # Once opened, sub is swapped for a link to the outside before the walk descends
+    swap = f"shutil.rmtree('{top}/sub'); os.symlink('{outside}', '{top}/sub')"
+    racing = _racing_tree(tmp_path, python, _after_first('open', 'sub', swap))
+    result = _run(['own', 'chown-tree', f'{top}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': racing}))
     assert result.returncode == 0, result.stderr
     assert (top / 'sub').is_symlink()
     assert not [g for g in chowned(trace) if g.startswith(str(outside))], chowned(trace)
@@ -1836,6 +1830,48 @@ def test_chown_tree_survives_a_directory_swapped_for_a_file_before_its_descent(t
     assert f'WARNING: {top}/sub: ' in result.stderr, result.stderr
     assert (top / 'sub').is_file()
     assert str(top / 'ca' / 'root.pem') in chowned(trace) and str(top / 'dns-hooks' / 'hook.sh') in chowned(trace)
+
+
+def inode_tracing_python(tmp_path):
+    """tracing_python, recording the inode each chown reaches instead of its name."""
+    trace = tmp_path / 'inode-trace'
+    prelude = (
+        "import os\n_lstat = os.stat\n"
+        f"def _log(st):\n    open('{trace}', 'a').write('%d\\n' % st.st_ino)\n"
+        "os.fchown = lambda fd, uid, gid: _log(os.fstat(fd))\n"
+        "os.chown = lambda name, uid, gid, dir_fd=None, follow_symlinks=True: "
+        "_log(_lstat(name, dir_fd=dir_fd, follow_symlinks=follow_symlinks))\n")
+    wrapper = _stub(tmp_path / 'inode-tracing-python', f'code=$3; shift 3\nexec {sys.executable} -I -c "{prelude}$code" "$@"')
+    return str(wrapper), trace
+
+
+@pytest.mark.parametrize('owner', ['7:8', '0:0'])
+@pytest.mark.parametrize('step', ['stat', 'open'])
+def test_chown_tree_never_reaches_a_file_linked_in_place_of_a_directory(tmp_path, owner, step):
+    """A directory swapped for a hard link to a root file, once read or once opened, is changed
+    through the descriptor of the directory, or not at all: never through its name."""
+    top, _outside = _tree_layout(tmp_path)
+    victim = tmp_path / 'shadow'
+    victim.write_text('root:*:1::::::\n')
+    victim.chmod(0o646)
+    python, trace = inode_tracing_python(tmp_path)
+    swap = f"shutil.rmtree('{top}/sub'); os.link('{victim}', '{top}/sub')"
+    racing = _racing_tree(tmp_path, python, _after_first(step, 'sub', swap))
+    result = _run(['own', 'chown-tree', f'{top}/', owner], _env(tmp_path, extra={'UCM_PYTHON': racing}))
+    assert result.returncode == 0, result.stderr
+    assert os.path.samefile(victim, top / 'sub')
+    reached = trace.read_text().split()
+    assert str(victim.stat().st_ino) not in reached and str((top / 'ca').stat().st_ino) in reached, reached
+    assert stat.S_IMODE(victim.stat().st_mode) == 0o646
+
+
+def test_chown_tree_leaves_what_is_neither_a_file_a_directory_nor_a_link(tmp_path):
+    top, _outside = _tree_layout(tmp_path)
+    os.mkfifo(top / 'ca' / 'pipe')
+    python, trace = tracing_python(tmp_path)
+    result = _run(['own', 'chown-tree', f'{top}/', '7:8'], _env(tmp_path, extra={'UCM_PYTHON': python}))
+    assert result.returncode == 0, result.stderr
+    assert str(top / 'ca' / 'pipe') not in chowned(trace) and str(top / 'ca' / 'root.pem') in chowned(trace)
 
 
 def test_ucm_env_swapped_for_a_link_before_it_is_restricted_keeps_the_target_mode(tmp_path):

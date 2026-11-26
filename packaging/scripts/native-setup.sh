@@ -24,11 +24,13 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 #       given); copy: created at its own name, stdin also copied to stdout (a build log read live)
 #   replace <path> [<mode>]   stdin replaces a regular file, keeping its owner and (unless given) mode
 #   read <path>               a regular file to stdout; nothing for an absent one, an error for a link
-#   (read, replace, mode and chown-tree never touch a regular file with a second name, a hard link)
+#   (read, replace, mode and chown-tree never touch a regular file with a second name, a hard link;
+#   chown-tree changes a file or directory only through its descriptor, a link only itself)
 #   mode <path> <mode> [link-ok]  fchmod of a regular file or directory (a final / follows the path
 #       itself); link-ok: a link is left as it is
-#   chown-tree <dir>/ <user>:<group> [<entry>...]  the directory, then what it holds, links themselves;
-#       .ucm-archive-* and the listed entries (paths under <dir>) are skipped with what they hold;
+#   chown-tree <dir>/ <user>:<group> [<entry>...]  the directory, then what it holds, links themselves
+#       (nothing else: no device, pipe or socket); .ucm-archive-* and the listed entries (paths under
+#       <dir>) are skipped with what they hold, an entry changed while walked is named and left;
 #       given to root, group and other write and set-id bits are also removed
 # UCM_PYTHON: the interpreter the package requires (python3.12 on EL9, where python3 may be absent)
 OWN_PY='
@@ -174,39 +176,36 @@ elif op == "chown-tree":
             st = os.stat(n, dir_fd=dirfd, follow_symlinks=False)
         except FileNotFoundError:
             return None
-        fd = None
-        if stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
-            isdir = stat.S_ISDIR(st.st_mode)
+        if stat.S_ISLNK(st.st_mode):
             try:
-                # A link laid since is refused by O_NOFOLLOW: only the entry itself is changed then
-                fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY
-                             | (os.O_DIRECTORY if isdir else 0), dir_fd=dirfd)
-            except FileNotFoundError:
-                return None
-            except OSError as e:
-                if isdir:
-                    # Swapped since it was listed (the account owns it), or out of descriptors
-                    warn(rel, "changed while walked (%s), left as it is" % e.strerror)
-                    return None
-        walk = False
-        try:
-            if fd is not None:
-                st = os.fstat(fd)
-            if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
-                warn(rel, "a hard link, left as it is")
-                return None
-            if fd is not None and stat.S_ISREG(st.st_mode):
-                os.fchown(fd, uid, gid)
-            else:
                 os.chown(n, uid, gid, dir_fd=dirfd, follow_symlinks=False)
-            if fd is not None:
-                restrict(fd)
-            walk = fd is not None and stat.S_ISDIR(st.st_mode)
-            return fd if walk else None
+            except FileNotFoundError:
+                pass
+            return None
+        if not (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode)):
+            return None
+        try:
+            # A file or directory is only ever changed through its descriptor, never by its name
+            fd = os.open(n, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY
+                         | (os.O_DIRECTORY if stat.S_ISDIR(st.st_mode) else 0), dir_fd=dirfd)
         except FileNotFoundError:
             return None
+        except OSError as e:
+            # Swapped since it was listed (the account owns it), or out of descriptors
+            warn(rel, "changed while walked (%s), left as it is" % e.strerror)
+            return None
+        walk = False
+        try:
+            st = os.fstat(fd)
+            if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+                warn(rel, "a hard link, left as it is")
+            elif stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
+                os.fchown(fd, uid, gid)
+                restrict(fd)
+                walk = stat.S_ISDIR(st.st_mode)
+            return fd if walk else None
         finally:
-            if fd is not None and not walk:
+            if not walk:
                 os.close(fd)
 
     os.fchown(top, uid, gid)
