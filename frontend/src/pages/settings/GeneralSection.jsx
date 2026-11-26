@@ -28,7 +28,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
   const { t, i18n } = useTranslation()
   // The short and long samples in the reader's language, as the dates will read
   const sampleDate = (month) => {
-    try { return new Intl.DateTimeFormat(i18n?.language, { year: 'numeric', month, day: 'numeric' }).format(new Date(2026, 0, 6)) } catch { return '' }
+    try { return new Intl.DateTimeFormat(i18n?.resolvedLanguage || i18n?.language, { year: 'numeric', month, day: 'numeric' }).format(new Date(2026, 0, 6)) } catch { return '' }
   }
   const { showSuccess, showError } = useNotification()
   const [metricsToken, setMetricsToken] = useState('')

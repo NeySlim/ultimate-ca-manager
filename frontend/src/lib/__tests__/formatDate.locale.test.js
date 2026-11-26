@@ -9,7 +9,7 @@ const DAY = '2026-01-06T12:00:00Z'
 
 describe('formatDate and the interface language', () => {
   beforeAll(async () => {
-    await i18next.init({ lng: 'fr', fallbackLng: 'en', resources: { en: { translation: {} }, fr: { translation: {} }, de: { translation: {} } } })
+    await i18next.init({ lng: 'fr', fallbackLng: 'en', resources: { en: { translation: { hi: 'Hello' } }, fr: { translation: { hi: 'Bonjour' } }, de: { translation: { hi: 'Hallo' } } } })
     setAppTimezone('UTC')
     setShowTime(false)
   })
@@ -22,6 +22,12 @@ describe('formatDate and the interface language', () => {
     setDateFormat('short')
     expect(formatDate(DAY)).toContain(short)
     expect(formatDate(DAY)).not.toContain('Jan 6')
+  })
+
+  it('follows the language shown, not an unsupported one asked for', async () => {
+    await i18next.changeLanguage('nl-NL')
+    setDateFormat('long')
+    expect(formatDate(DAY)).toContain('January')
   })
 
   it('keeps the numeric formats as they are named', async () => {

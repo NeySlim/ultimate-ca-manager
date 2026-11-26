@@ -104,8 +104,8 @@ export function formatDate(date, { time, ...options } = {}) {
       return parts.map(p => p.value).join('')
     }
 
-    // Month names in the interface's language (i18next), the browser's only before it is ready
-    const locale = fmt === 'us' ? 'en-US' : (i18next.language || undefined)
+    // Month names in the language shown (i18next), the browser's only before it is ready
+    const locale = fmt === 'us' ? 'en-US' : (i18next.resolvedLanguage || i18next.language || undefined)
     const opts = formatMap[fmt] || formatMap.short
     try {
       return new Intl.DateTimeFormat(locale, opts).format(d)
