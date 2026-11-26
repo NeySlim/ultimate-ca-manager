@@ -651,9 +651,17 @@ PATCH /api/v2/cas/{ca_id}
 Content-Type: application/json
 
 {
-  "name": "Updated Name"
+  "name": "Updated Name",
+  "description": "Issues the VPN gateways"
 }
 ```
+
+`name` is the display name (`descr` and `name` in the CA object): trimmed, 1 to 255 characters,
+no control character; an empty name answers `400`. `description` is free text of at most 1000
+characters, line feed and tab kept; `""` or `null` clears it, and the CA object reads it back as
+`description` (`""` when there is none). Neither touches the certificate, whose subject keeps
+its Common Name. A refused field leaves the CA as it was, and the `ca_updated` audit entry names
+the old and the new value of each.
 
 `issuanceHidden` (`true` or `false`, nothing else) keeps the CA out of the CA lists of the manual
 issuance forms (Issue Certificate, Sign CSR, bulk CSR signing, user mTLS certificates, TSA signing
@@ -4064,7 +4072,8 @@ POST /api/v2/cas/import
 Content-Type: multipart/form-data
 
 file: <CA certificate file>       # Required
-name: "My Root CA"                # Optional: display name
+name: "My Root CA"                # Optional: display name (default: the CN)
+description: "Partner root"       # Optional: free text, at most 1000 characters
 password: "pkcs12password"        # Optional: for PKCS12 files
 import_key: true                  # Optional: import private key (default: true)
 
@@ -4074,6 +4083,7 @@ import_key: true                  # Optional: import private key (default: true)
     "id": 5,
     "refid": "uuid",
     "descr": "My Root CA",
+    "description": "Partner root",
     "subject": "CN=My Root CA,O=Org",
     "is_root": true,
     ...
@@ -4081,6 +4091,10 @@ import_key: true                  # Optional: import private key (default: true)
   "message": "CA \"My Root CA\" imported successfully"
 }
 ```
+
+A certificate imported again over a CA already held keeps the CA's display name unless `name` is
+sent; `description` replaces the CA's only when sent. An invalid `name` or `description` answers
+`400` and imports nothing.
 
 A certificate that carries the subject and key of a CA already held, under another issuer, is a
 cross-certificate (#400). `cross_mode` decides what happens: `auto` attaches it to a self-signed root
@@ -4333,6 +4347,9 @@ Content-Type: application/json
 `options`: `import_cas`, `import_certs`, `import_csrs`, `import_keys` (each `true` by default),
 `skip_duplicates`, `description_prefix`, and `selected_indices`, the positions in the analysis
 `objects` list to import (all of them when absent; a position outside the list is refused).
+`ca_labels` names and describes the CAs imported: `{"<position>": {"name": "…", "description":
+"…"}}`, the same rules as `PATCH /api/v2/cas/{ca_id}`; a CA it leaves out is named by its CN, and
+an invalid entry imports nothing.
 `write:cas` is required only when a CA certificate is among the objects imported.
 
 Both routes also take `file_passwords`, an object or a list of passwords (one per uploaded file,

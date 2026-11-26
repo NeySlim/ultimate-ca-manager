@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- CAs: the display name and a free-text description can be changed from the CA's panel, set at import (CA import and smart import) and come back from a backup, without touching the certificate (#459). A re-import keeps the name given since, and both changes are audited with the old and new values.
+
 ### Changed
 
 - Settings and Account on a wide screen: once the form column reaches 1280 px (a window of 1552 px) a card takes the whole column and lays its groups of fields in two columns, with tables, notices and test lines across the card. Narrower windows keep the 960 px cards; no field or text grows (long fields stop at 640 px, help texts at 62 characters, notice texts at 78).
