@@ -4712,7 +4712,8 @@
     "profileReset": "Profile changes undone.",
     "apiKeyHint": "API keys allow programmatic access to UCM. Keep your keys secret and rotate them regularly. Each key can have a custom expiration date.",
     "apiKeySearchPlaceholder": "Search by name or prefix...",
-    "apiKeyPrefix": "Prefix"
+    "apiKeyPrefix": "Prefix",
+    "scopeInstance": "Instance management (fleet console)"
   },
   "rbac": {
     "title": "Role-Based Access Control",
@@ -4748,7 +4749,10 @@
       "trustStore": "Trust Store",
       "hsmManagement": "HSM Management",
       "ssh": "SSH Certificates",
-      "sshCas": "SSH Certificate Authorities"
+      "sshCas": "SSH Certificate Authorities",
+      "instanceState": "Instance state",
+      "backups": "Backups",
+      "updates": "Updates"
     },
     "customRole": "Custom Role",
     "noCustomRole": "None (base role only)",

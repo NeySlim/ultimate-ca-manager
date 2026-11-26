@@ -12,6 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Added
 
 - Instance state for a console that watches several instances: `GET /api/v2/system/instance` gives the version and channel, mode and nodes, database engine, health, CAs, update, last backup, FIPS and a stable instance identifier, without any secret, to a key holding the new `read:instance` scope (#403).
+- API keys: `write:backups` starts a backup and `write:updates` installs an update, so a console's key no longer needs `admin:system`; the account page offers an "Instance management" preset with them, `read:instance` and `read:settings` (#403).
 
 ### Changed
 

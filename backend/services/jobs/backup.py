@@ -141,7 +141,8 @@ def run(ctx):
 
 
 register(JobType(
-    kind=KIND, slot=SLOT_BACKUP, permission='admin:system', run=run, label='Backup',
+    kind=KIND, slot=SLOT_BACKUP, permission='admin:system', also_readable_by=('write:backups',), run=run,
+    label='Backup',
     audit_action=ACTION, resource_name='manual',
     messages={'executor_lost': 'The backup stopped before the end: run it again',
               'not_taken': 'The backup was never started: run it again',

@@ -341,7 +341,7 @@ def refuse_api_key_on_own_account(user_id):
     return None
 
 
-def require_auth(permissions=None, session_only=False):
+def require_auth(permissions=None, session_only=False, any_of=False):
     """
     Decorator to protect routes with authentication
     Supports: Session, JWT, API Key (auto-detected)
@@ -351,6 +351,7 @@ def require_auth(permissions=None, session_only=False):
                     Examples: ['read:cas'], ['write:certificates', 'read:cas']
         session_only: refuse API keys; for routes that change how the
                     account signs in, whatever scopes the key holds
+        any_of: one of the permissions suffices instead of all of them
     
     Usage:
         @require_auth()  # Any authenticated user
@@ -411,14 +412,12 @@ def require_auth(permissions=None, session_only=False):
                 user_perms = auth_result['permissions']
                 
                 # Wildcard check - '*' means all permissions
-                if '*' not in user_perms:
-                    # Check each required permission
-                    for perm in permissions:
-                        if not has_permission(perm, user_perms):
-                            return jsonify({
-                                'error': 'Forbidden',
-                                'message': 'Insufficient permissions'
-                            }), 403
+                held = [has_permission(perm, user_perms) for perm in permissions]
+                if '*' not in user_perms and not (any(held) if any_of else all(held)):
+                    return jsonify({
+                        'error': 'Forbidden',
+                        'message': 'Insufficient permissions'
+                    }), 403
             
             # Inject auth info into Flask's g object
             g.current_user = auth_result['user']

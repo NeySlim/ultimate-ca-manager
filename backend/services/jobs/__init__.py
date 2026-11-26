@@ -78,6 +78,8 @@ class JobType:
     # resume(job_id, executor): an orphan in one of these phases is finished, not failed
     resume: Optional[Callable[[str, str], bool]] = None
     resumable_phases: frozenset = frozenset()
+    # Other scopes that read and cancel the job besides `permission` (a console's write:backups)
+    also_readable_by: tuple = ()
 
 
 _TYPES: Dict[str, JobType] = {}

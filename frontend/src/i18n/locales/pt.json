@@ -4712,7 +4712,8 @@
     "profileReset": "Alterações do perfil anuladas.",
     "apiKeyHint": "As chaves de API permitem o acesso programático ao UCM. Mantenha suas chaves secretas e rode-as regularmente. Cada chave pode ter uma data de expiração personalizada.",
     "apiKeySearchPlaceholder": "Pesquisar por nome ou prefixo...",
-    "apiKeyPrefix": "Prefixo"
+    "apiKeyPrefix": "Prefixo",
+    "scopeInstance": "Gestão da instância (consola de frota)"
   },
   "rbac": {
     "title": "Controle de acesso baseado em funções",
@@ -4748,7 +4749,10 @@
       "trustStore": "Armazém de confiança",
       "hsmManagement": "Gerenciamento de HSM",
       "ssh": "Certificados SSH",
-      "sshCas": "Autoridades de certificação SSH"
+      "sshCas": "Autoridades de certificação SSH",
+      "instanceState": "Estado da instância",
+      "backups": "Cópias de segurança",
+      "updates": "Atualizações"
     },
     "customRole": "Papel Personalizado",
     "noCustomRole": "Nenhum (apenas função base)",

@@ -4712,7 +4712,8 @@
     "profileReset": "プロフィールの変更を元に戻しました。",
     "apiKeyHint": "API キーを使うと UCM にプログラムからアクセスできます。キーは秘密にし、定期的にローテーションしてください。キーごとに有効期限を設定できます。",
     "apiKeySearchPlaceholder": "名前またはプレフィックスで検索...",
-    "apiKeyPrefix": "プレフィックス"
+    "apiKeyPrefix": "プレフィックス",
+    "scopeInstance": "インスタンス管理（フリートコンソール）"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
@@ -4748,7 +4749,10 @@
       "trustStore": "トラストストア",
       "hsmManagement": "HSM管理",
       "ssh": "SSH証明書",
-      "sshCas": "SSH認証局"
+      "sshCas": "SSH認証局",
+      "instanceState": "インスタンスの状態",
+      "backups": "バックアップ",
+      "updates": "更新"
     },
     "customRole": "カスタムロール",
     "noCustomRole": "なし（基本ロールのみ）",

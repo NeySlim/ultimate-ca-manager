@@ -735,6 +735,7 @@ export default function AccountPage() {
                   { value: 'read', label: t('account.scopeReadOnly') },
                   { value: 'readwrite', label: t('account.scopeReadWrite') },
                   { value: 'certificates', label: t('account.scopeCertificates') },
+                  ...(hasPermission('read:instance') ? [{ value: 'instance', label: t('account.scopeInstance') }] : []),
                 ]} />
               <NumberInput id="key-expires" label={t('account.expiresInDays')} value={apiKeyForm.expires_days} placeholder={t('account.expiresInDaysPlaceholder')}
                 hint={t('account.expiresInDaysHelp')} error={expiresBad ? t('account.expiresInDaysInvalid') : undefined}

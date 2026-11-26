@@ -140,7 +140,8 @@
     "profileReset": "Modifications du profil annulées.",
     "apiKeyHint": "Les clés API permettent l’accès programmatique à UCM. Gardez vos clés secrètes et faites-les tourner régulièrement. Chaque clé peut avoir une date d’expiration personnalisée.",
     "apiKeySearchPlaceholder": "Rechercher par nom ou préfixe...",
-    "apiKeyPrefix": "Préfixe"
+    "apiKeyPrefix": "Préfixe",
+    "scopeInstance": "Gestion d’instance (console de parc)"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -3379,7 +3380,10 @@
       "trustStore": "Magasin de confiance",
       "hsmManagement": "Gestion HSM",
       "ssh": "Certificats SSH",
-      "sshCas": "Autorités de certification SSH"
+      "sshCas": "Autorités de certification SSH",
+      "instanceState": "État de l’instance",
+      "backups": "Sauvegardes",
+      "updates": "Mises à jour"
     },
     "customRole": "Rôle personnalisé",
     "noCustomRole": "Aucun (rôle de base uniquement)",

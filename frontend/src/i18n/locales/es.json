@@ -4712,7 +4712,8 @@
     "profileReset": "Cambios del perfil deshechos.",
     "apiKeyHint": "Las claves de API permiten el acceso programático a UCM. Mantenga sus claves en secreto y rótelas con regularidad. Cada clave puede tener una fecha de expiración personalizada.",
     "apiKeySearchPlaceholder": "Buscar por nombre o prefijo...",
-    "apiKeyPrefix": "Prefijo"
+    "apiKeyPrefix": "Prefijo",
+    "scopeInstance": "Gestión de instancia (consola de flota)"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",
@@ -4748,7 +4749,10 @@
       "trustStore": "Almacén de confianza",
       "hsmManagement": "Gestión de HSM",
       "ssh": "Certificados SSH",
-      "sshCas": "Autoridades de certificación SSH"
+      "sshCas": "Autoridades de certificación SSH",
+      "instanceState": "Estado de la instancia",
+      "backups": "Copias de seguridad",
+      "updates": "Actualizaciones"
     },
     "customRole": "Rol Personalizado",
     "noCustomRole": "Ninguno (solo rol base)",

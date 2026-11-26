@@ -4712,7 +4712,8 @@
     "profileReset": "Profiländerungen verworfen.",
     "apiKeyHint": "API-Schlüssel ermöglichen den programmgesteuerten Zugriff auf UCM. Halten Sie Ihre Schlüssel geheim und rotieren Sie sie regelmäßig. Jeder Schlüssel kann ein eigenes Ablaufdatum haben.",
     "apiKeySearchPlaceholder": "Nach Name oder Präfix suchen...",
-    "apiKeyPrefix": "Präfix"
+    "apiKeyPrefix": "Präfix",
+    "scopeInstance": "Instanzverwaltung (Flottenkonsole)"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
@@ -4748,7 +4749,10 @@
       "trustStore": "Vertrauensspeicher",
       "hsmManagement": "HSM-Verwaltung",
       "ssh": "SSH-Zertifikate",
-      "sshCas": "SSH-Zertifizierungsstellen"
+      "sshCas": "SSH-Zertifizierungsstellen",
+      "instanceState": "Instanzstatus",
+      "backups": "Sicherungen",
+      "updates": "Aktualisierungen"
     },
     "customRole": "Benutzerdefinierte Rolle",
     "noCustomRole": "Keine (nur Basisrolle)",

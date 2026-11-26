@@ -423,6 +423,13 @@ GET    /api/v2/users/{id}/apikeys                      // the user's keys
 DELETE /api/v2/users/{id}/apikeys/{key_id}             // revoke, then delete
 ```
 
+**Scopes for a fleet console.** Three admin-only scopes let a key do what a console does without
+`admin:system`: `read:instance` reads [the instance state](#instance-state), `write:backups` starts a
+backup (`POST /api/v2/system/backup/create`) and follows its job, `write:updates` installs an update
+(`POST /api/v2/system/updates/install`) and follows an HA rolling update
+(`GET /api/v2/system/updates/campaign`). Settings are read with `read:settings`. None of them reads,
+downloads or restores an archive, nor changes a setting.
+
 A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present. A bearer token that does not start with `ucm_ak_` (an IdP token relayed by an authenticating proxy, for instance) is not taken for a key: it is ignored, gets no CSRF exemption, and the session cookie applies.
 
 ### WebAuthn Credentials
@@ -3340,8 +3347,8 @@ GET  /api/v2/system/jobs/<id>
 POST /api/v2/system/jobs/<id>/cancel
 ```
 
-Each job is read and cancelled with its own permission (`admin:system` for `backup`,
-`read:audit` for `audit_verify`); the
+Each job is read and cancelled with its own permission (`admin:system` or `write:backups` for
+`backup`, `read:audit` for `audit_verify`); the
 list shows only the kinds the caller may read, and the id of another kind answers `404`.
 
 ```json
@@ -3503,6 +3510,7 @@ GET /api/v2/system/backup/list
 GET /api/v2/system/backups
 
 # Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id"; POST /api/v2/system/backup is the same route)
+# admin:system or write:backups; every other route of this block takes admin:system
 # Removes nothing for the ceiling: "warning" is set when the
 # archives are then above it, null otherwise; the next retention applies it
 # A background job of kind "backup" (see Background Jobs): within 25 s the answer of before
@@ -3826,6 +3834,7 @@ POST /api/v2/system/updates/install
 # Docker/Kubernetes: 400, the orchestrator updates; 502 with the message of a failed check)
 POST /api/v2/system/updates/install
 
+# install and campaign take admin:system or write:updates; the other routes admin:system
 # HA rolling update state: {ha, campaign: {status (running|stopped|done), target, order,
 # done, skipped, current: {node, since, state}, failed: {node, reason, at},
 # packages: {family: {download_url, package_name, sha256}}, families: {node: family}} or null}
