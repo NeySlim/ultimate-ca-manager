@@ -91,9 +91,9 @@
    opens it, and its chevron stays on screen at the right, a 44 px target. */
 :root .atl .mobile-record.opens{cursor:pointer}
 :root .atl .mobile-record .row-top>.icon-btn{width:44px;min-height:44px;flex-shrink:0}
-/* A fact named by its column: the name muted, the value in the text colour, the two on one line. */
-:root .atl .mobile-record .row-meta>span:has(>.fact-label){color:var(--text);white-space:nowrap}
-:root .atl .mobile-record .fact-label{color:var(--muted)}
+/* A fact named by its column: the name muted on one line, the value in the text colour, folding when long. */
+:root .atl .mobile-record .row-meta>span:has(>.fact-label){color:var(--text)}
+:root .atl .mobile-record .fact-label{color:var(--muted);white-space:nowrap}
 /* Without a checkbox the record starts at its left edge, as the mockup's module records do. */
 :root .atl .mobile-record:not(:has(.check-hit)) :is(.row-meta,.row-status){margin-left:0}
 
@@ -549,7 +549,7 @@
 /* Phone: a row of tabs wider than the screen fades at its right edge; scrolled to, the last tab stands clear of the fade. */
 @media(max-width:800px){:root .atl .views{padding-right:28px;-webkit-mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent);mask-image:linear-gradient(to right,var(--text) calc(100% - 28px),transparent)}}
 /* Phone records: a labelled fact on a line of its own; the detail chevron on the card's right edge. */
-:root .atl .mobile-record .row-meta>span:has(>.fact-label){flex-basis:100%}
+:root .atl .mobile-record .row-meta>span:has(>.fact-label){flex-basis:100%;min-width:0;overflow-wrap:anywhere}
 :root .atl .mobile-record .row-top>.icon-btn.quiet:last-child{margin-right:-14px}
 /* An empty block in a table: its action at a button's full height, as the page head's. */
 :root .atl .module-table td .empty .btn{min-height:32px}

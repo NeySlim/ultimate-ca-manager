@@ -39,6 +39,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Dates: the short and long formats of lists, inspectors and notices followed the browser's language instead of the interface's (English months on a French page in an English browser); they now follow the interface language, as the date format preview already did.
 - Status bar: the shortcut "Esc Close inspector" showed on every page; it now shows only while an inspector is open.
 - Settings and Account on a phone: a section reached by its link or by the section menu started under the sticky header, its title hidden; it now starts below the header.
+- Lists on a phone: a long labelled value (a long issuer name) ran past the edge of its card, cut mid-word; it now folds onto the next line.
 
 ## [3.0] - 2026-11-25
 
