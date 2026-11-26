@@ -105,3 +105,27 @@ describe('AccountPage: Certificates Only API key', () => {
     ])
   })
 })
+
+describe('AccountPage: API key creation', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('creates one key for a double click, Create key disabled meanwhile', async () => {
+    let release
+    m.createApiKey.mockReturnValue(new Promise((r) => { release = r }))
+    render(<MemoryRouter><AccountPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByText('account.apiKeys'))[0])
+    fireEvent.click((await screen.findAllByText('account.createKey'))[0])
+    fireEvent.change(await screen.findByLabelText('account.apiKeyName'), { target: { value: 'ci' } })
+    const form = screen.getByLabelText('account.apiKeyName').closest('form')
+    const button = form.querySelector('button[type="submit"]')
+    fireEvent.click(button)
+    fireEvent.click(button)
+    fireEvent.submit(form)
+    expect(m.createApiKey).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(button).toBeDisabled())
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    release({ data: { id: 1, key: 'k' } })
+    await waitFor(() => expect(screen.getByText('account.apiKeyCreatedTitle')).toBeInTheDocument())
+    expect(m.createApiKey).toHaveBeenCalledTimes(1)
+  })
+})

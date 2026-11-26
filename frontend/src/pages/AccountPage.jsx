@@ -34,6 +34,7 @@ import { ROLE_KEYS } from './users/userFacts'
 import { languages } from '../i18n'
 import ApiKeyList from './account/ApiKeyList'
 import { chooseLanguage } from '../lib/chooseLanguage'
+import { useInFlight } from '../hooks/useInFlight'
 
 // Profile edit left pending, kept for the tab (lib/draftMemory)
 const PROFILE_DRAFT = 'account:profile'
@@ -108,6 +109,8 @@ export default function AccountPage() {
   const [webauthnRegistering, setWebauthnRegistering] = useState(false)
 
   const [apiKeyForm, setApiKeyForm] = useState(NO_KEY_FORM)
+  // The key is shown once: a second submit while the first runs would create a key never shown
+  const [creatingKey, runCreateKey] = useInFlight()
 
   // Mirror the backend's mTLS issuance gates so the UI never offers an action
   // that can only 403: POST /api/v2/mtls/certificates requires
@@ -339,12 +342,15 @@ export default function AccountPage() {
   }
 
   // API Key handlers
-  const handleCreateApiKey = async (e) => {
+  const handleCreateApiKey = (e) => {
     e?.preventDefault()
     if (!apiKeyForm.name.trim()) {
       showError(t('account.apiKeyNameRequired'))
-      return
+      return undefined
     }
+    return runCreateKey(createApiKey)
+  }
+  const createApiKey = async () => {
     try {
       // Empty expiration field => no expiration (backend treats null as
       // "never expires"). Otherwise send the number of days.
@@ -736,7 +742,7 @@ export default function AccountPage() {
             </div>
             <div className="modal-actions">
               <button type="button" className="btn" data-action="close-modal" onClick={closeKeyModal}>{t('common.cancel')}</button>
-              <Btn type="submit" tone="primary" icon="key">{t('account.createKey')}</Btn>
+              <Btn type="submit" tone="primary" icon="key" disabled={creatingKey || undefined} aria-busy={creatingKey || undefined}>{t('account.createKey')}</Btn>
             </div>
           </form>
         </AtelierDialog>

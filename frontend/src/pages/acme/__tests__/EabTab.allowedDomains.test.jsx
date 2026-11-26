@@ -196,3 +196,26 @@ describe('EabTab dock', () => {
     expect(kid.querySelector('dd.v .code-value')).toHaveTextContent('kid-5')
   })
 })
+
+describe('EabTab creation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.list.mockResolvedValue({ data: [] })
+  })
+
+  it('creates one credential for a double click, Generate disabled meanwhile', async () => {
+    let release
+    mocks.create.mockReturnValue(new Promise((r) => { release = r }))
+    renderTab({ showCreateModal: true })
+    const button = await screen.findByRole('button', { name: 'acme.eab.generate' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    fireEvent.submit(button.closest('form'))
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(button).toBeDisabled())
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    release({ data: { kid: 'new', hmac_key: 'secret' } })
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('new')).toBeInTheDocument()
+  })
+})
