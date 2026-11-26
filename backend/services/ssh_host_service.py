@@ -312,11 +312,8 @@ def revoke_host(host_id, reason='host revoked', username=None):
     db.session.commit()
     host = db.session.get(SSHHost, host_id)
     # Swept on every request: one cut short leaves the host revoked, the next revokes what it left,
-    # unless the key was enrolled again since and its certificates are that host's
-    again = not first and SSHHost.query.filter(
-        SSHHost.ssh_ca_id == host.ssh_ca_id, SSHHost.fingerprint == host.fingerprint,
-        SSHHost.revoked_at.is_(None)).first() is not None
-    swept = 0 if again else _sweep(host, reason, username)
+    # never the certificates of a host the key was enrolled as since
+    swept = _sweep(host, reason, username)
     if not first and not swept:
         raise ValueError('This host is already revoked')
     return db.session.get(SSHHost, host_id)

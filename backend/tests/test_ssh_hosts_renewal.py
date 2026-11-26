@@ -456,3 +456,15 @@ class TestTheSweepOfRevokedHosts:
                 validity_seconds=3600, descr='signed by hand', source='web', username='admin').id
             hosts.sweep_revoked_hosts()
             assert not db.session.get(SSHCertificate, manual).revoked
+
+    def test_revoking_again_after_the_key_was_enrolled_again_sweeps_only_the_old_host(self, app, auth_client,
+                                                                                      client, enrolled, tmp_path,
+                                                                                      monkeypatch):
+        ca, refid, key = enrolled
+        host_id, certs = _cut_short(app, client, refid, key, tmp_path, monkeypatch)
+        _, kept = _enroll_again(app, auth_client, client, tmp_path, ca, key, ['db01.example.com'])
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        assert all(_in_krl(client, tmp_path, ca, c) for c in certs)
+        with app.app_context():
+            assert not db.session.get(SSHCertificate, kept).revoked
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 409
