@@ -161,14 +161,26 @@ def _prove(ca, cert, key_row):
         raise AttachRefused('The HSM key did not produce a signature the CA certificate verifies')
 
 
+def _refuse_signing(ca, cert, provider, algorithm):
+    """AttachRefused when *provider* cannot sign for *ca* with this key, under its signature scheme."""
+    from services.ca.signature_scheme import pss_refusal
+    from utils.key_type import weak_ca_key_refusal
+    refusal = (HsmService.algorithm_refusal(provider.type, algorithm)
+               or weak_ca_key_refusal(cert.public_key()))
+    if not refusal and ca.signature_scheme == 'pss':
+        from utils import key_algorithms
+        refusal = pss_refusal(key_algorithms.family_for_public_key(cert.public_key()) == 'RSA', provider.type)
+    if refusal:
+        raise AttachRefused(refusal)
+
+
 def attach(ca_id, provider_id, key_identifier):
     """Bind the token key *key_identifier* of *provider_id* to the keyless CA *ca_id*; returns (ca, key row).
 
-    Commits the key row before the signing proof, so the token round trip holds no lock; the CA and
-    the key row are then locked and every binding rule is checked again before the CA takes the key.
+    Commits the key row before the signing proof, so the token round trip holds no lock. The key
+    row and the CA are then locked, and the CA's state, the key match, the binding rules and the
+    signing refusals (provider algorithm, key size, RSA-PSS, FIPS mode) are checked again.
     """
-    from services.ca.signature_scheme import pss_refusal
-    from utils.key_type import weak_ca_key_refusal
     ca = db.session.get(CA, ca_id)
     cert = keyless_ca_certificate(ca)
     provider = _provider(provider_id)
@@ -181,13 +193,7 @@ def attach(ca_id, provider_id, key_identifier):
         raise AttachRefused('The public key of this HSM key could not be read')
     if not matches_certificate(info.public_key_pem, cert):
         raise AttachRefused('HSM key does not match the CA certificate')
-    refusal = (HsmService.algorithm_refusal(provider.type, info.algorithm)
-               or weak_ca_key_refusal(cert.public_key()))
-    if not refusal and ca.signature_scheme == 'pss':
-        from utils import key_algorithms
-        refusal = pss_refusal(key_algorithms.family_for_public_key(cert.public_key()) == 'RSA', provider.type)
-    if refusal:
-        raise AttachRefused(refusal)
+    _refuse_signing(ca, cert, provider, info.algorithm)
 
     key_row = _record(provider, info)
     db.session.flush()
@@ -207,6 +213,8 @@ def attach(ca_id, provider_id, key_identifier):
             raise AttachRefused('HSM key does not match the CA certificate')
         key_binding.refuse_bound_key(key_row)
         key_binding.refuse_same_token_key(key_row, cert.public_key())
+        _refuse_signing(ca, cert, provider, key_row.algorithm)
+        HsmService.refuse_signing_in_fips_mode(key_row, fetch=False)
     except Exception:
         db.session.rollback()
         raise

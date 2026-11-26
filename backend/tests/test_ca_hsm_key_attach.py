@@ -329,6 +329,26 @@ class TestAttach:
         assert r.status_code == 200, r.data
         assert [k['held_by'] for k in json.loads(r.data)['data']['keys']] == ["X.509 CA 'Uncached Holder CA'"]
 
+    def test_a_pss_scheme_set_during_the_proof_is_checked_again(self, app, auth_client, provider):
+        from services.hsm import HsmService, ca_key_attach
+        key = rsa.generate_private_key(65537, 2048)
+        ca_id, _ = _keyless_ca(app, key, 'PSS Switch CA')
+        provider_id = provider()
+        real_prove = ca_key_attach._prove
+
+        def prove_then_switch(ca, cert, key_row):
+            real_prove(ca, cert, key_row)
+            # Another request turns the CA to RSA-PSS while the token signs the proof
+            db.session.execute(db.update(CA).where(CA.id == ca_id).values(signature_scheme='pss'))
+            db.session.commit()
+
+        with _token(_Token({'ours': key})), patch.object(ca_key_attach, '_prove', prove_then_switch), \
+                patch.object(HsmService, 'signs_pss', return_value=False):
+            r = _attach(auth_client, ca_id, provider_id, 'ours')
+        assert r.status_code == 400, r.data
+        assert _message(r) == "HSM provider type 'pkcs11' does not sign RSA-PSS"
+        assert _bound_key(app, ca_id) is None
+
     def test_write_cas_and_read_hsm_are_both_needed(self, app, auth_client, provider, viewer_client):
         key = ec.generate_private_key(ec.SECP256R1())
         ca_id, _ = _keyless_ca(app, key, 'Permission CA')
