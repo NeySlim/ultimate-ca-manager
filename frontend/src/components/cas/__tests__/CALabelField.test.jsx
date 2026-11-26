@@ -24,7 +24,7 @@ import { CALabelField } from '../CALabelField'
 import { Facts } from '../../atelier/Detail'
 
 const L = en.cas.label
-const base = { id: 4, name: 'Issuing CN', descr: 'Issuing CN', common_name: 'Issuing CN', description: '' }
+const base = { id: 4, name: 'Issuing CN', descr: 'Issuing CN', common_name: 'Issuing CN', description: '', serial_number: '0A:1B' }
 const draw = (ca, props = {}) => render(<Facts items={[]}><CALabelField ca={ca} {...props} /></Facts>)
 const valueOf = (label) => screen.getByText(label, { selector: 'dt' }).nextElementSibling
 const dialog = () => screen.getByRole('dialog')
@@ -48,7 +48,8 @@ describe('the name and description of a CA', () => {
     const onChanged = vi.fn()
     const changed = vi.fn()
     window.addEventListener('ucm:data-changed', changed)
-    const updated = { ...base, name: 'Gateway CA', descr: 'Gateway CA', description: 'VPN\nonly' }
+    // The PATCH answer carries no parsed detail: the serial shown before is kept
+    const updated = { id: 4, name: 'Gateway CA', descr: 'Gateway CA', description: 'VPN\nonly' }
     svc.update.mockResolvedValue({ data: updated })
     draw(base, { canWrite: true, onChanged })
     fireEvent.click(screen.getByRole('button', { name: L.edit }))
@@ -60,7 +61,8 @@ describe('the name and description of a CA', () => {
     fireEvent.change(within(dialog()).getByRole('textbox', { name: L.description }), { target: { value: 'VPN\nonly' } })
     expect(within(dialog()).getByText('8 / 1000', { exact: false })).toBeInTheDocument()
     fireEvent.click(within(dialog()).getByRole('button', { name: en.common.save }))
-    await waitFor(() => expect(onChanged).toHaveBeenCalledWith(updated))
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith({ ...base, ...updated }))
+    expect(onChanged.mock.calls[0][0].serial_number).toBe('0A:1B')
     expect(svc.update).toHaveBeenCalledWith(4, { name: 'Gateway CA', description: 'VPN\nonly' })
     expect(notify.showSuccess).toHaveBeenCalledWith(L.saved)
     expect(changed.mock.calls[0][0].detail).toEqual({ type: 'ca' })

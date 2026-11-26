@@ -53,7 +53,8 @@ export function CALabelDialog({ ca, onClose, onSaved, returnTo, idPrefix = '' })
       const res = await casService.update(ca.id, { name: name.trim(), description })
       showSuccess(t('cas.label.saved'))
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
-      onSaved(res?.data ?? { ...ca, name: name.trim(), descr: name.trim(), description })
+      // The PATCH answer lacks the detail's parsed fields (serial, fingerprints): kept from the shown CA
+      onSaved({ ...ca, ...(res?.data ?? { name: name.trim(), descr: name.trim(), description }) })
     } catch (err) {
       setError(err?.message || t('cas.label.saveFailed'))
       setSaving(false)
