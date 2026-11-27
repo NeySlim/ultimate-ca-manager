@@ -768,16 +768,23 @@ host_name() {
 # https-cert <data dir> <user> <group>: a self-signed HTTPS certificate when the data has none. The data
 # is the service account's: generated in root's own directory, then put in place without following a link
 cmd_https_cert() {
-    local data=$1 user=$2 group=$3 host san ip work
+    local data=$1 user=$2 group=$3 host cn san ip work out
     [ ! -f "$data/https_cert.pem" ] || return 0
     say "Generating HTTPS certificate..."
     host=$(host_name)
+    # A common name holds 64 characters (RFC 5280 ub-common-name): a longer name keeps its first label
+    cn=$host
+    [ "${#cn}" -le 64 ] || cn=${host%%.*}
+    cn=${cn:0:64}
     san="DNS:${host},DNS:localhost,IP:127.0.0.1"
     for ip in $(hostname -I 2>/dev/null); do san="$san,IP:$ip"; done
     work=$(mktemp -d)
     trap "rm -rf -- $(printf %q "$work")" EXIT
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "$work/key.pem" -out "$work/cert.pem" \
-        -subj "/CN=${host}/O=UCM/OU=PKI" -addext "subjectAltName=${san}" 2>/dev/null
+    if ! out=$(openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "$work/key.pem" -out "$work/cert.pem" \
+        -subj "/CN=${cn}/O=UCM/OU=PKI" -addext "subjectAltName=${san}" 2>&1); then
+        printf 'HTTPS certificate not generated: %s\n' "$out" >&2
+        return 1
+    fi
     own write "$data/https_key.pem" 600 "$user:$group" < "$work/key.pem"
     own write "$data/https_cert.pem" 644 "$user:$group" < "$work/cert.pem"
     rm -rf -- "$work"

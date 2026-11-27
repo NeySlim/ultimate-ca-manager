@@ -1469,9 +1469,49 @@ def _owner():
     return pwd.getpwuid(os.getuid()).pw_name, grp.getgrgid(os.getgid()).gr_name
 
 
-def _https_cert(tmp_path, data):
+def _https_cert(tmp_path, data, fqdn='ucm.example.test'):
+    """The host's name is stubbed: a build machine's own can be anything."""
     user, group = _owner()
-    return _run(['https-cert', str(data), user, group], _env(tmp_path))
+    bin_dir = tmp_path / 'hostbin'
+    _stub(bin_dir / 'hostname', f'case "$1" in -f) echo {fqdn};; -I) echo 192.0.2.7;; *) echo {fqdn.split(".")[0]};; esac')
+    path = f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"
+    return _run(['https-cert', str(data), user, group], _env(tmp_path, extra={'PATH': path}))
+
+
+def _cert_names(cert):
+    from cryptography import x509
+    parsed = x509.load_pem_x509_certificate(cert.read_bytes())
+    cn = parsed.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+    san = parsed.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    return cn, san.get_values_for_type(x509.DNSName)
+
+
+def test_a_name_past_64_characters_keeps_its_first_label_as_common_name(tmp_path):
+    """A common name holds 64 characters (RFC 5280 ub-common-name); the full name stays in the SAN."""
+    fqdn = 'runnervm0abcd1.x2yz3abcdefghijklmnopqrstuvwx.bx.internal.cloudapp.net'
+    assert len(fqdn) > 64
+    data = tmp_path / 'data'
+    data.mkdir()
+    result = _https_cert(tmp_path, data, fqdn=fqdn)
+    assert result.returncode == 0, result.stderr
+    cn, dns = _cert_names(data / 'https_cert.pem')
+    assert cn == 'runnervm0abcd1' and dns == [fqdn, 'localhost']
+
+
+def test_an_openssl_failure_says_why(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    _stub(tmp_path / 'hostbin' / 'openssl', 'echo "unable to load provider" >&2; exit 1')
+    result = _https_cert(tmp_path, data)
+    assert result.returncode != 0 and 'unable to load provider' in result.stderr, result.stderr
+    assert not (data / 'https_cert.pem').exists()
+
+
+def test_a_short_name_is_the_common_name(tmp_path):
+    data = tmp_path / 'data'
+    data.mkdir()
+    assert _https_cert(tmp_path, data).returncode == 0
+    assert _cert_names(data / 'https_cert.pem') == ('ucm.example.test', ['ucm.example.test', 'localhost'])
 
 
 def test_a_missing_certificate_is_generated_with_its_modes(tmp_path):
