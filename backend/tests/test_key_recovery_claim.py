@@ -101,6 +101,26 @@ def test_a_build_that_fails_gives_the_approval_back(app, auth_client, create_cer
     assert _post(auth_client, f'/api/v2/key-recovery/{rid}/recover', PW).status_code == 200
 
 
+@pytest.mark.parametrize('where', ['content_disposition', '_audit'])
+def test_a_failure_after_the_bundle_is_built_gives_the_approval_back(app, auth_client, create_cert,
+                                                                     monkeypatch, where):
+    cn = 'claim-late-%s.example.test' % where.strip('_').replace('_', '-')
+    rid = _approved(auth_client, create_cert(cn=cn)['id'])
+    real = getattr(key_recovery, where)
+
+    def late(*args, **kw):
+        if where == 'content_disposition' or args[0] == 'key_recovery.recovered':
+            raise RuntimeError('after the bundle')
+        return real(*args, **kw)
+    monkeypatch.setattr(key_recovery, where, late)
+    try:
+        r = _post(auth_client, f'/api/v2/key-recovery/{rid}/recover', PW)
+        assert r.status_code == 500
+    except RuntimeError:
+        pass  # propagated by the test app
+    assert _status(app, rid) == 'approved'
+
+
 def test_an_account_reusing_a_deleted_requesters_name_cannot_collect(app, auth_client, create_user, create_cert):
     create_user(username='kr_reused', role='operator', email='kr-first@test.local')
     first = _signed_in(app, 'kr_reused')

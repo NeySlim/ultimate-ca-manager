@@ -2500,7 +2500,7 @@ Content-Type: application/json
 
 { "password": "at-least-8-chars", "legacy": false }
 ```
-Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. These are the only options, in a JSON object body, read as described under Export Certificate (where the options go). `409` when the request is not approved, a concurrent download included: the first one claims the request and the others get `409`; a download that fails to build the bundle leaves it approved. `403` unless the caller is the requester's account (by id: a later account with the same name is not) or holds `admin:key_recovery`, `410` when the certificate or key is gone.
+Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. These are the only options, in a JSON object body, read as described under Export Certificate (where the options go). `409` when the request is not approved, a concurrent download included: the first one claims the request and the others get `409`; a download that fails before the bundle is returned leaves it approved. `403` unless the caller is the requester's account (by id: a later account with the same name is not) or holds `admin:key_recovery`, `410` when the certificate or key is gone.
 
 ---
 

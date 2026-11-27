@@ -299,33 +299,42 @@ def recover_key(rid):
                   recovered_by=_username(), recovered_at=utc_now()):
         return error_response('Request is no longer approved: it was recovered or closed', 409)
 
+    # Every way out but the returned bundle gives the claim back: a claim stands only for a key handed out
+    settled = False
     try:
-        cert_obj = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
-        key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
-        private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-        refuse_unexportable_key(private_key, 'pkcs12', hint=(
-            'an administrator allowed to read private keys can export it as PEM (PKCS#8) '
-            'from the certificate'))
-        from utils.ca_chain import issuer_chain
-        start = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
-        chain = [x509.load_pem_x509_certificate(link.pem, default_backend()) for link in issuer_chain(start)]
-        p12 = pkcs12.serialize_key_and_certificates(
-            name=(cert.subject_cn or cert.refid or 'recovered').encode(),
-            key=private_key, cert=cert_obj, cas=chain or None,
-            encryption_algorithm=pkcs12_encryption(password, legacy, caref=cert.caref),
-        )
-    except FipsRestricted:
-        _give_back(rid)
-        _audit('key_recovery.recover_failed', req, success=False)
-        raise  # the app handler answers 400 with the FIPS problem type
-    except Exception as e:
-        logger.error(f"Key recovery {rid} failed to build PKCS12: {e}")
-        _give_back(rid)
-        _audit('key_recovery.recover_failed', req, success=False)
-        return error_response('Failed to assemble the recovered key', 500)
+        try:
+            cert_obj = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
+            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
+            private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+            refuse_unexportable_key(private_key, 'pkcs12', hint=(
+                'an administrator allowed to read private keys can export it as PEM (PKCS#8) '
+                'from the certificate'))
+            from utils.ca_chain import issuer_chain
+            start = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
+            chain = [x509.load_pem_x509_certificate(link.pem, default_backend()) for link in issuer_chain(start)]
+            p12 = pkcs12.serialize_key_and_certificates(
+                name=(cert.subject_cn or cert.refid or 'recovered').encode(),
+                key=private_key, cert=cert_obj, cas=chain or None,
+                encryption_algorithm=pkcs12_encryption(password, legacy, caref=cert.caref),
+            )
+        except FipsRestricted:
+            _give_back(rid)
+            settled = True
+            _audit('key_recovery.recover_failed', req, success=False)
+            raise  # the app handler answers 400 with the FIPS problem type
+        except Exception as e:
+            logger.error(f"Key recovery {rid} failed to build PKCS12: {e}")
+            _give_back(rid)
+            settled = True
+            _audit('key_recovery.recover_failed', req, success=False)
+            return error_response('Failed to assemble the recovered key', 500)
 
-    _audit('key_recovery.recovered', req)
-
-    return Response(p12, mimetype='application/x-pkcs12',
-                    headers={'Content-Disposition': content_disposition(
-                        cert.descr or cert.refid, '.p12', fallback=cert.refid or 'recovered')})
+        response = Response(p12, mimetype='application/x-pkcs12',
+                            headers={'Content-Disposition': content_disposition(
+                                cert.descr or cert.refid, '.p12', fallback=cert.refid or 'recovered')})
+        _audit('key_recovery.recovered', req)
+        settled = True
+        return response
+    finally:
+        if not settled:
+            _give_back(rid)
