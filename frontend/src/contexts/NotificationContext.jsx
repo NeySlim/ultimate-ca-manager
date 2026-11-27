@@ -302,7 +302,8 @@ function topModal() {
 // A dialog's primary button: a click on it sends the dialog as a submit would
 const PRIMARY = 'dialog .modal-actions :is(.primary, .is-primary, .danger, [type="submit"])'
 // The controls a pointer acts with in a dialog: a field, a select or a label is only focused by
-// it (typing or picking a value is an input event), so pointing at one does not end the sending
+// it (typing or picking a value is an input event), so pointing at one does not end the sending;
+// a combobox or contenteditable is a field too (a Radix select trigger is a button)
 const CONTROLS = 'button, a[href], summary, input:is([type="checkbox"], [type="radio"], [type="button"], [type="reset"], [type="image"]), [role="button"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="option"], [role="menuitem"], [role="slider"]'
 
 // A form dialog (it has an action bar), with its last bar

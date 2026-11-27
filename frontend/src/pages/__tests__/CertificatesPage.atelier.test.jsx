@@ -489,6 +489,7 @@ describe('CertificatesPage: the selection (batchbar, largeBatch)', () => {
     global.URL.createObjectURL = vi.fn(() => 'blob:x')
     global.URL.revokeObjectURL = vi.fn()
     stable.notify.showWarning.mockClear()
+    const t = vi.spyOn(stable.i18n, 't')
     await mount('/certificates', ROWS, 12000)
     fireEvent.click(zone().querySelector('#select-all'))
     fireEvent.click(screen.getByRole('button', { name: 'certificates.selectAllResults:12000' }))
@@ -498,6 +499,8 @@ describe('CertificatesPage: the selection (batchbar, largeBatch)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /bulkExport\.confirm/ }))
     await waitFor(() => expect(stable.notify.showWarning).toHaveBeenCalled())
     expect(stable.notify.showWarning.mock.calls).toEqual([['table.exportTruncatedSkipped:9997']])
+    expect(t).toHaveBeenCalledWith('table.exportTruncatedSkipped', { count: 9997, total: 12000, skipped: 3 })
+    t.mockRestore()
   })
 
   it('says why a batch export failed', async () => {
