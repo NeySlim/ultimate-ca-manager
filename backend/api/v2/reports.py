@@ -189,9 +189,10 @@ def generate_custom_pdf():
 def get_schedule_settings():
     """Get report schedule settings for all report types"""
     schedules = {}
-    for report_key in schedulable_reports():
-        config_key = f'report_schedule_{report_key}'
-        raw = _get_config(config_key, '')
+    keys = schedulable_reports()
+    stored = _get_configs([f'report_schedule_{k}' for k in keys])
+    for report_key in keys:
+        raw = stored.get(f'report_schedule_{report_key}', '')
         if raw:
             try:
                 schedules[report_key] = json.loads(raw)
@@ -312,6 +313,11 @@ def _get_config(key: str, default: str = '') -> str:
     """Get config value from database"""
     config = SystemConfig.query.filter_by(key=key).first()
     return config.value if config else default
+
+
+def _get_configs(keys) -> dict:
+    """{key: value} of the stored keys, in one query."""
+    return {r.key: r.value for r in SystemConfig.query.filter(SystemConfig.key.in_(list(keys))).all()}
 
 
 def _set_config(key: str, value: str):

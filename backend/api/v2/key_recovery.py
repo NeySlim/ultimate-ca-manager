@@ -87,8 +87,8 @@ def _dual_control_enabled():
     if env is not None:
         return env
 
-    from models import SystemConfig
-    row = SystemConfig.query.filter_by(key='key_recovery_dual_control').first()
+    from utils.config_snapshot import config_row
+    row = config_row('key_recovery_dual_control')
     return not (row and _is_disabled_value(row.value))
 
 
