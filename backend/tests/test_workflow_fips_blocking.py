@@ -36,14 +36,15 @@ def test_the_release_waits_for_the_fips_manifest():
     assert set(jobs['docker-fips-manifest']['needs']) >= {'build-docker-fips'}
 
 
-@pytest.mark.parametrize('branch', ['dev', 'test', 'main'])
+@pytest.mark.parametrize('branch', ['dev', 'main'])
 def test_the_fips_image_check_runs_on_each_line_branch(branch):
     job = load('tests.yml')['jobs']['build-test-fips']
     assert evaluate(job['if'], {'github': github_context('push', f'refs/heads/{branch}')})
 
 
 @pytest.mark.parametrize('event, ref', [('pull_request', 'refs/heads/dev'), ('push', 'refs/heads/feature/x'),
-                                         ('push', 'refs/heads/retired')])
+                                         ('push', 'refs/heads/retired'),
+                                         ('workflow_dispatch', 'refs/heads/dev')])
 def test_the_fips_image_check_stays_off_pull_requests_and_feature_branches(event, ref):
     job = load('tests.yml')['jobs']['build-test-fips']
     assert not evaluate(job['if'], {'github': github_context(event, ref)})

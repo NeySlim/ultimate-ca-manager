@@ -2,7 +2,8 @@ name: Tests & Quality Checks
 
 on:
   push:
-    branches: [main, master, develop, dev, test, 'v*', '*-dev', 'feature/**']
+    # Not test: it advances to a commit its push of dev has already run
+    branches: [main, master, develop, dev, 'v*', '*-dev', 'feature/**']
     # Prose-only commits do not need the suite (no required checks on any
     # branch), except the two files tests read.
     paths:
@@ -19,6 +20,10 @@ on:
         description: 'Also run the three-node HA bench (backend/tests/ha)'
         type: boolean
         default: false
+      full:
+        description: 'Also run every job a push runs (the FIPS build stays on pushes)'
+        type: boolean
+        default: false
   schedule:
     # Nightly sequential run of dev (the default branch is main, see the job)
     - cron: '0 3 * * *'
@@ -27,19 +32,18 @@ permissions:
   contents: read
   security-events: write
 
-# A new push to a branch replaces the run of its previous commit, except on
-# test and main, where every run is a release record, and on the 3.0 integration
-# branch, where a push carries the FIPS build and a manual run the sequential job:
+# A new push to a branch replaces the run of its previous commit, except on main,
+# where every run is a release record, and on dev, the run a release candidate is read from:
 # one group per commit and event there, so a newer commit never cancels a run
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'dev') && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'dev' }}
+  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'main' || github.ref_name == 'dev') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'main' && github.ref_name != 'dev' }}
 
 jobs:
   lint:
     name: Code Linting
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     
     steps:
       - name: Checkout code
@@ -62,7 +66,7 @@ jobs:
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     
     steps:
       - name: Checkout code
@@ -98,15 +102,15 @@ jobs:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
   
-  # Four parts of the file list balanced by measured duration (scripts/ci/shard-tests.sh), four workers each.
+  # Six parts of the file list balanced by measured duration (scripts/ci/shard-tests.sh), four workers each.
   test-backend:
-    name: Backend Tests (${{ matrix.shard }}/4)
+    name: Backend Tests (${{ matrix.shard }}/6)
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     
     steps:
       - name: Checkout code
@@ -139,7 +143,7 @@ jobs:
         run: |
           cd backend
           # A failed or empty list stops the step: pytest without files runs the whole suite
-          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 4)
+          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 6)
           [ -n "$files" ]
           pytest -v --tb=short -n 4 --dist loadfile $files
 
@@ -228,10 +232,32 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
+  # Two parts side by side, each with its own PostgreSQL service and unprivileged role:
+  # together they run the two commands the single job ran, once each.
   test-backend-postgres:
-    name: Backend Tests (PostgreSQL)
+    name: Backend Tests (PostgreSQL ${{ matrix.part }})
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Anything marked `postgres` anywhere in the suite, so a test added
+          # later is picked up without editing this file.
+          - part: marked
+            tests: -m postgres tests/
+          # The files whose PostgreSQL half is opt-in rather than marked: a backup
+          # restored onto another installation, the references it resolves, the
+          # migration matrix both ways, a migration at scale, the migration routes.
+          - part: opt-in
+            tests: >-
+              tests/test_backup_cross_installation.py
+              tests/test_restore_reference_resolution_pg.py
+              tests/test_database_migration_matrix.py
+              tests/test_database_migration_scale.py
+              tests/test_database_admin.py
+              tests/test_migration_runner_pg.py
+              tests/test_scep_intune_ca_lock_pg.py
 
     services:
       postgres:
@@ -304,30 +330,15 @@ jobs:
           UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
           cd backend
-          # Anything marked `postgres` anywhere in the suite, so a test added
-          # later is picked up without editing this file.
-          pytest --tb=short -m postgres tests/
-          # And the files whose PostgreSQL half is opt-in rather than marked:
-          # a backup restored onto an installation that is not the source, the
-          # references it has to resolve, the migration matrix in both
-          # directions, a migration at scale, and the migration routes. Every
-          # one of them is skipped without UCM_TEST_PG_URL, which is why this
-          # job exists at all.
-          pytest --tb=short \
-            tests/test_backup_cross_installation.py \
-            tests/test_restore_reference_resolution_pg.py \
-            tests/test_database_migration_matrix.py \
-            tests/test_database_migration_scale.py \
-            tests/test_database_admin.py \
-            tests/test_migration_runner_pg.py \
-            tests/test_scep_intune_ca_lock_pg.py
+          # Every one of these is skipped without UCM_TEST_PG_URL, hence this job
+          pytest --tb=short ${{ matrix.tests }}
 
   # The application suite on PostgreSQL, in three shards of scripts/ci/pg-app-tests.txt,
   # each with a PostgreSQL service of its own.
   test-backend-postgres-app:
     name: Backend Tests (PostgreSQL app ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     strategy:
       fail-fast: false
       matrix:
@@ -414,7 +425,7 @@ jobs:
   test-optional-backends:
     name: Backend Tests (SoftHSM, GSSAPI, Redis)
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     timeout-minutes: 20
 
     steps:
@@ -567,7 +578,7 @@ jobs:
   test-helm:
     name: Helm chart
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     timeout-minutes: 15
 
     steps:
@@ -606,7 +617,7 @@ jobs:
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     
     steps:
       - name: Checkout code
@@ -644,7 +655,7 @@ jobs:
   test-e2e:
     name: End-to-end (browser)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/test'))
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.full) || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
     timeout-minutes: 30
     permissions:
       contents: read
@@ -701,7 +712,7 @@ jobs:
   build-test:
     name: Docker Build Test
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.full)
     needs: [test-frontend]
     
     steps:
@@ -764,12 +775,13 @@ jobs:
             exit 1
           fi
 
-  # Pushes to the integration and release branches: the source build is too slow for every PR
+  # Pushes to the integration and release branches: the source build is too slow for every PR,
+  # and a manual run, even full, leaves it to the push
   build-test-fips:
     name: Docker Build Test (FIPS)
     runs-on: ubuntu-24.04
     needs: [test-frontend]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
     timeout-minutes: 60
 
     steps:

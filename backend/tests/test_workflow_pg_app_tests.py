@@ -8,6 +8,8 @@ import subprocess
 
 import pytest
 
+from tests.workflow_support import load
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIST = ROOT / 'scripts' / 'ci' / 'pg-app-tests.txt'
 SHARD = ROOT / 'scripts' / 'ci' / 'shard-tests.sh'
@@ -99,10 +101,12 @@ def test_the_durations_file_weighs_each_file_once():
     assert len(paths) == len(set(paths)) and all(p.startswith('tests/') for p in paths)
 
 
-def test_the_four_sqlite_shards_are_within_ten_percent_of_each_other():
+def test_the_six_sqlite_shards_are_within_ten_percent_of_each_other():
     weights = _weights(DURATIONS)
     median = statistics.median(weights.values())
-    totals = [sum(weights.get(f, median) for f in _shard(k, 4)) for k in (1, 2, 3, 4)]
+    n = len(load('tests.yml')['jobs']['test-backend']['strategy']['matrix']['shard'])
+    assert n == 6
+    totals = [sum(weights.get(f, median) for f in _shard(k, n)) for k in range(1, n + 1)]
     assert max(totals) <= min(totals) * 1.1, totals
 
 

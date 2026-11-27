@@ -137,15 +137,15 @@ def test_each_named_file_has_tests_under_its_marker():
     assert _collected('needs_redis', REDIS_FILES) == set(REDIS_FILES)
 
 
-@pytest.mark.parametrize('event, ref, runs', [
-    ('push', 'refs/heads/feature/x', True),
-    ('push', 'refs/heads/test', True),
-    ('pull_request', 'refs/pull/1/merge', True),
-    ('workflow_dispatch', 'refs/heads/dev', True),
-    ('schedule', 'refs/heads/main', False),  # the nightly run is the sequential suite's
+@pytest.mark.parametrize('event, ref, inputs, runs', [
+    ('push', 'refs/heads/feature/x', {}, True),
+    ('pull_request', 'refs/pull/1/merge', {}, True),
+    ('workflow_dispatch', 'refs/heads/dev', {'full': True}, True),
+    ('workflow_dispatch', 'refs/heads/dev', {'full': False}, False),  # a manual run adds, never repeats
+    ('schedule', 'refs/heads/main', {}, False),  # the nightly run is the sequential suite's
 ])
-def test_when_the_job_runs(event, ref, runs):
-    assert bool(evaluate(_job()['if'], {'github': github_context(event, ref), 'inputs': {}})) is runs
+def test_when_the_job_runs(event, ref, inputs, runs):
+    assert bool(evaluate(_job()['if'], {'github': github_context(event, ref), 'inputs': inputs})) is runs
 
 
 def _pytest_paths(run):

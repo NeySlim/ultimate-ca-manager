@@ -17,16 +17,14 @@ def _job():
     return load('tests.yml')['jobs'][JOB]
 
 
-def _runs(event, ref):
-    return bool(evaluate(_job()['if'], {'github': github_context(event, ref), 'inputs': {}}))
+def _runs(event, ref, **inputs):
+    return bool(evaluate(_job()['if'], {'github': github_context(event, ref), 'inputs': inputs}))
 
 
 @pytest.mark.parametrize('event,ref,expected', [
     ('push', 'refs/heads/dev', True),
     ('push', 'refs/heads/retired', False),
-    ('push', 'refs/heads/test', True),  # the run a release candidate is read from
     ('pull_request', 'refs/pull/12/merge', True),
-    ('workflow_dispatch', 'refs/heads/feature/x', True),
     ('push', 'refs/heads/feature/x', False),
     ('schedule', 'refs/heads/main', False),
 ])
@@ -34,9 +32,15 @@ def test_the_job_runs_on_integration_pushes_pull_requests_and_by_hand(event, ref
     assert _runs(event, ref) is expected
 
 
+def test_a_manual_run_plays_it_only_when_full():
+    assert _runs('workflow_dispatch', 'refs/heads/feature/x', full=True) is True
+    assert _runs('workflow_dispatch', 'refs/heads/dev', full=False) is False
+
+
 def test_the_workflow_is_triggered_by_those_events():
     on = triggers(load('tests.yml'))
     assert 'dev' in on['push']['branches']
+    assert 'test' not in on['push']['branches']  # the commit was already run by its push of dev
     assert 'pull_request' in on and 'workflow_dispatch' in on
 
 
