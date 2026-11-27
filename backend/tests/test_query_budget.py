@@ -12,9 +12,11 @@ from sqlalchemy import event, insert
 
 from config.settings import SESSION_TABLE
 from models import CA, Certificate, db
+from models.ca_cross_certificate import CACrossCertificate
 from utils.datetime_utils import utc_now
 
 from tests import pg_app_harness
+from tests.fresh_app import fresh_app_fixtures
 UCM_PG = pg_app_harness.ENABLED
 BUDGET_FILE = Path(__file__).with_name('query_budget.json')
 MARK = 'query-budget'
@@ -25,24 +27,36 @@ ROUTES = (
     '/api/v2/settings/general', '/api/v2/reports/schedule', ASSET,
 )
 
+# A database of its own: rows other files leave behind change which conditional queries a listing runs.
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def _budget():
     return json.loads(BUDGET_FILE.read_text())
 
 
 def _seed(app):
-    """Three CAs and forty certificates, the same on every run and every engine."""
+    """A root and an intermediate with a CN, a cross-certificate and forty certificates, same on every run."""
     now = utc_now()
     with app.app_context():
-        for i in range(3):
-            db.session.add(CA(refid=uuid.uuid4().hex, descr=f'{MARK} ca {i}', crt=''))
+        root = CA(refid=uuid.uuid4().hex, descr=f'{MARK} ca 0', crt='', subject='CN=Budget Root')
+        db.session.add(root)
         db.session.flush()
+        inter = CA(refid=uuid.uuid4().hex, descr=f'{MARK} ca 1', crt='', subject='CN=Budget Issuing',
+                   caref=root.refid)
+        db.session.add_all([inter, CA(refid=uuid.uuid4().hex, descr=f'{MARK} ca 2', crt='')])
+        db.session.flush()
+        db.session.add(CACrossCertificate(
+            ca_id=inter.id, crt='', fingerprint_sha256='b' * 64, subject='CN=Budget Issuing',
+            issuer='CN=Budget Root', issuer_caref=root.refid, served=True,
+            valid_from=now - timedelta(days=1), valid_to=now + timedelta(days=300)))
         db.session.execute(insert(Certificate.__table__), [{
             'refid': str(uuid.uuid4()), 'descr': MARK, 'crt': 'not parsed',
             'source': ('manual', 'acme', 'est')[i % 3], 'key_algo': 'RSA 2048', 'key_bits': 2048,
             'sig_hash': 'sha256', 'cert_type': 'server_cert', 'revoked': i % 10 == 0, 'archived': False,
             'valid_from': now - timedelta(days=i), 'valid_to': now + timedelta(days=10 + i * 9),
             'created_at': now - timedelta(days=i),
+            'caref': inter.refid if i % 2 else None,
         } for i in range(40)])
         db.session.commit()
 
@@ -50,11 +64,6 @@ def _seed(app):
 @pytest.fixture(scope='module')
 def fixed_data(app):
     _seed(app)
-    yield
-    with app.app_context():
-        Certificate.query.filter_by(descr=MARK).delete(synchronize_session=False)
-        CA.query.filter(CA.descr.like(f'{MARK} ca %')).delete(synchronize_session=False)
-        db.session.commit()
 
 
 @pytest.fixture(scope='module')
