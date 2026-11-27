@@ -1,7 +1,14 @@
 """UCM PDF reporting package.
 
-Exports PDFReportService for generating executive PDF reports.
+PDFReportService is resolved on first access so that importing the templates
+or formatters does not pull fpdf.
 """
-from .pdf_report_service import PDFReportService
 
 __all__ = ['PDFReportService']
+
+
+def __getattr__(name):
+    if name == 'PDFReportService':
+        from .pdf_report_service import PDFReportService
+        return PDFReportService
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

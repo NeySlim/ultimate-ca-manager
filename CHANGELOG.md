@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- The first Reports schedule or PDF templates request after a restart no longer waits for the PDF library to load (about 750 ms on a Raspberry Pi); it loads when a PDF is first rendered.
 - A native installation without a Base URL, `FQDN` or `UCM_FQDN` ran `hostname -f` three times per API request (60 to 75 ms per request on a Raspberry Pi); the name is now read once at startup, so a host name change takes effect after a service restart.
 
 ## [3.1] - 2026-11-27

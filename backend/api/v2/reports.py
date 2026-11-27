@@ -136,10 +136,10 @@ def download_executive_pdf():
 @require_auth(['read:audit'])
 def get_pdf_templates():
     """Get available PDF report templates and sections."""
-    from services.pdf_report_service import PDFReportService
+    from services.reporting.templates import ALL_SECTIONS, TEMPLATES
     return success_response(data={
-        'templates': PDFReportService.TEMPLATES,
-        'sections': PDFReportService.ALL_SECTIONS,
+        'templates': TEMPLATES,
+        'sections': ALL_SECTIONS,
     })
 
 
