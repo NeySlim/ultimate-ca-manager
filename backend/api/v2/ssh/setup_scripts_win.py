@@ -2,12 +2,13 @@
 SSH CA setup scripts — Windows PowerShell variants.
 """
 
+from .script_quoting import ps_help_comment, ps_literal
 
-def _user_ca_script_windows(pub_key, ca_label):
-    # PowerShell single-quoted strings preserve everything literally except '' (escaped quote).
-    # Escape any single quote in the public key for safety.
-    ps_pub_key = pub_key.replace("'", "''")
-    ps_label = ca_label.replace("'", "''")
+
+def _user_ca_script_windows(pub_key, descr):
+    # The key sits in a literal here-string, the description in a help line and a literal
+    ps_pub_key = pub_key
+    ca_label, ps_label = ps_help_comment(descr), ps_literal(descr)
     return rf'''<#
 .SYNOPSIS
     SSH User CA Trust Setup Script (Windows OpenSSH Server)
@@ -83,7 +84,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 
 Write-Host "========================================" -ForegroundColor White
 Write-Host "SSH User CA Trust Setup (Windows)"      -ForegroundColor White
-Write-Host "CA: {ca_label}"
+Write-Host ('CA: ' + {ps_label})
 if ($DryRun) {{
     Write-Host ">>> DRY RUN - no changes will be made <<<" -ForegroundColor Yellow
 }}
@@ -358,10 +359,10 @@ if (-not $DryRun) {{
 '''
 
 
-def _host_ca_script_windows(pub_key, ca_label, hostname):
-    ps_pub_key = pub_key.replace("'", "''")
-    ps_label = ca_label.replace("'", "''")
-    hostname_init = (hostname if hostname else '').replace("'", "''")
+def _host_ca_script_windows(pub_key, descr, hostname):
+    ps_pub_key = pub_key
+    ca_label, ps_label = ps_help_comment(descr), ps_literal(descr)
+    hostname_init = ps_literal(hostname or '')
     return rf'''<#
 .SYNOPSIS
     SSH Host CA Trust Setup Script (Windows OpenSSH Server)
@@ -420,7 +421,7 @@ $SshDir     = Join-Path $env:ProgramData 'ssh'
 $CaKeyDir   = Join-Path $SshDir 'ssh_ca_keys'
 $CaKeyFile  = Join-Path $CaKeyDir 'host_ca.pub'
 $SshdConfig = Join-Path $SshDir 'sshd_config'
-$Hostname   = '{hostname_init}'
+$Hostname   = {hostname_init}
 
 # --- Admin check ---
 $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -437,7 +438,7 @@ if (-not $Hostname) {{
 
 Write-Host "========================================" -ForegroundColor White
 Write-Host "SSH Host CA Trust Setup (Windows)"      -ForegroundColor White
-Write-Host "CA:   {ca_label}"
+Write-Host ('CA:   ' + {ps_label})
 Write-Host "Host: $Hostname"
 if ($DryRun) {{
     Write-Host ">>> DRY RUN - no changes will be made <<<" -ForegroundColor Yellow

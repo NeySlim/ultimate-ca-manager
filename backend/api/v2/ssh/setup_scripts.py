@@ -2,28 +2,27 @@
 SSH CA setup scripts — Unix shell variants + dispatcher.
 """
 
+from .script_quoting import one_line, sh_literal
 from .setup_scripts_win import _user_ca_script_windows, _host_ca_script_windows
 
 
 def _generate_setup_script(ca, pub_key, ca_type, hostname, platform='unix'):
     """Build a shell or PowerShell script for SSH CA trust configuration."""
-    ca_label = ca.descr.replace("'", "'\\''")
-
+    descr = ca.descr or ''
     if platform == 'windows':
-        # PowerShell escaping: backtick-escape backticks, escape single quotes for here-strings
-        ps_key = pub_key.strip().replace('\n', ' ').replace('`', '``')
-        ps_label = ca.descr.replace('`', '``').replace('"', '`"')
+        ps_key = one_line(pub_key.strip())
         if ca_type == 'user':
-            return _user_ca_script_windows(ps_key, ps_label)
-        return _host_ca_script_windows(ps_key, ps_label, hostname)
+            return _user_ca_script_windows(ps_key, descr)
+        return _host_ca_script_windows(ps_key, descr, hostname)
 
-    safe_key = pub_key.strip().replace("\n", " ").replace("'", "'\\''")
+    safe_key = one_line(pub_key.strip()).replace("'", "'\\''")
+    # The description is data: a one-line comment, and a single-quoted word where it is printed
     if ca_type == 'user':
-        return _user_ca_script(safe_key, ca_label)
-    return _host_ca_script(safe_key, ca_label, hostname, ca.id)
+        return _user_ca_script(safe_key, one_line(descr), sh_literal(descr))
+    return _host_ca_script(safe_key, one_line(descr), sh_literal(descr), hostname, ca.id)
 
 
-def _user_ca_script(pub_key, ca_label):
+def _user_ca_script(pub_key, ca_label, ca_label_sh):
     return rf'''#!/bin/sh
 # ============================================================================
 # SSH User CA Trust Setup Script
@@ -86,7 +85,7 @@ fi
 
 printf "%b========================================%b\\n" "$BOLD" "$NC"
 printf "%bSSH User CA Trust Setup%b\\n" "$BOLD" "$NC"
-printf "CA: %s\\n" "{ca_label}"
+printf 'CA: %s\n' {ca_label_sh}
 if [ "$DRY_RUN" = true ]; then
     printf "%b>>> DRY RUN, no changes will be made <<<%b\\n" "$YELLOW" "$NC"
 fi
@@ -270,8 +269,8 @@ fi
 '''
 
 
-def _host_ca_script(pub_key, ca_label, hostname, ca_id):
-    hostname_display = hostname if hostname else '$(hostname -f)'
+def _host_ca_script(pub_key, ca_label, ca_label_sh, hostname, ca_id):
+    hostname_sh = sh_literal(hostname or '')
     return rf'''#!/bin/sh
 # ============================================================================
 # SSH Host CA Trust Setup Script
@@ -292,7 +291,7 @@ set -eu
 CA_KEY_DIR="/etc/ssh/ssh_ca_keys"
 CA_KEY_FILE="$CA_KEY_DIR/host_ca.pub"
 SSHD_CONFIG="/etc/ssh/sshd_config"
-HOSTNAME="{hostname if hostname else ""}"
+HOSTNAME={hostname_sh}
 DRY_RUN=false
 
 # --- Colors ---
@@ -339,7 +338,7 @@ fi
 
 printf "%b========================================%b\\n" "$BOLD" "$NC"
 printf "%bSSH Host CA Trust Setup%b\\n" "$BOLD" "$NC"
-printf "CA: %s\\n" "{ca_label}"
+printf 'CA: %s\n' {ca_label_sh}
 printf "Host: %s\\n" "$HOSTNAME"
 if [ "$DRY_RUN" = true ]; then
     printf "%b>>> DRY RUN, no changes will be made <<<%b\\n" "$YELLOW" "$NC"
