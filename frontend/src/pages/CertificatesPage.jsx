@@ -435,8 +435,9 @@ export default function CertificatesPage() {
         const data = list.map(metadata)
         if (format === 'csv') exportToCSV(data, csvColumns, 'certificates')
         else exportToJSON(data, 'certificates')
-        if (every && total > EXPORT_MAX) showWarning(t('table.exportTruncated', { count: EXPORT_MAX, total }))
       }
+      // Every result is read up to EXPORT_MAX, whatever the format: say what was left out
+      if (every && total > EXPORT_MAX) showWarning(t('table.exportTruncated', { count: EXPORT_MAX, total }))
       setDialog(null)
     } catch (err) {
       showError(err?.status ? err.message : t('messages.errors.exportFailed.certificate'))
