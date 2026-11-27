@@ -3801,12 +3801,15 @@ GET /api/v2/system/security/secrets-status
       "source": "database",
       "previous_accepted_until": "2026-11-13T10:00:00Z",
       "rotation": "database",
-      "ha": false
+      "ha": false,
+      "docker": false
     },
     "encryption_key": {"configured": true}
   }
 }
 ```
+
+`rotation` is `database`, `blocked` (a disable of encryption is unfinished) or `environment_file`. `ha` and `docker` say that an `environment_file` rotation would be refused with 409.
 
 ### Security - Anomaly Detection
 ```http

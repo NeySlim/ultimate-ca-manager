@@ -126,17 +126,18 @@ export default function SecuritySection({ settings, fieldErrors = {}, updateSett
             )}
           </div>
           {/* What a rotation really does depends on whether the key can be stored encrypted;
-              in HA the environment-file rotation is refused (409 ha_mode) */}
+              in HA (409 ha_mode) and in Docker (409) the environment-file rotation is refused */}
           <p className="group-hint">
             {session.rotation === 'database' ? t('settings.sessionKeyRotateStoredDesc')
               : session.rotation === 'blocked' ? t('settings.sessionKeyRotateBlocked')
-                : session.ha ? t('settings.sessionKeyRotateHaRefused') : t('settings.sessionKeyRotateFileDesc')}
+                : session.ha ? t('settings.sessionKeyRotateHaRefused')
+                  : session.docker ? t('settings.sessionKeyRotateDockerRefused') : t('settings.sessionKeyRotateFileDesc')}
           </p>
           {hasPermission('admin:system') && handleRotateSessionKey && (
             <div className="settings-actions">
               <Btn icon="refresh" onClick={handleRotateSessionKey}
                 disabled={sessionKeyLoading || !!session.previous_accepted_until || session.rotation === 'blocked'
-                  || (session.ha && session.rotation !== 'database')}>
+                  || ((session.ha || session.docker) && session.rotation !== 'database')}>
                 {t('settings.rotateSessionKey')}
               </Btn>
             </div>

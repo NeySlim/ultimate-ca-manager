@@ -867,7 +867,7 @@ def _key_file_exists():
 @require_auth(['admin:system'])
 def secrets_status():
     """Get status of secret keys (without revealing them)"""
-    from config.settings import Config
+    from config.settings import Config, is_docker
     from security import session_key
     from utils.ha import ha_enabled
 
@@ -886,6 +886,8 @@ def secrets_status():
                          'environment_file'),
             # In HA the environment-file rotation is refused: the screen says so
             'ha': ha_enabled(),
+            # In Docker too (409): the key lives in UCM_SECRET_KEY or /etc/ucm/secret.key
+            'docker': is_docker(),
         },
         'encryption_key': {
             'configured': encryption_configured

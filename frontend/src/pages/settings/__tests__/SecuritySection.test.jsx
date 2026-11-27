@@ -364,6 +364,30 @@ describe('SecuritySection session key', () => {
     expect(rotate).not.toHaveBeenCalled()
   })
 
+  it('disables the file rotation in Docker and says why', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'environment', rotation: 'environment_file', ha: false, docker: true, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyRotateDockerRefused')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateFileDesc')).toBeNull()
+    expect(screen.getByText('settings.rotateSessionKey').closest('button')).toBeDisabled()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).not.toHaveBeenCalled()
+  })
+
+  it('keeps the stored rotation available in Docker', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'database', rotation: 'database', ha: false, docker: true, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyRotateStoredDesc')).toBeTruthy()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).toHaveBeenCalled()
+  })
+
   it('keeps the stored rotation available in HA', () => {
     const rotate = vi.fn()
     renderSection(null, {
