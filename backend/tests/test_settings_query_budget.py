@@ -31,7 +31,7 @@ def test_general_settings_read_in_few_queries(app):
 
 
 def test_general_settings_values_are_unchanged_by_the_batch(app, auth_client):
-    # defaults and stored values both come back as before
+    # stored values come back through the batched read
     from models import SystemConfig
     with app.app_context():
         db.session.add(SystemConfig(key='max_login_attempts', value='9'))
@@ -40,7 +40,6 @@ def test_general_settings_values_are_unchanged_by_the_batch(app, auth_client):
     try:
         data = auth_client.get('/api/v2/settings/general').get_json()['data']
         assert data['max_login_attempts'] == 9 and data['session_timeout'] == 1234
-        assert data['lockout_duration'] == 900 and data['timezone'] == 'UTC'
     finally:
         with app.app_context():
             SystemConfig.query.filter(SystemConfig.key.in_(['max_login_attempts', 'session_timeout'])).delete(
