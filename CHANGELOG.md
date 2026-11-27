@@ -14,6 +14,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME DNS: a `custom_command` provider runs a local program as the service account, yet any holder of `write:acme` (the operator role, custom roles, API keys) could create one or rewrite its command. Creating or changing such a provider now requires `write:deploy`, which only administrators hold; using an existing one is unchanged.
 - Package updates: the root watcher installed whatever package path the service account wrote, through links too, and ran `rpm -U --force`. It now installs only a release package of the updates directory, copied out of that account's reach, matching the release's `.sha256` fetched by root, named `ucm` and above the installed version; a refused update installs nothing and leaves UCM running.
 - Package updates: the root watcher appended its output to `/var/log/ucm/ucm.log` and read and wrote the service account's files following links; it now logs to the journal only (`journalctl -u ucm-watcher`, also in the system logs page and the diagnostic bundle) and opens those files without following links.
+- SSH CAs: a description holding `$(...)`, backquotes or a line break ran as a command on every server that installed the setup script (sh or PowerShell); the scripts now print it as a quoted literal, and a description with a control character or a line break is refused with 400.
 
 ## [2.254.7] - 2026-11-23
 
