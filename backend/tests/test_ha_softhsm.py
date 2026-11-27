@@ -493,3 +493,26 @@ def test_fips_creates_neither_token_nor_pin(tmp_path, auto):
     assert '--init-token' not in calls
     assert not (tmp_path / 'data' / 'softhsm' / '.default-pin').exists()
     assert 'not created in FIPS mode' in out and 'PIN=unset' in out
+
+
+@pytest.mark.parametrize('allow', ['1', ' TRUE ', 'yes', 'on'])
+def test_the_fips_escape_hatch_lets_the_entrypoint_create_the_token(tmp_path, allow):
+    # UCM_FIPS_ALLOW_SOFTHSM lets the boot register SoftHSM-Default: the token and its PIN follow
+    out, calls = _run_softhsm_block(tmp_path, {'FIPS_REQUESTED': '1', 'UCM_FIPS_ALLOW_SOFTHSM': allow})
+    assert '--init-token' in calls and 'UCM-Default' in calls
+    assert 'PIN=0123456789abcdef' in out and 'CREATED=1' in out
+
+
+def test_the_fips_escape_hatch_hands_the_kept_pin_of_an_existing_token(tmp_path):
+    _kept_pin(tmp_path)
+    out, calls = _run_softhsm_block(tmp_path, {'FIPS_REQUESTED': '1', 'UCM_FIPS_ALLOW_SOFTHSM': '1'},
+                                    slots=DEFAULT_SLOT)
+    assert '--init-token' not in calls
+    assert 'PIN=fedcba9876543210' in out and 'CREATED=1' in out
+
+
+@pytest.mark.parametrize('allow', ['0', 'false', '', 'maybe', 'y es'])
+def test_fips_without_the_escape_hatch_creates_no_token_neg(tmp_path, allow):
+    out, calls = _run_softhsm_block(tmp_path, {'FIPS_REQUESTED': '1', 'UCM_FIPS_ALLOW_SOFTHSM': allow})
+    assert '--init-token' not in calls
+    assert 'not created in FIPS mode' in out and 'PIN=unset' in out

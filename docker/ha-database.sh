@@ -373,18 +373,32 @@ ucm_export_database_path() {
     export DATABASE_PATH="${UCM_DATABASE_PATH}"
 }
 
-# Default SoftHSM token: returns 0 only when HA and FIPS are off and HSM_AUTO_INIT (default true)
-# is true. HA creates no token (it stays on one node's disk), nor FIPS (it never registers it).
+# FIPS refuses SoftHSM unless UCM_FIPS_ALLOW_SOFTHSM is on, read as fips_mode.refuse_softhsm reads it.
+ucm_fips_refuses_softhsm() {
+    [ "${FIPS_REQUESTED:-0}" = 1 ] || return 1
+    local allow="${UCM_FIPS_ALLOW_SOFTHSM:-}"
+    allow="${allow#"${allow%%[![:space:]]*}"}"
+    allow="${allow%"${allow##*[![:space:]]}"}"
+    case "${allow,,}" in
+        1|true|yes|on) return 1 ;;
+    esac
+    return 0
+}
+
+# Default SoftHSM token: returns 0 only when HA is off, FIPS does not refuse SoftHSM and
+# HSM_AUTO_INIT (default true) is true. HA creates no token (it stays on one node's disk), nor a
+# FIPS start that refuses SoftHSM (it never registers SoftHSM-Default).
 ucm_softhsm_auto_init() {
     ucm_ha_active && return 1
-    [ "${FIPS_REQUESTED:-0}" = 1 ] && return 1
+    ucm_fips_refuses_softhsm && return 1
     [ "${HSM_AUTO_INIT:-true}" = "true" ]
 }
 
 # SoftHSM token UCM-Default: created when ucm_softhsm_auto_init allows it, its PIN handed to the
 # application (HSM_DEFAULT_PIN, HSM_TOKEN_CREATED). The PIN stays in the data volume until the
 # application has registered the token (auto_register_softhsm removes it): a first start that dies
-# before that hands it again. FIPS and HA keep it unused for a later standard start; once the
+# before that hands it again. HA and a FIPS start that refuses SoftHSM keep it unused for a later
+# standard start; once the
 # token is gone it is removed.
 ucm_softhsm_default_token() {
     if ! command -v softhsm2-util >/dev/null 2>&1; then
@@ -394,7 +408,7 @@ ucm_softhsm_default_token() {
     local pin_file="${DATA_PATH:?}/softhsm/.default-pin" kept_pin pin_tmp
     if softhsm2-util --show-slots 2>/dev/null | grep -qE '^ *Label: +UCM-Default *$'; then
         echo -e "${GREEN:-}🔐 SoftHSM tokens found${NC:-}"
-        if [ "${FIPS_REQUESTED:-0}" = 1 ] || ucm_ha_active; then
+        if ucm_fips_refuses_softhsm || ucm_ha_active; then
             # Neither registers SoftHSM-Default: the PIN is kept, not handed
             :
         elif [ -s "$pin_file" ] && kept_pin=$(head -n 1 "$pin_file" 2>/dev/null) && [ -n "$kept_pin" ]; then
@@ -426,7 +440,7 @@ ucm_softhsm_default_token() {
     elif ucm_ha_active; then
         rm -f "$pin_file"
         echo -e "${YELLOW:-}🔐 SoftHSM default token not created in HA mode (a token stays on one node)${NC:-}"
-    elif [ "${FIPS_REQUESTED:-0}" = 1 ]; then
+    elif ucm_fips_refuses_softhsm; then
         rm -f "$pin_file"
         echo -e "${YELLOW:-}🔐 SoftHSM default token not created in FIPS mode${NC:-}"
     else
