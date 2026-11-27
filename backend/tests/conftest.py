@@ -806,6 +806,21 @@ def _database_key_stays_readable(request):
     warnings.warn(message, stacklevel=1)
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _jobs_end_in_their_module(request):
+    """A job thread a file started ends before the next file: a restore finishing later
+    revokes the sessions that file holds. Declared last, so it runs before the checks above."""
+    yield
+    from services.jobs import runner
+    with runner._local_lock:
+        running = dict(runner._local_done)
+    left = [job_id for job_id, done in running.items() if not done.wait(60)]
+    if left:
+        import warnings
+        warnings.warn(f'{os.path.basename(str(request.fspath))} left jobs running: {", ".join(left)}',
+                      stacklevel=1)
+
+
 @pytest.fixture(scope='module')
 def drop_new_cas_and_certificates(app):
     """Deletes what a module created above the ids present before it: the ACME orders, ACME
