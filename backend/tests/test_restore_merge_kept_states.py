@@ -4,7 +4,8 @@ Each case takes an archive while the row is live, revokes the row here, merges t
 and expects the revocation to stand; an archive that revokes a row live here still revokes it.
 Tables: SSH certificates (and so their KRL), SSH hosts, cross-certificates, API keys,
 authentication certificates, ACME accounts, EAB credentials (revoked or used), DNS UPDATE keys,
-key recovery requests (recovered, rejected, cancelled). SQLite and PostgreSQL.
+key recovery requests (recovered, rejected, cancelled), approval requests (rejected, expired,
+cancelled), SCEP requests (rejected). SQLite and PostgreSQL.
 """
 import base64
 import copy
@@ -189,6 +190,32 @@ def _make_key_recovery_request():
     return row.id
 
 
+def _make_approval_request():
+    from models.policy import ApprovalRequest
+    row = ApprovalRequest(request_type='certificate', requester_comment=f'kept-{_tag()}',
+                          status='pending', created_at=datetime(2026, 5, 1, 12, 0, 0,
+                                                                 int.from_bytes(os.urandom(2), 'big')))
+    db.session.add(row)
+    db.session.commit()
+    return row.id
+
+
+def _make_scep_request():
+    from models.scep import SCEPRequest
+    from tests.test_restore_replace_dependents import _authority_row
+    tag = _tag()
+    # A transaction id is unique per CA: without one the archived row is not this row
+    ca, _key, _cert = _authority_row(f'kept-scep-ca-{tag}')
+    row = SCEPRequest(transaction_id=f'kept-{tag}', ca_refid=ca.refid,
+                      csr=base64.b64encode(b'csr').decode(), status='pending')
+    db.session.add(row)
+    db.session.commit()
+    return row.id
+
+
+_REJECTED = '[{"user_id": 1, "username": "u", "action": "reject"}]'
+
+
 def _set(**values):
     def revoke(row):
         for name, value in values.items():
@@ -250,6 +277,28 @@ CASES = {
         'models.key_recovery:KeyRecoveryRequest', ('key_recovery_requests',), _make_key_recovery_request,
         ('row', _set(status='cancelled', decision_note='no')), ('status', 'decision_note'),
         lambda row: row.status == 'cancelled', {'status': 'cancelled', 'decision_note': 'no'}),
+    # A request refused or closed here is never pending again, to be approved after all
+    'approval_requests': (
+        'models.policy:ApprovalRequest', ('approval_requests',), _make_approval_request,
+        ('row', _set(status='rejected', resolved_at=_WHEN, approvals=_REJECTED)),
+        ('status', 'resolved_at', 'approvals'), lambda row: row.status == 'rejected',
+        {'status': 'rejected', 'resolved_at': '2026-06-01T12:00:00', 'approvals': _REJECTED}),
+    'approval_requests:expired': (
+        'models.policy:ApprovalRequest', ('approval_requests',), _make_approval_request,
+        ('row', _set(status='expired', resolved_at=_WHEN)), ('status', 'resolved_at'),
+        lambda row: row.status == 'expired', {'status': 'expired', 'resolved_at': '2026-06-01T12:00:00'}),
+    'approval_requests:cancelled': (
+        'models.policy:ApprovalRequest', ('approval_requests',), _make_approval_request,
+        ('row', _set(status='cancelled', resolved_at=_WHEN)), ('status', 'resolved_at'),
+        lambda row: row.status == 'cancelled',
+        {'status': 'cancelled', 'resolved_at': '2026-06-01T12:00:00'}),
+    'scep_requests': (
+        'models.scep:SCEPRequest', ('scep_requests',), _make_scep_request,
+        ('row', _set(status='rejected', rejection_reason='no', approved_by='t', approved_at=_WHEN)),
+        ('status', 'rejection_reason', 'approved_by', 'approved_at'),
+        lambda row: row.status == 'rejected',
+        {'status': 'rejected', 'rejection_reason': 'no', 'approved_by': 'v',
+         'approved_at': '2026-06-01T12:00:00'}),
     'acme_dns_update_keys': (
         'models.acme_dns_update:AcmeDnsUpdateKey', ('acme_dns_update_keys',), _make_dns_update_key,
         ('row', _set(status='revoked', revoked_at=_WHEN)), ('status', 'revoked_at'),
@@ -339,7 +388,8 @@ def _is(entry, row, section):
         'ca_cross_certificates': ('fingerprint_sha256',), 'api_keys': ('key_hash',),
         'auth_certificates': ('cert_fingerprint',), 'acme_accounts': ('account_id',),
         'acme_eab_credentials': ('kid',), 'acme_dns_update_keys': ('name',),
-        'key_recovery_requests': ('cert_refid',),
+        'key_recovery_requests': ('cert_refid',), 'approval_requests': ('requester_comment',),
+        'scep_requests': ('transaction_id',),
     }[section]
     return all(entry.get(column) == getattr(row, column) for column in identity)
 

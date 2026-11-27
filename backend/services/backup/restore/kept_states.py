@@ -36,6 +36,11 @@ KEPT_STATES = {
     'key_recovery_requests': (lambda row: row.status in ('recovered', 'rejected', 'cancelled'),
                               ('status', 'decided_by', 'decided_at', 'decision_note',
                                'recovered_by', 'recovered_at'), {}),
+    # A request refused or closed here never goes back to pending, to be approved after all
+    'approval_requests': (lambda row: row.status in ('rejected', 'expired', 'cancelled'),
+                          ('status', 'resolved_at', 'approvals'), {}),
+    'scep_requests': (lambda row: row.status == 'rejected',
+                      ('status', 'rejection_reason', 'approved_by', 'approved_at'), {}),
 }
 
 
