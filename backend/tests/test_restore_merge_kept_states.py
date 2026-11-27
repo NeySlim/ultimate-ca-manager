@@ -497,6 +497,42 @@ def test_an_approval_delivered_here_is_not_delivered_again(installation):
     assert protocol_approval.claim_delivery(row) is False
 
 
+@pytest.mark.parametrize('reverse', [False, True], ids=['in-order', 'reversed'])
+def test_requests_approved_here_at_one_instant_each_keep_their_own_row(installation, reverse):
+    """Archived requests of one instant, all approved here since: each lands on its own row.
+    In order, two alike take one row each; reversed, type and requester tell the others apart."""
+    from models.policy import ApprovalRequest
+    first_id = _make_approval_request()
+    when = db.session.get(ApprovalRequest, first_id).created_at
+
+    def request(request_type, requester=None):
+        row = ApprovalRequest(request_type=request_type, requester_comment=f'kept-{_tag()}',
+                              requester_id=requester, status='pending', created_at=when)
+        db.session.add(row)
+        db.session.commit()
+        return row.id
+
+    ids = [first_id] + ([] if reverse else [request('certificate')]) + [
+        request('certificate', _user().id), request('est_enrollment')]
+    comments = {row_id: db.session.get(ApprovalRequest, row_id).requester_comment for row_id in ids}
+    master, payload = _archive(('approval_requests', 'users'))
+    if reverse:
+        # A plain payload, as an older archive reads: no section digest for the new order to break
+        payload = {name: copy.deepcopy(list(payload[name])) for name in ('approval_requests', 'users')}
+        payload['approval_requests'].reverse()
+    for row_id in ids:
+        _revoke_here(ApprovalRequest, row_id, ('row', _approve_here))
+    certificates = {row_id: db.session.get(ApprovalRequest, row_id).certificate_id for row_id in ids}
+
+    _merge(master, payload)
+
+    db.session.expire_all()
+    rows = ApprovalRequest.query.filter(
+        ApprovalRequest.requester_comment.in_(list(comments.values()))).all()
+    assert sorted((r.id, r.requester_comment, r.status, r.certificate_id) for r in rows) == sorted(
+        (row_id, comments[row_id], 'approved', certificates[row_id]) for row_id in ids)
+
+
 def test_a_merge_keeps_an_account_key_changed_here(installation):
     """RFC 8555 §7.3.5: the account here is the truth on its key, an old archived one never comes back."""
     from models.acme_models import AcmeAccount

@@ -615,6 +615,7 @@ class RestoreExtendedMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('approval_requests', plan)
 
+        taken = []
         for position, ar_data in enumerate(rows):
             where = f"approval request {position}"
             created_at = _timestamp(where, 'created_at', ar_data.get('created_at'),
@@ -630,16 +631,27 @@ class RestoreExtendedMixin:
                                     {'certificate_id': certificate_id,
                                      'created_at': created_at}, plan, ar_data)
             if request is None and certificate_id is None and plan.merging:
-                # Approved here since the archive: the request now names the certificate it issued
-                request = ApprovalRequest.query.filter(
+                # Approved here since the archive: the request now names the certificate it issued.
+                # Same instant, type, policy and requester, and no row another archived row took
+                policy_id = _reference(where, 'approval_requests', ar_data, 'policy_id', plan,
+                                       optional=True)
+                candidates = ApprovalRequest.query.filter(
                     ApprovalRequest.created_at == created_at, ApprovalRequest.status == 'approved',
-                    ApprovalRequest.certificate_id.isnot(None)).order_by(ApprovalRequest.id).first()
+                    ApprovalRequest.certificate_id.isnot(None),
+                    ApprovalRequest.request_type == (ar_data.get('request_type') or 'certificate'),
+                    ApprovalRequest.policy_id.is_(None) if policy_id is None
+                    else ApprovalRequest.policy_id == policy_id,
+                    ApprovalRequest.requester_id.is_(None) if requester_id is None
+                    else ApprovalRequest.requester_id == requester_id,
+                ).order_by(ApprovalRequest.id)
+                request = next((row for row in candidates if all(row is not t for t in taken)), None)
             if request is None:
                 # request_type is NOT NULL; apply_columns overwrites it and requester_id
                 request = ApprovalRequest(
                     request_type=ar_data.get('request_type') or 'certificate',
                     requester_id=requester_id)
                 db.session.add(request)
+            taken.append(request)
 
             if apply_columns(request, 'approval_requests',
                              dict(ar_data, created_at=created_at), plan, archived=ar_data):
