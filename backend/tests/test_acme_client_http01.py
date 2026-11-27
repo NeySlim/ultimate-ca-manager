@@ -146,6 +146,7 @@ def test_challenge_reachable(responses, ok):
     (ValueError('Cannot resolve host'), 'not resolvable'),
     (requests.ConnectionError('refused'), 'connection failed'),
     (requests.Timeout('slow'), 'timed out'),
+    (http01.IncorrectResponse('x'), 'unexpected content encoding'),
 ])
 def test_unreachable_reason_names_the_failure(exc, reason):
     with patch.object(http01, 'fetch_following_redirects', side_effect=exc):

@@ -217,7 +217,9 @@ def test_http01_deadline_timer_leaks_no_thread_or_socket(challenge_server):
     fds = _open_fds()
     for _ in range(50):
         assert http01.fetch_following_redirects(url, None, allow_private=True, timeout=5).status_code == 200
-    assert not [t for t in threading.enumerate() if isinstance(t, threading.Timer)]
+    # Only this module's deadline timers: other tests run short Timers of their own
+    assert not [t for t in threading.enumerate() if isinstance(t, threading.Timer)
+                and getattr(getattr(t, 'function', None), '__func__', None) is http01._HopDeadline._fire]
     for _ in range(20):
         if _open_fds() - fds < 5:
             break

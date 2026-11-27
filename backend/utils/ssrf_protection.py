@@ -454,7 +454,7 @@ def watch_sockets(callback):
 def pin_host(host: str, ip):
     """Within this block, all urllib3 connections to `host` go to `ip` —
     a single IP string, or a list of validated IPs tried in order (see
-    _patched_create_connection)."""
+    _pinned_create_connection)."""
     _ensure_urllib3_patched()
     pinned = getattr(_pinned_resolution, 'host_to_ip', None)
     if pinned is None:
