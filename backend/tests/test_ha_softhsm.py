@@ -455,16 +455,41 @@ def _kept_pin(tmp_path):
 
 
 @pytest.mark.parametrize('slots, env', [
-    (DEFAULT_SLOT, {'FIPS_REQUESTED': '1', 'HSM_AUTO_INIT': 'false'}),
-    (DEFAULT_SLOT, {'UCM_HA': '1'}),
     ('', {'FIPS_REQUESTED': '1', 'HSM_AUTO_INIT': 'false'}),
+    ('', {'FIPS_REQUESTED': '1'}),
     ('', {'UCM_HA': 'true'}),
     ('', {'HSM_AUTO_INIT': 'false'}),
-], ids=['fips', 'ha', 'fips-no-token', 'ha-no-token', 'auto-init-off-no-token'])
-def test_a_pin_no_row_can_be_registered_with_is_removed(tmp_path, slots, env):
-    # FIPS and HA never register SoftHSM-Default, and without the token the PIN opens nothing
+], ids=['fips-no-token', 'fips-auto-init-default-no-token', 'ha-no-token', 'auto-init-off-no-token'])
+def test_a_pin_without_its_token_is_removed(tmp_path, slots, env):
+    # Without the token the PIN opens nothing, and FIPS or HA creates no token
     pin_file = _kept_pin(tmp_path)
     out, calls = _run_softhsm_block(tmp_path, env, slots=slots)
     assert '--init-token' not in calls
     assert not pin_file.exists()
     assert 'PIN=unset' in out and 'CREATED=unset' in out
+
+
+@pytest.mark.parametrize('env', [{'FIPS_REQUESTED': '1', 'HSM_AUTO_INIT': 'false'},
+                                 {'FIPS_REQUESTED': '1'}, {'UCM_HA': '1'}],
+                         ids=['fips', 'fips-auto-init-default', 'ha'])
+def test_an_existing_token_keeps_its_pin_for_a_later_standard_start(tmp_path, env):
+    # FIPS and HA do not register SoftHSM-Default, a later standard start still can
+    pin_file = _kept_pin(tmp_path)
+    out, calls = _run_softhsm_block(tmp_path, env, slots=DEFAULT_SLOT)
+    assert '--init-token' not in calls
+    assert pin_file.read_text().strip() == 'fedcba9876543210'
+    assert 'PIN=unset' in out and 'CREATED=unset' in out
+
+
+@pytest.mark.parametrize('auto', ['true', None])
+def test_no_default_token_in_fips(auto):
+    assert _auto_init({'FIPS_REQUESTED': '1', **({'HSM_AUTO_INIT': auto} if auto else {})}).returncode == 1
+
+
+@pytest.mark.parametrize('auto', ['true', None])
+def test_fips_creates_neither_token_nor_pin(tmp_path, auto):
+    # A token made in FIPS would lose its PIN before any standard start could register it
+    out, calls = _run_softhsm_block(tmp_path, {'FIPS_REQUESTED': '1', **({'HSM_AUTO_INIT': auto} if auto else {})})
+    assert '--init-token' not in calls
+    assert not (tmp_path / 'data' / 'softhsm' / '.default-pin').exists()
+    assert 'not created in FIPS mode' in out and 'PIN=unset' in out

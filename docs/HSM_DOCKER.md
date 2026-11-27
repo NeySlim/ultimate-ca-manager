@@ -12,7 +12,7 @@ On first start, a default SoftHSM token (`UCM-Default`) is automatically initial
 
 **Auto-registration:** UCM automatically creates an `SoftHSM-Default` provider in the database when it detects the Docker entrypoint initialized a token (`HSM_DEFAULT_PIN` env var). The provider appears immediately in the HSM page, no manual setup needed.
 
-Until that provider is saved, the entrypoint keeps the new token's PIN in `/opt/ucm/data/softhsm/.default-pin` (mode 0600): a first start that stops before UCM registers the token hands the PIN again at the next start, and UCM removes the file once the provider holds it. The entrypoint removes it itself where the provider can never be created from it: in FIPS mode, in HA mode, or once the token is gone.
+Until that provider is saved, the entrypoint keeps the new token's PIN in `/opt/ucm/data/softhsm/.default-pin` (mode 0600): a first start that stops before UCM registers the token hands the PIN again at the next start, and UCM removes the file once the provider holds it. The entrypoint removes it itself once the token is gone. In FIPS or HA mode no token is created, and the PIN of an existing token is kept for a later standard start.
 
 ## Legacy PKCS#11 key normalization (upgrade)
 
