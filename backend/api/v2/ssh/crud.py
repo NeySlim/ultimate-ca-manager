@@ -17,6 +17,7 @@ from services.audit_service import AuditService
 from models.ssh import SSHCertificateAuthority
 
 from .helpers import bp, logger
+from .validation import validate_ca_descr
 from models import db
 
 
@@ -130,6 +131,9 @@ def import_ssh_ca():
         descr = (data.get('descr') or data.get('name') or '').strip()[:255]
         if not descr:
             return error_response('Description is required', 400)
+        descr_err = validate_ca_descr(descr)
+        if descr_err:
+            return error_response(descr_err, 400)
 
         ca_type = (data.get('ca_type') or 'user').strip().lower()
         if ca_type not in ('user', 'host'):
@@ -203,6 +207,9 @@ def create_ssh_ca():
         descr = (data.get('descr') or data.get('name') or '').strip()
         if not descr:
             return error_response('Description is required', 400)
+        descr_err = validate_ca_descr(descr)
+        if descr_err:
+            return error_response(descr_err, 400)
 
         ca_type = (data.get('ca_type') or 'user').strip().lower()
 
@@ -301,6 +308,9 @@ def update_ssh_ca(ca_id):
         kwargs = {}
         if 'descr' in data or 'name' in data:
             descr = (data.get('descr') or data.get('name') or '').strip()
+            descr_err = validate_ca_descr(descr)
+            if descr_err:
+                return error_response(descr_err, 400)
             if descr:
                 kwargs['descr'] = descr
         if 'default_ttl' in data:

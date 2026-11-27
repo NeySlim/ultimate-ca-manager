@@ -44,7 +44,8 @@ export function usePermission() {
     canDelete,
     isAdmin,
     permissions,
-    // Who is signed in: a rule tied to the requester (dual control) compares names
+    // Who is signed in: a rule tied to the requester (dual control) compares account ids
     username: user?.username,
+    userId: user?.id ?? null,
   }
 }

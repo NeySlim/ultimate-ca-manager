@@ -36,6 +36,24 @@ def _session_proof():
     return confirm_account_holder(g.current_user, request.get_json(silent=True))
 
 
+def _caller_covers(api_key):
+    """A key renames, revokes or deletes itself, or a sibling whose every scope it and its owner
+    still hold: a narrow key that leaks cannot take down the owner's wider keys, and a sibling
+    holding a scope the owner lost is left to a session, which covers them all."""
+    if getattr(g, 'auth_method', None) != 'api_key' or api_key.id == getattr(g, 'api_key_id', None):
+        return True
+    try:
+        perms = json.loads(api_key.permissions or '[]')
+    except (TypeError, ValueError):
+        return False
+    owner_perms = get_effective_permissions(g.current_user)
+    return all(_caller_can_grant(p, owner_perms) for p in perms)
+
+
+_NOT_COVERED = ('An API key can only manage a key whose every permission it and its owner both '
+                'still hold; a signed-in session manages it')
+
+
 _WIDER_NETWORKS = 'An API key can only create or regenerate a key limited to its own networks'
 
 
@@ -248,6 +266,8 @@ def update_api_key(key_id):
 
     if not api_key:
         return error_response('API key not found', 404)
+    if not _caller_covers(api_key):
+        return error_response(_NOT_COVERED, 403)
 
     data = request.json
 
@@ -284,6 +304,8 @@ def delete_api_key(key_id):
 
     if not api_key:
         return error_response('API key not found', 404)
+    if not _caller_covers(api_key):
+        return error_response(_NOT_COVERED, 403)
 
     verb, err = revoke_or_delete(
         api_key, 'apikey', lambda verb, name: f'{verb} API key: {name}')

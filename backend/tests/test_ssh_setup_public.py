@@ -51,5 +51,5 @@ class TestPublicSSHSetupScript:
       )
       assert r.status_code == 200
       body = r.data.decode('utf-8')
-      assert f'HOSTNAME="{hostname}"' in body
+      assert f"HOSTNAME='{hostname}'" in body
       assert '$(id)' not in body

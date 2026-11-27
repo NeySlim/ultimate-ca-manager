@@ -14,6 +14,7 @@ import logging
 import os
 
 from flask import Blueprint, request, g, Response
+from sqlalchemy import update
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -53,6 +54,11 @@ def _username():
 
 def _user_id():
     return getattr(getattr(g, 'current_user', None), 'id', None)
+
+
+def _is_requester(req):
+    """The account that opened *req*, by id: a request written before the id was kept has none."""
+    return req.requested_by_id is not None and req.requested_by_id == _user_id()
 
 
 def _is_disabled_value(val):
@@ -129,6 +135,7 @@ def request_key_recovery(cert_id):
         reason=reason,
         status=STATUS_PENDING,
         requested_by=_username(),
+        requested_by_id=_user_id(),
         requested_at=utc_now(),
     )
     db.session.add(req)
@@ -188,7 +195,7 @@ def approve_key_recovery(rid):
         return error_response('Recovery request not found', 404)
     if req.status != STATUS_PENDING:
         return error_response(f'Request is not pending (status: {req.status})', 409)
-    if _dual_control_enabled() and req.requested_by == _username():
+    if _dual_control_enabled() and (_is_requester(req) or req.requested_by == _username()):
         _audit('key_recovery.approve_denied', req, success=False,
                 extra={'reason': 'dual_control'})
         return error_response('Dual control: the approver must be different from the requester', 403)
@@ -199,6 +206,7 @@ def approve_key_recovery(rid):
     data = request.get_json(silent=True) or {}
     req.status = STATUS_APPROVED
     req.decided_by = _username()
+    req.decided_by_id = _user_id()
     req.decided_at = utc_now()
     req.decision_note = (data.get('note') or '').strip()[:2000] or None
     ok, err = safe_commit(logger, "Failed to approve recovery request")
@@ -219,6 +227,7 @@ def reject_key_recovery(rid):
     data = request.get_json(silent=True) or {}
     req.status = STATUS_REJECTED
     req.decided_by = _username()
+    req.decided_by_id = _user_id()
     req.decided_at = utc_now()
     req.decision_note = (data.get('note') or '').strip()[:2000] or None
     ok, err = safe_commit(logger, "Failed to reject recovery request")
@@ -226,6 +235,34 @@ def reject_key_recovery(rid):
         return err
     _audit('key_recovery.rejected', req)
     return success_response(data=req.to_dict(), message='Recovery request rejected')
+
+
+def _claim(rid, current, new, **values):
+    """Move request *rid* from *current* to *new* in one conditional UPDATE, committed: True for
+    the one caller that moved it, False for every concurrent one."""
+    try:
+        moved = db.session.execute(
+            update(KeyRecoveryRequest)
+            .where(KeyRecoveryRequest.id == rid, KeyRecoveryRequest.status == current)
+            .values(status=new, **values)
+            .execution_options(synchronize_session=False)).rowcount
+        if moved != 1:
+            db.session.rollback()
+            return False
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def _give_back(rid):
+    """The claim of a download that did not hand the key out: the approval stands again."""
+    try:
+        db.session.rollback()
+        _claim(rid, STATUS_RECOVERED, STATUS_APPROVED, recovered_by=None, recovered_at=None)
+    except Exception as e:
+        logger.error(f"Key recovery {rid}: the claim could not be given back: {e}")
 
 
 RECOVER_OPTIONS = {'password': PASSWORD, 'legacy': BOOL}
@@ -241,7 +278,7 @@ def recover_key(rid):
     if req.status != STATUS_APPROVED:
         return error_response(f'Request is not approved (status: {req.status})', 409)
     # Only the original requester or an admin may collect the key.
-    if req.requested_by != _username() and not has_permission('admin:key_recovery', getattr(g, 'permissions', [])):
+    if not _is_requester(req) and not has_permission('admin:key_recovery', getattr(g, 'permissions', [])):
         return error_response('Only the requester or an admin may recover this key', 403)
 
     opts, refused = read_export_options(RECOVER_OPTIONS, log_name='key recovery')
@@ -257,37 +294,48 @@ def recover_key(rid):
     if not cert or not cert.prv:
         return error_response('The certificate or its archived key no longer exists', 410)
 
+    # One download per approval: the request is claimed and committed before the key is read
+    if not _claim(rid, STATUS_APPROVED, STATUS_RECOVERED,
+                  recovered_by=_username(), recovered_at=utc_now()):
+        return error_response('Request is no longer approved: it was recovered or closed', 409)
+
+    # Every way out but the returned bundle gives the claim back: a claim stands only for a key handed out
+    settled = False
     try:
-        cert_obj = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
-        key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
-        private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-        refuse_unexportable_key(private_key, 'pkcs12', hint=(
-            'an administrator allowed to read private keys can export it as PEM (PKCS#8) '
-            'from the certificate'))
-        from utils.ca_chain import issuer_chain
-        start = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
-        chain = [x509.load_pem_x509_certificate(link.pem, default_backend()) for link in issuer_chain(start)]
-        p12 = pkcs12.serialize_key_and_certificates(
-            name=(cert.subject_cn or cert.refid or 'recovered').encode(),
-            key=private_key, cert=cert_obj, cas=chain or None,
-            encryption_algorithm=pkcs12_encryption(password, legacy, caref=cert.caref),
-        )
-    except FipsRestricted:
-        _audit('key_recovery.recover_failed', req, success=False)
-        raise  # the app handler answers 400 with the FIPS problem type
-    except Exception as e:
-        logger.error(f"Key recovery {rid} failed to build PKCS12: {e}")
-        _audit('key_recovery.recover_failed', req, success=False)
-        return error_response('Failed to assemble the recovered key', 500)
+        try:
+            cert_obj = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
+            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
+            private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+            refuse_unexportable_key(private_key, 'pkcs12', hint=(
+                'an administrator allowed to read private keys can export it as PEM (PKCS#8) '
+                'from the certificate'))
+            from utils.ca_chain import issuer_chain
+            start = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
+            chain = [x509.load_pem_x509_certificate(link.pem, default_backend()) for link in issuer_chain(start)]
+            p12 = pkcs12.serialize_key_and_certificates(
+                name=(cert.subject_cn or cert.refid or 'recovered').encode(),
+                key=private_key, cert=cert_obj, cas=chain or None,
+                encryption_algorithm=pkcs12_encryption(password, legacy, caref=cert.caref),
+            )
+        except FipsRestricted:
+            _give_back(rid)
+            settled = True
+            _audit('key_recovery.recover_failed', req, success=False)
+            raise  # the app handler answers 400 with the FIPS problem type
+        except Exception as e:
+            logger.error(f"Key recovery {rid} failed to build PKCS12: {e}")
+            _give_back(rid)
+            settled = True
+            _audit('key_recovery.recover_failed', req, success=False)
+            return error_response('Failed to assemble the recovered key', 500)
 
-    req.status = STATUS_RECOVERED
-    req.recovered_by = _username()
-    req.recovered_at = utc_now()
-    ok, err = safe_commit(logger, "Failed to finalize recovery")
-    if not ok:
-        return err
-    _audit('key_recovery.recovered', req)
-
-    return Response(p12, mimetype='application/x-pkcs12',
-                    headers={'Content-Disposition': content_disposition(
-                        cert.descr or cert.refid, '.p12', fallback=cert.refid or 'recovered')})
+        response = Response(p12, mimetype='application/x-pkcs12',
+                            headers={'Content-Disposition': content_disposition(
+                                cert.descr or cert.refid, '.p12', fallback=cert.refid or 'recovered')})
+        _audit('key_recovery.recovered', req)
+        settled = True
+        return response
+    finally:
+        if not settled:
+            _give_back(rid)
+            _audit('key_recovery.recover_failed', req, success=False)

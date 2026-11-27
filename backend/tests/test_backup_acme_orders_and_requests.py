@@ -269,6 +269,64 @@ def test_a_recovery_request_follows_its_certificate_s_refid(target):
     assert _requested_certificate(request).refid == 'orders-b'
 
 
+def _as(user, req, monkeypatch):
+    import api.v2.key_recovery as key_recovery
+    monkeypatch.setattr(key_recovery, '_user_id', lambda: user.id)
+    return key_recovery._is_requester(req)
+
+
+def test_a_recovery_request_names_its_accounts_by_username_across_installations(target, monkeypatch):
+    """The source's alice held the number bob holds here: the request is still alice's."""
+    from models.key_recovery import KeyRecoveryRequest
+
+    alice, bob = _user('orders-alice'), _user('orders-bob')
+    issuer = _authority_row('orders-ca')
+    leaf = _certificate_row('orders-leaf', issuer)
+    _recovery(leaf).requested_by_id = alice.id
+    KeyRecoveryRequest.query.one().decided_by_id = alice.id
+    blob = _snapshot()
+    data = _payload(blob)
+    for row in data['key_recovery_requests']:
+        row['requested_by_id'] = row['decided_by_id'] = bob.id    # the source's numbering
+    db.session.query(KeyRecoveryRequest).delete()
+    db.session.commit()
+
+    _restore(_reseal(blob, data), mode='merge')
+
+    request = KeyRecoveryRequest.query.one()
+    assert (request.requested_by_id, request.decided_by_id) == (alice.id, alice.id)
+    assert not _as(bob, request, monkeypatch)
+    assert _as(alice, request, monkeypatch)
+
+
+def test_a_recovery_request_whose_requester_is_not_here_names_nobody(target, monkeypatch):
+    """Only an administrator collects it: no account here takes the requester's place."""
+    from models import User
+    from models.key_recovery import KeyRecoveryRequest
+
+    gone = _user('orders-gone-user')
+    issuer = _authority_row('orders-ca')
+    leaf = _certificate_row('orders-leaf', issuer)
+    _recovery(leaf).requested_by_id = gone.id
+    blob = _snapshot()
+    db.session.query(KeyRecoveryRequest).delete()
+    db.session.delete(gone)
+    db.session.flush()
+    other = _user('orders-other')
+    db.session.commit()
+    data = _payload(blob)
+    data['users'] = [row for row in data['users'] if row['username'] != 'orders-gone-user']
+    for row in data['key_recovery_requests']:
+        row['requested_by_id'] = other.id
+
+    _restore(_reseal(blob, data), mode='merge')
+
+    request = KeyRecoveryRequest.query.one()
+    assert User.query.filter_by(username='orders-gone-user').first() is None
+    assert request.requested_by_id is None
+    assert not _as(other, request, monkeypatch)
+
+
 def test_an_open_request_whose_certificate_is_not_here_is_cancelled(target):
     from models import Certificate
     from models.key_recovery import KeyRecoveryRequest

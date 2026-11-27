@@ -432,7 +432,7 @@ and its `last_used_at` is not updated. An invalid entry answers `400`. A key cre
 key gets its networks when none is given, and `403` when one lies outside them; regenerating keeps
 them, under the same rule when a limited API key regenerates another key. Every key in a listing carries `allowed_networks` (`[]` for any address).
 
-The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
+The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it. A call authenticated by an API key renames (`PATCH`), revokes or deletes itself, or another key of the account only when both the calling key and its owner still hold every scope of that key, as `regenerate` requires (`403` otherwise, a `*` key included when the owner has lost one of them); a session manages every key of its account.
 
 An administrator (`write:users`) lists another user's keys and revokes a leaked or unused one, with the same revoke-then-delete rule. The secret is never returned. Each change is audited with the administrator, the account and the key. An API key cannot revoke or delete through them a key of its own account.
 ```http
@@ -2309,7 +2309,7 @@ GET /api/v2/ssh/cas/{ca_id}/krl
 GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&platform=unix
 ```
 - `GET` list filters by `search` and by `type` (repeatable). Without `page` or `per_page` it returns every CA; with either it returns that page (`per_page` defaults to 20, 100 at most) and `meta` carries `total` and `total_pages`.
-- `POST` creates a CA (`201`): `descr` (or `name`, required), `ca_type` (`user` by default, or `host`), `key_type`, `default_ttl`, `max_ttl` (default `0`), `default_extensions`, `allowed_principals` (a list of non-empty strings), `allow_any_principal` and `allow_custom_key_id` (JSON booleans, default off), `comment`. `400` for an invalid value.
+- `POST` creates a CA (`201`): `descr` (or `name`, required), `ca_type` (`user` by default, or `host`), `key_type`, `default_ttl`, `max_ttl` (default `0`), `default_extensions`, `allowed_principals` (a list of non-empty strings), `allow_any_principal` and `allow_custom_key_id` (JSON booleans, default off), `comment`. `400` for an invalid value, among them a `descr` holding a control character or a line break (the same on `PUT` and `POST /import`).
 - `POST` with `hsm_key_id` (a JSON integer above zero, `400` otherwise) creates a CA whose key stays on an HSM token: the key must be an RSA or NIST P-256, P-384 or P-521 signing key, `key_type` is read from it and the CA carries `key_source: "hsm"` and `hsm_key_id` (`"software"` and `null` for any other CA). It requires `read:hsm` besides `write:ssh_cas` (`403` naming the missing permission otherwise). An HSM key backs one authority: `409` names the X.509 or SSH CA that already holds it. A token that cannot be reached answers `503`, a key no longer on its token `409`, a misconfigured provider `400`, any other HSM failure `502`. In FIPS mode a key FIPS mode does not approve is refused before the CA is created; in HA mode a SoftHSM or local smart card reader (OpenSC, YubiKey PIV) key answers `409` with code `ha_mode`.
 - `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value. `default_ttl` or `max_ttl` sent as `null` is emptied; a key left out is kept. Without a maximum nothing is capped; without a default a certificate is signed for the default of the CA type (24 hours for a user CA, 365 days for a host CA).
 - `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
@@ -2483,7 +2483,7 @@ Opens a request (`201`). `reason` is required and at most 2000 characters; `400`
 GET /api/v2/key-recovery?status=pending
 GET /api/v2/key-recovery/{id}
 ```
-The list returns `requests` and `dual_control`, whether the approver must differ from the requester; it pages with `page` and `per_page` (default 500, 500 at most), `meta` carries `total`, and it sorts by `sort_by`: `id` (default, newest first), `requested_at`, `status` (pending, approved, recovered, rejected, cancelled), `cert_cn`, `requested_by` (see [Sorting](#sorting)). `GET /{id}` reads one request whatever its age.
+The list returns `requests` and `dual_control`, whether the approver must differ from the requester; it pages with `page` and `per_page` (default 500, 500 at most), `meta` carries `total`, and it sorts by `sort_by`: `id` (default, newest first), `requested_at`, `status` (pending, approved, recovered, rejected, cancelled), `cert_cn`, `requested_by` (see [Sorting](#sorting)). `GET /{id}` reads one request whatever its age. A request carries `requested_by` and `decided_by`, the account names, and `requested_by_id` and `decided_by_id`, their account ids (`null` on a request opened before 3.1, and once that account is deleted; a restore points them at the account of the same username, or leaves them `null`).
 
 ```http
 POST /api/v2/key-recovery/{id}/approve
@@ -2492,7 +2492,7 @@ Content-Type: application/json
 
 { "note": "Ticket 1234" }
 ```
-`admin:key_recovery`. `note` is optional; a longer note is cut to its first 2000 characters. `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester, and `410` when the certificate no longer exists.
+`admin:key_recovery`. `note` is optional; a longer note is cut to its first 2000 characters. `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester (the same account id, or the same name), and `410` when the certificate no longer exists.
 
 ```http
 POST /api/v2/key-recovery/{id}/recover
@@ -2500,7 +2500,7 @@ Content-Type: application/json
 
 { "password": "at-least-8-chars", "legacy": false }
 ```
-Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. These are the only options, in a JSON object body, read as described under Export Certificate (where the options go). `409` when the request is not approved, `403` unless the caller is the requester or holds `admin:key_recovery`, `410` when the certificate or key is gone.
+Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. These are the only options, in a JSON object body, read as described under Export Certificate (where the options go). `409` when the request is not approved, a concurrent download included: the first one claims the request and the others get `409`; a download that fails before the bundle is returned leaves it approved. `403` unless the caller is the requester's account (by id: a later account with the same name is not) or holds `admin:key_recovery`, `410` when the certificate or key is gone.
 
 ---
 

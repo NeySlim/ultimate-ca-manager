@@ -16,3 +16,11 @@ def validate_setup_hostname(hostname: str) -> str | None:
     if not _SETUP_HOSTNAME_RE.match(hostname):
         return 'Invalid hostname format'
     return None
+
+
+def validate_ca_descr(descr: str) -> str | None:
+    """The description is printed in the setup scripts and the interface: one line of text."""
+    from .script_quoting import has_control_character
+    if has_control_character(descr):
+        return 'Description must not contain control characters or line breaks'
+    return None

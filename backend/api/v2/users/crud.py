@@ -208,6 +208,16 @@ def _purge_user_dependencies(user_id):
     except Exception as e:
         logger.debug(f"ApprovalRequest cleanup skipped for user {user_id}: {e}")
 
+    # Key recovery requests keep their history; the account ids go (ON DELETE SET NULL,
+    # which SQLite does not enforce here)
+    try:
+        from models import KeyRecoveryRequest
+        for column in ('requested_by_id', 'decided_by_id'):
+            KeyRecoveryRequest.query.filter(getattr(KeyRecoveryRequest, column) == user_id).update(
+                {column: None}, synchronize_session=False)
+    except Exception as e:
+        logger.debug(f"KeyRecoveryRequest cleanup skipped for user {user_id}: {e}")
+
     # HSM providers created_by → NULL (nullable FK, preserve the provider)
     try:
         from models import HsmProvider

@@ -25,7 +25,7 @@ const RECOVERY_SECTIONS = ['request', 'log']
 export default function KeyRecoveryPage() {
   const { t } = useTranslation()
   const { showError, showInfo } = useNotification()
-  const { hasPermission, username } = usePermission()
+  const { hasPermission, username, userId } = usePermission()
   const spot = useRef(-1)
   // The open request and its section live in the URL (`item`, `section`); the work queue's ?request= opens it too
   const recDock = useDockParam({ sections: RECOVERY_SECTIONS, fallback: 'request', aliases: ['request'] })
@@ -96,7 +96,7 @@ export default function KeyRecoveryPage() {
     spot.current = workSpot(reqs.map((r) => r.id))
     actions.open(kind, reqs)
   }
-  const who = { hasPermission, username, dualControl }
+  const who = { hasPermission, username, userId, dualControl }
   const open = (req) => recDock.open(req.id)
   // An open request past the 500 the list holds (a reload) is read by id; one that no longer exists leaves the URL
   useEffect(() => {

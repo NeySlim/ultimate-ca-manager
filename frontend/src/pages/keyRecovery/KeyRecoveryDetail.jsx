@@ -98,11 +98,11 @@ export function RecoveryLog({ req }) {
 /** The dock of the open request; onAsk(kind) opens the decision or the recovery. */
 export function KeyRecoveryDock({ req, section, onSection, onClose, onAsk }) {
   const { t } = useTranslation()
-  const { hasPermission, username } = usePermission()
+  const { hasPermission, username, userId } = usePermission()
   const title = recoveryName(req)
   const state = recoveryState(req, t)
   // The list says whether dual control is on; a request read alone assumes the default, on
-  const who = { hasPermission, username, dualControl: req.dual_control !== false }
+  const who = { hasPermission, username, userId, dualControl: req.dual_control !== false }
   return (
     <Dock label={t('atelier.detailOf', { name: t('keyRecovery.title') })} tabsLabel={t('atelier.openItem')} activeKey={req.id}
       tabs={[{ key: req.id, title, icon: 'key' }]} onClose={onClose}>

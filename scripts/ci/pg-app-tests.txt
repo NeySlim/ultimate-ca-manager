@@ -152,3 +152,4 @@ tests/test_instance_admin_scopes.py
 tests/test_cross_repair.py
 tests/test_ssh_krl_public.py
 tests/test_ssh_hosts*.py
+tests/test_key_recovery*.py
