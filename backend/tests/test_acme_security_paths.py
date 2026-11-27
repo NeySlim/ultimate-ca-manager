@@ -859,6 +859,12 @@ class TestRfc8555StateMachine:
                 text = 'wrong-key-authorization'
                 status_code = 200
 
+                def iter_content(self, chunk_size=1):
+                    yield self.text.encode()
+
+                def close(self):
+                    pass
+
                 @staticmethod
                 def raise_for_status():
                     return None

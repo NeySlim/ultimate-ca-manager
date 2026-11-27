@@ -34,6 +34,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- ACME server: the HTTP-01 check, and the ACME client's own self-check, read the whole challenge response, so an endless body exhausted the server's memory; the body is now refused past 1 KiB and the whole fetch, redirects included, is bounded in time.
 - Settings, SMTP OAuth: the console accepted an authorization result posted by any window, the provider's page included; it now takes it only from its own popup on the console's origin.
 - Operations, OPNsense import: the API key and secret were kept in clear in the browser's session storage after a connection test and survived a sign-out; only the host, port and TLS check stay there now, the credentials are held in memory until sign-out.
 - Email settings: `write:settings` (the operator role) could point the SMTP server, and with it every password-reset link, at a host of its choosing; the SMTP target (host, port, security, authentication, account, sender, OAuth2 client, endpoints and consent) now changes only with `admin:settings`, like `base_url`, and so do the email templates, which wrap those links.

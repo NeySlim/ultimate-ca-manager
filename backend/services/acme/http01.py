@@ -23,6 +23,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # challenge path and public CAs (Boulder) follow them. Each hop is re-vetted.
 REDIRECT_STATUSES = frozenset((301, 302, 303, 307, 308))
 MAX_REDIRECTS = 5
+# The body is the key authorization (~87 bytes, RFC 8555 §8.3): anything past
+# this is refused unread, and the whole chain is bounded in time, not per read.
+MAX_BODY_BYTES = 1024
+TOTAL_TIMEOUT_FACTOR = 3
 
 # Order states in which the CA may still fetch the token.
 _AWAITING_VALIDATION = ('pending', 'processing', 'validating')
@@ -32,25 +36,55 @@ SELFCHECK_TIMEOUT = 5
 _SELFCHECK_WORKERS = 8
 
 
-def _get(url: str, pin, timeout: int = 10):
-    """One unredirected GET. TLS is not verified: an https hop usually presents
-    the certificate being renewed, and HTTP-01 derives no security from TLS."""
+class ResponseTooLarge(ValueError):
+    """The challenge body exceeded MAX_BODY_BYTES."""
+
+
+def _read_bounded(response, deadline: float):
+    """Load at most MAX_BODY_BYTES of *response* before *deadline*, then close it.
+    A redirect or error body is never compared, so it is not read at all."""
+    body = bytearray()
+    try:
+        if response.status_code in REDIRECT_STATUSES or response.status_code >= 400:
+            response._content = b''
+            return response
+        for chunk in response.iter_content(chunk_size=256):
+            body += chunk
+            if len(body) > MAX_BODY_BYTES:
+                raise ResponseTooLarge(f'http-01 response larger than {MAX_BODY_BYTES} bytes')
+            if time.monotonic() > deadline:
+                raise requests.Timeout('http-01 response not received in time')
+    finally:
+        response.close()
+    response._content = bytes(body)
+    return response
+
+
+def _get(url: str, pin, timeout: float, deadline: float):
+    """One unredirected GET, body read bounded. TLS is not verified: an https hop usually
+    presents the certificate being renewed, and HTTP-01 derives no security from TLS."""
+    kwargs = dict(timeout=timeout, allow_redirects=False, verify=False, stream=True)
     if pin is not None:
         host, ips = pin
         with pin_host(host, ips):
-            return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)  # nosec B501
-    return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)  # nosec B501
+            return _read_bounded(requests.get(url, **kwargs), deadline)  # nosec B501
+    return _read_bounded(requests.get(url, **kwargs), deadline)  # nosec B501
 
 
 def fetch_following_redirects(url: str, pin, allow_private: bool, timeout: int = 10):
     """GET *url*, following redirects on http/https and ports 80/443 only.
 
     Cloud metadata is always refused, private addresses unless *allow_private*;
-    every hop is pinned to what was checked. Raises ValueError on a policy violation.
+    every hop is pinned to what was checked. Raises ValueError on a policy violation,
+    ResponseTooLarge past MAX_BODY_BYTES, requests.Timeout past TOTAL_TIMEOUT_FACTOR * timeout.
     """
+    deadline = time.monotonic() + TOTAL_TIMEOUT_FACTOR * timeout
     current = url
     for _ in range(MAX_REDIRECTS + 1):
-        response = _get(current, pin, timeout)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise requests.Timeout('http-01 redirect chain not completed in time')
+        response = _get(current, pin, min(timeout, remaining), deadline)
         if response.status_code not in REDIRECT_STATUSES:
             return response
         location = response.headers.get('Location')
@@ -106,6 +140,8 @@ def challenge_reachable(identifier: str, challenge: dict) -> tuple:
         # The first hop is pinned to what the check vetted, like every redirect
         pin = validated_addresses(url, allow_loopback=True)
         response = fetch_following_redirects(url, pin, allow_private=True, timeout=SELFCHECK_TIMEOUT)
+    except ResponseTooLarge:
+        return False, f'{url}: response too large'
     except ValueError:
         return False, f'{url}: name not resolvable or address refused'
     except requests.Timeout:

@@ -45,6 +45,12 @@ class _Resp:
         self.text = text
         self.headers = headers or {}
 
+    def iter_content(self, chunk_size=1):
+        yield self.text.encode()
+
+    def close(self):
+        pass
+
     def raise_for_status(self):
         if self.status_code >= 400:
             raise RuntimeError(f'HTTP {self.status_code}')
