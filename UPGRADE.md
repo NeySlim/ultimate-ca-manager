@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Custom Command DNS providers are written by administrators only
+
+Creating a DNS provider of type `custom_command`, or changing one (`PATCH /api/v2/dns-providers/{id}`), now requires the `write:deploy` permission, which only administrators hold. An operator, a custom role or an API key holding `write:acme` without it receives `403`; such keys must be replaced by an administrator's key that carries `write:deploy`. Existing providers keep working for domain tests, provider tests, orders and renewals, and every other provider type keeps its permissions.
+
 ### Export requests with a password in the wrong place are refused
 
 The routes that can return a private key (certificate, CA, CSR, user-certificate and mTLS exports, key recovery) now answer `400` instead of a key in clear for a request whose password they would not read: a form or plain-text body, a `GET` or `HEAD` carrying a body, a JSON body that is not an object, a `password` that is neither a string nor `null`, a name given twice in the JSON body, or a name containing `password` or `passphrase` placed anywhere but the top-level `password` string of the JSON body (including the query string, whatever the method, and a `password` nested inside another value). A script that sent `curl -d '{"password":"..."}'` without `Content-Type: application/json`, or `password=...` as a form, must send a `POST` with a JSON object body and that content type. Requests that were well formed, and unrelated extra parameters, are answered as before.
