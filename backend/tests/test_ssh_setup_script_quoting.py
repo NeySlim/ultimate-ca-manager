@@ -127,6 +127,17 @@ def test_the_host_name_is_a_single_quoted_literal(hostname):
     assert re.findall(r'^\$Hostname\s+=.*$', win, re.M) == [f"$Hostname   = '{hostname}'"]
 
 
+def test_a_hostile_host_name_still_lands_as_a_literal():
+    """The routes refuse such a name; the generators quote it all the same."""
+    ca = SimpleNamespace(descr='Production SSH CA', id=7)
+    name = "o'brien$(id)\u2019x"
+    unix = _generate_setup_script(ca, PUB, 'host', name, 'unix')
+    assert re.findall(r'^HOSTNAME=.*$', unix, re.M) == ["HOSTNAME='o'\\''brien$(id)\u2019x'"]
+    win = _generate_setup_script(ca, PUB, 'host', name, 'windows')
+    literal = re.findall(r'^\$Hostname\s+= (.*)$', win, re.M)
+    assert len(literal) == 1 and _ps_literal_value(literal[0]) == name
+
+
 # sha256 of the scripts served before the quoting change, for an ordinary description
 _BEFORE = {
     ('user', '', 'unix'): 'b13602b05eabdf13a94256055fc047a866554632f7798c3ade91682d898d6e9e',
