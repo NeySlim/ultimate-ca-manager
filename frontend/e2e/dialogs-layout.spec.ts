@@ -63,7 +63,13 @@ for (const width of [1280, 1920]) {
       await expect(dialog, path).toBeVisible()
       // the folded parts hold helps too
       const folded = dialog.locator('.advanced-toggle[aria-expanded=false]')
-      while (await folded.count()) await folded.first().click()
+      // A toggle is counted again only once its click has unfolded it
+      while (await folded.count()) {
+        const toggle = await folded.first().elementHandle()
+        if (!toggle) continue
+        await toggle.click()
+        await expect.poll(() => toggle.getAttribute('aria-expanded')).toBe('true')
+      }
       const m = await dialog.evaluate((d) => {
         const over: string[] = []
         let count = 0, widest = 0
