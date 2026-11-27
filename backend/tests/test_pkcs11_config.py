@@ -275,6 +275,29 @@ class TestAutoRegisterSofthsm:
             finally:
                 pin_file.unlink(missing_ok=True)
 
+    def test_the_kept_pin_is_removed_when_the_row_aims_at_another_token(self, app):
+        # That row never takes the UCM-Default PIN: kept, it would be handed again at every start
+        with app.app_context():
+            from models import db
+            row = self._seed_row({'token_label': 'MyToken', 'user_pin': 'admin-pin'})
+            pin_file = self._pin_file()
+            self._run({'HSM_DEFAULT_PIN': 'kept-pin', 'HSM_TOKEN_CREATED': '1'})
+            db.session.refresh(row)
+            assert row.get_config()['user_pin'] == 'admin-pin'
+            assert row.get_config()['token_label'] == 'MyToken'
+            assert not pin_file.exists()
+
+    def test_the_kept_pin_stays_for_a_row_aimed_at_the_token_neg(self, app):
+        # A FIPS or HA start hands no PIN: the row aimed at UCM-Default may take it later
+        with app.app_context():
+            self._seed_row({'token_label': 'UCM-Default', 'user_pin': 'stale-pin'})
+            pin_file = self._pin_file()
+            try:
+                self._run({})
+                assert pin_file.exists()
+            finally:
+                pin_file.unlink(missing_ok=True)
+
     @pytest.mark.parametrize('env, config', [
         ({'HSM_DEFAULT_PIN': 'env-pin'}, {'token_label': 'UCM-Default'}),
         ({'HSM_DEFAULT_PIN': 'env-pin', 'HSM_TOKEN_CREATED': '1'}, {'token_label': 'MyToken'}),
