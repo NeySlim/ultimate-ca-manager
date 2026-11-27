@@ -475,8 +475,9 @@
 :root[data-mode="dark"] .atl:not(.guide-app){color-scheme:dark}
 /* A block left empty: its title and its action apart. */
 :root .atl .empty>h3+.btn{margin-top:14px}
-/* Phone, narrow: a dialog's paired fields one under the other, so no value is cut under its chevron. */
-@media(max-width:480px){:root .atl dialog .form-fields{grid-template-columns:1fr}:root .atl dialog .form-fields>.field.full{grid-column:auto}:root .atl dialog .settings-grid{grid-template-columns:1fr}}
+/* Phone, narrow: a dialog's paired fields one under the other, so no value is cut under its chevron;
+   the column holds to the dialog (minmax(0,…)): a one-line value scrolls in its box, its copy button stays in view. */
+@media(max-width:480px){:root .atl dialog .form-fields{grid-template-columns:minmax(0,1fr)}:root .atl dialog .form-fields>.field.full{grid-column:auto}:root .atl dialog .settings-grid{grid-template-columns:1fr}}
 /* A definition row holding a pill keeps the 25 px step: centred, the pill without vertical room. */
 :root .atl .kv>.row:has(>dd .badge){align-items:center}
 :root .atl .kv>.row>dd .badge{margin-block:-2px}

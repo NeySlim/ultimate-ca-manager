@@ -109,6 +109,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SSH Hosts: the New enrollment token dialog could be closed, or submitted a second time, while its token was being created, which lost the token shown only once; it now stays open until the token is shown.
 - Certificates: exporting every result as PEM stopped at 10,000 certificates without a word; it now says that the export was cut, as the CSV and JSON exports do.
 - Settings: a refused deletion or switch of an SSO provider or a webhook showed only "Failed to delete"; it now gives the server's reason, such as a busy database to retry or a missing permission.
+- Dialogs on a phone: a value shown once (an SSH enrollment token and its command, an EAB key, a DNS UPDATE key) widened its dialog past the screen and pushed its copy button out of view; the value now scrolls in its box and the button stays on screen.
 
 ## [3.0] - 2026-11-25
 
