@@ -408,7 +408,7 @@ class OrderMixin:
             copied.append(copy)
         return copied
 
-    def _create_challenges(self, auth: AcmeAuthorization, status: str, validated: datetime = None):
+    def _create_challenges(self, auth: AcmeAuthorization, status: str):
         """Helper to create standard challenges for an authorization.
 
         RFC 8555 §7.1.3 / §8.4: wildcard identifiers (``*.example.com``)
@@ -436,7 +436,6 @@ class OrderMixin:
                 status=status,
                 token=dns_token,
                 url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-                validated=validated
             )
             auth.challenges.append(dns_challenge)
 
@@ -453,7 +452,6 @@ class OrderMixin:
                         status=status,
                         token=secrets.token_urlsafe(32),
                         url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-                        validated=validated
                     )
                     auth.challenges.append(persist_challenge)
 
@@ -470,7 +468,6 @@ class OrderMixin:
             status=status,
             token=http_token,
             url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-            validated=validated
         )
         auth.challenges.append(http_challenge)
 
@@ -482,7 +479,6 @@ class OrderMixin:
             status=status,
             token=tls_token,
             url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-            validated=validated
         )
         auth.challenges.append(tls_challenge)
     
