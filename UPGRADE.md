@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### An SSH CA description is one line of text
+
+`POST /api/v2/ssh/cas`, `PUT /api/v2/ssh/cas/{ca_id}` and `POST /api/v2/ssh/cas/import` now answer `400` for a `descr` holding a control character or a line break. A description stored before keeps working: the setup scripts print it on one line, and saving it again from the CA's panel needs those characters removed.
+
 ### Export requests with a password in the wrong place are refused
 
 The routes that can return a private key (certificate, CA, CSR, user-certificate and mTLS exports, key recovery) now answer `400` instead of a key in clear for a request whose password they would not read: a form or plain-text body, a `GET` or `HEAD` carrying a body, a JSON body that is not an object, a `password` that is neither a string nor `null`, a name given twice in the JSON body, or a name containing `password` or `passphrase` placed anywhere but the top-level `password` string of the JSON body (including the query string, whatever the method, and a `password` nested inside another value). A script that sent `curl -d '{"password":"..."}'` without `Content-Type: application/json`, or `password=...` as a form, must send a `POST` with a JSON object body and that content type. Requests that were well formed, and unrelated extra parameters, are answered as before.

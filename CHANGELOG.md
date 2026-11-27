@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- SSH CAs: a description holding `$(...)`, backquotes or a line break ran as a command on every server that installed the setup script (sh or PowerShell); the scripts now print it as a quoted literal, and a description with a control character or a line break is refused with 400.
+
 ## [2.254.7] - 2026-11-23
 
 ### Security
