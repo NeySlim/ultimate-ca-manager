@@ -141,6 +141,23 @@ describe('SSHHostsPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  it('cancels the token form without sending it, and opens it empty the next time', async () => {
+    renderPage(['read:ssh', 'write:ssh', 'read:ssh_cas'])
+    await screen.findAllByText('web01.example.com')
+    fireEvent.click(screen.getAllByText('sshHosts.token.create')[0])
+    let dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('sshHosts.token.principals'), { target: { value: 'web02' } })
+    fireEvent.change(within(dialog).getByLabelText('common.description'), { target: { value: 'left over' } })
+    fireEvent.click(within(dialog).getByText('common.cancel'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(svc.createToken).not.toHaveBeenCalled()
+    fireEvent.click(screen.getAllByText('sshHosts.token.create')[0])
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText('sshHosts.token.principals')).toHaveValue('')
+    expect(within(dialog).getByLabelText('common.description')).toHaveValue('')
+    expect(within(dialog).getByLabelText('sshHosts.token.renewPercent')).toHaveValue(30)
+  })
+
   it('lists the tokens and revokes an active one', async () => {
     svc.getTokens.mockResolvedValue({ data: [
       { id: 5, token_prefix: 'ucmh_aaa', state: 'active', principals: ['a'], expires_at: '2026-12-01T00:00:00Z' },
