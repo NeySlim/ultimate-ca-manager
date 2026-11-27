@@ -33,7 +33,7 @@ vi.mock('../../../components', () => ({
 
 vi.mock('../../../contexts', () => ({ useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }) }))
 vi.mock('../../../services', () => ({
-  certificatesService: { getAll: vi.fn() },
+  certificatesService: { getAll: vi.fn(), getById: vi.fn(() => Promise.resolve({ data: null })) },
   settingsService: { updateBulk: vi.fn() },
 }))
 vi.mock('../../../lib/fetchAllPages', () => ({ fetchAllPages: () => Promise.resolve([]) }))

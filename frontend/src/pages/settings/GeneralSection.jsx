@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Btn, Pill, Notice } from '../../components/atelier'
 import { Input, NumberInput, Select, ToggleSwitch } from '../../components/atelier/Form'
@@ -34,27 +34,37 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
   const [metricsToken, setMetricsToken] = useState('')
   const [metricsBusy, setMetricsBusy] = useState(false)
   const [tlsCertOptions, setTlsCertOptions] = useState([])
+  const [savedTlsCert, setSavedTlsCert] = useState(null)
 
   // The API drops these keys without admin:settings; the other fields still save.
   const adminLocked = !(typeof hasPermission === 'function' && hasPermission('admin:settings'))
   const lockedLabel = (key) => <AdminLockLabel text={t(key)} locked={adminLocked} mockup />
   // HTTP_PROTOCOL_PORT in the service environment sets the port: the value shown is the one bound
   const portPinned = settings.env_locked?.http_protocol_port_env === true
-  // Certificates with a private key, for the ACME public vhost TLS selector
+  // The ACME public vhost TLS selector loads its certificates when it is first used, not with the page
+  const tlsCertLoad = useRef(null)
+  const certOption = (c) => ({ value: String(c.id), label: `${certificateLabel(c) || c.refid} (#${c.id})` })
+  const loadTlsCertOptions = () => {
+    if (tlsCertLoad.current) return
+    tlsCertLoad.current = fetchAllPages((query) => certificatesService.getAll({ ...query, has_private_key: true }))
+      .then((all) => setTlsCertOptions(all.filter((c) => !c.revoked).map(certOption)))
+      .catch(() => { tlsCertLoad.current = null })
+  }
+  // The saved choice is named by one certificate read, so the closed selector shows it
+  const savedTlsCertId = settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''
   useEffect(() => {
+    if (!savedTlsCertId) return undefined
     let cancelled = false
-    fetchAllPages((query) => certificatesService.getAll({ ...query, has_private_key: true }))
-      .then((all) => {
-        if (cancelled) return
-        const certs = all.filter((c) => !c.revoked)
-        setTlsCertOptions(certs.map((c) => ({
-          value: String(c.id),
-          label: `${certificateLabel(c) || c.refid} (#${c.id})`,
-        })))
-      })
+    certificatesService.getById(savedTlsCertId)
+      .then((res) => { if (!cancelled && res?.data) setSavedTlsCert(certOption(res.data)) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedTlsCertId])
+  const tlsSelectOptions = [{ value: '', label: t('common.none') }, ...tlsCertOptions]
+  if (savedTlsCertId && !tlsCertOptions.some((o) => o.value === savedTlsCertId)) {
+    tlsSelectOptions.push(savedTlsCert?.value === savedTlsCertId ? savedTlsCert : { value: savedTlsCertId, label: `#${savedTlsCertId}` })
+  }
 
   const generateToken = () => {
     const a = new Uint8Array(24)
@@ -112,9 +122,9 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
           value={shownNumber(settings.acme_public_port ?? 443)} error={fieldErrors.acme_public_port}
           onChange={(e) => updateSetting('acme_public_port', typedNumber(e))} hint={t('settings.acmePublicPortHelper')} />
         <Select id="set-acme_public_tls_cert_id" label={lockedLabel('settings.acmePublicTlsCertId')} disabled={adminLocked}
-          value={settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''}
+          value={savedTlsCertId} onFocus={loadTlsCertOptions} onMouseDown={loadTlsCertOptions}
           onChange={(val) => updateSetting('acme_public_tls_cert_id', val || '')}
-          options={[{ value: '', label: t('common.none') }, ...tlsCertOptions]} hint={t('settings.acmePublicTlsCertIdHelper')} />
+          options={tlsSelectOptions} hint={t('settings.acmePublicTlsCertIdHelper')} />
         {canWrite('settings') && adminLocked && <Notice>{t('settings.adminFieldsLocked')}</Notice>}
       </SettingsGroup>
       <PublicEndpointsPanel settings={settings} updateSetting={updateSetting} refreshKey={savedVersion} adminLocked={adminLocked} />
