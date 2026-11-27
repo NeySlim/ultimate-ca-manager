@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [3.1] - 2026-11-27
 
 ### Added
 
@@ -43,7 +43,6 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME server: a TLS-ALPN-01 validation of a name resolving to many addresses that never answer held a worker ten seconds per address; the connections and the handshake now share one 30-second deadline.
 - Backup restore: a merge no longer lifts a revocation made here after the archive was taken on SSH certificates, which went back off the KRL, SSH hosts, cross-certificates, API keys, authentication certificates, ACME accounts, EAB credentials or DNS UPDATE keys, and it no longer makes a single-use EAB credential consumed here usable again. An archive can still revoke them.
 - Backup restore: a merge no longer puts a key recovery request recovered, rejected or cancelled here back to its archived state, so a recovered key is no longer handed out a second time. The same holds for approval requests approved, rejected, expired or cancelled here and SCEP requests approved or rejected here, which no longer become pending again, so an approval no longer issues a second certificate.
-- Backup restore: a merge that kept an EAB credential revoked here, or a key recovery request decided here, emptied who revoked or decided it; that account is now kept with the state.
 - Backup restore: an EAB credential from an older archive of another installation (one without reference identities) no longer names whichever account holds the source's user number here as its creator or revoker.
 - Backup restore: a merge no longer puts back the archived key of an ACME account whose key was changed here (RFC 8555 §7.3.5): the account keeps its current key.
 - Settings, SMTP OAuth: the console accepted an authorization result posted by any window, the provider's page included; it now takes it only from its own popup on the console's origin.
@@ -76,13 +75,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- SSH hosts: the revoked-host task could finish, as `system`, a revocation an administrator's request was still carrying out, and it filed the certificates of a key enrolled again under the earlier host; it now leaves a revocation to its request for five minutes, and a certificate goes with the host its key was enrolled as when it was signed.
 - Packages: on a host whose name is longer than 64 characters, generating the HTTPS certificate failed without a message (the DEB install stopped, the RPM install went on without it); the common name is now the first label, cut at 64, the whole name stays in the subject alternative name, and a failure prints the OpenSSL error.
-- Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it, and removed once the token is gone or `SoftHSM-Default` opens another token; FIPS mode (unless `UCM_FIPS_ALLOW_SOFTHSM=1`) no longer creates the token, and neither it nor HA mode hands the kept PIN of an existing token to the application.
+- Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it, and removed once the token is gone or `SoftHSM-Default` opens another token; FIPS mode (unless `UCM_FIPS_ALLOW_SOFTHSM=1`) no longer creates the token.
 - Helm chart: an HA render without cluster access (`helm template`, GitOps) drew a new `UCM_SECRET_KEY` at each render without restarting the pods, so pods started from two renders had different session keys; it now refuses to render until `secrets.secretKey` is set.
 - ACME server: a key-change refused because the new key belongs to another account now names that account in a `Location` header (RFC 8555 §7.3.5).
 - ACME server: the CAA search stopped below the top-level label, so a record at the apex of a single-label zone (`internal`, `corp`) was ignored; every ancestor short of the root is now searched (RFC 8659 §3).
-- Docker: without encryption, a rotation of the session key answered 500 and the Session key card still offered it; the API now answers 409 naming where the key lives (`UCM_SECRET_KEY` or `/etc/ucm/secret.key`), and the card disables the button and says so.
+- Docker: without encryption, a rotation of the session key answered success without applying the new key (500 only on a read-only root) and the Session key card still offered it; the API now answers 409 naming where the key lives (`UCM_SECRET_KEY` or `/etc/ucm/secret.key`), and the card disables the button and says so.
 - Docker: without `UCM_SECRET_KEY` the image generated a new session key at each start, so a restart signed every session out and broke what was signed with the key; the key generated at the first start is now kept in `/etc/ucm/secret.key` and used again (#457).
 - Dialogs: a message raised while a dialog was open was drawn under its blurred backdrop, unreadable and its buttons out of reach; the error or warning that answers a form dialog now shows in the dialog above its buttons, and any other message is drawn above the dialog; on a phone a message takes the screen's width instead of half of it (#456).
 - Web interface: after a restart of the service that changed `SECRET_KEY` (before 3.1, a container without `UCM_SECRET_KEY` generated one at each start), a page left open stayed signed in but every save failed with `403 CSRF validation failed`; a token now stays valid for the session that received it, and a refused token is renewed and the request sent once more, with a "reload the page" message if that fails too (#457).
