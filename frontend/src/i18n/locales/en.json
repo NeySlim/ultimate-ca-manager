@@ -5766,6 +5766,7 @@
     "exportJSON": "Export as JSON",
     "exporting": "Exporting...",
     "exportTruncated": "Exported {{count}} of {{total}} rows: the file is truncated",
+    "exportTruncatedSkipped": "Exported {{count}} of {{total}} rows: the file is truncated. Unreadable certificates left out: {{skipped}}",
     "exportFailed": "Export failed",
     "activeFilters": "Active filters",
     "density": "Density",

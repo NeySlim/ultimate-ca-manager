@@ -5766,6 +5766,7 @@
     "exportJSON": "Exportar como JSON",
     "exporting": "A exportar...",
     "exportTruncated": "Exportadas {{count}} de {{total}} linhas: o arquivo está truncado",
+    "exportTruncatedSkipped": "Exportadas {{count}} de {{total}} linhas: o arquivo está truncado. Certificados ilegíveis omitidos: {{skipped}}",
     "exportFailed": "Falha na exportação",
     "activeFilters": "Filtros ativos",
     "density": "Densidade",

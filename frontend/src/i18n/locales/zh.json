@@ -5766,6 +5766,7 @@
     "exportJSON": "导出为JSON",
     "exporting": "正在导出...",
     "exportTruncated": "已导出 {{total}} 行中的 {{count}} 行：文件已被截断",
+    "exportTruncatedSkipped": "已导出 {{total}} 行中的 {{count}} 行：文件已截断。因无法读取而跳过的证书：{{skipped}}",
     "exportFailed": "导出失败",
     "activeFilters": "活动筛选器",
     "density": "密度",

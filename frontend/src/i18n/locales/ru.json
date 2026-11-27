@@ -6018,6 +6018,7 @@
     "exportJSON": "Экспорт в JSON",
     "exporting": "Экспорт…",
     "exportTruncated": "Экспортировано строк: {{count}} из {{total}}, остальные не вошли в файл",
+    "exportTruncatedSkipped": "Экспортировано строк: {{count}} из {{total}}, файл обрезан. Пропущено нечитаемых сертификатов: {{skipped}}",
     "exportFailed": "Не удалось выполнить экспорт",
     "activeFilters": "Активные фильтры",
     "density": "Плотность",

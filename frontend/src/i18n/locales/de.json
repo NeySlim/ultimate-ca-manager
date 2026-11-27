@@ -5766,6 +5766,7 @@
     "exportJSON": "Als JSON exportieren",
     "exporting": "Exportieren...",
     "exportTruncated": "{{count}} von {{total}} Zeilen exportiert: Die Datei ist abgeschnitten",
+    "exportTruncatedSkipped": "{{count}} von {{total}} Zeilen exportiert: Die Datei ist abgeschnitten. Ausgelassene nicht lesbare Zertifikate: {{skipped}}",
     "exportFailed": "Export fehlgeschlagen",
     "activeFilters": "Aktive Filter",
     "density": "Dichte",

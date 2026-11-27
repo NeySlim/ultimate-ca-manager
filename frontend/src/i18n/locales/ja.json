@@ -5766,6 +5766,7 @@
     "exportJSON": "JSONでエクスポート",
     "exporting": "エクスポート中...",
     "exportTruncated": "{{total}} 行中 {{count}} 行をエクスポートしました。ファイルは途中で切り詰められています",
+    "exportTruncatedSkipped": "{{total}} 行中 {{count}} 行をエクスポートしました。ファイルは途中で切り捨てられています。読み取れずに除外された証明書: {{skipped}}",
     "exportFailed": "エクスポートに失敗しました",
     "activeFilters": "アクティブフィルター",
     "density": "密度",

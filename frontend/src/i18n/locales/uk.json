@@ -6018,6 +6018,7 @@
     "exportJSON": "Експортувати як JSON",
     "exporting": "Експорт...",
     "exportTruncated": "Експортовано {{count}} із {{total}} рядків: файл обрізано",
+    "exportTruncatedSkipped": "Експортовано рядків: {{count}} з {{total}}, файл обрізано. Пропущено нечитабельних сертифікатів: {{skipped}}",
     "exportFailed": "Не вдалося експортувати",
     "activeFilters": "Активні фільтри",
     "density": "Щільність",

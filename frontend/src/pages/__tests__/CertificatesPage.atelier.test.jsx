@@ -481,6 +481,25 @@ describe('CertificatesPage: the selection (batchbar, largeBatch)', () => {
     await waitFor(() => expect(stable.notify.showWarning).toHaveBeenCalledWith('table.exportTruncated:10000'))
   })
 
+  it('says a cut PEM export and its unreadable certificates in one warning, the cap first', async () => {
+    const blob = new Blob(['x'])
+    blob.exportedCount = 9997
+    blob.skippedCount = 3
+    svc.bulkExport.mockResolvedValue(blob)
+    global.URL.createObjectURL = vi.fn(() => 'blob:x')
+    global.URL.revokeObjectURL = vi.fn()
+    stable.notify.showWarning.mockClear()
+    await mount('/certificates', ROWS, 12000)
+    fireEvent.click(zone().querySelector('#select-all'))
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.selectAllResults:12000' }))
+    fireEvent.click(zone().querySelector('#bulk-export'))
+    const dialog = await screen.findByTestId('bulk-export-dialog')
+    fireEvent.click(within(dialog).getByRole('radio', { name: /PEM/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /bulkExport\.confirm/ }))
+    await waitFor(() => expect(stable.notify.showWarning).toHaveBeenCalled())
+    expect(stable.notify.showWarning.mock.calls).toEqual([['table.exportTruncatedSkipped:9997']])
+  })
+
   it('says why a batch export failed', async () => {
     svc.bulkExport.mockRejectedValue(Object.assign(new Error('nope'), { status: 400 }))
     await mount()
