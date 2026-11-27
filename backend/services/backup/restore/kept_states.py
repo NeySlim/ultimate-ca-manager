@@ -36,10 +36,12 @@ KEPT_STATES = {
     'key_recovery_requests': (lambda row: row.status in ('recovered', 'rejected', 'cancelled'),
                               ('status', 'decided_by', 'decided_by_id', 'decided_at', 'decision_note',
                                'recovered_by', 'recovered_at'), {}),
-    # A request decided or closed here never goes back to pending: approved again, it would issue twice
+    # A request decided or closed here never goes back to pending: approved again, it would issue twice.
+    # request_data holds its protocol's delivered_at: lost, EST and SCEP would deliver it again
     'approval_requests': (lambda row: row.status in ('approved', 'rejected', 'expired', 'cancelled'),
-                          ('status', 'resolved_at', 'approvals', 'certificate_id'), {}),
-    'scep_requests': (lambda row: row.status in ('approved', 'rejected'),
+                          ('status', 'resolved_at', 'approvals', 'certificate_id', 'request_data'), {}),
+    # Its delivery is recorded on its approval request (request_data), kept above
+    'scep_requests':(lambda row: row.status in ('approved', 'rejected'),
                       ('status', 'rejection_reason', 'approved_by', 'approved_at', 'cert_refid'), {}),
 }
 

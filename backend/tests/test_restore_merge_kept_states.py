@@ -475,6 +475,28 @@ def test_a_request_approved_here_is_not_queued_again(installation):
         (row_id, 'approved', before['certificate_id'])]
 
 
+def test_an_approval_delivered_here_is_not_delivered_again(installation):
+    """EST serverkeygen: an approval delivered here and claimed again would issue a second key."""
+    import json
+    from models.policy import ApprovalRequest
+    from services import protocol_approval
+    row_id = _make_approval_request()
+    row = db.session.get(ApprovalRequest, row_id)
+    row.request_type = 'est_enrollment'
+    row.request_data = json.dumps({'protocol': 'est', 'protocol_ref': f'est-{_tag()}'})
+    db.session.commit()
+    master, payload = _archive(('approval_requests',))
+    _revoke_here(ApprovalRequest, row_id, ('row', _approve_here))
+    protocol_approval.mark_delivered(db.session.get(ApprovalRequest, row_id))
+
+    _merge(master, payload)
+
+    db.session.expire_all()
+    row = db.session.get(ApprovalRequest, row_id)
+    assert protocol_approval.request_data(row).get('delivered_at'), row.request_data
+    assert protocol_approval.claim_delivery(row) is False
+
+
 def test_a_merge_keeps_an_account_key_changed_here(installation):
     """RFC 8555 §7.3.5: the account here is the truth on its key, an old archived one never comes back."""
     from models.acme_models import AcmeAccount
