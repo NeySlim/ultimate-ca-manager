@@ -46,7 +46,7 @@ def test_pg_gated_tests_run_in_the_pg_application_step():
     assert not missing, missing
 
 
-@pytest.mark.parametrize('n', [1, 2, 3, 4])
+@pytest.mark.parametrize('n', [1, 2, 3, 4, 7])
 def test_the_shards_together_are_every_test_file_once(n):
     every = sorted(f'tests/{f.relative_to(ROOT / "backend" / "tests")}'
                    for f in (ROOT / 'backend' / 'tests').rglob('test_*.py'))
@@ -101,13 +101,74 @@ def test_the_durations_file_weighs_each_file_once():
     assert len(paths) == len(set(paths)) and all(p.startswith('tests/') for p in paths)
 
 
-def test_the_six_sqlite_shards_are_within_ten_percent_of_each_other():
+FAULTS = 'test-backend-faults'
+# A part of test-backend: about twelve minutes on four workers
+PART_TARGET = 12 * 60
+
+
+def _every_test_file():
+    return sorted(f'tests/{f.relative_to(ROOT / "backend" / "tests")}'
+                  for f in (ROOT / 'backend' / 'tests').rglob('test_*.py'))
+
+
+def _job_shards(name):
+    """The file list of each part of job `name`, as its own `files=$(...)` line deals it."""
+    job = load('tests.yml')['jobs'][name]
+    run = next(s['run'] for s in job['steps'] if 'shard-tests.sh' in s.get('run', ''))
+    line = next(line.strip() for line in run.splitlines() if line.strip().startswith('files=$('))
+    out = []
+    for k in job['strategy']['matrix']['shard']:
+        script = line.replace('${{ matrix.shard }}', str(k)) + '\nprintf "%s\\n" "$files"\n'
+        done = subprocess.run(['bash', '-e', '-c', script], cwd=ROOT / 'backend',
+                              capture_output=True, text=True, check=True)
+        out.append(done.stdout.split())
+    return out
+
+
+def test_the_fault_scenarios_are_their_own_jobs_and_nothing_else():
+    """Every test_package_leftover_retry_*.py, a fifteenth one included, once in the fault
+    jobs and never in test-backend; the two jobs together are the whole suite, once each."""
+    scenarios = sorted(f'tests/{f.name}' for f in (ROOT / 'backend' / 'tests').glob('test_package_leftover_retry_*.py'))
+    assert len(scenarios) >= 14
+    faults = [f for part in _job_shards(FAULTS) for f in part]
+    backend = [f for part in _job_shards('test-backend') for f in part]
+    assert sorted(faults) == scenarios
+    assert not set(backend) & set(scenarios)
+    assert sorted(faults + backend) == _every_test_file()
+
+
+def test_the_fault_jobs_run_when_the_backend_shards_run():
+    jobs = load('tests.yml')['jobs']
+    assert jobs[FAULTS]['if'] == jobs['test-backend']['if']
+    assert jobs[FAULTS]['strategy'].get('fail-fast') is False
+
+
+def test_the_fault_jobs_deal_test_by_test():
+    """A file of these is twenty minutes on one worker: --dist load spreads its tests."""
+    job = load('tests.yml')['jobs'][FAULTS]
+    run = next(s['run'] for s in job['steps'] if 'pytest' in s.get('run', ''))
+    words = next(line.split() for line in run.splitlines() if line.strip().startswith('pytest '))
+    assert words[words.index('--dist') + 1] == 'load' and words[words.index('-n') + 1] == '4', words
+
+
+def test_the_sqlite_shards_are_within_ten_percent_of_each_other():
     weights = _weights(DURATIONS)
     median = statistics.median(weights.values())
-    n = len(load('tests.yml')['jobs']['test-backend']['strategy']['matrix']['shard'])
-    assert n == 6
-    totals = [sum(weights.get(f, median) for f in _shard(k, n)) for k in range(1, n + 1)]
+    totals = [sum(weights.get(f, median) for f in part) for part in _job_shards('test-backend')]
+    assert len(totals) >= 2
     assert max(totals) <= min(totals) * 1.1, totals
+
+
+def test_no_backend_file_outlasts_a_part():
+    """In loadfile a file stays on one worker: the longest one bounds its part, so none may pass
+    the target of a part, nor the share of a part on its four workers."""
+    weights = _weights(DURATIONS)
+    median = statistics.median(weights.values())
+    parts = _job_shards('test-backend')
+    files = [f for part in parts for f in part]
+    longest = max(weights.get(f, median) for f in files)
+    share = sum(weights.get(f, median) for f in files) / (len(parts) * 4)
+    assert longest <= PART_TARGET and longest <= share, (longest, share)
 
 
 def test_a_shard_lists_its_longest_files_first(tmp_path):
@@ -162,7 +223,7 @@ def _sharded_jobs():
 
 def test_the_workflow_runs_every_shard_it_cuts():
     jobs = _sharded_jobs()
-    assert {'test-backend', 'test-backend-postgres-app'} <= set(jobs), sorted(jobs)
+    assert {'test-backend', 'test-backend-postgres-app', FAULTS} <= set(jobs), sorted(jobs)
     for name, (job, runs) in jobs.items():
         matrix = job['strategy']['matrix']
         assert set(matrix) == {'shard'}, (name, matrix)  # no include or exclude
@@ -171,7 +232,7 @@ def test_the_workflow_runs_every_shard_it_cuts():
         assert len(runs) == 1 and f'shard-tests.sh ${{{{ matrix.shard }}}} {n}' in runs[0], (name, runs)
 
 
-@pytest.mark.parametrize('job', ['test-backend', 'test-backend-postgres-app'])
+@pytest.mark.parametrize('job', ['test-backend', 'test-backend-postgres-app', FAULTS])
 @pytest.mark.parametrize('shard_out, shard_rc, runs_pytest', [
     ('tests/test_a.py\ntests/test_b.py\n', 0, True),
     ('', 1, False),   # the script failed

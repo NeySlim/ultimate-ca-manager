@@ -174,8 +174,9 @@ def _collected(arguments):
     return [line for line in out.stdout.splitlines() if '::' in line]
 
 
-def test_the_shards_still_run_the_slow_tests():
+@pytest.mark.parametrize('job', ['test-backend', 'test-backend-faults'])
+def test_the_shards_still_run_the_slow_tests(job):
     """No -m on their command, and none from the configuration either: collected as they run."""
-    shard = _pytest_commands(load('tests.yml')['jobs']['test-backend'])
+    shard = _pytest_commands(load('tests.yml')['jobs'][job])
     assert shard and all(_marker(c) is None for c in shard), shard
     assert any(line.startswith(SLOW_FILE) for line in _collected([SLOW_FILE]))

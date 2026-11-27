@@ -5,8 +5,8 @@ name: Test Channel — RC Build Sanity
 # This catches packaging regressions BEFORE we tag a -rcN release.
 #
 # To actually publish an RC: rehearse it first (build-release.yml dispatched with
-# dry_run), run `scripts/bump-version.sh X.Y-rcN` on `test`, commit, then
-# `git tag vX.Y-rcN && git push origin vX.Y-rcN`. That triggers build-release.yml
+# dry_run), run `scripts/bump-version.sh X.Y-rcN` on `dev`, commit, then advance `test`
+# to it and `git tag vX.Y-rcN && git push origin vX.Y-rcN`. That triggers build-release.yml
 # which publishes to GitHub Releases as a pre-release.
 
 on:
