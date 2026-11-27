@@ -707,6 +707,12 @@ def rotate_secrets():
                               "key still signs: run the disable again, then rotate", 409)
     if ha_enabled():
         return ha_refusal(LOCAL_ONLY)
+    from config.settings import is_docker
+    if is_docker():
+        # The image's code is root's: the key comes from UCM_SECRET_KEY or /etc/ucm/secret.key
+        return error_response("In Docker the session key is UCM_SECRET_KEY (or /etc/ucm/secret.key): "
+                              "change it there and recreate the container, or enable encryption "
+                              "to rotate it here", 409)
     return _rotate_secret_in_env_file()
 
 

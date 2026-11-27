@@ -583,7 +583,7 @@ jobs:
         run: |
           helm lint charts/ucm
           helm template t charts/ucm > /dev/null
-          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm --set secrets.keyEncryptionKey=K --set secrets.dbEncryptionKey=D"
+          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm --set secrets.keyEncryptionKey=K --set secrets.dbEncryptionKey=D --set secrets.secretKey=S"
           helm lint charts/ucm $HA
           helm template t charts/ucm $HA > /dev/null
 

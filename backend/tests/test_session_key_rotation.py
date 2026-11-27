@@ -555,3 +555,16 @@ def test_a_rotation_in_the_database_signs_nobody_out(app, auth_client, stored, e
     assert r.status_code == 200, r.data
     assert r.get_json()['data']['previous_accepted_until']
     assert before.get('/api/v2/account/profile').status_code == 200
+
+
+def test_docker_without_encryption_refuses_a_file_rotation_it_cannot_apply(app, auth_client, monkeypatch):
+    """The image's /opt/ucm/.env is not the account's: a 409 that says where the key lives, not a 500."""
+    monkeypatch.setenv('UCM_DOCKER', '1')
+    file_path = []
+    monkeypatch.setattr('api.v2.system.security._rotate_secret_in_env_file',
+                        lambda: file_path.append(1) or ('', 200))
+    key = app.config['SECRET_KEY']
+    r = auth_client.post(ROTATE, json={})
+    assert r.status_code == 409, r.data
+    assert 'UCM_SECRET_KEY' in r.get_json()['message']
+    assert not file_path and app.config['SECRET_KEY'] == key
