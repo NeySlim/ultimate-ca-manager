@@ -28,13 +28,16 @@ def _cluster_wide():
 
 @contextmanager
 def _advisory_lock(record_name):
-    """A session advisory lock on a connection of its own, polled up to the wait."""
+    """A session advisory lock on a connection outside the pool, polled up to the wait.
+    The session ends with the lock, and the server drops it within a minute if this node vanishes."""
     from sqlalchemy import text
-    from models import db
+    from services.scheduler_leader import _SERVER_TIMEOUTS_SQL, _dedicated_engine, application_url
     key = advisory_key(record_name)
-    conn = db.engine.connect().execution_options(isolation_level='AUTOCOMMIT')
+    engine = _dedicated_engine(application_url())
+    conn = engine.connect().execution_options(isolation_level='AUTOCOMMIT')
     held = False
     try:
+        conn.execute(_SERVER_TIMEOUTS_SQL)
         deadline = time.monotonic() + LOCK_WAIT_SECONDS
         while not held:
             held = bool(conn.execute(text('SELECT pg_try_advisory_lock(:k)'), {'k': key}).scalar())
@@ -50,8 +53,9 @@ def _advisory_lock(record_name):
             try:
                 conn.execute(text('SELECT pg_advisory_unlock(:k)'), {'k': key})
             except Exception:
-                pass  # closing the session frees it
+                pass  # closing this session, outside any pool, frees it
         conn.close()
+        engine.dispose()
 
 
 @contextmanager

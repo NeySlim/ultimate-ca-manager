@@ -133,3 +133,47 @@ def test_in_ha_on_sqlite_the_lock_is_the_host_lock(app, ha, monkeypatch):
         with txt_record_lock(NAME):
             pass
     assert len(calls) == 1
+
+
+def _holder(other_node, key):
+    hi, lo = (key >> 32) & 0xFFFFFFFF, key & 0xFFFFFFFF
+    return other_node.execute(text(
+        "SELECT pid FROM pg_locks WHERE locktype = 'advisory' AND granted AND objsubid = 1"
+        " AND classid::bigint = :hi AND objid::bigint = :lo"), {'hi': hi, 'lo': lo}).scalar()
+
+
+@pytest.mark.postgres
+def test_the_lock_session_ends_with_the_lock(app, ha, other_node):
+    """Held on a session of its own, closed on the way out: no pooled session keeps the lock."""
+    key = dns_txt_lock.advisory_key(NAME)
+    with app.app_context(), txt_record_lock(NAME):
+        pid = _holder(other_node, key)
+        assert pid is not None
+    alive = True
+    for _ in range(50):
+        alive = other_node.execute(text('SELECT count(*) FROM pg_stat_activity WHERE pid = :p'),
+                                   {'p': pid}).scalar() > 0
+        if not alive:
+            break
+        time.sleep(0.1)
+    assert not alive, 'the session that held the lock outlived it'
+
+
+@pytest.mark.postgres
+def test_the_lock_session_has_the_server_keepalives(app, ha, on_postgresql):
+    """A vanished node's lock is dropped by the server within a minute, not the kernel's two hours."""
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+    ran = []
+
+    def seen(conn, _cursor, statement, *_args):
+        ran.append((id(conn.connection.dbapi_connection), statement))
+    event.listen(Engine, 'before_cursor_execute', seen)
+    try:
+        with app.app_context(), txt_record_lock(NAME):
+            pass
+    finally:
+        event.remove(Engine, 'before_cursor_execute', seen)
+    locking = {conn for conn, statement in ran if 'pg_try_advisory_lock' in statement}
+    assert len(locking) == 1
+    assert any(conn in locking and 'tcp_user_timeout' in statement for conn, statement in ran)
