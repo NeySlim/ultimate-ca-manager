@@ -34,6 +34,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Docker: the code, the venv and the start scripts of the image belong to root, as in the DEB and RPM packages, so code running as the `ucm` account can no longer change what the container runs at its next start; that account keeps only `/opt/ucm/data`, `/var/log/ucm` and `/etc/ucm`.
 - Settings, SMTP OAuth: the console accepted an authorization result posted by any window, the provider's page included; it now takes it only from its own popup on the console's origin.
 - Operations, OPNsense import: the API key and secret were kept in clear in the browser's session storage after a connection test and survived a sign-out; only the host, port and TLS check stay there now, the credentials are held in memory until sign-out.
 - Email settings: `write:settings` (the operator role) could point the SMTP server, and with it every password-reset link, at a host of its choosing; the SMTP target (host, port, security, authentication, account, sender, OAuth2 client, endpoints and consent) now changes only with `admin:settings`, like `base_url`, and so do the email templates, which wrap those links.

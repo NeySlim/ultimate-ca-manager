@@ -78,7 +78,7 @@ def test_the_entrypoint_takes_the_kept_key_after_the_ha_check():
     text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
     assert 'generate_secret)}' not in text
     assert text.index('check_ha_secret || exit 1') < text.index('ucm_secret_key /etc/ucm || exit 1')
-    assert 'COPY --chown=ucm:ucm docker/secret-key.sh /secret-key.sh' in (ROOT / 'Dockerfile').read_text()
+    assert 'COPY docker/secret-key.sh /secret-key.sh' in (ROOT / 'Dockerfile').read_text()
 
 
 def test_no_random_source_stops_the_start_with_a_message_that_says_what_to_do(tmp_path):
