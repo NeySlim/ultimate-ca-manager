@@ -14,6 +14,7 @@ Security:
 import logging
 from flask import Blueprint, request, Response
 
+from api.v2.ssh.script_quoting import one_line
 from api.v2.ssh.validation import validate_setup_hostname
 from models.ssh import SSHCertificateAuthority
 from services.ssh_ca_service import SSHCAService
@@ -67,7 +68,8 @@ def get_public_setup_script(refid):
         from api.v2.ssh.setup_scripts import _generate_setup_script
         script = _generate_setup_script(ca, pub_key, ca_type, hostname, platform)
 
-        safe_name = ca.descr.replace(' ', '_').replace('"', '').replace("'", '')
+        # A stored description may hold a line break, which no header may carry
+        safe_name = one_line(ca.descr).replace(' ', '_').replace('"', '').replace("'", '')
 
         if platform == 'windows':
             mimetype = 'text/x-powershell'
@@ -108,7 +110,7 @@ def get_public_key(refid):
             pub_key + '\n',
             mimetype='text/plain',
             headers={
-                'Content-Disposition': f'inline; filename="{ca.descr.replace(" ", "_")}_ca.pub"',
+                'Content-Disposition': f'inline; filename="{one_line(ca.descr).replace(" ", "_")}_ca.pub"',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
             }
         )
