@@ -118,6 +118,29 @@ describe('SSHHostsPage', () => {
     expect(screen.queryByText('ucmh_secretvalue')).toBeNull()
   })
 
+  it('keeps the token dialog open while the token is created, so its single showing is not lost', async () => {
+    let answer
+    svc.createToken.mockImplementation(() => new Promise((resolve) => { answer = resolve }))
+    renderPage(['read:ssh', 'write:ssh', 'read:ssh_cas'])
+    await screen.findAllByText('web01.example.com')
+    fireEvent.click(screen.getAllByText('sshHosts.token.create')[0])
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('sshHosts.token.principals'), { target: { value: 'web02' } })
+    const form = dialog.querySelector('form')
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    await waitFor(() => expect(svc.createToken).toHaveBeenCalledTimes(1))
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    fireEvent.click(within(dialog).getByLabelText('common.closeWindow'))
+    fireEvent.click(within(dialog).getByText('common.cancel'))
+    expect(screen.getByRole('dialog')).toBe(dialog)
+    answer({ data: { id: 2, token: 'ucmh_kept', token_prefix: 'ucmh_kep', expires_at: '2026-12-01T00:00:00Z' } })
+    expect(await within(dialog).findByTestId('ssh-token-secret')).toHaveTextContent('ucmh_kept')
+    expect(svc.createToken).toHaveBeenCalledTimes(1)
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
   it('lists the tokens and revokes an active one', async () => {
     svc.getTokens.mockResolvedValue({ data: [
       { id: 5, token_prefix: 'ucmh_aaa', state: 'active', principals: ['a'], expires_at: '2026-12-01T00:00:00Z' },
