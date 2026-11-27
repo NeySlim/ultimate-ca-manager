@@ -89,11 +89,12 @@ def check_caa(
     is_wildcard = domain.startswith('*.')
     check_domain = domain[2:] if is_wildcard else domain
 
-    # Walk up the domain tree until the first CAA RRset is found.
+    # Walk up the domain tree until the first CAA RRset is found: every
+    # ancestor up to the top label is searched, only the root is not (RFC 8659 §3).
     parts = check_domain.split('.')
     for i in range(len(parts)):
         lookup_domain = '.'.join(parts[i:])
-        if not lookup_domain or '.' not in lookup_domain:
+        if not lookup_domain:
             break
 
         try:

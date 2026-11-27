@@ -249,18 +249,24 @@ class TestTreeClimb:
         assert ok is False
         assert 'example.com' in reason
 
-    def test_tld_is_not_queried(self):
+    def test_every_ancestor_short_of_the_root_is_queried(self):
+        # RFC 8659 §3: the search climbs to the top label, never to the root.
         seen = []
 
         def _resolve(name, rdtype):
-            seen.append(str(name).rstrip('.'))
+            seen.append(str(name))
             raise dns.resolver.NXDOMAIN()
 
         with patch('dns.resolver.resolve', side_effect=_resolve):
             check_caa('www.example.com', ['ucm.example.com'])
-        assert 'com' not in seen
-        assert 'example.com' in seen
-        assert 'www.example.com' in seen
+        assert seen == ['www.example.com', 'example.com', 'com']
+
+    def test_single_label_zone_apex_record_applies(self):
+        rec = _FakeCAA('issue', ';')
+        with _patch({'internal': [rec]}):
+            ok, reason = check_caa('app.internal', ['ucm.example.com'])
+        assert ok is False
+        assert 'denies all issuance' in reason
 
 
 class TestWildcard:

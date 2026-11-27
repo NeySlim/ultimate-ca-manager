@@ -66,6 +66,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME server: the CAA search stopped below the top-level label, so a record at the apex of a single-label zone (`internal`, `corp`) was ignored; every ancestor short of the root is now searched (RFC 8659 §3).
 - Docker: without `UCM_SECRET_KEY` the image generated a new session key at each start, so a restart signed every session out and broke what was signed with the key; the key generated at the first start is now kept in `/etc/ucm/secret.key` and used again (#457).
 - Dialogs: a message raised while a dialog was open was drawn under its blurred backdrop, unreadable and its buttons out of reach; the error or warning that answers a form dialog now shows in the dialog above its buttons, and any other message is drawn above the dialog; on a phone a message takes the screen's width instead of half of it (#456).
 - Web interface: after a restart of the service that changed `SECRET_KEY` (before 3.1, a container without `UCM_SECRET_KEY` generated one at each start), a page left open stayed signed in but every save failed with `403 CSRF validation failed`; a token now stays valid for the session that received it, and a refused token is renewed and the request sent once more, with a "reload the page" message if that fails too (#457).
