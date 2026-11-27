@@ -120,11 +120,17 @@ def test_ha_existing_claim_keeps_the_data_pvc_pos():
      'databaseUrl'),
     # helm lint reports a fail as INFO and exits 0: each refusal is proven by a render
     (['--set', 'ha.enabled=true', '--set', 'replicaCount=2', '--set', 'secrets.keyEncryptionKey=K'] + PG,
-     'set secrets.dbEncryptionKey too'),
+     'set secrets.dbEncryptionKey and secrets.secretKey too'),
 ])
 def test_ha_render_is_refused_neg(args, message):
     r = _helm(*args, check=False)
     assert r.returncode != 0 and message in r.stderr
+
+
+def test_ha_render_without_a_cluster_refuses_a_drawn_secret_key_neg():
+    # Drawn at each render, it would differ between pods started from two renders
+    r = _helm(*HA, '--set', 'secrets.secretKey=', check=False)
+    assert r.returncode != 0 and 'set secrets.secretKey' in r.stderr
 
 
 def test_without_ha_nothing_ha_is_rendered_neg():

@@ -53,7 +53,7 @@ initialAdminPassword: ""
 ## App secrets. If left empty the chart generates random values on first install
 ## and PERSISTS them across upgrades (via lookup) so sessions survive restarts.
 secrets:
-  secretKey: ""   # UCM_SECRET_KEY (Flask)
+  secretKey: ""   # UCM_SECRET_KEY (Flask). With ha.enabled, helm template or GitOps (no cluster lookup) refuse to render until it is set, as keyEncryptionKey.
   keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled: there, helm template or GitOps (no cluster lookup) refuse to render until it is set.
   dbEncryptionKey: ""   # UCM_DB_ENCRYPTION_KEY (Fernet key) for the integration secrets (DNS, LDAP, SMTP, webhooks, SSO...), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled, where every pod must share it; helm template or GitOps refuse to render until it is set, as keyEncryptionKey. Moving an instance to HA: see docs/HA.md.
 
